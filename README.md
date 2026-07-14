@@ -38,6 +38,24 @@ Prebuilt packages are available on
 | Windows  | Installer (NSIS) / portable       |
 | macOS    | dmg / zip (Apple silicon)         |
 
+### Arch Linux (AUR)
+
+[meguri-bin](https://aur.archlinux.org/packages/meguri-bin) is available on
+the AUR. Install it with your favorite AUR helper:
+
+```bash
+yay -S meguri-bin
+# or: paru -S meguri-bin
+```
+
+Or build it manually:
+
+```bash
+git clone https://aur.archlinux.org/meguri-bin.git
+cd meguri-bin
+makepkg -si
+```
+
 Or run from source — see [Setup and Launch](#setup-and-launch).
 
 ## Features
