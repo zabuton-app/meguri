@@ -1,0 +1,54 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Pin the image: the core suite runs Electron as Node, and the Electron binary
+    # dynamically links GUI libs (libnss3 / gtk / gbm / asound …) that the GitHub
+    # ubuntu runner already provides via its preinstalled browsers.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # postinstall (electron-builder install-app-deps) rebuilds better-sqlite3 for Electron,
+      # which is exactly the ABI the core tests load via ELECTRON_RUN_AS_NODE.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      # Runs test:core (Electron-as-Node, better-sqlite3 against in-memory SQLite) then
+      # test:renderer (plain Node + jsdom).
+      - name: Run unit tests
+        run: npm test
+
+      # E2E: launch the built Electron app under xvfb (headless display).
+      # Ubuntu 24.04 restricts unprivileged user namespaces; Electron needs this sysctl.
+      - name: Install Playwright browser deps
+        run: npx playwright install --with-deps
+
+      - name: Build for E2E
+        run: npm run build
+
+      - name: Run E2E tests
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- npx playwright test

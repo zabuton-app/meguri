@@ -1,0 +1,891 @@
+// Electron main process. Workspaces management, media server, IPC, and auto scan.
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  globalShortcut,
+  Menu,
+  nativeImage,
+  session,
+  shell,
+  Tray,
+} from "electron";
+import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import fs from "node:fs";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+import path from "node:path";
+import { startServer } from "./core/server.js";
+import { runScan } from "./core/jobs.js";
+import * as q from "./core/queries.js";
+import * as cw from "./core/crossWorkspace.js";
+import * as tags from "./core/tags.js";
+import { generateThumb } from "./core/media.js";
+import { Workspaces, ALL_ID, COLLECTION_ID_PREFIX } from "./core/workspaces.js";
+import { isInsideRoot } from "./core/paths.js";
+import {
+  checkForUpdates,
+  getUpdateSettings,
+  ignoreVersion,
+  isAutoCheckEnabled,
+  setAutoCheck,
+  releasesPage,
+} from "./core/updater.js";
+import { handle } from "./core/ipcHandler.js";
+import log, { setupLogger } from "./core/logger.js";
+import type { Core } from "./core/index.js";
+
+// Set up logging before anything else so early failures land in the log file.
+setupLogger();
+
+// In CJS output, __dirname exists globally (out/main/).
+
+// Tray icon. Embedded as base64 to avoid bundle path resolution.
+const TRAY_ICON_BASE64 =
+  "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";
+
+const ws = new Workspaces();
+let mediaPort = 0;
+const mediaToken = randomBytes(32).toString("base64url");
+const MEDIA_TOKEN_HEADER = "X-Api-Token";
+let scanSeq = 1;
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+// When true, a close request actually quits instead of hiding to the tray.
+let isQuitting = false;
+
+app.setName("Meguri");
+
+// Only one running instance. Multiple processes would race on the same
+// SQLite WAL under userData/roots/<hash>/db.sqlite and confuse the user
+// (the app is tray-resident, so it's easy to launch twice by accident).
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+
+// Custom URL scheme (meguri://): opening a meguri:// URL while the app is
+// tray-resident brings the window to the front.
+// - Linux: the .desktop file's MimeType (x-scheme-handler/meguri) makes the OS
+//   spawn a second instance whose argv carries the URL; the single-instance
+//   lock routes it to "second-instance" below.
+// - Windows: setAsDefaultProtocolClient registers the scheme in the registry
+//   (electron-builder's `protocols` covers installed builds).
+// - macOS: delivered as "open-url" instead of a second instance.
+const URL_SCHEME = "meguri";
+
+app.on("second-instance", (_e, argv) => {
+  const url = argv.find((a) => a.startsWith(`${URL_SCHEME}://`));
+  if (url) log.info("[url-scheme] received:", url);
+  showWindow();
+});
+
+if (process.defaultApp) {
+  // Dev mode (electron launched with an app path): register with explicit args
+  // so the OS can route the URL back to this exact invocation.
+  const appArg = process.argv[1];
+  if (appArg) {
+    app.setAsDefaultProtocolClient(URL_SCHEME, process.execPath, [
+      path.resolve(appArg),
+    ]);
+  }
+} else {
+  app.setAsDefaultProtocolClient(URL_SCHEME);
+}
+app.on("open-url", (e, url) => {
+  e.preventDefault();
+  log.info("[url-scheme] received:", url);
+  showWindow();
+});
+
+// Fast-path control endpoint. Relaying meguri:// through a second Electron
+// instance costs a full AppImage mount + Chromium boot (~1s) just to pass
+// argv. Instead, a tiny local HTTP server accepts "show" requests so a shell
+// handler (see scripts/install-local.mjs) can raise the window in ~10ms.
+// Port and token are published to <userData>/control.json (0600); the token
+// is per-launch random, and the file is removed on quit so a handler hitting
+// a stale file just falls back to launching the app.
+function controlFilePath(): string {
+  return path.join(app.getPath("userData"), "control.json");
+}
+
+function startControlServer(): Promise<void> {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      const header = req.headers[MEDIA_TOKEN_HEADER.toLowerCase()];
+      const token = Array.isArray(header) ? header[0] : header;
+      if (token !== mediaToken) {
+        res.statusCode = 403;
+        res.end();
+        return;
+      }
+      const pathname = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
+      if (pathname === "/show") {
+        log.info("[control] show requested");
+        showWindow();
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      res.statusCode = 404;
+      res.end();
+    });
+    server.on("error", (e) => {
+      log.warn("[control] server error (fast-path disabled):", e);
+      resolve();
+    });
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address() as AddressInfo;
+      try {
+        // rm + write so the 0600 mode applies even if a stale file exists.
+        fs.rmSync(controlFilePath(), { force: true });
+        fs.writeFileSync(
+          controlFilePath(),
+          JSON.stringify({ port, token: mediaToken }),
+          { mode: 0o600 },
+        );
+        log.info(`[control] listening on http://127.0.0.1:${port}`);
+      } catch (e) {
+        log.warn("[control] failed to write control file:", e);
+      }
+      resolve();
+    });
+  });
+}
+
+// Restrict in-window navigation to the bundled renderer (or the Vite dev server
+// in development). Anything else is sent to the OS browser via shell.openExternal.
+// setWindowOpenHandler is also applied here so a future BrowserWindow inherits it.
+// `file:` is always permitted (bundled renderer); the dev origin is read on each
+// call so a late-resolved ELECTRON_RENDERER_URL is honored.
+function isAppUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol === "file:") return true;
+    const dev = process.env["ELECTRON_RENDERER_URL"];
+    if (dev) return u.origin === new URL(dev).origin;
+    return false;
+  } catch {
+    return false;
+  }
+}
+app.on("render-process-gone", (_e, _wc, details) => {
+  log.error("renderer process gone:", details);
+});
+app.on("child-process-gone", (_e, details) => {
+  log.error("child process gone:", details);
+});
+
+app.on("web-contents-created", (_e, contents) => {
+  contents.setWindowOpenHandler(() => ({ action: "deny" }));
+  contents.on("will-navigate", (event, url) => {
+    if (isAppUrl(url)) return;
+    event.preventDefault();
+    try {
+      const u = new URL(url);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        void shell.openExternal(url);
+      }
+    } catch {
+      /* drop */
+    }
+  });
+});
+
+function isDevMode(): boolean {
+  return !app.isPackaged;
+}
+
+function isTrayEnabled(): boolean {
+  return process.env.MEGURI_DISABLE_TRAY !== "1";
+}
+
+/** Get only the root explicitly specified via CLI/env var (does not fall back to cwd). */
+function resolveCliRoot(): string | null {
+  if (process.env.MEGURI_ROOT) return process.env.MEGURI_ROOT;
+  const appPath = app.getAppPath();
+  const args = process.argv
+    .slice(1)
+    .filter(
+      (a) => !a.startsWith("-") && a !== "." && path.resolve(a) !== appPath,
+    );
+  for (const a of args.reverse()) {
+    try {
+      if (fs.statSync(a).isDirectory()) return path.resolve(a);
+    } catch {
+      /* skip */
+    }
+  }
+  return null;
+}
+
+function emit(channel: string, payload: unknown): void {
+  mainWindow?.webContents.send(channel, payload);
+}
+
+// Launch an external file/URL in a fully detached child process.
+// shell.openPath leaves the spawned process attached to Electron's process
+// tree; on Wayland/Hyprland that makes the launched app's window a child of
+// Meguri and blocks the main window until the external app closes.
+// Windows uses shell.openPath directly: ShellExecuteExW doesn't reproduce the
+// child-process attachment issue, and routing through cmd.exe /c start would
+// open a command-injection surface for filenames containing &/|/^/( etc.
+function openDetached(target: string): void {
+  if (process.platform === "win32") {
+    void shell.openPath(target);
+    return;
+  }
+  const cmd = process.platform === "darwin" ? "open" : "xdg-open";
+  const child = spawn(cmd, [target], { detached: true, stdio: "ignore" });
+  child.on("error", (e) => {
+    log.error("[openDetached] failed to launch", cmd, target, e);
+  });
+  child.unref();
+}
+
+// Workspace IDs with a scan in progress. To avoid chunk-tx contention,
+// concurrent scans of the same workspace are suppressed.
+const scanningWs = new Set<string>();
+// AbortControllers for in-progress scans, keyed by workspace ID.
+const scanControllers = new Map<string, AbortController>();
+// Completion promises for in-progress scans, keyed by workspace ID.
+const scanPromises = new Map<string, Promise<void>>();
+
+/** Start a scan for a single workspace's Core. Returns the job id (empty if already scanning). */
+function scanCore(
+  core: Core,
+  wsId: string | null,
+  opts: { includeExcluded?: boolean; rebuild?: boolean },
+): string {
+  if (wsId && scanningWs.has(wsId)) return ""; // don't start again if already running
+  const jobId = `job-${scanSeq++}`;
+  if (wsId) scanningWs.add(wsId);
+  const controller = new AbortController();
+  if (wsId) scanControllers.set(wsId, controller);
+  const promise = (async () => {
+    try {
+      if (opts.includeExcluded) q.clearExcludedFiles(core.db, core.rootId);
+      await runScan(
+        core,
+        jobId,
+        (e) => {
+          if (e.type === "progress")
+            emit("scan:progress", {
+              jobId: e.jobId,
+              phase: e.phase,
+              done: e.done,
+              total: e.total,
+            });
+          else if (e.type === "thumbDone")
+            emit("thumb:done", { id: e.id, workspaceId: wsId });
+          else if (e.type === "done")
+            emit("scan:done", {
+              jobId: e.jobId,
+              stats: e.stats,
+              aborted: e.aborted,
+            });
+        },
+        { rebuild: opts.rebuild, signal: controller.signal },
+      );
+    } catch (err) {
+      log.error("scan failed", err);
+      emit("scan:done", {
+        jobId,
+        stats: { inserted: 0, updated: 0, moved: 0, deleted: 0, unchanged: 0 },
+        error: true,
+      });
+    } finally {
+      if (wsId) {
+        scanningWs.delete(wsId);
+        scanControllers.delete(wsId);
+        scanPromises.delete(wsId);
+      }
+    }
+  })();
+  if (wsId) scanPromises.set(wsId, promise);
+  void promise;
+  return jobId;
+}
+
+async function abortScan(wsId: string): Promise<void> {
+  scanControllers.get(wsId)?.abort();
+  await scanPromises.get(wsId);
+}
+
+function startScan(
+  opts: { includeExcluded?: boolean; rebuild?: boolean } = {},
+): string {
+  // In the virtual "All" view, scan every registered workspace concurrently
+  // (each gets its own job/progress). Return the first job's id for tracking.
+  if (ws.isAll()) {
+    let first = "";
+    for (const { id, core } of ws.allCores()) {
+      const jobId = scanCore(core, id, opts);
+      if (jobId && !first) first = jobId;
+    }
+    return first;
+  }
+  const core = ws.active();
+  if (!core) return "";
+  return scanCore(core, ws.activeId, opts);
+}
+
+// File operations are addressed by (workspaceId, fileId) since file IDs are unique
+// only within a workspace. The renderer always supplies the workspace ID.
+function coreById(wsId: string): Core {
+  const core = ws.byId(wsId);
+  if (!core) throw new Error("unknown workspace");
+  return core;
+}
+
+/** Resolve a file's absolute path and verify it lives under the workspace root. */
+function ensureFileInsideRoot(c: Core, id: number): string {
+  const abs = tags.absPathOf(c.db, id);
+  if (!abs) throw new Error("file not found");
+  if (!isInsideRoot(abs, c.root)) throw new Error("path is outside scan root");
+  return abs;
+}
+
+function registerStatusHandlers(): void {
+  handle("workspace_stats", () => {
+    // Aggregate across every workspace under the virtual "All" view; for a single
+    // active workspace just read its DB directly. Returns zeros/null when nothing is mounted.
+    const cores = ws.queryCores();
+    let fileCount = 0;
+    let lastScanAt: number | null = null;
+    for (const { core } of cores) {
+      fileCount += q.countFiles(core.db);
+      const t = q.lastScanAt(core.db);
+      if (t != null && (lastScanAt == null || t > lastScanAt)) lastScanAt = t;
+    }
+    return { fileCount, lastScanAt };
+  });
+
+  handle("app_status", () => {
+    if (ws.isAll()) {
+      return {
+        root: "All",
+        ready: ws.allCores().length > 0,
+        initError: null,
+        initErrorKind: null,
+        mediaBase: mediaPort ? `http://127.0.0.1:${mediaPort}` : null,
+        workspaceId: ALL_ID,
+        devMode: isDevMode(),
+      };
+    }
+    const activeCollection = ws.activeCollection();
+    if (activeCollection) {
+      return {
+        root: activeCollection.name,
+        ready: ws.allCores().length > 0,
+        initError: null,
+        initErrorKind: null,
+        mediaBase: mediaPort ? `http://127.0.0.1:${mediaPort}` : null,
+        workspaceId: ws.activeId,
+        devMode: isDevMode(),
+      };
+    }
+    const core = ws.active();
+    return {
+      root: core?.root ?? null,
+      ready: core != null,
+      initError: ws.initError(),
+      initErrorKind: ws.initErrorKind(),
+      mediaBase: mediaPort ? `http://127.0.0.1:${mediaPort}` : null,
+      workspaceId: ws.activeId,
+      devMode: isDevMode(),
+    };
+  });
+
+  // Static app/runtime versions for the Settings "About" section.
+  handle("about_info", () => ({
+    version: app.getVersion(),
+    electron: process.versions.electron ?? "",
+    chrome: process.versions.chrome ?? "",
+    node: process.versions.node ?? "",
+  }));
+}
+
+function registerWorkspaceHandlers(): void {
+  handle("workspaces_list", () => ({
+    workspaces: ws.list(),
+    collections: ws.collections(),
+    activeId: ws.activeId,
+  }));
+
+  handle("workspace_add", async () => {
+    const res = await dialog.showOpenDialog(mainWindow ?? undefined!, {
+      title: "Add video directory",
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (res.canceled || res.filePaths.length === 0) return { added: false };
+    const np = ws.add(res.filePaths[0]);
+    ws.setActive(np);
+    const scanJobId = startScan();
+    emit("workspace:changed", { activeId: ws.activeId });
+    return { added: true, id: Workspaces.idFor(np), scanJobId };
+  });
+
+  handle("workspace_remove", async ({ id }) => {
+    const p = ws.pathOf(id);
+    if (p) {
+      await abortScan(id);
+      ws.remove(p);
+    }
+    if (ws.active()) startScan();
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("workspace_reorder", ({ ids }) => {
+    ws.reorder(ids);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("workspace_switch", ({ id }) => {
+    if (id === ALL_ID) {
+      ws.setActive(ALL_ID); // the virtual "All" view is never scanned
+      emit("workspace:changed", { activeId: ws.activeId });
+      return;
+    }
+    if (id.startsWith(COLLECTION_ID_PREFIX)) {
+      ws.setActive(id);
+      emit("workspace:changed", { activeId: ws.activeId });
+      return;
+    }
+    const p = ws.pathOf(id);
+    if (p) ws.setActive(p);
+    startScan();
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("collection_create", ({ name, emoji }) => {
+    const collection = ws.addCollection(name, emoji);
+    emit("workspace:changed", { activeId: ws.activeId });
+    // addCollection makes the new collection active, so it's always the active one here.
+    return { ...collection, active: true };
+  });
+
+  handle("collection_remove", ({ id }) => {
+    ws.removeCollection(id);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("collection_reorder", ({ ids }) => {
+    ws.reorderCollections(ids);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("collection_set_emoji", ({ id, emoji }) => {
+    ws.setCollectionEmoji(id, emoji);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("collection_rename", ({ id, name }) => {
+    ws.renameCollection(id, name);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("workspace_set_emoji", ({ id, emoji }) => {
+    ws.setWorkspaceEmoji(id, emoji);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("collection_add_file", ({ collectionId, workspaceId, id }) => {
+    ws.addToCollection(collectionId, workspaceId, id);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("collection_remove_file", ({ collectionId, workspaceId, id }) => {
+    ws.removeFromCollection(collectionId, workspaceId, id);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+}
+
+function registerScanHandlers(): void {
+  handle("scan_start", ({ includeExcluded, rebuild }) =>
+    startScan({ includeExcluded, rebuild }),
+  );
+
+  handle("scan_cancel", ({ wsId }) => {
+    if (wsId) {
+      scanControllers.get(wsId)?.abort();
+    } else {
+      for (const ctrl of scanControllers.values()) ctrl.abort();
+    }
+  });
+}
+
+function registerFileHandlers(): void {
+  // List queries can be invalidated by the renderer just as the active workspace
+  // disappears (e.g. removing the last workspace). Return empty instead of throwing
+  // so a brief race during workspace:changed doesn't surface as an error toast.
+  handle("files_search", ({ query }) =>
+    ws.activeCollection()
+      ? cw.searchCollection(ws.allCores(), ws.activeCollection()!.items, query)
+      : cw.searchWorkspaces(ws.queryCores(), query),
+  );
+  handle("files_random", ({ query }) =>
+    ws.activeCollection()
+      ? cw.randomCollection(
+          ws.allCores(),
+          ws.activeCollection()!.items,
+          query ?? {},
+        )
+      : cw.randomWorkspaces(ws.queryCores(), query ?? {}),
+  );
+  handle("file_get", ({ id, workspaceId }) => {
+    const db = coreById(workspaceId).db;
+    q.recordAccess(db, id);
+    return q.fileDetail(db, id);
+  });
+  handle("file_set_rating", ({ id, workspaceId, rating }) =>
+    q.setRating(coreById(workspaceId).db, id, rating),
+  );
+  handle("file_set_favorite", ({ id, workspaceId, favorite }) =>
+    q.setFavorite(coreById(workspaceId).db, id, favorite),
+  );
+  handle("file_delete_from_index", ({ id, workspaceId }) => {
+    const deleted = q.deleteFromIndex(coreById(workspaceId).db, id);
+    // Drop any collection refs to the now-removed file so item counts stay accurate.
+    // Only broadcast when a collection actually changed; otherwise the renderer's
+    // own cache invalidation after delete already covers it.
+    if (ws.removeFileFromAllCollections(workspaceId, id)) {
+      emit("workspace:changed", { activeId: ws.activeId });
+    }
+    return deleted;
+  });
+  handle("file_record_play", ({ id, workspaceId, via, position }) =>
+    q.recordPlay(coreById(workspaceId).db, id, via, position ?? null),
+  );
+}
+
+function registerTagHandlers(): void {
+  handle("file_add_tag", ({ id, workspaceId, name }) => {
+    const db = coreById(workspaceId).db;
+    const tagId = tags.addManualTag(db, id, name.trim());
+    tags.syncFts(db, id);
+    return tagId;
+  });
+  handle("file_remove_tag", ({ id, workspaceId, tagId }) => {
+    const db = coreById(workspaceId).db;
+    tags.removeManualTag(db, id, tagId);
+    tags.syncFts(db, id);
+  });
+  handle("tags_list", ({ workspaceId, prefix, limit }) =>
+    tags.listTagNames(coreById(workspaceId).db, prefix, limit ?? 20),
+  );
+}
+
+function registerBookmarkHandlers(): void {
+  handle("bookmark_add", ({ id, workspaceId, sec }) =>
+    q.addBookmark(coreById(workspaceId).db, id, sec),
+  );
+  handle("bookmark_remove", ({ id, workspaceId, bookmarkId }) =>
+    q.removeBookmark(coreById(workspaceId).db, id, bookmarkId),
+  );
+}
+
+function registerThumbHandlers(): void {
+  // Custom main thumbnail: regenerate the on-disk WebP from the given offset (video only).
+  // Passing sec=null reverts to the auto-extracted frame.
+  handle("thumb_set_offset", async ({ id, workspaceId, sec }) => {
+    const c = coreById(workspaceId);
+    const file = c.db
+      .prepare(
+        "SELECT abs_path AS absPath, kind, duration FROM files WHERE id = ? AND deleted_at IS NULL",
+      )
+      .get(id) as
+      { absPath: string; kind: string; duration: number | null } | undefined;
+    if (!file) throw new Error("file not found");
+    if (file.kind !== "video")
+      throw new Error("custom thumbnail is only supported for videos");
+    if (!isInsideRoot(file.absPath, c.root))
+      throw new Error("path is outside scan root");
+    if (sec != null) {
+      if (!Number.isFinite(sec) || sec < 0) {
+        throw new Error("invalid offset");
+      }
+      if (file.duration != null && sec >= file.duration) {
+        throw new Error("offset exceeds video duration");
+      }
+    }
+    // Regenerate FIRST so we never persist an offset whose frame couldn't be extracted.
+    // On failure, leave file_meta.thumb_offset_sec untouched and surface the error to the
+    // renderer; the UI will roll back its optimistic update.
+    const dest = path.join(c.thumbsDir(), `${id}.webp`);
+    const ok = await generateThumb(
+      file.absPath,
+      "video",
+      dest,
+      undefined,
+      sec ?? undefined,
+    );
+    if (!ok)
+      throw new Error("failed to generate thumbnail at the requested offset");
+    q.setThumbOffset(c.db, id, sec);
+    q.setThumb(c.db, id, dest, "done");
+    emit("thumb:done", { id, workspaceId });
+    return { ok: true, thumbOffsetSec: sec };
+  });
+}
+
+function registerShellHandlers(): void {
+  handle("open_external", ({ id, workspaceId }) => {
+    const c = coreById(workspaceId);
+    const abs = ensureFileInsideRoot(c, id);
+    openDetached(abs);
+    q.recordPlay(c.db, id, "external", null);
+  });
+
+  handle("open_folder", ({ id, workspaceId }) => {
+    const abs = ensureFileInsideRoot(coreById(workspaceId), id);
+    shell.showItemInFolder(abs);
+  });
+
+  handle("copy_file_path", ({ id, workspaceId }) => {
+    const abs = ensureFileInsideRoot(coreById(workspaceId), id);
+    clipboard.writeText(abs);
+  });
+
+  // Open an arbitrary external URL (e.g. the support/donation link). Only http(s) is allowed.
+  handle("open_url", ({ url }) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error("invalid url");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("unsupported protocol");
+    }
+    void shell.openExternal(parsed.toString());
+  });
+
+  handle("open_devtools", () => {
+    if (!isDevMode()) return false;
+    mainWindow?.webContents.openDevTools({ mode: "right" });
+    return true;
+  });
+
+  // Close the window from the renderer (Esc on the bare list screen). Goes
+  // through close() so the tray-hide behavior in the "close" handler applies.
+  handle("window_close", () => {
+    mainWindow?.close();
+  });
+}
+
+function registerUpdateHandlers(): void {
+  handle("update_check", ({ force }) => checkForUpdates({ force }));
+  handle("update_get_settings", () => getUpdateSettings());
+  handle("update_set_auto_check", ({ enabled }) => {
+    setAutoCheck(enabled);
+  });
+  handle("update_ignore", ({ version }) => {
+    ignoreVersion(version);
+  });
+}
+
+/**
+ * On startup, check GitHub for a newer stable release (when auto-check is on)
+ * and push an event to the renderer if one is available. Deferred so it never
+ * competes with the initial scan/render, and failures are swallowed (it's a
+ * best-effort convenience, not a critical path).
+ */
+function scheduleStartupUpdateCheck(): void {
+  if (!isAutoCheckEnabled()) return;
+  setTimeout(() => {
+    void checkForUpdates()
+      .then((info) => {
+        if (info?.available) emit("update:available", info);
+      })
+      .catch((e) => log.warn("startup update check failed", e));
+  }, 8_000);
+}
+
+function registerIpc(): void {
+  registerStatusHandlers();
+  registerWorkspaceHandlers();
+  registerScanHandlers();
+  registerFileHandlers();
+  registerTagHandlers();
+  registerBookmarkHandlers();
+  registerThumbHandlers();
+  registerShellHandlers();
+  registerUpdateHandlers();
+}
+
+function createWindow(): void {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 640,
+    minHeight: 480,
+    title: "Meguri",
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, "../preload/preload.js"),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      devTools: isDevMode(),
+    },
+  });
+
+  // Window-open / will-navigate are governed globally via app.on("web-contents-created").
+
+  // Closing the window hides it to the tray unless tray support is disabled.
+  mainWindow.on("close", (e) => {
+    if (isTrayEnabled() && !isQuitting) {
+      e.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+
+  const devUrl = process.env["ELECTRON_RENDERER_URL"];
+  if (devUrl) {
+    void mainWindow.loadURL(devUrl);
+  } else {
+    void mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+  }
+}
+
+/** Show and focus the main window, recreating it if it was destroyed. */
+function showWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray(): void {
+  if (!isTrayEnabled()) return;
+  const icon = nativeImage.createFromDataURL(
+    `data:image/png;base64,${TRAY_ICON_BASE64}`,
+  );
+  tray = new Tray(icon);
+  tray.setToolTip("Meguri");
+  const menu = Menu.buildFromTemplate([
+    { label: "Show Meguri", click: () => showWindow() },
+    {
+      label: "Check for Updates…",
+      click: () => {
+        void checkForUpdates({ force: true })
+          .then((info) => {
+            if (info?.available) {
+              showWindow();
+              emit("update:available", info);
+            } else if (info) {
+              // Reached GitHub and we're current: take the user to the releases page.
+              void shell.openExternal(releasesPage());
+            } else {
+              // Couldn't reach GitHub (offline / rate-limited): don't silently
+              // open a browser; tell the user the check failed.
+              void dialog.showMessageBox({
+                type: "warning",
+                title: "Meguri",
+                message: "Could not check for updates.",
+                detail: "Please check your internet connection and try again.",
+              });
+            }
+          })
+          .catch((e) => log.warn("manual update check failed", e));
+      },
+    },
+    { type: "separator" },
+    {
+      label: "Quit",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+  tray.setContextMenu(menu);
+  // Left-click toggles window visibility (no-op on platforms that don't emit it).
+  tray.on("click", () => {
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+      mainWindow.hide();
+    } else {
+      showWindow();
+    }
+  });
+}
+
+function installMediaAuthHeader(): void {
+  if (!mediaPort) return;
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: [`http://127.0.0.1:${mediaPort}/*`] },
+    (details, callback) => {
+      callback({
+        requestHeaders: {
+          ...details.requestHeaders,
+          [MEDIA_TOKEN_HEADER]: mediaToken,
+        },
+      });
+    },
+  );
+}
+
+async function installReactDevTools(): Promise<void> {
+  if (!isDevMode()) return;
+  try {
+    const { default: installExtension, REACT_DEVELOPER_TOOLS } =
+      await import("electron-devtools-installer");
+    const extension = await installExtension(REACT_DEVELOPER_TOOLS, {
+      loadExtensionOptions: { allowFileAccess: true },
+    });
+    log.info(`Added Extension: ${extension.name}`);
+  } catch (err) {
+    log.warn("React DevTools extension could not be installed", err);
+  }
+}
+
+void app.whenReady().then(async () => {
+  // Completely remove the native app menu (File/Edit/View…).
+  Menu.setApplicationMenu(null);
+
+  ws.bootstrap(resolveCliRoot());
+
+  // The media server resolves the DB by workspace ID to serve (independent of the active one).
+  ({ port: mediaPort } = await startServer((id) => ws.byId(id), mediaToken));
+  installMediaAuthHeader();
+  log.info(`media server on http://127.0.0.1:${mediaPort}`);
+
+  await startControlServer();
+
+  registerIpc();
+  createTray();
+  await installReactDevTools();
+  createWindow();
+  if (isDevMode()) {
+    globalShortcut.register("CommandOrControl+Shift+I", () => {
+      mainWindow?.webContents.openDevTools({ mode: "right" });
+    });
+  }
+  startScan();
+  scheduleStartupUpdateCheck();
+
+  app.on("activate", () => showWindow());
+});
+
+app.on("before-quit", () => {
+  globalShortcut.unregisterAll();
+  isQuitting = true;
+  try {
+    fs.rmSync(controlFilePath(), { force: true });
+  } catch {
+    /* best-effort cleanup */
+  }
+});
+
+// With tray support enabled, closing windows keeps the app resident.
+// Without tray support (e.g. Docker), closing the last window quits.
+app.on("window-all-closed", () => {
+  if (!isTrayEnabled()) app.quit();
+  /* keep running in tray */
+});

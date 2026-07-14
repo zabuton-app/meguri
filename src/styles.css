@@ -1,0 +1,160 @@
+@import "tailwindcss";
+
+/*
+ * Three-stage bridge (PLAN "Frontend UI / Theme"):
+ *   base16(base00..0F)  →  runtime values --c-* (injected by ThemeProvider via [data-theme])
+ *                       →  Tailwind tokens --color-* (reference --c-* via @theme inline)
+ *                       →  shadcn variables --background, etc. (also aliases of --c-*)
+ *                       →  components reference them via bg-surface/text-fg/Button
+ *
+ * Separating the values (--c-*) from the Tailwind tokens (--color-*) avoids self-reference.
+ */
+
+:root {
+  /* Fallback (safety net before ThemeProvider applies: gruvbox-dark). */
+  --c-bg: #282828;
+  --c-surface: #3c3836;
+  --c-overlay: #504945;
+  --c-border: #504945;
+  --c-muted: #665c54;
+  --c-secondary-fg: #bdae93;
+  --c-fg: #d5c4a1;
+  --c-bright-fg: #ebdbb2;
+  --c-highlight: #fbf1c7;
+  --c-error: #fb4934;
+  --c-warn: #fe8019;
+  --c-accent2: #fabd2f;
+  --c-success: #b8bb26;
+  --c-info: #8ec07c;
+  --c-primary: #83a598;
+  --c-secondary-accent: #d3869b;
+  --c-special: #d65d0e;
+}
+
+/* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */
+@theme inline {
+  --color-bg: var(--c-bg);
+  --color-surface: var(--c-surface);
+  --color-overlay: var(--c-overlay);
+  --color-border: var(--c-border);
+  --color-muted: var(--c-muted);
+  --color-secondary-fg: var(--c-secondary-fg);
+  --color-fg: var(--c-fg);
+  --color-bright-fg: var(--c-bright-fg);
+  --color-highlight: var(--c-highlight);
+  --color-error: var(--c-error);
+  --color-warn: var(--c-warn);
+  --color-accent2: var(--c-accent2);
+  --color-success: var(--c-success);
+  --color-info: var(--c-info);
+  --color-primary: var(--c-primary);
+  --color-secondary-accent: var(--c-secondary-accent);
+  --color-special: var(--c-special);
+
+  /* shadcn/ui compatibility aliases. */
+  --color-background: var(--c-bg);
+  --color-foreground: var(--c-fg);
+  --color-card: var(--c-surface);
+  --color-card-foreground: var(--c-fg);
+  --color-popover: var(--c-overlay);
+  --color-popover-foreground: var(--c-fg);
+  --color-primary-foreground: var(--c-bg);
+  --color-secondary: var(--c-surface);
+  --color-secondary-foreground: var(--c-fg);
+  --color-accent: var(--c-overlay);
+  --color-accent-foreground: var(--c-bright-fg);
+  --color-destructive: var(--c-error);
+  --color-destructive-foreground: var(--c-bg);
+  --color-ring: var(--c-primary);
+  --color-input: var(--c-border);
+
+  --radius-lg: 0.5rem;
+  --radius-md: 0.375rem;
+  --radius-sm: 0.25rem;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--c-bg);
+  color: var(--c-fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Noto Sans JP",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Scrollbars are unified via the shadcn/ui ScrollArea (src/components/ui/scroll-area.tsx).
+ * Small incidental overflows that don't need a visible bar hide the native one
+ * with .no-scrollbar. Visible scrollbars should use ScrollArea.
+ */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Radix ScrollArea wraps the direct child of the Viewport with display:table; min-width:100%.
+ * In a table context, the child's width:100% creates a circular reference to the content-based
+ * table width, so <video>/<img> keep their natural width as a lower bound and stop shrinking.
+ * Only for vertically scrolling pages (.page-scroll), make it block so the width correctly
+ * follows the viewport. Not applied to horizontally scrolling ScrollAreas (scenes) (limited via the direct-child selector).
+ */
+.page-scroll > [data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+}
+
+/* Sonner uses its own light/dark palette by default. Bridge it to Meguri themes. */
+[data-sonner-toaster][data-sonner-theme] {
+  --normal-bg: var(--c-surface) !important;
+  --normal-bg-hover: var(--c-overlay) !important;
+  --normal-border: color-mix(
+    in srgb,
+    var(--c-muted) 35%,
+    transparent
+  ) !important;
+  --normal-border-hover: color-mix(
+    in srgb,
+    var(--c-muted) 55%,
+    transparent
+  ) !important;
+  --normal-text: var(--c-fg) !important;
+  --success-bg: var(--c-surface) !important;
+  --success-border: color-mix(
+    in srgb,
+    var(--c-success) 40%,
+    transparent
+  ) !important;
+  --success-text: var(--c-bright-fg) !important;
+}
+
+[data-sonner-toast][data-styled="true"].meguri-toast {
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--c-bg) 55%, transparent) !important;
+}
+
+[data-sonner-toast][data-styled="true"] .meguri-toast-description {
+  color: var(--c-muted) !important;
+}
+
+[data-sonner-toast][data-styled="true"] [data-close-button] {
+  background: var(--c-surface) !important;
+  border-color: color-mix(in srgb, var(--c-muted) 35%, transparent) !important;
+  color: var(--c-fg) !important;
+}
+
+[data-sonner-toast][data-styled="true"] [data-close-button]:hover {
+  background: var(--c-overlay) !important;
+  border-color: color-mix(in srgb, var(--c-muted) 55%, transparent) !important;
+}

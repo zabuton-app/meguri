@@ -1,0 +1,21 @@
+// IPC DTO types — re-exported from the shared Zod schema (single source of truth).
+// See shared/ipc/schema.ts for the canonical definitions.
+export type {
+  AppStatus,
+  FileDetail,
+  FileRow,
+  Kind,
+  PlayEntry,
+  ScanDone,
+  ScanProgress,
+  SceneBookmark,
+  SearchQuery,
+  SearchResult,
+  TagInfo,
+  ThumbDone,
+  UserCollection,
+  UserCollectionItem,
+  WorkspaceInfo,
+  WorkspaceStats,
+  WorkspacesList,
+} from "@shared/ipc/schema";

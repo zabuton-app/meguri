@@ -1,0 +1,90 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            args: --linux
+          - os: windows-latest
+            platform: win
+            arch: x64
+            args: --win --x64
+          - os: macos-14
+            platform: mac-arm64
+            arch: arm64
+            args: --mac --arm64
+          - os: macos-13
+            platform: mac-x64
+            arch: x64
+            args: --mac --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      # postinstall (electron-builder install-app-deps) rebuilds better-sqlite3 for Electron.
+      # ffmpeg-static downloads a SINGLE binary at install time based on npm_config_arch ||
+      # os.arch(), so we pin npm_config_arch to the electron-builder target arch to guarantee
+      # the bundled ffmpeg matches (e.g. avoids an x64-under-Rosetta Node fetching the wrong arch).
+      # (ffprobe-static bundles all platforms and resolves at runtime, so it needs no pinning.)
+      - name: Install dependencies
+        run: npm ci
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+
+      - name: Build (main / preload / renderer)
+        run: npm run build
+
+      - name: Package
+        run: npx electron-builder ${{ matrix.args }} --publish never
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Skip macOS code signing / notarization (unsigned build).
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: meguri-${{ matrix.platform }}
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          draft: true
+          generate_release_notes: true

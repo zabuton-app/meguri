@@ -1,0 +1,36 @@
+# Node / Vite
+node_modules
+dist
+dist-ssr
+*.local
+
+# Electron build output
+/out
+/release
+
+# Sample media (keep samples/config.json tracked)
+/samples/**/*.avi
+/samples/**/*.gif
+/samples/**/*.jpeg
+/samples/**/*.jpg
+/samples/**/*.mkv
+/samples/**/*.mov
+/samples/**/*.mp4
+/samples/**/*.png
+/samples/**/*.webm
+/samples/**/*.webp
+
+# Playwright E2E
+/test-results/
+/playwright-report/
+/blob-report/
+
+# Others
+*.log
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# demo-capture sample media
+tools/demo-capture/.media/

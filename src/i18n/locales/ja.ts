@@ -1,0 +1,301 @@
+// 日本語カタログ（原典）。キーはドット区切りのフラット構造。
+// 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
+export const ja = {
+  // 共通
+  "common.close": "閉じる",
+  "common.cancel": "キャンセル",
+  "common.ok": "OK",
+
+  // 種別
+  "kind.video": "動画",
+  "kind.image": "画像",
+
+  // 並び順
+  "sort.added": "追加順",
+  "sort.name": "名前",
+  "sort.rating": "レーティング",
+  "sort.captured": "撮影日時",
+  "sort.accessed": "最終表示順",
+  "sort.asc": "昇順",
+  "sort.desc": "降順",
+
+  // 設定画面
+  "settings.title": "設定",
+  "settings.appearance": "外観",
+  "settings.appearanceDesc":
+    "ライト / ダークを切り替えます（テーマの色合いは維持）。",
+  "settings.light": "ライト",
+  "settings.dark": "ダーク",
+  "settings.theme": "テーマ",
+  "settings.language": "言語",
+  "settings.languageDesc": "UI の表示言語を切り替えます。",
+  "settings.scenes": "シーンサムネ枚数",
+  "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
+  "settings.keybinding": "キーバインド",
+  "settings.keybindingDesc":
+    "一覧のフォーカス移動・ファイルの前後移動・スクロール・検索フォーカスのキー割り当て。",
+  "settings.support": "開発を応援",
+  "settings.supportDesc":
+    "このアプリが気に入ったら、開発の支援をご検討ください。",
+  "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.update": "アップデート",
+  "settings.updateDesc": "新しいバージョンが公開されていないか確認します。",
+  "settings.updateCheckNow": "今すぐ確認",
+  "settings.updateAuto": "起動時に自動で確認する",
+  "update.available": "新しいバージョン {version} が利用可能です",
+  "update.availableDesc": "現在のバージョン: {current}",
+  "update.view": "リリースを開く",
+  "update.skip": "このバージョンをスキップ",
+  "update.checking": "確認しています…",
+  "update.checkFailed":
+    "確認できませんでした（オフラインの可能性があります）。",
+  "update.upToDate": "最新です（{version}）。",
+  "settings.about": "このアプリについて",
+  "about.version": "バージョン {version}",
+  "about.appLicense": "Meguri は MIT License の下で公開されています。",
+  "about.ossTitle": "オープンソースライセンス",
+  "about.ossDesc": "本アプリは以下のオープンソースソフトウェアを含んでいます。",
+  "about.ffmpegNotice":
+    "FFmpeg / FFprobe は GPL v3 でライセンスされたバイナリを同梱しています。ライセンス全文とソースコードは各リンクから参照できます。",
+  "about.license": "ライセンス",
+  "about.source": "ソース",
+  "about.fullDependencies": "すべての依存パッケージを見る (package.json)",
+  "keybinding.normal": "標準",
+  "keybinding.vim": "Vim",
+  "keybinding.emacs": "Emacs",
+
+  // 一覧画面（Home）
+  "home.noDirectory": "（ディレクトリ未選択）",
+  "home.scan": "スキャン",
+  "home.initError": "初期化エラー: {msg}",
+  "home.initErrorSchemaMismatchHelp":
+    "データベースの形式が現在のアプリと一致しない可能性があります。左のサイドバーからこのワークスペースを削除して、再登録してください。",
+  "home.removeChip": "この条件を削除",
+  "home.clearAll": "すべてクリア",
+  "home.noWorkspace": "動画ディレクトリが追加されていません。",
+  "home.addDirectory": "ディレクトリを追加",
+  "home.addFromSidebar": "左のサイドバーからも追加・切り替えできます。",
+  "home.scanWithDeleted": "削除したものを含めて再同期",
+  "home.rebuildIndex": "インデックスを再構築",
+  "home.rebuildConfirm":
+    "ファイル一覧とサムネイルを破棄して最初から再スキャンします。お気に入り・評価・タグ・再生履歴は保持されますが、「インデックスから削除」したファイルは再び表示されます。続行しますか？",
+  "home.scanComplete": "スキャンが完了しました",
+  "home.resyncComplete": "再同期が完了しました",
+  "home.rebuildComplete": "インデックスの再構築が完了しました",
+  "home.scanCompleteDetail":
+    "追加 {inserted}、更新 {updated}、移動 {moved}、削除 {deleted}。",
+  "home.scanCanceled": "スキャンをキャンセルしました",
+  "home.escCloseHint": "もう一度 Esc を押すとウィンドウを閉じます",
+  "home.scanError": "スキャン中にエラーが発生しました",
+  "home.scanStartFailed": "スキャンを開始できませんでした",
+  "home.scanAlreadyRunning": "スキャンは既に実行中です",
+
+  // コマンドメニュー
+  "command.title": "コマンドメニュー",
+  "command.placeholder": "コマンドを検索...",
+  "command.empty": "該当するコマンドがありません。",
+  "command.groupNavigation": "移動",
+  "command.groupWorkspace": "ワークスペース",
+  "command.groupView": "表示",
+  "command.focusSearch": "検索にフォーカス",
+  "command.openDevTools": "開発者コンソールを開く",
+  "command.shortcutHint": "{shortcut} で開けます",
+
+  // フィルタ（FilterBar / 条件バッジ）
+  "filter.searchPlaceholder": "ファイル名・タグを検索",
+  "filter.all": "すべて",
+  "filter.playAny": "視聴状態",
+  "filter.played": "視聴済み",
+  "filter.unplayed": "未視聴",
+  "filter.sortLabel": "{label}",
+  "filter.ratingFilter": "最低レーティングで絞り込み",
+
+  // スマートコレクション
+  "smartCollection.title": "スマートコレクション",
+  "smartCollection.shortTitle": "フィルター",
+  "smartCollection.saveCurrent": "現在の条件を保存",
+  "smartCollection.empty": "保存済みの検索はまだありません。",
+  "smartCollection.delete": "コレクションを削除",
+  "smartCollection.saveTitle": "検索条件を保存",
+  "smartCollection.namePlaceholder": "コレクション名",
+  "smartCollection.save": "保存",
+  "smartCollection.allMedia": "すべてのメディア",
+  "smartCollection.defaultFavorites": "お気に入り",
+  "smartCollection.defaultRating": "★{rating}以上",
+  "smartCollection.defaultUnplayed": "未視聴",
+  "smartCollection.defaultName": "新しいコレクション",
+
+  // メディア詳細（MediaDetail）
+  "media.notFound": "ファイルが見つかりません。",
+  "media.openExternal": "外部で開く",
+  "media.openFolder": "フォルダを開く",
+  "media.copyFilePath": "ファイルパスをコピー",
+  "media.invertImageBackground": "画像の背景色を反転",
+  "media.modalMaximize": "モーダルを拡大",
+  "media.modalMinimize": "モーダルを縮小",
+  "media.deleteFromIndex": "インデックスから削除",
+  "media.deleteFromIndexConfirm":
+    "この項目をインデックスから削除しますか？\n今後スキャンしても再登録されません。",
+  "media.moreActions": "その他の操作",
+  "media.prev": "前のファイル",
+  "media.next": "次のファイル",
+  "shortcuts.title": "キーボードショートカット",
+  "shortcuts.sectionList": "一覧",
+  "shortcuts.sectionDetail": "詳細・プレイヤー",
+  "shortcuts.commandMenu": "コマンドメニューを開く",
+  "shortcuts.search": "検索にフォーカス",
+  "shortcuts.scrollDown": "下へスクロール",
+  "shortcuts.scrollUp": "上へスクロール",
+  "shortcuts.moveFocus": "フォーカス移動（上下左右）",
+  "shortcuts.openFocused": "選択中の項目を開く",
+  "shortcuts.help": "このヘルプ",
+  "shortcuts.playPause": "再生 / 一時停止",
+  "shortcuts.skip5": "5秒 戻る / 進む",
+  "shortcuts.skip10": "10秒 戻る / 進む",
+  "shortcuts.volume": "音量 上げ / 下げ",
+  "shortcuts.mute": "ミュート切替",
+  "shortcuts.fullscreen": "全画面切替",
+  "shortcuts.seekStart": "先頭へ移動",
+  "media.rating": "評価",
+  "media.tags": "タグ",
+  "media.metaWorkspace": "ワークスペース",
+  "media.metaKind": "種別",
+  "media.metaResolution": "解像度",
+  "media.metaSize": "サイズ",
+  "media.metaDuration": "長さ",
+  "media.metaCodec": "コーデック",
+  "media.metaFps": "FPS",
+  "media.playHistory": "再生履歴",
+  "media.scenes": "シーン",
+  "media.bookmarks": "シーンブックマーク",
+  "media.bookmarkRemove": "ブックマークを削除",
+  "media.thumbSet": "メインサムネに設定",
+  "media.thumbClear": "メインサムネを自動に戻す",
+  "media.thumbApplying": "メインサムネを適用中…",
+  "media.currentMainThumb": "現在のメインサムネ:",
+
+  // プレイヤー操作
+  "player.play": "再生",
+  "player.playKey": "再生 (Space)",
+  "player.pauseKey": "一時停止 (Space)",
+  "player.back10": "10秒戻る (J)",
+  "player.forward10": "10秒進む (L)",
+  "player.mute": "ミュート (M)",
+  "player.unmute": "ミュート解除 (M)",
+  "player.fullscreen": "全画面 (F)",
+  "player.volume": "音量",
+  "player.seek": "シーク",
+  "player.playFailed": "内蔵プレイヤーで再生できませんでした。",
+  "player.openExternal": "外部プレイヤーで開く",
+  "player.bookmarkAdd": "現在位置にブックマークを追加",
+  "player.bookmarkRemove": "{time} のブックマークを削除",
+
+  // 再生エラー
+  "player.errAborted": "読み込みが中断されました (MEDIA_ERR_ABORTED)",
+  "player.errNetwork": "ネットワークエラー (MEDIA_ERR_NETWORK)",
+  "player.errDecode":
+    "デコードに失敗しました — コーデック未対応の可能性 (MEDIA_ERR_DECODE)",
+  "player.errSrcNotSupported":
+    "この形式は再生できません (MEDIA_ERR_SRC_NOT_SUPPORTED)",
+  "player.errUnknown": "不明なエラー",
+  "player.errCode": "エラーコード {code}",
+
+  // シーン
+  "scene.seekTo": "{time} へシーク",
+  "scene.alt": "シーン {time}",
+
+  // スキャン進捗
+  "scan.phaseWalk": "ファイル列挙",
+  "scan.phaseHash": "ファイル照合",
+  "scan.phaseIndex": "インデックス作成",
+  "scan.phaseThumbnail": "サムネイル生成",
+  "scan.cancel": "スキャンをキャンセル",
+
+  // タグ編集
+  "tag.none": "タグなし",
+  "tag.addPlaceholder": "タグを追加して Enter",
+  "tag.remove": "タグ削除",
+
+  // メディアグリッド
+  "grid.empty": "表示できるメディアがありません。",
+  "grid.emptyHint":
+    "「スキャン」を実行すると、配下の動画・画像がここに並びます。",
+  "grid.searchByTag": "「{name}」で検索",
+  "view.grid": "グリッド表示",
+  "view.list": "リスト表示",
+  "view.table": "テーブル表示",
+  "table.name": "名前",
+
+  // ディスカバリー（ランダムおすすめ）
+  "discover.title": "ディスカバリー",
+  "discover.reshuffle": "引き直す",
+  "discover.play": "再生",
+  "discover.open": "開く",
+  "discover.progress": "{current} / {total}",
+  "discover.empty": "おすすめできるメディアがありません。",
+  "discover.emptyHint":
+    "「スキャン」で動画や画像を取り込むと、ここでランダムにおすすめされます。",
+
+  // ワークスペースレール
+  "workspace.all": "すべて",
+  "workspace.settings": "設定",
+  "workspace.edit": "ワークスペースを編集",
+  "workspace.editAction": "保存",
+  "workspace.pathReadonly": "パスは変更できません",
+  "workspace.addDirectory": "動画ディレクトリを追加",
+  "workspace.removeFromSidebar": "ワークスペースを削除",
+  "workspace.removeTitle": "ワークスペースを削除",
+  "workspace.removeConfirm":
+    "「{label}」を削除しますか？\nデータベースとサムネイルも削除されます（メディアファイル自体は削除されません）",
+  "workspace.removeAction": "削除",
+  "workspace.addedToast": "ワークスペースを追加しました",
+  "workspace.removedToast": "ワークスペースを削除しました",
+  "workspace.removedToastDetail": "「{label}」を削除しました。",
+
+  // ユーザコレクション
+  "collection.create": "ユーザコレクションを作成",
+  "collection.createAction": "作成",
+  "collection.edit": "コレクションを編集",
+  "collection.editAction": "保存",
+  "collection.createFailed": "コレクションを作成できませんでした",
+  "collection.namePrompt": "コレクション名",
+  "collection.removeFromSidebar": "コレクションを削除",
+  "collection.removeTitle": "コレクションを削除",
+  "collection.removeConfirm":
+    "「{name}」を削除しますか？\nメディアファイル自体は削除されません。",
+  "collection.removeAction": "削除",
+  "collection.removedToast": "コレクションを削除しました",
+  "collection.removedToastDetail": "「{name}」を削除しました。",
+  "collection.addToMenu": "コレクションに追加",
+  "collection.addTo": "「{name}」に追加",
+  "collection.removeFrom": "「{name}」から削除",
+  "collection.addedToast": "「{name}」に追加しました",
+  "collection.removedFromToast": "「{name}」から削除しました",
+  "collection.actionFailed": "コレクションの更新に失敗しました",
+
+  // 絵文字アイコン
+  "emoji.choose": "絵文字を選択",
+  "emoji.remove": "絵文字を削除",
+  "emoji.set": "絵文字を設定",
+  "collection.empty": "コレクションなし",
+
+  // レーティング
+  "rating.star": "{n} つ星",
+
+  // お気に入り
+  "favorite.add": "お気に入りに追加",
+  "favorite.remove": "お気に入りから外す",
+  "favorite.filter": "お気に入りのみ表示",
+  "favorite.chip": "お気に入り",
+
+  // ステータスバー
+  "statusbar.label": "ステータスバー",
+  "statusbar.lastScan": "最終スキャン",
+  "statusbar.lastScanNever": "未スキャン",
+  "statusbar.fileCount": "{count} 件",
+  "statusbar.status": "処理状況",
+  "statusbar.scanning": "スキャン中",
+  "statusbar.idle": "待機中",
+} as const;
+
+export type TranslationKey = keyof typeof ja;

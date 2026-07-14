@@ -1,0 +1,57 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Chromium's namespace sandbox needs the clone() syscall that Docker's
+    # default seccomp profile blocks; relax it (the SUID sandbox stays on).
+    security_opt:
+      - seccomp:unconfined
+    shm_size: "1gb"
+    environment:
+      # Wayland: the socket is bind-mounted into /tmp below.
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-1}
+      - XDG_RUNTIME_DIR=/tmp
+      - ELECTRON_OZONE_PLATFORM_HINT=wayland
+      # Docker desktop sessions often do not expose a usable system tray.
+      - MEGURI_DISABLE_TRAY=1
+    volumes:
+      # Live source for HMR. node_modules and out are kept as container-only
+      # volumes so the host (which has none / different ABI) doesn't shadow them.
+      - .:/app
+      - meguri_node_modules:/app/node_modules
+      - meguri_out:/app/out
+      # Persist app data (DB + thumbnails live under userData ~/.config/Meguri).
+      - meguri_userdata:/home/node/.config
+      # Wayland display socket (host session → container).
+      - ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY:-wayland-1}:/tmp/${WAYLAND_DISPLAY:-wayland-1}
+      # Library to scan. Defaults to the bundled samples/ so the app has media
+      # to show out of the box; point HOST_MEDIA_DIR at your own dir in .env.
+      - ${HOST_MEDIA_DIR:-./samples}:/media/library:ro
+    # GPU access for Chromium rendering / hardware video decode.
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${RENDER_GID:-989}" # host `render` group (getent group render)
+      - "${VIDEO_GID:-985}" # host `video` group  (getent group video)
+    # Optional: uncomment for audio during playback checks (PipeWire/Pulse).
+    # volumes additions:
+    #   - ${XDG_RUNTIME_DIR}/pulse/native:/tmp/pulse:ro
+    # environment additions:
+    #   - PULSE_SERVER=unix:/tmp/pulse
+    # electron-vite forwards args after `-- --` to the Electron binary. A nested
+    # Wayland client can't allocate GPU scanout buffers (GBM "Cannot create
+    # bo ... SCANOUT"), so force software rendering — reliable on any host.
+    # For host GPU acceleration instead, drop --disable-gpu (results vary).
+    command:
+      [
+        "sh",
+        "-lc",
+        "node scripts/seed-sample-config.mjs && npm run dev -- -- --ozone-platform=wayland --disable-gpu",
+      ]
+    init: true
+
+volumes:
+  meguri_node_modules:
+  meguri_out:
+  meguri_userdata:
