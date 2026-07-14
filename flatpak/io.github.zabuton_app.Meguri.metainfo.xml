@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.zabuton_app.Meguri</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>Meguri</name>
+  <summary>Browse, search, and play your local videos and photos</summary>
+
+  <description>
+    <p>
+      Meguri is a local-first media library for your videos and photos. Point
+      it at any folder and it builds a fast, searchable catalog of everything
+      inside — thumbnails, metadata, tags, and ratings — all stored locally.
+      No account, no cloud, no uploads.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Grid, list, and table layouts with smooth virtualized scrolling</li>
+      <li>Automatic thumbnails for both videos and images</li>
+      <li>Multiple libraries (workspaces) with one-click switching</li>
+      <li>Full-text search plus filters for type, rating, tags, and capture date</li>
+      <li>Built-in player with scene previews and scene bookmarks</li>
+      <li>Manual tags with autocomplete and star ratings that survive file moves</li>
+      <li>Discovery mode that resurfaces random finds from your library</li>
+      <li>A dozen base16 color themes (gruvbox, nord, solarized, dracula, and more)</li>
+    </ul>
+    <p>
+      Meguri never modifies your media files: it only reads the folders you
+      choose and keeps its own data separately.
+    </p>
+  </description>
+
+  <developer id="io.github.amgsk">
+    <name>amgsk</name>
+  </developer>
+
+  <launchable type="desktop-id">io.github.zabuton_app.Meguri.desktop</launchable>
+
+  <content_rating type="oars-1.1" />
+
+  <url type="homepage">https://github.com/zabuton-app/meguri</url>
+  <url type="bugtracker">https://github.com/zabuton-app/meguri/issues</url>
+  <url type="vcs-browser">https://github.com/zabuton-app/meguri</url>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#8a9a7b</color>
+    <color type="primary" scheme_preference="dark">#3c3836</color>
+  </branding>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Browsing a library in the grid view</caption>
+      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.1.0/docs/assets/theme-gruvbox-dark.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Table view with metadata columns</caption>
+      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.1.0/docs/assets/view-table.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Nord theme</caption>
+      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.1.0/docs/assets/theme-nord-dark.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Solarized light theme</caption>
+      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.1.0/docs/assets/theme-solarized-light.png</image>
+    </screenshot>
+  </screenshots>
+
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+  </categories>
+
+  <keywords>
+    <keyword>video</keyword>
+    <keyword>photo</keyword>
+    <keyword>media</keyword>
+    <keyword>library</keyword>
+    <keyword>thumbnails</keyword>
+  </keywords>
+
+  <releases>
+    <release version="0.1.0" date="2026-07-14">
+      <description>
+        <p>Initial release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

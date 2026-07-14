@@ -1,0 +1,67 @@
+# Flatpak manifest for Meguri.
+# Repacks the released .deb on top of the Electron BaseApp (zypak).
+# Build locally:
+#   flatpak run org.flatpak.Builder --user --install --force-clean \
+#     build-dir flatpak/io.github.zabuton_app.Meguri.yml
+app-id: io.github.zabuton_app.Meguri
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: meguri-run
+separate-locales: false
+
+rename-desktop-file: meguri.desktop
+rename-icon: meguri
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  # Update check against the GitHub Releases API
+  - --share=network
+  # Read-only access to common media locations (the app never writes to them;
+  # its own DB/thumbnails live in the sandboxed app config dir)
+  - --filesystem=xdg-videos:ro
+  - --filesystem=xdg-pictures:ro
+  - --filesystem=xdg-music:ro
+  - --filesystem=xdg-download:ro
+  - --filesystem=/media:ro
+  - --filesystem=/run/media:ro
+  # Tray icon (StatusNotifier)
+  - --talk-name=org.kde.StatusNotifierWatcher
+
+modules:
+  - name: meguri
+    buildsystem: simple
+    build-commands:
+      - ar x meguri.deb
+      - tar xf data.tar.xz
+      - cp -a opt/Meguri /app/meguri
+      - install -Dm644 usr/share/applications/meguri.desktop /app/share/applications/meguri.desktop
+      - desktop-file-edit --set-key=Exec --set-value='meguri-run %U' /app/share/applications/meguri.desktop
+      - install -Dm644 usr/share/icons/hicolor/512x512/apps/meguri.png /app/share/icons/hicolor/512x512/apps/meguri.png
+      - install -Dm644 io.github.zabuton_app.Meguri.metainfo.xml /app/share/metainfo/io.github.zabuton_app.Meguri.metainfo.xml
+      - install -Dm755 meguri-run.sh /app/bin/meguri-run
+    sources:
+      - type: file
+        url: https://github.com/zabuton-app/meguri/releases/download/v0.1.0/Meguri-0.1.0-linux-amd64.deb
+        sha256: 864ef2b63e87948121d10e1791b920687177ce346465eaa86eb5699971576279
+        dest-filename: meguri.deb
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/zabuton-app/meguri/releases/latest
+          version-query: .tag_name | sub("^v"; "")
+          url-query: .assets[] | select(.name | endswith("linux-amd64.deb")) | .browser_download_url
+      - type: file
+        path: io.github.zabuton_app.Meguri.metainfo.xml
+      - type: script
+        dest-filename: meguri-run.sh
+        commands:
+          # Stray ELECTRON_RUN_AS_NODE (e.g. left over from test runners on a
+          # dev machine) would make Electron start as plain Node and exit.
+          - unset ELECTRON_RUN_AS_NODE
+          - exec zypak-wrapper /app/meguri/meguri --ozone-platform-hint=auto "$@"

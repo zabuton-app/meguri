@@ -34,3 +34,7 @@ dist-ssr
 
 # demo-capture sample media
 tools/demo-capture/.media/
+
+# flatpak-builder artifacts
+.flatpak-builder/
+repo/
