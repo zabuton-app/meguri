@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meguri — a local-first media library</title>
+<meta name="description" content="Browse, search, and play your local videos and photos. No cloud, no account. Downloads for Linux, Windows, and macOS.">
+<link rel="icon" href="./assets/icon.png">
+<style>
+  /* Solarized light, regardless of the OS color scheme */
+  :root {
+    color-scheme: light;
+    --bg: #fdf6e3;
+    --fg: #586e75;
+    --muted: #93a1a1;
+    --card: #eee8d5;
+    --border: #d9d2bc;
+    --accent: #268bd2;
+    --accent-fg: #fdf6e3;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--fg);
+    line-height: 1.6;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header img.logo { width: 96px; height: 96px; border-radius: 22%; }
+  h1 { font-size: 2.2rem; margin-top: .75rem; }
+  .tagline { color: var(--muted); font-size: 1.1rem; max-width: 40rem; margin: .5rem auto 0; }
+  .shot {
+    display: block; width: 100%; border-radius: 12px;
+    border: 1px solid var(--border); margin: 2rem 0;
+    box-shadow: 0 12px 32px rgba(88, 110, 117, .25), 0 3px 8px rgba(88, 110, 117, .15);
+  }
+  h2 { font-size: 1.3rem; margin: 2.5rem 0 1rem; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.25rem;
+  }
+  .card.highlight { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .card h3 { font-size: 1.05rem; margin-bottom: .75rem; }
+  .btn {
+    display: block; text-align: center; text-decoration: none;
+    background: var(--accent); color: var(--accent-fg);
+    border-radius: 8px; padding: .55rem .9rem; margin: .4rem 0;
+    font-weight: 600; font-size: .95rem;
+  }
+  .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); font-weight: 500; }
+  .btn:hover { filter: brightness(1.08); }
+  .size { color: var(--muted); font-weight: 400; font-size: .85rem; }
+  code.cmd {
+    display: block; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: .55rem .9rem; margin: .4rem 0;
+    font-size: .9rem; overflow-x: auto; white-space: nowrap;
+  }
+  .note { color: var(--muted); font-size: .9rem; margin-top: 1rem; }
+  footer { margin-top: 3.5rem; text-align: center; color: var(--muted); font-size: .9rem; }
+  footer a { color: inherit; }
+  #version { color: var(--muted); font-size: .95rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="logo" src="./assets/icon.png" alt="Meguri logo">
+    <h1>Meguri</h1>
+    <p class="tagline">A local-first media library for your videos and photos —
+    scan, browse, search, and play, all offline. No cloud, no account.</p>
+    <p id="version"></p>
+  </header>
+
+  <img class="shot" src="./assets/theme-solarized-light.png" alt="Meguri browsing a media library in grid view">
+
+  <h2>Download</h2>
+  <div class="cards" id="downloads">
+    <div class="card" data-os="linux">
+      <h3>🐧 Linux</h3>
+      <a class="btn" data-asset="AppImage" href="https://github.com/zabuton-app/meguri/releases/latest">AppImage</a>
+      <a class="btn secondary" data-asset="deb" href="https://github.com/zabuton-app/meguri/releases/latest">.deb package</a>
+    </div>
+    <div class="card" data-os="windows">
+      <h3>🪟 Windows</h3>
+      <a class="btn" data-asset="exe" href="https://github.com/zabuton-app/meguri/releases/latest">Installer (x64)</a>
+    </div>
+    <div class="card" data-os="mac">
+      <h3>🍎 macOS</h3>
+      <a class="btn" data-asset="dmg" href="https://github.com/zabuton-app/meguri/releases/latest">.dmg (Apple silicon)</a>
+      <a class="btn secondary" data-asset="zip" href="https://github.com/zabuton-app/meguri/releases/latest">.zip (Apple silicon)</a>
+    </div>
+  </div>
+
+  <h2>Package managers</h2>
+  <div class="cards">
+    <div class="card" data-os="linux">
+      <h3>Arch Linux (AUR)</h3>
+      <code class="cmd">yay -S meguri-bin</code>
+    </div>
+  </div>
+
+  <p class="note">All downloads are also available on the
+  <a href="https://github.com/zabuton-app/meguri/releases">GitHub Releases</a> page.
+  Meguri only ever reads the folders you point it at — your media files are never modified.</p>
+
+  <footer>
+    <p>Free &amp; open source (MIT) ·
+    <a href="https://github.com/zabuton-app/meguri">Source code on GitHub</a> ·
+    <a href="https://github.com/zabuton-app/meguri/issues">Report an issue</a></p>
+  </footer>
+</div>
+
+<script>
+  // Resolve direct asset links + version from the latest GitHub release.
+  // Falls back to the releases page links already in the markup.
+  const human = (n) => `${(n / 1048576).toFixed(0)} MB`;
+  fetch("https://api.github.com/repos/zabuton-app/meguri/releases/latest")
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((rel) => {
+      document.getElementById("version").textContent =
+        `Latest release: ${rel.tag_name}`;
+      const match = {
+        AppImage: (a) => a.name.endsWith(".AppImage"),
+        deb: (a) => a.name.endsWith(".deb"),
+        exe: (a) => a.name.endsWith(".exe"),
+        dmg: (a) => a.name.endsWith(".dmg"),
+        zip: (a) => a.name.endsWith(".zip"),
+      };
+      for (const btn of document.querySelectorAll("[data-asset]")) {
+        const asset = rel.assets.find(match[btn.dataset.asset]);
+        if (asset) {
+          btn.href = asset.browser_download_url;
+          btn.insertAdjacentHTML(
+            "beforeend",
+            ` <span class="size">(${human(asset.size)})</span>`,
+          );
+        }
+      }
+    })
+    .catch(() => {});
+
+  // Highlight the visitor's platform.
+  const ua = navigator.userAgent;
+  const os = /Windows/i.test(ua) ? "windows" : /Mac/i.test(ua) ? "mac" : "linux";
+  for (const card of document.querySelectorAll(`[data-os="${os}"]`)) {
+    card.classList.add("highlight");
+  }
+</script>
+</body>
+</html>
