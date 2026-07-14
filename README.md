@@ -36,7 +36,7 @@ Prebuilt packages are available on
 | -------- | --------------------------------- |
 | Linux    | AppImage / deb                    |
 | Windows  | Installer (NSIS) / portable       |
-| macOS    | dmg / zip (Apple silicon & Intel) |
+| macOS    | dmg / zip (Apple silicon)         |
 
 Or run from source — see [Setup and Launch](#setup-and-launch).
 

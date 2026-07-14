@@ -20,14 +20,13 @@ jobs:
             platform: win
             arch: x64
             args: --win --x64
+          # Intel mac (--mac --x64) was dropped: the macos-13 x64 runners are
+          # being retired and queue for hours. If it is ever needed again,
+          # cross-build it from an arm64 runner instead.
           - os: macos-14
             platform: mac-arm64
             arch: arm64
             args: --mac --arm64
-          - os: macos-13
-            platform: mac-x64
-            arch: x64
-            args: --mac --x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
