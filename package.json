@@ -136,8 +136,16 @@
     "win": {
       "target": [
         "nsis",
-        "portable"
+        "portable",
+        "appx"
       ]
+    },
+    "appx": {
+      "identityName": "amgsk.meguri",
+      "publisher": "CN=72C8C359-BF5B-4932-A8A6-9114D02CCAB3",
+      "publisherDisplayName": "amgsk",
+      "applicationId": "Meguri",
+      "displayName": "Meguri"
     },
     "nsis": {
       "oneClick": false,
