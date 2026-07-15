@@ -79,6 +79,8 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 🎨 **Themes** — base16-based multi-theme switching (gruvbox / solarized /
   monokai / nord / dracula, etc.)
 - 🔎 **Content zoom** — Ctrl + wheel (and Ctrl +/-/0)
+- 🔒 **Privacy-first** — no telemetry, no analytics, no external network
+  communication ([see below](#privacy))
 
 ## 🔭 Discovery — find something new
 
@@ -218,6 +220,20 @@ Electron's userData.
 > the directories you register, and all of its own data stays under
 > `userData` above. Nothing Meguri does can destroy or modify your videos
 > and images.
+
+## Privacy
+
+Meguri is **privacy-first**: everything stays on your machine.
+
+- **No telemetry, no analytics.** Meguri contains no usage-tracking mechanism
+  such as Google Analytics, crash reporters, or any other third-party
+  measurement SDK.
+- **No external network communication.** The app never sends your data —
+  file names, paths, tags, search queries, playback history, or anything
+  else — to any external server. The only network activity is a local HTTP
+  media server bound to `127.0.0.1`, used solely to stream your own files to
+  the app window.
+- **Fully offline.** All features work without an internet connection.
 
 ## Architecture
 
