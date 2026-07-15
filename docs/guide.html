@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meguri User Guide</title>
+<meta name="description" content="How to use Meguri: add folders, browse, search, tag, and play your local videos and photos — all offline.">
+<link rel="icon" href="./assets/icon.png">
+<style>
+  /* Solarized light, regardless of the OS color scheme */
+  :root {
+    color-scheme: light;
+    --bg: #fdf6e3;
+    --fg: #586e75;
+    --muted: #93a1a1;
+    --card: #eee8d5;
+    --border: #d9d2bc;
+    --accent: #268bd2;
+    --accent-fg: #fdf6e3;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--fg);
+    line-height: 1.65;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header img.logo { width: 72px; height: 72px; border-radius: 22%; }
+  h1 { font-size: 2rem; margin-top: .75rem; }
+  .tagline { color: var(--muted); font-size: 1.05rem; max-width: 40rem; margin: .5rem auto 0; }
+  nav.top { margin-top: 1rem; font-size: .95rem; }
+  nav.top a { color: var(--accent); text-decoration: none; }
+  nav.top a:hover { text-decoration: underline; }
+  h2 { font-size: 1.35rem; margin: 2.75rem 0 .9rem; padding-top: .5rem; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; }
+  p { margin: .6rem 0; }
+  ul, ol { margin: .6rem 0 .6rem 1.4rem; }
+  li { margin: .3rem 0; }
+  a { color: var(--accent); }
+  kbd {
+    display: inline-block; padding: 0 .4em; border-radius: 5px;
+    border: 1px solid var(--border); border-bottom-width: 2px;
+    background: var(--card); font-family: inherit; font-size: .88em;
+  }
+  code {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 5px; padding: .05em .35em; font-size: .9em;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1rem 1.25rem; margin: 1rem 0;
+  }
+  .card.tip { border-left: 4px solid var(--accent); }
+  .shot { border: 1px solid var(--border); border-radius: 10px; max-width: 100%; display: block; margin: 1rem auto; box-shadow: 0 6px 18px rgba(88, 110, 117, .18); }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95rem; }
+  th, td { border: 1px solid var(--border); padding: .5rem .7rem; text-align: left; vertical-align: top; }
+  th { background: var(--card); }
+  .toc { columns: 2; column-gap: 2rem; }
+  @media (max-width: 560px) { .toc { columns: 1; } }
+  .toc a { text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  footer { margin-top: 3.5rem; text-align: center; color: var(--muted); font-size: .9rem; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a href="./index.html"><img class="logo" src="./assets/icon.png" alt="Meguri logo"></a>
+    <h1>Meguri User Guide</h1>
+    <p class="tagline">Everything you need to browse, search, and rediscover
+    your local videos and photos.</p>
+    <nav class="top">
+      <a href="./index.html">← Download page</a> ·
+      <a href="https://github.com/zabuton-app/meguri">GitHub</a> ·
+      <a href="https://github.com/zabuton-app/meguri/issues">Report an issue</a>
+    </nav>
+  </header>
+
+  <h2 id="contents" style="border-top: none; margin-top: 0;">Contents</h2>
+  <ul class="toc">
+    <li><a href="#getting-started">Getting started</a></li>
+    <li><a href="#browsing">Browsing your library</a></li>
+    <li><a href="#playing">Playing videos and viewing photos</a></li>
+    <li><a href="#search">Search and filters</a></li>
+    <li><a href="#tags">Tags, ratings, and favorites</a></li>
+    <li><a href="#collections">Collections</a></li>
+    <li><a href="#discovery">Discovery</a></li>
+    <li><a href="#bookmarks">Scene bookmarks and history</a></li>
+    <li><a href="#workspaces">Workspaces</a></li>
+    <li><a href="#tray">The tray icon and quitting</a></li>
+    <li><a href="#appearance">Themes, language, and zoom</a></li>
+    <li><a href="#data">Where your data lives</a></li>
+    <li><a href="#faq">FAQ</a></li>
+  </ul>
+
+  <h2 id="getting-started">Getting started</h2>
+  <p>Install Meguri from the <a href="./index.html">download page</a>, then
+  launch it. On first launch the library is empty, and a screen prompts you to
+  add a folder.</p>
+  <ol>
+    <li>Click the <strong>+</strong> button in the left sidebar (or the prompt
+    on the empty screen) and pick a folder that contains your videos or
+    photos.</li>
+    <li>Meguri scans the folder recursively and starts generating thumbnails
+    in the background. Progress is shown while it works — you can start
+    browsing right away as items appear.</li>
+    <li>That's it. The folder is remembered, and every later launch re-checks
+    it automatically for new, changed, moved, or deleted files.</li>
+  </ol>
+  <div class="card tip">
+    <strong>Your files are safe.</strong> Meguri only ever <em>reads</em> the
+    folders you add. It never modifies, moves, or deletes your media files.
+    Everything it creates (thumbnails, tags, its database) is stored separately
+    in its own app-data folder — see
+    <a href="#data">Where your data lives</a>.
+  </div>
+
+  <h2 id="browsing">Browsing your library</h2>
+  <img class="shot" src="./assets/theme-solarized-light.png" alt="Meguri browsing a media library in grid view">
+  <p>The main screen shows your library as an endless, scrollable wall of
+  thumbnails. Three layouts are available from the header, so you can switch
+  between visual browsing and detail-oriented lists:</p>
+  <ul>
+    <li><strong>Grid</strong> — large thumbnails, best for visual scanning.</li>
+    <li><strong>List</strong> — thumbnail plus name and key details per row.</li>
+    <li><strong>Table</strong> — compact rows with sortable columns for
+    working through a lot of files quickly.</li>
+  </ul>
+  <p>Scrolling is infinite — items load as you go, even in very large
+  libraries. Use <kbd>Ctrl</kbd> + mouse wheel (or <kbd>Ctrl</kbd> +
+  <kbd>+</kbd>/<kbd>-</kbd>) to make everything larger or smaller at any
+  time.</p>
+
+  <h2 id="playing">Playing videos and viewing photos</h2>
+  <p>Click any thumbnail to open the <strong>detail view</strong>. It appears
+  over the library, so closing it (or pressing <kbd>Esc</kbd>) drops you right
+  back where you were.</p>
+  <ul>
+    <li><strong>Videos</strong> play immediately with full seeking. Hovering
+    the seek bar shows frame previews so you can find a scene before jumping
+    to it. Common formats (mp4, webm, mkv, avi, and more) play in-app.</li>
+    <li><strong>Photos</strong> are shown full size.</li>
+    <li>If a file uses a codec the built-in player can't handle, use
+    <strong>Open externally</strong> to hand it to your system's default
+    player.</li>
+  </ul>
+  <p>The detail view is also where you edit a file's tags and rating, mark it
+  as a favorite, and add scene bookmarks.</p>
+
+  <h2 id="search">Search and filters</h2>
+  <p>The search bar at the top filters your whole library. You can combine:</p>
+  <ul>
+    <li><strong>Text search</strong> — matches file names, paths, and tags
+    (full-text search, so partial words work).</li>
+    <li><strong>Kind</strong> — only videos, or only images.</li>
+    <li><strong>Tags</strong> — one or more tags.</li>
+    <li><strong>Rating</strong> — minimum ★ rating.</li>
+    <li><strong>Favorites</strong> — only files you've marked.</li>
+    <li><strong>Capture date/time</strong> — when the media was recorded.</li>
+  </ul>
+  <p>Every active condition appears as a <strong>badge</strong> under the
+  search bar. Click a badge's × to remove just that condition. Sort order
+  (name, date, size, rating, …) is chosen next to the search bar.</p>
+  <div class="card tip">
+    <strong>Tip:</strong> clicking a tag anywhere — on a thumbnail or in the
+    detail view — instantly searches for that tag. A search you like can be
+    saved as a <a href="#collections">smart collection</a>.
+  </div>
+
+  <h2 id="tags">Tags, ratings, and favorites</h2>
+  <ul>
+    <li><strong>Tags</strong> — add free-form tags in the detail view; the
+    input autocompletes from tags you've already used.</li>
+    <li><strong>Ratings</strong> — rate files from ★ to ★★★★★.</li>
+    <li><strong>Favorites</strong> — a one-click heart for the files you come
+    back to.</li>
+  </ul>
+  <p>All of these stick to the file's <em>content</em>, not its location: if
+  you later rename a file or move it to another folder inside the same
+  workspace, your tags, rating, favorite mark, and history follow it
+  automatically after the next scan.</p>
+
+  <h2 id="collections">Collections</h2>
+  <p>Meguri has two ways to group files, for two different jobs:</p>
+  <table>
+    <tr><th></th><th>Collections</th><th>Smart collections</th></tr>
+    <tr>
+      <th>What they are</th>
+      <td>Hand-picked sets of files, like playlists or albums. Can mix files
+      from different workspaces, and each can have its own emoji icon.</td>
+      <td>Saved searches. You name a set of search conditions and re-run it
+      with one click.</td>
+    </tr>
+    <tr>
+      <th>How to build one</th>
+      <td>Create a collection in the sidebar, then add files to it from the
+      detail view or context menu.</td>
+      <td>Set up a search you like, then save it from the search area.</td>
+    </tr>
+    <tr>
+      <th>What's inside</th>
+      <td>Exactly the files you added, in the order you arrange them.</td>
+      <td>Whatever currently matches the conditions — new files that match
+      show up automatically.</td>
+    </tr>
+  </table>
+
+  <h2 id="discovery">Discovery</h2>
+  <img class="shot" src="./assets/discover.gif" alt="Discovery — random picks with scene previews and reshuffle">
+  <p>The bigger a library grows, the more of it sinks out of sight.
+  <strong>Discovery</strong> deals you a random hand from your library —
+  videos come with at-a-glance scene previews, so you can judge each pick
+  without opening it. One click reshuffles the deck; one more starts
+  playback. Great for rediscovering things you forgot you had.</p>
+
+  <h2 id="bookmarks">Scene bookmarks and history</h2>
+  <ul>
+    <li><strong>Scene bookmarks</strong> — while watching a video, save the
+    current position as a named bookmark. Later, jump straight back to that
+    scene from the detail view.</li>
+    <li><strong>Playback history</strong> — Meguri remembers what you've
+    played and when, so recently and frequently watched items are easy to
+    find again. Like tags, history survives file moves and renames.</li>
+  </ul>
+
+  <h2 id="workspaces">Workspaces</h2>
+  <p>Each folder you add is a <strong>workspace</strong> with its own
+  independent library — its own database, thumbnails, and scan schedule. The
+  icon rail on the far left (Slack-style) lets you add, switch between, and
+  remove workspaces.</p>
+  <ul>
+    <li>Removing a workspace removes it from Meguri only — the folder and
+    your media files on disk are untouched.</li>
+    <li>The special <strong>All</strong> workspace searches across every
+    registered workspace at once — handy when you don't remember which
+    library something is in.</li>
+    <li>Re-scan the current workspace any time with the
+    <strong>Scan</strong> button in the header. Scans are incremental: only
+    new or changed files are processed, and moved or renamed files are
+    recognized by content so their metadata is preserved.</li>
+  </ul>
+
+  <h2 id="tray">The tray icon and quitting</h2>
+  <p>Meguri lives in your system tray. <strong>Closing the window hides it to
+  the tray instead of quitting</strong> — the app keeps running so it can
+  reopen instantly. Click the tray icon to bring the window back.</p>
+  <p>To exit completely, choose <strong>Quit</strong> from the tray icon's
+  menu (on macOS, <kbd>Cmd</kbd>+<kbd>Q</kbd> also works).</p>
+
+  <h2 id="appearance">Themes, language, and zoom</h2>
+  <ul>
+    <li><strong>Themes</strong> — pick from base16 themes (gruvbox, solarized,
+    nord, catppuccin, tokyo night, and more) in Settings. The entire UI
+    follows the theme, in light and dark variants.</li>
+    <li><strong>Language</strong> — the UI is available in English, 日本語,
+    Español, Français, 한국어, and 简体中文. Switch in Settings.</li>
+    <li><strong>Zoom</strong> — <kbd>Ctrl</kbd> + mouse wheel or
+    <kbd>Ctrl</kbd> + <kbd>+</kbd>/<kbd>-</kbd> to scale the UI;
+    <kbd>Ctrl</kbd> + <kbd>0</kbd> resets.</li>
+  </ul>
+
+  <h2 id="data">Where your data lives</h2>
+  <p>Everything Meguri creates is kept in one place, separate from your media
+  (locations shown for Linux; on Windows it's under <code>%APPDATA%</code>,
+  on macOS under <code>~/Library/Application Support</code>):</p>
+  <ul>
+    <li><code>~/.config/Meguri/config.json</code> — your registered
+    workspaces and settings.</li>
+    <li><code>~/.config/Meguri/roots/&lt;id&gt;/db.sqlite</code> — the library
+    database for one workspace (tags, ratings, history, metadata).</li>
+    <li><code>~/.config/Meguri/roots/&lt;id&gt;/thumbs/</code> — generated
+    thumbnails.</li>
+  </ul>
+  <p><strong>Privacy:</strong> Meguri never connects to the internet. There is
+  no telemetry, no analytics, and no account. All features work fully
+  offline; the only network activity is a local server on your own machine
+  that streams your files to the app window.</p>
+  <div class="card">
+    <strong>Note:</strong> tags, ratings, and history stored in the database
+    may be lost when Meguri's internal data format changes between versions.
+    Your media files themselves are never at risk.
+  </div>
+
+  <h2 id="faq">FAQ</h2>
+  <h3>A video won't play — what do I do?</h3>
+  <p>Most formats play in-app, but a few codecs aren't supported by the
+  built-in player. Use <strong>Open externally</strong> in the detail view to
+  play the file with your system's default player.</p>
+  <h3>I added files to my folder but they don't show up.</h3>
+  <p>Click <strong>Scan</strong> in the header to re-scan the workspace. New
+  files are also picked up automatically the next time the app starts.</p>
+  <h3>I moved/renamed files — did I lose my tags?</h3>
+  <p>No. Meguri identifies files by their content, so tags, ratings,
+  favorites, and history follow a file across renames and moves within the
+  same workspace. Just run a scan after reorganizing.</p>
+  <h3>Does Meguri change my files in any way?</h3>
+  <p>No. Meguri only reads the folders you add. Thumbnails and metadata are
+  stored in its own app-data folder, never next to your media.</p>
+  <h3>How do I uninstall cleanly?</h3>
+  <p>Uninstall the app as usual for your OS, then delete Meguri's app-data
+  folder (see <a href="#data">Where your data lives</a>) if you also want to
+  remove thumbnails, tags, and settings. Your media files are unaffected.</p>
+
+  <footer>
+    <p>Free &amp; open source (MIT) ·
+    <a href="./index.html">Download Meguri</a> ·
+    <a href="https://github.com/zabuton-app/meguri">Source code on GitHub</a> ·
+    <a href="https://github.com/zabuton-app/meguri/issues">Report an issue</a></p>
+  </footer>
+</div>
+</body>
+</html>

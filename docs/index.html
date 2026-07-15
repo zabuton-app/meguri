@@ -85,6 +85,9 @@
     font-size: .9rem; overflow-x: auto; white-space: nowrap;
   }
   .note { color: var(--muted); font-size: .9rem; margin-top: 1rem; }
+  nav.top { margin-top: 1rem; font-size: .95rem; }
+  nav.top a { color: var(--accent); text-decoration: none; }
+  nav.top a:hover { text-decoration: underline; }
   footer { margin-top: 3.5rem; text-align: center; color: var(--muted); font-size: .9rem; }
   footer a { color: inherit; }
   #version { color: var(--muted); font-size: .95rem; }
@@ -98,6 +101,7 @@
     <p class="tagline">A local-first media library for your videos and photos —
     scan, browse, search, and play, all offline. No cloud, no account.</p>
     <p id="version"></p>
+    <nav class="top"><a href="./guide.html">📖 User Guide — how to use Meguri</a></nav>
   </header>
 
   <div class="monitor">
@@ -144,6 +148,7 @@
 
   <footer>
     <p>Free &amp; open source (MIT) ·
+    <a href="./guide.html">User Guide</a> ·
     <a href="https://github.com/zabuton-app/meguri">Source code on GitHub</a> ·
     <a href="https://github.com/zabuton-app/meguri/issues">Report an issue</a></p>
   </footer>
