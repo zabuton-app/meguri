@@ -60,6 +60,19 @@ substitution (see
 Distribution targets are Linux (AppImage / deb), Windows (nsis / portable), and
 macOS (dmg / zip).
 
+### macOS code signing
+
+There is no Apple developer certificate, so regular signing / notarization is
+skipped (`CSC_IDENTITY_AUTO_DISCOVERY: false` in CI). Skipping alone is not
+enough: electron-builder's repackaging invalidates the Electron binaries'
+original signatures, and an app with an _invalid_ signature is rejected by
+Gatekeeper on Apple silicon as "damaged" with no way to open it. The
+`afterPack` hook (`scripts/mac-adhoc-sign.mjs`) therefore ad-hoc signs the
+bundle, which restores a valid signature; users then only need the one-time
+"Open Anyway" approval for an un-notarized app. If real certificates are
+configured later (`CSC_LINK` / `CSC_NAME`), the hook steps aside
+automatically.
+
 ## CI
 
 GitHub Actions workflows live in `.github/workflows/`:
