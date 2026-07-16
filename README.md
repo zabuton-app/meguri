@@ -38,6 +38,24 @@ Prebuilt packages are available on
 | Windows  | Installer (NSIS) / portable       |
 | macOS    | dmg / zip (Apple silicon)         |
 
+### macOS: "Meguri is damaged and can't be opened"
+
+The macOS builds are not notarized by Apple yet, so Gatekeeper reports the
+downloaded app as "damaged" even though the file itself is fine. Proper code
+signing and notarization are planned — once in place, this error will go away.
+
+Until then, if you want to run the app right now, there is a workaround:
+after copying `Meguri.app` into `/Applications`, remove the quarantine
+attribute once:
+
+```bash
+xattr -cr /Applications/Meguri.app
+```
+
+The app launches normally from then on. Note that this is a hack that
+bypasses a macOS safety check, not a recommended practice — only use it if
+you trust the downloaded binary, and prefer waiting for a notarized release.
+
 ### Arch Linux (AUR)
 
 [meguri-bin](https://aur.archlinux.org/packages/meguri-bin) is available on
