@@ -38,6 +38,27 @@ Prebuilt packages are available on
 | Windows  | Installer (NSIS) / portable       |
 | macOS    | dmg / zip (Apple silicon)         |
 
+### macOS: first launch
+
+Meguri is not notarized by Apple (that requires a paid developer account), so
+the first launch is blocked with an "Apple could not verify…" dialog. To allow
+it:
+
+1. Open the app once and dismiss the dialog.
+2. Open **System Settings → Privacy & Security**, scroll down, and click
+   **Open Anyway** next to the Meguri entry.
+
+Alternatively, clear the quarantine flag from the terminal:
+
+```bash
+xattr -d com.apple.quarantine /Applications/Meguri.app
+```
+
+If macOS instead says the app **"is damaged and can't be opened"**, you are
+running a build from v0.1.0 or earlier that shipped with a broken code
+signature — download the latest release, which is ad-hoc signed and only
+needs the one-time approval above.
+
 ### Arch Linux (AUR)
 
 [meguri-bin](https://aur.archlinux.org/packages/meguri-bin) is available on
