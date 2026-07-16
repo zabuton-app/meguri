@@ -40,9 +40,9 @@ Prebuilt packages are available on
 
 ### macOS: first launch
 
-Meguri is not notarized by Apple (that requires a paid developer account), so
-the first launch is blocked with an "Apple could not verify…" dialog. To allow
-it:
+Meguri is not yet notarized by Apple (that requires a paid developer account;
+proper code signing and notarization are planned), so the first launch is
+blocked with an "Apple could not verify…" dialog. To allow it:
 
 1. Open the app once and dismiss the dialog.
 2. Open **System Settings → Privacy & Security**, scroll down, and click
