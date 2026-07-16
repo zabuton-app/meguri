@@ -38,23 +38,26 @@ Prebuilt packages are available on
 | Windows  | Installer (NSIS) / portable       |
 | macOS    | dmg / zip (Apple silicon)         |
 
-### macOS: "Meguri is damaged and can't be opened"
+### macOS: first launch
 
-The macOS builds are not notarized by Apple yet, so Gatekeeper reports the
-downloaded app as "damaged" even though the file itself is fine. Proper code
-signing and notarization are planned — once in place, this error will go away.
+Meguri is not notarized by Apple (that requires a paid developer account), so
+the first launch is blocked with an "Apple could not verify…" dialog. To allow
+it:
 
-Until then, if you want to run the app right now, there is a workaround:
-after copying `Meguri.app` into `/Applications`, remove the quarantine
-attribute once:
+1. Open the app once and dismiss the dialog.
+2. Open **System Settings → Privacy & Security**, scroll down, and click
+   **Open Anyway** next to the Meguri entry.
+
+Alternatively, clear the quarantine flag from the terminal:
 
 ```bash
-xattr -cr /Applications/Meguri.app
+xattr -d com.apple.quarantine /Applications/Meguri.app
 ```
 
-The app launches normally from then on. Note that this is a hack that
-bypasses a macOS safety check, not a recommended practice — only use it if
-you trust the downloaded binary, and prefer waiting for a notarized release.
+If macOS instead says the app **"is damaged and can't be opened"**, you are
+running a build from v0.1.0 or earlier that shipped with a broken code
+signature — download the latest release, which is ad-hoc signed and only
+needs the one-time approval above.
 
 ### Arch Linux (AUR)
 

@@ -54,7 +54,11 @@ jobs:
         run: npx electron-builder ${{ matrix.args }} --publish never
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Skip macOS code signing / notarization (unsigned build).
+          # Apple 証明書がないため通常の macOS 署名 / 公証はスキップする。
+          # そのままだと electron-builder のバンドル改変で Electron 本体の署名が
+          # 無効になり、Gatekeeper が「アプリケーションが壊れています」と表示して
+          # 起動できないため、afterPack フック (scripts/mac-adhoc-sign.mjs) で
+          # ad-hoc 署名して署名を有効な状態に戻している。
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifacts
