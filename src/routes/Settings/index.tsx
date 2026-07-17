@@ -32,8 +32,14 @@ const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/amgsk";
 export default function Settings() {
   const { mode, familyId, families, setMode, setFamily } = useTheme();
   const { lang, setLang, t } = useI18n();
-  const { sceneCount, setSceneCount, keybindingPreset, setKeybindingPreset } =
-    usePreferences();
+  const {
+    sceneCount,
+    setSceneCount,
+    keybindingPreset,
+    setKeybindingPreset,
+    hideSupportLink,
+    setHideSupportLink,
+  } = usePreferences();
   const navigate = useNavigate();
   // Closing the modal = drop the child route and return to the list (the list stays mounted).
   const onClose = useCallback(() => navigate("/"), [navigate]);
@@ -220,26 +226,40 @@ export default function Settings() {
           {/* Update check */}
           <UpdateSection />
 
-          {/* Support / donation link */}
-          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-bright-fg">
-                {t("settings.support")}
-              </span>
-              <span className="text-xs text-muted">
-                {t("settings.supportDesc")}
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => void api.openUrl(BUY_ME_A_COFFEE_URL)}
-            >
-              <Coffee className="size-4" />
-              {t("settings.buyMeCoffee")}
-            </Button>
-          </section>
+          {/* Support / donation link (dismissible; hidden permanently once closed) */}
+          {!hideSupportLink && (
+            <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-bright-fg">
+                  {t("settings.support")}
+                </span>
+                <span className="text-xs text-muted">
+                  {t("settings.supportDesc")}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => void api.openUrl(BUY_ME_A_COFFEE_URL)}
+                >
+                  <Coffee className="size-4" />
+                  {t("settings.buyMeCoffee")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => setHideSupportLink(true)}
+                  aria-label={t("settings.hideSupport")}
+                  title={t("settings.hideSupport")}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            </section>
+          )}
 
           {/* About / license attributions */}
           <AboutSection />

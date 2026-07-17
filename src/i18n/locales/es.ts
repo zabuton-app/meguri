@@ -40,6 +40,7 @@ export const es: Record<TranslationKey, string> = {
   "settings.supportDesc":
     "Si te gusta esta aplicación, considera apoyar su desarrollo.",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "Ocultar el enlace de apoyo",
   "settings.update": "Actualizaciones",
   "settings.updateDesc":
     "Comprueba si hay una versión más reciente disponible.",

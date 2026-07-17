@@ -37,6 +37,7 @@ export const ko: Record<TranslationKey, string> = {
   "settings.support": "개발 응원하기",
   "settings.supportDesc": "이 앱이 마음에 드신다면 개발 지원을 고려해 주세요.",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "지원 링크 숨기기",
   "settings.update": "업데이트",
   "settings.updateDesc": "새 버전이 있는지 확인합니다.",
   "settings.updateCheckNow": "지금 확인",

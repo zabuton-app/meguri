@@ -37,6 +37,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.support": "支持开发",
   "settings.supportDesc": "如果你喜欢这个应用，欢迎支持它的开发。",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "隐藏支持链接",
   "settings.update": "更新",
   "settings.updateDesc": "检查是否有新版本可用。",
   "settings.updateCheckNow": "立即检查",
