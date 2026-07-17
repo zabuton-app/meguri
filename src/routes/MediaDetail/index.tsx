@@ -168,10 +168,17 @@ export default function MediaDetail() {
     const key = `${wsId}:${fileId}`;
     if (recordedViewRef.current === key) return;
     recordedViewRef.current = key;
-    void api.fileRecordPlay(fileId, wsId, "browser").then(() => {
-      // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
-      void qc.invalidateQueries({ queryKey: ["files_search"] });
-    });
+    api
+      .fileRecordPlay(fileId, wsId, "browser")
+      .then(() => {
+        // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
+        void qc.invalidateQueries({ queryKey: ["files_search"] });
+      })
+      .catch(() => {
+        // Drop the guard on failure so a later effect run of this visit can retry;
+        // without this a transient IPC error would suppress the record for good.
+        if (recordedViewRef.current === key) recordedViewRef.current = null;
+      });
   }, [kind, fileId, wsId, qc]);
   const workspaces = useQuery({
     queryKey: ["workspaces_list"],

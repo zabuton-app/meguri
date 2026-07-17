@@ -25,17 +25,23 @@ import { HistoryModal } from "./HistoryModal";
 
 const PAGE_SIZE = 50;
 
-/** Day bucket label: today / yesterday / locale date. */
+/** Day bucket label: today / yesterday / locale date. Calendar-day comparison
+ *  (not ms arithmetic) so DST transitions can't shift the bucket boundaries. */
 function dayLabel(playedAt: number, t: TFunc): string {
   const day = new Date(playedAt * 1000);
   const today = new Date();
-  const startOf = (d: Date) =>
-    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const diffDays = Math.round(
-    (startOf(today) - startOf(day)) / (24 * 60 * 60 * 1000),
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+  if (sameDay(day, today)) return t("history.today");
+  // Rolling the date back by one lets Date normalize month/year boundaries.
+  const yesterday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() - 1,
   );
-  if (diffDays === 0) return t("history.today");
-  if (diffDays === 1) return t("history.yesterday");
+  if (sameDay(day, yesterday)) return t("history.yesterday");
   return day.toLocaleDateString();
 }
 
