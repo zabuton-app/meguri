@@ -486,7 +486,9 @@ export default function MediaDetail() {
                     variant="outline"
                     size="sm"
                     className="border-muted/35 bg-surface px-2"
+                    disabled={!mediaSrc}
                     onClick={() => {
+                      if (!mediaSrc) return;
                       void copyImageToClipboard(mediaSrc)
                         .then(() => toast.success(t("media.imageCopied")))
                         .catch((e: unknown) => {

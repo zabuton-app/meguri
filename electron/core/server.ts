@@ -141,9 +141,10 @@ function handle(
     // x-api-token header, injected by the app's webRequest layer — cross-origin
     // pages in external browsers never have it and get 401.
     res.setHeader("Access-Control-Allow-Origin", "*");
-    // Answer CORS preflight before the token check: preflight requests never
-    // carry the injected auth header, so they would otherwise 401 and block
-    // any future non-simple fetch (custom headers/methods) from the renderer.
+    // Answer CORS preflight before routing/token checks so OPTIONS gets a
+    // proper preflight response (Allow-Methods/Headers) instead of being
+    // treated as a media request. Keeps any future non-simple fetch (custom
+    // headers/methods) from the renderer working.
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
