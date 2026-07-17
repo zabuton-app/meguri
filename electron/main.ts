@@ -559,6 +559,18 @@ function registerFileHandlers(): void {
   handle("file_record_play", ({ id, workspaceId, via, position }) =>
     q.recordPlay(coreById(workspaceId).db, id, via, position ?? null),
   );
+  // A collection is a file set, not a history scope; while one is active (queryCores()
+  // returns []) fall back to every workspace so the timeline is still meaningful.
+  const historyCores = () =>
+    ws.isCollection() ? ws.allCores() : ws.queryCores();
+  handle("history_list", ({ query }) =>
+    cw.listHistoryWorkspaces(historyCores(), query ?? {}),
+  );
+  // Clear scope matches what history_list shows: the active workspace only, or
+  // every workspace when All / a collection is active.
+  handle("history_clear", () => {
+    for (const { core } of historyCores()) q.clearPlayHistory(core.db);
+  });
 }
 
 function registerTagHandlers(): void {

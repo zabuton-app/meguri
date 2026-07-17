@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS play_history (
   played_at INTEGER NOT NULL, position REAL, via TEXT NOT NULL CHECK (via IN ('browser','external'))
 );
 CREATE INDEX IF NOT EXISTS idx_play_history_meta ON play_history(meta_key);
+CREATE INDEX IF NOT EXISTS idx_play_history_played ON play_history(played_at DESC, id DESC);
 
 -- User-curated scene bookmarks (specific times in a video, distinct from the auto-generated
 -- evenly-spaced scenes shown in the player). Keyed by meta_key like file_meta so bookmarks

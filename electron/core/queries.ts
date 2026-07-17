@@ -5,3 +5,4 @@ export * from "./queries/meta.js";
 export * from "./queries/bookmarks.js";
 export * from "./queries/thumbs.js";
 export * from "./queries/scanRoots.js";
+export * from "./queries/history.js";

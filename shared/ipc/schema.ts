@@ -91,6 +91,32 @@ export const SearchQuerySchema = z.object({
 });
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 
+export const HistoryQuerySchema = z.object({
+  via: z.enum(["browser", "external"]).optional(),
+  cursor: z.number().int().min(0).optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+});
+export type HistoryQuery = z.infer<typeof HistoryQuerySchema>;
+
+/** One row of the cross-file play-history timeline: the played file plus event info. */
+export const HistoryEntrySchema = FileRowSchema.extend({
+  /** play_history row ID of the newest event in the collapsed run. */
+  historyId: z.number(),
+  /** Unix seconds of the newest event in the collapsed run. */
+  playedAt: z.number(),
+  via: z.string(),
+  position: z.number().nullable(),
+  /** Total play count of this file (all events, not just this run). */
+  playCount: z.number(),
+});
+export type HistoryEntryRow = z.infer<typeof HistoryEntrySchema>;
+
+export const HistoryPageSchema = z.object({
+  items: z.array(HistoryEntrySchema),
+  nextCursor: z.number().nullable(),
+});
+export type HistoryPage = z.infer<typeof HistoryPageSchema>;
+
 export const SearchResultSchema = z.object({
   items: z.array(FileRowSchema),
   nextCursor: z.number().nullable(),

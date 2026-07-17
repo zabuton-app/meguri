@@ -236,6 +236,20 @@ export const ja = {
   "discover.emptyHint":
     "「スキャン」で動画や画像を取り込むと、ここでランダムにおすすめされます。",
 
+  // 再生履歴
+  "history.title": "再生履歴",
+  "history.empty": "再生履歴はまだありません。",
+  "history.emptyHint": "動画や画像を再生すると、ここに履歴が表示されます。",
+  "history.clear": "履歴をクリア",
+  "history.clearAction": "クリア",
+  "history.clearConfirm":
+    "再生履歴をすべて削除しますか？この操作は取り消せません。",
+  "history.playCount": "{count} 回再生",
+  "history.viaBrowser": "アプリ内",
+  "history.viaExternal": "外部プレーヤー",
+  "history.today": "今日",
+  "history.yesterday": "昨日",
+
   // ワークスペースレール
   "workspace.all": "すべて",
   "workspace.settings": "設定",

@@ -236,6 +236,19 @@ export const en: Record<TranslationKey, string> = {
   "discover.emptyHint":
     'Run "Scan" to import videos and images, and they\'ll be recommended here at random.',
 
+  // Play history
+  "history.title": "Play history",
+  "history.empty": "No play history yet.",
+  "history.emptyHint": "Play videos or images and they will show up here.",
+  "history.clear": "Clear history",
+  "history.clearAction": "Clear",
+  "history.clearConfirm": "Delete all play history? This cannot be undone.",
+  "history.playCount": "{count} plays",
+  "history.viaBrowser": "In-app",
+  "history.viaExternal": "External player",
+  "history.today": "Today",
+  "history.yesterday": "Yesterday",
+
   // workspace rail
   "workspace.all": "All",
   "workspace.settings": "Settings",
