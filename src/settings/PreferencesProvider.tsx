@@ -25,11 +25,13 @@ export const SCENE_COUNT_OPTIONS = [4, 6, 8, 12, 16, 20, 24, 32] as const;
 interface Prefs {
   sceneCount: number;
   keybindingPreset: KeybindingPreset;
+  hideSupportLink: boolean;
 }
 
 const DEFAULTS: Prefs = {
   sceneCount: DEFAULT_SCENE_COUNT,
   keybindingPreset: DEFAULT_KEYBINDING_PRESET,
+  hideSupportLink: false,
 };
 
 function clampSceneCount(n: number): number {
@@ -51,6 +53,10 @@ function loadPrefs(): Prefs {
         keybindingPreset: isKeybindingPreset(parsed.keybindingPreset)
           ? parsed.keybindingPreset
           : DEFAULT_KEYBINDING_PRESET,
+        hideSupportLink:
+          typeof parsed.hideSupportLink === "boolean"
+            ? parsed.hideSupportLink
+            : DEFAULTS.hideSupportLink,
       };
     }
   } catch {
@@ -62,6 +68,7 @@ function loadPrefs(): Prefs {
 interface PrefsCtx extends Prefs {
   setSceneCount: (n: number) => void;
   setKeybindingPreset: (p: KeybindingPreset) => void;
+  setHideSupportLink: (hidden: boolean) => void;
 }
 
 const Ctx = createContext<PrefsCtx | null>(null);
@@ -84,6 +91,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPrefs((p) => ({ ...p, sceneCount: clampSceneCount(n) })),
       setKeybindingPreset: (kp) =>
         setPrefs((p) => ({ ...p, keybindingPreset: kp })),
+      setHideSupportLink: (hidden) =>
+        setPrefs((p) => ({ ...p, hideSupportLink: hidden })),
     }),
     [prefs],
   );

@@ -38,6 +38,7 @@ export const ja = {
   "settings.supportDesc":
     "このアプリが気に入ったら、開発の支援をご検討ください。",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "サポートリンクを非表示にする",
   "settings.update": "アップデート",
   "settings.updateDesc": "新しいバージョンが公開されていないか確認します。",
   "settings.updateCheckNow": "今すぐ確認",
