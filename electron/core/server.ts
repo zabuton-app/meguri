@@ -135,6 +135,24 @@ function handle(
   authToken: string,
 ) {
   try {
+    // The renderer origin (localhost:5173 in dev, file:// in prod) differs from
+    // this server's 127.0.0.1 origin, so fetch()/canvas need CORS to read media
+    // bytes (e.g. copy-image-to-clipboard). Safe to allow broadly: auth is the
+    // x-api-token header, injected by the app's webRequest layer — cross-origin
+    // pages in external browsers never have it and get 401.
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    // Answer CORS preflight before the token check: preflight requests never
+    // carry the injected auth header, so they would otherwise 401 and block
+    // any future non-simple fetch (custom headers/methods) from the renderer.
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": AUTH_HEADER,
+        "Access-Control-Max-Age": "600",
+      });
+      res.end();
+      return;
+    }
     const url = new URL(req.url ?? "", "http://127.0.0.1");
     const m = url.pathname.match(ROUTE);
     if (!m) {

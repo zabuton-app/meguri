@@ -17,6 +17,7 @@ import {
   FolderMinus,
   FolderOpen,
   FolderPlus,
+  ImageDown,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -49,6 +50,7 @@ import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
 import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
+import { copyImageToClipboard } from "./utils";
 import { syncFileRowAcrossCaches } from "@/lib/queryCache";
 
 const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
@@ -468,17 +470,36 @@ export default function MediaDetail() {
             </div>
             <ButtonGroup className="shrink-0">
               {d.kind === "image" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-muted/35 bg-surface px-2"
-                  onClick={toggleImageBgInverted}
-                  aria-label={t("media.invertImageBackground")}
-                  aria-pressed={imageBgInverted}
-                  title={t("media.invertImageBackground")}
-                >
-                  <Contrast />
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-muted/35 bg-surface px-2"
+                    onClick={toggleImageBgInverted}
+                    aria-label={t("media.invertImageBackground")}
+                    aria-pressed={imageBgInverted}
+                    title={t("media.invertImageBackground")}
+                  >
+                    <Contrast />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-muted/35 bg-surface px-2"
+                    onClick={() => {
+                      void copyImageToClipboard(mediaSrc)
+                        .then(() => toast.success(t("media.imageCopied")))
+                        .catch((e: unknown) => {
+                          console.error("copy image failed:", e);
+                          toast.error(t("media.imageCopyFailed"));
+                        });
+                    }}
+                    aria-label={t("media.copyImage")}
+                    title={t("media.copyImage")}
+                  >
+                    <ImageDown />
+                  </Button>
+                </>
               )}
               <Button
                 variant="outline"
