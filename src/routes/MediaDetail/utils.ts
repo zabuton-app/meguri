@@ -27,6 +27,44 @@ export function isThumbPendingFor(
   return isSameThumbSource(pendingThumbSec, sec);
 }
 
+// Copies the image served at `src` (the media-server URL) to the clipboard.
+// ClipboardItem only reliably accepts image/png, so any other decodable format
+// (jpeg/webp/gif/avif/bmp) is re-encoded to PNG via canvas. Animated images copy
+// their first frame only. Throws on fetch/decode/encode failure — callers surface it.
+export async function copyImageToClipboard(src: string): Promise<void> {
+  if (!src) throw new Error("empty media src");
+  const res = await fetch(src);
+  if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+  const blob = await res.blob();
+  const png = blob.type === "image/png" ? blob : await toPngBlob(blob);
+  await navigator.clipboard.write([
+    new ClipboardItem({ "image/png": png }),
+  ]);
+}
+
+async function toPngBlob(blob: Blob): Promise<Blob> {
+  // "from-image" applies EXIF orientation so the copied pixels match what <img> shows.
+  const bitmap = await createImageBitmap(blob, {
+    imageOrientation: "from-image",
+  });
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2d context unavailable");
+    ctx.drawImage(bitmap, 0, 0);
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("png encode failed"))),
+        "image/png",
+      );
+    });
+  } finally {
+    bitmap.close();
+  }
+}
+
 // Player seek display: always shows the hours field when needed and guards against
 // non-finite numbers (some streams expose Infinity as currentTime before metadata loads).
 // Kept separate from `formatDuration` because its "0:00" fallback and isFinite check
