@@ -227,6 +227,24 @@ async function handle(
   }
 }
 
+/**
+ * If-None-Match may be a comma-separated list, a repeated header (string[]),
+ * `*`, and each entry may carry a weak `W/` prefix — 304 revalidation uses the
+ * weak comparison, so strip the prefix before comparing against our ETag.
+ */
+function etagMatches(
+  header: string | string[] | undefined,
+  etag: string,
+): boolean {
+  if (!header) return false;
+  const raw = Array.isArray(header) ? header.join(",") : header;
+  return raw.split(",").some((entry) => {
+    const tag = entry.trim();
+    if (tag === "*") return true;
+    return (tag.startsWith("W/") ? tag.slice(2) : tag) === etag;
+  });
+}
+
 // Let the browser cache thumbnails instead of re-requesting on every grid
 // render. Not `immutable`: the renderer's `?v=` cache buster is a per-component
 // counter (not a persistent version), so a regenerated thumbnail can be
@@ -257,7 +275,7 @@ async function serveFile(
     // size+mtime changes). Answers conditional requests with 304.
     const etag = `"${size}-${Math.trunc(st.mtimeMs)}"`;
     res.setHeader("ETag", etag);
-    if (req.headers["if-none-match"] === etag) {
+    if (etagMatches(req.headers["if-none-match"], etag)) {
       res.writeHead(304).end();
       return;
     }

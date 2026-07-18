@@ -180,6 +180,43 @@ describe("thumb serving", () => {
         .status,
     ).toBe(404);
   });
+
+  it("serves thumbnails with Cache-Control and an ETag", async () => {
+    const res = await fetch(`${base}/ws/${WS}/thumb/${thumbId}`, authHeaders());
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(res.headers.get("etag")).toMatch(/^"\d+-\d+"$/);
+  });
+
+  it("answers a matching If-None-Match with 304 (incl. weak and list forms)", async () => {
+    const first = await fetch(
+      `${base}/ws/${WS}/thumb/${thumbId}`,
+      authHeaders(),
+    );
+    const etag = first.headers.get("etag")!;
+    await first.arrayBuffer(); // drain
+
+    for (const header of [etag, `W/${etag}`, `"other", ${etag}`, "*"]) {
+      const res = await fetch(`${base}/ws/${WS}/thumb/${thumbId}`, {
+        headers: { ...authHeader(), "If-None-Match": header },
+      });
+      expect(res.status, `If-None-Match: ${header}`).toBe(304);
+    }
+
+    const miss = await fetch(`${base}/ws/${WS}/thumb/${thumbId}`, {
+      headers: { ...authHeader(), "If-None-Match": '"stale-etag"' },
+    });
+    expect(miss.status).toBe(200);
+    expect(await miss.text()).toBe("THUMBDATA");
+  });
+
+  it("does not add cache headers to media responses", async () => {
+    const res = await fetch(`${base}/ws/${WS}/media/${mediaId}`, authHeaders());
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBeNull();
+    expect(res.headers.get("etag")).toBeNull();
+    await res.arrayBuffer();
+  });
 });
 
 describe("media serving and Range", () => {
