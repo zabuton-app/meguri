@@ -115,7 +115,12 @@ export function searchFiles(db: DB, query: SearchQuery): SearchResult {
   return { items, nextCursor };
 }
 
-function orderByFor(sort?: string, dir?: string): string {
+/**
+ * ORDER BY clause for a sort key/direction. Exported for the index-plan tests.
+ * Kept in lockstep with comparatorFor() in crossWorkspace.ts — the All view's
+ * k-way merge re-implements this ordering in JS and breaks if they diverge.
+ */
+export function orderByFor(sort?: string, dir?: string): string {
   const direction = resolveSortDir(sort, dir).toUpperCase();
   switch (sort) {
     case "rating":
@@ -123,7 +128,10 @@ function orderByFor(sort?: string, dir?: string): string {
     case "captured":
       return `f.captured_at IS NULL ASC, f.captured_at ${direction}, f.id ASC`;
     case "name":
-      return `f.rel_path ${direction}, f.id ASC`;
+      // The id tiebreak follows the main direction so both directions map onto
+      // a single scan of idx_files_alive_rel_path (forward/backward); a fixed
+      // "id ASC" would force a temp b-tree for the DESC case.
+      return `f.rel_path ${direction}, f.id ${direction}`;
     case "accessed":
       return `m.last_accessed_at IS NULL ASC, m.last_accessed_at ${direction}, f.id ASC`;
     default:

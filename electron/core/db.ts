@@ -32,11 +32,25 @@ CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);
 CREATE INDEX IF NOT EXISTS idx_files_thumb_status ON files(thumb_status);
 CREATE INDEX IF NOT EXISTS idx_files_excluded ON files(excluded_at);
 CREATE INDEX IF NOT EXISTS idx_files_meta_key ON files(meta_key);
+-- Partial indexes over live rows: every list/search/count filters on
+-- "deleted_at IS NULL", and better-sqlite3 runs synchronously on the main
+-- process, so a filesort/full scan here directly blocks UI/IPC/serving.
+-- idx_files_alive turns countFiles() into a covering-index scan.
+CREATE INDEX IF NOT EXISTS idx_files_alive ON files(deleted_at) WHERE deleted_at IS NULL;
+-- Drives sort=name ("ORDER BY rel_path <dir>, id <dir>" scans it forward/backward).
+CREATE INDEX IF NOT EXISTS idx_files_alive_rel_path ON files(rel_path, id) WHERE deleted_at IS NULL;
+-- Drives sort=captured in its default DESC direction: the leading expression
+-- matches the "captured_at IS NULL ASC" NULLs-last term exactly. The ASC
+-- direction still filesorts (a reversed scan would put NULLs first).
+CREATE INDEX IF NOT EXISTS idx_files_alive_captured ON files((captured_at IS NULL), captured_at DESC, id) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS tags (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, namespace TEXT NOT NULL DEFAULT '',
   UNIQUE (namespace, name)
 );
+-- Tag-name autocomplete uses a prefix LIKE; LIKE is case-insensitive by
+-- default, so the range-search optimization needs a NOCASE-collated index.
+CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name COLLATE NOCASE);
 
 -- Durable, manually-curated metadata keyed by the stable meta_key (not files.id),
 -- so it survives rebuilding the files/files_fts tables. Removed only when the whole
