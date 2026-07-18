@@ -70,7 +70,7 @@ export function SceneRail({
               className="aspect-[16/10] w-full object-cover"
             />
             <span className="absolute bottom-0.5 right-0.5 rounded bg-bg/80 px-1 text-[10px] tabular-nums text-fg">
-              {formatDuration(sec, { hours: true, fallback: "—" })}
+              {formatDuration(sec, { hours: true, fallback: "0:00" })}
             </span>
           </Link>
         ))}
