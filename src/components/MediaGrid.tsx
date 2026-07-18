@@ -54,7 +54,9 @@ interface Props {
   navActive?: boolean;
 }
 
-export function MediaGrid({
+// Memoized: Home re-renders on every thumbVersion flush and its other props are
+// referentially stable, so the grid only re-renders when the data actually changes.
+export const MediaGrid = memo(function MediaGrid({
   items,
   mediaBase,
   workspaceId: wsId,
@@ -84,19 +86,39 @@ export function MediaGrid({
     setScrollEl(node);
   }, []);
   const [cols, setCols] = useState(1);
+  const [innerW, setInnerW] = useState(0);
 
   // Compute the column count from the container width (equivalent to auto-fill minmax(180px,1fr)).
   useEffect(() => {
     if (!scrollEl) return;
     const compute = () => {
-      const innerW = scrollEl.clientWidth - SIDE_PAD * 2;
-      setCols(Math.max(1, Math.floor((innerW + GAP) / (MIN_COL + GAP))));
+      const w = scrollEl.clientWidth - SIDE_PAD * 2;
+      setInnerW(w);
+      setCols(Math.max(1, Math.floor((w + GAP) / (MIN_COL + GAP))));
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(scrollEl);
     return () => ro.disconnect();
   }, [scrollEl]);
+
+  // Every row has the same height for a given container width (aspect-video thumb +
+  // fixed-height metadata), so instead of measuring every visible row with
+  // measureElement (one ResizeObserver + forced reflow per row), measure a single
+  // mounted row once per width change and feed it to estimateSize.
+  const [rowH, setRowH] = useState(0);
+  const measuredKey = useRef("");
+  const rowKey = `${cols}:${innerW}`;
+  const measureRow = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node || measuredKey.current === rowKey) return;
+      measuredKey.current = rowKey;
+      const h = node.getBoundingClientRect().height;
+      setRowH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
+    },
+    [rowKey],
+  );
+  const rowEstimate = rowH || ROW_ESTIMATE;
 
   // Group items into rows by column count.
   const rows = useMemo(() => {
@@ -107,17 +129,22 @@ export function MediaGrid({
   }, [items, cols]);
   const leadingRows = Math.floor(listOffset / cols);
 
-  // TanStack Virtual returns functions React Compiler can't memoize; the skipped
-  // memoization is expected and harmless here (the virtualizer drives its own state).
-  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_ESTIMATE,
+    estimateSize: () => rowEstimate,
     overscan: 4,
-    paddingStart: leadingRows * ROW_ESTIMATE,
+    paddingStart: leadingRows * rowEstimate,
   });
   const virtualRows = virtualizer.getVirtualItems();
+
+  // estimateSize results are cached per index; drop the cache when the measured
+  // row height changes so all row offsets are recomputed with the new size.
+  useEffect(() => {
+    virtualizer.measure();
+    // The virtualizer reference is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowEstimate]);
 
   // Keyboard focus navigation (2D, by column count). Open the focused card on Enter.
   const scrollToRow = useScrollToRow(virtualizer);
@@ -209,8 +236,7 @@ export function MediaGrid({
         {virtualRows.map((vr) => (
           <div
             key={vr.key}
-            data-index={vr.index}
-            ref={virtualizer.measureElement}
+            ref={measureRow}
             className="absolute left-0 top-0 w-full"
             style={{ transform: `translateY(${vr.start}px)` }}
           >
@@ -234,7 +260,7 @@ export function MediaGrid({
       </div>
     </ScrollArea>
   );
-}
+});
 
 // The parent (MediaGrid) re-renders on every thumb:done, so memoize this and
 // only re-render cards whose version changed (onTagClick is stabilized in the parent).

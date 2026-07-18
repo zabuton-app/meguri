@@ -67,7 +67,9 @@ interface Props {
   navActive?: boolean;
 }
 
-export function MediaTable({
+// Memoized: Home re-renders on every thumbVersion flush and its other props are
+// referentially stable, so the table only re-renders when the data actually changes.
+export const MediaTable = memo(function MediaTable({
   items,
   mediaBase,
   workspaceId: wsId,
@@ -241,7 +243,7 @@ export function MediaTable({
       </div>
     </ScrollArea>
   );
-}
+});
 
 function HeadCell({ children }: { children?: ReactNode }) {
   return (

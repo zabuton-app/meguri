@@ -2,7 +2,18 @@
 // invalidating ["files_search"] so a favorite/rating toggle does not refetch
 // the entire infinite list.
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
-import type { FileDetail, FileRow, SearchResult } from "@/ipc/types";
+import type {
+  FileDetail,
+  FileRow,
+  SearchQuery,
+  SearchResult,
+} from "@/ipc/types";
+import { COLLECTION_ID_PREFIX } from "@/ipc/client";
+
+/** The SearchQuery part of a ["files_search", wsId, filter] query key. */
+function searchFilterOf(queryKey: readonly unknown[]): SearchQuery | undefined {
+  return queryKey[2] as SearchQuery | undefined;
+}
 
 function matchesFile(
   row: FileRow,
@@ -54,6 +65,51 @@ export function patchFileDetailInCache(
     ["file_get", workspaceId, fileId],
     (old) => (old ? { ...old, ...patch } : old),
   );
+}
+
+/**
+ * Invalidate only the searches affected by recording a play: a played/unplayed
+ * filter (membership changes) or an "accessed" sort (recording bumps
+ * last_accessed_at, so the order changes). Other lists keep their cache
+ * instead of refetching every page.
+ */
+export function invalidatePlayedSearches(qc: QueryClient): void {
+  void qc.invalidateQueries({
+    queryKey: ["files_search"],
+    predicate: (q) => {
+      const filter = searchFilterOf(q.queryKey);
+      return filter?.played != null || filter?.sort === "accessed";
+    },
+  });
+}
+
+/**
+ * Invalidate only the searches whose membership depends on tags: an explicit
+ * tag filter, or a text query (FTS matches tag text). Row-level tag display is
+ * kept in sync separately via patchFileRowInCaches.
+ */
+export function invalidateTagSearches(qc: QueryClient): void {
+  void qc.invalidateQueries({
+    queryKey: ["files_search"],
+    predicate: (q) => {
+      const filter = searchFilterOf(q.queryKey);
+      return Boolean(filter?.q || filter?.tags?.length);
+    },
+  });
+}
+
+/**
+ * Invalidate only the searches scoped to a user collection (membership changes
+ * on add/remove-from-collection); regular workspace lists are unaffected.
+ */
+export function invalidateCollectionSearches(qc: QueryClient): void {
+  void qc.invalidateQueries({
+    queryKey: ["files_search"],
+    predicate: (q) => {
+      const ws = q.queryKey[1];
+      return typeof ws === "string" && ws.startsWith(COLLECTION_ID_PREFIX);
+    },
+  });
 }
 
 /** Sync favorite/rating (and other FileRow fields) across all file caches. */
