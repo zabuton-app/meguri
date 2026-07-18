@@ -18,10 +18,11 @@ const MAX_LIMIT = 500;
 
 // Metadata (rating/favorite/last_accessed) lives in file_meta, keyed by meta_key, so it
 // is reached through a LEFT JOIN. COALESCE supplies defaults for files with no meta row.
-const FILE_COLS =
+// Exported for queries that join files under the same `f`/`m` aliases (see history.ts).
+export const FILE_COLS =
   "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, f.captured_at AS capturedAt, m.last_accessed_at AS lastAccessedAt";
 
-const FILE_FROM =
+export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
 
 function buildFtsMatch(q: string): string | null {

@@ -249,6 +249,20 @@ export const es: Record<TranslationKey, string> = {
   "discover.sceneHint": "Pasa el cursor para ampliar · haz clic para reproducir desde ese punto",
   "discover.moreScenes": "+{count}",
 
+  // Historial de reproducción
+  "history.title": "Historial de reproducción",
+  "history.empty": "Aún no hay historial de reproducción.",
+  "history.emptyHint": "Reproduce vídeos o imágenes y aparecerán aquí.",
+  "history.clear": "Borrar historial",
+  "history.clearAction": "Borrar",
+  "history.clearConfirm":
+    "¿Eliminar todo el historial de reproducción? Esta acción no se puede deshacer.",
+  "history.playCount": "{count} reproducciones",
+  "history.viaBrowser": "En la aplicación",
+  "history.viaExternal": "Reproductor externo",
+  "history.today": "Hoy",
+  "history.yesterday": "Ayer",
+
   // workspace rail
   "workspace.all": "Todo",
   "workspace.settings": "Ajustes",

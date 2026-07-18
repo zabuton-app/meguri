@@ -8,6 +8,7 @@ import type {
   AppStatus,
   FileDetail,
   FileRow,
+  HistoryPage,
   SceneBookmark,
   SearchResult,
   UpdateInfo,
@@ -15,7 +16,7 @@ import type {
   WorkspaceStats,
   WorkspacesList,
 } from "./schema.js";
-import { SearchQuerySchema } from "./schema.js";
+import { HistoryQuerySchema, SearchQuerySchema } from "./schema.js";
 import {
   EVENT_CHANNELS,
   INVOKE_CHANNELS,
@@ -77,6 +78,8 @@ export const ChannelInputs = {
     via: z.enum(["browser", "external"]),
     position: z.number().optional(),
   }),
+  history_list: z.object({ query: HistoryQuerySchema.optional() }).default({}),
+  history_clear: z.void(),
   file_add_tag: FileTarget.extend({ name: z.string() }),
   file_remove_tag: FileTarget.extend({ tagId: z.number() }),
   tags_list: z.object({
@@ -151,6 +154,8 @@ export interface ChannelOutputs {
   file_set_favorite: void;
   file_delete_from_index: { id: number; relPath: string };
   file_record_play: void;
+  history_list: HistoryPage;
+  history_clear: void;
   file_add_tag: number;
   file_remove_tag: void;
   tags_list: string[];

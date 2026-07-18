@@ -164,6 +164,35 @@ export default function MediaDetail() {
       void document.exitFullscreen().catch(() => {});
     }
   }, [kind]);
+  // Viewing an image counts as a play (images have no player to fire onPlay),
+  // so it shows up in the play history like videos do. The ref dedupes the
+  // refetches/re-renders of a single visit; prev/next to a different file and
+  // back records again, which matches "each view is a play".
+  const recordedViewRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (kind !== "image" || !wsId || !Number.isFinite(fileId)) {
+      // Once the viewer settles on a non-image, drop the guard so navigating
+      // back to the same image (e.g. image → video → image) records a new
+      // view. Keep it while kind is still undefined (the next file loading)
+      // so a transient fetch state can't cause double records.
+      if (kind !== undefined) recordedViewRef.current = null;
+      return;
+    }
+    const key = `${wsId}:${fileId}`;
+    if (recordedViewRef.current === key) return;
+    recordedViewRef.current = key;
+    api
+      .fileRecordPlay(fileId, wsId, "browser")
+      .then(() => {
+        // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
+        void qc.invalidateQueries({ queryKey: ["files_search"] });
+      })
+      .catch(() => {
+        // Drop the guard on failure so a later effect run of this visit can retry;
+        // without this a transient IPC error would suppress the record for good.
+        if (recordedViewRef.current === key) recordedViewRef.current = null;
+      });
+  }, [kind, fileId, wsId, qc]);
   const workspaces = useQuery({
     queryKey: ["workspaces_list"],
     queryFn: api.workspacesList,

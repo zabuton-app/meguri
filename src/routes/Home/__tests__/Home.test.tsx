@@ -93,7 +93,8 @@ describe("Home + MediaDetail integration", () => {
       expect(screen.getByText("sample.mp4")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getAllByRole("link")[0]);
+    // Click the grid tile's link specifically (the header also contains links).
+    fireEvent.click(screen.getByText("sample.mp4").closest("a")!);
 
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toBeTruthy();
@@ -131,5 +132,22 @@ describe("Home + MediaDetail integration", () => {
       pages: { items: { favorite: number }[] }[];
     }>(["files_search", WS_ID, {}]);
     expect(search?.pages[0].items[0].favorite).toBe(1);
+  });
+
+  it("records a play when opening an image detail", async () => {
+    mocks.fileGet.mockResolvedValue({
+      ...sampleFileDetail,
+      kind: "image",
+      relPath: "photos/pic.jpg",
+      ext: "jpg",
+      duration: null,
+    });
+    renderWithProviders(<AppRoutes />, { route: `/file/1?ws=${WS_ID}` });
+
+    await waitFor(() =>
+      expect(mocks.fileRecordPlay).toHaveBeenCalledWith(1, WS_ID, "browser"),
+    );
+    // A single visit records exactly once despite refetches/re-renders.
+    expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(1);
   });
 });

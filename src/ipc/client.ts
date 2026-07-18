@@ -96,6 +96,10 @@ export const api = {
     via: ChannelInput<"file_record_play">["via"],
     position?: number,
   ) => invoke("file_record_play", { id, workspaceId, via, position }),
+  /** Cross-file play-history timeline (scoped to the active workspace, or all for All/collections). */
+  historyList: (query?: ChannelInput<"history_list">["query"]) =>
+    invoke("history_list", { query }),
+  historyClear: () => invoke("history_clear"),
   bookmarkAdd: (id: number, workspaceId: string, sec: number) =>
     invoke("bookmark_add", { id, workspaceId, sec }),
   bookmarkRemove: (id: number, workspaceId: string, bookmarkId: number) =>

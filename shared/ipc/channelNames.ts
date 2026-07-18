@@ -29,6 +29,8 @@ export const INVOKE_CHANNELS = [
   "file_set_favorite",
   "file_delete_from_index",
   "file_record_play",
+  "history_list",
+  "history_clear",
   "file_add_tag",
   "file_remove_tag",
   "tags_list",

@@ -238,6 +238,19 @@ export const zhCN: Record<TranslationKey, string> = {
   "discover.sceneHint": "悬停放大 · 点击从该时间点播放",
   "discover.moreScenes": "+{count}",
 
+  // 播放历史
+  "history.title": "播放历史",
+  "history.empty": "暂无播放历史。",
+  "history.emptyHint": "播放视频或图片后，历史记录会显示在这里。",
+  "history.clear": "清除历史",
+  "history.clearAction": "清除",
+  "history.clearConfirm": "确定删除所有播放历史吗？此操作无法撤销。",
+  "history.playCount": "已播放 {count} 次",
+  "history.viaBrowser": "应用内",
+  "history.viaExternal": "外部播放器",
+  "history.today": "今天",
+  "history.yesterday": "昨天",
+
   // workspace rail
   "workspace.all": "全部",
   "workspace.settings": "设置",

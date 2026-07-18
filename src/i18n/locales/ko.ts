@@ -243,6 +243,20 @@ export const ko: Record<TranslationKey, string> = {
   "discover.sceneHint": "마우스를 올리면 확대 · 클릭하면 해당 지점부터 재생",
   "discover.moreScenes": "+{count}",
 
+  // 재생 기록
+  "history.title": "재생 기록",
+  "history.empty": "재생 기록이 아직 없습니다.",
+  "history.emptyHint": "동영상이나 이미지를 재생하면 여기에 기록이 표시됩니다.",
+  "history.clear": "기록 지우기",
+  "history.clearAction": "지우기",
+  "history.clearConfirm":
+    "재생 기록을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+  "history.playCount": "{count}회 재생",
+  "history.viaBrowser": "앱 내",
+  "history.viaExternal": "외부 플레이어",
+  "history.today": "오늘",
+  "history.yesterday": "어제",
+
   // workspace rail
   "workspace.all": "전체",
   "workspace.settings": "설정",

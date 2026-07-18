@@ -249,6 +249,21 @@ export const fr: Record<TranslationKey, string> = {
   "discover.sceneHint": "Survolez pour agrandir · cliquez pour lire à partir de ce point",
   "discover.moreScenes": "+{count}",
 
+  // Historique de lecture
+  "history.title": "Historique de lecture",
+  "history.empty": "Aucun historique de lecture pour l'instant.",
+  "history.emptyHint":
+    "Lisez des vidéos ou des images et elles apparaîtront ici.",
+  "history.clear": "Effacer l'historique",
+  "history.clearAction": "Effacer",
+  "history.clearConfirm":
+    "Supprimer tout l'historique de lecture ? Cette action est irréversible.",
+  "history.playCount": "{count} lectures",
+  "history.viaBrowser": "Dans l'application",
+  "history.viaExternal": "Lecteur externe",
+  "history.today": "Aujourd'hui",
+  "history.yesterday": "Hier",
+
   // workspace rail
   "workspace.all": "Tout",
   "workspace.settings": "Paramètres",

@@ -245,6 +245,19 @@ export const en: Record<TranslationKey, string> = {
   "discover.sceneHint": "Hover to enlarge · click to play from that point",
   "discover.moreScenes": "+{count}",
 
+  // Play history
+  "history.title": "Play history",
+  "history.empty": "No play history yet.",
+  "history.emptyHint": "Play videos or images and they will show up here.",
+  "history.clear": "Clear history",
+  "history.clearAction": "Clear",
+  "history.clearConfirm": "Delete all play history? This cannot be undone.",
+  "history.playCount": "{count} plays",
+  "history.viaBrowser": "In-app",
+  "history.viaExternal": "External player",
+  "history.today": "Today",
+  "history.yesterday": "Yesterday",
+
   // workspace rail
   "workspace.all": "All",
   "workspace.settings": "Settings",

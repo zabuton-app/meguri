@@ -3,8 +3,15 @@
 // A single-element set is the fast path (no merge), so callers use this uniformly.
 import { resolveSortDir } from "../../shared/sortDir.js";
 import type { Core } from "./index.js";
-import { searchFiles, randomFiles } from "./queries.js";
-import type { FileRow, SearchQuery, SearchResult } from "./types.js";
+import { searchFiles, randomFiles, listPlayHistory } from "./queries.js";
+import type {
+  FileRow,
+  HistoryEntryRow,
+  HistoryPage,
+  HistoryQuery,
+  SearchQuery,
+  SearchResult,
+} from "./types.js";
 
 const DEFAULT_LIMIT = 100;
 
@@ -19,7 +26,7 @@ export interface FileRef {
 }
 
 /** Stamp each row with its owning workspace ID (file IDs are unique only within a workspace). */
-function inject(items: FileRow[], wsId: string): FileRow[] {
+function inject<T extends FileRow>(items: T[], wsId: string): T[] {
   for (const it of items) it.workspaceId = wsId;
   return items;
 }
@@ -65,31 +72,59 @@ export function searchCollection(
   return mergeSearchPages(targets, query, idsByWs);
 }
 
-interface WsStream {
+interface WsStream<T> {
   wsId: string;
   core: Core;
-  fileIds?: number[];
   nextCursor: number;
-  buffer: FileRow[];
+  buffer: T[];
   bufIdx: number;
   exhausted: boolean;
 }
 
-/** k-way merge with per-workspace batched fetches — memory stays O(N × batch), not O(N × offset). */
+/** Per-workspace batched fetch: one page of already-sorted rows plus the next cursor. */
+type FetchBatch<T> = (
+  core: Core,
+  wsId: string,
+  cursor: number,
+  limit: number,
+) => { items: T[]; nextCursor: number | null };
+
+/** Thin wrapper over mergePages for the file-search shape (optional per-ws ID restriction). */
 function mergeSearchPages(
   targets: CoreTarget[],
   query: SearchQuery,
   idsByWs?: Map<string, number[]>,
 ): SearchResult {
-  const limit = Math.max(1, query.limit ?? DEFAULT_LIMIT);
-  const offset = Math.max(0, query.cursor ?? 0);
-  const batchSize = limit + 1;
-  const cmp = comparatorFor(query.sort, query.sortDir);
+  return mergePages<FileRow>(
+    targets,
+    (core, wsId, cursor, limit) => {
+      const res = searchFiles(core.db, {
+        ...query,
+        cursor,
+        limit,
+        fileIds: idsByWs?.get(wsId),
+      });
+      return { items: inject(res.items, wsId), nextCursor: res.nextCursor };
+    },
+    comparatorFor(query.sort, query.sortDir),
+    Math.max(1, query.limit ?? DEFAULT_LIMIT),
+    Math.max(0, query.cursor ?? 0),
+  );
+}
 
-  const streams: WsStream[] = targets.map(({ id, core }) => ({
+/** k-way merge with per-workspace batched fetches — memory stays O(N × batch), not O(N × offset). */
+function mergePages<T>(
+  targets: CoreTarget[],
+  fetchBatch: FetchBatch<T>,
+  cmp: (a: T, b: T) => number,
+  limit: number,
+  offset: number,
+): { items: T[]; nextCursor: number | null } {
+  const batchSize = limit + 1;
+
+  const streams: WsStream<T>[] = targets.map(({ id, core }) => ({
     wsId: id,
     core,
-    fileIds: idsByWs?.get(id),
     nextCursor: 0,
     buffer: [],
     bufIdx: 0,
@@ -97,7 +132,7 @@ function mergeSearchPages(
   }));
 
   for (const stream of streams) {
-    loadStreamBatch(stream, query, batchSize);
+    loadStreamBatch(stream, fetchBatch, batchSize);
   }
 
   const heap = new StreamHeap(streams, cmp);
@@ -106,13 +141,10 @@ function mergeSearchPages(
   }
 
   let skipped = 0;
-  const collected: FileRow[] = [];
+  const collected: T[] = [];
   const want = limit + 1;
 
-  while (
-    !heap.isEmpty() &&
-    (skipped < offset || collected.length < want)
-  ) {
+  while (!heap.isEmpty() && (skipped < offset || collected.length < want)) {
     const si = heap.pop();
     const stream = streams[si];
     const item = stream.buffer[stream.bufIdx];
@@ -125,7 +157,7 @@ function mergeSearchPages(
     }
 
     if (stream.bufIdx >= stream.buffer.length) {
-      loadStreamBatch(stream, query, batchSize);
+      loadStreamBatch(stream, fetchBatch, batchSize);
     }
     if (streamHasItem(stream)) {
       heap.push(si);
@@ -137,23 +169,22 @@ function mergeSearchPages(
   return { items, nextCursor };
 }
 
-function streamHasItem(stream: WsStream): boolean {
+function streamHasItem<T>(stream: WsStream<T>): boolean {
   return stream.bufIdx < stream.buffer.length;
 }
 
-function loadStreamBatch(
-  stream: WsStream,
-  query: SearchQuery,
+function loadStreamBatch<T>(
+  stream: WsStream<T>,
+  fetchBatch: FetchBatch<T>,
   batchSize: number,
 ): void {
   if (stream.exhausted) return;
-  const res = searchFiles(stream.core.db, {
-    ...query,
-    cursor: stream.nextCursor,
-    limit: batchSize,
-    fileIds: stream.fileIds,
-  });
-  inject(res.items, stream.wsId);
+  const res = fetchBatch(
+    stream.core,
+    stream.wsId,
+    stream.nextCursor,
+    batchSize,
+  );
   stream.buffer = res.items;
   stream.bufIdx = 0;
   if (res.nextCursor != null) {
@@ -164,12 +195,12 @@ function loadStreamBatch(
 }
 
 /** Min-heap of stream indices ordered by each stream's current head row. */
-class StreamHeap {
+class StreamHeap<T> {
   private readonly indices: number[] = [];
 
   constructor(
-    private readonly streams: WsStream[],
-    private readonly cmp: (a: FileRow, b: FileRow) => number,
+    private readonly streams: WsStream<T>[],
+    private readonly cmp: (a: T, b: T) => number,
   ) {}
 
   isEmpty(): boolean {
@@ -191,7 +222,7 @@ class StreamHeap {
     return top;
   }
 
-  private headAt(heapIdx: number): FileRow {
+  private headAt(heapIdx: number): T {
     const si = this.indices[heapIdx];
     const stream = this.streams[si];
     return stream.buffer[stream.bufIdx];
@@ -229,6 +260,38 @@ class StreamHeap {
       i = smallest;
     }
   }
+}
+
+/**
+ * Cross-workspace play-history timeline. Mirrors history.ts' ORDER BY
+ * (played_at DESC, id DESC) with (workspaceId, historyId) as the cross-workspace
+ * tiebreak. Runs collapsed per-workspace are not re-collapsed across workspaces:
+ * a file exists in one workspace's DB, so cross-ws duplicates can't occur.
+ */
+export function listHistoryWorkspaces(
+  cores: CoreTarget[],
+  query: HistoryQuery,
+): HistoryPage {
+  if (cores.length === 0) return { items: [], nextCursor: null };
+  if (cores.length === 1) {
+    const { id, core } = cores[0];
+    const res = listPlayHistory(core.db, query);
+    return { items: inject(res.items, id), nextCursor: res.nextCursor };
+  }
+  const cmp = (a: HistoryEntryRow, b: HistoryEntryRow): number =>
+    b.playedAt - a.playedAt ||
+    cmpStr(a.workspaceId, b.workspaceId) ||
+    b.historyId - a.historyId;
+  return mergePages<HistoryEntryRow>(
+    cores,
+    (core, wsId, cursor, limit) => {
+      const res = listPlayHistory(core.db, { ...query, cursor, limit });
+      return { items: inject(res.items, wsId), nextCursor: res.nextCursor };
+    },
+    cmp,
+    Math.max(1, query.limit ?? DEFAULT_LIMIT),
+    Math.max(0, query.cursor ?? 0),
+  );
 }
 
 export function randomWorkspaces(
