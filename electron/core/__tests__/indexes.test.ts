@@ -36,9 +36,11 @@ describe("index query plans", () => {
   afterEach(() => db.close());
 
   it("countFiles scans the partial live-rows index, not the table", () => {
+    // Only assert the positive (index usage): some SQLite versions word a
+    // covering plan as "SCAN files USING COVERING INDEX ...", so a negative
+    // "no SCAN files" check would be brittle across versions.
     const p = plan(db, "SELECT COUNT(*) FROM files WHERE deleted_at IS NULL");
     expect(p).toContain("COVERING INDEX idx_files_alive");
-    expect(p).not.toContain("SCAN files");
   });
 
   it("sort=name uses idx_files_alive_rel_path in both directions", () => {
@@ -56,11 +58,14 @@ describe("index query plans", () => {
   });
 
   it("tag-name prefix autocomplete is a range search on idx_tags_name", () => {
+    // Mirrors listTagNames' SQL: the NOCASE collation on ORDER BY lets the
+    // index satisfy the sort too (no temp b-tree).
     const p = plan(
       db,
-      "SELECT name FROM tags WHERE name LIKE 'pre%' ESCAPE '\\' ORDER BY name LIMIT 20",
+      "SELECT name FROM tags WHERE name LIKE 'pre%' ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT 20",
     );
     expect(p).toContain("SEARCH tags USING COVERING INDEX idx_tags_name");
+    expect(p).not.toContain("TEMP B-TREE");
   });
 
   it("sort=name desc keeps a deterministic reversed order (id tiebreak follows direction)", () => {
