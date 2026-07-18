@@ -20,7 +20,11 @@ export type WorkerReply =
 const port = parentPort;
 if (!port) throw new Error("queryWorker must run inside a worker thread");
 
-const exec = new QueryExecutor();
+// The electron-log logger needs the electron module (unavailable in a worker
+// thread); console.warn reaches the main process's stderr in dev builds.
+const exec = new QueryExecutor((message) =>
+  console.warn(`[queryWorker] ${message}`),
+);
 
 port.on("message", (msg: WorkerMessage) => {
   try {

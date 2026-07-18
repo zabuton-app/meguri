@@ -92,13 +92,23 @@ describe("QueryExecutor", () => {
     expect(scoped.items.map((f) => f.id)).toEqual([fileIds[1]]);
   });
 
-  it("skips targets whose DB is gone and reopens after closeWorkspace", () => {
-    const missing = exec.run({
+  it("skips targets whose DB is gone, warning once, and reopens after closeWorkspace", () => {
+    const warnings: string[] = [];
+    const warnedExec = new QueryExecutor((m) => warnings.push(m));
+    const missingTargets = [
+      { id: "nope", dbPath: path.join(dir, "missing.sqlite") },
+    ];
+    const missing = warnedExec.run({
       kind: "search",
-      targets: [{ id: "nope", dbPath: path.join(dir, "missing.sqlite") }],
+      targets: missingTargets,
       query: {},
     }) as SearchResult;
     expect(missing.items).toEqual([]);
+    // Repeated queries don't spam: one warning per workspace until it's reset.
+    warnedExec.run({ kind: "search", targets: missingTargets, query: {} });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("nope");
+    warnedExec.closeAll();
 
     // Close and query again: the handle is reopened lazily from the path.
     exec.run({ kind: "stats", targets: target() });

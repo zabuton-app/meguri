@@ -39,7 +39,7 @@ export class QueryWorkerClient {
   private seq = 0;
   private readonly pending = new Map<number, Pending>();
   /** Main-thread executor used only when the worker cannot run. */
-  private readonly fallback = new QueryExecutor();
+  private readonly fallback = new QueryExecutor((message) => log.warn(message));
 
   constructor(private readonly workerPath: string) {}
 

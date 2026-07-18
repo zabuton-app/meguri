@@ -45,10 +45,22 @@ export type QueryResponse =
 
 export class QueryExecutor {
   private dbs = new Map<string, DB>();
+  /** Workspaces whose open already failed and was reported (avoids re-warning
+   *  on every query; cleared by closeWorkspace/closeAll so a fix is retried). */
+  private warned = new Set<string>();
+
+  /** `warn` is injected because this class also runs inside the worker thread,
+   *  where the electron-log based logger (which requires the electron module)
+   *  is unavailable. */
+  constructor(
+    private readonly warn: (message: string) => void = () => undefined,
+  ) {}
 
   /** Resolve targets to CoreTargets, opening read-only handles lazily.
-   *  Targets whose DB cannot be opened (already removed) are skipped —
-   *  mirroring Workspaces.allCores(), which skips failed initializations. */
+   *  Targets whose DB cannot be opened (already removed, permissions,
+   *  corruption) are skipped — mirroring Workspaces.allCores(), which skips
+   *  failed initializations — but each failure is reported once so missing
+   *  results/stats are diagnosable instead of silent. */
   private cores(targets: QueryTarget[]): cw.CoreTarget[] {
     const out: cw.CoreTarget[] = [];
     for (const t of targets) {
@@ -56,9 +68,16 @@ export class QueryExecutor {
       if (!db) {
         try {
           db = openDbReadonly(t.dbPath);
-        } catch {
+        } catch (e) {
+          if (!this.warned.has(t.id)) {
+            this.warned.add(t.id);
+            this.warn(
+              `failed to open workspace DB ${t.id} read-only; skipping it in query results: ${String(e)}`,
+            );
+          }
           continue;
         }
+        this.warned.delete(t.id);
         this.dbs.set(t.id, db);
       }
       // Only `.db` is touched by the query layer; the rest of Core is
@@ -97,6 +116,7 @@ export class QueryExecutor {
   /** Close one workspace's read-only handle (before its data dir is deleted —
    *  Windows cannot remove files that any process still has open). */
   closeWorkspace(id: string): void {
+    this.warned.delete(id);
     const db = this.dbs.get(id);
     if (!db) return;
     this.dbs.delete(id);
@@ -108,6 +128,7 @@ export class QueryExecutor {
   }
 
   closeAll(): void {
+    this.warned.clear();
     for (const id of [...this.dbs.keys()]) this.closeWorkspace(id);
   }
 }
