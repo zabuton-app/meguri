@@ -235,6 +235,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "discover.progress": "{current} / {total}",
   "discover.empty": "没有可推荐的媒体。",
   "discover.emptyHint": "执行“扫描”导入视频和图片后，这里会随机推荐。",
+  "discover.sceneHint": "悬停放大 · 点击从该时间点播放",
+  "discover.moreScenes": "+{count}",
 
   // workspace rail
   "workspace.all": "全部",

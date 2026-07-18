@@ -1,10 +1,11 @@
 // Discovery queue. /discover. Picks random media matching the current filters and presents them one at a time,
 // Steam-discovery-queue style: a large preview, meta, tags, inline rating, and actions.
-// Overlays the list as a modal (like MediaDetail). Static thumbnails (no autoplay).
+// Overlays the list as a modal (like MediaDetail). No video autoplay; videos get
+// a hover scrub preview (frame endpoint) gated by the hoverPreview preference.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Sparkles, X } from "lucide-react";
+import { Maximize2, Minimize2, RefreshCw, Sparkles, X } from "lucide-react";
 import { api, events } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { syncFileRowAcrossCaches } from "@/lib/queryCache";
@@ -20,11 +21,15 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { NAV_BINDINGS, matchAny } from "@/settings/keybindings";
+import {
+  MODAL_SIZE_KEY,
+  type ModalSize,
+} from "@/routes/MediaDetail/MediaModal";
 import { DiscoverCard } from "./DiscoverCard";
 import { DiscoverModal } from "./DiscoverModal";
-import { SceneGrid } from "./SceneGrid";
 import {
   DISCOVER_FILTER_PARAM,
   QUEUE_SIZE,
@@ -58,6 +63,16 @@ export default function Discover() {
   const queueKey = useMemo(
     () => ["files_random", wsId, discoverFilter] as const,
     [wsId, discoverFilter],
+  );
+
+  // Workspace labels for the per-card meta chip (cache shared with WorkspaceRail).
+  const wsList = useQuery({
+    queryKey: ["workspaces_list"],
+    queryFn: api.workspacesList,
+  });
+  const wsNames = useMemo(
+    () => new Map(wsList.data?.workspaces.map((w) => [w.id, w.label]) ?? []),
+    [wsList.data],
   );
 
   // Keep the queue stable across remounts; reshuffle is explicit (the button below).
@@ -213,30 +228,45 @@ export default function Discover() {
     },
   });
 
+  // Modal size toggle; the persisted value is shared with MediaDetail's modal.
+  const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
+    MODAL_SIZE_KEY,
+    "large",
+    (raw) => (raw === "small" ? "small" : "large"),
+  );
+  const toggleModalSize = useCallback(
+    () => setModalSize((prev) => (prev === "small" ? "large" : "small")),
+    [setModalSize],
+  );
+  const isSmall = modalSize === "small";
+  const sizeToggleLabel = isSmall
+    ? t("media.modalMaximize")
+    : t("media.modalMinimize");
+
   const ready = status.data?.ready ?? false;
   const loading = queue.isLoading && ready;
-  const currentItem = items[current];
 
   return (
-    <DiscoverModal onClose={() => void onClose()}>
-      <header className="flex items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
-        <Sparkles className="size-4 text-primary" />
-        <span className="text-sm font-medium text-fg">
+    <DiscoverModal onClose={() => void onClose()} size={modalSize}>
+      {/* Header overlaid on the media; empty header space clicks through to the card. */}
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center gap-2.5 px-4 py-3">
+        <Sparkles className="size-4 text-primary drop-shadow-md" />
+        <span className="text-sm font-semibold text-bright-fg drop-shadow-md">
           {t("discover.title")}
         </span>
         {items.length > 0 && (
-          <span className="text-xs tabular-nums text-muted">
+          <span className="text-xs tabular-nums text-muted drop-shadow-md">
             {t("discover.progress", {
               current: current + 1,
               total: items.length,
             })}
           </span>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="pointer-events-auto ml-auto flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="h-7 px-2"
+            className="h-8 border-border/60 bg-bg/50 px-2.5 backdrop-blur-md"
             onClick={() => void reshuffle()}
             disabled={loading || queue.isFetching}
           >
@@ -244,9 +274,20 @@ export default function Discover() {
             {t("discover.reshuffle")}
           </Button>
           <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            variant="outline"
+            size="icon"
+            className="size-8 border-border/60 bg-bg/50 backdrop-blur-md"
+            onClick={toggleModalSize}
+            aria-label={sizeToggleLabel}
+            aria-pressed={isSmall}
+            title={sizeToggleLabel}
+          >
+            {isSmall ? <Maximize2 /> : <Minimize2 />}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8 border-border/60 bg-bg/50 backdrop-blur-md"
             onClick={() => void onClose()}
             title={`${t("common.close")} (Esc)`}
           >
@@ -255,16 +296,9 @@ export default function Discover() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="h-full w-full">
         {loading ? (
-          <div className="grid h-full w-full content-start gap-4 p-4 px-10 sm:p-5 sm:px-12 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">
-            <Skeleton className="aspect-video w-full rounded-xl" />
-            <div className="hidden flex-col gap-3 md:flex">
-              <Skeleton className="h-6 w-3/4 rounded" />
-              <Skeleton className="h-5 w-1/2 rounded" />
-              <Skeleton className="h-16 w-full rounded" />
-            </div>
-          </div>
+          <Skeleton className="h-full w-full rounded-none" />
         ) : items.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
             <Sparkles className="size-10 opacity-50" />
@@ -272,62 +306,46 @@ export default function Discover() {
             <p className="text-xs">{t("discover.emptyHint")}</p>
           </div>
         ) : (
-          <div className="flex h-full flex-col gap-3 p-4 sm:p-5">
-            <Carousel
-              className="w-full shrink-0"
-              opts={{ loop: false, align: "center" }}
-              setApi={setEmbla}
-            >
-              <CarouselContent>
-                {items.map((f) => (
-                  <CarouselItem key={f.id} className="px-10 sm:px-12">
-                    <DiscoverCard
-                      file={f}
-                      mediaBase={mediaBase}
-                      thumbVersion={
-                        thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0
-                      }
-                      onRate={(rating) =>
-                        setRating.mutate({
-                          id: f.id,
-                          workspaceId: f.workspaceId,
-                          rating,
-                        })
-                      }
-                      onToggleFavorite={() =>
-                        setFavorite.mutate({
-                          id: f.id,
-                          workspaceId: f.workspaceId,
-                          favorite: !f.favorite,
-                        })
-                      }
-                      filterParam={filterParam}
-                      t={t}
-                    />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="left-1 size-9 bg-bg/80 backdrop-blur-sm sm:left-2" />
-              <CarouselNext className="right-1 size-9 bg-bg/80 backdrop-blur-sm sm:right-2" />
-            </Carousel>
-
-            {/* Scene previews fill the remaining vertical space (taller windows show more rows). */}
-            {currentItem &&
-            currentItem.kind === "video" &&
-            currentItem.duration &&
-            currentItem.duration > 0 &&
-            mediaBase &&
-            currentItem.workspaceId ? (
-              <SceneGrid
-                id={currentItem.id}
-                total={currentItem.duration}
-                mediaBase={mediaBase}
-                wsId={currentItem.workspaceId}
-                filterParam={filterParam}
-                className="min-h-0 flex-1"
-              />
-            ) : null}
-          </div>
+          <Carousel
+            className="h-full w-full"
+            opts={{ loop: false, align: "center" }}
+            setApi={setEmbla}
+          >
+            <CarouselContent containerClassName="h-full" className="ml-0 h-full">
+              {items.map((f, i) => (
+                <CarouselItem
+                  key={`${f.workspaceId}:${f.id}`}
+                  className="h-full pl-0"
+                >
+                  <DiscoverCard
+                    file={f}
+                    mediaBase={mediaBase}
+                    thumbVersion={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
+                    onRate={(rating) =>
+                      setRating.mutate({
+                        id: f.id,
+                        workspaceId: f.workspaceId,
+                        rating,
+                      })
+                    }
+                    onToggleFavorite={() =>
+                      setFavorite.mutate({
+                        id: f.id,
+                        workspaceId: f.workspaceId,
+                        favorite: !f.favorite,
+                      })
+                    }
+                    filterParam={filterParam}
+                    workspaceName={wsNames.get(f.workspaceId)}
+                    isActive={i === current}
+                    t={t}
+                  />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious className="left-3 z-20 size-11 border-border/60 bg-bg/50 backdrop-blur-md" />
+            <CarouselNext className="right-3 z-20 size-11 border-border/60 bg-bg/50 backdrop-blur-md" />
+          </Carousel>
         )}
       </div>
     </DiscoverModal>

@@ -44,7 +44,12 @@ import { TagEditor } from "@/components/TagEditor";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatChords } from "@/settings/keybindings";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { MediaModal, TopBar, type ModalSize } from "./MediaModal";
+import {
+  MediaModal,
+  MODAL_SIZE_KEY,
+  TopBar,
+  type ModalSize,
+} from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
@@ -54,7 +59,6 @@ import { copyImageToClipboard } from "./utils";
 import { syncFileRowAcrossCaches } from "@/lib/queryCache";
 
 const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
-const MODAL_SIZE_KEY = "meguri.media.modalSize";
 
 export default function MediaDetail() {
   const { t } = useI18n();

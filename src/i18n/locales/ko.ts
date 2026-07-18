@@ -240,6 +240,8 @@ export const ko: Record<TranslationKey, string> = {
   "discover.empty": "추천할 미디어가 없습니다.",
   "discover.emptyHint":
     "「스캔」으로 동영상과 이미지를 가져오면 여기에서 무작위로 추천됩니다.",
+  "discover.sceneHint": "마우스를 올리면 확대 · 클릭하면 해당 지점부터 재생",
+  "discover.moreScenes": "+{count}",
 
   // workspace rail
   "workspace.all": "전체",

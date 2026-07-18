@@ -246,6 +246,8 @@ export const fr: Record<TranslationKey, string> = {
   "discover.empty": "Aucun média à recommander.",
   "discover.emptyHint":
     "Lancez « Analyser » pour importer des vidéos et des images ; elles seront recommandées ici au hasard.",
+  "discover.sceneHint": "Survolez pour agrandir · cliquez pour lire à partir de ce point",
+  "discover.moreScenes": "+{count}",
 
   // workspace rail
   "workspace.all": "Tout",
