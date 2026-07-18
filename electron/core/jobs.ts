@@ -1,7 +1,7 @@
 // Scan pipeline: walk → sync → thumbnail/meta (parallel).
 // Progress is reported via callbacks.
 import os from "node:os";
-import fs from "node:fs";
+import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
 import { walk, syncFiles, type ScanStats } from "./scan.js";
@@ -35,7 +35,7 @@ export type JobEvent =
  * therefore wiped too — a rebuild deliberately resets that list, so files previously removed
  * from the index reappear. This is spelled out in the rebuild confirmation dialog.
  */
-function clearIndex(core: Core): void {
+async function clearIndex(core: Core): Promise<void> {
   const { db } = core;
   db.transaction(() => {
     db.prepare(
@@ -43,15 +43,23 @@ function clearIndex(core: Core): void {
     ).run(core.rootId);
     db.prepare("DELETE FROM files WHERE root_id = ?").run(core.rootId);
   })();
-  // Thumbnails are named by the (now invalidated) file id, so wipe them to avoid orphans.
+  // Thumbnails are named by the (now invalidated) file id, so wipe them to avoid
+  // orphans. Async with a small concurrent pool — a synchronous unlink loop over
+  // tens of thousands of thumbnails would block the main thread.
   const thumbs = core.thumbsDir();
+  let names: string[] = [];
   try {
-    for (const name of fs.readdirSync(thumbs)) {
-      fs.rmSync(path.join(thumbs, name), { force: true });
-    }
+    names = await fsp.readdir(thumbs);
   } catch {
-    /* thumbs dir may not exist yet */
+    return; // thumbs dir may not exist yet
   }
+  await pool(names, 8, async (name) => {
+    try {
+      await fsp.rm(path.join(thumbs, name), { force: true });
+    } catch {
+      /* best-effort; a leftover thumb is overwritten by the rescan */
+    }
+  });
 }
 
 export async function runScan(
@@ -64,7 +72,7 @@ export async function runScan(
   const { db } = core;
 
   // A rebuild discards the derived file index (keeping durable metadata) before rescanning.
-  if (opts.rebuild) clearIndex(core);
+  if (opts.rebuild) await clearIndex(core);
 
   // --- walk + sync (both async with concurrent IO, so they don't block the event loop) ---
   // On SMB these phases dominate the time before thumbnails start, so report their progress.
@@ -134,6 +142,72 @@ export async function runScan(
   let processed = 0;
   const thumbs = core.thumbsDir();
 
+  // Persist results in batches: one transaction per THUMB_FLUSH_EVERY files
+  // instead of one implicit commit (+ FTS delete/insert) per file, which
+  // multiplied WAL commits by the file count on a full scan. Progress and
+  // thumbDone events are emitted per flush (after the commit, so the renderer's
+  // thumbnail request sees thumb_status = 'done'), which also throttles the
+  // previously per-file scan:progress IPC traffic.
+  type ThumbResult = {
+    id: number;
+    dest: string;
+    ok: boolean;
+    meta: Awaited<ReturnType<typeof extractMeta>>;
+  };
+  const THUMB_FLUSH_EVERY = 32;
+  let buffer: ThumbResult[] = [];
+
+  const persistOne = (r: ThumbResult): void => {
+    q.updateExtractedMeta(db, r.id, r.meta);
+    q.setThumb(db, r.id, r.ok ? r.dest : null, r.ok ? "done" : "error");
+    syncFts(db, r.id);
+  };
+  // Per-file transaction for the retry path: persistOne spans several writes
+  // (incl. the FTS delete+insert), so a mid-way failure must roll back the
+  // whole file rather than leave partial state (e.g. an FTS row deleted but
+  // never re-inserted).
+  const persistOneTx = db.transaction(persistOne);
+
+  const flush = (): void => {
+    if (buffer.length === 0) return;
+    const batch = buffer;
+    buffer = [];
+    const persisted: ThumbResult[] = [];
+    try {
+      db.transaction(() => {
+        for (const r of batch) persistOne(r);
+      })();
+      persisted.push(...batch);
+    } catch (e) {
+      // A DB error (SQLITE_BUSY, disk full, constraint) rolls back the whole
+      // batch; retry per file so one bad row can't discard its batchmates.
+      // Files that still fail stay 'pending' and are retried next scan.
+      log.warn("thumb/meta batch persist failed, retrying per file:", e);
+      for (const r of batch) {
+        try {
+          persistOneTx(r);
+          persisted.push(r);
+        } catch (err) {
+          log.warn(`failed to persist thumb/meta for file ${r.id}:`, err);
+        }
+      }
+    }
+    for (const r of persisted) {
+      if (r.ok) onEvent({ type: "thumbDone", id: r.id });
+    }
+    // Only successfully persisted rows advance the progress counter — failed
+    // rows stay 'pending' and are retried next scan (same as the old per-file
+    // semantics, where a failed persist did not count as done).
+    processed += persisted.length;
+    onEvent({
+      type: "progress",
+      jobId,
+      phase: "thumbnail",
+      done: processed,
+      total,
+    });
+  };
+
   await pool(
     pending,
     Math.max(2, os.cpus().length - 1),
@@ -152,35 +226,15 @@ export async function runScan(
       // skips on rescan) — leave it 'pending' so the next scan retries it.
       if (signal?.aborted) return;
 
-      // Persist per file inside its own try/catch. A DB error here (SQLITE_BUSY,
-      // disk full, constraint) must not reject the pool worker: an unhandled
-      // rejection would let Promise.all settle while the remaining workers keep
-      // running detached and racing the next scan. Swallow it (the file stays
-      // 'pending' and is retried next scan) so one bad file can't derail the batch.
-      try {
-        q.updateExtractedMeta(db, f.id, meta);
-        if (ok) {
-          q.setThumb(db, f.id, dest, "done");
-        } else {
-          q.setThumb(db, f.id, null, "error");
-        }
-        syncFts(db, f.id);
-
-        if (ok) onEvent({ type: "thumbDone", id: f.id });
-        processed++;
-        onEvent({
-          type: "progress",
-          jobId,
-          phase: "thumbnail",
-          done: processed,
-          total,
-        });
-      } catch (e) {
-        log.warn(`failed to persist thumb/meta for file ${f.id}:`, e);
-      }
+      // Workers share the event loop, so buffering + flushing is race-free.
+      buffer.push({ id: f.id, dest, ok, meta });
+      if (buffer.length >= THUMB_FLUSH_EVERY) flush();
     },
     signal,
   );
+  // Persist the tail batch. On abort the buffered results are from ffmpeg runs
+  // that completed before the signal fired, so they are safe to keep.
+  flush();
 
   // Reclaim durable metadata whose file row no longer exists (mainly post-rebuild orphans).
   // Skipped on abort to avoid purging metadata for files not yet re-indexed (especially after rebuild).

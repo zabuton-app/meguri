@@ -69,6 +69,28 @@ export const FileDetailSchema = FileRowSchema.extend({
 });
 export type FileDetail = z.infer<typeof FileDetailSchema>;
 
+/**
+ * Keyset-pagination cursor. `offset` is the global index of the page's first
+ * row (kept for the UI's virtualizer padding and backward paging); `key` is
+ * the seek position — the sort-key value / workspace / id of the last row
+ * already returned. When `key` is present the query layer seeks past it
+ * instead of scanning `offset` rows (deep pages stay O(page), not O(offset)).
+ * Backward pages are fetched with an offset-only cursor (no `key`).
+ */
+export const SearchSeekKeySchema = z.object({
+  /** Active sort key's value on the last returned row (null for id sorts or NULL columns). */
+  v: z.union([z.string(), z.number()]).nullable(),
+  ws: z.string(),
+  id: z.number().int(),
+});
+export type SearchSeekKey = z.infer<typeof SearchSeekKeySchema>;
+
+export const SearchCursorSchema = z.object({
+  offset: z.number().int().min(0),
+  key: SearchSeekKeySchema.optional(),
+});
+export type SearchCursor = z.infer<typeof SearchCursorSchema>;
+
 export const SearchQuerySchema = z.object({
   q: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -83,7 +105,8 @@ export const SearchQuerySchema = z.object({
   sort: z.string().optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
   fileIds: z.array(z.number()).optional(),
-  cursor: z.number().int().min(0).optional(),
+  // Number = plain offset (legacy / backward paging); object = keyset cursor.
+  cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
   // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
   // absurd values at the IPC boundary and double-guards the multi-core cross-
   // workspace path, where the per-core clamp doesn't bound the merged slice.
@@ -119,7 +142,9 @@ export type HistoryPage = z.infer<typeof HistoryPageSchema>;
 
 export const SearchResultSchema = z.object({
   items: z.array(FileRowSchema),
-  nextCursor: z.number().nullable(),
+  // Number when produced by the per-DB offset path; keyset object from the
+  // workspace-level search (both are accepted back as SearchQuery.cursor).
+  nextCursor: z.union([z.number(), SearchCursorSchema]).nullable(),
 });
 export type SearchResult = z.infer<typeof SearchResultSchema>;
 

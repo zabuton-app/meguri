@@ -219,9 +219,6 @@ export async function syncFiles(
   const seen = new Set(scannable.map((d) => d.relPath));
   const now = nowUnix();
 
-  const findExisting = db.prepare(
-    "SELECT id, size, mtime, content_hash FROM files WHERE root_id = ? AND rel_path = ?",
-  );
   const touchUnchanged = db.prepare(
     "UPDATE files SET deleted_at = NULL, abs_path = ?, inode = ? WHERE id = ?",
   );
@@ -246,12 +243,33 @@ export async function syncFiles(
     | undefined;
 
   // --- 1. Classify (look up existing rows, keeping indices aligned with discovered) ---
+  // One bulk SELECT + in-memory Map instead of a synchronous per-file SELECT
+  // (N statements on the main thread added up on large roots). Same pattern as
+  // the excluded-set fetch above.
+  const existingByRelPath = new Map<string, NonNullable<Existing>>(
+    (
+      db
+        .prepare(
+          "SELECT id, rel_path, size, mtime, content_hash FROM files WHERE root_id = ?",
+        )
+        .all(rootId) as {
+        id: number;
+        rel_path: string;
+        size: number;
+        mtime: number;
+        content_hash: string | null;
+      }[]
+    ).map((r) => [
+      r.rel_path,
+      { id: r.id, size: r.size, mtime: r.mtime, content_hash: r.content_hash },
+    ]),
+  );
   // hashIdx holds new files (move detection) plus changed files (content_hash refresh).
   const existingOf: Existing[] = new Array<Existing>(scannable.length);
   const hashIdx: number[] = [];
   for (let i = 0; i < scannable.length; i++) {
     if (signal?.aborted) break;
-    const existing = findExisting.get(rootId, scannable[i].relPath) as Existing;
+    const existing = existingByRelPath.get(scannable[i].relPath);
     existingOf[i] = existing;
     if (!existing) {
       hashIdx.push(i);
