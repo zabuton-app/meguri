@@ -19,7 +19,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
-const ROW_ESTIMATE = 88; // initial row-height estimate (corrected by measurement)
+const ROW_ESTIMATE = 124; // initial row-height estimate (corrected by measurement)
 
 interface Props {
   items: FileRow[];
@@ -133,7 +133,7 @@ export function MediaList({
             key={i}
             className="flex gap-3 rounded-md border border-border bg-surface p-2"
           >
-            <Skeleton className="aspect-video w-32 shrink-0 rounded" />
+            <Skeleton className="aspect-video w-48 shrink-0 rounded" />
             <div className="flex flex-1 flex-col gap-2 py-1">
               <Skeleton className="h-3.5 w-2/3" />
               <Skeleton className="h-2.5 w-1/3" />
@@ -221,16 +221,9 @@ const MediaRow = memo(function MediaRow({
     >
       <Link
         to={fileHref(file.id, file.workspaceId)}
-        className="group/thumb relative block aspect-video w-32 shrink-0 overflow-hidden rounded bg-overlay text-muted"
+        className="group/thumb relative block aspect-video w-48 shrink-0 overflow-hidden rounded bg-overlay text-muted"
       >
-        <MediaThumbnail
-          file={file}
-          mediaBase={mediaBase}
-          version={version}
-          fallbackIconSize="size-6"
-          playOverlaySize="size-7"
-          playIconSize="size-3.5"
-        />
+        <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
         {file.kind === "video" && (
           <span className="absolute bottom-0.5 right-0.5 rounded bg-bg/70 px-1 text-[10px] text-fg">
             {formatDuration(file.duration)}

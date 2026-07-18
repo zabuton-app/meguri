@@ -242,6 +242,8 @@ export const ja = {
   "discover.empty": "おすすめできるメディアがありません。",
   "discover.emptyHint":
     "「スキャン」で動画や画像を取り込むと、ここでランダムにおすすめされます。",
+  "discover.sceneHint": "ホバーで拡大 · クリックでその時点から再生",
+  "discover.moreScenes": "+{count}",
 
   // ワークスペースレール
   "workspace.all": "すべて",

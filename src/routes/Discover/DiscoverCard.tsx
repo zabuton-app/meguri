@@ -1,15 +1,23 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, Film, Heart, ImageIcon, Play } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/RatingStars";
-import { formatDuration } from "@/lib/format";
+import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
+import { usePreferences } from "@/settings/PreferencesProvider";
+import { formatDuration, formatSize } from "@/lib/format";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { detailPath } from "./utils";
+import { SceneRail } from "./SceneRail";
 
+// Full-bleed immersive slide: the media fills the card (blurred cover backdrop
+// + sharp contain foreground) and all info/actions are overlaid on gradient
+// scrims. The whole media area is a link to the detail/player; overlay
+// containers are pointer-events-none so empty overlay space still clicks
+// through, with interactive children opting back in.
 export function DiscoverCard({
   file,
   mediaBase,
@@ -17,6 +25,8 @@ export function DiscoverCard({
   onRate,
   onToggleFavorite,
   filterParam,
+  workspaceName,
+  isActive,
   t,
 }: {
   file: FileRow;
@@ -26,6 +36,10 @@ export function DiscoverCard({
   onRate: (rating: number) => void;
   onToggleFavorite: () => void;
   filterParam?: string;
+  /** Label of the file's workspace, shown as the first meta chip. */
+  workspaceName?: string;
+  /** Whether this slide is the selected one (scene frames load lazily per slide). */
+  isActive: boolean;
   t: TFunc;
 }) {
   const wsId = file.workspaceId;
@@ -36,121 +50,149 @@ export function DiscoverCard({
     : undefined;
   const slash = file.relPath.lastIndexOf("/");
   const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
-  const dir = slash >= 0 ? file.relPath.slice(0, slash) : "";
   const isVideo = file.kind === "video";
   const ActionIcon = isVideo ? Play : ImageIcon;
+  const detailTo = detailPath(file.id, wsId, filterParam);
+  const showRail = isVideo && !!file.duration && file.duration > 0 && isActive;
+
+  // Hover scrub preview on the main media (same behavior/preference as the
+  // list thumbnails): pointer X maps onto the video timeline.
+  const { hoverPreview } = usePreferences();
+  const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
+    useHoverFramePreview({
+      enabled: Boolean(hoverPreview && hasThumb && isVideo),
+      frameUrl: (t) => `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}`,
+      duration: file.duration,
+      fileId: file.id,
+    });
 
   return (
-    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)] md:gap-5">
-      {/* Large preview. Click to open the detail/player. */}
+    <div className="relative h-full w-full overflow-hidden bg-black">
+      {/* Media layers. Click anywhere to open the detail/player. */}
       <Link
-        to={detailPath(file.id, wsId, filterParam)}
-        className="group relative block aspect-video w-full self-start overflow-hidden rounded-xl border border-border bg-black"
+        to={detailTo}
+        className="absolute inset-0 block"
+        onMouseEnter={onMouseEnter}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
       >
         {src ? (
-          <img
-            src={src}
-            alt={file.relPath}
-            className="h-full w-full object-contain transition group-hover:opacity-90"
-          />
+          <>
+            <img
+              src={src}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
+            />
+            <img
+              src={src}
+              alt={file.relPath}
+              className="absolute inset-0 h-full w-full object-contain"
+            />
+            {previewSrc && (
+              <img
+                src={previewSrc}
+                alt=""
+                className="absolute inset-0 h-full w-full bg-black object-contain"
+              />
+            )}
+          </>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted">
             {isVideo ? (
-              <Film className="size-12" />
+              <Film className="size-16" />
             ) : (
-              <ImageIcon className="size-12" />
+              <ImageIcon className="size-16" />
             )}
           </div>
         )}
-        {isVideo ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
-            <span className="flex size-14 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
-              <Play className="size-6 translate-x-0.5 fill-current" />
-            </span>
-          </div>
-        ) : null}
-        {isVideo && file.duration ? (
-          <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 text-[11px] tabular-nums text-white">
-            {formatDuration(file.duration, { hours: true, fallback: "—" })}
-          </span>
-        ) : null}
       </Link>
 
-      {/* Right column: meta panel */}
-      <div className="flex min-w-0 flex-col gap-3">
-        {/* Title + path */}
-        <div className="min-w-0">
+      {/* Gradient scrims for overlay legibility. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[22%] bg-gradient-to-b from-bg/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-bg/90 via-bg/40 to-transparent" />
+
+      {/* Center play affordance (videos only). */}
+      {isVideo && (
+        <Link
+          to={detailTo}
+          aria-label={t("discover.play")}
+          className="absolute left-1/2 top-1/2 z-20 flex size-[76px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-bg/40 text-bright-fg backdrop-blur-md transition hover:scale-105 hover:bg-bg/60"
+        >
+          <Play className="size-7 translate-x-0.5 fill-current" />
+        </Link>
+      )}
+
+      {/* Bottom overlay: scene rail, title, meta chips, actions. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-6 p-5 pb-4">
+        <div className="min-w-0 flex-1">
+          {showRail && file.duration ? (
+            <SceneRail
+              id={file.id}
+              total={file.duration}
+              mediaBase={mediaBase}
+              wsId={wsId}
+              filterParam={filterParam}
+              t={t}
+              className="pointer-events-auto mb-2"
+            />
+          ) : null}
+
           <h2
-            className="line-clamp-2 text-base font-semibold leading-snug text-bright-fg"
+            className="truncate text-xl font-bold text-bright-fg drop-shadow-md"
             title={file.relPath}
           >
             {basename}
           </h2>
-          {dir && (
-            <p
-              className="mt-0.5 truncate text-xs text-muted"
-              title={file.relPath}
-            >
-              {dir}
-            </p>
-          )}
-        </div>
 
-        {/* Meta badges */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="outline" className="font-normal">
-            {file.width && file.height ? `${file.width}×${file.height}` : "—"}
-          </Badge>
-          {isVideo ? (
-            <Badge variant="outline" className="font-normal">
-              {formatDuration(file.duration, { hours: true, fallback: "—" })}
-            </Badge>
-          ) : null}
-        </div>
-
-        {/* Favorite + rating */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onToggleFavorite}
-            aria-pressed={isFav}
-            aria-label={isFav ? t("favorite.remove") : t("favorite.add")}
-            title={isFav ? t("favorite.remove") : t("favorite.add")}
-            className={cn(
-              "flex items-center justify-center transition-colors",
-              isFav ? "text-error" : "text-muted hover:text-error",
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {workspaceName && <Chip>{workspaceName}</Chip>}
+            {file.width && file.height ? (
+              <Chip>
+                {file.width}×{file.height}
+              </Chip>
+            ) : null}
+            {isVideo ? (
+              <Chip>
+                {formatDuration(file.duration, { hours: true, fallback: "—" })}
+              </Chip>
+            ) : (
+              <>
+                {file.size ? <Chip>{formatSize(file.size)}</Chip> : null}
+                {file.capturedAt ? (
+                  <Chip>
+                    {new Date(file.capturedAt * 1000).toLocaleDateString()}
+                  </Chip>
+                ) : null}
+              </>
             )}
-          >
-            <Heart
-              className={cn(
-                "size-[18px] transition-transform hover:scale-110",
-                isFav && "fill-current",
-              )}
-            />
-          </button>
-          <RatingStars value={file.rating} onChange={onRate} size={18} />
-        </div>
-
-        {/* Tags */}
-        <div className="no-scrollbar flex min-h-0 flex-wrap gap-1 overflow-y-auto">
-          {file.tags && file.tags.length > 0 ? (
-            file.tags.map((tag) => (
-              <span
-                key={`${tag.id}-${tag.source}`}
-                className="h-fit shrink-0 rounded bg-overlay px-1.5 text-[11px] leading-5 text-fg"
+            <Chip interactive className="gap-2">
+              <button
+                type="button"
+                onClick={onToggleFavorite}
+                aria-pressed={isFav}
+                aria-label={isFav ? t("favorite.remove") : t("favorite.add")}
+                title={isFav ? t("favorite.remove") : t("favorite.add")}
+                className={cn(
+                  "flex items-center justify-center transition-colors",
+                  isFav ? "text-error" : "text-muted hover:text-error",
+                )}
               >
-                {tag.name}
-              </span>
-            ))
-          ) : (
-            <span className="text-[11px] text-muted">{t("tag.none")}</span>
-          )}
+                <Heart
+                  className={cn("size-3.5", isFav && "fill-current")}
+                />
+              </button>
+              <RatingStars value={file.rating} onChange={onRate} size={14} />
+            </Chip>
+            {file.tags?.map((tag) => (
+              <Chip key={`${tag.id}-${tag.source}`}>{tag.name}</Chip>
+            ))}
+          </div>
         </div>
 
-        {/* Actions */}
-        <div className="mt-auto flex items-center gap-2 pt-1">
-          <Button asChild size="sm" className="flex-1">
-            <Link to={detailPath(file.id, wsId, filterParam)}>
+        <div className="pointer-events-auto flex shrink-0 items-center gap-2.5">
+          <Button asChild size="lg" className="px-7 font-bold shadow-lg">
+            <Link to={detailTo}>
               <ActionIcon className={isVideo ? "fill-current" : undefined} />
               {isVideo ? t("discover.play") : t("discover.open")}
             </Link>
@@ -158,7 +200,7 @@ export function DiscoverCard({
           <Button
             variant="outline"
             size="icon"
-            className="size-9 shrink-0"
+            className="size-11 shrink-0 border-border/60 bg-bg/50 backdrop-blur-md"
             onClick={() => void api.openExternal(file.id, wsId)}
             title={t("media.openExternal")}
             aria-label={t("media.openExternal")}
@@ -167,6 +209,39 @@ export function DiscoverCard({
           </Button>
         </div>
       </div>
+
+      {/* Seekbar-style indicator while hover-scrubbing. */}
+      {previewSrc && scrubFraction != null && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-1 bg-bg/40">
+          <div
+            className="h-full bg-primary"
+            style={{ width: `${scrubFraction * 100}%` }}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Small translucent meta chip used in the bottom overlay. */
+function Chip({
+  children,
+  interactive,
+  className,
+}: {
+  children: ReactNode;
+  interactive?: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "flex items-center rounded-md border border-border/60 bg-bg/50 px-2 py-1 text-xs text-fg backdrop-blur-md",
+        interactive && "pointer-events-auto",
+        className,
+      )}
+    >
+      {children}
+    </span>
   );
 }

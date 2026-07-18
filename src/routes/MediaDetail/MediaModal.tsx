@@ -11,6 +11,9 @@ import type { TFunc } from "@/i18n/I18nProvider";
 
 export type ModalSize = "large" | "small";
 
+// Shared localStorage key: MediaDetail and Discover persist one common size.
+export const MODAL_SIZE_KEY = "meguri.media.modalSize";
+
 // Modal frame. Close on backdrop click / Esc. `size` toggles between a
 // near-fullscreen layout ("large") and a centered compact panel ("small").
 // `containerRef` exposes the inner panel so the player can request fullscreen
