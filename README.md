@@ -21,12 +21,27 @@ videos and images with thumbnails. It recursively scans any folder you point it 
 generates thumbnails, tags, and metadata, and lets you browse the collection in
 a native window.
 
+The name **Meguri** comes from the Japanese word *巡り* — "going around,
+coming back around" — with the sentiment of wandering back through your
+memories and rediscovering them.
+
 Built with **Electron + Node/TypeScript + React**. Chromium is bundled, so video
 playback and rendering are largely insulated from the host environment. The only
 native dependency is SQLite (better-sqlite3); ffmpeg/ffprobe ship as static
 binaries, so no system-side ffmpeg is required.
 
 ![Meguri demo — browsing, search, playback, and Discovery](./docs/assets/demo.gif)
+
+## 🔭 Discovery — find something new
+
+**Stumble upon what you forgot you had.** The bigger a library grows, the more
+of it sinks out of sight. Discovery deals you a random hand from your library
+and shows each pick full-screen — the video front and center over a blurred
+backdrop, with a rail of scene previews to jump from — so every visit surfaces
+something worth rediscovering. One click reshuffles the deck; one more starts
+playback.
+
+![Discovery demo — immersive random picks with a scene-preview rail and reshuffle](./docs/assets/discover.gif)
 
 ## Download
 
@@ -100,7 +115,7 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   history timeline across all workspaces
 - 🔭 **Discovery** — an immersive shuffle mode that resurfaces random picks
   from your library full-screen with a scene-preview rail
-  ([see below](#-discovery--find-something-new))
+  ([see above](#-discovery--find-something-new))
 - 📋 **Copy to clipboard** — copy any image to the clipboard from the detail
   view, ready to paste elsewhere
 - 🎨 **Themes** — base16-based multi-theme switching (gruvbox / solarized /
@@ -108,17 +123,6 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 🔎 **Content zoom** — Ctrl + wheel (and Ctrl +/-/0)
 - 🔒 **Privacy-first** — no telemetry, no analytics, no external network
   communication ([see below](#privacy))
-
-## 🔭 Discovery — find something new
-
-**Stumble upon what you forgot you had.** The bigger a library grows, the more
-of it sinks out of sight. Discovery deals you a random hand from your library
-and shows each pick full-screen — the video front and center over a blurred
-backdrop, with a rail of scene previews to jump from — so every visit surfaces
-something worth rediscovering. One click reshuffles the deck; one more starts
-playback.
-
-![Discovery demo — immersive random picks with a scene-preview rail and reshuffle](./docs/assets/discover.gif)
 
 ## Screenshots
 
