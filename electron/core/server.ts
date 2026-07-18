@@ -181,8 +181,9 @@ async function handle(
         res.writeHead(404).end();
         return;
       }
-      // Thumbnails are immutable per URL: regeneration bumps the renderer's
-      // `?v=` cache buster, so the browser may cache each URL indefinitely.
+      // Thumbnails get max-age + ETag (not `immutable` — see the note on
+      // THUMB_CACHE_CONTROL) so repeat grid renders hit the browser cache and
+      // revalidations come back as cheap 304s.
       await serveFile(req, res, tp, THUMB_CACHE_CONTROL);
       return;
     }

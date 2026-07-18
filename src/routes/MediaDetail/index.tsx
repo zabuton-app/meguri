@@ -225,11 +225,17 @@ export default function MediaDetail() {
   // refetching every page of every list. Only searches whose membership
   // depends on tags (tag filter / text query) are invalidated.
   const onTagsChanged = async () => {
-    const fresh = await qc.fetchQuery({
-      queryKey: ["file_get", wsId, fileId],
-      queryFn: () => api.fileGet(fileId, wsId),
-    });
-    if (fresh) patchFileRowInCaches(qc, wsId, fileId, { tags: fresh.tags });
+    try {
+      const fresh = await qc.fetchQuery({
+        queryKey: ["file_get", wsId, fileId],
+        queryFn: () => api.fileGet(fileId, wsId),
+      });
+      if (fresh) patchFileRowInCaches(qc, wsId, fileId, { tags: fresh.tags });
+    } catch {
+      // The tag edit itself succeeded; if the refetch fails (transient IPC
+      // error), fall back to invalidating the detail so it reloads lazily.
+      void qc.invalidateQueries({ queryKey: ["file_get", wsId, fileId] });
+    }
     invalidateTagSearches(qc);
   };
   const addTag = useMutation({
