@@ -51,19 +51,19 @@
   <screenshots>
     <screenshot type="default">
       <caption>Browsing a library in the grid view</caption>
-      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.1.0/docs/assets/theme-gruvbox-dark.png</image>
+      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.2.2/docs/assets/theme-gruvbox-dark.png</image>
     </screenshot>
     <screenshot>
       <caption>Table view with metadata columns</caption>
-      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.1.0/docs/assets/view-table.png</image>
+      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.2.2/docs/assets/view-table.png</image>
     </screenshot>
     <screenshot>
       <caption>Nord theme</caption>
-      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.1.0/docs/assets/theme-nord-dark.png</image>
+      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.2.2/docs/assets/theme-nord-dark.png</image>
     </screenshot>
     <screenshot>
       <caption>Solarized light theme</caption>
-      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.1.0/docs/assets/theme-solarized-light.png</image>
+      <image>https://raw.githubusercontent.com/zabuton-app/meguri/v0.2.2/docs/assets/theme-solarized-light.png</image>
     </screenshot>
   </screenshots>
 
@@ -81,6 +81,26 @@
   </keywords>
 
   <releases>
+    <release version="0.2.2" date="2026-07-18">
+      <description>
+        <p>Performance-focused update: faster search and list queries, smoother scrolling, and quicker media serving through indexing, keyset pagination, and worker-thread offloading.</p>
+      </description>
+    </release>
+    <release version="0.2.1" date="2026-07-18">
+      <description>
+        <p>Redesigned Discovery as an immersive view, enlarged list/table thumbnails, and added a cross-file play history view.</p>
+      </description>
+    </release>
+    <release version="0.2.0" date="2026-07-18">
+      <description>
+        <p>Added hover scrub preview on video thumbnails and a copy-image-to-clipboard button in the media detail view.</p>
+      </description>
+    </release>
+    <release version="0.1.1" date="2026-07-16">
+      <description>
+        <p>Fixed the macOS Gatekeeper error on first launch by ad-hoc signing builds.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-07-14">
       <description>
         <p>Initial release.</p>

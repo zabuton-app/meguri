@@ -36,6 +36,13 @@ export default defineConfig({
   renderer: {
     root: ".",
     base: "./",
+    server: {
+      watch: {
+        // flatpak-builder's ostree cache contains symlink loops that crash
+        // the dev watcher with ELOOP; keep its artifacts out of the scan.
+        ignored: ["**/.flatpak-builder/**", "**/repo/**"],
+      },
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: { "@": resolve("src"), "@shared": resolve("shared") },
