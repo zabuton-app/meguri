@@ -13,6 +13,8 @@ const DEFAULT_START_DELAY_MS = 300;
 const SCRUB_POINTS = 20;
 /** Consecutive load failures before giving up until the next hover. */
 const SCRUB_MAX_FAILURES = 5;
+/** Videos shorter than this have no meaningful scrub range (always frame 0). */
+const MIN_SCRUB_DURATION_SEC = 2;
 
 /**
  * Map a 0..1 horizontal fraction to a quantized timestamp (seconds).
@@ -81,7 +83,9 @@ export function useHoverFramePreview({
     if (loadingRef.current) {
       loadingRef.current.onload = null;
       loadingRef.current.onerror = null;
-      loadingRef.current.src = "";
+      // Abort the in-flight load without hitting the network ("" would
+      // resolve relative to the document URL and trigger a request).
+      loadingRef.current.src = "data:,";
       loadingRef.current = null;
     }
     desiredRef.current = null;
@@ -130,7 +134,7 @@ export function useHoverFramePreview({
   /** Track the pointer: remember the wanted timestamp and the indicator fraction. */
   const updateScrub = (e: React.MouseEvent) => {
     const dur = optsRef.current.duration;
-    if (dur == null) return;
+    if (dur == null || dur < MIN_SCRUB_DURATION_SEC) return;
     const rect = e.currentTarget.getBoundingClientRect();
     if (rect.width <= 0) return;
     const fraction = Math.min(
@@ -145,7 +149,7 @@ export function useHoverFramePreview({
 
   const onMouseEnter = (e?: React.MouseEvent) => {
     const { enabled: on, duration: dur } = optsRef.current;
-    if (!on || dur == null) return;
+    if (!on || dur == null || dur < MIN_SCRUB_DURATION_SEC) return;
     stop();
     if (e) updateScrub(e);
     timerRef.current = setTimeout(() => {

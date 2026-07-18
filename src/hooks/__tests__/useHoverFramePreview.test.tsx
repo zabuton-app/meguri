@@ -169,6 +169,15 @@ describe("useHoverFramePreview", () => {
     expect(MockImage.instances).toHaveLength(0);
   });
 
+  it("does nothing for videos too short to scrub", () => {
+    const { result } = renderPreview({ duration: 1.5 });
+    act(() => result.current.onMouseEnter(mouseEvt(50)));
+    act(() => result.current.onMouseMove(mouseEvt(80)));
+    act(() => vi.advanceTimersByTime(5000));
+    expect(MockImage.instances).toHaveLength(0);
+    expect(result.current.scrubFraction).toBeNull();
+  });
+
   it("resets when the card is reused for a different file", () => {
     const { result, rerender } = renderPreview();
     act(() => result.current.onMouseEnter(mouseEvt(50)));
