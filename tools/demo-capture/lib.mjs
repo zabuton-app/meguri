@@ -85,7 +85,18 @@ export async function waitReady(page) {
     .getByRole("contentinfo", { name: "Status bar" })
     .filter({ hasText: "Idle" })
     .waitFor({ timeout: 120_000 });
+  await hideToasts(page);
   await sleep(1500);
+}
+
+/**
+ * Hide the toast layer (scan-done / update notifications) so it neither
+ * shows up in captures nor intercepts pointer events.
+ */
+export async function hideToasts(page) {
+  await page.addStyleTag({
+    content: 'section[aria-label^="Notifications"] { display: none !important; }',
+  });
 }
 
 /** Switch the base16 theme (persisted the same way the ThemeProvider does). */
