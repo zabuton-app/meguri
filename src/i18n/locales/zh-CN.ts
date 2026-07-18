@@ -31,6 +31,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.languageDesc": "切换界面的显示语言。",
   "settings.scenes": "场景缩略图数量",
   "settings.scenesDesc": "在详情页生成多少张场景缩略图。",
+  "settings.hoverPreview": "悬停预览",
+  "settings.hoverPreviewDesc": "预览视频缩略图上光标位置对应的场景。",
   "settings.keybinding": "键位绑定",
   "settings.keybindingDesc":
     "列表焦点移动、文件翻页、滚动和聚焦搜索的按键分配。",

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Film, ImageIcon, Play } from "lucide-react";
 import type { FileRow } from "@/ipc/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
+import { usePreferences } from "@/settings/PreferencesProvider";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -29,6 +31,10 @@ interface Props {
  * The play overlay strengthens via the named group `group/thumb`. Wrap the
  * thumbnail container (Link/cell) with `group/thumb` so the highlight only
  * fires when the thumbnail itself is hovered — not the surrounding metadata.
+ *
+ * Videos also get a hover scrub preview (the pointer's horizontal position
+ * maps onto the video timeline, frames served by the media server's `frame`
+ * endpoint), toggleable through the `hoverPreview` preference.
  */
 export function MediaThumbnail({
   file,
@@ -44,6 +50,15 @@ export function MediaThumbnail({
     ? `${mediaBase}/ws/${file.workspaceId}/thumb/${file.id}?v=${version}`
     : undefined;
   const [imgLoaded, setImgLoaded] = useState(false);
+  const { hoverPreview } = usePreferences();
+  const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
+    useHoverFramePreview({
+      enabled: Boolean(hoverPreview && hasThumb && file.kind === "video"),
+      frameUrl: (t) =>
+        `${mediaBase}/ws/${file.workspaceId}/frame/${file.id}?t=${t}`,
+      duration: file.duration,
+      fileId: file.id,
+    });
 
   if (!src) {
     return (
@@ -58,7 +73,12 @@ export function MediaThumbnail({
   }
 
   return (
-    <>
+    <div
+      className="absolute inset-0"
+      onMouseEnter={onMouseEnter}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+    >
       {!imgLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
       <img
         src={src}
@@ -70,6 +90,21 @@ export function MediaThumbnail({
           imgLoaded ? "opacity-100" : "opacity-0",
         )}
       />
+      {previewSrc && (
+        <img
+          src={previewSrc}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+      {previewSrc && scrubFraction != null && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-bg/40">
+          <div
+            className="h-full bg-primary"
+            style={{ width: `${scrubFraction * 100}%` }}
+          />
+        </div>
+      )}
       {file.kind === "video" && showPlayOverlay && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span
@@ -82,6 +117,6 @@ export function MediaThumbnail({
           </span>
         </div>
       )}
-    </>
+    </div>
   );
 }
