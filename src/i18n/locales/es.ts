@@ -33,6 +33,9 @@ export const es: Record<TranslationKey, string> = {
   "settings.scenes": "Miniaturas de escena",
   "settings.scenesDesc":
     "Cuántas miniaturas de escena generar en la pantalla de detalles.",
+  "settings.hoverPreview": "Vista previa al pasar el cursor",
+  "settings.hoverPreviewDesc":
+    "Muestra la escena bajo el cursor al pasar sobre la miniatura de un vídeo.",
   "settings.keybinding": "Atajos de teclado",
   "settings.keybindingDesc":
     "Asignación de teclas para mover el foco en la lista, navegar archivos, desplazar y enfocar la búsqueda.",
@@ -40,6 +43,7 @@ export const es: Record<TranslationKey, string> = {
   "settings.supportDesc":
     "Si te gusta esta aplicación, considera apoyar su desarrollo.",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "Ocultar el enlace de apoyo",
   "settings.update": "Actualizaciones",
   "settings.updateDesc":
     "Comprueba si hay una versión más reciente disponible.",
@@ -134,6 +138,9 @@ export const es: Record<TranslationKey, string> = {
   "media.openExternal": "Abrir externamente",
   "media.openFolder": "Abrir carpeta contenedora",
   "media.copyFilePath": "Copiar ruta del archivo",
+  "media.copyImage": "Copiar imagen",
+  "media.imageCopied": "Imagen copiada al portapapeles",
+  "media.imageCopyFailed": "No se pudo copiar la imagen",
   "media.invertImageBackground": "Invertir fondo de imagen",
   "media.modalMaximize": "Ampliar ventana",
   "media.modalMinimize": "Reducir ventana",

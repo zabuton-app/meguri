@@ -31,6 +31,9 @@ export const ja = {
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",
   "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
+  "settings.hoverPreview": "ホバープレビュー",
+  "settings.hoverPreviewDesc":
+    "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
   "settings.keybinding": "キーバインド",
   "settings.keybindingDesc":
     "一覧のフォーカス移動・ファイルの前後移動・スクロール・検索フォーカスのキー割り当て。",
@@ -38,6 +41,7 @@ export const ja = {
   "settings.supportDesc":
     "このアプリが気に入ったら、開発の支援をご検討ください。",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "サポートリンクを非表示にする",
   "settings.update": "アップデート",
   "settings.updateDesc": "新しいバージョンが公開されていないか確認します。",
   "settings.updateCheckNow": "今すぐ確認",
@@ -130,6 +134,9 @@ export const ja = {
   "media.openExternal": "外部で開く",
   "media.openFolder": "フォルダを開く",
   "media.copyFilePath": "ファイルパスをコピー",
+  "media.copyImage": "画像をコピー",
+  "media.imageCopied": "画像をクリップボードにコピーしました",
+  "media.imageCopyFailed": "画像のコピーに失敗しました",
   "media.invertImageBackground": "画像の背景色を反転",
   "media.modalMaximize": "モーダルを拡大",
   "media.modalMinimize": "モーダルを縮小",

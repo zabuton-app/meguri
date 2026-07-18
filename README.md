@@ -317,6 +317,21 @@ npm run test:e2e
 Keep changes focused, avoid unrelated refactors, and include tests when a change
 touches core behavior, persistence, media scanning, or user-facing workflows.
 
+A few conventions to follow:
+
+- **Write commit messages in English**, using the format
+  `#<issue> <type>: <summary>` when the change is tied to an issue, or
+  `<type>: <summary>` otherwise (types in use: `feat`, `fix`, `docs`, `chore`,
+  `ci`, `build`).
+- **Branch names** follow `feat/#<issue>-<short-description>`
+  (e.g. `feat/#9-hover-preview`), branched from `main`.
+- **Keep all locales in sync**: when adding or changing UI strings, update every
+  locale in [src/i18n/locales/](src/i18n/locales/) (ja / en / es / fr / ko /
+  zh-CN). `ja.ts` is the source of truth for translation keys.
+- **Read the developer docs first**: [docs/README.md](docs/README.md) is the
+  index of the architecture reference — worth a look before touching scanning,
+  the database, IPC, or the media server.
+
 ## Disclaimer
 
 Meguri is a personal-scale project provided **as is**, without warranty of any

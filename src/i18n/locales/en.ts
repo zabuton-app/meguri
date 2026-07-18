@@ -33,6 +33,9 @@ export const en: Record<TranslationKey, string> = {
   "settings.scenes": "Scene thumbnails",
   "settings.scenesDesc":
     "How many scene thumbnails to generate on the detail screen.",
+  "settings.hoverPreview": "Hover preview",
+  "settings.hoverPreviewDesc":
+    "Preview the scene under the cursor while hovering over a video thumbnail.",
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",
@@ -40,6 +43,7 @@ export const en: Record<TranslationKey, string> = {
   "settings.supportDesc":
     "If you enjoy this app, please consider supporting its development.",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "Hide support link",
   "settings.update": "Updates",
   "settings.updateDesc": "Check whether a newer version is available.",
   "settings.updateCheckNow": "Check now",
@@ -131,6 +135,9 @@ export const en: Record<TranslationKey, string> = {
   "media.openExternal": "Open externally",
   "media.openFolder": "Open containing folder",
   "media.copyFilePath": "Copy File Path",
+  "media.copyImage": "Copy image",
+  "media.imageCopied": "Image copied to clipboard",
+  "media.imageCopyFailed": "Failed to copy image",
   "media.invertImageBackground": "Invert image background",
   "media.modalMaximize": "Enlarge modal",
   "media.modalMinimize": "Shrink modal",
