@@ -12,6 +12,7 @@ search, and play, all offline.**
 [![Release](https://img.shields.io/github/v/release/zabuton-app/meguri?include_prereleases)](https://github.com/zabuton-app/meguri/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-8a9a7b)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/amgsk)
 
 </div>
 
