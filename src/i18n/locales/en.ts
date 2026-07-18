@@ -33,6 +33,9 @@ export const en: Record<TranslationKey, string> = {
   "settings.scenes": "Scene thumbnails",
   "settings.scenesDesc":
     "How many scene thumbnails to generate on the detail screen.",
+  "settings.hoverPreview": "Hover preview",
+  "settings.hoverPreviewDesc":
+    "Preview the scene under the cursor while hovering over a video thumbnail.",
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",

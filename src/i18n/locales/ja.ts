@@ -31,6 +31,9 @@ export const ja = {
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",
   "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
+  "settings.hoverPreview": "ホバープレビュー",
+  "settings.hoverPreviewDesc":
+    "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
   "settings.keybinding": "キーバインド",
   "settings.keybindingDesc":
     "一覧のフォーカス移動・ファイルの前後移動・スクロール・検索フォーカスのキー割り当て。",

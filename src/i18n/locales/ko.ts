@@ -31,6 +31,9 @@ export const ko: Record<TranslationKey, string> = {
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",
   "settings.scenesDesc": "상세 화면에서 생성할 장면 썸네일 수입니다.",
+  "settings.hoverPreview": "호버 미리보기",
+  "settings.hoverPreviewDesc":
+    "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",
   "settings.keybinding": "키 바인딩",
   "settings.keybindingDesc":
     "목록 포커스 이동·파일 이동·스크롤·검색 포커스의 키 할당입니다.",

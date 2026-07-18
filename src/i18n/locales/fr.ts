@@ -33,6 +33,9 @@ export const fr: Record<TranslationKey, string> = {
   "settings.scenes": "Miniatures de scène",
   "settings.scenesDesc":
     "Nombre de miniatures de scène à générer sur l'écran de détail.",
+  "settings.hoverPreview": "Aperçu au survol",
+  "settings.hoverPreviewDesc":
+    "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
   "settings.keybinding": "Raccourcis clavier",
   "settings.keybindingDesc":
     "Raccourcis pour déplacer le focus dans la liste, naviguer entre les fichiers, faire défiler et cibler la recherche.",

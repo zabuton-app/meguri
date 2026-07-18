@@ -6,6 +6,7 @@ import { Check, Coffee, Moon, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/ipc/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,8 @@ export default function Settings() {
     setKeybindingPreset,
     hideSupportLink,
     setHideSupportLink,
+    hoverPreview,
+    setHoverPreview,
   } = usePreferences();
   const navigate = useNavigate();
   // Closing the modal = drop the child route and return to the list (the list stays mounted).
@@ -112,6 +115,19 @@ export default function Settings() {
                 ))}
               </SelectContent>
             </Select>
+          </section>
+
+          {/* Hover preview (scrub preview on video thumbnails) */}
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.hoverPreview")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.hoverPreviewDesc")}
+              </span>
+            </div>
+            <Switch checked={hoverPreview} onCheckedChange={setHoverPreview} />
           </section>
 
           {/* Keybinding preset (file paging keys) */}
