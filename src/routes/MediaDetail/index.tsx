@@ -166,7 +166,14 @@ export default function MediaDetail() {
   // back records again, which matches "each view is a play".
   const recordedViewRef = useRef<string | null>(null);
   useEffect(() => {
-    if (kind !== "image" || !wsId || !Number.isFinite(fileId)) return;
+    if (kind !== "image" || !wsId || !Number.isFinite(fileId)) {
+      // Once the viewer settles on a non-image, drop the guard so navigating
+      // back to the same image (e.g. image → video → image) records a new
+      // view. Keep it while kind is still undefined (the next file loading)
+      // so a transient fetch state can't cause double records.
+      if (kind !== undefined) recordedViewRef.current = null;
+      return;
+    }
     const key = `${wsId}:${fileId}`;
     if (recordedViewRef.current === key) return;
     recordedViewRef.current = key;

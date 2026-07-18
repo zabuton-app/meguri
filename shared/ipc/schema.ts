@@ -104,7 +104,7 @@ export const HistoryEntrySchema = FileRowSchema.extend({
   historyId: z.number(),
   /** Unix seconds of the newest event in the collapsed run. */
   playedAt: z.number(),
-  via: z.string(),
+  via: z.enum(["browser", "external"]),
   position: z.number().nullable(),
   /** Total play count of this file (all events, not just this run). */
   playCount: z.number(),
