@@ -12,6 +12,7 @@ export type {
   ScanDone,
   ScanProgress,
   SceneBookmark,
+  SearchCursor,
   SearchQuery,
   SearchResult,
   TagInfo,
