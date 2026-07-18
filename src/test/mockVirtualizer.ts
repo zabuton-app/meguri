@@ -13,6 +13,7 @@ vi.mock("@tanstack/react-virtual", () => ({
         })),
       getTotalSize: () => opts.count * rowHeight,
       measureElement: () => {},
+      measure: () => {},
       scrollToOffset: vi.fn(),
     };
   },

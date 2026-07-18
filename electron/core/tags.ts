@@ -98,9 +98,12 @@ export function listTagNames(db: DB, prefix: string, limit: number): string[] {
     .replace(/\\/g, "\\\\")
     .replace(/%/g, "\\%")
     .replace(/_/g, "\\_");
+  // ORDER BY must match idx_tags_name's NOCASE collation — with the default
+  // BINARY collation SQLite can use the index for the prefix range but still
+  // needs a temp b-tree for the sort.
   const rows = db
     .prepare(
-      "SELECT name FROM tags WHERE name LIKE ? ESCAPE '\\' ORDER BY name LIMIT ?",
+      "SELECT name FROM tags WHERE name LIKE ? ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT ?",
     )
     .all(`${escaped}%`, Math.max(1, Math.min(100, limit))) as {
     name: string;

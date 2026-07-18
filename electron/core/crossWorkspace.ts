@@ -510,10 +510,12 @@ export function randomCollection(
 }
 
 /**
- * Mirror queries.ts' ORDER BY, with (workspaceId, id) as a stable cross-workspace
- * tiebreak. Kept in lockstep with orderByFor() in queries/files.ts — the k-way
- * merge assumes each per-DB stream arrives in exactly this order, so any change
- * to one side must be applied to both.
+ * Mirror queries.ts' ORDER BY, with workspaceId (then id) as the stable
+ * cross-workspace tiebreak. The id term follows each sort's SQL tiebreak:
+ * fixed ASC for most sorts, but direction-following for name (see below).
+ * Kept in lockstep with orderByFor() in queries/files.ts — the k-way merge
+ * assumes each per-DB stream arrives in exactly this order, so any change to
+ * one side must be applied to both.
  */
 function comparatorFor(
   sort?: string,
