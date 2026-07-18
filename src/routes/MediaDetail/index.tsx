@@ -56,7 +56,13 @@ import { SceneBookmarks } from "./SceneBookmarks";
 import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
 import { copyImageToClipboard } from "./utils";
-import { syncFileRowAcrossCaches } from "@/lib/queryCache";
+import {
+  invalidateCollectionSearches,
+  invalidatePlayedSearches,
+  invalidateTagSearches,
+  patchFileRowInCaches,
+  syncFileRowAcrossCaches,
+} from "@/lib/queryCache";
 
 const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
 
@@ -185,7 +191,7 @@ export default function MediaDetail() {
       .fileRecordPlay(fileId, wsId, "browser")
       .then(() => {
         // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
-        void qc.invalidateQueries({ queryKey: ["files_search"] });
+        invalidatePlayedSearches(qc);
       })
       .catch(() => {
         // Drop the guard on failure so a later effect run of this visit can retry;
@@ -208,35 +214,39 @@ export default function MediaDetail() {
   const mediaSrc =
     mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
 
-  const invalidate = () =>
-    qc.invalidateQueries({ queryKey: ["file_get", wsId, fileId] });
-
   const setRating = useMutation({
     mutationFn: (r: number) => api.fileSetRating(fileId, wsId, r),
     onSuccess: (_d, r) => {
       syncFileRowAcrossCaches(qc, wsId, fileId, { rating: r });
     },
   });
+  // After a tag edit, refetch the canonical detail (tag names are normalized
+  // server-side) and mirror its tags into the list caches, instead of
+  // refetching every page of every list. Only searches whose membership
+  // depends on tags (tag filter / text query) are invalidated.
+  const onTagsChanged = async () => {
+    const fresh = await qc.fetchQuery({
+      queryKey: ["file_get", wsId, fileId],
+      queryFn: () => api.fileGet(fileId, wsId),
+    });
+    if (fresh) patchFileRowInCaches(qc, wsId, fileId, { tags: fresh.tags });
+    invalidateTagSearches(qc);
+  };
   const addTag = useMutation({
     mutationFn: (name: string) => api.fileAddTag(fileId, wsId, name),
-    onSuccess: () => {
-      invalidate();
-      void qc.invalidateQueries({ queryKey: ["files_search"] });
-    },
+    onSuccess: onTagsChanged,
   });
   const removeTag = useMutation({
     mutationFn: (tagId: number) => api.fileRemoveTag(fileId, wsId, tagId),
-    onSuccess: () => {
-      invalidate();
-      void qc.invalidateQueries({ queryKey: ["files_search"] });
-    },
+    onSuccess: onTagsChanged,
   });
   const deleteFromIndex = useMutation({
     mutationFn: () => api.fileDeleteFromIndex(fileId, wsId),
   });
   const invalidateCollections = () => {
     void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
-    void qc.invalidateQueries({ queryKey: ["files_search"] });
+    // Membership changes only affect collection-scoped lists, not workspace lists.
+    invalidateCollectionSearches(qc);
   };
   const onCollectionError = (error: unknown) => {
     toast.error(t("collection.actionFailed"), {
@@ -466,9 +476,7 @@ export default function MediaDetail() {
                   removeBookmark.mutate(bookmarkId)
                 }
                 onNativeDuration={setNativeDur}
-                onPlayed={() =>
-                  void qc.invalidateQueries({ queryKey: ["files_search"] })
-                }
+                onPlayed={() => invalidatePlayedSearches(qc)}
                 t={t}
               />
             </div>

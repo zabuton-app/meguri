@@ -171,11 +171,34 @@ export default function Home() {
   }, [status.data?.root]);
 
   // On thumb:done, bump the version for that id to force the thumbnail to reload.
+  // Events arrive dozens of times per second during bulk thumbnail generation and
+  // each state update re-renders the whole Home tree, so coalesce them into one
+  // update per flush window instead of one per event.
+  const pendingThumbs = useRef(new Map<string, number>());
+  const thumbFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (thumbFlushTimer.current) clearTimeout(thumbFlushTimer.current);
+    },
+    [],
+  );
   const onThumbDone = useCallback((event: ThumbDone) => {
     const key = event.workspaceId
       ? `${event.workspaceId}:${event.id}`
       : String(event.id);
-    setThumbVersion((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
+    const pending = pendingThumbs.current;
+    pending.set(key, (pending.get(key) ?? 0) + 1);
+    if (thumbFlushTimer.current) return;
+    thumbFlushTimer.current = setTimeout(() => {
+      thumbFlushTimer.current = null;
+      const batch = pendingThumbs.current;
+      pendingThumbs.current = new Map();
+      setThumbVersion((v) => {
+        const next = { ...v };
+        for (const [k, n] of batch) next[k] = (next[k] ?? 0) + n;
+        return next;
+      });
+    }, 100);
   }, []);
 
   // Stabilize the reference so MediaCard's memo stays effective.
@@ -297,13 +320,17 @@ export default function Home() {
   }, []);
 
   // Delegate infinite scroll to MediaGrid's virtualization (last-row detection).
+  // Depend on the stable react-query method (not the whole `search` result object,
+  // which is a new reference every render) so the memoized views don't re-render.
   const fetchNextPage = useCallback(() => {
     void search.fetchNextPage();
-  }, [search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.fetchNextPage]);
 
   const fetchPreviousPage = useCallback(() => {
     void search.fetchPreviousPage();
-  }, [search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.fetchPreviousPage]);
 
   // "?" opens the shortcuts overlay (works over any screen; ignored while typing).
   useEffect(() => {

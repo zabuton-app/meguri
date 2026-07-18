@@ -109,9 +109,10 @@ export function startServer(
   authToken: string,
 ): Promise<{ port: number; server: http.Server }> {
   return new Promise((resolve) => {
-    const server = http.createServer((req, res) =>
-      handle(req, res, resolveWorkspace, authToken),
-    );
+    const server = http.createServer((req, res) => {
+      // handle() catches its own errors; nothing to await here.
+      void handle(req, res, resolveWorkspace, authToken);
+    });
     server.on("error", () => resolve({ port: 0, server }));
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
@@ -128,7 +129,7 @@ const AUTH_HEADER = "x-api-token";
 // URLs have the form /ws/<workspaceId>/<kind>/<fileId>.
 const ROUTE = /^\/ws\/([0-9a-f]+)\/(thumb|media|frame)\/(\d+)$/;
 
-function handle(
+async function handle(
   req: http.IncomingMessage,
   res: http.ServerResponse,
   resolveWorkspace: (id: string) => Core | null,
@@ -180,7 +181,9 @@ function handle(
         res.writeHead(404).end();
         return;
       }
-      serveFile(req, res, tp);
+      // Thumbnails are immutable per URL: regeneration bumps the renderer's
+      // `?v=` cache buster, so the browser may cache each URL indefinitely.
+      await serveFile(req, res, tp, THUMB_CACHE_CONTROL);
       return;
     }
 
@@ -216,26 +219,48 @@ function handle(
       return;
     }
     // Everything else (mp4/mov/webm/images) is served via Range = full seeking.
-    serveFile(req, res, abs);
+    await serveFile(req, res, abs);
   } catch (e) {
     log.error("request failed:", req.method, req.url ?? "", e);
     if (!res.headersSent) res.writeHead(500).end();
   }
 }
 
-function serveFile(
+// Let the browser cache thumbnails instead of re-requesting on every grid
+// render. Not `immutable`: the renderer's `?v=` cache buster is a per-component
+// counter (not a persistent version), so a regenerated thumbnail can be
+// requested under an old `?v=`. The ETag below lets those revalidations come
+// back as a cheap 304 instead of a full body once max-age expires.
+const THUMB_CACHE_CONTROL = "public, max-age=3600";
+
+async function serveFile(
   req: http.IncomingMessage,
   res: http.ServerResponse,
   file: string,
+  cacheControl?: string,
 ) {
-  let size: number;
+  let st: fs.Stats;
   try {
-    size = fs.statSync(file).size;
+    // Async stat: a synchronous stat on a network FS (SMB) would block the
+    // main-process event loop (UI/IPC/serving) for every media request.
+    st = await fs.promises.stat(file);
   } catch {
     res.writeHead(404).end();
     return;
   }
+  const size = st.size;
   const ctype = contentType(file);
+  if (cacheControl) {
+    res.setHeader("Cache-Control", cacheControl);
+    // Weak content validator from stat (regeneration rewrites the file, so
+    // size+mtime changes). Answers conditional requests with 304.
+    const etag = `"${size}-${Math.trunc(st.mtimeMs)}"`;
+    res.setHeader("ETag", etag);
+    if (req.headers["if-none-match"] === etag) {
+      res.writeHead(304).end();
+      return;
+    }
+  }
   const range = parseRange(req.headers["range"], size);
   if (range === "invalid") {
     res
