@@ -97,17 +97,21 @@ export class QueryWorkerClient {
   private send(msg: WorkerPayload): Promise<unknown> {
     const worker = this.ensureWorker();
     if (!worker) {
-      // Main-thread fallback: same executor logic, synchronous.
-      switch (msg.type) {
-        case "query":
-          return Promise.resolve(this.fallback.run(msg.req));
-        case "closeWorkspace":
-          this.fallback.closeWorkspace(msg.wsId);
-          return Promise.resolve(undefined);
-        case "closeAll":
-          this.fallback.closeAll();
-          return Promise.resolve(undefined);
-      }
+      // Main-thread fallback: same executor logic, synchronous. Run inside
+      // then() so a synchronous throw becomes a rejection — callers must be
+      // able to rely on .catch() regardless of which path served the request.
+      return Promise.resolve().then(() => {
+        switch (msg.type) {
+          case "query":
+            return this.fallback.run(msg.req);
+          case "closeWorkspace":
+            this.fallback.closeWorkspace(msg.wsId);
+            return undefined;
+          case "closeAll":
+            this.fallback.closeAll();
+            return undefined;
+        }
+      });
     }
     const id = ++this.seq;
     return new Promise((resolve, reject) => {

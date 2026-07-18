@@ -49,6 +49,18 @@ describe("QueryWorkerClient", () => {
     expect(stats.fileCount).toBe(4);
   });
 
+  it("rejects (not throws) when the fallback executor fails synchronously", async () => {
+    for (let i = 0; i < 3; i++) {
+      await client.run(statsReq()).catch(() => {});
+    }
+    // Now on the fallback path. An invalid request makes the executor throw
+    // synchronously; the client must still return a rejected promise.
+    const bad = { kind: "search" as const, targets: [{ id: "ws1", dbPath }] };
+    const p = client.run(bad as never); // missing `query` → sync TypeError
+    expect(p).toBeInstanceOf(Promise);
+    await expect(p).rejects.toThrow();
+  });
+
   it("closeWorkspace releases the fallback handle so the DB dir can be deleted", async () => {
     for (let i = 0; i < 3; i++) {
       await client.run(statsReq()).catch(() => {});
