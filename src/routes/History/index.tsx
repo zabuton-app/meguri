@@ -9,9 +9,17 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { History as HistoryIcon, Trash2, X } from "lucide-react";
+import {
+  History as HistoryIcon,
+  Maximize2,
+  Minimize2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { api } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { fileHref } from "@/lib/fileHref";
 import { formatDuration } from "@/lib/format";
 import type { HistoryEntryRow } from "@/ipc/types";
@@ -24,6 +32,7 @@ import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { HistoryModal } from "./HistoryModal";
 
 const PAGE_SIZE = 50;
+const MODAL_SIZE_KEY = "meguri.history.modalSize";
 
 /** Day bucket label: today / yesterday / locale date. Calendar-day comparison
  *  (not ms arithmetic) so DST transitions can't shift the bucket boundaries. */
@@ -53,6 +62,17 @@ export default function History() {
   const onClose = useCallback(() => {
     void navigate("/");
   }, [navigate]);
+  // Persisted large/small toggle, same UX as MediaDetail's modal (own key so
+  // the history panel remembers its size independently of the detail view).
+  const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
+    MODAL_SIZE_KEY,
+    "small",
+    (raw) => (raw === "large" ? "large" : "small"),
+  );
+  const toggleModalSize = useCallback(
+    () => setModalSize((prev) => (prev === "small" ? "large" : "small")),
+    [setModalSize],
+  );
 
   const status = useAppStatus();
   const ready = status.data?.ready ?? false;
@@ -131,8 +151,12 @@ export default function History() {
 
   const loading = ready && history.isLoading;
 
+  const isSmall = modalSize === "small";
+  const toggleLabel = isSmall
+    ? t("media.modalMaximize")
+    : t("media.modalMinimize");
   return (
-    <HistoryModal onClose={onClose}>
+    <HistoryModal onClose={onClose} size={modalSize}>
       <header className="flex items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
         <HistoryIcon className="size-4 text-primary" />
         <span className="text-sm font-medium text-fg">
@@ -151,6 +175,17 @@ export default function History() {
               {t("history.clear")}
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            onClick={toggleModalSize}
+            aria-label={toggleLabel}
+            aria-pressed={isSmall}
+            title={toggleLabel}
+          >
+            {isSmall ? <Maximize2 /> : <Minimize2 />}
+          </Button>
           <Button
             variant="ghost"
             size="sm"

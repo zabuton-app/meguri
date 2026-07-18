@@ -78,6 +78,15 @@ describe("History", () => {
     expect(await screen.findByText("No play history yet.")).toBeTruthy();
   });
 
+  it("toggles the modal size and persists it", async () => {
+    renderWithProviders(<HistoryRoute />, { route: "/history" });
+    // Default is the compact panel; the header offers the enlarge toggle.
+    const toggle = await screen.findByLabelText("Enlarge modal");
+    fireEvent.click(toggle);
+    expect(screen.getByLabelText("Shrink modal")).toBeTruthy();
+    expect(localStorage.getItem("meguri.history.modalSize")).toBe("large");
+  });
+
   it("clears the history after confirmation", async () => {
     renderWithProviders(<HistoryRoute />, { route: "/history" });
     fireEvent.click(await screen.findByText("Clear history"));
