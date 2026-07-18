@@ -5,6 +5,7 @@ import {
   FILES_SEARCH_MAX_PAGES,
   FILES_SEARCH_PAGE_SIZE,
   filesSearchPreviousCursor,
+  type FilesSearchPageParam,
 } from "@/lib/filesSearch";
 
 /** Windowed infinite search: only FILES_SEARCH_MAX_PAGES stay in the query cache. */
@@ -16,7 +17,7 @@ export function useFilesSearch(
   return useInfiniteQuery({
     queryKey: ["files_search", workspaceId ?? null, filter],
     enabled: ready,
-    initialPageParam: undefined as number | undefined,
+    initialPageParam: undefined as FilesSearchPageParam,
     queryFn: ({ pageParam }) =>
       api.filesSearch({
         ...filter,

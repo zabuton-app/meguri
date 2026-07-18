@@ -69,6 +69,28 @@ export const FileDetailSchema = FileRowSchema.extend({
 });
 export type FileDetail = z.infer<typeof FileDetailSchema>;
 
+/**
+ * Keyset-pagination cursor. `offset` is the global index of the page's first
+ * row (kept for the UI's virtualizer padding and backward paging); `key` is
+ * the seek position — the sort-key value / workspace / id of the last row
+ * already returned. When `key` is present the query layer seeks past it
+ * instead of scanning `offset` rows (deep pages stay O(page), not O(offset)).
+ * Backward pages are fetched with an offset-only cursor (no `key`).
+ */
+export const SearchSeekKeySchema = z.object({
+  /** Active sort key's value on the last returned row (null for id sorts or NULL columns). */
+  v: z.union([z.string(), z.number()]).nullable(),
+  ws: z.string(),
+  id: z.number().int(),
+});
+export type SearchSeekKey = z.infer<typeof SearchSeekKeySchema>;
+
+export const SearchCursorSchema = z.object({
+  offset: z.number().int().min(0),
+  key: SearchSeekKeySchema.optional(),
+});
+export type SearchCursor = z.infer<typeof SearchCursorSchema>;
+
 export const SearchQuerySchema = z.object({
   q: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -83,7 +105,8 @@ export const SearchQuerySchema = z.object({
   sort: z.string().optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
   fileIds: z.array(z.number()).optional(),
-  cursor: z.number().int().min(0).optional(),
+  // Number = plain offset (legacy / backward paging); object = keyset cursor.
+  cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
   // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
   // absurd values at the IPC boundary and double-guards the multi-core cross-
   // workspace path, where the per-core clamp doesn't bound the merged slice.
@@ -91,9 +114,37 @@ export const SearchQuerySchema = z.object({
 });
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 
+export const HistoryQuerySchema = z.object({
+  via: z.enum(["browser", "external"]).optional(),
+  cursor: z.number().int().min(0).optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+});
+export type HistoryQuery = z.infer<typeof HistoryQuerySchema>;
+
+/** One row of the cross-file play-history timeline: the played file plus event info. */
+export const HistoryEntrySchema = FileRowSchema.extend({
+  /** play_history row ID of the newest event in the collapsed run. */
+  historyId: z.number(),
+  /** Unix seconds of the newest event in the collapsed run. */
+  playedAt: z.number(),
+  via: z.enum(["browser", "external"]),
+  position: z.number().nullable(),
+  /** Total play count of this file (all events, not just this run). */
+  playCount: z.number(),
+});
+export type HistoryEntryRow = z.infer<typeof HistoryEntrySchema>;
+
+export const HistoryPageSchema = z.object({
+  items: z.array(HistoryEntrySchema),
+  nextCursor: z.number().nullable(),
+});
+export type HistoryPage = z.infer<typeof HistoryPageSchema>;
+
 export const SearchResultSchema = z.object({
   items: z.array(FileRowSchema),
-  nextCursor: z.number().nullable(),
+  // Number when produced by the per-DB offset path; keyset object from the
+  // workspace-level search (both are accepted back as SearchQuery.cursor).
+  nextCursor: z.union([z.number(), SearchCursorSchema]).nullable(),
 });
 export type SearchResult = z.infer<typeof SearchResultSchema>;
 

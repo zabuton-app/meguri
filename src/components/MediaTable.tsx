@@ -29,14 +29,14 @@ import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
-const ROW_HEIGHT = 80; // fixed row height (thumbnail 120×67.5 + padding)
+const ROW_HEIGHT = 114; // fixed row height (thumbnail 180×101.25 + padding)
 // Column layout shared by the header and every body row so cells stay aligned.
 // name + tags are the flexible (fr) columns that absorb the remaining width;
 // every column has a px minimum so the grid never collapses columns onto each
 // other — below MIN_TABLE_WIDTH the table scrolls horizontally instead.
-const GRID_COLS = "140px minmax(280px,1fr) 72px 110px 80px 96px 190px 220px";
+const GRID_COLS = "200px minmax(280px,1fr) 72px 110px 80px 96px 190px 220px";
 // Sum of the per-column minimums above (used as the table's min-width).
-const MIN_TABLE_WIDTH = 140 + 280 + 72 + 110 + 80 + 96 + 190 + 220;
+const MIN_TABLE_WIDTH = 200 + 280 + 72 + 110 + 80 + 96 + 190 + 220;
 
 interface Props {
   items: FileRow[];
@@ -67,7 +67,9 @@ interface Props {
   navActive?: boolean;
 }
 
-export function MediaTable({
+// Memoized: Home re-renders on every thumbVersion flush and its other props are
+// referentially stable, so the table only re-renders when the data actually changes.
+export const MediaTable = memo(function MediaTable({
   items,
   mediaBase,
   workspaceId: wsId,
@@ -178,7 +180,7 @@ export function MediaTable({
       <div className="flex flex-col gap-2 p-4">
         {Array.from({ length: 14 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3">
-            <Skeleton className="aspect-video w-[120px] shrink-0 rounded" />
+            <Skeleton className="aspect-video w-[180px] shrink-0 rounded" />
             <Skeleton className="h-3.5 flex-1" />
           </div>
         ))}
@@ -241,7 +243,7 @@ export function MediaTable({
       </div>
     </ScrollArea>
   );
-}
+});
 
 function HeadCell({ children }: { children?: ReactNode }) {
   return (
@@ -304,14 +306,14 @@ const MediaTableRow = memo(function MediaTableRow({
         }}
         className="group/thumb flex items-center px-2"
       >
-        <div className="relative aspect-video w-[120px] shrink-0 overflow-hidden rounded bg-overlay text-muted">
+        <div className="relative aspect-video w-[180px] shrink-0 overflow-hidden rounded bg-overlay text-muted">
           <MediaThumbnail
             file={file}
             mediaBase={mediaBase}
             version={version}
-            fallbackIconSize="size-5"
-            playOverlaySize="size-5"
-            playIconSize="size-2.5"
+            fallbackIconSize="size-7"
+            playOverlaySize="size-8"
+            playIconSize="size-4"
           />
         </div>
       </div>

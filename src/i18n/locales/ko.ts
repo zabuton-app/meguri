@@ -31,12 +31,16 @@ export const ko: Record<TranslationKey, string> = {
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",
   "settings.scenesDesc": "상세 화면에서 생성할 장면 썸네일 수입니다.",
+  "settings.hoverPreview": "호버 미리보기",
+  "settings.hoverPreviewDesc":
+    "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",
   "settings.keybinding": "키 바인딩",
   "settings.keybindingDesc":
     "목록 포커스 이동·파일 이동·스크롤·검색 포커스의 키 할당입니다.",
   "settings.support": "개발 응원하기",
   "settings.supportDesc": "이 앱이 마음에 드신다면 개발 지원을 고려해 주세요.",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "지원 링크 숨기기",
   "settings.update": "업데이트",
   "settings.updateDesc": "새 버전이 있는지 확인합니다.",
   "settings.updateCheckNow": "지금 확인",
@@ -128,6 +132,9 @@ export const ko: Record<TranslationKey, string> = {
   "media.openExternal": "외부에서 열기",
   "media.openFolder": "폴더 열기",
   "media.copyFilePath": "파일 경로 복사",
+  "media.copyImage": "이미지 복사",
+  "media.imageCopied": "이미지를 클립보드에 복사했습니다",
+  "media.imageCopyFailed": "이미지 복사에 실패했습니다",
   "media.invertImageBackground": "이미지 배경색 반전",
   "media.modalMaximize": "모달 확대",
   "media.modalMinimize": "모달 축소",
@@ -233,6 +240,22 @@ export const ko: Record<TranslationKey, string> = {
   "discover.empty": "추천할 미디어가 없습니다.",
   "discover.emptyHint":
     "「스캔」으로 동영상과 이미지를 가져오면 여기에서 무작위로 추천됩니다.",
+  "discover.sceneHint": "마우스를 올리면 확대 · 클릭하면 해당 지점부터 재생",
+  "discover.moreScenes": "+{count}",
+
+  // 재생 기록
+  "history.title": "재생 기록",
+  "history.empty": "재생 기록이 아직 없습니다.",
+  "history.emptyHint": "동영상이나 이미지를 재생하면 여기에 기록이 표시됩니다.",
+  "history.clear": "기록 지우기",
+  "history.clearAction": "지우기",
+  "history.clearConfirm":
+    "재생 기록을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+  "history.playCount": "{count}회 재생",
+  "history.viaBrowser": "앱 내",
+  "history.viaExternal": "외부 플레이어",
+  "history.today": "오늘",
+  "history.yesterday": "어제",
 
   // workspace rail
   "workspace.all": "전체",

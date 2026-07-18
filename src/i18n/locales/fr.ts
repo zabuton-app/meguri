@@ -33,6 +33,9 @@ export const fr: Record<TranslationKey, string> = {
   "settings.scenes": "Miniatures de scène",
   "settings.scenesDesc":
     "Nombre de miniatures de scène à générer sur l'écran de détail.",
+  "settings.hoverPreview": "Aperçu au survol",
+  "settings.hoverPreviewDesc":
+    "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
   "settings.keybinding": "Raccourcis clavier",
   "settings.keybindingDesc":
     "Raccourcis pour déplacer le focus dans la liste, naviguer entre les fichiers, faire défiler et cibler la recherche.",
@@ -40,6 +43,7 @@ export const fr: Record<TranslationKey, string> = {
   "settings.supportDesc":
     "Si vous aimez cette application, envisagez de soutenir son développement.",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "Masquer le lien de soutien",
   "settings.update": "Mises à jour",
   "settings.updateDesc": "Vérifier si une version plus récente est disponible.",
   "settings.updateCheckNow": "Vérifier maintenant",
@@ -134,6 +138,9 @@ export const fr: Record<TranslationKey, string> = {
   "media.openExternal": "Ouvrir avec une application externe",
   "media.openFolder": "Ouvrir le dossier",
   "media.copyFilePath": "Copier le chemin du fichier",
+  "media.copyImage": "Copier l'image",
+  "media.imageCopied": "Image copiée dans le presse-papiers",
+  "media.imageCopyFailed": "Échec de la copie de l'image",
   "media.invertImageBackground": "Inverser l'arrière-plan de l'image",
   "media.modalMaximize": "Agrandir la fenêtre",
   "media.modalMinimize": "Réduire la fenêtre",
@@ -239,6 +246,23 @@ export const fr: Record<TranslationKey, string> = {
   "discover.empty": "Aucun média à recommander.",
   "discover.emptyHint":
     "Lancez « Analyser » pour importer des vidéos et des images ; elles seront recommandées ici au hasard.",
+  "discover.sceneHint": "Survolez pour agrandir · cliquez pour lire à partir de ce point",
+  "discover.moreScenes": "+{count}",
+
+  // Historique de lecture
+  "history.title": "Historique de lecture",
+  "history.empty": "Aucun historique de lecture pour l'instant.",
+  "history.emptyHint":
+    "Lisez des vidéos ou des images et elles apparaîtront ici.",
+  "history.clear": "Effacer l'historique",
+  "history.clearAction": "Effacer",
+  "history.clearConfirm":
+    "Supprimer tout l'historique de lecture ? Cette action est irréversible.",
+  "history.playCount": "{count} lectures",
+  "history.viaBrowser": "Dans l'application",
+  "history.viaExternal": "Lecteur externe",
+  "history.today": "Aujourd'hui",
+  "history.yesterday": "Hier",
 
   // workspace rail
   "workspace.all": "Tout",

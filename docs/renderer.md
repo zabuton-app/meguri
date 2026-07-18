@@ -8,7 +8,8 @@ fetching, internationalization, theming, and content zoom.
 
 Routing uses `createHashRouter` (`src/App.tsx`); a hash router is the stable
 choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
-`file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`), and
+`file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`),
+`history` (`src/routes/History/`), and
 `settings` (`src/routes/Settings/`) are its **children**. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
 stays mounted underneath.
@@ -36,7 +37,15 @@ list, and table — are switchable.
 
 Toggling a favorite patches both the list and detail react-query caches so they
 stay in sync without a refetch. Discover pulls videos with `randomFiles`
-(`ORDER BY RANDOM()`) and previews them with embla-carousel.
+(`ORDER BY RANDOM()`) and presents them one at a time as a full-bleed immersive
+modal driven by embla-carousel, with a horizontal `SceneRail` of seekable scene
+previews. The History route lists `history_list` pages (day-grouped, infinite
+scroll) across the active or all workspaces.
+
+Hovering a video thumbnail scrubs through frames fetched from the `frame`
+endpoint (`src/hooks/useHoverFramePreview.ts`, shared by `MediaThumbnail` and
+the Discover main media); the `hoverPreview` preference in
+`PreferencesProvider` toggles it.
 
 Styling is Tailwind CSS v4 (`@tailwindcss/vite`). `@/*` is an alias for `src/*`.
 

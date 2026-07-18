@@ -1,7 +1,7 @@
 // Media listing as a vertical list (alternative to MediaGrid). Each row shows a
 // small thumbnail plus title, metadata (resolution/duration/size) and tags.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ImageIcon } from "lucide-react";
@@ -19,7 +19,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
-const ROW_ESTIMATE = 88; // initial row-height estimate (corrected by measurement)
+const ROW_ESTIMATE = 124; // initial row-height estimate (corrected by measurement)
 
 interface Props {
   items: FileRow[];
@@ -50,7 +50,9 @@ interface Props {
   navActive?: boolean;
 }
 
-export function MediaList({
+// Memoized: Home re-renders on every thumbVersion flush and its other props are
+// referentially stable, so the list only re-renders when the data actually changes.
+export const MediaList = memo(function MediaList({
   items,
   mediaBase,
   workspaceId: wsId,
@@ -74,17 +76,36 @@ export function MediaList({
     scrollRef.current = node;
   }, []);
 
-  // TanStack Virtual returns functions React Compiler can't memoize; the skipped
-  // memoization is expected and harmless here (the virtualizer drives its own state).
-  // eslint-disable-next-line react-hooks/incompatible-library
+  // Rows all share one fixed height (fixed-width thumbnail + fixed-height text
+  // block), so instead of measuring every visible row with measureElement (one
+  // ResizeObserver + forced reflow per row), measure a single mounted row once
+  // and feed it to estimateSize.
+  const [rowH, setRowH] = useState(0);
+  const measured = useRef(false);
+  const measureRow = useCallback((node: HTMLDivElement | null) => {
+    if (!node || measured.current) return;
+    measured.current = true;
+    const h = node.getBoundingClientRect().height;
+    setRowH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
+  }, []);
+  const rowEstimate = rowH || ROW_ESTIMATE;
+
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_ESTIMATE,
+    estimateSize: () => rowEstimate,
     overscan: 8,
-    paddingStart: listOffset * ROW_ESTIMATE,
+    paddingStart: listOffset * rowEstimate,
   });
   const virtualRows = virtualizer.getVirtualItems();
+
+  // estimateSize results are cached per index; drop the cache when the measured
+  // row height changes so all row offsets are recomputed with the new size.
+  useEffect(() => {
+    virtualizer.measure();
+    // The virtualizer reference is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowEstimate]);
 
   // Keyboard focus navigation (vertical; columns=1). Open the focused row on Enter.
   const scrollToRow = useScrollToRow(virtualizer);
@@ -133,7 +154,7 @@ export function MediaList({
             key={i}
             className="flex gap-3 rounded-md border border-border bg-surface p-2"
           >
-            <Skeleton className="aspect-video w-32 shrink-0 rounded" />
+            <Skeleton className="aspect-video w-48 shrink-0 rounded" />
             <div className="flex flex-1 flex-col gap-2 py-1">
               <Skeleton className="h-3.5 w-2/3" />
               <Skeleton className="h-2.5 w-1/3" />
@@ -171,8 +192,7 @@ export function MediaList({
         {virtualRows.map((vr) => (
           <div
             key={vr.key}
-            data-index={vr.index}
-            ref={virtualizer.measureElement}
+            ref={measureRow}
             className="absolute left-0 top-0 w-full px-4 pb-2"
             style={{ transform: `translateY(${vr.start}px)` }}
           >
@@ -192,7 +212,7 @@ export function MediaList({
       </div>
     </ScrollArea>
   );
-}
+});
 
 // Memoize so only rows whose version changed re-render (onTagClick is stabilized in the parent).
 const MediaRow = memo(function MediaRow({
@@ -221,16 +241,9 @@ const MediaRow = memo(function MediaRow({
     >
       <Link
         to={fileHref(file.id, file.workspaceId)}
-        className="group/thumb relative block aspect-video w-32 shrink-0 overflow-hidden rounded bg-overlay text-muted"
+        className="group/thumb relative block aspect-video w-48 shrink-0 overflow-hidden rounded bg-overlay text-muted"
       >
-        <MediaThumbnail
-          file={file}
-          mediaBase={mediaBase}
-          version={version}
-          fallbackIconSize="size-6"
-          playOverlaySize="size-7"
-          playIconSize="size-3.5"
-        />
+        <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
         {file.kind === "video" && (
           <span className="absolute bottom-0.5 right-0.5 rounded bg-bg/70 px-1 text-[10px] text-fg">
             {formatDuration(file.duration)}

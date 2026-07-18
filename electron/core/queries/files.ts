@@ -18,10 +18,11 @@ const MAX_LIMIT = 500;
 
 // Metadata (rating/favorite/last_accessed) lives in file_meta, keyed by meta_key, so it
 // is reached through a LEFT JOIN. COALESCE supplies defaults for files with no meta row.
-const FILE_COLS =
+// Exported for queries that join files under the same `f`/`m` aliases (see history.ts).
+export const FILE_COLS =
   "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, f.captured_at AS capturedAt, m.last_accessed_at AS lastAccessedAt";
 
-const FILE_FROM =
+export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
 
 function buildFtsMatch(q: string): string | null {
@@ -91,30 +92,165 @@ function appendSearchConditions(
   return sql;
 }
 
-export function searchFiles(db: DB, query: SearchQuery): SearchResult {
-  const limit = Math.max(1, Math.min(MAX_LIMIT, query.limit ?? DEFAULT_LIMIT));
+/**
+ * Keyset-seek position for one per-DB query: rows must come strictly after the
+ * sort position (v, id) in the active order. `tie` encodes how rows that tie
+ * on the sort value relate to the cross-workspace tiebreak (this stream's
+ * workspaceId vs. the key's): "after-id" = same workspace (skip up to and
+ * including the key row), "all" = later workspace (keep every tie), "none" =
+ * earlier workspace (ties already emitted).
+ */
+export interface SeekPosition {
+  v: string | number | null;
+  id: number;
+  tie: "after-id" | "all" | "none";
+}
+
+interface SortSpec {
+  /** SQL expression of the sort value (matches orderByFor's primary term). */
+  expr: string | null;
+  /** True when the column can be NULL (NULLs sort last in both directions). */
+  nullable: boolean;
+  /** SQL comparator moving *forward* in the sort direction. */
+  cmp: "<" | ">";
+  /** Forward comparator for the id tiebreak (follows direction only for name). */
+  idCmp: "<" | ">";
+}
+
+function sortSpecFor(sort?: string, dir?: string): SortSpec {
+  const desc = resolveSortDir(sort, dir) === "desc";
+  const cmp = desc ? "<" : ">";
+  switch (sort) {
+    case "rating":
+      return { expr: "COALESCE(m.rating, 0)", nullable: false, cmp, idCmp: ">" };
+    case "captured":
+      return { expr: "f.captured_at", nullable: true, cmp, idCmp: ">" };
+    case "name":
+      return { expr: "f.rel_path", nullable: false, cmp, idCmp: cmp };
+    case "accessed":
+      return { expr: "m.last_accessed_at", nullable: true, cmp, idCmp: ">" };
+    default:
+      return { expr: null, nullable: false, cmp, idCmp: cmp };
+  }
+}
+
+/** The seek key's value for a returned row (mirrors sortSpecFor's expressions). */
+export function sortValueOf(sort: string | undefined, row: FileRow): string | number | null {
+  switch (sort) {
+    case "rating":
+      return row.rating;
+    case "captured":
+      return row.capturedAt;
+    case "name":
+      return row.relPath;
+    case "accessed":
+      return row.lastAccessedAt;
+    default:
+      return null;
+  }
+}
+
+/** WHERE fragment (with bound args appended) placing the scan just after `seek`. */
+function appendSeekCondition(
+  args: unknown[],
+  seek: SeekPosition,
+  sort?: string,
+  dir?: string,
+): string {
+  const { expr, nullable, cmp, idCmp } = sortSpecFor(sort, dir);
+  if (!expr) {
+    // Default (id) sort: the cross-workspace order is workspaceId first, then
+    // id — so a later workspace's rows all follow the key ("all"), an earlier
+    // workspace's rows all precede it ("none"), and only the key's own
+    // workspace seeks by id.
+    if (seek.tie === "all") return "1";
+    if (seek.tie === "none") return "0";
+    args.push(seek.id);
+    return `f.id ${cmp} ?`;
+  }
+  if (nullable && seek.v == null) {
+    // The key sits in the NULLs-last tail: only NULL rows can still follow.
+    if (seek.tie === "none") return "0";
+    if (seek.tie === "all") return `${expr} IS NULL`;
+    args.push(seek.id);
+    return `${expr} IS NULL AND f.id ${idCmp} ?`;
+  }
+  // Non-null key. NULL rows always sort after it, so they stay included for
+  // nullable columns; non-null rows compare against the key value.
+  const nullTail = nullable ? `${expr} IS NULL OR ` : "";
+  if (seek.tie === "none") {
+    args.push(seek.v);
+    return `${nullTail}${expr} ${cmp} ?`;
+  }
+  if (seek.tie === "all") {
+    args.push(seek.v);
+    return `${nullTail}${expr} ${cmp}= ?`;
+  }
+  args.push(seek.v, seek.v, seek.id);
+  return `${nullTail}${expr} ${cmp} ? OR (${expr} = ? AND f.id ${idCmp} ?)`;
+}
+
+/**
+ * Search one workspace DB. With `seek`, the page starts right after that sort
+ * position (keyset pagination — no OFFSET scan) and `nextCursor` is null: the
+ * caller (crossWorkspace) tracks continuation itself. Without it, the legacy
+ * numeric-offset contract applies. `skipTags` defers tag attachment to the
+ * caller (the k-way merge discards rows, so batch-level attachment is wasted).
+ */
+export function searchFiles(
+  db: DB,
+  query: SearchQuery,
+  seek?: SeekPosition,
+  opts?: { skipTags?: boolean },
+): SearchResult {
+  // The seek path allows one extra row (internal callers fetch limit+1 for
+  // has-more detection); the IPC boundary still caps requests at MAX_LIMIT.
+  const cap = seek ? MAX_LIMIT + 1 : MAX_LIMIT;
+  const limit = Math.max(1, Math.min(cap, query.limit ?? DEFAULT_LIMIT));
   const args: unknown[] = [];
   let sql = `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL`;
   sql = appendSearchConditions(sql, args, query);
+  if (seek) {
+    const seekArgs: unknown[] = [];
+    sql += ` AND (${appendSeekCondition(seekArgs, seek, query.sort, query.sortDir)})`;
+    args.push(...seekArgs);
+  }
 
   const order = orderByFor(query.sort, query.sortDir);
   sql += ` ORDER BY ${order}`;
 
-  const offset = Math.max(0, query.cursor ?? 0);
-  sql += " LIMIT ? OFFSET ?";
-  args.push(limit + 1, offset);
-
-  const items = db.prepare(sql).all(...args) as FileRow[];
   let nextCursor: number | null = null;
-  if (items.length > limit) {
-    items.length = limit;
-    nextCursor = offset + limit;
+  let items: FileRow[];
+  if (seek) {
+    sql += " LIMIT ?";
+    args.push(limit);
+    items = db.prepare(sql).all(...args) as FileRow[];
+  } else {
+    const offset = numericCursor(query.cursor);
+    sql += " LIMIT ? OFFSET ?";
+    args.push(limit + 1, offset);
+    items = db.prepare(sql).all(...args) as FileRow[];
+    if (items.length > limit) {
+      items.length = limit;
+      nextCursor = offset + limit;
+    }
   }
-  attachTags(db, items);
+  if (!opts?.skipTags) attachTags(db, items);
   return { items, nextCursor };
 }
 
-function orderByFor(sort?: string, dir?: string): string {
+/** Offset of a legacy cursor (object cursors resolve through their offset). */
+export function numericCursor(cursor: SearchQuery["cursor"]): number {
+  if (cursor == null) return 0;
+  return Math.max(0, typeof cursor === "number" ? cursor : cursor.offset);
+}
+
+/**
+ * ORDER BY clause for a sort key/direction. Exported for the index-plan tests.
+ * Kept in lockstep with comparatorFor() in crossWorkspace.ts — the All view's
+ * k-way merge re-implements this ordering in JS and breaks if they diverge.
+ */
+export function orderByFor(sort?: string, dir?: string): string {
   const direction = resolveSortDir(sort, dir).toUpperCase();
   switch (sort) {
     case "rating":
@@ -122,7 +258,10 @@ function orderByFor(sort?: string, dir?: string): string {
     case "captured":
       return `f.captured_at IS NULL ASC, f.captured_at ${direction}, f.id ASC`;
     case "name":
-      return `f.rel_path ${direction}, f.id ASC`;
+      // The id tiebreak follows the main direction so both directions map onto
+      // a single scan of idx_files_alive_rel_path (forward/backward); a fixed
+      // "id ASC" would force a temp b-tree for the DESC case.
+      return `f.rel_path ${direction}, f.id ${direction}`;
     case "accessed":
       return `m.last_accessed_at IS NULL ASC, m.last_accessed_at ${direction}, f.id ASC`;
     default:
@@ -130,21 +269,44 @@ function orderByFor(sort?: string, dir?: string): string {
   }
 }
 
-/** Pick random files (discovery queue). Uniform random over files matching the query filters. */
+/**
+ * Pick random files (discovery queue). Uniform random over files matching the
+ * query filters. Instead of "ORDER BY RANDOM() LIMIT n" (which assigns a random
+ * to every matching row and sorts them all, O(N log N) on wide rows), stream
+ * the matching ids through a size-`lim` reservoir (Algorithm R) — memory stays
+ * O(lim) rather than one array entry per matching row — and materialize only
+ * the sampled rows via primary-key lookups.
+ */
 export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
   const lim = Math.max(1, Math.min(MAX_LIMIT, query.limit ?? 20));
   const args: unknown[] = [];
-  let sql = `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL`;
+  let sql = `SELECT f.id ${FILE_FROM} WHERE f.deleted_at IS NULL`;
   sql = appendSearchConditions(sql, args, query);
-  sql += " ORDER BY RANDOM() LIMIT ?";
-  args.push(lim);
-  const items = db.prepare(sql).all(...args) as FileRow[];
+
+  const reservoir: number[] = [];
+  let seen = 0;
+  for (const id of db.prepare(sql).pluck().iterate(...args)) {
+    if (seen < lim) {
+      reservoir.push(id as number);
+    } else {
+      const j = Math.floor(Math.random() * (seen + 1));
+      if (j < lim) reservoir[j] = id as number;
+    }
+    seen++;
+  }
+  // The reservoir is a uniform sample, but its internal order is biased
+  // (early rows tend to stay near the front) — shuffle before presenting.
+  for (let i = reservoir.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [reservoir[i], reservoir[j]] = [reservoir[j], reservoir[i]];
+  }
+  const items = filesByIds(db, reservoir);
   attachTags(db, items);
   return items;
 }
 
-/** Attach tags to a set of files in a single query (for grid display, avoids N+1). */
-function attachTags(db: DB, items: FileRow[]): void {
+/** Attach tags to a set of files in a single query (for grid display, avoids N+1). Exported for the All view's merge, which attaches tags only to the final page. */
+export function attachTags(db: DB, items: FileRow[]): void {
   if (items.length === 0) return;
   const ph = items.map(() => "?").join(",");
   const rows = db

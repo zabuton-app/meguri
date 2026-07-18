@@ -1,7 +1,7 @@
 {
   "name": "meguri",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.2",
   "description": "Meguri is a local video and image browser with thumbnails, search, and playback",
   "license": "MIT",
   "author": {
@@ -109,6 +109,7 @@
       "output": "release"
     },
     "artifactName": "${productName}-${version}-${platform}-${arch}.${ext}",
+    "afterPack": "scripts/mac-adhoc-sign.mjs",
     "protocols": [
       {
         "name": "Meguri",

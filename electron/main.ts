@@ -20,8 +20,15 @@ import path from "node:path";
 import { startServer } from "./core/server.js";
 import { runScan } from "./core/jobs.js";
 import * as q from "./core/queries.js";
-import * as cw from "./core/crossWorkspace.js";
 import * as tags from "./core/tags.js";
+import { QueryWorkerClient } from "./core/queryWorkerClient.js";
+import type { QueryTarget } from "./core/queryExec.js";
+import type {
+  FileRow,
+  HistoryPage,
+  SearchResult,
+  WorkspaceStats,
+} from "./core/types.js";
 import { generateThumb } from "./core/media.js";
 import { Workspaces, ALL_ID, COLLECTION_ID_PREFIX } from "./core/workspaces.js";
 import { isInsideRoot } from "./core/paths.js";
@@ -47,6 +54,18 @@ const TRAY_ICON_BASE64 =
   "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";
 
 const ws = new Workspaces();
+// Heavy read-only list/search queries run on a worker thread so a slow query
+// can't stall the main event loop (UI, IPC, media serving). Writes stay here.
+const queryClient = new QueryWorkerClient(
+  path.join(__dirname, "queryWorker.js"),
+);
+/** Worker-side targets for a set of Cores (the worker opens its own read-only handles). */
+function queryTargets(cores: { id: string; core: Core }[]): QueryTarget[] {
+  return cores.map(({ id, core }) => ({
+    id,
+    dbPath: path.join(core.dataDir, "db.sqlite"),
+  }));
+}
 let mediaPort = 0;
 const mediaToken = randomBytes(32).toString("base64url");
 const MEDIA_TOKEN_HEADER = "X-Api-Token";
@@ -349,19 +368,11 @@ function ensureFileInsideRoot(c: Core, id: number): string {
 }
 
 function registerStatusHandlers(): void {
-  handle("workspace_stats", () => {
+  handle("workspace_stats", () =>
     // Aggregate across every workspace under the virtual "All" view; for a single
     // active workspace just read its DB directly. Returns zeros/null when nothing is mounted.
-    const cores = ws.queryCores();
-    let fileCount = 0;
-    let lastScanAt: number | null = null;
-    for (const { core } of cores) {
-      fileCount += q.countFiles(core.db);
-      const t = q.lastScanAt(core.db);
-      if (t != null && (lastScanAt == null || t > lastScanAt)) lastScanAt = t;
-    }
-    return { fileCount, lastScanAt };
-  });
+    queryClient.run<WorkspaceStats>({ kind: "stats", targets: queryTargets(ws.queryCores()) }),
+  );
 
   handle("app_status", () => {
     if (ws.isAll()) {
@@ -432,6 +443,10 @@ function registerWorkspaceHandlers(): void {
     const p = ws.pathOf(id);
     if (p) {
       await abortScan(id);
+      // The worker holds a read-only handle on this workspace's DB; close it
+      // before ws.remove() deletes the data dir (open handles block removal
+      // on Windows).
+      await queryClient.closeWorkspace(id);
       ws.remove(p);
     }
     if (ws.active()) startScan();
@@ -521,20 +536,36 @@ function registerFileHandlers(): void {
   // List queries can be invalidated by the renderer just as the active workspace
   // disappears (e.g. removing the last workspace). Return empty instead of throwing
   // so a brief race during workspace:changed doesn't surface as an error toast.
-  handle("files_search", ({ query }) =>
-    ws.activeCollection()
-      ? cw.searchCollection(ws.allCores(), ws.activeCollection()!.items, query)
-      : cw.searchWorkspaces(ws.queryCores(), query),
-  );
-  handle("files_random", ({ query }) =>
-    ws.activeCollection()
-      ? cw.randomCollection(
-          ws.allCores(),
-          ws.activeCollection()!.items,
-          query ?? {},
-        )
-      : cw.randomWorkspaces(ws.queryCores(), query ?? {}),
-  );
+  handle("files_search", ({ query }) => {
+    const collection = ws.activeCollection();
+    return collection
+      ? queryClient.run<SearchResult>({
+          kind: "search",
+          targets: queryTargets(ws.allCores()),
+          query,
+          refs: collection.items,
+        })
+      : queryClient.run<SearchResult>({
+          kind: "search",
+          targets: queryTargets(ws.queryCores()),
+          query,
+        });
+  });
+  handle("files_random", ({ query }) => {
+    const collection = ws.activeCollection();
+    return collection
+      ? queryClient.run<FileRow[]>({
+          kind: "random",
+          targets: queryTargets(ws.allCores()),
+          query: query ?? {},
+          refs: collection.items,
+        })
+      : queryClient.run<FileRow[]>({
+          kind: "random",
+          targets: queryTargets(ws.queryCores()),
+          query: query ?? {},
+        });
+  });
   handle("file_get", ({ id, workspaceId }) => {
     const db = coreById(workspaceId).db;
     q.recordAccess(db, id);
@@ -559,6 +590,22 @@ function registerFileHandlers(): void {
   handle("file_record_play", ({ id, workspaceId, via, position }) =>
     q.recordPlay(coreById(workspaceId).db, id, via, position ?? null),
   );
+  // A collection is a file set, not a history scope; while one is active (queryCores()
+  // returns []) fall back to every workspace so the timeline is still meaningful.
+  const historyCores = () =>
+    ws.isCollection() ? ws.allCores() : ws.queryCores();
+  handle("history_list", ({ query }) =>
+    queryClient.run<HistoryPage>({
+      kind: "history",
+      targets: queryTargets(historyCores()),
+      query: query ?? {},
+    }),
+  );
+  // Clear scope matches what history_list shows: the active workspace only, or
+  // every workspace when All / a collection is active.
+  handle("history_clear", () => {
+    for (const { core } of historyCores()) q.clearPlayHistory(core.db);
+  });
 }
 
 function registerTagHandlers(): void {
@@ -876,6 +923,7 @@ void app.whenReady().then(async () => {
 app.on("before-quit", () => {
   globalShortcut.unregisterAll();
   isQuitting = true;
+  void queryClient.dispose();
   try {
     fs.rmSync(controlFilePath(), { force: true });
   } catch {

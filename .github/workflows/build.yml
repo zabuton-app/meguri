@@ -54,7 +54,12 @@ jobs:
         run: npx electron-builder ${{ matrix.args }} --publish never
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Skip macOS code signing / notarization (unsigned build).
+          # No Apple certificate, so regular macOS signing / notarization is
+          # skipped. Left as-is, electron-builder's repackaging invalidates the
+          # Electron binaries' signatures and Gatekeeper rejects the app as
+          # "damaged" with no way to open it, so the afterPack hook
+          # (scripts/mac-adhoc-sign.mjs) ad-hoc signs the bundle to restore a
+          # valid signature.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifacts

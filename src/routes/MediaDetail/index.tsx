@@ -17,6 +17,7 @@ import {
   FolderMinus,
   FolderOpen,
   FolderPlus,
+  ImageDown,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -43,16 +44,27 @@ import { TagEditor } from "@/components/TagEditor";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatChords } from "@/settings/keybindings";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { MediaModal, TopBar, type ModalSize } from "./MediaModal";
+import {
+  MediaModal,
+  MODAL_SIZE_KEY,
+  TopBar,
+  type ModalSize,
+} from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
 import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
-import { syncFileRowAcrossCaches } from "@/lib/queryCache";
+import { copyImageToClipboard } from "./utils";
+import {
+  invalidateCollectionSearches,
+  invalidatePlayedSearches,
+  invalidateTagSearches,
+  patchFileRowInCaches,
+  syncFileRowAcrossCaches,
+} from "@/lib/queryCache";
 
 const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
-const MODAL_SIZE_KEY = "meguri.media.modalSize";
 
 export default function MediaDetail() {
   const { t } = useI18n();
@@ -158,6 +170,35 @@ export default function MediaDetail() {
       void document.exitFullscreen().catch(() => {});
     }
   }, [kind]);
+  // Viewing an image counts as a play (images have no player to fire onPlay),
+  // so it shows up in the play history like videos do. The ref dedupes the
+  // refetches/re-renders of a single visit; prev/next to a different file and
+  // back records again, which matches "each view is a play".
+  const recordedViewRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (kind !== "image" || !wsId || !Number.isFinite(fileId)) {
+      // Once the viewer settles on a non-image, drop the guard so navigating
+      // back to the same image (e.g. image → video → image) records a new
+      // view. Keep it while kind is still undefined (the next file loading)
+      // so a transient fetch state can't cause double records.
+      if (kind !== undefined) recordedViewRef.current = null;
+      return;
+    }
+    const key = `${wsId}:${fileId}`;
+    if (recordedViewRef.current === key) return;
+    recordedViewRef.current = key;
+    api
+      .fileRecordPlay(fileId, wsId, "browser")
+      .then(() => {
+        // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
+        invalidatePlayedSearches(qc);
+      })
+      .catch(() => {
+        // Drop the guard on failure so a later effect run of this visit can retry;
+        // without this a transient IPC error would suppress the record for good.
+        if (recordedViewRef.current === key) recordedViewRef.current = null;
+      });
+  }, [kind, fileId, wsId, qc]);
   const workspaces = useQuery({
     queryKey: ["workspaces_list"],
     queryFn: api.workspacesList,
@@ -173,35 +214,45 @@ export default function MediaDetail() {
   const mediaSrc =
     mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
 
-  const invalidate = () =>
-    qc.invalidateQueries({ queryKey: ["file_get", wsId, fileId] });
-
   const setRating = useMutation({
     mutationFn: (r: number) => api.fileSetRating(fileId, wsId, r),
     onSuccess: (_d, r) => {
       syncFileRowAcrossCaches(qc, wsId, fileId, { rating: r });
     },
   });
+  // After a tag edit, refetch the canonical detail (tag names are normalized
+  // server-side) and mirror its tags into the list caches, instead of
+  // refetching every page of every list. Only searches whose membership
+  // depends on tags (tag filter / text query) are invalidated.
+  const onTagsChanged = async () => {
+    try {
+      const fresh = await qc.fetchQuery({
+        queryKey: ["file_get", wsId, fileId],
+        queryFn: () => api.fileGet(fileId, wsId),
+      });
+      if (fresh) patchFileRowInCaches(qc, wsId, fileId, { tags: fresh.tags });
+    } catch {
+      // The tag edit itself succeeded; if the refetch fails (transient IPC
+      // error), fall back to invalidating the detail so it reloads lazily.
+      void qc.invalidateQueries({ queryKey: ["file_get", wsId, fileId] });
+    }
+    invalidateTagSearches(qc);
+  };
   const addTag = useMutation({
     mutationFn: (name: string) => api.fileAddTag(fileId, wsId, name),
-    onSuccess: () => {
-      invalidate();
-      void qc.invalidateQueries({ queryKey: ["files_search"] });
-    },
+    onSuccess: onTagsChanged,
   });
   const removeTag = useMutation({
     mutationFn: (tagId: number) => api.fileRemoveTag(fileId, wsId, tagId),
-    onSuccess: () => {
-      invalidate();
-      void qc.invalidateQueries({ queryKey: ["files_search"] });
-    },
+    onSuccess: onTagsChanged,
   });
   const deleteFromIndex = useMutation({
     mutationFn: () => api.fileDeleteFromIndex(fileId, wsId),
   });
   const invalidateCollections = () => {
     void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
-    void qc.invalidateQueries({ queryKey: ["files_search"] });
+    // Membership changes only affect collection-scoped lists, not workspace lists.
+    invalidateCollectionSearches(qc);
   };
   const onCollectionError = (error: unknown) => {
     toast.error(t("collection.actionFailed"), {
@@ -431,9 +482,7 @@ export default function MediaDetail() {
                   removeBookmark.mutate(bookmarkId)
                 }
                 onNativeDuration={setNativeDur}
-                onPlayed={() =>
-                  void qc.invalidateQueries({ queryKey: ["files_search"] })
-                }
+                onPlayed={() => invalidatePlayedSearches(qc)}
                 t={t}
               />
             </div>
@@ -468,17 +517,38 @@ export default function MediaDetail() {
             </div>
             <ButtonGroup className="shrink-0">
               {d.kind === "image" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-muted/35 bg-surface px-2"
-                  onClick={toggleImageBgInverted}
-                  aria-label={t("media.invertImageBackground")}
-                  aria-pressed={imageBgInverted}
-                  title={t("media.invertImageBackground")}
-                >
-                  <Contrast />
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-muted/35 bg-surface px-2"
+                    onClick={toggleImageBgInverted}
+                    aria-label={t("media.invertImageBackground")}
+                    aria-pressed={imageBgInverted}
+                    title={t("media.invertImageBackground")}
+                  >
+                    <Contrast />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-muted/35 bg-surface px-2"
+                    disabled={!mediaSrc}
+                    onClick={() => {
+                      if (!mediaSrc) return;
+                      void copyImageToClipboard(mediaSrc)
+                        .then(() => toast.success(t("media.imageCopied")))
+                        .catch((e: unknown) => {
+                          console.error("copy image failed:", e);
+                          toast.error(t("media.imageCopyFailed"));
+                        });
+                    }}
+                    aria-label={t("media.copyImage")}
+                    title={t("media.copyImage")}
+                  >
+                    <ImageDown />
+                  </Button>
+                </>
               )}
               <Button
                 variant="outline"

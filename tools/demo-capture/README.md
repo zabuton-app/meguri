@@ -21,6 +21,7 @@ node tools/demo-capture/fetch-media.mjs
 node tools/demo-capture/record-demo.mjs      # demo.gif — overview tour
 node tools/demo-capture/record-discover.mjs  # discover.gif — Discovery showcase
 node tools/demo-capture/shoot-gallery.mjs    # theme-*.png / view-*.png
+node tools/demo-capture/shoot-history.mjs    # history.png — play-history view
 ```
 
 To use your own media instead of the sample library:

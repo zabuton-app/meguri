@@ -2,12 +2,14 @@ import {
   ChevronDown,
   DatabaseBackup,
   FolderOpen,
+  History,
   LayoutGrid,
   List,
   Pencil,
   RefreshCw,
   Table2,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { UserCollection, WorkspaceInfo } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -102,6 +104,14 @@ export function HomeHeader({
         </span>
       )}
       <div className="ml-auto flex items-center gap-2">
+        <Link
+          to="/history"
+          title={t("history.title")}
+          aria-label={t("history.title")}
+          className="flex size-7 items-center justify-center rounded-md border border-border text-muted transition hover:bg-fg/10 hover:text-fg"
+        >
+          <History className="size-4" />
+        </Link>
         <div className="flex items-center rounded-md border border-border">
           {(
             [

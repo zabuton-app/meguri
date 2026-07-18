@@ -33,6 +33,9 @@ export const en: Record<TranslationKey, string> = {
   "settings.scenes": "Scene thumbnails",
   "settings.scenesDesc":
     "How many scene thumbnails to generate on the detail screen.",
+  "settings.hoverPreview": "Hover preview",
+  "settings.hoverPreviewDesc":
+    "Preview the scene under the cursor while hovering over a video thumbnail.",
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",
@@ -40,6 +43,7 @@ export const en: Record<TranslationKey, string> = {
   "settings.supportDesc":
     "If you enjoy this app, please consider supporting its development.",
   "settings.buyMeCoffee": "Buy Me a Coffee",
+  "settings.hideSupport": "Hide support link",
   "settings.update": "Updates",
   "settings.updateDesc": "Check whether a newer version is available.",
   "settings.updateCheckNow": "Check now",
@@ -131,6 +135,9 @@ export const en: Record<TranslationKey, string> = {
   "media.openExternal": "Open externally",
   "media.openFolder": "Open containing folder",
   "media.copyFilePath": "Copy File Path",
+  "media.copyImage": "Copy image",
+  "media.imageCopied": "Image copied to clipboard",
+  "media.imageCopyFailed": "Failed to copy image",
   "media.invertImageBackground": "Invert image background",
   "media.modalMaximize": "Enlarge modal",
   "media.modalMinimize": "Shrink modal",
@@ -235,6 +242,21 @@ export const en: Record<TranslationKey, string> = {
   "discover.empty": "No media to recommend.",
   "discover.emptyHint":
     'Run "Scan" to import videos and images, and they\'ll be recommended here at random.',
+  "discover.sceneHint": "Hover to enlarge · click to play from that point",
+  "discover.moreScenes": "+{count}",
+
+  // Play history
+  "history.title": "Play history",
+  "history.empty": "No play history yet.",
+  "history.emptyHint": "Play videos or images and they will show up here.",
+  "history.clear": "Clear history",
+  "history.clearAction": "Clear",
+  "history.clearConfirm": "Delete all play history? This cannot be undone.",
+  "history.playCount": "{count} plays",
+  "history.viaBrowser": "In-app",
+  "history.viaExternal": "External player",
+  "history.today": "Today",
+  "history.yesterday": "Yesterday",
 
   // workspace rail
   "workspace.all": "All",

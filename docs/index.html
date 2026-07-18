@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meguri — a local-first media library</title>
+<meta name="description" content="Browse, search, and play your local videos and photos. No cloud, no account. Downloads for Linux, Windows, and macOS.">
+<link rel="icon" href="./assets/icon.png">
+<style>
+  /* Solarized light, regardless of the OS color scheme */
+  :root {
+    color-scheme: light;
+    --bg: #fdf6e3;
+    --fg: #586e75;
+    --muted: #93a1a1;
+    --card: #eee8d5;
+    --border: #d9d2bc;
+    --accent: #268bd2;
+    --accent-fg: #fdf6e3;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--fg);
+    line-height: 1.6;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header img.logo { width: 96px; height: 96px; border-radius: 22%; }
+  h1 { font-size: 2.2rem; margin-top: .75rem; }
+  .tagline { color: var(--muted); font-size: 1.1rem; max-width: 40rem; margin: .5rem auto 0; }
+  /* monitor-style bezel: thick dark frame with a crisp inner edge */
+  .monitor {
+    border-radius: 16px; overflow: hidden;
+    border: 10px solid #221a13;
+    box-shadow:
+      inset 0 0 0 1px rgba(253, 246, 227, .18),
+      0 12px 32px rgba(88, 110, 117, .25),
+      0 3px 8px rgba(88, 110, 117, .15);
+    margin: 2rem 0;
+  }
+  /* the "desktop" wallpaper visible around the floating app window */
+  .desktop {
+    padding: 6.5% 8%;
+    background: linear-gradient(135deg, #f0cf9a 0%, #dc9a6e 38%, #9a7d94 72%, #4f5f88 100%);
+  }
+  .appwin {
+    border-radius: 10px; overflow: hidden;
+    box-shadow: 0 18px 44px rgba(20, 14, 8, .45), 0 4px 12px rgba(20, 14, 8, .3);
+  }
+  .titlebar {
+    display: flex; align-items: center; gap: .45rem;
+    padding: .6rem .9rem;
+    background: var(--card); border-bottom: 1px solid var(--border);
+  }
+  .titlebar .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red { background: #ff5f57; }
+  .dot.yellow { background: #febc2e; }
+  .dot.green { background: #28c840; }
+  .titlebar .title {
+    flex: 1; text-align: center; margin-right: 3.3rem; /* balance the dots */
+    color: var(--muted); font-size: .85rem;
+  }
+  .appwin img { display: block; width: 100%; }
+  h2 { font-size: 1.3rem; margin: 2.5rem 0 1rem; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.25rem;
+  }
+  .card.highlight { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .card h3 { font-size: 1.05rem; margin-bottom: .75rem; }
+  .btn {
+    display: block; text-align: center; text-decoration: none;
+    background: var(--accent); color: var(--accent-fg);
+    border-radius: 8px; padding: .55rem .9rem; margin: .4rem 0;
+    font-weight: 600; font-size: .95rem;
+  }
+  .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); font-weight: 500; }
+  .btn:hover { filter: brightness(1.08); }
+  .size { color: var(--muted); font-weight: 400; font-size: .85rem; }
+  code.cmd {
+    display: block; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: .55rem .9rem; margin: .4rem 0;
+    font-size: .9rem; overflow-x: auto; white-space: nowrap;
+  }
+  .note { color: var(--muted); font-size: .9rem; margin-top: 1rem; }
+  nav.top { margin-top: 1rem; font-size: .95rem; }
+  nav.top a { color: var(--accent); text-decoration: none; }
+  nav.top a:hover { text-decoration: underline; }
+  footer { margin-top: 3.5rem; text-align: center; color: var(--muted); font-size: .9rem; }
+  footer a { color: inherit; }
+  #version { color: var(--muted); font-size: .95rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="logo" src="./assets/icon.png" alt="Meguri logo">
+    <h1>Meguri</h1>
+    <p class="tagline">A local-first media library for your videos and photos —
+    scan, browse, search, and play, all offline. No cloud, no account.</p>
+    <p id="version"></p>
+    <nav class="top"><a href="./guide.html">📖 User Guide — how to use Meguri</a></nav>
+  </header>
+
+  <div class="monitor">
+    <div class="desktop">
+      <div class="appwin">
+        <div class="titlebar">
+          <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+          <span class="title">Meguri</span>
+        </div>
+        <img src="./assets/theme-solarized-light.png" alt="Meguri browsing a media library in grid view">
+      </div>
+    </div>
+  </div>
+
+  <h2>Download</h2>
+  <div class="cards" id="downloads">
+    <div class="card" data-os="linux">
+      <h3>🐧 Linux</h3>
+      <a class="btn" data-asset="AppImage" href="https://github.com/zabuton-app/meguri/releases/latest">AppImage</a>
+      <a class="btn secondary" data-asset="deb" href="https://github.com/zabuton-app/meguri/releases/latest">.deb package</a>
+    </div>
+    <div class="card" data-os="windows">
+      <h3>🪟 Windows</h3>
+      <a class="btn" data-asset="exe" href="https://github.com/zabuton-app/meguri/releases/latest">Installer (x64)</a>
+    </div>
+    <div class="card" data-os="mac">
+      <h3>🍎 macOS</h3>
+      <a class="btn" data-asset="dmg" href="https://github.com/zabuton-app/meguri/releases/latest">.dmg (Apple silicon)</a>
+      <a class="btn secondary" data-asset="zip" href="https://github.com/zabuton-app/meguri/releases/latest">.zip (Apple silicon)</a>
+    </div>
+  </div>
+
+  <p class="note">macOS: Meguri is not notarized by Apple, so the first launch is blocked.
+  Allow it once via <strong>System Settings → Privacy &amp; Security → Open Anyway</strong>.
+  See the <a href="./guide.html#macos-first-launch">guide</a> for details.</p>
+
+  <h2>Package managers</h2>
+  <div class="cards">
+    <div class="card" data-os="linux">
+      <h3>Arch Linux (AUR)</h3>
+      <code class="cmd">yay -S meguri-bin</code>
+    </div>
+  </div>
+
+  <p class="note">All downloads are also available on the
+  <a href="https://github.com/zabuton-app/meguri/releases">GitHub Releases</a> page.
+  Meguri only ever reads the folders you point it at — your media files are never modified.</p>
+
+  <footer>
+    <p>Free &amp; open source (MIT) ·
+    <a href="./guide.html">User Guide</a> ·
+    <a href="https://github.com/zabuton-app/meguri">Source code on GitHub</a> ·
+    <a href="https://github.com/zabuton-app/meguri/issues">Report an issue</a></p>
+  </footer>
+</div>
+
+<script>
+  // Resolve direct asset links + version from the latest GitHub release.
+  // Falls back to the releases page links already in the markup.
+  const human = (n) => `${(n / 1048576).toFixed(0)} MB`;
+  fetch("https://api.github.com/repos/zabuton-app/meguri/releases/latest")
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((rel) => {
+      document.getElementById("version").textContent =
+        `Latest release: ${rel.tag_name}`;
+      const match = {
+        AppImage: (a) => a.name.endsWith(".AppImage"),
+        deb: (a) => a.name.endsWith(".deb"),
+        exe: (a) => a.name.endsWith(".exe"),
+        dmg: (a) => a.name.endsWith(".dmg"),
+        zip: (a) => a.name.endsWith(".zip"),
+      };
+      for (const btn of document.querySelectorAll("[data-asset]")) {
+        const asset = rel.assets.find(match[btn.dataset.asset]);
+        if (asset) {
+          btn.href = asset.browser_download_url;
+          btn.insertAdjacentHTML(
+            "beforeend",
+            ` <span class="size">(${human(asset.size)})</span>`,
+          );
+        }
+      }
+    })
+    .catch(() => {});
+
+  // Highlight the visitor's platform.
+  const ua = navigator.userAgent;
+  const os = /Windows/i.test(ua) ? "windows" : /Mac/i.test(ua) ? "mac" : "linux";
+  for (const card of document.querySelectorAll(`[data-os="${os}"]`)) {
+    card.classList.add("highlight");
+  }
+</script>
+</body>
+</html>
