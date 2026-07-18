@@ -58,7 +58,11 @@ export class QueryWorkerClient {
         if (reply.ok) p.resolve(reply.result);
         else p.reject(new Error(reply.error));
       });
+      // One crash can surface as both "error" and "exit"; count it once.
+      let dropped = false;
       const drop = (err: Error) => {
+        if (dropped) return;
+        dropped = true;
         // Reject everything in flight and let the next request respawn —
         // unless the worker keeps dying, in which case give up on it.
         if (this.worker === worker) this.worker = null;
@@ -108,7 +112,14 @@ export class QueryWorkerClient {
     const id = ++this.seq;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      worker.postMessage({ ...msg, id } satisfies WorkerMessage);
+      try {
+        worker.postMessage({ ...msg, id } satisfies WorkerMessage);
+      } catch (e) {
+        // postMessage can throw synchronously (e.g. the worker exited between
+        // ensureWorker() and here); don't leak the pending entry.
+        this.pending.delete(id);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      }
     });
   }
 

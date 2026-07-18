@@ -35,6 +35,12 @@ port.on("message", (msg: WorkerMessage) => {
       case "closeAll":
         exec.closeAll();
         break;
+      default:
+        // Exhaustive at the type level; guard at runtime so a protocol
+        // mismatch fails loudly instead of replying ok with no effect.
+        throw new Error(
+          `unknown worker message type: ${String((msg as { type?: unknown }).type)}`,
+        );
     }
     port.postMessage({ id: msg.id, ok: true, result } satisfies WorkerReply);
   } catch (e) {
