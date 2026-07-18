@@ -333,7 +333,12 @@ export function randomCollection(
   return all.slice(0, lim);
 }
 
-/** Mirror queries.ts' ORDER BY, with (workspaceId, id) as a stable cross-workspace tiebreak. */
+/**
+ * Mirror queries.ts' ORDER BY, with (workspaceId, id) as a stable cross-workspace
+ * tiebreak. Kept in lockstep with orderByFor() in queries/files.ts — the k-way
+ * merge assumes each per-DB stream arrives in exactly this order, so any change
+ * to one side must be applied to both.
+ */
 function comparatorFor(
   sort?: string,
   dir?: string,
@@ -346,8 +351,12 @@ function comparatorFor(
       return (a, b) =>
         cmpNullableNum(a.capturedAt, b.capturedAt, direction) || tiebreak(a, b);
     case "name":
+      // orderByFor()'s name sort tiebreaks on id following the sort direction
+      // (so the index can serve the DESC scan); mirror that here.
       return (a, b) =>
-        cmpStr(a.relPath, b.relPath, direction) || tiebreak(a, b);
+        cmpStr(a.relPath, b.relPath, direction) ||
+        cmpStr(a.workspaceId, b.workspaceId) ||
+        cmpNum(a.id, b.id, direction);
     case "accessed":
       return (a, b) =>
         cmpNullableNum(a.lastAccessedAt, b.lastAccessedAt, direction) ||
