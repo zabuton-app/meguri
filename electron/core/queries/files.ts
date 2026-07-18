@@ -272,8 +272,9 @@ export function orderByFor(sort?: string, dir?: string): string {
 /**
  * Pick random files (discovery queue). Uniform random over files matching the
  * query filters. Instead of "ORDER BY RANDOM() LIMIT n" (which assigns a random
- * to every matching row and sorts them all, O(N log N) on wide rows), fetch just
- * the matching ids, sample in JS (partial Fisher–Yates), and materialize only
+ * to every matching row and sorts them all, O(N log N) on wide rows), stream
+ * the matching ids through a size-`lim` reservoir (Algorithm R) — memory stays
+ * O(lim) rather than one array entry per matching row — and materialize only
  * the sampled rows via primary-key lookups.
  */
 export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
@@ -281,14 +282,25 @@ export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
   const args: unknown[] = [];
   let sql = `SELECT f.id ${FILE_FROM} WHERE f.deleted_at IS NULL`;
   sql = appendSearchConditions(sql, args, query);
-  const ids = db.prepare(sql).pluck().all(...args) as number[];
 
-  const take = Math.min(lim, ids.length);
-  for (let i = 0; i < take; i++) {
-    const j = i + Math.floor(Math.random() * (ids.length - i));
-    [ids[i], ids[j]] = [ids[j], ids[i]];
+  const reservoir: number[] = [];
+  let seen = 0;
+  for (const id of db.prepare(sql).pluck().iterate(...args)) {
+    if (seen < lim) {
+      reservoir.push(id as number);
+    } else {
+      const j = Math.floor(Math.random() * (seen + 1));
+      if (j < lim) reservoir[j] = id as number;
+    }
+    seen++;
   }
-  const items = filesByIds(db, ids.slice(0, take));
+  // The reservoir is a uniform sample, but its internal order is biased
+  // (early rows tend to stay near the front) — shuffle before presenting.
+  for (let i = reservoir.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [reservoir[i], reservoir[j]] = [reservoir[j], reservoir[i]];
+  }
+  const items = filesByIds(db, reservoir);
   attachTags(db, items);
   return items;
 }

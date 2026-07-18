@@ -162,6 +162,11 @@ export async function runScan(
     q.setThumb(db, r.id, r.ok ? r.dest : null, r.ok ? "done" : "error");
     syncFts(db, r.id);
   };
+  // Per-file transaction for the retry path: persistOne spans several writes
+  // (incl. the FTS delete+insert), so a mid-way failure must roll back the
+  // whole file rather than leave partial state (e.g. an FTS row deleted but
+  // never re-inserted).
+  const persistOneTx = db.transaction(persistOne);
 
   const flush = (): void => {
     if (buffer.length === 0) return;
@@ -180,7 +185,7 @@ export async function runScan(
       log.warn("thumb/meta batch persist failed, retrying per file:", e);
       for (const r of batch) {
         try {
-          persistOne(r);
+          persistOneTx(r);
           persisted.push(r);
         } catch (err) {
           log.warn(`failed to persist thumb/meta for file ${r.id}:`, err);
@@ -190,7 +195,10 @@ export async function runScan(
     for (const r of persisted) {
       if (r.ok) onEvent({ type: "thumbDone", id: r.id });
     }
-    processed += batch.length;
+    // Only successfully persisted rows advance the progress counter — failed
+    // rows stay 'pending' and are retried next scan (same as the old per-file
+    // semantics, where a failed persist did not count as done).
+    processed += persisted.length;
     onEvent({
       type: "progress",
       jobId,
