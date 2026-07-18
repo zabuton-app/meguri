@@ -137,6 +137,21 @@ function backfillColumns(db: DB): void {
   }
 }
 
+/**
+ * Open an existing workspace DB read-only (no DDL, no PRAGMA writes). Used by
+ * the query worker: WAL mode allows any number of readers alongside the main
+ * process's single writer, and a read-only handle can never take the write
+ * lock or mutate schema. Throws if the file does not exist.
+ */
+export function openDbReadonly(file: string): DB {
+  const db = new Database(file, { readonly: true, fileMustExist: true });
+  // Connection-local (never written to the file): even in WAL mode a reader
+  // can hit SQLITE_BUSY around writer checkpoints; retry briefly instead of
+  // surfacing an exception to the renderer.
+  db.pragma("busy_timeout = 5000");
+  return db;
+}
+
 export function nowUnix(): number {
   return Math.floor(Date.now() / 1000);
 }

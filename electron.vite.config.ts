@@ -9,7 +9,14 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       outDir: "out/main",
-      lib: { entry: resolve("electron/main.ts") },
+      lib: {
+        entry: {
+          // Entry names become the output file names (main.js is package.json's
+          // "main"; queryWorker.js is loaded via new Worker() from main).
+          main: resolve("electron/main.ts"),
+          queryWorker: resolve("electron/queryWorker.ts"),
+        },
+      },
     },
   },
   preload: {
