@@ -111,6 +111,7 @@ export default function Duplicates() {
             size="sm"
             className="h-7 px-2"
             onClick={onClose}
+            aria-label={t("common.close")}
             title={`${t("common.close")} (Esc)`}
           >
             <X />
