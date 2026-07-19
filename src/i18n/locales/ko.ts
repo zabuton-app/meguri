@@ -201,6 +201,9 @@ export const ko: Record<TranslationKey, string> = {
   "player.openExternal": "외부 플레이어로 열기",
   "player.bookmarkAdd": "현재 위치에 북마크 추가",
   "player.bookmarkRemove": "{time}의 북마크 삭제",
+  "player.exportFrame": "현재 프레임을 이미지로 저장",
+  "player.frameExported": "프레임을 이미지로 저장했습니다",
+  "player.frameExportFailed": "프레임 저장에 실패했습니다",
 
   // playback errors
   "player.errAborted": "로드가 중단되었습니다 (MEDIA_ERR_ABORTED)",

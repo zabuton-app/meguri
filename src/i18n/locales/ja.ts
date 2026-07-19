@@ -203,6 +203,9 @@ export const ja = {
   "player.openExternal": "外部プレイヤーで開く",
   "player.bookmarkAdd": "現在位置にブックマークを追加",
   "player.bookmarkRemove": "{time} のブックマークを削除",
+  "player.exportFrame": "現在のフレームを画像として保存",
+  "player.frameExported": "フレームを画像として保存しました",
+  "player.frameExportFailed": "フレームの保存に失敗しました",
 
   // 再生エラー
   "player.errAborted": "読み込みが中断されました (MEDIA_ERR_ABORTED)",

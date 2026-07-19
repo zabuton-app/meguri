@@ -19,6 +19,7 @@ vi.mock("@/ipc/client", () => ({
 function renderPlayer(overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {}) {
   const onAddBookmark = vi.fn();
   const onRemoveBookmark = vi.fn();
+  const onExportFrame = vi.fn();
   const onNativeDuration = vi.fn();
   const onPlayed = vi.fn();
   const t = (key: string) => key;
@@ -37,6 +38,8 @@ function renderPlayer(overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {}
     bookmarkPending: false,
     onAddBookmark,
     onRemoveBookmark,
+    exportPending: false,
+    onExportFrame,
     onNativeDuration,
     onPlayed,
     t,
@@ -56,6 +59,7 @@ function renderPlayer(overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {}
     ref,
     onAddBookmark,
     onRemoveBookmark,
+    onExportFrame,
     onPlayed,
   };
 }
@@ -115,6 +119,34 @@ describe("VideoPlayer", () => {
     fireEvent.click(bookmarkBtn);
 
     expect(onAddBookmark).toHaveBeenCalledWith(15);
+  });
+
+  it("exports the current frame from the control bar, pausing playback first", () => {
+    const { video, onExportFrame } = renderPlayer();
+    loadVideo(video);
+    const pause = vi.fn();
+    Object.defineProperty(video, "pause", { configurable: true, value: pause });
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      value: 33,
+      writable: true,
+    });
+    fireEvent.timeUpdate(video);
+
+    fireEvent.click(screen.getByTitle("player.exportFrame"));
+
+    expect(pause).toHaveBeenCalled();
+    expect(onExportFrame).toHaveBeenCalledWith(33);
+  });
+
+  it("disables the export button while an export is in flight", () => {
+    const { video, onExportFrame } = renderPlayer({ exportPending: true });
+    loadVideo(video);
+
+    const btn = screen.getByTitle<HTMLButtonElement>("player.exportFrame");
+    expect(btn.disabled).toBe(true);
+    fireEvent.click(btn);
+    expect(onExportFrame).not.toHaveBeenCalled();
   });
 
   it("records play via IPC and fires onPlayed once", () => {

@@ -1,5 +1,6 @@
 // Metadata extraction (ffprobe) and thumbnail generation (ffmpeg). Bundled static binaries, no system dependency.
 import { execFile } from "node:child_process";
+import { promises as fsPromises } from "node:fs";
 import { promisify } from "node:util";
 import { FFMPEG, FFPROBE } from "./ffmpeg-paths.js";
 import log from "./logger.js";
@@ -157,6 +158,73 @@ export async function generateThumb(
     return runFfmpegThumb(src, kind, dest, signal, offsetSec, true);
   }
   return false;
+}
+
+export type FrameFormat = "png" | "jpeg";
+
+/** Extract one full-resolution frame at `offsetSec` and write it to `dest`.
+ *  Uses the same hybrid seek strategy as generateThumb (coarse pre-input -ss +
+ *  fine post-input -ss), falling back to a pure pre-input (keyframe-only) seek
+ *  for containers where post-input seek yields zero frames. No scaling — the
+ *  frame keeps the source resolution. */
+export async function exportFrame(
+  src: string,
+  dest: string,
+  offsetSec: number,
+  format: FrameFormat,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (await runFfmpegFrameExport(src, dest, offsetSec, format, false, signal)) {
+    return true;
+  }
+  return runFfmpegFrameExport(src, dest, offsetSec, format, true, signal);
+}
+
+async function runFfmpegFrameExport(
+  src: string,
+  dest: string,
+  offsetSec: number,
+  format: FrameFormat,
+  keyframeOnly: boolean,
+  signal: AbortSignal | undefined,
+): Promise<boolean> {
+  const args: string[] = ["-v", "error", "-y"];
+  if (keyframeOnly) {
+    args.push("-ss", offsetSec.toFixed(3), "-i", src);
+  } else {
+    const fastSeek = Math.max(0, offsetSec - THUMB_SEEK_MARGIN_SEC);
+    const fineSeek = offsetSec - fastSeek;
+    args.push("-ss", fastSeek.toFixed(3), "-i", src);
+    if (fineSeek > 0.01) args.push("-ss", fineSeek.toFixed(3));
+  }
+  args.push("-frames:v", "1");
+  if (format === "jpeg") args.push("-c:v", "mjpeg", "-q:v", "2");
+  else args.push("-c:v", "png");
+  args.push(dest);
+  try {
+    await execFileAsync(FFMPEG, args, { timeout: 60000, signal });
+    // ffmpeg exits 0 even when the seek lands past EOF and zero frames are
+    // written (no output file) — treat that as a failure, not a success.
+    const st = await fsPromises.stat(dest).catch(() => null);
+    if (!st || st.size === 0) {
+      log.warn(
+        `ffmpeg frame export produced no output (offset=${offsetSec}, format=${format}, mode=${keyframeOnly ? "keyframe" : "hybrid"})`,
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    if (!signal?.aborted) {
+      const stderr =
+        (err as { stderr?: string }).stderr ??
+        (err as Error).message ??
+        String(err);
+      log.warn(
+        `ffmpeg frame export failed (offset=${offsetSec}, format=${format}, mode=${keyframeOnly ? "keyframe" : "hybrid"}): ${stderr}`,
+      );
+    }
+    return false;
+  }
 }
 
 async function runFfmpegThumb(

@@ -8,6 +8,7 @@ import {
 import {
   Bookmark,
   BookmarkCheck,
+  Camera,
   ExternalLink,
   Maximize,
   Pause,
@@ -76,6 +77,10 @@ export const VideoPlayer = forwardRef<
     bookmarkPending: boolean;
     onAddBookmark: (sec: number) => void;
     onRemoveBookmark: (bookmarkId: number) => void;
+    /** True while a frame export is in flight; the button is disabled until it resolves. */
+    exportPending: boolean;
+    /** Export the frame at `sec` as a still image (opens a native save dialog). */
+    onExportFrame: (sec: number) => void;
     onNativeDuration: (d: number | null) => void;
     /** Fired once per loaded file when playback first starts (used to refresh the list order). */
     onPlayed: () => void;
@@ -98,6 +103,8 @@ export const VideoPlayer = forwardRef<
     bookmarkPending,
     onAddBookmark,
     onRemoveBookmark,
+    exportPending,
+    onExportFrame,
     onNativeDuration,
     onPlayed,
     t,
@@ -429,6 +436,14 @@ export const VideoPlayer = forwardRef<
     else onAddBookmark(Math.max(0, displayPos));
   };
 
+  // Freeze playback before opening the save dialog: the exported position is
+  // captured here, but letting the video run on behind the dialog would drift
+  // away from the frame the user chose.
+  const onExportClick = () => {
+    ref.current?.pause();
+    onExportFrame(Math.max(0, displayPos));
+  };
+
   return (
     <div
       ref={wrapRef}
@@ -618,6 +633,13 @@ export const VideoPlayer = forwardRef<
             ) : (
               <Bookmark size={18} />
             )}
+          </CtrlButton>
+          <CtrlButton
+            onClick={onExportClick}
+            disabled={exportPending}
+            title={t("player.exportFrame")}
+          >
+            <Camera size={18} />
           </CtrlButton>
           <span className="ml-1 tabular-nums">{fmtTime(displayPos)}</span>
           <span className="opacity-50">/</span>

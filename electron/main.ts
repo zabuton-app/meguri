@@ -21,7 +21,7 @@ import type { Core } from "./core/index.js";
 import { handle } from "./core/ipcHandler.js";
 import { runScan } from "./core/jobs.js";
 import log, { setupLogger } from "./core/logger.js";
-import { generateThumb } from "./core/media.js";
+import { exportFrame, generateThumb } from "./core/media.js";
 import { isInsideRoot } from "./core/paths.js";
 import * as q from "./core/queries.js";
 import type { QueryTarget } from "./core/queryExec.js";
@@ -694,6 +694,63 @@ function registerThumbHandlers(): void {
     q.setThumb(c.db, id, dest, "done");
     emit("thumb:done", { id, workspaceId });
     return { ok: true, thumbOffsetSec: sec };
+  });
+
+  // Export the frame at `sec` as a full-resolution still image via a native
+  // save dialog. Dialog cancellation is a normal outcome (saved=false).
+  // Serialized: a rapid double-click can invoke twice before the renderer's
+  // pending state disables the button, and stacking two modal save dialogs
+  // would be confusing — treat re-entry like a cancel.
+  let frameExportInFlight = false;
+  handle("frame_export", async ({ id, workspaceId, sec }) => {
+    if (frameExportInFlight) return { saved: false, path: null };
+    frameExportInFlight = true;
+    try {
+      const c = coreById(workspaceId);
+      const abs = ensureFileInsideRoot(c, id);
+      const base = path.parse(abs).name;
+      // Colons aren't filesystem-safe, so the timestamp uses dashes (hh-mm-ss).
+      const whole = Math.floor(sec);
+      const stamp = [
+        Math.floor(whole / 3600),
+        Math.floor((whole % 3600) / 60),
+        whole % 60,
+      ]
+        .map((n) => String(n).padStart(2, "0"))
+        .join("-");
+      // Default to the OS pictures folder, not the video's own directory —
+      // that one lives inside the scan root, and an image saved there would be
+      // indexed into the library on the next scan. getPath can throw on Linux
+      // when the XDG pictures dir is undefined; fall back to home.
+      let picturesDir: string;
+      try {
+        picturesDir = app.getPath("pictures");
+      } catch {
+        picturesDir = app.getPath("home");
+      }
+      const res = await dialog.showSaveDialog(mainWindow ?? undefined!, {
+        title: "Export frame",
+        defaultPath: path.join(picturesDir, `${base}_${stamp}.png`),
+        filters: [
+          { name: "PNG", extensions: ["png"] },
+          { name: "JPEG", extensions: ["jpg", "jpeg"] },
+        ],
+      });
+      if (res.canceled || !res.filePath) return { saved: false, path: null };
+      const ext = path.extname(res.filePath).toLowerCase();
+      const format = ext === ".jpg" || ext === ".jpeg" ? "jpeg" : "png";
+      // ffmpeg infers the output muxer from the extension; force .png when the
+      // typed name has none (or an unknown one) so extraction can't fail on that.
+      const dest =
+        ext === ".png" || format === "jpeg"
+          ? res.filePath
+          : `${res.filePath}.png`;
+      const ok = await exportFrame(abs, dest, sec, format);
+      if (!ok) throw new Error("failed to export frame");
+      return { saved: true, path: dest };
+    } finally {
+      frameExportInFlight = false;
+    }
   });
 }
 

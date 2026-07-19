@@ -1,0 +1,85 @@
+// Regression tests for frame export (media.ts): real ffmpeg extraction into
+// PNG/JPEG files, format selection, and failure behaviour on broken input.
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { FFMPEG } from "../ffmpeg-paths.js";
+import { exportFrame } from "../media.js";
+
+let dir: string;
+let video: string;
+let broken: string;
+
+beforeAll(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-media-"));
+  video = path.join(dir, "src.mp4");
+  execFileSync(FFMPEG, [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "testsrc=size=64x48:rate=10:duration=1",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    video,
+  ]);
+  broken = path.join(dir, "broken.mp4");
+  fs.writeFileSync(broken, "NOT A REAL MP4");
+});
+
+afterAll(() => {
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+describe("exportFrame", () => {
+  it("writes a PNG frame at the requested offset", async () => {
+    const dest = path.join(dir, "out.png");
+    await expect(exportFrame(video, dest, 0.5, "png")).resolves.toBe(true);
+    const buf = fs.readFileSync(dest);
+    // PNG magic bytes.
+    expect([...buf.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  });
+
+  it("writes a JPEG frame when format=jpeg", async () => {
+    const dest = path.join(dir, "out.jpg");
+    await expect(exportFrame(video, dest, 0, "jpeg")).resolves.toBe(true);
+    const buf = fs.readFileSync(dest);
+    // JPEG SOI marker.
+    expect(buf[0]).toBe(0xff);
+    expect(buf[1]).toBe(0xd8);
+  });
+
+  it("keeps the source resolution (no scaling)", async () => {
+    const dest = path.join(dir, "size.png");
+    await expect(exportFrame(video, dest, 0.2, "png")).resolves.toBe(true);
+    const buf = fs.readFileSync(dest);
+    // PNG IHDR: width/height are big-endian uint32 at offsets 16/20.
+    expect(buf.readUInt32BE(16)).toBe(64);
+    expect(buf.readUInt32BE(20)).toBe(48);
+  });
+
+  it("returns false for a broken input instead of throwing", async () => {
+    const dest = path.join(dir, "never.png");
+    await expect(exportFrame(broken, dest, 0, "png")).resolves.toBe(false);
+    expect(fs.existsSync(dest)).toBe(false);
+  });
+
+  it("falls back to the keyframe-only seek for offsets past the end", async () => {
+    // The hybrid post-input seek yields zero frames past EOF; the keyframe-only
+    // retry (pure pre-input -ss) can still fail for the same reason, so either
+    // a valid last-keyframe frame or a clean false is acceptable — but never a throw.
+    const dest = path.join(dir, "past-end.png");
+    const ok = await exportFrame(video, dest, 999, "png");
+    if (ok) {
+      const buf = fs.readFileSync(dest);
+      expect([...buf.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    } else {
+      expect(fs.existsSync(dest)).toBe(false);
+    }
+  });
+});

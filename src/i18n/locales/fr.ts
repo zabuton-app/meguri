@@ -207,6 +207,9 @@ export const fr: Record<TranslationKey, string> = {
   "player.openExternal": "Ouvrir dans un lecteur externe",
   "player.bookmarkAdd": "Ajouter un marque-page à la position actuelle",
   "player.bookmarkRemove": "Supprimer le marque-page à {time}",
+  "player.exportFrame": "Enregistrer l'image actuelle",
+  "player.frameExported": "Image enregistrée",
+  "player.frameExportFailed": "Échec de l'enregistrement de l'image",
 
   // playback errors
   "player.errAborted": "Le chargement a été interrompu (MEDIA_ERR_ABORTED)",
