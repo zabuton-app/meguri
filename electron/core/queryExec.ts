@@ -2,9 +2,9 @@
 // thread and the main-thread fallback (used when the worker cannot be
 // spawned). Holds its own read-only connection cache keyed by workspace ID —
 // WAL mode allows these readers to coexist with the main process's writer.
+import * as cw from "./crossWorkspace.js";
 import { openDbReadonly, type DB } from "./db.js";
 import type { Core } from "./index.js";
-import * as cw from "./crossWorkspace.js";
 import { countFiles, lastScanAt } from "./queries.js";
 import type {
   DuplicatesResult,
@@ -40,11 +40,7 @@ export type QueryRequest =
   | { kind: "stats"; targets: QueryTarget[] };
 
 export type QueryResponse =
-  | SearchResult
-  | FileRow[]
-  | HistoryPage
-  | DuplicatesResult
-  | WorkspaceStats;
+  SearchResult | FileRow[] | HistoryPage | DuplicatesResult | WorkspaceStats;
 
 const DUP_REFS_CACHE_TTL_MS = 5_000;
 const DUP_REFS_CACHE_MAX_ENTRIES = 16;

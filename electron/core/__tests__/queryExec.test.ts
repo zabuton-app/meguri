@@ -8,7 +8,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDb, type DB } from "../db.js";
 import { recordPlay, upsertScanRoot } from "../queries.js";
 import { QueryExecutor } from "../queryExec.js";
-import { insertFile } from "./helpers.js";
 import type {
   DuplicatesResult,
   FileRow,
@@ -16,6 +15,7 @@ import type {
   SearchResult,
   WorkspaceStats,
 } from "../types.js";
+import { insertFile } from "./helpers.js";
 
 let dir: string;
 let db: DB;

@@ -17,12 +17,17 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import { startServer } from "./core/server.js";
+import type { Core } from "./core/index.js";
+import { handle } from "./core/ipcHandler.js";
 import { runScan } from "./core/jobs.js";
+import log, { setupLogger } from "./core/logger.js";
+import { generateThumb } from "./core/media.js";
+import { isInsideRoot } from "./core/paths.js";
 import * as q from "./core/queries.js";
-import * as tags from "./core/tags.js";
-import { QueryWorkerClient } from "./core/queryWorkerClient.js";
 import type { QueryTarget } from "./core/queryExec.js";
+import { QueryWorkerClient } from "./core/queryWorkerClient.js";
+import { startServer } from "./core/server.js";
+import * as tags from "./core/tags.js";
 import type {
   DuplicatesResult,
   FileRow,
@@ -30,20 +35,15 @@ import type {
   SearchResult,
   WorkspaceStats,
 } from "./core/types.js";
-import { generateThumb } from "./core/media.js";
-import { Workspaces, ALL_ID, COLLECTION_ID_PREFIX } from "./core/workspaces.js";
-import { isInsideRoot } from "./core/paths.js";
 import {
   checkForUpdates,
   getUpdateSettings,
   ignoreVersion,
   isAutoCheckEnabled,
-  setAutoCheck,
   releasesPage,
+  setAutoCheck,
 } from "./core/updater.js";
-import { handle } from "./core/ipcHandler.js";
-import log, { setupLogger } from "./core/logger.js";
-import type { Core } from "./core/index.js";
+import { ALL_ID, COLLECTION_ID_PREFIX, Workspaces } from "./core/workspaces.js";
 
 // Set up logging before anything else so early failures land in the log file.
 setupLogger();
@@ -376,7 +376,10 @@ function registerStatusHandlers(): void {
   handle("workspace_stats", () =>
     // Aggregate across every workspace under the virtual "All" view; for a single
     // active workspace just read its DB directly. Returns zeros/null when nothing is mounted.
-    queryClient.run<WorkspaceStats>({ kind: "stats", targets: queryTargets(ws.queryCores()) }),
+    queryClient.run<WorkspaceStats>({
+      kind: "stats",
+      targets: queryTargets(ws.queryCores()),
+    }),
   );
 
   handle("app_status", () => {
