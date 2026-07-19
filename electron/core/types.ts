@@ -2,6 +2,8 @@
 // See shared/ipc/schema.ts for the canonical definitions.
 export type {
   AppStatus,
+  DuplicateGroup,
+  DuplicatesResult,
   FileDetail,
   FileRow,
   HistoryEntryRow,

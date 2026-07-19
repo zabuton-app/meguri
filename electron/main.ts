@@ -24,6 +24,7 @@ import * as tags from "./core/tags.js";
 import { QueryWorkerClient } from "./core/queryWorkerClient.js";
 import type { QueryTarget } from "./core/queryExec.js";
 import type {
+  DuplicatesResult,
   FileRow,
   HistoryPage,
   SearchResult,
@@ -599,6 +600,14 @@ function registerFileHandlers(): void {
       kind: "history",
       targets: queryTargets(historyCores()),
       query: query ?? {},
+    }),
+  );
+  // Same scope rule as history: a collection is a file set, not a duplicate
+  // scope, so fall back to every workspace while one is active.
+  handle("duplicates_list", () =>
+    queryClient.run<DuplicatesResult>({
+      kind: "duplicates",
+      targets: queryTargets(historyCores()),
     }),
   );
   // Clear scope matches what history_list shows: the active workspace only, or

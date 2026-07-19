@@ -3,18 +3,16 @@
 // executing on the main thread when the worker cannot be spawned at all, so
 // query behavior degrades gracefully instead of breaking.
 import { Worker } from "node:worker_threads";
-import { QueryExecutor, type QueryRequest } from "./queryExec.js";
+import {
+  QueryExecutor,
+  type QueryRequest,
+  type QueryResponse,
+} from "./queryExec.js";
 import type {
   WorkerMessage,
   WorkerPayload,
   WorkerReply,
 } from "../queryWorker.js";
-import type {
-  FileRow,
-  HistoryPage,
-  SearchResult,
-  WorkspaceStats,
-} from "./types.js";
 import { scopedLog } from "./logger.js";
 
 const log = scopedLog("queryWorker");
@@ -127,7 +125,7 @@ export class QueryWorkerClient {
     });
   }
 
-  run<T extends SearchResult | FileRow[] | HistoryPage | WorkspaceStats>(
+  run<T extends QueryResponse>(
     req: QueryRequest,
   ): Promise<T> {
     return this.send({ type: "query", req }) as Promise<T>;

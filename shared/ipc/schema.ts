@@ -47,6 +47,8 @@ export const FileRowSchema = z.object({
   /** Favorite flag stored as 0/1 in SQLite. */
   favorite: z.number(),
   thumbStatus: z.string(),
+  /** Sampled content hash (see scan.ts). Null until the scan computes it; used by the "hash" sort. */
+  contentHash: z.string().nullable().optional(),
   capturedAt: z.number().nullable(),
   /** Last time the file's detail was opened (Unix seconds). Null if never opened. */
   lastAccessedAt: z.number().nullable(),
@@ -98,6 +100,8 @@ export const SearchQuerySchema = z.object({
   kind: z.string().optional(),
   ratingMin: z.number().optional(),
   favorite: z.boolean().optional(),
+  /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
+  duplicates: z.boolean().optional(),
   played: z.boolean().optional(),
   playedVia: z.string().optional(),
   capturedFrom: z.number().optional(),
@@ -139,6 +143,23 @@ export const HistoryPageSchema = z.object({
   nextCursor: z.number().nullable(),
 });
 export type HistoryPage = z.infer<typeof HistoryPageSchema>;
+
+/** Files sharing the same (content_hash, size) pair — treated as identical content. */
+export const DuplicateGroupSchema = z.object({
+  contentHash: z.string(),
+  size: z.number(),
+  files: z.array(FileRowSchema),
+});
+export type DuplicateGroup = z.infer<typeof DuplicateGroupSchema>;
+
+export const DuplicatesResultSchema = z.object({
+  groups: z.array(DuplicateGroupSchema),
+  /** Total file count across all returned groups (for the summary line). */
+  fileCount: z.number(),
+  /** True when the group list was cut off at the server-side cap. */
+  truncated: z.boolean(),
+});
+export type DuplicatesResult = z.infer<typeof DuplicatesResultSchema>;
 
 export const SearchResultSchema = z.object({
   items: z.array(FileRowSchema),

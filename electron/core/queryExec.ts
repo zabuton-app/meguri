@@ -7,6 +7,7 @@ import type { Core } from "./index.js";
 import * as cw from "./crossWorkspace.js";
 import { countFiles, lastScanAt } from "./queries.js";
 import type {
+  DuplicatesResult,
   FileRow,
   HistoryPage,
   HistoryQuery,
@@ -35,13 +36,27 @@ export type QueryRequest =
       refs?: cw.FileRef[];
     }
   | { kind: "history"; targets: QueryTarget[]; query: HistoryQuery }
+  | { kind: "duplicates"; targets: QueryTarget[] }
   | { kind: "stats"; targets: QueryTarget[] };
 
 export type QueryResponse =
   | SearchResult
   | FileRow[]
   | HistoryPage
+  | DuplicatesResult
   | WorkspaceStats;
+
+/** File-ref restriction for a search/random request. The `duplicates` filter
+ *  resolves to the set of duplicated files (intersected with the collection's
+ *  refs when both apply) and rides the existing per-workspace fileIds path. */
+function resolveRefs(
+  cores: cw.CoreTarget[],
+  query: SearchQuery,
+  refs?: cw.FileRef[],
+): cw.FileRef[] | undefined {
+  if (!query.duplicates) return refs;
+  return cw.duplicateFileRefs(cores, refs);
+}
 
 export class QueryExecutor {
   private dbs = new Map<string, DB>();
@@ -90,16 +105,22 @@ export class QueryExecutor {
   run(req: QueryRequest): QueryResponse {
     const cores = this.cores(req.targets);
     switch (req.kind) {
-      case "search":
-        return req.refs
-          ? cw.searchCollection(cores, req.refs, req.query)
+      case "search": {
+        const refs = resolveRefs(cores, req.query, req.refs);
+        return refs
+          ? cw.searchCollection(cores, refs, req.query)
           : cw.searchWorkspaces(cores, req.query);
-      case "random":
-        return req.refs
-          ? cw.randomCollection(cores, req.refs, req.query)
+      }
+      case "random": {
+        const refs = resolveRefs(cores, req.query, req.refs);
+        return refs
+          ? cw.randomCollection(cores, refs, req.query)
           : cw.randomWorkspaces(cores, req.query);
+      }
       case "history":
         return cw.listHistoryWorkspaces(cores, req.query);
+      case "duplicates":
+        return cw.listDuplicatesWorkspaces(cores);
       case "stats": {
         let fileCount = 0;
         let scanAt: number | null = null;

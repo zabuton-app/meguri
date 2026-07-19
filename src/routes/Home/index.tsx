@@ -35,6 +35,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
+import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
 import { HomeHeader } from "./HomeHeader";
 import { ActiveFilterChips, type ChipEntry } from "./ActiveFilterChips";
 import {
@@ -136,6 +137,12 @@ export default function Home() {
       key: "favorite",
       label: `♥ ${t("favorite.chip")}`,
       clear: () => patchFilter({ favorite: undefined }),
+    });
+  if (filter.duplicates)
+    activeChips.push({
+      key: "duplicates",
+      label: t("duplicates.chip"),
+      clear: () => patchFilter(toggleDuplicatesPatch(filter)),
     });
   if (filter.played != null)
     activeChips.push({

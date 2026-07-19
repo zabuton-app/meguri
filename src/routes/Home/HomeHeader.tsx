@@ -1,5 +1,6 @@
 import {
   ChevronDown,
+  CopyCheck,
   DatabaseBackup,
   FolderOpen,
   History,
@@ -111,6 +112,14 @@ export function HomeHeader({
           className="flex size-7 items-center justify-center rounded-md border border-border text-muted transition hover:bg-fg/10 hover:text-fg"
         >
           <History className="size-4" />
+        </Link>
+        <Link
+          to="/duplicates"
+          title={t("duplicates.title")}
+          aria-label={t("duplicates.title")}
+          className="flex size-7 items-center justify-center rounded-md border border-border text-muted transition hover:bg-fg/10 hover:text-fg"
+        >
+          <CopyCheck className="size-4" />
         </Link>
         <div className="flex items-center rounded-md border border-border">
           {(

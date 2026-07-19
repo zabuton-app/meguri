@@ -100,6 +100,8 @@ export const api = {
   historyList: (query?: ChannelInput<"history_list">["query"]) =>
     invoke("history_list", { query }),
   historyClear: () => invoke("history_clear"),
+  /** Duplicate groups by (content_hash, size) — same scope rule as historyList. */
+  duplicatesList: () => invoke("duplicates_list"),
   bookmarkAdd: (id: number, workspaceId: string, sec: number) =>
     invoke("bookmark_add", { id, workspaceId, sec }),
   bookmarkRemove: (id: number, workspaceId: string, bookmarkId: number) =>

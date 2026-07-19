@@ -8,6 +8,7 @@ export const SORT_KEYS: Record<string, TranslationKey> = {
   rating: "sort.rating",
   captured: "sort.captured",
   accessed: "sort.accessed",
+  hash: "sort.hash",
 };
 export const DISCOVER_FILTER_PARAM = "filter";
 export const VIEW_KEY = "meguri.view";

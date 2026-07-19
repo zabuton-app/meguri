@@ -17,6 +17,7 @@ export const fr: Record<TranslationKey, string> = {
   "sort.rating": "Note",
   "sort.captured": "Date de prise",
   "sort.accessed": "Vu récemment",
+  "sort.hash": "Hachage du fichier",
   "sort.asc": "Croissant",
   "sort.desc": "Décroissant",
 
@@ -263,6 +264,17 @@ export const fr: Record<TranslationKey, string> = {
   "history.viaExternal": "Lecteur externe",
   "history.today": "Aujourd'hui",
   "history.yesterday": "Hier",
+
+  "duplicates.title": "Fichiers en double",
+  "duplicates.empty": "Aucun fichier en double trouvé.",
+  "duplicates.emptyHint":
+    "Les fichiers au contenu identique (hachage et taille correspondants) apparaîtront ici.",
+  "duplicates.summary": "{groups} groupes / {files} fichiers / {size} en double",
+  "duplicates.fileCount": "{count} fichiers",
+  "duplicates.truncated":
+    "Trop de groupes ; seuls les {max} premiers sont affichés.",
+  "duplicates.filter": "Afficher uniquement les fichiers en double",
+  "duplicates.chip": "Doublons",
 
   // workspace rail
   "workspace.all": "Tout",

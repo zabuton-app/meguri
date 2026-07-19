@@ -4,6 +4,7 @@ import Home from "@/routes/Home";
 import MediaDetail from "@/routes/MediaDetail";
 import Discover from "@/routes/Discover";
 import History from "@/routes/History";
+import Duplicates from "@/routes/Duplicates";
 import Settings from "@/routes/Settings";
 import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { useContentZoom } from "@/hooks/useContentZoom";
@@ -19,6 +20,7 @@ const router = createHashRouter([
       { path: "file/:id", element: <MediaDetail /> },
       { path: "discover", element: <Discover /> },
       { path: "history", element: <History /> },
+      { path: "duplicates", element: <Duplicates /> },
       { path: "settings", element: <Settings /> },
     ],
   },

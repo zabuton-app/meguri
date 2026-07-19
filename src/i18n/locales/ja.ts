@@ -16,6 +16,7 @@ export const ja = {
   "sort.rating": "レーティング",
   "sort.captured": "撮影日時",
   "sort.accessed": "最終表示順",
+  "sort.hash": "ファイルハッシュ",
   "sort.asc": "昇順",
   "sort.desc": "降順",
 
@@ -258,6 +259,16 @@ export const ja = {
   "history.viaExternal": "外部プレーヤー",
   "history.today": "今日",
   "history.yesterday": "昨日",
+
+  "duplicates.title": "重複ファイル",
+  "duplicates.empty": "重複ファイルは見つかりませんでした。",
+  "duplicates.emptyHint":
+    "内容が同一（ハッシュとサイズが一致）のファイルが複数あるとここに表示されます。",
+  "duplicates.summary": "{groups} グループ / {files} ファイル / 重複 {size}",
+  "duplicates.fileCount": "{count} 件",
+  "duplicates.truncated": "グループ数が多いため上位 {max} 件のみ表示しています。",
+  "duplicates.filter": "重複ファイルのみ表示",
+  "duplicates.chip": "重複",
 
   // ワークスペースレール
   "workspace.all": "すべて",

@@ -17,6 +17,7 @@ export const ko: Record<TranslationKey, string> = {
   "sort.rating": "평점",
   "sort.captured": "촬영 일시",
   "sort.accessed": "최근 본 순",
+  "sort.hash": "파일 해시",
   "sort.asc": "오름차순",
   "sort.desc": "내림차순",
 
@@ -256,6 +257,16 @@ export const ko: Record<TranslationKey, string> = {
   "history.viaExternal": "외부 플레이어",
   "history.today": "오늘",
   "history.yesterday": "어제",
+
+  "duplicates.title": "중복 파일",
+  "duplicates.empty": "중복 파일을 찾을 수 없습니다.",
+  "duplicates.emptyHint":
+    "내용이 동일한(해시와 크기가 일치하는) 파일이 여러 개 있으면 여기에 표시됩니다.",
+  "duplicates.summary": "{groups}개 그룹 / {files}개 파일 / 중복 {size}",
+  "duplicates.fileCount": "{count}개",
+  "duplicates.truncated": "그룹이 많아 상위 {max}개만 표시합니다.",
+  "duplicates.filter": "중복 파일만 표시",
+  "duplicates.chip": "중복",
 
   // workspace rail
   "workspace.all": "전체",
