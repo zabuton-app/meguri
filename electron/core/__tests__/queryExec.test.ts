@@ -10,6 +10,7 @@ import { recordPlay, upsertScanRoot } from "../queries.js";
 import { QueryExecutor } from "../queryExec.js";
 import { insertFile } from "./helpers.js";
 import type {
+  DuplicatesResult,
   FileRow,
   HistoryPage,
   SearchResult,
@@ -90,6 +91,69 @@ describe("QueryExecutor", () => {
       refs: [{ workspaceId: "ws1", fileId: fileIds[1] }],
     }) as SearchResult;
     expect(scoped.items.map((f) => f.id)).toEqual([fileIds[1]]);
+  });
+
+  it("runs duplicates_list through the same target set", () => {
+    insertFile(db, 1, {
+      relPath: "dup-a.mp4",
+      contentHash: "dup-hash",
+      size: 123,
+    });
+    insertFile(db, 1, {
+      relPath: "dup-b.mp4",
+      contentHash: "dup-hash",
+      size: 123,
+    });
+
+    const res = exec.run({
+      kind: "duplicates",
+      targets: target(),
+    }) as DuplicatesResult;
+    expect(res.groups).toHaveLength(1);
+    expect(res.groups[0].files.map((f) => f.relPath).sort()).toEqual([
+      "dup-a.mp4",
+      "dup-b.mp4",
+    ]);
+    expect(res.fileCount).toBe(2);
+  });
+
+  it("rebuilds duplicates filter refs after explicit cache invalidation", () => {
+    const a = insertFile(db, 1, {
+      relPath: "dup-a.mp4",
+      contentHash: "dup-hash",
+      size: 123,
+    });
+    const b = insertFile(db, 1, {
+      relPath: "dup-b.mp4",
+      contentHash: "dup-hash",
+      size: 123,
+    });
+
+    const first = exec.run({
+      kind: "search",
+      targets: target(),
+      query: { duplicates: true, sort: "hash" },
+    }) as SearchResult;
+    expect(first.items.map((f) => f.id).sort((x, y) => x - y)).toEqual([a, b]);
+
+    db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(b);
+
+    // Cached refs still include the now-non-duplicate file pair until
+    // invalidateCaches() is called by the write path.
+    const stale = exec.run({
+      kind: "search",
+      targets: target(),
+      query: { duplicates: true, sort: "hash" },
+    }) as SearchResult;
+    expect(stale.items.map((f) => f.id)).toEqual([a]);
+
+    exec.invalidateCaches();
+    const fresh = exec.run({
+      kind: "search",
+      targets: target(),
+      query: { duplicates: true, sort: "hash" },
+    }) as SearchResult;
+    expect(fresh.items).toEqual([]);
   });
 
   it("skips targets whose DB is gone, warning once, and reopens after closeWorkspace", () => {

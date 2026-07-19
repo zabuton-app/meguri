@@ -105,6 +105,9 @@ export class QueryWorkerClient {
           case "closeWorkspace":
             this.fallback.closeWorkspace(msg.wsId);
             return undefined;
+          case "invalidateCaches":
+            this.fallback.invalidateCaches();
+            return undefined;
           case "closeAll":
             this.fallback.closeAll();
             return undefined;
@@ -141,6 +144,17 @@ export class QueryWorkerClient {
     } catch (e) {
       // A crashed worker holds no handles, so removal can proceed.
       log.warn(`closeWorkspace(${wsId}) failed:`, e);
+    }
+  }
+
+  /** Drop short-lived derived caches after writes (e.g. scan/delete). */
+  async invalidateCaches(): Promise<void> {
+    this.fallback.invalidateCaches();
+    if (!this.worker) return;
+    try {
+      await this.send({ type: "invalidateCaches" });
+    } catch (e) {
+      log.warn("invalidateCaches failed:", e);
     }
   }
 

@@ -322,6 +322,10 @@ function scanCore(
         scanControllers.delete(wsId);
         scanPromises.delete(wsId);
       }
+      // Scans can change duplicate group membership; clear derived query caches.
+      // Runs after the bookkeeping above so a failure here can never leave the
+      // workspace stuck in the "scanning" state.
+      await queryClient.invalidateCaches();
     }
   })();
   if (wsId) scanPromises.set(wsId, promise);
@@ -578,8 +582,11 @@ function registerFileHandlers(): void {
   handle("file_set_favorite", ({ id, workspaceId, favorite }) =>
     q.setFavorite(coreById(workspaceId).db, id, favorite),
   );
-  handle("file_delete_from_index", ({ id, workspaceId }) => {
+  handle("file_delete_from_index", async ({ id, workspaceId }) => {
     const deleted = q.deleteFromIndex(coreById(workspaceId).db, id);
+    // Await so the renderer's refetch after this resolves can't race a stale
+    // duplicate-refs cache (the scan path awaits for the same reason).
+    await queryClient.invalidateCaches();
     // Drop any collection refs to the now-removed file so item counts stay accurate.
     // Only broadcast when a collection actually changed; otherwise the renderer's
     // own cache invalidation after delete already covers it.

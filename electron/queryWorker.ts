@@ -9,6 +9,7 @@ import { QueryExecutor, type QueryRequest } from "./core/queryExec.js";
 export type WorkerPayload =
   | { type: "query"; req: QueryRequest }
   | { type: "closeWorkspace"; wsId: string }
+  | { type: "invalidateCaches" }
   | { type: "closeAll" };
 
 export type WorkerMessage = WorkerPayload & { id: number };
@@ -35,6 +36,9 @@ port.on("message", (msg: WorkerMessage) => {
         break;
       case "closeWorkspace":
         exec.closeWorkspace(msg.wsId);
+        break;
+      case "invalidateCaches":
+        exec.invalidateCaches();
         break;
       case "closeAll":
         exec.closeAll();
