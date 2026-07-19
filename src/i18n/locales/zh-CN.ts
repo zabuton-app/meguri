@@ -205,6 +205,9 @@ export const zhCN: Record<TranslationKey, string> = {
   "player.openExternal": "用外部播放器打开",
   "player.bookmarkAdd": "为当前位置添加书签",
   "player.bookmarkRemove": "删除 {time} 的书签",
+  "player.exportFrame": "将当前帧保存为图片",
+  "player.frameExported": "已将帧保存为图片",
+  "player.frameExportFailed": "帧保存失败",
 
   // playback errors
   "player.errAborted": "加载已中止 (MEDIA_ERR_ABORTED)",

@@ -212,6 +212,9 @@ export const es: Record<TranslationKey, string> = {
   "player.openExternal": "Abrir en un reproductor externo",
   "player.bookmarkAdd": "Marcar la posición actual",
   "player.bookmarkRemove": "Eliminar el marcador en {time}",
+  "player.exportFrame": "Guardar el fotograma actual como imagen",
+  "player.frameExported": "Fotograma guardado como imagen",
+  "player.frameExportFailed": "No se pudo guardar el fotograma",
 
   // playback errors
   "player.errAborted": "Se canceló la carga (MEDIA_ERR_ABORTED)",

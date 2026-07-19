@@ -38,6 +38,7 @@ export const INVOKE_CHANNELS = [
   "bookmark_add",
   "bookmark_remove",
   "thumb_set_offset",
+  "frame_export",
   "open_external",
   "open_folder",
   "copy_file_path",

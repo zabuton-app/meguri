@@ -209,6 +209,9 @@ export const en: Record<TranslationKey, string> = {
   "player.openExternal": "Open in external player",
   "player.bookmarkAdd": "Bookmark the current position",
   "player.bookmarkRemove": "Remove the bookmark at {time}",
+  "player.exportFrame": "Save the current frame as an image",
+  "player.frameExported": "Frame saved as an image",
+  "player.frameExportFailed": "Failed to save the frame",
 
   // playback errors
   "player.errAborted": "Loading was aborted (MEDIA_ERR_ABORTED)",

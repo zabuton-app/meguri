@@ -340,6 +340,15 @@ export default function MediaDetail() {
     },
   });
 
+  const exportFrame = useMutation({
+    mutationFn: (sec: number) => api.frameExport(fileId, wsId, sec),
+    onSuccess: (res) => {
+      // A canceled save dialog resolves with saved=false — stay silent.
+      if (res.saved) toast.success(t("player.frameExported"));
+    },
+    onError: () => toast.error(t("player.frameExportFailed")),
+  });
+
   const handleDeleteFromIndex = async () => {
     const ok = await confirm({
       title: t("media.deleteFromIndex"),
@@ -481,6 +490,8 @@ export default function MediaDetail() {
                 onRemoveBookmark={(bookmarkId) =>
                   removeBookmark.mutate(bookmarkId)
                 }
+                exportPending={exportFrame.isPending}
+                onExportFrame={(sec) => exportFrame.mutate(sec)}
                 onNativeDuration={setNativeDur}
                 onPlayed={() => invalidatePlayedSearches(qc)}
                 t={t}
