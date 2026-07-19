@@ -22,11 +22,22 @@ export const SCENE_COUNT_MAX = 48;
 // Choices offered in the settings UI.
 export const SCENE_COUNT_OPTIONS = [4, 6, 8, 12, 16, 20, 24, 32] as const;
 
+// Frame-preview (hover scrub / scene rail) quality presets, mirrored by the
+// media server's ?q= allowlist in electron/core/server.ts.
+export const FRAME_QUALITY_OPTIONS = ["low", "standard", "high"] as const;
+export type FrameQuality = (typeof FRAME_QUALITY_OPTIONS)[number];
+export const DEFAULT_FRAME_QUALITY: FrameQuality = "low";
+
+export function isFrameQuality(v: unknown): v is FrameQuality {
+  return FRAME_QUALITY_OPTIONS.includes(v as FrameQuality);
+}
+
 interface Prefs {
   sceneCount: number;
   keybindingPreset: KeybindingPreset;
   hideSupportLink: boolean;
   hoverPreview: boolean;
+  frameQuality: FrameQuality;
 }
 
 const DEFAULTS: Prefs = {
@@ -34,6 +45,7 @@ const DEFAULTS: Prefs = {
   keybindingPreset: DEFAULT_KEYBINDING_PRESET,
   hideSupportLink: false,
   hoverPreview: true,
+  frameQuality: DEFAULT_FRAME_QUALITY,
 };
 
 function clampSceneCount(n: number): number {
@@ -63,6 +75,9 @@ function loadPrefs(): Prefs {
           typeof parsed.hoverPreview === "boolean"
             ? parsed.hoverPreview
             : DEFAULTS.hoverPreview,
+        frameQuality: isFrameQuality(parsed.frameQuality)
+          ? parsed.frameQuality
+          : DEFAULT_FRAME_QUALITY,
       };
     }
   } catch {
@@ -76,6 +91,7 @@ interface PrefsCtx extends Prefs {
   setKeybindingPreset: (p: KeybindingPreset) => void;
   setHideSupportLink: (hidden: boolean) => void;
   setHoverPreview: (enabled: boolean) => void;
+  setFrameQuality: (q: FrameQuality) => void;
 }
 
 const Ctx = createContext<PrefsCtx | null>(null);
@@ -102,6 +118,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPrefs((p) => ({ ...p, hideSupportLink: hidden })),
       setHoverPreview: (enabled) =>
         setPrefs((p) => ({ ...p, hoverPreview: enabled })),
+      setFrameQuality: (q) => setPrefs((p) => ({ ...p, frameQuality: q })),
     }),
     [prefs],
   );

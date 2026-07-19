@@ -34,6 +34,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.scenesDesc": "在详情页生成多少张场景缩略图。",
   "settings.hoverPreview": "悬停预览",
   "settings.hoverPreviewDesc": "预览视频缩略图上光标位置对应的场景。",
+  "settings.frameQuality": "预览画质",
+  "settings.frameQualityDesc":
+    "发现页悬停预览和场景栏帧图像的画质。越高生成越慢。",
+  "settings.frameQualityLow": "低 (240px)",
+  "settings.frameQualityStandard": "标准 (480px)",
+  "settings.frameQualityHigh": "高 (960px)",
   "settings.keybinding": "键位绑定",
   "settings.keybindingDesc":
     "列表焦点移动、文件翻页、滚动和聚焦搜索的按键分配。",

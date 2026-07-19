@@ -30,7 +30,7 @@ export function SceneRail({
   t: TFunc;
   className?: string;
 }) {
-  const { sceneCount } = usePreferences();
+  const { sceneCount, frameQuality } = usePreferences();
   const [railEl, setRailEl] = useState<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
 
@@ -64,7 +64,7 @@ export function SceneRail({
             className="group/scene relative block w-[104px] shrink-0 overflow-hidden rounded-md border border-border/60 bg-black shadow-md transition-all duration-150 hover:z-10 hover:w-[132px] hover:-translate-y-1 hover:border-primary hover:shadow-lg"
           >
             <img
-              src={`${mediaBase}/ws/${wsId}/frame/${id}?t=${sec}`}
+              src={`${mediaBase}/ws/${wsId}/frame/${id}?t=${sec}&q=${frameQuality}`}
               alt=""
               loading="lazy"
               className="aspect-[16/10] w-full object-cover"

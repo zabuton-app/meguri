@@ -35,6 +35,12 @@ export const ko: Record<TranslationKey, string> = {
   "settings.hoverPreview": "호버 미리보기",
   "settings.hoverPreviewDesc":
     "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",
+  "settings.frameQuality": "미리보기 화질",
+  "settings.frameQualityDesc":
+    "디스커버리의 호버 미리보기와 장면 레일의 화질. 높을수록 생성이 느려집니다.",
+  "settings.frameQualityLow": "낮음 (240px)",
+  "settings.frameQualityStandard": "표준 (480px)",
+  "settings.frameQualityHigh": "높음 (960px)",
   "settings.keybinding": "키 바인딩",
   "settings.keybindingDesc":
     "목록 포커스 이동·파일 이동·스크롤·검색 포커스의 키 할당입니다.",

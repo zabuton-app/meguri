@@ -277,6 +277,40 @@ describe("media serving and Range", () => {
   });
 });
 
+describe("frame serving (ffmpeg path)", () => {
+  async function expectJpeg(res: Response) {
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    const buf = Buffer.from(await res.arrayBuffer());
+    // JPEG SOI marker, so we know real image bytes came back.
+    expect(buf.length).toBeGreaterThan(2);
+    expect(buf[0]).toBe(0xff);
+    expect(buf[1]).toBe(0xd8);
+  }
+
+  it("serves a frame with an allowed quality preset", async () => {
+    await expectJpeg(
+      await fetch(`${base}/ws/${WS}/frame/${remuxId}?t=0&q=high`, authHeaders()),
+    );
+  });
+
+  it("falls back to the default quality for an unknown ?q value", async () => {
+    await expectJpeg(
+      await fetch(`${base}/ws/${WS}/frame/${remuxId}?t=0&q=9999`, authHeaders()),
+    );
+    // Prototype members must not pass the allowlist (own-property check).
+    await expectJpeg(
+      await fetch(
+        `${base}/ws/${WS}/frame/${remuxId}?t=0&q=toString`,
+        authHeaders(),
+      ),
+    );
+    await expectJpeg(
+      await fetch(`${base}/ws/${WS}/frame/${remuxId}`, authHeaders()),
+    );
+  });
+});
+
 describe("media remux (ffmpeg path)", () => {
   it("remuxes an mkv to fragmented MP4 with a 200", async () => {
     const res = await fetch(`${base}/ws/${WS}/media/${remuxId}`, authHeaders());

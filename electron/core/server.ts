@@ -201,7 +201,8 @@ async function handle(
     if (kind === "frame") {
       // Serve a frame for seek preview (extract a single frame at the ?t=seconds position).
       const t = Number(url.searchParams.get("t") ?? "0");
-      serveFrame(res, abs, isFinite(t) && t > 0 ? t : 0);
+      const q = parseFrameQuality(url.searchParams.get("q"));
+      serveFrame(res, abs, isFinite(t) && t > 0 ? t : 0, q);
       return;
     }
 
@@ -554,20 +555,34 @@ function serveBufferedFfmpeg(
   })();
 }
 
-function serveFrame(res: http.ServerResponse, file: string, t: number) {
+// Frame-preview quality presets. Keys are the only values accepted from the
+// ?q= query param (allowlist); anything else falls back to "low".
+const FRAME_QUALITY = {
+  low: { width: 240, qv: null },
+  standard: { width: 480, qv: 4 },
+  high: { width: 960, qv: 2 },
+} as const;
+type FrameQuality = keyof typeof FRAME_QUALITY;
+
+function parseFrameQuality(v: string | null): FrameQuality {
+  // Object.hasOwn (not `in`) so prototype members like "toString" don't pass.
+  return v !== null && Object.hasOwn(FRAME_QUALITY, v)
+    ? (v as FrameQuality)
+    : "low";
+}
+
+function serveFrame(
+  res: http.ServerResponse,
+  file: string,
+  t: number,
+  quality: FrameQuality = "low",
+) {
+  const { width, qv } = FRAME_QUALITY[quality];
   const args = ["-v", "error"];
   if (t > 0) args.push("-ss", t.toFixed(3));
-  args.push(
-    "-i",
-    file,
-    "-frames:v",
-    "1",
-    "-vf",
-    "scale=240:-2",
-    "-f",
-    "mjpeg",
-    "pipe:1",
-  );
+  args.push("-i", file, "-frames:v", "1", "-vf", `scale=${width}:-2`);
+  if (qv !== null) args.push("-q:v", String(qv));
+  args.push("-f", "mjpeg", "pipe:1");
   serveBufferedFfmpeg(res, args, "image/jpeg");
 }
 

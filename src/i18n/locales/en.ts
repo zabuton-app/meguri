@@ -37,6 +37,12 @@ export const en: Record<TranslationKey, string> = {
   "settings.hoverPreview": "Hover preview",
   "settings.hoverPreviewDesc":
     "Preview the scene under the cursor while hovering over a video thumbnail.",
+  "settings.frameQuality": "Preview quality",
+  "settings.frameQualityDesc":
+    "Quality of Discovery hover previews and scene rail frames. Higher is slower to generate.",
+  "settings.frameQualityLow": "Low (240px)",
+  "settings.frameQualityStandard": "Standard (480px)",
+  "settings.frameQualityHigh": "High (960px)",
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",

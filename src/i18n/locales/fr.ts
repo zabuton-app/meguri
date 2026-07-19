@@ -37,6 +37,12 @@ export const fr: Record<TranslationKey, string> = {
   "settings.hoverPreview": "Aperçu au survol",
   "settings.hoverPreviewDesc":
     "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
+  "settings.frameQuality": "Qualité des aperçus",
+  "settings.frameQualityDesc":
+    "Qualité des aperçus au survol et de la rangée de scènes dans Découverte. Plus elle est élevée, plus la génération est lente.",
+  "settings.frameQualityLow": "Basse (240px)",
+  "settings.frameQualityStandard": "Standard (480px)",
+  "settings.frameQualityHigh": "Haute (960px)",
   "settings.keybinding": "Raccourcis clavier",
   "settings.keybindingDesc":
     "Raccourcis pour déplacer le focus dans la liste, naviguer entre les fichiers, faire défiler et cibler la recherche.",
