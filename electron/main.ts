@@ -17,32 +17,33 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import { startServer } from "./core/server.js";
+import type { Core } from "./core/index.js";
+import { handle } from "./core/ipcHandler.js";
 import { runScan } from "./core/jobs.js";
+import log, { setupLogger } from "./core/logger.js";
+import { generateThumb } from "./core/media.js";
+import { isInsideRoot } from "./core/paths.js";
 import * as q from "./core/queries.js";
-import * as tags from "./core/tags.js";
-import { QueryWorkerClient } from "./core/queryWorkerClient.js";
 import type { QueryTarget } from "./core/queryExec.js";
+import { QueryWorkerClient } from "./core/queryWorkerClient.js";
+import { startServer } from "./core/server.js";
+import * as tags from "./core/tags.js";
 import type {
+  DuplicatesResult,
   FileRow,
   HistoryPage,
   SearchResult,
   WorkspaceStats,
 } from "./core/types.js";
-import { generateThumb } from "./core/media.js";
-import { Workspaces, ALL_ID, COLLECTION_ID_PREFIX } from "./core/workspaces.js";
-import { isInsideRoot } from "./core/paths.js";
 import {
   checkForUpdates,
   getUpdateSettings,
   ignoreVersion,
   isAutoCheckEnabled,
-  setAutoCheck,
   releasesPage,
+  setAutoCheck,
 } from "./core/updater.js";
-import { handle } from "./core/ipcHandler.js";
-import log, { setupLogger } from "./core/logger.js";
-import type { Core } from "./core/index.js";
+import { ALL_ID, COLLECTION_ID_PREFIX, Workspaces } from "./core/workspaces.js";
 
 // Set up logging before anything else so early failures land in the log file.
 setupLogger();
@@ -321,6 +322,10 @@ function scanCore(
         scanControllers.delete(wsId);
         scanPromises.delete(wsId);
       }
+      // Scans can change duplicate group membership; clear derived query caches.
+      // Runs after the bookkeeping above so a failure here can never leave the
+      // workspace stuck in the "scanning" state.
+      await queryClient.invalidateCaches();
     }
   })();
   if (wsId) scanPromises.set(wsId, promise);
@@ -371,7 +376,10 @@ function registerStatusHandlers(): void {
   handle("workspace_stats", () =>
     // Aggregate across every workspace under the virtual "All" view; for a single
     // active workspace just read its DB directly. Returns zeros/null when nothing is mounted.
-    queryClient.run<WorkspaceStats>({ kind: "stats", targets: queryTargets(ws.queryCores()) }),
+    queryClient.run<WorkspaceStats>({
+      kind: "stats",
+      targets: queryTargets(ws.queryCores()),
+    }),
   );
 
   handle("app_status", () => {
@@ -577,8 +585,11 @@ function registerFileHandlers(): void {
   handle("file_set_favorite", ({ id, workspaceId, favorite }) =>
     q.setFavorite(coreById(workspaceId).db, id, favorite),
   );
-  handle("file_delete_from_index", ({ id, workspaceId }) => {
+  handle("file_delete_from_index", async ({ id, workspaceId }) => {
     const deleted = q.deleteFromIndex(coreById(workspaceId).db, id);
+    // Await so the renderer's refetch after this resolves can't race a stale
+    // duplicate-refs cache (the scan path awaits for the same reason).
+    await queryClient.invalidateCaches();
     // Drop any collection refs to the now-removed file so item counts stay accurate.
     // Only broadcast when a collection actually changed; otherwise the renderer's
     // own cache invalidation after delete already covers it.
@@ -599,6 +610,14 @@ function registerFileHandlers(): void {
       kind: "history",
       targets: queryTargets(historyCores()),
       query: query ?? {},
+    }),
+  );
+  // Same scope rule as history: a collection is a file set, not a duplicate
+  // scope, so fall back to every workspace while one is active.
+  handle("duplicates_list", () =>
+    queryClient.run<DuplicatesResult>({
+      kind: "duplicates",
+      targets: queryTargets(historyCores()),
     }),
   );
   // Clear scope matches what history_list shows: the active workspace only, or

@@ -30,6 +30,7 @@ export const INVOKE_CHANNELS = [
   "file_delete_from_index",
   "file_record_play",
   "history_list",
+  "duplicates_list",
   "history_clear",
   "file_add_tag",
   "file_remove_tag",

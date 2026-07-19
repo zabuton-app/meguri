@@ -1,8 +1,9 @@
-// Cross-search filter controls. q / kind / play state / minimum rating / favorite / sort order.
-import { Heart, Search, SortAsc, SortDesc } from "lucide-react";
+// Cross-search filter controls. q / kind / play state / minimum rating / favorite / duplicates / sort order.
+import { CopyCheck, Heart, Search, SortAsc, SortDesc } from "lucide-react";
 import { resolveSortDir } from "@shared/sortDir";
 import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
+import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -104,6 +105,7 @@ export function FilterBar({ value, onChange }: Props) {
             <SelectItem value="accessed">
               {sortLabel("sort.accessed")}
             </SelectItem>
+            <SelectItem value="hash">{sortLabel("sort.hash")}</SelectItem>
           </SelectContent>
         </Select>
         <button
@@ -142,6 +144,22 @@ export function FilterBar({ value, onChange }: Props) {
         )}
       >
         <Heart className={cn("size-4", value.favorite && "fill-current")} />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => patch(toggleDuplicatesPatch(value))}
+        aria-pressed={!!value.duplicates}
+        title={t("duplicates.filter")}
+        aria-label={t("duplicates.filter")}
+        className={cn(
+          "flex size-8 items-center justify-center rounded-md border border-border transition-colors",
+          value.duplicates
+            ? "border-primary/50 bg-primary/10 text-primary"
+            : "text-muted hover:text-fg",
+        )}
+      >
+        <CopyCheck className="size-4" />
       </button>
 
       <SmartCollectionsMenu value={value} onApply={onChange} />

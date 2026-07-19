@@ -17,6 +17,7 @@ export const es: Record<TranslationKey, string> = {
   "sort.rating": "Valoración",
   "sort.captured": "Captura",
   "sort.accessed": "Visto por última vez",
+  "sort.hash": "Hash del archivo",
   "sort.asc": "Ascendente",
   "sort.desc": "Descendente",
 
@@ -262,6 +263,17 @@ export const es: Record<TranslationKey, string> = {
   "history.viaExternal": "Reproductor externo",
   "history.today": "Hoy",
   "history.yesterday": "Ayer",
+
+  "duplicates.title": "Archivos duplicados",
+  "duplicates.empty": "No se encontraron archivos duplicados.",
+  "duplicates.emptyHint":
+    "Los archivos con contenido idéntico (hash y tamaño coincidentes) aparecerán aquí.",
+  "duplicates.summary": "{groups} grupos / {files} archivos / {size} duplicados",
+  "duplicates.fileCount": "{count} archivos",
+  "duplicates.truncated":
+    "Demasiados grupos; solo se muestran los {max} primeros.",
+  "duplicates.filter": "Mostrar solo archivos duplicados",
+  "duplicates.chip": "Duplicados",
 
   // workspace rail
   "workspace.all": "Todo",

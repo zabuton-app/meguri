@@ -20,7 +20,7 @@ const MAX_LIMIT = 500;
 // is reached through a LEFT JOIN. COALESCE supplies defaults for files with no meta row.
 // Exported for queries that join files under the same `f`/`m` aliases (see history.ts).
 export const FILE_COLS =
-  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, f.captured_at AS capturedAt, m.last_accessed_at AS lastAccessedAt";
+  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, f.content_hash AS contentHash, f.captured_at AS capturedAt, m.last_accessed_at AS lastAccessedAt";
 
 export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
@@ -129,6 +129,9 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
       return { expr: "f.rel_path", nullable: false, cmp, idCmp: cmp };
     case "accessed":
       return { expr: "m.last_accessed_at", nullable: true, cmp, idCmp: ">" };
+    case "hash":
+      // Content-hash order: identical files (duplicates) sort adjacently.
+      return { expr: "f.content_hash", nullable: true, cmp, idCmp: ">" };
     default:
       return { expr: null, nullable: false, cmp, idCmp: cmp };
   }
@@ -145,6 +148,8 @@ export function sortValueOf(sort: string | undefined, row: FileRow): string | nu
       return row.relPath;
     case "accessed":
       return row.lastAccessedAt;
+    case "hash":
+      return row.contentHash ?? null;
     default:
       return null;
   }
@@ -264,6 +269,8 @@ export function orderByFor(sort?: string, dir?: string): string {
       return `f.rel_path ${direction}, f.id ${direction}`;
     case "accessed":
       return `m.last_accessed_at IS NULL ASC, m.last_accessed_at ${direction}, f.id ASC`;
+    case "hash":
+      return `f.content_hash IS NULL ASC, f.content_hash ${direction}, f.id ASC`;
     default:
       return `f.id ${direction}`;
   }

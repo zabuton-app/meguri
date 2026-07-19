@@ -17,6 +17,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "sort.rating": "评分",
   "sort.captured": "拍摄时间",
   "sort.accessed": "最近查看",
+  "sort.hash": "文件哈希",
   "sort.asc": "升序",
   "sort.desc": "降序",
 
@@ -250,6 +251,15 @@ export const zhCN: Record<TranslationKey, string> = {
   "history.viaExternal": "外部播放器",
   "history.today": "今天",
   "history.yesterday": "昨天",
+
+  "duplicates.title": "重复文件",
+  "duplicates.empty": "未找到重复文件。",
+  "duplicates.emptyHint": "内容相同（哈希和大小一致）的文件会显示在这里。",
+  "duplicates.summary": "{groups} 组 / {files} 个文件 / 重复 {size}",
+  "duplicates.fileCount": "{count} 个",
+  "duplicates.truncated": "组数过多，仅显示前 {max} 组。",
+  "duplicates.filter": "仅显示重复文件",
+  "duplicates.chip": "重复",
 
   // workspace rail
   "workspace.all": "全部",

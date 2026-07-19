@@ -6,6 +6,7 @@
 import { z } from "zod";
 import type {
   AppStatus,
+  DuplicatesResult,
   FileDetail,
   FileRow,
   HistoryPage,
@@ -79,6 +80,7 @@ export const ChannelInputs = {
     position: z.number().optional(),
   }),
   history_list: z.object({ query: HistoryQuerySchema.optional() }).default({}),
+  duplicates_list: z.void(),
   history_clear: z.void(),
   file_add_tag: FileTarget.extend({ name: z.string() }),
   file_remove_tag: FileTarget.extend({ tagId: z.number() }),
@@ -155,6 +157,7 @@ export interface ChannelOutputs {
   file_delete_from_index: { id: number; relPath: string };
   file_record_play: void;
   history_list: HistoryPage;
+  duplicates_list: DuplicatesResult;
   history_clear: void;
   file_add_tag: number;
   file_remove_tag: void;

@@ -39,6 +39,13 @@ describe("smartCollections", () => {
     expect(hasSearchConditions({ favorite: true })).toBe(true);
   });
 
+  it("cleanSearchQuery keeps the duplicates flag only when set", () => {
+    expect(cleanSearchQuery({ duplicates: true })).toEqual({
+      duplicates: true,
+    });
+    expect(cleanSearchQuery({ duplicates: false })).toEqual({});
+  });
+
   it("parseSmartCollections ignores invalid JSON and schema", () => {
     expect(parseSmartCollections(null)).toEqual([]);
     expect(parseSmartCollections("{not json")).toEqual([]);

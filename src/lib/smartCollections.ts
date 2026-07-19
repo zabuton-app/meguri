@@ -25,6 +25,7 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.ratingMin != null && query.ratingMin > 0)
     next.ratingMin = query.ratingMin;
   if (query.favorite) next.favorite = true;
+  if (query.duplicates) next.duplicates = true;
   if (query.played != null) next.played = query.played;
   if (query.playedVia) next.playedVia = query.playedVia;
   if (query.capturedFrom != null) next.capturedFrom = query.capturedFrom;
@@ -83,6 +84,7 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     parts.push(query.kind === "video" ? t("kind.video") : t("kind.image"));
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
   if (query.favorite) parts.push(t("favorite.chip"));
+  if (query.duplicates) parts.push(t("duplicates.chip"));
   if (query.played != null) {
     const label = query.played ? t("filter.played") : t("filter.unplayed");
     parts.push(query.playedVia ? `${label} (${query.playedVia})` : label);
@@ -108,7 +110,9 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
             ? "sort.captured"
             : sort === "accessed"
               ? "sort.accessed"
-              : "sort.added";
+              : sort === "hash"
+                ? "sort.hash"
+                : "sort.added";
     const dir = resolveSortDir(sort, query.sortDir);
     parts.push(`${t(key)} / ${t(dir === "asc" ? "sort.asc" : "sort.desc")}`);
   }

@@ -3,19 +3,17 @@
 // executing on the main thread when the worker cannot be spawned at all, so
 // query behavior degrades gracefully instead of breaking.
 import { Worker } from "node:worker_threads";
-import { QueryExecutor, type QueryRequest } from "./queryExec.js";
 import type {
   WorkerMessage,
   WorkerPayload,
   WorkerReply,
 } from "../queryWorker.js";
-import type {
-  FileRow,
-  HistoryPage,
-  SearchResult,
-  WorkspaceStats,
-} from "./types.js";
 import { scopedLog } from "./logger.js";
+import {
+  QueryExecutor,
+  type QueryRequest,
+  type QueryResponse,
+} from "./queryExec.js";
 
 const log = scopedLog("queryWorker");
 
@@ -107,6 +105,9 @@ export class QueryWorkerClient {
           case "closeWorkspace":
             this.fallback.closeWorkspace(msg.wsId);
             return undefined;
+          case "invalidateCaches":
+            this.fallback.invalidateCaches();
+            return undefined;
           case "closeAll":
             this.fallback.closeAll();
             return undefined;
@@ -127,9 +128,7 @@ export class QueryWorkerClient {
     });
   }
 
-  run<T extends SearchResult | FileRow[] | HistoryPage | WorkspaceStats>(
-    req: QueryRequest,
-  ): Promise<T> {
+  run<T extends QueryResponse>(req: QueryRequest): Promise<T> {
     return this.send({ type: "query", req }) as Promise<T>;
   }
 
@@ -143,6 +142,17 @@ export class QueryWorkerClient {
     } catch (e) {
       // A crashed worker holds no handles, so removal can proceed.
       log.warn(`closeWorkspace(${wsId}) failed:`, e);
+    }
+  }
+
+  /** Drop short-lived derived caches after writes (e.g. scan/delete). */
+  async invalidateCaches(): Promise<void> {
+    this.fallback.invalidateCaches();
+    if (!this.worker) return;
+    try {
+      await this.send({ type: "invalidateCaches" });
+    } catch (e) {
+      log.warn("invalidateCaches failed:", e);
     }
   }
 

@@ -1,18 +1,27 @@
 // Cross-workspace aggregation. Runs the per-DB queries against a set of Cores and
 // merges/sorts/paginates in memory so the virtual "All" workspace can list every root.
 // A single-element set is the fast path (no merge), so callers use this uniformly.
+import { MAX_DUPLICATE_GROUPS } from "../../shared/duplicates.js";
 import { resolveSortDir } from "../../shared/sortDir.js";
 import type { Core } from "./index.js";
 import {
   attachTags,
+  duplicateFileIds,
+  duplicateFiles,
+  duplicateHashCounts,
+  fileIdsByContentHashes,
+  filesByContentHashes,
   listPlayHistory,
   numericCursor,
   randomFiles,
   searchFiles,
   sortValueOf,
+  type DuplicateFileRow,
   type SeekPosition,
 } from "./queries.js";
 import type {
+  DuplicateGroup,
+  DuplicatesResult,
   FileRow,
   HistoryEntryRow,
   HistoryPage,
@@ -470,6 +479,169 @@ export function listHistoryWorkspaces(
   );
 }
 
+/** Bucketing key: hash and size must both match to count as a duplicate. */
+function dupKey(hash: string, size: number): string {
+  return `${hash}\u0000${size}`;
+}
+
+/**
+ * Duplicate groups across a set of workspaces, sorted by reclaimable bytes
+ * (size × (copies − 1)) descending. A single workspace resolves with one
+ * grouped SQL query; multiple workspaces use a two-pass aggregation so files
+ * that are unique within their own DB but duplicated across DBs are found
+ * without shipping every row: pass 1 folds each DB's (hash, size, count)
+ * tuples into one map, pass 2 fetches full rows only for keys whose combined
+ * count exceeds one, and only from the DBs that hold them.
+ */
+export function listDuplicatesWorkspaces(cores: CoreTarget[]): DuplicatesResult {
+  const rows =
+    cores.length <= 1
+      ? cores.length
+        ? inject(duplicateFiles(cores[0].core.db), cores[0].id)
+        : []
+      : collectCrossDuplicateRows(cores);
+
+  const buckets = new Map<string, DuplicateFileRow[]>();
+  for (const row of rows) {
+    if (row.size == null) continue;
+    const key = dupKey(row.contentHash, row.size);
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(row);
+    else buckets.set(key, [row]);
+  }
+
+  const groups: DuplicateGroup[] = [];
+  for (const files of buckets.values()) {
+    // Same-hash/different-size strays from the hash-only pass-2 lookup land in
+    // singleton buckets; drop them here.
+    if (files.length < 2) continue;
+    files.sort(
+      (a, b) =>
+        cmpStr(a.workspaceId, b.workspaceId) ||
+        cmpStr(a.relPath, b.relPath) ||
+        a.id - b.id,
+    );
+    groups.push({
+      contentHash: files[0].contentHash,
+      size: files[0].size ?? 0,
+      files,
+    });
+  }
+  groups.sort(
+    (a, b) =>
+      b.size * (b.files.length - 1) - a.size * (a.files.length - 1) ||
+      cmpStr(a.contentHash, b.contentHash),
+  );
+
+  const truncated = groups.length > MAX_DUPLICATE_GROUPS;
+  if (truncated) groups.length = MAX_DUPLICATE_GROUPS;
+
+  // Tags are attached only to surviving rows (the merge above discards strays).
+  const byWs = new Map<string, FileRow[]>();
+  let fileCount = 0;
+  for (const group of groups) {
+    fileCount += group.files.length;
+    for (const file of group.files) {
+      const list = byWs.get(file.workspaceId);
+      if (list) list.push(file);
+      else byWs.set(file.workspaceId, [file]);
+    }
+  }
+  for (const { id, core } of cores) {
+    const list = byWs.get(id);
+    if (list?.length) attachTags(core.db, list);
+  }
+
+  return { groups, fileCount, truncated };
+}
+
+/** Pass 1 of the cross-workspace aggregation: fold every DB's (hash, size,
+ *  count) tuples into the set of duplicated keys, tracking which workspaces
+ *  hold each key so pass 2 only queries the DBs that matter. */
+function crossDuplicateKeys(cores: CoreTarget[]): {
+  keys: Set<string>;
+  hashesByWs: Map<string, Set<string>>;
+} {
+  const counts = new Map<string, { hash: string; n: number; wsIds: string[] }>();
+  for (const { id, core } of cores) {
+    for (const { hash, size, n } of duplicateHashCounts(core.db)) {
+      const key = dupKey(hash, size);
+      const entry = counts.get(key);
+      if (entry) {
+        entry.n += n;
+        // Tail-only dedup relies on cores being visited sequentially and
+        // duplicateHashCounts emitting each key at most once per DB, so a
+        // workspace can only repeat as the immediately preceding entry.
+        if (entry.wsIds[entry.wsIds.length - 1] !== id) entry.wsIds.push(id);
+      } else {
+        counts.set(key, { hash, n, wsIds: [id] });
+      }
+    }
+  }
+
+  const keys = new Set<string>();
+  const hashesByWs = new Map<string, Set<string>>();
+  for (const [key, entry] of counts) {
+    if (entry.n < 2) continue;
+    keys.add(key);
+    for (const wsId of entry.wsIds) {
+      const set = hashesByWs.get(wsId);
+      if (set) set.add(entry.hash);
+      else hashesByWs.set(wsId, new Set([entry.hash]));
+    }
+  }
+  return { keys, hashesByWs };
+}
+
+/** Two-pass cross-workspace duplicate row collection (see listDuplicatesWorkspaces). */
+function collectCrossDuplicateRows(cores: CoreTarget[]): DuplicateFileRow[] {
+  const { hashesByWs } = crossDuplicateKeys(cores);
+  const rows: DuplicateFileRow[] = [];
+  for (const { id, core } of cores) {
+    const hashes = hashesByWs.get(id);
+    if (!hashes?.size) continue;
+    rows.push(...inject(filesByContentHashes(core.db, [...hashes]), id));
+  }
+  return rows;
+}
+
+/**
+ * Refs of every file that has a duplicate (same rules as
+ * listDuplicatesWorkspaces), for use as a search filter via the per-workspace
+ * fileIds mechanism. When `refs` is given (a collection is active), the result
+ * is the intersection — duplicates that are also collection members.
+ */
+export function duplicateFileRefs(
+  cores: CoreTarget[],
+  refs?: FileRef[],
+): FileRef[] {
+  let dupRefs: FileRef[];
+  if (cores.length <= 1) {
+    dupRefs = cores.length
+      ? duplicateFileIds(cores[0].core.db).map((fileId) => ({
+          workspaceId: cores[0].id,
+          fileId,
+        }))
+      : [];
+  } else {
+    const { keys, hashesByWs } = crossDuplicateKeys(cores);
+    dupRefs = [];
+    for (const { id, core } of cores) {
+      const hashes = hashesByWs.get(id);
+      if (!hashes?.size) continue;
+      for (const row of fileIdsByContentHashes(core.db, [...hashes])) {
+        // Hash-only lookup can return same-hash/different-size strays.
+        if (keys.has(dupKey(row.hash, row.size))) {
+          dupRefs.push({ workspaceId: id, fileId: row.id });
+        }
+      }
+    }
+  }
+  if (!refs) return dupRefs;
+  const member = new Set(refs.map((r) => `${r.workspaceId}:${r.fileId}`));
+  return dupRefs.filter((r) => member.has(`${r.workspaceId}:${r.fileId}`));
+}
+
 export function randomWorkspaces(
   cores: CoreTarget[],
   query: SearchQuery,
@@ -539,6 +711,10 @@ function comparatorFor(
       return (a, b) =>
         cmpNullableNum(a.lastAccessedAt, b.lastAccessedAt, direction) ||
         tiebreak(a, b);
+    case "hash":
+      return (a, b) =>
+        cmpNullableStr(a.contentHash ?? null, b.contentHash ?? null, direction) ||
+        tiebreak(a, b);
     default:
       return (a, b) =>
         cmpStr(a.workspaceId, b.workspaceId) || cmpNum(a.id, b.id, direction);
@@ -556,6 +732,18 @@ function cmpNum(a: number, b: number, dir: "asc" | "desc"): number {
 function cmpStr(a: string, b: string, dir: "asc" | "desc" = "asc"): number {
   const result = a < b ? -1 : a > b ? 1 : 0;
   return dir === "asc" ? result : -result;
+}
+
+/** Sort NULLs last in both directions, matching the SQL ORDER BY expressions. */
+function cmpNullableStr(
+  a: string | null,
+  b: string | null,
+  dir: "asc" | "desc",
+): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return cmpStr(a, b, dir);
 }
 
 /** Sort NULLs last in both directions, matching the SQL ORDER BY expressions. */
