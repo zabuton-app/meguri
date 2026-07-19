@@ -57,11 +57,12 @@ export function DiscoverCard({
 
   // Hover scrub preview on the main media (same behavior/preference as the
   // list thumbnails): pointer X maps onto the video timeline.
-  const { hoverPreview } = usePreferences();
+  const { hoverPreview, frameQuality } = usePreferences();
   const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
     useHoverFramePreview({
       enabled: Boolean(hoverPreview && hasThumb && isVideo),
-      frameUrl: (t) => `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}`,
+      frameUrl: (t) =>
+        `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
       duration: file.duration,
       fileId: file.id,
     });

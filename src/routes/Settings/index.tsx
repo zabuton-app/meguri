@@ -16,9 +16,12 @@ import {
 } from "@/components/ui/select";
 import { useTheme } from "@/themes/ThemeProvider";
 import { LANGUAGES, useI18n, type Lang } from "@/i18n/I18nProvider";
+import { type TranslationKey } from "@/i18n/locales/ja";
 import {
   usePreferences,
   SCENE_COUNT_OPTIONS,
+  FRAME_QUALITY_OPTIONS,
+  type FrameQuality,
 } from "@/settings/PreferencesProvider";
 import {
   KEYBINDING_PRESETS,
@@ -29,6 +32,12 @@ import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/amgsk";
+
+const FRAME_QUALITY_LABELS: Record<FrameQuality, TranslationKey> = {
+  low: "settings.frameQualityLow",
+  standard: "settings.frameQualityStandard",
+  high: "settings.frameQualityHigh",
+};
 
 export default function Settings() {
   const { mode, familyId, families, setMode, setFamily } = useTheme();
@@ -42,6 +51,8 @@ export default function Settings() {
     setHideSupportLink,
     hoverPreview,
     setHoverPreview,
+    frameQuality,
+    setFrameQuality,
   } = usePreferences();
   const navigate = useNavigate();
   // Closing the modal = drop the child route and return to the list (the list stays mounted).
@@ -128,6 +139,33 @@ export default function Settings() {
               </span>
             </div>
             <Switch checked={hoverPreview} onCheckedChange={setHoverPreview} />
+          </section>
+
+          {/* Frame preview quality (hover scrub / scene rail JPEG size) */}
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.frameQuality")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.frameQualityDesc")}
+              </span>
+            </div>
+            <Select
+              value={frameQuality}
+              onValueChange={(v) => setFrameQuality(v as FrameQuality)}
+            >
+              <SelectTrigger className="min-w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FRAME_QUALITY_OPTIONS.map((q) => (
+                  <SelectItem key={q} value={q}>
+                    {t(FRAME_QUALITY_LABELS[q])}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </section>
 
           {/* Keybinding preset (file paging keys) */}

@@ -35,6 +35,12 @@ export const ja = {
   "settings.hoverPreview": "ホバープレビュー",
   "settings.hoverPreviewDesc":
     "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
+  "settings.frameQuality": "プレビュー画質",
+  "settings.frameQualityDesc":
+    "ディスカバリーのホバープレビューとシーンレールの画質。高いほど生成が遅くなります。",
+  "settings.frameQualityLow": "低 (240px)",
+  "settings.frameQualityStandard": "標準 (480px)",
+  "settings.frameQualityHigh": "高 (960px)",
   "settings.keybinding": "キーバインド",
   "settings.keybindingDesc":
     "一覧のフォーカス移動・ファイルの前後移動・スクロール・検索フォーカスのキー割り当て。",
