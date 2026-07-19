@@ -36,6 +36,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
+import { describeDateRange } from "@/lib/smartCollections";
 import { HomeHeader } from "./HomeHeader";
 import { ActiveFilterChips, type ChipEntry } from "./ActiveFilterChips";
 import {
@@ -151,12 +152,9 @@ export default function Home() {
       clear: () => patchFilter({ played: undefined }),
     });
   if (filter.btimeFrom != null || filter.btimeTo != null) {
-    const fmt = (sec: number) => new Date(sec * 1000).toLocaleDateString();
-    const from = filter.btimeFrom != null ? fmt(filter.btimeFrom) : "";
-    const to = filter.btimeTo != null ? fmt(filter.btimeTo) : "";
     activeChips.push({
       key: "btime",
-      label: `${t("filter.btime")}: ${from}–${to}`,
+      label: `${t("filter.btime")}: ${describeDateRange(t, filter.btimeFrom, filter.btimeTo)}`,
       clear: () => patchFilter({ btimeFrom: undefined, btimeTo: undefined }),
     });
   }
