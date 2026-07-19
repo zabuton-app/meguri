@@ -92,7 +92,7 @@ export const ChannelInputs = {
   bookmark_add: FileTarget.extend({ sec: z.number() }),
   bookmark_remove: FileTarget.extend({ bookmarkId: z.number() }),
   thumb_set_offset: FileTarget.extend({ sec: z.number().nullable() }),
-  frame_export: FileTarget.extend({ sec: z.number().min(0) }),
+  frame_export: FileTarget.extend({ sec: z.number().finite().min(0) }),
   open_external: FileTarget,
   open_folder: FileTarget,
   copy_file_path: FileTarget,

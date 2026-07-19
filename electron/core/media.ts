@@ -174,6 +174,12 @@ export async function exportFrame(
   format: FrameFormat,
   signal?: AbortSignal,
 ): Promise<boolean> {
+  // Same offset guard as generateThumb: a non-finite or negative offset would
+  // produce a bogus -ss argument, so refuse it instead of passing it to ffmpeg.
+  if (!Number.isFinite(offsetSec) || offsetSec < 0) {
+    log.warn(`frame export refused: invalid offset (${offsetSec})`);
+    return false;
+  }
   if (await runFfmpegFrameExport(src, dest, offsetSec, format, false, signal)) {
     return true;
   }

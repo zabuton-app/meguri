@@ -63,6 +63,14 @@ describe("exportFrame", () => {
     expect(buf.readUInt32BE(20)).toBe(48);
   });
 
+  it("refuses non-finite or negative offsets without invoking ffmpeg", async () => {
+    const dest = path.join(dir, "invalid-offset.png");
+    await expect(exportFrame(video, dest, NaN, "png")).resolves.toBe(false);
+    await expect(exportFrame(video, dest, Infinity, "png")).resolves.toBe(false);
+    await expect(exportFrame(video, dest, -1, "png")).resolves.toBe(false);
+    expect(fs.existsSync(dest)).toBe(false);
+  });
+
   it("returns false for a broken input instead of throwing", async () => {
     const dest = path.join(dir, "never.png");
     await expect(exportFrame(broken, dest, 0, "png")).resolves.toBe(false);
