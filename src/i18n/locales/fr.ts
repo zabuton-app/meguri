@@ -124,6 +124,11 @@ export const fr: Record<TranslationKey, string> = {
   "filter.unplayed": "Non lu",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "Filtrer par note minimale",
+  "filter.btime": "Date de création",
+  "filter.btimeFilter": "Filtrer par date de création",
+  "filter.dateFrom": "Du",
+  "filter.dateTo": "Au",
+  "filter.dateClear": "Effacer",
 
   // smart collections
   "smartCollection.title": "Collections intelligentes",

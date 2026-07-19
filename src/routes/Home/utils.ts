@@ -7,6 +7,7 @@ export const SORT_KEYS: Record<string, TranslationKey> = {
   name: "sort.name",
   rating: "sort.rating",
   captured: "sort.captured",
+  btime: "filter.btime",
   accessed: "sort.accessed",
   hash: "sort.hash",
 };

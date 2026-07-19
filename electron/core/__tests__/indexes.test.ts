@@ -29,6 +29,7 @@ describe("index query plans", () => {
       insertFile(db, rootId, {
         relPath: `dir/v${String(i).padStart(3, "0")}.mp4`,
         capturedAt: i % 3 ? 1_700_000_000 + i : null,
+        btime: i % 4 ? 1_690_000_000 + i : null,
       });
     }
     db.exec("ANALYZE");
@@ -54,6 +55,12 @@ describe("index query plans", () => {
   it("sort=captured (default desc) uses idx_files_alive_captured", () => {
     const p = plan(db, searchSql("captured", "desc"));
     expect(p).toContain("idx_files_alive_captured");
+    expect(p).not.toContain("TEMP B-TREE");
+  });
+
+  it("sort=btime (default desc) uses idx_files_alive_btime", () => {
+    const p = plan(db, searchSql("btime", "desc"));
+    expect(p).toContain("idx_files_alive_btime");
     expect(p).not.toContain("TEMP B-TREE");
   });
 

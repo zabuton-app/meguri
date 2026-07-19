@@ -30,6 +30,8 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.playedVia) next.playedVia = query.playedVia;
   if (query.capturedFrom != null) next.capturedFrom = query.capturedFrom;
   if (query.capturedTo != null) next.capturedTo = query.capturedTo;
+  if (query.btimeFrom != null) next.btimeFrom = query.btimeFrom;
+  if (query.btimeTo != null) next.btimeTo = query.btimeTo;
   if (query.sort) next.sort = query.sort;
   if (query.sortDir) next.sortDir = query.sortDir;
   return next;
@@ -95,6 +97,11 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     const to = query.capturedTo != null ? formatDate(query.capturedTo) : "";
     parts.push(`${t("sort.captured")}: ${from}–${to}`);
   }
+  if (query.btimeFrom != null || query.btimeTo != null) {
+    const from = query.btimeFrom != null ? formatDate(query.btimeFrom) : "";
+    const to = query.btimeTo != null ? formatDate(query.btimeTo) : "";
+    parts.push(`${t("filter.btime")}: ${from}–${to}`);
+  }
   for (const tag of query.tags ?? []) {
     const label = `${t("media.tags")}: ${tag}`;
     parts.push(query.tagSource ? `${label} (${query.tagSource})` : label);
@@ -108,7 +115,9 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
           ? "sort.rating"
           : sort === "captured"
             ? "sort.captured"
-            : sort === "accessed"
+            : sort === "btime"
+              ? "filter.btime"
+              : sort === "accessed"
               ? "sort.accessed"
               : sort === "hash"
                 ? "sort.hash"

@@ -117,6 +117,11 @@ export const zhCN: Record<TranslationKey, string> = {
   "filter.unplayed": "未播放",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "按最低评分筛选",
+  "filter.btime": "创建日期",
+  "filter.btimeFilter": "按创建日期筛选",
+  "filter.dateFrom": "开始日期",
+  "filter.dateTo": "结束日期",
+  "filter.dateClear": "清除",
 
   // smart collections
   "smartCollection.title": "智能收藏",

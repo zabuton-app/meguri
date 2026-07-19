@@ -150,6 +150,16 @@ export default function Home() {
       label: filter.played ? t("filter.played") : t("filter.unplayed"),
       clear: () => patchFilter({ played: undefined }),
     });
+  if (filter.btimeFrom != null || filter.btimeTo != null) {
+    const fmt = (sec: number) => new Date(sec * 1000).toLocaleDateString();
+    const from = filter.btimeFrom != null ? fmt(filter.btimeFrom) : "";
+    const to = filter.btimeTo != null ? fmt(filter.btimeTo) : "";
+    activeChips.push({
+      key: "btime",
+      label: `${t("filter.btime")}: ${from}–${to}`,
+      clear: () => patchFilter({ btimeFrom: undefined, btimeTo: undefined }),
+    });
+  }
   if (filter.sort || filter.sortDir) {
     const sort = filter.sort ?? "added";
     const sortDir = resolveSortDir(sort, filter.sortDir);

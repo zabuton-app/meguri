@@ -59,6 +59,8 @@ export interface Discovered {
   kind: Kind;
   size: number;
   mtime: number;
+  /** Filesystem creation time (birthtime), null where the FS doesn't provide it. */
+  btime: number | null;
   inode: number;
 }
 
@@ -130,6 +132,8 @@ export async function walk(
           kind: t.kind,
           size: st.size,
           mtime: Math.floor(st.mtimeMs / 1000),
+          // Filesystems without birthtime report 0 (or the epoch) — store NULL.
+          btime: st.birthtimeMs > 0 ? Math.floor(st.birthtimeMs / 1000) : null,
           inode: Number(st.ino),
         });
         // Total is unknown until the whole tree is traversed, so report the running count (indeterminate).
@@ -219,20 +223,22 @@ export async function syncFiles(
   const seen = new Set(scannable.map((d) => d.relPath));
   const now = nowUnix();
 
+  // btime is refreshed here too so rows scanned before the column existed get
+  // backfilled on the next scan without a content change.
   const touchUnchanged = db.prepare(
-    "UPDATE files SET deleted_at = NULL, abs_path = ?, inode = ? WHERE id = ?",
+    "UPDATE files SET deleted_at = NULL, abs_path = ?, inode = ?, btime = ? WHERE id = ?",
   );
   // Recompute content_hash for changed files so meta_key stays anchored to the hash
   // (rather than dropping to the rel_path fallback) and metadata keeps linking.
   const updateChanged = db.prepare(
-    "UPDATE files SET size = ?, mtime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL WHERE id = ?",
+    "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL WHERE id = ?",
   );
   const moveStmt = db.prepare(
-    "UPDATE files SET rel_path = ?, abs_path = ?, inode = ?, mtime = ?, size = ?, deleted_at = NULL WHERE id = ?",
+    "UPDATE files SET rel_path = ?, abs_path = ?, inode = ?, mtime = ?, btime = ?, size = ?, deleted_at = NULL WHERE id = ?",
   );
   const insertStmt = db.prepare(
-    `INSERT INTO files (root_id, rel_path, abs_path, kind, ext, size, mtime, inode, content_hash, thumb_status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+    `INSERT INTO files (root_id, rel_path, abs_path, kind, ext, size, mtime, btime, inode, content_hash, thumb_status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   );
   const moveCandidates = db.prepare(
     "SELECT id, rel_path FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL",
@@ -309,7 +315,7 @@ export async function syncFiles(
       const existing = existingOf[i];
       if (existing) {
         if (existing.size === d.size && existing.mtime === d.mtime) {
-          touchUnchanged.run(d.absPath, d.inode, existing.id);
+          touchUnchanged.run(d.absPath, d.inode, d.btime, existing.id);
           stats.unchanged++;
         } else {
           const newHash = hashOf.get(i) ?? null;
@@ -321,6 +327,7 @@ export async function syncFiles(
           updateChanged.run(
             d.size,
             d.mtime,
+            d.btime,
             d.absPath,
             d.inode,
             newHash,
@@ -348,7 +355,15 @@ export async function syncFiles(
           : [];
       const moved = cands.find((c) => !seen.has(c.rel_path));
       if (moved) {
-        moveStmt.run(d.relPath, d.absPath, d.inode, d.mtime, d.size, moved.id);
+        moveStmt.run(
+          d.relPath,
+          d.absPath,
+          d.inode,
+          d.mtime,
+          d.btime,
+          d.size,
+          moved.id,
+        );
         ftsTargets.push(moved.id);
         stats.moved++;
       } else {
@@ -360,6 +375,7 @@ export async function syncFiles(
           d.ext,
           d.size,
           d.mtime,
+          d.btime,
           d.inode,
           hash,
           now,

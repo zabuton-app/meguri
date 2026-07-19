@@ -80,6 +80,28 @@ describe("syncFiles lifecycle", () => {
     ).c;
   }
 
+  it("stores btime on insert and backfills NULL btime on an unchanged re-scan", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    // Expected value computed the same way walk() does, so the assertion holds
+    // on filesystems both with and without birthtime support.
+    const st = await fsp.stat(path.join(root, "a.mp4"));
+    const expected =
+      st.birthtimeMs > 0 ? Math.floor(st.birthtimeMs / 1000) : null;
+
+    await rescan();
+    const btimeOf = () =>
+      (db.prepare("SELECT btime FROM files").get() as { btime: number | null })
+        .btime;
+    expect(btimeOf()).toBe(expected);
+
+    // Rows scanned before the column existed have NULL btime; an unchanged
+    // re-scan must repopulate it.
+    db.prepare("UPDATE files SET btime = NULL").run();
+    const second = await rescan();
+    expect(second.stats.unchanged).toBe(1);
+    expect(btimeOf()).toBe(expected);
+  });
+
   it("inserts, then reports unchanged, then tracks a move/update/delete", async () => {
     await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
     await fsp.mkdir(path.join(root, "sub"));

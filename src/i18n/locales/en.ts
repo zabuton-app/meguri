@@ -121,6 +121,11 @@ export const en: Record<TranslationKey, string> = {
   "filter.unplayed": "Unplayed",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "Filter by minimum rating",
+  "filter.btime": "Created date",
+  "filter.btimeFilter": "Filter by creation date",
+  "filter.dateFrom": "From",
+  "filter.dateTo": "To",
+  "filter.dateClear": "Clear",
 
   // smart collections
   "smartCollection.title": "Smart collections",

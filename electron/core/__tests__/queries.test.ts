@@ -59,6 +59,20 @@ describe("searchFiles", () => {
     ]);
   });
 
+  it("filters by btime range; files without btime never match", () => {
+    const old = insertFile(db, rootId, { relPath: "old.mp4", btime: 100 });
+    const mid = insertFile(db, rootId, { relPath: "mid.mp4", btime: 200 });
+    const recent = insertFile(db, rootId, { relPath: "new.mp4", btime: 300 });
+    insertFile(db, rootId, { relPath: "nobtime.mp4", btime: null });
+
+    const ids = (q: Parameters<typeof searchFiles>[1]) =>
+      searchFiles(db, q).items.map((f) => f.id).sort();
+    expect(ids({ btimeFrom: 150 })).toEqual([mid, recent].sort());
+    expect(ids({ btimeTo: 250 })).toEqual([old, mid].sort());
+    expect(ids({ btimeFrom: 150, btimeTo: 250 })).toEqual([mid]);
+    expect(ids({ btimeFrom: 400 })).toEqual([]);
+  });
+
   it("filters by fileIds (collection membership)", () => {
     const a = insertFile(db, rootId, { relPath: "a.mp4" });
     insertFile(db, rootId, { relPath: "b.mp4" });
@@ -116,6 +130,22 @@ describe("searchFiles", () => {
         (f) => f.id,
       ),
     ).toEqual([a, c, b]);
+  });
+
+  it("sorts by btime in both directions with NULLs last", () => {
+    const mid = insertFile(db, rootId, { relPath: "mid.mp4", btime: 200 });
+    const old = insertFile(db, rootId, { relPath: "old.mp4", btime: 100 });
+    const none = insertFile(db, rootId, { relPath: "none.mp4", btime: null });
+
+    // Default direction is desc (newest first); NULLs sort last either way.
+    expect(searchFiles(db, { sort: "btime" }).items.map((f) => f.id)).toEqual([
+      mid,
+      old,
+      none,
+    ]);
+    expect(
+      searchFiles(db, { sort: "btime", sortDir: "asc" }).items.map((f) => f.id),
+    ).toEqual([old, mid, none]);
   });
 
   it("matches the full-text query against rel_path after FTS sync", () => {

@@ -1,5 +1,12 @@
-// Cross-search filter controls. q / kind / play state / minimum rating / favorite / duplicates / sort order.
-import { CopyCheck, Heart, Search, SortAsc, SortDesc } from "lucide-react";
+// Cross-search filter controls. q / kind / play state / creation date / minimum rating / favorite / duplicates / sort order.
+import {
+  CalendarDays,
+  CopyCheck,
+  Heart,
+  Search,
+  SortAsc,
+  SortDesc,
+} from "lucide-react";
 import { resolveSortDir } from "@shared/sortDir";
 import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
@@ -12,9 +19,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { RatingStars } from "./RatingStars";
 import { useI18n } from "@/i18n/I18nProvider";
 import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
+
+/** Unix seconds → local YYYY-MM-DD for a date input's value. */
+function toDateInput(sec: number | undefined): string {
+  if (sec == null) return "";
+  const d = new Date(sec * 1000);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** Date-input value → Unix seconds at local start/end of that day. */
+function fromDateInput(value: string, edge: "start" | "end"): number | undefined {
+  if (!value) return undefined;
+  const t = new Date(`${value}T${edge === "start" ? "00:00:00" : "23:59:59"}`);
+  const sec = Math.floor(t.getTime() / 1000);
+  return Number.isFinite(sec) ? sec : undefined;
+}
 
 interface Props {
   value: SearchQuery;
@@ -102,6 +131,7 @@ export function FilterBar({ value, onChange }: Props) {
             <SelectItem value="captured">
               {sortLabel("sort.captured")}
             </SelectItem>
+            <SelectItem value="btime">{sortLabel("filter.btime")}</SelectItem>
             <SelectItem value="accessed">
               {sortLabel("sort.accessed")}
             </SelectItem>
@@ -118,6 +148,64 @@ export function FilterBar({ value, onChange }: Props) {
           <SortDirIcon className="size-4" />
         </button>
       </div>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-pressed={value.btimeFrom != null || value.btimeTo != null}
+            title={t("filter.btimeFilter")}
+            aria-label={t("filter.btimeFilter")}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-md border border-border transition-colors",
+              value.btimeFrom != null || value.btimeTo != null
+                ? "border-primary/50 bg-primary/10 text-primary"
+                : "text-muted hover:text-fg",
+            )}
+          >
+            <CalendarDays className="size-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="p-3">
+          <div className="mb-2 text-xs font-medium text-muted">
+            {t("filter.btime")}
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={toDateInput(value.btimeFrom)}
+              max={toDateInput(value.btimeTo) || undefined}
+              aria-label={t("filter.dateFrom")}
+              onChange={(e) =>
+                patch({ btimeFrom: fromDateInput(e.target.value, "start") })
+              }
+              className="w-36"
+            />
+            <span className="text-muted">–</span>
+            <Input
+              type="date"
+              value={toDateInput(value.btimeTo)}
+              min={toDateInput(value.btimeFrom) || undefined}
+              aria-label={t("filter.dateTo")}
+              onChange={(e) =>
+                patch({ btimeTo: fromDateInput(e.target.value, "end") })
+              }
+              className="w-36"
+            />
+          </div>
+          {(value.btimeFrom != null || value.btimeTo != null) && (
+            <button
+              type="button"
+              onClick={() =>
+                patch({ btimeFrom: undefined, btimeTo: undefined })
+              }
+              className="mt-2 text-xs text-muted transition-colors hover:text-fg"
+            >
+              {t("filter.dateClear")}
+            </button>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <div
         className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2"

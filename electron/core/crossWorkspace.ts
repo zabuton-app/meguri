@@ -700,6 +700,9 @@ function comparatorFor(
     case "captured":
       return (a, b) =>
         cmpNullableNum(a.capturedAt, b.capturedAt, direction) || tiebreak(a, b);
+    case "btime":
+      return (a, b) =>
+        cmpNullableNum(a.btime, b.btime, direction) || tiebreak(a, b);
     case "name":
       // orderByFor()'s name sort tiebreaks on id following the sort direction
       // (so the index can serve the DESC scan); mirror that here.

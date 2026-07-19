@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS files (
   root_id INTEGER NOT NULL REFERENCES scan_roots(id) ON DELETE CASCADE,
   rel_path TEXT NOT NULL, abs_path TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('video','image')),
-  ext TEXT, size INTEGER, mtime INTEGER, inode INTEGER, content_hash TEXT,
+  ext TEXT, size INTEGER, mtime INTEGER, btime INTEGER, inode INTEGER, content_hash TEXT,
   width INTEGER, height INTEGER, duration REAL, codec TEXT, fps REAL, captured_at INTEGER,
   thumb_path TEXT, thumb_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (thumb_status IN ('pending','done','error')),
@@ -135,6 +135,18 @@ function backfillColumns(db: DB): void {
   if (!hasColumn(db, "file_meta", "thumb_offset_sec")) {
     db.exec("ALTER TABLE file_meta ADD COLUMN thumb_offset_sec REAL");
   }
+  // Filesystem creation time (birthtime), NULL where the filesystem doesn't
+  // provide it. The index lives here (not in CORE_DDL) because on pre-existing
+  // DBs the column only exists after this ALTER runs.
+  if (!hasColumn(db, "files", "btime")) {
+    db.exec("ALTER TABLE files ADD COLUMN btime INTEGER");
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_files_btime ON files(btime)");
+  // Mirrors idx_files_alive_captured: drives sort=btime in its default DESC
+  // direction (the leading expression matches the NULLs-last ORDER BY term).
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_alive_btime ON files((btime IS NULL), btime DESC, id) WHERE deleted_at IS NULL",
+  );
 }
 
 /**
