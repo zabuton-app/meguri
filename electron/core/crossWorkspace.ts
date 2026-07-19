@@ -481,7 +481,7 @@ export function listHistoryWorkspaces(
 
 /** Bucketing key: hash and size must both match to count as a duplicate. */
 function dupKey(hash: string, size: number): string {
-  return `${hash} ${size}`;
+  return `${hash}\u0000${size}`;
 }
 
 /**
