@@ -28,7 +28,7 @@ export const FRAME_QUALITY_OPTIONS = ["low", "standard", "high"] as const;
 export type FrameQuality = (typeof FRAME_QUALITY_OPTIONS)[number];
 export const DEFAULT_FRAME_QUALITY: FrameQuality = "low";
 
-function isFrameQuality(v: unknown): v is FrameQuality {
+export function isFrameQuality(v: unknown): v is FrameQuality {
   return FRAME_QUALITY_OPTIONS.includes(v as FrameQuality);
 }
 

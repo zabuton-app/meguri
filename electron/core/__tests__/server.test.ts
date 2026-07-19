@@ -298,6 +298,13 @@ describe("frame serving (ffmpeg path)", () => {
     await expectJpeg(
       await fetch(`${base}/ws/${WS}/frame/${remuxId}?t=0&q=9999`, authHeaders()),
     );
+    // Prototype members must not pass the allowlist (own-property check).
+    await expectJpeg(
+      await fetch(
+        `${base}/ws/${WS}/frame/${remuxId}?t=0&q=toString`,
+        authHeaders(),
+      ),
+    );
     await expectJpeg(
       await fetch(`${base}/ws/${WS}/frame/${remuxId}`, authHeaders()),
     );

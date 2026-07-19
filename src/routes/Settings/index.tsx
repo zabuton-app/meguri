@@ -21,6 +21,7 @@ import {
   usePreferences,
   SCENE_COUNT_OPTIONS,
   FRAME_QUALITY_OPTIONS,
+  isFrameQuality,
   type FrameQuality,
 } from "@/settings/PreferencesProvider";
 import {
@@ -153,7 +154,9 @@ export default function Settings() {
             </div>
             <Select
               value={frameQuality}
-              onValueChange={(v) => setFrameQuality(v as FrameQuality)}
+              onValueChange={(v) => {
+                if (isFrameQuality(v)) setFrameQuality(v);
+              }}
             >
               <SelectTrigger className="min-w-36">
                 <SelectValue />

@@ -565,7 +565,10 @@ const FRAME_QUALITY = {
 type FrameQuality = keyof typeof FRAME_QUALITY;
 
 function parseFrameQuality(v: string | null): FrameQuality {
-  return v !== null && v in FRAME_QUALITY ? (v as FrameQuality) : "low";
+  // Object.hasOwn (not `in`) so prototype members like "toString" don't pass.
+  return v !== null && Object.hasOwn(FRAME_QUALITY, v)
+    ? (v as FrameQuality)
+    : "low";
 }
 
 function serveFrame(

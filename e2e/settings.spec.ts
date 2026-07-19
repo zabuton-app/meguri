@@ -10,7 +10,10 @@ test.describe("Settings", () => {
 
   test("changes keybinding preset", async ({ ready }) => {
     const dialog = await openSettings(ready);
-    await dialog.getByRole("combobox").nth(2).click();
+    await dialog
+      .locator("section", { hasText: "Keybinds" })
+      .getByRole("combobox")
+      .click();
     await ready.getByRole("option", { name: "Vim" }).click();
     await closeTopDialog(ready);
     await ready.getByRole("button", { name: "Keyboard shortcuts" }).click();
