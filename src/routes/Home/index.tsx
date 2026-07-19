@@ -36,6 +36,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
+import { describeDateRange } from "@/lib/smartCollections";
 import { HomeHeader } from "./HomeHeader";
 import { ActiveFilterChips, type ChipEntry } from "./ActiveFilterChips";
 import {
@@ -150,6 +151,13 @@ export default function Home() {
       label: filter.played ? t("filter.played") : t("filter.unplayed"),
       clear: () => patchFilter({ played: undefined }),
     });
+  if (filter.btimeFrom != null || filter.btimeTo != null) {
+    activeChips.push({
+      key: "btime",
+      label: `${t("filter.btime")}: ${describeDateRange(t, filter.btimeFrom, filter.btimeTo)}`,
+      clear: () => patchFilter({ btimeFrom: undefined, btimeTo: undefined }),
+    });
+  }
   if (filter.sort || filter.sortDir) {
     const sort = filter.sort ?? "added";
     const sortDir = resolveSortDir(sort, filter.sortDir);

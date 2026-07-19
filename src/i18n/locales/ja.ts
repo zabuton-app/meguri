@@ -120,6 +120,11 @@ export const ja = {
   "filter.unplayed": "未視聴",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "最低レーティングで絞り込み",
+  "filter.btime": "作成日",
+  "filter.btimeFilter": "作成日で絞り込み",
+  "filter.dateFrom": "開始日",
+  "filter.dateTo": "終了日",
+  "filter.dateClear": "クリア",
 
   // スマートコレクション
   "smartCollection.title": "スマートコレクション",

@@ -8,6 +8,7 @@ export interface FileSeed {
   ext?: string;
   size?: number;
   mtime?: number;
+  btime?: number | null;
   contentHash?: string | null;
   capturedAt?: number | null;
   width?: number | null;
@@ -28,9 +29,9 @@ export function insertFile(db: DB, rootId: number, seed: FileSeed): number {
   const info = db
     .prepare(
       `INSERT INTO files
-        (root_id, rel_path, abs_path, kind, ext, size, mtime, content_hash,
+        (root_id, rel_path, abs_path, kind, ext, size, mtime, btime, content_hash,
          width, height, duration, captured_at, thumb_status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     )
     .run(
       rootId,
@@ -40,6 +41,7 @@ export function insertFile(db: DB, rootId: number, seed: FileSeed): number {
       ext,
       seed.size ?? 1000,
       seed.mtime ?? 1000,
+      seed.btime ?? null,
       seed.contentHash ?? null,
       seed.width ?? null,
       seed.height ?? null,

@@ -25,6 +25,7 @@ describe("syncFileRowAcrossCaches", () => {
       rating: 2,
       thumbStatus: "done",
       capturedAt: null,
+      btime: null,
       lastAccessedAt: null,
     };
     qc.setQueryData<InfiniteData<SearchResult>>(["files_search", "ws", {}], {

@@ -118,6 +118,11 @@ export const ko: Record<TranslationKey, string> = {
   "filter.unplayed": "미시청",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "최소 평점으로 필터링",
+  "filter.btime": "생성일",
+  "filter.btimeFilter": "생성일로 필터링",
+  "filter.dateFrom": "시작일",
+  "filter.dateTo": "종료일",
+  "filter.dateClear": "지우기",
 
   // smart collections
   "smartCollection.title": "스마트 컬렉션",

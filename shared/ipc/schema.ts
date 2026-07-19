@@ -50,6 +50,8 @@ export const FileRowSchema = z.object({
   /** Sampled content hash (see scan.ts). Null until the scan computes it; used by the "hash" sort. */
   contentHash: z.string().nullable().optional(),
   capturedAt: z.number().nullable(),
+  /** Filesystem creation time (birthtime, Unix seconds). Null where the FS doesn't provide it. */
+  btime: z.number().nullable(),
   /** Last time the file's detail was opened (Unix seconds). Null if never opened. */
   lastAccessedAt: z.number().nullable(),
   /** Tags attached to search results (for grid display). For detail fetches, use FileDetail.tags. */
@@ -106,6 +108,9 @@ export const SearchQuerySchema = z.object({
   playedVia: z.string().optional(),
   capturedFrom: z.number().optional(),
   capturedTo: z.number().optional(),
+  /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
+  btimeFrom: z.number().optional(),
+  btimeTo: z.number().optional(),
   sort: z.string().optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
   fileIds: z.array(z.number()).optional(),

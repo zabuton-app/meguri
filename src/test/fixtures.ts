@@ -21,6 +21,7 @@ export const sampleFileRow: FileRow = {
   favorite: 0,
   thumbStatus: "done",
   capturedAt: null,
+  btime: null,
   lastAccessedAt: null,
   tags: [],
 };

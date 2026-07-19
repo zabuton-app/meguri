@@ -1,6 +1,9 @@
 /** Default sort direction when the caller omits `sortDir`. */
 export function defaultSortDir(sort?: string): "asc" | "desc" {
-  return sort === "rating" || sort === "captured" || sort === "accessed"
+  return sort === "rating" ||
+    sort === "captured" ||
+    sort === "btime" ||
+    sort === "accessed"
     ? "desc"
     : "asc";
 }

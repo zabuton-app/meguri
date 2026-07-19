@@ -20,7 +20,7 @@ const MAX_LIMIT = 500;
 // is reached through a LEFT JOIN. COALESCE supplies defaults for files with no meta row.
 // Exported for queries that join files under the same `f`/`m` aliases (see history.ts).
 export const FILE_COLS =
-  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, f.content_hash AS contentHash, f.captured_at AS capturedAt, m.last_accessed_at AS lastAccessedAt";
+  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, m.last_accessed_at AS lastAccessedAt";
 
 export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
@@ -69,6 +69,14 @@ function appendSearchConditions(
   if (query.capturedTo != null) {
     sql += " AND f.captured_at <= ?";
     args.push(query.capturedTo);
+  }
+  if (query.btimeFrom != null) {
+    sql += " AND f.btime >= ?";
+    args.push(query.btimeFrom);
+  }
+  if (query.btimeTo != null) {
+    sql += " AND f.btime <= ?";
+    args.push(query.btimeTo);
   }
   for (const tag of (query.tags ?? []).filter(Boolean)) {
     sql +=
@@ -125,6 +133,8 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
       return { expr: "COALESCE(m.rating, 0)", nullable: false, cmp, idCmp: ">" };
     case "captured":
       return { expr: "f.captured_at", nullable: true, cmp, idCmp: ">" };
+    case "btime":
+      return { expr: "f.btime", nullable: true, cmp, idCmp: ">" };
     case "name":
       return { expr: "f.rel_path", nullable: false, cmp, idCmp: cmp };
     case "accessed":
@@ -144,6 +154,8 @@ export function sortValueOf(sort: string | undefined, row: FileRow): string | nu
       return row.rating;
     case "captured":
       return row.capturedAt;
+    case "btime":
+      return row.btime;
     case "name":
       return row.relPath;
     case "accessed":
@@ -262,6 +274,8 @@ export function orderByFor(sort?: string, dir?: string): string {
       return `COALESCE(m.rating, 0) ${direction}, f.id ASC`;
     case "captured":
       return `f.captured_at IS NULL ASC, f.captured_at ${direction}, f.id ASC`;
+    case "btime":
+      return `f.btime IS NULL ASC, f.btime ${direction}, f.id ASC`;
     case "name":
       // The id tiebreak follows the main direction so both directions map onto
       // a single scan of idx_files_alive_rel_path (forward/backward); a fixed

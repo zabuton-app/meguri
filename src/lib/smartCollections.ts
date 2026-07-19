@@ -30,6 +30,8 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.playedVia) next.playedVia = query.playedVia;
   if (query.capturedFrom != null) next.capturedFrom = query.capturedFrom;
   if (query.capturedTo != null) next.capturedTo = query.capturedTo;
+  if (query.btimeFrom != null) next.btimeFrom = query.btimeFrom;
+  if (query.btimeTo != null) next.btimeTo = query.btimeTo;
   if (query.sort) next.sort = query.sort;
   if (query.sortDir) next.sortDir = query.sortDir;
   return next;
@@ -77,6 +79,23 @@ function formatDate(sec: number): string {
   return new Date(sec * 1000).toLocaleDateString();
 }
 
+/**
+ * Human label for a possibly open-ended date range (Unix seconds). Open ends
+ * are spelled out ("From …" / "To …") rather than left as a dangling dash.
+ * Exported for the active-filter chips, which show the same ranges.
+ */
+export function describeDateRange(
+  t: TFunc,
+  from: number | undefined,
+  to: number | undefined,
+): string {
+  if (from != null && to != null)
+    return `${formatDate(from)}–${formatDate(to)}`;
+  if (from != null) return `${t("filter.dateFrom")} ${formatDate(from)}`;
+  if (to != null) return `${t("filter.dateTo")} ${formatDate(to)}`;
+  return "";
+}
+
 export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   const parts: string[] = [];
   if (query.q) parts.push(`"${query.q}"`);
@@ -90,10 +109,14 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     parts.push(query.playedVia ? `${label} (${query.playedVia})` : label);
   }
   if (query.capturedFrom != null || query.capturedTo != null) {
-    const from =
-      query.capturedFrom != null ? formatDate(query.capturedFrom) : "";
-    const to = query.capturedTo != null ? formatDate(query.capturedTo) : "";
-    parts.push(`${t("sort.captured")}: ${from}–${to}`);
+    parts.push(
+      `${t("sort.captured")}: ${describeDateRange(t, query.capturedFrom, query.capturedTo)}`,
+    );
+  }
+  if (query.btimeFrom != null || query.btimeTo != null) {
+    parts.push(
+      `${t("filter.btime")}: ${describeDateRange(t, query.btimeFrom, query.btimeTo)}`,
+    );
   }
   for (const tag of query.tags ?? []) {
     const label = `${t("media.tags")}: ${tag}`;
@@ -108,7 +131,9 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
           ? "sort.rating"
           : sort === "captured"
             ? "sort.captured"
-            : sort === "accessed"
+            : sort === "btime"
+              ? "filter.btime"
+              : sort === "accessed"
               ? "sort.accessed"
               : sort === "hash"
                 ? "sort.hash"
