@@ -204,9 +204,11 @@ async function runFfmpegFrameExport(
   try {
     await execFileAsync(FFMPEG, args, { timeout: 60000, signal });
     // ffmpeg exits 0 even when the seek lands past EOF and zero frames are
-    // written (no output file) — treat that as a failure, not a success.
+    // written (no output file, or an empty one) — treat that as a failure and
+    // don't leave a 0-byte file behind at the user-chosen destination.
     const st = await fsPromises.stat(dest).catch(() => null);
     if (!st || st.size === 0) {
+      if (st) await fsPromises.unlink(dest).catch(() => {});
       log.warn(
         `ffmpeg frame export produced no output (offset=${offsetSec}, format=${format}, mode=${keyframeOnly ? "keyframe" : "hybrid"})`,
       );

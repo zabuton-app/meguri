@@ -739,12 +739,16 @@ function registerThumbHandlers(): void {
       if (res.canceled || !res.filePath) return { saved: false, path: null };
       const ext = path.extname(res.filePath).toLowerCase();
       const format = ext === ".jpg" || ext === ".jpeg" ? "jpeg" : "png";
-      // ffmpeg infers the output muxer from the extension; force .png when the
-      // typed name has none (or an unknown one) so extraction can't fail on that.
-      const dest =
-        ext === ".png" || format === "jpeg"
-          ? res.filePath
-          : `${res.filePath}.png`;
+      // ffmpeg infers the output muxer from the extension; replace an unknown
+      // (or missing) extension with .png so extraction can't fail on that.
+      let dest = res.filePath;
+      if (format === "png" && ext !== ".png") {
+        const stem = ext ? res.filePath.slice(0, -ext.length) : res.filePath;
+        dest = `${stem}.png`;
+        // The dialog's overwrite prompt only covered the name as typed; never
+        // silently clobber a different existing file after rewriting it.
+        for (let n = 1; fs.existsSync(dest); n++) dest = `${stem} (${n}).png`;
+      }
       const ok = await exportFrame(abs, dest, sec, format);
       if (!ok) throw new Error("failed to export frame");
       return { saved: true, path: dest };
