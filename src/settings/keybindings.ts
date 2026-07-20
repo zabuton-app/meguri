@@ -109,8 +109,25 @@ export const GRID_BINDINGS: Record<KeybindingPreset, GridBinding> = {
   },
 };
 
-/** Opens the keyboard-shortcuts overlay. Preset-independent ("?"). */
+/**
+ * Declarative "?" chord for the shortcuts overlay (preset-independent).
+ * Kept as the single source of the binding; actual matching goes through
+ * {@link isHelpKey} so it works across keyboard layouts.
+ */
 export const HELP_KEY: KeyChord = { code: "Slash", shift: true };
+
+/**
+ * Whether the event is the shortcuts-overlay key ("?").
+ *
+ * Checks the produced character (`e.key === "?"`) first so it works regardless of
+ * physical layout (AZERTY, JIS, …), then falls back to Shift+Slash by `code` for
+ * layouts/IMEs where `key` may not surface "?". Modifier combos (Ctrl+? etc.) are
+ * excluded so it never fires alongside a real shortcut.
+ */
+export function isHelpKey(e: KeyboardEvent): boolean {
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  return e.key === "?" || (e.code === "Slash" && e.shiftKey);
+}
 
 const matcherCache = new WeakMap<
   KeyChord[],

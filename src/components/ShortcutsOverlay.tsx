@@ -10,6 +10,7 @@ import {
   NAV_BINDINGS,
   GRID_BINDINGS,
   formatChords,
+  isHelpKey,
 } from "@/settings/keybindings";
 
 interface Row {
@@ -26,7 +27,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
   // Close on Esc or "?". Capture phase so it preempts a detail modal's Esc handler underneath.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || (e.code === "Slash" && e.shiftKey)) {
+      if (e.key === "Escape" || isHelpKey(e)) {
         e.preventDefault();
         e.stopImmediatePropagation();
         onClose();

@@ -17,12 +17,7 @@ import { CollectionEditDialog } from "@/components/CollectionEditDialog";
 import { WorkspaceEditDialog } from "@/components/WorkspaceEditDialog";
 import { ShortcutsOverlay } from "@/components/ShortcutsOverlay";
 import { usePreferences } from "@/settings/PreferencesProvider";
-import {
-  NAV_BINDINGS,
-  HELP_KEY,
-  matchAny,
-  matchChord,
-} from "@/settings/keybindings";
+import { NAV_BINDINGS, isHelpKey, matchAny } from "@/settings/keybindings";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "@/components/FilterBar";
 import { ScanProgress } from "@/components/ScanProgress";
@@ -359,7 +354,7 @@ export default function Home() {
           el.isContentEditable)
       )
         return;
-      if (matchChord(e, HELP_KEY)) {
+      if (isHelpKey(e)) {
         e.preventDefault();
         setHelpOpen(true);
       }
