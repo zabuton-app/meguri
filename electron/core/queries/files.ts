@@ -25,13 +25,41 @@ export const FILE_COLS =
 export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
 
-function buildFtsMatch(q: string): string | null {
+// Same transform as listTagNames (tags.ts): escape LIKE metacharacters so user
+// input matches literally, paired with an ESCAPE '\' clause.
+function escapeLike(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+/** Split the free-text query for the trigram-tokenized files_fts. Tokens of 3+
+ *  codepoints go into an FTS MATCH expression (trigram matches substrings, so no
+ *  prefix `*` is needed). Shorter tokens cannot produce a trigram and would make
+ *  the whole MATCH return zero rows, so they are routed to LIKE filters against
+ *  the same files_fts columns instead (codepoint count, not UTF-16 length, since
+ *  the trigram tokenizer works on codepoints). Double quotes are stripped before
+ *  the length split: a pasted `"beach"` means the word beach, not a literal
+ *  quoted string — searching for the quote characters would return zero rows. */
+function buildSearchTerms(q: string): {
+  match: string | null;
+  likeTokens: string[];
+} {
   const tokens = q
     .split(/\s+/)
     .map((t) => t.replace(/"/g, ""))
-    .filter(Boolean)
-    .map((t) => `"${t}"*`);
-  return tokens.length ? tokens.join(" ") : null;
+    .filter(Boolean);
+  const matchTokens: string[] = [];
+  const likeTokens: string[] = [];
+  for (const t of tokens) {
+    if ([...t].length >= 3) {
+      matchTokens.push(`"${t}"`);
+    } else {
+      likeTokens.push(t);
+    }
+  }
+  return {
+    match: matchTokens.length ? matchTokens.join(" ") : null,
+    likeTokens,
+  };
 }
 
 function appendSearchConditions(
@@ -39,10 +67,21 @@ function appendSearchConditions(
   args: unknown[],
   query: SearchQuery,
 ): string {
-  const fts = query.q ? buildFtsMatch(query.q) : null;
-  if (fts) {
+  const terms = query.q
+    ? buildSearchTerms(query.q)
+    : { match: null, likeTokens: [] };
+  if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
-    args.push(fts);
+    args.push(terms.match);
+  }
+  for (const tok of terms.likeTokens) {
+    // Correlated EXISTS (rowid = f.id) instead of an independent IN-subquery:
+    // the latter LIKE-scans the whole files_fts table per token, while this
+    // form only probes the rows already narrowed by MATCH and other filters.
+    sql +=
+      " AND EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'))";
+    const pattern = `%${escapeLike(tok)}%`;
+    args.push(pattern, pattern);
   }
   if (query.kind) {
     sql += " AND f.kind = ?";

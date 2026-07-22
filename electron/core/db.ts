@@ -3,6 +3,12 @@ import Database from "better-sqlite3";
 
 export type DB = Database.Database;
 
+// Trigram tokenizer enables substring matching (mid-word and CJK), which the default
+// unicode61 tokenizer cannot do. Shared between CORE_DDL and the rebuild in
+// migrateFtsToTrigram so the two can never drift apart.
+const FTS_DDL =
+  "CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(rel_path, tags_text, tokenize='trigram')";
+
 const CORE_DDL = `
 CREATE TABLE IF NOT EXISTS scan_roots (
   id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, path_hash TEXT NOT NULL,
@@ -100,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_scene_bookmarks_meta ON scene_bookmarks(meta_key)
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
-CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(rel_path, tags_text);
+${FTS_DDL};
 `;
 
 /** Open the DB and apply PRAGMAs. New tables/columns added after release are reconciled
@@ -112,6 +118,7 @@ export function openDb(file: string): DB {
   db.pragma("foreign_keys = ON");
   db.exec(CORE_DDL);
   backfillColumns(db);
+  migrateFtsToTrigram(db);
   return db;
 }
 
@@ -149,11 +156,42 @@ function backfillColumns(db: DB): void {
   );
 }
 
+/** Versionless idempotent migration: DBs created before the trigram switch still carry
+ *  a unicode61 files_fts (CREATE VIRTUAL TABLE IF NOT EXISTS leaves it alone), so the
+ *  tokenizer is detected from the stored DDL and the table rebuilt once. files_fts is
+ *  fully derived data (rel_path from files, tags_text from meta_tags), so dropping it
+ *  loses nothing; all user-curated metadata is keyed by meta_key and unaffected. */
+function migrateFtsToTrigram(db: DB): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'files_fts'")
+    .get() as { sql: string } | undefined;
+  if (!row || row.sql.includes("trigram")) return;
+  db.transaction(() => {
+    db.exec("DROP TABLE files_fts");
+    db.exec(FTS_DDL);
+    // Bulk re-index mirroring syncFts (tags.ts): rel_path plus space-joined tag names.
+    // DISTINCT collapses the same tag attached via multiple sources — duplicates carry
+    // no extra search signal. Rows already removed from the index (deleted_at set) are
+    // not re-added, preserving deleteFromIndex's invariant.
+    db.exec(`
+      INSERT INTO files_fts (rowid, rel_path, tags_text)
+      SELECT f.id, f.rel_path,
+             COALESCE((SELECT group_concat(name, ' ') FROM
+               (SELECT DISTINCT t.name FROM meta_tags mt
+                JOIN tags t ON t.id = mt.tag_id
+                WHERE mt.meta_key = f.meta_key ORDER BY t.name)), '')
+      FROM files f WHERE f.deleted_at IS NULL
+    `);
+  })();
+}
+
 /**
  * Open an existing workspace DB read-only (no DDL, no PRAGMA writes). Used by
  * the query worker: WAL mode allows any number of readers alongside the main
  * process's single writer, and a read-only handle can never take the write
- * lock or mutate schema. Throws if the file does not exist.
+ * lock or mutate schema. Throws if the file does not exist. Schema migrations
+ * (backfillColumns / migrateFtsToTrigram) are assumed to have already run via
+ * the main process's openDb before any read-only handle is opened.
  */
 export function openDbReadonly(file: string): DB {
   const db = new Database(file, { readonly: true, fileMustExist: true });
