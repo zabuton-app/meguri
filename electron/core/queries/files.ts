@@ -70,8 +70,11 @@ function appendSearchConditions(
     args.push(terms.match);
   }
   for (const tok of terms.likeTokens) {
+    // Correlated EXISTS (rowid = f.id) instead of an independent IN-subquery:
+    // the latter LIKE-scans the whole files_fts table per token, while this
+    // form only probes the rows already narrowed by MATCH and other filters.
     sql +=
-      " AND f.id IN (SELECT rowid FROM files_fts WHERE rel_path LIKE ? ESCAPE '\\' OR tags_text LIKE ? ESCAPE '\\')";
+      " AND EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'))";
     const pattern = `%${escapeLike(tok)}%`;
     args.push(pattern, pattern);
   }
