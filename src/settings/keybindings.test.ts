@@ -103,6 +103,21 @@ describe("keybindings", () => {
       ).toBe(true);
     });
 
+    it("rejects '?' via AltGr when Meta is also held", () => {
+      expect(
+        isHelpKey(
+          keyEvent({
+            code: "KeyM",
+            key: "?",
+            ctrlKey: true,
+            altKey: true,
+            metaKey: true,
+            modifierAltGraph: true,
+          }),
+        ),
+      ).toBe(false);
+    });
+
     it("falls back to Shift+Slash by code when key does not surface '?'", () => {
       expect(
         isHelpKey(keyEvent({ code: "Slash", key: "Process", shiftKey: true })),

@@ -128,9 +128,10 @@ export const HELP_KEY: KeyPress = { code: "Slash", shift: true };
  */
 export function isHelpKey(e: KeyboardEvent): boolean {
   if (e.key === "?") {
-    // AltGr shows up as ctrlKey+altKey; only reject non-AltGraph modifier combos.
+    if (e.metaKey) return false;
+    // AltGr shows up as ctrlKey+altKey; exempt those two only while AltGraph is on.
     if (e.getModifierState?.("AltGraph")) return true;
-    return !e.ctrlKey && !e.metaKey && !e.altKey;
+    return !e.ctrlKey && !e.altKey;
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
   return e.code === HELP_KEY.code && e.shiftKey;
