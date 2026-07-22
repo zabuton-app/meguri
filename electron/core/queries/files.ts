@@ -36,17 +36,22 @@ function escapeLike(s: string): string {
  *  prefix `*` is needed). Shorter tokens cannot produce a trigram and would make
  *  the whole MATCH return zero rows, so they are routed to LIKE filters against
  *  the same files_fts columns instead (codepoint count, not UTF-16 length, since
- *  the trigram tokenizer works on codepoints). */
+ *  the trigram tokenizer works on codepoints). Double quotes are stripped before
+ *  the length split: a pasted `"beach"` means the word beach, not a literal
+ *  quoted string — searching for the quote characters would return zero rows. */
 function buildSearchTerms(q: string): {
   match: string | null;
   likeTokens: string[];
 } {
-  const tokens = q.split(/\s+/).filter(Boolean);
+  const tokens = q
+    .split(/\s+/)
+    .map((t) => t.replace(/"/g, ""))
+    .filter(Boolean);
   const matchTokens: string[] = [];
   const likeTokens: string[] = [];
   for (const t of tokens) {
     if ([...t].length >= 3) {
-      matchTokens.push(`"${t.replace(/"/g, '""')}"`);
+      matchTokens.push(`"${t}"`);
     } else {
       likeTokens.push(t);
     }

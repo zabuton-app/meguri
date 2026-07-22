@@ -211,6 +211,21 @@ describe("searchFiles", () => {
     ]);
   });
 
+  it("strips double quotes from query tokens instead of matching them literally", () => {
+    const hit = insertFile(db, rootId, { relPath: "holiday/beach.mp4" });
+    insertFile(db, rootId, { relPath: "work/report.mp4" });
+    syncFts(db, hit);
+    // A pasted quoted word must behave like the bare word, not a zero-row
+    // search for literal quote characters.
+    expect(searchFiles(db, { q: '"beach"' }).items.map((f) => f.id)).toEqual([
+      hit,
+    ]);
+    // A token that is only quotes vanishes; the remaining token still applies.
+    expect(searchFiles(db, { q: '" beach' }).items.map((f) => f.id)).toEqual([
+      hit,
+    ]);
+  });
+
   it("clamps an out-of-range rating into 0..5", () => {
     const id = insertFile(db, rootId, { relPath: "r.mp4" });
     setRating(db, id, 99);
