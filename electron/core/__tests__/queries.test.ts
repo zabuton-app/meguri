@@ -156,6 +156,76 @@ describe("searchFiles", () => {
     expect(res.items.map((f) => f.id)).toEqual([hit]);
   });
 
+  it("matches a substring in the middle of a word (trigram)", () => {
+    const hit = insertFile(db, rootId, { relPath: "summer_beachvideo.mp4" });
+    insertFile(db, rootId, { relPath: "work/report.mp4" });
+    syncFts(db, hit);
+    expect(searchFiles(db, { q: "chvid" }).items.map((f) => f.id)).toEqual([
+      hit,
+    ]);
+  });
+
+  it("matches CJK substrings via MATCH (3+ chars) and LIKE (short tokens)", () => {
+    const hit = insertFile(db, rootId, { relPath: "夏の海岸ビデオ.mp4" });
+    insertFile(db, rootId, { relPath: "work/report.mp4" });
+    syncFts(db, hit);
+    // 3 codepoints -> trigram MATCH path.
+    expect(searchFiles(db, { q: "海岸ビ" }).items.map((f) => f.id)).toEqual([
+      hit,
+    ]);
+    // 2 codepoints -> LIKE fallback path (a trigram MATCH would return zero rows).
+    expect(searchFiles(db, { q: "海岸" }).items.map((f) => f.id)).toEqual([
+      hit,
+    ]);
+    // Single codepoint.
+    expect(searchFiles(db, { q: "夏" }).items.map((f) => f.id)).toEqual([hit]);
+  });
+
+  it("ANDs long and short tokens together", () => {
+    const both = insertFile(db, rootId, { relPath: "海岸_beach.mp4" });
+    const beachOnly = insertFile(db, rootId, { relPath: "city_beach.mp4" });
+    syncFts(db, both);
+    syncFts(db, beachOnly);
+    // "beach" (MATCH) AND "海岸" (LIKE) must both hold.
+    expect(
+      searchFiles(db, { q: "beach 海岸" }).items.map((f) => f.id),
+    ).toEqual([both]);
+  });
+
+  it("treats LIKE metacharacters in short tokens literally", () => {
+    const percent = insertFile(db, rootId, { relPath: "sale_5%.mp4" });
+    const plain = insertFile(db, rootId, { relPath: "sale_55.mp4" });
+    syncFts(db, percent);
+    syncFts(db, plain);
+    // "5%" is 2 codepoints -> LIKE path; unescaped it would also match "55".
+    expect(searchFiles(db, { q: "5%" }).items.map((f) => f.id)).toEqual([
+      percent,
+    ]);
+  });
+
+  it("matches case-insensitively through the trigram tokenizer", () => {
+    const hit = insertFile(db, rootId, { relPath: "holiday/beach.mp4" });
+    syncFts(db, hit);
+    expect(searchFiles(db, { q: "BEACH" }).items.map((f) => f.id)).toEqual([
+      hit,
+    ]);
+  });
+
+  it("strips double quotes from query tokens instead of matching them literally", () => {
+    const hit = insertFile(db, rootId, { relPath: "holiday/beach.mp4" });
+    insertFile(db, rootId, { relPath: "work/report.mp4" });
+    syncFts(db, hit);
+    // A pasted quoted word must behave like the bare word, not a zero-row
+    // search for literal quote characters.
+    expect(searchFiles(db, { q: '"beach"' }).items.map((f) => f.id)).toEqual([
+      hit,
+    ]);
+    // A token that is only quotes vanishes; the remaining token still applies.
+    expect(searchFiles(db, { q: '" beach' }).items.map((f) => f.id)).toEqual([
+      hit,
+    ]);
+  });
+
   it("clamps an out-of-range rating into 0..5", () => {
     const id = insertFile(db, rootId, { relPath: "r.mp4" });
     setRating(db, id, 99);
