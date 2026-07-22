@@ -88,6 +88,39 @@ describe("keybindings", () => {
         ),
       ).toBe(false);
     });
+
+    it("allows '?' typed via AltGr (reported as Ctrl+Alt)", () => {
+      expect(
+        isHelpKey(
+          keyEvent({
+            code: "KeyM",
+            key: "?",
+            ctrlKey: true,
+            altKey: true,
+            modifierAltGraph: true,
+          }),
+        ),
+      ).toBe(true);
+    });
+
+    it("falls back to Shift+Slash by code when key does not surface '?'", () => {
+      expect(
+        isHelpKey(keyEvent({ code: "Slash", key: "Process", shiftKey: true })),
+      ).toBe(true);
+    });
+
+    it("rejects the code fallback when a modifier is held", () => {
+      expect(
+        isHelpKey(
+          keyEvent({
+            code: "Slash",
+            key: "Process",
+            shiftKey: true,
+            ctrlKey: true,
+          }),
+        ),
+      ).toBe(false);
+    });
   });
 
   it("matches tinykeys sequence strings with cached state", () => {

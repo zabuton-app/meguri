@@ -111,22 +111,29 @@ export const GRID_BINDINGS: Record<KeybindingPreset, GridBinding> = {
 
 /**
  * Declarative "?" chord for the shortcuts overlay (preset-independent).
- * Kept as the single source of the binding; actual matching goes through
- * {@link isHelpKey} so it works across keyboard layouts.
+ * Single source of the physical-key fallback used by {@link isHelpKey};
+ * actual matching goes through that helper so it works across layouts.
  */
-export const HELP_KEY: KeyChord = { code: "Slash", shift: true };
+export const HELP_KEY: KeyPress = { code: "Slash", shift: true };
 
 /**
  * Whether the event is the shortcuts-overlay key ("?").
  *
  * Checks the produced character (`e.key === "?"`) first so it works regardless of
- * physical layout (AZERTY, JIS, …), then falls back to Shift+Slash by `code` for
- * layouts/IMEs where `key` may not surface "?". Modifier combos (Ctrl+? etc.) are
- * excluded so it never fires alongside a real shortcut.
+ * physical layout (AZERTY, JIS, …). AltGraph is allowed on that path since some
+ * layouts type "?" via AltGr (browsers report it as Ctrl+Alt); real Ctrl/Meta/Alt
+ * shortcuts are still rejected. The fallback matches {@link HELP_KEY} by `code`
+ * for layouts/IMEs where `key` may not surface "?" and stays strict about
+ * modifiers so it never fires alongside a real shortcut.
  */
 export function isHelpKey(e: KeyboardEvent): boolean {
+  if (e.key === "?") {
+    // AltGr shows up as ctrlKey+altKey; only reject non-AltGraph modifier combos.
+    if (e.getModifierState?.("AltGraph")) return true;
+    return !e.ctrlKey && !e.metaKey && !e.altKey;
+  }
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
-  return e.key === "?" || (e.code === "Slash" && e.shiftKey);
+  return e.code === HELP_KEY.code && e.shiftKey;
 }
 
 const matcherCache = new WeakMap<
