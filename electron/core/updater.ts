@@ -29,7 +29,7 @@ function resolveRepo(): { owner: string; name: string } {
   // Only honor the override when we can positively confirm a dev build
   // (isPackaged === false). If it's undefined (e.g. a partial app stub) we fall
   // through to the real repo — fail safe so release users can't be redirected.
-  if (app.isPackaged === false) {
+  if (app?.isPackaged === false) {
     const override = process.env.MEGURI_UPDATE_REPO?.trim();
     const match = override?.match(/^([\w.-]+)\/([\w.-]+)$/);
     if (match) {
@@ -48,6 +48,26 @@ function latestReleaseApi(): string {
 function releasesPage(): string {
   const { owner, name } = resolveRepo();
   return `https://github.com/${owner}/${name}/releases`;
+}
+
+// Microsoft Store product ID (Partner Center → Product identity). Store installs
+// are updated by the Store itself, so "view this update" should land on the
+// product page instead of the GitHub release.
+const MS_STORE_PRODUCT_ID = "9NRSM11RRH8Z";
+
+/**
+ * Where the "View" action for an update should send the user. Store-installed
+ * builds (appx, `process.windowsStore`) go to the Store product page; everything
+ * else goes to the GitHub release page (or the releases list as a fallback).
+ */
+export function updateDownloadUrl(
+  releaseHtmlUrl?: string | null,
+  isWindowsStore: boolean = process.windowsStore === true,
+): string {
+  if (isWindowsStore) {
+    return `ms-windows-store://pdp/?ProductId=${MS_STORE_PRODUCT_ID}`;
+  }
+  return releaseHtmlUrl || releasesPage();
 }
 
 // Don't hammer the API on every startup. Background/startup checks are skipped
@@ -192,10 +212,9 @@ export async function checkForUpdates(
     current,
     latest,
     available: isNewer && !ignored,
-    url:
-      typeof release.html_url === "string" && release.html_url
-        ? release.html_url
-        : releasesPage(),
+    url: updateDownloadUrl(
+      typeof release.html_url === "string" ? release.html_url : null,
+    ),
     name: typeof release.name === "string" ? release.name : null,
     publishedAt:
       typeof release.published_at === "string" ? release.published_at : null,

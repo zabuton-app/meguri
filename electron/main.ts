@@ -40,8 +40,8 @@ import {
   getUpdateSettings,
   ignoreVersion,
   isAutoCheckEnabled,
-  releasesPage,
   setAutoCheck,
+  updateDownloadUrl,
 } from "./core/updater.js";
 import { ALL_ID, COLLECTION_ID_PREFIX, Workspaces } from "./core/workspaces.js";
 
@@ -776,7 +776,9 @@ function registerShellHandlers(): void {
     clipboard.writeText(abs);
   });
 
-  // Open an arbitrary external URL (e.g. the support/donation link). Only http(s) is allowed.
+  // Open an arbitrary external URL (e.g. the support/donation link). Only
+  // http(s) plus the MS Store deep link (update notification on Store installs)
+  // are allowed.
   handle("open_url", ({ url }) => {
     let parsed: URL;
     try {
@@ -784,7 +786,8 @@ function registerShellHandlers(): void {
     } catch {
       throw new Error("invalid url");
     }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    const allowed = ["http:", "https:", "ms-windows-store:"];
+    if (!allowed.includes(parsed.protocol)) {
       throw new Error("unsupported protocol");
     }
     void shell.openExternal(parsed.toString());
@@ -907,8 +910,9 @@ function createTray(): void {
               showWindow();
               emit("update:available", info);
             } else if (info) {
-              // Reached GitHub and we're current: take the user to the releases page.
-              void shell.openExternal(releasesPage());
+              // Reached GitHub and we're current: take the user to the releases
+              // page (or the Store product page on Store installs).
+              void shell.openExternal(updateDownloadUrl(null));
             } else {
               // Couldn't reach GitHub (offline / rate-limited): don't silently
               // open a browser; tell the user the check failed.
