@@ -268,7 +268,10 @@ export const UpdateInfoSchema = z.object({
   latest: z.string(),
   /** True when `latest` is newer than `current` and not ignored by the user. */
   available: z.boolean(),
-  /** GitHub Releases page URL for the latest release. */
+  /**
+   * Where the "View" action should send the user: the GitHub release page, or
+   * the MS Store product deep link (`ms-windows-store://`) on Store installs.
+   */
   url: z.url(),
   /** Release name/title, when present. */
   name: z.string().nullable().optional(),
