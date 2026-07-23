@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileNameOf } from "../relPath";
+import { fileNameOf } from "@/lib/relPath";
 
 describe("fileNameOf", () => {
   it("extracts the file name from a POSIX relative path", () => {
