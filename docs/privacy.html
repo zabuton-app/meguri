@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Meguri</title>
+<meta name="description" content="Privacy policy for Meguri, a local-first media library. Meguri does not collect any personal data — your media and library data stay on your machine.">
+<link rel="icon" href="./assets/icon.png">
+<style>
+  /* Solarized light, regardless of the OS color scheme */
+  :root {
+    color-scheme: light;
+    --bg: #fdf6e3;
+    --fg: #586e75;
+    --muted: #93a1a1;
+    --card: #eee8d5;
+    --border: #d9d2bc;
+    --accent: #268bd2;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--fg);
+    line-height: 1.7;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  header { margin-bottom: 2.5rem; }
+  header img.logo { width: 64px; height: 64px; border-radius: 22%; }
+  h1 { font-size: 2rem; margin-top: .75rem; color: #073642; }
+  .meta { color: var(--muted); margin-top: .25rem; }
+  h2 { font-size: 1.3rem; margin: 2.25rem 0 .75rem; color: #073642; }
+  p { margin: .75rem 0; }
+  ul { margin: .75rem 0; padding-left: 1.4rem; }
+  li { margin: .35rem 0; }
+  a { color: var(--accent); }
+  .summary {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem; margin: 1.5rem 0;
+  }
+  footer {
+    margin-top: 3rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted); font-size: .9rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a href="./index.html"><img class="logo" src="./assets/icon.png" alt="Meguri logo"></a>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Effective date: July 23, 2026</p>
+  </header>
+
+  <div class="summary">
+    <p><strong>In short: Meguri does not collect any personal data.</strong>
+    It is a local-first application — your media and everything derived from
+    it stay on your machine. The only network request it ever makes is an
+    optional update check, described below.</p>
+  </div>
+
+  <h2>Data stored locally</h2>
+  <p>Meguri indexes the folders you point it at and stores the resulting data
+  only on your device:</p>
+  <ul>
+    <li>The media index (file paths, metadata, tags, favorites, ratings,
+    bookmarks, play history) is kept in a local SQLite database.</li>
+    <li>Thumbnails and preview images are generated and cached locally.</li>
+    <li>Application settings are saved in a local configuration file.</li>
+  </ul>
+  <p>None of this data ever leaves your machine, and the developer has no
+  access to it. Your media files themselves are only read, never modified.</p>
+
+  <h2>Network access</h2>
+  <p>Meguri makes exactly one kind of network request: an optional update
+  check. It queries the GitHub API
+  (<code>api.github.com</code>) for the latest release of Meguri to let you
+  know when a new version is available.</p>
+  <ul>
+    <li>The request contains no personal data or identifiers beyond what any
+    HTTP request technically exposes (such as your IP address), which is
+    processed by GitHub under the
+    <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement">GitHub
+    Privacy Statement</a>.</li>
+    <li>The automatic check on startup can be turned off in the app's
+    settings; updates can then only be checked manually.</li>
+  </ul>
+  <p>All other network activity is confined to your own machine: media is
+  served to the app's window through a local server bound to
+  <code>127.0.0.1</code>, which is not reachable from other devices.</p>
+
+  <h2>Analytics and telemetry</h2>
+  <p>Meguri contains no analytics, telemetry, crash reporting, advertising,
+  or tracking of any kind. There are no user accounts and no cloud
+  services.</p>
+
+  <h2>Third parties</h2>
+  <p>Meguri never shares your media, library data, or settings with third
+  parties — none of it leaves your machine. The only third party involved is
+  GitHub, which receives standard request metadata (such as your IP address)
+  when the optional update check runs, as described under “Network access”
+  above.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If Meguri's behavior ever changes in a way that affects this policy,
+  this page will be updated and the effective date above will be revised.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy can be raised on the
+  <a href="https://github.com/zabuton-app/meguri/issues">GitHub issue
+  tracker</a>.</p>
+
+  <footer>
+    <p><a href="./index.html">Meguri</a> — free &amp; open source (MIT) ·
+    <a href="https://github.com/zabuton-app/meguri">Source code on GitHub</a></p>
+  </footer>
+</div>
+</body>
+</html>
