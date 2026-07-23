@@ -36,6 +36,13 @@ export function isInsideRoot(abs: string, root: string): boolean {
   } catch {
     return false;
   }
+  // Windows filesystems are case-insensitive, so a drive-letter or folder
+  // casing mismatch between the DB path and the configured root must not
+  // reject a file that is genuinely inside the root.
+  if (process.platform === "win32") {
+    normalizedAbs = normalizedAbs.toLowerCase();
+    normalizedRoot = normalizedRoot.toLowerCase();
+  }
   if (normalizedAbs === normalizedRoot) return true;
   const prefix = normalizedRoot.endsWith(path.sep)
     ? normalizedRoot

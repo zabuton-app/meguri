@@ -190,7 +190,15 @@ export class Workspaces {
   /** Register a root and return its normalized path (duplicates are ignored). */
   add(p: string): string {
     const np = normalizeDir(p);
-    if (!this.config.roots.includes(np)) {
+    const isDup =
+      process.platform === "win32"
+        ? // Windows paths are case-insensitive; don't register the same folder
+          // twice under a different casing.
+          this.config.roots.some(
+            (r) => r.toLowerCase() === np.toLowerCase(),
+          )
+        : this.config.roots.includes(np);
+    if (!isDup) {
       this.config.roots.push(np);
       saveConfig(this.config);
     }

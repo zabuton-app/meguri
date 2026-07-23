@@ -149,11 +149,19 @@ export function updateConfig(mutator: (c: AppConfig) => AppConfig): void {
 
 /** Normalize a path (realpath, falling back to resolve on failure). */
 export function normalizeDir(p: string): string {
+  let normalized: string;
   try {
-    return fs.realpathSync(p);
+    normalized = fs.realpathSync(p);
   } catch {
-    return path.resolve(p);
+    normalized = path.resolve(p);
   }
+  // Windows drive letters are case-insensitive ("c:\x" === "C:\x") but the
+  // workspace id is a hash of this string, so a casing difference would split
+  // the same folder into two workspaces. Canonicalize to uppercase.
+  if (process.platform === "win32") {
+    normalized = normalized.replace(/^[a-z]:/, (drive) => drive.toUpperCase());
+  }
+  return normalized;
 }
 
 function parseCollections(value: unknown): UserCollectionConfig[] {
