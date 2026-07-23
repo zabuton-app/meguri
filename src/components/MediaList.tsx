@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { formatDuration, formatSize } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { fileNameOf } from "@/lib/relPath";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
@@ -260,7 +261,7 @@ const MediaRow = memo(function MediaRow({
             className="min-w-0 flex-1 truncate text-sm text-fg"
             title={file.relPath}
           >
-            {file.relPath.split("/").pop()}
+            {fileNameOf(file.relPath)}
           </div>
           <RatingButton
             fileId={file.id}

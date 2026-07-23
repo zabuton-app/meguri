@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { fileNameOf } from "@/lib/relPath";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
@@ -319,7 +320,7 @@ const MediaCard = memo(function MediaCard({
         className="flex flex-col gap-1 px-2 py-1.5"
       >
         <div className="truncate text-xs text-fg" title={file.relPath}>
-          {file.relPath.split("/").pop()}
+          {fileNameOf(file.relPath)}
         </div>
         <div className="truncate text-[10px] text-muted">{metaLine(file)}</div>
         {/* Editable rating. Stops click propagation so it doesn't open the detail. */}

@@ -22,6 +22,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { fileHref } from "@/lib/fileHref";
 import { formatDuration } from "@/lib/format";
+import { fileNameOf } from "@/lib/relPath";
 import type { HistoryEntryRow } from "@/ipc/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -242,7 +243,7 @@ export default function History() {
                             className="block truncate text-sm text-fg"
                             title={row.relPath}
                           >
-                            {row.relPath.split("/").pop()}
+                            {fileNameOf(row.relPath)}
                           </span>
                           <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
                             <span className="tabular-nums">

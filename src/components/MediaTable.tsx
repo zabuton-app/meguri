@@ -25,6 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { formatDuration, formatSize } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { fileNameOf } from "@/lib/relPath";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
@@ -319,7 +320,7 @@ const MediaTableRow = memo(function MediaTableRow({
       </div>
       <div role="cell" className="flex items-center px-2">
         <span className="truncate text-fg" title={file.relPath}>
-          {file.relPath.split("/").pop()}
+          {fileNameOf(file.relPath)}
         </span>
       </div>
       <div role="cell" className="flex items-center px-2 text-muted">
