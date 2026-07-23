@@ -1,7 +1,7 @@
 {
   "name": "meguri",
   "private": true,
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Meguri is a local video and image browser with thumbnails, search, and playback",
   "license": "MIT",
   "author": {
