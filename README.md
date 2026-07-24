@@ -45,14 +45,19 @@ playback.
 
 ## Download
 
-Prebuilt packages are available on
+Windows users can install Meguri from the
+[Microsoft Store](https://apps.microsoft.com/detail/9NRSM11RRH8Z).
+
+[![Get it from Microsoft](https://get.microsoft.com/images/en-us%20dark.svg)](https://apps.microsoft.com/detail/9NRSM11RRH8Z)
+
+Prebuilt packages for all platforms are also available on
 [GitHub Releases](https://github.com/zabuton-app/meguri/releases).
 
-| Platform | Packages                          |
-| -------- | --------------------------------- |
-| Linux    | AppImage / deb                    |
-| Windows  | Installer (NSIS) / portable       |
-| macOS    | dmg / zip (Apple silicon)         |
+| Platform | Packages                                      |
+| -------- | --------------------------------------------- |
+| Linux    | AppImage / deb                                |
+| Windows  | Microsoft Store / Installer (NSIS) / portable |
+| macOS    | dmg / zip (Apple silicon)                     |
 
 ### macOS: first launch
 
