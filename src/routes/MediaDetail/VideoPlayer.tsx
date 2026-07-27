@@ -554,15 +554,19 @@ export const VideoPlayer = forwardRef<
         onError={() => {
           const v = ref.current;
           const code = v?.error?.code;
+          // MEDIA_ERR_ABORTED fires on normal load interruptions (src swap /
+          // load() during seek), not on unplayable media — never fatal, and
+          // not worth an error-level log entry either.
+          if (code === MEDIA_ERR_ABORTED) {
+            log.debug("video load aborted", { src });
+            return;
+          }
           log.error("video error", {
             src,
             currentSrc: v?.currentSrc,
             networkState: v?.networkState,
             code,
           });
-          // MEDIA_ERR_ABORTED fires on normal load interruptions (src swap /
-          // load() during seek), not on unplayable media — never fatal.
-          if (code === MEDIA_ERR_ABORTED) return;
           // A network error right after opening is often transient (the media
           // request can be starved while frame previews hold the origin's
           // connection slots) — reload once before surfacing the error. Only
@@ -579,6 +583,9 @@ export const VideoPlayer = forwardRef<
               retryTimerRef.current = null;
               const cur = ref.current;
               if (!cur) return;
+              // The element may have recovered on its own while the delay
+              // elapsed — a forced load() would needlessly restart playback.
+              if (cur.readyState >= cur.HAVE_METADATA) return;
               cur.load();
               void cur.play().catch(() => {});
             }, NETWORK_RETRY_DELAY_MS);
