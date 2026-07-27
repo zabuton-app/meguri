@@ -65,6 +65,14 @@ npm install        # postinstall rebuilds better-sqlite3 for Electron
 npm run dev        # start in development mode
 ```
 
+`package.json` carries an `overrides` entry that pins the `react` peer of
+`@emoji-mart/react` to the version the root project uses. That package was last
+published in 2023 and still declares a peer range of `^16.8 || ^17 || ^18`, so
+without the override `npm install` fails with `ERESOLVE` on React 19. Its
+implementation only uses `useRef`, `useEffect` and `createElement`, none of
+which changed in React 19. Keep the override until upstream ships a release that
+accepts React 19.
+
 Before opening a pull request, run the same checks CI runs:
 
 ```bash
