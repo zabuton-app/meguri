@@ -1,7 +1,7 @@
 // Settings screen. Appearance (light/dark) switch + theme (family) selection.
 // Like MediaDetail, it floats (as a modal) over the list.
 import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Check, Coffee, Moon, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/ipc/client";

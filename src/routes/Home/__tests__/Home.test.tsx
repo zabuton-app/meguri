@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router";
 import "@/test/mockVirtualizer";
 import Home from "@/routes/Home";
 import MediaDetail from "@/routes/MediaDetail";

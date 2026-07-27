@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Table2,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import type { UserCollection, WorkspaceInfo } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";

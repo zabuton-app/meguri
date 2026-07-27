@@ -3,7 +3,7 @@
 // workspaces when All / a collection is active. Read-only — resolving
 // duplicates (deleting copies) is out of scope. Overlays the list as a modal.
 import { useCallback, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CopyCheck, Maximize2, Minimize2, X } from "lucide-react";
 import { MAX_DUPLICATE_GROUPS } from "@shared/duplicates";

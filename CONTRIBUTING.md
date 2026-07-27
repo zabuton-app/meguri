@@ -57,7 +57,7 @@ A few notes:
 
 ## Development
 
-Requirements: Node.js 20+ and a C/C++ toolchain (for the native build of
+Requirements: Node.js 22.22+ and a C/C++ toolchain (for the native build of
 better-sqlite3).
 
 ```bash

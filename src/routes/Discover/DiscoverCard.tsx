@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { ExternalLink, Film, Heart, ImageIcon, Play } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
