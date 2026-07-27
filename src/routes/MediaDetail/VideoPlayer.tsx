@@ -13,6 +13,7 @@ import {
   Maximize,
   Pause,
   Play,
+  RotateCcw,
   SkipBack,
   SkipForward,
   Volume2,
@@ -27,6 +28,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { matchAny, type NavBinding } from "@/settings/keybindings";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { fmtTime } from "./utils";
+
+// MediaError codes as plain numbers: the MediaError global exists in Chromium
+// but not in jsdom, so referencing it would break renderer tests.
+const MEDIA_ERR_ABORTED = 1;
+const MEDIA_ERR_NETWORK = 2;
+
+// Delay before the one automatic reload after a network error: an immediate
+// retry in the same tick would likely hit the same connection-slot starvation
+// (frame previews holding the origin's sockets) that caused the failure.
+const NETWORK_RETRY_DELAY_MS = 300;
 
 // Persist the player volume/mute across sessions (renderer-local, survives restarts).
 const VOLUME_KEY = "meguri.player.volume";
@@ -153,6 +164,11 @@ export const VideoPlayer = forwardRef<
   const [previewT, setPreviewT] = useState<number | null>(null);
   // Ensures the initial seek (startAt) is applied only once per loaded file.
   const appliedStartRef = useRef(false);
+  // One automatic reload per loaded file after a network error (transient
+  // starvation right after opening; see onError).
+  const netRetriedRef = useRef(false);
+  // Pending automatic-reload timer, so unmount/file switch can cancel it.
+  const retryTimerRef = useRef<number | null>(null);
   // Fire onPlayed only on the first play of each loaded file (not on every pause/resume).
   const playedRef = useRef(false);
 
@@ -173,22 +189,40 @@ export const VideoPlayer = forwardRef<
     }
   };
 
-  useEffect(() => {
-    // Resetting playback state when the file (id/src) changes is a legitimate prop-change initialization, so synchronous setState is allowed here.
-    /* eslint-disable react-hooks/set-state-in-effect */
+  // Reset all per-file playback state. Shared by the [id, src] change effect
+  // and the reload button on the error screen. Deliberately leaves `playedRef`
+  // alone: reloading the same file must not re-fire onPlayed.
+  const resetPlaybackState = () => {
     setError(null);
     setOffset(0);
     setPosition(0);
+    setPlaying(false);
     setLoaded(false);
     setNativeDur(null);
     setHover(null);
     setScrub(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
     appliedStartRef.current = false;
+    netRetriedRef.current = false;
+    if (retryTimerRef.current != null) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    // Resetting playback state when the file (id/src) changes is a legitimate prop-change initialization, so synchronous setState is allowed here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    resetPlaybackState();
     playedRef.current = false;
   }, [id, src]);
 
-  useEffect(() => () => stopTimer(), []);
+  useEffect(
+    () => () => {
+      stopTimer();
+      if (retryTimerRef.current != null) clearTimeout(retryTimerRef.current);
+    },
+    [],
+  );
 
   // Seek operation. Use currentTime if the target falls within a seekable range,
   // otherwise re-stream via ?t. Remuxed containers (mkv/avi/wmv/flv/ts) are piped
@@ -409,14 +443,28 @@ export const VideoPlayer = forwardRef<
       <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl bg-surface p-8 text-center text-muted">
         <p>{t("player.playFailed")}</p>
         <p className="text-xs">{error}</p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void api.openExternal(id, wsId)}
-        >
-          <ExternalLink />
-          {t("player.openExternal")}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // Remount the <video> (the error return unmounts it) with fully
+              // reset per-file state and let autoplay kick in again.
+              resetPlaybackState();
+            }}
+          >
+            <RotateCcw />
+            {t("player.reload")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void api.openExternal(id, wsId)}
+          >
+            <ExternalLink />
+            {t("player.openExternal")}
+          </Button>
+        </div>
       </div>
     );
   }
@@ -505,13 +553,47 @@ export const VideoPlayer = forwardRef<
           if (v) setPosition(offset + v.currentTime);
         }}
         onError={() => {
+          const v = ref.current;
+          const code = v?.error?.code;
+          // MEDIA_ERR_ABORTED fires on normal load interruptions (src swap /
+          // load() during seek), not on unplayable media — never fatal, and
+          // not worth an error-level log entry either.
+          if (code === MEDIA_ERR_ABORTED) {
+            log.debug("video load aborted", { src });
+            return;
+          }
           log.error("video error", {
             src,
-            currentSrc: ref.current?.currentSrc,
-            networkState: ref.current?.networkState,
-            code: ref.current?.error?.code,
+            currentSrc: v?.currentSrc,
+            networkState: v?.networkState,
+            code,
           });
-          const code = ref.current?.error?.code;
+          // A network error right after opening is often transient (the media
+          // request can be starved while frame previews hold the origin's
+          // connection slots) — reload once before surfacing the error. Only
+          // before metadata has loaded: a mid-playback load() would silently
+          // rewind Range-served files to the start.
+          if (
+            code === MEDIA_ERR_NETWORK &&
+            v &&
+            !loaded &&
+            !netRetriedRef.current
+          ) {
+            netRetriedRef.current = true;
+            retryTimerRef.current = window.setTimeout(() => {
+              retryTimerRef.current = null;
+              const cur = ref.current;
+              if (!cur) return;
+              // The element may have recovered on its own while the delay
+              // elapsed — a forced load() would needlessly restart playback.
+              if (cur.readyState >= cur.HAVE_METADATA) return;
+              cur.load();
+              // Reloading must not change playback intent: only resume when
+              // the player was asked to autoplay in the first place.
+              if (autoplay) void cur.play().catch(() => {});
+            }, NETWORK_RETRY_DELAY_MS);
+            return;
+          }
           const map: Record<number, string> = {
             1: t("player.errAborted"),
             2: t("player.errNetwork"),

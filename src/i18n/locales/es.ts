@@ -210,6 +210,7 @@ export const es: Record<TranslationKey, string> = {
   "player.seek": "Buscar",
   "player.playFailed": "No se pudo reproducir en el reproductor integrado.",
   "player.openExternal": "Abrir en un reproductor externo",
+  "player.reload": "Recargar",
   "player.bookmarkAdd": "Marcar la posición actual",
   "player.bookmarkRemove": "Eliminar el marcador en {time}",
   "player.exportFrame": "Guardar el fotograma actual como imagen",

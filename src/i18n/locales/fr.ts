@@ -210,6 +210,7 @@ export const fr: Record<TranslationKey, string> = {
   "player.seek": "Position",
   "player.playFailed": "Impossible de lire dans le lecteur intégré.",
   "player.openExternal": "Ouvrir dans un lecteur externe",
+  "player.reload": "Recharger",
   "player.bookmarkAdd": "Ajouter un marque-page à la position actuelle",
   "player.bookmarkRemove": "Supprimer le marque-page à {time}",
   "player.exportFrame": "Enregistrer l'image actuelle",

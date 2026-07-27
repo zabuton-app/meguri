@@ -206,6 +206,7 @@ export const ja = {
   "player.seek": "シーク",
   "player.playFailed": "内蔵プレイヤーで再生できませんでした。",
   "player.openExternal": "外部プレイヤーで開く",
+  "player.reload": "再読み込み",
   "player.bookmarkAdd": "現在位置にブックマークを追加",
   "player.bookmarkRemove": "{time} のブックマークを削除",
   "player.exportFrame": "現在のフレームを画像として保存",

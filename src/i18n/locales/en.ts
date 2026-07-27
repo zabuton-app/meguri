@@ -207,6 +207,7 @@ export const en: Record<TranslationKey, string> = {
   "player.seek": "Seek",
   "player.playFailed": "Could not play in the built-in player.",
   "player.openExternal": "Open in external player",
+  "player.reload": "Reload",
   "player.bookmarkAdd": "Bookmark the current position",
   "player.bookmarkRemove": "Remove the bookmark at {time}",
   "player.exportFrame": "Save the current frame as an image",

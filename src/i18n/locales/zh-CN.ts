@@ -203,6 +203,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "player.seek": "进度",
   "player.playFailed": "无法在内置播放器中播放。",
   "player.openExternal": "用外部播放器打开",
+  "player.reload": "重新加载",
   "player.bookmarkAdd": "为当前位置添加书签",
   "player.bookmarkRemove": "删除 {time} 的书签",
   "player.exportFrame": "将当前帧保存为图片",
