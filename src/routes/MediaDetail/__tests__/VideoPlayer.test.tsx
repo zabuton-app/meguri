@@ -16,7 +16,9 @@ vi.mock("@/ipc/client", () => ({
   },
 }));
 
-function renderPlayer(overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {}) {
+function renderPlayer(
+  overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {},
+) {
   const onAddBookmark = vi.fn();
   const onRemoveBookmark = vi.fn();
   const onExportFrame = vi.fn();
@@ -78,6 +80,14 @@ function loadVideo(video: HTMLVideoElement) {
     },
   });
   fireEvent.loadedMetadata(video);
+}
+
+function fireVideoError(video: HTMLVideoElement, code: number) {
+  Object.defineProperty(video, "error", {
+    configurable: true,
+    value: { code },
+  });
+  fireEvent.error(video);
 }
 
 describe("VideoPlayer", () => {
@@ -158,5 +168,59 @@ describe("VideoPlayer", () => {
 
     expect(fileRecordPlay).toHaveBeenCalledWith(1, "ws1", "browser", 0);
     expect(onPlayed).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores MEDIA_ERR_ABORTED without surfacing the error screen", () => {
+    const { video } = renderPlayer();
+
+    fireVideoError(video, 1);
+
+    expect(screen.queryByText("player.playFailed")).toBeNull();
+    expect(document.querySelector("video")).not.toBeNull();
+  });
+
+  it("auto-reloads once on MEDIA_ERR_NETWORK before metadata, then surfaces the error", () => {
+    vi.useFakeTimers();
+    try {
+      const { video } = renderPlayer();
+      const load = vi.fn();
+      const play = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(video, "load", { configurable: true, value: load });
+      Object.defineProperty(video, "play", { configurable: true, value: play });
+
+      fireVideoError(video, 2);
+      expect(screen.queryByText("player.playFailed")).toBeNull();
+      expect(load).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(300);
+      expect(load).toHaveBeenCalledTimes(1);
+
+      fireVideoError(video, 2);
+      expect(screen.queryByText("player.playFailed")).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not auto-reload on MEDIA_ERR_NETWORK after metadata has loaded", () => {
+    const { video } = renderPlayer();
+    loadVideo(video);
+
+    fireVideoError(video, 2);
+
+    expect(screen.queryByText("player.playFailed")).not.toBeNull();
+  });
+
+  it("remounts the video with the reload button after a fatal error", () => {
+    const { video } = renderPlayer();
+
+    fireVideoError(video, 4);
+    expect(screen.queryByText("player.playFailed")).not.toBeNull();
+    expect(document.querySelector("video")).toBeNull();
+
+    fireEvent.click(screen.getByText("player.reload"));
+
+    expect(screen.queryByText("player.playFailed")).toBeNull();
+    expect(document.querySelector("video")).not.toBeNull();
   });
 });
