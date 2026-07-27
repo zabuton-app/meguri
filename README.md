@@ -145,7 +145,7 @@ Every corner of the UI follows your base16 theme:
 
 ## Requirements
 
-- Node.js 20+ / npm
+- Node.js 22.22+ / npm
 - Build time only: a C/C++ toolchain (for the native build of better-sqlite3)
 
 No runtime system dependencies are required (Chromium, ffmpeg, and SQLite are

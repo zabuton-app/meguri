@@ -1,6 +1,6 @@
 import { render, type RenderOptions } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter } from "react-router-dom";
+import { HashRouter } from "react-router";
 import type { ReactElement, ReactNode } from "react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { PreferencesProvider } from "@/settings/PreferencesProvider";

@@ -3,7 +3,7 @@
 // Overlays the list as a modal (like MediaDetail). No video autoplay; videos get
 // a hover scrub preview (frame endpoint) gated by the hoverPreview preference.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Maximize2, Minimize2, RefreshCw, Sparkles, X } from "lucide-react";
 import { api, events } from "@/ipc/client";

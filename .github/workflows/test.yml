@@ -24,7 +24,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Keep in sync with engines.node in package.json; react-router v8 needs 22.22+.
+          node-version: 22.22.x
           cache: npm
 
       # postinstall (electron-builder install-app-deps) rebuilds better-sqlite3 for Electron,

@@ -12,7 +12,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ImageIcon } from "lucide-react";
 import type { FileRow } from "@/ipc/types";

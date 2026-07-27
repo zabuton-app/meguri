@@ -1,7 +1,7 @@
 // Media listing grid. Shows thumbnails via thumb://; click to open detail.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ImageIcon } from "lucide-react";
 import type { FileRow } from "@/ipc/types";

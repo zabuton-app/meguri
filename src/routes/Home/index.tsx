@@ -1,7 +1,7 @@
 // List screen. Header (root/scan/theme) + filters + condition badges + progress +
 // infinite-scroll grid. On thumb:done, reload the corresponding thumbnail.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FolderPlus, Sparkles } from "lucide-react";

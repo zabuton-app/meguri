@@ -2,7 +2,7 @@
 // (consecutive re-plays of the same file are collapsed main-process-side),
 // grouped by day, with a clear-all action. Overlays the list as a modal.
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import {
   useInfiniteQuery,
   useMutation,

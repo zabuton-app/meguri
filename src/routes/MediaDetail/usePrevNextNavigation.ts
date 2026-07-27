@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { useMediaNav } from "@/components/MediaNavContext";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import {

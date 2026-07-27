@@ -1,5 +1,6 @@
 // Routing. List / detail / settings.
-import { createHashRouter, RouterProvider } from "react-router-dom";
+import { createHashRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import Home from "@/routes/Home";
 import MediaDetail from "@/routes/MediaDetail";
 import Discover from "@/routes/Discover";
