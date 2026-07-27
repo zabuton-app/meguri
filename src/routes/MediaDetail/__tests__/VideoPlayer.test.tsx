@@ -202,6 +202,25 @@ describe("VideoPlayer", () => {
     }
   });
 
+  it("does not resume playback on the network auto-reload when autoplay is off", () => {
+    vi.useFakeTimers();
+    try {
+      const { video } = renderPlayer({ autoplay: false });
+      const load = vi.fn();
+      const play = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(video, "load", { configurable: true, value: load });
+      Object.defineProperty(video, "play", { configurable: true, value: play });
+
+      fireVideoError(video, 2);
+      vi.advanceTimersByTime(300);
+
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(play).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not auto-reload on MEDIA_ERR_NETWORK after metadata has loaded", () => {
     const { video } = renderPlayer();
     loadVideo(video);

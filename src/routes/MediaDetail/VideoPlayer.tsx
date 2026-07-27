@@ -196,6 +196,7 @@ export const VideoPlayer = forwardRef<
     setError(null);
     setOffset(0);
     setPosition(0);
+    setPlaying(false);
     setLoaded(false);
     setNativeDur(null);
     setHover(null);
@@ -587,7 +588,9 @@ export const VideoPlayer = forwardRef<
               // elapsed — a forced load() would needlessly restart playback.
               if (cur.readyState >= cur.HAVE_METADATA) return;
               cur.load();
-              void cur.play().catch(() => {});
+              // Reloading must not change playback intent: only resume when
+              // the player was asked to autoplay in the first place.
+              if (autoplay) void cur.play().catch(() => {});
             }, NETWORK_RETRY_DELAY_MS);
             return;
           }
