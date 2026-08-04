@@ -20,14 +20,16 @@ export const sampleFileRow: FileRow = {
   rating: 3,
   favorite: 0,
   thumbStatus: "done",
+  hasThumb: 1,
   capturedAt: null,
   btime: null,
   lastAccessedAt: null,
   tags: [],
 };
 
-/** Audio rows never carry a thumbnail: thumbStatus is 'done' with no path, and
- *  width/height/fps stay null even for files with embedded cover art. */
+/** Audio without embedded cover art: thumbStatus is 'done' (a normal state, not a
+ *  failure) but no thumbnail file exists, so hasThumb is 0. width/height/fps stay
+ *  null for audio regardless of whether a cover is present. */
 export const sampleAudioRow: FileRow = {
   id: 2,
   workspaceId: WS_ID,
@@ -41,10 +43,19 @@ export const sampleAudioRow: FileRow = {
   rating: 0,
   favorite: 0,
   thumbStatus: "done",
+  hasThumb: 0,
   capturedAt: null,
   btime: null,
   lastAccessedAt: null,
   tags: [],
+};
+
+/** Audio whose embedded cover art was extracted into a thumbnail. */
+export const sampleAudioRowWithCover: FileRow = {
+  ...sampleAudioRow,
+  id: 3,
+  relPath: "music/with-cover.mp3",
+  hasThumb: 1,
 };
 
 export const sampleFileDetail: FileDetail = {

@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { ExternalLink, Film, Heart, ImageIcon, Play } from "lucide-react";
+import {
+  ExternalLink,
+  Film,
+  Heart,
+  ImageIcon,
+  Music,
+  Play,
+} from "lucide-react";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
@@ -44,7 +51,12 @@ export function DiscoverCard({
 }) {
   const wsId = file.workspaceId;
   const isFav = !!file.favorite;
-  const hasThumb = file.thumbStatus === "done" && mediaBase && wsId;
+  // Same rule as MediaThumbnail: thumb_status alone can be 'done' with no file
+  // produced (audio without embedded cover art), which would 404. randomFiles
+  // only excludes audio when no kind filter is set, so an explicit audio filter
+  // reaches here.
+  const hasThumb =
+    file.thumbStatus === "done" && file.hasThumb === 1 && mediaBase && wsId;
   const src = hasThumb
     ? `${mediaBase}/ws/${wsId}/thumb/${file.id}?v=${thumbVersion}`
     : undefined;
@@ -100,8 +112,12 @@ export function DiscoverCard({
           </>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted">
+            {/* Audio reaches Discover under an explicit kind filter, so the
+                fallback must cover all three kinds, not just video/image. */}
             {isVideo ? (
               <Film className="size-16" />
+            ) : file.kind === "audio" ? (
+              <Music className="size-16" />
             ) : (
               <ImageIcon className="size-16" />
             )}
@@ -179,9 +195,7 @@ export function DiscoverCard({
                   isFav ? "text-error" : "text-muted hover:text-error",
                 )}
               >
-                <Heart
-                  className={cn("size-3.5", isFav && "fill-current")}
-                />
+                <Heart className={cn("size-3.5", isFav && "fill-current")} />
               </button>
               <RatingStars value={file.rating} onChange={onRate} size={14} />
             </Chip>

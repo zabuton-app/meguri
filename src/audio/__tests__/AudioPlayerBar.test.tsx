@@ -9,7 +9,13 @@ import { I18nProvider } from "@/i18n/I18nProvider";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { useAudioPlayer } from "@/audio/useAudioPlayer";
-import { defaultAppStatus, sampleAudioRow, WS_ID } from "@/test/fixtures";
+import {
+  defaultAppStatus,
+  sampleAudioRow,
+  sampleAudioRowWithCover,
+  WS_ID,
+} from "@/test/fixtures";
+import type { FileRow } from "@/ipc/types";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
@@ -50,14 +56,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Renders the bar plus a hidden control that loads a track into it. */
-function Harness() {
+/** Renders the bar plus hidden controls that load tracks into it. `other` backs
+ *  the track-switching tests; it defaults to a second, distinct file. */
+function Harness({
+  track = sampleAudioRow,
+  other = { ...sampleAudioRow, id: 99, relPath: "music/other.mp3" },
+}: {
+  track?: FileRow;
+  other?: FileRow;
+}) {
   const { play } = useAudioPlayer();
   return (
     <>
-      <button onClick={() => play(sampleAudioRow, WS_ID)}>
-        activate-track
-      </button>
+      <button onClick={() => play(track, WS_ID)}>activate-track</button>
+      <button onClick={() => play(other, WS_ID)}>activate-other</button>
       <AudioPlayerBar />
     </>
   );
@@ -74,8 +86,12 @@ function Wrapper({ children }: { children: ReactNode }) {
   );
 }
 
-function setup() {
-  render(<Harness />, { wrapper: Wrapper });
+function setup(track?: FileRow, other?: FileRow) {
+  render(<Harness track={track} other={other} />, { wrapper: Wrapper });
+}
+
+function loadOther() {
+  fireEvent.click(screen.getByText("activate-other"));
 }
 
 function loadTrack() {
@@ -106,6 +122,64 @@ describe("AudioPlayerBar", () => {
     setDuration(240);
     expect(screen.getByText(/0:00/)).toBeTruthy();
     expect(screen.getByText(/4:00/)).toBeTruthy();
+  });
+
+  it("shows the embedded cover art when the track has one", async () => {
+    setup(sampleAudioRowWithCover);
+    loadTrack();
+    // mediaBase arrives with the app status query, so the URL can only be built
+    // once that has resolved.
+    const img = await screen.findByRole("presentation");
+    expect(img.getAttribute("src")).toBe(
+      `${defaultAppStatus.mediaBase}/ws/${WS_ID}/thumb/${sampleAudioRowWithCover.id}`,
+    );
+    // Decorative: the filename beside it already names the track.
+    expect(img.getAttribute("alt")).toBe("");
+  });
+
+  it("falls back to the music icon for a track with no cover art", () => {
+    setup();
+    loadTrack();
+    expect(screen.queryByRole("presentation")).toBeNull();
+    expect(
+      bar()?.querySelector("svg.lucide-music, svg[class*='music']"),
+    ).toBeTruthy();
+  });
+
+  it("falls back to the music icon when the cover image fails to load", async () => {
+    setup(sampleAudioRowWithCover);
+    loadTrack();
+    const img = await screen.findByRole("presentation");
+    act(() => {
+      fireEvent.error(img);
+    });
+    expect(screen.queryByRole("presentation")).toBeNull();
+    expect(
+      bar()?.querySelector("svg.lucide-music, svg[class*='music']"),
+    ).toBeTruthy();
+  });
+
+  it("retries a previously failed cover after switching away and back", async () => {
+    // The regression this guards: holding the failure in state that outlives the
+    // track (a bare flag, or one keyed on a URL that repeats) would leave the
+    // music icon showing forever once a cover had failed even once.
+    const other = { ...sampleAudioRowWithCover, id: 99, relPath: "b.mp3" };
+    setup(sampleAudioRowWithCover, other);
+    loadTrack();
+    const first = await screen.findByRole("presentation");
+    act(() => {
+      fireEvent.error(first);
+    });
+    expect(screen.queryByRole("presentation")).toBeNull();
+
+    loadOther();
+    expect(await screen.findByRole("presentation")).toBeTruthy();
+
+    loadTrack();
+    const back = await screen.findByRole("presentation");
+    expect(back.getAttribute("src")).toBe(
+      `${defaultAppStatus.mediaBase}/ws/${WS_ID}/thumb/${sampleAudioRowWithCover.id}`,
+    );
   });
 
   it("renders --:-- and disables seeking when the duration is unknown", () => {

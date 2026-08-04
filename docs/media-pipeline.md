@@ -24,6 +24,24 @@ file keeps its identity (and therefore its metadata — see
 `electron/core/media.ts` extracts metadata with ffprobe and generates thumbnails
 with ffmpeg, written as WebP.
 
+For audio the thumbnail is the file's embedded cover art (ID3v2 `APIC`, MP4
+`covr`, FLAC `METADATA_BLOCK_PICTURE`). `coverArtStreamIndex()` finds it in the
+already-probed ffprobe JSON via each stream's `disposition.attached_pic` flag,
+rather than assuming that any video stream in an audio file is artwork — a
+mis-tagged file could carry a real one. It returns the stream's absolute index
+(not a boolean) because a file can hold both a real video stream and a cover, in
+which case ffmpeg's `-map 0:v:0` would encode a frame of the movie as the
+thumbnail. Audio without a cover is recorded as
+`thumb_status = 'done'` with a NULL `thumb_path`: a normal state, not a failure.
+That keeps the row out of `filesNeedingThumb()`, so it is not re-probed on every
+scan. Embedding artwork later still gets picked up, because writing the tag
+changes the file's size/mtime and `syncFiles()` resets such rows to `'pending'`;
+a full index rebuild has the same effect.
+
+`FileRow.hasThumb` (derived from `thumb_path IS NOT NULL`) is what the renderer
+keys on, since `thumb_status` alone cannot distinguish a produced thumbnail from
+a deliberate absence.
+
 ### Concurrency
 
 `electron/core/concurrency.ts` provides `pool()`, a bounded parallel worker that

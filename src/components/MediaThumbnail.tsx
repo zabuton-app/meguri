@@ -46,18 +46,23 @@ export function MediaThumbnail({
   playIconSize = "size-5",
   showPlayOverlay = true,
 }: Props) {
-  // Audio is marked thumb_status 'done' with a null path (it is complete, not
-  // failed), so status alone would build a URL that 404s. Exclude it explicitly
-  // and let the fallback icon stand in.
+  // Keys on whether a thumbnail file actually exists, not on kind: audio is
+  // marked thumb_status 'done' whether or not it embeds cover art, so status
+  // alone would build a URL that 404s for the cover-less ones. Audio *with* a
+  // cover renders it like any other thumbnail.
   const hasThumb =
     file.thumbStatus === "done" &&
-    file.kind !== "audio" &&
+    file.hasThumb === 1 &&
     mediaBase &&
     file.workspaceId;
   const src = hasThumb
     ? `${mediaBase}/ws/${file.workspaceId}/thumb/${file.id}?v=${version}`
     : undefined;
   const [imgLoaded, setImgLoaded] = useState(false);
+  // Holds the URL that failed rather than a bare flag: this component is reused
+  // across rows by the virtualizer, so a sticky `true` would hide a perfectly
+  // good thumbnail on whichever row recycled the instance.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const { hoverPreview } = usePreferences();
   const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
     useHoverFramePreview({
@@ -68,9 +73,11 @@ export function MediaThumbnail({
       fileId: file.id,
     });
 
-  if (!src) {
-    // Audio never has a thumbnail, so this fallback is its only visual
-    // representation in the library.
+  if (!src || failedSrc === src) {
+    // Reached for audio without embedded cover art, for any file whose
+    // thumbnail generation failed or has not run yet, and for a recorded
+    // thumbnail whose file has since gone missing (without the onError
+    // fallback that last case would sit on the skeleton forever).
     const Icon = kindIcon(file.kind);
     return (
       <div className="flex h-full w-full items-center justify-center">
@@ -92,6 +99,7 @@ export function MediaThumbnail({
         alt={file.relPath}
         loading="lazy"
         onLoad={() => setImgLoaded(true)}
+        onError={() => setFailedSrc(src)}
         className={cn(
           "absolute inset-0 h-full w-full object-cover transition-opacity",
           imgLoaded ? "opacity-100" : "opacity-0",

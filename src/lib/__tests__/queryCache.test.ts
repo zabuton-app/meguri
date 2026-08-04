@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
-import type { FileDetail, FileRow, SearchQuery, SearchResult } from "@/ipc/types";
+import type {
+  FileDetail,
+  FileRow,
+  SearchQuery,
+  SearchResult,
+} from "@/ipc/types";
 import {
   invalidateCollectionSearches,
   invalidatePlayedSearches,
@@ -24,6 +29,7 @@ describe("syncFileRowAcrossCaches", () => {
       favorite: 0,
       rating: 2,
       thumbStatus: "done",
+      hasThumb: 1,
       capturedAt: null,
       btime: null,
       lastAccessedAt: null,

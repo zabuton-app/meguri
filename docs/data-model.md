@@ -27,10 +27,12 @@ mode with `synchronous = NORMAL` and `foreign_keys = ON`.
 The main tables:
 
 - `scan_roots` — the registered root for this database.
-- `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image`),
-  size/mtime/inode, `content_hash`, media metadata (`width`, `height`,
+- `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image` |
+  `audio`), size/mtime/inode, `content_hash`, media metadata (`width`, `height`,
   `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`, and
-  `deleted_at` / `excluded_at` markers.
+  `deleted_at` / `excluded_at` markers. For audio, `width` / `height` / `fps`
+  stay NULL even when the file embeds cover art — the artwork's dimensions
+  describe the jacket, not the track.
 - `tags` — the tag master, unique on `(namespace, name)`.
 - `file_meta` — durable user metadata (see below).
 - `meta_tags` — tag associations.
