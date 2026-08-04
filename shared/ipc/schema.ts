@@ -5,7 +5,7 @@
 // inferred types satisfy the prior hand-written interfaces.
 import { z } from "zod";
 
-export const KindSchema = z.enum(["video", "image"]);
+export const KindSchema = z.enum(["video", "image", "audio"]);
 export type Kind = z.infer<typeof KindSchema>;
 
 export const TagInfoSchema = z.object({

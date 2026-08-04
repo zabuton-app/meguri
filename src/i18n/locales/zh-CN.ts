@@ -10,6 +10,7 @@ export const zhCN: Record<TranslationKey, string> = {
   // kind
   "kind.video": "视频",
   "kind.image": "图片",
+  "kind.audio": "音频",
 
   // sort
   "sort.added": "添加时间",
@@ -217,6 +218,15 @@ export const zhCN: Record<TranslationKey, string> = {
   "player.errSrcNotSupported": "无法播放此格式 (MEDIA_ERR_SRC_NOT_SUPPORTED)",
   "player.errUnknown": "未知错误",
   "player.errCode": "错误代码 {code}",
+
+  // 音频播放器（底部栏）
+  "player.audio.region": "音频播放器",
+  "player.audio.pause": "暂停",
+  "player.audio.close": "关闭播放器",
+  "player.audio.unknownDuration": "--:--",
+  "player.audio.error": "无法播放此音轨。",
+  "player.audio.dismissError": "关闭错误提示",
+  "player.audio.nowPlaying": "正在播放：{name}",
 
   // scenes
   "scene.seekTo": "跳转到 {time}",

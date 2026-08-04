@@ -51,6 +51,7 @@ import {
   type ModalSize,
 } from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
+import { useAudioPlayer } from "@/audio/useAudioPlayer";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
 import { MetaChips } from "./MetaChips";
@@ -80,6 +81,7 @@ export default function MediaDetail() {
   const autoplay = searchParams.get("autoplay") !== "0";
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { play: playAudio, pause: pauseAudio } = useAudioPlayer();
   // Closing the modal = drop the child route. Return to Discovery if we came from there,
   // otherwise back to the list (the list stays mounted underneath).
   const onClose = useCallback(() => {
@@ -402,6 +404,26 @@ export default function MediaDetail() {
 
   const d = detail.data;
 
+  // Audio never reaches this route through normal activation (all three list views
+  // route it to the player bar), but a stale bookmark or a hand-edited hash URL can
+  // land here. Recover by closing the modal and starting playback rather than
+  // rendering the track inside an <img>.
+  // Guarded by file id, not just by `d`: react-query can hand back a fresh
+  // object for the same row, and re-running play() would restart the track the
+  // user is already listening to.
+  const recoveredAudioFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!d || d.kind !== "audio" || recoveredAudioFor.current === d.id) return;
+    // `file_get` does not inject workspaceId into its row, so d.workspaceId is
+    // undefined here — use the id resolved from the URL. Also wait for the media
+    // base: on a direct URL the detail query can resolve before app_status, and
+    // playing then would build a src against an empty origin.
+    if (!wsId || !mediaBase) return;
+    recoveredAudioFor.current = d.id;
+    playAudio({ ...d, workspaceId: wsId }, wsId);
+    onClose();
+  }, [d, wsId, mediaBase, playAudio, onClose]);
+
   if (detail.isLoading) {
     return (
       <MediaModal onClose={onClose} size={modalSize}>
@@ -494,6 +516,9 @@ export default function MediaDetail() {
                 onExportFrame={(sec) => exportFrame.mutate(sec)}
                 onNativeDuration={setNativeDur}
                 onPlayed={() => invalidatePlayedSearches(qc)}
+                // Video demands attention, background audio yields. Pause rather
+                // than close, so the bar stays visible and the user can resume.
+                onPlaybackStart={pauseAudio}
                 t={t}
               />
             </div>

@@ -1,7 +1,7 @@
 // Media listing grid. Shows thumbnails via thumb://; click to open detail.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ImageIcon } from "lucide-react";
 import type { FileRow } from "@/ipc/types";
@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
@@ -74,7 +75,7 @@ export const MediaGrid = memo(function MediaGrid({
   navActive = false,
 }: Props) {
   const { t } = useI18n();
-  const navigate = useNavigate();
+  const { activate } = useActivateFile();
 
   // Scroll parent. Virtualization DOM-renders only the visible rows relative to this element.
   // Because the scroll element mounts later when transitioning from loading to data,
@@ -153,9 +154,10 @@ export const MediaGrid = memo(function MediaGrid({
   const onOpen = useCallback(
     (index: number) => {
       const f = items[index];
-      if (f) void navigate(fileHref(f.id, f.workspaceId));
+      // Audio loads into the bottom player bar instead of navigating (FR-010).
+      if (f) activate(f);
     },
-    [items, navigate],
+    [items, activate],
   );
   const { focusedIndex, setFocusedIndex } = useGridKeyboardNav({
     itemCount: items.length,
@@ -281,6 +283,9 @@ const MediaCard = memo(function MediaCard({
   // The card is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
   // metadata click → opens detail paused (`?autoplay=0`).
+  // Audio intercepts both and plays in the bottom bar instead of navigating.
+  const { onLinkClick } = useActivateFile();
+  const handleClick = onLinkClick(file);
   return (
     <div
       data-testid="media-card"
@@ -292,10 +297,14 @@ const MediaCard = memo(function MediaCard({
     >
       <Link
         to={fileHref(file.id, file.workspaceId)}
+        onClick={handleClick}
         className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
       >
         <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
-        {file.kind === "video" && (
+        {/* The real condition is "has a duration", which audio does. Guarded on
+            the value too: metadata lands a scan phase later, and an empty badge
+            in the meantime is worse than none. */}
+        {file.kind !== "image" && file.duration && (
           <span className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg">
             {formatDuration(file.duration)}
           </span>
@@ -317,6 +326,7 @@ const MediaCard = memo(function MediaCard({
       {/* Metadata. Fixed height so the card height doesn't change with tag count. */}
       <Link
         to={fileHref(file.id, file.workspaceId, { autoplay: false })}
+        onClick={handleClick}
         className="flex flex-col gap-1 px-2 py-1.5"
       >
         <div className="truncate text-xs text-fg" title={file.relPath}>
@@ -344,7 +354,7 @@ function metaLine(file: FileRow): string {
   const dims =
     file.width && file.height ? `${file.width}×${file.height}` : null;
   const dur =
-    file.kind === "video" && file.duration
+    file.kind !== "image" && file.duration
       ? formatDuration(file.duration)
       : null;
   return [dims, dur].filter(Boolean).join(" · ") || "—";

@@ -153,13 +153,23 @@ export async function runScan(
     dest: string;
     ok: boolean;
     meta: Awaited<ReturnType<typeof extractMeta>>;
+    /** Audio has no thumbnail by design. Such rows still need their metadata
+     *  persisted (duration drives the UI), but must land on thumb_status 'done'
+     *  with a null path — not 'error', which would misreport a file that is
+     *  perfectly fine, and not left 'pending', which would keep them in
+     *  filesNeedingThumb forever and inflate every later scan's progress total. */
+    skipThumb?: boolean;
   };
   const THUMB_FLUSH_EVERY = 32;
   let buffer: ThumbResult[] = [];
 
   const persistOne = (r: ThumbResult): void => {
     q.updateExtractedMeta(db, r.id, r.meta);
-    q.setThumb(db, r.id, r.ok ? r.dest : null, r.ok ? "done" : "error");
+    if (r.skipThumb) {
+      q.setThumb(db, r.id, null, "done");
+    } else {
+      q.setThumb(db, r.id, r.ok ? r.dest : null, r.ok ? "done" : "error");
+    }
     syncFts(db, r.id);
   };
   // Per-file transaction for the retry path: persistOne spans several writes
@@ -214,8 +224,22 @@ export async function runScan(
     async (f) => {
       if (signal?.aborted) return;
       const kind = f.kind as Kind;
-      const meta = await extractMeta(f.abs_path, signal);
+      const meta = await extractMeta(f.abs_path, kind, signal);
       const dest = path.join(thumbs, `${f.id}.webp`);
+
+      // Audio still needs its metadata (duration), but never a thumbnail.
+      if (kind === "audio") {
+        if (signal?.aborted) return;
+        // A failed probe (timeout, transient IO error, unparseable output)
+        // yields `raw: null`. Marking such a row 'done' would freeze it out of
+        // filesNeedingThumb forever, so leave it pending for the next scan —
+        // the same retry semantics the video/image path already has.
+        if (meta.raw == null) return;
+        buffer.push({ id: f.id, dest, ok: false, meta, skipThumb: true });
+        if (buffer.length >= THUMB_FLUSH_EVERY) flush();
+        return;
+      }
+
       // Honour a user-chosen thumbnail frame if one was set previously. Ignored for images.
       const offsetSec =
         kind === "video" ? (q.thumbOffsetOf(db, f.id) ?? undefined) : undefined;

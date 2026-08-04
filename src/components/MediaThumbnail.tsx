@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Film, ImageIcon, Play } from "lucide-react";
+import { Play } from "lucide-react";
+import { kindIcon } from "@/lib/mediaKind";
 import type { FileRow } from "@/ipc/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
@@ -45,7 +46,14 @@ export function MediaThumbnail({
   playIconSize = "size-5",
   showPlayOverlay = true,
 }: Props) {
-  const hasThumb = file.thumbStatus === "done" && mediaBase && file.workspaceId;
+  // Audio is marked thumb_status 'done' with a null path (it is complete, not
+  // failed), so status alone would build a URL that 404s. Exclude it explicitly
+  // and let the fallback icon stand in.
+  const hasThumb =
+    file.thumbStatus === "done" &&
+    file.kind !== "audio" &&
+    mediaBase &&
+    file.workspaceId;
   const src = hasThumb
     ? `${mediaBase}/ws/${file.workspaceId}/thumb/${file.id}?v=${version}`
     : undefined;
@@ -61,13 +69,12 @@ export function MediaThumbnail({
     });
 
   if (!src) {
+    // Audio never has a thumbnail, so this fallback is its only visual
+    // representation in the library.
+    const Icon = kindIcon(file.kind);
     return (
       <div className="flex h-full w-full items-center justify-center">
-        {file.kind === "video" ? (
-          <Film className={fallbackIconSize} />
-        ) : (
-          <ImageIcon className={fallbackIconSize} />
-        )}
+        <Icon className={fallbackIconSize} />
       </div>
     );
   }

@@ -55,9 +55,14 @@ function parseDate(s: string | undefined): number | null {
   return isNaN(t) ? null : Math.floor(t / 1000);
 }
 
-/** Get metadata via ffprobe (both video and image). Returns empty meta on failure. */
+/** Get metadata via ffprobe (video, image, and audio). Returns empty meta on failure.
+ *
+ *  `kind` selects which stream describes the file. For audio it must be the audio
+ *  stream: an MP3 carrying embedded cover art also has a video stream, and reading it
+ *  would record the jacket's dimensions as the track's own and `mjpeg` as its codec. */
 export async function extractMeta(
   file: string,
+  kind: Kind,
   signal?: AbortSignal,
 ): Promise<ExtractedMeta> {
   const empty: ExtractedMeta = {
@@ -89,18 +94,23 @@ export async function extractMeta(
     );
     const json = JSON.parse(stdout) as FfprobeOutput;
     const streams = json.streams ?? [];
-    const v = streams.find((s) => s.codec_type === "video");
+    const wantAudio = kind === "audio";
+    const v = streams.find((s) =>
+      wantAudio ? s.codec_type === "audio" : s.codec_type === "video",
+    );
     const fmt = json.format ?? {};
     return {
-      width: v?.width ?? null,
-      height: v?.height ?? null,
+      // Audio has no intrinsic dimensions or frame rate. Left null even when the
+      // file embeds cover art, whose size describes the artwork and not the track.
+      width: wantAudio ? null : (v?.width ?? null),
+      height: wantAudio ? null : (v?.height ?? null),
       duration: fmt.duration
         ? Number(fmt.duration)
         : v?.duration
           ? Number(v.duration)
           : null,
       codec: v?.codec_name ?? null,
-      fps: parseRational(v?.avg_frame_rate),
+      fps: wantAudio ? null : parseRational(v?.avg_frame_rate),
       capturedAt:
         parseDate(fmt.tags?.creation_time) ??
         parseDate(v?.tags?.creation_time) ??

@@ -8,6 +8,8 @@ import History from "@/routes/History";
 import Duplicates from "@/routes/Duplicates";
 import Settings from "@/routes/Settings";
 import { WorkspaceRail } from "@/components/WorkspaceRail";
+import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
+import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { useContentZoom } from "@/hooks/useContentZoom";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
 
@@ -33,9 +35,17 @@ export default function App() {
   return (
     <div className="flex h-full">
       <WorkspaceRail />
-      <div className="min-w-0 flex-1">
-        <RouterProvider router={router} />
-      </div>
+      {/* The provider and its single <audio> element sit OUTSIDE RouterProvider, so
+          navigation never unmounts them and playback continues across route changes.
+          Moving it inside a route would break that guarantee. */}
+      <AudioPlayerProvider>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1">
+            <RouterProvider router={router} />
+          </div>
+          <AudioPlayerBar />
+        </div>
+      </AudioPlayerProvider>
     </div>
   );
 }

@@ -10,6 +10,7 @@ export const ko: Record<TranslationKey, string> = {
   // kind
   "kind.video": "동영상",
   "kind.image": "이미지",
+  "kind.audio": "오디오",
 
   // sort
   "sort.added": "추가순",
@@ -220,6 +221,15 @@ export const ko: Record<TranslationKey, string> = {
     "이 형식은 재생할 수 없습니다 (MEDIA_ERR_SRC_NOT_SUPPORTED)",
   "player.errUnknown": "알 수 없는 오류",
   "player.errCode": "오류 코드 {code}",
+
+  // 오디오 플레이어 (하단 바)
+  "player.audio.region": "오디오 플레이어",
+  "player.audio.pause": "일시정지",
+  "player.audio.close": "플레이어 닫기",
+  "player.audio.unknownDuration": "--:--",
+  "player.audio.error": "이 트랙을 재생할 수 없습니다.",
+  "player.audio.dismissError": "오류 닫기",
+  "player.audio.nowPlaying": "재생 중: {name}",
 
   // scenes
   "scene.seekTo": "{time} 로 이동",

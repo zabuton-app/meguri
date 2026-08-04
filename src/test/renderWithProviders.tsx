@@ -5,6 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { PreferencesProvider } from "@/settings/PreferencesProvider";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
+import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 
 export interface RenderWithProvidersOptions extends Omit<
   RenderOptions,
@@ -37,7 +38,11 @@ export function renderWithProviders(
         <I18nProvider>
           <PreferencesProvider>
             <ConfirmProvider>
-              <HashRouter>{children}</HashRouter>
+              {/* Outside the router, mirroring App.tsx: the list views call
+                  useActivateFile(), which requires this provider. */}
+              <AudioPlayerProvider>
+                <HashRouter>{children}</HashRouter>
+              </AudioPlayerProvider>
             </ConfirmProvider>
           </PreferencesProvider>
         </I18nProvider>

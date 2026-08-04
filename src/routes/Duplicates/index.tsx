@@ -13,6 +13,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { HistoryModal } from "@/routes/History/HistoryModal";
 import { fileHref } from "@/lib/fileHref";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { formatSize } from "@/lib/format";
 import type { DuplicateGroup } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ function wastedBytes(group: DuplicateGroup): number {
 
 export default function Duplicates() {
   const { t } = useI18n();
+  const { onLinkClick } = useActivateFile();
   const navigate = useNavigate();
   const onClose = useCallback(() => {
     void navigate("/");
@@ -159,6 +161,7 @@ export default function Duplicates() {
                         to={fileHref(file.id, file.workspaceId, {
                           autoplay: false,
                         })}
+                        onClick={onLinkClick(file)}
                         className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
                       >
                         <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">

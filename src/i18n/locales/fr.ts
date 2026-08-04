@@ -10,6 +10,7 @@ export const fr: Record<TranslationKey, string> = {
   // kind
   "kind.video": "Vidéo",
   "kind.image": "Image",
+  "kind.audio": "Audio",
 
   // sort
   "sort.added": "Ajout",
@@ -226,6 +227,15 @@ export const fr: Record<TranslationKey, string> = {
     "Ce format ne peut pas être lu (MEDIA_ERR_SRC_NOT_SUPPORTED)",
   "player.errUnknown": "Erreur inconnue",
   "player.errCode": "Code d'erreur {code}",
+
+  // Lecteur audio (barre inférieure)
+  "player.audio.region": "Lecteur audio",
+  "player.audio.pause": "Pause",
+  "player.audio.close": "Fermer le lecteur",
+  "player.audio.unknownDuration": "--:--",
+  "player.audio.error": "Impossible de lire cette piste.",
+  "player.audio.dismissError": "Masquer l'erreur",
+  "player.audio.nowPlaying": "Lecture en cours : {name}",
 
   // scenes
   "scene.seekTo": "Aller à {time}",

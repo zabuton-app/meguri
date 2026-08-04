@@ -9,6 +9,7 @@ export const ja = {
   // 種別
   "kind.video": "動画",
   "kind.image": "画像",
+  "kind.audio": "音声",
 
   // 並び順
   "sort.added": "追加順",
@@ -223,6 +224,15 @@ export const ja = {
   "player.errUnknown": "不明なエラー",
   "player.errCode": "エラーコード {code}",
 
+  // オーディオプレイヤー（ボトムバー）
+  "player.audio.region": "オーディオプレイヤー",
+  "player.audio.pause": "一時停止",
+  "player.audio.close": "プレイヤーを閉じる",
+  "player.audio.unknownDuration": "--:--",
+  "player.audio.error": "このトラックを再生できませんでした。",
+  "player.audio.dismissError": "エラーを閉じる",
+  "player.audio.nowPlaying": "再生中: {name}",
+
   // シーン
   "scene.seekTo": "{time} へシーク",
   "scene.alt": "シーン {time}",
@@ -281,7 +291,8 @@ export const ja = {
     "内容が同一（ハッシュとサイズが一致）のファイルが複数あるとここに表示されます。",
   "duplicates.summary": "{groups} グループ / {files} ファイル / 重複 {size}",
   "duplicates.fileCount": "{count} 件",
-  "duplicates.truncated": "グループ数が多いため上位 {max} 件のみ表示しています。",
+  "duplicates.truncated":
+    "グループ数が多いため上位 {max} 件のみ表示しています。",
   "duplicates.filter": "重複ファイルのみ表示",
   "duplicates.chip": "重複",
 

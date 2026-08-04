@@ -30,19 +30,23 @@ let symlinkMediaId: number;
 let remuxId: number;
 let brokenRemuxId: number;
 let fifoSrc: string;
+/** One row per supported audio extension, so contentType() is covered for all of them. */
+let audioIds: Record<string, number>;
 
 function insert(
   rel: string,
   absPath: string,
   thumbPath: string | null,
   thumbStatus: string,
+  kind: string = "video",
+  ext: string = "mp4",
 ): number {
   const info = db
     .prepare(
       `INSERT INTO files (root_id, rel_path, abs_path, kind, ext, thumb_path, thumb_status, created_at)
-       VALUES ((SELECT id FROM scan_roots LIMIT 1), ?, ?, 'video', 'mp4', ?, ?, ?)`,
+       VALUES ((SELECT id FROM scan_roots LIMIT 1), ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(rel, absPath, thumbPath, thumbStatus, nowUnix());
+    .run(rel, absPath, kind, ext, thumbPath, thumbStatus, nowUnix());
   return Number(info.lastInsertRowid);
 }
 
@@ -123,6 +127,17 @@ beforeAll(async () => {
   symlinkMediaId = insert("symlink.mp4", symlinkMedia, null, "pending");
   remuxId = insert("real.mkv", remuxFile, null, "pending");
   brokenRemuxId = insert("broken.mkv", brokenFile, null, "pending");
+
+  // Audio rows carry no thumbnail by design (thumb_status 'done', thumb_path NULL).
+  // The bytes are placeholder text, not real audio: these tests exercise routing,
+  // MIME selection, and Range serving, none of which decode the payload.
+  audioIds = {};
+  for (const ext of ["mp3", "m4a", "aac", "flac", "ogg", "opus", "wav"]) {
+    const rel = `track.${ext}`;
+    const abs = path.join(root, rel);
+    fs.writeFileSync(abs, "0123456789");
+    audioIds[ext] = insert(rel, abs, null, "done", "audio", ext);
+  }
 
   const core = { db, dataDir, root } as unknown as Core;
   ({ server } = await startServer((id) => (id === WS ? core : null), TOKEN));
@@ -277,6 +292,56 @@ describe("media serving and Range", () => {
   });
 });
 
+describe("audio serving", () => {
+  // Audio must fall through to serveFile() — outside both REMUX_CONTAINERS and
+  // TRANSCODE_IMAGES — so it inherits the existing Range implementation verbatim.
+  // That inheritance is what makes seeking work with no new serving code.
+  const EXPECTED_MIME: Record<string, string> = {
+    mp3: "audio/mpeg",
+    m4a: "audio/mp4",
+    aac: "audio/aac",
+    flac: "audio/flac",
+    ogg: "audio/ogg",
+    // Opus is effectively always Ogg-contained.
+    opus: "audio/ogg",
+    wav: "audio/wav",
+  };
+
+  it("serves every supported audio extension with its own MIME type", async () => {
+    for (const [ext, mime] of Object.entries(EXPECTED_MIME)) {
+      const res = await fetch(
+        `${base}/ws/${WS}/media/${audioIds[ext]}`,
+        authHeaders(),
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe(mime);
+      // Never the octet-stream fallback, which would leave the browser guessing.
+      expect(res.headers.get("content-type")).not.toBe(
+        "application/octet-stream",
+      );
+      expect(await res.text()).toBe("0123456789");
+    }
+  });
+
+  it("honours a Range request on audio with a 206 and a correct Content-Range", async () => {
+    const res = await fetch(`${base}/ws/${WS}/media/${audioIds.mp3}`, {
+      headers: { ...authHeader(), Range: "bytes=3-6" },
+    });
+    expect(res.status).toBe(206);
+    expect(res.headers.get("content-range")).toBe("bytes 3-6/10");
+    expect(res.headers.get("accept-ranges")).toBe("bytes");
+    expect(await res.text()).toBe("3456");
+  });
+
+  it("returns 416 for an unsatisfiable audio Range request", async () => {
+    const res = await fetch(`${base}/ws/${WS}/media/${audioIds.flac}`, {
+      headers: { ...authHeader(), Range: "bytes=99-100" },
+    });
+    expect(res.status).toBe(416);
+    expect(res.headers.get("content-range")).toBe("bytes */10");
+  });
+});
+
 describe("frame serving (ffmpeg path)", () => {
   async function expectJpeg(res: Response) {
     expect(res.status).toBe(200);
@@ -290,13 +355,19 @@ describe("frame serving (ffmpeg path)", () => {
 
   it("serves a frame with an allowed quality preset", async () => {
     await expectJpeg(
-      await fetch(`${base}/ws/${WS}/frame/${remuxId}?t=0&q=high`, authHeaders()),
+      await fetch(
+        `${base}/ws/${WS}/frame/${remuxId}?t=0&q=high`,
+        authHeaders(),
+      ),
     );
   });
 
   it("falls back to the default quality for an unknown ?q value", async () => {
     await expectJpeg(
-      await fetch(`${base}/ws/${WS}/frame/${remuxId}?t=0&q=9999`, authHeaders()),
+      await fetch(
+        `${base}/ws/${WS}/frame/${remuxId}?t=0&q=9999`,
+        authHeaders(),
+      ),
     );
     // Prototype members must not pass the allowlist (own-property check).
     await expectJpeg(

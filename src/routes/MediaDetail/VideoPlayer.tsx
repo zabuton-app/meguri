@@ -23,6 +23,7 @@ import { api } from "@/ipc/client";
 import type { SceneBookmark } from "@/ipc/types";
 import { findNearestBookmark } from "@/lib/bookmarks";
 import log from "@/lib/logger";
+import { loadMuted, loadVolume, saveVolume } from "@/lib/playerVolume";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { matchAny, type NavBinding } from "@/settings/keybindings";
@@ -38,23 +39,6 @@ const MEDIA_ERR_NETWORK = 2;
 // retry in the same tick would likely hit the same connection-slot starvation
 // (frame previews holding the origin's sockets) that caused the failure.
 const NETWORK_RETRY_DELAY_MS = 300;
-
-// Persist the player volume/mute across sessions (renderer-local, survives restarts).
-const VOLUME_KEY = "meguri.player.volume";
-const MUTED_KEY = "meguri.player.muted";
-
-function loadVolume(): number {
-  const raw = localStorage.getItem(VOLUME_KEY);
-  const n = raw == null ? NaN : Number(raw);
-  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1;
-}
-function loadMuted(): boolean {
-  return localStorage.getItem(MUTED_KEY) === "1";
-}
-function saveVolume(v: number, muted: boolean) {
-  localStorage.setItem(VOLUME_KEY, String(v));
-  localStorage.setItem(MUTED_KEY, muted ? "1" : "0");
-}
 
 export interface PlayerHandle {
   seek: (t: number) => void;
@@ -95,6 +79,9 @@ export const VideoPlayer = forwardRef<
     onNativeDuration: (d: number | null) => void;
     /** Fired once per loaded file when playback first starts (used to refresh the list order). */
     onPlayed: () => void;
+    /** Fires on every play (not just the first), so the caller can enforce
+     *  audio/video exclusivity. Distinct from onPlayed, which fires once per file. */
+    onPlaybackStart?: () => void;
     t: TFunc;
   }
 >(function VideoPlayer(
@@ -118,6 +105,7 @@ export const VideoPlayer = forwardRef<
     onExportFrame,
     onNativeDuration,
     onPlayed,
+    onPlaybackStart,
     t,
   },
   handleRef,
@@ -516,6 +504,7 @@ export const VideoPlayer = forwardRef<
         onClick={togglePlay}
         onPlay={() => {
           setPlaying(true);
+          onPlaybackStart?.();
           void api.fileRecordPlay(id, wsId, "browser", position);
           if (!playedRef.current) {
             playedRef.current = true;
