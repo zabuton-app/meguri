@@ -21,12 +21,14 @@ export interface ExtractedMeta {
 }
 
 interface FfprobeStream {
+  index?: number;
   codec_type?: string;
   codec_name?: string;
   width?: number;
   height?: number;
   duration?: string;
   avg_frame_rate?: string;
+  disposition?: { attached_pic?: number };
   tags?: { creation_time?: string };
 }
 
@@ -122,6 +124,30 @@ export async function extractMeta(
   }
 }
 
+/** The ffprobe stream index of a file's embedded cover picture, or null if it has
+ *  none.
+ *
+ *  Keys on `disposition.attached_pic` rather than "has a video stream", because a
+ *  mis-tagged file (a real video with an audio-ish extension, or an mp3 muxed with
+ *  an actual moving stream) would otherwise be treated as artwork and produce a
+ *  thumbnail from an arbitrary frame. `attached_pic` is exactly the flag ffmpeg
+ *  sets for ID3v2 APIC / MP4 covr / FLAC METADATA_BLOCK_PICTURE payloads.
+ *
+ *  Returns the *index* rather than a boolean because a file can hold both a real
+ *  video stream and a cover; `-map 0:v:0` would then pick the moving one. The
+ *  absolute index pins the exact stream. Note ffmpeg's `m:disposition:attached_pic`
+ *  map syntax is not available in the bundled build, hence the explicit index.
+ *
+ *  Takes the already-probed JSON so callers don't pay for a second ffprobe run. */
+export function coverArtStreamIndex(raw: unknown): number | null {
+  const streams = (raw as FfprobeOutput | null)?.streams;
+  if (!Array.isArray(streams)) return null;
+  const cover = streams.find(
+    (s) => s.codec_type === "video" && s.disposition?.attached_pic === 1,
+  );
+  return typeof cover?.index === "number" ? cover.index : null;
+}
+
 // How many seconds of margin to leave when doing the coarse pre-input seek of the hybrid
 // thumbnail seek. The fine post-input seek then decodes that much (worst case) to land on
 // the exact target frame. Tuned to comfortably cover typical GOP lengths (1–4 s).
@@ -137,14 +163,31 @@ const THUMB_SEEK_MARGIN_SEC = 5;
  *    mode of pure post-input seek on some containers (mkv/avi/wmv/flv/ts), which can
  *    return zero frames when ffmpeg can't establish a usable timeline from the input.
  *    On failure, we fall back once to pre-input-only seek (keyframe-accurate but always
- *    yields a frame) so the user still gets a usable thumbnail. */
+ *    yields a frame) so the user still gets a usable thumbnail.
+ *
+ *  For audio the "frame" is the embedded cover picture, and `coverStreamIndex` (from
+ *  `coverArtStreamIndex()`) selects it. There is no seek and no fallback, since an
+ *  attached picture is a single still. Audio without an index generates nothing. */
 export async function generateThumb(
   src: string,
   kind: Kind,
   dest: string,
   signal?: AbortSignal,
   offsetSec?: number,
+  coverStreamIndex?: number,
 ): Promise<boolean> {
+  if (kind === "audio") {
+    if (coverStreamIndex == null) return false;
+    return runFfmpegThumb(
+      src,
+      kind,
+      dest,
+      signal,
+      undefined,
+      false,
+      coverStreamIndex,
+    );
+  }
   const useOffset =
     kind === "video" &&
     typeof offsetSec === "number" &&
@@ -252,6 +295,7 @@ async function runFfmpegThumb(
   signal: AbortSignal | undefined,
   offsetSec: number | undefined,
   keyframeOnly: boolean,
+  coverStreamIndex?: number,
 ): Promise<boolean> {
   const useOffset = typeof offsetSec === "number";
   const vf =
@@ -273,6 +317,13 @@ async function runFfmpegThumb(
   } else {
     args.push("-i", src);
   }
+  // Audio inputs carry an audio stream plus the attached picture, and ffmpeg's
+  // default stream selection would pick the audio one. Map the picture by its
+  // absolute ffprobe index — `0:v:0` would grab a real video stream in a file
+  // that has both, yielding a frame of the movie instead of the jacket.
+  if (kind === "audio" && coverStreamIndex != null) {
+    args.push("-map", `0:${coverStreamIndex}`);
+  }
   args.push(
     "-vf",
     vf,
@@ -286,6 +337,19 @@ async function runFfmpegThumb(
   );
   try {
     await execFileAsync(FFMPEG, args, { timeout: 60000, signal });
+    // A corrupt attached picture can leave ffmpeg exiting 0 having written
+    // nothing (or an empty file). Reporting success there would persist
+    // thumb_path with hasThumb = 1, and every request for it would 404. The
+    // video/image path reaches here only after decoding a real frame, so this
+    // check stays scoped to audio rather than changing existing behaviour.
+    if (kind === "audio") {
+      const st = await fsPromises.stat(dest).catch(() => null);
+      if (!st || st.size === 0) {
+        if (st) await fsPromises.unlink(dest).catch(() => {});
+        log.warn(`ffmpeg cover extraction produced no output for ${src}`);
+        return false;
+      }
+    }
     return true;
   } catch (err) {
     // Surface ffmpeg's reason so the next failure isn't silent. Aborted runs are expected

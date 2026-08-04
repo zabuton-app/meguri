@@ -47,6 +47,10 @@ export const FileRowSchema = z.object({
   /** Favorite flag stored as 0/1 in SQLite. */
   favorite: z.number(),
   thumbStatus: z.string(),
+  /** Whether a thumbnail file was actually produced, as 0/1 (SQLite has no boolean).
+   *  Distinct from thumbStatus: audio is marked 'done' whether or not it embeds cover
+   *  art, so status alone can't tell a real thumbnail from a deliberate absence. */
+  hasThumb: z.number(),
   /** Sampled content hash (see scan.ts). Null until the scan computes it; used by the "hash" sort. */
   contentHash: z.string().nullable().optional(),
   capturedAt: z.number().nullable(),

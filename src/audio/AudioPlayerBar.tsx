@@ -7,7 +7,9 @@
 import { useLayoutEffect, useState } from "react";
 import { Music, Pause, Play, Volume2, VolumeX, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useAppStatus } from "@/hooks/useAppStatus";
 import { fmtTime } from "@/routes/MediaDetail/utils";
+import type { AudioTrack } from "./context";
 import { useAudioPlayer, useAudioPosition } from "./useAudioPlayer";
 
 function baseName(relPath: string): string {
@@ -86,7 +88,13 @@ export function AudioPlayerBar() {
       aria-label={t("player.audio.region")}
       className="flex shrink-0 items-center gap-3 border-t border-border bg-bg px-3 py-2 text-sm text-fg"
     >
-      <Music size={18} className="shrink-0 text-muted" aria-hidden="true" />
+      {/* Keyed on the track so a failed cover doesn't stick: remounting resets
+          the fallback state, and the previous jacket never shows while the new
+          one loads. */}
+      <Cover
+        key={`${current.workspaceId}:${current.file.id}`}
+        track={current}
+      />
       {/* Announced when the track changes; position updates are never announced. */}
       <span
         className="min-w-0 max-w-64 flex-1 truncate"
@@ -162,6 +170,36 @@ export function AudioPlayerBar() {
         <X size={18} />
       </button>
     </div>
+  );
+}
+
+/** The track's embedded cover art, falling back to a music note when the file has
+ *  none (or the image fails to load). Square and bar-height, so a taller jacket
+ *  cannot grow the bar and shift every bottom-anchored overlay with it.
+ *
+ *  Decorative: the filename beside it already identifies the track, so an alt text
+ *  here would only make screen readers announce the same name twice. */
+function Cover({ track }: { track: AudioTrack }) {
+  const status = useAppStatus();
+  const mediaBase = status.data?.mediaBase ?? "";
+  const [failed, setFailed] = useState(false);
+  const src =
+    track.file.hasThumb === 1 && mediaBase
+      ? `${mediaBase}/ws/${track.workspaceId}/thumb/${track.file.id}`
+      : null;
+
+  if (!src || failed) {
+    return (
+      <Music size={18} className="shrink-0 text-muted" aria-hidden="true" />
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      className="size-8 shrink-0 rounded-sm object-cover"
+    />
   );
 }
 

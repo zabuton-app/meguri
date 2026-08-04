@@ -5,7 +5,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
 import { walk, syncFiles, type ScanStats } from "./scan.js";
-import { extractMeta, generateThumb } from "./media.js";
+import { coverArtStreamIndex, extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
 import { syncFts } from "./tags.js";
 import { pool } from "./concurrency.js";
@@ -153,11 +153,14 @@ export async function runScan(
     dest: string;
     ok: boolean;
     meta: Awaited<ReturnType<typeof extractMeta>>;
-    /** Audio has no thumbnail by design. Such rows still need their metadata
-     *  persisted (duration drives the UI), but must land on thumb_status 'done'
-     *  with a null path — not 'error', which would misreport a file that is
-     *  perfectly fine, and not left 'pending', which would keep them in
-     *  filesNeedingThumb forever and inflate every later scan's progress total. */
+    /** Set for audio files that carry no embedded cover art, which is a normal
+     *  state rather than a failure. Such rows still need their metadata persisted
+     *  (duration drives the UI), but must land on thumb_status 'done' with a null
+     *  path — not 'error', which would misreport a file that is perfectly fine,
+     *  and not left 'pending', which would keep them in filesNeedingThumb forever
+     *  and inflate every later scan's progress total. Adding art to such a file
+     *  later is still picked up: writing the tag changes size/mtime, which
+     *  syncFiles() resets back to 'pending'. */
     skipThumb?: boolean;
   };
   const THUMB_FLUSH_EVERY = 32;
@@ -227,15 +230,34 @@ export async function runScan(
       const meta = await extractMeta(f.abs_path, kind, signal);
       const dest = path.join(thumbs, `${f.id}.webp`);
 
-      // Audio still needs its metadata (duration), but never a thumbnail.
+      // Audio always needs its metadata (duration), and gets a thumbnail only
+      // when the file embeds cover art.
       if (kind === "audio") {
         if (signal?.aborted) return;
         // A failed probe (timeout, transient IO error, unparseable output)
         // yields `raw: null`. Marking such a row 'done' would freeze it out of
         // filesNeedingThumb forever, so leave it pending for the next scan —
-        // the same retry semantics the video/image path already has.
+        // the same retry semantics the video/image path already has. It also
+        // means we can't tell whether the file has cover art, so don't guess.
         if (meta.raw == null) return;
-        buffer.push({ id: f.id, dest, ok: false, meta, skipThumb: true });
+        const coverIndex = coverArtStreamIndex(meta.raw);
+        if (coverIndex == null) {
+          buffer.push({ id: f.id, dest, ok: false, meta, skipThumb: true });
+          if (buffer.length >= THUMB_FLUSH_EVERY) flush();
+          return;
+        }
+        const coverOk = await generateThumb(
+          f.abs_path,
+          kind,
+          dest,
+          signal,
+          undefined,
+          coverIndex,
+        );
+        if (signal?.aborted) return;
+        // Extraction failure here is a real error (the probe said a picture is
+        // present), so let it record as 'error' like the video/image path.
+        buffer.push({ id: f.id, dest, ok: coverOk, meta });
         if (buffer.length >= THUMB_FLUSH_EVERY) flush();
         return;
       }
