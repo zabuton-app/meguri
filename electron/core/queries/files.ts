@@ -169,7 +169,12 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
   const cmp = desc ? "<" : ">";
   switch (sort) {
     case "rating":
-      return { expr: "COALESCE(m.rating, 0)", nullable: false, cmp, idCmp: ">" };
+      return {
+        expr: "COALESCE(m.rating, 0)",
+        nullable: false,
+        cmp,
+        idCmp: ">",
+      };
     case "captured":
       return { expr: "f.captured_at", nullable: true, cmp, idCmp: ">" };
     case "btime":
@@ -187,7 +192,10 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
 }
 
 /** The seek key's value for a returned row (mirrors sortSpecFor's expressions). */
-export function sortValueOf(sort: string | undefined, row: FileRow): string | number | null {
+export function sortValueOf(
+  sort: string | undefined,
+  row: FileRow,
+): string | number | null {
   switch (sort) {
     case "rating":
       return row.rating;
@@ -336,16 +344,28 @@ export function orderByFor(sort?: string, dir?: string): string {
  * the matching ids through a size-`lim` reservoir (Algorithm R) — memory stays
  * O(lim) rather than one array entry per matching row — and materialize only
  * the sampled rows via primary-key lookups.
+ *
+ * Audio is excluded unless explicitly asked for by kind. This backs Discover, a
+ * purely visual browsing surface built around full-screen frames and autoplaying
+ * previews; an audio row there renders as a broken image. Discover inherits the
+ * user's active filter, and the common case is no kind filter at all, so the
+ * exclusion has to live here rather than in the caller's query. It therefore
+ * applies to every Discover path, including the cross-workspace and
+ * collection-scoped ones in crossWorkspace.ts.
  */
 export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
   const lim = Math.max(1, Math.min(MAX_LIMIT, query.limit ?? 20));
   const args: unknown[] = [];
   let sql = `SELECT f.id ${FILE_FROM} WHERE f.deleted_at IS NULL`;
+  if (!query.kind) sql += ` AND f.kind <> 'audio'`;
   sql = appendSearchConditions(sql, args, query);
 
   const reservoir: number[] = [];
   let seen = 0;
-  for (const id of db.prepare(sql).pluck().iterate(...args)) {
+  for (const id of db
+    .prepare(sql)
+    .pluck()
+    .iterate(...args)) {
     if (seen < lim) {
       reservoir.push(id as number);
     } else {

@@ -66,7 +66,9 @@ describe("searchFiles", () => {
     insertFile(db, rootId, { relPath: "nobtime.mp4", btime: null });
 
     const ids = (q: Parameters<typeof searchFiles>[1]) =>
-      searchFiles(db, q).items.map((f) => f.id).sort();
+      searchFiles(db, q)
+        .items.map((f) => f.id)
+        .sort();
     expect(ids({ btimeFrom: 150 })).toEqual([mid, recent].sort());
     expect(ids({ btimeTo: 250 })).toEqual([old, mid].sort());
     expect(ids({ btimeFrom: 150, btimeTo: 250 })).toEqual([mid]);
@@ -187,9 +189,9 @@ describe("searchFiles", () => {
     syncFts(db, both);
     syncFts(db, beachOnly);
     // "beach" (MATCH) AND "海岸" (LIKE) must both hold.
-    expect(
-      searchFiles(db, { q: "beach 海岸" }).items.map((f) => f.id),
-    ).toEqual([both]);
+    expect(searchFiles(db, { q: "beach 海岸" }).items.map((f) => f.id)).toEqual(
+      [both],
+    );
   });
 
   it("treats LIKE metacharacters in short tokens literally", () => {
@@ -244,6 +246,27 @@ describe("randomFiles", () => {
     const out = randomFiles(db, { kind: "video", limit: 3 });
     expect(out.length).toBe(3);
     expect(out.every((f) => f.kind === "video")).toBe(true);
+    db.close();
+  });
+
+  it("excludes audio when no kind filter is set (Discover is a visual surface)", () => {
+    const { db, rootId } = newDb();
+    insertFile(db, rootId, { relPath: "v.mp4", kind: "video" });
+    insertFile(db, rootId, { relPath: "p.jpg", kind: "image" });
+    insertFile(db, rootId, { relPath: "a.mp3", kind: "audio" });
+    const out = randomFiles(db, { limit: 10 });
+    expect(out.length).toBe(2);
+    expect(out.some((f) => f.kind === "audio")).toBe(false);
+    db.close();
+  });
+
+  it("still returns audio when it is explicitly requested by kind", () => {
+    const { db, rootId } = newDb();
+    insertFile(db, rootId, { relPath: "v.mp4", kind: "video" });
+    insertFile(db, rootId, { relPath: "a.mp3", kind: "audio" });
+    const out = randomFiles(db, { kind: "audio", limit: 10 });
+    expect(out.length).toBe(1);
+    expect(out[0].kind).toBe("audio");
     db.close();
   });
 });

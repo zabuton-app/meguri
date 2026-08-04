@@ -69,6 +69,14 @@ function contentType(p: string): string {
     bmp: "image/bmp",
     tiff: "image/tiff",
     avif: "image/avif",
+    mp3: "audio/mpeg",
+    m4a: "audio/mp4",
+    aac: "audio/aac",
+    flac: "audio/flac",
+    ogg: "audio/ogg",
+    // Opus is effectively always Ogg-contained, and audio/opus is not reliably recognized.
+    opus: "audio/ogg",
+    wav: "audio/wav",
   };
   return map[ext(p)] ?? "application/octet-stream";
 }

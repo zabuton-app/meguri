@@ -10,7 +10,13 @@ import {
   tagsText,
   upsertTag,
 } from "../tags.js";
-import { searchFiles } from "../queries.js";
+import {
+  fileDetail,
+  recordPlay,
+  searchFiles,
+  setFavorite,
+  setRating,
+} from "../queries.js";
 import { insertFile, newDb } from "./helpers.js";
 
 describe("tags", () => {
@@ -83,5 +89,87 @@ describe("tags", () => {
     // "_" is a LIKE wildcard; it must be escaped so the prefix is treated literally.
     expect(listTagNames(db, "a_", 10)).toEqual(["a_b"]);
     expect(listTagNames(db, "a", 10).sort()).toEqual(["a_b", "abc", "axb"]);
+  });
+});
+
+describe("audio in the library (US3: inherited metadata behaviour)", () => {
+  // Every user-data table keys on meta_key rather than files.id, so audio is
+  // expected to inherit favorites, ratings, tags, and history with no
+  // kind-specific code. These tests confirm that inheritance rather than
+  // assuming it: a failure here points at the files-table rebuild, not at
+  // missing feature work.
+  let db: DB;
+  let rootId: number;
+  beforeEach(() => {
+    ({ db, rootId } = newDb());
+  });
+  afterEach(() => {
+    db.close();
+  });
+
+  it("attaches favorite, rating, tags, and play history to an audio row", () => {
+    const id = insertFile(db, rootId, {
+      relPath: "music/track.mp3",
+      kind: "audio",
+      contentHash: "audio-hash",
+      duration: 240,
+    });
+    setFavorite(db, id, true);
+    setRating(db, id, 5);
+    addManualTag(db, id, "jazz");
+    recordPlay(db, id, "browser", null);
+
+    const detail = fileDetail(db, id);
+    expect(detail).toBeTruthy();
+    expect(detail!.kind).toBe("audio");
+    expect(detail!.favorite).toBe(1);
+    expect(detail!.rating).toBe(5);
+    expect(detail!.duration).toBe(240);
+    expect(detail!.tags.map((t) => t.name)).toContain("jazz");
+    expect(detail!.playHistory.length).toBe(1);
+    expect(detail!.playHistory[0].via).toBe("browser");
+  });
+
+  it("finds an audio row by filename fragment and by tag through files_fts", () => {
+    const id = insertFile(db, rootId, {
+      relPath: "music/nocturne.mp3",
+      kind: "audio",
+      contentHash: "fts-hash",
+    });
+    addManualTag(db, id, "piano");
+    syncFts(db, id);
+
+    const byName = searchFiles(db, { q: "nocturne", limit: 10 });
+    expect(byName.items.map((f) => f.id)).toContain(id);
+
+    const byTag = searchFiles(db, { q: "piano", limit: 10 });
+    expect(byTag.items.map((f) => f.id)).toContain(id);
+  });
+
+  it("keeps audio metadata attached when the file is renamed (content_hash move tracking)", () => {
+    const id = insertFile(db, rootId, {
+      relPath: "music/old-name.mp3",
+      kind: "audio",
+      contentHash: "stable-hash",
+    });
+    setFavorite(db, id, true);
+    setRating(db, id, 4);
+    addManualTag(db, id, "ambient");
+    recordPlay(db, id, "browser", null);
+
+    // A rename updates rel_path in place; meta_key stays the content_hash, which
+    // is exactly why the user's edits survive it.
+    db.prepare("UPDATE files SET rel_path = ?, abs_path = ? WHERE id = ?").run(
+      "music/new-name.mp3",
+      "/fake/root/music/new-name.mp3",
+      id,
+    );
+
+    const detail = fileDetail(db, id);
+    expect(detail!.relPath).toBe("music/new-name.mp3");
+    expect(detail!.favorite).toBe(1);
+    expect(detail!.rating).toBe(4);
+    expect(detail!.tags.map((t) => t.name)).toContain("ambient");
+    expect(detail!.playHistory.length).toBe(1);
   });
 });

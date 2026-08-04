@@ -21,6 +21,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { fileHref } from "@/lib/fileHref";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { formatDuration } from "@/lib/format";
 import { fileNameOf } from "@/lib/relPath";
 import type { HistoryEntryRow } from "@/ipc/types";
@@ -57,6 +58,7 @@ function dayLabel(playedAt: number, t: TFunc): string {
 
 export default function History() {
   const { t } = useI18n();
+  const { onLinkClick } = useActivateFile();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -226,6 +228,7 @@ export default function History() {
                         to={fileHref(row.id, row.workspaceId, {
                           autoplay: false,
                         })}
+                        onClick={onLinkClick(row)}
                         className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
                       >
                         <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">

@@ -26,6 +26,27 @@ export const sampleFileRow: FileRow = {
   tags: [],
 };
 
+/** Audio rows never carry a thumbnail: thumbStatus is 'done' with no path, and
+ *  width/height/fps stay null even for files with embedded cover art. */
+export const sampleAudioRow: FileRow = {
+  id: 2,
+  workspaceId: WS_ID,
+  relPath: "music/track.mp3",
+  kind: "audio",
+  ext: "mp3",
+  size: 4_096_000,
+  width: null,
+  height: null,
+  duration: 240,
+  rating: 0,
+  favorite: 0,
+  thumbStatus: "done",
+  capturedAt: null,
+  btime: null,
+  lastAccessedAt: null,
+  tags: [],
+};
+
 export const sampleFileDetail: FileDetail = {
   ...sampleFileRow,
   absPath: "/media/videos/sample.mp4",

@@ -77,7 +77,7 @@ export function ScanProgress({
   const pct = indeterminate ? 0 : Math.round((state.done / state.total) * 100);
 
   return (
-    <div className="fixed bottom-10 left-4 z-30 w-72 rounded-md border border-border bg-surface px-3 py-2 shadow-lg shadow-black/25">
+    <div className="fixed bottom-[calc(2.5rem+var(--meguri-player-bar-h))] left-4 z-30 w-72 rounded-md border border-border bg-surface px-3 py-2 shadow-lg shadow-black/25">
       <div className="flex items-center justify-between text-xs text-muted">
         <span className="truncate">
           {PHASE_KEY[state.phase] ? t(PHASE_KEY[state.phase]) : state.phase}{" "}

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { resolveSortDir } from "@shared/sortDir";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { kindLabelKey } from "@/lib/mediaKind";
 
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
 
@@ -99,8 +100,7 @@ export function describeDateRange(
 export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   const parts: string[] = [];
   if (query.q) parts.push(`"${query.q}"`);
-  if (query.kind)
-    parts.push(query.kind === "video" ? t("kind.video") : t("kind.image"));
+  if (query.kind) parts.push(t(kindLabelKey(query.kind)));
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
   if (query.favorite) parts.push(t("favorite.chip"));
   if (query.duplicates) parts.push(t("duplicates.chip"));
@@ -134,10 +134,10 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
             : sort === "btime"
               ? "filter.btime"
               : sort === "accessed"
-              ? "sort.accessed"
-              : sort === "hash"
-                ? "sort.hash"
-                : "sort.added";
+                ? "sort.accessed"
+                : sort === "hash"
+                  ? "sort.hash"
+                  : "sort.added";
     const dir = resolveSortDir(sort, query.sortDir);
     parts.push(`${t(key)} / ${t(dir === "asc" ? "sort.asc" : "sort.desc")}`);
   }

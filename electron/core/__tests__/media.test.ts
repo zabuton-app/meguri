@@ -6,11 +6,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { FFMPEG } from "../ffmpeg-paths.js";
-import { exportFrame } from "../media.js";
+import { exportFrame, extractMeta } from "../media.js";
 
 let dir: string;
 let video: string;
 let broken: string;
+let audio: string;
+let audioWithArt: string;
 
 beforeAll(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-media-"));
@@ -30,6 +32,54 @@ beforeAll(() => {
   ]);
   broken = path.join(dir, "broken.mp4");
   fs.writeFileSync(broken, "NOT A REAL MP4");
+
+  // A plain 1-second tone.
+  audio = path.join(dir, "tone.mp3");
+  execFileSync(FFMPEG, [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "sine=frequency=440:duration=1",
+    "-c:a",
+    "libmp3lame",
+    audio,
+  ]);
+
+  // The same tone with embedded cover art: ffprobe reports a *video* stream for
+  // the jacket, so reading the video stream would misattribute the artwork's
+  // 64x48 dimensions and mjpeg codec to the track itself.
+  audioWithArt = path.join(dir, "tone-art.mp3");
+  execFileSync(FFMPEG, [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "sine=frequency=440:duration=1",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=red:size=64x48:duration=1:rate=1",
+    "-map",
+    "0:a",
+    "-map",
+    "1:v",
+    "-c:a",
+    "libmp3lame",
+    "-c:v",
+    "mjpeg",
+    "-frames:v",
+    "1",
+    "-id3v2_version",
+    "3",
+    "-metadata:s:v",
+    "title=Album cover",
+    "-metadata:s:v",
+    "comment=Cover (front)",
+    audioWithArt,
+  ]);
 });
 
 afterAll(() => {
@@ -66,7 +116,9 @@ describe("exportFrame", () => {
   it("refuses non-finite or negative offsets without invoking ffmpeg", async () => {
     const dest = path.join(dir, "invalid-offset.png");
     await expect(exportFrame(video, dest, NaN, "png")).resolves.toBe(false);
-    await expect(exportFrame(video, dest, Infinity, "png")).resolves.toBe(false);
+    await expect(exportFrame(video, dest, Infinity, "png")).resolves.toBe(
+      false,
+    );
     await expect(exportFrame(video, dest, -1, "png")).resolves.toBe(false);
     expect(fs.existsSync(dest)).toBe(false);
   });
@@ -89,5 +141,48 @@ describe("exportFrame", () => {
     } else {
       expect(fs.existsSync(dest)).toBe(false);
     }
+  });
+});
+
+describe("extractMeta", () => {
+  it("reads duration from an audio file with no video-only fields", async () => {
+    const meta = await extractMeta(audio, "audio");
+    expect(meta.duration).toBeGreaterThan(0.5);
+    expect(meta.duration).toBeLessThan(2);
+    expect(meta.width).toBeNull();
+    expect(meta.height).toBeNull();
+    expect(meta.fps).toBeNull();
+    expect(meta.codec).toBe("mp3");
+  });
+
+  it("ignores embedded cover art rather than reporting it as the track's own dimensions", async () => {
+    const meta = await extractMeta(audioWithArt, "audio");
+    // The regression this guards: reading the video stream would yield 64x48 / mjpeg.
+    expect(meta.width).toBeNull();
+    expect(meta.height).toBeNull();
+    expect(meta.fps).toBeNull();
+    expect(meta.codec).toBe("mp3");
+    expect(meta.duration).toBeGreaterThan(0.5);
+  });
+
+  it("still reads the video stream for video files", async () => {
+    const meta = await extractMeta(video, "video");
+    expect(meta.width).toBe(64);
+    expect(meta.height).toBe(48);
+    expect(meta.codec).toBe("h264");
+    expect(meta.duration).toBeGreaterThan(0);
+  });
+
+  it("returns empty meta for a broken file instead of throwing", async () => {
+    const meta = await extractMeta(broken, "video");
+    expect(meta).toEqual({
+      width: null,
+      height: null,
+      duration: null,
+      codec: null,
+      fps: null,
+      capturedAt: null,
+      raw: null,
+    });
   });
 });

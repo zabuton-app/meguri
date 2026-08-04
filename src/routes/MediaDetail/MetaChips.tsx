@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { kindLabelKey } from "@/lib/mediaKind";
 
 interface Props {
   detail: FileDetail;
@@ -29,10 +30,7 @@ export function MetaChips({
         value={workspaceLabel ?? wsId}
         title={workspacePath || workspaceLabel || wsId}
       />
-      <Chip
-        label={t("media.metaKind")}
-        value={detail.kind === "video" ? t("kind.video") : t("kind.image")}
-      />
+      <Chip label={t("media.metaKind")} value={t(kindLabelKey(detail.kind))} />
       <Chip
         label={t("media.metaResolution")}
         value={

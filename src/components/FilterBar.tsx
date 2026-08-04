@@ -38,7 +38,10 @@ function toDateInput(sec: number | undefined): string {
 }
 
 /** Date-input value → Unix seconds at local start/end of that day. */
-function fromDateInput(value: string, edge: "start" | "end"): number | undefined {
+function fromDateInput(
+  value: string,
+  edge: "start" | "end",
+): number | undefined {
   if (!value) return undefined;
   const t = new Date(`${value}T${edge === "start" ? "00:00:00" : "23:59:59"}`);
   const sec = Math.floor(t.getTime() / 1000);
@@ -93,6 +96,7 @@ export function FilterBar({ value, onChange }: Props) {
           <SelectItem value="all">{t("filter.all")}</SelectItem>
           <SelectItem value="video">{t("kind.video")}</SelectItem>
           <SelectItem value="image">{t("kind.image")}</SelectItem>
+          <SelectItem value="audio">{t("kind.audio")}</SelectItem>
         </SelectContent>
       </Select>
 

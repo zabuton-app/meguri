@@ -17,10 +17,22 @@ describe("kindForExt", () => {
     expect(kindForExt("WEBP")).toBe("image");
   });
 
+  it("classifies every supported audio extension case-insensitively", () => {
+    for (const ext of ["mp3", "m4a", "aac", "flac", "ogg", "opus", "wav"]) {
+      expect(kindForExt(ext)).toBe("audio");
+      expect(kindForExt(ext.toUpperCase())).toBe("audio");
+    }
+  });
+
+  it("keeps m4v as video and m4a as audio (adjacent extensions, different sets)", () => {
+    expect(kindForExt("m4v")).toBe("video");
+    expect(kindForExt("m4a")).toBe("audio");
+  });
+
   it("returns null for unknown extensions", () => {
     expect(kindForExt("txt")).toBeNull();
     expect(kindForExt("")).toBeNull();
-    expect(kindForExt("mp3")).toBeNull();
+    expect(kindForExt("doc")).toBeNull();
   });
 });
 
@@ -79,6 +91,57 @@ describe("syncFiles lifecycle", () => {
         .get() as { c: number }
     ).c;
   }
+
+  it("re-derives kind/ext when a move changes the extension", async () => {
+    // The same bytes are video as .mp4 and audio as .m4a. Move detection is
+    // content-hash based, so this is seen as a move rather than insert+delete —
+    // and the row must not keep describing itself as the old kind.
+    await fsp.writeFile(path.join(root, "clip.mp4"), "AAAAAAAAAA");
+    await rescan();
+    db.prepare(
+      "UPDATE files SET thumb_status = 'done', thumb_path = '/t.webp'",
+    ).run();
+
+    await fsp.rename(path.join(root, "clip.mp4"), path.join(root, "clip.m4a"));
+    const after = await rescan();
+    expect(after.stats.moved).toBe(1);
+
+    const row = db
+      .prepare("SELECT kind, ext, thumb_status, thumb_path FROM files")
+      .get() as {
+      kind: string;
+      ext: string;
+      thumb_status: string;
+      thumb_path: string | null;
+    };
+    expect(row.kind).toBe("audio");
+    expect(row.ext).toBe("m4a");
+    // The old video thumbnail no longer describes the row; audio has none at all.
+    expect(row.thumb_path).toBeNull();
+    expect(row.thumb_status).toBe("pending");
+    // Audio never needs a thumbnail, so it is not queued for one.
+    expect(after.needsThumb).toEqual([]);
+  });
+
+  it("queues a thumbnail again when a move changes the kind to a visual one", async () => {
+    await fsp.writeFile(path.join(root, "track.m4a"), "AAAAAAAAAA");
+    await rescan();
+    const id = (db.prepare("SELECT id FROM files").get() as { id: number }).id;
+
+    await fsp.rename(
+      path.join(root, "track.m4a"),
+      path.join(root, "track.mp4"),
+    );
+    const after = await rescan();
+    expect(after.stats.moved).toBe(1);
+    const row = db.prepare("SELECT kind, ext FROM files").get() as {
+      kind: string;
+      ext: string;
+    };
+    expect(row.kind).toBe("video");
+    expect(row.ext).toBe("mp4");
+    expect(after.needsThumb).toContain(id);
+  });
 
   it("stores btime on insert and backfills NULL btime on an unchanged re-scan", async () => {
     await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");

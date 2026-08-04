@@ -2,7 +2,7 @@
 // small thumbnail plus title, metadata (resolution/duration/size) and tags.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ImageIcon } from "lucide-react";
 import type { FileRow } from "@/ipc/types";
@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { formatDuration, formatSize } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
@@ -70,7 +71,7 @@ export const MediaList = memo(function MediaList({
   navActive = false,
 }: Props) {
   const { t } = useI18n();
-  const navigate = useNavigate();
+  const { activate } = useActivateFile();
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const setScrollRef = useCallback((node: HTMLDivElement | null) => {
@@ -114,9 +115,10 @@ export const MediaList = memo(function MediaList({
   const onOpen = useCallback(
     (index: number) => {
       const f = items[index];
-      if (f) void navigate(fileHref(f.id, f.workspaceId));
+      // Audio loads into the bottom player bar instead of navigating (FR-010).
+      if (f) activate(f);
     },
-    [items, navigate],
+    [items, activate],
   );
   const { focusedIndex, setFocusedIndex } = useGridKeyboardNav({
     itemCount: items.length,
@@ -232,6 +234,9 @@ const MediaRow = memo(function MediaRow({
   // The row is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
   // metadata click → opens detail paused (`?autoplay=0`).
+  // Audio intercepts both and plays in the bottom bar instead of navigating.
+  const { onLinkClick } = useActivateFile();
+  const handleClick = onLinkClick(file);
   return (
     <div
       aria-current={focused ? "true" : undefined}
@@ -242,10 +247,14 @@ const MediaRow = memo(function MediaRow({
     >
       <Link
         to={fileHref(file.id, file.workspaceId)}
+        onClick={handleClick}
         className="group/thumb relative block aspect-video w-48 shrink-0 overflow-hidden rounded bg-overlay text-muted"
       >
         <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
-        {file.kind === "video" && (
+        {/* The real condition is "has a duration", which audio does. Guarded on
+            the value too: metadata lands a scan phase later, and an empty badge
+            in the meantime is worse than none. */}
+        {file.kind !== "image" && file.duration && (
           <span className="absolute bottom-0.5 right-0.5 rounded bg-bg/70 px-1 text-[10px] text-fg">
             {formatDuration(file.duration)}
           </span>
@@ -254,6 +263,7 @@ const MediaRow = memo(function MediaRow({
 
       <Link
         to={fileHref(file.id, file.workspaceId, { autoplay: false })}
+        onClick={handleClick}
         className="flex min-w-0 flex-1 flex-col gap-1 py-0.5"
       >
         <div className="flex items-center gap-2">
@@ -291,7 +301,7 @@ function metaLine(file: FileRow): string {
   const dims =
     file.width && file.height ? `${file.width}×${file.height}` : null;
   const dur =
-    file.kind === "video" && file.duration
+    file.kind !== "image" && file.duration
       ? formatDuration(file.duration)
       : null;
   const size = formatSize(file.size);

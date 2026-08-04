@@ -34,6 +34,7 @@ import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
 import { describeDateRange } from "@/lib/smartCollections";
 import { HomeHeader } from "./HomeHeader";
 import { ActiveFilterChips, type ChipEntry } from "./ActiveFilterChips";
+import { kindLabelKey } from "@/lib/mediaKind";
 import {
   VIEW_KEY,
   type ViewMode,
@@ -119,7 +120,7 @@ export default function Home() {
   if (filter.kind)
     activeChips.push({
       key: "kind",
-      label: filter.kind === "video" ? t("kind.video") : t("kind.image"),
+      label: t(kindLabelKey(filter.kind)),
       clear: () => patchFilter({ kind: undefined }),
     });
   if (filter.ratingMin)
@@ -278,7 +279,9 @@ export default function Home() {
       if (!jobId) {
         setScanning(false);
         toast.error(
-          t(status.data?.ready ? "home.scanAlreadyRunning" : "home.noWorkspace"),
+          t(
+            status.data?.ready ? "home.scanAlreadyRunning" : "home.noWorkspace",
+          ),
           { id: "scan-start-unavailable" },
         );
         return;
@@ -293,8 +296,7 @@ export default function Home() {
       setScanning(false);
       toast.error(t("home.scanStartFailed"), {
         id: "scan-start-failed",
-        description:
-          error instanceof Error ? error.message : String(error),
+        description: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -473,7 +475,14 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [location.pathname, helpOpen, commandOpen, editCollection, editWorkspace, t]);
+  }, [
+    location.pathname,
+    helpOpen,
+    commandOpen,
+    editCollection,
+    editWorkspace,
+    t,
+  ]);
 
   return (
     <div className="flex h-full flex-col">
@@ -604,7 +613,9 @@ export default function Home() {
         aria-disabled={!status.data?.ready}
         tabIndex={status.data?.ready ? undefined : -1}
         className={cn(
-          "fixed bottom-5 right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          // Lifted clear of the audio player bar when one is showing (the
+          // variable is 0 otherwise, keeping the original offset).
+          "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-h))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           !status.data?.ready && "pointer-events-none opacity-45",
         )}
       >

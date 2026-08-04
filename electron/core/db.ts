@@ -9,17 +9,14 @@ export type DB = Database.Database;
 const FTS_DDL =
   "CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(rel_path, tags_text, tokenize='trigram')";
 
-const CORE_DDL = `
-CREATE TABLE IF NOT EXISTS scan_roots (
-  id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, path_hash TEXT NOT NULL,
-  last_scan_at INTEGER, created_at INTEGER NOT NULL
-);
-
+// Shared between CORE_DDL and the rebuild in migrateKindCheck so the two can never
+// drift apart (same rationale as FTS_DDL above).
+const FILES_DDL = `
 CREATE TABLE IF NOT EXISTS files (
   id INTEGER PRIMARY KEY,
   root_id INTEGER NOT NULL REFERENCES scan_roots(id) ON DELETE CASCADE,
   rel_path TEXT NOT NULL, abs_path TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('video','image')),
+  kind TEXT NOT NULL CHECK (kind IN ('video','image','audio')),
   ext TEXT, size INTEGER, mtime INTEGER, btime INTEGER, inode INTEGER, content_hash TEXT,
   width INTEGER, height INTEGER, duration REAL, codec TEXT, fps REAL, captured_at INTEGER,
   thumb_path TEXT, thumb_status TEXT NOT NULL DEFAULT 'pending'
@@ -30,7 +27,15 @@ CREATE TABLE IF NOT EXISTS files (
   meta_key TEXT GENERATED ALWAYS AS
     (COALESCE(content_hash, 'p:' || root_id || ':' || rel_path)) VIRTUAL,
   UNIQUE (root_id, rel_path)
+)`;
+
+const CORE_DDL = `
+CREATE TABLE IF NOT EXISTS scan_roots (
+  id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, path_hash TEXT NOT NULL,
+  last_scan_at INTEGER, created_at INTEGER NOT NULL
 );
+
+${FILES_DDL};
 CREATE INDEX IF NOT EXISTS idx_files_root ON files(root_id);
 CREATE INDEX IF NOT EXISTS idx_files_kind ON files(kind);
 CREATE INDEX IF NOT EXISTS idx_files_captured ON files(captured_at);
@@ -118,6 +123,9 @@ export function openDb(file: string): DB {
   db.pragma("foreign_keys = ON");
   db.exec(CORE_DDL);
   backfillColumns(db);
+  // Must run before migrateFtsToTrigram: that migration reads `files`, so it has to
+  // see the final table rather than one about to be rebuilt underneath it.
+  migrateKindCheck(db);
   migrateFtsToTrigram(db);
   return db;
 }
@@ -156,6 +164,52 @@ function backfillColumns(db: DB): void {
   );
 }
 
+/** Versionless idempotent migration: DBs created before audio support carry a
+ *  `CHECK (kind IN ('video','image'))` on files, which rejects every audio INSERT.
+ *  SQLite cannot ALTER a CHECK constraint, so the table is rebuilt once.
+ *
+ *  Detected from the stored DDL rather than a version number (Principle III), so it is
+ *  safe to run from any prior state and safe to re-run. Unlike files_fts this table is
+ *  NOT derived data — the copy must be lossless:
+ *  - `files.id` is carried across explicitly: files_fts is a standalone FTS5 table
+ *    (not content=files) whose rowid is set to files.id by syncFts, and searches
+ *    join the two on it — renumbering would silently break every search result.
+ *  - The column list is read from the live table so a DB that pre-dates `btime`
+ *    (added by backfillColumns) copies only the columns it actually has.
+ *  - `meta_key` is a VIRTUAL generated column and must be excluded from the INSERT;
+ *    it re-derives itself from content_hash / root_id / rel_path.
+ *  - DROP TABLE takes the indexes with it, so CORE_DDL and backfillColumns are re-run
+ *    afterwards to restore them.
+ *  User-curated metadata is keyed by meta_key in separate tables and is untouched. */
+function migrateKindCheck(db: DB): void {
+  const row = db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'files'",
+    )
+    .get() as { sql: string } | undefined;
+  if (!row || row.sql.includes("'audio'")) return;
+  // Real (non-generated) columns of the existing table. PRAGMA table_info omits
+  // VIRTUAL generated columns, which is exactly the meta_key exclusion we need.
+  const cols = (
+    db.prepare("PRAGMA table_info(files)").all() as { name: string }[]
+  )
+    .map((r) => r.name)
+    .filter((n) => n !== "meta_key");
+  const colList = cols.map((c) => `"${c}"`).join(", ");
+  db.transaction(() => {
+    db.exec("ALTER TABLE files RENAME TO files_old");
+    // Recreate `files` (and only it) with the widened CHECK; CORE_DDL below restores
+    // the indexes that RENAME carried over to files_old.
+    db.exec(FILES_DDL);
+    db.exec(`INSERT INTO files (${colList}) SELECT ${colList} FROM files_old`);
+    db.exec("DROP TABLE files_old");
+  })();
+  // Indexes on the old table were dropped with it; CORE_DDL and backfillColumns are
+  // both idempotent and recreate every index (including the btime ones).
+  db.exec(CORE_DDL);
+  backfillColumns(db);
+}
+
 /** Versionless idempotent migration: DBs created before the trigram switch still carry
  *  a unicode61 files_fts (CREATE VIRTUAL TABLE IF NOT EXISTS leaves it alone), so the
  *  tokenizer is detected from the stored DDL and the table rebuilt once. files_fts is
@@ -163,7 +217,9 @@ function backfillColumns(db: DB): void {
  *  loses nothing; all user-curated metadata is keyed by meta_key and unaffected. */
 function migrateFtsToTrigram(db: DB): void {
   const row = db
-    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'files_fts'")
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'files_fts'",
+    )
     .get() as { sql: string } | undefined;
   if (!row || row.sql.includes("trigram")) return;
   db.transaction(() => {
