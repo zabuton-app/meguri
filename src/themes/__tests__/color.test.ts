@@ -3,7 +3,9 @@ import {
   awayFrom,
   contrastRatio,
   ensureContrast,
+  farSide,
   fromOklab,
+  opposite,
   parseHex,
   pickFirst,
   relativeLuminance,
@@ -65,6 +67,27 @@ describe("awayFrom", () => {
   it("darkens on light backgrounds and lightens on dark ones", () => {
     expect(awayFrom("#fafafa")).toBe("darker");
     expect(awayFrom("#0f1419")).toBe("lighter");
+  });
+});
+
+describe("farSide", () => {
+  it("continues past the color, whichever side it is on", () => {
+    expect(farSide("#0f1419", "#272d38")).toBe("lighter");
+    expect(farSide("#fafafa", "#e1e1e2")).toBe("darker");
+  });
+
+  it("reads the pair, not the light/dark classification of one color", () => {
+    // A background just past the WCAG light/dark split with a fill raised above it: classifying
+    // the background alone would send the fill back down toward it.
+    const bg = "#787878";
+    const fill = "#8a8a8a";
+    expect(awayFrom(bg)).toBe("darker");
+    expect(farSide(bg, fill)).toBe("lighter");
+  });
+
+  it("opposite() turns it around", () => {
+    expect(opposite("lighter")).toBe("darker");
+    expect(opposite("darker")).toBe("lighter");
   });
 });
 

@@ -90,17 +90,39 @@ export function awayFrom(bg: Hex): Direction {
   return relativeLuminance(bg) > LIGHT_BG_LUMINANCE ? "darker" : "lighter";
 }
 
+/**
+ * The direction that takes `color` even further from `bg`.
+ *
+ * Unlike {@link awayFrom} this reads the pair's actual relationship instead of classifying a
+ * single color as light or dark, so it stays right for a raised fill whose background sits
+ * near the light/dark boundary, or on the "wrong" side of it.
+ */
+export function farSide(bg: Hex, color: Hex): Direction {
+  return relativeLuminance(color) >= relativeLuminance(bg)
+    ? "lighter"
+    : "darker";
+}
+
+export const opposite = (direction: Direction): Direction =>
+  direction === "lighter" ? "darker" : "lighter";
+
 const satisfies = (color: Hex, reqs: ContrastReq[]): boolean =>
   reqs.every((r) => contrastRatio(color, r.against) >= r.ratio);
 
 /**
- * Return `color` if it already meets every requirement, otherwise the nearest color along
- * the OKLab lightness axis that does.
+ * Return `color` if it already meets every requirement, otherwise the nearest color that does,
+ * searching along the OKLab lightness axis **in one direction only**.
+ *
+ * That direction is `direction` when given, and otherwise the one that moves away from the
+ * first requirement's background. It is not "nearest in both directions": with several
+ * requirements, or a mid-tone color, the two directions are not equivalent, and callers that
+ * care (raised fills, which must not slide back toward the page) pass it explicitly.
  *
  * The search runs a fixed 24 bisection steps (finer than 8-bit quantization) and only ever
  * keeps candidates that were measured *after* rounding to sRGB, so the returned color really
- * meets the target. When even pure black/white cannot reach it, the extreme is returned as a
- * best effort — never throws, so adding a pathological palette degrades instead of crashing.
+ * meets the target. When the extreme of the chosen direction (pure black or white) still
+ * cannot reach it, that extreme is returned as a best effort — never throws, so adding a
+ * pathological palette degrades instead of crashing.
  */
 export function ensureContrast(
   color: Hex,

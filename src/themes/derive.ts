@@ -11,9 +11,10 @@
 // unchanged, which keeps schemes that were fine — gruvbox-dark and friends — looking the same.
 import type { Base16Scheme } from "./base16";
 import {
-  awayFrom,
   contrastRatio,
   ensureContrast,
+  farSide,
+  opposite,
   pickFirst,
   type ContrastReq,
   type Hex,
@@ -139,20 +140,30 @@ function computeTokens(scheme: Base16Scheme): DerivedTokens {
   // along the lightness axis. Every current scheme clears both with room to spare; a palette
   // that does not will fail the "separates ... fills" tests in derive.test.ts, and the fix
   // there is to raise FLOORS.fg rather than to lower the floors here.
-  const towardBg = awayFrom(bg) === "lighter" ? "darker" : "lighter";
+  //
+  // Each step's direction is read off the fill's own position relative to bg rather than from
+  // a light/dark classification of a single color, so "raise it further" and "pull it back"
+  // stay meaningful even when bg and surface land on opposite sides of that classification.
+  const raisedOverlay = ensureContrast(raw("overlay"), [
+    req(bg, FLOORS.overlay[0]),
+    req(surface, FLOORS.overlay[1]),
+  ]);
   const overlay = ensureContrast(
-    ensureContrast(raw("overlay"), [
-      req(bg, FLOORS.overlay[0]),
-      req(surface, FLOORS.overlay[1]),
-    ]),
+    raisedOverlay,
     [req(fg, FLOORS.textOnRaised)],
-    towardBg,
+    opposite(farSide(bg, raisedOverlay)),
   );
-  // The menu highlight separates from the popover background, which is surface.
+  // The menu highlight separates from the popover background, which is surface — but it has to
+  // do so by moving further from the page, not by sliding back toward it.
+  const raisedHover = ensureContrast(
+    overlay,
+    [req(surface, FLOORS.hover)],
+    farSide(bg, overlay),
+  );
   const hover = ensureContrast(
-    ensureContrast(overlay, [req(surface, FLOORS.hover)], awayFrom(bg)),
+    raisedHover,
     [req(brightFg, FLOORS.textOnRaised)],
-    towardBg,
+    opposite(farSide(bg, raisedHover)),
   );
 
   const accentText = (token: SemanticToken): Hex =>

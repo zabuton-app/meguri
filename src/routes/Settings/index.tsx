@@ -262,6 +262,7 @@ export default function Settings() {
                 const variant = fam[mode] ?? fam.dark ?? fam.light;
                 if (!variant) return null;
                 const active = fam.id === familyId;
+                const swatch = deriveTokens(variant);
                 return (
                   <button
                     key={fam.id}
@@ -280,9 +281,7 @@ export default function Settings() {
                           <span
                             key={token}
                             className="h-4 w-4"
-                            style={{
-                              backgroundColor: deriveTokens(variant)[token],
-                            }}
+                            style={{ backgroundColor: swatch[token] }}
                           />
                         ))}
                       </span>
