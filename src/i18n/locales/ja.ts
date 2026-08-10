@@ -28,6 +28,11 @@ export const ja = {
   "settings.light": "ライト",
   "settings.dark": "ダーク",
   "settings.theme": "テーマ",
+
+  // 外観トグル（ヘッダー）
+  "theme.switchToLight": "ライトモードに切り替え",
+  "theme.switchToDark": "ダークモードに切り替え",
+
   "settings.language": "言語",
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",

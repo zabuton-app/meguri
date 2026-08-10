@@ -29,6 +29,11 @@ export const fr: Record<TranslationKey, string> = {
   "settings.light": "Clair",
   "settings.dark": "Sombre",
   "settings.theme": "Thème",
+
+  // Appearance toggle (header)
+  "theme.switchToLight": "Passer au mode clair",
+  "theme.switchToDark": "Passer au mode sombre",
+
   "settings.language": "Langue",
   "settings.languageDesc": "Changer la langue d'affichage de l'interface.",
   "settings.scenes": "Miniatures de scène",

@@ -28,6 +28,11 @@ export const ko: Record<TranslationKey, string> = {
   "settings.light": "라이트",
   "settings.dark": "다크",
   "settings.theme": "테마",
+
+  // Appearance toggle (header)
+  "theme.switchToLight": "라이트 모드로 전환",
+  "theme.switchToDark": "다크 모드로 전환",
+
   "settings.language": "언어",
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",

@@ -28,6 +28,11 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.light": "浅色",
   "settings.dark": "深色",
   "settings.theme": "主题",
+
+  // Appearance toggle (header)
+  "theme.switchToLight": "切换到浅色模式",
+  "theme.switchToDark": "切换到深色模式",
+
   "settings.language": "语言",
   "settings.languageDesc": "切换界面的显示语言。",
   "settings.scenes": "场景缩略图数量",
