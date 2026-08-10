@@ -91,7 +91,7 @@ export function TagEditor({ tags, workspaceId, onAdd, onRemove }: Props) {
           if (e.key === "Enter") submit();
         }}
         placeholder={t("tag.addPlaceholder")}
-        className="h-8 rounded-md border border-border bg-bg px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 rounded-md border border-border-strong bg-bg px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
       />
       <datalist id={listId}>
         {suggestions.map((s) => (

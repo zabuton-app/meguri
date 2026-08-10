@@ -65,9 +65,27 @@ in the shadcn style). Confirmation dialogs use `ConfirmProvider` / `useConfirm`
 
 ## Theming
 
-Theming is a base16-based multi-theme system in `src/themes/` (`base16.ts`,
-`schemes.ts`, `ThemeProvider.tsx`), covering schemes such as gruvbox, solarized,
-and nord.
+Theming is a base16-based multi-theme system in `src/themes/`, covering schemes
+such as gruvbox, solarized, and nord. It has four layers:
+
+- `base16.ts` — the `Base16Scheme` shape only.
+- `schemes.ts` — the palettes, kept verbatim from their upstream definitions.
+- `derive.ts` — maps base16 slots onto semantic tokens **and enforces contrast
+  floors** (`FLOORS`). A base16 palette is not a contrast-checked design system:
+  several upstream schemes have non-monotonic ramps (ayu-light's base02 is
+  lighter than base01) or repurpose slots for accents (catppuccin-latte's base06
+  is salmon), so mapping slots straight onto UI roles produces themes where
+  hairlines or even body text disappear. Corrections move only the OKLab
+  lightness, so hue and chroma survive, and a color that already clears its floor
+  is passed through untouched.
+- `ThemeProvider.tsx` — injects one `html[data-theme="<id>"]` block per scheme at
+  import time (before the first paint, which is what `public/theme-boot.js`
+  assumes) and switches `<html data-theme>`.
+
+Adding a theme means adding its palette to `schemes.ts`; nothing else needs to be
+touched. `src/themes/__tests__/derive.test.ts` runs every scheme through the
+floors and the hierarchy invariants, so a palette that would break somewhere in
+the UI fails there instead of shipping.
 
 ## Content zoom
 
