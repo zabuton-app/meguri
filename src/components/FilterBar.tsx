@@ -61,7 +61,12 @@ export function FilterBar({ value, onChange }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-border bg-bg px-4 py-2">
-      <div className="relative flex min-w-0 flex-1 items-center">
+      {/* grow + a non-zero basis (flex-1 would zero it): with a 0 basis this box
+          never counts toward a row's width, so the wrapping bar never breaks a
+          line and the fixed-width controls squeeze the input down to nothing.
+          min-w-0 stays so it can still shrink below the basis when one row is
+          all we get. */}
+      <div className="relative flex min-w-0 grow basis-48 items-center">
         <Search className="pointer-events-none absolute left-2 size-3.5 text-muted" />
         <Input
           id="list-search-input"
