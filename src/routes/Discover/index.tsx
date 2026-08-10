@@ -9,6 +9,7 @@ import { Maximize2, Minimize2, RefreshCw, Sparkles, X } from "lucide-react";
 import { api, events } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { syncFileRowAcrossCaches } from "@/lib/queryCache";
+import { cn } from "@/lib/utils";
 import type { FileRow } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +36,11 @@ import {
   QUEUE_SIZE,
   parseDiscoverFilter,
 } from "./utils";
+
+// The arrows overlay the card, so keep their disabled-hover background identical
+// to the resting one (the primitive clears it, assuming arrows sit outside).
+const ARROW_CLASS =
+  "z-20 size-11 border-border/60 bg-bg/50 backdrop-blur-md disabled:hover:bg-bg/50";
 
 // Remembers the last viewed queue position so returning from the detail page resumes there.
 // Module-level (not state) because the component unmounts while the detail modal is open.
@@ -343,8 +349,8 @@ export default function Discover() {
                 </CarouselItem>
               ))}
             </CarouselContent>
-            <CarouselPrevious className="left-3 z-20 size-11 border-border/60 bg-bg/50 backdrop-blur-md" />
-            <CarouselNext className="right-3 z-20 size-11 border-border/60 bg-bg/50 backdrop-blur-md" />
+            <CarouselPrevious className={cn("left-3", ARROW_CLASS)} />
+            <CarouselNext className={cn("right-3", ARROW_CLASS)} />
           </Carousel>
         )}
       </div>
