@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTheme } from "@/themes/ThemeProvider";
+import { deriveTokens, type Token } from "@/themes/derive";
 import { LANGUAGES, useI18n, type Lang } from "@/i18n/I18nProvider";
 import { type TranslationKey } from "@/i18n/locales/ja";
 import {
@@ -33,6 +34,18 @@ import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/amgsk";
+
+// Swatches for the theme picker. Derived tokens, not raw palette slots, so what the swatch
+// shows is what the UI will actually use — and the chrome colors that used to be invisible in
+// some themes (hairlines, secondary text) can be judged before switching.
+const PREVIEW_TOKENS: Token[] = [
+  "bg",
+  "border",
+  "muted",
+  "primary",
+  "accent2",
+  "error",
+];
 
 const FRAME_QUALITY_LABELS: Record<FrameQuality, TranslationKey> = {
   low: "settings.frameQualityLow",
@@ -263,11 +276,13 @@ export default function Settings() {
                   >
                     <span className="flex items-center gap-2">
                       <span className="flex overflow-hidden rounded-[3px] border border-border">
-                        {[0, 8, 11, 13, 14].map((i) => (
+                        {PREVIEW_TOKENS.map((token) => (
                           <span
-                            key={i}
+                            key={token}
                             className="h-4 w-4"
-                            style={{ backgroundColor: variant.palette[i] }}
+                            style={{
+                              backgroundColor: deriveTokens(variant)[token],
+                            }}
                           />
                         ))}
                       </span>

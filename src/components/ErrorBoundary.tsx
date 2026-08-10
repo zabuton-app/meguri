@@ -30,20 +30,22 @@ export class ErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     if (!this.state.hasError) return this.props.children;
     if (this.props.fallback !== undefined) return this.props.fallback;
+    // Inline styles (Tailwind classes could themselves be what failed), but still the theme
+    // variables: hardcoded dark colors would blind-side anyone on a light theme.
     return (
       <div
         style={{
           padding: 24,
           fontFamily: "system-ui, sans-serif",
-          color: "#eee",
-          background: "#222",
+          color: "var(--c-fg)",
+          background: "var(--c-bg)",
           minHeight: "100vh",
         }}
       >
         <h1 style={{ fontSize: 18, marginBottom: 12 }}>
           Something went wrong.
         </h1>
-        <p style={{ marginBottom: 16, opacity: 0.8 }}>
+        <p style={{ marginBottom: 16, color: "var(--c-muted)" }}>
           The error has been logged. You can try reloading the window.
         </p>
         <button
@@ -51,9 +53,9 @@ export class ErrorBoundary extends Component<Props, State> {
           onClick={() => location.reload()}
           style={{
             padding: "6px 12px",
-            background: "#444",
-            color: "#fff",
-            border: "1px solid #666",
+            background: "var(--c-surface)",
+            color: "var(--c-fg)",
+            border: "1px solid var(--c-border-strong)",
             borderRadius: 4,
             cursor: "pointer",
           }}

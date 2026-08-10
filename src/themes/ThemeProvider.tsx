@@ -8,10 +8,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { schemeToCssVars } from "./base16";
+import { deriveTokens, schemeToCssVars } from "./derive";
 import { DEFAULT_THEME, SCHEMES } from "./schemes";
 
 const LS_KEY = "meguri.theme";
+const LS_BG_KEY = "meguri.theme.bg";
 
 export type Appearance = "light" | "dark";
 
@@ -56,39 +57,67 @@ interface ThemeCtx {
 
 const Ctx = createContext<ThemeCtx | null>(null);
 
-/** Generate the CSS for all schemes once (only changes when a theme is added). */
+const defaultScheme = SCHEMES.find((s) => s.id === DEFAULT_THEME) ?? SCHEMES[0];
+
+/**
+ * Generate the CSS for all schemes once (only changes when a theme is added).
+ *
+ * `html[data-theme]` rather than `[data-theme]`: the extra specificity makes these blocks
+ * independent of where this <style> lands relative to styles.css in the document. The `:root`
+ * block is the safety net for a data-theme value that matches no scheme (a renamed id left in
+ * localStorage), which would otherwise leave every --c-* undefined.
+ */
 function buildStyleSheet(): string {
-  return SCHEMES.map(
-    (s) => `[data-theme="${s.id}"] {\n${schemeToCssVars(s)}\n}`,
-  ).join("\n\n");
+  return [
+    `:root {\n${schemeToCssVars(defaultScheme)}\n}`,
+    ...SCHEMES.map(
+      (s) => `html[data-theme="${s.id}"] {\n${schemeToCssVars(s)}\n}`,
+    ),
+  ].join("\n\n");
 }
+
+/**
+ * Inject at import time, not from an effect: public/theme-boot.js sets data-theme before the
+ * first paint, so the matching variables have to exist by then as well. main.tsx imports this
+ * module before it calls createRoot().render().
+ */
+function injectStyleSheet(): void {
+  if (typeof document === "undefined") return;
+  const id = "meguri-theme-vars";
+  let el = document.getElementById(id) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement("style");
+    el.id = id;
+    document.head.appendChild(el);
+  }
+  el.textContent = buildStyleSheet();
+}
+
+injectStyleSheet();
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<string>(() => {
+    let stored: string | null = null;
     try {
-      return localStorage.getItem(LS_KEY) || DEFAULT_THEME;
+      stored = localStorage.getItem(LS_KEY);
     } catch {
-      return DEFAULT_THEME;
+      // ignore
     }
+    // A stale id (renamed or removed scheme) would match no [data-theme] block at all.
+    return SCHEMES.find((s) => s.id === stored)?.id ?? DEFAULT_THEME;
   });
-
-  // Inject the CSS sheet only once.
-  useEffect(() => {
-    const id = "meguri-theme-vars";
-    let el = document.getElementById(id) as HTMLStyleElement | null;
-    if (!el) {
-      el = document.createElement("style");
-      el.id = id;
-      document.head.appendChild(el);
-    }
-    el.textContent = buildStyleSheet();
-  }, []);
 
   // Apply data-theme + save the LS mirror.
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    const scheme = SCHEMES.find((s) => s.id === theme);
+    const bg = scheme && deriveTokens(scheme).bg;
+    if (bg) document.documentElement.style.backgroundColor = bg;
     try {
       localStorage.setItem(LS_KEY, theme);
+      // Read back by public/theme-boot.js, which runs before the bundle and therefore before
+      // any palette is available (see injectStyleSheet).
+      if (bg) localStorage.setItem(LS_BG_KEY, bg);
     } catch {
       // ignore
     }
