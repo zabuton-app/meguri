@@ -5,6 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { PreferencesProvider } from "@/settings/PreferencesProvider";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
+import { ThemeProvider } from "@/themes/ThemeProvider";
 
 export interface RenderWithProvidersOptions extends Omit<
   RenderOptions,
@@ -34,13 +35,15 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <I18nProvider>
-          <PreferencesProvider>
-            <ConfirmProvider>
-              <HashRouter>{children}</HashRouter>
-            </ConfirmProvider>
-          </PreferencesProvider>
-        </I18nProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <PreferencesProvider>
+              <ConfirmProvider>
+                <HashRouter>{children}</HashRouter>
+              </ConfirmProvider>
+            </PreferencesProvider>
+          </I18nProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     );
   }

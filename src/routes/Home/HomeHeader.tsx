@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import type { TFunc } from "@/i18n/I18nProvider";
 import type { ViewMode } from "./utils";
@@ -205,6 +206,7 @@ export function HomeHeader({
             </DropdownMenuContent>
           </DropdownMenu>
         </ButtonGroup>
+        <ThemeToggle />
       </div>
     </header>
   );
