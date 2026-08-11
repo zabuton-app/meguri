@@ -12,6 +12,7 @@ import type {
 import type {
   ScanDone,
   ScanProgress,
+  TagRef,
   ThumbDone,
   UpdateInfo,
 } from "@shared/ipc/schema";
@@ -90,6 +91,12 @@ export const api = {
     invoke("file_remove_tag", { id, workspaceId, tagId }),
   tagsList: (workspaceId: string, prefix: string, limit?: number) =>
     invoke("tags_list", { workspaceId, prefix, limit }),
+  /** Whole tag catalog for the tag management screen (scope follows the active view). */
+  tagsListAll: () => invoke("tags_list_all"),
+  tagRename: (from: TagRef, to: string) => invoke("tag_rename", { from, to }),
+  tagMerge: (from: TagRef[], into: TagRef) =>
+    invoke("tag_merge", { from, into }),
+  tagDelete: (tags: TagRef[]) => invoke("tag_delete", { tags }),
   fileRecordPlay: (
     id: number,
     workspaceId: string,

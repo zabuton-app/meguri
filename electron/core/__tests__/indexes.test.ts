@@ -64,14 +64,18 @@ describe("index query plans", () => {
     expect(p).not.toContain("TEMP B-TREE");
   });
 
-  it("tag-name prefix autocomplete is a range search on idx_tags_name", () => {
-    // Mirrors listTagNames' SQL: the NOCASE collation on ORDER BY lets the
-    // index satisfy the sort too (no temp b-tree).
+  it("tag-name prefix autocomplete is a range search on idx_tags_manual_name", () => {
+    // Mirrors listTagNames' SQL: the namespace = '' predicate restricts completion
+    // to user-owned tags, and the partial index over the same predicate keeps the
+    // range search covering. The NOCASE collation on ORDER BY lets the index
+    // satisfy the sort too (no temp b-tree).
     const p = plan(
       db,
-      "SELECT name FROM tags WHERE name LIKE 'pre%' ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT 20",
+      "SELECT name FROM tags WHERE namespace = '' AND name LIKE 'pre%' ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT 20",
     );
-    expect(p).toContain("SEARCH tags USING COVERING INDEX idx_tags_name");
+    expect(p).toContain(
+      "SEARCH tags USING COVERING INDEX idx_tags_manual_name",
+    );
     expect(p).not.toContain("TEMP B-TREE");
   });
 

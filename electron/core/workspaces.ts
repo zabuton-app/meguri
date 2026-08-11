@@ -117,6 +117,11 @@ export class Workspaces {
       : null;
   }
 
+  /** How many roots are registered, including any whose DB fails to open. */
+  rootCount(): number {
+    return this.config.roots.length;
+  }
+
   /** All registered workspaces resolved to Cores, skipping any that fail to initialize. */
   allCores(): { id: string; core: Core }[] {
     const out: { id: string; core: Core }[] = [];

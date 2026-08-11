@@ -99,6 +99,22 @@ export function invalidateTagSearches(qc: QueryClient): void {
 }
 
 /**
+ * Invalidate everything that embeds tag names, after a catalog-level edit
+ * (rename / merge / delete).
+ *
+ * Deliberately broader than invalidateTagSearches: tag names are denormalized
+ * into every row's `tags[]`, so there is no row to patch — the name itself
+ * changed. These edits are rare and explicitly user-initiated, so a wide
+ * invalidation is the right trade.
+ */
+export function invalidateTagCatalog(qc: QueryClient): void {
+  void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+  void qc.invalidateQueries({ queryKey: ["files_search"] });
+  void qc.invalidateQueries({ queryKey: ["files_random"] });
+  void qc.invalidateQueries({ queryKey: ["file_get"] });
+}
+
+/**
  * Invalidate only the searches scoped to a user collection (membership changes
  * on add/remove-from-collection); regular workspace lists are unaffected.
  */

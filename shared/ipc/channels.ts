@@ -12,12 +12,17 @@ import type {
   HistoryPage,
   SceneBookmark,
   SearchResult,
+  TagList,
   UpdateInfo,
   UserCollection,
   WorkspaceStats,
   WorkspacesList,
 } from "./schema.js";
-import { HistoryQuerySchema, SearchQuerySchema } from "./schema.js";
+import {
+  HistoryQuerySchema,
+  SearchQuerySchema,
+  TagRefSchema,
+} from "./schema.js";
 import {
   EVENT_CHANNELS,
   INVOKE_CHANNELS,
@@ -82,13 +87,28 @@ export const ChannelInputs = {
   history_list: z.object({ query: HistoryQuerySchema.optional() }).default({}),
   duplicates_list: z.void(),
   history_clear: z.void(),
-  file_add_tag: FileTarget.extend({ name: z.string() }),
+  // Same ceiling as tag_rename's `to` and TagRefSchema.name.
+  file_add_tag: FileTarget.extend({ name: z.string().min(1).max(64) }),
   file_remove_tag: FileTarget.extend({ tagId: z.number() }),
   tags_list: z.object({
     workspaceId: z.string(),
     prefix: z.string(),
     limit: z.number().optional(),
   }),
+  // The tag-catalog channels take no workspaceId: scope comes from the active
+  // view (like duplicates_list), and tags are addressed by name because ids are
+  // per-database and meaningless across the "All" view.
+  tags_list_all: z.void(),
+  tag_rename: z.object({
+    from: TagRefSchema,
+    /** New plain name; the namespace is always "" since only manual tags are editable. */
+    to: z.string().min(1).max(64),
+  }),
+  tag_merge: z.object({
+    from: z.array(TagRefSchema).min(1),
+    into: TagRefSchema,
+  }),
+  tag_delete: z.object({ tags: z.array(TagRefSchema).min(1) }),
   bookmark_add: FileTarget.extend({ sec: z.number() }),
   bookmark_remove: FileTarget.extend({ bookmarkId: z.number() }),
   thumb_set_offset: FileTarget.extend({ sec: z.number().nullable() }),
@@ -122,9 +142,10 @@ type AssertChannelInputsMatch =
       ];
 type Expect<T extends true> = T;
 
-export type ChannelName = Expect<AssertChannelInputsMatch> extends true
-  ? keyof typeof ChannelInputs
-  : never;
+export type ChannelName =
+  Expect<AssertChannelInputsMatch> extends true
+    ? keyof typeof ChannelInputs
+    : never;
 export type ChannelInput<C extends ChannelName> = z.infer<
   (typeof ChannelInputs)[C]
 >;
@@ -163,6 +184,15 @@ export interface ChannelOutputs {
   file_add_tag: number;
   file_remove_tag: void;
   tags_list: string[];
+  tags_list_all: TagList;
+  // The counters below are summed over the databases in scope, so in the "All"
+  // view a tag present in three workspaces reports removedTags: 3 for one
+  // logical tag, and a file shared between workspaces is counted once per
+  // database. They are progress feedback, not identities.
+  /** merged=true when the new name already existed and the rename escalated to a merge. */
+  tag_rename: { merged: boolean; affectedFiles: number };
+  tag_merge: { affectedFiles: number };
+  tag_delete: { removedTags: number; affectedFiles: number };
   bookmark_add: SceneBookmark | null;
   bookmark_remove: void;
   thumb_set_offset: { ok: boolean; thumbOffsetSec: number | null };
@@ -213,8 +243,5 @@ export interface UpdateSettings {
   /** Version the user chose to skip ("don't notify me about this one"), if any. */
   ignoredVersion: string | null;
 }
-export type ChannelOutput<C extends ChannelName> = Expect<
-  AssertChannelOutputsMatch
-> extends true
-  ? ChannelOutputs[C]
-  : never;
+export type ChannelOutput<C extends ChannelName> =
+  Expect<AssertChannelOutputsMatch> extends true ? ChannelOutputs[C] : never;

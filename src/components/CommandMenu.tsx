@@ -8,6 +8,7 @@ import {
   Settings,
   Sparkles,
   Table2,
+  Tags as TagsIcon,
   Terminal,
 } from "lucide-react";
 import {
@@ -37,6 +38,7 @@ interface CommandMenuProps {
   onRebuild: () => void;
   onSetView: (view: ViewMode) => void;
   onDiscover: () => void;
+  onTags: () => void;
   onSettings: () => void;
   onHelp: () => void;
   onOpenDevTools: () => void;
@@ -80,6 +82,7 @@ export function CommandMenu({
   onRebuild,
   onSetView,
   onDiscover,
+  onTags,
   onSettings,
   onHelp,
   onOpenDevTools,
@@ -102,6 +105,12 @@ export function CommandMenu({
       icon: Sparkles,
       disabled: !ready,
       run: () => closeThen(onDiscover),
+    }),
+    action(t, "tags.title", {
+      id: "tags",
+      icon: TagsIcon,
+      disabled: !ready,
+      run: () => closeThen(onTags),
     }),
     action(t, "settings.title", {
       id: "settings",

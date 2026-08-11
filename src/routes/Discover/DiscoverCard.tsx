@@ -9,6 +9,10 @@ import { RatingStars } from "@/components/RatingStars";
 import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { formatDuration, formatSize } from "@/lib/format";
+import { LIST_HIDDEN_SOURCES } from "@shared/tags";
+import { tagColorClass } from "@/lib/tagColorClass";
+import { tagHumanLabel } from "@/lib/tagLabel";
+import { TagChipLabel } from "@/components/TagChipLabel";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { detailPath } from "./utils";
 import { SceneRail } from "./SceneRail";
@@ -179,15 +183,21 @@ export function DiscoverCard({
                   isFav ? "text-error" : "text-muted hover:text-error",
                 )}
               >
-                <Heart
-                  className={cn("size-3.5", isFav && "fill-current")}
-                />
+                <Heart className={cn("size-3.5", isFav && "fill-current")} />
               </button>
               <RatingStars value={file.rating} onChange={onRate} size={14} />
             </Chip>
-            {file.tags?.map((tag) => (
-              <Chip key={`${tag.id}-${tag.source}`}>{tag.name}</Chip>
-            ))}
+            {file.tags
+              ?.filter((tag) => !LIST_HIDDEN_SOURCES.includes(tag.source))
+              .map((tag) => (
+                <Chip
+                  key={`${tag.id}-${tag.source}`}
+                  className={tagColorClass(tag.source)}
+                  title={tagHumanLabel(t, tag.namespace, tag.name)}
+                >
+                  <TagChipLabel namespace={tag.namespace} name={tag.name} />
+                </Chip>
+              ))}
           </div>
         </div>
 
@@ -229,13 +239,16 @@ function Chip({
   children,
   interactive,
   className,
+  title,
 }: {
   children: ReactNode;
   interactive?: boolean;
   className?: string;
+  title?: string;
 }) {
   return (
     <span
+      title={title}
       className={cn(
         "flex items-center rounded-md border border-border/60 bg-bg/50 px-2 py-1 text-xs text-fg backdrop-blur-md",
         interactive && "pointer-events-auto",

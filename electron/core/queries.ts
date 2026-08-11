@@ -7,3 +7,4 @@ export * from "./queries/thumbs.js";
 export * from "./queries/scanRoots.js";
 export * from "./queries/history.js";
 export * from "./queries/duplicates.js";
+export * from "./queries/settings.js";

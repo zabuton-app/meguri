@@ -2,10 +2,21 @@ import type {
   AppStatus,
   FileDetail,
   FileRow,
+  TagInfo,
   WorkspacesList,
 } from "@/ipc/types";
 
 export const WS_ID = "ws-test-abc123";
+
+/**
+ * A manual tag plus a namespaced generated one. Not attached to sampleFileRow by
+ * default — tests that need tags spread it in, so suites that do not care keep
+ * rendering an untagged row.
+ */
+export const sampleTags: TagInfo[] = [
+  { id: 10, name: "beach", namespace: "", source: "manual", score: null },
+  { id: 11, name: "4k", namespace: "res", source: "auto-meta", score: null },
+];
 
 export const sampleFileRow: FileRow = {
   id: 1,

@@ -89,8 +89,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         close(true);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // Capture phase, matching Radix's dismissable layer: this dialog is on top,
+    // so it must claim Escape before the modal underneath it — which listens in
+    // the bubble phase and bails on defaultPrevented — gets a chance to close.
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [state, close]);
 
   return (

@@ -122,7 +122,10 @@ export const es: Record<TranslationKey, string> = {
   "command.shortcutHint": "Abrir con {shortcut}",
 
   // filter
+  "filter.searchHint":
+    'Busca en los nombres de archivo y en las etiquetas. Usa tag:playa o tag:4k para coincidir de forma exacta, tanto con las tuyas como con las automáticas. Entrecomilla los valores con espacios: tag:"casa de playa".',
   "filter.searchPlaceholder": "Buscar nombre de archivo o etiquetas",
+  "filter.tagSuggestions": "Sugerencias de etiquetas",
   "filter.all": "Todo",
   "filter.playAny": "Estado",
   "filter.played": "Reproducido",
@@ -241,18 +244,20 @@ export const es: Record<TranslationKey, string> = {
   "scan.phaseHash": "Verificando archivos",
   "scan.phaseIndex": "Creando índice",
   "scan.phaseThumbnail": "Generando miniaturas",
+  "scan.phaseTags": "Etiquetando",
   "scan.cancel": "Cancelar escaneo",
 
   // tag editor
   "tag.none": "Sin etiquetas",
   "tag.addPlaceholder": "Añade una etiqueta y pulsa Enter",
   "tag.remove": "Eliminar etiqueta",
+  "tag.addFailed": "No se pudo añadir la etiqueta",
 
   // media grid
   "grid.empty": "No hay medios que mostrar.",
   "grid.emptyHint":
     "Ejecuta «Escanear» para listar aquí los vídeos e imágenes.",
-  "grid.searchByTag": "Buscar «{name}»",
+  "grid.searchByTag": "Filtrar por «{name}»",
   "view.grid": "Vista de cuadrícula",
   "view.list": "Vista de lista",
   "view.table": "Vista de tabla",
@@ -267,7 +272,8 @@ export const es: Record<TranslationKey, string> = {
   "discover.empty": "No hay medios para recomendar.",
   "discover.emptyHint":
     "Ejecuta «Escanear» para importar vídeos e imágenes y se recomendarán aquí al azar.",
-  "discover.sceneHint": "Pasa el cursor para ampliar · haz clic para reproducir desde ese punto",
+  "discover.sceneHint":
+    "Pasa el cursor para ampliar · haz clic para reproducir desde ese punto",
   "discover.moreScenes": "+{count}",
 
   // Historial de reproducción
@@ -288,12 +294,70 @@ export const es: Record<TranslationKey, string> = {
   "duplicates.empty": "No se encontraron archivos duplicados.",
   "duplicates.emptyHint":
     "Los archivos con contenido idéntico (hash y tamaño coincidentes) aparecerán aquí.",
-  "duplicates.summary": "{groups} grupos / {files} archivos / {size} duplicados",
+  "duplicates.summary":
+    "{groups} grupos / {files} archivos / {size} duplicados",
   "duplicates.fileCount": "{count} archivos",
   "duplicates.truncated":
     "Demasiados grupos; solo se muestran los {max} primeros.",
   "duplicates.filter": "Mostrar solo archivos duplicados",
   "duplicates.chip": "Duplicados",
+
+  // Pantalla de gestión de etiquetas
+  "tags.title": "Etiquetas",
+  "tags.summary": "{tags} etiquetas / {assignments} asignaciones",
+  "tags.empty": "Todavía no hay etiquetas.",
+  "tags.emptyHint":
+    "Añade etiquetas desde la vista de detalle y aparecerán aquí.",
+  "tags.searchPlaceholder": "Filtrar etiquetas",
+  "tags.noMatch": "No hay etiquetas coincidentes.",
+  "tags.truncated": "Demasiadas etiquetas: se muestran las {max} primeras.",
+  "tags.fileCount": "{count} archivos",
+  "tags.sortByName": "Por nombre",
+  "tags.sortByCount": "Por cantidad",
+  "tags.groupManual": "Etiquetas manuales",
+  "tags.readOnly": "Solo lectura",
+  "tags.readOnlyHint":
+    "Se asignan automáticamente durante el escaneo. No se pueden editar ni eliminar.",
+  "tags.filterByTag": "Filtrar por esta etiqueta",
+  "tags.source.manual": "Manual",
+  "tags.source.autoMeta": "Automática",
+  "tags.selected": "{count} seleccionadas",
+  "tags.clearSelection": "Quitar selección",
+  "tags.rename": "Cambiar nombre",
+  "tags.renameTitle": "Cambiar nombre de la etiqueta",
+  "tags.renamePlaceholder": "Nuevo nombre",
+  "tags.renameAction": "Cambiar",
+  "tags.renamed": "«{from}» se cambió a «{to}»",
+  "tags.renameFailed": "No se pudo cambiar el nombre de la etiqueta",
+  "tags.renameConflict": "«{name}» ya existe. ¿Combinar las dos etiquetas?",
+  "tags.merge": "Combinar",
+  "tags.mergeTitle": "Combinar etiquetas",
+  "tags.mergeDescription":
+    "Las {count} etiquetas seleccionadas se combinan en la de destino. Las demás se eliminan.",
+  "tags.mergeTarget": "Combinar en",
+  "tags.mergeAction": "Combinar",
+  "tags.merged": "Se combinaron {count} etiquetas",
+  "tags.mergeFailed": "No se pudieron combinar las etiquetas",
+  "tags.delete": "Eliminar",
+  "tags.deleteAction": "Eliminar",
+  "tags.deleteConfirm":
+    "Se quitará la etiqueta «{name}» de {count} archivos. ¿Continuar?",
+  "tags.deleteConfirmMany":
+    "Se eliminarán las {count} etiquetas seleccionadas. ¿Continuar?",
+  "tags.deleted": "Etiqueta eliminada",
+  "tags.deleteFailed": "No se pudo eliminar la etiqueta",
+  "tags.addFailedReserved":
+    "«{prefix}:» está reservado para las etiquetas automáticas. Elige otro nombre.",
+  "tags.ns.res": "Resolución",
+  "tags.ns.dur": "Duración",
+  "tags.ns.codec": "Códec",
+  "tags.ns.orient": "Orientación",
+  "tags.value.durShort": "Corta",
+  "tags.value.durMedium": "Media",
+  "tags.value.durLong": "Larga",
+  "tags.value.orientVertical": "Vertical",
+  "tags.value.orientHorizontal": "Horizontal",
+  "tags.value.orientSquare": "Cuadrada",
 
   // workspace rail
   "workspace.all": "Todo",

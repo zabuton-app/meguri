@@ -116,7 +116,10 @@ export const ko: Record<TranslationKey, string> = {
   "command.shortcutHint": "{shortcut} 로 열기",
 
   // filter
+  "filter.searchHint":
+    '파일 이름과 태그를 검색합니다. tag:여행 이나 tag:4k 로 직접 붙인 태그와 자동 태그를 모두 정확히 일치시켜 필터링합니다. 공백이 있는 값은 tag:"여름 여행" 처럼 따옴표로 묶습니다.',
   "filter.searchPlaceholder": "파일 이름·태그 검색",
+  "filter.tagSuggestions": "태그 제안",
   "filter.all": "전체",
   "filter.playAny": "시청 상태",
   "filter.played": "시청함",
@@ -235,18 +238,20 @@ export const ko: Record<TranslationKey, string> = {
   "scan.phaseHash": "파일 대조",
   "scan.phaseIndex": "인덱스 생성",
   "scan.phaseThumbnail": "썸네일 생성",
+  "scan.phaseTags": "태그 부여",
   "scan.cancel": "스캔 취소",
 
   // tag editor
   "tag.none": "태그 없음",
   "tag.addPlaceholder": "태그를 입력하고 Enter",
   "tag.remove": "태그 삭제",
+  "tag.addFailed": "태그를 추가하지 못했습니다",
 
   // media grid
   "grid.empty": "표시할 미디어가 없습니다.",
   "grid.emptyHint":
     "「스캔」을 실행하면 하위의 동영상·이미지가 여기에 표시됩니다.",
-  "grid.searchByTag": "「{name}」(으)로 검색",
+  "grid.searchByTag": "「{name}」(으)로 필터링",
   "view.grid": "그리드 보기",
   "view.list": "리스트 보기",
   "view.table": "테이블 보기",
@@ -287,6 +292,62 @@ export const ko: Record<TranslationKey, string> = {
   "duplicates.truncated": "그룹이 많아 상위 {max}개만 표시합니다.",
   "duplicates.filter": "중복 파일만 표시",
   "duplicates.chip": "중복",
+
+  // 태그 관리 화면
+  "tags.title": "태그 관리",
+  "tags.summary": "{tags}개 태그 / 부여 {assignments}건",
+  "tags.empty": "아직 태그가 없습니다.",
+  "tags.emptyHint": "상세 화면에서 태그를 추가하면 여기에 표시됩니다.",
+  "tags.searchPlaceholder": "태그 검색",
+  "tags.noMatch": "일치하는 태그가 없습니다.",
+  "tags.truncated": "태그가 많아 상위 {max}개만 표시합니다.",
+  "tags.fileCount": "{count}개 파일",
+  "tags.sortByName": "이름순",
+  "tags.sortByCount": "개수순",
+  "tags.groupManual": "수동 태그",
+  "tags.readOnly": "읽기 전용",
+  "tags.readOnlyHint":
+    "스캔 시 자동으로 부여되는 태그입니다. 편집·삭제할 수 없습니다.",
+  "tags.filterByTag": "이 태그로 필터링",
+  "tags.source.manual": "수동",
+  "tags.source.autoMeta": "자동",
+  "tags.selected": "{count}개 선택됨",
+  "tags.clearSelection": "선택 해제",
+  "tags.rename": "이름 변경",
+  "tags.renameTitle": "태그 이름 변경",
+  "tags.renamePlaceholder": "새 태그 이름",
+  "tags.renameAction": "변경",
+  "tags.renamed": "「{from}」을(를) 「{to}」(으)로 변경했습니다",
+  "tags.renameFailed": "태그 이름을 변경하지 못했습니다",
+  "tags.renameConflict":
+    "「{name}」은(는) 이미 있습니다. 두 태그를 통합할까요?",
+  "tags.merge": "통합",
+  "tags.mergeTitle": "태그 통합",
+  "tags.mergeDescription":
+    "선택한 {count}개 태그를 대상 태그로 합칩니다. 나머지 태그는 삭제됩니다.",
+  "tags.mergeTarget": "통합 대상",
+  "tags.mergeAction": "통합",
+  "tags.merged": "{count}개 태그를 통합했습니다",
+  "tags.mergeFailed": "태그를 통합하지 못했습니다",
+  "tags.delete": "삭제",
+  "tags.deleteAction": "삭제",
+  "tags.deleteConfirm":
+    "태그 「{name}」을(를) {count}개 파일에서 삭제합니다. 계속할까요?",
+  "tags.deleteConfirmMany": "선택한 {count}개 태그를 삭제합니다. 계속할까요?",
+  "tags.deleted": "태그를 삭제했습니다",
+  "tags.deleteFailed": "태그를 삭제하지 못했습니다",
+  "tags.addFailedReserved":
+    "「{prefix}:」은(는) 자동 태그 전용 예약어입니다. 다른 이름을 사용하세요.",
+  "tags.ns.res": "해상도",
+  "tags.ns.dur": "길이",
+  "tags.ns.codec": "코덱",
+  "tags.ns.orient": "방향",
+  "tags.value.durShort": "짧음",
+  "tags.value.durMedium": "보통",
+  "tags.value.durLong": "긺",
+  "tags.value.orientVertical": "세로",
+  "tags.value.orientHorizontal": "가로",
+  "tags.value.orientSquare": "정사각형",
 
   // workspace rail
   "workspace.all": "전체",

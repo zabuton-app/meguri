@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { resolveSortDir } from "@shared/sortDir";
+import { parseQualifiedTagName } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { tagHumanLabel } from "@/lib/tagLabel";
 
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
 
@@ -119,7 +121,8 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     );
   }
   for (const tag of query.tags ?? []) {
-    const label = `${t("media.tags")}: ${tag}`;
+    const { namespace, name } = parseQualifiedTagName(tag);
+    const label = `${t("media.tags")}: ${tagHumanLabel(t, namespace, name)}`;
     parts.push(query.tagSource ? `${label} (${query.tagSource})` : label);
   }
   if (query.sort || query.sortDir) {
@@ -134,10 +137,10 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
             : sort === "btime"
               ? "filter.btime"
               : sort === "accessed"
-              ? "sort.accessed"
-              : sort === "hash"
-                ? "sort.hash"
-                : "sort.added";
+                ? "sort.accessed"
+                : sort === "hash"
+                  ? "sort.hash"
+                  : "sort.added";
     const dir = resolveSortDir(sort, query.sortDir);
     parts.push(`${t(key)} / ${t(dir === "asc" ? "sort.asc" : "sort.desc")}`);
   }

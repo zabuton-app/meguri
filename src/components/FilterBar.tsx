@@ -3,7 +3,6 @@ import {
   CalendarDays,
   CopyCheck,
   Heart,
-  Search,
   SortAsc,
   SortDesc,
 } from "lucide-react";
@@ -25,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { RatingStars } from "./RatingStars";
+import { SearchTokenInput } from "./SearchTokenInput";
 import { useI18n } from "@/i18n/I18nProvider";
 import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
 
@@ -38,7 +38,10 @@ function toDateInput(sec: number | undefined): string {
 }
 
 /** Date-input value → Unix seconds at local start/end of that day. */
-function fromDateInput(value: string, edge: "start" | "end"): number | undefined {
+function fromDateInput(
+  value: string,
+  edge: "start" | "end",
+): number | undefined {
   if (!value) return undefined;
   const t = new Date(`${value}T${edge === "start" ? "00:00:00" : "23:59:59"}`);
   const sec = Math.floor(t.getTime() / 1000);
@@ -66,24 +69,13 @@ export function FilterBar({ value, onChange }: Props) {
           line and the fixed-width controls squeeze the input down to nothing.
           min-w-0 stays so it can still shrink below the basis when one row is
           all we get. */}
-      <div className="relative flex min-w-0 grow basis-48 items-center">
-        <Search className="pointer-events-none absolute left-2 size-3.5 text-muted" />
-        <Input
+      <div className="flex min-w-0 grow basis-48 items-center">
+        <SearchTokenInput
           id="list-search-input"
           value={value.q ?? ""}
-          onChange={(e) => patch({ q: e.target.value || undefined })}
-          onKeyDown={(e) => {
-            // Esc / Enter drop focus (so list shortcuts work again). Stop Esc from
-            // bubbling to modal/overlay Esc handlers.
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              e.currentTarget.blur();
-            } else if (e.key === "Enter") {
-              e.currentTarget.blur();
-            }
-          }}
+          onChange={(q) => patch({ q: q || undefined })}
           placeholder={t("filter.searchPlaceholder")}
-          className="pl-7"
+          title={t("filter.searchHint")}
         />
       </div>
 
