@@ -1,17 +1,6 @@
 import { joinSearchTokens, splitSearchTokens } from "@shared/tags";
 import type { SearchQuery } from "@/ipc/types";
-import type { TFunc } from "@/i18n/I18nProvider";
-import type { TranslationKey } from "@/i18n/locales/ja";
 
-export const SORT_KEYS: Record<string, TranslationKey> = {
-  added: "sort.added",
-  name: "sort.name",
-  rating: "sort.rating",
-  captured: "sort.captured",
-  btime: "filter.btime",
-  accessed: "sort.accessed",
-  hash: "sort.hash",
-};
 export const DISCOVER_FILTER_PARAM = "filter";
 export const VIEW_KEY = "meguri.view";
 
@@ -64,11 +53,6 @@ export function addSearchTokens(
   const added = incoming.filter((token) => token && !current.includes(token));
   if (added.length === 0) return filter;
   return { ...filter, q: joinSearchTokens([...current, ...added]) };
-}
-
-export function sortLabel(t: TFunc, s: string): string {
-  const key = SORT_KEYS[s];
-  return t("filter.sortLabel", { label: key ? t(key) : s });
 }
 
 /** Scroll the list's scroll viewport by ~one screen (dir: 1 = down, -1 = up). */

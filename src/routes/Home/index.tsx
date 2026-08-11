@@ -5,13 +5,6 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FolderPlus, Sparkles } from "lucide-react";
-import { resolveSortDir } from "@shared/sortDir";
-import {
-  isTagDirective,
-  joinSearchTokens,
-  parseQualifiedTagName,
-  splitSearchTokens,
-} from "@shared/tags";
 import { api, events, ALL_ID, type ThumbDone } from "@/ipc/client";
 import type { SearchQuery, UserCollection, WorkspaceInfo } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
@@ -41,11 +34,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
-import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
-import { describeDateRange } from "@/lib/smartCollections";
-import { tagHumanLabel } from "@/lib/tagLabel";
 import { HomeHeader } from "./HomeHeader";
-import { ActiveFilterChips, type ChipEntry } from "./ActiveFilterChips";
 import {
   VIEW_KEY,
   type ViewMode,
@@ -53,7 +42,6 @@ import {
   discoverPath,
   isViewMode,
   scrollListByPage,
-  sortLabel,
 } from "./utils";
 
 // A second Esc within this window (ms) confirms closing to tray.
@@ -119,83 +107,6 @@ export default function Home() {
   // Keyboard focus navigation in the views runs only while the list is foreground
   // (no detail/settings/discover modal, and no help/command overlay on top).
   const navActive = location.pathname === "/" && !helpOpen && !commandOpen;
-
-  // Turn active search conditions into badges (remove individually via ✗).
-  const patchFilter = (p: Partial<SearchQuery>) =>
-    setFilter((f) => ({ ...f, ...p }));
-  const activeChips: ChipEntry[] = [];
-  // The search box holds free text and exact-tag directives side by side, and
-  // renders each directive as its own chip; only the free text needs a badge
-  // here, or the same condition would appear twice one line apart.
-  const queryTokens = splitSearchTokens(filter.q ?? "");
-  const freeText = queryTokens.filter((token) => !isTagDirective(token));
-  if (freeText.length)
-    activeChips.push({
-      key: "q",
-      label: `"${joinSearchTokens(freeText)}"`,
-      clear: () =>
-        patchFilter({
-          q: joinSearchTokens(queryTokens.filter(isTagDirective)) || undefined,
-        }),
-    });
-  if (filter.kind)
-    activeChips.push({
-      key: "kind",
-      label: filter.kind === "video" ? t("kind.video") : t("kind.image"),
-      clear: () => patchFilter({ kind: undefined }),
-    });
-  if (filter.ratingMin)
-    activeChips.push({
-      key: "rating",
-      label: `★${filter.ratingMin}+`,
-      clear: () => patchFilter({ ratingMin: undefined }),
-    });
-  if (filter.favorite)
-    activeChips.push({
-      key: "favorite",
-      label: `♥ ${t("favorite.chip")}`,
-      clear: () => patchFilter({ favorite: undefined }),
-    });
-  if (filter.duplicates)
-    activeChips.push({
-      key: "duplicates",
-      label: t("duplicates.chip"),
-      clear: () => patchFilter(toggleDuplicatesPatch(filter)),
-    });
-  if (filter.played != null)
-    activeChips.push({
-      key: "played",
-      label: filter.played ? t("filter.played") : t("filter.unplayed"),
-      clear: () => patchFilter({ played: undefined }),
-    });
-  if (filter.btimeFrom != null || filter.btimeTo != null) {
-    activeChips.push({
-      key: "btime",
-      label: `${t("filter.btime")}: ${describeDateRange(t, filter.btimeFrom, filter.btimeTo)}`,
-      clear: () => patchFilter({ btimeFrom: undefined, btimeTo: undefined }),
-    });
-  }
-  if (filter.sort || filter.sortDir) {
-    const sort = filter.sort ?? "added";
-    const sortDir = resolveSortDir(sort, filter.sortDir);
-    activeChips.push({
-      key: "sort",
-      label: `${sortLabel(t, sort)} / ${t(sortDir === "asc" ? "sort.asc" : "sort.desc")}`,
-      clear: () => patchFilter({ sort: undefined, sortDir: undefined }),
-    });
-  }
-  (filter.tags ?? []).forEach((tag, i) => {
-    const { namespace, name } = parseQualifiedTagName(tag);
-    activeChips.push({
-      key: `tag-${i}`,
-      label: `${t("media.tags")}: ${tagHumanLabel(t, namespace, name)}`,
-      clear: () =>
-        setFilter((f) => ({
-          ...f,
-          tags: (f.tags ?? []).filter((_, j) => j !== i),
-        })),
-    });
-  });
 
   useEffect(() => {
     document.title = status.data?.root
@@ -565,11 +476,6 @@ export default function Home() {
 
       <FilterBar value={filter} onChange={setFilter} />
 
-      <ActiveFilterChips
-        chips={activeChips}
-        onClearAll={() => setFilter({})}
-        t={t}
-      />
       <ScanProgress onThumbDone={onThumbDone} wsId={status.data?.workspaceId} />
 
       <CommandMenu

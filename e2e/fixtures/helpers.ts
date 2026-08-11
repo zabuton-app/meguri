@@ -34,18 +34,6 @@ export async function waitForIdle(page: Page): Promise<void> {
   await expect(statusBar(page)).toContainText("Idle", { timeout: 60_000 });
 }
 
-export async function selectComboboxOption(
-  page: Page,
-  index: number,
-  option: string,
-): Promise<void> {
-  // Radix's SelectTrigger carries role="combobox", but so does the search box —
-  // it has a suggestion listbox. Target the trigger's slot so `index` keeps
-  // counting selects only.
-  await page.locator('[data-slot="select-trigger"]').nth(index).click();
-  await page.getByRole("option", { name: option }).click();
-}
-
 export async function openFileDetail(
   page: Page,
   fileName = FIXTURE_FILE,
