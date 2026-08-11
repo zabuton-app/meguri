@@ -3,6 +3,7 @@ import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { resolveSortDir } from "@shared/sortDir";
 import { parseQualifiedTagName } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
 
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
@@ -127,22 +128,12 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   }
   if (query.sort || query.sortDir) {
     const sort = query.sort ?? "added";
-    const key =
-      sort === "name"
-        ? "sort.name"
-        : sort === "rating"
-          ? "sort.rating"
-          : sort === "captured"
-            ? "sort.captured"
-            : sort === "btime"
-              ? "filter.btime"
-              : sort === "accessed"
-                ? "sort.accessed"
-                : sort === "hash"
-                  ? "sort.hash"
-                  : "sort.added";
     const dir = resolveSortDir(sort, query.sortDir);
-    parts.push(`${t(key)} / ${t(dir === "asc" ? "sort.asc" : "sort.desc")}`);
+    // Same key table the filter bar's sort dropdown reads, so a key added there
+    // cannot go unlabelled here.
+    parts.push(
+      `${t(SORT_KEYS[sort] ?? "sort.added")} / ${t(dir === "asc" ? "sort.asc" : "sort.desc")}`,
+    );
   }
   return parts.join(" / ") || t("smartCollection.allMedia");
 }
