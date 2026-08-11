@@ -77,7 +77,7 @@ describe("collapsed-condition badge", () => {
     expect(badge()?.textContent).toBe("1");
   });
 
-  it("counts a non-default sort even though it gets no chip", () => {
+  it("counts a non-default sort alongside the other panel conditions", () => {
     setup({ played: false, sort: "name" });
     expect(badge()?.textContent).toBe("2");
   });

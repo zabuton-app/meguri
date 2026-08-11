@@ -21,11 +21,25 @@ const keys = (query: SearchQuery) => describe_(query).map((d) => d.key);
 const find = (query: SearchQuery, key: string) =>
   describe_(query).find((d) => d.key === key) as ConditionDescriptor;
 
-/** Apply every descriptor's clear in order, recomputing as the query shrinks. */
+/**
+ * Clear conditions one at a time until none is left, re-deriving after each.
+ *
+ * A descriptor describes the query it came from — `q`-token positions shift as
+ * tokens are removed — so folding a stale list over a shrinking query is not a
+ * thing any caller does. The bar rebuilds the list on every render; this mirrors
+ * that, and fails loudly if a clear ever stops making progress.
+ */
 function clearEverything(query: SearchQuery): SearchQuery {
   let q = query;
-  for (const d of describe_(q)) q = d.clear(q);
-  return q;
+  for (let guard = 0; guard < 50; guard++) {
+    const [first] = describe_(q);
+    if (!first) return q;
+    const next = first.clear(q);
+    if (JSON.stringify(next) === JSON.stringify(q))
+      throw new Error(`clear made no progress on ${first.key}`);
+    q = next;
+  }
+  throw new Error("clearEverything did not converge");
 }
 
 const EVERYTHING: SearchQuery = {
@@ -169,6 +183,15 @@ describe("clear reducers", () => {
     expect(find(before, "directive-0").clear(before)).toEqual({});
   });
 
+  it("removes only one of two identical directives", () => {
+    // Nothing stops the same directive being typed twice, and each chip stands
+    // for one of them — matching by token text would take both.
+    const before: SearchQuery = { q: "tag:beach tag:beach" };
+    expect(find(before, "directive-0").clear(before)).toEqual({
+      q: "tag:beach",
+    });
+  });
+
   it("clears both ends of a date range together", () => {
     const before: SearchQuery = { btimeFrom: 1, btimeTo: 2 };
     expect(find(before, "btime").clear(before)).toEqual({});
@@ -237,7 +260,7 @@ describe("collapsedConditionCount", () => {
 
   it("counts only what lives inside the panel", () => {
     expect(collapsedConditionCount(describe_({ played: false }))).toBe(1);
-    // Sort is not a chip, but it is hidden state, so it still counts.
+    // Sort lives in the panel too, so it counts alongside the play state.
     expect(
       collapsedConditionCount(describe_({ played: false, sort: "name" })),
     ).toBe(2);

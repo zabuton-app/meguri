@@ -89,12 +89,11 @@ export function describeConditions(
       label: tagLabel(t, tag),
       group: "primary",
       chip: true,
-      // Matched by token text, so the directive is removed whole — a partial
-      // edit would leave `tag:bea` behind as a substring search.
+      // Removed whole and by position: whole because a partial edit would leave
+      // `tag:bea` behind as a substring search, by position because the same
+      // directive can be typed twice and each chip must undo only its own.
       clear: (q) => {
-        const rest = splitSearchTokens(q.q ?? "").filter(
-          (tok) => tok !== token,
-        );
+        const rest = splitSearchTokens(q.q ?? "").filter((_, j) => j !== i);
         const joined = joinSearchTokens(rest);
         return joined ? { ...q, q: joined } : without(q, "q");
       },
