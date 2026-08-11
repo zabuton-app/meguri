@@ -1,7 +1,7 @@
 // Regression tests for search/filter/sort and durable-metadata operations in queries.ts.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DB } from "../db.js";
-import { syncFts } from "../tags.js";
+import { addFileTag, addManualTag, syncFts, upsertTag } from "../tags.js";
 import {
   addBookmark,
   deleteFromIndex,
@@ -66,7 +66,9 @@ describe("searchFiles", () => {
     insertFile(db, rootId, { relPath: "nobtime.mp4", btime: null });
 
     const ids = (q: Parameters<typeof searchFiles>[1]) =>
-      searchFiles(db, q).items.map((f) => f.id).sort();
+      searchFiles(db, q)
+        .items.map((f) => f.id)
+        .sort();
     expect(ids({ btimeFrom: 150 })).toEqual([mid, recent].sort());
     expect(ids({ btimeTo: 250 })).toEqual([old, mid].sort());
     expect(ids({ btimeFrom: 150, btimeTo: 250 })).toEqual([mid]);
@@ -187,9 +189,9 @@ describe("searchFiles", () => {
     syncFts(db, both);
     syncFts(db, beachOnly);
     // "beach" (MATCH) AND "海岸" (LIKE) must both hold.
-    expect(
-      searchFiles(db, { q: "beach 海岸" }).items.map((f) => f.id),
-    ).toEqual([both]);
+    expect(searchFiles(db, { q: "beach 海岸" }).items.map((f) => f.id)).toEqual(
+      [both],
+    );
   });
 
   it("treats LIKE metacharacters in short tokens literally", () => {
@@ -245,6 +247,199 @@ describe("randomFiles", () => {
     expect(out.length).toBe(3);
     expect(out.every((f) => f.kind === "video")).toBe(true);
     db.close();
+  });
+});
+
+describe("attachTags", () => {
+  it("omits pipeline sources from list rows but keeps them on the detail", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "a.mp4" });
+    addManualTag(db, id, "beach");
+    addFileTag(db, id, upsertTag(db, "res", "4k"), "auto-meta", null);
+
+    // A list row never draws generated tags, so shipping four of them per file
+    // across the process boundary would be paid for nothing.
+    const row = searchFiles(db, {}).items[0];
+    expect(row.tags?.map((t) => t.name)).toEqual(["beach"]);
+    // The detail pane does show them.
+    expect(
+      fileDetail(db, id)
+        ?.tags.map((t) => `${t.namespace}:${t.name}`)
+        .sort(),
+    ).toEqual([":beach", "res:4k"]);
+    db.close();
+  });
+});
+
+describe("structured tag filtering", () => {
+  let db: DB;
+  let rootId: number;
+  let manualOnly: number;
+  let autoOnly: number;
+  let both: number;
+  beforeEach(() => {
+    ({ db, rootId } = newDb());
+    manualOnly = insertFile(db, rootId, { relPath: "manual.mp4" });
+    autoOnly = insertFile(db, rootId, { relPath: "auto.mp4" });
+    both = insertFile(db, rootId, { relPath: "both.mp4" });
+    addManualTag(db, manualOnly, "beach");
+    addManualTag(db, both, "beach");
+    const res4k = upsertTag(db, "res", "4k");
+    addFileTag(db, autoOnly, res4k, "auto-meta", null);
+    addFileTag(db, both, res4k, "auto-meta", null);
+  });
+  afterEach(() => db.close());
+
+  function ids(tags: string[], tagSource?: string): number[] {
+    return searchFiles(db, { tags, tagSource })
+      .items.map((f) => f.id)
+      .sort((a, b) => a - b);
+  }
+
+  it("matches a namespaced tag by its qualified name", () => {
+    expect(ids(["res:4k"])).toEqual([autoOnly, both].sort((a, b) => a - b));
+  });
+
+  it("does not confuse a manual tag with the value half of a namespaced one", () => {
+    const plain4k = insertFile(db, rootId, { relPath: "plain.mp4" });
+    addManualTag(db, plain4k, "4k");
+    // The bare token only resolves against namespace = ''.
+    expect(ids(["4k"])).toEqual([plain4k]);
+  });
+
+  it("matches a manual tag whose own name contains a colon", () => {
+    const id = insertFile(db, rootId, { relPath: "todo.mp4" });
+    addManualTag(db, id, "todo:later");
+    expect(ids(["todo:later"])).toEqual([id]);
+  });
+
+  it("resolves a namespace it has never heard of, straight from the tags table", () => {
+    const id = insertFile(db, rootId, { relPath: "studio.mp4" });
+    // "studio" is not in AUTO_META_NAMESPACES — matching must not depend on that list.
+    addFileTag(db, id, upsertTag(db, "studio", "a24"), "auto-name", null);
+    expect(ids(["studio:a24"])).toEqual([id]);
+  });
+
+  it("returns nothing for a tag that does not exist", () => {
+    expect(ids(["nope"])).toEqual([]);
+    expect(ids(["res:8k"])).toEqual([]);
+  });
+
+  it("combines multiple tags with AND", () => {
+    expect(ids(["beach", "res:4k"])).toEqual([both]);
+  });
+
+  it("still honours tagSource across every token", () => {
+    expect(ids(["res:4k"], "auto-meta")).toEqual(
+      [autoOnly, both].sort((a, b) => a - b),
+    );
+    expect(ids(["res:4k"], "manual")).toEqual([]);
+  });
+
+  describe("the meta: free-text directive", () => {
+    function q(text: string): number[] {
+      return searchFiles(db, { q: text })
+        .items.map((f) => f.id)
+        .sort((a, b) => a - b);
+    }
+
+    it("matches a generated tag by its bare value", () => {
+      expect(q("meta:4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
+    });
+
+    it("matches the qualified form too", () => {
+      expect(q("meta:res:4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
+    });
+
+    it("is case-insensitive on both the prefix and the value", () => {
+      // The FTS half of the box is case-insensitive; an arbitrary split here
+      // would just look broken.
+      const expected = [autoOnly, both].sort((a, b) => a - b);
+      expect(q("META:4k")).toEqual(expected);
+      expect(q("meta:4K")).toEqual(expected);
+      expect(q("meta:RES:4K")).toEqual(expected);
+    });
+
+    it("never matches a manual tag", () => {
+      const plain = insertFile(db, rootId, { relPath: "plain.mp4" });
+      addManualTag(db, plain, "4k");
+      syncFts(db, plain);
+      expect(q("meta:4k")).not.toContain(plain);
+    });
+
+    it("returns nothing for an unknown value", () => {
+      expect(q("meta:8k")).toEqual([]);
+    });
+
+    it("combines with ordinary free text", () => {
+      syncFts(db, autoOnly);
+      syncFts(db, both);
+      // "auto" only appears in auto.mp4's path, so the pair narrows to one file.
+      expect(q("auto meta:4k")).toEqual([autoOnly]);
+    });
+
+    it("leaves a bare `meta:` as ordinary text", () => {
+      expect(q("meta:")).toEqual([]);
+    });
+  });
+
+  describe("the tag: free-text directive", () => {
+    function q(text: string): number[] {
+      return searchFiles(db, { q: text })
+        .items.map((f) => f.id)
+        .sort((a, b) => a - b);
+    }
+
+    it("matches a manual tag exactly, unlike the bare word", () => {
+      const named = insertFile(db, rootId, { relPath: "beach-holiday.mp4" });
+      syncFts(db, named);
+      // The whole point of the directive: putting the condition in the search
+      // box must not degrade it into a substring search over file names.
+      expect(q("beach")).toContain(named);
+      expect(q("tag:beach")).not.toContain(named);
+      expect(q("tag:beach")).toEqual([manualOnly, both].sort((a, b) => a - b));
+    });
+
+    it("never matches a generated tag", () => {
+      expect(q("tag:4k")).toEqual([]);
+      expect(q("tag:res:4k")).toEqual([]);
+    });
+
+    it("is case-insensitive", () => {
+      expect(q("TAG:BEACH")).toEqual([manualOnly, both].sort((a, b) => a - b));
+    });
+
+    it("combines with meta: and with free text", () => {
+      expect(q("tag:beach meta:4k")).toEqual([both]);
+    });
+
+    it("tolerates a space after the colon", () => {
+      // What a person types. The search box shows the same chip either way, so
+      // the SQL has to agree — a mismatch would be invisible to the user.
+      expect(q("tag: beach")).toEqual([manualOnly, both].sort((a, b) => a - b));
+      expect(q("meta: 4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
+    });
+
+    it("keeps a quoted multi-word tag together", () => {
+      const id = insertFile(db, rootId, { relPath: "spaced.mp4" });
+      addManualTag(db, id, "beach house");
+      expect(q('tag:"beach house"')).toEqual([id]);
+      // Unquoted, the space splits it into two ordinary conditions.
+      expect(q("tag:beach house")).not.toContain(id);
+    });
+
+    it("returns nothing for an unknown tag", () => {
+      expect(q("tag:nope")).toEqual([]);
+    });
+  });
+
+  it("does not match on the file name the way free text does", () => {
+    const named = insertFile(db, rootId, { relPath: "beach-holiday.mp4" });
+    syncFts(db, named);
+    expect(searchFiles(db, { q: "beach" }).items.map((f) => f.id)).toContain(
+      named,
+    );
+    expect(ids(["beach"])).not.toContain(named);
   });
 });
 

@@ -2,10 +2,16 @@
 // infinite-scroll grid. On thumb:done, reload the corresponding thumbnail.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FolderPlus, Sparkles } from "lucide-react";
 import { resolveSortDir } from "@shared/sortDir";
+import {
+  isTagDirective,
+  joinSearchTokens,
+  parseQualifiedTagName,
+  splitSearchTokens,
+} from "@shared/tags";
 import { api, events, ALL_ID, type ThumbDone } from "@/ipc/client";
 import type { SearchQuery, UserCollection, WorkspaceInfo } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
@@ -24,7 +30,11 @@ import { ScanProgress } from "@/components/ScanProgress";
 import { StatusBar } from "@/components/StatusBar";
 import { CommandMenu } from "@/components/CommandMenu";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { onOpenCommandMenu, onOpenShortcuts } from "@/lib/ui-events";
+import {
+  onApplyTagFilter,
+  onOpenCommandMenu,
+  onOpenShortcuts,
+} from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useAppStatus } from "@/hooks/useAppStatus";
@@ -32,11 +42,13 @@ import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
 import { describeDateRange } from "@/lib/smartCollections";
+import { tagHumanLabel } from "@/lib/tagLabel";
 import { HomeHeader } from "./HomeHeader";
 import { ActiveFilterChips, type ChipEntry } from "./ActiveFilterChips";
 import {
   VIEW_KEY,
   type ViewMode,
+  addSearchTokens,
   discoverPath,
   isViewMode,
   scrollListByPage,
@@ -48,6 +60,7 @@ const ESC_CLOSE_CONFIRM_MS = 2000;
 
 export default function Home() {
   const { t } = useI18n();
+  const qc = useQueryClient();
   const confirm = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
@@ -110,11 +123,19 @@ export default function Home() {
   const patchFilter = (p: Partial<SearchQuery>) =>
     setFilter((f) => ({ ...f, ...p }));
   const activeChips: ChipEntry[] = [];
-  if (filter.q)
+  // The search box holds free text and exact-tag directives side by side, and
+  // renders each directive as its own chip; only the free text needs a badge
+  // here, or the same condition would appear twice one line apart.
+  const queryTokens = splitSearchTokens(filter.q ?? "");
+  const freeText = queryTokens.filter((token) => !isTagDirective(token));
+  if (freeText.length)
     activeChips.push({
       key: "q",
-      label: `"${filter.q}"`,
-      clear: () => patchFilter({ q: undefined }),
+      label: `"${joinSearchTokens(freeText)}"`,
+      clear: () =>
+        patchFilter({
+          q: joinSearchTokens(queryTokens.filter(isTagDirective)) || undefined,
+        }),
     });
   if (filter.kind)
     activeChips.push({
@@ -162,17 +183,18 @@ export default function Home() {
       clear: () => patchFilter({ sort: undefined, sortDir: undefined }),
     });
   }
-  (filter.tags ?? []).forEach((tag, i) =>
+  (filter.tags ?? []).forEach((tag, i) => {
+    const { namespace, name } = parseQualifiedTagName(tag);
     activeChips.push({
       key: `tag-${i}`,
-      label: `${t("media.tags")}: ${tag}`,
+      label: `${t("media.tags")}: ${tagHumanLabel(t, namespace, name)}`,
       clear: () =>
         setFilter((f) => ({
           ...f,
           tags: (f.tags ?? []).filter((_, j) => j !== i),
         })),
-    }),
-  );
+    });
+  });
 
   useEffect(() => {
     document.title = status.data?.root
@@ -212,8 +234,10 @@ export default function Home() {
   }, []);
 
   // Stabilize the reference so MediaCard's memo stays effective.
+  // A click AND-appends an exact tag condition rather than overwriting the
+  // free-text box, which used to also match file names.
   const onTagClick = useCallback(
-    (name: string) => setFilter((f) => ({ ...f, q: name })),
+    (token: string) => setFilter((f) => addSearchTokens(f, [token])),
     [],
   );
 
@@ -225,6 +249,9 @@ export default function Home() {
         setScanning(false);
         void status.refetch();
         void search.refetch();
+        // A scan can add tags (new files, the derived-tag backfill), so a tag
+        // screen left open would otherwise show a stale catalog.
+        void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
         const mode = manualScanJobs.current.get(done.jobId);
         manualScanJobs.current.delete(done.jobId);
         // Cancel/error are explicit, user-visible outcomes: notify regardless of
@@ -278,7 +305,9 @@ export default function Home() {
       if (!jobId) {
         setScanning(false);
         toast.error(
-          t(status.data?.ready ? "home.scanAlreadyRunning" : "home.noWorkspace"),
+          t(
+            status.data?.ready ? "home.scanAlreadyRunning" : "home.noWorkspace",
+          ),
           { id: "scan-start-unavailable" },
         );
         return;
@@ -293,8 +322,7 @@ export default function Home() {
       setScanning(false);
       toast.error(t("home.scanStartFailed"), {
         id: "scan-start-failed",
-        description:
-          error instanceof Error ? error.message : String(error),
+        description: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -320,6 +348,10 @@ export default function Home() {
   const openDiscover = useCallback(() => {
     void navigate(discoverPath(filter));
   }, [filter, navigate]);
+
+  const openTags = useCallback(() => {
+    void navigate("/tags");
+  }, [navigate]);
 
   const openSettings = useCallback(() => {
     void navigate("/settings");
@@ -418,9 +450,15 @@ export default function Home() {
   useEffect(() => {
     const unCommand = onOpenCommandMenu(() => setCommandOpen(true));
     const unShortcuts = onOpenShortcuts(() => setHelpOpen(true));
+    // The tag screen is a child route, so it asks the list to filter rather than
+    // reaching into this component's state.
+    const unApplyTags = onApplyTagFilter((tokens) =>
+      setFilter((f) => addSearchTokens(f, tokens)),
+    );
     return () => {
       unCommand();
       unShortcuts();
+      unApplyTags();
     };
   }, []);
 
@@ -473,7 +511,14 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [location.pathname, helpOpen, commandOpen, editCollection, editWorkspace, t]);
+  }, [
+    location.pathname,
+    helpOpen,
+    commandOpen,
+    editCollection,
+    editWorkspace,
+    t,
+  ]);
 
   return (
     <div className="flex h-full flex-col">
@@ -525,6 +570,7 @@ export default function Home() {
         onRebuild={() => void onRebuild()}
         onSetView={setViewMode}
         onDiscover={openDiscover}
+        onTags={openTags}
         onSettings={openSettings}
         onHelp={() => setHelpOpen(true)}
         onOpenDevTools={openDevTools}

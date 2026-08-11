@@ -9,6 +9,7 @@ import {
   defaultWorkspacesList,
   sampleFileDetail,
   sampleFileRow,
+  sampleTags,
   WS_ID,
 } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -114,9 +115,7 @@ describe("Home + MediaDetail integration", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { name: "sample.mp4" }),
-      ).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
     });
 
     const favBtn = within(screen.getByRole("dialog")).getByRole("button", {
@@ -132,6 +131,132 @@ describe("Home + MediaDetail integration", () => {
       pages: { items: { favorite: number }[] }[];
     }>(["files_search", WS_ID, {}]);
     expect(search?.pages[0].items[0].favorite).toBe(1);
+  });
+
+  describe("tag chips", () => {
+    beforeEach(() => {
+      mocks.filesSearch.mockResolvedValue({
+        items: [{ ...sampleFileRow, tags: sampleTags }],
+        nextCursor: null,
+      });
+    });
+
+    /** The most recent files_search query the component issued. */
+    function lastQuery(): Record<string, unknown> {
+      const calls = mocks.filesSearch.mock.calls;
+      return calls[calls.length - 1][0] as Record<string, unknown>;
+    }
+
+    it("hides auto-meta tags from the cards but keeps manual ones", async () => {
+      renderWithProviders(<AppRoutes />);
+      await waitFor(() => expect(screen.getByText("beach")).toBeTruthy());
+      // The metadata classifier emits several tags per file; they would crowd out
+      // the manual ones in the card's single scrolling chip row.
+      expect(screen.queryByText("res:")).toBeNull();
+    });
+
+    it("hides by source, not by namespace", async () => {
+      mocks.filesSearch.mockResolvedValue({
+        items: [
+          {
+            ...sampleFileRow,
+            tags: [
+              ...sampleTags,
+              {
+                id: 12,
+                name: "a24",
+                namespace: "studio",
+                source: "auto-name",
+                score: null,
+              },
+            ],
+          },
+        ],
+        nextCursor: null,
+      });
+      renderWithProviders(<AppRoutes />);
+      // A namespaced tag from a source that is not in LIST_HIDDEN_SOURCES still
+      // renders — hiding is about the source's verbosity, not the namespace.
+      expect(await screen.findByText("a24")).toBeTruthy();
+      expect(screen.getByText("studio:")).toBeTruthy();
+      expect(screen.queryByText("res:")).toBeNull();
+    });
+
+    it("puts an exact-tag directive in the search box, not the bare word", async () => {
+      renderWithProviders(<AppRoutes />);
+      await waitFor(() => expect(screen.getByText("beach")).toBeTruthy());
+
+      fireEvent.click(screen.getByText("beach"));
+
+      // The condition is exact — a bare "beach" would also hit files merely
+      // named that — and it is visible in the search box, as a chip rather than
+      // as raw text the user could break in half.
+      await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
+      const input = document.getElementById(
+        "list-search-input",
+      ) as HTMLInputElement;
+      expect(
+        within(input.parentElement!).getByTitle("Tags: beach"),
+      ).toBeTruthy();
+      expect(input.value).toBe("");
+    });
+
+    it("does not duplicate a condition when the same tag is clicked twice", async () => {
+      renderWithProviders(<AppRoutes />);
+      fireEvent.click(await screen.findByText("beach"));
+      await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
+
+      // The chip re-renders once the refetch settles; clicking it again is a no-op.
+      fireEvent.click(await screen.findByText("beach"));
+      await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
+    });
+
+    it("removes the directive as a whole from the search box", async () => {
+      renderWithProviders(<AppRoutes />);
+      fireEvent.click(await screen.findByText("beach"));
+
+      // A directive only means anything whole, so it is removed whole — one
+      // click, no half-deleted `tag:bea` left behind as a substring search.
+      const chip = await screen.findByTitle("Tags: beach");
+      fireEvent.click(within(chip).getByRole("button"));
+
+      await waitFor(() => expect(lastQuery().q).toBeUndefined());
+    });
+  });
+
+  it("filters the library from a tag in the detail view", async () => {
+    mocks.fileGet.mockResolvedValue({ ...sampleFileDetail, tags: sampleTags });
+    renderWithProviders(<AppRoutes />, { route: `/file/1?ws=${WS_ID}` });
+
+    // The detail pane is the one place generated tags are visible, so it is also
+    // where they can be clicked.
+    fireEvent.click(await screen.findByText("4k"));
+
+    await waitFor(() => {
+      const calls = mocks.filesSearch.mock.calls;
+      // The bare value: category vocabularies are disjoint, so `meta:4k` is
+      // unambiguous and reads better than `meta:res:4k`.
+      expect((calls[calls.length - 1][0] as Record<string, unknown>).q).toBe(
+        "meta:4k",
+      );
+    });
+    // Filtering only makes sense with the library visible, so the modal closes.
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("filters by a manual tag from the detail view", async () => {
+    mocks.fileGet.mockResolvedValue({ ...sampleFileDetail, tags: sampleTags });
+    renderWithProviders(<AppRoutes />, { route: `/file/1?ws=${WS_ID}` });
+
+    fireEvent.click(await screen.findByText("beach"));
+
+    await waitFor(() => {
+      const last = mocks.filesSearch.mock.calls.at(-1)![0] as Record<
+        string,
+        unknown
+      >;
+      expect(last.q).toBe("tag:beach");
+    });
   });
 
   it("records a play when opening an image detail", async () => {

@@ -4,6 +4,12 @@ import { fileTags } from "../tags.js";
 import { listBookmarksByMetaKey } from "./bookmarks.js";
 import { thumbOffsetByKey } from "./meta.js";
 import { resolveSortDir } from "../../../shared/sortDir.js";
+import {
+  LIST_HIDDEN_SOURCES,
+  parseMetaSearchToken,
+  parseTagSearchToken,
+  splitSearchTokens,
+} from "../../../shared/tags.js";
 import type {
   FileDetail,
   FileRow,
@@ -14,6 +20,9 @@ import type {
 } from "../types.js";
 
 const DEFAULT_LIMIT = 100;
+
+/** Bound once: the excluded-source list never changes at runtime. */
+const HIDDEN_SOURCES_JSON = JSON.stringify([...LIST_HIDDEN_SOURCES]);
 const MAX_LIMIT = 500;
 
 // Metadata (rating/favorite/last_accessed) lives in file_meta, keyed by meta_key, so it
@@ -31,27 +40,42 @@ function escapeLike(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
-/** Split the free-text query for the trigram-tokenized files_fts. Tokens of 3+
- *  codepoints go into an FTS MATCH expression (trigram matches substrings, so no
- *  prefix `*` is needed). Shorter tokens cannot produce a trigram and would make
- *  the whole MATCH return zero rows, so they are routed to LIKE filters against
- *  the same files_fts columns instead (codepoint count, not UTF-16 length, since
- *  the trigram tokenizer works on codepoints). Double quotes are stripped before
- *  the length split: a pasted `"beach"` means the word beach, not a literal
- *  quoted string — searching for the quote characters would return zero rows. */
+/** Split the free-text query for the trigram-tokenized files_fts.
+ *
+ *  A `meta:<value>` token is pulled out first: generated tags are not in the
+ *  full-text index (see FTS_ROW_SELECT in db.ts), so this prefix is the explicit
+ *  way to reach them from the search box.
+ *
+ *  Of what remains, tokens of 3+ codepoints go into an FTS MATCH expression
+ *  (trigram matches substrings, so no prefix `*` is needed). Shorter tokens
+ *  cannot produce a trigram and would make the whole MATCH return zero rows, so
+ *  they are routed to LIKE filters against the same files_fts columns instead
+ *  (codepoint count, not UTF-16 length, since the trigram tokenizer works on
+ *  codepoints). Double quotes are stripped before the length split: a pasted
+ *  `"beach"` means the word beach, not a literal quoted string — searching for
+ *  the quote characters would return zero rows. */
 function buildSearchTerms(q: string): {
   match: string | null;
   likeTokens: string[];
+  metaTokens: string[];
+  tagTokens: string[];
 } {
-  const tokens = q
-    .split(/\s+/)
-    .map((t) => t.replace(/"/g, ""))
-    .filter(Boolean);
+  const tokens = splitSearchTokens(q);
   const matchTokens: string[] = [];
   const likeTokens: string[] = [];
+  const metaTokens: string[] = [];
+  const tagTokens: string[] = [];
   for (const t of tokens) {
-    if ([...t].length >= 3) {
-      matchTokens.push(`"${t}"`);
+    const meta = parseMetaSearchToken(t);
+    const tag = parseTagSearchToken(t);
+    if (meta) {
+      metaTokens.push(meta);
+    } else if (tag) {
+      tagTokens.push(tag);
+    } else if ([...t].length >= 3) {
+      // FTS5 phrase syntax: the token is delimited by quotes, so a quote inside
+      // it has to be doubled or the whole MATCH expression is malformed.
+      matchTokens.push(`"${t.replace(/"/g, '""')}"`);
     } else {
       likeTokens.push(t);
     }
@@ -59,17 +83,78 @@ function buildSearchTerms(q: string): {
   return {
     match: matchTokens.length ? matchTokens.join(" ") : null,
     likeTokens,
+    metaTokens,
+    tagTokens,
   };
 }
 
+/**
+ * Resolve one qualified tag token ("beach", "res:4k") to the tag ids that satisfy
+ * it in THIS database.
+ *
+ * Matching is driven by the `tags` table rather than by parsing the token against
+ * a hardcoded namespace list, so any namespace present in the data is filterable
+ * without touching this code, and a manual tag literally named "todo:later" still
+ * matches itself. The concatenation is evaluated over `tags` only — a small table
+ * — once per token while the query is built, never per candidate row.
+ */
+function resolveTagIds(db: DB, token: string): number[] {
+  const rows = token.includes(":")
+    ? db
+        .prepare(
+          `SELECT id FROM tags
+            WHERE (namespace = '' AND name = ?)
+               OR (namespace <> '' AND namespace || ':' || name = ?)`,
+        )
+        .pluck()
+        .all(token, token)
+    : db
+        .prepare("SELECT id FROM tags WHERE namespace = '' AND name = ?")
+        .pluck()
+        .all(token);
+  return rows as number[];
+}
+
+/**
+ * Resolve a `meta:` search value to the pipeline-owned tag ids it names. Accepts
+ * either the bare value (`4k`, `long`, `hevc`) or the qualified form
+ * (`res:4k`), so a user can type whichever they saw.
+ *
+ * Matched case-insensitively: this value is typed into the search box, where the
+ * FTS half is case-insensitive too — `meta:4K` failing while `4K` works would be
+ * an arbitrary split. Structured `tags[]` tokens stay exact; those come from a
+ * chip click or a saved search, never from typing.
+ */
+function resolveManualTagIds(db: DB, value: string): number[] {
+  return db
+    .prepare(
+      "SELECT id FROM tags WHERE namespace = '' AND name = ? COLLATE NOCASE",
+    )
+    .pluck()
+    .all(value) as number[];
+}
+
+function resolvePipelineTagIds(db: DB, value: string): number[] {
+  return db
+    .prepare(
+      `SELECT id FROM tags
+        WHERE namespace <> ''
+          AND (name = ? COLLATE NOCASE
+               OR namespace || ':' || name = ? COLLATE NOCASE)`,
+    )
+    .pluck()
+    .all(value, value) as number[];
+}
+
 function appendSearchConditions(
+  db: DB,
   sql: string,
   args: unknown[],
   query: SearchQuery,
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : { match: null, likeTokens: [] };
+    : { match: null, likeTokens: [], metaTokens: [], tagTokens: [] };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
@@ -82,6 +167,23 @@ function appendSearchConditions(
       " AND EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'))";
     const pattern = `%${escapeLike(tok)}%`;
     args.push(pattern, pattern);
+  }
+  const directives: [string[], (v: string) => number[]][] = [
+    [terms.metaTokens, (v) => resolvePipelineTagIds(db, v)],
+    [terms.tagTokens, (v) => resolveManualTagIds(db, v)],
+  ];
+  for (const [values, resolve] of directives) {
+    for (const value of values) {
+      const ids = resolve(value);
+      if (ids.length === 0) {
+        // No tag by that name: nothing can match.
+        sql += " AND 0";
+        break;
+      }
+      sql +=
+        " AND EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?)))";
+      args.push(JSON.stringify(ids));
+    }
   }
   if (query.kind) {
     sql += " AND f.kind = ?";
@@ -118,9 +220,17 @@ function appendSearchConditions(
     args.push(query.btimeTo);
   }
   for (const tag of (query.tags ?? []).filter(Boolean)) {
+    const ids = resolveTagIds(db, tag);
+    if (ids.length === 0) {
+      // Unknown tag: nothing can carry it, so short-circuit the whole query.
+      sql += " AND 0";
+      break;
+    }
+    // Pre-resolving to ids drops the `tags` join, leaving a primary-key probe on
+    // meta_tags(meta_key, tag_id).
     sql +=
-      " AND EXISTS (SELECT 1 FROM meta_tags mt JOIN tags t ON t.id = mt.tag_id WHERE mt.meta_key = f.meta_key AND t.name = ?";
-    args.push(tag);
+      " AND EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?))";
+    args.push(JSON.stringify(ids));
     if (query.tagSource) {
       sql += " AND mt.source = ?";
       args.push(query.tagSource);
@@ -169,7 +279,12 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
   const cmp = desc ? "<" : ">";
   switch (sort) {
     case "rating":
-      return { expr: "COALESCE(m.rating, 0)", nullable: false, cmp, idCmp: ">" };
+      return {
+        expr: "COALESCE(m.rating, 0)",
+        nullable: false,
+        cmp,
+        idCmp: ">",
+      };
     case "captured":
       return { expr: "f.captured_at", nullable: true, cmp, idCmp: ">" };
     case "btime":
@@ -187,7 +302,10 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
 }
 
 /** The seek key's value for a returned row (mirrors sortSpecFor's expressions). */
-export function sortValueOf(sort: string | undefined, row: FileRow): string | number | null {
+export function sortValueOf(
+  sort: string | undefined,
+  row: FileRow,
+): string | number | null {
   switch (sort) {
     case "rating":
       return row.rating;
@@ -265,7 +383,7 @@ export function searchFiles(
   const limit = Math.max(1, Math.min(cap, query.limit ?? DEFAULT_LIMIT));
   const args: unknown[] = [];
   let sql = `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL`;
-  sql = appendSearchConditions(sql, args, query);
+  sql = appendSearchConditions(db, sql, args, query);
   if (seek) {
     const seekArgs: unknown[] = [];
     sql += ` AND (${appendSeekCondition(seekArgs, seek, query.sort, query.sortDir)})`;
@@ -341,11 +459,14 @@ export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
   const lim = Math.max(1, Math.min(MAX_LIMIT, query.limit ?? 20));
   const args: unknown[] = [];
   let sql = `SELECT f.id ${FILE_FROM} WHERE f.deleted_at IS NULL`;
-  sql = appendSearchConditions(sql, args, query);
+  sql = appendSearchConditions(db, sql, args, query);
 
   const reservoir: number[] = [];
   let seen = 0;
-  for (const id of db.prepare(sql).pluck().iterate(...args)) {
+  for (const id of db
+    .prepare(sql)
+    .pluck()
+    .iterate(...args)) {
     if (seen < lim) {
       reservoir.push(id as number);
     } else {
@@ -366,6 +487,14 @@ export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
 }
 
 /** Attach tags to a set of files in a single query (for grid display, avoids N+1). Exported for the All view's merge, which attaches tags only to the final page. */
+/**
+ * Attach each row's tags in one query (rather than N+1).
+ *
+ * Sources in LIST_HIDDEN_SOURCES are left out: a list row never renders them, so
+ * shipping four generated tags per file across the process boundary — 100 rows a
+ * page — would be paid for nothing. `fileDetail()` still returns the full set,
+ * which is where the detail pane reads them from.
+ */
 export function attachTags(db: DB, items: FileRow[]): void {
   if (items.length === 0) return;
   const ph = items.map(() => "?").join(",");
@@ -374,9 +503,10 @@ export function attachTags(db: DB, items: FileRow[]): void {
       `SELECT f.id AS fileId, t.id, t.name, t.namespace, mt.source, mt.score
        FROM files f JOIN meta_tags mt ON mt.meta_key = f.meta_key JOIN tags t ON t.id = mt.tag_id
        WHERE f.id IN (${ph})
-       ORDER BY mt.source, t.name`,
+         AND mt.source NOT IN (SELECT value FROM json_each(?))
+       ORDER BY mt.source, t.namespace, t.name`,
     )
-    .all(...items.map((i) => i.id)) as {
+    .all(...items.map((i) => i.id), HIDDEN_SOURCES_JSON) as {
     fileId: number;
     id: number;
     name: string;

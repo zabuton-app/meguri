@@ -119,7 +119,10 @@ export const en: Record<TranslationKey, string> = {
   "command.shortcutHint": "Open with {shortcut}",
 
   // filter
+  "filter.searchHint":
+    'Searches file names and tags. Use tag:beach for your own tags and meta:4k or meta:long for automatic ones — both match exactly. Quote values with spaces: tag:"beach house".',
   "filter.searchPlaceholder": "Search file name or tags",
+  "filter.tagSuggestions": "Tag suggestions",
   "filter.all": "All",
   "filter.playAny": "Play state",
   "filter.played": "Played",
@@ -238,17 +241,19 @@ export const en: Record<TranslationKey, string> = {
   "scan.phaseHash": "Checking files",
   "scan.phaseIndex": "Building index",
   "scan.phaseThumbnail": "Generating thumbnails",
+  "scan.phaseTags": "Tagging",
   "scan.cancel": "Cancel scan",
 
   // tag editor
   "tag.none": "No tags",
   "tag.addPlaceholder": "Add a tag and press Enter",
   "tag.remove": "Remove tag",
+  "tag.addFailed": "Could not add the tag",
 
   // media grid
   "grid.empty": "No media to display.",
   "grid.emptyHint": 'Run "Scan" to list videos and images here.',
-  "grid.searchByTag": 'Search for "{name}"',
+  "grid.searchByTag": 'Filter by "{name}"',
   "view.grid": "Grid view",
   "view.list": "List view",
   "view.table": "Table view",
@@ -288,6 +293,62 @@ export const en: Record<TranslationKey, string> = {
   "duplicates.truncated": "Too many groups; showing only the top {max}.",
   "duplicates.filter": "Show only duplicate files",
   "duplicates.chip": "Duplicates",
+
+  // Tag management screen
+  "tags.title": "Tags",
+  "tags.summary": "{tags} tags / {assignments} assignments",
+  "tags.empty": "No tags yet.",
+  "tags.emptyHint":
+    "Add tags from the detail view and they will be listed here.",
+  "tags.searchPlaceholder": "Filter tags",
+  "tags.noMatch": "No matching tags.",
+  "tags.truncated": "Too many tags — showing the top {max}.",
+  "tags.fileCount": "{count} files",
+  "tags.sortByName": "By name",
+  "tags.sortByCount": "By count",
+  "tags.groupManual": "Manual tags",
+  "tags.readOnly": "Read-only",
+  "tags.readOnlyHint":
+    "Assigned automatically during the scan. They cannot be edited or deleted.",
+  "tags.filterByTag": "Filter by this tag",
+  "tags.source.manual": "Manual",
+  "tags.source.autoMeta": "Automatic",
+  "tags.selected": "{count} selected",
+  "tags.clearSelection": "Clear selection",
+  "tags.rename": "Rename",
+  "tags.renameTitle": "Rename tag",
+  "tags.renamePlaceholder": "New tag name",
+  "tags.renameAction": "Rename",
+  "tags.renamed": 'Renamed "{from}" to "{to}"',
+  "tags.renameFailed": "Could not rename the tag",
+  "tags.renameConflict":
+    '"{name}" already exists. Merge the two tags into one?',
+  "tags.merge": "Merge",
+  "tags.mergeTitle": "Merge tags",
+  "tags.mergeDescription":
+    "The {count} selected tags are combined into the target. The others are removed.",
+  "tags.mergeTarget": "Merge into",
+  "tags.mergeAction": "Merge",
+  "tags.merged": "Merged {count} tags",
+  "tags.mergeFailed": "Could not merge the tags",
+  "tags.delete": "Delete",
+  "tags.deleteAction": "Delete",
+  "tags.deleteConfirm": 'Remove the tag "{name}" from {count} files. Continue?',
+  "tags.deleteConfirmMany": "Delete the {count} selected tags. Continue?",
+  "tags.deleted": "Tag deleted",
+  "tags.deleteFailed": "Could not delete the tag",
+  "tags.addFailedReserved":
+    '"{prefix}:" is reserved for automatic tags. Please choose another name.',
+  "tags.ns.res": "Resolution",
+  "tags.ns.dur": "Length",
+  "tags.ns.codec": "Codec",
+  "tags.ns.orient": "Orientation",
+  "tags.value.durShort": "Short",
+  "tags.value.durMedium": "Medium",
+  "tags.value.durLong": "Long",
+  "tags.value.orientVertical": "Portrait",
+  "tags.value.orientHorizontal": "Landscape",
+  "tags.value.orientSquare": "Square",
 
   // workspace rail
   "workspace.all": "All",

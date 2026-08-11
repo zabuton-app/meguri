@@ -9,6 +9,7 @@ import {
   Pencil,
   RefreshCw,
   Table2,
+  Tags as TagsIcon,
 } from "lucide-react";
 import { Link } from "react-router";
 import type { UserCollection, WorkspaceInfo } from "@/ipc/types";
@@ -121,6 +122,14 @@ export function HomeHeader({
           className="flex size-7 items-center justify-center rounded-md border border-border text-muted transition hover:bg-fg/10 hover:text-fg"
         >
           <CopyCheck className="size-4" />
+        </Link>
+        <Link
+          to="/tags"
+          title={t("tags.title")}
+          aria-label={t("tags.title")}
+          className="flex size-7 items-center justify-center rounded-md border border-border text-muted transition hover:bg-fg/10 hover:text-fg"
+        >
+          <TagsIcon className="size-4" />
         </Link>
         <div className="flex items-center rounded-md border border-border">
           {(

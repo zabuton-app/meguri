@@ -2,6 +2,7 @@
 // merges/sorts/paginates in memory so the virtual "All" workspace can list every root.
 // A single-element set is the fast path (no merge), so callers use this uniformly.
 import { MAX_DUPLICATE_GROUPS } from "../../shared/duplicates.js";
+import { MAX_TAG_LIST, qualifiedTagName } from "../../shared/tags.js";
 import { resolveSortDir } from "../../shared/sortDir.js";
 import type { Core } from "./index.js";
 import {
@@ -19,6 +20,7 @@ import {
   type DuplicateFileRow,
   type SeekPosition,
 } from "./queries.js";
+import { listTags } from "./tagAdmin.js";
 import type {
   DuplicateGroup,
   DuplicatesResult,
@@ -30,6 +32,8 @@ import type {
   SearchQuery,
   SearchResult,
   SearchSeekKey,
+  TagList,
+  TagSummary,
 } from "./types.js";
 
 const DEFAULT_LIMIT = 100;
@@ -63,8 +67,7 @@ function normalizeCursor(cursor: SearchQuery["cursor"]): {
 
 /** Per-stream seek derived from the global key (see SeekPosition's tie rules). */
 function seekFor(key: SearchSeekKey, wsId: string): SeekPosition {
-  const tie =
-    wsId === key.ws ? "after-id" : wsId > key.ws ? "all" : "none";
+  const tie = wsId === key.ws ? "after-id" : wsId > key.ws ? "all" : "none";
   return { v: key.v, id: key.id, tie };
 }
 
@@ -103,7 +106,11 @@ function searchSingle(
     hasMore = res.items.length > limit;
     items = inject(res.items.slice(0, limit), target.id);
   } else {
-    const res = searchFiles(target.core.db, { ...query, cursor: offset, fileIds });
+    const res = searchFiles(target.core.db, {
+      ...query,
+      cursor: offset,
+      fileIds,
+    });
     hasMore = res.nextCursor != null;
     items = inject(res.items, target.id);
   }
@@ -485,6 +492,60 @@ function dupKey(hash: string, size: number): string {
 }
 
 /**
+ * The tag catalog across a set of workspaces, folded by qualified name.
+ *
+ * Tags live in per-workspace databases with per-database ids, so the union is
+ * built on the name — the same identifier the mutation channels use. Counts and
+ * per-source breakdowns are summed; a workspace is listed once per tag it holds.
+ *
+ * Ordering puts user-owned tags first, then namespaces alphabetically, then
+ * names case-insensitively. The known auto-meta namespaces get no special
+ * treatment here: the set is open, and the renderer applies its own grouping
+ * order on top.
+ */
+export function listTagsWorkspaces(cores: CoreTarget[]): TagList {
+  const merged = new Map<string, TagSummary>();
+  for (const { id, core } of cores) {
+    for (const row of listTags(core.db)) {
+      const qualified = qualifiedTagName(row.namespace, row.name);
+      const entry = merged.get(qualified);
+      if (!entry) {
+        merged.set(qualified, {
+          namespace: row.namespace,
+          name: row.name,
+          qualified,
+          fileCount: row.fileCount,
+          bySource: row.bySource.map((s) => ({ ...s })),
+          pipelineOwned: row.namespace !== "",
+          workspaceIds: [id],
+        });
+        continue;
+      }
+      entry.fileCount += row.fileCount;
+      entry.workspaceIds.push(id);
+      for (const s of row.bySource) {
+        const existing = entry.bySource.find((x) => x.source === s.source);
+        if (existing) existing.count += s.count;
+        else entry.bySource.push({ ...s });
+      }
+    }
+  }
+
+  const tags = [...merged.values()].sort(
+    (a, b) =>
+      a.namespace.localeCompare(b.namespace) ||
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+  );
+  for (const tag of tags) {
+    tag.bySource.sort((a, b) => a.source.localeCompare(b.source));
+  }
+  return {
+    tags: tags.slice(0, MAX_TAG_LIST),
+    truncated: tags.length > MAX_TAG_LIST,
+  };
+}
+
+/**
  * Duplicate groups across a set of workspaces, sorted by reclaimable bytes
  * (size × (copies − 1)) descending. A single workspace resolves with one
  * grouped SQL query; multiple workspaces use a two-pass aggregation so files
@@ -493,7 +554,9 @@ function dupKey(hash: string, size: number): string {
  * tuples into one map, pass 2 fetches full rows only for keys whose combined
  * count exceeds one, and only from the DBs that hold them.
  */
-export function listDuplicatesWorkspaces(cores: CoreTarget[]): DuplicatesResult {
+export function listDuplicatesWorkspaces(
+  cores: CoreTarget[],
+): DuplicatesResult {
   const rows =
     cores.length <= 1
       ? cores.length
@@ -562,7 +625,10 @@ function crossDuplicateKeys(cores: CoreTarget[]): {
   keys: Set<string>;
   hashesByWs: Map<string, Set<string>>;
 } {
-  const counts = new Map<string, { hash: string; n: number; wsIds: string[] }>();
+  const counts = new Map<
+    string,
+    { hash: string; n: number; wsIds: string[] }
+  >();
   for (const { id, core } of cores) {
     for (const { hash, size, n } of duplicateHashCounts(core.db)) {
       const key = dupKey(hash, size);
@@ -716,8 +782,11 @@ function comparatorFor(
         tiebreak(a, b);
     case "hash":
       return (a, b) =>
-        cmpNullableStr(a.contentHash ?? null, b.contentHash ?? null, direction) ||
-        tiebreak(a, b);
+        cmpNullableStr(
+          a.contentHash ?? null,
+          b.contentHash ?? null,
+          direction,
+        ) || tiebreak(a, b);
     default:
       return (a, b) =>
         cmpStr(a.workspaceId, b.workspaceId) || cmpNum(a.id, b.id, direction);

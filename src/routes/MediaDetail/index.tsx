@@ -21,6 +21,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  LIST_HIDDEN_SOURCES,
+  RESERVED_TAG_ERROR,
+  parseQualifiedTagName,
+} from "@shared/tags";
+import { applyTagFilter } from "@/lib/ui-events";
 import { api, events, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import type { FileDetail, FileRow, SearchResult } from "@/ipc/types";
@@ -82,6 +88,17 @@ export default function MediaDetail() {
   const navigate = useNavigate();
   // Closing the modal = drop the child route. Return to Discovery if we came from there,
   // otherwise back to the list (the list stays mounted underneath).
+  // Filtering the library by a tag only makes sense with the library visible, so
+  // this closes the detail — to `/` rather than back to Discovery, since Discovery
+  // has no notion of the list's filter.
+  const onTagFilter = useCallback(
+    (qualifiedName: string) => {
+      applyTagFilter([qualifiedName]);
+      void navigate("/");
+    },
+    [navigate],
+  );
+
   const onClose = useCallback(() => {
     if (searchParams.get("from") !== "discover") {
       void navigate("/");
@@ -230,17 +247,40 @@ export default function MediaDetail() {
         queryKey: ["file_get", wsId, fileId],
         queryFn: () => api.fileGet(fileId, wsId),
       });
-      if (fresh) patchFileRowInCaches(qc, wsId, fileId, { tags: fresh.tags });
+      if (fresh) {
+        // FileRow omits pipeline sources (see attachTags); patching straight from
+        // the detail response would put them back into the list caches.
+        patchFileRowInCaches(qc, wsId, fileId, {
+          tags: fresh.tags.filter(
+            (tag) => !LIST_HIDDEN_SOURCES.includes(tag.source),
+          ),
+        });
+      }
     } catch {
       // The tag edit itself succeeded; if the refetch fails (transient IPC
       // error), fall back to invalidating the detail so it reloads lazily.
       void qc.invalidateQueries({ queryKey: ["file_get", wsId, fileId] });
     }
     invalidateTagSearches(qc);
+    void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
   };
   const addTag = useMutation({
     mutationFn: (name: string) => api.fileAddTag(fileId, wsId, name),
     onSuccess: onTagsChanged,
+    onError: (error, name) => {
+      // main rejects a name that impersonates a pipeline-owned namespace; any
+      // other failure (DB error, unknown workspace) deserves its own message.
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes(RESERVED_TAG_ERROR)) {
+        toast.error(
+          t("tags.addFailedReserved", {
+            prefix: parseQualifiedTagName(name).namespace || name.split(":")[0],
+          }),
+        );
+      } else {
+        toast.error(t("tag.addFailed"), { description: message });
+      }
+    },
   });
   const removeTag = useMutation({
     mutationFn: (tagId: number) => api.fileRemoveTag(fileId, wsId, tagId),
@@ -750,6 +790,7 @@ export default function MediaDetail() {
                 workspaceId={wsId}
                 onAdd={(name) => addTag.mutate(name)}
                 onRemove={(tagId) => removeTag.mutate(tagId)}
+                onTagClick={onTagFilter}
               />
             </div>
           </div>

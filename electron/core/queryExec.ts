@@ -13,6 +13,7 @@ import type {
   HistoryQuery,
   SearchQuery,
   SearchResult,
+  TagList,
   WorkspaceStats,
 } from "./types.js";
 
@@ -37,10 +38,16 @@ export type QueryRequest =
     }
   | { kind: "history"; targets: QueryTarget[]; query: HistoryQuery }
   | { kind: "duplicates"; targets: QueryTarget[] }
+  | { kind: "tagsList"; targets: QueryTarget[] }
   | { kind: "stats"; targets: QueryTarget[] };
 
 export type QueryResponse =
-  SearchResult | FileRow[] | HistoryPage | DuplicatesResult | WorkspaceStats;
+  | SearchResult
+  | FileRow[]
+  | HistoryPage
+  | DuplicatesResult
+  | TagList
+  | WorkspaceStats;
 
 const DUP_REFS_CACHE_TTL_MS = 5_000;
 const DUP_REFS_CACHE_MAX_ENTRIES = 16;
@@ -166,6 +173,8 @@ export class QueryExecutor {
         return cw.listHistoryWorkspaces(cores, req.query);
       case "duplicates":
         return cw.listDuplicatesWorkspaces(cores);
+      case "tagsList":
+        return cw.listTagsWorkspaces(cores);
       case "stats": {
         let fileCount = 0;
         let scanAt: number | null = null;

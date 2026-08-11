@@ -166,6 +166,49 @@ export const DuplicatesResultSchema = z.object({
 });
 export type DuplicatesResult = z.infer<typeof DuplicatesResultSchema>;
 
+/**
+ * A tag addressed by name rather than by `tags.id`. Each workspace has its own
+ * database, so the same logical tag carries a different id in each — a name is
+ * the only identifier that survives the cross-workspace ("All") view.
+ */
+export const TagRefSchema = z.object({
+  namespace: z.string().max(32),
+  // Same ceiling as tag_rename's `to`, so merge cannot be used to create a name
+  // that rename would have refused.
+  name: z.string().min(1).max(64),
+});
+export type TagRef = z.infer<typeof TagRefSchema>;
+
+export const TagSourceCountSchema = z.object({
+  source: z.string(),
+  count: z.number(),
+});
+export type TagSourceCount = z.infer<typeof TagSourceCountSchema>;
+
+/** One row of the tag management screen, aggregated over the workspaces in scope. */
+export const TagSummarySchema = z.object({
+  namespace: z.string(),
+  name: z.string(),
+  /** Display and query form ("beach" | "res:4k"). Also the stable list key. */
+  qualified: z.string(),
+  /** Distinct alive files carrying the tag, summed over the workspaces in scope. */
+  fileCount: z.number(),
+  /** Same basis, split by origin. A file tagged twice counts once per source. */
+  bySource: z.array(TagSourceCountSchema),
+  /** namespace !== "" — rename / merge / delete are rejected for these. */
+  pipelineOwned: z.boolean(),
+  /** Workspaces holding the tag; only meaningful in the "All" view. */
+  workspaceIds: z.array(z.string()),
+});
+export type TagSummary = z.infer<typeof TagSummarySchema>;
+
+export const TagListSchema = z.object({
+  tags: z.array(TagSummarySchema),
+  /** True when the catalog exceeded MAX_TAG_LIST and was cut short. */
+  truncated: z.boolean(),
+});
+export type TagList = z.infer<typeof TagListSchema>;
+
 export const SearchResultSchema = z.object({
   items: z.array(FileRowSchema),
   // Number when produced by the per-DB offset path; keyset object from the

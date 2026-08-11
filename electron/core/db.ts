@@ -9,6 +9,34 @@ export type DB = Database.Database;
 const FTS_DDL =
   "CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(rel_path, tags_text, tokenize='trigram')";
 
+/**
+ * The (rowid, rel_path, tags_text) projection every FTS writer must agree on —
+ * this constant, syncFts() and tagsText() in tags.ts must produce the same set
+ * of names — the order within tags_text is not load-bearing (the tokenizer
+ * indexes trigrams, not positions). DISTINCT collapses the same tag attached
+ * via multiple sources; duplicates carry no extra search signal.
+ *
+ * Only user-owned tags (namespace = '') are indexed. The tokenizer is trigram,
+ * so indexing a generated tag like `dur:long` would make a plain search for
+ * "long" return every long video — and likewise for "short", "square",
+ * "h264"… Generated tags stay reachable through the explicit `meta:` directive
+ * (see buildSearchTerms in queries/files.ts) and through the structured
+ * SearchQuery.tags[] filter, neither of which goes through FTS.
+ *
+ * Callers append their own scope to the trailing WHERE clause.
+ */
+const FTS_ROW_SELECT = `
+  SELECT f.id, f.rel_path,
+         COALESCE((SELECT group_concat(name, ' ') FROM
+           (SELECT DISTINCT t.name AS name
+            FROM meta_tags mt JOIN tags t ON t.id = mt.tag_id
+            WHERE mt.meta_key = f.meta_key AND t.namespace = ''
+            ORDER BY name)), '')
+  FROM files f WHERE f.deleted_at IS NULL`;
+
+/** Chunk size for meta_key batches passed to resyncFtsForKeys as one JSON array. */
+const FTS_RESYNC_CHUNK = 5000;
+
 const CORE_DDL = `
 CREATE TABLE IF NOT EXISTS scan_roots (
   id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, path_hash TEXT NOT NULL,
@@ -57,6 +85,10 @@ CREATE TABLE IF NOT EXISTS tags (
 -- Tag-name autocomplete uses a prefix LIKE; LIKE is case-insensitive by
 -- default, so the range-search optimization needs a NOCASE-collated index.
 CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name COLLATE NOCASE);
+-- Manual-tag autocomplete only offers user-owned tags, so listTagNames filters on
+-- namespace = ''. A partial index over the same expression keeps that prefix range
+-- search covering, which the plain index above cannot do once the predicate is added.
+CREATE INDEX IF NOT EXISTS idx_tags_manual_name ON tags(name COLLATE NOCASE) WHERE namespace = '';
 
 -- Durable, manually-curated metadata keyed by the stable meta_key (not files.id),
 -- so it survives rebuilding the files/files_fts tables. Removed only when the whole
@@ -156,6 +188,44 @@ function backfillColumns(db: DB): void {
   );
 }
 
+/**
+ * Rebuild every FTS row from scratch. Rows already removed from the index
+ * (deleted_at set) are not re-added, preserving deleteFromIndex's invariant.
+ * Caller supplies the transaction.
+ */
+export function rebuildFtsAll(db: DB): void {
+  db.exec("DELETE FROM files_fts");
+  db.exec(
+    `INSERT INTO files_fts (rowid, rel_path, tags_text) ${FTS_ROW_SELECT}`,
+  );
+}
+
+/**
+ * Re-index only the files behind the given meta_keys. Used after a tag-catalog
+ * mutation (rename / merge / delete) and after the derived-tag backfill, where
+ * looping syncFts() per file would mean one delete+insert pair per row plus a
+ * meta_key -> file id round trip. Keys are passed as a single JSON array bound
+ * to one placeholder (as elsewhere) to stay clear of SQLITE_MAX_VARIABLE_NUMBER.
+ */
+export function resyncFtsForKeys(db: DB, metaKeys: string[]): void {
+  if (metaKeys.length === 0) return;
+  // The delete deliberately ignores deleted_at while the insert honours it: a key
+  // whose file has since been soft-deleted must lose its stale row, not keep it.
+  const del = db.prepare(
+    `DELETE FROM files_fts WHERE rowid IN
+       (SELECT id FROM files WHERE meta_key IN (SELECT value FROM json_each(?)))`,
+  );
+  const ins = db.prepare(
+    `INSERT INTO files_fts (rowid, rel_path, tags_text)
+     ${FTS_ROW_SELECT} AND f.meta_key IN (SELECT value FROM json_each(?))`,
+  );
+  for (let i = 0; i < metaKeys.length; i += FTS_RESYNC_CHUNK) {
+    const chunk = JSON.stringify(metaKeys.slice(i, i + FTS_RESYNC_CHUNK));
+    del.run(chunk);
+    ins.run(chunk);
+  }
+}
+
 /** Versionless idempotent migration: DBs created before the trigram switch still carry
  *  a unicode61 files_fts (CREATE VIRTUAL TABLE IF NOT EXISTS leaves it alone), so the
  *  tokenizer is detected from the stored DDL and the table rebuilt once. files_fts is
@@ -163,25 +233,15 @@ function backfillColumns(db: DB): void {
  *  loses nothing; all user-curated metadata is keyed by meta_key and unaffected. */
 function migrateFtsToTrigram(db: DB): void {
   const row = db
-    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'files_fts'")
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'files_fts'",
+    )
     .get() as { sql: string } | undefined;
   if (!row || row.sql.includes("trigram")) return;
   db.transaction(() => {
     db.exec("DROP TABLE files_fts");
     db.exec(FTS_DDL);
-    // Bulk re-index mirroring syncFts (tags.ts): rel_path plus space-joined tag names.
-    // DISTINCT collapses the same tag attached via multiple sources — duplicates carry
-    // no extra search signal. Rows already removed from the index (deleted_at set) are
-    // not re-added, preserving deleteFromIndex's invariant.
-    db.exec(`
-      INSERT INTO files_fts (rowid, rel_path, tags_text)
-      SELECT f.id, f.rel_path,
-             COALESCE((SELECT group_concat(name, ' ') FROM
-               (SELECT DISTINCT t.name FROM meta_tags mt
-                JOIN tags t ON t.id = mt.tag_id
-                WHERE mt.meta_key = f.meta_key ORDER BY t.name)), '')
-      FROM files f WHERE f.deleted_at IS NULL
-    `);
+    rebuildFtsAll(db);
   })();
 }
 

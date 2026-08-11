@@ -10,6 +10,11 @@ export function searchInput(page: Page): Locator {
   return page.locator("#list-search-input");
 }
 
+/** The exact-tag directives the search box renders as chips beside the text. */
+export function searchChips(page: Page): Locator {
+  return page.locator('[data-slot="search-chip"]');
+}
+
 /** Grid-view card for a file. List/table views don't carry the testid. */
 export function fileCard(page: Page, fileName = FIXTURE_FILE): Locator {
   return page.getByTestId("media-card").filter({ hasText: fileName }).first();
@@ -85,7 +90,9 @@ export async function expectStarRating(
   stars: number,
 ): Promise<void> {
   for (let n = 1; n <= 5; n += 1) {
-    const icon = scope.getByRole("button", { name: `${n} stars` }).locator("svg");
+    const icon = scope
+      .getByRole("button", { name: `${n} stars` })
+      .locator("svg");
     if (n <= stars) {
       await expect(icon).toHaveClass(/fill-accent2/);
     } else {

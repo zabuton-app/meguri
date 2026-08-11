@@ -118,7 +118,10 @@ export const ja = {
   "command.shortcutHint": "{shortcut} で開けます",
 
   // フィルタ（FilterBar / 条件バッジ）
+  "filter.searchHint":
+    'ファイル名とタグを検索します。tag:旅行 で手動タグ、meta:4k や meta:long で自動タグを完全一致で絞り込めます。空白を含むタグは tag:"夏 旅行" のように引用符で囲みます。',
   "filter.searchPlaceholder": "ファイル名・タグを検索",
+  "filter.tagSuggestions": "タグの候補",
   "filter.all": "すべて",
   "filter.playAny": "視聴状態",
   "filter.played": "視聴済み",
@@ -237,18 +240,20 @@ export const ja = {
   "scan.phaseHash": "ファイル照合",
   "scan.phaseIndex": "インデックス作成",
   "scan.phaseThumbnail": "サムネイル生成",
+  "scan.phaseTags": "タグ付与",
   "scan.cancel": "スキャンをキャンセル",
 
   // タグ編集
   "tag.none": "タグなし",
   "tag.addPlaceholder": "タグを追加して Enter",
   "tag.remove": "タグ削除",
+  "tag.addFailed": "タグを追加できませんでした",
 
   // メディアグリッド
   "grid.empty": "表示できるメディアがありません。",
   "grid.emptyHint":
     "「スキャン」を実行すると、配下の動画・画像がここに並びます。",
-  "grid.searchByTag": "「{name}」で検索",
+  "grid.searchByTag": "「{name}」で絞り込み",
   "view.grid": "グリッド表示",
   "view.list": "リスト表示",
   "view.table": "テーブル表示",
@@ -286,9 +291,67 @@ export const ja = {
     "内容が同一（ハッシュとサイズが一致）のファイルが複数あるとここに表示されます。",
   "duplicates.summary": "{groups} グループ / {files} ファイル / 重複 {size}",
   "duplicates.fileCount": "{count} 件",
-  "duplicates.truncated": "グループ数が多いため上位 {max} 件のみ表示しています。",
+  "duplicates.truncated":
+    "グループ数が多いため上位 {max} 件のみ表示しています。",
   "duplicates.filter": "重複ファイルのみ表示",
   "duplicates.chip": "重複",
+
+  // タグ管理画面
+  "tags.title": "タグ管理",
+  "tags.summary": "{tags} タグ / 付与 {assignments} 件",
+  "tags.empty": "タグはまだありません。",
+  "tags.emptyHint": "詳細画面でタグを追加すると、ここに一覧が表示されます。",
+  "tags.searchPlaceholder": "タグを絞り込み",
+  "tags.noMatch": "一致するタグがありません。",
+  "tags.truncated": "タグ数が多いため上位 {max} 件のみ表示しています。",
+  "tags.fileCount": "{count} ファイル",
+  "tags.sortByName": "名前順",
+  "tags.sortByCount": "件数順",
+  "tags.groupManual": "手動タグ",
+  "tags.readOnly": "読み取り専用",
+  "tags.readOnlyHint":
+    "スキャン時に自動付与されるタグです。編集・削除はできません。",
+  "tags.filterByTag": "このタグで絞り込む",
+  "tags.source.manual": "手動",
+  "tags.source.autoMeta": "自動",
+  "tags.selected": "{count} 件選択中",
+  "tags.clearSelection": "選択を解除",
+  "tags.rename": "名前を変更",
+  "tags.renameTitle": "タグ名を変更",
+  "tags.renamePlaceholder": "新しいタグ名",
+  "tags.renameAction": "変更",
+  "tags.renamed": "「{from}」を「{to}」に変更しました",
+  "tags.renameFailed": "タグ名の変更に失敗しました",
+  "tags.renameConflict":
+    "「{name}」は既に存在します。2 つのタグを統合しますか?",
+  "tags.merge": "統合",
+  "tags.mergeTitle": "タグを統合",
+  "tags.mergeDescription":
+    "選択した {count} 個のタグを統合先にまとめます。統合元のタグは削除されます。",
+  "tags.mergeTarget": "統合先",
+  "tags.mergeAction": "統合する",
+  "tags.merged": "{count} 個のタグを統合しました",
+  "tags.mergeFailed": "タグの統合に失敗しました",
+  "tags.delete": "削除",
+  "tags.deleteAction": "削除",
+  "tags.deleteConfirm":
+    "タグ「{name}」を {count} ファイルから削除します。よろしいですか?",
+  "tags.deleteConfirmMany":
+    "選択した {count} 個のタグを削除します。よろしいですか?",
+  "tags.deleted": "タグを削除しました",
+  "tags.deleteFailed": "タグの削除に失敗しました",
+  "tags.addFailedReserved":
+    "「{prefix}:」は自動タグ用の予約語です。別の名前を指定してください。",
+  "tags.ns.res": "解像度",
+  "tags.ns.dur": "長さ",
+  "tags.ns.codec": "コーデック",
+  "tags.ns.orient": "向き",
+  "tags.value.durShort": "短尺",
+  "tags.value.durMedium": "中尺",
+  "tags.value.durLong": "長尺",
+  "tags.value.orientVertical": "縦長",
+  "tags.value.orientHorizontal": "横長",
+  "tags.value.orientSquare": "正方形",
 
   // ワークスペースレール
   "workspace.all": "すべて",

@@ -122,7 +122,10 @@ export const fr: Record<TranslationKey, string> = {
   "command.shortcutHint": "Ouvrir avec {shortcut}",
 
   // filter
+  "filter.searchHint":
+    'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage pour les vôtres et meta:4k ou meta:long pour les tags automatiques — correspondance exacte dans les deux cas. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage".',
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
+  "filter.tagSuggestions": "Suggestions de tags",
   "filter.all": "Tout",
   "filter.playAny": "État de lecture",
   "filter.played": "Lu",
@@ -241,18 +244,20 @@ export const fr: Record<TranslationKey, string> = {
   "scan.phaseHash": "Vérification des fichiers",
   "scan.phaseIndex": "Création de l'index",
   "scan.phaseThumbnail": "Génération des miniatures",
+  "scan.phaseTags": "Étiquetage",
   "scan.cancel": "Annuler le scan",
 
   // tag editor
   "tag.none": "Aucun tag",
   "tag.addPlaceholder": "Ajoutez un tag et appuyez sur Entrée",
   "tag.remove": "Supprimer le tag",
+  "tag.addFailed": "Impossible d'ajouter le tag",
 
   // media grid
   "grid.empty": "Aucun média à afficher.",
   "grid.emptyHint":
     "Lancez « Analyser » pour lister ici les vidéos et les images.",
-  "grid.searchByTag": "Rechercher « {name} »",
+  "grid.searchByTag": "Filtrer par « {name} »",
   "view.grid": "Vue en grille",
   "view.list": "Vue en liste",
   "view.table": "Vue en tableau",
@@ -267,7 +272,8 @@ export const fr: Record<TranslationKey, string> = {
   "discover.empty": "Aucun média à recommander.",
   "discover.emptyHint":
     "Lancez « Analyser » pour importer des vidéos et des images ; elles seront recommandées ici au hasard.",
-  "discover.sceneHint": "Survolez pour agrandir · cliquez pour lire à partir de ce point",
+  "discover.sceneHint":
+    "Survolez pour agrandir · cliquez pour lire à partir de ce point",
   "discover.moreScenes": "+{count}",
 
   // Historique de lecture
@@ -289,12 +295,70 @@ export const fr: Record<TranslationKey, string> = {
   "duplicates.empty": "Aucun fichier en double trouvé.",
   "duplicates.emptyHint":
     "Les fichiers au contenu identique (hachage et taille correspondants) apparaîtront ici.",
-  "duplicates.summary": "{groups} groupes / {files} fichiers / {size} en double",
+  "duplicates.summary":
+    "{groups} groupes / {files} fichiers / {size} en double",
   "duplicates.fileCount": "{count} fichiers",
   "duplicates.truncated":
     "Trop de groupes ; seuls les {max} premiers sont affichés.",
   "duplicates.filter": "Afficher uniquement les fichiers en double",
   "duplicates.chip": "Doublons",
+
+  // Écran de gestion des tags
+  "tags.title": "Tags",
+  "tags.summary": "{tags} tags / {assignments} attributions",
+  "tags.empty": "Aucun tag pour l'instant.",
+  "tags.emptyHint":
+    "Ajoutez des tags depuis la vue détaillée et ils apparaîtront ici.",
+  "tags.searchPlaceholder": "Filtrer les tags",
+  "tags.noMatch": "Aucun tag correspondant.",
+  "tags.truncated": "Trop de tags : affichage des {max} premiers.",
+  "tags.fileCount": "{count} fichiers",
+  "tags.sortByName": "Par nom",
+  "tags.sortByCount": "Par nombre",
+  "tags.groupManual": "Tags manuels",
+  "tags.readOnly": "Lecture seule",
+  "tags.readOnlyHint":
+    "Attribués automatiquement lors de l'analyse. Ils ne peuvent être ni modifiés ni supprimés.",
+  "tags.filterByTag": "Filtrer par ce tag",
+  "tags.source.manual": "Manuel",
+  "tags.source.autoMeta": "Automatique",
+  "tags.selected": "{count} sélectionnés",
+  "tags.clearSelection": "Annuler la sélection",
+  "tags.rename": "Renommer",
+  "tags.renameTitle": "Renommer le tag",
+  "tags.renamePlaceholder": "Nouveau nom",
+  "tags.renameAction": "Renommer",
+  "tags.renamed": "« {from} » renommé en « {to} »",
+  "tags.renameFailed": "Impossible de renommer le tag",
+  "tags.renameConflict": "« {name} » existe déjà. Fusionner les deux tags ?",
+  "tags.merge": "Fusionner",
+  "tags.mergeTitle": "Fusionner les tags",
+  "tags.mergeDescription":
+    "Les {count} tags sélectionnés sont regroupés dans la cible. Les autres sont supprimés.",
+  "tags.mergeTarget": "Fusionner dans",
+  "tags.mergeAction": "Fusionner",
+  "tags.merged": "{count} tags fusionnés",
+  "tags.mergeFailed": "Impossible de fusionner les tags",
+  "tags.delete": "Supprimer",
+  "tags.deleteAction": "Supprimer",
+  "tags.deleteConfirm":
+    "Le tag « {name} » sera retiré de {count} fichiers. Continuer ?",
+  "tags.deleteConfirmMany":
+    "Les {count} tags sélectionnés seront supprimés. Continuer ?",
+  "tags.deleted": "Tag supprimé",
+  "tags.deleteFailed": "Impossible de supprimer le tag",
+  "tags.addFailedReserved":
+    "« {prefix}: » est réservé aux tags automatiques. Choisissez un autre nom.",
+  "tags.ns.res": "Résolution",
+  "tags.ns.dur": "Durée",
+  "tags.ns.codec": "Codec",
+  "tags.ns.orient": "Orientation",
+  "tags.value.durShort": "Courte",
+  "tags.value.durMedium": "Moyenne",
+  "tags.value.durLong": "Longue",
+  "tags.value.orientVertical": "Portrait",
+  "tags.value.orientHorizontal": "Paysage",
+  "tags.value.orientSquare": "Carré",
 
   // workspace rail
   "workspace.all": "Tout",

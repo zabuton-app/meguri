@@ -8,6 +8,11 @@ import { walk, syncFiles, type ScanStats } from "./scan.js";
 import { extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
 import { syncFts } from "./tags.js";
+import {
+  applyAutoMetaTags,
+  backfillAutoMetaTags,
+  needsAutoMetaBackfill,
+} from "./autoMetaTags.js";
 import { pool } from "./concurrency.js";
 import { scopedLog } from "./logger.js";
 import type { Kind } from "./types.js";
@@ -150,6 +155,7 @@ export async function runScan(
   // previously per-file scan:progress IPC traffic.
   type ThumbResult = {
     id: number;
+    kind: Kind;
     dest: string;
     ok: boolean;
     meta: Awaited<ReturnType<typeof extractMeta>>;
@@ -160,6 +166,9 @@ export async function runScan(
   const persistOne = (r: ThumbResult): void => {
     q.updateExtractedMeta(db, r.id, r.meta);
     q.setThumb(db, r.id, r.ok ? r.dest : null, r.ok ? "done" : "error");
+    // Derive from what was just written, and before syncFts — which rebuilds
+    // tags_text by re-reading meta_tags.
+    applyAutoMetaTags(db, r.id, { kind: r.kind, ...r.meta });
     syncFts(db, r.id);
   };
   // Per-file transaction for the retry path: persistOne spans several writes
@@ -227,7 +236,7 @@ export async function runScan(
       if (signal?.aborted) return;
 
       // Workers share the event loop, so buffering + flushing is race-free.
-      buffer.push({ id: f.id, dest, ok, meta });
+      buffer.push({ id: f.id, kind, dest, ok, meta });
       if (buffer.length >= THUMB_FLUSH_EVERY) flush();
     },
     signal,
@@ -235,6 +244,18 @@ export async function runScan(
   // Persist the tail batch. On abort the buffered results are from ffmpeg runs
   // that completed before the signal fired, so they are safe to keep.
   flush();
+
+  // Files classified as unchanged/moved never enter the pool above (syncFiles
+  // leaves their thumb_status alone), so an existing library only gains derived
+  // tags through this pass. It reads the ffprobe columns already on `files`, so
+  // no media file is touched.
+  if (!signal?.aborted && needsAutoMetaBackfill(db)) {
+    await backfillAutoMetaTags(db, {
+      signal,
+      onProgress: (d, t) =>
+        onEvent({ type: "progress", jobId, phase: "tags", done: d, total: t }),
+    });
+  }
 
   // Reclaim durable metadata whose file row no longer exists (mainly post-rebuild orphans).
   // Skipped on abort to avoid purging metadata for files not yet re-indexed (especially after rebuild).

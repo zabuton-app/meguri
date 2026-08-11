@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DB } from "../db.js";
 import {
+  addFileTag,
   addManualTag,
   fileTags,
   listTagNames,
@@ -83,5 +84,38 @@ describe("tags", () => {
     // "_" is a LIKE wildcard; it must be escaped so the prefix is treated literally.
     expect(listTagNames(db, "a_", 10)).toEqual(["a_b"]);
     expect(listTagNames(db, "a", 10).sort()).toEqual(["a_b", "abc", "axb"]);
+  });
+
+  it("listTagNames never offers pipeline-owned (namespaced) tags", () => {
+    upsertTag(db, "", "4k-remaster");
+    upsertTag(db, "res", "4k");
+    expect(listTagNames(db, "4k", 10)).toEqual(["4k-remaster"]);
+  });
+
+  it("tagsText carries only user-owned tags, deduplicated across sources", () => {
+    const id = insertFile(db, rootId, { relPath: "a.mp4" });
+    addManualTag(db, id, "beach");
+    const manual = upsertTag(db, "", "beach");
+    // Same tag from a second source must not be repeated in the search text.
+    addFileTag(db, id, manual, "plugin", null);
+    // A generated tag stays out: with a trigram tokenizer, indexing "dur:long"
+    // would make a plain search for "long" return every long video.
+    addFileTag(db, id, upsertTag(db, "dur", "long"), "auto-meta", null);
+    expect(tagsText(db, id)).toBe("beach");
+  });
+
+  it("keeps generated tags out of free-text results", () => {
+    const id = insertFile(db, rootId, { relPath: "a.mp4" });
+    addFileTag(db, id, upsertTag(db, "dur", "long"), "auto-meta", null);
+    syncFts(db, id);
+    expect(searchFiles(db, { q: "long" }).items).toEqual([]);
+  });
+
+  it("addManualTag rejects a name impersonating a pipeline namespace", () => {
+    const id = insertFile(db, rootId, { relPath: "a.mp4" });
+    expect(() => addManualTag(db, id, "res:4k")).toThrow(/reserved/);
+    // A colon that is not a known namespace stays a perfectly ordinary tag name.
+    expect(() => addManualTag(db, id, "todo:later")).not.toThrow();
+    expect(fileTags(db, id).map((t) => t.name)).toEqual(["todo:later"]);
   });
 });
