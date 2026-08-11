@@ -211,6 +211,24 @@ describe("Home + MediaDetail integration", () => {
       await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
     });
 
+    it("points at the existing chip when the tag is already a condition", async () => {
+      renderWithProviders(<AppRoutes />);
+      fireEvent.click(await screen.findByText("beach"));
+      const chip = await screen.findByTitle("Tags: beach");
+      expect(chip.dataset.selected).toBeUndefined();
+
+      // A second click adds nothing, so without this it reads as a dead click.
+      fireEvent.click(await screen.findByText("beach"));
+      await waitFor(() =>
+        expect(
+          document
+            .querySelector('[data-slot="search-chip"]')
+            ?.getAttribute("data-selected"),
+        ).toBe("true"),
+      );
+      expect(lastQuery().q).toBe("tag:beach");
+    });
+
     it("removes the directive as a whole from the search box", async () => {
       renderWithProviders(<AppRoutes />);
       fireEvent.click(await screen.findByText("beach"));
@@ -234,10 +252,10 @@ describe("Home + MediaDetail integration", () => {
 
     await waitFor(() => {
       const calls = mocks.filesSearch.mock.calls;
-      // The bare value: category vocabularies are disjoint, so `meta:4k` is
-      // unambiguous and reads better than `meta:res:4k`.
+      // The bare value: category vocabularies are disjoint, so `tag:4k` is
+      // unambiguous and reads better than `tag:res:4k`.
       expect((calls[calls.length - 1][0] as Record<string, unknown>).q).toBe(
-        "meta:4k",
+        "tag:4k",
       );
     });
     // Filtering only makes sense with the library visible, so the modal closes.

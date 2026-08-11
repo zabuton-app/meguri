@@ -116,7 +116,7 @@ export const zhCN: Record<TranslationKey, string> = {
 
   // filter
   "filter.searchHint":
-    '搜索文件名和标签。用 tag:旅行 筛选手动标签，用 meta:4k 或 meta:long 筛选自动标签，均为精确匹配。含空格的值请加引号：tag:"夏日 旅行"。',
+    '搜索文件名和标签。用 tag:旅行 或 tag:4k 精确匹配标签，手动标签与自动标签通用。含空格的值请加引号：tag:"夏日 旅行"。',
   "filter.searchPlaceholder": "搜索文件名或标签",
   "filter.tagSuggestions": "标签建议",
   "filter.all": "全部",

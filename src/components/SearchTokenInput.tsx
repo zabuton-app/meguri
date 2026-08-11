@@ -1,18 +1,16 @@
 // The library search box. Free text stays editable text; an exact-tag directive
-// (`tag:beach`, `meta:long`) becomes a chip, because it only means anything as a
+// (`tag:beach`, `tag:long`) becomes a chip, because it only means anything as a
 // whole: backspacing through the middle of one turns an exact tag match into a
 // substring search that also hits file names, with nothing on screen to say so.
 // While one is being typed the box completes it from the tag catalog.
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
 import {
-  META_SEARCH_PREFIX,
   TAG_SEARCH_PREFIX,
   hasOpenQuote,
   isTagDirective,
   joinSearchTokens,
-  parseMetaSearchToken,
   parseTagSearchToken,
   splitSearchTokens,
   tagSearchToken,
@@ -28,6 +26,7 @@ import {
   splitQueryChips,
   tagSuggestions,
 } from "@/lib/searchTokens";
+import { onHighlightSearchToken } from "@/lib/ui-events";
 
 interface Props {
   id?: string;
@@ -119,7 +118,7 @@ export function SearchTokenInput({
 
   /**
    * A token turns into a chip only once it is closed — by a space or by Enter
-   * (`force`) — so `meta:lo…` is not pulled out of the field mid-word.
+   * (`force`) — so `tag:lo…` is not pulled out of the field mid-word.
    */
   const apply = (raw: string, force = false) => {
     const closed = force || (/\s$/.test(raw) && !hasOpenQuote(raw));
@@ -135,15 +134,40 @@ export function SearchTokenInput({
     let next = joinSearchTokens(rest);
     // Give back the space the user just typed, or the next word runs into the
     // last one. Only that space — re-joining must not invent one after a word
-    // the caret is still sitting in (a pasted "meta:4k s").
+    // the caret is still sitting in (a pasted "tag:4k s").
     if (closed && !force && next) next += " ";
     commit([...chips, ...promoted], next);
   };
 
+  /** Put the highlight on a chip and leave the field ready to act on it. */
+  const highlight = (index: number) => {
+    setSelected(index);
+    inputRef.current?.focus();
+  };
+
+  // Clicking a tag that is already a condition changes nothing, so Home asks the
+  // box to point at the chip it landed on. Matching is on the resolved value, not
+  // the raw token: the two differ in quoting.
+  useEffect(
+    () =>
+      onHighlightSearchToken((token) => {
+        // Through the tokenizer first: the sender quotes a value with spaces,
+        // the chips hold it unquoted.
+        const wanted = parseTagSearchToken(
+          splitSearchTokens(token)[0] ?? "",
+        )?.toLowerCase();
+        const at = chips.findIndex(
+          (chip) => parseTagSearchToken(chip)?.toLowerCase() === wanted,
+        );
+        if (wanted !== undefined && at >= 0) highlight(at);
+      }),
+    [chips],
+  );
+
   /** Swap the directive under the caret for the chosen tag and chip it. */
   const accept = (tag: TagSummary) => {
     const tokens = splitSearchTokens(draft);
-    tokens[tokens.length - 1] = tagSearchToken(tag.namespace, tag.name);
+    tokens[tokens.length - 1] = tagSearchToken(tag.name);
     apply(`${joinSearchTokens(tokens)} `);
     inputRef.current?.focus();
   };
@@ -169,14 +193,15 @@ export function SearchTokenInput({
           icon still lands on the box and focuses the field. */}
       <Search className="pointer-events-none size-3.5 shrink-0 text-muted" />
       {chips.map((token, i) => {
-        const meta = parseMetaSearchToken(token);
-        const prefix = meta === null ? TAG_SEARCH_PREFIX : META_SEARCH_PREFIX;
-        const body = meta ?? parseTagSearchToken(token) ?? "";
+        const body = parseTagSearchToken(token) ?? "";
         return (
           <span
             key={`${token}-${i}`}
             data-slot="search-chip"
             data-selected={i === picked ? "true" : undefined}
+            // Mouse parity with the arrow keys: clicking a condition aims at it
+            // rather than doing nothing.
+            onClick={() => highlight(i)}
             title={searchTokenLabel(t, token) ?? undefined}
             className={cn(
               "flex h-5 max-w-full shrink-0 items-center gap-0.5 rounded py-0 pl-1.5 pr-0.5 text-xs",
@@ -184,17 +209,20 @@ export function SearchTokenInput({
             )}
           >
             <span className="truncate">
-              <span className="text-muted">{prefix}:</span>
+              <span className="text-muted">{TAG_SEARCH_PREFIX}:</span>
               {body}
             </span>
             <button
               type="button"
-              onClick={() =>
+              onClick={(e) => {
+                // Otherwise the chip's own handler would highlight what is
+                // already gone.
+                e.stopPropagation();
                 commit(
                   chips.filter((_, j) => j !== i),
                   draft,
-                )
-              }
+                );
+              }}
               aria-label={t("home.removeChip")}
               className="rounded-full p-0.5 transition hover:bg-fg/15"
             >
@@ -251,6 +279,12 @@ export function SearchTokenInput({
             setActive(
               (activeIndex + step + suggestions.length) % suggestions.length,
             );
+          } else if (open && e.key === "Tab" && !e.shiftKey) {
+            // Tab completes, as it does in a shell. preventDefault keeps the
+            // caret here so the next condition can be typed straight away;
+            // Shift+Tab still means "leave", and blurring closes the list.
+            e.preventDefault();
+            accept(suggestions[activeIndex]);
           } else if (e.key === "Enter") {
             if (open) accept(suggestions[activeIndex]);
             else {
@@ -299,9 +333,7 @@ export function SearchTokenInput({
               )}
             >
               <span className="truncate">
-                <span className="text-muted">
-                  {tag.namespace ? META_SEARCH_PREFIX : TAG_SEARCH_PREFIX}:
-                </span>
+                <span className="text-muted">{TAG_SEARCH_PREFIX}:</span>
                 {tag.name}
               </span>
               {tag.namespace && (

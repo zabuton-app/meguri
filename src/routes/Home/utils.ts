@@ -42,7 +42,7 @@ export function discoverPath(filter: SearchQuery): string {
 }
 
 /**
- * AND-append search-box tokens (`tag:beach`, `meta:4k`) to the query, skipping
+ * AND-append search-box tokens (`tag:beach`, `tag:4k`) to the query, skipping
  * ones already present. Writing into `q` rather than `SearchQuery.tags[]` is what
  * puts the condition in the text field where the user can see and edit it; the
  * tokens still resolve to an exact tag match, so no file-name false positives

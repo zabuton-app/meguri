@@ -29,7 +29,7 @@ export type AutoMetaNamespace = (typeof AUTO_META_NAMESPACES)[number];
  * from ffprobe and form an open set.
  *
  * These sets must stay disjoint — that is what lets the search box accept
- * `meta:long` instead of `meta:dur:long`. A ruleset test asserts both that they
+ * `tag:long` instead of `tag:dur:long`. A ruleset test asserts both that they
  * do not overlap and that the classifier emits nothing outside them.
  */
 export const AUTO_META_VALUES: Readonly<Record<string, readonly string[]>> = {
@@ -105,52 +105,43 @@ export function isEditableTag(namespace: string): boolean {
 }
 
 /**
- * Search-box directives that target a tag exactly instead of searching text:
- * `tag:beach` for a user's own tag, `meta:4k` / `meta:res:4k` for a generated
- * one.
+ * The one search-box directive that targets a tag exactly instead of searching
+ * text: `tag:beach` for a user's own tag, `tag:4k` / `tag:res:4k` for a
+ * generated one.
  *
- * Generated tags are deliberately kept out of the full-text index — with a
- * trigram tokenizer, indexing `dur:long` would make a plain search for "long"
- * return every long video — so `meta:` is the only free-text route to them.
- * `tag:` exists so that clicking a tag can put the condition *in the search box*
- * without the exact match degrading into a substring search that also hits file
- * names.
+ * One prefix for both, not one each. The user does not think of "my tags" and
+ * "the scanner's tags" as separate things to search, and a second prefix bought
+ * nothing but two vocabularies to keep straight — in the code as much as in the
+ * head of whoever is typing.
+ *
+ * It has to exist because generated tags are deliberately kept out of the
+ * full-text index (with a trigram tokenizer, indexing `dur:long` would make a
+ * plain search for "long" return every long video), so this is the only route to
+ * them; and because clicking a tag has to put the condition *in the search box*
+ * without the exact match degrading into a substring search over file names.
  */
-export const META_SEARCH_PREFIX = "meta";
 export const TAG_SEARCH_PREFIX = "tag";
 
-/** Prefixes a manual tag name may not claim: the namespaces plus the directives. */
+/** Prefixes a manual tag name may not claim: the namespaces plus the directive. */
 export const RESERVED_TAG_PREFIXES: readonly string[] = [
   ...AUTO_META_NAMESPACES,
-  META_SEARCH_PREFIX,
   TAG_SEARCH_PREFIX,
 ];
 
-function parseDirective(token: string, prefix: string): string | null {
-  const head = `${prefix}:`;
+/**
+ * Extract the value of a `tag:` search token, or null when the token is ordinary
+ * free text. `tag:` with nothing after it is ordinary text too.
+ */
+export function parseTagSearchToken(token: string): string | null {
+  const head = `${TAG_SEARCH_PREFIX}:`;
   if (!token.toLowerCase().startsWith(head)) return null;
   const value = token.slice(head.length).trim();
   return value || null;
 }
 
-/**
- * Extract the value of a `meta:` search token, or null when the token is
- * ordinary free text. `meta:` with nothing after it is ordinary text too.
- */
-export function parseMetaSearchToken(token: string): string | null {
-  return parseDirective(token, META_SEARCH_PREFIX);
-}
-
-/** Same for `tag:`, which targets the user's own tags. */
-export function parseTagSearchToken(token: string): string | null {
-  return parseDirective(token, TAG_SEARCH_PREFIX);
-}
-
-/** True for any token the search box treats as an exact-tag directive. */
+/** True for a token the search box treats as an exact-tag directive. */
 export function isTagDirective(token: string): boolean {
-  return (
-    parseTagSearchToken(token) !== null || parseMetaSearchToken(token) !== null
-  );
+  return parseTagSearchToken(token) !== null;
 }
 
 function needsQuoting(value: string): boolean {
@@ -158,21 +149,20 @@ function needsQuoting(value: string): boolean {
 }
 
 /**
- * The search-box token that reproduces this tag as an exact filter: `tag:` for
- * the user's own, `meta:` for a generated one.
+ * The search-box token that reproduces this tag as an exact filter.
  *
- * The generated form carries the **bare** value (`meta:long`, not
- * `meta:dur:long`): the category vocabularies are disjoint, so the value alone
- * is unambiguous and far easier to read and type. The qualified form stays
- * accepted on input as an escape hatch.
+ * A generated tag carries its **bare** value (`tag:long`, not `tag:dur:long`):
+ * the category vocabularies are disjoint, so the value alone identifies the
+ * category, and it is far easier to read and type. The qualified form stays
+ * accepted on input for the rare case where a manual tag shares the name — a
+ * bare value matches both, which is usually what was wanted anyway.
  *
  * Values containing whitespace or a quote are quoted, doubling any inner quote —
  * the same convention {@link splitSearchTokens} reads back.
  */
-export function tagSearchToken(namespace: string, name: string): string {
-  const prefix = namespace ? META_SEARCH_PREFIX : TAG_SEARCH_PREFIX;
+export function tagSearchToken(name: string): string {
   const body = needsQuoting(name) ? `"${name.replace(/"/g, '""')}"` : name;
-  return `${prefix}:${body}`;
+  return `${TAG_SEARCH_PREFIX}:${body}`;
 }
 
 /**
@@ -184,10 +174,10 @@ export function tagSearchToken(namespace: string, name: string): string {
  * that the directive exists to avoid — the one failure the user cannot see.
  */
 function foldSpacedDirectives(tokens: string[]): string[] {
-  const bare = [`${TAG_SEARCH_PREFIX}:`, `${META_SEARCH_PREFIX}:`];
+  const bare = `${TAG_SEARCH_PREFIX}:`;
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    if (bare.includes(tokens[i].toLowerCase()) && i + 1 < tokens.length) {
+    if (tokens[i].toLowerCase() === bare && i + 1 < tokens.length) {
       out.push(tokens[i] + tokens[i + 1]);
       i++;
       continue;
@@ -257,15 +247,8 @@ export function joinSearchTokens(tokens: string[]): string {
   return tokens
     .map((token) => {
       // A directive quotes only its value, so the prefix stays readable.
-      for (const prefix of [TAG_SEARCH_PREFIX, META_SEARCH_PREFIX]) {
-        const value = parseDirective(token, prefix);
-        if (value !== null) {
-          const body = needsQuoting(value)
-            ? `"${value.replace(/"/g, '""')}"`
-            : value;
-          return `${prefix}:${body}`;
-        }
-      }
+      const value = parseTagSearchToken(token);
+      if (value !== null) return tagSearchToken(value);
       return needsQuoting(token) ? `"${token.replace(/"/g, '""')}"` : token;
     })
     .join(" ");

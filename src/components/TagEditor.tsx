@@ -20,7 +20,7 @@ interface Props {
   onAdd: (name: string) => void;
   onRemove: (tagId: number) => void;
   /**
-   * Receives the search-box token ("tag:beach" | "meta:4k" — a generated tag
+   * Receives the search-box token ("tag:beach", "tag:4k" — a generated tag
    * carries the bare value; see tagSearchToken). Omit to render inert labels.
    */
   onTagClick?: (token: string) => void;
@@ -90,9 +90,7 @@ export function TagEditor({
                 // one button inside another is invalid.
                 <button
                   type="button"
-                  onClick={() =>
-                    onTagClick(tagSearchToken(tag.namespace, tag.name))
-                  }
+                  onClick={() => onTagClick(tagSearchToken(tag.name))}
                   title={t("grid.searchByTag", { name: human })}
                   className="transition hover:opacity-80"
                 >

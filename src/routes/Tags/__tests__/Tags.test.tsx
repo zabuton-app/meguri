@@ -200,11 +200,11 @@ describe("Tags screen", () => {
         .hasAttribute("disabled"),
     ).toBe(true);
 
-    // A search directive is reserved too, and the message has to name it: the
-    // display-only name parser reads "meta:foo" as a plain name, so asking it
+    // The search directive is reserved too, and the message has to name it: the
+    // display-only name parser reads "tag:foo" as a plain name, so asking it
     // for the prefix used to print a bare colon.
-    fireEvent.change(input, { target: { value: "meta:foo" } });
-    expect(await screen.findByText(/^"meta:" is reserved/)).toBeTruthy();
+    fireEvent.change(input, { target: { value: "tag:foo" } });
+    expect(await screen.findByText(/^"tag:" is reserved/)).toBeTruthy();
   });
 
   it("deletes a tag after confirmation", async () => {

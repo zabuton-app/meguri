@@ -209,7 +209,7 @@ describe("tag catalog mutations", () => {
       expect(() => mergeTags(db, [manual("beach")], manual("res:4k"))).toThrow(
         /reserved/,
       );
-      expect(() => mergeTags(db, [manual("beach")], manual("meta:4k"))).toThrow(
+      expect(() => mergeTags(db, [manual("beach")], manual("tag:4k"))).toThrow(
         /reserved/,
       );
     });

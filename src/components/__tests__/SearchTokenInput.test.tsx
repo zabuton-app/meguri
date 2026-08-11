@@ -96,8 +96,8 @@ function chips(): HTMLElement[] {
 
 describe("splitQueryChips", () => {
   it("separates directives from free text", () => {
-    expect(splitQueryChips('sunset tag:"beach house" meta:4k')).toEqual({
-      chips: ["tag:beach house", "meta:4k"],
+    expect(splitQueryChips('sunset tag:"beach house" tag:4k')).toEqual({
+      chips: ["tag:beach house", "tag:4k"],
       text: "sunset",
     });
   });
@@ -112,7 +112,7 @@ describe("splitQueryChips", () => {
 
 describe("SearchTokenInput", () => {
   it("shows a directive from the outside as a chip, not as text", () => {
-    const { input } = setup("meta:long");
+    const { input } = setup("tag:long");
     expect(screen.getByTitle("Length: Long")).toBeTruthy();
     expect(input.value).toBe("");
   });
@@ -171,7 +171,7 @@ describe("SearchTokenInput", () => {
 
   it("leaves room to keep typing after a directive is chipped mid-sentence", () => {
     const { input } = setup();
-    fireEvent.change(input, { target: { value: "sunset meta:4k " } });
+    fireEvent.change(input, { target: { value: "sunset tag:4k " } });
     expect(screen.getByTitle("Resolution: 4k")).toBeTruthy();
     expect(input.value).toBe("sunset ");
   });
@@ -180,21 +180,21 @@ describe("SearchTokenInput", () => {
     const { input } = setup();
     // Reachable by pasting: the directive is already closed but the last word
     // is not, and a space here would land between the caret and what precedes it.
-    fireEvent.change(input, { target: { value: "meta:4k su" } });
+    fireEvent.change(input, { target: { value: "tag:4k su" } });
     expect(screen.getByTitle("Resolution: 4k")).toBeTruthy();
     expect(input.value).toBe("su");
   });
 
   it("closes the pending directive on Enter", () => {
     const { input, last } = setup();
-    fireEvent.change(input, { target: { value: "meta:long" } });
+    fireEvent.change(input, { target: { value: "tag:long" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(screen.getByTitle("Length: Long")).toBeTruthy();
-    expect(last()).toBe("meta:long");
+    expect(last()).toBe("tag:long");
   });
 
   it("deletes a chip whole from its own button", () => {
-    const { input, last } = setup("meta:long sunset");
+    const { input, last } = setup("tag:long sunset");
     fireEvent.click(
       within(screen.getByTitle("Length: Long")).getByRole("button"),
     );
@@ -203,14 +203,14 @@ describe("SearchTokenInput", () => {
   });
 
   it("highlights the preceding chip on Backspace, then deletes it", () => {
-    const { input, last, seen } = setup("tag:beach meta:long");
+    const { input, last, seen } = setup("tag:beach tag:long");
     fireEvent.keyDown(input, { key: "Backspace" });
     // A chip disappears with no undo, so the first Backspace only aims.
     expect(seen).not.toHaveBeenCalled();
     expect(chips()[1].dataset.selected).toBe("true");
 
     fireEvent.keyDown(input, { key: "Backspace" });
-    // Whole, not one character of `meta:long` at a time.
+    // Whole, not one character of `tag:long` at a time.
     expect(last()).toBe("tag:beach");
     expect(screen.queryByTitle("Length: Long")).toBeNull();
   });
@@ -228,7 +228,7 @@ describe("SearchTokenInput", () => {
 
 describe("SearchTokenInput chip selection", () => {
   it("walks back onto the chips with ArrowLeft and forward with ArrowRight", () => {
-    const { input } = setup("tag:beach meta:long");
+    const { input } = setup("tag:beach tag:long");
     input.focus();
 
     fireEvent.keyDown(input, { key: "ArrowLeft" });
@@ -243,7 +243,7 @@ describe("SearchTokenInput chip selection", () => {
   });
 
   it("stops at the left edge rather than wrapping round", () => {
-    const { input } = setup("tag:beach meta:long");
+    const { input } = setup("tag:beach tag:long");
     input.focus();
     for (let i = 0; i < 5; i++) fireEvent.keyDown(input, { key: "ArrowLeft" });
     expect(chips()[0].dataset.selected).toBe("true");
@@ -268,7 +268,7 @@ describe("SearchTokenInput chip selection", () => {
   });
 
   it("deletes the highlighted chip with Delete and keeps the highlight in place", () => {
-    const { input, last } = setup("tag:beach meta:long tag:sea");
+    const { input, last } = setup("tag:beach tag:long tag:sea");
     input.focus();
     fireEvent.keyDown(input, { key: "ArrowLeft" });
     fireEvent.keyDown(input, { key: "ArrowLeft" });
@@ -299,6 +299,40 @@ describe("SearchTokenInput chip selection", () => {
     fireEvent.keyDown(input, { key: "Escape" });
     expect(chips()[0].dataset.selected).toBeUndefined();
     expect(document.activeElement).toBe(input);
+  });
+
+  it("highlights the chip a click lands on", () => {
+    const { input, seen } = setup("tag:beach tag:long");
+    fireEvent.click(chips()[0]);
+    // Mouse parity with ArrowLeft: aim at the condition, do not remove it.
+    expect(chips()[0].dataset.selected).toBe("true");
+    expect(seen).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("removes rather than highlights when the click is on the chip's cross", () => {
+    const { last } = setup("tag:beach tag:long");
+    fireEvent.click(within(chips()[1]).getByRole("button"));
+    expect(last()).toBe("tag:beach");
+    expect(chips()[0].dataset.selected).toBeUndefined();
+  });
+
+  it("points at the chip a token already occupies", async () => {
+    const { input, seen } = setup("tag:beach");
+    const { highlightSearchToken } = await import("@/lib/ui-events");
+    // Clicking a tag that is already a condition changes nothing, so the box is
+    // asked to answer "it is already on" instead of looking dead.
+    highlightSearchToken('tag:"beach"');
+    await waitFor(() => expect(chips()[0].dataset.selected).toBe("true"));
+    expect(seen).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("ignores a highlight for a token it does not carry", async () => {
+    setup("tag:beach");
+    const { highlightSearchToken } = await import("@/lib/ui-events");
+    highlightSearchToken("tag:sunset");
+    await waitFor(() => expect(chips()[0].dataset.selected).toBeUndefined());
   });
 
   it("hides the suggestions while a chip is highlighted", async () => {
@@ -339,16 +373,18 @@ describe("SearchTokenInput completion", () => {
   it("offers the whole vocabulary right after the colon", async () => {
     const { input } = setup();
     type(input, "tag:");
-    // Most-used first, so the list is useful before a single letter is typed.
-    await waitFor(() => expect(options()).toHaveLength(3));
-    expect(options()[0].textContent).toContain("hoge");
+    // Most-used first, and both kinds together — the generated res:4k outranks
+    // every manual tag here on file count.
+    await waitFor(() => expect(options()).toHaveLength(4));
+    expect(options()[0].textContent).toContain("4k");
+    expect(options()[1].textContent).toContain("hoge");
   });
 
-  it("keeps the two vocabularies apart", async () => {
+  it("offers generated tags from the same directive", async () => {
     const { input } = setup();
-    type(input, "meta:");
-    // `tag:` addresses the user's own tags, `meta:` the generated ones; offering
-    // a generated tag to `tag:` would be a condition that can never match.
+    type(input, "tag:4");
+    // One directive covers both kinds, so the generated res:4k is reachable
+    // without a second prefix to remember.
     await waitFor(() => expect(options()).toHaveLength(1));
     expect(options()[0].textContent).toContain("4k");
   });
@@ -372,6 +408,38 @@ describe("SearchTokenInput completion", () => {
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(last()).toBe("tag:piyo");
+  });
+
+  it("completes on Tab and keeps the caret in the field", async () => {
+    const { input, last } = setup();
+    type(input, "tag:o");
+    await waitFor(() => expect(options()).toHaveLength(2));
+
+    const prevented = !fireEvent.keyDown(input, { key: "Tab" });
+    expect(last()).toBe("tag:hoge");
+    // The default would move focus away mid-query.
+    expect(prevented).toBe(true);
+    expect(document.activeElement).toBe(input);
+    expect(options()).toHaveLength(0);
+  });
+
+  it("leaves Shift+Tab alone so it can still move focus back", async () => {
+    const { input, seen } = setup();
+    type(input, "tag:o");
+    await waitFor(() => expect(options()).toHaveLength(2));
+
+    seen.mockClear();
+    const prevented = !fireEvent.keyDown(input, { key: "Tab", shiftKey: true });
+    expect(prevented).toBe(false);
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it("leaves Tab alone when there is nothing to complete", () => {
+    const { input, seen } = setup();
+    type(input, "sunset");
+    const prevented = !fireEvent.keyDown(input, { key: "Tab" });
+    expect(prevented).toBe(false);
+    expect(seen).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the free text in front of the completed directive alone", async () => {

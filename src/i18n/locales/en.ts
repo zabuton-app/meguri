@@ -120,7 +120,7 @@ export const en: Record<TranslationKey, string> = {
 
   // filter
   "filter.searchHint":
-    'Searches file names and tags. Use tag:beach for your own tags and meta:4k or meta:long for automatic ones — both match exactly. Quote values with spaces: tag:"beach house".',
+    'Searches file names and tags. Use tag:beach or tag:4k to match a tag exactly, whether you added it or the scan did. Quote values with spaces: tag:"beach house".',
   "filter.searchPlaceholder": "Search file name or tags",
   "filter.tagSuggestions": "Tag suggestions",
   "filter.all": "All",

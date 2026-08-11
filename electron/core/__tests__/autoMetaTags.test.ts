@@ -174,8 +174,8 @@ describe("autoMetaTagsFor — whole rows", () => {
 
 describe("the declared vocabulary", () => {
   it("has no value shared between categories", () => {
-    // This is what lets the search box accept `meta:long` instead of
-    // `meta:dur:long`. If a future category reuses a value, the bare form
+    // This is what lets the search box accept `tag:long` instead of
+    // `tag:dur:long`. If a future category reuses a value, the bare form
     // becomes ambiguous and this must be reconsidered.
     const seen = new Map<string, string>();
     for (const [namespace, values] of Object.entries(AUTO_META_VALUES)) {

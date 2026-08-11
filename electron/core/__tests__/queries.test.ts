@@ -336,53 +336,6 @@ describe("structured tag filtering", () => {
     expect(ids(["res:4k"], "manual")).toEqual([]);
   });
 
-  describe("the meta: free-text directive", () => {
-    function q(text: string): number[] {
-      return searchFiles(db, { q: text })
-        .items.map((f) => f.id)
-        .sort((a, b) => a - b);
-    }
-
-    it("matches a generated tag by its bare value", () => {
-      expect(q("meta:4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
-    });
-
-    it("matches the qualified form too", () => {
-      expect(q("meta:res:4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
-    });
-
-    it("is case-insensitive on both the prefix and the value", () => {
-      // The FTS half of the box is case-insensitive; an arbitrary split here
-      // would just look broken.
-      const expected = [autoOnly, both].sort((a, b) => a - b);
-      expect(q("META:4k")).toEqual(expected);
-      expect(q("meta:4K")).toEqual(expected);
-      expect(q("meta:RES:4K")).toEqual(expected);
-    });
-
-    it("never matches a manual tag", () => {
-      const plain = insertFile(db, rootId, { relPath: "plain.mp4" });
-      addManualTag(db, plain, "4k");
-      syncFts(db, plain);
-      expect(q("meta:4k")).not.toContain(plain);
-    });
-
-    it("returns nothing for an unknown value", () => {
-      expect(q("meta:8k")).toEqual([]);
-    });
-
-    it("combines with ordinary free text", () => {
-      syncFts(db, autoOnly);
-      syncFts(db, both);
-      // "auto" only appears in auto.mp4's path, so the pair narrows to one file.
-      expect(q("auto meta:4k")).toEqual([autoOnly]);
-    });
-
-    it("leaves a bare `meta:` as ordinary text", () => {
-      expect(q("meta:")).toEqual([]);
-    });
-  });
-
   describe("the tag: free-text directive", () => {
     function q(text: string): number[] {
       return searchFiles(db, { q: text })
@@ -400,24 +353,56 @@ describe("structured tag filtering", () => {
       expect(q("tag:beach")).toEqual([manualOnly, both].sort((a, b) => a - b));
     });
 
-    it("never matches a generated tag", () => {
-      expect(q("tag:4k")).toEqual([]);
-      expect(q("tag:res:4k")).toEqual([]);
+    it("reaches a generated tag by its bare value", () => {
+      // One directive covers both kinds: the user does not think of "my tags"
+      // and "the scanner's tags" as separate things to search.
+      expect(q("tag:4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
     });
 
-    it("is case-insensitive", () => {
+    it("reaches a generated tag by its qualified form", () => {
+      expect(q("tag:res:4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
+    });
+
+    it("matches both kinds when a bare value names each", () => {
+      // A manual "4k" alongside the generated res:4k. Either is what a person
+      // means by tag:4k; the qualified form narrows it back down.
+      const plain = insertFile(db, rootId, { relPath: "plain.mp4" });
+      addManualTag(db, plain, "4k");
+      syncFts(db, plain);
+      expect(q("tag:4k")).toContain(plain);
+      expect(q("tag:res:4k")).not.toContain(plain);
+    });
+
+    it("is case-insensitive on both the prefix and the value", () => {
+      // The FTS half of the box is case-insensitive; an arbitrary split here
+      // would just look broken.
       expect(q("TAG:BEACH")).toEqual([manualOnly, both].sort((a, b) => a - b));
+      const expected = [autoOnly, both].sort((a, b) => a - b);
+      expect(q("tag:4K")).toEqual(expected);
+      expect(q("tag:RES:4K")).toEqual(expected);
     });
 
-    it("combines with meta: and with free text", () => {
-      expect(q("tag:beach meta:4k")).toEqual([both]);
+    it("returns nothing for an unknown value", () => {
+      expect(q("tag:8k")).toEqual([]);
+    });
+
+    it("combines two directives and free text", () => {
+      expect(q("tag:beach tag:4k")).toEqual([both]);
+      syncFts(db, autoOnly);
+      syncFts(db, both);
+      // "auto" only appears in auto.mp4's path, so the pair narrows to one file.
+      expect(q("auto tag:4k")).toEqual([autoOnly]);
+    });
+
+    it("leaves a bare `tag:` as ordinary text", () => {
+      expect(q("tag:")).toEqual([]);
     });
 
     it("tolerates a space after the colon", () => {
       // What a person types. The search box shows the same chip either way, so
       // the SQL has to agree — a mismatch would be invisible to the user.
       expect(q("tag: beach")).toEqual([manualOnly, both].sort((a, b) => a - b));
-      expect(q("meta: 4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
+      expect(q("tag: 4k")).toEqual([autoOnly, both].sort((a, b) => a - b));
     });
 
     it("keeps a quoted multi-word tag together", () => {

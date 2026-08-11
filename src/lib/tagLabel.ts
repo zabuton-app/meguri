@@ -1,7 +1,6 @@
 import {
   AUTO_META_SOURCE,
   namespaceOfAutoMetaValue,
-  parseMetaSearchToken,
   parseQualifiedTagName,
   parseTagSearchToken,
 } from "@shared/tags";
@@ -62,23 +61,23 @@ export function tagHumanLabel(
 }
 
 /**
- * Human-readable description of a `tag:` / `meta:` search token, or null when the
- * token is ordinary free text. Used for the tooltip on the chips the search box
- * renders, where the chip itself shows the raw token.
+ * Human-readable description of a `tag:` search token, or null when the token is
+ * ordinary free text. Used for the tooltip on the chips the search box renders,
+ * where the chip itself shows the raw token.
  *
- * A `meta:` token usually carries the bare value ("long"), so the category is
- * recovered from the vocabulary; the qualified form is still accepted, and a
- * codec value belongs to no closed set and reads as itself.
+ * A generated tag is usually written as its bare value ("long"), so the category
+ * is recovered from the vocabulary; the qualified form is accepted too. A value
+ * that belongs to no closed set — a manual tag, or a codec — reads as itself.
  */
 export function searchTokenLabel(t: TFunc, token: string): string | null {
-  const meta = parseMetaSearchToken(token);
-  const raw = meta ?? parseTagSearchToken(token);
+  const raw = parseTagSearchToken(token);
   if (raw === null) return null;
   const parsed = parseQualifiedTagName(raw);
-  if (meta === null) return `${t("media.tags")}: ${parsed.name}`;
   const namespace =
     parsed.namespace || namespaceOfAutoMetaValue(parsed.name) || "";
-  return namespace ? tagHumanLabel(t, namespace, parsed.name) : parsed.name;
+  return namespace
+    ? tagHumanLabel(t, namespace, parsed.name)
+    : `${t("media.tags")}: ${parsed.name}`;
 }
 
 /** Origin label for a tag. Unknown sources fall back to their raw name. */

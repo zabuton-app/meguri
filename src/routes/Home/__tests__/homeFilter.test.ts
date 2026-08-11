@@ -8,8 +8,8 @@ describe("addSearchTokens", () => {
 
   it("AND-appends to existing text without dropping other conditions", () => {
     const before = { q: "sunset", kind: "video" as const };
-    expect(addSearchTokens(before, ["meta:4k"])).toEqual({
-      q: "sunset meta:4k",
+    expect(addSearchTokens(before, ["tag:4k"])).toEqual({
+      q: "sunset tag:4k",
       kind: "video",
     });
   });
@@ -23,13 +23,13 @@ describe("addSearchTokens", () => {
 
   it("adds only the tokens that are missing", () => {
     expect(
-      addSearchTokens({ q: "tag:beach" }, ["tag:beach", "meta:4k"]),
-    ).toEqual({ q: "tag:beach meta:4k" });
+      addSearchTokens({ q: "tag:beach" }, ["tag:beach", "tag:4k"]),
+    ).toEqual({ q: "tag:beach tag:4k" });
   });
 
   it("keeps a quoted multi-word tag as one token", () => {
-    const after = addSearchTokens({ q: 'tag:"beach house"' }, ["meta:4k"]);
-    expect(after.q).toBe('tag:"beach house" meta:4k');
+    const after = addSearchTokens({ q: 'tag:"beach house"' }, ["tag:4k"]);
+    expect(after.q).toBe('tag:"beach house" tag:4k');
     // And a second click on the same tag is still a no-op.
     expect(addSearchTokens(after, ['tag:"beach house"'])).toBe(after);
   });

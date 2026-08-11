@@ -52,18 +52,18 @@ describe("tagHumanLabel", () => {
 
 describe("searchTokenLabel", () => {
   it("recovers the category from a bare generated value", () => {
-    // `meta:long` carries no namespace; the vocabulary supplies it.
-    expect(searchTokenLabel(t, "meta:long")).toBe("Length: Long");
-    expect(searchTokenLabel(t, "meta:4k")).toBe("Resolution: 4k");
+    // `tag:long` carries no namespace; the vocabulary supplies it.
+    expect(searchTokenLabel(t, "tag:long")).toBe("Length: Long");
+    expect(searchTokenLabel(t, "tag:4k")).toBe("Resolution: 4k");
   });
 
   it("accepts the qualified form too", () => {
-    expect(searchTokenLabel(t, "meta:dur:long")).toBe("Length: Long");
+    expect(searchTokenLabel(t, "tag:dur:long")).toBe("Length: Long");
   });
 
   it("reads an open-set value as itself", () => {
     // Codecs belong to no closed vocabulary, so there is no category to show.
-    expect(searchTokenLabel(t, "meta:hevc")).toBe("hevc");
+    expect(searchTokenLabel(t, "tag:hevc")).toBe("Tags: hevc");
   });
 
   it("marks a user tag as one", () => {

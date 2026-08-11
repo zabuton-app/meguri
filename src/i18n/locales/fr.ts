@@ -123,7 +123,7 @@ export const fr: Record<TranslationKey, string> = {
 
   // filter
   "filter.searchHint":
-    'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage pour les vôtres et meta:4k ou meta:long pour les tags automatiques — correspondance exacte dans les deux cas. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage".',
+    'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage ou tag:4k pour une correspondance exacte, sur vos tags comme sur ceux du scan. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage".',
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
   "filter.tagSuggestions": "Suggestions de tags",
   "filter.all": "Tout",

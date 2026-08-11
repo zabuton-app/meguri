@@ -6,7 +6,6 @@ import { thumbOffsetByKey } from "./meta.js";
 import { resolveSortDir } from "../../../shared/sortDir.js";
 import {
   LIST_HIDDEN_SOURCES,
-  parseMetaSearchToken,
   parseTagSearchToken,
   splitSearchTokens,
 } from "../../../shared/tags.js";
@@ -42,7 +41,7 @@ function escapeLike(s: string): string {
 
 /** Split the free-text query for the trigram-tokenized files_fts.
  *
- *  A `meta:<value>` token is pulled out first: generated tags are not in the
+ *  A `tag:<value>` token is pulled out first: generated tags are not in the
  *  full-text index (see FTS_ROW_SELECT in db.ts), so this prefix is the explicit
  *  way to reach them from the search box.
  *
@@ -57,20 +56,15 @@ function escapeLike(s: string): string {
 function buildSearchTerms(q: string): {
   match: string | null;
   likeTokens: string[];
-  metaTokens: string[];
   tagTokens: string[];
 } {
   const tokens = splitSearchTokens(q);
   const matchTokens: string[] = [];
   const likeTokens: string[] = [];
-  const metaTokens: string[] = [];
   const tagTokens: string[] = [];
   for (const t of tokens) {
-    const meta = parseMetaSearchToken(t);
     const tag = parseTagSearchToken(t);
-    if (meta) {
-      metaTokens.push(meta);
-    } else if (tag) {
+    if (tag) {
       tagTokens.push(tag);
     } else if ([...t].length >= 3) {
       // FTS5 phrase syntax: the token is delimited by quotes, so a quote inside
@@ -83,7 +77,6 @@ function buildSearchTerms(q: string): {
   return {
     match: matchTokens.length ? matchTokens.join(" ") : null,
     likeTokens,
-    metaTokens,
     tagTokens,
   };
 }
@@ -116,31 +109,26 @@ function resolveTagIds(db: DB, token: string): number[] {
 }
 
 /**
- * Resolve a `meta:` search value to the pipeline-owned tag ids it names. Accepts
- * either the bare value (`4k`, `long`, `hevc`) or the qualified form
+ * Resolve a `tag:` search value to every tag id it names — the user's own and
+ * the generated ones alike, since one directive covers both. Accepts the bare
+ * name (`beach`, `4k`, `long`) or, for a generated tag, the qualified form
  * (`res:4k`), so a user can type whichever they saw.
  *
+ * A bare value that names a manual tag *and* a generated one resolves to both,
+ * and the condition matches either. That is the reading a person means by
+ * "tag:4k"; the qualified form is there when only the generated one is wanted.
+ *
  * Matched case-insensitively: this value is typed into the search box, where the
- * FTS half is case-insensitive too — `meta:4K` failing while `4K` works would be
+ * FTS half is case-insensitive too — `tag:4K` failing while `4K` works would be
  * an arbitrary split. Structured `tags[]` tokens stay exact; those come from a
- * chip click or a saved search, never from typing.
+ * saved search, never from typing.
  */
-function resolveManualTagIds(db: DB, value: string): number[] {
-  return db
-    .prepare(
-      "SELECT id FROM tags WHERE namespace = '' AND name = ? COLLATE NOCASE",
-    )
-    .pluck()
-    .all(value) as number[];
-}
-
-function resolvePipelineTagIds(db: DB, value: string): number[] {
+function resolveSearchTagIds(db: DB, value: string): number[] {
   return db
     .prepare(
       `SELECT id FROM tags
-        WHERE namespace <> ''
-          AND (name = ? COLLATE NOCASE
-               OR namespace || ':' || name = ? COLLATE NOCASE)`,
+        WHERE name = ? COLLATE NOCASE
+           OR (namespace <> '' AND namespace || ':' || name = ? COLLATE NOCASE)`,
     )
     .pluck()
     .all(value, value) as number[];
@@ -154,7 +142,7 @@ function appendSearchConditions(
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : { match: null, likeTokens: [], metaTokens: [], tagTokens: [] };
+    : { match: null, likeTokens: [], tagTokens: [] };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
@@ -168,22 +156,16 @@ function appendSearchConditions(
     const pattern = `%${escapeLike(tok)}%`;
     args.push(pattern, pattern);
   }
-  const directives: [string[], (v: string) => number[]][] = [
-    [terms.metaTokens, (v) => resolvePipelineTagIds(db, v)],
-    [terms.tagTokens, (v) => resolveManualTagIds(db, v)],
-  ];
-  for (const [values, resolve] of directives) {
-    for (const value of values) {
-      const ids = resolve(value);
-      if (ids.length === 0) {
-        // No tag by that name: nothing can match.
-        sql += " AND 0";
-        break;
-      }
-      sql +=
-        " AND EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?)))";
-      args.push(JSON.stringify(ids));
+  for (const value of terms.tagTokens) {
+    const ids = resolveSearchTagIds(db, value);
+    if (ids.length === 0) {
+      // No tag by that name: nothing can match.
+      sql += " AND 0";
+      break;
     }
+    sql +=
+      " AND EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?)))";
+    args.push(JSON.stringify(ids));
   }
   if (query.kind) {
     sql += " AND f.kind = ?";

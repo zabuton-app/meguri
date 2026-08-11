@@ -117,7 +117,7 @@ export const ko: Record<TranslationKey, string> = {
 
   // filter
   "filter.searchHint":
-    '파일 이름과 태그를 검색합니다. tag:여행 으로 직접 붙인 태그를, meta:4k 나 meta:long 으로 자동 태그를 정확히 일치시켜 필터링합니다. 공백이 있는 값은 tag:"여름 여행" 처럼 따옴표로 묶습니다.',
+    '파일 이름과 태그를 검색합니다. tag:여행 이나 tag:4k 로 직접 붙인 태그와 자동 태그를 모두 정확히 일치시켜 필터링합니다. 공백이 있는 값은 tag:"여름 여행" 처럼 따옴표로 묶습니다.',
   "filter.searchPlaceholder": "파일 이름·태그 검색",
   "filter.tagSuggestions": "태그 제안",
   "filter.all": "전체",

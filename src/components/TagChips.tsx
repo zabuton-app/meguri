@@ -9,7 +9,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 interface Props {
   tags: TagInfo[] | undefined;
   /**
-   * Receives the search-box token ("tag:beach" | "meta:4k" — a generated tag
+   * Receives the search-box token ("tag:beach", "tag:4k" — a generated tag
    * carries the bare value; see tagSearchToken).
    * preventDefault/stopPropagation are applied here so callers can ignore them.
    */
@@ -44,7 +44,7 @@ export function TagChips({ tags, onTagClick }: Props) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onTagClick?.(tagSearchToken(tag.namespace, tag.name));
+            onTagClick?.(tagSearchToken(tag.name));
           }}
           className={cn(
             "shrink-0 rounded px-1 text-[10px] leading-4 transition hover:ring-1 hover:ring-primary",

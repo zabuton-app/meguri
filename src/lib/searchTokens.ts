@@ -1,5 +1,4 @@
 import {
-  META_SEARCH_PREFIX,
   TAG_SEARCH_PREFIX,
   hasOpenQuote,
   isTagDirective,
@@ -25,9 +24,7 @@ export function splitQueryChips(q: string): { chips: string[]; text: string } {
 }
 
 export interface PendingDirective {
-  /** `tag` or `meta` — which half of the catalog can complete it. */
-  prefix: string;
-  /** What has been typed after the colon; empty right after `tag:`. */
+  /** What has been typed after `tag:`; empty right after the colon. */
   value: string;
 }
 
@@ -44,20 +41,17 @@ export function pendingDirective(draft: string): PendingDirective | null {
   const tokens = splitSearchTokens(draft);
   const tail = tokens[tokens.length - 1];
   if (tail === undefined) return null;
-  for (const prefix of [TAG_SEARCH_PREFIX, META_SEARCH_PREFIX]) {
-    if (tail.toLowerCase().startsWith(`${prefix}:`)) {
-      return { prefix, value: tail.slice(prefix.length + 1) };
-    }
-  }
-  return null;
+  const head = `${TAG_SEARCH_PREFIX}:`;
+  if (!tail.toLowerCase().startsWith(head)) return null;
+  return { value: tail.slice(head.length) };
 }
 
 /** How many completions the search box offers at once. */
 export const MAX_TAG_SUGGESTIONS = 10;
 
 /**
- * Catalog entries that could complete the directive under the caret: the user's
- * own tags for `tag:`, generated ones for `meta:`.
+ * Catalog entries that could complete the directive under the caret — the user's
+ * own tags and the generated ones together, since one directive matches both.
  *
  * The match is a case-insensitive **substring**, not a prefix — a tag is as often
  * remembered by a word in the middle of it as by its first letters — with prefix
@@ -69,13 +63,11 @@ export function tagSuggestions(
   pending: PendingDirective,
   limit: number = MAX_TAG_SUGGESTIONS,
 ): TagSummary[] {
-  const manual = pending.prefix === TAG_SEARCH_PREFIX;
   const q = pending.value.trim().toLowerCase();
   const hits = tags.filter(
     (tag) =>
-      (tag.namespace === "") === manual &&
-      (tag.name.toLowerCase().includes(q) ||
-        tag.qualified.toLowerCase().includes(q)),
+      tag.name.toLowerCase().includes(q) ||
+      tag.qualified.toLowerCase().includes(q),
   );
   const rank = (tag: TagSummary) =>
     tag.name.toLowerCase().startsWith(q) ? 0 : 1;

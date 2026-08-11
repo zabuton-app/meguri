@@ -31,6 +31,7 @@ import { StatusBar } from "@/components/StatusBar";
 import { CommandMenu } from "@/components/CommandMenu";
 import { useConfirm } from "@/components/ConfirmDialog";
 import {
+  highlightSearchToken,
   onApplyTagFilter,
   onOpenCommandMenu,
   onOpenShortcuts,
@@ -236,10 +237,22 @@ export default function Home() {
   // Stabilize the reference so MediaCard's memo stays effective.
   // A click AND-appends an exact tag condition rather than overwriting the
   // free-text box, which used to also match file names.
-  const onTagClick = useCallback(
-    (token: string) => setFilter((f) => addSearchTokens(f, [token])),
-    [],
-  );
+  // The click handler has to stay reference-stable for MediaCard's memo, but it
+  // also needs the current filter to tell "added" from "already there". A ref
+  // synced in an effect gives it both; an updater cannot, because dispatching an
+  // event from one is a side effect StrictMode would run twice.
+  const filterRef = useRef(filter);
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
+  const onTagClick = useCallback((token: string) => {
+    const current = filterRef.current;
+    const next = addSearchTokens(current, [token]);
+    // Same reference means the condition was already there. Point at the chip
+    // instead of doing nothing, which reads as a dead click.
+    if (next === current) highlightSearchToken(token);
+    else setFilter(next);
+  }, []);
 
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {

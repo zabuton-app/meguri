@@ -114,25 +114,30 @@ Generated tags are deliberately **not** indexed. The tokenizer is trigram, so
 indexing `dur:long` would make a plain search for "long" return every long
 video — and likewise for "short", "square", "h264".
 
-Exact tag conditions instead live in the search box as **directives**, which
-`buildSearchTerms()` in `queries/files.ts` pulls out before the FTS split and
-resolves against the `tags` table:
+Exact tag conditions instead live in the search box as the **`tag:` directive**,
+which `buildSearchTerms()` in `queries/files.ts` pulls out before the FTS split
+and resolves against the `tags` table:
 
 - `tag:beach` — a user's own tag. Clicking a tag writes this into the box, so the
   condition is visible and editable without the exact match degrading into a
   substring search that also hits file names.
-- `meta:4k`, `meta:long` — a generated tag; the only free-text route to them.
-  The bare value is enough because the categories share no values (declared in
-  `AUTO_META_VALUES` and pinned by a ruleset test); the qualified `meta:res:4k`
-  is still accepted.
+- `tag:4k`, `tag:long` — a generated tag; this is the only free-text route to
+  them. The bare value is enough because the categories share no values (declared
+  in `AUTO_META_VALUES` and pinned by a ruleset test); the qualified `tag:res:4k`
+  is accepted too.
+
+**One prefix, both kinds.** A bare value that names a manual tag _and_ a
+generated one resolves to both, which is the reading a person means by `tag:4k`;
+the qualified form narrows it back down. A second prefix for generated tags was
+tried and removed: nobody thinks of "my tags" and "the scanner's tags" as
+separate things to search, and it only bought two vocabularies to keep straight.
 
 Values containing spaces are quoted (`tag:"beach house"`); `splitSearchTokens()`
 and `joinSearchTokens()` in `shared/tags.ts` round-trip them. A space after the
 colon is folded away (`tag: beach` = `tag:beach`) inside the tokenizer, so the
 chip the box draws and the SQL the query produces can never disagree about it.
-Both `tag` and
-`meta` are reserved manual-tag prefixes, so neither directive can be shadowed by
-a tag the user creates. The structured `SearchQuery.tags[]` field still works and
+`tag` is a reserved manual-tag prefix, so the directive cannot be shadowed by a
+tag the user creates. The structured `SearchQuery.tags[]` field still works and
 is what saved searches and Discover URLs carry.
 
 The box itself (`SearchTokenInput`) renders a directive as a **chip** rather than
@@ -148,16 +153,23 @@ widgets of their own. Once the caret runs out of text to its left, Left and
 Backspace start walking back over the chips instead, highlighting one at a time;
 Left/Right move the highlight, Backspace/Delete removes the highlighted chip, and
 Escape, Right past the last chip, or simply typing returns to the text. Backspace
-highlights before it deletes because a chip goes with no undo.
+highlights before it deletes because a chip goes with no undo. Clicking a chip
+highlights it too, and so does clicking a tag that is _already_ a condition:
+`onTagClick` in Home compares the result of `addSearchTokens()` by reference and,
+when nothing changed, sends `highlightSearchToken()` over the event bus rather
+than leaving what looks like a dead click.
 
-While a directive is being typed the box completes it from the tag catalog:
-`tag:` offers the user's own tags, `meta:` the generated ones. The match is a
-case-insensitive substring — a tag is as often remembered by a word in the middle
-of it — ranked prefix-first then by file count, and capped at
-`MAX_TAG_SUGGESTIONS`. The candidates come from the `tags_list_all` catalog the
-tag management screen already caches, filtered in the renderer: one query instead
-of one per keystroke, and correct in the `All` view and in collections, where a
-workspace-scoped `tags_list` cannot resolve a database at all.
+While a directive is being typed the box completes it from the tag catalog — the
+user's own tags and the generated ones in one list, since one directive matches
+both. The match is a case-insensitive substring — a tag is as often remembered by
+a word in the middle of it — ranked prefix-first then by file count, and capped
+at `MAX_TAG_SUGGESTIONS`. Tab or Enter accepts the highlighted candidate and
+chips it; Tab preventDefaults so the caret stays put for the next condition,
+while Shift+Tab still leaves the field. The candidates come from the
+`tags_list_all` catalog the tag management screen already caches, filtered in the
+renderer: one query instead of one per keystroke, and correct in the `All` view
+and in collections, where a workspace-scoped `tags_list` cannot resolve a
+database at all.
 
 ## Derived tags
 

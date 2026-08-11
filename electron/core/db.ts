@@ -19,7 +19,7 @@ const FTS_DDL =
  * Only user-owned tags (namespace = '') are indexed. The tokenizer is trigram,
  * so indexing a generated tag like `dur:long` would make a plain search for
  * "long" return every long video — and likewise for "short", "square",
- * "h264"… Generated tags stay reachable through the explicit `meta:` directive
+ * "h264"… Generated tags stay reachable through the explicit `tag:` directive
  * (see buildSearchTerms in queries/files.ts) and through the structured
  * SearchQuery.tags[] filter, neither of which goes through FTS.
  *

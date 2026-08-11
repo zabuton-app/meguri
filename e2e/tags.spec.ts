@@ -58,7 +58,7 @@ test.describe("Tags", () => {
     await expect(ready).toHaveURL(/#\/$/);
     const chip = searchChips(ready);
     await expect(chip).toHaveCount(1);
-    await expect(chip).toContainText("meta:");
+    await expect(chip).toContainText("tag:");
 
     // Removing it takes the whole directive, not a character of it.
     await chip.getByRole("button").click();

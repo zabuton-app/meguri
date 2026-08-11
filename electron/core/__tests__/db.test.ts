@@ -163,7 +163,7 @@ describe("migrateFtsToTrigram", () => {
     const row = db
       .prepare("SELECT tags_text FROM files_fts WHERE rowid = 1")
       .get() as { tags_text: string };
-    // Only the user's own tag; the namespaced one is reachable via `meta:`.
+    // Only the user's own tag; the namespaced one is reachable via `tag:`.
     expect(row.tags_text).toBe("sunset");
     db.close();
   });

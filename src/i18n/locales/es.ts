@@ -123,7 +123,7 @@ export const es: Record<TranslationKey, string> = {
 
   // filter
   "filter.searchHint":
-    'Busca en los nombres de archivo y en las etiquetas. Usa tag:playa para las tuyas y meta:4k o meta:long para las automáticas; ambas coinciden de forma exacta. Entrecomilla los valores con espacios: tag:"casa de playa".',
+    'Busca en los nombres de archivo y en las etiquetas. Usa tag:playa o tag:4k para coincidir de forma exacta, tanto con las tuyas como con las automáticas. Entrecomilla los valores con espacios: tag:"casa de playa".',
   "filter.searchPlaceholder": "Buscar nombre de archivo o etiquetas",
   "filter.tagSuggestions": "Sugerencias de etiquetas",
   "filter.all": "Todo",

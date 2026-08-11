@@ -4,7 +4,6 @@ import {
   isReservedTagName,
   hasOpenQuote,
   joinSearchTokens,
-  parseMetaSearchToken,
   parseQualifiedTagName,
   parseTagSearchToken,
   reservedTagPrefix,
@@ -84,25 +83,22 @@ describe("isEditableTag", () => {
 });
 
 describe("tagSearchToken", () => {
-  it("uses tag: for the user's own tags", () => {
-    expect(tagSearchToken("", "beach")).toBe("tag:beach");
-  });
-
-  it("uses meta: with the bare value for generated tags", () => {
-    // The categories share no values, so `meta:4k` is unambiguous — and much
-    // easier to read and type than `meta:res:4k`.
-    expect(tagSearchToken("res", "4k")).toBe("meta:4k");
-    expect(tagSearchToken("dur", "long")).toBe("meta:long");
+  it("uses one prefix for every tag, generated ones included", () => {
+    // The categories share no values, so the bare `tag:4k` is unambiguous — and
+    // much easier to read and type than a second prefix plus a namespace.
+    expect(tagSearchToken("beach")).toBe("tag:beach");
+    expect(tagSearchToken("4k")).toBe("tag:4k");
+    expect(tagSearchToken("long")).toBe("tag:long");
   });
 
   it("quotes a value with whitespace, doubling an inner quote", () => {
-    expect(tagSearchToken("", "beach house")).toBe('tag:"beach house"');
-    expect(tagSearchToken("", 'a "b" c')).toBe('tag:"a ""b"" c"');
+    expect(tagSearchToken("beach house")).toBe('tag:"beach house"');
+    expect(tagSearchToken('a "b" c')).toBe('tag:"a ""b"" c"');
   });
 
   it("round-trips through the tokenizer", () => {
     for (const name of ["beach", "beach house", 'a "b" c']) {
-      const token = tagSearchToken("", name);
+      const token = tagSearchToken(name);
       expect(parseTagSearchToken(splitSearchTokens(token)[0])).toBe(name);
     }
   });
@@ -125,8 +121,8 @@ describe("splitSearchTokens / joinSearchTokens", () => {
     // `tag: beach` is what a person types; leaving "beach" as free text would
     // quietly hand back the substring match the directive is there to avoid.
     expect(splitSearchTokens("tag: beach")).toEqual(["tag:beach"]);
-    expect(splitSearchTokens('meta: 4k tag: "sea side"')).toEqual([
-      "meta:4k",
+    expect(splitSearchTokens('tag: 4k tag: "sea side"')).toEqual([
+      "tag:4k",
       "tag:sea side",
     ]);
   });
@@ -142,8 +138,8 @@ describe("splitSearchTokens / joinSearchTokens", () => {
   });
 
   it("re-quotes only what needs it", () => {
-    expect(joinSearchTokens(["beach", "tag:sea side", "meta:4k"])).toBe(
-      'beach tag:"sea side" meta:4k',
+    expect(joinSearchTokens(["beach", "tag:sea side", "tag:4k"])).toBe(
+      'beach tag:"sea side" tag:4k',
     );
   });
 });
@@ -151,14 +147,15 @@ describe("splitSearchTokens / joinSearchTokens", () => {
 describe("reservedTagPrefix", () => {
   it("names the prefix a manual tag would impersonate", () => {
     expect(reservedTagPrefix("res:8k")).toBe("res");
-    // Including the search directives, which parseQualifiedTagName does not
+    // Including the search directive, which parseQualifiedTagName does not
     // split — it only knows the auto-meta namespaces.
-    expect(reservedTagPrefix("meta:foo")).toBe("meta");
     expect(reservedTagPrefix("TAG:foo")).toBe("tag");
   });
 
   it("is null for a name that claims nothing", () => {
     expect(reservedTagPrefix("todo:later")).toBeNull();
+    // `meta` is no longer a directive, so it is no longer reserved either.
+    expect(reservedTagPrefix("meta:foo")).toBeNull();
     expect(reservedTagPrefix("beach")).toBeNull();
     expect(reservedTagPrefix("res:")).toBeNull();
   });
@@ -178,25 +175,27 @@ describe("hasOpenQuote", () => {
   });
 
   it("is false for a query with no quotes at all", () => {
-    expect(hasOpenQuote("beach meta:4k ")).toBe(false);
+    expect(hasOpenQuote("beach tag:4k ")).toBe(false);
   });
 });
 
-describe("parseMetaSearchToken", () => {
+describe("parseTagSearchToken", () => {
   it("extracts the value after the prefix", () => {
-    expect(parseMetaSearchToken("meta:4k")).toBe("4k");
-    expect(parseMetaSearchToken("meta:res:4k")).toBe("res:4k");
+    expect(parseTagSearchToken("tag:beach")).toBe("beach");
+    expect(parseTagSearchToken("tag:4k")).toBe("4k");
+    // The qualified form of a generated tag passes through whole.
+    expect(parseTagSearchToken("tag:res:4k")).toBe("res:4k");
   });
 
   it("is case-insensitive on the prefix", () => {
-    expect(parseMetaSearchToken("META:long")).toBe("long");
+    expect(parseTagSearchToken("TAG:long")).toBe("long");
   });
 
   it("returns null for ordinary text and for a bare prefix", () => {
-    expect(parseMetaSearchToken("beach")).toBeNull();
-    expect(parseMetaSearchToken("metadata")).toBeNull();
-    expect(parseMetaSearchToken("meta:")).toBeNull();
-    expect(parseMetaSearchToken("todo:later")).toBeNull();
+    expect(parseTagSearchToken("beach")).toBeNull();
+    expect(parseTagSearchToken("tagline")).toBeNull();
+    expect(parseTagSearchToken("tag:")).toBeNull();
+    expect(parseTagSearchToken("todo:later")).toBeNull();
   });
 });
 
@@ -207,9 +206,9 @@ describe("isReservedTagName", () => {
   });
 
   it("rejects the search directive prefix, in any case", () => {
-    // Otherwise a manual tag named `meta:foo` would be shadowed by the directive.
-    expect(isReservedTagName("meta:foo")).toBe(true);
-    expect(isReservedTagName("META:foo")).toBe(true);
+    // Otherwise a manual tag named `tag:foo` would be shadowed by the directive.
+    expect(isReservedTagName("tag:foo")).toBe(true);
+    expect(isReservedTagName("TAG:foo")).toBe(true);
   });
 
   it("accepts a manual name whose prefix is not reserved", () => {
