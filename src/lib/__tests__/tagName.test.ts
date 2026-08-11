@@ -7,6 +7,7 @@ import {
   parseMetaSearchToken,
   parseQualifiedTagName,
   parseTagSearchToken,
+  reservedTagPrefix,
   qualifiedTagName,
   splitSearchTokens,
   tagSearchToken,
@@ -144,6 +145,22 @@ describe("splitSearchTokens / joinSearchTokens", () => {
     expect(joinSearchTokens(["beach", "tag:sea side", "meta:4k"])).toBe(
       'beach tag:"sea side" meta:4k',
     );
+  });
+});
+
+describe("reservedTagPrefix", () => {
+  it("names the prefix a manual tag would impersonate", () => {
+    expect(reservedTagPrefix("res:8k")).toBe("res");
+    // Including the search directives, which parseQualifiedTagName does not
+    // split — it only knows the auto-meta namespaces.
+    expect(reservedTagPrefix("meta:foo")).toBe("meta");
+    expect(reservedTagPrefix("TAG:foo")).toBe("tag");
+  });
+
+  it("is null for a name that claims nothing", () => {
+    expect(reservedTagPrefix("todo:later")).toBeNull();
+    expect(reservedTagPrefix("beach")).toBeNull();
+    expect(reservedTagPrefix("res:")).toBeNull();
   });
 });
 

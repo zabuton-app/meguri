@@ -57,6 +57,11 @@ export function SearchTokenInput({
   );
   const [seen, setSeen] = useState(value);
   if (value !== seen) {
+    // React's sanctioned "adjust state when a prop changes" pattern, not a
+    // mistake: setting state during render of the *same* component restarts
+    // this render before anything is committed. An effect would paint the stale
+    // draft first and then correct it, which is a visible flicker in a field
+    // the user is typing into.
     setSeen(value);
     setState(splitQueryChips(value));
   }

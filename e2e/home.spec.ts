@@ -52,6 +52,10 @@ test.describe("Home", () => {
   });
 
   test("filters by media kind", async ({ ready }) => {
+    // The scan now derives tags as well, so it is still finishing when the
+    // fixture reports ready and its completion re-renders the bar out from
+    // under the open dropdown. Every other select test already waits.
+    await waitForIdle(ready);
     await selectComboboxOption(ready, 0, "Image");
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
 

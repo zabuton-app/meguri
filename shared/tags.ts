@@ -272,17 +272,30 @@ export function joinSearchTokens(tokens: string[]): string {
 }
 
 /**
- * Whether a would-be manual tag name impersonates a reserved prefix.
+ * The reserved prefix a would-be manual tag name impersonates, or null when it
+ * claims none. Returned rather than just tested so the rejection message can
+ * name the prefix without re-deriving it — `parseQualifiedTagName()` cannot,
+ * since it only splits on an auto-meta namespace and reads `meta:foo` as a
+ * plain name.
+ *
  * The reserved set is a parameter rather than a hardcoded list so widening it
  * (a second derived-tag source, user-defined namespaces) stays a one-liner.
  */
+export function reservedTagPrefix(
+  name: string,
+  reserved: readonly string[] = RESERVED_TAG_PREFIXES,
+): string | null {
+  const i = name.indexOf(":");
+  if (i <= 0 || i === name.length - 1) return null;
+  const prefix = name.slice(0, i).toLowerCase();
+  return reserved.includes(prefix) ? prefix : null;
+}
+
 export function isReservedTagName(
   name: string,
   reserved: readonly string[] = RESERVED_TAG_PREFIXES,
 ): boolean {
-  const i = name.indexOf(":");
-  if (i <= 0 || i === name.length - 1) return false;
-  return reserved.includes(name.slice(0, i).toLowerCase());
+  return reservedTagPrefix(name, reserved) !== null;
 }
 
 /** Marker in the error a reserved-name rejection throws, so the renderer can

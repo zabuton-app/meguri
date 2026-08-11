@@ -9,7 +9,8 @@ import { useI18n } from "@/i18n/I18nProvider";
 interface Props {
   tags: TagInfo[] | undefined;
   /**
-   * Receives the search-box token ("tag:beach" | "meta:res:4k").
+   * Receives the search-box token ("tag:beach" | "meta:4k" — a generated tag
+   * carries the bare value; see tagSearchToken).
    * preventDefault/stopPropagation are applied here so callers can ignore them.
    */
   onTagClick?: (token: string) => void;

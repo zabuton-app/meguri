@@ -8,7 +8,9 @@ import {
 
 test.describe("Tags", () => {
   test("opens from the header and closes with Escape", async ({ ready }) => {
-    await ready.getByRole("link", { name: "Tags" }).click();
+    // exact: the accessible name of a card with no manual tags contains "No
+    // tags", which a substring match picks up too.
+    await ready.getByRole("link", { name: "Tags", exact: true }).click();
     const dialog = ready.getByRole("dialog");
     await expect(dialog.getByText("Tags", { exact: true })).toBeVisible();
     await closeTopDialog(ready);
@@ -27,11 +29,14 @@ test.describe("Tags", () => {
   }) => {
     // The fixture is an image, so the classifier gives it resolution and orientation.
     await waitForIndexedMedia(ready);
-    await ready.getByRole("link", { name: "Tags" }).click();
+    // exact: the accessible name of a card with no manual tags contains "No
+    // tags", which a substring match picks up too.
+    await ready.getByRole("link", { name: "Tags", exact: true }).click();
     const dialog = ready.getByRole("dialog");
-    await expect(dialog.getByText("Resolution")).toBeVisible({
-      timeout: 60_000,
-    });
+    // The group header, not the row label under it, which reads "Resolution: sd".
+    await expect(
+      dialog.getByRole("button", { name: "Resolution", exact: true }),
+    ).toBeVisible({ timeout: 60_000 });
     // Generated tags are read-only.
     await expect(dialog.getByText("Read-only").first()).toBeVisible();
 

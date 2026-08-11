@@ -2,7 +2,7 @@
 // merge in disguise, so the collision is detected here (against the catalog the
 // screen already loaded) and confirmed before it is carried out.
 import { useEffect, useState } from "react";
-import { isReservedTagName, parseQualifiedTagName } from "@shared/tags";
+import { reservedTagPrefix } from "@shared/tags";
 import type { TagSummary } from "@/ipc/types";
 import {
   Dialog,
@@ -45,9 +45,9 @@ export function TagRenameDialog({
   }, [open, tag]);
 
   const trimmed = name.trim();
-  const reserved = isReservedTagName(trimmed);
+  const reserved = reservedTagPrefix(trimmed);
   const collides = trimmed !== tag?.name && existingNames.has(trimmed);
-  const canSubmit = !!tag && !!trimmed && !reserved;
+  const canSubmit = !!tag && !!trimmed && reserved === null;
 
   const onSubmit = () => {
     if (!tag || !canSubmit) return;
@@ -77,14 +77,12 @@ export function TagRenameDialog({
               placeholder={t("tags.renamePlaceholder")}
               aria-label={t("tags.renamePlaceholder")}
             />
-            {reserved && (
+            {reserved !== null && (
               <p className="text-xs text-error">
-                {t("tags.addFailedReserved", {
-                  prefix: parseQualifiedTagName(trimmed).namespace,
-                })}
+                {t("tags.addFailedReserved", { prefix: reserved })}
               </p>
             )}
-            {collides && !reserved && (
+            {collides && reserved === null && (
               <p className="text-xs text-muted">
                 {t("tags.renameConflict", { name: trimmed })}
               </p>

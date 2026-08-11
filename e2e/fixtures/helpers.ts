@@ -39,7 +39,10 @@ export async function selectComboboxOption(
   index: number,
   option: string,
 ): Promise<void> {
-  await page.getByRole("combobox").nth(index).click();
+  // Radix's SelectTrigger carries role="combobox", but so does the search box —
+  // it has a suggestion listbox. Target the trigger's slot so `index` keeps
+  // counting selects only.
+  await page.locator('[data-slot="select-trigger"]').nth(index).click();
   await page.getByRole("option", { name: option }).click();
 }
 

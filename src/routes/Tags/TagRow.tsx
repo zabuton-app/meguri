@@ -36,8 +36,11 @@ export function TagRow({
       {editable ? (
         <input
           type="checkbox"
-          className="size-3.5 shrink-0 accent-primary"
+          className="size-3.5 shrink-0 accent-primary disabled:opacity-50"
           checked={selected}
+          // A mutation is in flight against this selection; letting it change
+          // underneath would aim the next action at a different set of tags.
+          disabled={busy}
           onChange={() => onToggleSelect(tag)}
           aria-label={tag.qualified}
         />

@@ -19,7 +19,10 @@ interface Props {
   workspaceId: string;
   onAdd: (name: string) => void;
   onRemove: (tagId: number) => void;
-  /** Receives the search-box token ("tag:beach" | "meta:res:4k"). Omit to render inert labels. */
+  /**
+   * Receives the search-box token ("tag:beach" | "meta:4k" — a generated tag
+   * carries the bare value; see tagSearchToken). Omit to render inert labels.
+   */
   onTagClick?: (token: string) => void;
 }
 

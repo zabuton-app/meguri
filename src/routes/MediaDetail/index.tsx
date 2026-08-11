@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import {
   LIST_HIDDEN_SOURCES,
   RESERVED_TAG_ERROR,
-  parseQualifiedTagName,
+  reservedTagPrefix,
 } from "@shared/tags";
 import { applyTagFilter } from "@/lib/ui-events";
 import { api, events, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
@@ -274,7 +274,7 @@ export default function MediaDetail() {
       if (message.includes(RESERVED_TAG_ERROR)) {
         toast.error(
           t("tags.addFailedReserved", {
-            prefix: parseQualifiedTagName(name).namespace || name.split(":")[0],
+            prefix: reservedTagPrefix(name) ?? name,
           }),
         );
       } else {

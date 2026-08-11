@@ -193,12 +193,18 @@ describe("Tags screen", () => {
     const input = await screen.findByLabelText("New tag name");
     fireEvent.change(input, { target: { value: "res:8k" } });
 
-    expect(await screen.findByText(/reserved for automatic tags/)).toBeTruthy();
+    expect(await screen.findByText(/^"res:" is reserved/)).toBeTruthy();
     expect(
       screen
         .getByText("Rename", { selector: "button" })
         .hasAttribute("disabled"),
     ).toBe(true);
+
+    // A search directive is reserved too, and the message has to name it: the
+    // display-only name parser reads "meta:foo" as a plain name, so asking it
+    // for the prefix used to print a bare colon.
+    fireEvent.change(input, { target: { value: "meta:foo" } });
+    expect(await screen.findByText(/^"meta:" is reserved/)).toBeTruthy();
   });
 
   it("deletes a tag after confirmation", async () => {
