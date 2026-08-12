@@ -2,7 +2,7 @@
 // merge in disguise, so the collision is detected here (against the catalog the
 // screen already loaded) and confirmed before it is carried out.
 import { useEffect, useState } from "react";
-import { reservedTagPrefix } from "@shared/tags";
+import { MAX_TAG_NAME, reservedTagPrefix } from "@shared/tags";
 import type { TagSummary } from "@/ipc/types";
 import {
   Dialog,
@@ -47,7 +47,12 @@ export function TagRenameDialog({
   const trimmed = name.trim();
   const reserved = reservedTagPrefix(trimmed);
   const collides = trimmed !== tag?.name && existingNames.has(trimmed);
-  const canSubmit = !!tag && !!trimmed && reserved === null;
+  // maxLength on the field stops this being reachable by typing; the check is
+  // here so a name that gets in another way (an IME commit, a paste the browser
+  // does not clip) is refused in the form rather than by the IPC layer, whose
+  // rejection reaches the user as a raw Zod message in a toast.
+  const tooLong = trimmed.length > MAX_TAG_NAME;
+  const canSubmit = !!tag && !!trimmed && reserved === null && !tooLong;
 
   const onSubmit = () => {
     if (!tag || !canSubmit) return;
@@ -73,6 +78,7 @@ export function TagRenameDialog({
             <Input
               autoFocus
               value={name}
+              maxLength={MAX_TAG_NAME}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("tags.renamePlaceholder")}
               aria-label={t("tags.renamePlaceholder")}
@@ -82,7 +88,12 @@ export function TagRenameDialog({
                 {t("tags.addFailedReserved", { prefix: reserved })}
               </p>
             )}
-            {collides && reserved === null && (
+            {tooLong && reserved === null && (
+              <p className="text-xs text-error">
+                {t("tags.nameTooLong", { max: MAX_TAG_NAME })}
+              </p>
+            )}
+            {collides && reserved === null && !tooLong && (
               <p className="text-xs text-muted">
                 {t("tags.renameConflict", { name: trimmed })}
               </p>

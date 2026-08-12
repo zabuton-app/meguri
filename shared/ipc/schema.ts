@@ -4,6 +4,7 @@
 // values can be used at runtime (e.g. for .parse() validation in main); the
 // inferred types satisfy the prior hand-written interfaces.
 import { z } from "zod";
+import { MAX_TAG_REF_NAME } from "../tags.js";
 
 export const KindSchema = z.enum(["video", "image"]);
 export type Kind = z.infer<typeof KindSchema>;
@@ -173,9 +174,11 @@ export type DuplicatesResult = z.infer<typeof DuplicatesResultSchema>;
  */
 export const TagRefSchema = z.object({
   namespace: z.string().max(32),
-  // Same ceiling as tag_rename's `to`, so merge cannot be used to create a name
-  // that rename would have refused.
-  name: z.string().min(1).max(64),
+  // A reference to an existing tag, so this is MAX_TAG_REF_NAME rather than the
+  // creation cap: tags named before that cap existed have to stay renameable,
+  // mergeable and deletable. Names the user creates are bounded where they are
+  // created (file_add_tag, tag_rename's `to`).
+  name: z.string().min(1).max(MAX_TAG_REF_NAME),
 });
 export type TagRef = z.infer<typeof TagRefSchema>;
 

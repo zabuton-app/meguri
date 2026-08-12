@@ -34,6 +34,25 @@ describe("addSearchTokens", () => {
     expect(addSearchTokens(after, ['tag:"beach house"'])).toBe(after);
   });
 
+  it("recognises a condition the box holds in another case", () => {
+    // The tag resolves case-insensitively in SQL, so `tag:4K` and a click on
+    // "4k" are one condition — the search box folds a typed repeat the same way.
+    const before = { q: "tag:4K" };
+    expect(addSearchTokens(before, ["tag:4k"])).toBe(before);
+  });
+
+  it("keeps two tags that differ beyond ASCII apart", () => {
+    // SQLite's NOCASE collation only folds ASCII, so these really are two tags.
+    const after = addSearchTokens({ q: "tag:été" }, ["tag:ÉTÉ"]);
+    expect(after.q).toBe("tag:été tag:ÉTÉ");
+  });
+
+  it("still compares free text exactly", () => {
+    expect(addSearchTokens({ q: "sunset" }, ["Sunset"]).q).toBe(
+      "sunset Sunset",
+    );
+  });
+
   it("ignores empty tokens", () => {
     const before = { q: "tag:beach" };
     expect(addSearchTokens(before, [""])).toBe(before);

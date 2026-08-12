@@ -9,6 +9,7 @@ import {
   reservedTagPrefix,
   qualifiedTagName,
   splitSearchTokens,
+  tagSearchKey,
   tagSearchToken,
 } from "@shared/tags";
 
@@ -196,6 +197,28 @@ describe("parseTagSearchToken", () => {
     expect(parseTagSearchToken("tagline")).toBeNull();
     expect(parseTagSearchToken("tag:")).toBeNull();
     expect(parseTagSearchToken("todo:later")).toBeNull();
+  });
+});
+
+describe("tagSearchKey", () => {
+  it("folds the difference two spellings of one condition can have", () => {
+    expect(tagSearchKey("tag:4K")).toBe("4k");
+    expect(tagSearchKey("TAG:Beach")).toBe(tagSearchKey("tag:beach"));
+    // Quoting is the tokenizer's business, not the key's.
+    expect(tagSearchKey(splitSearchTokens('tag:"Beach House"')[0])).toBe(
+      "beach house",
+    );
+  });
+
+  it("leaves non-ASCII case alone, as the SQL that resolves the tag does", () => {
+    // SQLite's NOCASE collation folds ASCII only, so these are two tags there;
+    // folding them here would drop one of the two conditions without a trace.
+    expect(tagSearchKey("tag:ÉTÉ")).not.toBe(tagSearchKey("tag:été"));
+  });
+
+  it("returns null for anything that is not a directive", () => {
+    expect(tagSearchKey("beach")).toBeNull();
+    expect(tagSearchKey("tag:")).toBeNull();
   });
 });
 

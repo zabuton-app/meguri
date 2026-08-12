@@ -1,4 +1,8 @@
-import { joinSearchTokens, splitSearchTokens } from "@shared/tags";
+import {
+  joinSearchTokens,
+  splitSearchTokens,
+  tagSearchKey,
+} from "@shared/tags";
 import type { SearchQuery } from "@/ipc/types";
 
 export const DISCOVER_FILTER_PARAM = "filter";
@@ -50,7 +54,19 @@ export function addSearchTokens(
   // while `current` holds them unquoted — normalize both sides before comparing,
   // or a second click on a multi-word tag would append a duplicate.
   const incoming = tokens.flatMap((token) => splitSearchTokens(token));
-  const added = incoming.filter((token) => token && !current.includes(token));
+  // A directive is compared on tagSearchKey rather than on the token, so a tag
+  // clicked while `tag:4K` is already in the box is recognised as the condition
+  // it resolves to — the same key the search box applies to a typed one. Free
+  // text has no such resolution and stays an exact comparison.
+  const keys = new Set(current.map(tagSearchKey));
+  const added = incoming.filter((token) => {
+    if (!token) return false;
+    const key = tagSearchKey(token);
+    if (key === null) return !current.includes(token);
+    if (keys.has(key)) return false;
+    keys.add(key);
+    return true;
+  });
   if (added.length === 0) return filter;
   return { ...filter, q: joinSearchTokens([...current, ...added]) };
 }

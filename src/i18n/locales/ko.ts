@@ -341,6 +341,7 @@ export const ko: Record<TranslationKey, string> = {
   "tags.deleteFailed": "태그를 삭제하지 못했습니다",
   "tags.addFailedReserved":
     "「{prefix}:」은(는) 자동 태그 전용 예약어입니다. 다른 이름을 사용하세요.",
+  "tags.nameTooLong": "태그 이름은 최대 {max}자까지 입력할 수 있습니다.",
   "tags.ns.res": "해상도",
   "tags.ns.dur": "길이",
   "tags.ns.codec": "코덱",

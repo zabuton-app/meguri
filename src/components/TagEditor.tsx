@@ -5,7 +5,7 @@
 import { useEffect, useId, useState } from "react";
 import { X } from "lucide-react";
 import { api } from "@/ipc/client";
-import { tagSearchToken } from "@shared/tags";
+import { MAX_TAG_NAME, tagSearchToken } from "@shared/tags";
 import type { TagInfo } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import { tagColorClass } from "@/lib/tagColorClass";
@@ -56,9 +56,15 @@ export function TagEditor({
     return () => clearTimeout(t);
   }, [input, workspaceId]);
 
+  // maxLength on the field stops this being reachable by typing; the check is
+  // here for a value that gets in another way (an IME commit, a paste the
+  // browser does not clip), and it says so rather than dropping the Enter on
+  // the floor — the IPC layer would refuse the name with a raw Zod message.
+  const tooLong = input.trim().length > MAX_TAG_NAME;
+
   const submit = () => {
     const v = input.trim();
-    if (v) {
+    if (v && !tooLong) {
       onAdd(v);
       setInput("");
       setSuggestions([]);
@@ -116,6 +122,7 @@ export function TagEditor({
       <input
         value={input}
         list={listId}
+        maxLength={MAX_TAG_NAME}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") submit();
@@ -123,6 +130,11 @@ export function TagEditor({
         placeholder={t("tag.addPlaceholder")}
         className="h-8 rounded-md border border-border-strong bg-bg px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
       />
+      {tooLong && (
+        <p className="text-xs text-error">
+          {t("tags.nameTooLong", { max: MAX_TAG_NAME })}
+        </p>
+      )}
       <datalist id={listId}>
         {suggestions.map((s) => (
           <option key={s} value={s} />

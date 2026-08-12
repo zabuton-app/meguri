@@ -3,7 +3,14 @@
 // whole: backspacing through the middle of one turns an exact tag match into a
 // substring search that also hits file names, with nothing on screen to say so.
 // While one is being typed the box completes it from the tag catalog.
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
 import {
@@ -13,6 +20,7 @@ import {
   joinSearchTokens,
   parseTagSearchToken,
   splitSearchTokens,
+  tagSearchKey,
   tagSearchToken,
 } from "@shared/tags";
 import { api } from "@/ipc/client";
@@ -71,8 +79,24 @@ export function SearchTokenInput({
   // Index of the chip the arrow keys have walked back onto, or null while the
   // caret is in the text. Focus stays in the input throughout: the chips are a
   // rendering of the query string, not widgets of their own.
-  const [selected, setSelected] = useState<number | null>(null);
-  const picked = selected !== null && selected < chips.length ? selected : null;
+  //
+  // `armed` says the user aimed at this chip themselves, which is what makes the
+  // next Backspace a confirmation rather than a surprise: the box also puts the
+  // highlight on a chip on its own, to answer a condition typed twice, and that
+  // one must not double as the first press of a delete.
+  const [selected, setSelected] = useState<{
+    at: number;
+    armed: boolean;
+  } | null>(null);
+  const picked =
+    selected !== null && selected.at < chips.length ? selected.at : null;
+  // Stable so the highlight subscription below is not torn down and rebuilt on
+  // every render; it only ever calls setSelected.
+  const aim = useCallback(
+    (at: number | null, armed = true) =>
+      setSelected(at === null ? null : { at, armed }),
+    [],
+  );
 
   const pending = focused && picked === null ? pendingDirective(draft) : null;
   const status = useAppStatus();
@@ -106,28 +130,55 @@ export function SearchTokenInput({
     onChange(q);
     setActive(0);
     setDismissed(false);
-    setSelected(null);
+    aim(null);
   };
 
   /** Drop the highlighted chip and leave the highlight on whatever slides into its place. */
   const removeSelected = (index: number) => {
     const next = chips.filter((_, j) => j !== index);
     commit(next, draft);
-    setSelected(next.length ? Math.min(index, next.length - 1) : null);
+    aim(next.length ? Math.min(index, next.length - 1) : null);
   };
 
   /**
    * A token turns into a chip only once it is closed — by a space or by Enter
    * (`force`) — so `tag:lo…` is not pulled out of the field mid-word.
+   *
+   * Returns the chip a repeated condition was folded into, or null when nothing
+   * was a repeat; Enter needs to know, because leaving the field would clear the
+   * very highlight that says where what was typed went.
    */
-  const apply = (raw: string, force = false) => {
+  const apply = (raw: string, force = false): number | null => {
     const closed = force || (/\s$/.test(raw) && !hasOpenQuote(raw));
     const tokens = splitSearchTokens(raw);
     const typing = closed ? undefined : tokens.pop();
-    const promoted = tokens.filter(isTagDirective);
-    if (promoted.length === 0) {
+    const directives = tokens.filter(isTagDirective);
+    if (directives.length === 0) {
       commit(chips, raw);
-      return;
+      return null;
+    }
+    // A condition already in the box is not repeated — through the same key the
+    // click path (addSearchTokens) compares on, so typing `tag:4k` and clicking
+    // the tag land on the same query instead of one of them producing two chips.
+    // The index each key sits at is kept so a repeat can point at the chip that
+    // already carries it, the way a redundant click does.
+    const taken = new Map<string, number>();
+    chips.forEach((chip, i) => {
+      const key = tagSearchKey(chip);
+      if (key !== null) taken.set(key, i);
+    });
+    const promoted: string[] = [];
+    let repeated: number | null = null;
+    for (const token of directives) {
+      const key = tagSearchKey(token);
+      if (key === null) continue;
+      const at = taken.get(key);
+      if (at !== undefined) {
+        repeated = at;
+        continue;
+      }
+      taken.set(key, chips.length + promoted.length);
+      promoted.push(token);
     }
     const rest = tokens.filter((token) => !isTagDirective(token));
     if (typing !== undefined) rest.push(typing);
@@ -137,13 +188,21 @@ export function SearchTokenInput({
     // the caret is still sitting in (a pasted "tag:4k s").
     if (closed && !force && next) next += " ";
     commit([...chips, ...promoted], next);
+    // After commit, which clears the highlight: a condition that quietly went
+    // nowhere would otherwise read as the box swallowing what was typed. Not
+    // armed — the user aimed at the text, not at the chip.
+    if (repeated !== null) aim(repeated, false);
+    return repeated;
   };
 
   /** Put the highlight on a chip and leave the field ready to act on it. */
-  const highlight = (index: number) => {
-    setSelected(index);
-    inputRef.current?.focus();
-  };
+  const highlight = useCallback(
+    (index: number) => {
+      aim(index);
+      inputRef.current?.focus();
+    },
+    [aim],
+  );
 
   // Clicking a tag that is already a condition changes nothing, so Home asks the
   // box to point at the chip it landed on. Matching is on the resolved value, not
@@ -153,15 +212,11 @@ export function SearchTokenInput({
       onHighlightSearchToken((token) => {
         // Through the tokenizer first: the sender quotes a value with spaces,
         // the chips hold it unquoted.
-        const wanted = parseTagSearchToken(
-          splitSearchTokens(token)[0] ?? "",
-        )?.toLowerCase();
-        const at = chips.findIndex(
-          (chip) => parseTagSearchToken(chip)?.toLowerCase() === wanted,
-        );
-        if (wanted !== undefined && at >= 0) highlight(at);
+        const wanted = tagSearchKey(splitSearchTokens(token)[0] ?? "");
+        const at = chips.findIndex((chip) => tagSearchKey(chip) === wanted);
+        if (wanted !== null && at >= 0) highlight(at);
       }),
-    [chips],
+    [chips, highlight],
   );
 
   /** Swap the directive under the caret for the chosen tag and chip it. */
@@ -239,7 +294,7 @@ export function SearchTokenInput({
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false);
-          setSelected(null);
+          aim(null);
         }}
         onKeyDown={(e) => {
           // The caret is at the very start with nothing selected, so Left and
@@ -250,14 +305,14 @@ export function SearchTokenInput({
             e.currentTarget.selectionEnd === 0;
           const highlight = (index: number | null) => {
             e.preventDefault();
-            setSelected(index);
+            aim(index);
           };
 
           if (e.key === "Escape") {
             e.stopPropagation();
             // Each Esc undoes one layer: the highlight, then the suggestions,
             // then focus — the field keeps what the user was typing throughout.
-            if (picked !== null) setSelected(null);
+            if (picked !== null) aim(null);
             else if (open) setDismissed(true);
             else e.currentTarget.blur();
           } else if (e.key === "ArrowLeft") {
@@ -272,7 +327,11 @@ export function SearchTokenInput({
             (e.key === "Backspace" || e.key === "Delete")
           ) {
             e.preventDefault();
-            removeSelected(picked);
+            // A highlight the box placed itself has not been confirmed by
+            // anyone: this press arms it, exactly as the first Backspace does
+            // on a chip the arrow keys walked onto.
+            if (selected?.armed) removeSelected(picked);
+            else aim(picked);
           } else if (open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
             e.preventDefault();
             const step = e.key === "ArrowDown" ? 1 : -1;
@@ -287,17 +346,17 @@ export function SearchTokenInput({
             accept(suggestions[activeIndex]);
           } else if (e.key === "Enter") {
             if (open) accept(suggestions[activeIndex]);
-            else {
-              apply(draft, true);
-              e.currentTarget.blur();
-            }
+            // Leaving the field clears the highlight, so a repeat keeps focus:
+            // Enter on a condition already on would otherwise look like the box
+            // ate it — the one failure the user cannot see.
+            else if (apply(draft, true) === null) e.currentTarget.blur();
           } else if (e.key === "Backspace" && atStart && chips.length > 0) {
             // Highlight rather than delete: the chip is about to disappear with
             // no undo, and one more Backspace confirms it.
             highlight(chips.length - 1);
           } else if (picked !== null && e.key.length === 1) {
             // Typing means the user is done with the chips.
-            setSelected(null);
+            aim(null);
           }
         }}
         placeholder={chips.length ? undefined : placeholder}

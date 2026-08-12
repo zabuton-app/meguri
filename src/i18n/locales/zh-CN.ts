@@ -330,6 +330,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "tags.deleted": "已删除标签",
   "tags.deleteFailed": "删除标签失败",
   "tags.addFailedReserved": "“{prefix}:”是自动标签的保留前缀，请换一个名称。",
+  "tags.nameTooLong": "标签名称最多 {max} 个字符。",
   "tags.ns.res": "分辨率",
   "tags.ns.dur": "时长",
   "tags.ns.codec": "编解码器",
