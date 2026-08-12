@@ -200,7 +200,11 @@ describe("Tags screen", () => {
       target: { value: "x".repeat(MAX_TAG_NAME + 1) },
     });
 
-    expect(await screen.findByText(/at most 64 characters/)).toBeTruthy();
+    expect(
+      await screen.findByText(
+        `A tag name can be at most ${MAX_TAG_NAME} characters.`,
+      ),
+    ).toBeTruthy();
     expect(
       screen
         .getByText("Rename", { selector: "button" })

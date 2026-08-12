@@ -593,19 +593,21 @@ function capTagList(tags: TagSummary[]): TagList {
  */
 function takeAcrossNamespaces(tags: TagSummary[], limit: number): TagSummary[] {
   if (tags.length <= limit) return tags;
-  const queues = new Map<string, TagSummary[]>();
+  // Each namespace keeps a cursor rather than being shifted from: shift() is
+  // O(n), and one namespace holding most of the catalog would make the round
+  // robin quadratic in the size of that namespace.
+  const queues = new Map<string, { items: TagSummary[]; at: number }>();
   for (const tag of tags) {
     const queue = queues.get(tag.namespace);
-    if (queue) queue.push(tag);
-    else queues.set(tag.namespace, [tag]);
+    if (queue) queue.items.push(tag);
+    else queues.set(tag.namespace, { items: [tag], at: 0 });
   }
   const kept = new Set<TagSummary>();
   while (kept.size < limit) {
     const before = kept.size;
     for (const queue of queues.values()) {
-      const tag = queue.shift();
-      if (tag === undefined) continue;
-      kept.add(tag);
+      if (queue.at === queue.items.length) continue;
+      kept.add(queue.items[queue.at++]);
       if (kept.size === limit) break;
     }
     // Unreachable while limit < tags.length, which the early return guarantees —

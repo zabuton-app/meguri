@@ -46,7 +46,9 @@ describe("TagEditor", () => {
       target: { value: "x".repeat(MAX_TAG_NAME + 1) },
     });
 
-    expect(screen.getByText(/at most 64 characters/)).toBeTruthy();
+    expect(
+      screen.getByText(`A tag name can be at most ${MAX_TAG_NAME} characters.`),
+    ).toBeTruthy();
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onAdd).not.toHaveBeenCalled();
     // The text stays put so it can be shortened instead of retyped.
