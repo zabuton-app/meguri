@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { ExternalLink, Film, Heart, ImageIcon, Play } from "lucide-react";
+import { ExternalLink, Film, ImageIcon, Play } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { RatingStars } from "@/components/RatingStars";
 import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
 import { usePreferences } from "@/settings/PreferencesProvider";
@@ -27,7 +28,6 @@ export function DiscoverCard({
   mediaBase,
   thumbVersion,
   onRate,
-  onToggleFavorite,
   filterParam,
   workspaceName,
   isActive,
@@ -38,7 +38,6 @@ export function DiscoverCard({
   /** Bumped on thumb:done so a regenerated thumbnail busts the browser cache. */
   thumbVersion: number;
   onRate: (rating: number) => void;
-  onToggleFavorite: () => void;
   filterParam?: string;
   /** Label of the file's workspace, shown as the first meta chip. */
   workspaceName?: string;
@@ -47,7 +46,6 @@ export function DiscoverCard({
   t: TFunc;
 }) {
   const wsId = file.workspaceId;
-  const isFav = !!file.favorite;
   const hasThumb = file.thumbStatus === "done" && mediaBase && wsId;
   const src = hasThumb
     ? `${mediaBase}/ws/${wsId}/thumb/${file.id}?v=${thumbVersion}`
@@ -172,19 +170,12 @@ export function DiscoverCard({
               </>
             )}
             <Chip interactive className="gap-2">
-              <button
-                type="button"
-                onClick={onToggleFavorite}
-                aria-pressed={isFav}
-                aria-label={isFav ? t("favorite.remove") : t("favorite.add")}
-                title={isFav ? t("favorite.remove") : t("favorite.add")}
-                className={cn(
-                  "flex items-center justify-center transition-colors",
-                  isFav ? "text-error" : "text-muted hover:text-error",
-                )}
-              >
-                <Heart className={cn("size-3.5", isFav && "fill-current")} />
-              </button>
+              <FavoriteButton
+                fileId={file.id}
+                workspaceId={wsId}
+                favorite={file.favorite}
+                size={14}
+              />
               <RatingStars value={file.rating} onChange={onRate} size={14} />
             </Chip>
             {file.tags
