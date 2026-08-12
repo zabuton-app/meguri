@@ -539,10 +539,82 @@ export function listTagsWorkspaces(cores: CoreTarget[]): TagList {
   for (const tag of tags) {
     tag.bySource.sort((a, b) => a.source.localeCompare(b.source));
   }
+  return capTagList(tags);
+}
+
+/**
+ * Cut an over-long catalog down to MAX_TAG_LIST without losing a whole class of
+ * tags.
+ *
+ * The ordering puts user-owned tags first, so a plain slice() would drop every
+ * generated tag the moment the manual ones alone fill the cap — and with them
+ * every `tag:` completion for a resolution or a duration, with nothing but the
+ * generic truncation notice to explain it.
+ *
+ * So each class is guaranteed half the cap, and whatever half a class does not
+ * use goes to the other. In the ordinary library that costs the manual list
+ * nothing, since a scan produces far fewer than a thousand generated tags; the
+ * floor only bites where both classes are over a thousand, and there being cut
+ * to half a catalog nobody can read through anyway is the point.
+ */
+function capTagList(tags: TagSummary[]): TagList {
+  if (tags.length <= MAX_TAG_LIST) return { tags, truncated: false };
+  const manual = tags.filter((tag) => !tag.pipelineOwned);
+  const pipeline = tags.filter((tag) => tag.pipelineOwned);
+  const keepPipeline = Math.min(
+    pipeline.length,
+    Math.max(Math.floor(MAX_TAG_LIST / 2), MAX_TAG_LIST - manual.length),
+  );
   return {
-    tags: tags.slice(0, MAX_TAG_LIST),
-    truncated: tags.length > MAX_TAG_LIST,
+    // Concatenating in this order preserves the sort: manual tags have an empty
+    // namespace, which sorts ahead of every generated one.
+    tags: [
+      ...manual.slice(0, MAX_TAG_LIST - keepPipeline),
+      ...takeAcrossNamespaces(pipeline, keepPipeline),
+    ],
+    truncated: true,
   };
+}
+
+/**
+ * Take `limit` tags, one namespace at a time, so no namespace can crowd out
+ * another.
+ *
+ * The same failure as the one capTagList exists to prevent, a level down: the
+ * catalog is sorted by namespace, so slicing the generated tags would empty the
+ * ones late in the alphabet first. `codec` is the namespace this actually
+ * threatens — its values come from ffprobe and are an open set, unlike the
+ * closed vocabularies of `res`, `dur` and `orient`, so it is the only one that
+ * can grow far enough to fill the share by itself.
+ *
+ * `tags` must not repeat an element: membership is tracked by identity, so a
+ * duplicate would be kept once and counted once, and the result would run over
+ * `limit`. The catalog is folded through a Map before it gets here.
+ */
+function takeAcrossNamespaces(tags: TagSummary[], limit: number): TagSummary[] {
+  if (tags.length <= limit) return tags;
+  const queues = new Map<string, TagSummary[]>();
+  for (const tag of tags) {
+    const queue = queues.get(tag.namespace);
+    if (queue) queue.push(tag);
+    else queues.set(tag.namespace, [tag]);
+  }
+  const kept = new Set<TagSummary>();
+  while (kept.size < limit) {
+    const before = kept.size;
+    for (const queue of queues.values()) {
+      const tag = queue.shift();
+      if (tag === undefined) continue;
+      kept.add(tag);
+      if (kept.size === limit) break;
+    }
+    // Unreachable while limit < tags.length, which the early return guarantees —
+    // but a loop that only exits on a counter is one edit away from spinning.
+    if (kept.size === before) break;
+  }
+  // Filtering the input rather than concatenating the queues keeps the catalog
+  // order; the round robin only decides membership.
+  return tags.filter((tag) => kept.has(tag));
 }
 
 /**

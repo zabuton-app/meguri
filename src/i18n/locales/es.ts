@@ -351,6 +351,8 @@ export const es: Record<TranslationKey, string> = {
   "tags.deleteFailed": "No se pudo eliminar la etiqueta",
   "tags.addFailedReserved":
     "«{prefix}:» está reservado para las etiquetas automáticas. Elige otro nombre.",
+  "tags.nameTooLong":
+    "El nombre de una etiqueta puede tener como máximo {max} caracteres.",
   "tags.ns.res": "Resolución",
   "tags.ns.dur": "Duración",
   "tags.ns.codec": "Códec",

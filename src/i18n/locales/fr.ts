@@ -352,6 +352,7 @@ export const fr: Record<TranslationKey, string> = {
   "tags.deleteFailed": "Impossible de supprimer le tag",
   "tags.addFailedReserved":
     "« {prefix}: » est réservé aux tags automatiques. Choisissez un autre nom.",
+  "tags.nameTooLong": "Un nom de tag ne peut pas dépasser {max} caractères.",
   "tags.ns.res": "Résolution",
   "tags.ns.dur": "Durée",
   "tags.ns.codec": "Codec",

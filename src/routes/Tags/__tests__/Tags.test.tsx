@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { Route, Routes } from "react-router";
+import { MAX_TAG_NAME } from "@shared/tags";
 import Tags from "@/routes/Tags";
 import { defaultAppStatus, defaultWorkspacesList } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -182,6 +183,29 @@ describe("Tags screen", () => {
         { namespace: "", name: "holiday" },
       ),
     );
+    expect(mocks.tagRename).not.toHaveBeenCalled();
+  });
+
+  it("refuses an over-long name in the form instead of at the IPC layer", async () => {
+    render();
+    await screen.findByText("Manual tags");
+    fireEvent.click(screen.getAllByLabelText("Rename")[0]);
+
+    const input =
+      await screen.findByLabelText<HTMLInputElement>("New tag name");
+    // The field caps typing; the guard behind it is what a value arriving any
+    // other way hits, since the IPC rejection is a raw Zod message in a toast.
+    expect(input.maxLength).toBe(MAX_TAG_NAME);
+    fireEvent.change(input, {
+      target: { value: "x".repeat(MAX_TAG_NAME + 1) },
+    });
+
+    expect(await screen.findByText(/at most 64 characters/)).toBeTruthy();
+    expect(
+      screen
+        .getByText("Rename", { selector: "button" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
     expect(mocks.tagRename).not.toHaveBeenCalled();
   });
 

@@ -29,6 +29,7 @@ import {
   type EventChannel,
   type InvokeChannel,
 } from "./channelNames.js";
+import { MAX_TAG_LIST, MAX_TAG_NAME } from "../tags.js";
 
 export { EVENT_CHANNELS, INVOKE_CHANNELS };
 export type { EventChannel, InvokeChannel };
@@ -87,8 +88,11 @@ export const ChannelInputs = {
   history_list: z.object({ query: HistoryQuerySchema.optional() }).default({}),
   duplicates_list: z.void(),
   history_clear: z.void(),
-  // Same ceiling as tag_rename's `to` and TagRefSchema.name.
-  file_add_tag: FileTarget.extend({ name: z.string().min(1).max(64) }),
+  // A name being created, so it is capped at MAX_TAG_NAME — same as
+  // tag_rename's `to`, and unlike TagRefSchema, which only addresses one.
+  file_add_tag: FileTarget.extend({
+    name: z.string().min(1).max(MAX_TAG_NAME),
+  }),
   file_remove_tag: FileTarget.extend({ tagId: z.number() }),
   tags_list: z.object({
     workspaceId: z.string(),
@@ -102,13 +106,22 @@ export const ChannelInputs = {
   tag_rename: z.object({
     from: TagRefSchema,
     /** New plain name; the namespace is always "" since only manual tags are editable. */
-    to: z.string().min(1).max(64),
+    to: z.string().min(1).max(MAX_TAG_NAME),
   }),
+  // Both operand lists are bounded by the catalog they are picked from: the
+  // screen can select every row it shows, and it never shows more than
+  // MAX_TAG_LIST. Each element resolves with its own synchronous query, so an
+  // unbounded array is a way to stall the main process from the renderer side.
   tag_merge: z.object({
-    from: z.array(TagRefSchema).min(1),
+    from: z.array(TagRefSchema).min(1).max(MAX_TAG_LIST),
+    // Also a reference, not a new name: the merge dialog only ever targets a tag
+    // from the selection. Main may still have to create it in a database that
+    // does not hold it yet, which is why the "All" view can merge at all.
     into: TagRefSchema,
   }),
-  tag_delete: z.object({ tags: z.array(TagRefSchema).min(1) }),
+  tag_delete: z.object({
+    tags: z.array(TagRefSchema).min(1).max(MAX_TAG_LIST),
+  }),
   bookmark_add: FileTarget.extend({ sec: z.number() }),
   bookmark_remove: FileTarget.extend({ bookmarkId: z.number() }),
   thumb_set_offset: FileTarget.extend({ sec: z.number().nullable() }),

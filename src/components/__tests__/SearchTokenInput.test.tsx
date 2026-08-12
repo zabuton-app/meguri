@@ -346,6 +346,98 @@ describe("SearchTokenInput chip selection", () => {
     expect(chips()[0].dataset.selected).toBe("true");
     expect(options()).toHaveLength(0);
   });
+
+  it("does not chip a condition the box already carries", () => {
+    const { input, last } = setup("tag:4k");
+    // Same rule the click path follows: a condition already on stays on once.
+    fireEvent.change(input, { target: { value: "tag:4k " } });
+    expect(chips()).toHaveLength(1);
+    expect(input.value).toBe("");
+    expect(last()).toBe("tag:4k");
+  });
+
+  it("treats a differently-cased repeat as the same condition", () => {
+    const { input } = setup("tag:4k");
+    fireEvent.change(input, { target: { value: "tag:4K " } });
+    expect(chips()).toHaveLength(1);
+  });
+
+  it("collapses a directive repeated within one paste", () => {
+    const { input, last } = setup();
+    fireEvent.change(input, { target: { value: "tag:4k sunset tag:4k " } });
+    expect(chips()).toHaveLength(1);
+    expect(last()).toBe("tag:4k sunset");
+  });
+
+  it("keeps the free text when the only directive was a repeat", () => {
+    const { input, last } = setup("tag:4k");
+    fireEvent.change(input, { target: { value: "tag:4k sunset " } });
+    // The repeat is dropped rather than left behind as text, which would give
+    // the substring search over file names the directive exists to avoid.
+    expect(chips()).toHaveLength(1);
+    expect(input.value).toBe("sunset ");
+    expect(last()).toBe("tag:4k sunset");
+  });
+
+  it("points at the chip a typed repeat lands on", () => {
+    const { input } = setup("tag:beach tag:4k");
+    fireEvent.change(input, { target: { value: "tag:4k " } });
+    // Parity with a redundant click, which asks the box to aim at the chip
+    // instead of looking as though the typing went nowhere.
+    expect(chips()[1].dataset.selected).toBe("true");
+    expect(chips()[0].dataset.selected).toBeUndefined();
+  });
+
+  it("leaves the highlight off when the directive was actually added", () => {
+    const { input } = setup("tag:beach");
+    fireEvent.change(input, { target: { value: "tag:4k " } });
+    expect(chips()).toHaveLength(2);
+    expect(chips().every((chip) => !chip.dataset.selected)).toBe(true);
+  });
+
+  it("stays in the field when Enter closes a repeat", () => {
+    const { input } = setup("tag:beach tag:4k");
+    input.focus();
+    fireEvent.change(input, { target: { value: "tag:4k" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    // Blurring here would clear the highlight that says where the condition
+    // went, leaving the box looking as though it swallowed the typing.
+    expect(chips()[1].dataset.selected).toBe("true");
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("still leaves the field when Enter closes something new", () => {
+    const { input } = setup("tag:beach");
+    input.focus();
+    fireEvent.change(input, { target: { value: "tag:4k" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips()).toHaveLength(2);
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it("does not let a repeat's highlight double as a delete confirmation", () => {
+    const { input, last } = setup("tag:beach tag:4k");
+    fireEvent.change(input, { target: { value: "tag:4k " } });
+    expect(chips()[1].dataset.selected).toBe("true");
+
+    // The natural next keystroke after "my typing vanished" is Backspace, and
+    // it must not take a condition with it on the first press.
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(chips()).toHaveLength(2);
+    // Now it is armed, exactly as a chip walked onto with the arrow keys.
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(chips()).toHaveLength(1);
+    expect(last()).toBe("tag:beach");
+  });
+
+  it("keeps deleting in one press from a chip the user aimed at", () => {
+    const { input, last } = setup("tag:beach tag:4k");
+    input.focus();
+    input.setSelectionRange(0, 0);
+    fireEvent.keyDown(input, { key: "ArrowLeft" });
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(last()).toBe("tag:beach");
+  });
 });
 
 describe("SearchTokenInput completion", () => {
@@ -398,6 +490,20 @@ describe("SearchTokenInput completion", () => {
     expect(last()).toBe("tag:piyo");
     expect(screen.getByTitle("Tags: piyo")).toBeTruthy();
     expect(input.value).toBe("");
+  });
+
+  it("does not chip a completed suggestion the box already carries", async () => {
+    const { input, last } = setup("tag:piyo");
+    type(input, "tag:o");
+    await waitFor(() => expect(options()).toHaveLength(2));
+    // Completing something already on is the third route into the query, and it
+    // goes through apply() like the other two.
+    fireEvent.click(options()[1]);
+
+    expect(chips()).toHaveLength(1);
+    expect(chips()[0].dataset.selected).toBe("true");
+    expect(input.value).toBe("");
+    expect(last()).toBe("tag:piyo");
   });
 
   it("accepts the highlighted suggestion with the arrow keys and Enter", async () => {

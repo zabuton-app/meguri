@@ -58,6 +58,25 @@ export function namespaceOfAutoMetaValue(value: string): string | null {
 export const MAX_TAG_LIST = 2000;
 
 /**
+ * Cap on a tag name the user *creates* — by typing one in, or by renaming into
+ * one. Shared so the input that takes the name refuses it at the same length the
+ * IPC layer does, instead of letting a validation error surface as a toast.
+ */
+export const MAX_TAG_NAME = 64;
+
+/**
+ * Cap on a tag name that merely *addresses* a tag which already exists (rename's
+ * source, merge's operands, delete's list).
+ *
+ * Deliberately far looser than MAX_TAG_NAME: names created before that cap
+ * existed are still in people's databases, and validating a reference at the
+ * creation limit would make exactly those tags impossible to rename, merge or
+ * delete — the operations that exist to clean them up. A ceiling remains only so
+ * an unbounded string never reaches a query.
+ */
+export const MAX_TAG_REF_NAME = 1024;
+
+/**
  * Sources whose tags a list row neither carries nor draws — `attachTags` leaves
  * them out of FileRow, and the chip row filters again for rows that arrive from
  * a cache patch or a fixture. The detail view is unaffected and still shows
@@ -142,6 +161,24 @@ export function parseTagSearchToken(token: string): string | null {
 /** True for a token the search box treats as an exact-tag directive. */
 export function isTagDirective(token: string): boolean {
   return parseTagSearchToken(token) !== null;
+}
+
+/**
+ * The key two directives are compared on when deciding whether they are the same
+ * condition — null for ordinary free text.
+ *
+ * Both routes into the query (typing one, clicking a tag) go through here, so
+ * neither can append a condition the other would have called a repeat. The fold
+ * is ASCII-only on purpose: it has to agree with the SQL that finally resolves
+ * the tag, and SQLite's NOCASE collation leaves everything above ASCII alone —
+ * `Été` and `été` really are two tags there, and calling them one here would
+ * silently drop a condition the user typed.
+ */
+export function tagSearchKey(token: string): string | null {
+  const value = parseTagSearchToken(token);
+  return value === null
+    ? null
+    : value.replace(/[A-Z]/g, (c) => c.toLowerCase());
 }
 
 function needsQuoting(value: string): boolean {

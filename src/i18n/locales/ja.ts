@@ -345,6 +345,7 @@ export const ja = {
   "tags.deleteFailed": "タグの削除に失敗しました",
   "tags.addFailedReserved":
     "「{prefix}:」は自動タグ用の予約語です。別の名前を指定してください。",
+  "tags.nameTooLong": "タグ名は{max}文字以内で指定してください。",
   "tags.ns.res": "解像度",
   "tags.ns.dur": "長さ",
   "tags.ns.codec": "コーデック",
