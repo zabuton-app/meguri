@@ -29,7 +29,7 @@ import {
   KEYBINDING_PRESETS,
   type KeybindingPreset,
 } from "@/settings/keybindings";
-import { SettingsModal } from "./SettingsModal";
+import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
 
@@ -75,7 +75,10 @@ export default function Settings() {
   return (
     <SettingsModal onClose={() => void onClose()}>
       <header className="flex items-center gap-3 border-b border-border bg-bg px-4 py-2.5">
-        <span className="text-sm font-semibold text-bright-fg">
+        <span
+          id={SETTINGS_MODAL_TITLE_ID}
+          className="text-sm font-semibold text-bright-fg"
+        >
           {t("settings.title")}
         </span>
         <Button
