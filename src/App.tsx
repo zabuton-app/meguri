@@ -10,6 +10,7 @@ import Tags from "@/routes/Tags";
 import Settings from "@/routes/Settings";
 import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { useContentZoom } from "@/hooks/useContentZoom";
+import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
 
 // In a webview, a hash router is more stable than a file-path-style history.
@@ -31,6 +32,7 @@ const router = createHashRouter([
 
 export default function App() {
   useContentZoom();
+  useSelectAllGuard();
   useUpdateNotifier();
   return (
     <div className="flex h-full">

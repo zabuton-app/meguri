@@ -78,8 +78,11 @@ export function AboutSection() {
     };
   }, []);
 
+  // The section opts into selection as a whole: version strings get pasted into
+  // bug reports, and the attributions below are notices we are obliged to
+  // surface. The app has no Edit menu or context menu to copy them any other way.
   return (
-    <section className="flex flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
+    <section className="flex select-text flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
       {/* App identity + version */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col">

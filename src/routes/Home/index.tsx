@@ -463,8 +463,9 @@ export default function Home() {
         t={t}
       />
 
+      {/* Selectable: this carries the raw main-process error users report. */}
       {status.data?.initError && (
-        <div className="border-b border-border bg-destructive px-4 py-2 text-sm text-destructive-foreground">
+        <div className="select-text border-b border-border bg-destructive px-4 py-2 text-sm text-destructive-foreground">
           <p>{t("home.initError", { msg: status.data.initError })}</p>
           {status.data.initErrorKind === "schema_mismatch" && (
             <p className="mt-1 text-xs">

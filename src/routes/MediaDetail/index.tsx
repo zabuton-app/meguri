@@ -554,14 +554,18 @@ export default function MediaDetail() {
           {/* Title + controls */}
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
+              {/* File name and folder are the two strings users copy out. */}
               <h1
-                className="truncate text-lg font-semibold text-bright-fg"
+                className="select-text truncate text-lg font-semibold text-bright-fg"
                 title={d.relPath}
               >
                 {basename}
               </h1>
               {dir && (
-                <p className="truncate text-xs text-muted" title={d.relPath}>
+                <p
+                  className="select-text truncate text-xs text-muted"
+                  title={d.relPath}
+                >
                   {dir}
                 </p>
               )}

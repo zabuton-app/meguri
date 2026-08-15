@@ -83,6 +83,30 @@ body {
     "Noto Sans JP",
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  /*
+   * This is a desktop shell, not a document: dragging across the grid or hitting
+   * Ctrl+A should not paint the window blue. Selection is opt-in, so text that is
+   * worth copying (file names, paths, version strings) carries Tailwind's
+   * `select-text`. user-select is inherited, so a direct declaration on the
+   * element wins over this one.
+   */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/*
+ * Fields are exempt unconditionally. Chromium already keeps the caret and
+ * selection working inside them even when they inherit `user-select: none`, so
+ * this is defensive: it states the intent, and it holds if a field ends up
+ * inside something that opts out more aggressively.
+ * The :not() form also covers bare `contenteditable` and "plaintext-only",
+ * matching the isContentEditable check in src/hooks/useSelectAllGuard.ts.
+ */
+input,
+textarea,
+[contenteditable]:not([contenteditable="false"]) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /*
