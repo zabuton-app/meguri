@@ -208,31 +208,9 @@ export default function Discover() {
     },
   });
 
-  // Favorite toggle. Patches the queue card in place (avoids reshuffling the
-  // random queue) and keeps the list / detail caches in sync.
-  const setFavorite = useMutation({
-    mutationFn: ({
-      id,
-      workspaceId,
-      favorite,
-    }: {
-      id: number;
-      workspaceId: string;
-      favorite: boolean;
-    }) => api.fileSetFavorite(id, workspaceId, favorite),
-    onSuccess: (_d, { id, workspaceId, favorite }) => {
-      qc.setQueryData<FileRow[]>(queueKey, (old) =>
-        old?.map((f) =>
-          f.id === id && f.workspaceId === workspaceId
-            ? { ...f, favorite: favorite ? 1 : 0 }
-            : f,
-        ),
-      );
-      syncFileRowAcrossCaches(qc, workspaceId, id, {
-        favorite: favorite ? 1 : 0,
-      });
-    },
-  });
+  // Favorite toggling on cards is handled by the shared FavoriteButton, whose
+  // cache sync patches every ["files_random"]-prefixed query including this
+  // queue (no reshuffle) plus the list / detail caches.
 
   // Modal size toggle; the persisted value is shared with MediaDetail's modal.
   const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
@@ -332,13 +310,6 @@ export default function Discover() {
                         id: f.id,
                         workspaceId: f.workspaceId,
                         rating,
-                      })
-                    }
-                    onToggleFavorite={() =>
-                      setFavorite.mutate({
-                        id: f.id,
-                        workspaceId: f.workspaceId,
-                        favorite: !f.favorite,
                       })
                     }
                     filterParam={filterParam}
