@@ -442,7 +442,8 @@ export const VideoPlayer = forwardRef<
     return (
       <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl bg-surface p-8 text-center text-muted">
         <p>{t("player.playFailed")}</p>
-        <p className="text-xs">{error}</p>
+        {/* Selectable: the raw codec / MediaError string belongs in bug reports. */}
+        <p className="select-text text-xs">{error}</p>
         <div className="flex gap-2">
           <Button
             variant="outline"

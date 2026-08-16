@@ -40,6 +40,11 @@ export class ErrorBoundary extends Component<Props, State> {
           color: "var(--c-fg)",
           background: "var(--c-bg)",
           minHeight: "100vh",
+          // Inline rather than the `select-text` class, for the same reason as
+          // the colors above: Tailwind may be what failed. Selection is opt-in
+          // app-wide (see styles.css), and a crash screen has to stay copyable.
+          WebkitUserSelect: "text",
+          userSelect: "text",
         }}
       >
         <h1 style={{ fontSize: 18, marginBottom: 12 }}>

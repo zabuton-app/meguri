@@ -137,7 +137,10 @@ export function TopBar({
         </div>
       )}
       {title && (
-        <span className="truncate text-sm font-medium text-fg" title={title}>
+        <span
+          className="select-text truncate text-sm font-medium text-fg"
+          title={title}
+        >
           {title}
         </span>
       )}
