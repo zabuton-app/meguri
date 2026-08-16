@@ -399,7 +399,7 @@ export const ko: Record<TranslationKey, string> = {
   "watchLater.actionFailed": "나중에 보기를 업데이트하지 못했습니다",
   "watchLater.empty": "나중에 보기가 비어 있습니다.",
   "watchLater.emptyHint":
-    "미디어를 마우스 오른쪽 버튼으로 클릭하고 ‘나중에 보기에 추가’를 선택하면 여기에 모입니다. 열어 본 항목은 목록에서 자동으로 빠집니다.",
+    "미디어의 시계 아이콘을 누르면 여기에 모입니다. 재생한 항목은 목록에서 자동으로 빠집니다.",
 
   // 이모지 아이콘
   "emoji.choose": "이모지 선택",

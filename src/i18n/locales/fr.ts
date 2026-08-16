@@ -410,7 +410,7 @@ export const fr: Record<TranslationKey, string> = {
   "watchLater.actionFailed": "Impossible de mettre à jour À regarder plus tard",
   "watchLater.empty": "À regarder plus tard est vide.",
   "watchLater.emptyHint":
-    "Faites un clic droit sur un média et choisissez « Ajouter à À regarder plus tard » pour le retrouver ici. Les éléments quittent la liste dès que vous les ouvrez.",
+    "Appuyez sur l’icône d’horloge d’un média pour le retrouver ici. Les éléments quittent la liste dès que vous les lisez.",
 
   // icône emoji
   "emoji.choose": "Choisir un emoji",

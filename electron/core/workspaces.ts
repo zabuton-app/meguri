@@ -397,10 +397,11 @@ export class Workspaces {
 
   /**
    * Drop a file from the built-in Watch Later collection. Called whenever a file
-   * is opened (see the `file_get` handler): "watch later" means "not watched
-   * yet", so viewing an entry is what takes it off the list. Only the Watch
-   * Later membership changes — the file itself and every other collection are
-   * left alone.
+   * is played (see `consumeWatchLater` in main.ts): "watch later" means "not
+   * watched yet", so playing an entry is what takes it off the list. Opening a
+   * video's detail view without starting playback leaves it listed. Only the
+   * Watch Later membership changes — the file itself and every other collection
+   * are left alone.
    *
    * Callers deliberately do not broadcast workspace:changed for this: refetching
    * the list while the detail view is open would drop the file being viewed out

@@ -102,14 +102,16 @@ describe("MediaGrid", () => {
     expect(screen.queryByText(/No media to display/i)).toBeNull();
   });
 
-  describe("Watch Later context menu", () => {
-    const openMenu = async () => {
-      const card = await screen.findByTestId("media-card");
-      fireEvent.contextMenu(card);
-      return card;
+  describe("Watch Later button", () => {
+    // The toggle stays disabled until workspaces_list resolves (it needs the
+    // collection id), so wait for that rather than clicking a dead button.
+    const button = async () => {
+      const btn = await screen.findByRole("button", { name: /Watch Later/ });
+      await waitFor(() => expect(btn.hasAttribute("disabled")).toBe(false));
+      return btn;
     };
 
-    it("offers to add a file that is not in Watch Later yet", async () => {
+    it("adds a file that is not in Watch Later yet", async () => {
       renderWithProviders(
         <MediaGrid
           items={[sampleFileRow]}
@@ -119,10 +121,11 @@ describe("MediaGrid", () => {
           thumbVersion={{}}
         />,
       );
-      await openMenu();
 
-      const item = await screen.findByText("Add to Watch Later");
-      fireEvent.click(item);
+      const btn = await button();
+      expect(btn.getAttribute("aria-label")).toBe("Add to Watch Later");
+      expect(btn.getAttribute("aria-pressed")).toBe("false");
+      fireEvent.click(btn);
 
       await waitFor(() =>
         expect(mocks.collectionAddFile).toHaveBeenCalledWith(
@@ -134,7 +137,7 @@ describe("MediaGrid", () => {
       expect(mocks.collectionRemoveFile).not.toHaveBeenCalled();
     });
 
-    it("offers to remove a file already in Watch Later", async () => {
+    it("removes a file already in Watch Later", async () => {
       mocks.workspacesList.mockResolvedValue({
         ...defaultWorkspacesList,
         collections: [
@@ -156,10 +159,11 @@ describe("MediaGrid", () => {
           thumbVersion={{}}
         />,
       );
-      await openMenu();
 
-      const item = await screen.findByText("Remove from Watch Later");
-      fireEvent.click(item);
+      const btn = await button();
+      expect(btn.getAttribute("aria-label")).toBe("Remove from Watch Later");
+      expect(btn.getAttribute("aria-pressed")).toBe("true");
+      fireEvent.click(btn);
 
       await waitFor(() =>
         expect(mocks.collectionRemoveFile).toHaveBeenCalledWith(
@@ -173,7 +177,7 @@ describe("MediaGrid", () => {
 
     it("targets each file's own workspace, not the active one", async () => {
       // A cross-workspace view (All / a collection) lists files from several
-      // workspaces; the menu must reference the file's own workspace id.
+      // workspaces; the button must reference the file's own workspace id.
       const foreign = {
         ...sampleFileRow,
         id: 42,
@@ -189,9 +193,8 @@ describe("MediaGrid", () => {
           thumbVersion={{}}
         />,
       );
-      await openMenu();
 
-      fireEvent.click(await screen.findByText("Add to Watch Later"));
+      fireEvent.click(await button());
 
       await waitFor(() =>
         expect(mocks.collectionAddFile).toHaveBeenCalledWith(
@@ -200,6 +203,24 @@ describe("MediaGrid", () => {
           "ws-other",
         ),
       );
+    });
+
+    it("does not navigate to the detail view when clicked", async () => {
+      renderWithProviders(
+        <MediaGrid
+          items={[sampleFileRow]}
+          mediaBase="http://127.0.0.1:17345"
+          workspaceId={WS_ID}
+          loading={false}
+          thumbVersion={{}}
+        />,
+      );
+
+      const before = window.location.hash;
+      fireEvent.click(await button());
+
+      await waitFor(() => expect(mocks.collectionAddFile).toHaveBeenCalled());
+      expect(window.location.hash).toBe(before);
     });
   });
 });

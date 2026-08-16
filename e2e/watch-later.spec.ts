@@ -8,11 +8,12 @@ import {
 } from "./fixtures/helpers";
 
 // End-to-end cover for the quickstart scenarios: the built-in list exists from
-// first launch, entries go in from the grid's context menu, and opening a file
-// takes it back off the list.
+// first launch, entries go in from the per-item toggle, and playing a file takes
+// it back off the list. The fixture is an image, and images record a play when
+// their detail view opens, so viewing one here exercises the removal path.
 test.describe("Watch Later", () => {
   const railButton = (page: Parameters<typeof fileCard>[0]) =>
-    page.getByRole("button", { name: "Watch Later" });
+    page.getByRole("button", { name: "Watch Later", exact: true });
 
   test("exists on first launch without the user creating anything", async ({
     ready,
@@ -36,13 +37,13 @@ test.describe("Watch Later", () => {
     await expect(ready.getByTitle("Delete collection")).toHaveCount(1);
   });
 
-  test("collects a file from the grid context menu, then drops it once opened", async ({
+  test("collects a file from the grid toggle, then drops it once played", async ({
     ready,
   }) => {
     await waitForIndexedMedia(ready);
 
     // Empty until something is added, and it explains itself rather than
-    // telling the user to run a scan.
+    // telling the user to run a scan (which would never populate this list).
     await railButton(ready).click();
     await expect(ready.getByText("Watch Later is empty.")).toBeVisible();
     await expect(ready.getByText(/Run "Scan"/)).toHaveCount(0);
@@ -50,15 +51,17 @@ test.describe("Watch Later", () => {
     // Add from the workspace grid.
     await ready.getByRole("button", { name: "media" }).click();
     await waitForIndexedMedia(ready);
-    await fileCard(ready).click({ button: "right" });
-    await ready.getByRole("menuitem", { name: "Add to Watch Later" }).click();
+    await fileCard(ready)
+      .getByRole("button", { name: "Add to Watch Later" })
+      .click();
     await expect(ready.getByText("Added to Watch Later")).toBeVisible();
 
     // The file is now listed under Watch Later.
     await railButton(ready).click();
     await waitForIndexedMedia(ready);
 
-    // Opening it marks it watched, so it leaves the list.
+    // Viewing the image records a play (images have no player, so a view is the
+    // play), which is what takes it off the list.
     await openFileDetail(ready);
     await closeTopDialog(ready);
     await expect(ready.getByText("Watch Later is empty.")).toBeVisible();
@@ -71,12 +74,13 @@ test.describe("Watch Later", () => {
   test("keeps prev/next usable while viewing from the list", async ({
     ready,
   }) => {
-    // The file leaves Watch Later the moment it is opened. If that removal were
+    // The file leaves Watch Later the moment it is played. If that removal were
     // broadcast while the detail view is up, the open file would drop out of the
     // navigation order and prev/next would dead-end mid-session.
     await waitForIndexedMedia(ready);
-    await fileCard(ready).click({ button: "right" });
-    await ready.getByRole("menuitem", { name: "Add to Watch Later" }).click();
+    await fileCard(ready)
+      .getByRole("button", { name: "Add to Watch Later" })
+      .click();
     await expect(ready.getByText("Added to Watch Later")).toBeVisible();
 
     await railButton(ready).click();
@@ -98,15 +102,35 @@ test.describe("Watch Later", () => {
     await expect(ready.getByLabel("Edit collection")).toHaveCount(0);
   });
 
+  test("offers the toggle in list and table views too", async ({ ready }) => {
+    await waitForIndexedMedia(ready);
+
+    for (const view of ["List view", "Table view"] as const) {
+      await ready.getByRole("button", { name: view }).click();
+      await expect(
+        ready.getByRole("button", { name: "Add to Watch Later" }).first(),
+      ).toBeVisible();
+    }
+
+    // Adding from the table view lands in the same list.
+    await ready
+      .getByRole("button", { name: "Add to Watch Later" })
+      .first()
+      .click();
+    await expect(ready.getByText("Added to Watch Later")).toBeVisible();
+    await railButton(ready).click();
+    await waitForIndexedMedia(ready);
+  });
+
   test("offers removal for a file already collected", async ({ ready }) => {
     await waitForIndexedMedia(ready);
-    await fileCard(ready).click({ button: "right" });
-    await ready.getByRole("menuitem", { name: "Add to Watch Later" }).click();
+    await fileCard(ready)
+      .getByRole("button", { name: "Add to Watch Later" })
+      .click();
     await expect(ready.getByText("Added to Watch Later")).toBeVisible();
 
-    await fileCard(ready).click({ button: "right" });
-    await ready
-      .getByRole("menuitem", { name: "Remove from Watch Later" })
+    await fileCard(ready)
+      .getByRole("button", { name: "Remove from Watch Later" })
       .click();
     await expect(ready.getByText("Removed from Watch Later")).toBeVisible();
   });

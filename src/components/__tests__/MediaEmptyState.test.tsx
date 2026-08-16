@@ -17,6 +17,6 @@ describe("MediaEmptyState", () => {
     expect(screen.getByText("Watch Later is empty.")).toBeTruthy();
     // A scan would never populate Watch Later, so that hint must not appear.
     expect(screen.queryByText(/Scan/i)).toBeNull();
-    expect(screen.getByText(/Add to Watch Later/)).toBeTruthy();
+    expect(screen.getByText(/clock icon/i)).toBeTruthy();
   });
 });

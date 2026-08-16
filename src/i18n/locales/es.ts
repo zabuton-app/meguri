@@ -410,7 +410,7 @@ export const es: Record<TranslationKey, string> = {
   "watchLater.actionFailed": "No se pudo actualizar Ver más tarde",
   "watchLater.empty": "Ver más tarde está vacío.",
   "watchLater.emptyHint":
-    "Haz clic derecho en cualquier medio y elige «Añadir a Ver más tarde» para reunirlo aquí. Los elementos salen de la lista al abrirlos.",
+    "Pulsa el icono de reloj en cualquier medio para reunirlo aquí. Los elementos salen de la lista al reproducirlos.",
 
   // icono de emoji
   "emoji.choose": "Elegir emoji",

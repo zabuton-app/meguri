@@ -387,7 +387,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "watchLater.actionFailed": "无法更新稍后观看",
   "watchLater.empty": "稍后观看是空的。",
   "watchLater.emptyHint":
-    "右键点击任意媒体并选择“添加到稍后观看”，即可收集到这里。打开后会自动从列表中移除。",
+    "点击媒体上的时钟图标，即可收集到这里。播放后会自动从列表中移除。",
 
   // 表情符号图标
   "emoji.choose": "选择表情符号",

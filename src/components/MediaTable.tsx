@@ -17,6 +17,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
@@ -343,6 +344,11 @@ const MediaTableRow = memo(function MediaTableRow({
           fileId={file.id}
           workspaceId={file.workspaceId}
           favorite={file.favorite}
+          size={14}
+        />
+        <WatchLaterButton
+          fileId={file.id}
+          workspaceId={file.workspaceId}
           size={14}
         />
         <RatingButton

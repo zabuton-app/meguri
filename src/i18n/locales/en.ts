@@ -400,7 +400,7 @@ export const en: Record<TranslationKey, string> = {
   "watchLater.actionFailed": "Could not update Watch Later",
   "watchLater.empty": "Watch Later is empty.",
   "watchLater.emptyHint":
-    "Right-click any media and choose “Add to Watch Later” to collect it here. Items leave the list once you open them.",
+    "Press the clock icon on any media to collect it here. Items leave the list once you play them.",
 
   // emoji icon
   "emoji.choose": "Choose emoji",

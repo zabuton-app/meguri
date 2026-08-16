@@ -237,11 +237,11 @@ describe("lock guards", () => {
   });
 });
 
-describe("removeFromWatchLater (auto-removal on open)", () => {
+describe("removeFromWatchLater (auto-removal on play)", () => {
   const itemsOf = (ws: InstanceType<typeof Workspaces>, id: string) =>
     ws.collections().find((c) => c.id === id)?.items ?? [];
 
-  it("drops the opened file from the list", () => {
+  it("drops the played file from the list", () => {
     const ws = new Workspaces();
     ws.addToCollection(WATCH_LATER_ID, "wsA", 1);
     ws.addToCollection(WATCH_LATER_ID, "wsA", 2);
@@ -291,7 +291,7 @@ describe("removeFromWatchLater (auto-removal on open)", () => {
   });
 
   it("lets a deliberate re-add after auto-removal stick", () => {
-    // Spec edge case: order decides the outcome. Auto-removal on open followed by
+    // Spec edge case: order decides the outcome. Auto-removal on play followed by
     // an explicit re-add (e.g. from the detail screen) must leave the file listed.
     const ws = new Workspaces();
     ws.addToCollection(WATCH_LATER_ID, "wsA", 1);

@@ -403,7 +403,7 @@ export const ja = {
   "watchLater.actionFailed": "後で見るの更新に失敗しました",
   "watchLater.empty": "後で見るは空です。",
   "watchLater.emptyHint":
-    "メディアを右クリックして「後で見るに追加」を選ぶと、ここに並びます。開いたものは自動的に外れます。",
+    "メディアの時計アイコンを押すと、ここに並びます。再生したものは自動的に外れます。",
 
   // 絵文字アイコン
   "emoji.choose": "絵文字を選択",
