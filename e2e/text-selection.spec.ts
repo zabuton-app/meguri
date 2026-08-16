@@ -74,10 +74,12 @@ test.describe("Text selection", () => {
 
   test("the About section stays selectable", async ({ ready }) => {
     const dialog = await openSettings(ready);
-    const version = dialog.getByText(/^Meguri Version /);
+    // about.version renders as "<app name> version <x.y.z>", and the app name is
+    // the brand glyph in every locale (app.name), not the romanized "Meguri".
+    const version = dialog.getByText(/^巡 version /);
     await expect(version).toHaveCSS("user-select", "text");
     await version.click({ clickCount: 3 });
-    expect(await selectedText(ready)).toContain("Meguri Version");
+    expect(await selectedText(ready)).toContain("巡 version");
   });
 
   test("error toasts stay selectable", async ({ ready }) => {
