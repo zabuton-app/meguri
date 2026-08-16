@@ -2,12 +2,18 @@
 // Mirrors FavoriteButton, except that the collection id and membership come from
 // the parent view via useWatchLater() — resolving them per row would give every
 // rendered card its own query observer and a linear scan of the collection.
+// It also plays the same control-local effect (burst on queue, settle on
+// unqueue); the trigger lives in local state set only inside the click handler,
+// so cache syncs from other views can never fire it (spec 009, FR-005).
+import { useState } from "react";
 import { Clock } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/ipc/client";
 import { invalidateCollectionSearches } from "@/lib/queryCache";
 import type { WatchLaterMembership } from "@/hooks/useWatchLater";
+import { BurstEffect } from "@/components/effects/BurstEffect";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 
@@ -31,6 +37,13 @@ export function WatchLaterButton({
   const { t } = useI18n();
   const qc = useQueryClient();
   const included = watchLater.has(workspaceId, fileId);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  // seq=0 means "never activated"; each activation remounts the animated
+  // wrapper via key so a running effect restarts cleanly (FR-008).
+  const [fx, setFx] = useState<{ seq: number; variant: "add" | "remove" }>({
+    seq: 0,
+    variant: "add",
+  });
 
   const toggle = useMutation({
     mutationFn: (next: boolean) => {
@@ -55,6 +68,8 @@ export function WatchLaterButton({
   });
 
   const label = included ? t("watchLater.remove") : t("watchLater.add");
+  const showFx = fx.seq > 0 && !prefersReducedMotion;
+
   return (
     <button
       type="button"
@@ -62,25 +77,47 @@ export function WatchLaterButton({
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        toggle.mutate(!included);
+        const next = !included;
+        setFx((f) => ({ seq: f.seq + 1, variant: next ? "add" : "remove" }));
+        toggle.mutate(next);
       }}
       disabled={toggle.isPending || !watchLater.id}
       aria-pressed={included}
       aria-label={label}
       title={label}
       className={cn(
-        "flex items-center justify-center transition-colors",
+        "relative flex items-center justify-center transition-colors",
         included ? "text-primary" : "text-muted hover:text-primary",
         className,
       )}
     >
-      <Clock
-        style={{ width: size, height: size }}
+      {/* Keys share fx.seq to restart on re-activation but must stay distinct
+          between siblings — equal sibling keys corrupt React's reconciliation
+          and leave stale DOM behind. */}
+      <span
+        key={`icon-${fx.seq}`}
         className={cn(
-          "transition-transform hover:scale-110",
-          included && "fill-current",
+          "flex",
+          showFx && (fx.variant === "add" ? "fx-pop" : "fx-settle"),
         )}
-      />
+      >
+        <Clock
+          style={{ width: size, height: size }}
+          className={cn(
+            "transition-transform hover:scale-110",
+            included && "fill-current",
+          )}
+        />
+      </span>
+      {showFx && fx.variant === "add" && (
+        // The burst is always in the queued color, independent of the button's
+        // current (pre-mutation) text color.
+        <BurstEffect
+          key={`burst-${fx.seq}`}
+          sizePx={size}
+          colorClass="text-primary"
+        />
+      )}
     </button>
   );
 }
