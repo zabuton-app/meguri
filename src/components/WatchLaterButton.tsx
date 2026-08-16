@@ -1,13 +1,13 @@
 // Watch Later toggle for list entries (grid card, list row, table row).
-// Self-contained like FavoriteButton: it resolves the built-in collection from
-// the workspace list, runs the add/remove mutation, and refreshes the caches
-// that show collection membership.
+// Mirrors FavoriteButton, except that the collection id and membership come from
+// the parent view via useWatchLater() — resolving them per row would give every
+// rendered card its own query observer and a linear scan of the collection.
 import { Clock } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/ipc/client";
 import { invalidateCollectionSearches } from "@/lib/queryCache";
-import { WATCH_LATER_ID } from "@shared/workspaceIds";
+import type { WatchLaterMembership } from "@/hooks/useWatchLater";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 
@@ -15,6 +15,8 @@ interface Props {
   fileId: number;
   /** Owning workspace ID (file IDs are unique only within a workspace). */
   workspaceId: string;
+  /** Shared membership lookup from the enclosing view. */
+  watchLater: WatchLaterMembership;
   size?: number;
   className?: string;
 }
@@ -22,25 +24,17 @@ interface Props {
 export function WatchLaterButton({
   fileId,
   workspaceId,
+  watchLater,
   size = 16,
   className,
 }: Props) {
   const { t } = useI18n();
   const qc = useQueryClient();
-  const workspaces = useQuery({
-    queryKey: ["workspaces_list"],
-    queryFn: api.workspacesList,
-  });
-  const watchLater =
-    workspaces.data?.collections.find((c) => c.id === WATCH_LATER_ID) ?? null;
-  const included =
-    watchLater?.items.some(
-      (item) => item.workspaceId === workspaceId && item.fileId === fileId,
-    ) ?? false;
+  const included = watchLater.has(workspaceId, fileId);
 
   const toggle = useMutation({
     mutationFn: (next: boolean) => {
-      if (!watchLater) return Promise.resolve();
+      if (!watchLater.id) return Promise.resolve();
       return next
         ? api.collectionAddFile(watchLater.id, fileId, workspaceId)
         : api.collectionRemoveFile(watchLater.id, fileId, workspaceId);
@@ -70,7 +64,7 @@ export function WatchLaterButton({
         e.stopPropagation();
         toggle.mutate(!included);
       }}
-      disabled={toggle.isPending || !watchLater}
+      disabled={toggle.isPending || !watchLater.id}
       aria-pressed={included}
       aria-label={label}
       title={label}

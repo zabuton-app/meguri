@@ -8,6 +8,10 @@ import { MediaEmptyState } from "@/components/MediaEmptyState";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
+import {
+  useWatchLater,
+  type WatchLaterMembership,
+} from "@/hooks/useWatchLater";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
@@ -73,6 +77,7 @@ export const MediaList = memo(function MediaList({
   watchLater = false,
 }: Props) {
   const navigate = useNavigate();
+  const watchLaterMembership = useWatchLater();
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const setScrollRef = useCallback((node: HTMLDivElement | null) => {
@@ -203,6 +208,7 @@ export const MediaList = memo(function MediaList({
               mediaBase={mediaBase}
               onTagClick={onTagClick}
               focused={vr.index === focusedIndex}
+              watchLater={watchLaterMembership}
             />
           </div>
         ))}
@@ -218,12 +224,14 @@ const MediaRow = memo(function MediaRow({
   mediaBase,
   onTagClick,
   focused,
+  watchLater,
 }: {
   file: FileRow;
   version: number;
   mediaBase: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  watchLater: WatchLaterMembership;
 }) {
   // The row is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
@@ -275,6 +283,7 @@ const MediaRow = memo(function MediaRow({
           <WatchLaterButton
             fileId={file.id}
             workspaceId={file.workspaceId}
+            watchLater={watchLater}
             size={16}
             className="shrink-0"
           />

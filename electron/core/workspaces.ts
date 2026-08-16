@@ -69,12 +69,27 @@ export class Workspaces {
   }
 
   /**
-   * Ensure the built-in "Watch Later" collection exists. Runs on every load
-   * rather than behind a one-time migration flag, so a config that was
-   * hand-edited (or written by an older build) self-heals on the next launch.
+   * Ensure the built-in "Watch Later" collection exists *and is locked*. Runs on
+   * every load rather than behind a one-time migration flag, so a config that
+   * was hand-edited self-heals on the next launch.
+   *
+   * The lock is repaired rather than assumed: an entry that kept its id but lost
+   * `locked` would pass the "already exists" check while `isLocked()` reported
+   * false, leaving the list renamable/removable/reorderable and breaking the
+   * guarantee this collection is supposed to carry.
    */
   private seedWatchLater(): void {
-    if (this.config.collections.some((c) => c.id === WATCH_LATER_ID)) return;
+    const existing = this.config.collections.find(
+      (c) => c.id === WATCH_LATER_ID,
+    );
+    if (existing) {
+      if (existing.locked !== true) {
+        existing.locked = true;
+        existing.updatedAt = nowUnix();
+        this.persist();
+      }
+      return;
+    }
     const now = nowUnix();
     this.config.collections.unshift({
       id: WATCH_LATER_ID,

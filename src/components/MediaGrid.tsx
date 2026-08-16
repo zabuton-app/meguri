@@ -5,6 +5,10 @@ import { Link, useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
+import {
+  useWatchLater,
+  type WatchLaterMembership,
+} from "@/hooks/useWatchLater";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { RatingButton } from "@/components/RatingButton";
@@ -77,6 +81,7 @@ export const MediaGrid = memo(function MediaGrid({
   watchLater = false,
 }: Props) {
   const navigate = useNavigate();
+  const watchLaterMembership = useWatchLater();
 
   // Scroll parent. Virtualization DOM-renders only the visible rows relative to this element.
   // Because the scroll element mounts later when transitioning from loading to data,
@@ -249,6 +254,7 @@ export const MediaGrid = memo(function MediaGrid({
                   mediaBase={mediaBase}
                   onTagClick={onTagClick}
                   focused={vr.index * cols + localIndex === focusedIndex}
+                  watchLater={watchLaterMembership}
                 />
               ))}
             </div>
@@ -267,12 +273,14 @@ const MediaCard = memo(function MediaCard({
   mediaBase,
   onTagClick,
   focused,
+  watchLater,
 }: {
   file: FileRow;
   version: number;
   mediaBase: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  watchLater: WatchLaterMembership;
 }) {
   // The card is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
@@ -313,6 +321,7 @@ const MediaCard = memo(function MediaCard({
         <WatchLaterButton
           fileId={file.id}
           workspaceId={file.workspaceId}
+          watchLater={watchLater}
           size={16}
           className="absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
         />

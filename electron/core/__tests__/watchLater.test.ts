@@ -70,6 +70,46 @@ describe("Watch Later seeding", () => {
     expect(watchLater?.items).toEqual([]);
   });
 
+  it("relocks an entry that kept its id but lost the locked flag", () => {
+    const first = new Workspaces();
+    first.addToCollection(WATCH_LATER_ID, "wsA", 1);
+
+    // Simulate a hand-edited config where `locked` was stripped. Without repair
+    // the entry passes the "already exists" check while isLocked() reports
+    // false, leaving it renamable/removable.
+    const config = loadConfig();
+    const watchLater = config.collections.find((c) => c.id === WATCH_LATER_ID)!;
+    delete watchLater.locked;
+    saveConfig(config);
+
+    const ws = new Workspaces();
+    const repaired = ws.collections().find((c) => c.id === WATCH_LATER_ID);
+    expect(repaired?.locked).toBe(true);
+    // The repair must not cost the user their queued files.
+    expect(repaired?.items).toEqual([
+      expect.objectContaining({ workspaceId: "wsA", fileId: 1 }),
+    ]);
+    // ...and the guards must actually take effect afterwards.
+    ws.renameCollection(WATCH_LATER_ID, "Renamed");
+    expect(
+      ws.collections().find((c) => c.id === WATCH_LATER_ID)?.name,
+    ).not.toBe("Renamed");
+  });
+
+  it("persists the repaired lock so it survives a reload", () => {
+    new Workspaces();
+    const config = loadConfig();
+    const watchLater = config.collections.find((c) => c.id === WATCH_LATER_ID)!;
+    delete watchLater.locked;
+    saveConfig(config);
+
+    new Workspaces();
+
+    expect(
+      loadConfig().collections.find((c) => c.id === WATCH_LATER_ID)?.locked,
+    ).toBe(true);
+  });
+
   it("keeps existing user collections and their contents untouched", () => {
     const first = new Workspaces();
     const mine = first.addCollection("Mine");

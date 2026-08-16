@@ -18,6 +18,10 @@ import { MediaEmptyState } from "@/components/MediaEmptyState";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
+import {
+  useWatchLater,
+  type WatchLaterMembership,
+} from "@/hooks/useWatchLater";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
@@ -91,6 +95,7 @@ export const MediaTable = memo(function MediaTable({
   watchLater = false,
 }: Props) {
   const { t } = useI18n();
+  const watchLaterMembership = useWatchLater();
   const navigate = useNavigate();
 
   // Capture the scroll viewport into state so we can measure its width (the
@@ -234,6 +239,7 @@ export const MediaTable = memo(function MediaTable({
               top={vr.start}
               onTagClick={onTagClick}
               focused={vr.index === focusedIndex}
+              watchLater={watchLaterMembership}
               onOpen={onRowOpen}
               t={t}
             />
@@ -264,6 +270,7 @@ const MediaTableRow = memo(function MediaTableRow({
   top,
   onTagClick,
   focused,
+  watchLater,
   onOpen,
   t,
 }: {
@@ -274,6 +281,7 @@ const MediaTableRow = memo(function MediaTableRow({
   top: number;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  watchLater: WatchLaterMembership;
   /** Opens the detail view. `autoplay=true` (thumbnail click) plays automatically. */
   onOpen: (index: number, autoplay: boolean) => void;
   t: TFunc;
@@ -349,6 +357,7 @@ const MediaTableRow = memo(function MediaTableRow({
         <WatchLaterButton
           fileId={file.id}
           workspaceId={file.workspaceId}
+          watchLater={watchLater}
           size={14}
         />
         <RatingButton
