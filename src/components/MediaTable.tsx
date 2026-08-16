@@ -14,9 +14,14 @@ import {
 } from "react";
 import { useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ImageIcon } from "lucide-react";
+import { MediaEmptyState } from "@/components/MediaEmptyState";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import {
+  useWatchLater,
+  type WatchLaterMembership,
+} from "@/hooks/useWatchLater";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
@@ -66,6 +71,8 @@ interface Props {
   isFetchingPreviousPage?: boolean;
   /** Whether keyboard focus navigation is active (list is foreground). */
   navActive?: boolean;
+  /** Whether the active view is the built-in Watch Later collection (changes empty-state copy). */
+  watchLater?: boolean;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -85,8 +92,10 @@ export const MediaTable = memo(function MediaTable({
   fetchPreviousPage,
   isFetchingPreviousPage,
   navActive = false,
+  watchLater = false,
 }: Props) {
   const { t } = useI18n();
+  const watchLaterMembership = useWatchLater();
   const navigate = useNavigate();
 
   // Capture the scroll viewport into state so we can measure its width (the
@@ -190,13 +199,7 @@ export const MediaTable = memo(function MediaTable({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
-        <ImageIcon className="size-10 opacity-50" />
-        <p>{t("grid.empty")}</p>
-        <p className="text-xs">{t("grid.emptyHint")}</p>
-      </div>
-    );
+    return <MediaEmptyState watchLater={watchLater} />;
   }
 
   return (
@@ -236,6 +239,7 @@ export const MediaTable = memo(function MediaTable({
               top={vr.start}
               onTagClick={onTagClick}
               focused={vr.index === focusedIndex}
+              watchLater={watchLaterMembership}
               onOpen={onRowOpen}
               t={t}
             />
@@ -266,6 +270,7 @@ const MediaTableRow = memo(function MediaTableRow({
   top,
   onTagClick,
   focused,
+  watchLater,
   onOpen,
   t,
 }: {
@@ -276,6 +281,7 @@ const MediaTableRow = memo(function MediaTableRow({
   top: number;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  watchLater: WatchLaterMembership;
   /** Opens the detail view. `autoplay=true` (thumbnail click) plays automatically. */
   onOpen: (index: number, autoplay: boolean) => void;
   t: TFunc;
@@ -346,6 +352,12 @@ const MediaTableRow = memo(function MediaTableRow({
           fileId={file.id}
           workspaceId={file.workspaceId}
           favorite={file.favorite}
+          size={14}
+        />
+        <WatchLaterButton
+          fileId={file.id}
+          workspaceId={file.workspaceId}
+          watchLater={watchLater}
           size={14}
         />
         <RatingButton

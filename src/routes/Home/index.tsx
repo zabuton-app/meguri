@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FolderPlus, Sparkles } from "lucide-react";
 import { api, events, ALL_ID, type ThumbDone } from "@/ipc/client";
+import { WATCH_LATER_ID } from "@shared/workspaceIds";
 import type { SearchQuery, UserCollection, WorkspaceInfo } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { MediaGrid } from "@/components/MediaGrid";
@@ -522,6 +523,7 @@ export default function Home() {
             fetchPreviousPage={fetchPreviousPage}
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
+            watchLater={activeCollection?.id === WATCH_LATER_ID}
           />
         ) : view === "table" ? (
           <MediaTable
@@ -539,6 +541,7 @@ export default function Home() {
             fetchPreviousPage={fetchPreviousPage}
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
+            watchLater={activeCollection?.id === WATCH_LATER_ID}
           />
         ) : (
           <MediaGrid
@@ -556,6 +559,7 @@ export default function Home() {
             fetchPreviousPage={fetchPreviousPage}
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
+            watchLater={activeCollection?.id === WATCH_LATER_ID}
           />
         )}
       </main>

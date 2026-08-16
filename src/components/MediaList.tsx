@@ -4,9 +4,14 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ImageIcon } from "lucide-react";
+import { MediaEmptyState } from "@/components/MediaEmptyState";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import {
+  useWatchLater,
+  type WatchLaterMembership,
+} from "@/hooks/useWatchLater";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
@@ -16,7 +21,6 @@ import { cn } from "@/lib/utils";
 import { formatDuration, formatSize } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
 import { fileNameOf } from "@/lib/relPath";
-import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
@@ -49,6 +53,8 @@ interface Props {
   isFetchingPreviousPage?: boolean;
   /** Whether keyboard focus navigation is active (list is foreground). */
   navActive?: boolean;
+  /** Whether the active view is the built-in Watch Later collection (changes empty-state copy). */
+  watchLater?: boolean;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -68,9 +74,10 @@ export const MediaList = memo(function MediaList({
   fetchPreviousPage,
   isFetchingPreviousPage,
   navActive = false,
+  watchLater = false,
 }: Props) {
-  const { t } = useI18n();
   const navigate = useNavigate();
+  const watchLaterMembership = useWatchLater();
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const setScrollRef = useCallback((node: HTMLDivElement | null) => {
@@ -168,13 +175,7 @@ export const MediaList = memo(function MediaList({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
-        <ImageIcon className="size-10 opacity-50" />
-        <p>{t("grid.empty")}</p>
-        <p className="text-xs">{t("grid.emptyHint")}</p>
-      </div>
-    );
+    return <MediaEmptyState watchLater={watchLater} />;
   }
 
   return (
@@ -207,6 +208,7 @@ export const MediaList = memo(function MediaList({
               mediaBase={mediaBase}
               onTagClick={onTagClick}
               focused={vr.index === focusedIndex}
+              watchLater={watchLaterMembership}
             />
           </div>
         ))}
@@ -222,12 +224,14 @@ const MediaRow = memo(function MediaRow({
   mediaBase,
   onTagClick,
   focused,
+  watchLater,
 }: {
   file: FileRow;
   version: number;
   mediaBase: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  watchLater: WatchLaterMembership;
 }) {
   // The row is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
@@ -273,6 +277,13 @@ const MediaRow = memo(function MediaRow({
             fileId={file.id}
             workspaceId={file.workspaceId}
             favorite={file.favorite}
+            size={16}
+            className="shrink-0"
+          />
+          <WatchLaterButton
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            watchLater={watchLater}
             size={16}
             className="shrink-0"
           />

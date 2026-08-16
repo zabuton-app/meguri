@@ -277,6 +277,50 @@ describe("Home + MediaDetail integration", () => {
     });
   });
 
+  // FR-014: the detail screen's existing collection dropdown lists all collections,
+  // so the seeded Watch Later shows up there alongside user collections with no
+  // extra wiring. Locked in here so a future filter can't silently drop it.
+  it("lists Watch Later in the detail view's collection menu", async () => {
+    mocks.workspacesList.mockResolvedValue({
+      ...defaultWorkspacesList,
+      collections: [
+        {
+          id: "watch-later",
+          name: "Watch Later",
+          emoji: "🕒",
+          active: false,
+          items: [],
+          createdAt: 0,
+          updatedAt: 0,
+          locked: true,
+        },
+      ],
+    });
+    renderWithProviders(<AppRoutes />, { route: `/file/1?ws=${WS_ID}` });
+
+    fireEvent.pointerDown(await screen.findByLabelText("Add to collection"), {
+      button: 0,
+      ctrlKey: false,
+      pointerType: "mouse",
+    });
+
+    expect(await screen.findByText('Add to "Watch Later"')).toBeTruthy();
+  });
+
+  // Watch Later removal rides on "a play was recorded" (see consumeWatchLater in
+  // electron/main.ts). Merely opening a video's detail must not record one, or
+  // queueing something and peeking at its metadata would silently consume it.
+  it("does not record a play when only opening a video detail", async () => {
+    renderWithProviders(<AppRoutes />, {
+      route: `/file/1?ws=${WS_ID}&autoplay=0`,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
+    });
+    expect(mocks.fileRecordPlay).not.toHaveBeenCalled();
+  });
+
   it("records a play when opening an image detail", async () => {
     mocks.fileGet.mockResolvedValue({
       ...sampleFileDetail,

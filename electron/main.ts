@@ -366,6 +366,23 @@ function coreById(wsId: string): Core {
   return core;
 }
 
+/**
+ * Take a file off Watch Later because it has now been played. Called wherever a
+ * play is recorded — the in-app player's first `play` event, opening in an
+ * external player, and an image's detail view (images have no player, so the
+ * app already counts a view as a play). Merely opening the detail view of a
+ * video does not reach here, so queueing something and peeking at its metadata
+ * leaves it on the list.
+ *
+ * Deliberately no workspace:changed broadcast: that would refetch the list
+ * behind the open detail view, dropping the very file being viewed out of the
+ * prev/next navigation order mid-session. The renderer refreshes the affected
+ * lists when the detail view closes instead (see MediaDetail).
+ */
+function consumeWatchLater(workspaceId: string, id: number): void {
+  ws.removeFromWatchLater(workspaceId, id);
+}
+
 /** Resolve a file's absolute path and verify it lives under the workspace root. */
 function ensureFileInsideRoot(c: Core, id: number): string {
   const abs = tags.absPathOf(c.db, id);
@@ -489,7 +506,8 @@ function registerWorkspaceHandlers(): void {
     const collection = ws.addCollection(name, emoji);
     emit("workspace:changed", { activeId: ws.activeId });
     // addCollection makes the new collection active, so it's always the active one here.
-    return { ...collection, active: true };
+    // User-created collections are never locked; only the built-in Watch Later is.
+    return { ...collection, active: true, locked: false };
   });
 
   handle("collection_remove", ({ id }) => {
@@ -600,9 +618,10 @@ function registerFileHandlers(): void {
     }
     return deleted;
   });
-  handle("file_record_play", ({ id, workspaceId, via, position }) =>
-    q.recordPlay(coreById(workspaceId).db, id, via, position ?? null),
-  );
+  handle("file_record_play", ({ id, workspaceId, via, position }) => {
+    q.recordPlay(coreById(workspaceId).db, id, via, position ?? null);
+    consumeWatchLater(workspaceId, id);
+  });
   // A collection is a file set, not a history scope; while one is active (queryCores()
   // returns []) fall back to every workspace so the timeline is still meaningful.
   const historyCores = () =>
@@ -823,6 +842,7 @@ function registerShellHandlers(): void {
     const abs = ensureFileInsideRoot(c, id);
     openDetached(abs);
     q.recordPlay(c.db, id, "external", null);
+    consumeWatchLater(workspaceId, id);
   });
 
   handle("open_folder", ({ id, workspaceId }) => {

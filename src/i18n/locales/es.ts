@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const es: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "Cerrar",
   "common.cancel": "Cancelar",
@@ -69,8 +72,8 @@ export const es: Record<TranslationKey, string> = {
   "update.checkFailed": "No se pudo comprobar (puede que estés sin conexión).",
   "update.upToDate": "Estás al día ({version}).",
   "settings.about": "Acerca de",
-  "about.version": "Versión {version}",
-  "about.appLicense": "Meguri se publica bajo la licencia MIT.",
+  "about.version": "{name} versión {version}",
+  "about.appLicense": "{name} se publica bajo la licencia MIT.",
   "about.ossTitle": "Licencias de código abierto",
   "about.ossDesc":
     "Esta aplicación incluye el siguiente software de código abierto.",
@@ -400,6 +403,17 @@ export const es: Record<TranslationKey, string> = {
   "collection.addedToast": "Añadido a «{name}»",
   "collection.removedFromToast": "Quitado de «{name}»",
   "collection.actionFailed": "No se pudo actualizar la colección",
+
+  // Ver más tarde (colección integrada)
+  "watchLater.name": "Ver más tarde",
+  "watchLater.add": "Añadir a Ver más tarde",
+  "watchLater.remove": "Quitar de Ver más tarde",
+  "watchLater.addedToast": "Añadido a Ver más tarde",
+  "watchLater.removedToast": "Quitado de Ver más tarde",
+  "watchLater.actionFailed": "No se pudo actualizar Ver más tarde",
+  "watchLater.empty": "Ver más tarde está vacío.",
+  "watchLater.emptyHint":
+    "Pulsa el icono de reloj en cualquier medio para reunirlo aquí. Los elementos salen de la lista al reproducirlos.",
 
   // icono de emoji
   "emoji.choose": "Elegir emoji",

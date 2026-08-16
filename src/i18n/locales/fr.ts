@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const fr: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "Fermer",
   "common.cancel": "Annuler",
@@ -69,8 +72,8 @@ export const fr: Record<TranslationKey, string> = {
     "Impossible de vérifier (vous êtes peut-être hors ligne).",
   "update.upToDate": "Vous êtes à jour ({version}).",
   "settings.about": "À propos",
-  "about.version": "Version {version}",
-  "about.appLicense": "Meguri est publié sous licence MIT.",
+  "about.version": "{name} version {version}",
+  "about.appLicense": "{name} est publié sous licence MIT.",
   "about.ossTitle": "Licences open source",
   "about.ossDesc":
     "Cette application inclut les logiciels open source suivants.",
@@ -400,6 +403,17 @@ export const fr: Record<TranslationKey, string> = {
   "collection.addedToast": "Ajouté à « {name} »",
   "collection.removedFromToast": "Retiré de « {name} »",
   "collection.actionFailed": "Impossible de mettre à jour la collection",
+
+  // À regarder plus tard (collection intégrée)
+  "watchLater.name": "À regarder plus tard",
+  "watchLater.add": "Ajouter à À regarder plus tard",
+  "watchLater.remove": "Retirer de À regarder plus tard",
+  "watchLater.addedToast": "Ajouté à À regarder plus tard",
+  "watchLater.removedToast": "Retiré de À regarder plus tard",
+  "watchLater.actionFailed": "Impossible de mettre à jour À regarder plus tard",
+  "watchLater.empty": "À regarder plus tard est vide.",
+  "watchLater.emptyHint":
+    "Appuyez sur l’icône d’horloge d’un média pour le retrouver ici. Les éléments quittent la liste dès que vous les lisez.",
 
   // icône emoji
   "emoji.choose": "Choisir un emoji",

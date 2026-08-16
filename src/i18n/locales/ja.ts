@@ -1,6 +1,9 @@
 // 日本語カタログ（原典）。キーはドット区切りのフラット構造。
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
+  // アプリ名（表示名の漢字1文字。ガイドライン00）
+  "app.name": "巡",
+
   // 共通
   "common.close": "閉じる",
   "common.cancel": "キャンセル",
@@ -67,8 +70,8 @@ export const ja = {
     "確認できませんでした（オフラインの可能性があります）。",
   "update.upToDate": "最新です（{version}）。",
   "settings.about": "このアプリについて",
-  "about.version": "バージョン {version}",
-  "about.appLicense": "Meguri は MIT License の下で公開されています。",
+  "about.version": "{name} バージョン {version}",
+  "about.appLicense": "{name}は MIT License の下で公開されています。",
   "about.ossTitle": "オープンソースライセンス",
   "about.ossDesc": "本アプリは以下のオープンソースソフトウェアを含んでいます。",
   "about.ffmpegNotice":
@@ -393,6 +396,17 @@ export const ja = {
   "collection.addedToast": "「{name}」に追加しました",
   "collection.removedFromToast": "「{name}」から削除しました",
   "collection.actionFailed": "コレクションの更新に失敗しました",
+
+  // 後で見る（組み込みコレクション）
+  "watchLater.name": "後で見る",
+  "watchLater.add": "後で見るに追加",
+  "watchLater.remove": "後で見るから削除",
+  "watchLater.addedToast": "後で見るに追加しました",
+  "watchLater.removedToast": "後で見るから削除しました",
+  "watchLater.actionFailed": "後で見るの更新に失敗しました",
+  "watchLater.empty": "後で見るは空です。",
+  "watchLater.emptyHint":
+    "メディアの時計アイコンを押すと、ここに並びます。再生したものは自動的に外れます。",
 
   // 絵文字アイコン
   "emoji.choose": "絵文字を選択",

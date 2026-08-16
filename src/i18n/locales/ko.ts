@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const ko: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "닫기",
   "common.cancel": "취소",
@@ -65,8 +68,8 @@ export const ko: Record<TranslationKey, string> = {
   "update.checkFailed": "확인할 수 없습니다(오프라인일 수 있습니다).",
   "update.upToDate": "최신 버전입니다 ({version}).",
   "settings.about": "정보",
-  "about.version": "버전 {version}",
-  "about.appLicense": "Meguri는 MIT License로 공개되어 있습니다.",
+  "about.version": "{name} 버전 {version}",
+  "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
   "about.ossTitle": "오픈소스 라이선스",
   "about.ossDesc": "이 앱은 다음 오픈소스 소프트웨어를 포함합니다.",
   "about.ffmpegNotice":
@@ -389,6 +392,17 @@ export const ko: Record<TranslationKey, string> = {
   "collection.addedToast": "「{name}」에 추가했습니다",
   "collection.removedFromToast": "「{name}」에서 삭제했습니다",
   "collection.actionFailed": "컬렉션을 업데이트하지 못했습니다",
+
+  // 나중에 볼 동영상 (기본 제공 컬렉션)
+  "watchLater.name": "나중에 보기",
+  "watchLater.add": "나중에 보기에 추가",
+  "watchLater.remove": "나중에 보기에서 삭제",
+  "watchLater.addedToast": "나중에 보기에 추가했습니다",
+  "watchLater.removedToast": "나중에 보기에서 삭제했습니다",
+  "watchLater.actionFailed": "나중에 보기를 업데이트하지 못했습니다",
+  "watchLater.empty": "나중에 보기가 비어 있습니다.",
+  "watchLater.emptyHint":
+    "미디어의 시계 아이콘을 누르면 여기에 모입니다. 재생한 항목은 목록에서 자동으로 빠집니다.",
 
   // 이모지 아이콘
   "emoji.choose": "이모지 선택",

@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const en: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "Close",
   "common.cancel": "Cancel",
@@ -68,8 +71,8 @@ export const en: Record<TranslationKey, string> = {
   "update.checkFailed": "Couldn't check (you may be offline).",
   "update.upToDate": "You're up to date ({version}).",
   "settings.about": "About",
-  "about.version": "Version {version}",
-  "about.appLicense": "Meguri is released under the MIT License.",
+  "about.version": "{name} version {version}",
+  "about.appLicense": "{name} is released under the MIT License.",
   "about.ossTitle": "Open-source licenses",
   "about.ossDesc": "This app includes the following open-source software.",
   "about.ffmpegNotice":
@@ -390,6 +393,17 @@ export const en: Record<TranslationKey, string> = {
   "collection.addedToast": 'Added to "{name}"',
   "collection.removedFromToast": 'Removed from "{name}"',
   "collection.actionFailed": "Could not update collection",
+
+  // Watch Later (built-in collection)
+  "watchLater.name": "Watch Later",
+  "watchLater.add": "Add to Watch Later",
+  "watchLater.remove": "Remove from Watch Later",
+  "watchLater.addedToast": "Added to Watch Later",
+  "watchLater.removedToast": "Removed from Watch Later",
+  "watchLater.actionFailed": "Could not update Watch Later",
+  "watchLater.empty": "Watch Later is empty.",
+  "watchLater.emptyHint":
+    "Press the clock icon on any media to collect it here. Items leave the list once you play them.",
 
   // emoji icon
   "emoji.choose": "Choose emoji",

@@ -47,6 +47,12 @@ export interface UserCollectionConfig {
   items: UserCollectionItemConfig[];
   createdAt: number;
   updatedAt: number;
+  /**
+   * Built-in collections (currently only "Watch Later") set this. Locked
+   * collections can still gain and lose files, but cannot be removed, renamed,
+   * reordered, or re-iconed. Absent/false on every user-created collection.
+   */
+  locked?: boolean;
 }
 
 function configPath(): string {
@@ -195,6 +201,7 @@ function parseCollections(value: unknown): UserCollectionConfig[] {
       items,
       createdAt: typeof c.createdAt === "number" ? c.createdAt : 0,
       updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : 0,
+      ...(c.locked === true ? { locked: true } : {}),
     });
   }
   return out;

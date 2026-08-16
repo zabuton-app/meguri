@@ -221,6 +221,25 @@ export default function MediaDetail() {
     queryFn: api.workspacesList,
   });
   const collections = workspaces.data?.collections ?? [];
+  // Opening a file drops it from Watch Later in the main process, but the main
+  // process deliberately stays quiet about it so the list doesn't shift while
+  // the user is stepping through it with prev/next. Flush the affected caches
+  // once, when the detail view closes — this component stays mounted across
+  // prev/next, so by then every file viewed this session has left the list.
+  //
+  // Done unconditionally rather than only when the file looked like a Watch
+  // Later entry: the only evidence available here is the workspaces_list cache,
+  // which may already have been refetched *after* the main process removed the
+  // entry, leaving no trace that it was ever there. Guessing from it silently
+  // skips the flush and strands the viewed file in the list. The cost is one
+  // refetch on close, and invalidateCollectionSearches only touches
+  // collection-scoped searches, not the workspace lists.
+  useEffect(() => {
+    return () => {
+      void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
+      invalidateCollectionSearches(qc);
+    };
+  }, [qc]);
   const owningWorkspace = useMemo(
     () => workspaces.data?.workspaces.find((w) => w.id === wsId) ?? null,
     [workspaces.data?.workspaces, wsId],
@@ -676,6 +695,10 @@ export default function MediaDetail() {
                 className="min-w-44 border border-muted/35 bg-surface p-0"
               >
                 <DropdownMenuGroup>
+                  {/* Kept as a guard for a not-yet-loaded/failed workspaces_list
+                      query. In practice the list is never empty at rest: the
+                      built-in Watch Later collection is always seeded, and it
+                      shows up in this menu like any other collection. */}
                   {collections.length === 0 ? (
                     <DropdownMenuItem
                       disabled

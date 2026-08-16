@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const zhCN: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "关闭",
   "common.cancel": "取消",
@@ -64,8 +67,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "update.checkFailed": "无法检查（可能处于离线状态）。",
   "update.upToDate": "已是最新版本（{version}）。",
   "settings.about": "关于",
-  "about.version": "版本 {version}",
-  "about.appLicense": "Meguri 基于 MIT License 发布。",
+  "about.version": "{name} 版本 {version}",
+  "about.appLicense": "{name} 基于 MIT License 发布。",
   "about.ossTitle": "开源许可证",
   "about.ossDesc": "本应用包含以下开源软件。",
   "about.ffmpegNotice":
@@ -377,6 +380,17 @@ export const zhCN: Record<TranslationKey, string> = {
   "collection.addedToast": "已添加到“{name}”",
   "collection.removedFromToast": "已从“{name}”移除",
   "collection.actionFailed": "无法更新收藏",
+
+  // 稍后观看（内置收藏）
+  "watchLater.name": "稍后观看",
+  "watchLater.add": "添加到稍后观看",
+  "watchLater.remove": "从稍后观看中移除",
+  "watchLater.addedToast": "已添加到稍后观看",
+  "watchLater.removedToast": "已从稍后观看中移除",
+  "watchLater.actionFailed": "无法更新稍后观看",
+  "watchLater.empty": "稍后观看是空的。",
+  "watchLater.emptyHint":
+    "点击媒体上的时钟图标，即可收集到这里。播放后会自动从列表中移除。",
 
   // 表情符号图标
   "emoji.choose": "选择表情符号",
