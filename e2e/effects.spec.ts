@@ -30,6 +30,25 @@ test("favorite add bursts at the card heart; remove settles without particles", 
   await expect(ready.locator(BURST)).toHaveCount(0);
 });
 
+test("watch later add bursts at the card clock; remove settles without particles", async ({
+  ready,
+}) => {
+  const card = fileCard(ready);
+
+  await card.getByRole("button", { name: "Add to Watch Later" }).click();
+  await expect(card.locator(BURST)).toBeVisible();
+  await expect(card.locator(".fx-pop")).toHaveCount(1);
+  await expect(
+    card.getByRole("button", { name: "Remove from Watch Later" }),
+  ).toBeVisible();
+  // The burst removes itself once the animation finishes.
+  await expect(ready.locator(BURST)).toHaveCount(0);
+
+  await card.getByRole("button", { name: "Remove from Watch Later" }).click();
+  await expect(card.locator(".fx-settle")).toHaveCount(1);
+  await expect(ready.locator(BURST)).toHaveCount(0);
+});
+
 test("effect plays only at the activated control, not on other views of the same file", async ({
   ready,
 }) => {
@@ -54,9 +73,9 @@ test("rapid re-activation restarts the effect instead of stacking overlays", asy
   }
 
   expect(await ready.locator(BURST).count()).toBeLessThanOrEqual(1);
-  expect(
-    await card.locator(".fx-pop, .fx-settle").count(),
-  ).toBeLessThanOrEqual(1);
+  expect(await card.locator(".fx-pop, .fx-settle").count()).toBeLessThanOrEqual(
+    1,
+  );
 });
 
 test("rating set staggers pops up to the chosen star and bursts there; clear settles", async ({
