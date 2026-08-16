@@ -87,8 +87,12 @@ export function AboutSection() {
             {t("settings.about")}
           </span>
           <span className="text-xs text-muted">
-            Meguri
-            {info ? ` ${t("about.version", { version: info.version })}` : ""}
+            {info
+              ? t("about.version", {
+                  name: t("app.name"),
+                  version: info.version,
+                })
+              : t("app.name")}
           </span>
           {info && (
             <span className="text-xs text-muted">
@@ -110,7 +114,7 @@ export function AboutSection() {
 
       {/* App license */}
       <p className="text-xs text-muted">
-        {t("about.appLicense")}{" "}
+        {t("about.appLicense", { name: t("app.name") })}{" "}
         <button
           type="button"
           className="cursor-pointer underline hover:text-fg"

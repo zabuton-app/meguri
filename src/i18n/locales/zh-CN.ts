@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const zhCN: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "关闭",
   "common.cancel": "取消",
@@ -64,8 +67,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "update.checkFailed": "无法检查（可能处于离线状态）。",
   "update.upToDate": "已是最新版本（{version}）。",
   "settings.about": "关于",
-  "about.version": "版本 {version}",
-  "about.appLicense": "Meguri 基于 MIT License 发布。",
+  "about.version": "{name} 版本 {version}",
+  "about.appLicense": "{name} 基于 MIT License 发布。",
   "about.ossTitle": "开源许可证",
   "about.ossDesc": "本应用包含以下开源软件。",
   "about.ffmpegNotice":

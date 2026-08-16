@@ -1,6 +1,9 @@
 // 日本語カタログ（原典）。キーはドット区切りのフラット構造。
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
+  // アプリ名（表示名の漢字1文字。ガイドライン00）
+  "app.name": "巡",
+
   // 共通
   "common.close": "閉じる",
   "common.cancel": "キャンセル",
@@ -67,8 +70,8 @@ export const ja = {
     "確認できませんでした（オフラインの可能性があります）。",
   "update.upToDate": "最新です（{version}）。",
   "settings.about": "このアプリについて",
-  "about.version": "バージョン {version}",
-  "about.appLicense": "Meguri は MIT License の下で公開されています。",
+  "about.version": "{name} バージョン {version}",
+  "about.appLicense": "{name}は MIT License の下で公開されています。",
   "about.ossTitle": "オープンソースライセンス",
   "about.ossDesc": "本アプリは以下のオープンソースソフトウェアを含んでいます。",
   "about.ffmpegNotice":

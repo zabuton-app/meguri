@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const fr: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "Fermer",
   "common.cancel": "Annuler",
@@ -69,8 +72,8 @@ export const fr: Record<TranslationKey, string> = {
     "Impossible de vérifier (vous êtes peut-être hors ligne).",
   "update.upToDate": "Vous êtes à jour ({version}).",
   "settings.about": "À propos",
-  "about.version": "Version {version}",
-  "about.appLicense": "Meguri est publié sous licence MIT.",
+  "about.version": "{name} version {version}",
+  "about.appLicense": "{name} est publié sous licence MIT.",
   "about.ossTitle": "Licences open source",
   "about.ossDesc":
     "Cette application inclut les logiciels open source suivants.",
