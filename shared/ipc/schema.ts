@@ -257,6 +257,12 @@ export const UserCollectionSchema = z.object({
   items: z.array(UserCollectionItemSchema),
   createdAt: z.number(),
   updatedAt: z.number(),
+  /**
+   * True for built-in collections ("Watch Later"), which cannot be removed,
+   * renamed, reordered, or re-iconed. The renderer uses this to hide those
+   * affordances; the main process enforces it independently.
+   */
+  locked: z.boolean(),
 });
 export type UserCollection = z.infer<typeof UserCollectionSchema>;
 

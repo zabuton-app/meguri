@@ -378,6 +378,17 @@ export const zhCN: Record<TranslationKey, string> = {
   "collection.removedFromToast": "已从“{name}”移除",
   "collection.actionFailed": "无法更新收藏",
 
+  // 稍后观看（内置收藏）
+  "watchLater.name": "稍后观看",
+  "watchLater.add": "添加到稍后观看",
+  "watchLater.remove": "从稍后观看中移除",
+  "watchLater.addedToast": "已添加到稍后观看",
+  "watchLater.removedToast": "已从稍后观看中移除",
+  "watchLater.actionFailed": "无法更新稍后观看",
+  "watchLater.empty": "稍后观看是空的。",
+  "watchLater.emptyHint":
+    "右键点击任意媒体并选择“添加到稍后观看”，即可收集到这里。打开后会自动从列表中移除。",
+
   // 表情符号图标
   "emoji.choose": "选择表情符号",
   "emoji.remove": "移除表情符号",

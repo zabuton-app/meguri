@@ -390,6 +390,17 @@ export const ko: Record<TranslationKey, string> = {
   "collection.removedFromToast": "「{name}」에서 삭제했습니다",
   "collection.actionFailed": "컬렉션을 업데이트하지 못했습니다",
 
+  // 나중에 볼 동영상 (기본 제공 컬렉션)
+  "watchLater.name": "나중에 보기",
+  "watchLater.add": "나중에 보기에 추가",
+  "watchLater.remove": "나중에 보기에서 삭제",
+  "watchLater.addedToast": "나중에 보기에 추가했습니다",
+  "watchLater.removedToast": "나중에 보기에서 삭제했습니다",
+  "watchLater.actionFailed": "나중에 보기를 업데이트하지 못했습니다",
+  "watchLater.empty": "나중에 보기가 비어 있습니다.",
+  "watchLater.emptyHint":
+    "미디어를 마우스 오른쪽 버튼으로 클릭하고 ‘나중에 보기에 추가’를 선택하면 여기에 모입니다. 열어 본 항목은 목록에서 자동으로 빠집니다.",
+
   // 이모지 아이콘
   "emoji.choose": "이모지 선택",
   "emoji.remove": "이모지 삭제",

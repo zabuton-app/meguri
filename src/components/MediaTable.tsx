@@ -14,7 +14,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ImageIcon } from "lucide-react";
+import { MediaEmptyState } from "@/components/MediaEmptyState";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { RatingButton } from "@/components/RatingButton";
@@ -66,6 +66,8 @@ interface Props {
   isFetchingPreviousPage?: boolean;
   /** Whether keyboard focus navigation is active (list is foreground). */
   navActive?: boolean;
+  /** Whether the active view is the built-in Watch Later collection (changes empty-state copy). */
+  watchLater?: boolean;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -85,6 +87,7 @@ export const MediaTable = memo(function MediaTable({
   fetchPreviousPage,
   isFetchingPreviousPage,
   navActive = false,
+  watchLater = false,
 }: Props) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -190,13 +193,7 @@ export const MediaTable = memo(function MediaTable({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
-        <ImageIcon className="size-10 opacity-50" />
-        <p>{t("grid.empty")}</p>
-        <p className="text-xs">{t("grid.emptyHint")}</p>
-      </div>
-    );
+    return <MediaEmptyState watchLater={watchLater} />;
   }
 
   return (

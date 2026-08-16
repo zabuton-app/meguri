@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  Clock,
   Folder,
   FolderPlus,
   HelpCircle,
@@ -51,6 +52,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { WATCH_LATER_ID } from "@shared/workspaceIds";
 import { cn } from "@/lib/utils";
 import { openCommandMenu, openShortcuts } from "@/lib/ui-events";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
@@ -172,7 +174,13 @@ export function WorkspaceRail() {
     onError: invalidateListOnly,
   });
   const list = workspaces.data?.workspaces ?? [];
-  const collections = workspaces.data?.collections ?? [];
+  const allCollections = workspaces.data?.collections ?? [];
+  // Built-in "Watch Later" is pinned right below "All" and never takes part in
+  // reordering; only user-created collections are draggable. Matched by ID, not
+  // by the generic `locked` flag, so it stays the one entry rendered here even
+  // if other locked collections ever exist.
+  const watchLater = allCollections.find((c) => c.id === WATCH_LATER_ID);
+  const collections = allCollections.filter((c) => c.id !== WATCH_LATER_ID);
   const allWorkspace = list.find((w) => w.id === ALL_ID);
   const realWorkspaces = list.filter((w) => w.id !== ALL_ID);
   // Only real workspaces are draggable; the virtual "All" stays pinned at the top.
@@ -207,7 +215,10 @@ export function WorkspaceRail() {
         const reordered = nextIds
           .map((id) => byId.get(id))
           .filter((c): c is UserCollection => !!c);
-        return { ...prev, collections: reordered };
+        // Watch Later isn't part of `nextIds`; keep it pinned in front instead
+        // of dropping it from the cache.
+        const pinned = prev.collections.filter((c) => c.id === WATCH_LATER_ID);
+        return { ...prev, collections: [...pinned, ...reordered] };
       });
       reorderCollections.mutate(nextIds);
       return;
@@ -270,6 +281,16 @@ export function WorkspaceRail() {
                   workspace={allWorkspace}
                   onClick={() => {
                     if (!allWorkspace.active) switchTo.mutate(allWorkspace.id);
+                  }}
+                  t={t}
+                />
+              )}
+              {watchLater && (
+                <WatchLaterButton
+                  collection={watchLater}
+                  onClick={() => {
+                    if (!watchLater.active)
+                      switchTo.mutate(collectionTarget(watchLater.id));
                   }}
                   t={t}
                 />
@@ -401,6 +422,44 @@ export function WorkspaceRail() {
         onCreated={() => void refreshAll()}
       />
     </>
+  );
+}
+
+/**
+ * The built-in "Watch Later" collection. Deliberately not a `CollectionButton`:
+ * it is not sortable and carries none of the remove/edit affordances, since it
+ * cannot be deleted, renamed, reordered, or re-iconed. Its label comes from i18n
+ * rather than the stored name so it follows the UI language.
+ */
+function WatchLaterButton({
+  collection,
+  onClick,
+  t,
+}: {
+  collection: UserCollection;
+  onClick: () => void;
+  t: TFunc;
+}) {
+  const label = t("watchLater.name");
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${label} (${collection.items.length})`}
+      aria-label={label}
+      className={cn(
+        "flex size-11 shrink-0 items-center justify-center text-sm font-semibold transition",
+        collection.active
+          ? "rounded-xl bg-primary text-primary-foreground ring-2 ring-fg/40"
+          : "rounded-2xl bg-surface text-fg hover:rounded-xl hover:bg-overlay",
+      )}
+    >
+      {collection.emoji ? (
+        <span className="text-xl leading-none">{collection.emoji}</span>
+      ) : (
+        <Clock className={cn("size-5", collection.active && "fill-current")} />
+      )}
+    </button>
   );
 }
 

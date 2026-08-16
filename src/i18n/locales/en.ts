@@ -391,6 +391,17 @@ export const en: Record<TranslationKey, string> = {
   "collection.removedFromToast": 'Removed from "{name}"',
   "collection.actionFailed": "Could not update collection",
 
+  // Watch Later (built-in collection)
+  "watchLater.name": "Watch Later",
+  "watchLater.add": "Add to Watch Later",
+  "watchLater.remove": "Remove from Watch Later",
+  "watchLater.addedToast": "Added to Watch Later",
+  "watchLater.removedToast": "Removed from Watch Later",
+  "watchLater.actionFailed": "Could not update Watch Later",
+  "watchLater.empty": "Watch Later is empty.",
+  "watchLater.emptyHint":
+    "Right-click any media and choose “Add to Watch Later” to collect it here. Items leave the list once you open them.",
+
   // emoji icon
   "emoji.choose": "Choose emoji",
   "emoji.remove": "Remove emoji",

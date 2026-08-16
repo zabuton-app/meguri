@@ -489,7 +489,8 @@ function registerWorkspaceHandlers(): void {
     const collection = ws.addCollection(name, emoji);
     emit("workspace:changed", { activeId: ws.activeId });
     // addCollection makes the new collection active, so it's always the active one here.
-    return { ...collection, active: true };
+    // User-created collections are never locked; only the built-in Watch Later is.
+    return { ...collection, active: true, locked: false };
   });
 
   handle("collection_remove", ({ id }) => {
@@ -579,6 +580,15 @@ function registerFileHandlers(): void {
   handle("file_get", ({ id, workspaceId }) => {
     const db = coreById(workspaceId).db;
     q.recordAccess(db, id);
+    // Opening a file is what marks it "watched", so it leaves Watch Later here.
+    // This fires wherever the file was opened from (Watch Later itself, another
+    // workspace's grid, search results), which is exactly the intent.
+    //
+    // Deliberately no workspace:changed broadcast: that would refetch the list
+    // behind the open detail view, dropping the very file being viewed out of
+    // the prev/next navigation order mid-session. The renderer refreshes the
+    // affected lists when the detail view closes instead (see MediaDetail).
+    ws.removeFromWatchLater(workspaceId, id);
     return q.fileDetail(db, id);
   });
   handle("file_set_rating", ({ id, workspaceId, rating }) =>

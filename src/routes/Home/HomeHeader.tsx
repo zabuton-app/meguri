@@ -26,7 +26,19 @@ import {
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { WATCH_LATER_ID } from "@shared/workspaceIds";
 import type { ViewMode } from "./utils";
+
+/**
+ * Display name for a collection. The built-in Watch Later stores an English
+ * placeholder name, so its label comes from the catalog and follows the UI
+ * language like every other built-in string.
+ */
+function collectionLabel(collection: UserCollection, t: TFunc): string {
+  return collection.id === WATCH_LATER_ID
+    ? t("watchLater.name")
+    : collection.name;
+}
 
 export function HomeHeader({
   root,
@@ -70,18 +82,26 @@ export function HomeHeader({
           ) : (
             <FolderOpen className="size-3.5 shrink-0" />
           )}
-          <span className="truncate font-medium" title={collection.name}>
-            {collection.name}
-          </span>
-          <button
-            type="button"
-            onClick={onEditCollection}
-            aria-label={t("collection.edit")}
-            title={t("collection.edit")}
-            className="flex size-5 shrink-0 items-center justify-center rounded text-muted transition hover:bg-fg/10 hover:text-fg"
+          <span
+            className="truncate font-medium"
+            title={collectionLabel(collection, t)}
           >
-            <Pencil className="size-3" />
-          </button>
+            {collectionLabel(collection, t)}
+          </span>
+          {/* Built-in collections can't be renamed or re-iconed, so no pencil.
+              The main process rejects those edits anyway; offering the dialog
+              here would look like it worked and then silently revert. */}
+          {!collection.locked && (
+            <button
+              type="button"
+              onClick={onEditCollection}
+              aria-label={t("collection.edit")}
+              title={t("collection.edit")}
+              className="flex size-5 shrink-0 items-center justify-center rounded text-muted transition hover:bg-fg/10 hover:text-fg"
+            >
+              <Pencil className="size-3" />
+            </button>
+          )}
         </span>
       ) : (
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">

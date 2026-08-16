@@ -29,11 +29,13 @@ export interface WorkspaceInfo {
 export {
   ALL_ID,
   COLLECTION_ID_PREFIX,
+  WATCH_LATER_ID,
   collectionTarget,
 } from "../../shared/workspaceIds.js";
 import {
   ALL_ID,
   COLLECTION_ID_PREFIX,
+  WATCH_LATER_ID,
   collectionTarget,
 } from "../../shared/workspaceIds.js";
 
@@ -51,6 +53,41 @@ export class Workspaces {
 
   constructor() {
     this.config = loadConfig();
+    this.seedWatchLater();
+  }
+
+  /**
+   * Persist our snapshot, refreshing the fields this class never owns first.
+   * `update` is written independently via `updateConfig()` (the update checker
+   * runs across awaits), so spreading our startup snapshot back wholesale would
+   * silently revert the user's update preferences. Every write below goes
+   * through here rather than calling saveConfig directly.
+   */
+  private persist(): void {
+    this.config.update = loadConfig().update;
+    saveConfig(this.config);
+  }
+
+  /**
+   * Ensure the built-in "Watch Later" collection exists. Runs on every load
+   * rather than behind a one-time migration flag, so a config that was
+   * hand-edited (or written by an older build) self-heals on the next launch.
+   */
+  private seedWatchLater(): void {
+    if (this.config.collections.some((c) => c.id === WATCH_LATER_ID)) return;
+    const now = nowUnix();
+    this.config.collections.unshift({
+      id: WATCH_LATER_ID,
+      // Display name comes from the renderer's i18n ("watchLater.name"); this is
+      // only a fallback for any surface that reads the stored name directly.
+      name: "Watch Later",
+      emoji: "🕒",
+      items: [],
+      createdAt: now,
+      updatedAt: now,
+      locked: true,
+    });
+    this.persist();
   }
 
   /** Root path → stable workspace ID (matches Core's data directory name). */
@@ -85,6 +122,7 @@ export class Workspaces {
     return this.config.collections.map((collection) => ({
       ...collection,
       active: this.config.activePath === collectionTarget(collection.id),
+      locked: collection.locked === true,
     }));
   }
 
@@ -204,7 +242,7 @@ export class Workspaces {
         : this.config.roots.find((r) => r === np);
     if (existing !== undefined) return existing;
     this.config.roots.push(np);
-    saveConfig(this.config);
+    this.persist();
     return np;
   }
 
@@ -233,7 +271,7 @@ export class Workspaces {
       // "All" is meaningless with no workspaces left.
       this.config.activePath = null;
     }
-    saveConfig(this.config);
+    this.persist();
 
     // Close the DB handle first so the files can be removed (Windows locks open files).
     const dir = core?.dataDir ?? dataDirForRoot(p);
@@ -257,11 +295,22 @@ export class Workspaces {
     };
     this.config.collections.unshift(collection);
     this.config.activePath = collectionTarget(collection.id);
-    saveConfig(this.config);
+    this.persist();
     return collection;
   }
 
+  /**
+   * Whether a collection is built-in and therefore protected from delete/rename/
+   * reorder/re-icon. Enforced here rather than only in the renderer: a stale
+   * renderer build or a bug in the menu-hiding logic must not be able to remove
+   * or reposition Watch Later.
+   */
+  private isLocked(id: string): boolean {
+    return this.config.collections.find((c) => c.id === id)?.locked === true;
+  }
+
   removeCollection(id: string): void {
+    if (this.isLocked(id)) return;
     this.config.collections = this.config.collections.filter(
       (c) => c.id !== id,
     );
@@ -270,29 +319,31 @@ export class Workspaces {
       // bootstrap() enforces); fall back to null when nothing is registered.
       this.config.activePath = this.config.roots.length > 0 ? ALL_ID : null;
     }
-    saveConfig(this.config);
+    this.persist();
   }
 
   /** Set (or clear, when emoji is null/empty) a collection's emoji icon. */
   setCollectionEmoji(id: string, emoji: string | null): void {
+    if (this.isLocked(id)) return;
     const collection = this.config.collections.find((c) => c.id === id);
     if (!collection) return;
     const next = emoji?.trim() || undefined;
     if (collection.emoji === next) return;
     collection.emoji = next;
     collection.updatedAt = nowUnix();
-    saveConfig(this.config);
+    this.persist();
   }
 
   /** Rename a collection. No-op when the collection is missing or the name is unchanged/empty. */
   renameCollection(id: string, name: string): void {
+    if (this.isLocked(id)) return;
     const collection = this.config.collections.find((c) => c.id === id);
     if (!collection) return;
     const next = name.trim();
     if (!next || collection.name === next) return;
     collection.name = next;
     collection.updatedAt = nowUnix();
-    saveConfig(this.config);
+    this.persist();
   }
 
   /** Set (or clear, when emoji is null/empty) a registered workspace's emoji icon. */
@@ -301,7 +352,7 @@ export class Workspaces {
     if ((this.config.workspaceEmojis[id] || undefined) === next) return;
     if (next) this.config.workspaceEmojis[id] = next;
     else delete this.config.workspaceEmojis[id];
-    saveConfig(this.config);
+    this.persist();
   }
 
   addToCollection(
@@ -323,7 +374,7 @@ export class Workspaces {
     const now = nowUnix();
     collection.items.unshift({ workspaceId, fileId, addedAt: now });
     collection.updatedAt = now;
-    saveConfig(this.config);
+    this.persist();
   }
 
   removeFromCollection(
@@ -341,7 +392,34 @@ export class Workspaces {
     if (next.length === collection.items.length) return;
     collection.items = next;
     collection.updatedAt = nowUnix();
-    saveConfig(this.config);
+    this.persist();
+  }
+
+  /**
+   * Drop a file from the built-in Watch Later collection. Called whenever a file
+   * is opened (see the `file_get` handler): "watch later" means "not watched
+   * yet", so viewing an entry is what takes it off the list. Only the Watch
+   * Later membership changes — the file itself and every other collection are
+   * left alone.
+   *
+   * Callers deliberately do not broadcast workspace:changed for this: refetching
+   * the list while the detail view is open would drop the file being viewed out
+   * of the prev/next order. The renderer refreshes on close instead. The boolean
+   * return reports whether the file was actually listed (used by tests).
+   */
+  removeFromWatchLater(workspaceId: string, fileId: number): boolean {
+    const watchLater = this.config.collections.find(
+      (c) => c.id === WATCH_LATER_ID,
+    );
+    if (!watchLater) return false;
+    const next = watchLater.items.filter(
+      (item) => item.workspaceId !== workspaceId || item.fileId !== fileId,
+    );
+    if (next.length === watchLater.items.length) return false;
+    watchLater.items = next;
+    watchLater.updatedAt = nowUnix();
+    this.persist();
+    return true;
   }
 
   /**
@@ -363,7 +441,7 @@ export class Workspaces {
         changed = true;
       }
     }
-    if (changed) saveConfig(this.config);
+    if (changed) this.persist();
     return changed;
   }
 
@@ -389,7 +467,7 @@ export class Workspaces {
       if (byId.has(Workspaces.idFor(p))) ordered.push(p);
     }
     this.config.roots = ordered;
-    saveConfig(this.config);
+    this.persist();
   }
 
   /**
@@ -398,7 +476,12 @@ export class Workspaces {
    * stale input). Does not change the active collection.
    */
   reorderCollections(ids: string[]): void {
-    const byId = new Map(this.config.collections.map((c) => [c.id, c]));
+    // Locked collections keep their pinned position at the front and never take
+    // part in reordering, so a stale/hostile id list can't displace them.
+    const locked = this.config.collections.filter((c) => c.locked);
+    const byId = new Map(
+      this.config.collections.filter((c) => !c.locked).map((c) => [c.id, c]),
+    );
     const ordered: UserCollectionConfig[] = [];
     for (const id of ids) {
       const c = byId.get(id);
@@ -410,27 +493,27 @@ export class Workspaces {
     for (const c of this.config.collections) {
       if (byId.has(c.id)) ordered.push(c);
     }
-    this.config.collections = ordered;
-    saveConfig(this.config);
+    this.config.collections = [...locked, ...ordered];
+    this.persist();
   }
 
   /** Switch the active workspace (accepts the "All" sentinel). */
   setActive(p: string): void {
     if (p === ALL_ID) {
       this.config.activePath = ALL_ID;
-      saveConfig(this.config);
+      this.persist();
       return;
     }
     const collectionId = activeCollectionId(p);
     if (collectionId) {
       if (!this.config.collections.some((c) => c.id === collectionId)) return;
       this.config.activePath = p;
-      saveConfig(this.config);
+      this.persist();
       return;
     }
     if (!this.config.roots.includes(p)) return;
     this.config.activePath = p;
-    saveConfig(this.config);
+    this.persist();
   }
 
   /** At startup: take in the CLI/env-var root, settle the active workspace, and pre-open it. */
@@ -452,7 +535,7 @@ export class Workspaces {
     ) {
       this.config.activePath = this.config.roots[0] ?? null;
     }
-    saveConfig(this.config);
+    this.persist();
     // Pre-open the active workspace (the virtual "All" has no Core of its own).
     if (
       this.config.activePath &&

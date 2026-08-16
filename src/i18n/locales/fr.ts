@@ -401,6 +401,17 @@ export const fr: Record<TranslationKey, string> = {
   "collection.removedFromToast": "Retiré de « {name} »",
   "collection.actionFailed": "Impossible de mettre à jour la collection",
 
+  // À regarder plus tard (collection intégrée)
+  "watchLater.name": "À regarder plus tard",
+  "watchLater.add": "Ajouter à À regarder plus tard",
+  "watchLater.remove": "Retirer de À regarder plus tard",
+  "watchLater.addedToast": "Ajouté à À regarder plus tard",
+  "watchLater.removedToast": "Retiré de À regarder plus tard",
+  "watchLater.actionFailed": "Impossible de mettre à jour À regarder plus tard",
+  "watchLater.empty": "À regarder plus tard est vide.",
+  "watchLater.emptyHint":
+    "Faites un clic droit sur un média et choisissez « Ajouter à À regarder plus tard » pour le retrouver ici. Les éléments quittent la liste dès que vous les ouvrez.",
+
   // icône emoji
   "emoji.choose": "Choisir un emoji",
   "emoji.remove": "Retirer l'emoji",

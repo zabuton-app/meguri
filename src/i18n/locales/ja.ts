@@ -394,6 +394,17 @@ export const ja = {
   "collection.removedFromToast": "「{name}」から削除しました",
   "collection.actionFailed": "コレクションの更新に失敗しました",
 
+  // 後で見る（組み込みコレクション）
+  "watchLater.name": "後で見る",
+  "watchLater.add": "後で見るに追加",
+  "watchLater.remove": "後で見るから削除",
+  "watchLater.addedToast": "後で見るに追加しました",
+  "watchLater.removedToast": "後で見るから削除しました",
+  "watchLater.actionFailed": "後で見るの更新に失敗しました",
+  "watchLater.empty": "後で見るは空です。",
+  "watchLater.emptyHint":
+    "メディアを右クリックして「後で見るに追加」を選ぶと、ここに並びます。開いたものは自動的に外れます。",
+
   // 絵文字アイコン
   "emoji.choose": "絵文字を選択",
   "emoji.remove": "絵文字を削除",

@@ -3,7 +3,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ImageIcon } from "lucide-react";
+import { MediaEmptyState } from "@/components/MediaEmptyState";
+import { WatchLaterContextMenu } from "@/components/WatchLaterContextMenu";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { RatingButton } from "@/components/RatingButton";
@@ -15,7 +16,6 @@ import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
 import { fileNameOf } from "@/lib/relPath";
-import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
@@ -53,6 +53,8 @@ interface Props {
   isFetchingPreviousPage?: boolean;
   /** Whether keyboard focus navigation is active (list is foreground). */
   navActive?: boolean;
+  /** Whether the active view is the built-in Watch Later collection (changes empty-state copy). */
+  watchLater?: boolean;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -72,8 +74,8 @@ export const MediaGrid = memo(function MediaGrid({
   fetchPreviousPage,
   isFetchingPreviousPage,
   navActive = false,
+  watchLater = false,
 }: Props) {
-  const { t } = useI18n();
   const navigate = useNavigate();
 
   // Scroll parent. Virtualization DOM-renders only the visible rows relative to this element.
@@ -209,13 +211,7 @@ export const MediaGrid = memo(function MediaGrid({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
-        <ImageIcon className="size-10 opacity-50" />
-        <p>{t("grid.empty")}</p>
-        <p className="text-xs">{t("grid.emptyHint")}</p>
-      </div>
-    );
+    return <MediaEmptyState watchLater={watchLater} />;
   }
 
   // Keep the custom scrollbar (shadcn ScrollArea) while using its Viewport as the
@@ -282,60 +278,64 @@ const MediaCard = memo(function MediaCard({
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
   // metadata click → opens detail paused (`?autoplay=0`).
   return (
-    <div
-      data-testid="media-card"
-      aria-current={focused ? "true" : undefined}
-      className={cn(
-        "group flex flex-col overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-primary",
-        focused && "border-primary ring-2 ring-primary",
-      )}
-    >
-      <Link
-        to={fileHref(file.id, file.workspaceId)}
-        className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
-      >
-        <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
-        {file.kind === "video" && (
-          <span className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg">
-            {formatDuration(file.duration)}
-          </span>
+    <WatchLaterContextMenu file={file}>
+      <div
+        data-testid="media-card"
+        aria-current={focused ? "true" : undefined}
+        className={cn(
+          "group flex flex-col overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-primary",
+          focused && "border-primary ring-2 ring-primary",
         )}
-        {/* Favorite toggle. Always visible when favorited; on hover otherwise. */}
-        <FavoriteButton
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          favorite={file.favorite}
-          size={16}
-          className={cn(
-            "absolute right-1 top-1 rounded bg-bg/70 p-1 backdrop-blur-[1px] transition-opacity",
-            file.favorite
-              ? "opacity-100"
-              : "opacity-0 focus:opacity-100 group-hover:opacity-100",
-          )}
-        />
-      </Link>
-      {/* Metadata. Fixed height so the card height doesn't change with tag count. */}
-      <Link
-        to={fileHref(file.id, file.workspaceId, { autoplay: false })}
-        className="flex flex-col gap-1 px-2 py-1.5"
       >
-        <div className="truncate text-xs text-fg" title={file.relPath}>
-          {fileNameOf(file.relPath)}
-        </div>
-        <div className="truncate text-[10px] text-muted">{metaLine(file)}</div>
-        {/* Editable rating. Stops click propagation so it doesn't open the detail. */}
-        <RatingButton
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          rating={file.rating}
-          size={14}
-        />
-        {/* Tags shown in full via horizontal scroll. Click to reflect into the search query. Fixed height. */}
-        <div className="no-scrollbar flex h-6 items-center gap-1 overflow-x-auto overflow-y-hidden">
-          <TagChips tags={file.tags} onTagClick={onTagClick} />
-        </div>
-      </Link>
-    </div>
+        <Link
+          to={fileHref(file.id, file.workspaceId)}
+          className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
+        >
+          <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
+          {file.kind === "video" && (
+            <span className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg">
+              {formatDuration(file.duration)}
+            </span>
+          )}
+          {/* Favorite toggle. Always visible when favorited; on hover otherwise. */}
+          <FavoriteButton
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            favorite={file.favorite}
+            size={16}
+            className={cn(
+              "absolute right-1 top-1 rounded bg-bg/70 p-1 backdrop-blur-[1px] transition-opacity",
+              file.favorite
+                ? "opacity-100"
+                : "opacity-0 focus:opacity-100 group-hover:opacity-100",
+            )}
+          />
+        </Link>
+        {/* Metadata. Fixed height so the card height doesn't change with tag count. */}
+        <Link
+          to={fileHref(file.id, file.workspaceId, { autoplay: false })}
+          className="flex flex-col gap-1 px-2 py-1.5"
+        >
+          <div className="truncate text-xs text-fg" title={file.relPath}>
+            {fileNameOf(file.relPath)}
+          </div>
+          <div className="truncate text-[10px] text-muted">
+            {metaLine(file)}
+          </div>
+          {/* Editable rating. Stops click propagation so it doesn't open the detail. */}
+          <RatingButton
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            rating={file.rating}
+            size={14}
+          />
+          {/* Tags shown in full via horizontal scroll. Click to reflect into the search query. Fixed height. */}
+          <div className="no-scrollbar flex h-6 items-center gap-1 overflow-x-auto overflow-y-hidden">
+            <TagChips tags={file.tags} onTagClick={onTagClick} />
+          </div>
+        </Link>
+      </div>
+    </WatchLaterContextMenu>
   );
 });
 

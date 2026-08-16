@@ -401,6 +401,17 @@ export const es: Record<TranslationKey, string> = {
   "collection.removedFromToast": "Quitado de «{name}»",
   "collection.actionFailed": "No se pudo actualizar la colección",
 
+  // Ver más tarde (colección integrada)
+  "watchLater.name": "Ver más tarde",
+  "watchLater.add": "Añadir a Ver más tarde",
+  "watchLater.remove": "Quitar de Ver más tarde",
+  "watchLater.addedToast": "Añadido a Ver más tarde",
+  "watchLater.removedToast": "Quitado de Ver más tarde",
+  "watchLater.actionFailed": "No se pudo actualizar Ver más tarde",
+  "watchLater.empty": "Ver más tarde está vacío.",
+  "watchLater.emptyHint":
+    "Haz clic derecho en cualquier medio y elige «Añadir a Ver más tarde» para reunirlo aquí. Los elementos salen de la lista al abrirlos.",
+
   // icono de emoji
   "emoji.choose": "Elegir emoji",
   "emoji.remove": "Quitar emoji",
