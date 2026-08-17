@@ -51,6 +51,13 @@ export const es: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "Baja (240px)",
   "settings.frameQualityStandard": "Estándar (480px)",
   "settings.frameQualityHigh": "Alta (960px)",
+  "settings.emojiStyle": "Estilo de emojis",
+  "settings.emojiStyleDesc":
+    "Cambia el aspecto de los iconos de emoji y de los emojis en el texto.",
+  "settings.emojiStyleNative": "Predeterminado del sistema",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
   "settings.keybinding": "Atajos de teclado",
   "settings.keybindingDesc":
     "Asignación de teclas para mover el foco en la lista, navegar archivos, desplazar y enfocar la búsqueda.",

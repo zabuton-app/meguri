@@ -49,6 +49,13 @@ export const ko: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "낮음 (240px)",
   "settings.frameQualityStandard": "표준 (480px)",
   "settings.frameQualityHigh": "높음 (960px)",
+  "settings.emojiStyle": "이모지 스타일",
+  "settings.emojiStyleDesc":
+    "이모지 아이콘과 텍스트 속 이모지의 모양을 전환합니다.",
+  "settings.emojiStyleNative": "시스템 기본",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
   "settings.keybinding": "키 바인딩",
   "settings.keybindingDesc":
     "목록 포커스 이동·파일 이동·스크롤·검색 포커스의 키 할당입니다.",
