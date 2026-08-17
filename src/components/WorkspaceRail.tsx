@@ -56,7 +56,7 @@ import { WATCH_LATER_ID } from "@shared/workspaceIds";
 import { cn } from "@/lib/utils";
 import { openCommandMenu, openShortcuts } from "@/lib/ui-events";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
-import appIconUrl from "../../logo/app-256.png";
+import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 
 /** Never animate sortable layout changes, so items snap to their final position on drop. */
 const animateLayoutChanges: AnimateLayoutChanges = () => false;
@@ -74,6 +74,8 @@ export function WorkspaceRail() {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const { t } = useI18n();
+  // In-app logo mark follows the selected variant (Settings > App logo).
+  const { logo } = useLogo();
   const addedWorkspaceScanJobs = useRef(new Set<string>());
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   // null = create mode; a collection = edit mode for it.
@@ -255,7 +257,11 @@ export function WorkspaceRail() {
   return (
     <>
       <nav className="flex h-full w-16 shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-3">
-        <img src={appIconUrl} alt="Meguri" className="size-[50px] shrink-0" />
+        <img
+          src={LOGO_SRC[logo]}
+          alt="Meguri"
+          className="size-[50px] shrink-0"
+        />
 
         {/* Workspace list (scrolls only here when there are many).
           Add padding so the first avatar's selection ring (ring-2) is not clipped at the top edge. */}

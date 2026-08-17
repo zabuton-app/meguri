@@ -1,6 +1,6 @@
 // Settings screen. Appearance (light/dark) switch + theme (family) selection.
 // Like MediaDetail, it floats (as a modal) over the list.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { useNavigate } from "react-router";
 import { Check, Coffee, Moon, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,11 +33,10 @@ import {
   type KeybindingPreset,
 } from "@/settings/keybindings";
 import { LOGO_IDS, type LogoId } from "@shared/ipc/schema";
+import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
-import logoDarkPng from "../../../logo/app-256.png";
-import logoLightPng from "../../../logo/light/app-256.png";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/amgsk";
 
@@ -81,11 +80,7 @@ const EMOJI_SAMPLE = "😀🎬📁";
 const LOGO_LABELS: Record<LogoId, TranslationKey> = {
   dark: "logo.dark",
   light: "logo.light",
-};
-
-const LOGO_PREVIEWS: Record<LogoId, string> = {
-  dark: logoDarkPng,
-  light: logoLightPng,
+  enso: "logo.enso",
 };
 
 export default function Settings() {
@@ -109,38 +104,7 @@ export default function Settings() {
   // Closing the modal = drop the child route and return to the list (the list stays mounted).
   const onClose = useCallback(() => navigate("/"), [navigate]);
 
-  // App logo variant lives in main's config.json (the tray needs it before any
-  // renderer exists), so it is fetched/stored over IPC rather than kept in
-  // PreferencesProvider. Optimistic set; settle on main's echoed value.
-  const [logo, setLogo] = useState<LogoId>("dark");
-  // Once the user has picked a logo, a late logoGet() result must not roll
-  // the selection back.
-  const logoTouched = useRef(false);
-  useEffect(() => {
-    let active = true;
-    void api
-      .logoGet()
-      .then((v) => {
-        if (active && !logoTouched.current) setLogo(v);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-  const selectLogo = useCallback(
-    (next: LogoId) => {
-      const prev = logo;
-      logoTouched.current = true;
-      setLogo(next);
-      // Optimistic; settle on main's echoed value, revert if the IPC fails.
-      void api
-        .logoSet(next)
-        .then((applied) => setLogo(applied))
-        .catch(() => setLogo(prev));
-    },
-    [logo],
-  );
+  const { logo, setLogo: selectLogo } = useLogo();
 
   return (
     <SettingsModal onClose={() => void onClose()}>
@@ -364,7 +328,7 @@ export default function Settings() {
             </Select>
           </section>
 
-          {/* App logo (window + tray icon) */}
+          {/* App logo (window, tray, and in-app icon) */}
           <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-bright-fg">
@@ -391,7 +355,7 @@ export default function Settings() {
                     }
                   >
                     <img
-                      src={LOGO_PREVIEWS[id]}
+                      src={LOGO_SRC[id]}
                       alt=""
                       className="size-12 rounded-md"
                       draggable={false}
