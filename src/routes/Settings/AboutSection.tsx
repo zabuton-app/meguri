@@ -62,6 +62,27 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
     licenseUrl: "https://github.com/facebook/react/blob/main/LICENSE",
     sourceUrl: "https://github.com/facebook/react",
   },
+  // Bundled emoji fonts for the selectable emoji styles
+  // (details in src/assets/fonts/emoji/LICENSES.md).
+  {
+    name: "Twemoji Mozilla (emoji font)",
+    license: "CC-BY 4.0 / Apache-2.0",
+    licenseUrl:
+      "https://github.com/mozilla/twemoji-colr/blob/master/LICENSE.md",
+    sourceUrl: "https://github.com/mozilla/twemoji-colr",
+  },
+  {
+    name: "Noto Emoji (emoji font)",
+    license: "OFL-1.1",
+    licenseUrl: "https://openfontlicense.org/",
+    sourceUrl: "https://github.com/google/fonts/tree/main/ofl/notoemoji",
+  },
+  {
+    name: "OpenMoji (emoji font)",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
+    sourceUrl: "https://github.com/hfg-gmuend/openmoji",
+  },
 ];
 
 export function AboutSection() {

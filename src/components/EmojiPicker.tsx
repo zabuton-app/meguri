@@ -5,7 +5,7 @@
 // self-contained Dialog is the robust choice here.
 // Selecting an emoji calls onSelect(emoji); the "remove" action calls
 // onSelect(null) to clear it back to the default icon.
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 // Bundle the locale packs locally. emoji-mart otherwise fetches them from a CDN
@@ -26,6 +26,31 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/themes/ThemeProvider";
 import { useI18n, type Lang } from "@/i18n/I18nProvider";
+
+// emoji-mart writes `font-family` as an INLINE style on the span that carries
+// each native glyph, so neither inheritance nor a document-level rule on the
+// em-emoji-picker host can restyle the grid. Overriding from inside the shadow
+// root with !important is the only offline, dependency-free way to make the
+// picker follow the selected emoji style. var(--font-family) resolves to the
+// emoji-augmented UI stack that emoji-fonts.css sets on the host element
+// (custom properties inherit across the shadow boundary).
+const SHADOW_STYLE_ID = "meguri-emoji-style";
+const SHADOW_FONT_CSS = `.emoji-mart-emoji span {
+  font-family: var(--font-family) !important;
+}`;
+
+/** Inject the font override into the picker's shadow root (idempotent). */
+function injectShadowFont(host: Element): boolean {
+  const root = host.shadowRoot;
+  if (!root) return false;
+  if (!root.getElementById(SHADOW_STYLE_ID)) {
+    const style = document.createElement("style");
+    style.id = SHADOW_STYLE_ID;
+    style.textContent = SHADOW_FONT_CSS;
+    root.appendChild(style);
+  }
+  return true;
+}
 
 // Map our app languages to the bundled emoji-mart i18n packs (falls back to en).
 const EMOJI_MART_I18N: Record<Lang, unknown> = {
@@ -55,6 +80,21 @@ export function EmojiPicker({
   const { mode } = useTheme();
   const { lang, t } = useI18n();
   const emojiI18n = useMemo(() => EMOJI_MART_I18N[lang] ?? i18nEn, [lang]);
+
+  // emoji-mart creates the em-emoji-picker element (and its shadow root)
+  // asynchronously after mount, so poll a few frames until it appears.
+  const pickerHostRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    let tries = 0;
+    let raf = 0;
+    const tryInject = () => {
+      const host = node.querySelector("em-emoji-picker");
+      if ((host && injectShadowFont(host)) || tries++ > 60) return;
+      raf = requestAnimationFrame(tryInject);
+    };
+    tryInject();
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // Radix can leave `pointer-events: none` on <body> if the dialog unmounts while
   // another layer (the originating context menu) is still tearing down — that
@@ -91,7 +131,7 @@ export function EmojiPicker({
         {/* emoji-mart's picker has a fixed intrinsic height; on short viewports it
             overflows the centered dialog. Wrap it in a scrollable region so the
             full grid stays reachable. */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={pickerHostRef} className="min-h-0 flex-1 overflow-y-auto">
           <Picker
             data={data}
             i18n={emojiI18n}

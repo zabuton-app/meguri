@@ -48,6 +48,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "低 (240px)",
   "settings.frameQualityStandard": "标准 (480px)",
   "settings.frameQualityHigh": "高 (960px)",
+  "settings.emojiStyle": "表情符号样式",
+  "settings.emojiStyleDesc": "切换表情符号图标及文本中表情符号的显示样式。",
+  "settings.emojiStyleNative": "系统默认",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
   "settings.keybinding": "键位绑定",
   "settings.keybindingDesc":
     "列表焦点移动、文件翻页、滚动和聚焦搜索的按键分配。",

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/emoji-fonts.css";
 
 /*
  * Three-stage bridge (PLAN "Frontend UI / Theme"):
@@ -75,12 +76,16 @@ body {
   margin: 0;
   background-color: var(--c-bg);
   color: var(--c-fg);
+  /* var(--font-emoji) stays second-to-last (before the generic): emoji fonts
+     also cover digits/#/* so an earlier slot would hijack regular text, while
+     any later slot would never be reached. See src/styles/emoji-fonts.css. */
   font-family:
     system-ui,
     -apple-system,
     "Segoe UI",
     Roboto,
     "Noto Sans JP",
+    var(--font-emoji),
     sans-serif;
   -webkit-font-smoothing: antialiased;
   /*

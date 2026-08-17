@@ -32,12 +32,29 @@ export function isFrameQuality(v: unknown): v is FrameQuality {
   return FRAME_QUALITY_OPTIONS.includes(v as FrameQuality);
 }
 
+// Emoji glyph styles. Each id is stable API shared by localStorage, the
+// <html data-emoji-style> attribute, and the --font-emoji mapping in
+// src/styles/emoji-fonts.css — renaming one would orphan stored prefs.
+export const EMOJI_STYLE_OPTIONS = [
+  "native", // OS emoji font (default; no bundled font involved)
+  "twemoji", // flat full-color (Twemoji Mozilla, COLRv0)
+  "noto", // monochrome (Noto Emoji)
+  "openmoji", // outline color (OpenMoji glyf_colr_0)
+] as const;
+export type EmojiStyle = (typeof EMOJI_STYLE_OPTIONS)[number];
+export const DEFAULT_EMOJI_STYLE: EmojiStyle = "native";
+
+export function isEmojiStyle(v: unknown): v is EmojiStyle {
+  return EMOJI_STYLE_OPTIONS.includes(v as EmojiStyle);
+}
+
 interface Prefs {
   sceneCount: number;
   keybindingPreset: KeybindingPreset;
   hideSupportLink: boolean;
   hoverPreview: boolean;
   frameQuality: FrameQuality;
+  emojiStyle: EmojiStyle;
 }
 
 const DEFAULTS: Prefs = {
@@ -46,6 +63,7 @@ const DEFAULTS: Prefs = {
   hideSupportLink: false,
   hoverPreview: true,
   frameQuality: DEFAULT_FRAME_QUALITY,
+  emojiStyle: DEFAULT_EMOJI_STYLE,
 };
 
 function clampSceneCount(n: number): number {
@@ -78,6 +96,9 @@ function loadPrefs(): Prefs {
         frameQuality: isFrameQuality(parsed.frameQuality)
           ? parsed.frameQuality
           : DEFAULT_FRAME_QUALITY,
+        emojiStyle: isEmojiStyle(parsed.emojiStyle)
+          ? parsed.emojiStyle
+          : DEFAULT_EMOJI_STYLE,
       };
     }
   } catch {
@@ -92,6 +113,7 @@ interface PrefsCtx extends Prefs {
   setHideSupportLink: (hidden: boolean) => void;
   setHoverPreview: (enabled: boolean) => void;
   setFrameQuality: (q: FrameQuality) => void;
+  setEmojiStyle: (s: EmojiStyle) => void;
 }
 
 const Ctx = createContext<PrefsCtx | null>(null);
@@ -107,6 +129,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     }
   }, [prefs]);
 
+  // Mirror the emoji style to <html data-emoji-style>, which
+  // src/styles/emoji-fonts.css maps to the --font-emoji font family. Emoji only
+  // appear in React-rendered content, so applying it at mount is early enough
+  // (no pre-paint boot script needed, unlike data-theme).
+  useEffect(() => {
+    document.documentElement.dataset.emojiStyle = prefs.emojiStyle;
+  }, [prefs.emojiStyle]);
+
   const value = useMemo<PrefsCtx>(
     () => ({
       ...prefs,
@@ -119,6 +149,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setHoverPreview: (enabled) =>
         setPrefs((p) => ({ ...p, hoverPreview: enabled })),
       setFrameQuality: (q) => setPrefs((p) => ({ ...p, frameQuality: q })),
+      setEmojiStyle: (s) => setPrefs((p) => ({ ...p, emojiStyle: s })),
     }),
     [prefs],
   );

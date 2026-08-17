@@ -51,6 +51,13 @@ export const en: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "Low (240px)",
   "settings.frameQualityStandard": "Standard (480px)",
   "settings.frameQualityHigh": "High (960px)",
+  "settings.emojiStyle": "Emoji style",
+  "settings.emojiStyleDesc":
+    "Switches how emoji icons and in-text emoji are drawn.",
+  "settings.emojiStyleNative": "System default",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",

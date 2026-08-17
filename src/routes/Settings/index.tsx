@@ -24,6 +24,9 @@ import {
   FRAME_QUALITY_OPTIONS,
   isFrameQuality,
   type FrameQuality,
+  EMOJI_STYLE_OPTIONS,
+  isEmojiStyle,
+  type EmojiStyle,
 } from "@/settings/PreferencesProvider";
 import {
   KEYBINDING_PRESETS,
@@ -53,6 +56,25 @@ const FRAME_QUALITY_LABELS: Record<FrameQuality, TranslationKey> = {
   high: "settings.frameQualityHigh",
 };
 
+const EMOJI_STYLE_LABELS: Record<EmojiStyle, TranslationKey> = {
+  native: "settings.emojiStyleNative",
+  twemoji: "settings.emojiStyleTwemoji",
+  noto: "settings.emojiStyleNoto",
+  openmoji: "settings.emojiStyleOpenmoji",
+};
+
+// Per-option font for the sample string, so styles can be compared before
+// choosing. "native" uses the same non-existent-family trick as emoji-fonts.css
+// to reach the OS emoji font even while another style is active.
+const EMOJI_STYLE_FONTS: Record<EmojiStyle, string> = {
+  native: '"meguri-emoji-none"',
+  twemoji: '"Meguri Twemoji"',
+  noto: '"Meguri Noto Emoji"',
+  openmoji: '"Meguri OpenMoji"',
+};
+
+const EMOJI_SAMPLE = "😀🎬📁";
+
 export default function Settings() {
   const { mode, familyId, families, setMode, setFamily } = useTheme();
   const { lang, setLang, t } = useI18n();
@@ -67,6 +89,8 @@ export default function Settings() {
     setHoverPreview,
     frameQuality,
     setFrameQuality,
+    emojiStyle,
+    setEmojiStyle,
   } = usePreferences();
   const navigate = useNavigate();
   // Closing the modal = drop the child route and return to the list (the list stays mounted).
@@ -252,6 +276,46 @@ export default function Settings() {
                 {t("settings.dark")}
               </button>
             </div>
+          </section>
+
+          {/* Emoji glyph style (applies to all emoji in the UI) */}
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.emojiStyle")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.emojiStyleDesc")}
+              </span>
+            </div>
+            <Select
+              value={emojiStyle}
+              onValueChange={(v) => {
+                if (isEmojiStyle(v)) setEmojiStyle(v);
+              }}
+            >
+              <SelectTrigger className="min-w-44">
+                {/* Custom children: the trigger shows only the label — the
+                    emoji sample would wrap it onto two lines. The per-style
+                    samples stay in the dropdown items below. */}
+                <SelectValue>{t(EMOJI_STYLE_LABELS[emojiStyle])}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {EMOJI_STYLE_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      {t(EMOJI_STYLE_LABELS[s])}
+                      <span
+                        aria-hidden="true"
+                        style={{ fontFamily: EMOJI_STYLE_FONTS[s] }}
+                      >
+                        {EMOJI_SAMPLE}
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </section>
 
           {/* Theme (family) selection */}

@@ -49,6 +49,13 @@ export const ja = {
   "settings.frameQualityLow": "低 (240px)",
   "settings.frameQualityStandard": "標準 (480px)",
   "settings.frameQualityHigh": "高 (960px)",
+  "settings.emojiStyle": "絵文字スタイル",
+  "settings.emojiStyleDesc":
+    "絵文字アイコンや文中の絵文字の見た目を切り替えます。",
+  "settings.emojiStyleNative": "システム標準",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
   "settings.keybinding": "キーバインド",
   "settings.keybindingDesc":
     "一覧のフォーカス移動・ファイルの前後移動・スクロール・検索フォーカスのキー割り当て。",
