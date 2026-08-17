@@ -56,6 +56,10 @@ export const ko: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "앱 로고",
+  "settings.logoDesc": "창과 트레이 아이콘에 적용됩니다.",
+  "logo.dark": "진한 색",
+  "logo.light": "밝은 색",
   "settings.keybinding": "키 바인딩",
   "settings.keybindingDesc":
     "목록 포커스 이동·파일 이동·스크롤·검색 포커스의 키 할당입니다.",

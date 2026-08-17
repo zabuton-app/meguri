@@ -10,6 +10,7 @@ import type {
   ChannelOutput,
 } from "@shared/ipc/channels";
 import type {
+  LogoId,
   ScanDone,
   ScanProgress,
   TagRef,
@@ -135,6 +136,9 @@ export const api = {
   updateSetAutoCheck: (enabled: boolean) =>
     invoke("update_set_auto_check", { enabled }),
   updateIgnore: (version: string) => invoke("update_ignore", { version }),
+  /** App logo variant (window + tray icon), persisted in main's config.json. */
+  logoGet: () => invoke("logo_get"),
+  logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
 };
 
 export {
@@ -145,7 +149,7 @@ export {
 
 // --- Events ---
 // Re-exported for compatibility with components that imported these from this module.
-export type { AboutInfo, ScanDone, ScanProgress, ThumbDone, UpdateInfo };
+export type { AboutInfo, LogoId, ScanDone, ScanProgress, ThumbDone, UpdateInfo };
 
 // Returns a Promise so existing components can receive the unlisten function via `.then(unlisten => ...)`.
 type Unlisten = () => void;

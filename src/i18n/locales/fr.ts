@@ -58,6 +58,10 @@ export const fr: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "Logo de l'application",
+  "settings.logoDesc": "S'applique aux icônes de la fenêtre et de la barre d'état.",
+  "logo.dark": "Foncé",
+  "logo.light": "Clair",
   "settings.keybinding": "Raccourcis clavier",
   "settings.keybindingDesc":
     "Raccourcis pour déplacer le focus dans la liste, naviguer entre les fichiers, faire défiler et cibler la recherche.",

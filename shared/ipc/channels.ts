@@ -10,6 +10,7 @@ import type {
   FileDetail,
   FileRow,
   HistoryPage,
+  LogoId,
   SceneBookmark,
   SearchResult,
   TagList,
@@ -20,6 +21,7 @@ import type {
 } from "./schema.js";
 import {
   HistoryQuerySchema,
+  LogoIdSchema,
   SearchQuerySchema,
   TagRefSchema,
 } from "./schema.js";
@@ -138,6 +140,8 @@ export const ChannelInputs = {
   update_get_settings: z.void(),
   update_set_auto_check: z.object({ enabled: z.boolean() }),
   update_ignore: z.object({ version: z.string() }),
+  logo_get: z.void(),
+  logo_set: z.object({ logo: LogoIdSchema }),
 } as const satisfies Record<InvokeChannel, z.ZodTypeAny>;
 
 type ChannelInputKeys = keyof typeof ChannelInputs;
@@ -223,6 +227,9 @@ export interface ChannelOutputs {
   update_get_settings: UpdateSettings;
   update_set_auto_check: void;
   update_ignore: void;
+  logo_get: LogoId;
+  // Echoes the applied variant so the renderer can settle on main's value.
+  logo_set: LogoId;
 }
 
 type ChannelOutputKeys = keyof ChannelOutputs;

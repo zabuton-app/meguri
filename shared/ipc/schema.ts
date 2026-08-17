@@ -9,6 +9,14 @@ import { MAX_TAG_REF_NAME } from "../tags.js";
 export const KindSchema = z.enum(["video", "image"]);
 export type Kind = z.infer<typeof KindSchema>;
 
+// App logo variants (window + tray icon). "dark" is the original vermilion
+// icon; "light" is the inverted unbleached-cotton one. Persisted in main's
+// config.json (the tray exists before any renderer), so the ids are a stable
+// API shared by config.json, IPC, and the bundled assets — do not rename.
+export const LOGO_IDS = ["dark", "light"] as const;
+export const LogoIdSchema = z.enum(LOGO_IDS);
+export type LogoId = z.infer<typeof LogoIdSchema>;
+
 export const TagInfoSchema = z.object({
   id: z.number(),
   name: z.string(),

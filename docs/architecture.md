@@ -95,8 +95,11 @@ lifecycle behavior:
 - The app quits only via the tray "Quit" menu item or, on macOS, Cmd+Q; both set
   `isQuitting = true` (the latter through `before-quit`).
 - A single-instance lock prevents a second copy from launching.
-- The tray icon is a base64-embedded image, to avoid bundle path-resolution
-  issues.
+- The tray and window icons are base64-embedded images
+  (`electron/core/logoAssets.ts`), to avoid bundle path-resolution issues. Two
+  logo variants exist (`dark` = vermilion, `light` = inverted); the choice is
+  persisted as `logo` in main's `config.json` and switched from Settings via
+  the `logo_get` / `logo_set` IPC channels.
 
 ## Workspace model
 

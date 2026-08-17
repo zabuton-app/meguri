@@ -54,6 +54,10 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "应用图标",
+  "settings.logoDesc": "应用于窗口和托盘图标。",
+  "logo.dark": "深色",
+  "logo.light": "浅色",
   "settings.keybinding": "键位绑定",
   "settings.keybindingDesc":
     "列表焦点移动、文件翻页、滚动和聚焦搜索的按键分配。",

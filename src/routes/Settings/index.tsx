@@ -1,6 +1,6 @@
 // Settings screen. Appearance (light/dark) switch + theme (family) selection.
 // Like MediaDetail, it floats (as a modal) over the list.
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Check, Coffee, Moon, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,9 +32,12 @@ import {
   KEYBINDING_PRESETS,
   type KeybindingPreset,
 } from "@/settings/keybindings";
+import { LOGO_IDS, type LogoId } from "@shared/ipc/schema";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
+import logoDarkPng from "../../../logo/app-256.png";
+import logoLightPng from "../../../logo/light/app-256.png";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/amgsk";
 
@@ -75,6 +78,16 @@ const EMOJI_STYLE_FONTS: Record<EmojiStyle, string> = {
 
 const EMOJI_SAMPLE = "😀🎬📁";
 
+const LOGO_LABELS: Record<LogoId, TranslationKey> = {
+  dark: "logo.dark",
+  light: "logo.light",
+};
+
+const LOGO_PREVIEWS: Record<LogoId, string> = {
+  dark: logoDarkPng,
+  light: logoLightPng,
+};
+
 export default function Settings() {
   const { mode, familyId, families, setMode, setFamily } = useTheme();
   const { lang, setLang, t } = useI18n();
@@ -95,6 +108,39 @@ export default function Settings() {
   const navigate = useNavigate();
   // Closing the modal = drop the child route and return to the list (the list stays mounted).
   const onClose = useCallback(() => navigate("/"), [navigate]);
+
+  // App logo variant lives in main's config.json (the tray needs it before any
+  // renderer exists), so it is fetched/stored over IPC rather than kept in
+  // PreferencesProvider. Optimistic set; settle on main's echoed value.
+  const [logo, setLogo] = useState<LogoId>("dark");
+  // Once the user has picked a logo, a late logoGet() result must not roll
+  // the selection back.
+  const logoTouched = useRef(false);
+  useEffect(() => {
+    let active = true;
+    void api
+      .logoGet()
+      .then((v) => {
+        if (active && !logoTouched.current) setLogo(v);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  const selectLogo = useCallback(
+    (next: LogoId) => {
+      const prev = logo;
+      logoTouched.current = true;
+      setLogo(next);
+      // Optimistic; settle on main's echoed value, revert if the IPC fails.
+      void api
+        .logoSet(next)
+        .then((applied) => setLogo(applied))
+        .catch(() => setLogo(prev));
+    },
+    [logo],
+  );
 
   return (
     <SettingsModal onClose={() => void onClose()}>
@@ -316,6 +362,51 @@ export default function Settings() {
                 ))}
               </SelectContent>
             </Select>
+          </section>
+
+          {/* App logo (window + tray icon) */}
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.logo")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.logoDesc")}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {LOGO_IDS.map((id) => {
+                const active = logo === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => selectLogo(id)}
+                    className={
+                      "flex flex-col items-center gap-1.5 rounded-md border px-3 py-2 transition " +
+                      (active
+                        ? "border-primary ring-1 ring-primary"
+                        : "border-border hover:border-primary")
+                    }
+                  >
+                    <img
+                      src={LOGO_PREVIEWS[id]}
+                      alt=""
+                      className="size-12 rounded-md"
+                      draggable={false}
+                    />
+                    <span
+                      className={
+                        "text-xs " + (active ? "text-fg" : "text-muted")
+                      }
+                    >
+                      {t(LOGO_LABELS[id])}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </section>
 
           {/* Theme (family) selection */}
