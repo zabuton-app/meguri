@@ -896,7 +896,15 @@ function windowImage(logo: LogoId): Electron.NativeImage {
   );
 }
 
-/** Re-apply the logo variant to the live tray and window/dock icons. */
+/**
+ * Re-apply the logo variant to the live tray and window/dock icons.
+ *
+ * Live switches always use the embedded 256px bitmap, including a switch back
+ * to the default: there is no Electron API to restore the packaged icon on a
+ * live window/dock. The full-resolution packaged icon (.ico/.icns/.desktop)
+ * comes back on the next launch, where startup skips the override for the
+ * default logo.
+ */
 function applyLogo(logo: LogoId): void {
   tray?.setImage(trayImage(logo));
   if (process.platform === "darwin") {
@@ -958,6 +966,7 @@ function registerIpc(): void {
 }
 
 function createWindow(): void {
+  const { logo } = loadConfig();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -968,9 +977,7 @@ function createWindow(): void {
     // Only overridden for non-default logos: the packaged multi-size icon
     // (exe-embedded .ico / .desktop entry) stays in charge for the default,
     // and it carries more sizes than the embedded bitmap.
-    ...(loadConfig().logo !== DEFAULT_LOGO
-      ? { icon: windowImage(loadConfig().logo) }
-      : {}),
+    ...(logo !== DEFAULT_LOGO ? { icon: windowImage(logo) } : {}),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.js"),

@@ -5,6 +5,7 @@
 // and stored over IPC instead of PreferencesProvider/localStorage. Reading it
 // through a query keys every consumer (Settings picker, workspace rail logo)
 // to the same cache entry, so a change propagates everywhere at once.
+import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
 import type { LogoId } from "@shared/ipc/schema";
@@ -34,7 +35,7 @@ export function useLogo(): {
     staleTime: Infinity,
   });
   // Optimistic; settle on main's echoed value, roll back if the IPC fails.
-  const { mutate: setLogo } = useMutation({
+  const { mutate } = useMutation({
     mutationFn: (next: LogoId) => api.logoSet(next),
     // Serialize picks so a slow earlier IPC cannot settle after a later one.
     scope: { id: "logo" },
@@ -54,5 +55,13 @@ export function useLogo(): {
       else void qc.invalidateQueries({ queryKey: LOGO_QUERY_KEY });
     },
   });
-  return { logo: data ?? "dark", setLogo };
+  const logo = data ?? "dark";
+  const setLogo = useCallback(
+    (next: LogoId) => {
+      // Re-picking the active variant would be a pointless IPC round-trip.
+      if (next !== qc.getQueryData<LogoId>(LOGO_QUERY_KEY)) mutate(next);
+    },
+    [qc, mutate],
+  );
+  return { logo, setLogo };
 }
