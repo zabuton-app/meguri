@@ -95,8 +95,15 @@ lifecycle behavior:
 - The app quits only via the tray "Quit" menu item or, on macOS, Cmd+Q; both set
   `isQuitting = true` (the latter through `before-quit`).
 - A single-instance lock prevents a second copy from launching.
-- The tray icon is a base64-embedded image, to avoid bundle path-resolution
-  issues.
+- The tray and window icons are base64-embedded images
+  (`electron/core/logoAssets.ts`), to avoid bundle path-resolution issues.
+  Three logo variants exist (`dark` = vermilion kanji, `light` = inverted,
+  `enso` = pictorial brush circle with a media card, raster-sourced — no SVG
+  master); the choice is persisted as `logo` in
+  main's `config.json` and switched from Settings via the `logo_get` /
+  `logo_set` IPC channels. The renderer mirrors the same choice through
+  `useLogo()` (react-query cache), which drives the Settings picker and the
+  in-app logo in the workspace rail.
 
 ## Workspace model
 

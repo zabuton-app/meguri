@@ -58,6 +58,11 @@ export const en: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "App logo",
+  "settings.logoDesc": "Applies to the window, tray, and in-app icons.",
+  "logo.dark": "Dark",
+  "logo.light": "Light",
+  "logo.enso": "Ensō",
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",

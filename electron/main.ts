@@ -17,8 +17,10 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { DEFAULT_LOGO, loadConfig, updateConfig } from "./core/appConfig.js";
 import type { Core } from "./core/index.js";
 import { handle } from "./core/ipcHandler.js";
+import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import { runScan } from "./core/jobs.js";
 import log, { setupLogger } from "./core/logger.js";
 import { exportFrame, generateThumb } from "./core/media.js";
@@ -46,15 +48,12 @@ import {
   updateDownloadUrl,
 } from "./core/updater.js";
 import { ALL_ID, COLLECTION_ID_PREFIX, Workspaces } from "./core/workspaces.js";
+import type { LogoId } from "../shared/ipc/schema.js";
 
 // Set up logging before anything else so early failures land in the log file.
 setupLogger();
 
 // In CJS output, __dirname exists globally (out/main/).
-
-// Tray icon. Embedded as base64 to avoid bundle path resolution.
-const TRAY_ICON_BASE64 =
-  "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";
 
 const ws = new Workspaces();
 // Heavy read-only list/search queries run on a worker thread so a slow query
@@ -885,6 +884,46 @@ function registerShellHandlers(): void {
   });
 }
 
+function trayImage(logo: LogoId): Electron.NativeImage {
+  return nativeImage.createFromDataURL(
+    `data:image/png;base64,${TRAY_ICON_BASE64[logo]}`,
+  );
+}
+
+function windowImage(logo: LogoId): Electron.NativeImage {
+  return nativeImage.createFromDataURL(
+    `data:image/png;base64,${WINDOW_ICON_BASE64[logo]}`,
+  );
+}
+
+/**
+ * Re-apply the logo variant to the live tray and window/dock icons.
+ *
+ * Live switches always use the embedded 256px bitmap, including a switch back
+ * to the default: there is no Electron API to restore the packaged icon on a
+ * live window/dock. The full-resolution packaged icon (.ico/.icns/.desktop)
+ * comes back on the next launch, where startup skips the override for the
+ * default logo.
+ */
+function applyLogo(logo: LogoId): void {
+  tray?.setImage(trayImage(logo));
+  if (process.platform === "darwin") {
+    // BrowserWindow icons are ignored on macOS; the dock icon is the app icon.
+    app.dock?.setIcon(windowImage(logo));
+  } else if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setIcon(windowImage(logo));
+  }
+}
+
+function registerLogoHandlers(): void {
+  handle("logo_get", () => loadConfig().logo);
+  handle("logo_set", ({ logo }) => {
+    updateConfig((c) => ({ ...c, logo }));
+    applyLogo(logo);
+    return logo;
+  });
+}
+
 function registerUpdateHandlers(): void {
   handle("update_check", ({ force }) => checkForUpdates({ force }));
   handle("update_get_settings", () => getUpdateSettings());
@@ -923,15 +962,22 @@ function registerIpc(): void {
   registerThumbHandlers();
   registerShellHandlers();
   registerUpdateHandlers();
+  registerLogoHandlers();
 }
 
 function createWindow(): void {
+  const { logo } = loadConfig();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 640,
     minHeight: 480,
     title: "Meguri",
+    // Window/taskbar icon (Linux/Windows; macOS uses the dock icon instead).
+    // Only overridden for non-default logos: the packaged multi-size icon
+    // (exe-embedded .ico / .desktop entry) stays in charge for the default,
+    // and it carries more sizes than the embedded bitmap.
+    ...(logo !== DEFAULT_LOGO ? { icon: windowImage(logo) } : {}),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.js"),
@@ -973,10 +1019,7 @@ function showWindow(): void {
 
 function createTray(): void {
   if (!isTrayEnabled()) return;
-  const icon = nativeImage.createFromDataURL(
-    `data:image/png;base64,${TRAY_ICON_BASE64}`,
-  );
-  tray = new Tray(icon);
+  tray = new Tray(trayImage(loadConfig().logo));
   tray.setToolTip("Meguri");
   const menu = Menu.buildFromTemplate([
     { label: "Show Meguri", click: () => showWindow() },
@@ -1070,6 +1113,12 @@ void app.whenReady().then(async () => {
 
   registerIpc();
   createTray();
+  // Dock icon override on macOS (BrowserWindow icons are ignored there).
+  // Skipped for the default logo so the packaged .icns keeps its full
+  // resolution set.
+  if (process.platform === "darwin" && loadConfig().logo !== DEFAULT_LOGO) {
+    applyLogo(loadConfig().logo);
+  }
   await installReactDevTools();
   createWindow();
   if (isDevMode()) {

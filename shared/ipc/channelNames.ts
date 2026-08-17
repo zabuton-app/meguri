@@ -53,6 +53,8 @@ export const INVOKE_CHANNELS = [
   "update_get_settings",
   "update_set_auto_check",
   "update_ignore",
+  "logo_get",
+  "logo_set",
 ] as const;
 
 /** Main → renderer event channels (webContents.send). */

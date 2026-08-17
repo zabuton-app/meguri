@@ -56,6 +56,11 @@ export const ja = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "アプリのロゴ",
+  "settings.logoDesc": "ウィンドウ・トレイ・画面内のアイコンに反映されます。",
+  "logo.dark": "濃色",
+  "logo.light": "淡色",
+  "logo.enso": "円相",
   "settings.keybinding": "キーバインド",
   "settings.keybindingDesc":
     "一覧のフォーカス移動・ファイルの前後移動・スクロール・検索フォーカスのキー割り当て。",
