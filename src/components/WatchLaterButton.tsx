@@ -5,7 +5,7 @@
 // It also plays the same control-local effect (burst on queue, settle on
 // unqueue); the trigger lives in local state set only inside the click handler,
 // so cache syncs from other views can never fire it (spec 009, FR-005).
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { Clock } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -25,6 +25,12 @@ interface Props {
   watchLater: WatchLaterMembership;
   size?: number;
   className?: string;
+  /**
+   * Handle on the underlying button. Discovery uses it to drive the toggle from
+   * a keyboard shortcut through this same control, so the mutation, toast,
+   * effect and disabled state stay in one place.
+   */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function WatchLaterButton({
@@ -33,6 +39,7 @@ export function WatchLaterButton({
   watchLater,
   size = 16,
   className,
+  ref,
 }: Props) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -72,6 +79,7 @@ export function WatchLaterButton({
 
   return (
     <button
+      ref={ref}
       type="button"
       // Prevent the surrounding Link / row click from navigating.
       onClick={(e) => {

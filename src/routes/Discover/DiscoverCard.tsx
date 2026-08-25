@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 import { ExternalLink, Film, ImageIcon, Play } from "lucide-react";
 import { api } from "@/ipc/client";
@@ -6,6 +6,8 @@ import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import type { WatchLaterMembership } from "@/hooks/useWatchLater";
 import { RatingStars } from "@/components/RatingStars";
 import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
 import { usePreferences } from "@/settings/PreferencesProvider";
@@ -28,6 +30,8 @@ export function DiscoverCard({
   mediaBase,
   thumbVersion,
   onRate,
+  watchLater,
+  watchLaterRef,
   filterParam,
   workspaceName,
   isActive,
@@ -38,6 +42,10 @@ export function DiscoverCard({
   /** Bumped on thumb:done so a regenerated thumbnail busts the browser cache. */
   thumbVersion: number;
   onRate: (rating: number) => void;
+  /** Shared membership lookup, resolved once by the route. */
+  watchLater: WatchLaterMembership;
+  /** Set only on the selected slide, so the "w" shortcut can drive this card. */
+  watchLaterRef?: Ref<HTMLButtonElement>;
   filterParam?: string;
   /** Label of the file's workspace, shown as the first meta chip. */
   workspaceName?: string;
@@ -199,6 +207,15 @@ export function DiscoverCard({
               {isVideo ? t("discover.play") : t("discover.open")}
             </Link>
           </Button>
+          {/* Styled to sit flush with the outline icon buttons around it; the
+              control keeps its own primary hover/pressed colors. */}
+          <WatchLaterButton
+            ref={watchLaterRef}
+            fileId={file.id}
+            workspaceId={wsId}
+            watchLater={watchLater}
+            className="size-11 shrink-0 rounded-md border border-border/60 bg-bg/50 backdrop-blur-md hover:bg-bg/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+          />
           <Button
             variant="outline"
             size="icon"

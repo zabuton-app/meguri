@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Maximize2, Minimize2, RefreshCw, Sparkles, X } from "lucide-react";
 import { api, events } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { useWatchLater } from "@/hooks/useWatchLater";
 import { syncFileRowAcrossCaches } from "@/lib/queryCache";
 import { cn } from "@/lib/utils";
 import type { FileRow } from "@/ipc/types";
@@ -80,6 +81,13 @@ export default function Discover() {
     () => new Map(wsList.data?.workspaces.map((w) => [w.id, w.label]) ?? []),
     [wsList.data],
   );
+
+  // Watch Later membership for the card toggles. Shares the workspaces_list
+  // cache with wsList above, so this costs no extra request.
+  const watchLater = useWatchLater();
+  // Points at the selected slide's toggle so the "w" shortcut can activate it
+  // through the button itself (same mutation, toast, effect and disabled state).
+  const activeWatchLaterRef = useRef<HTMLButtonElement>(null);
 
   // Keep the queue stable across remounts; reshuffle is explicit (the button below).
   const queue = useQuery({
@@ -154,7 +162,8 @@ export default function Discover() {
 
   // Carousel paging via the keyboard. Reuses the prev/next chords of the active
   // preset (vim h/l, normal [ ], emacs C-b/C-f); arrows always work as a fallback.
-  // "r" reshuffles. Esc / backdrop close is handled by DiscoverModal.
+  // "r" reshuffles, "w" toggles Watch Later on the current card.
+  // Esc / backdrop close is handled by DiscoverModal.
   const { keybindingPreset } = usePreferences();
   const nav = NAV_BINDINGS[keybindingPreset];
   useEffect(() => {
@@ -171,6 +180,11 @@ export default function Discover() {
       if (e.code === "KeyR" && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault();
         void reshuffle();
+        return;
+      }
+      if (e.code === "KeyW" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        activeWatchLaterRef.current?.click();
         return;
       }
       if (matchAny(e, nav.prev) || e.code === "ArrowLeft") {
@@ -311,6 +325,10 @@ export default function Discover() {
                         workspaceId: f.workspaceId,
                         rating,
                       })
+                    }
+                    watchLater={watchLater}
+                    watchLaterRef={
+                      i === current ? activeWatchLaterRef : undefined
                     }
                     filterParam={filterParam}
                     workspaceName={wsNames.get(f.workspaceId)}
