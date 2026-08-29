@@ -225,6 +225,39 @@ describe("extend", () => {
     const q = createQueue(items(2));
     expect(extend(q, items(2))).toBe(q);
   });
+
+  it("carries a parked pass back intact", () => {
+    // How the player comes back from the detail view: the queue it left with is
+    // handed to extend() against the list as it stands now. Progress, history
+    // and the already-seen set have to survive that, or the user is handed a
+    // playlist that looks like it started over.
+    let q = createQueue(items(4));
+    q = advance(q);
+    q = advance(q);
+    const parked = q;
+
+    const resumed = extend(parked, [
+      ...items(4),
+      { workspaceId: "ws1", fileId: 5, kind: "video" },
+    ]);
+    expect(queueKey(resumed.current!)).toBe(queueKey(parked.current!));
+    expect(resumed.history.map(queueKey)).toEqual(parked.history.map(queueKey));
+    expect(queuePosition(resumed)).toBe(3);
+    // The page that arrived while the player was away joins the tail.
+    expect(resumed.pool.map(queueKey)).toEqual(["ws1:4", "ws1:5"]);
+  });
+
+  it("keeps a parked shuffle order rather than drawing a new one", () => {
+    let q = createQueue(items(4), { shuffle: true }, reverseRng);
+    q = advance(q);
+    const parked = q;
+    const order = parked.pool.map(queueKey);
+    // No new items: nothing to reorder, so the pass the user was hearing is
+    // exactly the pass they come back to.
+    expect(extend(parked, items(4), reverseRng).pool.map(queueKey)).toEqual(
+      order,
+    );
+  });
 });
 
 describe("shuffle", () => {

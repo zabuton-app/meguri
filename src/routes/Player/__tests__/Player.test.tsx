@@ -83,7 +83,7 @@ beforeEach(() => {
 });
 
 describe("Player chrome", () => {
-  it("shows only playback controls", async () => {
+  it("shows playback controls and the one way out to the detail view", async () => {
     renderPlayer([row(1, "video"), row(2, "image")]);
     await screen.findByLabelText("Play (Space)");
     expect(screen.getByLabelText("Next (N)")).toBeTruthy();
@@ -91,12 +91,14 @@ describe("Player chrome", () => {
     expect(screen.getByLabelText("Shuffle (S)")).toBeTruthy();
     expect(screen.getByLabelText("Repeat")).toBeTruthy();
     expect(screen.getByLabelText("Exit playback (Esc)")).toBeTruthy();
+    expect(screen.getByLabelText("Open details (I)")).toBeTruthy();
   });
 
-  it("shows none of the manual-browsing affordances (FR-022)", async () => {
+  it("shows no manual-browsing affordances beyond the detail button (FR-022)", async () => {
     renderPlayer([row(1, "video"), row(2, "image")]);
     await screen.findByLabelText("Play (Space)");
-    // No route out to the detail view or an external player.
+    // The detail button is the single exception, and it is a button that parks
+    // the pass on its way out — not a bare link that would strand playback.
     expect(document.querySelectorAll("a")).toHaveLength(0);
     // No favorite / rating / tag editing, no scene rail, no open-externally.
     for (const label of [

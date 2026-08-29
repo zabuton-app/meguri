@@ -54,6 +54,14 @@ export interface PlayerHandle {
   pause: () => void;
   /** Play/pause from outside the player's own chrome (the playlist control bar). */
   togglePlay: () => void;
+  /**
+   * Current position in seconds. This is the *real* time in the file, not the
+   * element's own `currentTime`: a remuxed stream starts at whatever second the
+   * server was asked for, so the two differ by that offset. While the seek bar
+   * is being dragged this reports where the drag is headed, which is what the
+   * user means by "here" at that moment.
+   */
+  currentTime: () => number;
 }
 
 export const VideoPlayer = forwardRef<
@@ -317,6 +325,9 @@ export const VideoPlayer = forwardRef<
         ref.current?.pause();
       },
       togglePlay,
+      // Through the ref, not the closure: this handle is rebuilt only when
+      // togglePlay changes, so a captured position would go stale immediately.
+      currentTime: () => posRef.current,
     }),
     [togglePlay],
   );

@@ -5,7 +5,7 @@
 // The order comes from MediaNavContext, so whatever sort and filter the list has
 // is what plays, and the queue keeps growing as further pages load.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -27,6 +27,8 @@ import {
   invalidateCollectionSearches,
   invalidatePlayedSearches,
 } from "@/lib/queryCache";
+import { fileHref } from "@/lib/fileHref";
+import { queueKey, type PlaybackQueue } from "@/lib/playbackQueue";
 import { fileNameOf } from "@/lib/relPath";
 import {
   VideoPlayer,
@@ -49,6 +51,26 @@ const CHROME_IDLE_MS = 2500;
  * cross-dissolving keeps exactly one video element alive at a time.
  */
 const TRANSITION_MS = 260;
+
+/**
+ * Seconds into a video below which the detail view is opened from the start
+ * instead. A `?t=` on a stream makes the server re-encode from that second, so
+ * paying for it to land back where the file already begins is pure waste.
+ */
+const RESUME_MIN_SEC = 3;
+
+/**
+ * The pass to pick back up, left behind when the player steps out to the detail
+ * view. A module-level slot rather than state because that trip unmounts this
+ * component (the detail route is a sibling, not a layer on top) — the same
+ * reason Discover keeps its carousel position this way.
+ *
+ * Read once on mount and dropped immediately, and only honoured when the detail
+ * view names the very file the pass was parked on (`/play?resume=<ws>:<id>`):
+ * a leftover pass must never resurface under a later, unrelated playback of
+ * some other list.
+ */
+let resume: { queue: PlaybackQueue; key: string; sec: number } | null = null;
 
 export default function Player() {
   const navigate = useNavigate();
@@ -75,9 +97,21 @@ export default function Player() {
   const ground = mode === "light" ? "bg-white" : "bg-black";
   const navBinding = NAV_BINDINGS[keybindingPreset];
 
+  // Claimed on the first render, before the effect below empties the slot, and
+  // only when the file named in the URL is the one the pass was parked on.
+  const [searchParams] = useSearchParams();
+  const [pickUp, setPickUp] = useState(() => {
+    const token = searchParams.get("resume");
+    return token && resume?.key === token ? resume : null;
+  });
+  useEffect(() => {
+    resume = null;
+  }, []);
+
   const queue = usePlaybackQueue({
     shuffle: playlistShuffle,
     repeat: playlistRepeat,
+    restore: pickUp?.queue,
   });
   const { current, next, prev, skipCurrent } = queue;
 
@@ -146,6 +180,38 @@ export default function Player() {
   });
   const file = detail.data ?? null;
   const isImage = current?.kind === "image";
+
+  // Step out to this file's detail view. The detail route is a sibling of this
+  // one, so this always ends playback for now — what makes it a detour rather
+  // than an exit is the pass left in `resume` and the `from=player` marker the
+  // detail view reads when it closes.
+  const openDetail = useCallback(() => {
+    if (!current) return;
+    const sec = isImage ? 0 : Math.floor(videoRef.current?.currentTime() ?? 0);
+    resume = { queue: queue.queue, key: queueKey(current), sec };
+    void navigate(
+      fileHref(current.fileId, current.workspaceId, {
+        from: "player",
+        t: sec >= RESUME_MIN_SEC ? sec : undefined,
+      }),
+    );
+  }, [current, isImage, navigate, queue.queue]);
+
+  // The second to come back to, offered only to the file the player left from.
+  // The detail view hands back where *it* got to, which is ahead of the detour
+  // whenever the user kept watching there; the parked second is the fallback
+  // for an item with no player of its own (a picture).
+  //
+  // Dropped as soon as the pass steps somewhere else (goNext / goPrev below), so
+  // coming back to that file later in the same pass — or on the next lap with
+  // repeat on — starts it where any other item would.
+  const handedBack = searchParams.get("t");
+  const resumeSec =
+    current && pickUp?.key === queueKey(current)
+      ? handedBack != null && Number.isFinite(Number(handedBack))
+        ? Math.max(0, Math.floor(Number(handedBack)))
+        : pickUp.sec
+      : 0;
 
   // Without its details there is nothing to render for this item, so a failed
   // fetch would leave the stage blank for good. Treat it like any other
@@ -302,6 +368,7 @@ export default function Player() {
     () =>
       transitionTo(() => {
         setPaused(false);
+        setPickUp(null);
         next();
       }, 1),
     [next, transitionTo],
@@ -310,6 +377,7 @@ export default function Player() {
     () =>
       transitionTo(() => {
         setPaused(false);
+        setPickUp(null);
         prev();
       }, -1),
     [prev, transitionTo],
@@ -330,6 +398,7 @@ export default function Player() {
   const keyState = useRef({
     isImage,
     togglePlay,
+    openDetail,
     goNext,
     goPrev,
     toggleShuffle,
@@ -342,6 +411,7 @@ export default function Player() {
     keyState.current = {
       isImage,
       togglePlay,
+      openDetail,
       goNext,
       goPrev,
       toggleShuffle,
@@ -415,6 +485,11 @@ export default function Player() {
         case "KeyS":
           e.preventDefault();
           s.toggleShuffle();
+          return;
+        // Not gated on the item's kind: a picture has a detail view too.
+        case "KeyI":
+          e.preventDefault();
+          s.openDetail();
           return;
         case "Space":
           if (!s.isImage) return;
@@ -567,7 +642,7 @@ export default function Player() {
                   height={file?.height ?? null}
                   mediaBase={mediaBase}
                   wsId={wsId}
-                  startAt={0}
+                  startAt={resumeSec}
                   autoplay
                   navKeys={navBinding}
                   fullscreenTargetRef={rootRef}
@@ -604,6 +679,8 @@ export default function Player() {
           volume={volume}
           muted={muted}
           audible={!isImage}
+          canOpenDetail={!!current}
+          onOpenDetail={openDetail}
           onVolumeChange={setVolume}
           onToggleMute={toggleMuted}
           onTogglePlay={togglePlay}

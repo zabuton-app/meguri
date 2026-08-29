@@ -48,8 +48,7 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
   const nextItem =
     index >= 0 && index < navItems.length - 1 ? navItems[index + 1] : null;
   const canPrev =
-    !!prevItem ||
-    (index === 0 && (nav?.hasPreviousPage ?? false));
+    !!prevItem || (index === 0 && (nav?.hasPreviousPage ?? false));
   const canNext =
     !!nextItem ||
     (index >= 0 &&
@@ -62,7 +61,10 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
       const params = new URLSearchParams();
       params.set("ws", target.workspaceId);
       const from = searchParams.get("from");
-      if (from) params.set("from", from);
+      // Paging to another file leaves the playlist behind: the player's parked
+      // pass is on the file we arrived with, so handing it back after the user
+      // has walked off it would resume somewhere they no longer are.
+      if (from && from !== "player") params.set("from", from);
       const filter = searchParams.get("filter");
       if (filter) params.set("filter", filter);
       void navigate(`/file/${target.id}?${params.toString()}`);

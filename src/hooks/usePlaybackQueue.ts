@@ -29,6 +29,12 @@ export interface UsePlaybackQueueOptions {
   repeat: boolean;
   /** Start on this item instead of the head of the list. */
   startAt?: { workspaceId: string; fileId: number };
+  /**
+   * Pick a previous queue back up instead of building a new one. Used when the
+   * player comes back from the detail view: seeding afresh would restart the
+   * pass, losing the history, the shuffled order and the progress count.
+   */
+  restore?: PlaybackQueue;
 }
 
 export interface UsePlaybackQueueResult {
@@ -47,6 +53,8 @@ export interface UsePlaybackQueueResult {
   prev: () => void;
   skipCurrent: () => void;
   canPrev: boolean;
+  /** The queue itself, so a caller can put it aside and restore it later. */
+  queue: PlaybackQueue;
 }
 
 function toQueueItems(
@@ -73,12 +81,14 @@ export function usePlaybackQueue(
     createQueue([], { shuffle: options.shuffle, repeat: options.repeat }),
   );
 
-  const { shuffle, repeat, startAt } = options;
-  // Read through a ref so seeding uses the current start item without making
-  // the seeding effect re-run when the caller passes a fresh object literal.
+  const { shuffle, repeat, startAt, restore } = options;
+  // Read through refs so seeding uses the current start item without making the
+  // seeding effect re-run when the caller passes a fresh object literal.
   const startAtRef = useRef(startAt);
+  const restoreRef = useRef(restore);
   useEffect(() => {
     startAtRef.current = startAt;
+    restoreRef.current = restore;
   });
 
   // One effect owns the queue's reaction to the outside world: newly loaded list
@@ -86,6 +96,23 @@ export function usePlaybackQueue(
   // all no-ops when nothing actually changed, so this settles in one pass.
   useEffect(() => {
     if (!seeded.current) {
+      const previous = restoreRef.current;
+      if (previous) {
+        // A restored queue stands on its own: it already holds every item it
+        // ever admitted, so unlike a fresh seed it does not have to wait for
+        // the list to load before playback can carry on. What arrives from the
+        // list is only ever appended, so the caller has to be sure it is the
+        // same list the queue came from — the player checks that by naming the
+        // parked file in the URL before it hands one back.
+        seeded.current = true;
+        setQueue(
+          setQueueRepeat(
+            setQueueShuffle(extend(previous, items), shuffle),
+            repeat,
+          ),
+        );
+        return;
+      }
       if (items.length === 0) return;
       seeded.current = true;
       setQueue(
@@ -123,5 +150,6 @@ export function usePlaybackQueue(
     prev,
     skipCurrent,
     canPrev: queue.history.length > 0,
+    queue,
   };
 }
