@@ -225,8 +225,10 @@ describe("Player video chrome", () => {
     // Paused (jsdom never actually plays), which is exactly when the video
     // player would otherwise raise its centre play button and control bar.
     expect(screen.queryByTitle("Play")).toBeNull();
-    expect(screen.queryByTitle("Volume")).toBeNull();
     expect(screen.queryByTitle("Seek")).toBeNull();
+    // The player's own bar carries the volume control; the video must not add
+    // a second one behind it.
+    expect(screen.getAllByTitle("Volume")).toHaveLength(1);
     // The player has a fullscreen control of its own; the video must not add a
     // second one behind it.
     expect(screen.getAllByTitle("Fullscreen (F)")).toHaveLength(1);
@@ -280,7 +282,7 @@ describe("Player video chrome", () => {
     loadVideo();
     fireEvent.keyDown(window, { code: "KeyK" });
     expect(screen.queryByTitle("Play")).toBeNull();
-    expect(screen.queryByTitle("Volume")).toBeNull();
+    expect(screen.getAllByTitle("Volume")).toHaveLength(1);
   });
 });
 

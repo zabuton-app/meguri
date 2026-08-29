@@ -26,6 +26,15 @@ import { findNearestBookmark } from "@/lib/bookmarks";
 import log from "@/lib/logger";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  bumpVolume,
+  setVolume,
+  syncFromElement,
+  toggleMuted,
+  useVolume,
+  VOLUME_EPSILON,
+  VOLUME_STEP,
+} from "@/hooks/useVolume";
 import { matchAny, type NavBinding } from "@/settings/keybindings";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { fmtTime } from "./utils";
@@ -39,23 +48,6 @@ const MEDIA_ERR_NETWORK = 2;
 // retry in the same tick would likely hit the same connection-slot starvation
 // (frame previews holding the origin's sockets) that caused the failure.
 const NETWORK_RETRY_DELAY_MS = 300;
-
-// Persist the player volume/mute across sessions (renderer-local, survives restarts).
-const VOLUME_KEY = "meguri.player.volume";
-const MUTED_KEY = "meguri.player.muted";
-
-function loadVolume(): number {
-  const raw = localStorage.getItem(VOLUME_KEY);
-  const n = raw == null ? NaN : Number(raw);
-  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1;
-}
-function loadMuted(): boolean {
-  return localStorage.getItem(MUTED_KEY) === "1";
-}
-function saveVolume(v: number, muted: boolean) {
-  localStorage.setItem(VOLUME_KEY, String(v));
-  localStorage.setItem(MUTED_KEY, muted ? "1" : "0");
-}
 
 export interface PlayerHandle {
   seek: (t: number) => void;
@@ -174,8 +166,9 @@ export const VideoPlayer = forwardRef<
   const [loaded, setLoaded] = useState(false);
   // Whether this player is currently the fullscreen element (used to drop the max-height cap).
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [muted, setMuted] = useState(loadMuted);
-  const [volume, setVolume] = useState(loadVolume);
+  // Volume lives outside this component so the playlist chrome and the detail
+  // view stay in step (see hooks/useVolume.ts).
+  const { volume, muted } = useVolume();
   // Total duration obtained natively (only when finite).
   const [nativeDur, setNativeDur] = useState<number | null>(null);
   // Hover position on the seek bar {ratio: 0..1, t: seconds}. Positioning uses % to be invariant to CSS zoom.
@@ -196,6 +189,18 @@ export const VideoPlayer = forwardRef<
     posRef.current = displayPos;
     totalRef.current = total;
   });
+
+  // Push the shared volume onto the element. Assigning only when the value
+  // actually differs is what stops this from ping-ponging with the
+  // `volumechange` handler below, which feeds the element's value back in.
+  // This covers changes to the value; a *new* element (the error screen's
+  // reload swaps one in) is caught by onLoadedMetadata instead.
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (Math.abs(v.volume - volume) > VOLUME_EPSILON) v.volume = volume;
+    if (v.muted !== muted) v.muted = muted;
+  }, [volume, muted]);
 
   // Throttle preview fetching (limit ffmpeg launches to ~10 times/sec).
   const desiredRef = useRef<number | null>(null);
@@ -329,13 +334,6 @@ export const VideoPlayer = forwardRef<
     onPlayingChangeRef.current?.(playing);
   }, [playing]);
 
-  const toggleMute = () => {
-    const v = ref.current;
-    if (!v) return;
-    v.muted = !v.muted;
-    setMuted(v.muted);
-  };
-
   // Relative skip (±seconds). Clamped to the total duration, based on the current position.
   const skip = (delta: number) => {
     const base = posRef.current;
@@ -344,13 +342,6 @@ export const VideoPlayer = forwardRef<
     if (t < 0) t = 0;
     if (max && t > max) t = max;
     seekRef.current(t);
-  };
-
-  const bumpVolume = (delta: number) => {
-    const v = ref.current;
-    if (!v) return;
-    v.volume = Math.min(1, Math.max(0, v.volume + delta));
-    v.muted = false;
   };
 
   const toggleFullscreen = () => {
@@ -424,15 +415,15 @@ export const VideoPlayer = forwardRef<
           if (!chromeless) toggleFullscreen();
           break;
         case "KeyM":
-          toggleMute();
+          toggleMuted();
           break;
         case "ArrowUp":
           e.preventDefault();
-          bumpVolume(0.05);
+          bumpVolume(VOLUME_STEP);
           break;
         case "ArrowDown":
           e.preventDefault();
-          bumpVolume(-0.05);
+          bumpVolume(-VOLUME_STEP);
           break;
         case "Home":
         case "Digit0":
@@ -627,17 +618,15 @@ export const VideoPlayer = forwardRef<
         }}
         onVolumeChange={() => {
           const v = ref.current;
-          if (v) {
-            setMuted(v.muted);
-            setVolume(v.volume);
-            saveVolume(v.volume, v.muted);
-          }
+          if (v) syncFromElement(v.volume, v.muted);
         }}
         onLoadedMetadata={() => {
           const v = ref.current;
           if (!v) return;
           setLoaded(true);
-          // Apply the persisted volume/mute to this freshly-loaded media element.
+          // Apply the shared volume/mute to this freshly-loaded element. The
+          // effect above only fires when the value changes, so this is what
+          // covers an element that is new rather than a value that is new.
           v.volume = volume;
           v.muted = muted;
           if (isFinite(v.duration)) {
@@ -842,7 +831,7 @@ export const VideoPlayer = forwardRef<
             <div className="ml-auto flex items-center gap-1">
               <div className="group/vol flex items-center">
                 <CtrlButton
-                  onClick={toggleMute}
+                  onClick={toggleMuted}
                   title={muted ? t("player.unmute") : t("player.mute")}
                 >
                   {muted || volume === 0 ? (
@@ -855,14 +844,9 @@ export const VideoPlayer = forwardRef<
                   type="range"
                   min={0}
                   max={1}
-                  step={0.05}
+                  step={VOLUME_STEP}
                   value={muted ? 0 : volume}
-                  onChange={(e) => {
-                    const v = ref.current;
-                    if (!v) return;
-                    v.volume = Number(e.target.value);
-                    v.muted = false;
-                  }}
+                  onChange={(e) => setVolume(Number(e.target.value))}
                   className="w-0 accent-[var(--c-primary)] opacity-0 transition-all group-hover/vol:ml-1 group-hover/vol:w-20 group-hover/vol:opacity-100"
                   title={t("player.volume")}
                 />
