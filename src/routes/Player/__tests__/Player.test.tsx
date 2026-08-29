@@ -190,6 +190,68 @@ describe("Player keyboard control", () => {
   });
 });
 
+describe("Player video chrome", () => {
+  /** Let the <video> report itself as loaded, which is what reveals its chrome. */
+  function loadVideo() {
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    fireEvent.loadedMetadata(video!);
+  }
+
+  it("never shows the video's own controls on top of the player's", async () => {
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    loadVideo();
+    // Paused (jsdom never actually plays), which is exactly when the video
+    // player would otherwise raise its centre play button and control bar.
+    expect(screen.queryByTitle("Play")).toBeNull();
+    expect(screen.queryByTitle("Volume")).toBeNull();
+    expect(screen.queryByTitle("Fullscreen (F)")).toBeNull();
+    expect(screen.queryByTitle("Seek")).toBeNull();
+  });
+
+  it("keeps the video's controls hidden after a play/pause keypress", async () => {
+    // "K" is the video player's own play/pause chord; it used to surface the
+    // chrome the playlist player deliberately replaces.
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    loadVideo();
+    fireEvent.keyDown(window, { code: "KeyK" });
+    expect(screen.queryByTitle("Play")).toBeNull();
+    expect(screen.queryByTitle("Volume")).toBeNull();
+  });
+});
+
+describe("Player paging keys", () => {
+  it("steps with the preset's paging chords", async () => {
+    // Default "normal" preset: [ and ] page between files elsewhere in the app.
+    renderPlayer([row(1, "video"), row(3, "video"), row(5, "video")]);
+    await screen.findByText("1 / 3");
+    fireEvent.keyDown(window, { code: "BracketRight" });
+    expect(await screen.findByText("2 / 3")).toBeTruthy();
+    fireEvent.keyDown(window, { code: "BracketLeft" });
+    expect(await screen.findByText("1 / 3")).toBeTruthy();
+  });
+
+  it("follows the configured preset rather than a fixed pair of keys", async () => {
+    setPrefs({ keybindingPreset: "vim" });
+    renderPlayer([row(1, "video"), row(3, "video")]);
+    await screen.findByText("1 / 2");
+    fireEvent.keyDown(window, { code: "KeyL" });
+    expect(await screen.findByText("2 / 2")).toBeTruthy();
+    fireEvent.keyDown(window, { code: "KeyH" });
+    expect(await screen.findByText("1 / 2")).toBeTruthy();
+  });
+
+  it("leaves the normal preset's chords inert under another preset", async () => {
+    setPrefs({ keybindingPreset: "vim" });
+    renderPlayer([row(1, "video"), row(3, "video")]);
+    await screen.findByText("1 / 2");
+    fireEvent.keyDown(window, { code: "BracketRight" });
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+  });
+});
+
 describe("Player transitions", () => {
   function fade(): HTMLElement | null {
     return document.querySelector('[data-slot="player-fade"]');

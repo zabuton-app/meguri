@@ -19,7 +19,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { usePreferences } from "@/settings/PreferencesProvider";
-import { NAV_BINDINGS } from "@/settings/keybindings";
+import { NAV_BINDINGS, matchAny } from "@/settings/keybindings";
 import {
   invalidateCollectionSearches,
   invalidatePlayedSearches,
@@ -322,6 +322,7 @@ export default function Player() {
     goPrev,
     toggleShuffle,
     exit,
+    navBinding,
   });
   useEffect(() => {
     keyState.current = {
@@ -331,6 +332,7 @@ export default function Player() {
       goPrev,
       toggleShuffle,
       exit,
+      navBinding,
     };
   });
   useEffect(() => {
@@ -343,8 +345,22 @@ export default function Player() {
           el.isContentEditable)
       )
         return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const s = keyState.current;
+      // The preset's paging chords step through the playlist, the same way they
+      // page files in the detail view. Checked before the modifier guard because
+      // a preset chord may itself carry one, and before the switch because the
+      // video player yields these keys expecting someone else to act on them.
+      if (matchAny(e, s.navBinding.prev)) {
+        e.preventDefault();
+        s.goPrev();
+        return;
+      }
+      if (matchAny(e, s.navBinding.next)) {
+        e.preventDefault();
+        s.goNext();
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       switch (e.code) {
         case "Escape":
           e.preventDefault();
@@ -465,8 +481,14 @@ export default function Player() {
                 fullscreenTargetRef={rootRef}
                 onNativeDuration={() => undefined}
                 onPlayed={() => invalidatePlayedSearches(qc)}
+                chromeless
                 onEnded={goNext}
-                onPlayingChange={setVideoPlaying}
+                onPlayingChange={(playing) => {
+                  setVideoPlaying(playing);
+                  // The video draws no chrome of its own here, so a play/pause
+                  // from the keyboard would otherwise change nothing on screen.
+                  wake();
+                }}
                 onFatalError={skipCurrent}
                 t={t}
               />
