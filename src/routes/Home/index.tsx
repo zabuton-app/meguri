@@ -649,7 +649,9 @@ export default function Home() {
 
       {/* Play the list as a playlist. No params: the player reads the very list
           order shared through MediaNavContext below, so whatever sort/filter is
-          on screen is what plays — collection, Watch Later or plain search. */}
+          on screen is what plays — collection, Watch Later or plain search.
+          Accent-filled like the discovery button beside it: both start a way of
+          watching, and neither is subordinate to the other. */}
       <Link
         to="/play"
         title={t("playlist.start")}
@@ -657,7 +659,7 @@ export default function Home() {
         aria-disabled={!canPlay}
         tabIndex={canPlay ? undefined : -1}
         className={cn(
-          "fixed bottom-24 right-5 z-30 flex size-14 items-center justify-center rounded-full bg-surface text-fg shadow-xl shadow-black/25 ring-1 ring-border transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "fixed bottom-24 right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           !canPlay && "pointer-events-none opacity-45",
         )}
       >
