@@ -42,6 +42,9 @@ export function captureStage(
         // out — drawing and displaying it is still allowed, and that is all this
         // needs.
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Styled here rather than where it is mounted: the element is this
+        // module's to shape, and the component that shows it only borrows it.
+        canvas.className = "h-full w-full object-contain";
         return { key, backdropSrc, canvas };
       } catch {
         // Nothing usable; fall through to the image case.

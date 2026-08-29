@@ -56,6 +56,7 @@ export function PlayerChrome({
 }) {
   return (
     <div
+      data-slot="player-chrome"
       className={`absolute inset-0 z-20 transition-opacity duration-300 ${
         visible ? "opacity-100" : "pointer-events-none opacity-0"
       }`}

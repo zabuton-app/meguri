@@ -84,7 +84,16 @@ export function kenBurnsKeyframes(spec: KenBurnsSpec): Keyframe[] {
   ];
 }
 
-/** The still transform to apply when motion is off (keeps framing identical). */
+/**
+ * How a still image sits when it is not moving: whole, uncropped, centred.
+ *
+ * Deliberately not MIN_SCALE — with motion off there is no travel to leave room
+ * for, so cropping into the picture would be a loss for nothing. It does mean
+ * the framing differs between motion on and off, which is inherent to a zoom
+ * effect; what must not happen is this transform being painted for a frame
+ * *before* an animation takes over, and ImageStage starts the animation in a
+ * layout effect so that frame never reaches the screen.
+ */
 export function staticTransform(): string {
   return "translate(0%, 0%) scale(1)";
 }

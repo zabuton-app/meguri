@@ -34,7 +34,6 @@ function CanvasFrame({ canvas }: { canvas: HTMLCanvasElement }) {
   const mount = useCallback(
     (node: HTMLDivElement | null) => {
       if (!node) return;
-      canvas.className = "h-full w-full object-contain";
       node.replaceChildren(canvas);
     },
     [canvas],

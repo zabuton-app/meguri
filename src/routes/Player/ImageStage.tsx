@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import {
   createKenBurnsSpec,
   kenBurnsKeyframes,
@@ -46,7 +46,12 @@ export function ImageStage({
   });
 
   // One clock per image. Keyed on src so each item gets a fresh draw.
-  useEffect(() => {
+  //
+  // A layout effect, not a normal one: the element renders at staticTransform()
+  // and the animation replaces that. Waiting until after paint would show the
+  // uncropped frame for a beat before the motion snapped it to its starting
+  // scale — most visible right after a switch, when the eye is already on it.
+  useLayoutEffect(() => {
     const el = ref.current;
     const timer = timerRef.current;
     const finish = () => onDoneRef.current();

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MediaNavProvider, type MediaNav } from "@/components/MediaNavContext";
 import Player from "@/routes/Player";
 import type { FileDetail, FileRow } from "@/ipc/types";
@@ -137,6 +137,26 @@ describe("Player chrome", () => {
 });
 
 describe("Player keyboard control", () => {
+  it("wakes the control bar on a shortcut, so a keypress has an answer", async () => {
+    // Shortcuts are handled on window; the root's own onKeyDown never sees them
+    // because focus sits on <body>, so nothing used to bring the bar back.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderPlayer([row(1, "video"), row(3, "video")]);
+      await screen.findByLabelText("Next (N)");
+      const chrome = () =>
+        document.querySelector('[data-slot="player-chrome"]');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4000);
+      });
+      expect(chrome()?.className).toContain("opacity-0");
+      fireEvent.keyDown(window, { code: "KeyS" });
+      expect(chrome()?.className).toContain("opacity-100");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("steps forward on N and back on P", async () => {
     renderPlayer([row(1, "video"), row(3, "video"), row(5, "video")]);
     await screen.findByText("1 / 3");

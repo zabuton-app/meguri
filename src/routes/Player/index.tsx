@@ -313,6 +313,7 @@ export default function Player() {
     toggleFullscreen,
     exit,
     navBinding,
+    wake,
   });
   useEffect(() => {
     keyState.current = {
@@ -324,6 +325,7 @@ export default function Player() {
       toggleFullscreen,
       exit,
       navBinding,
+      wake,
     };
   });
   useEffect(() => {
@@ -348,6 +350,10 @@ export default function Player() {
       )
         return;
       const s = keyState.current;
+      // Shortcuts arrive on window, so the root's own onKeyDown never sees them
+      // (focus usually sits on <body>). Waking here is what gives a keypress any
+      // visible answer at all once the bar has hidden itself.
+      s.wake();
       // The preset's paging chords step through the playlist, the same way they
       // page files in the detail view. Checked before the modifier guard because
       // a preset chord may itself carry one, and before the switch because the
