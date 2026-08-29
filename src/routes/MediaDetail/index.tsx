@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import log from "@/lib/logger";
 import {
   LIST_HIDDEN_SOURCES,
   RESERVED_TAG_ERROR,
@@ -46,6 +47,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RatingStars } from "@/components/RatingStars";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import { useWatchLater } from "@/hooks/useWatchLater";
+import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { TagEditor } from "@/components/TagEditor";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatChords } from "@/settings/keybindings";
@@ -63,6 +67,7 @@ import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
 import { copyImageToClipboard } from "./utils";
 import {
+  dropFromWatchLaterCache,
   invalidateCollectionSearches,
   invalidatePlayedSearches,
   invalidateTagSearches,
@@ -209,6 +214,9 @@ export default function MediaDetail() {
       .then(() => {
         // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
         invalidatePlayedSearches(qc);
+        // Viewing an image counts as a play, so the main process just consumed
+        // this file's Watch Later entry. Mirror that into the cache.
+        dropFromWatchLaterCache(qc, wsId, fileId);
       })
       .catch(() => {
         // Drop the guard on failure so a later effect run of this visit can retry;
@@ -221,6 +229,11 @@ export default function MediaDetail() {
     queryFn: api.workspacesList,
   });
   const collections = workspaces.data?.collections ?? [];
+  // Watch Later membership for the toggle next to the favorite heart, plus the
+  // "W" shortcut that drives that same control.
+  const watchLater = useWatchLater();
+  const watchLaterRef = useRef<HTMLButtonElement>(null);
+  useWatchLaterHotkey({ active: true, buttonRef: watchLaterRef });
   // Opening a file drops it from Watch Later in the main process, but the main
   // process deliberately stays quiet about it so the list doesn't shift while
   // the user is stepping through it with prev/next. Flush the affected caches
@@ -552,7 +565,11 @@ export default function MediaDetail() {
                 exportPending={exportFrame.isPending}
                 onExportFrame={(sec) => exportFrame.mutate(sec)}
                 onNativeDuration={setNativeDur}
-                onPlayed={() => invalidatePlayedSearches(qc)}
+                onPlayed={() => {
+                  invalidatePlayedSearches(qc);
+                  dropFromWatchLaterCache(qc, wsId, fileId);
+                }}
+                onOpenExternal={() => dropFromWatchLaterCache(qc, wsId, fileId)}
                 t={t}
               />
             </div>
@@ -630,7 +647,14 @@ export default function MediaDetail() {
                 className="border-muted/35 bg-surface"
                 onClick={() => {
                   playerRef.current?.pause();
-                  void api.openExternal(fileId, wsId);
+                  // The main process records the play and consumes the Watch
+                  // Later entry, so mirror that once it confirms — it can also
+                  // refuse (a file gone missing under the root), and patching
+                  // regardless would show the file as consumed when it is not.
+                  void api
+                    .openExternal(fileId, wsId)
+                    .then(() => dropFromWatchLaterCache(qc, wsId, fileId))
+                    .catch((e: unknown) => log.error("open external", e));
                 }}
               >
                 <ExternalLink />
@@ -800,12 +824,21 @@ export default function MediaDetail() {
                 onChange={(r) => setRating.mutate(r)}
                 size={20}
               />
+              {/* Pushed to the far end of the row, favorite outermost. */}
+              <WatchLaterButton
+                ref={watchLaterRef}
+                fileId={fileId}
+                workspaceId={wsId}
+                watchLater={watchLater}
+                size={22}
+                deferListRefresh
+                className="ml-auto"
+              />
               <FavoriteButton
                 fileId={fileId}
                 workspaceId={wsId}
                 favorite={d.favorite}
                 size={22}
-                className="ml-auto"
               />
             </div>
             <div className="flex flex-col gap-2 border-t border-border pt-4">

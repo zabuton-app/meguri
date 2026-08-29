@@ -24,6 +24,7 @@ function renderPlayer(
   const onExportFrame = vi.fn();
   const onNativeDuration = vi.fn();
   const onPlayed = vi.fn();
+  const onOpenExternal = vi.fn();
   const t = (key: string) => key;
 
   const props = {
@@ -44,6 +45,7 @@ function renderPlayer(
     onExportFrame,
     onNativeDuration,
     onPlayed,
+    onOpenExternal,
     t,
     ...overrides,
   };

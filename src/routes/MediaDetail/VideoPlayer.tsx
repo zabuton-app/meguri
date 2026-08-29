@@ -123,6 +123,13 @@ export const VideoPlayer = forwardRef<
      * full-screen player must not show.
      */
     onFatalError?: (message: string) => void;
+    /**
+     * Fired when the error screen hands the file to an external player. That
+     * counts as a play main-side (and consumes the Watch Later entry), so the
+     * parent gets to keep its caches in step. Optional because a caller that
+     * handles failures itself (onFatalError) never renders that screen.
+     */
+    onOpenExternal?: () => void;
     t: TFunc;
   }
 >(function VideoPlayer(
@@ -149,6 +156,7 @@ export const VideoPlayer = forwardRef<
     onEnded,
     onPlayingChange,
     onFatalError,
+    onOpenExternal,
     chromeless = false,
     t,
   },
@@ -520,7 +528,15 @@ export const VideoPlayer = forwardRef<
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void api.openExternal(id, wsId)}
+            // Only report the launch once the main process confirms it: it
+            // records the play (and consumes the Watch Later entry) there, and
+            // can refuse for a file that has gone missing under the root.
+            onClick={() =>
+              void api
+                .openExternal(id, wsId)
+                .then(() => onOpenExternal?.())
+                .catch((e: unknown) => log.error("open external", e))
+            }
           >
             <ExternalLink />
             {t("player.openExternal")}

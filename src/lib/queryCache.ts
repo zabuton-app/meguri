@@ -7,8 +7,10 @@ import type {
   FileRow,
   SearchQuery,
   SearchResult,
+  WorkspacesList,
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
+import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
 /** The SearchQuery part of a ["files_search", wsId, filter] query key. */
 function searchFilterOf(queryKey: readonly unknown[]): SearchQuery | undefined {
@@ -137,4 +139,53 @@ export function syncFileRowAcrossCaches(
 ): void {
   patchFileRowInCaches(qc, workspaceId, fileId, patch);
   patchFileDetailInCache(qc, workspaceId, fileId, patch);
+}
+
+/**
+ * Mirror the main process's `consumeWatchLater()` into the cached workspace list.
+ *
+ * Playing a file (in the player, as an image view, or in an external player)
+ * takes it off Watch Later main-side, but that removal is deliberately silent:
+ * broadcasting `workspace:changed` would refetch the list under an open detail
+ * view and drop the viewed file out of the prev/next order. The detail view
+ * flushes the caches on close instead — which leaves the toggle looking queued
+ * for the rest of the visit.
+ *
+ * So patch the cache in place rather than invalidating it: `setQueryData` keeps
+ * the refetch (and with it the navigation order) from happening at all.
+ */
+export function dropFromWatchLaterCache(
+  qc: QueryClient,
+  workspaceId: string,
+  fileId: number,
+): void {
+  // Cancel first: a workspaces_list fetch already in flight would land after
+  // this patch and restore the entry the main process has just consumed. The
+  // detail view mounts its own observer for that key, so such a fetch is
+  // routinely in the air when the play is recorded.
+  //
+  // Only when there is data to protect, though. Cancelling reverts the query to
+  // its previous value, so cancelling a first-ever load strands this app-wide
+  // key at undefined with nothing to re-run it (refetchOnWindowFocus is off) —
+  // which would empty the workspace rail and freeze every Watch Later toggle in
+  // its disabled state. With no data the patch below is a no-op anyway.
+  if (qc.getQueryData(["workspaces_list"]) !== undefined) {
+    void qc.cancelQueries({ queryKey: ["workspaces_list"] });
+  }
+  qc.setQueryData<WorkspacesList>(["workspaces_list"], (prev) => {
+    if (!prev) return prev;
+    const watchLater = prev.collections.find((c) => c.id === WATCH_LATER_ID);
+    if (!watchLater) return prev;
+    const items = watchLater.items.filter(
+      (item) => item.workspaceId !== workspaceId || item.fileId !== fileId,
+    );
+    // Same object identity when nothing matched, so no observer re-renders.
+    if (items.length === watchLater.items.length) return prev;
+    return {
+      ...prev,
+      collections: prev.collections.map((c) =>
+        c.id === WATCH_LATER_ID ? { ...c, items } : c,
+      ),
+    };
+  });
 }
