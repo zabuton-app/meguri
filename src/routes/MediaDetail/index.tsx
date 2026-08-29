@@ -117,11 +117,16 @@ export default function MediaDetail() {
       params.set("resume", `${searchParams.get("ws") ?? ""}:${fileId}`);
       // Hand back where this player got to, not where the playlist left off —
       // watching on for a few minutes here and then being rewound to the second
-      // of the detour reads as a bug.
+      // of the detour reads as a bug. Until its metadata has loaded this player
+      // still reports 0, so closing straight away falls back to the second the
+      // detour was taken at rather than rewinding to the top of the file.
+      const arrived = Number(searchParams.get("t")) || 0;
       const sec = playerRef.current?.currentTime();
-      if (sec != null && Number.isFinite(sec)) {
-        params.set("t", String(Math.max(0, Math.floor(sec))));
-      }
+      const handBack =
+        sec != null && Number.isFinite(sec) && sec > 0
+          ? Math.floor(sec)
+          : arrived;
+      if (handBack > 0) params.set("t", String(handBack));
       // Replaced, not pushed: the detour is one round trip, and a growing
       // history would offer a "back" that lands on a pass already spent.
       void navigate(`/play?${params.toString()}`, { replace: true });

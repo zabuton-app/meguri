@@ -2,6 +2,7 @@
 // file on screen, then come back to the same pass at the same second. The
 // detail route is a sibling of the player's, so the trip always unmounts the
 // player — everything here is about surviving that.
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MediaNavProvider, type MediaNav } from "@/components/MediaNavContext";
@@ -71,6 +72,19 @@ function renderPlayer(
     <MediaNavProvider value={nav(items, overrides)}>
       <Player />
     </MediaNavProvider>,
+    { route },
+  );
+}
+
+/** The app runs under StrictMode, whose double-invoked effects are a hazard
+ * for anything read once on mount. */
+function renderPlayerStrict(items: FileRow[], route: string) {
+  return renderWithProviders(
+    <StrictMode>
+      <MediaNavProvider value={nav(items)}>
+        <Player />
+      </MediaNavProvider>
+    </StrictMode>,
     { route },
   );
 }
@@ -219,6 +233,19 @@ describe("Player resume after a detour", () => {
     const video = await videoFor(1);
     fireEvent.loadedMetadata(video);
     await waitFor(() => expect(video.getAttribute("src")).toContain("t=42"));
+  });
+
+  it("survives StrictMode's double-invoked mount effects", async () => {
+    const items = [row(1, "video"), row(3, "video")];
+    const first = renderPlayer(items);
+    await screen.findByText("1 / 2");
+    fireEvent.click(screen.getByLabelText("Next (N)"));
+    await screen.findByText("2 / 2");
+    await stepOut();
+    first.unmount();
+
+    renderPlayerStrict(items, `/play?resume=${WS_ID}:3`);
+    expect(await screen.findByText("2 / 2")).toBeTruthy();
   });
 
   it("refuses a pass parked on some other file", async () => {

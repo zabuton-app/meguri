@@ -88,6 +88,9 @@ async function openDetail(route: string) {
 /** Where the router ended up, without the leading "#". */
 const at = () => window.location.hash.slice(1);
 
+/** The query the router ended up with. */
+const query = () => new URLSearchParams(at().split("?")[1] ?? "");
+
 function close() {
   fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
 }
@@ -120,15 +123,26 @@ describe("MediaDetail close target", () => {
     // that matches what it put aside — and where this view got to, so watching
     // on here and then closing does not rewind to the second of the detour.
     await waitFor(() => expect(at()).toContain("/play?"));
-    expect(at()).toContain(`resume=${encodeURIComponent(`${WS_ID}:1`)}`);
-    expect(at()).toContain("t=0");
+    expect(query().get("resume")).toBe(`${WS_ID}:1`);
+    // Nothing has played here, so there is no position worth handing back.
+    expect(query().has("t")).toBe(false);
+  });
+
+  it("keeps the detour's position when closed before anything has played", async () => {
+    // This player reports 0 until its metadata loads, so closing straight away
+    // must not hand back a zero that rewinds the playlist to the top of the
+    // file the user was already partway through.
+    await openDetail(`/file/1?ws=${WS_ID}&from=player&t=90`);
+    close();
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(query().get("t")).toBe("90");
   });
 
   it("hands playback back from the close button too, not just Esc", async () => {
     await openDetail(`/file/1?ws=${WS_ID}&from=player`);
     fireEvent.click(screen.getByTitle("Close (Esc)"));
     await waitFor(() => expect(at()).toContain("/play?"));
-    expect(at()).toContain(`resume=${encodeURIComponent(`${WS_ID}:1`)}`);
+    expect(query().get("resume")).toBe(`${WS_ID}:1`);
   });
 
   it("stops being a detour once the user pages to another file", async () => {
