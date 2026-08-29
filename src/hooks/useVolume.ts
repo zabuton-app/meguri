@@ -22,6 +22,12 @@ const MUTED_KEY = "meguri.player.muted";
  */
 export const VOLUME_EPSILON = 0.001;
 
+/**
+ * One keypress (and one slider notch) worth of volume. Shared so the detail
+ * player and the playlist player move the same level at the same rate.
+ */
+export const VOLUME_STEP = 0.05;
+
 export interface VolumeState {
   /** 0..1. Kept as-is while muted, so unmuting restores the same loudness. */
   volume: number;
@@ -68,6 +74,11 @@ function persist(s: VolumeState) {
  * echoing back the value it was just given stops here.
  */
 function commit(next: VolumeState) {
+  // NaN survives Math.min/max and compares false against everything, so it
+  // would slip past the check below and be persisted as the string "NaN",
+  // poisoning every later read and the slider with it. A bad number is not a
+  // request to change anything — least of all to jump to full volume.
+  if (!Number.isFinite(next.volume)) return;
   if (
     Math.abs(next.volume - state.volume) <= VOLUME_EPSILON &&
     next.muted === state.muted
@@ -108,7 +119,7 @@ export function toggleMuted(): void {
 }
 
 /**
- * Relative change (e.g. the keyboard's ±0.05 steps). Unlike {@link setVolume}
+ * Relative change (one {@link VOLUME_STEP} per keypress). Unlike {@link setVolume}
  * this leaves mute alone: nudging the level down while muted means "set it
  * lower for when the sound comes back", not "start playing it out loud now".
  */

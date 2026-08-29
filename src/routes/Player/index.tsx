@@ -17,6 +17,7 @@ import {
   setVolume,
   toggleMuted,
   useVolume,
+  VOLUME_STEP,
 } from "@/hooks/useVolume";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { useTheme } from "@/themes/ThemeProvider";
@@ -40,10 +41,6 @@ import { PlayerStage } from "./PlayerStage";
 
 /** Idle time before the control bar fades away. */
 const CHROME_IDLE_MS = 2500;
-
-// One keypress worth of volume. Matches the detail player's step so the two
-// surfaces move the shared level at the same rate.
-const VOLUME_STEP = 0.05;
 
 /**
  * Half of one item-to-item transition: the outgoing item fades out over this

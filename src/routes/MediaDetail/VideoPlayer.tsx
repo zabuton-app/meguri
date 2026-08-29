@@ -33,6 +33,7 @@ import {
   toggleMuted,
   useVolume,
   VOLUME_EPSILON,
+  VOLUME_STEP,
 } from "@/hooks/useVolume";
 import { matchAny, type NavBinding } from "@/settings/keybindings";
 import type { TFunc } from "@/i18n/I18nProvider";
@@ -418,11 +419,11 @@ export const VideoPlayer = forwardRef<
           break;
         case "ArrowUp":
           e.preventDefault();
-          bumpVolume(0.05);
+          bumpVolume(VOLUME_STEP);
           break;
         case "ArrowDown":
           e.preventDefault();
-          bumpVolume(-0.05);
+          bumpVolume(-VOLUME_STEP);
           break;
         case "Home":
         case "Digit0":
@@ -843,7 +844,7 @@ export const VideoPlayer = forwardRef<
                   type="range"
                   min={0}
                   max={1}
-                  step={0.05}
+                  step={VOLUME_STEP}
                   value={muted ? 0 : volume}
                   onChange={(e) => setVolume(Number(e.target.value))}
                   className="w-0 accent-[var(--c-primary)] opacity-0 transition-all group-hover/vol:ml-1 group-hover/vol:w-20 group-hover/vol:opacity-100"

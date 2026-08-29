@@ -12,6 +12,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import { VOLUME_STEP } from "@/hooks/useVolume";
 import type { TFunc } from "@/i18n/I18nProvider";
 
 // The player's only interactive surface. Deliberately minimal: no jump-to-detail,
@@ -139,7 +140,7 @@ export function PlayerChrome({
                 type="range"
                 min={0}
                 max={1}
-                step={0.05}
+                step={VOLUME_STEP}
                 value={muted ? 0 : volume}
                 onChange={(e) => onVolumeChange(Number(e.target.value))}
                 title={t("player.volume")}

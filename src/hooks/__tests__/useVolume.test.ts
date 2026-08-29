@@ -105,6 +105,21 @@ describe("useVolume store", () => {
     expect(result.current.volume).toBe(0);
   });
 
+  it("ignores a non-finite level instead of storing it", async () => {
+    // "NaN" in storage would poison every later read and the slider with it,
+    // and falling back to full volume would be a jump to the loudest setting
+    // on the back of a bad number.
+    const { useVolume, setVolume, bumpVolume, syncFromElement } =
+      await loadStore();
+    const { result } = renderHook(() => useVolume());
+    act(() => setVolume(0.4));
+    act(() => setVolume(Number.NaN));
+    act(() => bumpVolume(Number.NaN));
+    act(() => syncFromElement(Number.NaN, false));
+    expect(result.current.volume).toBeCloseTo(0.4);
+    expect(localStorage.getItem(VOLUME_KEY)).toBe("0.4");
+  });
+
   it("takes the value a media element reports, mute included", async () => {
     const { useVolume, syncFromElement } = await loadStore();
     const { result } = renderHook(() => useVolume());
