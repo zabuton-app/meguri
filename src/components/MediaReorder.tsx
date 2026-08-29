@@ -2,7 +2,7 @@
 // its manual order. The order being edited is the collection's stored item
 // order (config.json), so a drop reports the loaded window's new order and the
 // main process rearranges just those slots — items outside the window never move.
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -49,10 +49,16 @@ export function MediaReorderProvider({
     }),
   );
   const ids = useMemo(() => items.map(mediaSortId), [items]);
+  // A pointerup that ends a drag is still followed by a click on the item that
+  // was picked up, which would open its detail view. The flag is raised when a
+  // drag ends and swallows that one click; a fresh pointerdown clears it so a
+  // drag that produces no click cannot swallow a later one.
+  const draggedRef = useRef(false);
 
   if (!reorder) return <>{children}</>;
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    draggedRef.current = true;
     if (!over || active.id === over.id) return;
     const from = ids.indexOf(String(active.id));
     const to = ids.indexOf(String(over.id));
@@ -66,10 +72,27 @@ export function MediaReorderProvider({
       collisionDetection={closestCenter}
       modifiers={[restrictToFirstScrollableAncestor]}
       onDragEnd={onDragEnd}
+      onDragCancel={() => {
+        draggedRef.current = true;
+      }}
     >
       {/* rect strategy covers all three views: grid rows, list rows and table rows. */}
       <SortableContext items={ids} strategy={rectSortingStrategy}>
-        {children}
+        {/* display:contents so this listener host adds no box of its own. */}
+        <div
+          className="contents"
+          onPointerDownCapture={() => {
+            draggedRef.current = false;
+          }}
+          onClickCapture={(e) => {
+            if (!draggedRef.current) return;
+            draggedRef.current = false;
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          {children}
+        </div>
       </SortableContext>
     </DndContext>
   );
