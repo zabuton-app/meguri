@@ -8,6 +8,8 @@ import {
   Shuffle,
   SkipBack,
   SkipForward,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import type { TFunc } from "@/i18n/I18nProvider";
@@ -25,6 +27,11 @@ export function PlayerChrome({
   fullscreen,
   canPrev,
   visible,
+  volume,
+  muted,
+  audible,
+  onVolumeChange,
+  onToggleMute,
   onTogglePlay,
   onPrev,
   onNext,
@@ -45,6 +52,19 @@ export function PlayerChrome({
   canPrev: boolean;
   /** False once the user has been idle; the chrome fades out of the way. */
   visible: boolean;
+  /** Playback volume, 0..1. Kept as-is while muted. */
+  volume: number;
+  muted: boolean;
+  /**
+   * Whether the item on screen can make a sound (false for a still image). The
+   * controls stay drawn and usable either way — dropping them would shift every
+   * button beside them each time the queue reaches a picture, and the keyboard
+   * can move the level during a picture too — so this only dims them to say
+   * "nothing to hear right now".
+   */
+  audible: boolean;
+  onVolumeChange: (v: number) => void;
+  onToggleMute: () => void;
   onTogglePlay: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -97,6 +117,36 @@ export function PlayerChrome({
           </span>
 
           <div className="ml-auto flex items-center gap-1">
+            <div
+              className={`mr-1 flex items-center gap-1 transition-opacity ${
+                audible ? "" : "opacity-50"
+              }`}
+            >
+              <ChromeButton
+                onClick={onToggleMute}
+                title={muted ? t("player.unmute") : t("player.mute")}
+              >
+                {muted || volume === 0 ? (
+                  <VolumeX size={18} />
+                ) : (
+                  <Volume2 size={18} />
+                )}
+              </ChromeButton>
+              {/* Always open, unlike the detail player's hover-to-expand slider:
+                  from across the room the current level has to be readable
+                  without hunting for it first. */}
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={muted ? 0 : volume}
+                onChange={(e) => onVolumeChange(Number(e.target.value))}
+                title={t("player.volume")}
+                aria-label={t("player.volume")}
+                className="w-24 cursor-pointer accent-[var(--c-primary)]"
+              />
+            </div>
             <ChromeButton
               onClick={onToggleShuffle}
               active={shuffle}

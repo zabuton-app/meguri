@@ -12,6 +12,12 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import {
+  bumpVolume,
+  setVolume,
+  toggleMuted,
+  useVolume,
+} from "@/hooks/useVolume";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { useTheme } from "@/themes/ThemeProvider";
 import { cn } from "@/lib/utils";
@@ -34,6 +40,10 @@ import { PlayerStage } from "./PlayerStage";
 
 /** Idle time before the control bar fades away. */
 const CHROME_IDLE_MS = 2500;
+
+// One keypress worth of volume. Matches the detail player's step so the two
+// surfaces move the shared level at the same rate.
+const VOLUME_STEP = 0.05;
 
 /**
  * Half of one item-to-item transition: the outgoing item fades out over this
@@ -82,6 +92,9 @@ export default function Player() {
 
   const [paused, setPaused] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
+  // Shared with the detail view's player, so a level set in either place holds
+  // for the other and survives both item switches and restarts.
+  const { volume, muted } = useVolume();
   const videoRef = useRef<PlayerHandle>(null);
 
   const exit = useCallback(() => {
@@ -191,6 +204,19 @@ export default function Player() {
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
   }, []);
+
+  // Any volume change gets an answer on screen. The keys are handled in two
+  // places (here for images, the video player for everything else) and the
+  // detail view can move the same value, so watching the value itself covers
+  // every route without wiring a callback through each one.
+  const volumeReady = useRef(false);
+  useEffect(() => {
+    if (!volumeReady.current) {
+      volumeReady.current = true;
+      return;
+    }
+    wake();
+  }, [volume, muted, wake]);
 
   // Decode the next item ahead of time so the swap lands on a warm cache. Only
   // its pixels: file_get records an access server-side, so prefetching the
@@ -408,6 +434,24 @@ export default function Player() {
           e.preventDefault();
           s.goPrev();
           return;
+        // Volume follows the same split as play/pause and seeking: while a video
+        // is on screen its own handler owns these keys, and acting here as well
+        // would move the level twice per press.
+        case "ArrowUp":
+          if (!s.isImage) return;
+          e.preventDefault();
+          bumpVolume(VOLUME_STEP);
+          return;
+        case "ArrowDown":
+          if (!s.isImage) return;
+          e.preventDefault();
+          bumpVolume(-VOLUME_STEP);
+          return;
+        case "KeyM":
+          if (!s.isImage) return;
+          e.preventDefault();
+          toggleMuted();
+          return;
         default:
       }
     };
@@ -560,6 +604,11 @@ export default function Player() {
           fullscreen={isFullscreen}
           canPrev={queue.canPrev}
           visible={chromeVisible}
+          volume={volume}
+          muted={muted}
+          audible={!isImage}
+          onVolumeChange={setVolume}
+          onToggleMute={toggleMuted}
           onTogglePlay={togglePlay}
           onPrev={goPrev}
           onNext={goNext}
