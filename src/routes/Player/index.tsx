@@ -577,6 +577,13 @@ export default function Player() {
       aria-label={t("playlist.start")}
       className={cn("fixed inset-0 z-50 overflow-hidden", ground)}
       onMouseMove={wake}
+      // Pressing a control counts as activity in its own right. Without this the
+      // bar keeps counting down from the last mouse *movement*, so clicking Next
+      // and holding still makes it vanish a moment later — right as the user is
+      // reaching for it again. Pointer-down rather than click so that starting a
+      // drag on the volume slider counts too; keyboard activation already
+      // arrives here as a bubbling keydown.
+      onPointerDown={wake}
       onKeyDown={wake}
     >
       {queue.waiting && !current ? (

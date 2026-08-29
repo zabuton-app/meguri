@@ -159,6 +159,34 @@ describe("Player keyboard control", () => {
     }
   });
 
+  it("restarts the countdown when a control is pressed", async () => {
+    // The bar used to keep counting from the last mouse *movement*, so pressing
+    // Next and then holding still made it vanish moments later.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderPlayer([row(1, "video"), row(3, "video")]);
+      const nextButton = await screen.findByLabelText("Next (N)");
+      const chrome = () =>
+        document.querySelector('[data-slot="player-chrome"]');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      fireEvent.pointerDown(nextButton);
+      // Past the point the original countdown would have expired.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(chrome()?.className).toContain("opacity-100");
+      // And it still goes away once the new countdown runs out.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      expect(chrome()?.className).toContain("opacity-0");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("steps forward on N and back on P", async () => {
     renderPlayer([row(1, "video"), row(3, "video"), row(5, "video")]);
     await screen.findByText("1 / 3");
