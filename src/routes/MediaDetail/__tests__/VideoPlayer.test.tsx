@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { NAV_BINDINGS } from "@/settings/keybindings";
 import {
@@ -115,6 +115,122 @@ describe("VideoPlayer", () => {
 
     ref.current?.seek(42);
     expect(video.currentTime).toBe(42);
+  });
+
+  describe("holding a seek key", () => {
+    /** Press the key `times` times in a row, as a held key repeats. */
+    function press(times: number, code = "ArrowRight") {
+      for (let i = 0; i < times; i += 1) fireEvent.keyDown(window, { code });
+    }
+
+    /** Let any rate-limited follow-up land. */
+    async function settle() {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("moves on every press when the file can seek itself", async () => {
+      // A native seek costs nothing, so holding the key still fast-forwards —
+      // and every press counts, where before they measured from the last
+      // position a timeupdate happened to report and so all landed on the same
+      // second.
+      const { video } = renderPlayer();
+      loadVideo(video);
+      press(5);
+      expect(video.currentTime).toBe(25);
+      await settle();
+      expect(video.currentTime).toBe(25);
+    });
+
+    it("lets each seek land before asking for the next one", async () => {
+      // Assigning currentTime again mid-seek replaces the request the element
+      // was working on. At ~30 presses a second that happens forever: the
+      // position runs ahead while no frame is ever decoded, so the picture sits
+      // frozen where the run began.
+      const { video } = renderPlayer();
+      loadVideo(video);
+      let seeking = false;
+      let at = 0;
+      Object.defineProperty(video, "seeking", {
+        configurable: true,
+        get: () => seeking,
+      });
+      Object.defineProperty(video, "currentTime", {
+        configurable: true,
+        get: () => at,
+        set: (v: number) => {
+          at = v;
+          seeking = true;
+        },
+      });
+
+      press(1);
+      expect(at).toBe(5);
+      // Still decoding: these presses aim further ahead but must not disturb it.
+      press(3);
+      expect(at).toBe(5);
+
+      seeking = false;
+      fireEvent.seeked(video);
+      // The frame landed, so the run's newest target goes in now.
+      expect(at).toBe(20);
+    });
+
+    it("keeps counting the presses that follow the first one", async () => {
+      const { video } = renderPlayer();
+      loadVideo(video);
+      press(1);
+      expect(video.currentTime).toBe(5);
+      press(1);
+      expect(video.currentTime).toBe(10);
+    });
+
+    it("re-serves a stream at a bounded rate, ending on the target", async () => {
+      // Nothing is seekable here (no duration): each seek re-serves the file,
+      // which spawns an ffmpeg and calls load() — and load() leaves the element
+      // paused with the previous play() aborted. Thirty of those a second is
+      // how holding a key ended in a stopped video.
+      const { video } = renderPlayer();
+      const load = vi.fn();
+      Object.defineProperty(video, "load", { configurable: true, value: load });
+      Object.defineProperty(video, "play", {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+      });
+      fireEvent.loadedMetadata(video);
+
+      press(5);
+      // The first press still moves the stream straight away.
+      expect(load).toHaveBeenCalledTimes(1);
+      await settle();
+      expect(load.mock.calls.length).toBeLessThanOrEqual(2);
+      expect(video.getAttribute("src")).toContain("?t=25");
+    });
+
+    it("waits for metadata rather than re-serving a file it cannot place", async () => {
+      // Before metadata there is no way to tell a seekable file from a stream.
+      // Guessing "stream" re-served with a `?t=` the server ignores for
+      // anything but a remuxed container: playback restarted from the top while
+      // the position display claimed otherwise.
+      const { video } = renderPlayer();
+      const src = video.getAttribute("src");
+      press(2);
+      await settle();
+      expect(video.getAttribute("src")).toBe(src);
+      expect(video.currentTime).toBe(0);
+
+      loadVideo(video);
+      expect(video.getAttribute("src")).toBe(src);
+      expect(video.currentTime).toBe(10);
+    });
   });
 
   it("adds a bookmark at the current position from the control bar", async () => {
