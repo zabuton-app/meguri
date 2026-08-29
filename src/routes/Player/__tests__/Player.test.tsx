@@ -330,90 +330,84 @@ describe("Player paging keys", () => {
   });
 });
 
+describe("Player switching latency", () => {
+  it("renders the media without waiting for its details", async () => {
+    // file_get used to gate the whole stage, putting an IPC round trip between
+    // the swap and the first pixel.
+    let resolveDetail: (d: FileDetail) => void = () => {};
+    mocks.fileGet.mockImplementation(
+      () =>
+        new Promise<FileDetail>((resolve) => {
+          resolveDetail = resolve;
+        }),
+    );
+    renderPlayer([row(1, "video")]);
+    // Nothing has answered file_get yet, and the video is already streaming.
+    await waitFor(() => {
+      expect(
+        document.querySelector("video")?.getAttribute("src") ?? "",
+      ).toContain("/media/1");
+    });
+    expect(screen.queryByText("clip-1.mp4")).toBeNull();
+    resolveDetail(detailFor(1, "video"));
+    // The detail only fills in the label afterwards.
+    expect(await screen.findByText("clip-1.mp4")).toBeTruthy();
+  });
+
+  it("warms the next item before it is reached", async () => {
+    const requested: string[] = [];
+    class SpyImage {
+      set src(value: string) {
+        requested.push(value);
+      }
+    }
+    const original = globalThis.Image;
+    globalThis.Image = SpyImage as unknown as typeof Image;
+    try {
+      renderPlayer([row(1, "video"), row(2, "image")]);
+      await screen.findByText("clip-1.mp4");
+      // The upcoming image is decoded ahead of the swap; a video only needs the
+      // thumbnail its blurred backdrop is drawn from.
+      await waitFor(() => {
+        expect(requested.some((u) => u.includes("/media/2"))).toBe(true);
+      });
+    } finally {
+      globalThis.Image = original;
+    }
+  });
+});
+
 describe("Player transitions", () => {
-  function fade(): HTMLElement | null {
+  function live(): HTMLElement | null {
     return document.querySelector('[data-slot="player-fade"]');
   }
+  function outgoing(): HTMLElement | null {
+    return document.querySelector('[data-slot="player-leaving"]');
+  }
 
-  it("dips the stage out before swapping, then back in", async () => {
-    renderPlayer([row(1, "video"), row(3, "video")]);
-    await screen.findByText("1 / 2");
-    expect(fade()?.style.opacity).toBe("1");
-
-    fireEvent.click(screen.getByLabelText("Next (N)"));
-    // The swap is deferred to the bottom of the dip, so the old item is still
-    // on screen while the stage fades out.
-    expect(fade()?.style.opacity).toBe("0");
-    expect(screen.getByText("1 / 2")).toBeTruthy();
-
-    expect(await screen.findByText("2 / 2")).toBeTruthy();
-    await waitFor(() => {
-      expect(fade()?.style.opacity).toBe("1");
-    });
-  });
-
-  it("gives the switch a duration", async () => {
-    renderPlayer([row(1, "video"), row(3, "video")]);
-    await screen.findByText("1 / 2");
-    expect(fade()?.style.transition).toMatch(/^opacity \d+ms/);
-  });
-
-  it("does not slide while only the fade is on (the default)", async () => {
+  it("swaps at once so the incoming item is on screen for the whole switch", async () => {
+    // The item changes immediately; the one that left is held beside it as a
+    // still rather than the stage going empty between the two.
     renderPlayer([row(1, "video"), row(3, "video")]);
     await screen.findByText("1 / 2");
     fireEvent.click(screen.getByLabelText("Next (N)"));
-    expect(fade()?.style.opacity).toBe("0");
-    expect(fade()?.style.transform).toBe("");
-    await screen.findByText("2 / 2");
-  });
-
-  it("slides without dimming when only the transition is on", async () => {
-    setPrefs({ playlistFade: false, playlistTransition: true });
-    renderPlayer([row(1, "video"), row(3, "video")]);
-    await screen.findByText("1 / 2");
-    fireEvent.click(screen.getByLabelText("Next (N)"));
-    expect(fade()?.style.opacity).toBe("1");
-    // Leaving goes against the direction of travel.
-    expect(fade()?.style.transform).toBe("translateX(-100%)");
-    await screen.findByText("2 / 2");
-  });
-
-  it("dims and slides when both effects are on", async () => {
-    setPrefs({ playlistFade: true, playlistTransition: true });
-    renderPlayer([row(1, "video"), row(3, "video")]);
-    await screen.findByText("1 / 2");
-    fireEvent.click(screen.getByLabelText("Next (N)"));
-    expect(fade()?.style.opacity).toBe("0");
-    expect(fade()?.style.transform).toBe("translateX(-100%)");
-    await screen.findByText("2 / 2");
-  });
-
-  it("slides the other way when stepping back", async () => {
-    setPrefs({ playlistTransition: true });
-    renderPlayer([row(1, "video"), row(3, "video")]);
-    await screen.findByText("1 / 2");
-    fireEvent.click(screen.getByLabelText("Next (N)"));
-    await screen.findByText("2 / 2");
-    fireEvent.click(screen.getByLabelText("Previous (P)"));
-    expect(fade()?.style.transform).toBe("translateX(100%)");
-    await screen.findByText("1 / 2");
-  });
-
-  it("cuts straight over when both effects are off", async () => {
-    setPrefs({ playlistFade: false, playlistTransition: false });
-    renderPlayer([row(1, "video"), row(3, "video")]);
-    await screen.findByText("1 / 2");
-    fireEvent.click(screen.getByLabelText("Next (N)"));
-    // No dip, no deferral.
     expect(screen.getByText("2 / 2")).toBeTruthy();
-    expect(fade()?.style.transition).toBe("");
   });
 
-  it("still moves two items when next is pressed twice mid-fade", async () => {
+  it("holds no outgoing layer when there was no frame to freeze", async () => {
+    // jsdom paints nothing, so there is nothing to capture — and a switch with
+    // no still to animate against is a plain swap, not an empty stage.
+    renderPlayer([row(1, "video"), row(3, "video")]);
+    await screen.findByText("1 / 2");
+    fireEvent.click(screen.getByLabelText("Next (N)"));
+    expect(outgoing()).toBeNull();
+    expect(live()?.style.opacity).toBeFalsy();
+  });
+
+  it("still moves two items when next is pressed twice in quick succession", async () => {
     renderPlayer([row(1, "video"), row(3, "video"), row(5, "video")]);
     await screen.findByText("1 / 3");
     fireEvent.click(screen.getByLabelText("Next (N)"));
-    // Second press lands before the first swap has been applied.
     fireEvent.click(screen.getByLabelText("Next (N)"));
     expect(await screen.findByText("3 / 3")).toBeTruthy();
   });
@@ -435,9 +429,8 @@ describe("Player transitions", () => {
       renderPlayer([row(1, "video"), row(3, "video")]);
       await screen.findByText("1 / 2");
       fireEvent.click(screen.getByLabelText("Next (N)"));
-      // No dip, no deferral: the next item is on screen right away.
       expect(screen.getByText("2 / 2")).toBeTruthy();
-      expect(fade()?.style.transition).toBe("");
+      expect(outgoing()).toBeNull();
     } finally {
       window.matchMedia = original;
     }

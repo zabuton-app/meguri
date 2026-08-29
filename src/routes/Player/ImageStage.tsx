@@ -110,6 +110,7 @@ export function ImageStage({
       src={src}
       alt={alt}
       onError={onError}
+      data-slot="player-media"
       className="h-full w-full object-contain will-change-transform"
       style={{ transform: staticTransform() }}
     />

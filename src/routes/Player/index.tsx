@@ -4,13 +4,7 @@
 // listing or a search result — one item after another with no input required.
 // The order comes from MediaNavContext, so whatever sort and filter the list has
 // is what plays, and the queue keeps growing as further pages load.
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
@@ -32,6 +26,9 @@ import {
   type PlayerHandle,
 } from "@/routes/MediaDetail/VideoPlayer";
 import { ImageStage } from "./ImageStage";
+import { SnapshotStage } from "./SnapshotStage";
+import { captureStage, type StageSnapshot } from "./stageSnapshot";
+import { enteringStyle, leavingStyle, type Leg } from "./transition";
 import { PlayerChrome } from "./PlayerChrome";
 import { PlayerStage } from "./PlayerStage";
 
@@ -45,40 +42,6 @@ const CHROME_IDLE_MS = 2500;
  * cross-dissolving keeps exactly one video element alive at a time.
  */
 const TRANSITION_MS = 260;
-
-/**
- * "out" = leaving, "in" = parked at the incoming position with the animation
- * suppressed for one frame, "idle" = settled in place.
- */
-type SwapPhase = "idle" | "out" | "in";
-
-/**
- * Inline style for the stage during a switch. The two effects are independent:
- * `fade` contributes the opacity, `slide` the horizontal offset. With both off
- * nothing animates and the swap is a plain cut.
- */
-function swapStyle(
-  phase: SwapPhase,
-  dir: 1 | -1,
-  durationMs: number,
-  fade: boolean,
-  slide: boolean,
-): CSSProperties {
-  if (durationMs === 0 || (!fade && !slide)) return {};
-  // Leaving goes against the travel direction, arriving comes from ahead of it.
-  const offset = phase === "out" ? -100 * dir : phase === "in" ? 100 * dir : 0;
-  const away = phase !== "idle";
-  return {
-    opacity: fade && away ? 0 : 1,
-    transform: slide ? `translateX(${offset}%)` : undefined,
-    // The parked frame must not animate, or the stage would slide back from the
-    // far side instead of jumping there.
-    transition:
-      phase === "in"
-        ? "none"
-        : `opacity ${durationMs}ms ease-in-out, transform ${durationMs}ms ease-in-out`,
-  };
-}
 
 export default function Player() {
   const navigate = useNavigate();
@@ -229,6 +192,17 @@ export default function Player() {
     };
   }, []);
 
+  // Decode the next item ahead of time so the swap lands on a warm cache. Only
+  // its pixels: file_get records an access server-side, so prefetching the
+  // detail would mark items as seen before the user ever reaches them.
+  const upcoming = queue.upcoming;
+  useEffect(() => {
+    if (!upcoming || !mediaBase) return;
+    const kind = upcoming.kind === "image" ? "media" : "thumb";
+    const img = new Image();
+    img.src = `${mediaBase}/ws/${upcoming.workspaceId}/${kind}/${upcoming.fileId}`;
+  }, [upcoming, mediaBase]);
+
   const togglePlay = useCallback(() => {
     if (isImage) {
       setPaused((p) => !p);
@@ -238,20 +212,22 @@ export default function Player() {
   }, [isImage]);
 
   // Item changes animate rather than cut. Two independent effects compose:
-  // "fade" dims the stage to its ground, "transition" pushes it sideways. The
-  // swap happens at the far end of the outgoing leg — with one media element on
-  // screen at a time there is nothing to cross-dissolve against, so the switch
-  // has to happen while the stage is out of view.
-  //
-  // "in" is the one frame where the stage is parked at the incoming position
-  // with animation off, so returning to "idle" animates instead of jumping.
-  const [swap, setSwap] = useState<{ phase: SwapPhase; dir: 1 | -1 }>({
-    phase: "idle",
-    dir: 1,
-  });
+  // "fade" dissolves between the two items, "transition" slides one over the
+  // other. Both need the outgoing item to stay on screen while the incoming one
+  // arrives, so the swap happens immediately and the item that left is held as a
+  // frozen still beside the live one — which keeps exactly one media element
+  // playing at any moment.
+  const [leaving, setLeaving] = useState<{
+    snapshot: StageSnapshot;
+    dir: 1 | -1;
+    leg: Leg;
+  } | null>(null);
   const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swapFrame = useRef<number | null>(null);
-  const pendingStep = useRef<(() => void) | null>(null);
+  // What is on screen right now, read at capture time (the values themselves are
+  // derived further down, after the queue has been consulted).
+  const currentKeyRef = useRef("");
+  const thumbSrcRef = useRef<string | undefined>(undefined);
   const clearSwapTimers = useCallback(() => {
     if (swapTimer.current) {
       clearTimeout(swapTimer.current);
@@ -262,52 +238,41 @@ export default function Player() {
       swapFrame.current = null;
     }
   }, []);
-  useEffect(
-    () => () => {
-      clearSwapTimers();
-      pendingStep.current = null;
-    },
-    [clearSwapTimers],
-  );
-
-  /**
-   * Apply a swap that is still waiting out its animation. Pressing next twice
-   * in quick succession has to move two items, so the queued step is run rather
-   * than dropped when the second transition starts.
-   */
-  const flushPending = useCallback(() => {
-    clearSwapTimers();
-    const step = pendingStep.current;
-    pendingStep.current = null;
-    step?.();
-  }, [clearSwapTimers]);
+  useEffect(() => clearSwapTimers, [clearSwapTimers]);
 
   const transitionTo = useCallback(
     (step: () => void, dir: 1 | -1) => {
-      flushPending();
+      clearSwapTimers();
       if (transitionMs === 0) {
-        setSwap({ phase: "idle", dir });
+        setLeaving(null);
         step();
         return;
       }
+      // Freeze what is on screen before the swap replaces it. Nothing to freeze
+      // (no media loaded yet) means nothing to animate against, so just swap.
+      const snapshot = captureStage(
+        rootRef.current,
+        currentKeyRef.current,
+        thumbSrcRef.current,
+      );
       videoRef.current?.pause();
-      setSwap({ phase: "out", dir });
-      pendingStep.current = step;
-      swapTimer.current = setTimeout(() => {
-        swapTimer.current = null;
-        const queued = pendingStep.current;
-        pendingStep.current = null;
-        queued?.();
-        setSwap({ phase: "in", dir });
-        // Park for one frame with the animation off, then release: that is what
-        // turns the jump back to centre into the incoming leg.
-        swapFrame.current = requestAnimationFrame(() => {
-          swapFrame.current = null;
-          setSwap({ phase: "idle", dir });
-        });
-      }, transitionMs);
+      step();
+      if (!snapshot) {
+        setLeaving(null);
+        return;
+      }
+      setLeaving({ snapshot, dir, leg: "armed" });
+      // One parked frame, then release both layers together.
+      swapFrame.current = requestAnimationFrame(() => {
+        swapFrame.current = null;
+        setLeaving((l) => (l ? { ...l, leg: "running" } : l));
+        swapTimer.current = setTimeout(() => {
+          swapTimer.current = null;
+          setLeaving(null);
+        }, transitionMs);
+      });
     },
-    [transitionMs, flushPending],
+    [transitionMs, clearSwapTimers],
   );
 
   const goNext = useCallback(
@@ -456,15 +421,25 @@ export default function Player() {
   }, [queue.ended, queue.total, queue.unplayable, exit]);
 
   const wsId = current?.workspaceId ?? "";
+  // Both URLs are addressable from the queue item alone. Deriving them from the
+  // fetched detail instead put an IPC round trip between the swap and the first
+  // pixel, which is the gap that showed up on every next/previous. The detail
+  // now only enriches what is already on screen (the file's name).
   const thumbSrc =
-    file?.thumbStatus === "done" && mediaBase && wsId
-      ? `${mediaBase}/ws/${wsId}/thumb/${file.id}`
+    mediaBase && current
+      ? `${mediaBase}/ws/${wsId}/thumb/${current.fileId}`
       : undefined;
   const mediaSrc =
-    mediaBase && wsId && current
+    mediaBase && current
       ? `${mediaBase}/ws/${wsId}/media/${current.fileId}`
       : "";
   const title = file ? fileNameOf(file.relPath) : "";
+  useEffect(() => {
+    currentKeyRef.current = current
+      ? `${current.workspaceId}:${current.fileId}`
+      : "";
+    thumbSrcRef.current = thumbSrc;
+  });
   const imageMotion = playlistImageMotion && !reducedMotion;
   const playing = isImage ? !paused : videoPlaying;
 
@@ -492,60 +467,80 @@ export default function Player() {
           <p className="text-sm">{t("playlist.emptyHint")}</p>
         </div>
       ) : (
-        <div
-          data-slot="player-fade"
-          className="absolute inset-0"
-          style={swapStyle(
-            swap.phase,
-            swap.dir,
-            transitionMs,
-            playlistFade,
-            playlistTransition,
+        <>
+          {leaving && (
+            <div
+              key={leaving.snapshot.key}
+              data-slot="player-leaving"
+              className="absolute inset-0"
+              style={leavingStyle(
+                leaving.leg,
+                leaving.dir,
+                transitionMs,
+                playlistFade,
+                playlistTransition,
+              )}
+            >
+              <SnapshotStage snapshot={leaving.snapshot} ground={ground} />
+            </div>
           )}
-        >
-          <PlayerStage backdropSrc={thumbSrc} ground={ground}>
-            {current && isImage && file && (
-              <ImageStage
-                src={mediaSrc}
-                alt={file.relPath}
-                durationMs={playlistImageSeconds * 1000}
-                paused={paused}
-                motion={imageMotion}
-                onDone={goNext}
-                onError={skipCurrent}
-              />
+          <div
+            data-slot="player-fade"
+            className="absolute inset-0"
+            style={enteringStyle(
+              leaving?.leg ?? null,
+              leaving?.dir ?? 1,
+              transitionMs,
+              playlistFade,
+              playlistTransition,
             )}
-            {current && !isImage && file && (
-              <VideoPlayer
-                ref={videoRef}
-                key={`${wsId}:${current.fileId}`}
-                id={current.fileId}
-                src={mediaSrc}
-                duration={file.duration}
-                width={file.width}
-                height={file.height}
-                mediaBase={mediaBase}
-                wsId={wsId}
-                startAt={0}
-                autoplay
-                navKeys={navBinding}
-                fullscreenTargetRef={rootRef}
-                onNativeDuration={() => undefined}
-                onPlayed={() => invalidatePlayedSearches(qc)}
-                chromeless
-                onEnded={goNext}
-                onPlayingChange={(playing) => {
-                  setVideoPlaying(playing);
-                  // The video draws no chrome of its own here, so a play/pause
-                  // from the keyboard would otherwise change nothing on screen.
-                  wake();
-                }}
-                onFatalError={skipCurrent}
-                t={t}
-              />
-            )}
-          </PlayerStage>
-        </div>
+          >
+            <PlayerStage backdropSrc={thumbSrc} ground={ground}>
+              {current && isImage && (
+                <ImageStage
+                  src={mediaSrc}
+                  alt={file?.relPath ?? ""}
+                  durationMs={playlistImageSeconds * 1000}
+                  paused={paused}
+                  motion={imageMotion}
+                  onDone={goNext}
+                  onError={skipCurrent}
+                />
+              )}
+              {current && !isImage && (
+                <VideoPlayer
+                  ref={videoRef}
+                  key={`${wsId}:${current.fileId}`}
+                  id={current.fileId}
+                  src={mediaSrc}
+                  // Chromeless hides the seek bar and drops the aspect-ratio box,
+                  // so these only enrich; the video need not wait for them.
+                  duration={file?.duration ?? null}
+                  width={file?.width ?? null}
+                  height={file?.height ?? null}
+                  mediaBase={mediaBase}
+                  wsId={wsId}
+                  startAt={0}
+                  autoplay
+                  navKeys={navBinding}
+                  fullscreenTargetRef={rootRef}
+                  onNativeDuration={() => undefined}
+                  onPlayed={() => invalidatePlayedSearches(qc)}
+                  chromeless
+                  onEnded={goNext}
+                  onPlayingChange={(playing) => {
+                    setVideoPlaying(playing);
+                    // The video draws no chrome of its own here, so a play/pause
+                    // from the keyboard would otherwise change nothing on screen.
+                    wake();
+                  }}
+                  onFatalError={skipCurrent}
+                  t={t}
+                />
+              )}
+            </PlayerStage>
+          </div>
+        </>
       )}
 
       {!empty && !queue.unplayable && (

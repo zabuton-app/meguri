@@ -33,6 +33,8 @@ export interface UsePlaybackQueueOptions {
 
 export interface UsePlaybackQueueResult {
   current: QueueItem | null;
+  /** The item that would play next, without advancing to it. */
+  upcoming: QueueItem | null;
   /** True once playback is finished and no further pages can extend it. */
   ended: boolean;
   /** True when the pass finished without a single item having played. */
@@ -111,6 +113,7 @@ export function usePlaybackQueue(
   const morePending = nav?.hasNextPage ?? false;
   return {
     current: queue.current,
+    upcoming: queue.pool[0] ?? null,
     ended: queue.ended && !morePending,
     unplayable: endedUnplayable(queue) && !morePending,
     waiting: queue.current == null && morePending,

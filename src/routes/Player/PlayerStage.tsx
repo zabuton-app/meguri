@@ -14,7 +14,11 @@ export function PlayerStage({
   ground,
   children,
 }: {
-  /** Thumbnail used as the blurred backdrop; omitted while none exists yet. */
+  /**
+   * Thumbnail used as the blurred backdrop. Requested without first checking
+   * that one has been generated — waiting on that answer would stall the switch
+   * — so a miss just leaves the ground showing.
+   */
   backdropSrc?: string;
   /** Tailwind background class for the ground, decided by the appearance. */
   ground: string;
@@ -24,9 +28,13 @@ export function PlayerStage({
     <div className={cn("absolute inset-0 overflow-hidden", ground)}>
       {backdropSrc && (
         <img
+          key={backdropSrc}
           src={backdropSrc}
           alt=""
           aria-hidden
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
           className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
         />
       )}
