@@ -61,6 +61,19 @@ export async function openSettings(page: Page): Promise<Locator> {
   return dialog;
 }
 
+/**
+ * Opens settings and switches to one of its tabs. Only the selected tab's panel
+ * is mounted, so anything outside the first tab has to be reached this way.
+ */
+export async function openSettingsTab(
+  page: Page,
+  name: string,
+): Promise<Locator> {
+  const dialog = await openSettings(page);
+  await dialog.getByRole("tab", { name, exact: true }).click();
+  return dialog;
+}
+
 export async function openDiscover(page: Page): Promise<Locator> {
   await page.getByRole("link", { name: "Discovery" }).click();
   const dialog = page.getByRole("dialog");

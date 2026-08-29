@@ -6,7 +6,7 @@ import { type Page } from "@playwright/test";
 import { test, expect } from "./fixtures/app";
 import {
   openFileDetail,
-  openSettings,
+  openSettingsTab,
   searchInput,
   waitForIndexedMedia,
   FIXTURE_FILE,
@@ -29,9 +29,10 @@ test.describe("Text selection", () => {
     ready,
   }) => {
     // The list screen has no `select-text` at all, so the CSS alone would pass
-    // it. Settings carries two opted-in sections: without the guard, Ctrl+A
-    // grabs both at once — which is the whole-window highlight being avoided.
-    await openSettings(ready);
+    // it. The settings App tab carries two opted-in sections (update and
+    // about): without the guard, Ctrl+A grabs both at once — which is the
+    // whole-window highlight being avoided.
+    await openSettingsTab(ready, "App");
     await ready.keyboard.press("Control+KeyA");
     expect(await selectedText(ready)).toBe("");
   });
@@ -73,7 +74,8 @@ test.describe("Text selection", () => {
   });
 
   test("the About section stays selectable", async ({ ready }) => {
-    const dialog = await openSettings(ready);
+    // About lives on the App tab, and only the selected tab's panel is mounted.
+    const dialog = await openSettingsTab(ready, "App");
     // about.version renders as "<app name> version <x.y.z>", and the app name is
     // the brand glyph in every locale (app.name), not the romanized "Meguri".
     const version = dialog.getByText(/^巡 version /);
