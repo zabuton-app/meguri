@@ -26,6 +26,14 @@ interface Props {
   size?: number;
   className?: string;
   /**
+   * Skip the collection-search invalidation on success. The detail view sets
+   * this: refetching a collection-scoped list while a file is open drops that
+   * file out of the prev/next order (the same reason the main process stays
+   * quiet about its own auto-removal — see `removeFromWatchLater` in
+   * electron/core/workspaces.ts). MediaDetail flushes those caches on close.
+   */
+  deferListRefresh?: boolean;
+  /**
    * Handle on the underlying button. Discovery uses it to drive the toggle from
    * a keyboard shortcut through this same control, so the mutation, toast,
    * effect and disabled state stay in one place.
@@ -39,6 +47,7 @@ export function WatchLaterButton({
   watchLater,
   size = 16,
   className,
+  deferListRefresh = false,
   ref,
 }: Props) {
   const { t } = useI18n();
@@ -62,7 +71,7 @@ export function WatchLaterButton({
     onSuccess: (_d, next) => {
       void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
       // Membership changes only affect collection-scoped lists, not workspace lists.
-      invalidateCollectionSearches(qc);
+      if (!deferListRefresh) invalidateCollectionSearches(qc);
       toast.success(
         next ? t("watchLater.addedToast") : t("watchLater.removedToast"),
       );

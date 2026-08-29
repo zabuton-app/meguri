@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import "@/test/mockVirtualizer";
 import { MediaGrid } from "@/components/MediaGrid";
 import { defaultWorkspacesList, sampleFileRow, WS_ID } from "@/test/fixtures";
@@ -221,6 +221,128 @@ describe("MediaGrid", () => {
 
       await waitFor(() => expect(mocks.collectionAddFile).toHaveBeenCalled());
       expect(window.location.hash).toBe(before);
+    });
+  });
+
+  describe('"W" shortcut', () => {
+    const renderGrid = () =>
+      renderWithProviders(
+        <MediaGrid
+          items={[sampleFileRow]}
+          mediaBase="http://127.0.0.1:17345"
+          workspaceId={WS_ID}
+          loading={false}
+          thumbVersion={{}}
+          navActive
+        />,
+      );
+
+    // The toggle is disabled until workspaces_list resolves (it needs the
+    // collection id), so let that settle before pressing anything.
+    const ready = async () => {
+      const btn = await screen.findByRole("button", { name: /Watch Later/ });
+      await waitFor(() => expect(btn.hasAttribute("disabled")).toBe(false));
+    };
+
+    /**
+     * Asserts that the key press just made was a no-op. Checking
+     * `not.toHaveBeenCalled()` straight after a fireEvent would pass either
+     * way — react-query only reaches the mutationFn a microtask later — so let
+     * that settle first.
+     */
+    const expectNoToggle = async () => {
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(mocks.collectionAddFile).not.toHaveBeenCalled();
+      expect(mocks.collectionRemoveFile).not.toHaveBeenCalled();
+    };
+
+    it("toggles the focused card", async () => {
+      renderGrid();
+      await ready();
+
+      // Nothing is focused until the user moves into the grid.
+      fireEvent.keyDown(window, { code: "KeyW" });
+      expect(mocks.collectionAddFile).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(window, { code: "ArrowDown" });
+      fireEvent.keyDown(window, { code: "KeyW" });
+
+      await waitFor(() =>
+        expect(mocks.collectionAddFile).toHaveBeenCalledWith(
+          "watch-later",
+          sampleFileRow.id,
+          sampleFileRow.workspaceId,
+        ),
+      );
+    });
+
+    it("stays out of the way while typing in a text field", async () => {
+      renderGrid();
+      await ready();
+      fireEvent.keyDown(window, { code: "ArrowDown" });
+
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      try {
+        input.focus();
+        fireEvent.keyDown(window, { code: "KeyW" });
+      } finally {
+        // Leaving a focused input behind would suppress the key in later tests.
+        input.remove();
+      }
+
+      await expectNoToggle();
+    });
+
+    it("ignores the key once the list stops being foreground", async () => {
+      // Focus a card while the grid is foreground, *then* put a modal over it:
+      // asserting on a never-focused grid would pass even without the `active`
+      // guard, since no card would be holding the ref.
+      const view = renderGrid();
+      await ready();
+      fireEvent.keyDown(window, { code: "ArrowDown" });
+
+      view.rerender(
+        <MediaGrid
+          items={[sampleFileRow]}
+          mediaBase="http://127.0.0.1:17345"
+          workspaceId={WS_ID}
+          loading={false}
+          thumbVersion={{}}
+          navActive={false}
+        />,
+      );
+      fireEvent.keyDown(window, { code: "KeyW" });
+
+      await expectNoToggle();
+    });
+
+    it("lets the key through while the toggle is still disabled", async () => {
+      // workspaces_list never resolves here, so the toggle stays disabled for
+      // want of the collection id. Clicking a disabled button is a no-op, so
+      // claiming the key would eat it while nothing can act on it.
+      mocks.workspacesList.mockReturnValue(new Promise(() => {}));
+      renderGrid();
+      await screen.findByRole("button", { name: /Watch Later/ });
+      fireEvent.keyDown(window, { code: "ArrowDown" });
+
+      // fireEvent returns false when a handler called preventDefault.
+      const notSwallowed = fireEvent.keyDown(window, { code: "KeyW" });
+
+      expect(notSwallowed).toBe(true);
+      await expectNoToggle();
+    });
+
+    it("ignores auto-repeat from a held key", async () => {
+      renderGrid();
+      await ready();
+      fireEvent.keyDown(window, { code: "ArrowDown" });
+
+      fireEvent.keyDown(window, { code: "KeyW", repeat: true });
+
+      await expectNoToggle();
     });
   });
 });

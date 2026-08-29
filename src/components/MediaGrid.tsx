@@ -1,6 +1,14 @@
 // Media listing grid. Shows thumbnails via thumb://; click to open detail.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { Link, useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
@@ -21,6 +29,7 @@ import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
 import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
+import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
 const GRID_CLASS =
@@ -171,6 +180,10 @@ export const MediaGrid = memo(function MediaGrid({
     onOpen,
     scrollToRow,
   });
+  // Points at the focused card's toggle so "W" activates it through the button
+  // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
+  const focusedWatchLaterRef = useRef<HTMLButtonElement>(null);
+  useWatchLaterHotkey({ active: navActive, buttonRef: focusedWatchLaterRef });
 
   // Reset the scroll position to the top on workspace switch (so the previous
   // workspace's position doesn't linger). Also reset the virtualizer's internal offset to 0.
@@ -246,17 +259,21 @@ export const MediaGrid = memo(function MediaGrid({
               className="grid gap-3 px-4 pb-3"
               style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
             >
-              {rows[vr.index].map((f, localIndex) => (
-                <MediaCard
-                  key={`${f.workspaceId}:${f.id}`}
-                  file={f}
-                  version={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
-                  mediaBase={mediaBase}
-                  onTagClick={onTagClick}
-                  focused={vr.index * cols + localIndex === focusedIndex}
-                  watchLater={watchLaterMembership}
-                />
-              ))}
+              {rows[vr.index].map((f, localIndex) => {
+                const focused = vr.index * cols + localIndex === focusedIndex;
+                return (
+                  <MediaCard
+                    key={`${f.workspaceId}:${f.id}`}
+                    file={f}
+                    version={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
+                    mediaBase={mediaBase}
+                    onTagClick={onTagClick}
+                    focused={focused}
+                    watchLater={watchLaterMembership}
+                    watchLaterRef={focused ? focusedWatchLaterRef : undefined}
+                  />
+                );
+              })}
             </div>
           </div>
         ))}
@@ -274,6 +291,7 @@ const MediaCard = memo(function MediaCard({
   onTagClick,
   focused,
   watchLater,
+  watchLaterRef,
 }: {
   file: FileRow;
   version: number;
@@ -281,6 +299,8 @@ const MediaCard = memo(function MediaCard({
   onTagClick?: (name: string) => void;
   focused?: boolean;
   watchLater: WatchLaterMembership;
+  /** Set only on the focused card, so the "W" shortcut can drive this toggle. */
+  watchLaterRef?: Ref<HTMLButtonElement>;
 }) {
   // The card is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
@@ -319,6 +339,7 @@ const MediaCard = memo(function MediaCard({
         />
         {/* Watch Later toggle, mirroring the favorite affordance below it. */}
         <WatchLaterButton
+          ref={watchLaterRef}
           fileId={file.id}
           workspaceId={file.workspaceId}
           watchLater={watchLater}

@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type Ref,
 } from "react";
 import { useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -33,6 +34,7 @@ import { fileHref } from "@/lib/fileHref";
 import { fileNameOf } from "@/lib/relPath";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
+import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
 const ROW_HEIGHT = 114; // fixed row height (thumbnail 180×101.25 + padding)
@@ -163,6 +165,10 @@ export const MediaTable = memo(function MediaTable({
     onOpen,
     scrollToRow,
   });
+  // Points at the focused row's toggle so "W" activates it through the button
+  // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
+  const focusedWatchLaterRef = useRef<HTMLButtonElement>(null);
+  useWatchLaterHotkey({ active: navActive, buttonRef: focusedWatchLaterRef });
 
   // Reset the scroll position to the top on workspace switch.
   useEffect(() => {
@@ -240,6 +246,9 @@ export const MediaTable = memo(function MediaTable({
               onTagClick={onTagClick}
               focused={vr.index === focusedIndex}
               watchLater={watchLaterMembership}
+              watchLaterRef={
+                vr.index === focusedIndex ? focusedWatchLaterRef : undefined
+              }
               onOpen={onRowOpen}
               t={t}
             />
@@ -271,6 +280,7 @@ const MediaTableRow = memo(function MediaTableRow({
   onTagClick,
   focused,
   watchLater,
+  watchLaterRef,
   onOpen,
   t,
 }: {
@@ -282,6 +292,8 @@ const MediaTableRow = memo(function MediaTableRow({
   onTagClick?: (name: string) => void;
   focused?: boolean;
   watchLater: WatchLaterMembership;
+  /** Set only on the focused row, so the "W" shortcut can drive this toggle. */
+  watchLaterRef?: Ref<HTMLButtonElement>;
   /** Opens the detail view. `autoplay=true` (thumbnail click) plays automatically. */
   onOpen: (index: number, autoplay: boolean) => void;
   t: TFunc;
@@ -355,6 +367,7 @@ const MediaTableRow = memo(function MediaTableRow({
           size={14}
         />
         <WatchLaterButton
+          ref={watchLaterRef}
           fileId={file.id}
           workspaceId={file.workspaceId}
           watchLater={watchLater}

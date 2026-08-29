@@ -1,7 +1,14 @@
 // Media listing as a vertical list (alternative to MediaGrid). Each row shows a
 // small thumbnail plus title, metadata (resolution/duration/size) and tags.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { Link, useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
@@ -22,6 +29,7 @@ import { formatDuration, formatSize } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
 import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
+import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
 const ROW_ESTIMATE = 124; // initial row-height estimate (corrected by measurement)
@@ -132,6 +140,10 @@ export const MediaList = memo(function MediaList({
     onOpen,
     scrollToRow,
   });
+  // Points at the focused row's toggle so "W" activates it through the button
+  // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
+  const focusedWatchLaterRef = useRef<HTMLButtonElement>(null);
+  useWatchLaterHotkey({ active: navActive, buttonRef: focusedWatchLaterRef });
 
   // Reset the scroll position to the top on workspace switch.
   useEffect(() => {
@@ -209,6 +221,9 @@ export const MediaList = memo(function MediaList({
               onTagClick={onTagClick}
               focused={vr.index === focusedIndex}
               watchLater={watchLaterMembership}
+              watchLaterRef={
+                vr.index === focusedIndex ? focusedWatchLaterRef : undefined
+              }
             />
           </div>
         ))}
@@ -225,6 +240,7 @@ const MediaRow = memo(function MediaRow({
   onTagClick,
   focused,
   watchLater,
+  watchLaterRef,
 }: {
   file: FileRow;
   version: number;
@@ -232,6 +248,8 @@ const MediaRow = memo(function MediaRow({
   onTagClick?: (name: string) => void;
   focused?: boolean;
   watchLater: WatchLaterMembership;
+  /** Set only on the focused row, so the "W" shortcut can drive this toggle. */
+  watchLaterRef?: Ref<HTMLButtonElement>;
 }) {
   // The row is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
@@ -281,6 +299,7 @@ const MediaRow = memo(function MediaRow({
             className="shrink-0"
           />
           <WatchLaterButton
+            ref={watchLaterRef}
             fileId={file.id}
             workspaceId={file.workspaceId}
             watchLater={watchLater}
