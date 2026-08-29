@@ -83,7 +83,7 @@ beforeEach(() => {
 });
 
 describe("Player chrome", () => {
-  it("shows only playback controls", async () => {
+  it("shows playback controls and the one way out to the detail view", async () => {
     renderPlayer([row(1, "video"), row(2, "image")]);
     await screen.findByLabelText("Play (Space)");
     expect(screen.getByLabelText("Next (N)")).toBeTruthy();
@@ -91,12 +91,14 @@ describe("Player chrome", () => {
     expect(screen.getByLabelText("Shuffle (S)")).toBeTruthy();
     expect(screen.getByLabelText("Repeat")).toBeTruthy();
     expect(screen.getByLabelText("Exit playback (Esc)")).toBeTruthy();
+    expect(screen.getByLabelText("Open details (I)")).toBeTruthy();
   });
 
-  it("shows none of the manual-browsing affordances (FR-022)", async () => {
+  it("shows no manual-browsing affordances beyond the detail button (FR-022)", async () => {
     renderPlayer([row(1, "video"), row(2, "image")]);
     await screen.findByLabelText("Play (Space)");
-    // No route out to the detail view or an external player.
+    // The detail button is the single exception, and it is a button that parks
+    // the pass on its way out — not a bare link that would strand playback.
     expect(document.querySelectorAll("a")).toHaveLength(0);
     // No favorite / rating / tag editing, no scene rail, no open-externally.
     for (const label of [
@@ -152,6 +154,34 @@ describe("Player keyboard control", () => {
       expect(chrome()?.className).toContain("opacity-0");
       fireEvent.keyDown(window, { code: "KeyS" });
       expect(chrome()?.className).toContain("opacity-100");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("restarts the countdown when a control is pressed", async () => {
+    // The bar used to keep counting from the last mouse *movement*, so pressing
+    // Next and then holding still made it vanish moments later.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderPlayer([row(1, "video"), row(3, "video")]);
+      const nextButton = await screen.findByLabelText("Next (N)");
+      const chrome = () =>
+        document.querySelector('[data-slot="player-chrome"]');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      fireEvent.pointerDown(nextButton);
+      // Past the point the original countdown would have expired.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(chrome()?.className).toContain("opacity-100");
+      // And it still goes away once the new countdown runs out.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      expect(chrome()?.className).toContain("opacity-0");
     } finally {
       vi.useRealTimers();
     }

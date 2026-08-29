@@ -454,6 +454,7 @@ export const ko: Record<TranslationKey, string> = {
   "playlist.prev": "이전 (P)",
   "playlist.shuffle": "셔플 (S)",
   "playlist.repeat": "반복",
+  "playlist.openDetail": "상세 정보 열기 (I)",
   "playlist.fullscreen": "전체 화면 (F)",
   "playlist.exitFullscreen": "전체 화면 해제 (F)",
   "playlist.exit": "재생 종료 (Esc)",

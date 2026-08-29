@@ -49,11 +49,39 @@ const MEDIA_ERR_NETWORK = 2;
 // (frame previews holding the origin's sockets) that caused the failure.
 const NETWORK_RETRY_DELAY_MS = 300;
 
+/**
+ * The shortest gap between two re-serves of a streamed file. A held arrow key
+ * repeats ~30 times a second, and each press on that path spawns a fresh ffmpeg
+ * and calls `load()`, which leaves the element paused with the previous `play()`
+ * aborted by the next one — that is how holding a key used to end in a stopped
+ * video that had not moved. Seeks the element can do by itself cost nothing and
+ * are not rate-limited at all, so those stay as immediate as they ever were.
+ */
+const STREAM_SEEK_INTERVAL_MS = 350;
+
+/**
+ * How long after the last press a run is considered over. Until then the next
+ * press is measured from the second the run reached, not from the position the
+ * element has got round to reporting.
+ */
+const SEEK_RUN_IDLE_MS = 500;
+
+/** Close enough to the target to call a seek finished. */
+const SEEK_SETTLED_SEC = 0.05;
+
 export interface PlayerHandle {
   seek: (t: number) => void;
   pause: () => void;
   /** Play/pause from outside the player's own chrome (the playlist control bar). */
   togglePlay: () => void;
+  /**
+   * Current position in seconds. This is the *real* time in the file, not the
+   * element's own `currentTime`: a remuxed stream starts at whatever second the
+   * server was asked for, so the two differ by that offset. While the seek bar
+   * is being dragged this reports where the drag is headed, which is what the
+   * user means by "here" at that moment.
+   */
+  currentTime: () => number;
 }
 
 export const VideoPlayer = forwardRef<
@@ -181,6 +209,23 @@ export const VideoPlayer = forwardRef<
   // Display position (scrub while dragging).
   const displayPos = scrub ?? position;
 
+  /**
+   * The second the current run of seek presses has reached, before the element
+   * has been told about it. Presses measure from here rather than from
+   * `position`, which only moves when a `timeupdate` arrives: presses that
+   * outrun that event would all measure from the same second and collapse into
+   * a single step, which is how a held key used to stop making progress.
+   */
+  const seekTargetRef = useRef<number | null>(null);
+  const seekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** When the stream was last re-served, so a held key cannot do it 30×/s. */
+  const lastStreamSeekRef = useRef(0);
+  /** A seek asked for before there was any media to seek (see `seek`). */
+  const deferredSeekRef = useRef<number | null>(null);
+  /** Whether this source has reported its metadata yet. */
+  const haveMetadataRef = useRef(false);
+
   // Keep the latest values for keyboard handling (referenced through the listener's closure).
   const posRef = useRef(0);
   const totalRef = useRef<number | undefined>(undefined);
@@ -234,6 +279,18 @@ export const VideoPlayer = forwardRef<
     }
   };
 
+  const cancelQueuedSeek = () => {
+    if (seekTimerRef.current != null) {
+      clearTimeout(seekTimerRef.current);
+      seekTimerRef.current = null;
+    }
+    if (runIdleTimerRef.current != null) {
+      clearTimeout(runIdleTimerRef.current);
+      runIdleTimerRef.current = null;
+    }
+    seekTargetRef.current = null;
+  };
+
   // Reset all per-file playback state. Shared by the [id, src] change effect
   // and the reload button on the error screen. Deliberately leaves `playedRef`
   // alone: reloading the same file must not re-fire onPlayed.
@@ -246,6 +303,9 @@ export const VideoPlayer = forwardRef<
     setNativeDur(null);
     setHover(null);
     setScrub(null);
+    cancelQueuedSeek();
+    deferredSeekRef.current = null;
+    haveMetadataRef.current = false;
     appliedStartRef.current = false;
     netRetriedRef.current = false;
     if (retryTimerRef.current != null) {
@@ -265,6 +325,7 @@ export const VideoPlayer = forwardRef<
     () => () => {
       stopTimer();
       if (retryTimerRef.current != null) clearTimeout(retryTimerRef.current);
+      cancelQueuedSeek();
     },
     [],
   );
@@ -273,9 +334,32 @@ export const VideoPlayer = forwardRef<
   // otherwise re-stream via ?t. Remuxed containers (mkv/avi/wmv/flv/ts) are piped
   // without Range support, so seekable only covers the buffered portion — checking
   // length > 0 isn't enough; the target time must actually be inside one of the ranges.
-  const seek = (t: number) => {
+  /**
+   * @param fromRun whether this is the run of key presses landing its target.
+   *   Anything else — the seek bar, a scene click, the resumed position — is a
+   *   seek asked for outright, and supersedes the run: leaving its target in
+   *   place would have `onSeeked` chase it and undo the seek just made.
+   */
+  const seek = (t: number, fromRun = false) => {
     const v = ref.current;
     if (!v) return;
+    if (fromRun) {
+      if (seekTimerRef.current != null) {
+        clearTimeout(seekTimerRef.current);
+        seekTimerRef.current = null;
+      }
+    } else {
+      cancelQueuedSeek();
+    }
+    // Nothing loaded yet — an item that has only just been swapped in. Whether
+    // this source can be seeked at all is not knowable until its metadata
+    // arrives, and guessing "stream" here re-serves the file with a `?t=` that
+    // the server ignores for everything but a remuxed container: playback would
+    // silently restart from the top while `offset` told the UI otherwise.
+    if (!haveMetadataRef.current) {
+      deferredSeekRef.current = t;
+      return;
+    }
     let inSeekable = false;
     for (let i = 0; i < v.seekable.length; i++) {
       if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) {
@@ -287,6 +371,7 @@ export const VideoPlayer = forwardRef<
       v.currentTime = t;
     } else {
       // Stream: re-serve from the specified second.
+      lastStreamSeekRef.current = Date.now();
       setOffset(t);
       setPosition(t);
       v.src = `${src}?t=${Math.floor(t)}`;
@@ -317,6 +402,9 @@ export const VideoPlayer = forwardRef<
         ref.current?.pause();
       },
       togglePlay,
+      // Through the ref, not the closure: this handle is rebuilt only when
+      // togglePlay changes, so a captured position would go stale immediately.
+      currentTime: () => posRef.current,
     }),
     [togglePlay],
   );
@@ -334,14 +422,79 @@ export const VideoPlayer = forwardRef<
     onPlayingChangeRef.current?.(playing);
   }, [playing]);
 
-  // Relative skip (±seconds). Clamped to the total duration, based on the current position.
+  /** Whether the element can reach `t` on its own, without re-serving. */
+  const canSeekNatively = (v: HTMLVideoElement, t: number) => {
+    if (!haveMetadataRef.current || !isFinite(v.duration)) return false;
+    for (let i = 0; i < v.seekable.length; i++) {
+      if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) return true;
+    }
+    return false;
+  };
+
+  /** Hand the second the run has reached to the element. */
+  const flushSeek = () => {
+    if (seekTimerRef.current != null) {
+      clearTimeout(seekTimerRef.current);
+      seekTimerRef.current = null;
+    }
+    const target = seekTargetRef.current;
+    if (target == null) return;
+    setScrub(null);
+    seekRef.current(target, true);
+  };
+
+  /**
+   * Aim at a second. A file the element can seek by itself is moved at once —
+   * that is what makes holding the key feel like fast-forwarding — while a
+   * stream, where every seek costs an ffmpeg and a reload, is moved at most
+   * every {@link STREAM_SEEK_INTERVAL_MS} with the final target always landing.
+   *
+   * The target survives the press (see {@link SEEK_RUN_IDLE_MS}) so the next one
+   * measures from it rather than from a position report that has not caught up.
+   */
+  const queueSeek = (t: number) => {
+    const v = ref.current;
+    if (!v) return;
+    seekTargetRef.current = t;
+    if (runIdleTimerRef.current != null) clearTimeout(runIdleTimerRef.current);
+    runIdleTimerRef.current = setTimeout(() => {
+      runIdleTimerRef.current = null;
+      seekTargetRef.current = null;
+    }, SEEK_RUN_IDLE_MS);
+
+    if (canSeekNatively(v, t)) {
+      // One at a time. Assigning `currentTime` again while the element is still
+      // seeking replaces the request it was working on, and a key repeating
+      // every ~33ms replaces it forever: the position runs ahead while no frame
+      // is ever decoded, so the picture sits frozen on the second the run
+      // started from. The `seeked` handler picks the newest target up the
+      // moment the current one lands.
+      if (!v.seeking) flushSeek();
+      return;
+    }
+    // Show where the run is heading while the stream catches up.
+    setScrub(t);
+    const since = Date.now() - lastStreamSeekRef.current;
+    if (since >= STREAM_SEEK_INTERVAL_MS) {
+      flushSeek();
+      return;
+    }
+    if (seekTimerRef.current != null) clearTimeout(seekTimerRef.current);
+    seekTimerRef.current = setTimeout(
+      flushSeek,
+      STREAM_SEEK_INTERVAL_MS - since,
+    );
+  };
+
+  // Relative skip (±seconds). Clamped to the total duration, measured from where
+  // the run of presses has got to rather than from the last reported position.
   const skip = (delta: number) => {
-    const base = posRef.current;
+    const base = seekTargetRef.current ?? posRef.current;
     const max = totalRef.current;
     let t = base + delta;
     if (t < 0) t = 0;
     if (max && t > max) t = max;
-    seekRef.current(t);
+    queueSeek(t);
   };
 
   const toggleFullscreen = () => {
@@ -623,6 +776,9 @@ export const VideoPlayer = forwardRef<
         onLoadedMetadata={() => {
           const v = ref.current;
           if (!v) return;
+          // Before anything else: seeks made from here on can be decided on
+          // their merits rather than deferred.
+          haveMetadataRef.current = true;
           setLoaded(true);
           // Apply the shared volume/mute to this freshly-loaded element. The
           // effect above only fires when the value changes, so this is what
@@ -638,10 +794,25 @@ export const VideoPlayer = forwardRef<
             appliedStartRef.current = true;
             seekRef.current(startAt);
           }
+          // A seek asked for while there was nothing loaded yet. It comes after
+          // the initial seek because it is the newer intent of the two.
+          const deferred = deferredSeekRef.current;
+          if (deferred != null) {
+            deferredSeekRef.current = null;
+            seekRef.current(deferred);
+          }
         }}
         onTimeUpdate={() => {
           const v = ref.current;
           if (v) setPosition(offset + v.currentTime);
+        }}
+        onSeeked={() => {
+          const v = ref.current;
+          const target = seekTargetRef.current;
+          if (!v || target == null) return;
+          // The run moved on while this seek was in flight; go where it points
+          // now. Landing on the target ends the chain.
+          if (Math.abs(v.currentTime - target) > SEEK_SETTLED_SEC) flushSeek();
         }}
         onError={() => {
           const v = ref.current;

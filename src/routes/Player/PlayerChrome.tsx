@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  Info,
   Maximize,
   Minimize,
   Pause,
@@ -15,9 +16,11 @@ import {
 import { VOLUME_STEP } from "@/hooks/useVolume";
 import type { TFunc } from "@/i18n/I18nProvider";
 
-// The player's only interactive surface. Deliberately minimal: no jump-to-detail,
-// no scene rail, no favorite/rating/tag editing — those belong to the list and
-// the detail view, not to unattended playback (spec FR-022).
+// The player's only interactive surface. Deliberately minimal: no scene rail,
+// no favorite/rating/tag editing, no external player — those belong to the list
+// and the detail view, not to unattended playback (spec FR-022). The one way out
+// of the minimum is the detail button: "what is this one?" is a question the
+// player itself cannot answer, and it was the first thing missing in use.
 export function PlayerChrome({
   title,
   position,
@@ -31,6 +34,8 @@ export function PlayerChrome({
   volume,
   muted,
   audible,
+  canOpenDetail,
+  onOpenDetail,
   onVolumeChange,
   onToggleMute,
   onTogglePlay,
@@ -64,6 +69,10 @@ export function PlayerChrome({
    * "nothing to hear right now".
    */
   audible: boolean;
+  /** False while the item on screen is still being resolved. */
+  canOpenDetail: boolean;
+  /** Leave playback for this file's detail view. */
+  onOpenDetail: () => void;
   onVolumeChange: (v: number) => void;
   onToggleMute: () => void;
   onTogglePlay: () => void;
@@ -118,6 +127,14 @@ export function PlayerChrome({
           </span>
 
           <div className="ml-auto flex items-center gap-1">
+            {/* Not a toggle, so no `active`: this one leaves the player. */}
+            <ChromeButton
+              onClick={onOpenDetail}
+              disabled={!canOpenDetail}
+              title={t("playlist.openDetail")}
+            >
+              <Info size={18} />
+            </ChromeButton>
             <div
               className={`mr-1 flex items-center gap-1 transition-opacity ${
                 audible ? "" : "opacity-50"

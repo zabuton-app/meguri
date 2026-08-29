@@ -91,8 +91,9 @@ export default function MediaDetail() {
   const autoplay = searchParams.get("autoplay") !== "0";
   const qc = useQueryClient();
   const navigate = useNavigate();
-  // Closing the modal = drop the child route. Return to Discovery if we came from there,
-  // otherwise back to the list (the list stays mounted underneath).
+  // Closing the modal = drop the child route. Return to Discovery or the playlist
+  // player if we came from there, otherwise back to the list (the list stays
+  // mounted underneath).
   // Filtering the library by a tag only makes sense with the library visible, so
   // this closes the detail — to `/` rather than back to Discovery, since Discovery
   // has no notion of the list's filter.
@@ -105,7 +106,33 @@ export default function MediaDetail() {
   );
 
   const onClose = useCallback(() => {
-    if (searchParams.get("from") !== "discover") {
+    const from = searchParams.get("from");
+    // The playlist player parked its pass on the way here, so closing hands
+    // playback back rather than dropping the user on the list.
+    if (from === "player") {
+      const params = new URLSearchParams();
+      // Name the file the pass was parked on: the player restores only when
+      // this matches what it put aside, so a stale pass can never be picked up
+      // by an unrelated later playback (or by walking the history back here).
+      params.set("resume", `${searchParams.get("ws") ?? ""}:${fileId}`);
+      // Hand back where this player got to, not where the playlist left off —
+      // watching on for a few minutes here and then being rewound to the second
+      // of the detour reads as a bug. Until its metadata has loaded this player
+      // still reports 0, so closing straight away falls back to the second the
+      // detour was taken at rather than rewinding to the top of the file.
+      const arrived = Number(searchParams.get("t")) || 0;
+      const sec = playerRef.current?.currentTime();
+      const handBack =
+        sec != null && Number.isFinite(sec) && sec > 0
+          ? Math.floor(sec)
+          : arrived;
+      if (handBack > 0) params.set("t", String(handBack));
+      // Replaced, not pushed: the detour is one round trip, and a growing
+      // history would offer a "back" that lands on a pass already spent.
+      void navigate(`/play?${params.toString()}`, { replace: true });
+      return;
+    }
+    if (from !== "discover") {
       void navigate("/");
       return;
     }
@@ -114,7 +141,7 @@ export default function MediaDetail() {
     if (filter) params.set("filter", filter);
     const query = params.toString();
     void navigate(query ? `/discover?${query}` : "/discover");
-  }, [navigate, searchParams]);
+  }, [fileId, navigate, searchParams]);
 
   // Total duration for scenes/history. Falls back to the natively obtained value when the DB duration is empty.
   const [nativeDur, setNativeDur] = useState<number | null>(null);
