@@ -62,8 +62,9 @@ export interface UserCollectionConfig {
   updatedAt: number;
   /**
    * Built-in collections (currently only "Watch Later") set this. Locked
-   * collections can still gain and lose files, but cannot be removed, renamed,
-   * reordered, or re-iconed. Absent/false on every user-created collection.
+   * collections can still gain and lose files, and their files can still be
+   * rearranged, but the collection itself cannot be removed, renamed, re-iconed
+   * or repositioned among the collections. Absent/false on every user-created one.
    */
   locked?: boolean;
 }

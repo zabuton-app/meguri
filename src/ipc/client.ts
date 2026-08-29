@@ -60,6 +60,11 @@ export const api = {
     invoke("collection_create", { name, emoji }),
   collectionRemove: (id: string) => invoke("collection_remove", { id }),
   collectionReorder: (ids: string[]) => invoke("collection_reorder", { ids }),
+  /** Order of the files inside one collection — the "manual" sort. */
+  collectionReorderItems: (
+    collectionId: string,
+    items: { workspaceId: string; fileId: number }[],
+  ) => invoke("collection_reorder_items", { collectionId, items }),
   collectionSetEmoji: (id: string, emoji: string | null) =>
     invoke("collection_set_emoji", { id, emoji }),
   collectionRename: (id: string, name: string) =>
@@ -149,7 +154,14 @@ export {
 
 // --- Events ---
 // Re-exported for compatibility with components that imported these from this module.
-export type { AboutInfo, LogoId, ScanDone, ScanProgress, ThumbDone, UpdateInfo };
+export type {
+  AboutInfo,
+  LogoId,
+  ScanDone,
+  ScanProgress,
+  ThumbDone,
+  UpdateInfo,
+};
 
 // Returns a Promise so existing components can receive the unlisten function via `.then(unlisten => ...)`.
 type Unlisten = () => void;

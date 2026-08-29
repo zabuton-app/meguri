@@ -9,7 +9,7 @@ fetching, internationalization, theming, and content zoom.
 Routing uses `createHashRouter` (`src/App.tsx`); a hash router is the stable
 choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`),
-`history` (`src/routes/History/`), and
+`play` (`src/routes/Player/`), `history` (`src/routes/History/`), and
 `settings` (`src/routes/Settings/`) are its **children**. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
 stays mounted underneath.

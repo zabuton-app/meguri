@@ -1,3 +1,10 @@
+/**
+ * The collection's own item order. A protocol value both processes must agree
+ * on — the renderer offers it as a sort, the main process routes on it — so it
+ * lives here rather than being spelled out on each side.
+ */
+export const MANUAL_SORT = "manual";
+
 /** Default sort direction when the caller omits `sortDir`. */
 export function defaultSortDir(sort?: string): "asc" | "desc" {
   return sort === "rating" ||

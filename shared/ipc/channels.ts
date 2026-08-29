@@ -61,6 +61,14 @@ export const ChannelInputs = {
   }),
   collection_remove: z.object({ id: z.string() }),
   collection_reorder: z.object({ ids: z.array(z.string()) }),
+  // Order of the FILES inside one collection (the "manual" sort). Distinct from
+  // collection_reorder above, which orders the collections themselves.
+  collection_reorder_items: z.object({
+    collectionId: z.string(),
+    items: z.array(
+      z.object({ workspaceId: z.string(), fileId: z.number().int() }),
+    ),
+  }),
   collection_set_emoji: z.object({
     id: z.string(),
     emoji: z.string().nullable(),
@@ -182,6 +190,7 @@ export interface ChannelOutputs {
   collection_create: UserCollection;
   collection_remove: void;
   collection_reorder: void;
+  collection_reorder_items: void;
   collection_set_emoji: void;
   collection_rename: void;
   collection_add_file: void;

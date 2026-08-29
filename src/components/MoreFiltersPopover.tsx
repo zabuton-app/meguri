@@ -14,6 +14,7 @@ import { resolveSortDir } from "@shared/sortDir";
 import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
+import { MANUAL_SORT } from "@shared/sortDir";
 import { SORT_KEYS, sortLabel } from "@/lib/sortLabel";
 import { Input } from "@/components/ui/input";
 import {
@@ -77,6 +78,8 @@ interface Props {
   collapsedCount: number;
   /** Whether anything at all is filtering, for the clear-all action. */
   hasConditions: boolean;
+  /** True while a collection is active: only then is there a manual order to sort by. */
+  manualSortAvailable?: boolean;
 }
 
 export function MoreFiltersPopover({
@@ -84,6 +87,7 @@ export function MoreFiltersPopover({
   onChange,
   collapsedCount,
   hasConditions,
+  manualSortAvailable = false,
 }: Props) {
   const { t } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
@@ -94,6 +98,11 @@ export function MoreFiltersPopover({
   const sort = value.sort ?? "added";
   const sortDir = resolveSortDir(sort, value.sortDir);
   const SortDirIcon = sortDir === "asc" ? SortAsc : SortDesc;
+  // Manual order is the collection's stored item order, so it is offered only
+  // where such an order exists to follow.
+  const sortKeys = Object.keys(SORT_KEYS).filter(
+    (key) => key !== MANUAL_SORT || manualSortAvailable,
+  );
   const active = collapsedCount > 0;
 
   return (
@@ -179,25 +188,34 @@ export function MoreFiltersPopover({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.keys(SORT_KEYS).map((key) => (
+                {sortKeys.map((key) => (
                   <SelectItem key={key} value={key}>
                     {sortLabel(t, key)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <button
-              type="button"
-              onClick={() =>
-                patch({ sortDir: sortDir === "asc" ? "desc" : "asc" })
-              }
-              title={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
-              aria-label={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
-              className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:text-fg"
-            >
-              <SortDirIcon className="size-4" />
-            </button>
+            {/* Manual order is the collection's own arrangement; there is no
+                direction to reverse, and searchCollectionManual ignores it. */}
+            {sort !== MANUAL_SORT && (
+              <button
+                type="button"
+                onClick={() =>
+                  patch({ sortDir: sortDir === "asc" ? "desc" : "asc" })
+                }
+                title={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
+                aria-label={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
+                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:text-fg"
+              >
+                <SortDirIcon className="size-4" />
+              </button>
+            )}
           </div>
+          {manualSortAvailable && sort !== MANUAL_SORT && (
+            <p className="mt-1.5 text-xs text-muted">
+              {t("playlist.reorderNeedsManual")}
+            </p>
+          )}
         </Section>
 
         <Section label={t("filter.btime")}>

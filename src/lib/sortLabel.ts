@@ -5,6 +5,7 @@ import type { TranslationKey } from "@/i18n/locales/ja";
 
 export const SORT_KEYS: Record<string, TranslationKey> = {
   added: "sort.added",
+  manual: "sort.manual",
   name: "sort.name",
   rating: "sort.rating",
   captured: "sort.captured",

@@ -144,8 +144,11 @@ Manually curated virtual folders that span workspaces. They are stored in the
 `electron/core/appConfig.ts`), and each item references a file by
 `workspaceId + fileId`. The main process is the source of truth, manipulated
 through the `collection_create` / `collection_remove` / `collection_reorder` /
-`collection_set_emoji` / `collection_rename` / `collection_add_file` /
-`collection_remove_file` IPC channels. The UI lives in
+`collection_reorder_items` / `collection_set_emoji` / `collection_rename` /
+`collection_add_file` / `collection_remove_file` IPC channels. Note the two
+distinct reorderings: `collection_reorder` orders the collections themselves,
+while `collection_reorder_items` orders the files inside one — that item order
+is what the `manual` sort reads. The UI lives in
 `src/components/WorkspaceRail.tsx` and related components.
 
 ### Smart collections

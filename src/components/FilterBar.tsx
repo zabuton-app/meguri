@@ -20,9 +20,11 @@ import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
 interface Props {
   value: SearchQuery;
   onChange: (q: SearchQuery) => void;
+  /** True while a collection is active, which is where manual ordering applies. */
+  manualSortAvailable?: boolean;
 }
 
-export function FilterBar({ value, onChange }: Props) {
+export function FilterBar({ value, onChange, manualSortAvailable }: Props) {
   const { t } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
 
@@ -91,6 +93,7 @@ export function FilterBar({ value, onChange }: Props) {
           onChange={onChange}
           collapsedCount={collapsedCount}
           hasConditions={descriptors.length > 0}
+          manualSortAvailable={manualSortAvailable}
         />
 
         {/* Pushed to the far end: saved searches are a way *into* a set of

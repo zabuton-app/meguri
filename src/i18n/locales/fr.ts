@@ -37,6 +37,10 @@ export const fr: Record<TranslationKey, string> = {
   "theme.switchToLight": "Passer au mode clair",
   "theme.switchToDark": "Passer au mode sombre",
 
+  "settings.tabGeneral": "Général",
+  "settings.tabLibrary": "Bibliothèque",
+  "settings.tabPlayback": "Lecture de liste",
+  "settings.tabApp": "Application",
   "settings.language": "Langue",
   "settings.languageDesc": "Changer la langue d'affichage de l'interface.",
   "settings.scenes": "Miniatures de scène",
@@ -452,4 +456,41 @@ export const fr: Record<TranslationKey, string> = {
   "statusbar.status": "État",
   "statusbar.scanning": "Analyse en cours",
   "statusbar.idle": "Inactif",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "Ordre manuel",
+  "playlist.start": "Lire comme une liste",
+  "playlist.play": "Lire (Space)",
+  "playlist.pause": "Pause (Space)",
+  "playlist.next": "Suivant (N)",
+  "playlist.prev": "Précédent (P)",
+  "playlist.shuffle": "Aléatoire (S)",
+  "playlist.repeat": "Répéter",
+  "playlist.fullscreen": "Plein écran (F)",
+  "playlist.exitFullscreen": "Quitter le plein écran (F)",
+  "playlist.exit": "Quitter la lecture (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.loading": "Chargement…",
+  "playlist.empty": "Rien ici ne peut être lu.",
+  "playlist.emptyHint":
+    "Ouvrez une liste contenant des vidéos ou des images, puis démarrez la lecture.",
+  "playlist.unplayable": "Aucun de ces éléments n’a pu être lu.",
+  "playlist.reorderNeedsManual":
+    "Passez à l’ordre manuel pour réorganiser les éléments.",
+  "settings.playlistImageSeconds": "Durée des images",
+  "settings.playlistImageSecondsHint":
+    "Durée d’affichage de chaque image avant le passage au suivant.",
+  "settings.playlistImageMotion": "Animer les images",
+  "settings.playlistImageMotionHint":
+    "Applique un lent panoramique et zoom à chaque image. Toujours désactivé si le système réduit les animations.",
+  "settings.playlistFade": "Fondu",
+  "settings.playlistFadeHint":
+    "Assombrit la scène avant d’afficher l’élément suivant.",
+  "settings.playlistTransition": "Transition",
+  "settings.playlistTransitionHint":
+    "Fait glisser latéralement au changement d’élément. Peut se combiner avec le fondu.",
+  "settings.playlistShuffle": "Aléatoire",
+  "settings.playlistShuffleHint":
+    "Lit dans un ordre aléatoire. Aucun élément ne se répète au cours d’un même passage.",
+  "settings.secondsValue": "{n} s",
 };

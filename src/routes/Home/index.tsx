@@ -2,13 +2,24 @@
 // infinite-scroll grid. On thumb:done, reload the corresponding thumbnail.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FolderPlus, Sparkles } from "lucide-react";
+import { FolderPlus, PlayCircle, Sparkles } from "lucide-react";
 import { api, events, ALL_ID, type ThumbDone } from "@/ipc/client";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
-import type { SearchQuery, UserCollection, WorkspaceInfo } from "@/ipc/types";
+import type {
+  FileRow,
+  SearchQuery,
+  SearchResult,
+  UserCollection,
+  WorkspaceInfo,
+} from "@/ipc/types";
 import { Button } from "@/components/ui/button";
+import { MANUAL_SORT } from "@shared/sortDir";
 import { MediaGrid } from "@/components/MediaGrid";
 import { MediaList } from "@/components/MediaList";
 import { MediaTable } from "@/components/MediaTable";
@@ -104,6 +115,68 @@ export default function Home() {
     [search.data],
   );
   const listOffset = filesSearchListOffset(search.data?.pageParams);
+  // Nothing to play means no entry point to playback at all, rather than a
+  // player that opens onto an empty screen (spec FR-016).
+  const canPlay = (status.data?.ready ?? false) && items.length > 0;
+
+  // Drag-to-reorder edits the collection's own item order, so it is offered only
+  // where that order is both stored (a collection) and visible (manual sort).
+  const manualSort = filter.sort === MANUAL_SORT;
+  const reorderCollectionId =
+    activeCollection && manualSort ? activeCollection.id : null;
+
+  // Manual order belongs to a collection. Leaving one would otherwise leave the
+  // sort set to a value the picker no longer offers — a blank control over a
+  // list the main process has quietly fallen back to the default order for.
+  useEffect(() => {
+    if (activeCollection || !manualSort) return;
+    // Settles in one pass: clearing the sort makes manualSort false, so the
+    // guard above stops the next run.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFilter((f) => {
+      const next = { ...f };
+      delete next.sort;
+      delete next.sortDir;
+      return next;
+    });
+  }, [activeCollection, manualSort]);
+  const reorder = useMemo(
+    () =>
+      reorderCollectionId
+        ? {
+            onReorder: (next: FileRow[]) => {
+              // Patch the loaded pages first so the drop lands instantly, then
+              // persist. Only the loaded window is described; the main process
+              // rearranges exactly those slots and leaves the rest alone.
+              qc.setQueryData<InfiniteData<SearchResult>>(
+                ["files_search", status.data?.workspaceId ?? null, filter],
+                (prev) => {
+                  if (!prev) return prev;
+                  let at = 0;
+                  const pages = prev.pages.map((page) => ({
+                    ...page,
+                    items: page.items.map(() => next[at++]),
+                  }));
+                  return { ...prev, pages };
+                },
+              );
+              void api
+                .collectionReorderItems(
+                  reorderCollectionId,
+                  next.map((f) => ({
+                    workspaceId: f.workspaceId,
+                    fileId: f.id,
+                  })),
+                )
+                .catch(() => {
+                  // Fall back to the stored order if the write did not land.
+                  void qc.invalidateQueries({ queryKey: ["files_search"] });
+                });
+            },
+          }
+        : undefined,
+    [reorderCollectionId, qc, filter, status.data?.workspaceId],
+  );
 
   // Keyboard focus navigation in the views runs only while the list is foreground
   // (no detail/settings/discover modal, and no help/command overlay on top).
@@ -476,7 +549,11 @@ export default function Home() {
         </div>
       )}
 
-      <FilterBar value={filter} onChange={setFilter} />
+      <FilterBar
+        value={filter}
+        onChange={setFilter}
+        manualSortAvailable={!!activeCollection}
+      />
 
       <ScanProgress onThumbDone={onThumbDone} wsId={status.data?.workspaceId} />
 
@@ -525,6 +602,7 @@ export default function Home() {
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
             watchLater={activeCollection?.id === WATCH_LATER_ID}
+            reorder={reorder}
           />
         ) : view === "table" ? (
           <MediaTable
@@ -543,6 +621,7 @@ export default function Home() {
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
             watchLater={activeCollection?.id === WATCH_LATER_ID}
+            reorder={reorder}
           />
         ) : (
           <MediaGrid
@@ -561,11 +640,31 @@ export default function Home() {
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
             watchLater={activeCollection?.id === WATCH_LATER_ID}
+            reorder={reorder}
           />
         )}
       </main>
 
       <StatusBar workspaceId={status.data?.workspaceId} scanning={scanning} />
+
+      {/* Play the list as a playlist. No params: the player reads the very list
+          order shared through MediaNavContext below, so whatever sort/filter is
+          on screen is what plays — collection, Watch Later or plain search.
+          Accent-filled like the discovery button beside it: both start a way of
+          watching, and neither is subordinate to the other. */}
+      <Link
+        to="/play"
+        title={t("playlist.start")}
+        aria-label={t("playlist.start")}
+        aria-disabled={!canPlay}
+        tabIndex={canPlay ? undefined : -1}
+        className={cn(
+          "fixed bottom-24 right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          !canPlay && "pointer-events-none opacity-45",
+        )}
+      >
+        <PlayCircle className="size-6" />
+      </Link>
 
       <Link
         to={discoverPath(filter)}
