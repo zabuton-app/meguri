@@ -421,7 +421,13 @@ function SortableTableRow(
   props: Omit<Parameters<typeof MediaTableRow>[0], "dnd">,
 ) {
   // Read during render by design (see SortableMedia in MediaReorder.tsx).
-  const sortable = useSortable({ id: mediaSortId(props.file) });
+  // dnd-kit's attributes default role to "button". Spread over a row that
+  // declares role="row" inside a role="table", that orphans its role="cell"
+  // children, so the row's own semantics are handed back to it here.
+  const sortable = useSortable({
+    id: mediaSortId(props.file),
+    attributes: { role: "row" },
+  });
   const { setNodeRef, transition, isDragging, attributes, listeners } =
     sortable;
   return (

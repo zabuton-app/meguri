@@ -458,6 +458,7 @@ export const en: Record<TranslationKey, string> = {
   "playlist.exitFullscreen": "Leave fullscreen (F)",
   "playlist.exit": "Exit playback (Esc)",
   "playlist.progress": "{current} / {total}",
+  "playlist.loading": "Loading…",
   "playlist.empty": "Nothing here can be played.",
   "playlist.emptyHint":
     "Open a list that contains videos or images, then start playback.",
@@ -472,8 +473,10 @@ export const en: Record<TranslationKey, string> = {
   "settings.playlistFade": "Fade",
   "settings.playlistFadeHint": "Dims the stage before showing the next item.",
   "settings.playlistTransition": "Transition",
-  "settings.playlistTransitionHint": "Slides sideways when the item changes. Can be combined with the fade.",
+  "settings.playlistTransitionHint":
+    "Slides sideways when the item changes. Can be combined with the fade.",
   "settings.playlistShuffle": "Shuffle",
-  "settings.playlistShuffleHint": "Plays in a random order. No item repeats within a single pass.",
+  "settings.playlistShuffleHint":
+    "Plays in a random order. No item repeats within a single pass.",
   "settings.secondsValue": "{n}s",
 };

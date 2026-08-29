@@ -3,6 +3,7 @@
 // spawned). Holds its own read-only connection cache keyed by workspace ID —
 // WAL mode allows these readers to coexist with the main process's writer.
 import * as cw from "./crossWorkspace.js";
+import { MANUAL_SORT } from "../../shared/sortDir.js";
 import { openDbReadonly, type DB } from "./db.js";
 import type { Core } from "./index.js";
 import { countFiles, lastScanAt } from "./queries.js";
@@ -159,16 +160,20 @@ export class QueryExecutor {
     switch (req.kind) {
       case "search": {
         const refs = this.resolveRefs(cores, req.query, req.refs);
+        // Manual order is the collection's stored order, so it applies only when
+        // the refs ARE that order. `refs` is not that test: the duplicates
+        // filter also produces refs (duplicate-scan order, and intersected with
+        // the collection when both apply), and ordering by those would be
+        // passing off a derived list as the order the user arranged by hand.
+        const manual = req.query.sort === MANUAL_SORT;
+        const storedOrder = manual && !!req.refs && !req.query.duplicates;
         if (!refs) {
-          // Manual order only exists inside a collection; anywhere else it has
-          // no stored order to follow, so it falls back to the default sort.
-          const query =
-            req.query.sort === cw.MANUAL_SORT
-              ? { ...req.query, sort: undefined, sortDir: undefined }
-              : req.query;
+          const query = manual
+            ? { ...req.query, sort: undefined, sortDir: undefined }
+            : req.query;
           return cw.searchWorkspaces(cores, query);
         }
-        return req.query.sort === cw.MANUAL_SORT
+        return storedOrder
           ? cw.searchCollectionManual(cores, refs, req.query)
           : cw.searchCollection(cores, refs, req.query);
       }

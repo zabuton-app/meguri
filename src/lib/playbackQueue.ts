@@ -174,17 +174,20 @@ export function extend(
   rng: Rng = defaultRng,
 ): PlaybackQueue {
   const seen = q.seen;
+  const nextSeen = new Set(seen);
   const fresh: SeqItem[] = [];
   let nextSeq = q.nextSeq;
   for (const item of items) {
     const key = queueKey(item);
-    if (seen.has(key)) continue;
+    // Checked against the running set, not the incoming one: a batch that
+    // repeats a key would otherwise admit it twice and play it twice in a pass,
+    // which is the very thing this dedupe exists to prevent.
+    if (nextSeen.has(key)) continue;
+    nextSeen.add(key);
     fresh.push({ ...item, seq: nextSeq++ });
   }
   if (fresh.length === 0) return q;
 
-  const nextSeen = new Set(seen);
-  for (const item of fresh) nextSeen.add(queueKey(item));
   const pool = orderPool([...q.pool, ...fresh], q.shuffle, rng);
   const next: PlaybackQueue = { ...q, pool, seen: nextSeen, nextSeq };
 

@@ -215,6 +215,12 @@ describe("extend", () => {
     expect(queueKey(q.current!)).toBe("ws1:2");
   });
 
+  it("admits a key once even when the same batch repeats it", () => {
+    const q = createQueue([]);
+    const dup = [...items(2), { workspaceId: "ws1", fileId: 1, kind: "video" }];
+    expect(queueSize(extend(q, dup))).toBe(2);
+  });
+
   it("returns the same object when there is nothing new", () => {
     const q = createQueue(items(2));
     expect(extend(q, items(2))).toBe(q);

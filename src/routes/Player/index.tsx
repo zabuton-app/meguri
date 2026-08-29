@@ -41,7 +41,7 @@ const CHROME_IDLE_MS = 2500;
 /**
  * Half of one item-to-item transition: the outgoing item fades out over this
  * long, the swap happens at the bottom of the dip, and the incoming item fades
- * back in over the same span. Dipping through the stage's own black rather than
+ * back in over the same span. Dipping through the stage's own ground rather than
  * cross-dissolving keeps exactly one video element alive at a time.
  */
 const TRANSITION_MS = 260;
@@ -174,11 +174,27 @@ export default function Player() {
   const file = detail.data ?? null;
   const isImage = current?.kind === "image";
 
+  // Without its details there is nothing to render for this item, so a failed
+  // fetch would leave the stage blank for good. Treat it like any other
+  // unplayable item and move on (FR-015).
+  useEffect(() => {
+    if (!current || !detail.isError) return;
+    skipCurrent();
+  }, [current, detail.isError, skipCurrent]);
+
   // Images have no "play" event of their own, so viewing one is the play record
   // (mirrors the detail view, and is what removes it from Watch Later).
   const recordedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!current || !isImage) return;
+    if (!current || !isImage) {
+      // Once the player settles on a non-image, drop the guard so coming back to
+      // the same image records a new view. A playlist reaches image → video →
+      // the same image routinely (repeat, shuffle, stepping back), and without
+      // this the second visit is never recorded — which also leaves the file
+      // sitting in Watch Later. Same fix the detail view already carries.
+      if (current) recordedRef.current = null;
+      return;
+    }
     const key = `${current.workspaceId}:${current.fileId}`;
     if (recordedRef.current === key) return;
     recordedRef.current = key;
@@ -222,7 +238,7 @@ export default function Player() {
   }, [isImage]);
 
   // Item changes animate rather than cut. Two independent effects compose:
-  // "fade" dims the stage through black, "transition" pushes it sideways. The
+  // "fade" dims the stage to its ground, "transition" pushes it sideways. The
   // swap happens at the far end of the outgoing leg — with one media element on
   // screen at a time there is nothing to cross-dissolve against, so the switch
   // has to happen while the stage is out of view.
@@ -355,6 +371,17 @@ export default function Player() {
           el.isContentEditable)
       )
         return;
+      // Space and Enter belong to whatever control has focus. Swallowing them
+      // here would stop the control bar's own buttons from ever activating,
+      // which is the whole of "usable from the keyboard alone".
+      if (
+        el &&
+        (e.code === "Space" || e.code === "Enter") &&
+        (el.tagName === "BUTTON" ||
+          el.tagName === "A" ||
+          el.getAttribute("role") === "button")
+      )
+        return;
       const s = keyState.current;
       // The preset's paging chords step through the playlist, the same way they
       // page files in the detail view. Checked before the modifier guard because
@@ -421,9 +448,12 @@ export default function Player() {
   const empty = queue.ended && queue.total === 0;
   useEffect(() => {
     if (!queue.ended || queue.total === 0) return;
+    // A pass where nothing could be played ends on the explanation below rather
+    // than dropping the user back on the list with no idea why (FR-015).
+    if (queue.unplayable) return;
     // Finished a pass with repeat off — hand the user back to their list (FR-006).
     exit();
-  }, [queue.ended, queue.total, exit]);
+  }, [queue.ended, queue.total, queue.unplayable, exit]);
 
   const wsId = current?.workspaceId ?? "";
   const thumbSrc =
@@ -452,7 +482,11 @@ export default function Player() {
       onMouseMove={wake}
       onKeyDown={wake}
     >
-      {empty || queue.unplayable ? (
+      {queue.waiting && !current ? (
+        <div className="flex h-full w-full items-center justify-center text-muted">
+          <p>{t("playlist.loading")}</p>
+        </div>
+      ) : empty || queue.unplayable ? (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center text-muted">
           <p>{emptyMessage}</p>
           <p className="text-sm">{t("playlist.emptyHint")}</p>

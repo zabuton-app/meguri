@@ -77,7 +77,7 @@ interface Prefs {
    * overrides this to off; this flag only lets the user turn it off as well.
    */
   playlistImageMotion: boolean;
-  /** Whether an item change dips through black (the opacity half of the switch). */
+  /** Whether an item change dips out and back (the opacity half of the switch). */
   playlistFade: boolean;
   /** Whether an item change slides sideways (the positional half of the switch). */
   playlistTransition: boolean;

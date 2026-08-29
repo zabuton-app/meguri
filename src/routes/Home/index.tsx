@@ -19,7 +19,7 @@ import type {
   WorkspaceInfo,
 } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
-import { MANUAL_SORT } from "@/lib/sortLabel";
+import { MANUAL_SORT } from "@shared/sortDir";
 import { MediaGrid } from "@/components/MediaGrid";
 import { MediaList } from "@/components/MediaList";
 import { MediaTable } from "@/components/MediaTable";
@@ -124,6 +124,22 @@ export default function Home() {
   const manualSort = filter.sort === MANUAL_SORT;
   const reorderCollectionId =
     activeCollection && manualSort ? activeCollection.id : null;
+
+  // Manual order belongs to a collection. Leaving one would otherwise leave the
+  // sort set to a value the picker no longer offers — a blank control over a
+  // list the main process has quietly fallen back to the default order for.
+  useEffect(() => {
+    if (activeCollection || !manualSort) return;
+    // Settles in one pass: clearing the sort makes manualSort false, so the
+    // guard above stops the next run.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFilter((f) => {
+      const next = { ...f };
+      delete next.sort;
+      delete next.sortDir;
+      return next;
+    });
+  }, [activeCollection, manualSort]);
   const reorder = useMemo(
     () =>
       reorderCollectionId

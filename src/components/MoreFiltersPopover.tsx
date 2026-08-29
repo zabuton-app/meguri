@@ -14,7 +14,8 @@ import { resolveSortDir } from "@shared/sortDir";
 import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
-import { MANUAL_SORT, SORT_KEYS, sortLabel } from "@/lib/sortLabel";
+import { MANUAL_SORT } from "@shared/sortDir";
+import { SORT_KEYS, sortLabel } from "@/lib/sortLabel";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -194,17 +195,21 @@ export function MoreFiltersPopover({
                 ))}
               </SelectContent>
             </Select>
-            <button
-              type="button"
-              onClick={() =>
-                patch({ sortDir: sortDir === "asc" ? "desc" : "asc" })
-              }
-              title={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
-              aria-label={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
-              className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:text-fg"
-            >
-              <SortDirIcon className="size-4" />
-            </button>
+            {/* Manual order is the collection's own arrangement; there is no
+                direction to reverse, and searchCollectionManual ignores it. */}
+            {sort !== MANUAL_SORT && (
+              <button
+                type="button"
+                onClick={() =>
+                  patch({ sortDir: sortDir === "asc" ? "desc" : "asc" })
+                }
+                title={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
+                aria-label={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
+                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:text-fg"
+              >
+                <SortDirIcon className="size-4" />
+              </button>
+            )}
           </div>
           {manualSortAvailable && sort !== MANUAL_SORT && (
             <p className="mt-1.5 text-xs text-muted">

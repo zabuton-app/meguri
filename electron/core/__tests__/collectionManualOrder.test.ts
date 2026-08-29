@@ -178,6 +178,49 @@ describe("searchCollectionManual", () => {
     ).toEqual(["005.mp4", "010.mp4", "015.mp4", "020.mp4"]);
   });
 
+  it("resumes from a plain numeric cursor, the way backward paging sends it", () => {
+    // filesSearchPreviousCursor emits an offset with no seek key and expects the
+    // main process to count from the start. Manual order used to discard it and
+    // hand back the head of the collection in the middle of the list.
+    const { db, ids } = seedWorkspace(10);
+    const cores = [coreTarget("ws1", db)];
+    const res = searchCollectionManual(cores, refsOf("ws1", ids), {
+      limit: 3,
+      cursor: 4,
+    });
+    expect(pathsOf(res)).toEqual(["005.mp4", "006.mp4", "007.mp4"]);
+  });
+
+  it("counts real rows, not refs, when a filter thins the numeric offset", () => {
+    const { db, ids } = seedWorkspace(10, (i) => ({
+      kind: i % 2 === 0 ? "image" : "video",
+    }));
+    const cores = [coreTarget("ws1", db)];
+    // Videos are 001, 003, 005, 007, 009 — skipping two rows lands on 005.
+    const res = searchCollectionManual(cores, refsOf("ws1", ids), {
+      kind: "video",
+      limit: 2,
+      cursor: 2,
+    });
+    expect(pathsOf(res)).toEqual(["005.mp4", "007.mp4"]);
+  });
+
+  it("returns the same rows whether a page is reached forwards or by offset", () => {
+    const { db, ids } = seedWorkspace(12);
+    const cores = [coreTarget("ws1", db)];
+    const refs = refsOf("ws1", ids);
+    const first = searchCollectionManual(cores, refs, { limit: 4 });
+    const second = searchCollectionManual(cores, refs, {
+      limit: 4,
+      cursor: first.nextCursor ?? undefined,
+    });
+    const byOffset = searchCollectionManual(cores, refs, {
+      limit: 4,
+      cursor: 4,
+    });
+    expect(pathsOf(byOffset)).toEqual(pathsOf(second));
+  });
+
   it("ignores refs whose workspace is not among the cores", () => {
     const { db, ids } = seedWorkspace(2);
     const cores = [coreTarget("ws1", db)];

@@ -457,6 +457,7 @@ export const ko: Record<TranslationKey, string> = {
   "playlist.exitFullscreen": "전체 화면 해제 (F)",
   "playlist.exit": "재생 종료 (Esc)",
   "playlist.progress": "{current} / {total}",
+  "playlist.loading": "불러오는 중…",
   "playlist.empty": "재생할 수 있는 미디어가 없습니다.",
   "playlist.emptyHint":
     "동영상이나 이미지가 있는 목록을 연 뒤 재생을 시작하세요.",
@@ -469,10 +470,13 @@ export const ko: Record<TranslationKey, string> = {
   "settings.playlistImageMotionHint":
     "표시 중인 이미지를 천천히 확대·이동합니다. OS에서 동작 줄이기가 켜져 있으면 항상 정지합니다.",
   "settings.playlistFade": "페이드",
-  "settings.playlistFadeHint": "항목이 바뀔 때 화면을 한 번 어둡게 한 뒤 다음 항목을 표시합니다.",
+  "settings.playlistFadeHint":
+    "항목이 바뀔 때 화면을 한 번 어둡게 한 뒤 다음 항목을 표시합니다.",
   "settings.playlistTransition": "트랜지션",
-  "settings.playlistTransitionHint": "항목이 바뀔 때 옆으로 밀어 넘깁니다. 페이드와 함께 사용할 수 있습니다.",
+  "settings.playlistTransitionHint":
+    "항목이 바뀔 때 옆으로 밀어 넘깁니다. 페이드와 함께 사용할 수 있습니다.",
   "settings.playlistShuffle": "랜덤",
-  "settings.playlistShuffleHint": "재생 순서를 무작위로 섞습니다. 한 바퀴 도는 동안 같은 항목은 반복되지 않습니다.",
+  "settings.playlistShuffleHint":
+    "재생 순서를 무작위로 섞습니다. 한 바퀴 도는 동안 같은 항목은 반복되지 않습니다.",
   "settings.secondsValue": "{n}초",
 };

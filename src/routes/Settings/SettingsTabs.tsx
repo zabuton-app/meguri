@@ -72,7 +72,12 @@ export function SettingsTabs<T extends string>({
             type="button"
             role="tab"
             aria-selected={i === selected}
-            aria-controls={`settings-panel-${tab.id}`}
+            // Only the selected tab's panel is in the DOM, so only that tab may
+            // point at one: a reference to a missing element is worse for a
+            // screen reader than no reference at all.
+            aria-controls={
+              i === selected ? `settings-panel-${tab.id}` : undefined
+            }
             tabIndex={i === selected ? 0 : -1}
             onClick={() => onChange(tab.id)}
             onKeyDown={onKeyDown}

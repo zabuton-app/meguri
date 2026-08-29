@@ -444,6 +444,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "playlist.exitFullscreen": "退出全屏 (F)",
   "playlist.exit": "退出播放 (Esc)",
   "playlist.progress": "{current} / {total}",
+  "playlist.loading": "加载中…",
   "playlist.empty": "这里没有可播放的媒体。",
   "playlist.emptyHint": "请打开包含视频或图片的列表后再开始播放。",
   "playlist.unplayable": "这些项目都无法播放。",
@@ -457,7 +458,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.playlistFade": "淡入淡出",
   "settings.playlistFadeHint": "切换项目时先变暗，再显示下一项。",
   "settings.playlistTransition": "转场",
-  "settings.playlistTransitionHint": "切换项目时横向滑动。可与淡入淡出同时使用。",
+  "settings.playlistTransitionHint":
+    "切换项目时横向滑动。可与淡入淡出同时使用。",
   "settings.playlistShuffle": "随机",
   "settings.playlistShuffleHint": "以随机顺序播放。一轮之内不会重复同一项目。",
   "settings.secondsValue": "{n} 秒",

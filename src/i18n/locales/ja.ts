@@ -461,6 +461,7 @@ export const ja = {
   "playlist.exitFullscreen": "全画面を解除 (F)",
   "playlist.exit": "再生を終了 (Esc)",
   "playlist.progress": "{current} / {total}",
+  "playlist.loading": "読み込み中…",
   "playlist.empty": "再生できるメディアがありません。",
   "playlist.emptyHint":
     "動画や画像を含む一覧を開いてから再生を始めてください。",
@@ -472,11 +473,14 @@ export const ja = {
   "settings.playlistImageMotionHint":
     "表示中の画像をゆっくり拡大・移動させます。OS で動きを減らす設定が有効な場合は常に停止します。",
   "settings.playlistFade": "フェード",
-  "settings.playlistFadeHint": "アイテムが切り替わるとき、いったん暗くしてから次を表示します。",
+  "settings.playlistFadeHint":
+    "アイテムが切り替わるとき、いったん暗くしてから次を表示します。",
   "settings.playlistTransition": "トランジション",
-  "settings.playlistTransitionHint": "アイテムが切り替わるとき、横方向にスライドさせます。フェードと同時に使えます。",
+  "settings.playlistTransitionHint":
+    "アイテムが切り替わるとき、横方向にスライドさせます。フェードと同時に使えます。",
   "settings.playlistShuffle": "ランダム",
-  "settings.playlistShuffleHint": "再生順をランダムに入れ替えます。一巡のあいだ同じアイテムは繰り返されません。",
+  "settings.playlistShuffleHint":
+    "再生順をランダムに入れ替えます。一巡のあいだ同じアイテムは繰り返されません。",
   "settings.secondsValue": "{n} 秒",
 } as const;
 

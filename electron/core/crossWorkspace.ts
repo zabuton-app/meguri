@@ -154,12 +154,11 @@ export function searchCollection(
 }
 
 /**
- * The collection's own item order ("manual" sort). This order lives in
- * config.json, not in any SQL column, so it cannot ride orderByFor()/the k-way
- * merge: the refs array *is* the ordering. Paging slices that array and pulls
- * the matching rows by id, then puts them back in refs order.
+ * The collection's own item order ("manual" sort, see shared/sortDir.ts). This
+ * order lives in config.json, not in any SQL column, so it cannot ride
+ * orderByFor()/the k-way merge: the refs array *is* the ordering. Paging slices
+ * that array and pulls the matching rows by id, then puts them back in refs order.
  */
-export const MANUAL_SORT = "manual";
 
 /** Refs pulled per round trip while filling a page (<= the query layer's MAX_LIMIT). */
 const MANUAL_CHUNK = 200;
@@ -174,11 +173,11 @@ function refKey(ref: { workspaceId: string; fileId: number }): string {
  * diverges from the refs index as soon as a filter drops entries, so the refs
  * index rides along in the seek key's `v` slot.
  */
-function manualRefIndex(key: SearchSeekKey | undefined): number {
+function manualRefIndex(key: SearchSeekKey | undefined): number | null {
   if (key && key.ws === "" && typeof key.v === "number") {
     return Math.max(0, key.v);
   }
-  return 0;
+  return null;
 }
 
 /** Fetch the rows for one slice of refs, keyed for reordering. */
@@ -221,20 +220,32 @@ export function searchCollectionManual(
 ): SearchResult {
   const limit = Math.max(1, query.limit ?? DEFAULT_LIMIT);
   const { offset, key } = normalizeCursor(query.cursor);
+  const resume = manualRefIndex(key);
   const items: FileRow[] = [];
-  let i = manualRefIndex(key);
+  // Forward paging carries the refs index in the seek key and resumes there.
+  // Backward paging deliberately sends an offset-only cursor (see
+  // filesSearchPreviousCursor) and expects the main process to fall back to
+  // counting from the start — filters can drop refs, so the refs index and the
+  // row offset are not the same number and the count has to be a real one.
+  let i = resume ?? 0;
+  let skip = resume == null ? offset : 0;
 
-  // Filters can drop refs, so keep pulling until the page is full or the refs
-  // run out; `i` always lands on the first ref not yet accounted for.
-  while (items.length < limit && i < refs.length) {
+  // Keep pulling until the page is full or the refs run out; `i` always lands
+  // on the first ref not yet accounted for.
+  while ((skip > 0 || items.length < limit) && i < refs.length) {
     const slice = refs.slice(i, i + MANUAL_CHUNK);
     const rows = manualRows(cores, slice, query);
     let consumed = 0;
     for (const ref of slice) {
-      if (items.length >= limit) break;
+      if (skip === 0 && items.length >= limit) break;
       consumed++;
       const row = rows.get(refKey(ref));
-      if (row) items.push(row);
+      if (!row) continue;
+      if (skip > 0) {
+        skip--;
+        continue;
+      }
+      items.push(row);
     }
     i += consumed;
   }

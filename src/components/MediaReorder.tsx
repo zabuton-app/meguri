@@ -2,7 +2,7 @@
 // its manual order. The order being edited is the collection's stored item
 // order (config.json), so a drop reports the loaded window's new order and the
 // main process rearranges just those slots — items outside the window never move.
-import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -76,41 +76,35 @@ export function MediaReorderProvider({
 }
 
 /**
- * Makes one rendered media item draggable. `baseTransform` is composed in front
- * of the drag transform so a virtualized row keeps its own positioning.
+ * Makes one rendered media item draggable, as a wrapper around it. A view whose
+ * rows position themselves with a transform cannot use this — the two would
+ * fight over that transform — and hands the drag wiring down to the row instead;
+ * see MediaTable's SortableTableRow.
  */
 export function SortableMedia({
   id,
-  className,
-  baseTransform,
-  style,
   children,
 }: {
   id: string;
-  className?: string;
-  baseTransform?: string;
-  style?: CSSProperties;
   children: ReactNode;
 }) {
   // useSortable's node ref, transform and drag state are read and applied during
   // render by design; routing them through state would break DnD.
-  const sortable = useSortable({ id });
+  //
+  // The wrapper is a drag handle around content that already has its own
+  // semantics (a card containing a link). Left at dnd-kit's default role of
+  // "button" it would announce as a control and add a second tab stop over the
+  // grid's existing keyboard navigation.
+  const sortable = useSortable({ id, attributes: { role: "presentation" } });
   const { setNodeRef, transition, isDragging, attributes, listeners } =
     sortable;
-  const drag = CSS.Transform.toString(sortable.transform);
-  const transform =
-    [baseTransform, drag].filter(Boolean).join(" ") || undefined;
+  const transform = CSS.Transform.toString(sortable.transform) || undefined;
 
   return (
     <div
       ref={setNodeRef}
-      style={{
-        ...style,
-        transform,
-        transition,
-        zIndex: isDragging ? 1 : undefined,
-      }}
-      className={cn("touch-none", className, isDragging && "opacity-60")}
+      style={{ transform, transition, zIndex: isDragging ? 1 : undefined }}
+      className={cn("touch-none", isDragging && "opacity-60")}
       {...attributes}
       {...listeners}
     >

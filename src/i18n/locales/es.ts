@@ -469,6 +469,7 @@ export const es: Record<TranslationKey, string> = {
   "playlist.exitFullscreen": "Salir de pantalla completa (F)",
   "playlist.exit": "Salir de la reproducción (Esc)",
   "playlist.progress": "{current} / {total}",
+  "playlist.loading": "Cargando…",
   "playlist.empty": "No hay nada que se pueda reproducir aquí.",
   "playlist.emptyHint":
     "Abre una lista que contenga vídeos o imágenes y luego inicia la reproducción.",
@@ -482,10 +483,13 @@ export const es: Record<TranslationKey, string> = {
   "settings.playlistImageMotionHint":
     "Aplica un desplazamiento y zoom lentos a cada imagen. Siempre se desactiva si el sistema reduce el movimiento.",
   "settings.playlistFade": "Fundido",
-  "settings.playlistFadeHint": "Atenúa la pantalla antes de mostrar el siguiente elemento.",
+  "settings.playlistFadeHint":
+    "Atenúa la pantalla antes de mostrar el siguiente elemento.",
   "settings.playlistTransition": "Transición",
-  "settings.playlistTransitionHint": "Desplaza lateralmente al cambiar de elemento. Se puede combinar con el fundido.",
+  "settings.playlistTransitionHint":
+    "Desplaza lateralmente al cambiar de elemento. Se puede combinar con el fundido.",
   "settings.playlistShuffle": "Aleatorio",
-  "settings.playlistShuffleHint": "Reproduce en orden aleatorio. Ningún elemento se repite dentro de una misma vuelta.",
+  "settings.playlistShuffleHint":
+    "Reproduce en orden aleatorio. Ningún elemento se repite dentro de una misma vuelta.",
   "settings.secondsValue": "{n} s",
 };

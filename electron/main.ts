@@ -521,7 +521,11 @@ function registerWorkspaceHandlers(): void {
 
   handle("collection_reorder_items", ({ collectionId, items }) => {
     ws.reorderCollectionItems(collectionId, items);
-    emit("workspace:changed", { activeId: ws.activeId });
+    // Deliberately no workspace:changed broadcast. The rail listens for it by
+    // invalidating every files_search, which would refetch the pages the
+    // renderer just patched optimistically — on every single drop. Nothing in
+    // the rail depends on the order within a collection, and the renderer
+    // refetches itself if the write fails. Same reasoning as consumeWatchLater.
   });
 
   handle("collection_set_emoji", ({ id, emoji }) => {

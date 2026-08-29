@@ -309,9 +309,17 @@ export const VideoPlayer = forwardRef<
   );
 
   // Mirror the play/pause state out so an external control bar can render it.
+  // Read through a ref (the convention in this file) so a caller passing an
+  // inline closure does not make this fire on each of its own renders — the
+  // playlist player wakes its control bar from here, and that turned into a bar
+  // that could never stay hidden.
+  const onPlayingChangeRef = useRef(onPlayingChange);
   useEffect(() => {
-    onPlayingChange?.(playing);
-  }, [playing, onPlayingChange]);
+    onPlayingChangeRef.current = onPlayingChange;
+  });
+  useEffect(() => {
+    onPlayingChangeRef.current?.(playing);
+  }, [playing]);
 
   const toggleMute = () => {
     const v = ref.current;

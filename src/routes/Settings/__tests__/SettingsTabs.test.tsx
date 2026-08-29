@@ -50,11 +50,22 @@ describe("SettingsTabs", () => {
     ]);
   });
 
-  it("points each tab at the panel it controls", () => {
-    renderTabs();
+  it("points the selected tab at the panel it controls", () => {
+    renderTabs("library");
     const tab = screen.getByRole("tab", { name: "Library" });
     expect(tab.id).toBe("settings-tab-library");
     expect(tab.getAttribute("aria-controls")).toBe("settings-panel-library");
+  });
+
+  it("claims no panel from the tabs whose panel is not rendered", () => {
+    // Only the selected panel exists in the DOM, and a reference to a missing
+    // element is worse for a screen reader than no reference at all.
+    renderTabs("library");
+    for (const name of ["General", "App"]) {
+      expect(
+        screen.getByRole("tab", { name }).getAttribute("aria-controls"),
+      ).toBeNull();
+    }
   });
 
   it("reports the tab that was clicked", () => {

@@ -7,11 +7,12 @@ import {
 
 // A still image on the playlist stage, with its own advance clock.
 //
-// The clock IS the animation: when the Web Animations API is available the
-// pan/zoom animation's own finish event advances the player, so the motion can
-// never end early and leave a frozen image sitting there (spec SC-008). Pausing
-// pauses the same object. Environments without WAAPI (jsdom under test) fall
-// back to a pausable timer that keeps the timing contract identical.
+// With motion on, the clock IS the animation: the pan/zoom animation's own
+// finish event advances the player, so the motion can never end early and leave
+// a frozen image sitting there (spec SC-008), and pausing pauses that same
+// object. With motion off — the user's choice, the OS reduce-motion setting, or
+// an environment without the Web Animations API such as jsdom under test — a
+// pausable timer takes over and keeps the timing contract identical.
 export function ImageStage({
   src,
   alt,
