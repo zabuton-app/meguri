@@ -184,6 +184,37 @@ describe("VideoPlayer", () => {
       expect(at).toBe(20);
     });
 
+    it("lets an outright seek win over the run it interrupted", async () => {
+      // Clicking the bar (or a scene, or a resumed position) right after a run
+      // used to be undone: the run's target was still set, so the seeked
+      // handler chased it and dragged playback back there.
+      const { video, ref } = renderPlayer();
+      loadVideo(video);
+      let seeking = false;
+      let at = 0;
+      Object.defineProperty(video, "seeking", {
+        configurable: true,
+        get: () => seeking,
+      });
+      Object.defineProperty(video, "currentTime", {
+        configurable: true,
+        get: () => at,
+        set: (v: number) => {
+          at = v;
+          seeking = true;
+        },
+      });
+
+      press(4);
+      expect(at).toBe(5);
+
+      ref.current?.seek(90);
+      expect(at).toBe(90);
+      seeking = false;
+      fireEvent.seeked(video);
+      expect(at).toBe(90);
+    });
+
     it("keeps counting the presses that follow the first one", async () => {
       const { video } = renderPlayer();
       loadVideo(video);

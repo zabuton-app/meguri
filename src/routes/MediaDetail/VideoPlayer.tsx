@@ -325,7 +325,7 @@ export const VideoPlayer = forwardRef<
     () => () => {
       stopTimer();
       if (retryTimerRef.current != null) clearTimeout(retryTimerRef.current);
-      if (seekTimerRef.current != null) clearTimeout(seekTimerRef.current);
+      cancelQueuedSeek();
     },
     [],
   );
@@ -334,14 +334,22 @@ export const VideoPlayer = forwardRef<
   // otherwise re-stream via ?t. Remuxed containers (mkv/avi/wmv/flv/ts) are piped
   // without Range support, so seekable only covers the buffered portion — checking
   // length > 0 isn't enough; the target time must actually be inside one of the ranges.
-  const seek = (t: number) => {
+  /**
+   * @param fromRun whether this is the run of key presses landing its target.
+   *   Anything else — the seek bar, a scene click, the resumed position — is a
+   *   seek asked for outright, and supersedes the run: leaving its target in
+   *   place would have `onSeeked` chase it and undo the seek just made.
+   */
+  const seek = (t: number, fromRun = false) => {
     const v = ref.current;
     if (!v) return;
-    // A seek asked for outright (the seek bar, a scene click, the resumed
-    // position) supersedes whatever a run of key presses was heading towards.
-    if (seekTimerRef.current != null) {
-      clearTimeout(seekTimerRef.current);
-      seekTimerRef.current = null;
+    if (fromRun) {
+      if (seekTimerRef.current != null) {
+        clearTimeout(seekTimerRef.current);
+        seekTimerRef.current = null;
+      }
+    } else {
+      cancelQueuedSeek();
     }
     // Nothing loaded yet — an item that has only just been swapped in. Whether
     // this source can be seeked at all is not knowable until its metadata
@@ -432,7 +440,7 @@ export const VideoPlayer = forwardRef<
     const target = seekTargetRef.current;
     if (target == null) return;
     setScrub(null);
-    seekRef.current(target);
+    seekRef.current(target, true);
   };
 
   /**
