@@ -2,7 +2,7 @@
 // its manual order. The order being edited is the collection's stored item
 // order (config.json), so a drop reports the loaded window's new order and the
 // main process rearranges just those slots — items outside the window never move.
-import { useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -49,11 +49,32 @@ export function MediaReorderProvider({
     }),
   );
   const ids = useMemo(() => items.map(mediaSortId), [items]);
-  // A pointerup that ends a drag is still followed by a click on the item that
-  // was picked up, which would open its detail view. The flag is raised when a
-  // drag ends and swallows that one click; a fresh pointerdown clears it so a
-  // drag that produces no click cannot swallow a later one.
+  // The pointerup that drops an item is still followed by a click on it, and
+  // media items are links: dnd-kit only stops that click from propagating, so
+  // the anchor's own default action still navigated to the dragged file's
+  // detail view. Cancelling it has to happen in a document-level capture
+  // listener — dnd-kit's own stopPropagation there keeps the click from ever
+  // reaching React's delegated handlers. The flag is raised when a drag ends
+  // and cleared by the next pointerdown, so a drag followed by no click cannot
+  // swallow an unrelated later one.
   const draggedRef = useRef(false);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!draggedRef.current) return;
+      draggedRef.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const onPointerDown = () => {
+      draggedRef.current = false;
+    };
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, []);
 
   if (!reorder) return <>{children}</>;
 
@@ -78,21 +99,7 @@ export function MediaReorderProvider({
     >
       {/* rect strategy covers all three views: grid rows, list rows and table rows. */}
       <SortableContext items={ids} strategy={rectSortingStrategy}>
-        {/* display:contents so this listener host adds no box of its own. */}
-        <div
-          className="contents"
-          onPointerDownCapture={() => {
-            draggedRef.current = false;
-          }}
-          onClickCapture={(e) => {
-            if (!draggedRef.current) return;
-            draggedRef.current = false;
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          {children}
-        </div>
+        {children}
       </SortableContext>
     </DndContext>
   );
