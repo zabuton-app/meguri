@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
-import type { FileDetail, FileRow, SearchQuery, SearchResult } from "@/ipc/types";
+import type {
+  FileDetail,
+  FileRow,
+  SearchQuery,
+  SearchResult,
+} from "@/ipc/types";
 import {
+  dropFromWatchLaterCache,
   invalidateCollectionSearches,
   invalidatePlayedSearches,
   invalidateTagSearches,
@@ -122,5 +128,94 @@ describe("targeted files_search invalidation", () => {
     });
     invalidateCollectionSearches(qc);
     expect(invalidated()).toEqual(["collection"]);
+  });
+});
+
+describe("dropFromWatchLaterCache", () => {
+  const listWith = (items: { workspaceId: string; fileId: number }[]) => ({
+    workspaces: [],
+    activeId: "ws",
+    collections: [
+      {
+        id: "watch-later",
+        name: "Watch Later",
+        active: false,
+        items: items.map((i) => ({ ...i, addedAt: 0 })),
+        createdAt: 0,
+        updatedAt: 0,
+        locked: true,
+      },
+    ],
+  });
+
+  const itemsOf = (qc: QueryClient) =>
+    qc.getQueryData<ReturnType<typeof listWith>>(["workspaces_list"])
+      ?.collections[0].items;
+
+  it("removes the entry without refetching the query", async () => {
+    const qc = new QueryClient();
+    let fetches = 0;
+    await qc.fetchQuery({
+      queryKey: ["workspaces_list"],
+      queryFn: () => {
+        fetches++;
+        return listWith([{ workspaceId: "ws", fileId: 1 }]);
+      },
+    });
+
+    dropFromWatchLaterCache(qc, "ws", 1);
+
+    expect(itemsOf(qc)).toEqual([]);
+    expect(fetches).toBe(1);
+  });
+
+  it("survives an in-flight refetch landing afterwards", async () => {
+    // The detail view mounts its own observer for this key, so a refetch is
+    // routinely in the air when a play is recorded. Without the cancel, its
+    // response restores the entry the main process has already consumed.
+    const qc = new QueryClient();
+    await qc.fetchQuery({
+      queryKey: ["workspaces_list"],
+      queryFn: () => listWith([{ workspaceId: "ws", fileId: 1 }]),
+    });
+
+    const refetch = qc.fetchQuery({
+      queryKey: ["workspaces_list"],
+      staleTime: 0,
+      queryFn: () =>
+        new Promise<ReturnType<typeof listWith>>((resolve) =>
+          setTimeout(
+            () => resolve(listWith([{ workspaceId: "ws", fileId: 1 }])),
+            0,
+          ),
+        ),
+    });
+    dropFromWatchLaterCache(qc, "ws", 1);
+    await refetch.catch(() => {});
+
+    expect(itemsOf(qc)).toEqual([]);
+  });
+
+  it("leaves a first-ever load alone", async () => {
+    // Cancelling reverts a query to its previous value, so cancelling a load
+    // that has nothing behind it would strand this app-wide key at undefined
+    // with nothing to re-run it — blanking the workspace rail and freezing
+    // every Watch Later toggle in its disabled state.
+    const qc = new QueryClient();
+    const load = qc.fetchQuery({
+      queryKey: ["workspaces_list"],
+      queryFn: () =>
+        new Promise<ReturnType<typeof listWith>>((resolve) =>
+          setTimeout(
+            () => resolve(listWith([{ workspaceId: "ws", fileId: 1 }])),
+            0,
+          ),
+        ),
+    });
+    dropFromWatchLaterCache(qc, "ws", 1);
+    await load;
+
+    expect(itemsOf(qc)).toEqual([{ workspaceId: "ws", fileId: 1, addedAt: 0 }]);
+    expect(qc.getQueryState(["workspaces_list"])?.status).toBe("success");
   });
 });

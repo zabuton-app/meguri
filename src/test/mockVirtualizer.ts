@@ -15,6 +15,8 @@ vi.mock("@tanstack/react-virtual", () => ({
       measureElement: () => {},
       measure: () => {},
       scrollToOffset: vi.fn(),
+      // Keyboard focus navigation scrolls the focused row into view.
+      scrollToIndex: vi.fn(),
     };
   },
 }));

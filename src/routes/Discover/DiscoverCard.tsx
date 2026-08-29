@@ -1,9 +1,11 @@
 import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Film, ImageIcon, Play } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
+import { dropFromWatchLaterCache } from "@/lib/queryCache";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
@@ -53,6 +55,7 @@ export function DiscoverCard({
   isActive: boolean;
   t: TFunc;
 }) {
+  const qc = useQueryClient();
   const wsId = file.workspaceId;
   const hasThumb = file.thumbStatus === "done" && mediaBase && wsId;
   const src = hasThumb
@@ -220,7 +223,14 @@ export function DiscoverCard({
             variant="outline"
             size="icon"
             className="size-11 shrink-0 border-border/60 bg-bg/50 backdrop-blur-md"
-            onClick={() => void api.openExternal(file.id, wsId)}
+            // Main-side this counts as a play and consumes the Watch Later
+            // entry, so mirror that once it confirms (it can refuse for a file
+            // that has gone missing under the root).
+            onClick={() =>
+              void api
+                .openExternal(file.id, wsId)
+                .then(() => dropFromWatchLaterCache(qc, wsId, file.id))
+            }
             title={t("media.openExternal")}
             aria-label={t("media.openExternal")}
           >
