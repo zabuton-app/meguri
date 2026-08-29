@@ -16,6 +16,7 @@ export const INVOKE_CHANNELS = [
   "collection_create",
   "collection_remove",
   "collection_reorder",
+  "collection_reorder_items",
   "collection_set_emoji",
   "collection_rename",
   "collection_add_file",

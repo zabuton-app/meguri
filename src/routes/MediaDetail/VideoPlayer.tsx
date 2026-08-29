@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -59,6 +60,8 @@ function saveVolume(v: number, muted: boolean) {
 export interface PlayerHandle {
   seek: (t: number) => void;
   pause: () => void;
+  /** Play/pause from outside the player's own chrome (the playlist control bar). */
+  togglePlay: () => void;
 }
 
 export const VideoPlayer = forwardRef<
@@ -82,19 +85,37 @@ export const VideoPlayer = forwardRef<
      * YouTube-style: the video fills the screen and the rest scrolls below it).
      */
     fullscreenTargetRef?: React.RefObject<HTMLDivElement | null>;
-    /** User-curated bookmarks for this file (drives the toggle button state). */
-    bookmarks: SceneBookmark[];
+    /**
+     * User-curated bookmarks for this file (drives the toggle button state).
+     * Omitted by the playlist player, which shows no editing affordances; the
+     * bookmark button is then not rendered at all.
+     */
+    bookmarks?: SceneBookmark[];
     /** True while a bookmark mutation is in flight; the toggle button is disabled until it resolves. */
-    bookmarkPending: boolean;
-    onAddBookmark: (sec: number) => void;
-    onRemoveBookmark: (bookmarkId: number) => void;
+    bookmarkPending?: boolean;
+    onAddBookmark?: (sec: number) => void;
+    onRemoveBookmark?: (bookmarkId: number) => void;
     /** True while a frame export is in flight; the button is disabled until it resolves. */
-    exportPending: boolean;
-    /** Export the frame at `sec` as a still image (opens a native save dialog). */
-    onExportFrame: (sec: number) => void;
+    exportPending?: boolean;
+    /**
+     * Export the frame at `sec` as a still image (opens a native save dialog).
+     * Omitted by the playlist player; the export button is then not rendered.
+     */
+    onExportFrame?: (sec: number) => void;
     onNativeDuration: (d: number | null) => void;
     /** Fired once per loaded file when playback first starts (used to refresh the list order). */
     onPlayed: () => void;
+    /** Fired when the media plays through to its end (drives playlist auto-advance). */
+    onEnded?: () => void;
+    /** Mirrors the play/pause state out to an external control bar. */
+    onPlayingChange?: (playing: boolean) => void;
+    /**
+     * Fired instead of rendering the built-in error panel when playback fails
+     * for good. The playlist player uses this to skip to the next item; the
+     * panel's "open externally" escape hatch would be a manual affordance the
+     * full-screen player must not show.
+     */
+    onFatalError?: (message: string) => void;
     t: TFunc;
   }
 >(function VideoPlayer(
@@ -118,6 +139,9 @@ export const VideoPlayer = forwardRef<
     onExportFrame,
     onNativeDuration,
     onPlayed,
+    onEnded,
+    onPlayingChange,
+    onFatalError,
     t,
   },
   handleRef,
@@ -256,6 +280,14 @@ export const VideoPlayer = forwardRef<
   useEffect(() => {
     seekRef.current = seek;
   });
+  // Stable, so the imperative handle below can just close over it.
+  const togglePlay = useCallback(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => {});
+    else v.pause();
+  }, []);
+
   useImperativeHandle(
     handleRef,
     () => ({
@@ -263,16 +295,15 @@ export const VideoPlayer = forwardRef<
       pause: () => {
         ref.current?.pause();
       },
+      togglePlay,
     }),
-    [],
+    [togglePlay],
   );
 
-  const togglePlay = () => {
-    const v = ref.current;
-    if (!v) return;
-    if (v.paused) void v.play().catch(() => {});
-    else v.pause();
-  };
+  // Mirror the play/pause state out so an external control bar can render it.
+  useEffect(() => {
+    onPlayingChange?.(playing);
+  }, [playing, onPlayingChange]);
 
   const toggleMute = () => {
     const v = ref.current;
@@ -387,7 +418,7 @@ export const VideoPlayer = forwardRef<
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // All handlers go through refs / stable references, so registering once is enough.
-  }, []);
+  }, [togglePlay]);
 
   // Event coordinates on the seek bar → {ratio, t}.
   // ratio is computed from getBoundingClientRect+clientX (consistent even under CSS zoom). Positioning
@@ -438,6 +469,15 @@ export const VideoPlayer = forwardRef<
     stopTimer();
   };
 
+  // A caller that handles failures itself (the playlist player skips the item)
+  // gets the message through onFatalError instead of the built-in panel. The
+  // effect sits above the early return so the hook order stays unconditional.
+  useEffect(() => {
+    if (error && onFatalError) onFatalError(error);
+  }, [error, onFatalError]);
+
+  if (error && onFatalError) return null;
+
   if (error) {
     return (
       <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl bg-surface p-8 text-center text-muted">
@@ -479,10 +519,11 @@ export const VideoPlayer = forwardRef<
 
   // Bookmark toggle. If a bookmark exists within BOOKMARK_NEAR_EPS of the current display
   // position, the button removes it; otherwise it adds one at the current position.
-  const nearBookmark = findNearestBookmark(bookmarks, displayPos);
+  const showBookmarkButton = !!onAddBookmark && !!onRemoveBookmark;
+  const nearBookmark = findNearestBookmark(bookmarks ?? [], displayPos);
   const onBookmarkToggle = () => {
-    if (nearBookmark) onRemoveBookmark(nearBookmark.id);
-    else onAddBookmark(Math.max(0, displayPos));
+    if (nearBookmark) onRemoveBookmark?.(nearBookmark.id);
+    else onAddBookmark?.(Math.max(0, displayPos));
   };
 
   // Freeze playback before opening the save dialog: the exported position is
@@ -490,7 +531,7 @@ export const VideoPlayer = forwardRef<
   // away from the frame the user chose.
   const onExportClick = () => {
     ref.current?.pause();
-    onExportFrame(Math.max(0, displayPos));
+    onExportFrame?.(Math.max(0, displayPos));
   };
 
   return (
@@ -524,6 +565,10 @@ export const VideoPlayer = forwardRef<
           }
         }}
         onPause={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          onEnded?.();
+        }}
         onVolumeChange={() => {
           const v = ref.current;
           if (v) {
@@ -697,33 +742,37 @@ export const VideoPlayer = forwardRef<
           <CtrlButton onClick={() => skip(10)} title={t("player.forward10")}>
             <SkipForward size={18} />
           </CtrlButton>
-          <CtrlButton
-            onClick={onBookmarkToggle}
-            disabled={bookmarkPending}
-            title={
-              nearBookmark
-                ? t("player.bookmarkRemove", {
-                    time: fmtTime(nearBookmark.sec),
-                  })
-                : t("player.bookmarkAdd")
-            }
-          >
-            {nearBookmark ? (
-              <BookmarkCheck
-                size={18}
-                className="fill-current text-[var(--c-primary)]"
-              />
-            ) : (
-              <Bookmark size={18} />
-            )}
-          </CtrlButton>
-          <CtrlButton
-            onClick={onExportClick}
-            disabled={exportPending}
-            title={t("player.exportFrame")}
-          >
-            <Camera size={18} />
-          </CtrlButton>
+          {showBookmarkButton && (
+            <CtrlButton
+              onClick={onBookmarkToggle}
+              disabled={bookmarkPending}
+              title={
+                nearBookmark
+                  ? t("player.bookmarkRemove", {
+                      time: fmtTime(nearBookmark.sec),
+                    })
+                  : t("player.bookmarkAdd")
+              }
+            >
+              {nearBookmark ? (
+                <BookmarkCheck
+                  size={18}
+                  className="fill-current text-[var(--c-primary)]"
+                />
+              ) : (
+                <Bookmark size={18} />
+              )}
+            </CtrlButton>
+          )}
+          {onExportFrame && (
+            <CtrlButton
+              onClick={onExportClick}
+              disabled={exportPending}
+              title={t("player.exportFrame")}
+            >
+              <Camera size={18} />
+            </CtrlButton>
+          )}
           <span className="ml-1 tabular-nums">{fmtTime(displayPos)}</span>
           <span className="opacity-50">/</span>
           <span className="tabular-nums opacity-80">

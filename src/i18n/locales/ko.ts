@@ -439,4 +439,34 @@ export const ko: Record<TranslationKey, string> = {
   "statusbar.status": "상태",
   "statusbar.scanning": "스캔 중",
   "statusbar.idle": "대기 중",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "수동 순서",
+  "playlist.start": "재생 목록으로 재생",
+  "playlist.play": "재생 (Space)",
+  "playlist.pause": "일시정지 (Space)",
+  "playlist.next": "다음 (N)",
+  "playlist.prev": "이전 (P)",
+  "playlist.shuffle": "셔플 (S)",
+  "playlist.repeat": "반복",
+  "playlist.exit": "재생 종료 (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.empty": "재생할 수 있는 미디어가 없습니다.",
+  "playlist.emptyHint":
+    "동영상이나 이미지가 있는 목록을 연 뒤 재생을 시작하세요.",
+  "playlist.unplayable": "재생할 수 있는 항목이 없었습니다.",
+  "playlist.reorderNeedsManual": "순서를 바꾸려면 수동 순서로 전환하세요.",
+  "settings.playlistImageSeconds": "이미지 표시 시간",
+  "settings.playlistImageSecondsHint":
+    "다음 항목으로 넘어가기 전까지 이미지를 표시하는 시간입니다.",
+  "settings.playlistImageMotion": "이미지에 움직임 주기",
+  "settings.playlistImageMotionHint":
+    "표시 중인 이미지를 천천히 확대·이동합니다. OS에서 동작 줄이기가 켜져 있으면 항상 정지합니다.",
+  "settings.playlistFade": "페이드",
+  "settings.playlistFadeHint": "항목이 바뀔 때 화면을 한 번 어둡게 한 뒤 다음 항목을 표시합니다.",
+  "settings.playlistTransition": "트랜지션",
+  "settings.playlistTransitionHint": "항목이 바뀔 때 옆으로 밀어 넘깁니다. 페이드와 함께 사용할 수 있습니다.",
+  "settings.playlistShuffle": "랜덤",
+  "settings.playlistShuffleHint": "재생 순서를 무작위로 섞습니다. 한 바퀴 도는 동안 같은 항목은 반복되지 않습니다.",
+  "settings.secondsValue": "{n}초",
 };

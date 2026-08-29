@@ -426,4 +426,33 @@ export const zhCN: Record<TranslationKey, string> = {
   "statusbar.status": "状态",
   "statusbar.scanning": "扫描中",
   "statusbar.idle": "空闲",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "手动排序",
+  "playlist.start": "作为播放列表播放",
+  "playlist.play": "播放 (Space)",
+  "playlist.pause": "暂停 (Space)",
+  "playlist.next": "下一个 (N)",
+  "playlist.prev": "上一个 (P)",
+  "playlist.shuffle": "随机播放 (S)",
+  "playlist.repeat": "循环播放",
+  "playlist.exit": "退出播放 (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.empty": "这里没有可播放的媒体。",
+  "playlist.emptyHint": "请打开包含视频或图片的列表后再开始播放。",
+  "playlist.unplayable": "这些项目都无法播放。",
+  "playlist.reorderNeedsManual": "切换到手动排序即可重新排列。",
+  "settings.playlistImageSeconds": "图片显示时长",
+  "settings.playlistImageSecondsHint":
+    "每张图片在自动切换到下一项之前的显示时长。",
+  "settings.playlistImageMotion": "为图片添加动效",
+  "settings.playlistImageMotionHint":
+    "让显示中的图片缓慢缩放和平移。当系统开启“减弱动态效果”时始终关闭。",
+  "settings.playlistFade": "淡入淡出",
+  "settings.playlistFadeHint": "切换项目时先变暗，再显示下一项。",
+  "settings.playlistTransition": "转场",
+  "settings.playlistTransitionHint": "切换项目时横向滑动。可与淡入淡出同时使用。",
+  "settings.playlistShuffle": "随机",
+  "settings.playlistShuffleHint": "以随机顺序播放。一轮之内不会重复同一项目。",
+  "settings.secondsValue": "{n} 秒",
 };

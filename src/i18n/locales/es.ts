@@ -451,4 +451,35 @@ export const es: Record<TranslationKey, string> = {
   "statusbar.status": "Estado",
   "statusbar.scanning": "Escaneando",
   "statusbar.idle": "Inactivo",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "Orden manual",
+  "playlist.start": "Reproducir como lista",
+  "playlist.play": "Reproducir (Space)",
+  "playlist.pause": "Pausar (Space)",
+  "playlist.next": "Siguiente (N)",
+  "playlist.prev": "Anterior (P)",
+  "playlist.shuffle": "Aleatorio (S)",
+  "playlist.repeat": "Repetir",
+  "playlist.exit": "Salir de la reproducción (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.empty": "No hay nada que se pueda reproducir aquí.",
+  "playlist.emptyHint":
+    "Abre una lista que contenga vídeos o imágenes y luego inicia la reproducción.",
+  "playlist.unplayable": "No se pudo reproducir ninguno de estos elementos.",
+  "playlist.reorderNeedsManual":
+    "Cambia al orden manual para reorganizar los elementos.",
+  "settings.playlistImageSeconds": "Duración de la imagen",
+  "settings.playlistImageSecondsHint":
+    "Cuánto tiempo permanece cada imagen en pantalla antes de avanzar.",
+  "settings.playlistImageMotion": "Animar las imágenes",
+  "settings.playlistImageMotionHint":
+    "Aplica un desplazamiento y zoom lentos a cada imagen. Siempre se desactiva si el sistema reduce el movimiento.",
+  "settings.playlistFade": "Fundido",
+  "settings.playlistFadeHint": "Atenúa la pantalla antes de mostrar el siguiente elemento.",
+  "settings.playlistTransition": "Transición",
+  "settings.playlistTransitionHint": "Desplaza lateralmente al cambiar de elemento. Se puede combinar con el fundido.",
+  "settings.playlistShuffle": "Aleatorio",
+  "settings.playlistShuffleHint": "Reproduce en orden aleatorio. Ningún elemento se repite dentro de una misma vuelta.",
+  "settings.secondsValue": "{n} s",
 };

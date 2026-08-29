@@ -1,9 +1,23 @@
 // Media listing grid. Shows thumbnails via thumb://; click to open detail.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
+import {
+  MediaReorderProvider,
+  SortableMedia,
+  type MediaReorder,
+} from "@/components/MediaReorder";
+import { mediaSortId } from "@/lib/mediaSortId";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import {
   useWatchLater,
@@ -59,6 +73,8 @@ interface Props {
   navActive?: boolean;
   /** Whether the active view is the built-in Watch Later collection (changes empty-state copy). */
   watchLater?: boolean;
+  /** Set only while a collection is shown in its manual order; enables drag-to-reorder. */
+  reorder?: MediaReorder;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -79,6 +95,7 @@ export const MediaGrid = memo(function MediaGrid({
   isFetchingPreviousPage,
   navActive = false,
   watchLater = false,
+  reorder,
 }: Props) {
   const navigate = useNavigate();
   const watchLaterMembership = useWatchLater();
@@ -223,45 +240,58 @@ export const MediaGrid = memo(function MediaGrid({
   // virtualization scroll element. .page-scroll converts the Viewport child's
   // display:table to block so absolutely positioned rows track the width correctly.
   return (
-    <ScrollArea
-      className="page-scroll h-full"
-      viewportClassName="pt-4"
-      viewportRef={setScrollRef}
-    >
-      <div
-        style={{
-          height: virtualizer.getTotalSize(),
-          position: "relative",
-          width: "100%",
-        }}
+    <MediaReorderProvider items={items} reorder={reorder}>
+      <ScrollArea
+        className="page-scroll h-full"
+        viewportClassName="pt-4"
+        viewportRef={setScrollRef}
       >
-        {virtualRows.map((vr) => (
-          <div
-            key={vr.key}
-            ref={measureRow}
-            className="absolute left-0 top-0 w-full"
-            style={{ transform: `translateY(${vr.start}px)` }}
-          >
+        <div
+          style={{
+            height: virtualizer.getTotalSize(),
+            position: "relative",
+            width: "100%",
+          }}
+        >
+          {virtualRows.map((vr) => (
             <div
-              className="grid gap-3 px-4 pb-3"
-              style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+              key={vr.key}
+              ref={measureRow}
+              className="absolute left-0 top-0 w-full"
+              style={{ transform: `translateY(${vr.start}px)` }}
             >
-              {rows[vr.index].map((f, localIndex) => (
-                <MediaCard
-                  key={`${f.workspaceId}:${f.id}`}
-                  file={f}
-                  version={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
-                  mediaBase={mediaBase}
-                  onTagClick={onTagClick}
-                  focused={vr.index * cols + localIndex === focusedIndex}
-                  watchLater={watchLaterMembership}
-                />
-              ))}
+              <div
+                className="grid gap-3 px-4 pb-3"
+                style={{
+                  gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                }}
+              >
+                {rows[vr.index].map((f, localIndex) => {
+                  const card = (
+                    <MediaCard
+                      file={f}
+                      version={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
+                      mediaBase={mediaBase}
+                      onTagClick={onTagClick}
+                      focused={vr.index * cols + localIndex === focusedIndex}
+                      watchLater={watchLaterMembership}
+                    />
+                  );
+                  const key = mediaSortId(f);
+                  return reorder ? (
+                    <SortableMedia key={key} id={key}>
+                      {card}
+                    </SortableMedia>
+                  ) : (
+                    <Fragment key={key}>{card}</Fragment>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+          ))}
+        </div>
+      </ScrollArea>
+    </MediaReorderProvider>
   );
 });
 

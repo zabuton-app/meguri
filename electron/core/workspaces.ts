@@ -12,6 +12,7 @@ import {
   normalizeDir,
   type AppConfig,
   type UserCollectionConfig,
+  type UserCollectionItemConfig,
 } from "./appConfig.js";
 import { dataDirForRoot, pathHash } from "./paths.js";
 import log from "./logger.js";
@@ -387,7 +388,9 @@ export class Workspaces {
       return;
     }
     const now = nowUnix();
-    collection.items.unshift({ workspaceId, fileId, addedAt: now });
+    // Appended, not prepended: items[] is the collection's manual play order, so
+    // a new file has to land in a spot that leaves the existing order untouched.
+    collection.items.push({ workspaceId, fileId, addedAt: now });
     collection.updatedAt = now;
     this.persist();
   }
@@ -510,6 +513,57 @@ export class Workspaces {
       if (byId.has(c.id)) ordered.push(c);
     }
     this.config.collections = [...locked, ...ordered];
+    this.persist();
+  }
+
+  /**
+   * Reorder the FILES inside one collection — this array order *is* the manual
+   * sort.
+   *
+   * The rearrangement is slot-preserving: the listed items are redistributed
+   * across the positions they already occupy, and every unlisted item stays
+   * exactly where it is. That matters because the renderer only ever holds a
+   * window of a long collection, so it can only ever describe the order of the
+   * part it has loaded; treating the rest as "everything else, at the end"
+   * would fling unloaded items around. Unknown refs are ignored, and no item
+   * can be added or dropped here.
+   *
+   * Allowed on locked collections too: the lock forbids removing/renaming/
+   * re-iconing the collection itself, not arranging what is inside it.
+   */
+  reorderCollectionItems(
+    collectionId: string,
+    order: { workspaceId: string; fileId: number }[],
+  ): void {
+    const collection = this.config.collections.find(
+      (c) => c.id === collectionId,
+    );
+    if (!collection) return;
+    const key = (i: { workspaceId: string; fileId: number }) =>
+      `${i.workspaceId}:${i.fileId}`;
+    const byKey = new Map(collection.items.map((item) => [key(item), item]));
+
+    // Resolve to real items, dropping unknown refs and repeats so the moved
+    // list and the slot list stay the same length.
+    const taken = new Set<string>();
+    const moving: UserCollectionItemConfig[] = [];
+    for (const ref of order) {
+      const k = key(ref);
+      if (taken.has(k)) continue;
+      const item = byKey.get(k);
+      if (!item) continue;
+      taken.add(k);
+      moving.push(item);
+    }
+    if (moving.length === 0) return;
+
+    const next = collection.items.slice();
+    let at = 0;
+    for (let i = 0; i < next.length; i++) {
+      if (taken.has(key(next[i]))) next[i] = moving[at++];
+    }
+    collection.items = next;
+    collection.updatedAt = nowUnix();
     this.persist();
   }
 

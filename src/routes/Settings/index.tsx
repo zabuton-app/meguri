@@ -21,6 +21,7 @@ import { type TranslationKey } from "@/i18n/locales/ja";
 import {
   usePreferences,
   SCENE_COUNT_OPTIONS,
+  PLAYLIST_IMAGE_SECONDS_OPTIONS,
   FRAME_QUALITY_OPTIONS,
   isFrameQuality,
   type FrameQuality,
@@ -96,6 +97,16 @@ export default function Settings() {
     hoverPreview,
     setHoverPreview,
     frameQuality,
+    playlistImageSeconds,
+    setPlaylistImageSeconds,
+    playlistImageMotion,
+    setPlaylistImageMotion,
+    playlistFade,
+    setPlaylistFade,
+    playlistTransition,
+    setPlaylistTransition,
+    playlistShuffle,
+    setPlaylistShuffle,
     setFrameQuality,
     emojiStyle,
     setEmojiStyle,
@@ -219,6 +230,94 @@ export default function Settings() {
                 ))}
               </SelectContent>
             </Select>
+          </section>
+
+          {/* Playlist: image duration (also the pan/zoom duration) */}
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.playlistImageSeconds")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.playlistImageSecondsHint")}
+              </span>
+            </div>
+            <Select
+              value={String(playlistImageSeconds)}
+              onValueChange={(v) => setPlaylistImageSeconds(Number(v))}
+            >
+              <SelectTrigger className="min-w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PLAYLIST_IMAGE_SECONDS_OPTIONS.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {t("settings.secondsValue", { n })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </section>
+
+          {/* Playlist: image pan/zoom (the OS reduce-motion setting still wins) */}
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.playlistImageMotion")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.playlistImageMotionHint")}
+              </span>
+            </div>
+            <Switch
+              checked={playlistImageMotion}
+              onCheckedChange={setPlaylistImageMotion}
+            />
+          </section>
+
+          {/* Playlist: switching effects. The two are independent — fade dims,
+              transition slides — and the OS reduce-motion setting overrides both. */}
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.playlistFade")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.playlistFadeHint")}
+              </span>
+            </div>
+            <Switch checked={playlistFade} onCheckedChange={setPlaylistFade} />
+          </section>
+
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.playlistTransition")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.playlistTransitionHint")}
+              </span>
+            </div>
+            <Switch
+              checked={playlistTransition}
+              onCheckedChange={setPlaylistTransition}
+            />
+          </section>
+
+          {/* Playlist: playback order. Also toggled from the player itself. */}
+          <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-bright-fg">
+                {t("settings.playlistShuffle")}
+              </span>
+              <span className="text-xs text-muted">
+                {t("settings.playlistShuffleHint")}
+              </span>
+            </div>
+            <Switch
+              checked={playlistShuffle}
+              onCheckedChange={setPlaylistShuffle}
+            />
           </section>
 
           {/* Keybinding preset (file paging keys) */}

@@ -159,11 +159,21 @@ export class QueryExecutor {
     switch (req.kind) {
       case "search": {
         const refs = this.resolveRefs(cores, req.query, req.refs);
-        return refs
-          ? cw.searchCollection(cores, refs, req.query)
-          : cw.searchWorkspaces(cores, req.query);
+        if (!refs) {
+          // Manual order only exists inside a collection; anywhere else it has
+          // no stored order to follow, so it falls back to the default sort.
+          const query =
+            req.query.sort === cw.MANUAL_SORT
+              ? { ...req.query, sort: undefined, sortDir: undefined }
+              : req.query;
+          return cw.searchWorkspaces(cores, query);
+        }
+        return req.query.sort === cw.MANUAL_SORT
+          ? cw.searchCollectionManual(cores, refs, req.query)
+          : cw.searchCollection(cores, refs, req.query);
       }
       case "random": {
+        // Random ignores the sort key entirely, manual included.
         const refs = this.resolveRefs(cores, req.query, req.refs);
         return refs
           ? cw.randomCollection(cores, refs, req.query)

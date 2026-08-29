@@ -4,6 +4,7 @@ import { RouterProvider } from "react-router/dom";
 import Home from "@/routes/Home";
 import MediaDetail from "@/routes/MediaDetail";
 import Discover from "@/routes/Discover";
+import Player from "@/routes/Player";
 import History from "@/routes/History";
 import Duplicates from "@/routes/Duplicates";
 import Tags from "@/routes/Tags";
@@ -14,7 +15,8 @@ import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
 
 // In a webview, a hash router is more stable than a file-path-style history.
-// /file/:id and /settings are child routes of Home so a modal overlays on top while the list stays mounted.
+// /file/:id, /play and /settings are child routes of Home so a modal overlays on top while the list stays mounted
+// (the player also inherits the list order through MediaNavContext).
 const router = createHashRouter([
   {
     path: "/",
@@ -22,6 +24,7 @@ const router = createHashRouter([
     children: [
       { path: "file/:id", element: <MediaDetail /> },
       { path: "discover", element: <Discover /> },
+      { path: "play", element: <Player /> },
       { path: "history", element: <History /> },
       { path: "duplicates", element: <Duplicates /> },
       { path: "tags", element: <Tags /> },

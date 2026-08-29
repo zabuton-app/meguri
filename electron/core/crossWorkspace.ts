@@ -153,6 +153,101 @@ export function searchCollection(
   return mergeSearchPages(targets, query, idsByWs);
 }
 
+/**
+ * The collection's own item order ("manual" sort). This order lives in
+ * config.json, not in any SQL column, so it cannot ride orderByFor()/the k-way
+ * merge: the refs array *is* the ordering. Paging slices that array and pulls
+ * the matching rows by id, then puts them back in refs order.
+ */
+export const MANUAL_SORT = "manual";
+
+/** Refs pulled per round trip while filling a page (<= the query layer's MAX_LIMIT). */
+const MANUAL_CHUNK = 200;
+
+function refKey(ref: { workspaceId: string; fileId: number }): string {
+  return `${ref.workspaceId}:${ref.fileId}`;
+}
+
+/**
+ * Position in the refs array to resume from. The cursor's `offset` keeps its
+ * usual meaning (global row index, which the virtualizer pads with) — that
+ * diverges from the refs index as soon as a filter drops entries, so the refs
+ * index rides along in the seek key's `v` slot.
+ */
+function manualRefIndex(key: SearchSeekKey | undefined): number {
+  if (key && key.ws === "" && typeof key.v === "number") {
+    return Math.max(0, key.v);
+  }
+  return 0;
+}
+
+/** Fetch the rows for one slice of refs, keyed for reordering. */
+function manualRows(
+  cores: CoreTarget[],
+  slice: FileRef[],
+  query: SearchQuery,
+): Map<string, FileRow> {
+  const idsByWs = new Map<string, number[]>();
+  for (const ref of slice) {
+    const ids = idsByWs.get(ref.workspaceId) ?? [];
+    ids.push(ref.fileId);
+    idsByWs.set(ref.workspaceId, ids);
+  }
+  const out = new Map<string, FileRow>();
+  for (const target of cores) {
+    const ids = idsByWs.get(target.id);
+    if (!ids?.length) continue;
+    // Order is irrelevant here (the refs decide it), so ask for the plain
+    // id-ordered page and cap it at exactly the ids we asked about.
+    const res = searchFiles(target.core.db, {
+      ...query,
+      sort: undefined,
+      sortDir: undefined,
+      cursor: 0,
+      limit: ids.length,
+      fileIds: ids,
+    });
+    for (const row of inject(res.items, target.id))
+      out.set(refKey({ workspaceId: target.id, fileId: row.id }), row);
+  }
+  return out;
+}
+
+/** Search a collection in its own manual item order. */
+export function searchCollectionManual(
+  cores: CoreTarget[],
+  refs: FileRef[],
+  query: SearchQuery,
+): SearchResult {
+  const limit = Math.max(1, query.limit ?? DEFAULT_LIMIT);
+  const { offset, key } = normalizeCursor(query.cursor);
+  const items: FileRow[] = [];
+  let i = manualRefIndex(key);
+
+  // Filters can drop refs, so keep pulling until the page is full or the refs
+  // run out; `i` always lands on the first ref not yet accounted for.
+  while (items.length < limit && i < refs.length) {
+    const slice = refs.slice(i, i + MANUAL_CHUNK);
+    const rows = manualRows(cores, slice, query);
+    let consumed = 0;
+    for (const ref of slice) {
+      if (items.length >= limit) break;
+      consumed++;
+      const row = rows.get(refKey(ref));
+      if (row) items.push(row);
+    }
+    i += consumed;
+  }
+
+  const hasMore = i < refs.length;
+  return {
+    items,
+    nextCursor: hasMore
+      ? { offset: offset + items.length, key: { v: i, ws: "", id: 0 } }
+      : null,
+  };
+}
+
 interface WsStream<T> {
   wsId: string;
   core: Core;

@@ -3,8 +3,16 @@
 import type { TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 
+/**
+ * `manual` is the collection's own item order and only exists inside a
+ * collection; callers that can also show non-collection lists filter it out
+ * (see MANUAL_SORT / manualSortAvailable).
+ */
+export const MANUAL_SORT = "manual";
+
 export const SORT_KEYS: Record<string, TranslationKey> = {
   added: "sort.added",
+  manual: "sort.manual",
   name: "sort.name",
   rating: "sort.rating",
   captured: "sort.captured",

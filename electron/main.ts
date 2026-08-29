@@ -519,6 +519,11 @@ function registerWorkspaceHandlers(): void {
     emit("workspace:changed", { activeId: ws.activeId });
   });
 
+  handle("collection_reorder_items", ({ collectionId, items }) => {
+    ws.reorderCollectionItems(collectionId, items);
+    emit("workspace:changed", { activeId: ws.activeId });
+  });
+
   handle("collection_set_emoji", ({ id, emoji }) => {
     ws.setCollectionEmoji(id, emoji);
     emit("workspace:changed", { activeId: ws.activeId });

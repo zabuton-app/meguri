@@ -440,4 +440,34 @@ export const en: Record<TranslationKey, string> = {
   "statusbar.status": "Status",
   "statusbar.scanning": "Scanning",
   "statusbar.idle": "Idle",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "Manual order",
+  "playlist.start": "Play as playlist",
+  "playlist.play": "Play (Space)",
+  "playlist.pause": "Pause (Space)",
+  "playlist.next": "Next (N)",
+  "playlist.prev": "Previous (P)",
+  "playlist.shuffle": "Shuffle (S)",
+  "playlist.repeat": "Repeat",
+  "playlist.exit": "Exit playback (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.empty": "Nothing here can be played.",
+  "playlist.emptyHint":
+    "Open a list that contains videos or images, then start playback.",
+  "playlist.unplayable": "None of these items could be played.",
+  "playlist.reorderNeedsManual": "Switch to manual order to rearrange items.",
+  "settings.playlistImageSeconds": "Image duration",
+  "settings.playlistImageSecondsHint":
+    "How long each image stays on screen before the player advances.",
+  "settings.playlistImageMotion": "Animate images",
+  "settings.playlistImageMotionHint":
+    "Slowly pans and zooms each image. Always disabled when the OS is set to reduce motion.",
+  "settings.playlistFade": "Fade",
+  "settings.playlistFadeHint": "Dims the stage before showing the next item.",
+  "settings.playlistTransition": "Transition",
+  "settings.playlistTransitionHint": "Slides sideways when the item changes. Can be combined with the fade.",
+  "settings.playlistShuffle": "Shuffle",
+  "settings.playlistShuffleHint": "Plays in a random order. No item repeats within a single pass.",
+  "settings.secondsValue": "{n}s",
 };

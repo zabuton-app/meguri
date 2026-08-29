@@ -14,7 +14,7 @@ import { resolveSortDir } from "@shared/sortDir";
 import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
-import { SORT_KEYS, sortLabel } from "@/lib/sortLabel";
+import { MANUAL_SORT, SORT_KEYS, sortLabel } from "@/lib/sortLabel";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -77,6 +77,8 @@ interface Props {
   collapsedCount: number;
   /** Whether anything at all is filtering, for the clear-all action. */
   hasConditions: boolean;
+  /** True while a collection is active: only then is there a manual order to sort by. */
+  manualSortAvailable?: boolean;
 }
 
 export function MoreFiltersPopover({
@@ -84,6 +86,7 @@ export function MoreFiltersPopover({
   onChange,
   collapsedCount,
   hasConditions,
+  manualSortAvailable = false,
 }: Props) {
   const { t } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
@@ -94,6 +97,11 @@ export function MoreFiltersPopover({
   const sort = value.sort ?? "added";
   const sortDir = resolveSortDir(sort, value.sortDir);
   const SortDirIcon = sortDir === "asc" ? SortAsc : SortDesc;
+  // Manual order is the collection's stored item order, so it is offered only
+  // where such an order exists to follow.
+  const sortKeys = Object.keys(SORT_KEYS).filter(
+    (key) => key !== MANUAL_SORT || manualSortAvailable,
+  );
   const active = collapsedCount > 0;
 
   return (
@@ -179,7 +187,7 @@ export function MoreFiltersPopover({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.keys(SORT_KEYS).map((key) => (
+                {sortKeys.map((key) => (
                   <SelectItem key={key} value={key}>
                     {sortLabel(t, key)}
                   </SelectItem>
@@ -198,6 +206,11 @@ export function MoreFiltersPopover({
               <SortDirIcon className="size-4" />
             </button>
           </div>
+          {manualSortAvailable && sort !== MANUAL_SORT && (
+            <p className="mt-1.5 text-xs text-muted">
+              {t("playlist.reorderNeedsManual")}
+            </p>
+          )}
         </Section>
 
         <Section label={t("filter.btime")}>

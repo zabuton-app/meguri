@@ -443,6 +443,35 @@ export const ja = {
   "statusbar.status": "処理状況",
   "statusbar.scanning": "スキャン中",
   "statusbar.idle": "待機中",
+
+  // プレイリスト再生（自動再生）
+  "sort.manual": "手動順",
+  "playlist.start": "プレイリスト再生",
+  "playlist.play": "再生 (Space)",
+  "playlist.pause": "一時停止 (Space)",
+  "playlist.next": "次へ (N)",
+  "playlist.prev": "前へ (P)",
+  "playlist.shuffle": "シャッフル (S)",
+  "playlist.repeat": "繰り返し",
+  "playlist.exit": "再生を終了 (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.empty": "再生できるメディアがありません。",
+  "playlist.emptyHint":
+    "動画や画像を含む一覧を開いてから再生を始めてください。",
+  "playlist.unplayable": "再生できるメディアがありませんでした。",
+  "playlist.reorderNeedsManual": "並び替えるには手動順に切り替えます。",
+  "settings.playlistImageSeconds": "画像の表示時間",
+  "settings.playlistImageSecondsHint": "自動再生で画像を次へ送るまでの秒数。",
+  "settings.playlistImageMotion": "画像に動きを付ける",
+  "settings.playlistImageMotionHint":
+    "表示中の画像をゆっくり拡大・移動させます。OS で動きを減らす設定が有効な場合は常に停止します。",
+  "settings.playlistFade": "フェード",
+  "settings.playlistFadeHint": "アイテムが切り替わるとき、いったん暗くしてから次を表示します。",
+  "settings.playlistTransition": "トランジション",
+  "settings.playlistTransitionHint": "アイテムが切り替わるとき、横方向にスライドさせます。フェードと同時に使えます。",
+  "settings.playlistShuffle": "ランダム",
+  "settings.playlistShuffleHint": "再生順をランダムに入れ替えます。一巡のあいだ同じアイテムは繰り返されません。",
+  "settings.secondsValue": "{n} 秒",
 } as const;
 
 export type TranslationKey = keyof typeof ja;
