@@ -37,6 +37,10 @@ export const en: Record<TranslationKey, string> = {
   "theme.switchToLight": "Switch to light mode",
   "theme.switchToDark": "Switch to dark mode",
 
+  "settings.tabGeneral": "General",
+  "settings.tabLibrary": "Library",
+  "settings.tabPlayback": "Playlist playback",
+  "settings.tabApp": "App",
   "settings.language": "Language",
   "settings.languageDesc": "Switch the display language of the UI.",
   "settings.scenes": "Scene thumbnails",

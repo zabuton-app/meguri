@@ -36,6 +36,10 @@ export const ja = {
   "theme.switchToLight": "ライトモードに切り替え",
   "theme.switchToDark": "ダークモードに切り替え",
 
+  "settings.tabGeneral": "一般",
+  "settings.tabLibrary": "ライブラリ表示",
+  "settings.tabPlayback": "プレイリスト再生",
+  "settings.tabApp": "アプリ",
   "settings.language": "言語",
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",

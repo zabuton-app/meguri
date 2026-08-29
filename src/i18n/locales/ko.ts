@@ -36,6 +36,10 @@ export const ko: Record<TranslationKey, string> = {
   "theme.switchToLight": "라이트 모드로 전환",
   "theme.switchToDark": "다크 모드로 전환",
 
+  "settings.tabGeneral": "일반",
+  "settings.tabLibrary": "라이브러리",
+  "settings.tabPlayback": "재생 목록 재생",
+  "settings.tabApp": "앱",
   "settings.language": "언어",
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",

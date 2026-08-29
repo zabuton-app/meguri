@@ -36,6 +36,10 @@ export const zhCN: Record<TranslationKey, string> = {
   "theme.switchToLight": "切换到浅色模式",
   "theme.switchToDark": "切换到深色模式",
 
+  "settings.tabGeneral": "常规",
+  "settings.tabLibrary": "媒体库",
+  "settings.tabPlayback": "播放列表播放",
+  "settings.tabApp": "应用",
   "settings.language": "语言",
   "settings.languageDesc": "切换界面的显示语言。",
   "settings.scenes": "场景缩略图数量",
