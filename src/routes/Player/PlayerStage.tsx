@@ -1,19 +1,27 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 // Full-bleed stage for one playlist item. The layering follows the discovery
 // view — a blurred cover fills the frame and the sharp media sits on top at its
 // own aspect ratio — but nothing here is transparent to what is behind the
 // player, and there is no panel frame, padding or rounding (spec FR-021).
+//
+// The ground follows the appearance: black in dark mode, white in light. An
+// image with transparency is composited straight onto it, so a fixed black would
+// swallow light artwork for anyone working in a light theme.
 export function PlayerStage({
   backdropSrc,
+  ground,
   children,
 }: {
   /** Thumbnail used as the blurred backdrop; omitted while none exists yet. */
   backdropSrc?: string;
+  /** Tailwind background class for the ground, decided by the appearance. */
+  ground: string;
   children: ReactNode;
 }) {
   return (
-    <div className="absolute inset-0 overflow-hidden bg-black">
+    <div className={cn("absolute inset-0 overflow-hidden", ground)}>
       {backdropSrc && (
         <img
           src={backdropSrc}

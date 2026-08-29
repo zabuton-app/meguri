@@ -19,6 +19,8 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { usePreferences } from "@/settings/PreferencesProvider";
+import { useTheme } from "@/themes/ThemeProvider";
+import { cn } from "@/lib/utils";
 import { NAV_BINDINGS, matchAny } from "@/settings/keybindings";
 import {
   invalidateCollectionSearches,
@@ -96,6 +98,11 @@ export default function Player() {
     setPlaylistRepeat,
   } = usePreferences();
   const reducedMotion = usePrefersReducedMotion();
+  // Plain black or plain white rather than the theme family's own background:
+  // this is the ground a transparent image is composited onto, so it wants to be
+  // the neutral extreme of the current appearance, not a tinted surface.
+  const { mode } = useTheme();
+  const ground = mode === "light" ? "bg-white" : "bg-black";
   const navBinding = NAV_BINDINGS[keybindingPreset];
 
   const queue = usePlaybackQueue({
@@ -120,32 +127,33 @@ export default function Player() {
     void navigate("/");
   }, [navigate]);
 
-  // Take over the screen for as long as the player is open, and treat leaving
-  // full screen by any route (Esc, the OS chrome) as ending playback (FR-006).
+  // The player covers the window on its own; going full screen on top of that is
+  // the user's call, not something entering playback decides for them. Leaving
+  // full screen therefore just leaves full screen — playback carries on.
   const rootRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
-    const el = rootRef.current;
-    if (el?.requestFullscreen) void el.requestFullscreen().catch(() => {});
-    return () => {
+    const onChange = () =>
+      setIsFullscreen(document.fullscreenElement === rootRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  // Whatever state the player is left in, it must not strand the app full screen.
+  useEffect(
+    () => () => {
       if (document.fullscreenElement) {
         void document.exitFullscreen().catch(() => {});
       }
-    };
+    },
+    [],
+  );
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+      return;
+    }
+    void rootRef.current?.requestFullscreen?.().catch(() => {});
   }, []);
-  const enteredFullscreen = useRef(false);
-  useEffect(() => {
-    const onChange = () => {
-      if (document.fullscreenElement) {
-        enteredFullscreen.current = true;
-        return;
-      }
-      // Only a real exit counts; the initial "not yet full screen" state must not
-      // close the player before the request resolves.
-      if (enteredFullscreen.current) exit();
-    };
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, [exit]);
 
   // Playing an item drops it from Watch Later in the main process, which stays
   // quiet about it so the list does not shift mid-playback. Flush the affected
@@ -321,6 +329,7 @@ export default function Player() {
     goNext,
     goPrev,
     toggleShuffle,
+    toggleFullscreen,
     exit,
     navBinding,
   });
@@ -331,6 +340,7 @@ export default function Player() {
       goNext,
       goPrev,
       toggleShuffle,
+      toggleFullscreen,
       exit,
       navBinding,
     };
@@ -363,8 +373,15 @@ export default function Player() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       switch (e.code) {
         case "Escape":
+          // In full screen the browser's own Esc leaves it; closing the player
+          // as well would collapse two steps into one keypress.
+          if (document.fullscreenElement) return;
           e.preventDefault();
           s.exit();
+          return;
+        case "KeyF":
+          e.preventDefault();
+          s.toggleFullscreen();
           return;
         case "KeyN":
           e.preventDefault();
@@ -431,7 +448,7 @@ export default function Player() {
       role="dialog"
       aria-modal="true"
       aria-label={t("playlist.start")}
-      className="fixed inset-0 z-50 overflow-hidden bg-black"
+      className={cn("fixed inset-0 z-50 overflow-hidden", ground)}
       onMouseMove={wake}
       onKeyDown={wake}
     >
@@ -452,7 +469,7 @@ export default function Player() {
             playlistTransition,
           )}
         >
-          <PlayerStage backdropSrc={thumbSrc}>
+          <PlayerStage backdropSrc={thumbSrc} ground={ground}>
             {current && isImage && file && (
               <ImageStage
                 src={mediaSrc}
@@ -505,6 +522,7 @@ export default function Player() {
           playing={playing}
           shuffle={playlistShuffle}
           repeat={playlistRepeat}
+          fullscreen={isFullscreen}
           canPrev={queue.canPrev}
           visible={chromeVisible}
           onTogglePlay={togglePlay}
@@ -512,6 +530,7 @@ export default function Player() {
           onNext={goNext}
           onToggleShuffle={toggleShuffle}
           onToggleRepeat={toggleRepeat}
+          onToggleFullscreen={toggleFullscreen}
           onExit={exit}
           t={t}
         />

@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import {
+  Maximize,
+  Minimize,
   Pause,
   Play,
   Repeat,
@@ -20,6 +22,7 @@ export function PlayerChrome({
   playing,
   shuffle,
   repeat,
+  fullscreen,
   canPrev,
   visible,
   onTogglePlay,
@@ -27,6 +30,7 @@ export function PlayerChrome({
   onNext,
   onToggleShuffle,
   onToggleRepeat,
+  onToggleFullscreen,
   onExit,
   t,
 }: {
@@ -36,6 +40,8 @@ export function PlayerChrome({
   playing: boolean;
   shuffle: boolean;
   repeat: boolean;
+  /** Whether the player currently owns the screen (it does not by default). */
+  fullscreen: boolean;
   canPrev: boolean;
   /** False once the user has been idle; the chrome fades out of the way. */
   visible: boolean;
@@ -44,6 +50,7 @@ export function PlayerChrome({
   onNext: () => void;
   onToggleShuffle: () => void;
   onToggleRepeat: () => void;
+  onToggleFullscreen: () => void;
   onExit: () => void;
   t: TFunc;
 }) {
@@ -102,6 +109,16 @@ export function PlayerChrome({
               title={t("playlist.repeat")}
             >
               <Repeat size={18} />
+            </ChromeButton>
+            <ChromeButton
+              onClick={onToggleFullscreen}
+              title={
+                fullscreen
+                  ? t("playlist.exitFullscreen")
+                  : t("playlist.fullscreen")
+              }
+            >
+              {fullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
             </ChromeButton>
           </div>
         </div>

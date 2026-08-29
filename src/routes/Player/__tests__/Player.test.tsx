@@ -206,8 +206,50 @@ describe("Player video chrome", () => {
     // player would otherwise raise its centre play button and control bar.
     expect(screen.queryByTitle("Play")).toBeNull();
     expect(screen.queryByTitle("Volume")).toBeNull();
-    expect(screen.queryByTitle("Fullscreen (F)")).toBeNull();
     expect(screen.queryByTitle("Seek")).toBeNull();
+    // The player has a fullscreen control of its own; the video must not add a
+    // second one behind it.
+    expect(screen.getAllByTitle("Fullscreen (F)")).toHaveLength(1);
+    expect(screen.getByLabelText("Fullscreen (F)")).toBeTruthy();
+  });
+
+  it("hands the video the whole stage instead of boxing it to its ratio", async () => {
+    // The detail view's aspect-ratio box and 78vh cap leave room for metadata
+    // below; in the player they only show up as bands above and below the video.
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const video = document.querySelector("video");
+    const stage = video?.parentElement;
+    expect(stage?.style.aspectRatio).toBeFalsy();
+    expect(stage?.className).not.toContain("max-h-[78vh]");
+    expect(video?.className).not.toContain("max-h-[78vh]");
+  });
+
+  it("lets the blurred backdrop show through the letterbox bars", async () => {
+    // The stage paints a blurred cover of the same file behind the media; an
+    // opaque video wrapper would hide it and leave flat black bars instead.
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const stage = document.querySelector("video")?.parentElement;
+    expect(stage?.className).not.toContain("bg-black");
+  });
+
+  it("grounds the stage in black under a dark appearance", async () => {
+    localStorage.setItem("meguri.theme", "gruvbox-dark");
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    expect(document.querySelectorAll(".bg-white")).toHaveLength(0);
+    expect(document.querySelectorAll(".bg-black").length).toBeGreaterThan(0);
+  });
+
+  it("grounds the stage in white under a light appearance", async () => {
+    // A transparent image is composited straight onto the ground, so a fixed
+    // black would swallow light artwork for anyone working in a light theme.
+    localStorage.setItem("meguri.theme", "gruvbox-light");
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    expect(document.querySelectorAll(".bg-black")).toHaveLength(0);
+    expect(document.querySelectorAll(".bg-white").length).toBeGreaterThan(0);
   });
 
   it("keeps the video's controls hidden after a play/pause keypress", async () => {
@@ -219,6 +261,42 @@ describe("Player video chrome", () => {
     fireEvent.keyDown(window, { code: "KeyK" });
     expect(screen.queryByTitle("Play")).toBeNull();
     expect(screen.queryByTitle("Volume")).toBeNull();
+  });
+});
+
+describe("Player fullscreen", () => {
+  it("does not take over the screen on its own", async () => {
+    const request = vi.fn();
+    Element.prototype.requestFullscreen = request;
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("offers full screen as a control instead", async () => {
+    const request = vi.fn().mockResolvedValue(undefined);
+    Element.prototype.requestFullscreen = request;
+    renderPlayer([row(1, "video")]);
+    fireEvent.click(await screen.findByLabelText("Fullscreen (F)"));
+    expect(request).toHaveBeenCalled();
+  });
+
+  it("toggles full screen on F", async () => {
+    const request = vi.fn().mockResolvedValue(undefined);
+    Element.prototype.requestFullscreen = request;
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    fireEvent.keyDown(window, { code: "KeyF" });
+    expect(request).toHaveBeenCalled();
+  });
+
+  it("keeps playing when full screen is left", async () => {
+    renderPlayer([row(1, "video"), row(3, "video")]);
+    await screen.findByText("1 / 2");
+    // Whatever route the user took out of full screen, the queue is untouched.
+    fireEvent(document, new Event("fullscreenchange"));
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+    expect(screen.getByLabelText("Next (N)")).toBeTruthy();
   });
 });
 

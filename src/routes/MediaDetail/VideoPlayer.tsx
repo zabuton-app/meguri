@@ -403,7 +403,9 @@ export const VideoPlayer = forwardRef<
           skip(-10);
           break;
         case "KeyF":
-          toggleFullscreen();
+          // Chromeless means the caller owns the frame, its fullscreen control
+          // and therefore this key too; acting here as well would cancel it out.
+          if (!chromeless) toggleFullscreen();
           break;
         case "KeyM":
           toggleMute();
@@ -425,8 +427,10 @@ export const VideoPlayer = forwardRef<
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // All handlers go through refs / stable references, so registering once is enough.
-  }, [togglePlay]);
+    // All handlers go through refs / stable references, so registering once is
+    // enough; `chromeless` is a prop the handler reads directly, so it re-binds
+    // on the rare occasion that changes.
+  }, [togglePlay, chromeless]);
 
   // Event coordinates on the seek bar → {ratio, t}.
   // ratio is computed from getBoundingClientRect+clientX (consistent even under CSS zoom). Positioning
@@ -542,15 +546,31 @@ export const VideoPlayer = forwardRef<
     onExportFrame?.(Math.max(0, displayPos));
   };
 
+  // The detail view boxes the video to its aspect ratio and caps it at 78vh so
+  // the metadata below it stays on screen. Neither applies when the video is the
+  // whole screen: the playlist player hands it the entire stage, and letterboxing
+  // is the blurred backdrop's job, not a gap in the layout.
+  const fillsParent = chromeless || isFullscreen;
+
   return (
     <div
       ref={wrapRef}
-      className={`group relative flex w-full items-center justify-center overflow-hidden bg-black ${
-        isFullscreen ? "h-screen rounded-none" : "max-h-[78vh] rounded-xl"
+      className={`group relative flex w-full items-center justify-center overflow-hidden ${
+        // Opaque on its own, but not in the playlist player: the stage there
+        // already paints a blurred cover of this very file behind it, and black
+        // here would hide it and turn the letterbox bars into flat gaps.
+        chromeless ? "bg-transparent" : "bg-black"
+      } ${
+        fillsParent
+          ? `${chromeless ? "h-full" : "h-screen"} rounded-none`
+          : "max-h-[78vh] rounded-xl"
       }`}
-      style={isFullscreen ? undefined : { aspectRatio }}
+      style={fillsParent ? undefined : { aspectRatio }}
     >
-      {!loaded && (
+      {/* Skipped in the playlist player: the stage's blurred cover of this very
+          file is already the placeholder, and a grey sheet over it would flash
+          on every item change. */}
+      {!loaded && !chromeless && (
         <Skeleton
           className="absolute inset-0 z-10 rounded-none bg-overlay"
           aria-hidden="true"
@@ -561,7 +581,11 @@ export const VideoPlayer = forwardRef<
         src={src}
         autoPlay={autoplay}
         className={`h-full w-full object-contain transition-opacity ${
-          isFullscreen ? "h-full max-h-screen" : "max-h-[78vh]"
+          chromeless
+            ? "max-h-full"
+            : isFullscreen
+              ? "max-h-screen"
+              : "max-h-[78vh]"
         } ${loaded ? "opacity-100" : "opacity-0"}`}
         onClick={togglePlay}
         onPlay={() => {

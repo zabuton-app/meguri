@@ -457,6 +457,8 @@ export const ja = {
   "playlist.prev": "前へ (P)",
   "playlist.shuffle": "シャッフル (S)",
   "playlist.repeat": "繰り返し",
+  "playlist.fullscreen": "全画面 (F)",
+  "playlist.exitFullscreen": "全画面を解除 (F)",
   "playlist.exit": "再生を終了 (Esc)",
   "playlist.progress": "{current} / {total}",
   "playlist.empty": "再生できるメディアがありません。",

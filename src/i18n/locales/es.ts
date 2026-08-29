@@ -465,6 +465,8 @@ export const es: Record<TranslationKey, string> = {
   "playlist.prev": "Anterior (P)",
   "playlist.shuffle": "Aleatorio (S)",
   "playlist.repeat": "Repetir",
+  "playlist.fullscreen": "Pantalla completa (F)",
+  "playlist.exitFullscreen": "Salir de pantalla completa (F)",
   "playlist.exit": "Salir de la reproducción (Esc)",
   "playlist.progress": "{current} / {total}",
   "playlist.empty": "No hay nada que se pueda reproducir aquí.",

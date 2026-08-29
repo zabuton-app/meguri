@@ -440,6 +440,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "playlist.prev": "上一个 (P)",
   "playlist.shuffle": "随机播放 (S)",
   "playlist.repeat": "循环播放",
+  "playlist.fullscreen": "全屏 (F)",
+  "playlist.exitFullscreen": "退出全屏 (F)",
   "playlist.exit": "退出播放 (Esc)",
   "playlist.progress": "{current} / {total}",
   "playlist.empty": "这里没有可播放的媒体。",
