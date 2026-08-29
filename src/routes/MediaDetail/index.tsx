@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import log from "@/lib/logger";
 import {
   LIST_HIDDEN_SOURCES,
   RESERVED_TAG_ERROR,
@@ -652,7 +653,8 @@ export default function MediaDetail() {
                   // regardless would show the file as consumed when it is not.
                   void api
                     .openExternal(fileId, wsId)
-                    .then(() => dropFromWatchLaterCache(qc, wsId, fileId));
+                    .then(() => dropFromWatchLaterCache(qc, wsId, fileId))
+                    .catch((e: unknown) => log.error("open external", e));
                 }}
               >
                 <ExternalLink />

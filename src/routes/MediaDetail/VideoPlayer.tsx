@@ -471,7 +471,10 @@ export const VideoPlayer = forwardRef<
             // records the play (and consumes the Watch Later entry) there, and
             // can refuse for a file that has gone missing under the root.
             onClick={() =>
-              void api.openExternal(id, wsId).then(() => onOpenExternal())
+              void api
+                .openExternal(id, wsId)
+                .then(() => onOpenExternal())
+                .catch((e: unknown) => log.error("open external", e))
             }
           >
             <ExternalLink />

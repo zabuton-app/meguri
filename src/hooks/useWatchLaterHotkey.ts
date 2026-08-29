@@ -29,11 +29,14 @@ export function useWatchLaterHotkey({ active, buttonRef }: Options): void {
           el.isContentEditable)
       )
         return;
-      // No focused item (or the button is still waiting on the collection id):
-      // swallow nothing, let the key fall through as a plain keystroke.
-      if (!buttonRef.current) return;
+      // No focused item, or the button is still disabled waiting on the
+      // collection id: swallow nothing, let the key fall through as a plain
+      // keystroke. Clicking a disabled button is a no-op, so claiming the key
+      // there would eat it while nothing can actually toggle.
+      const button = buttonRef.current;
+      if (!button || button.disabled) return;
       e.preventDefault();
-      buttonRef.current.click();
+      button.click();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

@@ -319,6 +319,22 @@ describe("MediaGrid", () => {
       await expectNoToggle();
     });
 
+    it("lets the key through while the toggle is still disabled", async () => {
+      // workspaces_list never resolves here, so the toggle stays disabled for
+      // want of the collection id. Clicking a disabled button is a no-op, so
+      // claiming the key would eat it while nothing can act on it.
+      mocks.workspacesList.mockReturnValue(new Promise(() => {}));
+      renderGrid();
+      await screen.findByRole("button", { name: /Watch Later/ });
+      fireEvent.keyDown(window, { code: "ArrowDown" });
+
+      // fireEvent returns false when a handler called preventDefault.
+      const notSwallowed = fireEvent.keyDown(window, { code: "KeyW" });
+
+      expect(notSwallowed).toBe(true);
+      await expectNoToggle();
+    });
+
     it("ignores auto-repeat from a held key", async () => {
       renderGrid();
       await ready();

@@ -5,6 +5,7 @@ import { ExternalLink, Film, ImageIcon, Play } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
+import log from "@/lib/logger";
 import { dropFromWatchLaterCache } from "@/lib/queryCache";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/FavoriteButton";
@@ -230,6 +231,7 @@ export function DiscoverCard({
               void api
                 .openExternal(file.id, wsId)
                 .then(() => dropFromWatchLaterCache(qc, wsId, file.id))
+                .catch((e: unknown) => log.error("open external", e))
             }
             title={t("media.openExternal")}
             aria-label={t("media.openExternal")}
