@@ -93,7 +93,23 @@ export function EmojiPicker({
       raf = requestAnimationFrame(tryInject);
     };
     tryInject();
-    return () => cancelAnimationFrame(raf);
+
+    // Radix's scroll lock (react-remove-scroll) listens for `wheel` on
+    // `document` and preventDefault()s it unless the event target's ancestor
+    // chain contains a scrollable element. A wheel over the picker originates
+    // inside emoji-mart's shadow root, so by the time it reaches `document` it
+    // has been retargeted to the <em-emoji-picker> host — whose light-DOM
+    // ancestors do not scroll. The lock therefore cancels every wheel and the
+    // emoji grid can only be scrolled by dragging its scrollbar. Stop the event
+    // below `document` so the lock never sees it; the shadow root's own
+    // scroller still handles it natively.
+    const stopWheel = (e: WheelEvent) => e.stopPropagation();
+    node.addEventListener("wheel", stopWheel);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      node.removeEventListener("wheel", stopWheel);
+    };
   }, []);
 
   // Radix can leave `pointer-events: none` on <body> if the dialog unmounts while
