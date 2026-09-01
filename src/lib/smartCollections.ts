@@ -137,15 +137,3 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   }
   return parts.join(" / ") || t("smartCollection.allMedia");
 }
-
-export function defaultSmartCollectionName(
-  t: TFunc,
-  query: SearchQuery,
-): string {
-  if (query.favorite) return t("smartCollection.defaultFavorites");
-  if (query.ratingMin)
-    return t("smartCollection.defaultRating", { rating: query.ratingMin });
-  if (query.played === false) return t("smartCollection.defaultUnplayed");
-  if (query.q) return query.q;
-  return t("smartCollection.defaultName");
-}

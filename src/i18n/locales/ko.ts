@@ -164,10 +164,6 @@ export const ko: Record<TranslationKey, string> = {
   "smartCollection.namePlaceholder": "컬렉션 이름",
   "smartCollection.save": "저장",
   "smartCollection.allMedia": "전체 미디어",
-  "smartCollection.defaultFavorites": "즐겨찾기",
-  "smartCollection.defaultRating": "★{rating}+",
-  "smartCollection.defaultUnplayed": "미시청",
-  "smartCollection.defaultName": "새 컬렉션",
 
   // media detail
   "media.notFound": "파일을 찾을 수 없습니다.",
