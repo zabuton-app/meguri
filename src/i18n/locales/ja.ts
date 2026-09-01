@@ -166,10 +166,6 @@ export const ja = {
   "smartCollection.namePlaceholder": "コレクション名",
   "smartCollection.save": "保存",
   "smartCollection.allMedia": "すべてのメディア",
-  "smartCollection.defaultFavorites": "お気に入り",
-  "smartCollection.defaultRating": "★{rating}以上",
-  "smartCollection.defaultUnplayed": "未視聴",
-  "smartCollection.defaultName": "新しいコレクション",
 
   // メディア詳細（MediaDetail）
   "media.notFound": "ファイルが見つかりません。",

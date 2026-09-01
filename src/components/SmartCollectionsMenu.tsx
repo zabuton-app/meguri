@@ -21,7 +21,6 @@ import { Input } from "@/components/ui/input";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   cleanSearchQuery,
-  defaultSmartCollectionName,
   describeSearchQuery,
   hasSearchConditions,
 } from "@/lib/smartCollections";
@@ -40,16 +39,18 @@ export function SmartCollectionsMenu({ value, onApply }: Props) {
   const [name, setName] = useState("");
   const canSave = hasSearchConditions(value);
 
-  const defaultName = useMemo(
-    () => defaultSmartCollectionName(t, cleanSearchQuery(value)),
+  // The full condition summary doubles as the default name, so the dialog can
+  // be confirmed as-is and the saved entry still says what it filters.
+  const summary = useMemo(
+    () => describeSearchQuery(t, cleanSearchQuery(value)),
     [t, value],
   );
 
   useEffect(() => {
     // Initializing the edit-form state with the default name when the save dialog opens is a legitimate pattern, so synchronous setState is allowed.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (saveOpen) setName(defaultName);
-  }, [defaultName, saveOpen]);
+    if (saveOpen) setName(summary);
+  }, [summary, saveOpen]);
 
   const onSave = () => {
     const trimmed = name.trim();
@@ -145,9 +146,7 @@ export function SmartCollectionsMenu({ value, onApply }: Props) {
                 onChange={(event) => setName(event.target.value)}
                 placeholder={t("smartCollection.namePlaceholder")}
               />
-              <p className="text-xs text-muted">
-                {describeSearchQuery(t, cleanSearchQuery(value))}
-              </p>
+              <p className="select-text text-xs text-muted">{summary}</p>
             </div>
             <DialogFooter className="border-t border-border p-4">
               <Button

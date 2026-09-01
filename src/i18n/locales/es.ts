@@ -171,10 +171,6 @@ export const es: Record<TranslationKey, string> = {
   "smartCollection.namePlaceholder": "Nombre de la colección",
   "smartCollection.save": "Guardar",
   "smartCollection.allMedia": "Todos los medios",
-  "smartCollection.defaultFavorites": "Favoritos",
-  "smartCollection.defaultRating": "★{rating}+",
-  "smartCollection.defaultUnplayed": "No reproducidos",
-  "smartCollection.defaultName": "Nueva colección",
 
   // media detail
   "media.notFound": "Archivo no encontrado.",

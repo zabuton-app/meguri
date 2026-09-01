@@ -162,10 +162,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "smartCollection.namePlaceholder": "收藏名称",
   "smartCollection.save": "保存",
   "smartCollection.allMedia": "所有媒体",
-  "smartCollection.defaultFavorites": "收藏",
-  "smartCollection.defaultRating": "★{rating}+",
-  "smartCollection.defaultUnplayed": "未播放",
-  "smartCollection.defaultName": "新收藏",
 
   // media detail
   "media.notFound": "未找到文件。",
