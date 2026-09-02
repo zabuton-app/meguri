@@ -90,10 +90,25 @@ This is an invariant in `electron/main.ts`; preserve it when changing window or
 lifecycle behavior:
 
 - The window's `close` event calls `preventDefault()` and hides the window to the
-  tray unless `isQuitting` is set.
+  tray unless the app is quitting (`isQuitting()`, derived from `quitPhase`).
 - `window-all-closed` does **not** call `app.quit()`.
-- The app quits only via the tray "Quit" menu item or, on macOS, Cmd+Q; both set
-  `isQuitting = true` (the latter through `before-quit`).
+- The app quits only via the tray "Quit" menu item or, on macOS, Cmd+Q; both go
+  through `app.quit()` and therefore `before-quit`, which advances `quitPhase`.
+- `before-quit` is a two-pass gate (Linux / Windows): the first pass calls
+  `preventDefault()`, runs the async `shutdown()` (hide the window, stop the
+  local servers, abort scans, dispose the query worker), then closes every
+  workspace DB handle and re-enters `app.quit()`; the second pass lets the quit
+  proceed. Repeated quit requests during the wait are absorbed, and the wait is
+  bounded so a stuck teardown cannot keep the app alive. Once quitting, no scan
+  starts and no workspace DB is reopened.
+- On macOS `before-quit` tears down synchronously instead (`teardownSync()`):
+  cancelling the quit there would also cancel an OS log-out. The same
+  synchronous path handles `powerMonitor` "shutdown" (macOS / Linux) and the
+  window's `session-end` (Windows shutdown / log-off, which never reaches
+  `before-quit`).
+- If the renderer process crashes, the main window is reloaded with a growing
+  delay, bounded per minute; past that (or on a launch / integrity failure) the
+  user is asked to reload or quit instead of being left with a blank window.
 - A single-instance lock prevents a second copy from launching.
 - The tray and window icons are base64-embedded images
   (`electron/core/logoAssets.ts`), to avoid bundle path-resolution issues.

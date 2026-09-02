@@ -12,7 +12,6 @@
 // and the browser cache key is naturally separated by ID as well.
 // frame returns a single JPEG frame at ?t=<seconds> (for seek preview).
 import http from "node:http";
-import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -20,7 +19,8 @@ import type { Core } from "./index.js";
 import { absPathOf, thumbPathIfDone } from "./tags.js";
 import { isInsideRoot } from "./paths.js";
 import { FFMPEG } from "./ffmpeg-paths.js";
-import { Semaphore } from "./concurrency.js";
+import { QueueFullError, Semaphore } from "./concurrency.js";
+import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
 import { scopedLog } from "./logger.js";
 
 const log = scopedLog("server");
@@ -35,12 +35,50 @@ const REMUX_CONTAINERS = new Set(["mkv", "avi", "wmv", "flv", "ts"]);
 // SIGKILL ensures the child actually dies if it ignores SIGTERM.
 const FFMPEG_REQUEST_TIMEOUT_MS = 60_000;
 const FFMPEG_KILL_SIGNAL = "SIGKILL" as const;
-// Cap concurrent ffmpeg child processes so parallel remux/frame requests cannot
-// spawn unbounded workers and exhaust CPU / memory on the local host. Scales
-// with the machine (same cpus-1 convention as the scan pool in jobs.ts), with
-// a floor of 2 so low-core hosts can still overlap a remux and a frame grab.
-const FFMPEG_MAX_CONCURRENT = Math.max(2, os.cpus().length - 1);
-const ffmpegSem = new Semaphore(FFMPEG_MAX_CONCURRENT);
+// Decoding requests (frame grabs, image transcodes) take a slot from the
+// process-wide `videoDecodeSlots` pool shared with the scan pipeline
+// (mediaConcurrency.ts). Remux sessions are `-c copy` — no decode, little memory,
+// but they live as long as playback — so they get their own cap: one long
+// movie must not pin a decode slot for hours. The number is a count of
+// concurrent playback sessions (a single user rarely has more than a couple
+// open at once) rather than anything CPU-derived.
+const REMUX_MAX_CONCURRENT = 8;
+const remuxSlots = new Semaphore(REMUX_MAX_CONCURRENT);
+// Requests queued for a slot are bounded too, so a burst of frame grabs (or
+// a renderer gone haywire) cannot pile up sockets and waiters without limit;
+// beyond this the request is shed with 503. A client that disconnects while
+// queued is dropped from the queue right away.
+const MAX_WAITING = 32;
+
+/**
+ * Take a slot on behalf of `res`: null (with the response already ended) when
+ * the queue is full or the client went away while waiting.
+ */
+async function acquireForResponse(
+  slots: Semaphore,
+  res: http.ServerResponse,
+): Promise<(() => void) | null> {
+  const gone = new AbortController();
+  const onClose = () => gone.abort();
+  res.on("close", onClose);
+  try {
+    return await slots.acquire({
+      signal: gone.signal,
+      maxWaiting: MAX_WAITING,
+    });
+  } catch (e) {
+    if (e instanceof QueueFullError) {
+      if (!res.headersSent) res.writeHead(503, { "Retry-After": "1" }).end();
+    } else if (!gone.signal.aborted) {
+      // Not the client leaving: don't leave the socket dangling.
+      log.warn("slot acquire failed:", e);
+      if (!res.headersSent) res.writeHead(500).end();
+    }
+    return null;
+  } finally {
+    res.off("close", onClose);
+  }
+}
 
 // Image formats Chromium cannot decode natively are transcoded to JPEG with ffmpeg on the fly.
 // (jpg/png/gif/webp/avif/bmp render directly, so they are served as raw files.)
@@ -518,19 +556,21 @@ function serveBufferedFfmpeg(
   args: string[],
   contentType: string,
 ) {
-  let cancelled = false;
-  res.on("close", () => {
-    cancelled = true;
-  });
-
   void (async () => {
-    const releaseSlot = await ffmpegSem.acquire();
-    if (cancelled) {
+    const releaseSlot = await acquireForResponse(videoDecodeSlots, res);
+    if (!releaseSlot) return;
+
+    let child: ChildProcess;
+    try {
+      child = spawnFfmpeg(args, res);
+    } catch (e) {
+      // spawn() throws synchronously on bad options; the slot is shared with
+      // the scan pipeline, so it must not leak here.
       releaseSlot();
+      if (!res.headersSent) res.writeHead(500).end();
+      log.warn("ffmpeg spawn failed:", e);
       return;
     }
-
-    const child = spawnFfmpeg(args, res);
     const chunks: Buffer[] = [];
     child.stdout!.on("data", (c: Buffer) => chunks.push(c));
     child.on("error", () => {
@@ -578,7 +618,9 @@ function serveFrame(
   quality: FrameQuality = "low",
 ) {
   const { width, qv } = FRAME_QUALITY[quality];
-  const args = ["-v", "error"];
+  // Bounded decoder threads: these runs share the decode slots with the scan
+  // pipeline, and per-process memory is what those slots are meant to cap.
+  const args = ["-v", "error", "-threads", String(DECODE_FFMPEG_THREADS)];
   if (t > 0) args.push("-ss", t.toFixed(3));
   args.push("-i", file, "-frames:v", "1", "-vf", `scale=${width}:-2`);
   if (qv !== null) args.push("-q:v", String(qv));
@@ -591,6 +633,8 @@ function serveTranscodedImage(res: http.ServerResponse, file: string) {
   const args = [
     "-v",
     "error",
+    "-threads",
+    String(DECODE_FFMPEG_THREADS),
     "-i",
     file,
     "-frames:v",
@@ -616,17 +660,9 @@ function serveRemux(
     return;
   }
 
-  let cancelled = false;
-  res.on("close", () => {
-    cancelled = true;
-  });
-
   void (async () => {
-    const releaseSlot = await ffmpegSem.acquire();
-    if (cancelled) {
-      releaseSlot();
-      return;
-    }
+    const releaseSlot = await acquireForResponse(remuxSlots, res);
+    if (!releaseSlot) return;
 
     const again = remuxInflight.get(key);
     if (again) {
@@ -635,6 +671,14 @@ function serveRemux(
       return;
     }
 
-    startRemuxSession(key, file, start, res, releaseSlot);
+    try {
+      startRemuxSession(key, file, start, res, releaseSlot);
+    } catch (e) {
+      // spawn() can throw synchronously; the slot would otherwise never be
+      // released (it only reaches the session on success).
+      releaseSlot();
+      if (!res.headersSent) res.writeHead(500).end();
+      log.warn("ffmpeg remux spawn failed:", e);
+    }
   })();
 }

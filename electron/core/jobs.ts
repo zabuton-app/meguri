@@ -1,6 +1,5 @@
 // Scan pipeline: walk → sync → thumbnail/meta (parallel).
 // Progress is reported via callbacks.
-import os from "node:os";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
@@ -14,6 +13,11 @@ import {
   needsAutoMetaBackfill,
 } from "./autoMetaTags.js";
 import { pool } from "./concurrency.js";
+import {
+  LARGE_IMAGE_PIXELS,
+  SCAN_POOL_WIDTH,
+  withScanDecodeSlot,
+} from "./mediaConcurrency.js";
 import { scopedLog } from "./logger.js";
 import type { Kind } from "./types.js";
 
@@ -217,33 +221,80 @@ export async function runScan(
     });
   };
 
-  await pool(
-    pending,
-    Math.max(2, os.cpus().length - 1),
-    async (f) => {
-      if (signal?.aborted) return;
-      const kind = f.kind as Kind;
+  // Per-file worker. Never throws: a pool worker that rejects would abandon
+  // its siblings mid-flight (still writing to this DB after the scan has
+  // reported as finished), so per-file failures are logged and the file is
+  // left 'pending' for the next scan. Failures are counted so a tool that is
+  // broken outright (every file failing) still surfaces as a scan error.
+  let failed = 0;
+  const processOne = async (f: (typeof pending)[number]): Promise<void> => {
+    if (signal?.aborted) return;
+    const kind = f.kind as Kind;
+    const dest = path.join(thumbs, `${f.id}.webp`);
+    try {
+      // ffprobe runs outside the decode slot: it doesn't decode, but it can be
+      // slow on network shares and must not hold a decoder up meanwhile.
       const meta = await extractMeta(f.abs_path, signal);
-      const dest = path.join(thumbs, `${f.id}.webp`);
       // Honour a user-chosen thumbnail frame if one was set previously. Ignored for images.
       const offsetSec =
         kind === "video" ? (q.thumbOffsetOf(db, f.id) ?? undefined) : undefined;
-      const ok = await generateThumb(f.abs_path, kind, dest, signal, offsetSec);
+      const thumb = () =>
+        generateThumb(f.abs_path, kind, dest, signal, offsetSec);
+      // Only the expensive decodes take a slot: every video, and images big
+      // enough to cost hundreds of MB — or of unknown size (ffprobe failed),
+      // which are treated as big. Everything else runs at pool width.
+      const pixels =
+        meta.width != null && meta.height != null
+          ? meta.width * meta.height
+          : Infinity;
+      const expensive = kind === "video" || pixels >= LARGE_IMAGE_PIXELS;
+      const ok = expensive
+        ? await withScanDecodeSlot(thumb, signal)
+        : await thumb();
 
       // If aborted mid-flight, ffprobe/ffmpeg were killed and returned partial/empty
       // results. Don't persist them or mark the file 'error' (which filesNeedingThumb
       // skips on rescan) — leave it 'pending' so the next scan retries it.
       if (signal?.aborted) return;
 
+      // ffmpeg reporting failure counts too, so a broken ffmpeg (every file
+      // marked 'error') is caught by the all-failed check below.
+      if (!ok) failed++;
       // Workers share the event loop, so buffering + flushing is race-free.
       buffer.push({ id: f.id, kind, dest, ok, meta });
       if (buffer.length >= THUMB_FLUSH_EVERY) flush();
-    },
-    signal,
-  );
-  // Persist the tail batch. On abort the buffered results are from ffmpeg runs
-  // that completed before the signal fired, so they are safe to keep.
-  flush();
+    } catch (err) {
+      if (signal?.aborted) return;
+      failed++;
+      log.warn(`thumbnail worker failed for ${f.id}:`, err);
+    }
+  };
+  // Images and videos run in separate pools (mediaConcurrency.ts has the
+  // width and the reasoning): a run of videos must not block the cheap image
+  // side, and the expensive decodes are bounded process-wide inside
+  // processOne, together with the media server's. Both pools are awaited to
+  // completion regardless of failure, and whatever completed is persisted
+  // before any failure propagates.
+  const images = pending.filter((f) => f.kind !== "video");
+  const videos = pending.filter((f) => f.kind === "video");
+  try {
+    const results = await Promise.allSettled([
+      pool(images, SCAN_POOL_WIDTH, processOne, signal),
+      pool(videos, SCAN_POOL_WIDTH, processOne, signal),
+    ]);
+    for (const r of results) if (r.status === "rejected") throw r.reason;
+    // Every file failing points at the tooling, not the files — but a single
+    // corrupt file in a tiny incremental scan must not be mistaken for that.
+    if (failed >= 3 && failed === pending.length && !signal?.aborted) {
+      throw new Error(
+        `thumbnail extraction failed for all ${failed} files (is ffmpeg/ffprobe working?)`,
+      );
+    }
+  } finally {
+    // Persist the tail batch. On abort the buffered results are from ffmpeg
+    // runs that completed before the signal fired, so they are safe to keep.
+    flush();
+  }
 
   // Files classified as unchanged/moved never enter the pool above (syncFiles
   // leaves their thumb_status alone), so an existing library only gains derived
