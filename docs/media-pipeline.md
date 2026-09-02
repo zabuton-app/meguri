@@ -31,6 +31,17 @@ supports cancellation via `AbortSignal` while idle. The main process guards
 against concurrent scans of the same workspace with the `scanningWs` set, which
 avoids chunked-transaction conflicts.
 
+ffmpeg processes that decode video are capped process-wide by the
+`videoDecodeSlots` semaphore in `electron/core/mediaConcurrency.ts`, shared between
+the scan pipeline (video thumbnails) and the media server (frame grabs, image
+transcodes, user-triggered thumbnail regeneration and frame export). Running
+scans together hold at most all-but-one or -two of those slots so interactive
+requests are never queued behind a thumbnail backlog. Scans run images and
+videos in separate pools; only the expensive decodes inside (every video, and
+images above `LARGE_IMAGE_PIXELS`) take a slot, so ffprobe and small-image
+thumbnails keep the full pool width. Remux sessions (`-c copy`, no decode) have
+a separate cap in `server.ts`.
+
 ## Media server
 
 `electron/core/server.ts` runs a local HTTP server bound to `127.0.0.1`. URLs

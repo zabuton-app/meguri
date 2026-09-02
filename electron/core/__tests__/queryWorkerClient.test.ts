@@ -2,7 +2,7 @@
 // missing bundle spawns but dies on every request (async MODULE_NOT_FOUND) —
 // after enough consecutive crashes the client must pin itself to the
 // main-thread fallback instead of respawning forever.
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -70,5 +70,43 @@ describe("QueryWorkerClient", () => {
     // Reopens lazily on the next query (the file still exists).
     const stats = await client.run<WorkspaceStats>(statsReq());
     expect(stats.fileCount).toBe(4);
+  });
+});
+
+// Stand-in workers speaking the real message protocol, so dispose()'s
+// closeAll-before-terminate path (which the missing-bundle tests above never
+// reach) is exercised against an actual worker thread.
+function writeWorker(file: string, body: string): string {
+  writeFileSync(
+    file,
+    `const { parentPort } = require("node:worker_threads");
+const fs = require("node:fs");
+parentPort.on("message", (m) => { ${body} });
+`,
+  );
+  return file;
+}
+
+describe("QueryWorkerClient.dispose() with a live worker", () => {
+  it("asks the worker to close its handles before terminating it", async () => {
+    const marker = path.join(dir, "closed.marker");
+    const script = writeWorker(
+      path.join(dir, "worker-ok.js"),
+      `if (m.type === "closeAll") fs.writeFileSync(${JSON.stringify(marker)}, "1");
+       parentPort.postMessage({ id: m.id, ok: true, result: null });`,
+    );
+    const live = new QueryWorkerClient(script);
+    await live.run(statsReq()); // spawns the worker
+    await live.dispose();
+    expect(existsSync(marker)).toBe(true);
+    await expect(live.run(statsReq())).rejects.toThrow(/disposed/);
+  });
+
+  it("gives up on a worker that never answers within the dispose bound", async () => {
+    const script = writeWorker(path.join(dir, "worker-silent.js"), "");
+    const silent = new QueryWorkerClient(script);
+    const inflight = silent.run(statsReq()).catch(() => "rejected"); // spawns
+    await silent.dispose(); // bounded by DISPOSE_TIMEOUT_MS (< the test timeout)
+    expect(await inflight).toBe("rejected"); // pending request was released
   });
 });

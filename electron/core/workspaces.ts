@@ -51,6 +51,8 @@ export class Workspaces {
   private config: AppConfig;
   private cores = new Map<string, Core>();
   private errors = new Map<string, WorkspaceInitError>();
+  /** Set by closeAll(): no Core may be (re)opened afterwards. */
+  private closed = false;
 
   constructor() {
     this.config = loadConfig();
@@ -174,6 +176,19 @@ export class Workspaces {
   /** How many roots are registered, including any whose DB fails to open. */
   rootCount(): number {
     return this.config.roots.length;
+  }
+
+  /**
+   * Close every cached Core (quit path) and refuse to open any more. No writer
+   * handle may outlive process teardown: a live better-sqlite3 connection at
+   * exit is a native-crash risk, and a late media request or IPC during the
+   * quit window must not quietly reopen one.
+   */
+  closeAll(): void {
+    this.closed = true;
+    for (const core of this.cores.values()) core.close();
+    this.cores.clear();
+    this.errors.clear();
   }
 
   /** All registered workspaces resolved to Cores, skipping any that fail to initialize. */
@@ -620,6 +635,7 @@ export class Workspaces {
     const id = Workspaces.idFor(p);
     const cached = this.cores.get(id);
     if (cached) return cached;
+    if (this.closed) return null;
     try {
       const core = Core.init(p);
       this.cores.set(id, core);

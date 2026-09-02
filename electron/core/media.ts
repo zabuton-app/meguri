@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { promises as fsPromises } from "node:fs";
 import { promisify } from "node:util";
 import { FFMPEG, FFPROBE } from "./ffmpeg-paths.js";
+import { DECODE_FFMPEG_THREADS } from "./mediaConcurrency.js";
 import log from "./logger.js";
 import type { Kind } from "./types.js";
 
@@ -194,7 +195,13 @@ async function runFfmpegFrameExport(
   keyframeOnly: boolean,
   signal: AbortSignal | undefined,
 ): Promise<boolean> {
-  const args: string[] = ["-v", "error", "-y"];
+  const args: string[] = [
+    "-v",
+    "error",
+    "-y",
+    "-threads",
+    String(DECODE_FFMPEG_THREADS),
+  ];
   if (keyframeOnly) {
     args.push("-ss", offsetSec.toFixed(3), "-i", src);
   } else {
@@ -244,11 +251,21 @@ async function runFfmpegThumb(
   keyframeOnly: boolean,
 ): Promise<boolean> {
   const useOffset = typeof offsetSec === "number";
+  // scale BEFORE thumbnail: the thumbnail filter keeps its whole scoring
+  // window (default 100 frames) in memory, so at full 4K that is ~1.2 GB per
+  // process versus ~140 MB once the frames are already 480px. Its histogram
+  // scoring picks the same frame either way.
   const vf =
     kind === "video" && !useOffset
-      ? `thumbnail,scale='min(${THUMB_MAX},iw)':-2`
+      ? `scale='min(${THUMB_MAX},iw)':-2,thumbnail`
       : `scale='min(${THUMB_MAX},iw)':-2`;
-  const args: string[] = ["-v", "error", "-y"];
+  const args: string[] = [
+    "-v",
+    "error",
+    "-y",
+    "-threads",
+    String(DECODE_FFMPEG_THREADS),
+  ];
   if (useOffset) {
     if (keyframeOnly) {
       // Pure pre-input seek: fast, always lands on a keyframe (no frame-accuracy retry).
