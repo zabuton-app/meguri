@@ -283,13 +283,6 @@ export async function runScan(
       pool(videos, SCAN_POOL_WIDTH, processOne, signal),
     ]);
     for (const r of results) if (r.status === "rejected") throw r.reason;
-    // Every file failing points at the tooling, not the files — but a single
-    // corrupt file in a tiny incremental scan must not be mistaken for that.
-    if (failed >= 3 && failed === pending.length && !signal?.aborted) {
-      throw new Error(
-        `thumbnail extraction failed for all ${failed} files (is ffmpeg/ffprobe working?)`,
-      );
-    }
   } finally {
     // Persist the tail batch. On abort the buffered results are from ffmpeg
     // runs that completed before the signal fired, so they are safe to keep.
@@ -311,6 +304,18 @@ export async function runScan(
   // Reclaim durable metadata whose file row no longer exists (mainly post-rebuild orphans).
   // Skipped on abort to avoid purging metadata for files not yet re-indexed (especially after rebuild).
   if (!signal?.aborted) q.pruneOrphanMeta(db);
+
+  // Every file failing points at the tooling, not the files. Reported
+  // regardless of batch size: a tiny incremental scan may flag a merely
+  // corrupt file, but the alternative — a broken ffmpeg hiding behind small
+  // scans and reporting success with zero thumbnails — is worse. Raised only
+  // after the backfill/prune passes above, so a file that fails on every scan
+  // cannot starve them indefinitely.
+  if (failed > 0 && failed === pending.length && !signal?.aborted) {
+    throw new Error(
+      `thumbnail extraction failed for all ${failed} pending file(s) (is ffmpeg/ffprobe working?)`,
+    );
+  }
 
   onEvent({ type: "done", jobId, stats, aborted: signal?.aborted });
   return stats;

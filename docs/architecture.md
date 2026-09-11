@@ -91,9 +91,11 @@ lifecycle behavior:
 
 - The window's `close` event calls `preventDefault()` and hides the window to the
   tray unless the app is quitting (`isQuitting()`, derived from `quitPhase`).
-- `window-all-closed` does **not** call `app.quit()`.
-- The app quits only via the tray "Quit" menu item or, on macOS, Cmd+Q; both go
-  through `app.quit()` and therefore `before-quit`, which advances `quitPhase`.
+- `window-all-closed` does **not** call `app.quit()` (unless tray support is
+  disabled, e.g. in Docker — then closing the last window quits).
+- The app quits via the tray "Quit" menu item, macOS Cmd+Q, or the last window
+  closing when tray support is disabled; all go through `app.quit()` and
+  therefore `before-quit`, which advances `quitPhase`.
 - `before-quit` is a two-pass gate (Linux / Windows): the first pass calls
   `preventDefault()`, runs the async `shutdown()` (hide the window, stop the
   local servers, abort scans, dispose the query worker), then closes every
