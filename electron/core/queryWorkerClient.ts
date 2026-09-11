@@ -3,6 +3,7 @@
 // executing on the main thread when the worker cannot be spawned at all, so
 // query behavior degrades gracefully instead of breaking.
 import { Worker } from "node:worker_threads";
+import { withTimeout } from "./concurrency.js";
 import type {
   WorkerMessage,
   WorkerPayload,
@@ -28,8 +29,15 @@ interface Pending {
 // which would otherwise respawn-and-fail forever.
 const MAX_CONSECUTIVE_CRASHES = 3;
 
+/** Upper bound on the whole dispose() teardown (closeAll round-trip + terminate).
+ *  Exported so the app's quit budget can be derived from it. */
+export const DISPOSE_TIMEOUT_MS = 2_000;
+
 export class QueryWorkerClient {
   private worker: Worker | null = null;
+  /** Worker whose async dispose() is in flight, so terminateNow() can still
+   *  cut it short if an OS shutdown overtakes a normal quit. */
+  private disposing: Worker | null = null;
   /** Set after a spawn failure or repeated crashes: stop retrying, use the fallback. */
   private workerUnavailable = false;
   private disposed = false;
@@ -93,6 +101,11 @@ export class QueryWorkerClient {
   }
 
   private send(msg: WorkerPayload): Promise<unknown> {
+    // After dispose() nothing may reopen a DB handle — not even the fallback,
+    // which opens lazily. Requests arriving during quit are simply refused.
+    if (this.disposed) {
+      return Promise.reject(new Error("query client disposed"));
+    }
     const worker = this.ensureWorker();
     if (!worker) {
       // Main-thread fallback: same executor logic, synchronous. Run inside
@@ -114,6 +127,13 @@ export class QueryWorkerClient {
         }
       });
     }
+    return this.post(worker, msg);
+  }
+
+  /** Post a message to a specific worker and await its reply. Raw path below
+   *  the disposed gate in send(): dispose() itself uses it to tell the worker
+   *  to close its handles. */
+  private post(worker: Worker, msg: WorkerPayload): Promise<unknown> {
     const id = ++this.seq;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -156,6 +176,32 @@ export class QueryWorkerClient {
     }
   }
 
+  /**
+   * Synchronous variant of dispose() for paths that cannot wait (OS session
+   * end, macOS quit): the closeAll message is queued and terminate() is
+   * issued right away, so the thread is already being torn down when the
+   * process exits even though no event-loop turn may follow.
+   */
+  terminateNow(): void {
+    if (this.disposed) {
+      // dispose() may still be waiting on closeAll; don't wait any longer.
+      void this.disposing?.terminate().catch(() => {});
+      this.disposing = null;
+      return;
+    }
+    this.disposed = true;
+    this.fallback.closeAll();
+    const worker = this.worker;
+    this.worker = null;
+    if (!worker) return;
+    try {
+      worker.postMessage({ type: "closeAll", id: ++this.seq });
+    } catch {
+      /* already gone */
+    }
+    void worker.terminate().catch(() => {});
+  }
+
   /** Shut down: close handles and terminate the worker. Safe to call twice. */
   async dispose(): Promise<void> {
     if (this.disposed) return;
@@ -164,7 +210,26 @@ export class QueryWorkerClient {
     const worker = this.worker;
     this.worker = null;
     if (worker) {
-      await worker.terminate().catch(() => {});
+      // Ask the worker to close its better-sqlite3 handles before tearing the
+      // thread down: terminate() mid-statement leaves the native addon to be
+      // unloaded with live connections, which can crash the process on exit.
+      // The bound covers terminate() too — it cannot interrupt a synchronous
+      // native call, so a worker stuck inside SQLite would otherwise stall
+      // quit indefinitely. Process exit reaps the thread either way.
+      // One deadline for both steps: a worker that never answers closeAll
+      // still gets terminate() called (so its pending requests are released),
+      // just without waiting for it.
+      const deadline = Date.now() + DISPOSE_TIMEOUT_MS;
+      this.disposing = worker;
+      await withTimeout(
+        this.post(worker, { type: "closeAll" }).catch(() => {}),
+        DISPOSE_TIMEOUT_MS,
+      );
+      this.disposing = null;
+      await withTimeout(
+        worker.terminate().catch(() => {}),
+        Math.max(0, deadline - Date.now()),
+      );
     }
   }
 }
