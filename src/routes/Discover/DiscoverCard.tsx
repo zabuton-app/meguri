@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, ImageIcon, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,9 @@ import { SceneRail } from "./SceneRail";
 // scrims. The whole media area is a link to the detail/player; overlay
 // containers are pointer-events-none so empty overlay space still clicks
 // through, with interactive children opting back in.
+const CENTER_PLAY_CLASS =
+  "absolute left-1/2 top-1/2 z-20 flex size-[76px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-bg/40 text-bright-fg backdrop-blur-md transition hover:scale-105 hover:bg-bg/60";
+
 export function DiscoverCard({
   file,
   mediaBase,
@@ -60,11 +64,10 @@ export function DiscoverCard({
 }) {
   const qc = useQueryClient();
   const { pause: pauseAudio, current: audioCurrent } = useAudioPlayer();
+  const { activate } = useActivateFile();
   const wsId = file.workspaceId;
   // Same rule as MediaThumbnail: thumb_status alone can be 'done' with no file
-  // produced (audio without embedded cover art), which would 404. randomFiles
-  // only excludes audio when no kind filter is set, so an explicit audio filter
-  // reaches here.
+  // produced (audio without embedded cover art), which would 404.
   const hasThumb =
     file.thumbStatus === "done" && file.hasThumb === 1 && mediaBase && wsId;
   const thumbUrl = hasThumb
@@ -79,8 +82,15 @@ export function DiscoverCard({
   const slash = file.relPath.lastIndexOf("/");
   const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
   const isVideo = file.kind === "video";
-  const ActionIcon = isVideo ? Play : ImageIcon;
-  const detailTo = detailPath(file.id, wsId, filterParam);
+  const isAudio = file.kind === "audio";
+  const ActionIcon = isVideo || isAudio ? Play : ImageIcon;
+  // Audio follows the list views' gesture split: "Play" starts the track in the
+  // bottom bar without leaving Discover, and opening the card is the inspect
+  // gesture, so its detail view must not start playback on its own.
+  const detailTo = detailPath(file.id, wsId, filterParam, undefined, {
+    autoplay: !isAudio,
+  });
+  const playInBar = () => activate(file);
   const showRail = isVideo && !!file.duration && file.duration > 0 && isActive;
 
   // Hover scrub preview on the main media (same behavior/preference as the
@@ -96,7 +106,15 @@ export function DiscoverCard({
     });
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-black">
+    // Black is the right ground behind a frame or a photo; with nothing to
+    // show it only leaves a dark slab that the light-toned scrims fade into,
+    // so a cover-less slide sits on the theme's surface instead.
+    <div
+      className={cn(
+        "relative h-full w-full overflow-hidden",
+        src ? "bg-black" : "bg-surface",
+      )}
+    >
       {/* Media layers. Click anywhere to open the detail/player. */}
       <Link
         to={detailTo}
@@ -128,10 +146,17 @@ export function DiscoverCard({
             )}
           </>
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted">
-            {/* Audio reaches Discover under an explicit kind filter, so the
-                fallback covers every kind, not just video/image. */}
-            {createElement(kindIcon(file.kind), { className: "size-16" })}
+          // The fallback covers every kind; audio without cover art lands here
+          // as a matter of course. A faint primary glow behind an album-sized
+          // tile, in the theme's own tones, so the slide reads as "a track
+          // with no artwork" rather than as a failed image.
+          <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(ellipse_70%_60%_at_50%_45%,color-mix(in_oklab,var(--c-primary)_14%,transparent),transparent_70%)] text-muted">
+            <div className="flex size-64 items-center justify-center rounded-[20px] border border-bright-fg/10 bg-gradient-to-br from-overlay to-surface shadow-2xl shadow-black/15">
+              {createElement(kindIcon(file.kind), {
+                className: "size-28",
+                strokeWidth: 1.5,
+              })}
+            </div>
           </div>
         )}
       </Link>
@@ -140,15 +165,26 @@ export function DiscoverCard({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[22%] bg-gradient-to-b from-bg/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-bg/90 via-bg/40 to-transparent" />
 
-      {/* Center play affordance (videos only). */}
+      {/* Center play affordance: opens the video, or plays the track in the
+          bottom bar. Images have nothing to play. */}
       {isVideo && (
         <Link
           to={detailTo}
           aria-label={t("discover.play")}
-          className="absolute left-1/2 top-1/2 z-20 flex size-[76px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-bg/40 text-bright-fg backdrop-blur-md transition hover:scale-105 hover:bg-bg/60"
+          className={CENTER_PLAY_CLASS}
         >
           <Play className="size-7 translate-x-0.5 fill-current" />
         </Link>
+      )}
+      {isAudio && (
+        <button
+          type="button"
+          onClick={playInBar}
+          aria-label={t("discover.play")}
+          className={CENTER_PLAY_CLASS}
+        >
+          <Play className="size-7 translate-x-0.5 fill-current" />
+        </button>
       )}
 
       {/* Bottom overlay: scene rail, title, meta chips, actions. */}
@@ -218,12 +254,23 @@ export function DiscoverCard({
         </div>
 
         <div className="pointer-events-auto flex shrink-0 items-center gap-2.5">
-          <Button asChild size="lg" className="px-7 font-bold shadow-lg">
-            <Link to={detailTo}>
-              <ActionIcon className={isVideo ? "fill-current" : undefined} />
-              {isVideo ? t("discover.play") : t("discover.open")}
-            </Link>
-          </Button>
+          {isAudio ? (
+            <Button
+              size="lg"
+              className="px-7 font-bold shadow-lg"
+              onClick={playInBar}
+            >
+              <ActionIcon className="fill-current" />
+              {t("discover.play")}
+            </Button>
+          ) : (
+            <Button asChild size="lg" className="px-7 font-bold shadow-lg">
+              <Link to={detailTo}>
+                <ActionIcon className={isVideo ? "fill-current" : undefined} />
+                {isVideo ? t("discover.play") : t("discover.open")}
+              </Link>
+            </Button>
+          )}
           {/* Styled to sit flush with the outline icon buttons around it; the
               control keeps its own primary hover/pressed colors. */}
           <WatchLaterButton

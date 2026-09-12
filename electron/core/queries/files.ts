@@ -437,19 +437,14 @@ export function orderByFor(sort?: string, dir?: string): string {
  * O(lim) rather than one array entry per matching row — and materialize only
  * the sampled rows via primary-key lookups.
  *
- * Audio is excluded unless explicitly asked for by kind. This backs Discover, a
- * purely visual browsing surface built around full-screen frames and autoplaying
- * previews; an audio row there renders as a broken image. Discover inherits the
- * user's active filter, and the common case is no kind filter at all, so the
- * exclusion has to live here rather than in the caller's query. It therefore
- * applies to every Discover path, including the cross-workspace and
- * collection-scoped ones in crossWorkspace.ts.
+ * Every kind takes part, audio included: Discover renders a track's cover art
+ * (or the kind's glyph) and plays it through the bottom bar, so nothing here
+ * needs to be filtered beyond what the caller's SearchQuery asks for.
  */
 export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
   const lim = Math.max(1, Math.min(MAX_LIMIT, query.limit ?? 20));
   const args: unknown[] = [];
   let sql = `SELECT f.id ${FILE_FROM} WHERE f.deleted_at IS NULL`;
-  if (!query.kind) sql += ` AND f.kind <> 'audio'`;
   sql = appendSearchConditions(db, sql, args, query);
 
   const reservoir: number[] = [];

@@ -276,18 +276,18 @@ describe("randomFiles", () => {
     db.close();
   });
 
-  it("excludes audio when no kind filter is set (Discover is a visual surface)", () => {
+  it("includes audio alongside video and images when no kind filter is set", () => {
     const { db, rootId } = newDb();
     insertFile(db, rootId, { relPath: "v.mp4", kind: "video" });
     insertFile(db, rootId, { relPath: "p.jpg", kind: "image" });
     insertFile(db, rootId, { relPath: "a.mp3", kind: "audio" });
     const out = randomFiles(db, { limit: 10 });
-    expect(out.length).toBe(2);
-    expect(out.some((f) => f.kind === "audio")).toBe(false);
+    expect(out.length).toBe(3);
+    expect(out.some((f) => f.kind === "audio")).toBe(true);
     db.close();
   });
 
-  it("still returns audio when it is explicitly requested by kind", () => {
+  it("returns only audio when it is requested by kind", () => {
     const { db, rootId } = newDb();
     insertFile(db, rootId, { relPath: "v.mp4", kind: "video" });
     insertFile(db, rootId, { relPath: "a.mp3", kind: "audio" });

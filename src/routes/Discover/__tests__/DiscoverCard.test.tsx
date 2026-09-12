@@ -2,7 +2,7 @@
 // passed down by the route, and activating it hits the same collection IPC the
 // list views use. The mutation itself is covered by WatchLaterButton's own tests.
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
@@ -183,5 +183,39 @@ describe("DiscoverCard thumbnail fallback", () => {
     }
     rerender(<Bumped />);
     expect(container.querySelector("img")).not.toBeNull();
+  });
+});
+
+describe("DiscoverCard audio", () => {
+  function renderAudio() {
+    function Harness() {
+      const { t } = useI18n();
+      return (
+        <DiscoverCard
+          file={{ ...file, kind: "audio", relPath: "music/track.mp3" }}
+          mediaBase=""
+          thumbVersion={0}
+          onRate={() => {}}
+          watchLater={membership(false)}
+          isActive={false}
+          t={t}
+        />
+      );
+    }
+    return renderWithProviders(<Harness />);
+  }
+
+  it("offers Play as a button that stays in Discover, not a link to the detail view", () => {
+    renderAudio();
+    const plays = screen.getAllByRole("button", { name: /^play$/i });
+    // The centre affordance and the primary action, both buttons.
+    expect(plays).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: /^play$/i })).toBeNull();
+  });
+
+  it("opens the detail view without autoplay when the card itself is clicked", () => {
+    const { container } = renderAudio();
+    const card = container.querySelector('a[href*="/file/"]');
+    expect(card?.getAttribute("href")).toContain("autoplay=0");
   });
 });
