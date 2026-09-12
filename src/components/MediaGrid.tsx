@@ -10,7 +10,7 @@ import {
   useState,
   type Ref,
 } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import {
@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { hasTimeline } from "@/lib/mediaKind";
 import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
@@ -100,7 +101,7 @@ export const MediaGrid = memo(function MediaGrid({
   watchLater = false,
   reorder,
 }: Props) {
-  const navigate = useNavigate();
+  const { activate } = useActivateFile();
   const watchLaterMembership = useWatchLater();
 
   // Scroll parent. Virtualization DOM-renders only the visible rows relative to this element.
@@ -180,9 +181,9 @@ export const MediaGrid = memo(function MediaGrid({
   const onOpen = useCallback(
     (index: number) => {
       const f = items[index];
-      if (f) void navigate(fileHref(f.id, f.workspaceId));
+      if (f) activate(f);
     },
-    [items, navigate],
+    [items, activate],
   );
   const { focusedIndex, setFocusedIndex } = useGridKeyboardNav({
     itemCount: items.length,
@@ -326,8 +327,10 @@ const MediaCard = memo(function MediaCard({
 }) {
   // The card is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
-  // metadata click → opens detail paused (`?autoplay=0`). Audio follows the
-  // same path: its detail view starts the track in the bottom player bar.
+  // metadata click → opens detail paused (`?autoplay=0`). For audio the
+  // thumbnail plays the track in the bottom bar instead of navigating, and the
+  // metadata region opens the detail view without starting playback.
+  const { onThumbnailClick } = useActivateFile();
   return (
     <div
       data-testid="media-card"
@@ -339,6 +342,7 @@ const MediaCard = memo(function MediaCard({
     >
       <Link
         to={fileHref(file.id, file.workspaceId)}
+        onClick={onThumbnailClick(file)}
         className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
       >
         <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />

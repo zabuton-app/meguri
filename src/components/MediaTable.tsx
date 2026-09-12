@@ -38,8 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { formatDuration, formatSize } from "@/lib/format";
-import { useNavigate } from "react-router";
-import { fileHref } from "@/lib/fileHref";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
@@ -110,7 +109,7 @@ export const MediaTable = memo(function MediaTable({
   reorder,
 }: Props) {
   const { t } = useI18n();
-  const navigate = useNavigate();
+  const { activate } = useActivateFile();
   const watchLaterMembership = useWatchLater();
 
   // Capture the scroll viewport into state so we can measure its width (the
@@ -157,9 +156,9 @@ export const MediaTable = memo(function MediaTable({
   const onOpen = useCallback(
     (index: number) => {
       const f = items[index];
-      if (f) void navigate(fileHref(f.id, f.workspaceId));
+      if (f) activate(f);
     },
-    [items, navigate],
+    [items, activate],
   );
   // Shared row click handler: routes to the detail view either with or without
   // auto-play. `useCallback` keeps the function reference stable so memoized
@@ -167,9 +166,11 @@ export const MediaTable = memo(function MediaTable({
   const onRowOpen = useCallback(
     (index: number, autoplay: boolean) => {
       const f = items[index];
-      if (f) void navigate(fileHref(f.id, f.workspaceId, { autoplay }));
+      // For audio the thumbnail cell (autoplay) plays in the bottom bar and the
+      // row itself opens the detail view silently.
+      if (f) activate(f, { autoplay });
     },
-    [items, navigate],
+    [items, activate],
   );
   const { focusedIndex, setFocusedIndex } = useGridKeyboardNav({
     itemCount: items.length,
