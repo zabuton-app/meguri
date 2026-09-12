@@ -101,11 +101,12 @@ export function AudioPlayerBar() {
       ref={setBarEl}
       role="region"
       aria-label={t("player.audio.region")}
-      // z-[60] lifts the bar above the route modals that leave it showing
-      // (z-50: settings, history, dialogs) so playback stays reachable while
-      // one is open. The playlist player (z-[70]) and the shortcuts overlay
-      // (z-[80]) still cover it on purpose; the detail view hides it instead.
-      className="relative z-[60] flex shrink-0 items-center gap-3 border-t border-border bg-bg px-3 py-2 text-sm text-fg"
+      // Part of the shell, not an overlay: the route modals (settings, history,
+      // tags, duplicates, discovery) dim it along with the rest of the window
+      // rather than leaving it lit on top of them, playback carries on
+      // underneath, and the detail view hides it altogether. The playlist
+      // player covers it after pausing it.
+      className="flex shrink-0 items-center gap-3 border-t border-border bg-bg px-3 py-2 text-sm text-fg"
     >
       {/* Keyed on the track so a failed cover doesn't stick: remounting resets
           the fallback state, and the previous jacket never shows while the new

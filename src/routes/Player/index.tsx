@@ -591,9 +591,7 @@ export default function Player() {
       role="dialog"
       aria-modal="true"
       aria-label={t("playlist.start")}
-      // Above the audio player bar (z-[60]): the playlist owns the screen and
-      // has paused the bar on entry.
-      className={cn("fixed inset-0 z-[70] overflow-hidden", ground)}
+      className={cn("fixed inset-0 z-50 overflow-hidden", ground)}
       onMouseMove={wake}
       // Pressing a control counts as activity in its own right. Without this the
       // bar keeps counting down from the last mouse *movement*, so clicking Next
