@@ -66,6 +66,8 @@ import {
 } from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
 import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import { AudioTransport } from "@/audio/AudioTransport";
+import { setBarSuppressed } from "@/audio/barVisibility";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
 import { MetaChips } from "./MetaChips";
@@ -101,8 +103,16 @@ export default function MediaDetail() {
     pause: pauseAudio,
     toggle: toggleAudio,
     close: closeAudio,
+    seek: seekAudio,
+    setVolume: setAudioVolume,
+    toggleMuted: toggleAudioMuted,
+    dismissError: dismissAudioError,
     current: audioCurrent,
     isPlaying: audioPlaying,
+    duration: audioDuration,
+    volume: audioVolume,
+    muted: audioMuted,
+    error: audioError,
   } = useAudioPlayer();
   // Closing the modal = drop the child route. Return to Discovery or the playlist
   // player if we came from there, otherwise back to the list (the list stays
@@ -577,6 +587,15 @@ export default function MediaDetail() {
     playAudio,
     toggleAudio,
   ]);
+  // The bottom bar steps aside for as long as this view is open, whatever the
+  // kind: for audio the same transport lives under the cover art, and for a
+  // video or image the bar would sit over the modal while the track it shows is
+  // paused anyway (starting the video pauses it). Playback is untouched; the
+  // bar returns on close.
+  useEffect(() => {
+    setBarSuppressed(true);
+    return () => setBarSuppressed(false);
+  }, []);
   // The other half of the exclusivity the video player enforces through
   // onPlaybackStart: resuming from the bar (which renders above the modal)
   // must pause an inline video, or both would sound at once.
@@ -693,57 +712,82 @@ export default function MediaDetail() {
               />
             </div>
           ) : d.kind === "audio" ? (
-            // Mirrors the video player's paused state: the artwork itself is the
-            // click target, with the same round play glyph in the centre. While
-            // playing, the glyph swaps to pause and only shows on hover, so the
-            // cover stays unobstructed — the bottom bar is the primary control.
-            <button
-              type="button"
-              disabled={!mediaBase || !wsId}
-              onClick={() => {
-                if (isCurrentAudio) toggleAudio();
-                else if (wsId) playAudio({ ...d, workspaceId: wsId }, wsId);
-              }}
-              title={
-                isCurrentAudio && audioPlaying
-                  ? t("player.audio.pause")
-                  : t("player.play")
-              }
-              aria-label={
-                isCurrentAudio && audioPlaying
-                  ? t("player.audio.pause")
-                  : t("player.play")
-              }
-              className="group relative flex w-full items-center justify-center overflow-hidden rounded-xl bg-black py-8"
-            >
-              {coverSrc ? (
-                <img
-                  src={coverSrc}
-                  alt={d.relPath}
-                  className="max-h-[50vh] max-w-full rounded-lg object-contain"
-                />
-              ) : (
-                <div className="flex size-48 items-center justify-center rounded-lg bg-overlay text-muted">
-                  <Music className="size-24" aria-hidden />
-                </div>
-              )}
-              <span
-                className={cn(
-                  "absolute inset-0 flex items-center justify-center transition-opacity",
-                  isCurrentAudio &&
-                    audioPlaying &&
-                    "opacity-0 group-hover:opacity-100",
-                )}
+            // Same anatomy as the video player: the artwork is the click target
+            // with the paused-state play glyph in its centre, and the transport
+            // (the bottom bar's controls, which steps aside while this is open)
+            // runs along the bottom edge.
+            <div className="flex flex-col overflow-hidden rounded-xl bg-black">
+              <button
+                type="button"
+                disabled={!mediaBase || !wsId}
+                onClick={() => {
+                  if (isCurrentAudio) toggleAudio();
+                  else if (wsId) playAudio({ ...d, workspaceId: wsId }, wsId);
+                }}
+                title={
+                  isCurrentAudio && audioPlaying
+                    ? t("player.audio.pause")
+                    : t("player.play")
+                }
+                aria-label={
+                  isCurrentAudio && audioPlaying
+                    ? t("player.audio.pause")
+                    : t("player.play")
+                }
+                className="group relative flex w-full items-center justify-center py-8"
               >
-                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
-                  {isCurrentAudio && audioPlaying ? (
-                    <Pause size={30} />
-                  ) : (
-                    <Play size={30} className="translate-x-0.5" />
+                {coverSrc ? (
+                  <img
+                    src={coverSrc}
+                    alt={d.relPath}
+                    className="max-h-[50vh] max-w-full rounded-lg object-contain"
+                  />
+                ) : (
+                  <div className="flex size-48 items-center justify-center rounded-lg bg-overlay text-muted">
+                    <Music className="size-24" aria-hidden />
+                  </div>
+                )}
+                <span
+                  className={cn(
+                    "absolute inset-0 flex items-center justify-center transition-opacity",
+                    isCurrentAudio &&
+                      audioPlaying &&
+                      "opacity-0 group-hover:opacity-100",
                   )}
+                >
+                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
+                    {isCurrentAudio && audioPlaying ? (
+                      <Pause size={30} />
+                    ) : (
+                      <Play size={30} className="translate-x-0.5" />
+                    )}
+                  </span>
                 </span>
-              </span>
-            </button>
+              </button>
+              <div
+                role="region"
+                aria-label={t("player.audio.region")}
+                className="flex items-center gap-3 px-4 pb-4 text-sm text-fg"
+              >
+                <AudioTransport
+                  size="stage"
+                  live={isCurrentAudio}
+                  isPlaying={isCurrentAudio && audioPlaying}
+                  onTogglePlay={() => {
+                    if (isCurrentAudio) toggleAudio();
+                    else if (wsId) playAudio({ ...d, workspaceId: wsId }, wsId);
+                  }}
+                  duration={isCurrentAudio ? audioDuration : d.duration}
+                  onSeek={seekAudio}
+                  volume={audioVolume}
+                  muted={audioMuted}
+                  onVolume={setAudioVolume}
+                  onToggleMuted={toggleAudioMuted}
+                  error={isCurrentAudio ? audioError : null}
+                  onDismissError={dismissAudioError}
+                />
+              </div>
+            </div>
           ) : (
             <div
               className={`flex justify-center overflow-hidden rounded-xl ${

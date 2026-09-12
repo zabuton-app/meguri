@@ -15,10 +15,10 @@
  */
 
 :root {
-  /* Height of the audio player bar, published by AudioPlayerBar while a track is
-     loaded. Bottom-anchored overlays add it to their offset so they clear the
-     bar; it stays 0 when nothing is playing. */
-  --meguri-player-bar-h: 0px;
+  /* Distance from the viewport bottom to the top of the audio player bar,
+     published by AudioPlayerBar while it is showing. Bottom-anchored overlays
+     add it to their offset so they clear the bar; it stays 0 otherwise. */
+  --meguri-player-bar-inset: 0px;
 }
 
 /* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */

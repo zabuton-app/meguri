@@ -9,6 +9,7 @@ import { I18nProvider } from "@/i18n/I18nProvider";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import { setBarSuppressed } from "@/audio/barVisibility";
 import {
   defaultAppStatus,
   sampleAudioRow,
@@ -252,23 +253,47 @@ describe("AudioPlayerBar", () => {
     expect(screen.getByRole("slider", { name: /seek/i })).toBeTruthy();
   });
 
-  it("publishes its height so bottom-anchored overlays can clear it", () => {
+  it("publishes its bottom inset so bottom-anchored overlays can clear it", () => {
     const varOf = () =>
-      document.documentElement.style.getPropertyValue("--meguri-player-bar-h");
+      document.documentElement.style.getPropertyValue(
+        "--meguri-player-bar-inset",
+      );
     setup();
     // Nothing loaded: overlays keep their original offset.
     expect(varOf()).toBe("0px");
 
     // jsdom reports 0 for every measurement, so assert the wiring by stubbing
-    // the measured height rather than expecting a real pixel value.
+    // the viewport height and the bar's top edge: the inset is the distance
+    // from the viewport bottom to the bar's top, which also spans whatever sits
+    // below the bar (the status bar).
+    vi.spyOn(document.documentElement, "clientHeight", "get").mockReturnValue(
+      800,
+    );
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      top: 726,
       height: 48,
     } as DOMRect);
     loadTrack();
-    expect(varOf()).toBe("48px");
+    expect(varOf()).toBe("74px");
 
     fireEvent.click(screen.getByRole("button", { name: /close player/i }));
     expect(varOf()).toBe("0px");
+  });
+
+  it("steps aside while the audio detail view hosts the controls, without stopping playback", () => {
+    setup();
+    loadTrack();
+    expect(bar()).toBeTruthy();
+    act(() => setBarSuppressed(true));
+    expect(bar()).toBeNull();
+    expect(
+      document.documentElement.style.getPropertyValue(
+        "--meguri-player-bar-inset",
+      ),
+    ).toBe("0px");
+    // Not closed: the track is still loaded, so releasing brings it straight back.
+    act(() => setBarSuppressed(false));
+    expect(bar()).toBeTruthy();
   });
 
   it("hides the bar again when closed", () => {

@@ -660,7 +660,7 @@ export default function Home() {
         className={cn(
           // Stacked above the discovery button; both lift together when the
           // audio player bar is showing (the variable is 0 otherwise).
-          "fixed bottom-[calc(6rem+var(--meguri-player-bar-h))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "fixed bottom-[calc(6rem+var(--meguri-player-bar-inset))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           !canPlay && "pointer-events-none opacity-45",
         )}
       >
@@ -676,7 +676,7 @@ export default function Home() {
         className={cn(
           // Lifted clear of the audio player bar when one is showing (the
           // variable is 0 otherwise, keeping the original offset).
-          "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-h))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-inset))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           !status.data?.ready && "pointer-events-none opacity-45",
         )}
       >
