@@ -100,6 +100,7 @@ export default function MediaDetail() {
     play: playAudio,
     pause: pauseAudio,
     toggle: toggleAudio,
+    close: closeAudio,
     current: audioCurrent,
     isPlaying: audioPlaying,
   } = useAudioPlayer();
@@ -221,13 +222,18 @@ export default function MediaDetail() {
     queryFn: () => api.fileGet(fileId, wsId),
     enabled: Number.isFinite(fileId) && wsId !== "",
   });
-  // Exit fullscreen when prev/next lands on an image: the image view has no
-  // fullscreen toggle, so staying fullscreen would strand the user (Esc only).
-  // Keyed on the resolved kind ("image"), not on !video, so the transient
-  // undefined while the next file loads doesn't drop video→video fullscreen.
+  // Exit fullscreen when prev/next lands on anything but a video: only the
+  // video player has a fullscreen toggle, so staying fullscreen on an image or
+  // an audio track would strand the user (Esc only). Keyed on the resolved
+  // kind, not on !video alone, so the transient undefined while the next file
+  // loads doesn't drop video→video fullscreen.
   const kind = detail.data?.kind;
   useEffect(() => {
-    if (kind === "image" && document.fullscreenElement === modalRef.current) {
+    if (
+      kind != null &&
+      kind !== "video" &&
+      document.fullscreenElement === modalRef.current
+    ) {
       void document.exitFullscreen().catch(() => {});
     }
   }, [kind]);
@@ -359,6 +365,12 @@ export default function MediaDetail() {
   });
   const deleteFromIndex = useMutation({
     mutationFn: () => api.fileDeleteFromIndex(fileId, wsId),
+    onSuccess: () => {
+      // The bar outlives this modal, so a track that was playing would keep
+      // going (and 404 on the next seek) after its row is gone.
+      if (audioCurrent?.file.id === fileId && audioCurrent.workspaceId === wsId)
+        closeAudio();
+    },
   });
   const invalidateCollections = () => {
     void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
@@ -518,33 +530,56 @@ export default function MediaDetail() {
   // inline element, so the track survives closing the modal. Auto-start mirrors
   // the video player's `autoplay` handling: a thumbnail click starts playback,
   // a name click (`?autoplay=0`) opens the details silently.
-  // Guarded by file id, not just by `d`: react-query can hand back a fresh
-  // object for the same row, and re-running play() would restart the track the
-  // user is already listening to.
+  // Guarded per visit of a track, not just by `d`: react-query can hand back a
+  // fresh object for the same row, and re-running play() would restart the
+  // track the user is already listening to. The key carries the workspace
+  // because file ids only mean something within one (the All view puts several
+  // side by side), and it is cleared whenever a non-audio file is shown so
+  // "A → video → A" starts A again.
   const isAudio = d?.kind === "audio";
   const isCurrentAudio =
     isAudio &&
     audioCurrent?.file.id === fileId &&
     audioCurrent.workspaceId === wsId;
-  const autoStartedAudioFor = useRef<number | null>(null);
+  const autoStartedAudioFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!d || d.kind !== "audio" || !autoplay) return;
-    if (autoStartedAudioFor.current === d.id) return;
+    if (!d) return;
+    if (d.kind !== "audio") {
+      autoStartedAudioFor.current = null;
+      return;
+    }
+    if (!autoplay) return;
     // `file_get` does not inject workspaceId into its row, so d.workspaceId is
     // undefined here — use the id resolved from the URL. Also wait for the media
     // base: on a direct URL the detail query can resolve before app_status, and
     // playing then would build a src against an empty origin.
     if (!wsId || !mediaBase) return;
-    autoStartedAudioFor.current = d.id;
-    // Already loaded in the bar (e.g. reopened from the list while playing):
-    // leave it alone rather than restarting from zero.
-    if (audioCurrent?.file.id === d.id && audioCurrent.workspaceId === wsId)
+    const visitKey = `${wsId}:${d.id}`;
+    if (autoStartedAudioFor.current === visitKey) return;
+    autoStartedAudioFor.current = visitKey;
+    const loaded =
+      audioCurrent?.file.id === d.id && audioCurrent.workspaceId === wsId;
+    // Already playing in the bar (reopened from the list mid-track): leave it
+    // alone rather than restarting from zero. Loaded but paused: the thumbnail
+    // click was a request to hear it, so resume from where it stopped.
+    if (loaded) {
+      if (!audioPlaying) toggleAudio();
       return;
+    }
     playAudio({ ...d, workspaceId: wsId }, wsId);
-  }, [d, wsId, mediaBase, autoplay, audioCurrent, playAudio]);
+  }, [
+    d,
+    wsId,
+    mediaBase,
+    autoplay,
+    audioCurrent,
+    audioPlaying,
+    playAudio,
+    toggleAudio,
+  ]);
   // The other half of the exclusivity the video player enforces through
-  // onPlaybackStart: resuming the bar (its own play button stays reachable under
-  // the modal) must pause an inline video, or both would sound at once.
+  // onPlaybackStart: resuming from the bar (which renders above the modal)
+  // must pause an inline video, or both would sound at once.
   useEffect(() => {
     if (audioPlaying && d?.kind === "video") playerRef.current?.pause();
   }, [audioPlaying, d?.kind]);

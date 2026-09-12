@@ -32,6 +32,7 @@ import { TagChips } from "@/components/TagChips";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { hasTimeline } from "@/lib/mediaKind";
 import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
 import { fileNameOf } from "@/lib/relPath";
@@ -341,10 +342,7 @@ const MediaCard = memo(function MediaCard({
         className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
       >
         <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
-        {/* The real condition is "has a duration", which audio does. Guarded on
-            the value too: metadata lands a scan phase later, and an empty badge
-            in the meantime is worse than none. */}
-        {file.kind !== "image" && file.duration && (
+        {hasTimeline(file.kind) && file.duration && (
           <span className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg">
             {formatDuration(file.duration)}
           </span>
@@ -402,7 +400,7 @@ function metaLine(file: FileRow): string {
   const dims =
     file.width && file.height ? `${file.width}×${file.height}` : null;
   const dur =
-    file.kind !== "image" && file.duration
+    hasTimeline(file.kind) && file.duration
       ? formatDuration(file.duration)
       : null;
   return [dims, dur].filter(Boolean).join(" · ") || "—";

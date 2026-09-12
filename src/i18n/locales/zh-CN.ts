@@ -252,7 +252,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "无法播放此音轨。",
   "player.audio.dismissError": "关闭错误提示",
-  "player.audio.nowPlaying": "正在播放：{name}",
 
   // scenes
   "scene.seekTo": "跳转到 {time}",

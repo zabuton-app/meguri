@@ -240,6 +240,10 @@ function migrateKindCheck(db: DB): void {
   // both idempotent and recreate every index (including the btime ones).
   db.exec(CORE_DDL);
   backfillColumns(db);
+  // The copy plus the index rebuilds write roughly 1.5x the database size into
+  // the WAL, and nothing shrinks a WAL file on its own — without this it would
+  // sit next to the database at that high-water mark for good.
+  db.pragma("wal_checkpoint(TRUNCATE)");
 }
 
 /**

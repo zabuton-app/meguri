@@ -263,7 +263,6 @@ export const es: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "No se pudo reproducir esta pista.",
   "player.audio.dismissError": "Descartar el error",
-  "player.audio.nowPlaying": "Reproduciendo: {name}",
 
   // scenes
   "scene.seekTo": "Ir a {time}",

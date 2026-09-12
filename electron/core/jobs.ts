@@ -240,6 +240,10 @@ export async function runScan(
   // left 'pending' for the next scan. Failures are counted so a tool that is
   // broken outright (every file failing) still surfaces as a scan error.
   let failed = 0;
+  // Audio without cover art never attempts a thumbnail, so it counts towards
+  // neither success nor failure of the tooling — it is taken out of the
+  // denominator of the all-failed check below.
+  let skipped = 0;
   const processOne = async (f: (typeof pending)[number]): Promise<void> => {
     if (signal?.aborted) return;
     const kind = f.kind as Kind;
@@ -250,23 +254,25 @@ export async function runScan(
       const meta = await extractMeta(f.abs_path, kind, signal);
 
       // Audio always needs its metadata (duration), and gets a thumbnail only
-      // when the file embeds cover art. Decoding one embedded picture is cheap,
-      // so it runs at pool width without taking a decode slot.
+      // when the file embeds cover art.
       if (kind === "audio") {
         if (signal?.aborted) return;
         // A failed probe (timeout, transient IO error, unparseable output)
-        // yields `raw: null`. Marking such a row 'done' would freeze it out of
-        // filesNeedingThumb forever, so leave it pending for the next scan —
-        // the same retry semantics the video/image path already has. It also
-        // means we can't tell whether the file has cover art, so don't guess.
-        // It still counts as a failure so a broken ffprobe is caught by the
-        // all-failed check below.
+        // yields `raw: null`, so whether the file has cover art is unknown.
+        // Record it as 'error' — the same terminal state a video whose probe
+        // failed lands in — rather than leaving it 'pending': a pending row is
+        // re-probed on every scan (up to the 60 s ffprobe timeout each time)
+        // and never counts towards the progress total. A later change to the
+        // file resets it to 'pending' through syncFiles() like any other row.
         if (meta.raw == null) {
           failed++;
+          buffer.push({ id: f.id, kind, dest, ok: false, meta });
+          if (buffer.length >= THUMB_FLUSH_EVERY) flush();
           return;
         }
         const coverIndex = coverArtStreamIndex(meta.raw);
         if (coverIndex == null) {
+          skipped++;
           buffer.push({
             id: f.id,
             kind,
@@ -278,13 +284,20 @@ export async function runScan(
           if (buffer.length >= THUMB_FLUSH_EVERY) flush();
           return;
         }
-        const coverOk = await generateThumb(
-          f.abs_path,
-          kind,
-          dest,
+        // Embedded artwork has no size limit (multi-megapixel scans are
+        // common), so it takes a decode slot like any other expensive decode
+        // instead of adding a pool's worth of ffmpeg processes on top.
+        const coverOk = await withScanDecodeSlot(
+          () =>
+            generateThumb(
+              f.abs_path,
+              kind,
+              dest,
+              signal,
+              undefined,
+              coverIndex,
+            ),
           signal,
-          undefined,
-          coverIndex,
         );
         if (signal?.aborted) return;
         // Extraction failure here is a real error (the probe said a picture is
@@ -371,9 +384,10 @@ export async function runScan(
   // scans and reporting success with zero thumbnails — is worse. Raised only
   // after the backfill/prune passes above, so a file that fails on every scan
   // cannot starve them indefinitely.
-  if (failed > 0 && failed === pending.length && !signal?.aborted) {
+  const attempted = pending.length - skipped;
+  if (failed > 0 && failed === attempted && !signal?.aborted) {
     throw new Error(
-      `thumbnail extraction failed for all ${failed} pending file(s) (is ffmpeg/ffprobe working?)`,
+      `thumbnail extraction failed for all ${failed} attempted file(s) (is ffmpeg/ffprobe working?)`,
     );
   }
 

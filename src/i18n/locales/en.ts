@@ -259,7 +259,6 @@ export const en: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "This track could not be played.",
   "player.audio.dismissError": "Dismiss error",
-  "player.audio.nowPlaying": "Now playing: {name}",
 
   // scenes
   "scene.seekTo": "Seek to {time}",

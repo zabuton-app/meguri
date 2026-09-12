@@ -1,7 +1,9 @@
-import { useState, type ReactNode, type Ref } from "react";
+import { createElement, useState, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Film, ImageIcon, Music, Play } from "lucide-react";
+import { ExternalLink, ImageIcon, Play } from "lucide-react";
+import { kindIcon } from "@/lib/mediaKind";
+import { useAudioPlayer } from "@/audio/useAudioPlayer";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
@@ -57,6 +59,7 @@ export function DiscoverCard({
   t: TFunc;
 }) {
   const qc = useQueryClient();
+  const { pause: pauseAudio, current: audioCurrent } = useAudioPlayer();
   const wsId = file.workspaceId;
   // Same rule as MediaThumbnail: thumb_status alone can be 'done' with no file
   // produced (audio without embedded cover art), which would 404. randomFiles
@@ -127,14 +130,8 @@ export function DiscoverCard({
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted">
             {/* Audio reaches Discover under an explicit kind filter, so the
-                fallback must cover all three kinds, not just video/image. */}
-            {isVideo ? (
-              <Film className="size-16" />
-            ) : file.kind === "audio" ? (
-              <Music className="size-16" />
-            ) : (
-              <ImageIcon className="size-16" />
-            )}
+                fallback covers every kind, not just video/image. */}
+            {createElement(kindIcon(file.kind), { className: "size-16" })}
           </div>
         )}
       </Link>
@@ -243,12 +240,19 @@ export function DiscoverCard({
             // Main-side this counts as a play and consumes the Watch Later
             // entry, so mirror that once it confirms (it can refuse for a file
             // that has gone missing under the root).
-            onClick={() =>
+            onClick={() => {
+              // Same courtesy the detail view extends: the external player is
+              // about to play the very file the bar may be playing.
+              if (
+                audioCurrent?.file.id === file.id &&
+                audioCurrent.workspaceId === wsId
+              )
+                pauseAudio();
               void api
                 .openExternal(file.id, wsId)
                 .then(() => dropFromWatchLaterCache(qc, wsId, file.id))
-                .catch((e: unknown) => log.error("open external", e))
-            }
+                .catch((e: unknown) => log.error("open external", e));
+            }}
             title={t("media.openExternal")}
             aria-label={t("media.openExternal")}
           >

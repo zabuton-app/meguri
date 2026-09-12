@@ -24,13 +24,17 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/ipc/client", () => ({
   api: {
-    appStatus: () => mocks.appStatus(),
-    fileRecordPlay: (...args: unknown[]) => mocks.fileRecordPlay(...args),
+    appStatus: (): Promise<unknown> => mocks.appStatus() as Promise<unknown>,
+    fileRecordPlay: (...args: unknown[]): Promise<void> =>
+      mocks.fileRecordPlay(...args) as Promise<void>,
   },
   ALL_ID: "__all__",
 }));
 
 let el: HTMLAudioElement;
+function capture(instance: HTMLAudioElement): void {
+  el = instance;
+}
 
 beforeEach(() => {
   mocks.appStatus.mockReset().mockResolvedValue(defaultAppStatus);
@@ -45,7 +49,7 @@ beforeEach(() => {
     class extends OriginalAudio {
       constructor() {
         super();
-        el = this;
+        capture(this);
       }
     },
   );
@@ -195,9 +199,9 @@ describe("AudioPlayerBar", () => {
     setup();
     loadTrack();
     setDuration(240);
-    const seek = screen.getByRole("slider", {
+    const seek = screen.getByRole<HTMLInputElement>("slider", {
       name: /seek/i,
-    }) as HTMLInputElement;
+    });
     expect(seek.disabled).toBe(false);
     // A native range input carries valuemin/valuemax/valuenow implicitly.
     expect(seek.min).toBe("0");

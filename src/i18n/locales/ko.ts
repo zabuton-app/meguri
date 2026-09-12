@@ -256,7 +256,6 @@ export const ko: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "이 트랙을 재생할 수 없습니다.",
   "player.audio.dismissError": "오류 닫기",
-  "player.audio.nowPlaying": "재생 중: {name}",
 
   // scenes
   "scene.seekTo": "{time} 로 이동",

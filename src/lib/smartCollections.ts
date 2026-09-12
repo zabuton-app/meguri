@@ -103,7 +103,10 @@ export function describeDateRange(
 export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   const parts: string[] = [];
   if (query.q) parts.push(`"${query.q}"`);
-  if (query.kind) parts.push(t(kindLabelKey(query.kind)));
+  if (query.kind) {
+    const key = kindLabelKey(query.kind);
+    parts.push(key ? t(key) : query.kind);
+  }
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
   if (query.favorite) parts.push(t("favorite.chip"));
   if (query.duplicates) parts.push(t("duplicates.chip"));

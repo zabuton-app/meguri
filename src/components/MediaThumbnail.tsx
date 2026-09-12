@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { createElement, useState } from "react";
 import { Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import type { FileRow } from "@/ipc/types";
@@ -78,10 +78,9 @@ export function MediaThumbnail({
     // thumbnail generation failed or has not run yet, and for a recorded
     // thumbnail whose file has since gone missing (without the onError
     // fallback that last case would sit on the skeleton forever).
-    const Icon = kindIcon(file.kind);
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <Icon className={fallbackIconSize} />
+        {createElement(kindIcon(file.kind), { className: fallbackIconSize })}
       </div>
     );
   }

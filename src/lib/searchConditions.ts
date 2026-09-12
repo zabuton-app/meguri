@@ -7,6 +7,7 @@
 // them from drifting: a condition added here shows up in the chips, in the badge,
 // and in "clear all" at once, instead of in whichever of the three the next
 // change remembered to update.
+import { kindLabel } from "@/lib/mediaKind";
 import { resolveSortDir } from "@shared/sortDir";
 import {
   isTagDirective,
@@ -120,14 +121,7 @@ export function describeConditions(
       key: "kind",
       // `kind` is a plain string in the schema, so a saved search can carry a
       // value the UI has no label for. Show it verbatim rather than mislabel it.
-      label:
-        query.kind === "video"
-          ? t("kind.video")
-          : query.kind === "image"
-            ? t("kind.image")
-            : query.kind === "audio"
-              ? t("kind.audio")
-              : query.kind,
+      label: kindLabel(t, query.kind),
       group: "primary",
       chip: true,
       clear: (q) => without(q, "kind"),

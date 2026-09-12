@@ -45,11 +45,14 @@ export function MediaModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // The audio player bar (z-[60]) renders over the bottom of this overlay while
+  // a track is loaded, so the panel is padded by its published height (0px when
+  // nothing is playing) and never ends up underneath it.
   const outerBase = "fixed inset-0 z-50 flex bg-black/70 backdrop-blur-sm";
   const outerClass =
     size === "small"
-      ? `${outerBase} justify-center p-4 sm:p-6 md:p-10`
-      : `${outerBase} p-2 sm:p-4 md:p-6`;
+      ? `${outerBase} justify-center p-4 pb-[calc(1rem+var(--meguri-player-bar-h))] sm:p-6 sm:pb-[calc(1.5rem+var(--meguri-player-bar-h))] md:p-10 md:pb-[calc(2.5rem+var(--meguri-player-bar-h))]`
+      : `${outerBase} p-2 pb-[calc(0.5rem+var(--meguri-player-bar-h))] sm:p-4 sm:pb-[calc(1rem+var(--meguri-player-bar-h))] md:p-6 md:pb-[calc(1.5rem+var(--meguri-player-bar-h))]`;
   const innerBase = "relative flex min-h-0 w-full flex-col overflow-hidden";
   const innerClass = fullscreen
     ? `${innerBase} bg-bg`

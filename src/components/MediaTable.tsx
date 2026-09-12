@@ -45,7 +45,7 @@ import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
-import { kindLabelKey } from "@/lib/mediaKind";
+import { hasTimeline, kindLabel } from "@/lib/mediaKind";
 
 const ROW_HEIGHT = 114; // fixed row height (thumbnail 180×101.25 + padding)
 // Column layout shared by the header and every body row so cells stay aligned.
@@ -368,13 +368,13 @@ const MediaTableRow = memo(function MediaTableRow({
         </span>
       </div>
       <div role="cell" className="flex items-center px-2 text-muted">
-        {t(kindLabelKey(file.kind))}
+        {kindLabel(t, file.kind)}
       </div>
       <div role="cell" className="flex items-center px-2 text-muted">
         {file.width && file.height ? `${file.width}×${file.height}` : "—"}
       </div>
       <div role="cell" className="flex items-center px-2 text-muted">
-        {file.kind !== "image" && file.duration
+        {hasTimeline(file.kind) && file.duration
           ? formatDuration(file.duration)
           : "—"}
       </div>

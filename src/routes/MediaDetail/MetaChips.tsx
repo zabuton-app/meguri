@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
-import { kindLabelKey } from "@/lib/mediaKind";
+import { hasTimeline, kindLabel } from "@/lib/mediaKind";
 
 interface Props {
   detail: FileDetail;
@@ -30,7 +30,7 @@ export function MetaChips({
         value={workspaceLabel ?? wsId}
         title={workspacePath || workspaceLabel || wsId}
       />
-      <Chip label={t("media.metaKind")} value={t(kindLabelKey(detail.kind))} />
+      <Chip label={t("media.metaKind")} value={kindLabel(t, detail.kind)} />
       <Chip
         label={t("media.metaResolution")}
         value={
@@ -40,8 +40,7 @@ export function MetaChips({
         }
       />
       <Chip label={t("media.metaSize")} value={formatSize(detail.size, "—")} />
-      {/* Anything with a timeline: video and audio share duration and codec. */}
-      {detail.kind !== "image" && (
+      {hasTimeline(detail.kind) && (
         <>
           <Chip
             label={t("media.metaDuration")}

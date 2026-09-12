@@ -60,11 +60,19 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     return audioRef.current;
   }, []);
 
-  // Bumped by every play()/close(). play() returns a promise that can reject
-  // long after a newer track replaced the source (an interrupted load rejects
-  // with AbortError), so a late rejection must not attach its error to whatever
-  // is playing now.
+  // Bumped by every play()/pause()/close(). play() returns a promise that can
+  // reject long after a newer track replaced the source (an interrupted load
+  // rejects with AbortError), so a late rejection must not attach its error to
+  // whatever is playing now. pause() bumps it too: pausing while play() is
+  // still pending rejects that promise with AbortError, and an intentional stop
+  // is not a playback failure.
   const requestId = useRef(0);
+
+  /** Pause and disown any play() still in flight (see requestId). */
+  const pauseEl = useCallback((el: HTMLAudioElement) => {
+    requestId.current++;
+    el.pause();
+  }, []);
 
   /** Start the element and report failure only if the request is still current. */
   const startPlayback = useCallback((el: HTMLAudioElement) => {
@@ -189,13 +197,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         el.currentTime = 0;
       startPlayback(el);
     } else {
-      el.pause();
+      pauseEl(el);
     }
-  }, [current, duration, startPlayback]);
+  }, [current, duration, startPlayback, pauseEl]);
 
   const pause = useCallback(() => {
-    audioRef.current?.pause();
-  }, []);
+    const el = audioRef.current;
+    if (el) pauseEl(el);
+  }, [pauseEl]);
 
   const seek = useCallback(
     (sec: number) => {

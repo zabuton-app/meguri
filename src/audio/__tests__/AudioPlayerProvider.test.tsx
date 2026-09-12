@@ -20,14 +20,18 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/ipc/client", () => ({
   api: {
-    appStatus: () => mocks.appStatus(),
-    fileRecordPlay: (...args: unknown[]) => mocks.fileRecordPlay(...args),
+    appStatus: (): Promise<unknown> => mocks.appStatus() as Promise<unknown>,
+    fileRecordPlay: (...args: unknown[]): Promise<void> =>
+      mocks.fileRecordPlay(...args) as Promise<void>,
   },
   ALL_ID: "__all__",
 }));
 
 /** The single element the provider creates, captured so tests can drive it. */
 let el: HTMLAudioElement;
+function capture(instance: HTMLAudioElement): void {
+  el = instance;
+}
 let playSpy: ReturnType<typeof vi.fn>;
 let pauseSpy: ReturnType<typeof vi.fn>;
 
@@ -59,7 +63,7 @@ beforeEach(() => {
     class extends OriginalAudio {
       constructor() {
         super();
-        el = this;
+        capture(this);
       }
     },
   );
@@ -322,6 +326,27 @@ describe("AudioPlayerProvider", () => {
 
     expect(text("error")).toBe("none");
     expect(text("current")).toBe("b.mp3");
+  });
+
+  it("does not report an AbortError caused by an intentional pause", async () => {
+    setup();
+    // Pausing while play() is still pending rejects that promise with
+    // AbortError in real engines. That is the user stopping the track (or a
+    // video / the playlist claiming the sound), not a playback failure.
+    let rejectPlay!: (e: Error) => void;
+    playSpy.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectPlay = reject;
+      }),
+    );
+    click("play");
+    click("pause");
+    rejectPlay(new Error("AbortError"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(text("error")).toBe("none");
+    expect(text("current")).toBe("music/track.mp3");
   });
 
   it("unmutes when the volume slider is moved", () => {

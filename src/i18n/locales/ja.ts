@@ -258,7 +258,6 @@ export const ja = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "このトラックを再生できませんでした。",
   "player.audio.dismissError": "エラーを閉じる",
-  "player.audio.nowPlaying": "再生中: {name}",
 
   // シーン
   "scene.seekTo": "{time} へシーク",
