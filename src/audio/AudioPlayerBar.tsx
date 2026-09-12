@@ -1,8 +1,8 @@
 // Persistent bottom player bar for audio playback.
 //
-// Participates in layout below the routed content rather than floating over it, so it
-// never occludes the last row of the list, and occupies zero height when no track is
-// loaded. Only the seek bar and the time readout consume useAudioPosition(), so the
+// Participates in layout between the routed content and the status bar rather than
+// floating over it, so it never occludes the last row of the list, and occupies zero
+// height when no track is loaded. Only the seek bar and the time readout consume useAudioPosition(), so the
 // per-tick re-render stays confined to those two small components.
 import { useLayoutEffect, useState } from "react";
 import { Music, Pause, Play, Volume2, VolumeX, X } from "lucide-react";

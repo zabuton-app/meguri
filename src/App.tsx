@@ -12,6 +12,7 @@ import Settings from "@/routes/Settings";
 import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
+import { StatusBar } from "@/components/StatusBar";
 import { useContentZoom } from "@/hooks/useContentZoom";
 import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
@@ -50,7 +51,10 @@ export default function App() {
           <div className="min-h-0 flex-1">
             <RouterProvider router={router} />
           </div>
+          {/* Player bar sits on top of the status bar: the status bar is always
+              the lowest strip of the window, whatever else is showing. */}
           <AudioPlayerBar />
+          <StatusBar />
         </div>
       </AudioPlayerProvider>
     </div>

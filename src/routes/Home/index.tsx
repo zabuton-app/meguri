@@ -32,7 +32,6 @@ import { NAV_BINDINGS, isHelpKey, matchAny } from "@/settings/keybindings";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "@/components/FilterBar";
 import { ScanProgress } from "@/components/ScanProgress";
-import { StatusBar } from "@/components/StatusBar";
 import { CommandMenu } from "@/components/CommandMenu";
 import { useConfirm } from "@/components/ConfirmDialog";
 import {
@@ -44,6 +43,7 @@ import {
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
 import { HomeHeader } from "./HomeHeader";
@@ -66,7 +66,8 @@ export default function Home() {
   const location = useLocation();
   const navigate = useNavigate();
   const { keybindingPreset } = usePreferences();
-  const [scanning, setScanning] = useState(false);
+  // Shared with the StatusBar, which App mounts outside the router.
+  const scanning = useScanning();
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [filter, setFilter] = useState<SearchQuery>({});
@@ -644,8 +645,6 @@ export default function Home() {
           />
         )}
       </main>
-
-      <StatusBar workspaceId={status.data?.workspaceId} scanning={scanning} />
 
       {/* Play the list as a playlist. No params: the player reads the very list
           order shared through MediaNavContext below, so whatever sort/filter is
