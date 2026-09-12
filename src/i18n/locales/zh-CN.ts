@@ -249,6 +249,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "player.audio.region": "音频播放器",
   "player.audio.pause": "暂停",
   "player.audio.close": "关闭播放器",
+  "player.audio.openDetail": "打开详情",
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "无法播放此音轨。",
   "player.audio.dismissError": "关闭错误提示",

@@ -255,6 +255,7 @@ export const ja = {
   "player.audio.region": "オーディオプレイヤー",
   "player.audio.pause": "一時停止",
   "player.audio.close": "プレイヤーを閉じる",
+  "player.audio.openDetail": "詳細を開く",
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "このトラックを再生できませんでした。",
   "player.audio.dismissError": "エラーを閉じる",

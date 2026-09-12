@@ -260,6 +260,7 @@ export const fr: Record<TranslationKey, string> = {
   "player.audio.region": "Lecteur audio",
   "player.audio.pause": "Pause",
   "player.audio.close": "Fermer le lecteur",
+  "player.audio.openDetail": "Ouvrir les détails",
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "Impossible de lire cette piste.",
   "player.audio.dismissError": "Masquer l'erreur",

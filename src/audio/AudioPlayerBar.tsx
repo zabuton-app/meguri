@@ -8,6 +8,7 @@ import { useLayoutEffect, useState } from "react";
 import { Music, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { fileHref } from "@/lib/fileHref";
 import type { AudioTrack } from "./context";
 import { useAudioPlayer } from "./useAudioPlayer";
 import { AudioTransport, CTRL_CLASS } from "./AudioTransport";
@@ -113,14 +114,29 @@ export function AudioPlayerBar() {
         key={`${current.workspaceId}:${current.file.id}`}
         track={current}
       />
-      {/* Announced when the track changes; position updates are never announced. */}
-      <span
-        className="min-w-0 max-w-64 flex-1 truncate"
-        title={name}
+      {/* Announced when the track changes; position updates are never announced.
+          The name is the way back to the track's detail view (tags, rating).
+          The bar sits outside RouterProvider, so it navigates through the hash
+          the router listens to; `autoplay: false` so opening the details never
+          restarts or resumes what the bar is doing. */}
+      <button
+        type="button"
+        onClick={() => {
+          window.location.hash = fileHref(
+            current.file.id,
+            current.workspaceId,
+            {
+              autoplay: false,
+            },
+          );
+        }}
+        className="min-w-0 max-w-64 flex-1 truncate text-left transition hover:text-bright-fg hover:underline"
+        title={t("player.audio.openDetail")}
+        aria-label={`${t("player.audio.openDetail")}: ${name}`}
         aria-live="polite"
       >
         {name}
-      </span>
+      </button>
 
       <AudioTransport
         live

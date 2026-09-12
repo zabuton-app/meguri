@@ -118,7 +118,11 @@ export function AudioTransport({
           step={0.05}
           value={muted ? 0 : volume}
           onChange={(e) => onVolume(Number(e.target.value))}
-          className="ml-1 w-16 accent-primary"
+          className={
+            size === "stage"
+              ? "ml-1 w-36 accent-primary"
+              : "ml-1 w-28 accent-primary"
+          }
           title={t("player.volume")}
           aria-label={t("player.volume")}
         />

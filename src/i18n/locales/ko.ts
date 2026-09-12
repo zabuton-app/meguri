@@ -253,6 +253,7 @@ export const ko: Record<TranslationKey, string> = {
   "player.audio.region": "오디오 플레이어",
   "player.audio.pause": "일시정지",
   "player.audio.close": "플레이어 닫기",
+  "player.audio.openDetail": "상세 열기",
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "이 트랙을 재생할 수 없습니다.",
   "player.audio.dismissError": "오류 닫기",

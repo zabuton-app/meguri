@@ -260,6 +260,7 @@ export const es: Record<TranslationKey, string> = {
   "player.audio.region": "Reproductor de audio",
   "player.audio.pause": "Pausar",
   "player.audio.close": "Cerrar el reproductor",
+  "player.audio.openDetail": "Abrir los detalles",
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "No se pudo reproducir esta pista.",
   "player.audio.dismissError": "Descartar el error",

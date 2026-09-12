@@ -216,8 +216,8 @@ describe("AudioPlayerBar", () => {
     setDuration(240);
     const region = bar()!;
     const controls = region.querySelectorAll("button, input");
-    // play/pause, seek, mute, volume, close.
-    expect(controls.length).toBe(5);
+    // title (opens the detail view), play/pause, seek, mute, volume, close.
+    expect(controls.length).toBe(6);
     for (const c of controls) {
       // Real elements, natively focusable, never removed from the tab order.
       expect(["BUTTON", "INPUT"]).toContain(c.tagName);
@@ -294,6 +294,19 @@ describe("AudioPlayerBar", () => {
     // Not closed: the track is still loaded, so releasing brings it straight back.
     act(() => setBarSuppressed(false));
     expect(bar()).toBeTruthy();
+  });
+
+  it("opens the track's detail view from its name without touching playback", () => {
+    setup();
+    loadTrack();
+    window.location.hash = "";
+    fireEvent.click(screen.getByRole("button", { name: /open details/i }));
+    expect(window.location.hash).toBe(
+      `#/file/${sampleAudioRow.id}?ws=${WS_ID}&autoplay=0`,
+    );
+    // Navigating is all it does: the bar stays up with the same track loaded.
+    expect(bar()).toBeTruthy();
+    expect(screen.getByText("track.mp3")).toBeTruthy();
   });
 
   it("hides the bar again when closed", () => {
