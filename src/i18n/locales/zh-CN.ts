@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const zhCN: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "关闭",
   "common.cancel": "取消",
@@ -29,6 +32,15 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.light": "浅色",
   "settings.dark": "深色",
   "settings.theme": "主题",
+
+  // Appearance toggle (header)
+  "theme.switchToLight": "切换到浅色模式",
+  "theme.switchToDark": "切换到深色模式",
+
+  "settings.tabGeneral": "常规",
+  "settings.tabLibrary": "媒体库",
+  "settings.tabPlayback": "播放列表播放",
+  "settings.tabApp": "应用",
   "settings.language": "语言",
   "settings.languageDesc": "切换界面的显示语言。",
   "settings.scenes": "场景缩略图数量",
@@ -41,6 +53,17 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "低 (240px)",
   "settings.frameQualityStandard": "标准 (480px)",
   "settings.frameQualityHigh": "高 (960px)",
+  "settings.emojiStyle": "表情符号样式",
+  "settings.emojiStyleDesc": "切换表情符号图标及文本中表情符号的显示样式。",
+  "settings.emojiStyleNative": "系统默认",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "应用图标",
+  "settings.logoDesc": "应用于窗口、托盘和应用内图标。",
+  "logo.dark": "深色",
+  "logo.light": "浅色",
+  "logo.enso": "圆相",
   "settings.keybinding": "键位绑定",
   "settings.keybindingDesc":
     "列表焦点移动、文件翻页、滚动和聚焦搜索的按键分配。",
@@ -60,8 +83,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "update.checkFailed": "无法检查（可能处于离线状态）。",
   "update.upToDate": "已是最新版本（{version}）。",
   "settings.about": "关于",
-  "about.version": "版本 {version}",
-  "about.appLicense": "Meguri 基于 MIT License 发布。",
+  "about.version": "{name} 版本 {version}",
+  "about.appLicense": "{name} 基于 MIT License 发布。",
   "about.ossTitle": "开源许可证",
   "about.ossDesc": "本应用包含以下开源软件。",
   "about.ffmpegNotice":
@@ -111,18 +134,24 @@ export const zhCN: Record<TranslationKey, string> = {
   "command.shortcutHint": "使用 {shortcut} 打开",
 
   // filter
+  "filter.searchHint":
+    '搜索文件名和标签。用 tag:旅行 或 tag:4k 精确匹配标签，手动标签与自动标签通用。含空格的值请加引号：tag:"夏日 旅行"。',
   "filter.searchPlaceholder": "搜索文件名或标签",
+  "filter.tagSuggestions": "标签建议",
   "filter.all": "全部",
-  "filter.playAny": "播放状态",
   "filter.played": "已播放",
   "filter.unplayed": "未播放",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "按最低评分筛选",
   "filter.btime": "创建日期",
-  "filter.btimeFilter": "按创建日期筛选",
   "filter.dateFrom": "开始日期",
   "filter.dateTo": "结束日期",
-  "filter.dateClear": "清除",
+  "filter.more": "其他条件",
+  "filter.moreActive": "其他条件（已应用 {count} 项）",
+  "filter.kindFilter": "按类型筛选",
+  "filter.playState": "播放状态",
+  "filter.sortSection": "排序方式",
+  "filter.otherSection": "其他",
 
   // smart collections
   "smartCollection.title": "智能收藏",
@@ -134,10 +163,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "smartCollection.namePlaceholder": "收藏名称",
   "smartCollection.save": "保存",
   "smartCollection.allMedia": "所有媒体",
-  "smartCollection.defaultFavorites": "收藏",
-  "smartCollection.defaultRating": "★{rating}+",
-  "smartCollection.defaultUnplayed": "未播放",
-  "smartCollection.defaultName": "新收藏",
 
   // media detail
   "media.notFound": "未找到文件。",
@@ -165,6 +190,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "向上滚动",
   "shortcuts.moveFocus": "移动焦点（上下左右）",
   "shortcuts.openFocused": "打开选中项",
+  "shortcuts.watchLater": "切换稍后观看",
   "shortcuts.help": "本帮助",
   "shortcuts.playPause": "播放 / 暂停",
   "shortcuts.skip5": "后退 / 前进 5 秒",
@@ -237,17 +263,19 @@ export const zhCN: Record<TranslationKey, string> = {
   "scan.phaseHash": "正在校对文件",
   "scan.phaseIndex": "正在建立索引",
   "scan.phaseThumbnail": "正在生成缩略图",
+  "scan.phaseTags": "正在添加标签",
   "scan.cancel": "取消扫描",
 
   // tag editor
   "tag.none": "无标签",
   "tag.addPlaceholder": "输入标签后按 Enter",
   "tag.remove": "删除标签",
+  "tag.addFailed": "添加标签失败",
 
   // media grid
   "grid.empty": "没有可显示的媒体。",
   "grid.emptyHint": "执行“扫描”后，其下的视频和图片会显示在这里。",
-  "grid.searchByTag": "搜索“{name}”",
+  "grid.searchByTag": "按“{name}”筛选",
   "view.grid": "网格视图",
   "view.list": "列表视图",
   "view.table": "表格视图",
@@ -286,6 +314,59 @@ export const zhCN: Record<TranslationKey, string> = {
   "duplicates.filter": "仅显示重复文件",
   "duplicates.chip": "重复",
 
+  // 标签管理界面
+  "tags.title": "标签管理",
+  "tags.summary": "{tags} 个标签 / {assignments} 次标注",
+  "tags.empty": "还没有标签。",
+  "tags.emptyHint": "在详情页添加标签后，会显示在这里。",
+  "tags.searchPlaceholder": "筛选标签",
+  "tags.noMatch": "没有匹配的标签。",
+  "tags.truncated": "标签过多，仅显示前 {max} 个。",
+  "tags.fileCount": "{count} 个文件",
+  "tags.sortByName": "按名称",
+  "tags.sortByCount": "按数量",
+  "tags.groupManual": "手动标签",
+  "tags.readOnly": "只读",
+  "tags.readOnlyHint": "扫描时自动添加的标签，无法编辑或删除。",
+  "tags.filterByTag": "按此标签筛选",
+  "tags.source.manual": "手动",
+  "tags.source.autoMeta": "自动",
+  "tags.selected": "已选择 {count} 个",
+  "tags.clearSelection": "取消选择",
+  "tags.rename": "重命名",
+  "tags.renameTitle": "重命名标签",
+  "tags.renamePlaceholder": "新标签名",
+  "tags.renameAction": "重命名",
+  "tags.renamed": "已将“{from}”重命名为“{to}”",
+  "tags.renameFailed": "重命名标签失败",
+  "tags.renameConflict": "“{name}”已存在。是否合并这两个标签？",
+  "tags.merge": "合并",
+  "tags.mergeTitle": "合并标签",
+  "tags.mergeDescription":
+    "将所选的 {count} 个标签合并到目标标签，其余标签将被删除。",
+  "tags.mergeTarget": "合并到",
+  "tags.mergeAction": "合并",
+  "tags.merged": "已合并 {count} 个标签",
+  "tags.mergeFailed": "合并标签失败",
+  "tags.delete": "删除",
+  "tags.deleteAction": "删除",
+  "tags.deleteConfirm": "将从 {count} 个文件中移除标签“{name}”。是否继续？",
+  "tags.deleteConfirmMany": "将删除所选的 {count} 个标签。是否继续？",
+  "tags.deleted": "已删除标签",
+  "tags.deleteFailed": "删除标签失败",
+  "tags.addFailedReserved": "“{prefix}:”是自动标签的保留前缀，请换一个名称。",
+  "tags.nameTooLong": "标签名称最多 {max} 个字符。",
+  "tags.ns.res": "分辨率",
+  "tags.ns.dur": "时长",
+  "tags.ns.codec": "编解码器",
+  "tags.ns.orient": "方向",
+  "tags.value.durShort": "短",
+  "tags.value.durMedium": "中",
+  "tags.value.durLong": "长",
+  "tags.value.orientVertical": "竖向",
+  "tags.value.orientHorizontal": "横向",
+  "tags.value.orientSquare": "方形",
+
   // workspace rail
   "workspace.all": "全部",
   "workspace.settings": "设置",
@@ -322,6 +403,17 @@ export const zhCN: Record<TranslationKey, string> = {
   "collection.removedFromToast": "已从“{name}”移除",
   "collection.actionFailed": "无法更新收藏",
 
+  // 稍后观看（内置收藏）
+  "watchLater.name": "稍后观看",
+  "watchLater.add": "添加到稍后观看",
+  "watchLater.remove": "从稍后观看中移除",
+  "watchLater.addedToast": "已添加到稍后观看",
+  "watchLater.removedToast": "已从稍后观看中移除",
+  "watchLater.actionFailed": "无法更新稍后观看",
+  "watchLater.empty": "稍后观看是空的。",
+  "watchLater.emptyHint":
+    "点击媒体上的时钟图标，即可收集到这里。播放后会自动从列表中移除。",
+
   // 表情符号图标
   "emoji.choose": "选择表情符号",
   "emoji.remove": "移除表情符号",
@@ -345,4 +437,38 @@ export const zhCN: Record<TranslationKey, string> = {
   "statusbar.status": "状态",
   "statusbar.scanning": "扫描中",
   "statusbar.idle": "空闲",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "手动排序",
+  "playlist.start": "作为播放列表播放",
+  "playlist.play": "播放 (Space)",
+  "playlist.pause": "暂停 (Space)",
+  "playlist.next": "下一个 (N)",
+  "playlist.prev": "上一个 (P)",
+  "playlist.shuffle": "随机播放 (S)",
+  "playlist.repeat": "循环播放",
+  "playlist.openDetail": "打开详情 (I)",
+  "playlist.fullscreen": "全屏 (F)",
+  "playlist.exitFullscreen": "退出全屏 (F)",
+  "playlist.exit": "退出播放 (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.loading": "加载中…",
+  "playlist.empty": "这里没有可播放的媒体。",
+  "playlist.emptyHint": "请打开包含视频或图片的列表后再开始播放。",
+  "playlist.unplayable": "这些项目都无法播放。",
+  "playlist.reorderNeedsManual": "切换到手动排序即可重新排列。",
+  "settings.playlistImageSeconds": "图片显示时长",
+  "settings.playlistImageSecondsHint":
+    "每张图片在自动切换到下一项之前的显示时长。",
+  "settings.playlistImageMotion": "为图片添加动效",
+  "settings.playlistImageMotionHint":
+    "让显示中的图片缓慢缩放和平移。当系统开启“减弱动态效果”时始终关闭。",
+  "settings.playlistFade": "淡入淡出",
+  "settings.playlistFadeHint": "切换项目时先变暗，再显示下一项。",
+  "settings.playlistTransition": "转场",
+  "settings.playlistTransitionHint":
+    "切换项目时横向滑动。可与淡入淡出同时使用。",
+  "settings.playlistShuffle": "随机",
+  "settings.playlistShuffleHint": "以随机顺序播放。一轮之内不会重复同一项目。",
+  "settings.secondsValue": "{n} 秒",
 };

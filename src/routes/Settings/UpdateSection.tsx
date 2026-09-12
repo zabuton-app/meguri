@@ -45,8 +45,10 @@ export function UpdateSection() {
 
   const info = check.status === "result" ? check.info : null;
 
+  // Selectable as a whole, like AboutSection: the version numbers this reports
+  // are the same thing users paste into bug reports.
   return (
-    <section className="flex flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
+    <section className="flex select-text flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col">
           <span className="text-sm font-semibold text-bright-fg">

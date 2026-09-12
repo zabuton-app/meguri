@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const ko: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "닫기",
   "common.cancel": "취소",
@@ -29,6 +32,15 @@ export const ko: Record<TranslationKey, string> = {
   "settings.light": "라이트",
   "settings.dark": "다크",
   "settings.theme": "테마",
+
+  // Appearance toggle (header)
+  "theme.switchToLight": "라이트 모드로 전환",
+  "theme.switchToDark": "다크 모드로 전환",
+
+  "settings.tabGeneral": "일반",
+  "settings.tabLibrary": "라이브러리",
+  "settings.tabPlayback": "재생 목록 재생",
+  "settings.tabApp": "앱",
   "settings.language": "언어",
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",
@@ -42,6 +54,18 @@ export const ko: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "낮음 (240px)",
   "settings.frameQualityStandard": "표준 (480px)",
   "settings.frameQualityHigh": "높음 (960px)",
+  "settings.emojiStyle": "이모지 스타일",
+  "settings.emojiStyleDesc":
+    "이모지 아이콘과 텍스트 속 이모지의 모양을 전환합니다.",
+  "settings.emojiStyleNative": "시스템 기본",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "앱 로고",
+  "settings.logoDesc": "창, 트레이, 앱 내 아이콘에 적용됩니다.",
+  "logo.dark": "진한 색",
+  "logo.light": "밝은 색",
+  "logo.enso": "원상",
   "settings.keybinding": "키 바인딩",
   "settings.keybindingDesc":
     "목록 포커스 이동·파일 이동·스크롤·검색 포커스의 키 할당입니다.",
@@ -61,8 +85,8 @@ export const ko: Record<TranslationKey, string> = {
   "update.checkFailed": "확인할 수 없습니다(오프라인일 수 있습니다).",
   "update.upToDate": "최신 버전입니다 ({version}).",
   "settings.about": "정보",
-  "about.version": "버전 {version}",
-  "about.appLicense": "Meguri는 MIT License로 공개되어 있습니다.",
+  "about.version": "{name} 버전 {version}",
+  "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
   "about.ossTitle": "오픈소스 라이선스",
   "about.ossDesc": "이 앱은 다음 오픈소스 소프트웨어를 포함합니다.",
   "about.ffmpegNotice":
@@ -112,18 +136,24 @@ export const ko: Record<TranslationKey, string> = {
   "command.shortcutHint": "{shortcut} 로 열기",
 
   // filter
+  "filter.searchHint":
+    '파일 이름과 태그를 검색합니다. tag:여행 이나 tag:4k 로 직접 붙인 태그와 자동 태그를 모두 정확히 일치시켜 필터링합니다. 공백이 있는 값은 tag:"여름 여행" 처럼 따옴표로 묶습니다.',
   "filter.searchPlaceholder": "파일 이름·태그 검색",
+  "filter.tagSuggestions": "태그 제안",
   "filter.all": "전체",
-  "filter.playAny": "시청 상태",
   "filter.played": "시청함",
   "filter.unplayed": "미시청",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "최소 평점으로 필터링",
   "filter.btime": "생성일",
-  "filter.btimeFilter": "생성일로 필터링",
   "filter.dateFrom": "시작일",
   "filter.dateTo": "종료일",
-  "filter.dateClear": "지우기",
+  "filter.more": "기타 조건",
+  "filter.moreActive": "기타 조건 ({count}개 적용 중)",
+  "filter.kindFilter": "종류로 필터링",
+  "filter.playState": "시청 상태",
+  "filter.sortSection": "정렬 순서",
+  "filter.otherSection": "기타",
 
   // smart collections
   "smartCollection.title": "스마트 컬렉션",
@@ -135,10 +165,6 @@ export const ko: Record<TranslationKey, string> = {
   "smartCollection.namePlaceholder": "컬렉션 이름",
   "smartCollection.save": "저장",
   "smartCollection.allMedia": "전체 미디어",
-  "smartCollection.defaultFavorites": "즐겨찾기",
-  "smartCollection.defaultRating": "★{rating}+",
-  "smartCollection.defaultUnplayed": "미시청",
-  "smartCollection.defaultName": "새 컬렉션",
 
   // media detail
   "media.notFound": "파일을 찾을 수 없습니다.",
@@ -166,6 +192,7 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "위로 스크롤",
   "shortcuts.moveFocus": "포커스 이동(상하좌우)",
   "shortcuts.openFocused": "선택한 항목 열기",
+  "shortcuts.watchLater": "나중에 보기 전환",
   "shortcuts.help": "이 도움말",
   "shortcuts.playPause": "재생 / 일시정지",
   "shortcuts.skip5": "5초 뒤로 / 앞으로",
@@ -240,18 +267,20 @@ export const ko: Record<TranslationKey, string> = {
   "scan.phaseHash": "파일 대조",
   "scan.phaseIndex": "인덱스 생성",
   "scan.phaseThumbnail": "썸네일 생성",
+  "scan.phaseTags": "태그 부여",
   "scan.cancel": "스캔 취소",
 
   // tag editor
   "tag.none": "태그 없음",
   "tag.addPlaceholder": "태그를 입력하고 Enter",
   "tag.remove": "태그 삭제",
+  "tag.addFailed": "태그를 추가하지 못했습니다",
 
   // media grid
   "grid.empty": "표시할 미디어가 없습니다.",
   "grid.emptyHint":
     "「스캔」을 실행하면 하위의 동영상·이미지가 여기에 표시됩니다.",
-  "grid.searchByTag": "「{name}」(으)로 검색",
+  "grid.searchByTag": "「{name}」(으)로 필터링",
   "view.grid": "그리드 보기",
   "view.list": "리스트 보기",
   "view.table": "테이블 보기",
@@ -293,6 +322,63 @@ export const ko: Record<TranslationKey, string> = {
   "duplicates.filter": "중복 파일만 표시",
   "duplicates.chip": "중복",
 
+  // 태그 관리 화면
+  "tags.title": "태그 관리",
+  "tags.summary": "{tags}개 태그 / 부여 {assignments}건",
+  "tags.empty": "아직 태그가 없습니다.",
+  "tags.emptyHint": "상세 화면에서 태그를 추가하면 여기에 표시됩니다.",
+  "tags.searchPlaceholder": "태그 검색",
+  "tags.noMatch": "일치하는 태그가 없습니다.",
+  "tags.truncated": "태그가 많아 상위 {max}개만 표시합니다.",
+  "tags.fileCount": "{count}개 파일",
+  "tags.sortByName": "이름순",
+  "tags.sortByCount": "개수순",
+  "tags.groupManual": "수동 태그",
+  "tags.readOnly": "읽기 전용",
+  "tags.readOnlyHint":
+    "스캔 시 자동으로 부여되는 태그입니다. 편집·삭제할 수 없습니다.",
+  "tags.filterByTag": "이 태그로 필터링",
+  "tags.source.manual": "수동",
+  "tags.source.autoMeta": "자동",
+  "tags.selected": "{count}개 선택됨",
+  "tags.clearSelection": "선택 해제",
+  "tags.rename": "이름 변경",
+  "tags.renameTitle": "태그 이름 변경",
+  "tags.renamePlaceholder": "새 태그 이름",
+  "tags.renameAction": "변경",
+  "tags.renamed": "「{from}」을(를) 「{to}」(으)로 변경했습니다",
+  "tags.renameFailed": "태그 이름을 변경하지 못했습니다",
+  "tags.renameConflict":
+    "「{name}」은(는) 이미 있습니다. 두 태그를 통합할까요?",
+  "tags.merge": "통합",
+  "tags.mergeTitle": "태그 통합",
+  "tags.mergeDescription":
+    "선택한 {count}개 태그를 대상 태그로 합칩니다. 나머지 태그는 삭제됩니다.",
+  "tags.mergeTarget": "통합 대상",
+  "tags.mergeAction": "통합",
+  "tags.merged": "{count}개 태그를 통합했습니다",
+  "tags.mergeFailed": "태그를 통합하지 못했습니다",
+  "tags.delete": "삭제",
+  "tags.deleteAction": "삭제",
+  "tags.deleteConfirm":
+    "태그 「{name}」을(를) {count}개 파일에서 삭제합니다. 계속할까요?",
+  "tags.deleteConfirmMany": "선택한 {count}개 태그를 삭제합니다. 계속할까요?",
+  "tags.deleted": "태그를 삭제했습니다",
+  "tags.deleteFailed": "태그를 삭제하지 못했습니다",
+  "tags.addFailedReserved":
+    "「{prefix}:」은(는) 자동 태그 전용 예약어입니다. 다른 이름을 사용하세요.",
+  "tags.nameTooLong": "태그 이름은 최대 {max}자까지 입력할 수 있습니다.",
+  "tags.ns.res": "해상도",
+  "tags.ns.dur": "길이",
+  "tags.ns.codec": "코덱",
+  "tags.ns.orient": "방향",
+  "tags.value.durShort": "짧음",
+  "tags.value.durMedium": "보통",
+  "tags.value.durLong": "긺",
+  "tags.value.orientVertical": "세로",
+  "tags.value.orientHorizontal": "가로",
+  "tags.value.orientSquare": "정사각형",
+
   // workspace rail
   "workspace.all": "전체",
   "workspace.settings": "설정",
@@ -330,6 +416,17 @@ export const ko: Record<TranslationKey, string> = {
   "collection.removedFromToast": "「{name}」에서 삭제했습니다",
   "collection.actionFailed": "컬렉션을 업데이트하지 못했습니다",
 
+  // 나중에 볼 동영상 (기본 제공 컬렉션)
+  "watchLater.name": "나중에 보기",
+  "watchLater.add": "나중에 보기에 추가",
+  "watchLater.remove": "나중에 보기에서 삭제",
+  "watchLater.addedToast": "나중에 보기에 추가했습니다",
+  "watchLater.removedToast": "나중에 보기에서 삭제했습니다",
+  "watchLater.actionFailed": "나중에 보기를 업데이트하지 못했습니다",
+  "watchLater.empty": "나중에 보기가 비어 있습니다.",
+  "watchLater.emptyHint":
+    "미디어의 시계 아이콘을 누르면 여기에 모입니다. 재생한 항목은 목록에서 자동으로 빠집니다.",
+
   // 이모지 아이콘
   "emoji.choose": "이모지 선택",
   "emoji.remove": "이모지 삭제",
@@ -353,4 +450,41 @@ export const ko: Record<TranslationKey, string> = {
   "statusbar.status": "상태",
   "statusbar.scanning": "스캔 중",
   "statusbar.idle": "대기 중",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "수동 순서",
+  "playlist.start": "재생 목록으로 재생",
+  "playlist.play": "재생 (Space)",
+  "playlist.pause": "일시정지 (Space)",
+  "playlist.next": "다음 (N)",
+  "playlist.prev": "이전 (P)",
+  "playlist.shuffle": "셔플 (S)",
+  "playlist.repeat": "반복",
+  "playlist.openDetail": "상세 정보 열기 (I)",
+  "playlist.fullscreen": "전체 화면 (F)",
+  "playlist.exitFullscreen": "전체 화면 해제 (F)",
+  "playlist.exit": "재생 종료 (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.loading": "불러오는 중…",
+  "playlist.empty": "재생할 수 있는 미디어가 없습니다.",
+  "playlist.emptyHint":
+    "동영상이나 이미지가 있는 목록을 연 뒤 재생을 시작하세요.",
+  "playlist.unplayable": "재생할 수 있는 항목이 없었습니다.",
+  "playlist.reorderNeedsManual": "순서를 바꾸려면 수동 순서로 전환하세요.",
+  "settings.playlistImageSeconds": "이미지 표시 시간",
+  "settings.playlistImageSecondsHint":
+    "다음 항목으로 넘어가기 전까지 이미지를 표시하는 시간입니다.",
+  "settings.playlistImageMotion": "이미지에 움직임 주기",
+  "settings.playlistImageMotionHint":
+    "표시 중인 이미지를 천천히 확대·이동합니다. OS에서 동작 줄이기가 켜져 있으면 항상 정지합니다.",
+  "settings.playlistFade": "페이드",
+  "settings.playlistFadeHint":
+    "항목이 바뀔 때 화면을 한 번 어둡게 한 뒤 다음 항목을 표시합니다.",
+  "settings.playlistTransition": "트랜지션",
+  "settings.playlistTransitionHint":
+    "항목이 바뀔 때 옆으로 밀어 넘깁니다. 페이드와 함께 사용할 수 있습니다.",
+  "settings.playlistShuffle": "랜덤",
+  "settings.playlistShuffleHint":
+    "재생 순서를 무작위로 섞습니다. 한 바퀴 도는 동안 같은 항목은 반복되지 않습니다.",
+  "settings.secondsValue": "{n}초",
 };

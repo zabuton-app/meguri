@@ -1,16 +1,10 @@
+import {
+  joinSearchTokens,
+  splitSearchTokens,
+  tagSearchKey,
+} from "@shared/tags";
 import type { SearchQuery } from "@/ipc/types";
-import type { TFunc } from "@/i18n/I18nProvider";
-import type { TranslationKey } from "@/i18n/locales/ja";
 
-export const SORT_KEYS: Record<string, TranslationKey> = {
-  added: "sort.added",
-  name: "sort.name",
-  rating: "sort.rating",
-  captured: "sort.captured",
-  btime: "filter.btime",
-  accessed: "sort.accessed",
-  hash: "sort.hash",
-};
 export const DISCOVER_FILTER_PARAM = "filter";
 export const VIEW_KEY = "meguri.view";
 
@@ -40,9 +34,41 @@ export function discoverPath(filter: SearchQuery): string {
   return `/discover?${DISCOVER_FILTER_PARAM}=${encodeURIComponent(JSON.stringify(clean))}`;
 }
 
-export function sortLabel(t: TFunc, s: string): string {
-  const key = SORT_KEYS[s];
-  return t("filter.sortLabel", { label: key ? t(key) : s });
+/**
+ * AND-append search-box tokens (`tag:beach`, `tag:4k`) to the query, skipping
+ * ones already present. Writing into `q` rather than `SearchQuery.tags[]` is what
+ * puts the condition in the text field where the user can see and edit it; the
+ * tokens still resolve to an exact tag match, so no file-name false positives
+ * come back.
+ *
+ * Returns the same object reference when nothing changes, so the files_search
+ * query key stays identical and the cached page (and scroll position) survives a
+ * click on a tag that is already active.
+ */
+export function addSearchTokens(
+  filter: SearchQuery,
+  tokens: string[],
+): SearchQuery {
+  const current = splitSearchTokens(filter.q ?? "");
+  // Incoming tokens arrive quoted where the value needs it (`tag:"beach house"`),
+  // while `current` holds them unquoted — normalize both sides before comparing,
+  // or a second click on a multi-word tag would append a duplicate.
+  const incoming = tokens.flatMap((token) => splitSearchTokens(token));
+  // A directive is compared on tagSearchKey rather than on the token, so a tag
+  // clicked while `tag:4K` is already in the box is recognised as the condition
+  // it resolves to — the same key the search box applies to a typed one. Free
+  // text has no such resolution and stays an exact comparison.
+  const keys = new Set(current.map(tagSearchKey));
+  const added = incoming.filter((token) => {
+    if (!token) return false;
+    const key = tagSearchKey(token);
+    if (key === null) return !current.includes(token);
+    if (keys.has(key)) return false;
+    keys.add(key);
+    return true;
+  });
+  if (added.length === 0) return filter;
+  return { ...filter, q: joinSearchTokens([...current, ...added]) };
 }
 
 /** Scroll the list's scroll viewport by ~one screen (dir: 1 = down, -1 = up). */

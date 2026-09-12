@@ -1,12 +1,30 @@
 // Media listing as a vertical list (alternative to MediaGrid). Each row shows a
 // small thumbnail plus title, metadata (resolution/duration/size) and tags.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ImageIcon } from "lucide-react";
+import { MediaEmptyState } from "@/components/MediaEmptyState";
+import {
+  MediaReorderProvider,
+  SortableMedia,
+  type MediaReorder,
+} from "@/components/MediaReorder";
+import { mediaSortId } from "@/lib/mediaSortId";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import {
+  useWatchLater,
+  type WatchLaterMembership,
+} from "@/hooks/useWatchLater";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
@@ -17,8 +35,8 @@ import { formatDuration, formatSize } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
 import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
-import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
+import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
 const ROW_ESTIMATE = 124; // initial row-height estimate (corrected by measurement)
@@ -50,6 +68,10 @@ interface Props {
   isFetchingPreviousPage?: boolean;
   /** Whether keyboard focus navigation is active (list is foreground). */
   navActive?: boolean;
+  /** Whether the active view is the built-in Watch Later collection (changes empty-state copy). */
+  watchLater?: boolean;
+  /** Set only while a collection is shown in its manual order; enables drag-to-reorder. */
+  reorder?: MediaReorder;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -69,9 +91,11 @@ export const MediaList = memo(function MediaList({
   fetchPreviousPage,
   isFetchingPreviousPage,
   navActive = false,
+  watchLater = false,
+  reorder,
 }: Props) {
-  const { t } = useI18n();
   const { activate } = useActivateFile();
+  const watchLaterMembership = useWatchLater();
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const setScrollRef = useCallback((node: HTMLDivElement | null) => {
@@ -127,6 +151,10 @@ export const MediaList = memo(function MediaList({
     onOpen,
     scrollToRow,
   });
+  // Points at the focused row's toggle so "W" activates it through the button
+  // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
+  const focusedWatchLaterRef = useRef<HTMLButtonElement>(null);
+  useWatchLaterHotkey({ active: navActive, buttonRef: focusedWatchLaterRef });
 
   // Reset the scroll position to the top on workspace switch.
   useEffect(() => {
@@ -170,50 +198,55 @@ export const MediaList = memo(function MediaList({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
-        <ImageIcon className="size-10 opacity-50" />
-        <p>{t("grid.empty")}</p>
-        <p className="text-xs">{t("grid.emptyHint")}</p>
-      </div>
-    );
+    return <MediaEmptyState watchLater={watchLater} />;
   }
 
   return (
-    <ScrollArea
-      className="page-scroll h-full"
-      viewportClassName="pt-4"
-      viewportRef={setScrollRef}
-    >
-      <div
-        style={{
-          height: virtualizer.getTotalSize(),
-          position: "relative",
-          width: "100%",
-        }}
+    <MediaReorderProvider items={items} reorder={reorder}>
+      <ScrollArea
+        className="page-scroll h-full"
+        viewportClassName="pt-4"
+        viewportRef={setScrollRef}
       >
-        {virtualRows.map((vr) => (
-          <div
-            key={vr.key}
-            ref={measureRow}
-            className="absolute left-0 top-0 w-full px-4 pb-2"
-            style={{ transform: `translateY(${vr.start}px)` }}
-          >
-            <MediaRow
-              file={items[vr.index]}
-              version={
-                thumbVersion[
-                  `${items[vr.index].workspaceId}:${items[vr.index].id}`
-                ] ?? 0
-              }
-              mediaBase={mediaBase}
-              onTagClick={onTagClick}
-              focused={vr.index === focusedIndex}
-            />
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+        <div
+          style={{
+            height: virtualizer.getTotalSize(),
+            position: "relative",
+            width: "100%",
+          }}
+        >
+          {virtualRows.map((vr) => (
+            <div
+              key={vr.key}
+              ref={measureRow}
+              className="absolute left-0 top-0 w-full px-4 pb-2"
+              style={{ transform: `translateY(${vr.start}px)` }}
+            >
+              {(() => {
+                const file = items[vr.index];
+                const focused = vr.index === focusedIndex;
+                const row = (
+                  <MediaRow
+                    file={file}
+                    version={thumbVersion[mediaSortId(file)] ?? 0}
+                    mediaBase={mediaBase}
+                    onTagClick={onTagClick}
+                    focused={focused}
+                    watchLater={watchLaterMembership}
+                    watchLaterRef={focused ? focusedWatchLaterRef : undefined}
+                  />
+                );
+                return reorder ? (
+                  <SortableMedia id={mediaSortId(file)}>{row}</SortableMedia>
+                ) : (
+                  row
+                );
+              })()}
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </MediaReorderProvider>
   );
 });
 
@@ -224,12 +257,17 @@ const MediaRow = memo(function MediaRow({
   mediaBase,
   onTagClick,
   focused,
+  watchLater,
+  watchLaterRef,
 }: {
   file: FileRow;
   version: number;
   mediaBase: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  watchLater: WatchLaterMembership;
+  /** Set only on the focused row, so the "W" shortcut can drive this toggle. */
+  watchLaterRef?: Ref<HTMLButtonElement>;
 }) {
   // The row is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
@@ -283,6 +321,14 @@ const MediaRow = memo(function MediaRow({
             fileId={file.id}
             workspaceId={file.workspaceId}
             favorite={file.favorite}
+            size={16}
+            className="shrink-0"
+          />
+          <WatchLaterButton
+            ref={watchLaterRef}
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            watchLater={watchLater}
             size={16}
             className="shrink-0"
           />

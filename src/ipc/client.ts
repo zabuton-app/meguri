@@ -10,8 +10,10 @@ import type {
   ChannelOutput,
 } from "@shared/ipc/channels";
 import type {
+  LogoId,
   ScanDone,
   ScanProgress,
+  TagRef,
   ThumbDone,
   UpdateInfo,
 } from "@shared/ipc/schema";
@@ -58,6 +60,11 @@ export const api = {
     invoke("collection_create", { name, emoji }),
   collectionRemove: (id: string) => invoke("collection_remove", { id }),
   collectionReorder: (ids: string[]) => invoke("collection_reorder", { ids }),
+  /** Order of the files inside one collection — the "manual" sort. */
+  collectionReorderItems: (
+    collectionId: string,
+    items: { workspaceId: string; fileId: number }[],
+  ) => invoke("collection_reorder_items", { collectionId, items }),
   collectionSetEmoji: (id: string, emoji: string | null) =>
     invoke("collection_set_emoji", { id, emoji }),
   collectionRename: (id: string, name: string) =>
@@ -90,6 +97,12 @@ export const api = {
     invoke("file_remove_tag", { id, workspaceId, tagId }),
   tagsList: (workspaceId: string, prefix: string, limit?: number) =>
     invoke("tags_list", { workspaceId, prefix, limit }),
+  /** Whole tag catalog for the tag management screen (scope follows the active view). */
+  tagsListAll: () => invoke("tags_list_all"),
+  tagRename: (from: TagRef, to: string) => invoke("tag_rename", { from, to }),
+  tagMerge: (from: TagRef[], into: TagRef) =>
+    invoke("tag_merge", { from, into }),
+  tagDelete: (tags: TagRef[]) => invoke("tag_delete", { tags }),
   fileRecordPlay: (
     id: number,
     workspaceId: string,
@@ -128,6 +141,9 @@ export const api = {
   updateSetAutoCheck: (enabled: boolean) =>
     invoke("update_set_auto_check", { enabled }),
   updateIgnore: (version: string) => invoke("update_ignore", { version }),
+  /** App logo variant (window + tray icon), persisted in main's config.json. */
+  logoGet: () => invoke("logo_get"),
+  logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
 };
 
 export {
@@ -138,7 +154,14 @@ export {
 
 // --- Events ---
 // Re-exported for compatibility with components that imported these from this module.
-export type { AboutInfo, ScanDone, ScanProgress, ThumbDone, UpdateInfo };
+export type {
+  AboutInfo,
+  LogoId,
+  ScanDone,
+  ScanProgress,
+  ThumbDone,
+  UpdateInfo,
+};
 
 // Returns a Promise so existing components can receive the unlisten function via `.then(unlisten => ...)`.
 type Unlisten = () => void;

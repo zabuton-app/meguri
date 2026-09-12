@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const fr: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "Fermer",
   "common.cancel": "Annuler",
@@ -30,6 +33,15 @@ export const fr: Record<TranslationKey, string> = {
   "settings.light": "Clair",
   "settings.dark": "Sombre",
   "settings.theme": "Thème",
+
+  // Appearance toggle (header)
+  "theme.switchToLight": "Passer au mode clair",
+  "theme.switchToDark": "Passer au mode sombre",
+
+  "settings.tabGeneral": "Général",
+  "settings.tabLibrary": "Bibliothèque",
+  "settings.tabPlayback": "Lecture de liste",
+  "settings.tabApp": "Application",
   "settings.language": "Langue",
   "settings.languageDesc": "Changer la langue d'affichage de l'interface.",
   "settings.scenes": "Miniatures de scène",
@@ -44,6 +56,19 @@ export const fr: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "Basse (240px)",
   "settings.frameQualityStandard": "Standard (480px)",
   "settings.frameQualityHigh": "Haute (960px)",
+  "settings.emojiStyle": "Style des émojis",
+  "settings.emojiStyleDesc":
+    "Change l'apparence des icônes emoji et des émojis dans le texte.",
+  "settings.emojiStyleNative": "Par défaut du système",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "Logo de l'application",
+  "settings.logoDesc":
+    "S'applique aux icônes de la fenêtre, de la barre d'état et de l'application.",
+  "logo.dark": "Foncé",
+  "logo.light": "Clair",
+  "logo.enso": "Ensō",
   "settings.keybinding": "Raccourcis clavier",
   "settings.keybindingDesc":
     "Raccourcis pour déplacer le focus dans la liste, naviguer entre les fichiers, faire défiler et cibler la recherche.",
@@ -65,8 +90,8 @@ export const fr: Record<TranslationKey, string> = {
     "Impossible de vérifier (vous êtes peut-être hors ligne).",
   "update.upToDate": "Vous êtes à jour ({version}).",
   "settings.about": "À propos",
-  "about.version": "Version {version}",
-  "about.appLicense": "Meguri est publié sous licence MIT.",
+  "about.version": "{name} version {version}",
+  "about.appLicense": "{name} est publié sous licence MIT.",
   "about.ossTitle": "Licences open source",
   "about.ossDesc":
     "Cette application inclut les logiciels open source suivants.",
@@ -118,18 +143,24 @@ export const fr: Record<TranslationKey, string> = {
   "command.shortcutHint": "Ouvrir avec {shortcut}",
 
   // filter
+  "filter.searchHint":
+    'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage ou tag:4k pour une correspondance exacte, sur vos tags comme sur ceux du scan. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage".',
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
+  "filter.tagSuggestions": "Suggestions de tags",
   "filter.all": "Tout",
-  "filter.playAny": "État de lecture",
   "filter.played": "Lu",
   "filter.unplayed": "Non lu",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "Filtrer par note minimale",
   "filter.btime": "Date de création",
-  "filter.btimeFilter": "Filtrer par date de création",
   "filter.dateFrom": "Du",
   "filter.dateTo": "Au",
-  "filter.dateClear": "Effacer",
+  "filter.more": "Autres critères",
+  "filter.moreActive": "Autres critères ({count} actifs)",
+  "filter.kindFilter": "Filtrer par type",
+  "filter.playState": "État de lecture",
+  "filter.sortSection": "Tri",
+  "filter.otherSection": "Autres",
 
   // smart collections
   "smartCollection.title": "Collections intelligentes",
@@ -141,10 +172,6 @@ export const fr: Record<TranslationKey, string> = {
   "smartCollection.namePlaceholder": "Nom de la collection",
   "smartCollection.save": "Enregistrer",
   "smartCollection.allMedia": "Tous les médias",
-  "smartCollection.defaultFavorites": "Favoris",
-  "smartCollection.defaultRating": "★{rating}+",
-  "smartCollection.defaultUnplayed": "Non lus",
-  "smartCollection.defaultName": "Nouvelle collection",
 
   // media detail
   "media.notFound": "Fichier introuvable.",
@@ -172,6 +199,7 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "Défiler vers le haut",
   "shortcuts.moveFocus": "Déplacer le focus (haut/bas/gauche/droite)",
   "shortcuts.openFocused": "Ouvrir l'élément ciblé",
+  "shortcuts.watchLater": "Basculer À regarder plus tard",
   "shortcuts.help": "Cette aide",
   "shortcuts.playPause": "Lecture / pause",
   "shortcuts.skip5": "Reculer / avancer 5 s",
@@ -246,18 +274,20 @@ export const fr: Record<TranslationKey, string> = {
   "scan.phaseHash": "Vérification des fichiers",
   "scan.phaseIndex": "Création de l'index",
   "scan.phaseThumbnail": "Génération des miniatures",
+  "scan.phaseTags": "Étiquetage",
   "scan.cancel": "Annuler le scan",
 
   // tag editor
   "tag.none": "Aucun tag",
   "tag.addPlaceholder": "Ajoutez un tag et appuyez sur Entrée",
   "tag.remove": "Supprimer le tag",
+  "tag.addFailed": "Impossible d'ajouter le tag",
 
   // media grid
   "grid.empty": "Aucun média à afficher.",
   "grid.emptyHint":
     "Lancez « Analyser » pour lister ici les vidéos et les images.",
-  "grid.searchByTag": "Rechercher « {name} »",
+  "grid.searchByTag": "Filtrer par « {name} »",
   "view.grid": "Vue en grille",
   "view.list": "Vue en liste",
   "view.table": "Vue en tableau",
@@ -272,7 +302,8 @@ export const fr: Record<TranslationKey, string> = {
   "discover.empty": "Aucun média à recommander.",
   "discover.emptyHint":
     "Lancez « Analyser » pour importer des vidéos et des images ; elles seront recommandées ici au hasard.",
-  "discover.sceneHint": "Survolez pour agrandir · cliquez pour lire à partir de ce point",
+  "discover.sceneHint":
+    "Survolez pour agrandir · cliquez pour lire à partir de ce point",
   "discover.moreScenes": "+{count}",
 
   // Historique de lecture
@@ -294,12 +325,71 @@ export const fr: Record<TranslationKey, string> = {
   "duplicates.empty": "Aucun fichier en double trouvé.",
   "duplicates.emptyHint":
     "Les fichiers au contenu identique (hachage et taille correspondants) apparaîtront ici.",
-  "duplicates.summary": "{groups} groupes / {files} fichiers / {size} en double",
+  "duplicates.summary":
+    "{groups} groupes / {files} fichiers / {size} en double",
   "duplicates.fileCount": "{count} fichiers",
   "duplicates.truncated":
     "Trop de groupes ; seuls les {max} premiers sont affichés.",
   "duplicates.filter": "Afficher uniquement les fichiers en double",
   "duplicates.chip": "Doublons",
+
+  // Écran de gestion des tags
+  "tags.title": "Tags",
+  "tags.summary": "{tags} tags / {assignments} attributions",
+  "tags.empty": "Aucun tag pour l'instant.",
+  "tags.emptyHint":
+    "Ajoutez des tags depuis la vue détaillée et ils apparaîtront ici.",
+  "tags.searchPlaceholder": "Filtrer les tags",
+  "tags.noMatch": "Aucun tag correspondant.",
+  "tags.truncated": "Trop de tags : affichage des {max} premiers.",
+  "tags.fileCount": "{count} fichiers",
+  "tags.sortByName": "Par nom",
+  "tags.sortByCount": "Par nombre",
+  "tags.groupManual": "Tags manuels",
+  "tags.readOnly": "Lecture seule",
+  "tags.readOnlyHint":
+    "Attribués automatiquement lors de l'analyse. Ils ne peuvent être ni modifiés ni supprimés.",
+  "tags.filterByTag": "Filtrer par ce tag",
+  "tags.source.manual": "Manuel",
+  "tags.source.autoMeta": "Automatique",
+  "tags.selected": "{count} sélectionnés",
+  "tags.clearSelection": "Annuler la sélection",
+  "tags.rename": "Renommer",
+  "tags.renameTitle": "Renommer le tag",
+  "tags.renamePlaceholder": "Nouveau nom",
+  "tags.renameAction": "Renommer",
+  "tags.renamed": "« {from} » renommé en « {to} »",
+  "tags.renameFailed": "Impossible de renommer le tag",
+  "tags.renameConflict": "« {name} » existe déjà. Fusionner les deux tags ?",
+  "tags.merge": "Fusionner",
+  "tags.mergeTitle": "Fusionner les tags",
+  "tags.mergeDescription":
+    "Les {count} tags sélectionnés sont regroupés dans la cible. Les autres sont supprimés.",
+  "tags.mergeTarget": "Fusionner dans",
+  "tags.mergeAction": "Fusionner",
+  "tags.merged": "{count} tags fusionnés",
+  "tags.mergeFailed": "Impossible de fusionner les tags",
+  "tags.delete": "Supprimer",
+  "tags.deleteAction": "Supprimer",
+  "tags.deleteConfirm":
+    "Le tag « {name} » sera retiré de {count} fichiers. Continuer ?",
+  "tags.deleteConfirmMany":
+    "Les {count} tags sélectionnés seront supprimés. Continuer ?",
+  "tags.deleted": "Tag supprimé",
+  "tags.deleteFailed": "Impossible de supprimer le tag",
+  "tags.addFailedReserved":
+    "« {prefix}: » est réservé aux tags automatiques. Choisissez un autre nom.",
+  "tags.nameTooLong": "Un nom de tag ne peut pas dépasser {max} caractères.",
+  "tags.ns.res": "Résolution",
+  "tags.ns.dur": "Durée",
+  "tags.ns.codec": "Codec",
+  "tags.ns.orient": "Orientation",
+  "tags.value.durShort": "Courte",
+  "tags.value.durMedium": "Moyenne",
+  "tags.value.durLong": "Longue",
+  "tags.value.orientVertical": "Portrait",
+  "tags.value.orientHorizontal": "Paysage",
+  "tags.value.orientSquare": "Carré",
 
   // workspace rail
   "workspace.all": "Tout",
@@ -338,6 +428,17 @@ export const fr: Record<TranslationKey, string> = {
   "collection.removedFromToast": "Retiré de « {name} »",
   "collection.actionFailed": "Impossible de mettre à jour la collection",
 
+  // À regarder plus tard (collection intégrée)
+  "watchLater.name": "À regarder plus tard",
+  "watchLater.add": "Ajouter à À regarder plus tard",
+  "watchLater.remove": "Retirer de À regarder plus tard",
+  "watchLater.addedToast": "Ajouté à À regarder plus tard",
+  "watchLater.removedToast": "Retiré de À regarder plus tard",
+  "watchLater.actionFailed": "Impossible de mettre à jour À regarder plus tard",
+  "watchLater.empty": "À regarder plus tard est vide.",
+  "watchLater.emptyHint":
+    "Appuyez sur l’icône d’horloge d’un média pour le retrouver ici. Les éléments quittent la liste dès que vous les lisez.",
+
   // icône emoji
   "emoji.choose": "Choisir un emoji",
   "emoji.remove": "Retirer l'emoji",
@@ -361,4 +462,42 @@ export const fr: Record<TranslationKey, string> = {
   "statusbar.status": "État",
   "statusbar.scanning": "Analyse en cours",
   "statusbar.idle": "Inactif",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "Ordre manuel",
+  "playlist.start": "Lire comme une liste",
+  "playlist.play": "Lire (Space)",
+  "playlist.pause": "Pause (Space)",
+  "playlist.next": "Suivant (N)",
+  "playlist.prev": "Précédent (P)",
+  "playlist.shuffle": "Aléatoire (S)",
+  "playlist.repeat": "Répéter",
+  "playlist.openDetail": "Ouvrir les détails (I)",
+  "playlist.fullscreen": "Plein écran (F)",
+  "playlist.exitFullscreen": "Quitter le plein écran (F)",
+  "playlist.exit": "Quitter la lecture (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.loading": "Chargement…",
+  "playlist.empty": "Rien ici ne peut être lu.",
+  "playlist.emptyHint":
+    "Ouvrez une liste contenant des vidéos ou des images, puis démarrez la lecture.",
+  "playlist.unplayable": "Aucun de ces éléments n’a pu être lu.",
+  "playlist.reorderNeedsManual":
+    "Passez à l’ordre manuel pour réorganiser les éléments.",
+  "settings.playlistImageSeconds": "Durée des images",
+  "settings.playlistImageSecondsHint":
+    "Durée d’affichage de chaque image avant le passage au suivant.",
+  "settings.playlistImageMotion": "Animer les images",
+  "settings.playlistImageMotionHint":
+    "Applique un lent panoramique et zoom à chaque image. Toujours désactivé si le système réduit les animations.",
+  "settings.playlistFade": "Fondu",
+  "settings.playlistFadeHint":
+    "Assombrit la scène avant d’afficher l’élément suivant.",
+  "settings.playlistTransition": "Transition",
+  "settings.playlistTransitionHint":
+    "Fait glisser latéralement au changement d’élément. Peut se combiner avec le fondu.",
+  "settings.playlistShuffle": "Aléatoire",
+  "settings.playlistShuffleHint":
+    "Lit dans un ordre aléatoire. Aucun élément ne se répète au cours d’un même passage.",
+  "settings.secondsValue": "{n} s",
 };

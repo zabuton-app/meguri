@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openDb } from "../db.js";
+import { openDb, resyncFtsForKeys } from "../db.js";
 
 function tableColumns(db: Database.Database, table: string): string[] {
   return (
@@ -325,5 +325,76 @@ describe("migrateFtsToTrigram", () => {
     const db = openDb(":memory:");
     expect(ftsDdl(db)).toContain("trigram");
     db.close();
+  });
+
+  it("leaves generated tags out of the rebuilt index", () => {
+    const file = path.join(dir, "qualified.sqlite");
+    makeLegacyDb(file);
+    const seed = new Database(file);
+    seed.exec(`
+      INSERT INTO tags (id, name, namespace) VALUES (11, '4k', 'res');
+      INSERT INTO meta_tags (meta_key, tag_id, source)
+        VALUES ('p:1:alive.mp4', 11, 'auto-meta');
+    `);
+    seed.close();
+    const db = openDb(file);
+    const row = db
+      .prepare("SELECT tags_text FROM files_fts WHERE rowid = 1")
+      .get() as { tags_text: string };
+    // Only the user's own tag; the namespaced one is reachable via `tag:`.
+    expect(row.tags_text).toBe("sunset");
+    db.close();
+  });
+});
+
+describe("resyncFtsForKeys", () => {
+  let db: ReturnType<typeof openDb>;
+  beforeEach(() => {
+    db = openDb(":memory:");
+    db.exec(`
+      INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
+      INSERT INTO files (id, root_id, rel_path, abs_path, kind, created_at)
+        VALUES (1, 1, 'a.mp4', '/r/a.mp4', 'video', 0),
+               (2, 1, 'b.mp4', '/r/b.mp4', 'video', 0);
+      INSERT INTO tags (id, name, namespace) VALUES (10, 'beach', ''), (11, '4k', 'res');
+      INSERT INTO meta_tags (meta_key, tag_id, source)
+        VALUES ('p:1:a.mp4', 10, 'manual'), ('p:1:b.mp4', 11, 'auto-meta');
+      INSERT INTO files_fts (rowid, rel_path, tags_text)
+        VALUES (1, 'a.mp4', 'stale'), (2, 'b.mp4', 'stale');
+    `);
+  });
+  afterEach(() => db.close());
+
+  function textOf(rowid: number): string {
+    return (
+      db
+        .prepare("SELECT tags_text FROM files_fts WHERE rowid = ?")
+        .get(rowid) as { tags_text: string }
+    ).tags_text;
+  }
+
+  it("re-indexes only the files behind the given meta_keys", () => {
+    resyncFtsForKeys(db, ["p:1:a.mp4"]);
+    expect(textOf(1)).toBe("beach");
+    expect(textOf(2)).toBe("stale");
+  });
+
+  it("is a no-op for an empty key list, and clears generated-only rows", () => {
+    resyncFtsForKeys(db, []);
+    expect(textOf(2)).toBe("stale");
+    resyncFtsForKeys(db, ["p:1:a.mp4", "p:1:b.mp4"]);
+    // b.mp4 carries only a namespaced tag, which is not indexed.
+    expect(textOf(2)).toBe("");
+  });
+
+  it("does not re-add a soft-deleted file", () => {
+    db.exec("UPDATE files SET deleted_at = 100 WHERE id = 1");
+    resyncFtsForKeys(db, ["p:1:a.mp4"]);
+    const n = (
+      db
+        .prepare("SELECT count(*) AS n FROM files_fts WHERE rowid = 1")
+        .get() as { n: number }
+    ).n;
+    expect(n).toBe(0);
   });
 });

@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const en: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "Close",
   "common.cancel": "Cancel",
@@ -30,6 +33,15 @@ export const en: Record<TranslationKey, string> = {
   "settings.light": "Light",
   "settings.dark": "Dark",
   "settings.theme": "Theme",
+
+  // Appearance toggle (header)
+  "theme.switchToLight": "Switch to light mode",
+  "theme.switchToDark": "Switch to dark mode",
+
+  "settings.tabGeneral": "General",
+  "settings.tabLibrary": "Library",
+  "settings.tabPlayback": "Playlist playback",
+  "settings.tabApp": "App",
   "settings.language": "Language",
   "settings.languageDesc": "Switch the display language of the UI.",
   "settings.scenes": "Scene thumbnails",
@@ -44,6 +56,18 @@ export const en: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "Low (240px)",
   "settings.frameQualityStandard": "Standard (480px)",
   "settings.frameQualityHigh": "High (960px)",
+  "settings.emojiStyle": "Emoji style",
+  "settings.emojiStyleDesc":
+    "Switches how emoji icons and in-text emoji are drawn.",
+  "settings.emojiStyleNative": "System default",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "App logo",
+  "settings.logoDesc": "Applies to the window, tray, and in-app icons.",
+  "logo.dark": "Dark",
+  "logo.light": "Light",
+  "logo.enso": "Ensō",
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",
@@ -64,8 +88,8 @@ export const en: Record<TranslationKey, string> = {
   "update.checkFailed": "Couldn't check (you may be offline).",
   "update.upToDate": "You're up to date ({version}).",
   "settings.about": "About",
-  "about.version": "Version {version}",
-  "about.appLicense": "Meguri is released under the MIT License.",
+  "about.version": "{name} version {version}",
+  "about.appLicense": "{name} is released under the MIT License.",
   "about.ossTitle": "Open-source licenses",
   "about.ossDesc": "This app includes the following open-source software.",
   "about.ffmpegNotice":
@@ -115,18 +139,24 @@ export const en: Record<TranslationKey, string> = {
   "command.shortcutHint": "Open with {shortcut}",
 
   // filter
+  "filter.searchHint":
+    'Searches file names and tags. Use tag:beach or tag:4k to match a tag exactly, whether you added it or the scan did. Quote values with spaces: tag:"beach house".',
   "filter.searchPlaceholder": "Search file name or tags",
+  "filter.tagSuggestions": "Tag suggestions",
   "filter.all": "All",
-  "filter.playAny": "Play state",
   "filter.played": "Played",
   "filter.unplayed": "Unplayed",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "Filter by minimum rating",
   "filter.btime": "Created date",
-  "filter.btimeFilter": "Filter by creation date",
   "filter.dateFrom": "From",
   "filter.dateTo": "To",
-  "filter.dateClear": "Clear",
+  "filter.more": "More conditions",
+  "filter.moreActive": "More conditions ({count} active)",
+  "filter.kindFilter": "Filter by kind",
+  "filter.playState": "Play state",
+  "filter.sortSection": "Sort order",
+  "filter.otherSection": "Other",
 
   // smart collections
   "smartCollection.title": "Smart collections",
@@ -138,10 +168,6 @@ export const en: Record<TranslationKey, string> = {
   "smartCollection.namePlaceholder": "Collection name",
   "smartCollection.save": "Save",
   "smartCollection.allMedia": "All media",
-  "smartCollection.defaultFavorites": "Favorites",
-  "smartCollection.defaultRating": "★{rating}+",
-  "smartCollection.defaultUnplayed": "Unplayed",
-  "smartCollection.defaultName": "New collection",
 
   // media detail
   "media.notFound": "File not found.",
@@ -169,6 +195,7 @@ export const en: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "Scroll up",
   "shortcuts.moveFocus": "Move focus (up/down/left/right)",
   "shortcuts.openFocused": "Open focused item",
+  "shortcuts.watchLater": "Toggle Watch Later",
   "shortcuts.help": "This help",
   "shortcuts.playPause": "Play / pause",
   "shortcuts.skip5": "Back / forward 5s",
@@ -243,17 +270,19 @@ export const en: Record<TranslationKey, string> = {
   "scan.phaseHash": "Checking files",
   "scan.phaseIndex": "Building index",
   "scan.phaseThumbnail": "Generating thumbnails",
+  "scan.phaseTags": "Tagging",
   "scan.cancel": "Cancel scan",
 
   // tag editor
   "tag.none": "No tags",
   "tag.addPlaceholder": "Add a tag and press Enter",
   "tag.remove": "Remove tag",
+  "tag.addFailed": "Could not add the tag",
 
   // media grid
   "grid.empty": "No media to display.",
   "grid.emptyHint": 'Run "Scan" to list videos and images here.',
-  "grid.searchByTag": 'Search for "{name}"',
+  "grid.searchByTag": 'Filter by "{name}"',
   "view.grid": "Grid view",
   "view.list": "List view",
   "view.table": "Table view",
@@ -294,6 +323,63 @@ export const en: Record<TranslationKey, string> = {
   "duplicates.filter": "Show only duplicate files",
   "duplicates.chip": "Duplicates",
 
+  // Tag management screen
+  "tags.title": "Tags",
+  "tags.summary": "{tags} tags / {assignments} assignments",
+  "tags.empty": "No tags yet.",
+  "tags.emptyHint":
+    "Add tags from the detail view and they will be listed here.",
+  "tags.searchPlaceholder": "Filter tags",
+  "tags.noMatch": "No matching tags.",
+  "tags.truncated": "Too many tags — showing the top {max}.",
+  "tags.fileCount": "{count} files",
+  "tags.sortByName": "By name",
+  "tags.sortByCount": "By count",
+  "tags.groupManual": "Manual tags",
+  "tags.readOnly": "Read-only",
+  "tags.readOnlyHint":
+    "Assigned automatically during the scan. They cannot be edited or deleted.",
+  "tags.filterByTag": "Filter by this tag",
+  "tags.source.manual": "Manual",
+  "tags.source.autoMeta": "Automatic",
+  "tags.selected": "{count} selected",
+  "tags.clearSelection": "Clear selection",
+  "tags.rename": "Rename",
+  "tags.renameTitle": "Rename tag",
+  "tags.renamePlaceholder": "New tag name",
+  "tags.renameAction": "Rename",
+  "tags.renamed": 'Renamed "{from}" to "{to}"',
+  "tags.renameFailed": "Could not rename the tag",
+  "tags.renameConflict":
+    '"{name}" already exists. Merge the two tags into one?',
+  "tags.merge": "Merge",
+  "tags.mergeTitle": "Merge tags",
+  "tags.mergeDescription":
+    "The {count} selected tags are combined into the target. The others are removed.",
+  "tags.mergeTarget": "Merge into",
+  "tags.mergeAction": "Merge",
+  "tags.merged": "Merged {count} tags",
+  "tags.mergeFailed": "Could not merge the tags",
+  "tags.delete": "Delete",
+  "tags.deleteAction": "Delete",
+  "tags.deleteConfirm": 'Remove the tag "{name}" from {count} files. Continue?',
+  "tags.deleteConfirmMany": "Delete the {count} selected tags. Continue?",
+  "tags.deleted": "Tag deleted",
+  "tags.deleteFailed": "Could not delete the tag",
+  "tags.addFailedReserved":
+    '"{prefix}:" is reserved for automatic tags. Please choose another name.',
+  "tags.nameTooLong": "A tag name can be at most {max} characters.",
+  "tags.ns.res": "Resolution",
+  "tags.ns.dur": "Length",
+  "tags.ns.codec": "Codec",
+  "tags.ns.orient": "Orientation",
+  "tags.value.durShort": "Short",
+  "tags.value.durMedium": "Medium",
+  "tags.value.durLong": "Long",
+  "tags.value.orientVertical": "Portrait",
+  "tags.value.orientHorizontal": "Landscape",
+  "tags.value.orientSquare": "Square",
+
   // workspace rail
   "workspace.all": "All",
   "workspace.settings": "Settings",
@@ -331,6 +417,17 @@ export const en: Record<TranslationKey, string> = {
   "collection.removedFromToast": 'Removed from "{name}"',
   "collection.actionFailed": "Could not update collection",
 
+  // Watch Later (built-in collection)
+  "watchLater.name": "Watch Later",
+  "watchLater.add": "Add to Watch Later",
+  "watchLater.remove": "Remove from Watch Later",
+  "watchLater.addedToast": "Added to Watch Later",
+  "watchLater.removedToast": "Removed from Watch Later",
+  "watchLater.actionFailed": "Could not update Watch Later",
+  "watchLater.empty": "Watch Later is empty.",
+  "watchLater.emptyHint":
+    "Press the clock icon on any media to collect it here. Items leave the list once you play them.",
+
   // emoji icon
   "emoji.choose": "Choose emoji",
   "emoji.remove": "Remove emoji",
@@ -354,4 +451,40 @@ export const en: Record<TranslationKey, string> = {
   "statusbar.status": "Status",
   "statusbar.scanning": "Scanning",
   "statusbar.idle": "Idle",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "Manual order",
+  "playlist.start": "Play as playlist",
+  "playlist.play": "Play (Space)",
+  "playlist.pause": "Pause (Space)",
+  "playlist.next": "Next (N)",
+  "playlist.prev": "Previous (P)",
+  "playlist.shuffle": "Shuffle (S)",
+  "playlist.repeat": "Repeat",
+  "playlist.openDetail": "Open details (I)",
+  "playlist.fullscreen": "Fullscreen (F)",
+  "playlist.exitFullscreen": "Leave fullscreen (F)",
+  "playlist.exit": "Exit playback (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.loading": "Loading…",
+  "playlist.empty": "Nothing here can be played.",
+  "playlist.emptyHint":
+    "Open a list that contains videos or images, then start playback.",
+  "playlist.unplayable": "None of these items could be played.",
+  "playlist.reorderNeedsManual": "Switch to manual order to rearrange items.",
+  "settings.playlistImageSeconds": "Image duration",
+  "settings.playlistImageSecondsHint":
+    "How long each image stays on screen before the player advances.",
+  "settings.playlistImageMotion": "Animate images",
+  "settings.playlistImageMotionHint":
+    "Slowly pans and zooms each image. Always disabled when the OS is set to reduce motion.",
+  "settings.playlistFade": "Fade",
+  "settings.playlistFadeHint": "Dims the stage before showing the next item.",
+  "settings.playlistTransition": "Transition",
+  "settings.playlistTransitionHint":
+    "Slides sideways when the item changes. Can be combined with the fade.",
+  "settings.playlistShuffle": "Shuffle",
+  "settings.playlistShuffleHint":
+    "Plays in a random order. No item repeats within a single pass.",
+  "settings.secondsValue": "{n}s",
 };

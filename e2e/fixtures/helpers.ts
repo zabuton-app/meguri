@@ -10,6 +10,11 @@ export function searchInput(page: Page): Locator {
   return page.locator("#list-search-input");
 }
 
+/** The exact-tag directives the search box renders as chips beside the text. */
+export function searchChips(page: Page): Locator {
+  return page.locator('[data-slot="search-chip"]');
+}
+
 /** Grid-view card for a file. List/table views don't carry the testid. */
 export function fileCard(page: Page, fileName = FIXTURE_FILE): Locator {
   return page.getByTestId("media-card").filter({ hasText: fileName }).first();
@@ -27,15 +32,6 @@ export async function waitForIndexedMedia(
 
 export async function waitForIdle(page: Page): Promise<void> {
   await expect(statusBar(page)).toContainText("Idle", { timeout: 60_000 });
-}
-
-export async function selectComboboxOption(
-  page: Page,
-  index: number,
-  option: string,
-): Promise<void> {
-  await page.getByRole("combobox").nth(index).click();
-  await page.getByRole("option", { name: option }).click();
 }
 
 export async function openFileDetail(
@@ -65,6 +61,19 @@ export async function openSettings(page: Page): Promise<Locator> {
   return dialog;
 }
 
+/**
+ * Opens settings and switches to one of its tabs. Only the selected tab's panel
+ * is mounted, so anything outside the first tab has to be reached this way.
+ */
+export async function openSettingsTab(
+  page: Page,
+  name: string,
+): Promise<Locator> {
+  const dialog = await openSettings(page);
+  await dialog.getByRole("tab", { name, exact: true }).click();
+  return dialog;
+}
+
 export async function openDiscover(page: Page): Promise<Locator> {
   await page.getByRole("link", { name: "Discovery" }).click();
   const dialog = page.getByRole("dialog");
@@ -85,7 +94,9 @@ export async function expectStarRating(
   stars: number,
 ): Promise<void> {
   for (let n = 1; n <= 5; n += 1) {
-    const icon = scope.getByRole("button", { name: `${n} stars` }).locator("svg");
+    const icon = scope
+      .getByRole("button", { name: `${n} stars` })
+      .locator("svg");
     if (n <= stars) {
       await expect(icon).toHaveClass(/fill-accent2/);
     } else {

@@ -21,6 +21,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import log from "@/lib/logger";
+import {
+  LIST_HIDDEN_SOURCES,
+  RESERVED_TAG_ERROR,
+  reservedTagPrefix,
+} from "@shared/tags";
+import { applyTagFilter } from "@/lib/ui-events";
 import { api, events, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import type { FileDetail, FileRow, SearchResult } from "@/ipc/types";
@@ -40,6 +47,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RatingStars } from "@/components/RatingStars";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import { useWatchLater } from "@/hooks/useWatchLater";
+import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { TagEditor } from "@/components/TagEditor";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatChords } from "@/settings/keybindings";
@@ -58,6 +68,7 @@ import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
 import { copyImageToClipboard } from "./utils";
 import {
+  dropFromWatchLaterCache,
   invalidateCollectionSearches,
   invalidatePlayedSearches,
   invalidateTagSearches,
@@ -82,10 +93,48 @@ export default function MediaDetail() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { play: playAudio, pause: pauseAudio } = useAudioPlayer();
-  // Closing the modal = drop the child route. Return to Discovery if we came from there,
-  // otherwise back to the list (the list stays mounted underneath).
+  // Closing the modal = drop the child route. Return to Discovery or the playlist
+  // player if we came from there, otherwise back to the list (the list stays
+  // mounted underneath).
+  // Filtering the library by a tag only makes sense with the library visible, so
+  // this closes the detail — to `/` rather than back to Discovery, since Discovery
+  // has no notion of the list's filter.
+  const onTagFilter = useCallback(
+    (qualifiedName: string) => {
+      applyTagFilter([qualifiedName]);
+      void navigate("/");
+    },
+    [navigate],
+  );
+
   const onClose = useCallback(() => {
-    if (searchParams.get("from") !== "discover") {
+    const from = searchParams.get("from");
+    // The playlist player parked its pass on the way here, so closing hands
+    // playback back rather than dropping the user on the list.
+    if (from === "player") {
+      const params = new URLSearchParams();
+      // Name the file the pass was parked on: the player restores only when
+      // this matches what it put aside, so a stale pass can never be picked up
+      // by an unrelated later playback (or by walking the history back here).
+      params.set("resume", `${searchParams.get("ws") ?? ""}:${fileId}`);
+      // Hand back where this player got to, not where the playlist left off —
+      // watching on for a few minutes here and then being rewound to the second
+      // of the detour reads as a bug. Until its metadata has loaded this player
+      // still reports 0, so closing straight away falls back to the second the
+      // detour was taken at rather than rewinding to the top of the file.
+      const arrived = Number(searchParams.get("t")) || 0;
+      const sec = playerRef.current?.currentTime();
+      const handBack =
+        sec != null && Number.isFinite(sec) && sec > 0
+          ? Math.floor(sec)
+          : arrived;
+      if (handBack > 0) params.set("t", String(handBack));
+      // Replaced, not pushed: the detour is one round trip, and a growing
+      // history would offer a "back" that lands on a pass already spent.
+      void navigate(`/play?${params.toString()}`, { replace: true });
+      return;
+    }
+    if (from !== "discover") {
       void navigate("/");
       return;
     }
@@ -94,7 +143,7 @@ export default function MediaDetail() {
     if (filter) params.set("filter", filter);
     const query = params.toString();
     void navigate(query ? `/discover?${query}` : "/discover");
-  }, [navigate, searchParams]);
+  }, [fileId, navigate, searchParams]);
 
   // Total duration for scenes/history. Falls back to the natively obtained value when the DB duration is empty.
   const [nativeDur, setNativeDur] = useState<number | null>(null);
@@ -194,6 +243,9 @@ export default function MediaDetail() {
       .then(() => {
         // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
         invalidatePlayedSearches(qc);
+        // Viewing an image counts as a play, so the main process just consumed
+        // this file's Watch Later entry. Mirror that into the cache.
+        dropFromWatchLaterCache(qc, wsId, fileId);
       })
       .catch(() => {
         // Drop the guard on failure so a later effect run of this visit can retry;
@@ -206,6 +258,30 @@ export default function MediaDetail() {
     queryFn: api.workspacesList,
   });
   const collections = workspaces.data?.collections ?? [];
+  // Watch Later membership for the toggle next to the favorite heart, plus the
+  // "W" shortcut that drives that same control.
+  const watchLater = useWatchLater();
+  const watchLaterRef = useRef<HTMLButtonElement>(null);
+  useWatchLaterHotkey({ active: true, buttonRef: watchLaterRef });
+  // Opening a file drops it from Watch Later in the main process, but the main
+  // process deliberately stays quiet about it so the list doesn't shift while
+  // the user is stepping through it with prev/next. Flush the affected caches
+  // once, when the detail view closes — this component stays mounted across
+  // prev/next, so by then every file viewed this session has left the list.
+  //
+  // Done unconditionally rather than only when the file looked like a Watch
+  // Later entry: the only evidence available here is the workspaces_list cache,
+  // which may already have been refetched *after* the main process removed the
+  // entry, leaving no trace that it was ever there. Guessing from it silently
+  // skips the flush and strands the viewed file in the list. The cost is one
+  // refetch on close, and invalidateCollectionSearches only touches
+  // collection-scoped searches, not the workspace lists.
+  useEffect(() => {
+    return () => {
+      void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
+      invalidateCollectionSearches(qc);
+    };
+  }, [qc]);
   const owningWorkspace = useMemo(
     () => workspaces.data?.workspaces.find((w) => w.id === wsId) ?? null,
     [workspaces.data?.workspaces, wsId],
@@ -232,17 +308,40 @@ export default function MediaDetail() {
         queryKey: ["file_get", wsId, fileId],
         queryFn: () => api.fileGet(fileId, wsId),
       });
-      if (fresh) patchFileRowInCaches(qc, wsId, fileId, { tags: fresh.tags });
+      if (fresh) {
+        // FileRow omits pipeline sources (see attachTags); patching straight from
+        // the detail response would put them back into the list caches.
+        patchFileRowInCaches(qc, wsId, fileId, {
+          tags: fresh.tags.filter(
+            (tag) => !LIST_HIDDEN_SOURCES.includes(tag.source),
+          ),
+        });
+      }
     } catch {
       // The tag edit itself succeeded; if the refetch fails (transient IPC
       // error), fall back to invalidating the detail so it reloads lazily.
       void qc.invalidateQueries({ queryKey: ["file_get", wsId, fileId] });
     }
     invalidateTagSearches(qc);
+    void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
   };
   const addTag = useMutation({
     mutationFn: (name: string) => api.fileAddTag(fileId, wsId, name),
     onSuccess: onTagsChanged,
+    onError: (error, name) => {
+      // main rejects a name that impersonates a pipeline-owned namespace; any
+      // other failure (DB error, unknown workspace) deserves its own message.
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes(RESERVED_TAG_ERROR)) {
+        toast.error(
+          t("tags.addFailedReserved", {
+            prefix: reservedTagPrefix(name) ?? name,
+          }),
+        );
+      } else {
+        toast.error(t("tag.addFailed"), { description: message });
+      }
+    },
   });
   const removeTag = useMutation({
     mutationFn: (tagId: number) => api.fileRemoveTag(fileId, wsId, tagId),
@@ -515,7 +614,11 @@ export default function MediaDetail() {
                 exportPending={exportFrame.isPending}
                 onExportFrame={(sec) => exportFrame.mutate(sec)}
                 onNativeDuration={setNativeDur}
-                onPlayed={() => invalidatePlayedSearches(qc)}
+                onPlayed={() => {
+                  invalidatePlayedSearches(qc);
+                  dropFromWatchLaterCache(qc, wsId, fileId);
+                }}
+                onOpenExternal={() => dropFromWatchLaterCache(qc, wsId, fileId)}
                 // Video demands attention, background audio yields. Pause rather
                 // than close, so the bar stays visible and the user can resume.
                 onPlaybackStart={pauseAudio}
@@ -539,14 +642,18 @@ export default function MediaDetail() {
           {/* Title + controls */}
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
+              {/* File name and folder are the two strings users copy out. */}
               <h1
-                className="truncate text-lg font-semibold text-bright-fg"
+                className="select-text truncate text-lg font-semibold text-bright-fg"
                 title={d.relPath}
               >
                 {basename}
               </h1>
               {dir && (
-                <p className="truncate text-xs text-muted" title={d.relPath}>
+                <p
+                  className="select-text truncate text-xs text-muted"
+                  title={d.relPath}
+                >
                   {dir}
                 </p>
               )}
@@ -592,7 +699,14 @@ export default function MediaDetail() {
                 className="border-muted/35 bg-surface"
                 onClick={() => {
                   playerRef.current?.pause();
-                  void api.openExternal(fileId, wsId);
+                  // The main process records the play and consumes the Watch
+                  // Later entry, so mirror that once it confirms — it can also
+                  // refuse (a file gone missing under the root), and patching
+                  // regardless would show the file as consumed when it is not.
+                  void api
+                    .openExternal(fileId, wsId)
+                    .then(() => dropFromWatchLaterCache(qc, wsId, fileId))
+                    .catch((e: unknown) => log.error("open external", e));
                 }}
               >
                 <ExternalLink />
@@ -661,6 +775,10 @@ export default function MediaDetail() {
                 className="min-w-44 border border-muted/35 bg-surface p-0"
               >
                 <DropdownMenuGroup>
+                  {/* Kept as a guard for a not-yet-loaded/failed workspaces_list
+                      query. In practice the list is never empty at rest: the
+                      built-in Watch Later collection is always seeded, and it
+                      shows up in this menu like any other collection. */}
                   {collections.length === 0 ? (
                     <DropdownMenuItem
                       disabled
@@ -758,12 +876,21 @@ export default function MediaDetail() {
                 onChange={(r) => setRating.mutate(r)}
                 size={20}
               />
+              {/* Pushed to the far end of the row, favorite outermost. */}
+              <WatchLaterButton
+                ref={watchLaterRef}
+                fileId={fileId}
+                workspaceId={wsId}
+                watchLater={watchLater}
+                size={22}
+                deferListRefresh
+                className="ml-auto"
+              />
               <FavoriteButton
                 fileId={fileId}
                 workspaceId={wsId}
                 favorite={d.favorite}
                 size={22}
-                className="ml-auto"
               />
             </div>
             <div className="flex flex-col gap-2 border-t border-border pt-4">
@@ -775,6 +902,7 @@ export default function MediaDetail() {
                 workspaceId={wsId}
                 onAdd={(name) => addTag.mutate(name)}
                 onRemove={(tagId) => removeTag.mutate(tagId)}
+                onTagClick={onTagFilter}
               />
             </div>
           </div>

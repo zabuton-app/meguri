@@ -3,6 +3,7 @@
 // spawned). Holds its own read-only connection cache keyed by workspace ID —
 // WAL mode allows these readers to coexist with the main process's writer.
 import * as cw from "./crossWorkspace.js";
+import { MANUAL_SORT } from "../../shared/sortDir.js";
 import { openDbReadonly, type DB } from "./db.js";
 import type { Core } from "./index.js";
 import { countFiles, lastScanAt } from "./queries.js";
@@ -13,6 +14,7 @@ import type {
   HistoryQuery,
   SearchQuery,
   SearchResult,
+  TagList,
   WorkspaceStats,
 } from "./types.js";
 
@@ -37,10 +39,16 @@ export type QueryRequest =
     }
   | { kind: "history"; targets: QueryTarget[]; query: HistoryQuery }
   | { kind: "duplicates"; targets: QueryTarget[] }
+  | { kind: "tagsList"; targets: QueryTarget[] }
   | { kind: "stats"; targets: QueryTarget[] };
 
 export type QueryResponse =
-  SearchResult | FileRow[] | HistoryPage | DuplicatesResult | WorkspaceStats;
+  | SearchResult
+  | FileRow[]
+  | HistoryPage
+  | DuplicatesResult
+  | TagList
+  | WorkspaceStats;
 
 const DUP_REFS_CACHE_TTL_MS = 5_000;
 const DUP_REFS_CACHE_MAX_ENTRIES = 16;
@@ -152,11 +160,25 @@ export class QueryExecutor {
     switch (req.kind) {
       case "search": {
         const refs = this.resolveRefs(cores, req.query, req.refs);
-        return refs
-          ? cw.searchCollection(cores, refs, req.query)
-          : cw.searchWorkspaces(cores, req.query);
+        // Manual order is the collection's stored order, so it applies only when
+        // the refs ARE that order. `refs` is not that test: the duplicates
+        // filter also produces refs (duplicate-scan order, and intersected with
+        // the collection when both apply), and ordering by those would be
+        // passing off a derived list as the order the user arranged by hand.
+        const manual = req.query.sort === MANUAL_SORT;
+        const storedOrder = manual && !!req.refs && !req.query.duplicates;
+        if (!refs) {
+          const query = manual
+            ? { ...req.query, sort: undefined, sortDir: undefined }
+            : req.query;
+          return cw.searchWorkspaces(cores, query);
+        }
+        return storedOrder
+          ? cw.searchCollectionManual(cores, refs, req.query)
+          : cw.searchCollection(cores, refs, req.query);
       }
       case "random": {
+        // Random ignores the sort key entirely, manual included.
         const refs = this.resolveRefs(cores, req.query, req.refs);
         return refs
           ? cw.randomCollection(cores, refs, req.query)
@@ -166,6 +188,8 @@ export class QueryExecutor {
         return cw.listHistoryWorkspaces(cores, req.query);
       case "duplicates":
         return cw.listDuplicatesWorkspaces(cores);
+      case "tagsList":
+        return cw.listTagsWorkspaces(cores);
       case "stats": {
         let fileCount = 0;
         let scanAt: number | null = null;

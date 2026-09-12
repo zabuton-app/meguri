@@ -1,35 +1,20 @@
 @import "tailwindcss";
+@import "./styles/emoji-fonts.css";
 
 /*
  * Three-stage bridge (PLAN "Frontend UI / Theme"):
- *   base16(base00..0F)  →  runtime values --c-* (injected by ThemeProvider via [data-theme])
+ *   base16(base00..0F)  →  contrast-corrected values --c-* (src/themes/derive.ts, injected by
+ *                          ThemeProvider into html[data-theme] before the first paint)
  *                       →  Tailwind tokens --color-* (reference --c-* via @theme inline)
  *                       →  shadcn variables --background, etc. (also aliases of --c-*)
  *                       →  components reference them via bg-surface/text-fg/Button
  *
  * Separating the values (--c-*) from the Tailwind tokens (--color-*) avoids self-reference.
+ * There is deliberately no :root fallback here: ThemeProvider injects every scheme at import
+ * time, so a hardcoded copy would only be a second source of truth that drifts.
  */
 
 :root {
-  /* Fallback (safety net before ThemeProvider applies: gruvbox-dark). */
-  --c-bg: #282828;
-  --c-surface: #3c3836;
-  --c-overlay: #504945;
-  --c-border: #504945;
-  --c-muted: #665c54;
-  --c-secondary-fg: #bdae93;
-  --c-fg: #d5c4a1;
-  --c-bright-fg: #ebdbb2;
-  --c-highlight: #fbf1c7;
-  --c-error: #fb4934;
-  --c-warn: #fe8019;
-  --c-accent2: #fabd2f;
-  --c-success: #b8bb26;
-  --c-info: #8ec07c;
-  --c-primary: #83a598;
-  --c-secondary-accent: #d3869b;
-  --c-special: #d65d0e;
-
   /* Height of the audio player bar, published by AudioPlayerBar while a track is
      loaded. Bottom-anchored overlays add it to their offset so they clear the
      bar; it stays 0 when nothing is playing. */
@@ -42,6 +27,8 @@
   --color-surface: var(--c-surface);
   --color-overlay: var(--c-overlay);
   --color-border: var(--c-border);
+  /* Meaningful UI boundaries (form controls, switch tracks) rather than decorative rules. */
+  --color-border-strong: var(--c-border-strong);
   --color-muted: var(--c-muted);
   --color-secondary-fg: var(--c-secondary-fg);
   --color-fg: var(--c-fg);
@@ -61,17 +48,25 @@
   --color-foreground: var(--c-fg);
   --color-card: var(--c-surface);
   --color-card-foreground: var(--c-fg);
-  --color-popover: var(--c-overlay);
+  /* surface, not overlay: fg and muted are guaranteed readable on the panel color. */
+  --color-popover: var(--c-surface);
   --color-popover-foreground: var(--c-fg);
   --color-primary-foreground: var(--c-bg);
   --color-secondary: var(--c-surface);
   --color-secondary-foreground: var(--c-fg);
-  --color-accent: var(--c-overlay);
+  /*
+   * The highlighted row of a menu has to separate from the popover it sits in, so it uses
+   * --c-hover rather than --c-overlay (which is the popover background itself). --c-hover is
+   * only aliased, never exposed as its own --color-* token: a `bg-hover` utility would read
+   * as the `hover:` variant.
+   */
+  --color-accent: var(--c-hover);
+  /* bright-fg is the strongest text the scheme has, and --c-hover is bounded against it. */
   --color-accent-foreground: var(--c-bright-fg);
   --color-destructive: var(--c-error);
   --color-destructive-foreground: var(--c-bg);
   --color-ring: var(--c-primary);
-  --color-input: var(--c-border);
+  --color-input: var(--c-border-strong);
 
   --radius-lg: 0.5rem;
   --radius-md: 0.375rem;
@@ -88,14 +83,42 @@ body {
   margin: 0;
   background-color: var(--c-bg);
   color: var(--c-fg);
+  /* var(--font-emoji) stays second-to-last (before the generic): emoji fonts
+     also cover digits/#/* so an earlier slot would hijack regular text, while
+     any later slot would never be reached. See src/styles/emoji-fonts.css. */
   font-family:
     system-ui,
     -apple-system,
     "Segoe UI",
     Roboto,
     "Noto Sans JP",
+    var(--font-emoji),
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  /*
+   * This is a desktop shell, not a document: dragging across the grid or hitting
+   * Ctrl+A should not paint the window blue. Selection is opt-in, so text that is
+   * worth copying (file names, paths, version strings) carries Tailwind's
+   * `select-text`. user-select is inherited, so a direct declaration on the
+   * element wins over this one.
+   */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/*
+ * Fields are exempt unconditionally. Chromium already keeps the caret and
+ * selection working inside them even when they inherit `user-select: none`, so
+ * this is defensive: it states the intent, and it holds if a field ends up
+ * inside something that opts out more aggressively.
+ * The :not() form also covers bare `contenteditable` and "plaintext-only",
+ * matching the isContentEditable check in src/hooks/useSelectAllGuard.ts.
+ */
+input,
+textarea,
+[contenteditable]:not([contenteditable="false"]) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /*
@@ -162,4 +185,81 @@ body {
 [data-sonner-toast][data-styled="true"] [data-close-button]:hover {
   background: var(--c-overlay) !important;
   border-color: color-mix(in srgb, var(--c-muted) 55%, transparent) !important;
+}
+
+/*
+ * Favorite/rating micro-interaction effects (spec 009).
+ * transform/opacity only, so the animations run on the compositor and never
+ * cause layout shift. Colors come from currentColor (the control's own theme
+ * color) — no hardcoded values.
+ */
+@keyframes fx-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  70% {
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes fx-particle {
+  0% {
+    transform: rotate(var(--fx-angle)) translateX(0) scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: rotate(var(--fx-angle)) translateX(var(--fx-radius)) scale(0.2);
+    opacity: 0;
+  }
+}
+
+@keyframes fx-settle {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(0.8);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.fx-pop {
+  animation: fx-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.fx-settle {
+  animation: fx-settle 250ms ease-out both;
+}
+
+.fx-particle {
+  animation: fx-particle 450ms ease-out both;
+}
+
+/*
+ * Backup suppression layer: callers already skip rendering effect DOM via
+ * usePrefersReducedMotion(), but if any call site forgets, this guarantees
+ * nothing decorative moves or lingers (FR-009). The overlay is hidden outright
+ * because with `animation: none` its particles would otherwise sit static
+ * until the unmount timeout.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .fx-pop,
+  .fx-settle,
+  .fx-particle {
+    animation: none;
+  }
+  .fx-overlay {
+    display: none;
+  }
 }

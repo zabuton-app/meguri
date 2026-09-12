@@ -44,7 +44,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   closeButton
                   toastOptions={{
                     classNames: {
-                      toast: "meguri-toast",
+                      // select-text: error toasts render raw error.message.
+                      // Sonner captures the pointer for swipe-to-dismiss, so
+                      // dragging across a toast selects nothing; double- and
+                      // triple-click still do.
+                      toast: "meguri-toast select-text",
                       title: "text-bright-fg",
                       description: "meguri-toast-description",
                     },

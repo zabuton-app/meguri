@@ -3,6 +3,7 @@
 // so they survive rebuilding the files table.
 import type { DB } from "./db.js";
 import type { TagInfo } from "./types.js";
+import { RESERVED_TAG_ERROR, isReservedTagName } from "../../shared/tags.js";
 
 /** Resolve a file id to its stable meta_key (null if the file row is gone). */
 export function metaKeyOf(db: DB, fileId: number): string | null {
@@ -36,7 +37,15 @@ export function addFileTag(
   ).run(metaKey, tagId, source, score);
 }
 
+/**
+ * Attach a user-created tag. Names that would impersonate a pipeline-owned
+ * namespace are rejected here rather than silently creating a manual tag that
+ * renders identically to a generated one.
+ */
 export function addManualTag(db: DB, fileId: number, name: string): number {
+  if (isReservedTagName(name)) {
+    throw new Error(`${RESERVED_TAG_ERROR}: ${name}`);
+  }
   const tagId = upsertTag(db, "", name);
   addFileTag(db, fileId, tagId, "manual", null);
   return tagId;
@@ -70,15 +79,22 @@ export function fileTags(db: DB, fileId: number): TagInfo[] {
     .prepare(
       `SELECT t.id, t.name, t.namespace, mt.source, mt.score
        FROM meta_tags mt JOIN tags t ON t.id = mt.tag_id
-       WHERE mt.meta_key = ? ORDER BY t.name`,
+       WHERE mt.meta_key = ? ORDER BY mt.source, t.namespace, t.name`,
     )
     .all(metaKey) as TagInfo[];
 }
 
+/** Searchable text for files_fts: the user's own tag names, deduplicated across
+ *  sources. Must stay in step with FTS_ROW_SELECT in db.ts — same set of names,
+ *  same separator. Generated (namespaced) tags are excluded on purpose; see the
+ *  comment on that constant. */
 export function tagsText(db: DB, fileId: number): string {
-  return fileTags(db, fileId)
-    .map((t) => t.name)
-    .join(" ");
+  const names = new Set(
+    fileTags(db, fileId)
+      .filter((t) => t.namespace === "")
+      .map((t) => t.name),
+  );
+  return [...names].sort().join(" ");
 }
 
 export function syncFts(db: DB, fileId: number): void {
@@ -98,12 +114,14 @@ export function listTagNames(db: DB, prefix: string, limit: number): string[] {
     .replace(/\\/g, "\\\\")
     .replace(/%/g, "\\%")
     .replace(/_/g, "\\_");
-  // ORDER BY must match idx_tags_name's NOCASE collation — with the default
+  // Manual completion only: a namespaced tag is pipeline-owned and the user is
+  // not allowed to create one, so offering it would be a dead end.
+  // ORDER BY must match idx_tags_manual_name's NOCASE collation — with the default
   // BINARY collation SQLite can use the index for the prefix range but still
   // needs a temp b-tree for the sort.
   const rows = db
     .prepare(
-      "SELECT name FROM tags WHERE name LIKE ? ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT ?",
+      "SELECT name FROM tags WHERE namespace = '' AND name LIKE ? ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT ?",
     )
     .all(`${escaped}%`, Math.max(1, Math.min(100, limit))) as {
     name: string;

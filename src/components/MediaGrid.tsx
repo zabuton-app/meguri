@@ -1,9 +1,29 @@
 // Media listing grid. Shows thumbnails via thumb://; click to open detail.
 // thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ImageIcon } from "lucide-react";
+import { MediaEmptyState } from "@/components/MediaEmptyState";
+import {
+  MediaReorderProvider,
+  SortableMedia,
+  type MediaReorder,
+} from "@/components/MediaReorder";
+import { mediaSortId } from "@/lib/mediaSortId";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import {
+  useWatchLater,
+  type WatchLaterMembership,
+} from "@/hooks/useWatchLater";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { RatingButton } from "@/components/RatingButton";
@@ -16,8 +36,8 @@ import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
 import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
-import { useI18n } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
+import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
 const GRID_CLASS =
@@ -54,6 +74,10 @@ interface Props {
   isFetchingPreviousPage?: boolean;
   /** Whether keyboard focus navigation is active (list is foreground). */
   navActive?: boolean;
+  /** Whether the active view is the built-in Watch Later collection (changes empty-state copy). */
+  watchLater?: boolean;
+  /** Set only while a collection is shown in its manual order; enables drag-to-reorder. */
+  reorder?: MediaReorder;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -73,9 +97,11 @@ export const MediaGrid = memo(function MediaGrid({
   fetchPreviousPage,
   isFetchingPreviousPage,
   navActive = false,
+  watchLater = false,
+  reorder,
 }: Props) {
-  const { t } = useI18n();
   const { activate } = useActivateFile();
+  const watchLaterMembership = useWatchLater();
 
   // Scroll parent. Virtualization DOM-renders only the visible rows relative to this element.
   // Because the scroll element mounts later when transitioning from loading to data,
@@ -166,6 +192,10 @@ export const MediaGrid = memo(function MediaGrid({
     onOpen,
     scrollToRow,
   });
+  // Points at the focused card's toggle so "W" activates it through the button
+  // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
+  const focusedWatchLaterRef = useRef<HTMLButtonElement>(null);
+  useWatchLaterHotkey({ active: navActive, buttonRef: focusedWatchLaterRef });
 
   // Reset the scroll position to the top on workspace switch (so the previous
   // workspace's position doesn't linger). Also reset the virtualizer's internal offset to 0.
@@ -211,57 +241,67 @@ export const MediaGrid = memo(function MediaGrid({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
-        <ImageIcon className="size-10 opacity-50" />
-        <p>{t("grid.empty")}</p>
-        <p className="text-xs">{t("grid.emptyHint")}</p>
-      </div>
-    );
+    return <MediaEmptyState watchLater={watchLater} />;
   }
 
   // Keep the custom scrollbar (shadcn ScrollArea) while using its Viewport as the
   // virtualization scroll element. .page-scroll converts the Viewport child's
   // display:table to block so absolutely positioned rows track the width correctly.
   return (
-    <ScrollArea
-      className="page-scroll h-full"
-      viewportClassName="pt-4"
-      viewportRef={setScrollRef}
-    >
-      <div
-        style={{
-          height: virtualizer.getTotalSize(),
-          position: "relative",
-          width: "100%",
-        }}
+    <MediaReorderProvider items={items} reorder={reorder}>
+      <ScrollArea
+        className="page-scroll h-full"
+        viewportClassName="pt-4"
+        viewportRef={setScrollRef}
       >
-        {virtualRows.map((vr) => (
-          <div
-            key={vr.key}
-            ref={measureRow}
-            className="absolute left-0 top-0 w-full"
-            style={{ transform: `translateY(${vr.start}px)` }}
-          >
+        <div
+          style={{
+            height: virtualizer.getTotalSize(),
+            position: "relative",
+            width: "100%",
+          }}
+        >
+          {virtualRows.map((vr) => (
             <div
-              className="grid gap-3 px-4 pb-3"
-              style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+              key={vr.key}
+              ref={measureRow}
+              className="absolute left-0 top-0 w-full"
+              style={{ transform: `translateY(${vr.start}px)` }}
             >
-              {rows[vr.index].map((f, localIndex) => (
-                <MediaCard
-                  key={`${f.workspaceId}:${f.id}`}
-                  file={f}
-                  version={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
-                  mediaBase={mediaBase}
-                  onTagClick={onTagClick}
-                  focused={vr.index * cols + localIndex === focusedIndex}
-                />
-              ))}
+              <div
+                className="grid gap-3 px-4 pb-3"
+                style={{
+                  gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                }}
+              >
+                {rows[vr.index].map((f, localIndex) => {
+                  const focused = vr.index * cols + localIndex === focusedIndex;
+                  const card = (
+                    <MediaCard
+                      file={f}
+                      version={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
+                      mediaBase={mediaBase}
+                      onTagClick={onTagClick}
+                      focused={focused}
+                      watchLater={watchLaterMembership}
+                      watchLaterRef={focused ? focusedWatchLaterRef : undefined}
+                    />
+                  );
+                  const key = mediaSortId(f);
+                  return reorder ? (
+                    <SortableMedia key={key} id={key}>
+                      {card}
+                    </SortableMedia>
+                  ) : (
+                    <Fragment key={key}>{card}</Fragment>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+          ))}
+        </div>
+      </ScrollArea>
+    </MediaReorderProvider>
   );
 });
 
@@ -273,12 +313,17 @@ const MediaCard = memo(function MediaCard({
   mediaBase,
   onTagClick,
   focused,
+  watchLater,
+  watchLaterRef,
 }: {
   file: FileRow;
   version: number;
   mediaBase: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  watchLater: WatchLaterMembership;
+  /** Set only on the focused card, so the "W" shortcut can drive this toggle. */
+  watchLaterRef?: Ref<HTMLButtonElement>;
 }) {
   // The card is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
@@ -321,6 +366,15 @@ const MediaCard = memo(function MediaCard({
               ? "opacity-100"
               : "opacity-0 focus:opacity-100 group-hover:opacity-100",
           )}
+        />
+        {/* Watch Later toggle, mirroring the favorite affordance below it. */}
+        <WatchLaterButton
+          ref={watchLaterRef}
+          fileId={file.id}
+          workspaceId={file.workspaceId}
+          watchLater={watchLater}
+          size={16}
+          className="absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
         />
       </Link>
       {/* Metadata. Fixed height so the card height doesn't change with tag count. */}

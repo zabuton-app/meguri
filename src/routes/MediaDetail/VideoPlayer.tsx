@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -23,9 +24,17 @@ import { api } from "@/ipc/client";
 import type { SceneBookmark } from "@/ipc/types";
 import { findNearestBookmark } from "@/lib/bookmarks";
 import log from "@/lib/logger";
-import { loadMuted, loadVolume, saveVolume } from "@/lib/playerVolume";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  bumpVolume,
+  setVolume,
+  syncFromElement,
+  toggleMuted,
+  useVolume,
+  VOLUME_EPSILON,
+  VOLUME_STEP,
+} from "@/hooks/useVolume";
 import { matchAny, type NavBinding } from "@/settings/keybindings";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { fmtTime } from "./utils";
@@ -40,9 +49,39 @@ const MEDIA_ERR_NETWORK = 2;
 // (frame previews holding the origin's sockets) that caused the failure.
 const NETWORK_RETRY_DELAY_MS = 300;
 
+/**
+ * The shortest gap between two re-serves of a streamed file. A held arrow key
+ * repeats ~30 times a second, and each press on that path spawns a fresh ffmpeg
+ * and calls `load()`, which leaves the element paused with the previous `play()`
+ * aborted by the next one — that is how holding a key used to end in a stopped
+ * video that had not moved. Seeks the element can do by itself cost nothing and
+ * are not rate-limited at all, so those stay as immediate as they ever were.
+ */
+const STREAM_SEEK_INTERVAL_MS = 350;
+
+/**
+ * How long after the last press a run is considered over. Until then the next
+ * press is measured from the second the run reached, not from the position the
+ * element has got round to reporting.
+ */
+const SEEK_RUN_IDLE_MS = 500;
+
+/** Close enough to the target to call a seek finished. */
+const SEEK_SETTLED_SEC = 0.05;
+
 export interface PlayerHandle {
   seek: (t: number) => void;
   pause: () => void;
+  /** Play/pause from outside the player's own chrome (the playlist control bar). */
+  togglePlay: () => void;
+  /**
+   * Current position in seconds. This is the *real* time in the file, not the
+   * element's own `currentTime`: a remuxed stream starts at whatever second the
+   * server was asked for, so the two differ by that offset. While the seek bar
+   * is being dragged this reports where the drag is headed, which is what the
+   * user means by "here" at that moment.
+   */
+  currentTime: () => number;
 }
 
 export const VideoPlayer = forwardRef<
@@ -66,22 +105,54 @@ export const VideoPlayer = forwardRef<
      * YouTube-style: the video fills the screen and the rest scrolls below it).
      */
     fullscreenTargetRef?: React.RefObject<HTMLDivElement | null>;
-    /** User-curated bookmarks for this file (drives the toggle button state). */
-    bookmarks: SceneBookmark[];
+    /**
+     * User-curated bookmarks for this file (drives the toggle button state).
+     * Omitted by the playlist player, which shows no editing affordances; the
+     * bookmark button is then not rendered at all.
+     */
+    bookmarks?: SceneBookmark[];
     /** True while a bookmark mutation is in flight; the toggle button is disabled until it resolves. */
-    bookmarkPending: boolean;
-    onAddBookmark: (sec: number) => void;
-    onRemoveBookmark: (bookmarkId: number) => void;
+    bookmarkPending?: boolean;
+    onAddBookmark?: (sec: number) => void;
+    onRemoveBookmark?: (bookmarkId: number) => void;
     /** True while a frame export is in flight; the button is disabled until it resolves. */
-    exportPending: boolean;
-    /** Export the frame at `sec` as a still image (opens a native save dialog). */
-    onExportFrame: (sec: number) => void;
+    exportPending?: boolean;
+    /**
+     * Export the frame at `sec` as a still image (opens a native save dialog).
+     * Omitted by the playlist player; the export button is then not rendered.
+     */
+    onExportFrame?: (sec: number) => void;
     onNativeDuration: (d: number | null) => void;
     /** Fired once per loaded file when playback first starts (used to refresh the list order). */
     onPlayed: () => void;
     /** Fires on every play (not just the first), so the caller can enforce
      *  audio/video exclusivity. Distinct from onPlayed, which fires once per file. */
     onPlaybackStart?: () => void;
+    /** Fired when the media plays through to its end (drives playlist auto-advance). */
+    onEnded?: () => void;
+    /** Mirrors the play/pause state out to an external control bar. */
+    onPlayingChange?: (playing: boolean) => void;
+    /**
+     * Draw the video only. The playlist player supplies its own control bar, so
+     * this suppresses both of this player's own surfaces — the paused-state
+     * centre play button and the bottom control bar — which would otherwise
+     * appear on top of it the moment playback pauses.
+     */
+    chromeless?: boolean;
+    /**
+     * Fired instead of rendering the built-in error panel when playback fails
+     * for good. The playlist player uses this to skip to the next item; the
+     * panel's "open externally" escape hatch would be a manual affordance the
+     * full-screen player must not show.
+     */
+    onFatalError?: (message: string) => void;
+    /**
+     * Fired when the error screen hands the file to an external player. That
+     * counts as a play main-side (and consumes the Watch Later entry), so the
+     * parent gets to keep its caches in step. Optional because a caller that
+     * handles failures itself (onFatalError) never renders that screen.
+     */
+    onOpenExternal?: () => void;
     t: TFunc;
   }
 >(function VideoPlayer(
@@ -106,6 +177,11 @@ export const VideoPlayer = forwardRef<
     onNativeDuration,
     onPlayed,
     onPlaybackStart,
+    onEnded,
+    onPlayingChange,
+    onFatalError,
+    onOpenExternal,
+    chromeless = false,
     t,
   },
   handleRef,
@@ -122,8 +198,9 @@ export const VideoPlayer = forwardRef<
   const [loaded, setLoaded] = useState(false);
   // Whether this player is currently the fullscreen element (used to drop the max-height cap).
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [muted, setMuted] = useState(loadMuted);
-  const [volume, setVolume] = useState(loadVolume);
+  // Volume lives outside this component so the playlist chrome and the detail
+  // view stay in step (see hooks/useVolume.ts).
+  const { volume, muted } = useVolume();
   // Total duration obtained natively (only when finite).
   const [nativeDur, setNativeDur] = useState<number | null>(null);
   // Hover position on the seek bar {ratio: 0..1, t: seconds}. Positioning uses % to be invariant to CSS zoom.
@@ -136,6 +213,23 @@ export const VideoPlayer = forwardRef<
   // Display position (scrub while dragging).
   const displayPos = scrub ?? position;
 
+  /**
+   * The second the current run of seek presses has reached, before the element
+   * has been told about it. Presses measure from here rather than from
+   * `position`, which only moves when a `timeupdate` arrives: presses that
+   * outrun that event would all measure from the same second and collapse into
+   * a single step, which is how a held key used to stop making progress.
+   */
+  const seekTargetRef = useRef<number | null>(null);
+  const seekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** When the stream was last re-served, so a held key cannot do it 30×/s. */
+  const lastStreamSeekRef = useRef(0);
+  /** A seek asked for before there was any media to seek (see `seek`). */
+  const deferredSeekRef = useRef<number | null>(null);
+  /** Whether this source has reported its metadata yet. */
+  const haveMetadataRef = useRef(false);
+
   // Keep the latest values for keyboard handling (referenced through the listener's closure).
   const posRef = useRef(0);
   const totalRef = useRef<number | undefined>(undefined);
@@ -144,6 +238,18 @@ export const VideoPlayer = forwardRef<
     posRef.current = displayPos;
     totalRef.current = total;
   });
+
+  // Push the shared volume onto the element. Assigning only when the value
+  // actually differs is what stops this from ping-ponging with the
+  // `volumechange` handler below, which feeds the element's value back in.
+  // This covers changes to the value; a *new* element (the error screen's
+  // reload swaps one in) is caught by onLoadedMetadata instead.
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (Math.abs(v.volume - volume) > VOLUME_EPSILON) v.volume = volume;
+    if (v.muted !== muted) v.muted = muted;
+  }, [volume, muted]);
 
   // Throttle preview fetching (limit ffmpeg launches to ~10 times/sec).
   const desiredRef = useRef<number | null>(null);
@@ -177,6 +283,18 @@ export const VideoPlayer = forwardRef<
     }
   };
 
+  const cancelQueuedSeek = () => {
+    if (seekTimerRef.current != null) {
+      clearTimeout(seekTimerRef.current);
+      seekTimerRef.current = null;
+    }
+    if (runIdleTimerRef.current != null) {
+      clearTimeout(runIdleTimerRef.current);
+      runIdleTimerRef.current = null;
+    }
+    seekTargetRef.current = null;
+  };
+
   // Reset all per-file playback state. Shared by the [id, src] change effect
   // and the reload button on the error screen. Deliberately leaves `playedRef`
   // alone: reloading the same file must not re-fire onPlayed.
@@ -189,6 +307,9 @@ export const VideoPlayer = forwardRef<
     setNativeDur(null);
     setHover(null);
     setScrub(null);
+    cancelQueuedSeek();
+    deferredSeekRef.current = null;
+    haveMetadataRef.current = false;
     appliedStartRef.current = false;
     netRetriedRef.current = false;
     if (retryTimerRef.current != null) {
@@ -208,6 +329,7 @@ export const VideoPlayer = forwardRef<
     () => () => {
       stopTimer();
       if (retryTimerRef.current != null) clearTimeout(retryTimerRef.current);
+      cancelQueuedSeek();
     },
     [],
   );
@@ -216,9 +338,32 @@ export const VideoPlayer = forwardRef<
   // otherwise re-stream via ?t. Remuxed containers (mkv/avi/wmv/flv/ts) are piped
   // without Range support, so seekable only covers the buffered portion — checking
   // length > 0 isn't enough; the target time must actually be inside one of the ranges.
-  const seek = (t: number) => {
+  /**
+   * @param fromRun whether this is the run of key presses landing its target.
+   *   Anything else — the seek bar, a scene click, the resumed position — is a
+   *   seek asked for outright, and supersedes the run: leaving its target in
+   *   place would have `onSeeked` chase it and undo the seek just made.
+   */
+  const seek = (t: number, fromRun = false) => {
     const v = ref.current;
     if (!v) return;
+    if (fromRun) {
+      if (seekTimerRef.current != null) {
+        clearTimeout(seekTimerRef.current);
+        seekTimerRef.current = null;
+      }
+    } else {
+      cancelQueuedSeek();
+    }
+    // Nothing loaded yet — an item that has only just been swapped in. Whether
+    // this source can be seeked at all is not knowable until its metadata
+    // arrives, and guessing "stream" here re-serves the file with a `?t=` that
+    // the server ignores for everything but a remuxed container: playback would
+    // silently restart from the top while `offset` told the UI otherwise.
+    if (!haveMetadataRef.current) {
+      deferredSeekRef.current = t;
+      return;
+    }
     let inSeekable = false;
     for (let i = 0; i < v.seekable.length; i++) {
       if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) {
@@ -230,6 +375,7 @@ export const VideoPlayer = forwardRef<
       v.currentTime = t;
     } else {
       // Stream: re-serve from the specified second.
+      lastStreamSeekRef.current = Date.now();
       setOffset(t);
       setPosition(t);
       v.src = `${src}?t=${Math.floor(t)}`;
@@ -244,6 +390,14 @@ export const VideoPlayer = forwardRef<
   useEffect(() => {
     seekRef.current = seek;
   });
+  // Stable, so the imperative handle below can just close over it.
+  const togglePlay = useCallback(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => {});
+    else v.pause();
+  }, []);
+
   useImperativeHandle(
     handleRef,
     () => ({
@@ -251,39 +405,100 @@ export const VideoPlayer = forwardRef<
       pause: () => {
         ref.current?.pause();
       },
+      togglePlay,
+      // Through the ref, not the closure: this handle is rebuilt only when
+      // togglePlay changes, so a captured position would go stale immediately.
+      currentTime: () => posRef.current,
     }),
-    [],
+    [togglePlay],
   );
 
-  const togglePlay = () => {
-    const v = ref.current;
-    if (!v) return;
-    if (v.paused) void v.play().catch(() => {});
-    else v.pause();
+  // Mirror the play/pause state out so an external control bar can render it.
+  // Read through a ref (the convention in this file) so a caller passing an
+  // inline closure does not make this fire on each of its own renders — the
+  // playlist player wakes its control bar from here, and that turned into a bar
+  // that could never stay hidden.
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  useEffect(() => {
+    onPlayingChangeRef.current = onPlayingChange;
+  });
+  useEffect(() => {
+    onPlayingChangeRef.current?.(playing);
+  }, [playing]);
+
+  /** Whether the element can reach `t` on its own, without re-serving. */
+  const canSeekNatively = (v: HTMLVideoElement, t: number) => {
+    if (!haveMetadataRef.current || !isFinite(v.duration)) return false;
+    for (let i = 0; i < v.seekable.length; i++) {
+      if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) return true;
+    }
+    return false;
   };
 
-  const toggleMute = () => {
-    const v = ref.current;
-    if (!v) return;
-    v.muted = !v.muted;
-    setMuted(v.muted);
+  /** Hand the second the run has reached to the element. */
+  const flushSeek = () => {
+    if (seekTimerRef.current != null) {
+      clearTimeout(seekTimerRef.current);
+      seekTimerRef.current = null;
+    }
+    const target = seekTargetRef.current;
+    if (target == null) return;
+    setScrub(null);
+    seekRef.current(target, true);
   };
 
-  // Relative skip (±seconds). Clamped to the total duration, based on the current position.
+  /**
+   * Aim at a second. A file the element can seek by itself is moved at once —
+   * that is what makes holding the key feel like fast-forwarding — while a
+   * stream, where every seek costs an ffmpeg and a reload, is moved at most
+   * every {@link STREAM_SEEK_INTERVAL_MS} with the final target always landing.
+   *
+   * The target survives the press (see {@link SEEK_RUN_IDLE_MS}) so the next one
+   * measures from it rather than from a position report that has not caught up.
+   */
+  const queueSeek = (t: number) => {
+    const v = ref.current;
+    if (!v) return;
+    seekTargetRef.current = t;
+    if (runIdleTimerRef.current != null) clearTimeout(runIdleTimerRef.current);
+    runIdleTimerRef.current = setTimeout(() => {
+      runIdleTimerRef.current = null;
+      seekTargetRef.current = null;
+    }, SEEK_RUN_IDLE_MS);
+
+    if (canSeekNatively(v, t)) {
+      // One at a time. Assigning `currentTime` again while the element is still
+      // seeking replaces the request it was working on, and a key repeating
+      // every ~33ms replaces it forever: the position runs ahead while no frame
+      // is ever decoded, so the picture sits frozen on the second the run
+      // started from. The `seeked` handler picks the newest target up the
+      // moment the current one lands.
+      if (!v.seeking) flushSeek();
+      return;
+    }
+    // Show where the run is heading while the stream catches up.
+    setScrub(t);
+    const since = Date.now() - lastStreamSeekRef.current;
+    if (since >= STREAM_SEEK_INTERVAL_MS) {
+      flushSeek();
+      return;
+    }
+    if (seekTimerRef.current != null) clearTimeout(seekTimerRef.current);
+    seekTimerRef.current = setTimeout(
+      flushSeek,
+      STREAM_SEEK_INTERVAL_MS - since,
+    );
+  };
+
+  // Relative skip (±seconds). Clamped to the total duration, measured from where
+  // the run of presses has got to rather than from the last reported position.
   const skip = (delta: number) => {
-    const base = posRef.current;
+    const base = seekTargetRef.current ?? posRef.current;
     const max = totalRef.current;
     let t = base + delta;
     if (t < 0) t = 0;
     if (max && t > max) t = max;
-    seekRef.current(t);
-  };
-
-  const bumpVolume = (delta: number) => {
-    const v = ref.current;
-    if (!v) return;
-    v.volume = Math.min(1, Math.max(0, v.volume + delta));
-    v.muted = false;
+    queueSeek(t);
   };
 
   const toggleFullscreen = () => {
@@ -352,18 +567,20 @@ export const VideoPlayer = forwardRef<
           skip(-10);
           break;
         case "KeyF":
-          toggleFullscreen();
+          // Chromeless means the caller owns the frame, its fullscreen control
+          // and therefore this key too; acting here as well would cancel it out.
+          if (!chromeless) toggleFullscreen();
           break;
         case "KeyM":
-          toggleMute();
+          toggleMuted();
           break;
         case "ArrowUp":
           e.preventDefault();
-          bumpVolume(0.05);
+          bumpVolume(VOLUME_STEP);
           break;
         case "ArrowDown":
           e.preventDefault();
-          bumpVolume(-0.05);
+          bumpVolume(-VOLUME_STEP);
           break;
         case "Home":
         case "Digit0":
@@ -374,8 +591,10 @@ export const VideoPlayer = forwardRef<
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // All handlers go through refs / stable references, so registering once is enough.
-  }, []);
+    // All handlers go through refs / stable references, so registering once is
+    // enough; `chromeless` is a prop the handler reads directly, so it re-binds
+    // on the rare occasion that changes.
+  }, [togglePlay, chromeless]);
 
   // Event coordinates on the seek bar → {ratio, t}.
   // ratio is computed from getBoundingClientRect+clientX (consistent even under CSS zoom). Positioning
@@ -426,11 +645,21 @@ export const VideoPlayer = forwardRef<
     stopTimer();
   };
 
+  // A caller that handles failures itself (the playlist player skips the item)
+  // gets the message through onFatalError instead of the built-in panel. The
+  // effect sits above the early return so the hook order stays unconditional.
+  useEffect(() => {
+    if (error && onFatalError) onFatalError(error);
+  }, [error, onFatalError]);
+
+  if (error && onFatalError) return null;
+
   if (error) {
     return (
       <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl bg-surface p-8 text-center text-muted">
         <p>{t("player.playFailed")}</p>
-        <p className="text-xs">{error}</p>
+        {/* Selectable: the raw codec / MediaError string belongs in bug reports. */}
+        <p className="select-text text-xs">{error}</p>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -447,7 +676,15 @@ export const VideoPlayer = forwardRef<
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void api.openExternal(id, wsId)}
+            // Only report the launch once the main process confirms it: it
+            // records the play (and consumes the Watch Later entry) there, and
+            // can refuse for a file that has gone missing under the root.
+            onClick={() =>
+              void api
+                .openExternal(id, wsId)
+                .then(() => onOpenExternal?.())
+                .catch((e: unknown) => log.error("open external", e))
+            }
           >
             <ExternalLink />
             {t("player.openExternal")}
@@ -458,7 +695,7 @@ export const VideoPlayer = forwardRef<
   }
 
   const pct = total ? `${Math.min(100, (displayPos / total) * 100)}%` : "0%";
-  const controlsVisible = loaded && (!playing || hover != null);
+  const controlsVisible = !chromeless && loaded && (!playing || hover != null);
   const aspectRatio =
     width && height && width > 0 && height > 0
       ? `${width} / ${height}`
@@ -466,10 +703,11 @@ export const VideoPlayer = forwardRef<
 
   // Bookmark toggle. If a bookmark exists within BOOKMARK_NEAR_EPS of the current display
   // position, the button removes it; otherwise it adds one at the current position.
-  const nearBookmark = findNearestBookmark(bookmarks, displayPos);
+  const showBookmarkButton = !!onAddBookmark && !!onRemoveBookmark;
+  const nearBookmark = findNearestBookmark(bookmarks ?? [], displayPos);
   const onBookmarkToggle = () => {
-    if (nearBookmark) onRemoveBookmark(nearBookmark.id);
-    else onAddBookmark(Math.max(0, displayPos));
+    if (nearBookmark) onRemoveBookmark?.(nearBookmark.id);
+    else onAddBookmark?.(Math.max(0, displayPos));
   };
 
   // Freeze playback before opening the save dialog: the exported position is
@@ -477,18 +715,34 @@ export const VideoPlayer = forwardRef<
   // away from the frame the user chose.
   const onExportClick = () => {
     ref.current?.pause();
-    onExportFrame(Math.max(0, displayPos));
+    onExportFrame?.(Math.max(0, displayPos));
   };
+
+  // The detail view boxes the video to its aspect ratio and caps it at 78vh so
+  // the metadata below it stays on screen. Neither applies when the video is the
+  // whole screen: the playlist player hands it the entire stage, and letterboxing
+  // is the blurred backdrop's job, not a gap in the layout.
+  const fillsParent = chromeless || isFullscreen;
 
   return (
     <div
       ref={wrapRef}
-      className={`group relative flex w-full items-center justify-center overflow-hidden bg-black ${
-        isFullscreen ? "h-screen rounded-none" : "max-h-[78vh] rounded-xl"
+      className={`group relative flex w-full items-center justify-center overflow-hidden ${
+        // Opaque on its own, but not in the playlist player: the stage there
+        // already paints a blurred cover of this very file behind it, and black
+        // here would hide it and turn the letterbox bars into flat gaps.
+        chromeless ? "bg-transparent" : "bg-black"
+      } ${
+        fillsParent
+          ? `${chromeless ? "h-full" : "h-screen"} rounded-none`
+          : "max-h-[78vh] rounded-xl"
       }`}
-      style={isFullscreen ? undefined : { aspectRatio }}
+      style={fillsParent ? undefined : { aspectRatio }}
     >
-      {!loaded && (
+      {/* Skipped in the playlist player: the stage's blurred cover of this very
+          file is already the placeholder, and a grey sheet over it would flash
+          on every item change. */}
+      {!loaded && !chromeless && (
         <Skeleton
           className="absolute inset-0 z-10 rounded-none bg-overlay"
           aria-hidden="true"
@@ -499,7 +753,11 @@ export const VideoPlayer = forwardRef<
         src={src}
         autoPlay={autoplay}
         className={`h-full w-full object-contain transition-opacity ${
-          isFullscreen ? "h-full max-h-screen" : "max-h-[78vh]"
+          chromeless
+            ? "max-h-full"
+            : isFullscreen
+              ? "max-h-screen"
+              : "max-h-[78vh]"
         } ${loaded ? "opacity-100" : "opacity-0"}`}
         onClick={togglePlay}
         onPlay={() => {
@@ -512,19 +770,24 @@ export const VideoPlayer = forwardRef<
           }
         }}
         onPause={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          onEnded?.();
+        }}
         onVolumeChange={() => {
           const v = ref.current;
-          if (v) {
-            setMuted(v.muted);
-            setVolume(v.volume);
-            saveVolume(v.volume, v.muted);
-          }
+          if (v) syncFromElement(v.volume, v.muted);
         }}
         onLoadedMetadata={() => {
           const v = ref.current;
           if (!v) return;
+          // Before anything else: seeks made from here on can be decided on
+          // their merits rather than deferred.
+          haveMetadataRef.current = true;
           setLoaded(true);
-          // Apply the persisted volume/mute to this freshly-loaded media element.
+          // Apply the shared volume/mute to this freshly-loaded element. The
+          // effect above only fires when the value changes, so this is what
+          // covers an element that is new rather than a value that is new.
           v.volume = volume;
           v.muted = muted;
           if (isFinite(v.duration)) {
@@ -536,10 +799,25 @@ export const VideoPlayer = forwardRef<
             appliedStartRef.current = true;
             seekRef.current(startAt);
           }
+          // A seek asked for while there was nothing loaded yet. It comes after
+          // the initial seek because it is the newer intent of the two.
+          const deferred = deferredSeekRef.current;
+          if (deferred != null) {
+            deferredSeekRef.current = null;
+            seekRef.current(deferred);
+          }
         }}
         onTimeUpdate={() => {
           const v = ref.current;
           if (v) setPosition(offset + v.currentTime);
+        }}
+        onSeeked={() => {
+          const v = ref.current;
+          const target = seekTargetRef.current;
+          if (!v || target == null) return;
+          // The run moved on while this seek was in flight; go where it points
+          // now. Landing on the target ends the chain.
+          if (Math.abs(v.currentTime - target) > SEEK_SETTLED_SEC) flushSeek();
         }}
         onError={() => {
           const v = ref.current;
@@ -598,7 +876,7 @@ export const VideoPlayer = forwardRef<
       />
 
       {/* Center play/pause indicator (shown large while paused). */}
-      {loaded && !playing && (
+      {!chromeless && loaded && !playing && (
         <button
           type="button"
           onClick={togglePlay}
@@ -611,149 +889,154 @@ export const VideoPlayer = forwardRef<
         </button>
       )}
 
-      {/* Custom controls (with a frame preview at the hover position). */}
-      <div
-        className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity ${
-          controlsVisible ? "opacity-100" : "opacity-0"
-        } group-hover:opacity-100`}
-      >
-        {/* Seek bar + preview. */}
-        {/*
-          The track doubles as the "measurement" surface and the positioning reference (offsetParent) for the thumb/preview.
-          To widen the hit area, the track is made tall, while the visual bar is drawn thin in the center.
-        */}
+      {/*
+        Custom controls (with a frame preview at the hover position).
+        Not rendered at all when chromeless: leaving it in the tree at
+        opacity 0 would keep its buttons clickable and tab-reachable.
+      */}
+      {!chromeless && (
         <div
-          ref={trackRef}
-          onPointerDown={onTrackDown}
-          onPointerMove={onTrackMove}
-          onPointerUp={onTrackUp}
-          onPointerLeave={onTrackLeave}
-          className="group/bar relative flex h-5 w-full cursor-pointer items-center"
-          title={total ? t("player.seek") : undefined}
+          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity ${
+            controlsVisible ? "opacity-100" : "opacity-0"
+          } group-hover:opacity-100`}
         >
-          {/* Visual bar + playback-position fill (thicker on hover) */}
-          <div className="pointer-events-none h-1 w-full overflow-hidden rounded-full bg-white/25 transition-[height] group-hover/bar:h-1.5">
-            <div
-              className="h-full rounded-full bg-[var(--c-primary)]"
-              style={{ width: pct }}
-            />
-          </div>
-          {/* Thumb (relative to the track, % positioning is zoom-invariant) */}
+          {/* Seek bar + preview. */}
+          {/*
+            The track doubles as the "measurement" surface and the positioning reference (offsetParent) for the thumb/preview.
+            To widen the hit area, the track is made tall, while the visual bar is drawn thin in the center.
+          */}
           <div
-            className={`pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow transition-opacity ${
-              hover || scrub != null ? "opacity-100" : "opacity-0"
-            }`}
-            style={{ left: hover ? `${hover.ratio * 100}%` : pct }}
-          />
-          {/* Frame preview at the hover position (relative to the track, shown above) */}
-          {hover && total && (
-            <div
-              className="pointer-events-none absolute bottom-full z-10 mb-3 flex -translate-x-1/2 flex-col items-center"
-              // Clamp the preview overflow using the track's actual width. The DOM measurement
-              // must be read during render, and turning it into state would shift the measurement
-              // timing and change behavior, so the rule is suppressed here.
-              style={{
-                // eslint-disable-next-line react-hooks/refs
-                left: `${clampPreview(hover.ratio, trackRef.current?.clientWidth ?? 0) * 100}%`,
-              }}
-            >
-              <img
-                src={`${mediaBase}/ws/${wsId}/frame/${id}?t=${previewT ?? quantize(hover.t)}`}
-                alt=""
-                // max-w-none: cancels Tailwind preflight's img{max-width:100%}.
-                // Prevents the image from being squashed horizontally when the containing block's available width shrinks at later positions.
-                className="h-28 w-auto max-w-none rounded-md border border-white/30 bg-black shadow-lg"
+            ref={trackRef}
+            onPointerDown={onTrackDown}
+            onPointerMove={onTrackMove}
+            onPointerUp={onTrackUp}
+            onPointerLeave={onTrackLeave}
+            className="group/bar relative flex h-5 w-full cursor-pointer items-center"
+            title={total ? t("player.seek") : undefined}
+          >
+            {/* Visual bar + playback-position fill (thicker on hover) */}
+            <div className="pointer-events-none h-1 w-full overflow-hidden rounded-full bg-white/25 transition-[height] group-hover/bar:h-1.5">
+              <div
+                className="h-full rounded-full bg-[var(--c-primary)]"
+                style={{ width: pct }}
               />
-              <span className="mt-1 rounded bg-black/75 px-1.5 py-0.5 text-[11px] tabular-nums">
-                {fmtTime(hover.t)}
-              </span>
             </div>
-          )}
-        </div>
-
-        {/* Controls row. */}
-        <div className="flex items-center gap-1 text-xs">
-          <CtrlButton onClick={() => skip(-10)} title={t("player.back10")}>
-            <SkipBack size={18} />
-          </CtrlButton>
-          <CtrlButton
-            onClick={togglePlay}
-            title={playing ? t("player.pauseKey") : t("player.playKey")}
-          >
-            {playing ? <Pause size={20} /> : <Play size={20} />}
-          </CtrlButton>
-          <CtrlButton onClick={() => skip(10)} title={t("player.forward10")}>
-            <SkipForward size={18} />
-          </CtrlButton>
-          <CtrlButton
-            onClick={onBookmarkToggle}
-            disabled={bookmarkPending}
-            title={
-              nearBookmark
-                ? t("player.bookmarkRemove", {
-                    time: fmtTime(nearBookmark.sec),
-                  })
-                : t("player.bookmarkAdd")
-            }
-          >
-            {nearBookmark ? (
-              <BookmarkCheck
-                size={18}
-                className="fill-current text-[var(--c-primary)]"
-              />
-            ) : (
-              <Bookmark size={18} />
-            )}
-          </CtrlButton>
-          <CtrlButton
-            onClick={onExportClick}
-            disabled={exportPending}
-            title={t("player.exportFrame")}
-          >
-            <Camera size={18} />
-          </CtrlButton>
-          <span className="ml-1 tabular-nums">{fmtTime(displayPos)}</span>
-          <span className="opacity-50">/</span>
-          <span className="tabular-nums opacity-80">
-            {total ? fmtTime(total) : "--:--"}
-          </span>
-          <div className="ml-auto flex items-center gap-1">
-            <div className="group/vol flex items-center">
-              <CtrlButton
-                onClick={toggleMute}
-                title={muted ? t("player.unmute") : t("player.mute")}
+            {/* Thumb (relative to the track, % positioning is zoom-invariant) */}
+            <div
+              className={`pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow transition-opacity ${
+                hover || scrub != null ? "opacity-100" : "opacity-0"
+              }`}
+              style={{ left: hover ? `${hover.ratio * 100}%` : pct }}
+            />
+            {/* Frame preview at the hover position (relative to the track, shown above) */}
+            {hover && total && (
+              <div
+                className="pointer-events-none absolute bottom-full z-10 mb-3 flex -translate-x-1/2 flex-col items-center"
+                // Clamp the preview overflow using the track's actual width. The DOM measurement
+                // must be read during render, and turning it into state would shift the measurement
+                // timing and change behavior, so the rule is suppressed here.
+                style={{
+                  // eslint-disable-next-line react-hooks/refs
+                  left: `${clampPreview(hover.ratio, trackRef.current?.clientWidth ?? 0) * 100}%`,
+                }}
               >
-                {muted || volume === 0 ? (
-                  <VolumeX size={18} />
+                <img
+                  src={`${mediaBase}/ws/${wsId}/frame/${id}?t=${previewT ?? quantize(hover.t)}`}
+                  alt=""
+                  // max-w-none: cancels Tailwind preflight's img{max-width:100%}.
+                  // Prevents the image from being squashed horizontally when the containing block's available width shrinks at later positions.
+                  className="h-28 w-auto max-w-none rounded-md border border-white/30 bg-black shadow-lg"
+                />
+                <span className="mt-1 rounded bg-black/75 px-1.5 py-0.5 text-[11px] tabular-nums">
+                  {fmtTime(hover.t)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Controls row. */}
+          <div className="flex items-center gap-1 text-xs">
+            <CtrlButton onClick={() => skip(-10)} title={t("player.back10")}>
+              <SkipBack size={18} />
+            </CtrlButton>
+            <CtrlButton
+              onClick={togglePlay}
+              title={playing ? t("player.pauseKey") : t("player.playKey")}
+            >
+              {playing ? <Pause size={20} /> : <Play size={20} />}
+            </CtrlButton>
+            <CtrlButton onClick={() => skip(10)} title={t("player.forward10")}>
+              <SkipForward size={18} />
+            </CtrlButton>
+            {showBookmarkButton && (
+              <CtrlButton
+                onClick={onBookmarkToggle}
+                disabled={bookmarkPending}
+                title={
+                  nearBookmark
+                    ? t("player.bookmarkRemove", {
+                        time: fmtTime(nearBookmark.sec),
+                      })
+                    : t("player.bookmarkAdd")
+                }
+              >
+                {nearBookmark ? (
+                  <BookmarkCheck
+                    size={18}
+                    className="fill-current text-[var(--c-primary)]"
+                  />
                 ) : (
-                  <Volume2 size={18} />
+                  <Bookmark size={18} />
                 )}
               </CtrlButton>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={muted ? 0 : volume}
-                onChange={(e) => {
-                  const v = ref.current;
-                  if (!v) return;
-                  v.volume = Number(e.target.value);
-                  v.muted = false;
-                }}
-                className="w-0 accent-[var(--c-primary)] opacity-0 transition-all group-hover/vol:ml-1 group-hover/vol:w-20 group-hover/vol:opacity-100"
-                title={t("player.volume")}
-              />
+            )}
+            {onExportFrame && (
+              <CtrlButton
+                onClick={onExportClick}
+                disabled={exportPending}
+                title={t("player.exportFrame")}
+              >
+                <Camera size={18} />
+              </CtrlButton>
+            )}
+            <span className="ml-1 tabular-nums">{fmtTime(displayPos)}</span>
+            <span className="opacity-50">/</span>
+            <span className="tabular-nums opacity-80">
+              {total ? fmtTime(total) : "--:--"}
+            </span>
+            <div className="ml-auto flex items-center gap-1">
+              <div className="group/vol flex items-center">
+                <CtrlButton
+                  onClick={toggleMuted}
+                  title={muted ? t("player.unmute") : t("player.mute")}
+                >
+                  {muted || volume === 0 ? (
+                    <VolumeX size={18} />
+                  ) : (
+                    <Volume2 size={18} />
+                  )}
+                </CtrlButton>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={VOLUME_STEP}
+                  value={muted ? 0 : volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                  className="w-0 accent-[var(--c-primary)] opacity-0 transition-all group-hover/vol:ml-1 group-hover/vol:w-20 group-hover/vol:opacity-100"
+                  title={t("player.volume")}
+                />
+              </div>
+              <CtrlButton
+                onClick={toggleFullscreen}
+                title={t("player.fullscreen")}
+              >
+                <Maximize size={18} />
+              </CtrlButton>
             </div>
-            <CtrlButton
-              onClick={toggleFullscreen}
-              title={t("player.fullscreen")}
-            >
-              <Maximize size={18} />
-            </CtrlButton>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 });

@@ -1,21 +1,24 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
-import {
-  ExternalLink,
-  Film,
-  Heart,
-  ImageIcon,
-  Music,
-  Play,
-} from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, Film, ImageIcon, Music, Play } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
+import log from "@/lib/logger";
+import { dropFromWatchLaterCache } from "@/lib/queryCache";
 import { Button } from "@/components/ui/button";
+import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import type { WatchLaterMembership } from "@/hooks/useWatchLater";
 import { RatingStars } from "@/components/RatingStars";
 import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { formatDuration, formatSize } from "@/lib/format";
+import { LIST_HIDDEN_SOURCES } from "@shared/tags";
+import { tagColorClass } from "@/lib/tagColorClass";
+import { tagHumanLabel } from "@/lib/tagLabel";
+import { TagChipLabel } from "@/components/TagChipLabel";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { detailPath } from "./utils";
 import { SceneRail } from "./SceneRail";
@@ -30,7 +33,8 @@ export function DiscoverCard({
   mediaBase,
   thumbVersion,
   onRate,
-  onToggleFavorite,
+  watchLater,
+  watchLaterRef,
   filterParam,
   workspaceName,
   isActive,
@@ -41,7 +45,10 @@ export function DiscoverCard({
   /** Bumped on thumb:done so a regenerated thumbnail busts the browser cache. */
   thumbVersion: number;
   onRate: (rating: number) => void;
-  onToggleFavorite: () => void;
+  /** Shared membership lookup, resolved once by the route. */
+  watchLater: WatchLaterMembership;
+  /** Set only on the selected slide, so the "w" shortcut can drive this card. */
+  watchLaterRef?: Ref<HTMLButtonElement>;
   filterParam?: string;
   /** Label of the file's workspace, shown as the first meta chip. */
   workspaceName?: string;
@@ -49,8 +56,8 @@ export function DiscoverCard({
   isActive: boolean;
   t: TFunc;
 }) {
+  const qc = useQueryClient();
   const wsId = file.workspaceId;
-  const isFav = !!file.favorite;
   // Same rule as MediaThumbnail: thumb_status alone can be 'done' with no file
   // produced (audio without embedded cover art), which would 404. randomFiles
   // only excludes audio when no kind filter is set, so an explicit audio filter
@@ -184,24 +191,25 @@ export function DiscoverCard({
               </>
             )}
             <Chip interactive className="gap-2">
-              <button
-                type="button"
-                onClick={onToggleFavorite}
-                aria-pressed={isFav}
-                aria-label={isFav ? t("favorite.remove") : t("favorite.add")}
-                title={isFav ? t("favorite.remove") : t("favorite.add")}
-                className={cn(
-                  "flex items-center justify-center transition-colors",
-                  isFav ? "text-error" : "text-muted hover:text-error",
-                )}
-              >
-                <Heart className={cn("size-3.5", isFav && "fill-current")} />
-              </button>
+              <FavoriteButton
+                fileId={file.id}
+                workspaceId={wsId}
+                favorite={file.favorite}
+                size={14}
+              />
               <RatingStars value={file.rating} onChange={onRate} size={14} />
             </Chip>
-            {file.tags?.map((tag) => (
-              <Chip key={`${tag.id}-${tag.source}`}>{tag.name}</Chip>
-            ))}
+            {file.tags
+              ?.filter((tag) => !LIST_HIDDEN_SOURCES.includes(tag.source))
+              .map((tag) => (
+                <Chip
+                  key={`${tag.id}-${tag.source}`}
+                  className={tagColorClass(tag.source)}
+                  title={tagHumanLabel(t, tag.namespace, tag.name)}
+                >
+                  <TagChipLabel namespace={tag.namespace} name={tag.name} />
+                </Chip>
+              ))}
           </div>
         </div>
 
@@ -212,11 +220,28 @@ export function DiscoverCard({
               {isVideo ? t("discover.play") : t("discover.open")}
             </Link>
           </Button>
+          {/* Styled to sit flush with the outline icon buttons around it; the
+              control keeps its own primary hover/pressed colors. */}
+          <WatchLaterButton
+            ref={watchLaterRef}
+            fileId={file.id}
+            workspaceId={wsId}
+            watchLater={watchLater}
+            className="size-11 shrink-0 rounded-md border border-border/60 bg-bg/50 backdrop-blur-md hover:bg-bg/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+          />
           <Button
             variant="outline"
             size="icon"
             className="size-11 shrink-0 border-border/60 bg-bg/50 backdrop-blur-md"
-            onClick={() => void api.openExternal(file.id, wsId)}
+            // Main-side this counts as a play and consumes the Watch Later
+            // entry, so mirror that once it confirms (it can refuse for a file
+            // that has gone missing under the root).
+            onClick={() =>
+              void api
+                .openExternal(file.id, wsId)
+                .then(() => dropFromWatchLaterCache(qc, wsId, file.id))
+                .catch((e: unknown) => log.error("open external", e))
+            }
             title={t("media.openExternal")}
             aria-label={t("media.openExternal")}
           >
@@ -243,13 +268,16 @@ function Chip({
   children,
   interactive,
   className,
+  title,
 }: {
   children: ReactNode;
   interactive?: boolean;
   className?: string;
+  title?: string;
 }) {
   return (
     <span
+      title={title}
       className={cn(
         "flex items-center rounded-md border border-border/60 bg-bg/50 px-2 py-1 text-xs text-fg backdrop-blur-md",
         interactive && "pointer-events-auto",

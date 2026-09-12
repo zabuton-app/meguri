@@ -4,9 +4,20 @@
 // values can be used at runtime (e.g. for .parse() validation in main); the
 // inferred types satisfy the prior hand-written interfaces.
 import { z } from "zod";
+import { MAX_TAG_REF_NAME } from "../tags.js";
 
 export const KindSchema = z.enum(["video", "image", "audio"]);
 export type Kind = z.infer<typeof KindSchema>;
+
+// App logo variants (window/tray/in-app icon). "dark" is the original
+// vermilion kanji icon, "light" the inverted unbleached-cotton one, and
+// "enso" a pictorial brush-circle-with-media-card mark on navy. Persisted in
+// main's config.json (the tray exists before any renderer), so the ids are a
+// stable API shared by config.json, IPC, and the bundled assets — do not
+// rename.
+export const LOGO_IDS = ["dark", "light", "enso"] as const;
+export const LogoIdSchema = z.enum(LOGO_IDS);
+export type LogoId = z.infer<typeof LogoIdSchema>;
 
 export const TagInfoSchema = z.object({
   id: z.number(),
@@ -170,6 +181,51 @@ export const DuplicatesResultSchema = z.object({
 });
 export type DuplicatesResult = z.infer<typeof DuplicatesResultSchema>;
 
+/**
+ * A tag addressed by name rather than by `tags.id`. Each workspace has its own
+ * database, so the same logical tag carries a different id in each — a name is
+ * the only identifier that survives the cross-workspace ("All") view.
+ */
+export const TagRefSchema = z.object({
+  namespace: z.string().max(32),
+  // A reference to an existing tag, so this is MAX_TAG_REF_NAME rather than the
+  // creation cap: tags named before that cap existed have to stay renameable,
+  // mergeable and deletable. Names the user creates are bounded where they are
+  // created (file_add_tag, tag_rename's `to`).
+  name: z.string().min(1).max(MAX_TAG_REF_NAME),
+});
+export type TagRef = z.infer<typeof TagRefSchema>;
+
+export const TagSourceCountSchema = z.object({
+  source: z.string(),
+  count: z.number(),
+});
+export type TagSourceCount = z.infer<typeof TagSourceCountSchema>;
+
+/** One row of the tag management screen, aggregated over the workspaces in scope. */
+export const TagSummarySchema = z.object({
+  namespace: z.string(),
+  name: z.string(),
+  /** Display and query form ("beach" | "res:4k"). Also the stable list key. */
+  qualified: z.string(),
+  /** Distinct alive files carrying the tag, summed over the workspaces in scope. */
+  fileCount: z.number(),
+  /** Same basis, split by origin. A file tagged twice counts once per source. */
+  bySource: z.array(TagSourceCountSchema),
+  /** namespace !== "" — rename / merge / delete are rejected for these. */
+  pipelineOwned: z.boolean(),
+  /** Workspaces holding the tag; only meaningful in the "All" view. */
+  workspaceIds: z.array(z.string()),
+});
+export type TagSummary = z.infer<typeof TagSummarySchema>;
+
+export const TagListSchema = z.object({
+  tags: z.array(TagSummarySchema),
+  /** True when the catalog exceeded MAX_TAG_LIST and was cut short. */
+  truncated: z.boolean(),
+});
+export type TagList = z.infer<typeof TagListSchema>;
+
 export const SearchResultSchema = z.object({
   items: z.array(FileRowSchema),
   // Number when produced by the per-DB offset path; keyset object from the
@@ -215,6 +271,12 @@ export const UserCollectionSchema = z.object({
   items: z.array(UserCollectionItemSchema),
   createdAt: z.number(),
   updatedAt: z.number(),
+  /**
+   * True for built-in collections ("Watch Later"), which cannot be removed,
+   * renamed, reordered, or re-iconed. The renderer uses this to hide those
+   * affordances; the main process enforces it independently.
+   */
+  locked: z.boolean(),
 });
 export type UserCollection = z.infer<typeof UserCollectionSchema>;
 

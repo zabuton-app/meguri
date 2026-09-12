@@ -90,13 +90,37 @@ This is an invariant in `electron/main.ts`; preserve it when changing window or
 lifecycle behavior:
 
 - The window's `close` event calls `preventDefault()` and hides the window to the
-  tray unless `isQuitting` is set.
-- `window-all-closed` does **not** call `app.quit()`.
-- The app quits only via the tray "Quit" menu item or, on macOS, Cmd+Q; both set
-  `isQuitting = true` (the latter through `before-quit`).
+  tray unless the app is quitting (`isQuitting()`, derived from `quitPhase`).
+- `window-all-closed` does **not** call `app.quit()` (unless tray support is
+  disabled, e.g. in Docker — then closing the last window quits).
+- The app quits via the tray "Quit" menu item, macOS Cmd+Q, or the last window
+  closing when tray support is disabled; all go through `app.quit()` and
+  therefore `before-quit`, which advances `quitPhase`.
+- `before-quit` is a two-pass gate (Linux / Windows): the first pass calls
+  `preventDefault()`, runs the async `shutdown()` (hide the window, stop the
+  local servers, abort scans, dispose the query worker), then closes every
+  workspace DB handle and re-enters `app.quit()`; the second pass lets the quit
+  proceed. Repeated quit requests during the wait are absorbed, and the wait is
+  bounded so a stuck teardown cannot keep the app alive. Once quitting, no scan
+  starts and no workspace DB is reopened.
+- On macOS `before-quit` tears down synchronously instead (`teardownSync()`):
+  cancelling the quit there would also cancel an OS log-out. The same
+  synchronous path handles `powerMonitor` "shutdown" (macOS / Linux) and the
+  window's `session-end` (Windows shutdown / log-off, which never reaches
+  `before-quit`).
+- If the renderer process crashes, the main window is reloaded with a growing
+  delay, bounded per minute; past that (or on a launch / integrity failure) the
+  user is asked to reload or quit instead of being left with a blank window.
 - A single-instance lock prevents a second copy from launching.
-- The tray icon is a base64-embedded image, to avoid bundle path-resolution
-  issues.
+- The tray and window icons are base64-embedded images
+  (`electron/core/logoAssets.ts`), to avoid bundle path-resolution issues.
+  Three logo variants exist (`dark` = vermilion kanji, `light` = inverted,
+  `enso` = pictorial brush circle with a media card, raster-sourced — no SVG
+  master); the choice is persisted as `logo` in
+  main's `config.json` and switched from Settings via the `logo_get` /
+  `logo_set` IPC channels. The renderer mirrors the same choice through
+  `useLogo()` (react-query cache), which drives the Settings picker and the
+  in-app logo in the workspace rail.
 
 ## Workspace model
 
@@ -137,8 +161,11 @@ Manually curated virtual folders that span workspaces. They are stored in the
 `electron/core/appConfig.ts`), and each item references a file by
 `workspaceId + fileId`. The main process is the source of truth, manipulated
 through the `collection_create` / `collection_remove` / `collection_reorder` /
-`collection_set_emoji` / `collection_rename` / `collection_add_file` /
-`collection_remove_file` IPC channels. The UI lives in
+`collection_reorder_items` / `collection_set_emoji` / `collection_rename` /
+`collection_add_file` / `collection_remove_file` IPC channels. Note the two
+distinct reorderings: `collection_reorder` orders the collections themselves,
+while `collection_reorder_items` orders the files inside one — that item order
+is what the `manual` sort reads. The UI lives in
 `src/components/WorkspaceRail.tsx` and related components.
 
 ### Smart collections

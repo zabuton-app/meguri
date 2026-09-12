@@ -50,6 +50,28 @@ test.describe("Discover", () => {
     ).toBeVisible();
   });
 
+  test("clicking a disabled arrow does not open the detail", async ({
+    ready,
+  }) => {
+    const dialog = await openDiscover(ready);
+    await expect(dialog.getByText(FIXTURE_FILE)).toBeVisible({
+      timeout: 30_000,
+    });
+
+    // The single fixture file is both the first and the last slide, so both
+    // arrows are disabled. They overlay the card-wide detail link, so a click
+    // must be swallowed instead of falling through to it.
+    await expect(dialog.getByText("1 / 1")).toBeVisible();
+    for (const name of ["Previous slide", "Next slide"]) {
+      const arrow = dialog.getByRole("button", { name });
+      await expect(arrow).toBeDisabled();
+      await arrow.click({ force: true });
+    }
+
+    await expect(ready).toHaveURL(/#\/discover/);
+    await expect(dialog.getByText("Discovery", { exact: true })).toBeVisible();
+  });
+
   test("closes with Escape", async ({ ready }) => {
     await openDiscover(ready);
     await closeTopDialog(ready);

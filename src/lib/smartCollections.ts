@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { resolveSortDir } from "@shared/sortDir";
+import { parseQualifiedTagName } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { kindLabelKey } from "@/lib/mediaKind";
+import { SORT_KEYS } from "@/lib/sortLabel";
+import { tagHumanLabel } from "@/lib/tagLabel";
 
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
 
@@ -119,39 +122,18 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     );
   }
   for (const tag of query.tags ?? []) {
-    const label = `${t("media.tags")}: ${tag}`;
+    const { namespace, name } = parseQualifiedTagName(tag);
+    const label = `${t("media.tags")}: ${tagHumanLabel(t, namespace, name)}`;
     parts.push(query.tagSource ? `${label} (${query.tagSource})` : label);
   }
   if (query.sort || query.sortDir) {
     const sort = query.sort ?? "added";
-    const key =
-      sort === "name"
-        ? "sort.name"
-        : sort === "rating"
-          ? "sort.rating"
-          : sort === "captured"
-            ? "sort.captured"
-            : sort === "btime"
-              ? "filter.btime"
-              : sort === "accessed"
-                ? "sort.accessed"
-                : sort === "hash"
-                  ? "sort.hash"
-                  : "sort.added";
     const dir = resolveSortDir(sort, query.sortDir);
-    parts.push(`${t(key)} / ${t(dir === "asc" ? "sort.asc" : "sort.desc")}`);
+    // Same key table the filter bar's sort dropdown reads, so a key added there
+    // cannot go unlabelled here.
+    parts.push(
+      `${t(SORT_KEYS[sort] ?? "sort.added")} / ${t(dir === "asc" ? "sort.asc" : "sort.desc")}`,
+    );
   }
   return parts.join(" / ") || t("smartCollection.allMedia");
-}
-
-export function defaultSmartCollectionName(
-  t: TFunc,
-  query: SearchQuery,
-): string {
-  if (query.favorite) return t("smartCollection.defaultFavorites");
-  if (query.ratingMin)
-    return t("smartCollection.defaultRating", { rating: query.ratingMin });
-  if (query.played === false) return t("smartCollection.defaultUnplayed");
-  if (query.q) return query.q;
-  return t("smartCollection.defaultName");
 }

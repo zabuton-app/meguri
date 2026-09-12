@@ -4,11 +4,14 @@ import type { Core } from "../index.js";
 import type { DB } from "../db.js";
 import { recordAccess, searchFiles, setRating } from "../queries.js";
 import {
+  listTagsWorkspaces,
   searchCollection,
   searchWorkspaces,
   type CoreTarget,
   type FileRef,
 } from "../crossWorkspace.js";
+import { addFileTag, addManualTag, upsertTag } from "../tags.js";
+import { MAX_TAG_LIST } from "../../../shared/tags.js";
 import type {
   FileRow,
   SearchCursor,
@@ -61,8 +64,7 @@ function comparatorFor(
         cmpStr(a.relPath, b.relPath, direction) || tiebreak(a, b);
     default:
       return (a, b) =>
-        cmpStr(a.workspaceId, b.workspaceId) ||
-        cmpNum(a.id, b.id, direction);
+        cmpStr(a.workspaceId, b.workspaceId) || cmpNum(a.id, b.id, direction);
   }
 }
 
@@ -184,7 +186,10 @@ describe("keyset pagination equivalence", () => {
 
   /** Shared rel_paths across workspaces force cross-ws sort-value ties; a
    *  captured_at mix (incl. NULLs) exercises the NULLs-last seek branches. */
-  function seedTies(wsId: string, count: number): { target: CoreTarget; db: DB } {
+  function seedTies(
+    wsId: string,
+    count: number,
+  ): { target: CoreTarget; db: DB } {
     const { db, rootId } = newDb();
     for (let i = 0; i < count; i++) {
       const id = insertFile(db, rootId, {
@@ -231,7 +236,12 @@ describe("keyset pagination equivalence", () => {
       const walked: FileRow[] = [];
       let cursor: SearchQuery["cursor"] = undefined;
       for (;;) {
-        const page = searchWorkspaces(cores, { sort, sortDir, limit: 7, cursor });
+        const page = searchWorkspaces(cores, {
+          sort,
+          sortDir,
+          limit: 7,
+          cursor,
+        });
         walked.push(...page.items);
         if (page.nextCursor == null) break;
         cursor = page.nextCursor;
@@ -387,7 +397,9 @@ describe("searchCollection k-way merge", () => {
         )
         .map((f) => f.relPath),
     );
-    expect(new Set(merged.map((f) => `${f.workspaceId}:${f.id}`)).size).toBe(20);
+    expect(new Set(merged.map((f) => `${f.workspaceId}:${f.id}`)).size).toBe(
+      20,
+    );
   });
 
   it("walks cursor pages without overlap and ends with a null nextCursor", () => {
@@ -433,5 +445,135 @@ describe("searchCollection k-way merge", () => {
 
     expect(seen.size).toBe(15);
     expect(pageCount).toBe(3);
+  });
+});
+
+describe("listTagsWorkspaces", () => {
+  /** One file carrying `manualCount` manual tags plus every given generated tag. */
+  function seedTags(
+    manualCount: number,
+    generated: [namespace: string, name: string][],
+  ): DB {
+    const { db, rootId } = newDb();
+    const file = insertFile(db, rootId, { relPath: "a.mp4" });
+    for (let i = 0; i < manualCount; i++) {
+      addManualTag(db, file, `t${String(i).padStart(5, "0")}`);
+    }
+    for (const [namespace, name] of generated) {
+      addFileTag(db, file, upsertTag(db, namespace, name), "auto-meta", null);
+    }
+    return db;
+  }
+
+  it("returns the whole catalog untruncated below the cap", () => {
+    const db = seedTags(3, [["res", "4k"]]);
+    const res = listTagsWorkspaces([coreTarget("w1", db)]);
+    expect(res.truncated).toBe(false);
+    expect(res.tags).toHaveLength(4);
+    db.close();
+  });
+
+  it("keeps generated tags when the manual ones alone fill the cap", () => {
+    // Sorting puts manual tags first, so a plain slice() would drop every
+    // generated tag here — and with it every completion for a resolution.
+    const db = seedTags(MAX_TAG_LIST + 500, [
+      ["res", "4k"],
+      ["dur", "long"],
+    ]);
+    const res = listTagsWorkspaces([coreTarget("w1", db)]);
+
+    expect(res.truncated).toBe(true);
+    expect(res.tags).toHaveLength(MAX_TAG_LIST);
+    expect(
+      res.tags.filter((tag) => tag.pipelineOwned).map((tag) => tag.qualified),
+    ).toEqual(["dur:long", "res:4k"]);
+    // Manual tags take everything the generated ones left, and the concatenation
+    // keeps the sort: user-owned first, then namespaces.
+    expect(res.tags.filter((tag) => !tag.pipelineOwned)).toHaveLength(
+      MAX_TAG_LIST - 2,
+    );
+    expect(res.tags[0].qualified).toBe("t00000");
+    db.close();
+  });
+
+  it("splits the cap when both classes are over their share", () => {
+    const generated: [string, string][] = Array.from(
+      { length: MAX_TAG_LIST },
+      (_, i) => ["codec", `c${String(i).padStart(5, "0")}`],
+    );
+    const db = seedTags(MAX_TAG_LIST, generated);
+    const res = listTagsWorkspaces([coreTarget("w1", db)]);
+
+    expect(res.tags).toHaveLength(MAX_TAG_LIST);
+    expect(res.tags.filter((tag) => tag.pipelineOwned)).toHaveLength(
+      MAX_TAG_LIST / 2,
+    );
+    expect(res.tags.filter((tag) => !tag.pipelineOwned)).toHaveLength(
+      MAX_TAG_LIST / 2,
+    );
+    db.close();
+  });
+
+  it("cuts nothing at exactly the cap and one tag at one over it", () => {
+    const exact = seedTags(MAX_TAG_LIST, []);
+    expect(listTagsWorkspaces([coreTarget("w1", exact)])).toMatchObject({
+      truncated: false,
+    });
+    expect(listTagsWorkspaces([coreTarget("w1", exact)]).tags).toHaveLength(
+      MAX_TAG_LIST,
+    );
+    exact.close();
+
+    const over = seedTags(MAX_TAG_LIST + 1, []);
+    const res = listTagsWorkspaces([coreTarget("w1", over)]);
+    expect(res.truncated).toBe(true);
+    expect(res.tags).toHaveLength(MAX_TAG_LIST);
+    over.close();
+  });
+
+  it("gives the whole cap to generated tags when there are no manual ones", () => {
+    const generated: [string, string][] = Array.from(
+      { length: MAX_TAG_LIST + 100 },
+      (_, i) => ["codec", `c${String(i).padStart(5, "0")}`],
+    );
+    const db = seedTags(0, generated);
+    const res = listTagsWorkspaces([coreTarget("w1", db)]);
+
+    // Nothing is held back for a class that has no members.
+    expect(res.tags).toHaveLength(MAX_TAG_LIST);
+    expect(res.tags.every((tag) => tag.pipelineOwned)).toBe(true);
+    db.close();
+  });
+
+  it("shares the generated tags' room across their namespaces", () => {
+    // codec is the open set (ffprobe names them), so sorted by namespace it
+    // would take the whole share and leave res / orient with nothing.
+    const generated: [string, string][] = Array.from(
+      { length: MAX_TAG_LIST },
+      (_, i) => ["codec", `c${String(i).padStart(5, "0")}`],
+    );
+    generated.push(["res", "4k"], ["orient", "vertical"]);
+    const db = seedTags(MAX_TAG_LIST, generated);
+    const res = listTagsWorkspaces([coreTarget("w1", db)]);
+
+    expect(res.tags.map((tag) => tag.qualified)).toContain("res:4k");
+    expect(res.tags.map((tag) => tag.qualified)).toContain("orient:vertical");
+    expect(res.tags).toHaveLength(MAX_TAG_LIST);
+    db.close();
+  });
+
+  it("folds the same tag across workspaces before the cap is applied", () => {
+    const a = seedTags(2, [["res", "4k"]]);
+    const b = seedTags(2, [["res", "4k"]]);
+    const res = listTagsWorkspaces([coreTarget("w1", a), coreTarget("w2", b)]);
+
+    expect(res.truncated).toBe(false);
+    expect(res.tags).toHaveLength(3);
+    expect(res.tags.find((tag) => tag.qualified === "res:4k")).toMatchObject({
+      fileCount: 2,
+      workspaceIds: ["w1", "w2"],
+    });
+    a.close();
+    b.close();
   });
 });

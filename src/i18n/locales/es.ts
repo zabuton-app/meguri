@@ -2,6 +2,9 @@
 import type { TranslationKey } from "./ja";
 
 export const es: Record<TranslationKey, string> = {
+  // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "app.name": "巡",
+
   // common
   "common.close": "Cerrar",
   "common.cancel": "Cancelar",
@@ -30,6 +33,15 @@ export const es: Record<TranslationKey, string> = {
   "settings.light": "Claro",
   "settings.dark": "Oscuro",
   "settings.theme": "Tema",
+
+  // Appearance toggle (header)
+  "theme.switchToLight": "Cambiar al modo claro",
+  "theme.switchToDark": "Cambiar al modo oscuro",
+
+  "settings.tabGeneral": "General",
+  "settings.tabLibrary": "Biblioteca",
+  "settings.tabPlayback": "Reproducción de listas",
+  "settings.tabApp": "Aplicación",
   "settings.language": "Idioma",
   "settings.languageDesc": "Cambia el idioma de la interfaz.",
   "settings.scenes": "Miniaturas de escena",
@@ -44,6 +56,19 @@ export const es: Record<TranslationKey, string> = {
   "settings.frameQualityLow": "Baja (240px)",
   "settings.frameQualityStandard": "Estándar (480px)",
   "settings.frameQualityHigh": "Alta (960px)",
+  "settings.emojiStyle": "Estilo de emojis",
+  "settings.emojiStyleDesc":
+    "Cambia el aspecto de los iconos de emoji y de los emojis en el texto.",
+  "settings.emojiStyleNative": "Predeterminado del sistema",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "Logotipo de la aplicación",
+  "settings.logoDesc":
+    "Se aplica a los iconos de la ventana, de la bandeja y de la aplicación.",
+  "logo.dark": "Oscuro",
+  "logo.light": "Claro",
+  "logo.enso": "Ensō",
   "settings.keybinding": "Atajos de teclado",
   "settings.keybindingDesc":
     "Asignación de teclas para mover el foco en la lista, navegar archivos, desplazar y enfocar la búsqueda.",
@@ -65,8 +90,8 @@ export const es: Record<TranslationKey, string> = {
   "update.checkFailed": "No se pudo comprobar (puede que estés sin conexión).",
   "update.upToDate": "Estás al día ({version}).",
   "settings.about": "Acerca de",
-  "about.version": "Versión {version}",
-  "about.appLicense": "Meguri se publica bajo la licencia MIT.",
+  "about.version": "{name} versión {version}",
+  "about.appLicense": "{name} se publica bajo la licencia MIT.",
   "about.ossTitle": "Licencias de código abierto",
   "about.ossDesc":
     "Esta aplicación incluye el siguiente software de código abierto.",
@@ -118,18 +143,24 @@ export const es: Record<TranslationKey, string> = {
   "command.shortcutHint": "Abrir con {shortcut}",
 
   // filter
+  "filter.searchHint":
+    'Busca en los nombres de archivo y en las etiquetas. Usa tag:playa o tag:4k para coincidir de forma exacta, tanto con las tuyas como con las automáticas. Entrecomilla los valores con espacios: tag:"casa de playa".',
   "filter.searchPlaceholder": "Buscar nombre de archivo o etiquetas",
+  "filter.tagSuggestions": "Sugerencias de etiquetas",
   "filter.all": "Todo",
-  "filter.playAny": "Estado",
   "filter.played": "Reproducido",
   "filter.unplayed": "No reproducido",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "Filtrar por valoración mínima",
   "filter.btime": "Fecha de creación",
-  "filter.btimeFilter": "Filtrar por fecha de creación",
   "filter.dateFrom": "Desde",
   "filter.dateTo": "Hasta",
-  "filter.dateClear": "Borrar",
+  "filter.more": "Más filtros",
+  "filter.moreActive": "Más filtros ({count} activos)",
+  "filter.kindFilter": "Filtrar por tipo",
+  "filter.playState": "Estado de reproducción",
+  "filter.sortSection": "Orden",
+  "filter.otherSection": "Otros",
 
   // smart collections
   "smartCollection.title": "Colecciones inteligentes",
@@ -141,10 +172,6 @@ export const es: Record<TranslationKey, string> = {
   "smartCollection.namePlaceholder": "Nombre de la colección",
   "smartCollection.save": "Guardar",
   "smartCollection.allMedia": "Todos los medios",
-  "smartCollection.defaultFavorites": "Favoritos",
-  "smartCollection.defaultRating": "★{rating}+",
-  "smartCollection.defaultUnplayed": "No reproducidos",
-  "smartCollection.defaultName": "Nueva colección",
 
   // media detail
   "media.notFound": "Archivo no encontrado.",
@@ -172,6 +199,7 @@ export const es: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "Desplazar arriba",
   "shortcuts.moveFocus": "Mover el foco (arriba/abajo/izquierda/derecha)",
   "shortcuts.openFocused": "Abrir el elemento enfocado",
+  "shortcuts.watchLater": "Alternar Ver más tarde",
   "shortcuts.help": "Esta ayuda",
   "shortcuts.playPause": "Reproducir / pausar",
   "shortcuts.skip5": "Retroceder / avanzar 5 s",
@@ -246,18 +274,20 @@ export const es: Record<TranslationKey, string> = {
   "scan.phaseHash": "Verificando archivos",
   "scan.phaseIndex": "Creando índice",
   "scan.phaseThumbnail": "Generando miniaturas",
+  "scan.phaseTags": "Etiquetando",
   "scan.cancel": "Cancelar escaneo",
 
   // tag editor
   "tag.none": "Sin etiquetas",
   "tag.addPlaceholder": "Añade una etiqueta y pulsa Enter",
   "tag.remove": "Eliminar etiqueta",
+  "tag.addFailed": "No se pudo añadir la etiqueta",
 
   // media grid
   "grid.empty": "No hay medios que mostrar.",
   "grid.emptyHint":
     "Ejecuta «Escanear» para listar aquí los vídeos e imágenes.",
-  "grid.searchByTag": "Buscar «{name}»",
+  "grid.searchByTag": "Filtrar por «{name}»",
   "view.grid": "Vista de cuadrícula",
   "view.list": "Vista de lista",
   "view.table": "Vista de tabla",
@@ -272,7 +302,8 @@ export const es: Record<TranslationKey, string> = {
   "discover.empty": "No hay medios para recomendar.",
   "discover.emptyHint":
     "Ejecuta «Escanear» para importar vídeos e imágenes y se recomendarán aquí al azar.",
-  "discover.sceneHint": "Pasa el cursor para ampliar · haz clic para reproducir desde ese punto",
+  "discover.sceneHint":
+    "Pasa el cursor para ampliar · haz clic para reproducir desde ese punto",
   "discover.moreScenes": "+{count}",
 
   // Historial de reproducción
@@ -293,12 +324,72 @@ export const es: Record<TranslationKey, string> = {
   "duplicates.empty": "No se encontraron archivos duplicados.",
   "duplicates.emptyHint":
     "Los archivos con contenido idéntico (hash y tamaño coincidentes) aparecerán aquí.",
-  "duplicates.summary": "{groups} grupos / {files} archivos / {size} duplicados",
+  "duplicates.summary":
+    "{groups} grupos / {files} archivos / {size} duplicados",
   "duplicates.fileCount": "{count} archivos",
   "duplicates.truncated":
     "Demasiados grupos; solo se muestran los {max} primeros.",
   "duplicates.filter": "Mostrar solo archivos duplicados",
   "duplicates.chip": "Duplicados",
+
+  // Pantalla de gestión de etiquetas
+  "tags.title": "Etiquetas",
+  "tags.summary": "{tags} etiquetas / {assignments} asignaciones",
+  "tags.empty": "Todavía no hay etiquetas.",
+  "tags.emptyHint":
+    "Añade etiquetas desde la vista de detalle y aparecerán aquí.",
+  "tags.searchPlaceholder": "Filtrar etiquetas",
+  "tags.noMatch": "No hay etiquetas coincidentes.",
+  "tags.truncated": "Demasiadas etiquetas: se muestran las {max} primeras.",
+  "tags.fileCount": "{count} archivos",
+  "tags.sortByName": "Por nombre",
+  "tags.sortByCount": "Por cantidad",
+  "tags.groupManual": "Etiquetas manuales",
+  "tags.readOnly": "Solo lectura",
+  "tags.readOnlyHint":
+    "Se asignan automáticamente durante el escaneo. No se pueden editar ni eliminar.",
+  "tags.filterByTag": "Filtrar por esta etiqueta",
+  "tags.source.manual": "Manual",
+  "tags.source.autoMeta": "Automática",
+  "tags.selected": "{count} seleccionadas",
+  "tags.clearSelection": "Quitar selección",
+  "tags.rename": "Cambiar nombre",
+  "tags.renameTitle": "Cambiar nombre de la etiqueta",
+  "tags.renamePlaceholder": "Nuevo nombre",
+  "tags.renameAction": "Cambiar",
+  "tags.renamed": "«{from}» se cambió a «{to}»",
+  "tags.renameFailed": "No se pudo cambiar el nombre de la etiqueta",
+  "tags.renameConflict": "«{name}» ya existe. ¿Combinar las dos etiquetas?",
+  "tags.merge": "Combinar",
+  "tags.mergeTitle": "Combinar etiquetas",
+  "tags.mergeDescription":
+    "Las {count} etiquetas seleccionadas se combinan en la de destino. Las demás se eliminan.",
+  "tags.mergeTarget": "Combinar en",
+  "tags.mergeAction": "Combinar",
+  "tags.merged": "Se combinaron {count} etiquetas",
+  "tags.mergeFailed": "No se pudieron combinar las etiquetas",
+  "tags.delete": "Eliminar",
+  "tags.deleteAction": "Eliminar",
+  "tags.deleteConfirm":
+    "Se quitará la etiqueta «{name}» de {count} archivos. ¿Continuar?",
+  "tags.deleteConfirmMany":
+    "Se eliminarán las {count} etiquetas seleccionadas. ¿Continuar?",
+  "tags.deleted": "Etiqueta eliminada",
+  "tags.deleteFailed": "No se pudo eliminar la etiqueta",
+  "tags.addFailedReserved":
+    "«{prefix}:» está reservado para las etiquetas automáticas. Elige otro nombre.",
+  "tags.nameTooLong":
+    "El nombre de una etiqueta puede tener como máximo {max} caracteres.",
+  "tags.ns.res": "Resolución",
+  "tags.ns.dur": "Duración",
+  "tags.ns.codec": "Códec",
+  "tags.ns.orient": "Orientación",
+  "tags.value.durShort": "Corta",
+  "tags.value.durMedium": "Media",
+  "tags.value.durLong": "Larga",
+  "tags.value.orientVertical": "Vertical",
+  "tags.value.orientHorizontal": "Horizontal",
+  "tags.value.orientSquare": "Cuadrada",
 
   // workspace rail
   "workspace.all": "Todo",
@@ -337,6 +428,17 @@ export const es: Record<TranslationKey, string> = {
   "collection.removedFromToast": "Quitado de «{name}»",
   "collection.actionFailed": "No se pudo actualizar la colección",
 
+  // Ver más tarde (colección integrada)
+  "watchLater.name": "Ver más tarde",
+  "watchLater.add": "Añadir a Ver más tarde",
+  "watchLater.remove": "Quitar de Ver más tarde",
+  "watchLater.addedToast": "Añadido a Ver más tarde",
+  "watchLater.removedToast": "Quitado de Ver más tarde",
+  "watchLater.actionFailed": "No se pudo actualizar Ver más tarde",
+  "watchLater.empty": "Ver más tarde está vacío.",
+  "watchLater.emptyHint":
+    "Pulsa el icono de reloj en cualquier medio para reunirlo aquí. Los elementos salen de la lista al reproducirlos.",
+
   // icono de emoji
   "emoji.choose": "Elegir emoji",
   "emoji.remove": "Quitar emoji",
@@ -360,4 +462,42 @@ export const es: Record<TranslationKey, string> = {
   "statusbar.status": "Estado",
   "statusbar.scanning": "Escaneando",
   "statusbar.idle": "Inactivo",
+
+  // Playlist playback (auto-play)
+  "sort.manual": "Orden manual",
+  "playlist.start": "Reproducir como lista",
+  "playlist.play": "Reproducir (Space)",
+  "playlist.pause": "Pausar (Space)",
+  "playlist.next": "Siguiente (N)",
+  "playlist.prev": "Anterior (P)",
+  "playlist.shuffle": "Aleatorio (S)",
+  "playlist.repeat": "Repetir",
+  "playlist.openDetail": "Abrir detalles (I)",
+  "playlist.fullscreen": "Pantalla completa (F)",
+  "playlist.exitFullscreen": "Salir de pantalla completa (F)",
+  "playlist.exit": "Salir de la reproducción (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.loading": "Cargando…",
+  "playlist.empty": "No hay nada que se pueda reproducir aquí.",
+  "playlist.emptyHint":
+    "Abre una lista que contenga vídeos o imágenes y luego inicia la reproducción.",
+  "playlist.unplayable": "No se pudo reproducir ninguno de estos elementos.",
+  "playlist.reorderNeedsManual":
+    "Cambia al orden manual para reorganizar los elementos.",
+  "settings.playlistImageSeconds": "Duración de la imagen",
+  "settings.playlistImageSecondsHint":
+    "Cuánto tiempo permanece cada imagen en pantalla antes de avanzar.",
+  "settings.playlistImageMotion": "Animar las imágenes",
+  "settings.playlistImageMotionHint":
+    "Aplica un desplazamiento y zoom lentos a cada imagen. Siempre se desactiva si el sistema reduce el movimiento.",
+  "settings.playlistFade": "Fundido",
+  "settings.playlistFadeHint":
+    "Atenúa la pantalla antes de mostrar el siguiente elemento.",
+  "settings.playlistTransition": "Transición",
+  "settings.playlistTransitionHint":
+    "Desplaza lateralmente al cambiar de elemento. Se puede combinar con el fundido.",
+  "settings.playlistShuffle": "Aleatorio",
+  "settings.playlistShuffleHint":
+    "Reproduce en orden aleatorio. Ningún elemento se repite dentro de una misma vuelta.",
+  "settings.secondsValue": "{n} s",
 };

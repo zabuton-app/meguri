@@ -2,6 +2,7 @@
 // merges/sorts/paginates in memory so the virtual "All" workspace can list every root.
 // A single-element set is the fast path (no merge), so callers use this uniformly.
 import { MAX_DUPLICATE_GROUPS } from "../../shared/duplicates.js";
+import { MAX_TAG_LIST, qualifiedTagName } from "../../shared/tags.js";
 import { resolveSortDir } from "../../shared/sortDir.js";
 import type { Core } from "./index.js";
 import {
@@ -19,6 +20,7 @@ import {
   type DuplicateFileRow,
   type SeekPosition,
 } from "./queries.js";
+import { listTags } from "./tagAdmin.js";
 import type {
   DuplicateGroup,
   DuplicatesResult,
@@ -30,6 +32,8 @@ import type {
   SearchQuery,
   SearchResult,
   SearchSeekKey,
+  TagList,
+  TagSummary,
 } from "./types.js";
 
 const DEFAULT_LIMIT = 100;
@@ -63,8 +67,7 @@ function normalizeCursor(cursor: SearchQuery["cursor"]): {
 
 /** Per-stream seek derived from the global key (see SeekPosition's tie rules). */
 function seekFor(key: SearchSeekKey, wsId: string): SeekPosition {
-  const tie =
-    wsId === key.ws ? "after-id" : wsId > key.ws ? "all" : "none";
+  const tie = wsId === key.ws ? "after-id" : wsId > key.ws ? "all" : "none";
   return { v: key.v, id: key.id, tie };
 }
 
@@ -103,7 +106,11 @@ function searchSingle(
     hasMore = res.items.length > limit;
     items = inject(res.items.slice(0, limit), target.id);
   } else {
-    const res = searchFiles(target.core.db, { ...query, cursor: offset, fileIds });
+    const res = searchFiles(target.core.db, {
+      ...query,
+      cursor: offset,
+      fileIds,
+    });
     hasMore = res.nextCursor != null;
     items = inject(res.items, target.id);
   }
@@ -144,6 +151,112 @@ export function searchCollection(
   }
 
   return mergeSearchPages(targets, query, idsByWs);
+}
+
+/**
+ * The collection's own item order ("manual" sort, see shared/sortDir.ts). This
+ * order lives in config.json, not in any SQL column, so it cannot ride
+ * orderByFor()/the k-way merge: the refs array *is* the ordering. Paging slices
+ * that array and pulls the matching rows by id, then puts them back in refs order.
+ */
+
+/** Refs pulled per round trip while filling a page (<= the query layer's MAX_LIMIT). */
+const MANUAL_CHUNK = 200;
+
+function refKey(ref: { workspaceId: string; fileId: number }): string {
+  return `${ref.workspaceId}:${ref.fileId}`;
+}
+
+/**
+ * Position in the refs array to resume from. The cursor's `offset` keeps its
+ * usual meaning (global row index, which the virtualizer pads with) — that
+ * diverges from the refs index as soon as a filter drops entries, so the refs
+ * index rides along in the seek key's `v` slot.
+ */
+function manualRefIndex(key: SearchSeekKey | undefined): number | null {
+  if (key && key.ws === "" && typeof key.v === "number") {
+    return Math.max(0, key.v);
+  }
+  return null;
+}
+
+/** Fetch the rows for one slice of refs, keyed for reordering. */
+function manualRows(
+  cores: CoreTarget[],
+  slice: FileRef[],
+  query: SearchQuery,
+): Map<string, FileRow> {
+  const idsByWs = new Map<string, number[]>();
+  for (const ref of slice) {
+    const ids = idsByWs.get(ref.workspaceId) ?? [];
+    ids.push(ref.fileId);
+    idsByWs.set(ref.workspaceId, ids);
+  }
+  const out = new Map<string, FileRow>();
+  for (const target of cores) {
+    const ids = idsByWs.get(target.id);
+    if (!ids?.length) continue;
+    // Order is irrelevant here (the refs decide it), so ask for the plain
+    // id-ordered page and cap it at exactly the ids we asked about.
+    const res = searchFiles(target.core.db, {
+      ...query,
+      sort: undefined,
+      sortDir: undefined,
+      cursor: 0,
+      limit: ids.length,
+      fileIds: ids,
+    });
+    for (const row of inject(res.items, target.id))
+      out.set(refKey({ workspaceId: target.id, fileId: row.id }), row);
+  }
+  return out;
+}
+
+/** Search a collection in its own manual item order. */
+export function searchCollectionManual(
+  cores: CoreTarget[],
+  refs: FileRef[],
+  query: SearchQuery,
+): SearchResult {
+  const limit = Math.max(1, query.limit ?? DEFAULT_LIMIT);
+  const { offset, key } = normalizeCursor(query.cursor);
+  const resume = manualRefIndex(key);
+  const items: FileRow[] = [];
+  // Forward paging carries the refs index in the seek key and resumes there.
+  // Backward paging deliberately sends an offset-only cursor (see
+  // filesSearchPreviousCursor) and expects the main process to fall back to
+  // counting from the start — filters can drop refs, so the refs index and the
+  // row offset are not the same number and the count has to be a real one.
+  let i = resume ?? 0;
+  let skip = resume == null ? offset : 0;
+
+  // Keep pulling until the page is full or the refs run out; `i` always lands
+  // on the first ref not yet accounted for.
+  while ((skip > 0 || items.length < limit) && i < refs.length) {
+    const slice = refs.slice(i, i + MANUAL_CHUNK);
+    const rows = manualRows(cores, slice, query);
+    let consumed = 0;
+    for (const ref of slice) {
+      if (skip === 0 && items.length >= limit) break;
+      consumed++;
+      const row = rows.get(refKey(ref));
+      if (!row) continue;
+      if (skip > 0) {
+        skip--;
+        continue;
+      }
+      items.push(row);
+    }
+    i += consumed;
+  }
+
+  const hasMore = i < refs.length;
+  return {
+    items,
+    nextCursor: hasMore
+      ? { offset: offset + items.length, key: { v: i, ws: "", id: 0 } }
+      : null,
+  };
 }
 
 interface WsStream<T> {
@@ -485,6 +598,134 @@ function dupKey(hash: string, size: number): string {
 }
 
 /**
+ * The tag catalog across a set of workspaces, folded by qualified name.
+ *
+ * Tags live in per-workspace databases with per-database ids, so the union is
+ * built on the name — the same identifier the mutation channels use. Counts and
+ * per-source breakdowns are summed; a workspace is listed once per tag it holds.
+ *
+ * Ordering puts user-owned tags first, then namespaces alphabetically, then
+ * names case-insensitively. The known auto-meta namespaces get no special
+ * treatment here: the set is open, and the renderer applies its own grouping
+ * order on top.
+ */
+export function listTagsWorkspaces(cores: CoreTarget[]): TagList {
+  const merged = new Map<string, TagSummary>();
+  for (const { id, core } of cores) {
+    for (const row of listTags(core.db)) {
+      const qualified = qualifiedTagName(row.namespace, row.name);
+      const entry = merged.get(qualified);
+      if (!entry) {
+        merged.set(qualified, {
+          namespace: row.namespace,
+          name: row.name,
+          qualified,
+          fileCount: row.fileCount,
+          bySource: row.bySource.map((s) => ({ ...s })),
+          pipelineOwned: row.namespace !== "",
+          workspaceIds: [id],
+        });
+        continue;
+      }
+      entry.fileCount += row.fileCount;
+      entry.workspaceIds.push(id);
+      for (const s of row.bySource) {
+        const existing = entry.bySource.find((x) => x.source === s.source);
+        if (existing) existing.count += s.count;
+        else entry.bySource.push({ ...s });
+      }
+    }
+  }
+
+  const tags = [...merged.values()].sort(
+    (a, b) =>
+      a.namespace.localeCompare(b.namespace) ||
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+  );
+  for (const tag of tags) {
+    tag.bySource.sort((a, b) => a.source.localeCompare(b.source));
+  }
+  return capTagList(tags);
+}
+
+/**
+ * Cut an over-long catalog down to MAX_TAG_LIST without losing a whole class of
+ * tags.
+ *
+ * The ordering puts user-owned tags first, so a plain slice() would drop every
+ * generated tag the moment the manual ones alone fill the cap — and with them
+ * every `tag:` completion for a resolution or a duration, with nothing but the
+ * generic truncation notice to explain it.
+ *
+ * So each class is guaranteed half the cap, and whatever half a class does not
+ * use goes to the other. In the ordinary library that costs the manual list
+ * nothing, since a scan produces far fewer than a thousand generated tags; the
+ * floor only bites where both classes are over a thousand, and there being cut
+ * to half a catalog nobody can read through anyway is the point.
+ */
+function capTagList(tags: TagSummary[]): TagList {
+  if (tags.length <= MAX_TAG_LIST) return { tags, truncated: false };
+  const manual = tags.filter((tag) => !tag.pipelineOwned);
+  const pipeline = tags.filter((tag) => tag.pipelineOwned);
+  const keepPipeline = Math.min(
+    pipeline.length,
+    Math.max(Math.floor(MAX_TAG_LIST / 2), MAX_TAG_LIST - manual.length),
+  );
+  return {
+    // Concatenating in this order preserves the sort: manual tags have an empty
+    // namespace, which sorts ahead of every generated one.
+    tags: [
+      ...manual.slice(0, MAX_TAG_LIST - keepPipeline),
+      ...takeAcrossNamespaces(pipeline, keepPipeline),
+    ],
+    truncated: true,
+  };
+}
+
+/**
+ * Take `limit` tags, one namespace at a time, so no namespace can crowd out
+ * another.
+ *
+ * The same failure as the one capTagList exists to prevent, a level down: the
+ * catalog is sorted by namespace, so slicing the generated tags would empty the
+ * ones late in the alphabet first. `codec` is the namespace this actually
+ * threatens — its values come from ffprobe and are an open set, unlike the
+ * closed vocabularies of `res`, `dur` and `orient`, so it is the only one that
+ * can grow far enough to fill the share by itself.
+ *
+ * `tags` must not repeat an element: membership is tracked by identity, so a
+ * duplicate would be kept once and counted once, and the result would run over
+ * `limit`. The catalog is folded through a Map before it gets here.
+ */
+function takeAcrossNamespaces(tags: TagSummary[], limit: number): TagSummary[] {
+  if (tags.length <= limit) return tags;
+  // Each namespace keeps a cursor rather than being shifted from: shift() is
+  // O(n), and one namespace holding most of the catalog would make the round
+  // robin quadratic in the size of that namespace.
+  const queues = new Map<string, { items: TagSummary[]; at: number }>();
+  for (const tag of tags) {
+    const queue = queues.get(tag.namespace);
+    if (queue) queue.items.push(tag);
+    else queues.set(tag.namespace, { items: [tag], at: 0 });
+  }
+  const kept = new Set<TagSummary>();
+  while (kept.size < limit) {
+    const before = kept.size;
+    for (const queue of queues.values()) {
+      if (queue.at === queue.items.length) continue;
+      kept.add(queue.items[queue.at++]);
+      if (kept.size === limit) break;
+    }
+    // Unreachable while limit < tags.length, which the early return guarantees —
+    // but a loop that only exits on a counter is one edit away from spinning.
+    if (kept.size === before) break;
+  }
+  // Filtering the input rather than concatenating the queues keeps the catalog
+  // order; the round robin only decides membership.
+  return tags.filter((tag) => kept.has(tag));
+}
+
+/**
  * Duplicate groups across a set of workspaces, sorted by reclaimable bytes
  * (size × (copies − 1)) descending. A single workspace resolves with one
  * grouped SQL query; multiple workspaces use a two-pass aggregation so files
@@ -493,7 +734,9 @@ function dupKey(hash: string, size: number): string {
  * tuples into one map, pass 2 fetches full rows only for keys whose combined
  * count exceeds one, and only from the DBs that hold them.
  */
-export function listDuplicatesWorkspaces(cores: CoreTarget[]): DuplicatesResult {
+export function listDuplicatesWorkspaces(
+  cores: CoreTarget[],
+): DuplicatesResult {
   const rows =
     cores.length <= 1
       ? cores.length
@@ -562,7 +805,10 @@ function crossDuplicateKeys(cores: CoreTarget[]): {
   keys: Set<string>;
   hashesByWs: Map<string, Set<string>>;
 } {
-  const counts = new Map<string, { hash: string; n: number; wsIds: string[] }>();
+  const counts = new Map<
+    string,
+    { hash: string; n: number; wsIds: string[] }
+  >();
   for (const { id, core } of cores) {
     for (const { hash, size, n } of duplicateHashCounts(core.db)) {
       const key = dupKey(hash, size);
@@ -716,8 +962,11 @@ function comparatorFor(
         tiebreak(a, b);
     case "hash":
       return (a, b) =>
-        cmpNullableStr(a.contentHash ?? null, b.contentHash ?? null, direction) ||
-        tiebreak(a, b);
+        cmpNullableStr(
+          a.contentHash ?? null,
+          b.contentHash ?? null,
+          direction,
+        ) || tiebreak(a, b);
     default:
       return (a, b) =>
         cmpStr(a.workspaceId, b.workspaceId) || cmpNum(a.id, b.id, direction);

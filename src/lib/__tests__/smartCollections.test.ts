@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/locales/en";
 import {
   cleanSearchQuery,
-  defaultSmartCollectionName,
   describeSearchQuery,
   hasSearchConditions,
   makeSmartCollection,
@@ -74,10 +73,15 @@ describe("smartCollections", () => {
     );
   });
 
-  it("defaultSmartCollectionName picks sensible defaults", () => {
-    expect(defaultSmartCollectionName(t, { favorite: true })).toBe(
-      en["smartCollection.defaultFavorites"],
-    );
-    expect(defaultSmartCollectionName(t, { q: "sunset" })).toBe("sunset");
+  it("describeSearchQuery joins every condition in a fixed order", () => {
+    // This string is also the pre-filled name in the save dialog.
+    expect(
+      describeSearchQuery(t, {
+        ratingMin: 4,
+        favorite: true,
+        sort: "btime",
+        sortDir: "desc",
+      }),
+    ).toBe("★4+ / Favorites / Created date / Descending");
   });
 });

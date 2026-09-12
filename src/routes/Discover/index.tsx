@@ -8,7 +8,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Maximize2, Minimize2, RefreshCw, Sparkles, X } from "lucide-react";
 import { api, events } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { useWatchLater } from "@/hooks/useWatchLater";
 import { syncFileRowAcrossCaches } from "@/lib/queryCache";
+import { cn } from "@/lib/utils";
 import type { FileRow } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +37,11 @@ import {
   QUEUE_SIZE,
   parseDiscoverFilter,
 } from "./utils";
+
+// The arrows overlay the card, so keep their disabled-hover background identical
+// to the resting one (the primitive clears it, assuming arrows sit outside).
+const ARROW_CLASS =
+  "z-20 size-11 border-border/60 bg-bg/50 backdrop-blur-md disabled:hover:bg-bg/50";
 
 // Remembers the last viewed queue position so returning from the detail page resumes there.
 // Module-level (not state) because the component unmounts while the detail modal is open.
@@ -74,6 +81,13 @@ export default function Discover() {
     () => new Map(wsList.data?.workspaces.map((w) => [w.id, w.label]) ?? []),
     [wsList.data],
   );
+
+  // Watch Later membership for the card toggles. Shares the workspaces_list
+  // cache with wsList above, so this costs no extra request.
+  const watchLater = useWatchLater();
+  // Points at the selected slide's toggle so the "w" shortcut can activate it
+  // through the button itself (same mutation, toast, effect and disabled state).
+  const activeWatchLaterRef = useRef<HTMLButtonElement>(null);
 
   // Keep the queue stable across remounts; reshuffle is explicit (the button below).
   const queue = useQuery({
@@ -148,7 +162,8 @@ export default function Discover() {
 
   // Carousel paging via the keyboard. Reuses the prev/next chords of the active
   // preset (vim h/l, normal [ ], emacs C-b/C-f); arrows always work as a fallback.
-  // "r" reshuffles. Esc / backdrop close is handled by DiscoverModal.
+  // "r" reshuffles, "w" toggles Watch Later on the current card.
+  // Esc / backdrop close is handled by DiscoverModal.
   const { keybindingPreset } = usePreferences();
   const nav = NAV_BINDINGS[keybindingPreset];
   useEffect(() => {
@@ -165,6 +180,11 @@ export default function Discover() {
       if (e.code === "KeyR" && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault();
         void reshuffle();
+        return;
+      }
+      if (e.code === "KeyW" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        activeWatchLaterRef.current?.click();
         return;
       }
       if (matchAny(e, nav.prev) || e.code === "ArrowLeft") {
@@ -202,31 +222,9 @@ export default function Discover() {
     },
   });
 
-  // Favorite toggle. Patches the queue card in place (avoids reshuffling the
-  // random queue) and keeps the list / detail caches in sync.
-  const setFavorite = useMutation({
-    mutationFn: ({
-      id,
-      workspaceId,
-      favorite,
-    }: {
-      id: number;
-      workspaceId: string;
-      favorite: boolean;
-    }) => api.fileSetFavorite(id, workspaceId, favorite),
-    onSuccess: (_d, { id, workspaceId, favorite }) => {
-      qc.setQueryData<FileRow[]>(queueKey, (old) =>
-        old?.map((f) =>
-          f.id === id && f.workspaceId === workspaceId
-            ? { ...f, favorite: favorite ? 1 : 0 }
-            : f,
-        ),
-      );
-      syncFileRowAcrossCaches(qc, workspaceId, id, {
-        favorite: favorite ? 1 : 0,
-      });
-    },
-  });
+  // Favorite toggling on cards is handled by the shared FavoriteButton, whose
+  // cache sync patches every ["files_random"]-prefixed query including this
+  // queue (no reshuffle) plus the list / detail caches.
 
   // Modal size toggle; the persisted value is shared with MediaDetail's modal.
   const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
@@ -328,12 +326,9 @@ export default function Discover() {
                         rating,
                       })
                     }
-                    onToggleFavorite={() =>
-                      setFavorite.mutate({
-                        id: f.id,
-                        workspaceId: f.workspaceId,
-                        favorite: !f.favorite,
-                      })
+                    watchLater={watchLater}
+                    watchLaterRef={
+                      i === current ? activeWatchLaterRef : undefined
                     }
                     filterParam={filterParam}
                     workspaceName={wsNames.get(f.workspaceId)}
@@ -343,8 +338,8 @@ export default function Discover() {
                 </CarouselItem>
               ))}
             </CarouselContent>
-            <CarouselPrevious className="left-3 z-20 size-11 border-border/60 bg-bg/50 backdrop-blur-md" />
-            <CarouselNext className="right-3 z-20 size-11 border-border/60 bg-bg/50 backdrop-blur-md" />
+            <CarouselPrevious className={cn("left-3", ARROW_CLASS)} />
+            <CarouselNext className={cn("right-3", ARROW_CLASS)} />
           </Carousel>
         )}
       </div>

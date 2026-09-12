@@ -1,6 +1,5 @@
 // Scan pipeline: walk → sync → thumbnail/meta (parallel).
 // Progress is reported via callbacks.
-import os from "node:os";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
@@ -8,7 +7,17 @@ import { walk, syncFiles, type ScanStats } from "./scan.js";
 import { coverArtStreamIndex, extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
 import { syncFts } from "./tags.js";
+import {
+  applyAutoMetaTags,
+  backfillAutoMetaTags,
+  needsAutoMetaBackfill,
+} from "./autoMetaTags.js";
 import { pool } from "./concurrency.js";
+import {
+  LARGE_IMAGE_PIXELS,
+  SCAN_POOL_WIDTH,
+  withScanDecodeSlot,
+} from "./mediaConcurrency.js";
 import { scopedLog } from "./logger.js";
 import type { Kind } from "./types.js";
 
@@ -150,6 +159,7 @@ export async function runScan(
   // previously per-file scan:progress IPC traffic.
   type ThumbResult = {
     id: number;
+    kind: Kind;
     dest: string;
     ok: boolean;
     meta: Awaited<ReturnType<typeof extractMeta>>;
@@ -173,6 +183,9 @@ export async function runScan(
     } else {
       q.setThumb(db, r.id, r.ok ? r.dest : null, r.ok ? "done" : "error");
     }
+    // Derive from what was just written, and before syncFts — which rebuilds
+    // tags_text by re-reading meta_tags.
+    applyAutoMetaTags(db, r.id, { kind: r.kind, ...r.meta });
     syncFts(db, r.id);
   };
   // Per-file transaction for the retry path: persistOne spans several writes
@@ -221,17 +234,24 @@ export async function runScan(
     });
   };
 
-  await pool(
-    pending,
-    Math.max(2, os.cpus().length - 1),
-    async (f) => {
-      if (signal?.aborted) return;
-      const kind = f.kind as Kind;
+  // Per-file worker. Never throws: a pool worker that rejects would abandon
+  // its siblings mid-flight (still writing to this DB after the scan has
+  // reported as finished), so per-file failures are logged and the file is
+  // left 'pending' for the next scan. Failures are counted so a tool that is
+  // broken outright (every file failing) still surfaces as a scan error.
+  let failed = 0;
+  const processOne = async (f: (typeof pending)[number]): Promise<void> => {
+    if (signal?.aborted) return;
+    const kind = f.kind as Kind;
+    const dest = path.join(thumbs, `${f.id}.webp`);
+    try {
+      // ffprobe runs outside the decode slot: it doesn't decode, but it can be
+      // slow on network shares and must not hold a decoder up meanwhile.
       const meta = await extractMeta(f.abs_path, kind, signal);
-      const dest = path.join(thumbs, `${f.id}.webp`);
 
       // Audio always needs its metadata (duration), and gets a thumbnail only
-      // when the file embeds cover art.
+      // when the file embeds cover art. Decoding one embedded picture is cheap,
+      // so it runs at pool width without taking a decode slot.
       if (kind === "audio") {
         if (signal?.aborted) return;
         // A failed probe (timeout, transient IO error, unparseable output)
@@ -239,10 +259,22 @@ export async function runScan(
         // filesNeedingThumb forever, so leave it pending for the next scan —
         // the same retry semantics the video/image path already has. It also
         // means we can't tell whether the file has cover art, so don't guess.
-        if (meta.raw == null) return;
+        // It still counts as a failure so a broken ffprobe is caught by the
+        // all-failed check below.
+        if (meta.raw == null) {
+          failed++;
+          return;
+        }
         const coverIndex = coverArtStreamIndex(meta.raw);
         if (coverIndex == null) {
-          buffer.push({ id: f.id, dest, ok: false, meta, skipThumb: true });
+          buffer.push({
+            id: f.id,
+            kind,
+            dest,
+            ok: false,
+            meta,
+            skipThumb: true,
+          });
           if (buffer.length >= THUMB_FLUSH_EVERY) flush();
           return;
         }
@@ -257,7 +289,8 @@ export async function runScan(
         if (signal?.aborted) return;
         // Extraction failure here is a real error (the probe said a picture is
         // present), so let it record as 'error' like the video/image path.
-        buffer.push({ id: f.id, dest, ok: coverOk, meta });
+        if (!coverOk) failed++;
+        buffer.push({ id: f.id, kind, dest, ok: coverOk, meta });
         if (buffer.length >= THUMB_FLUSH_EVERY) flush();
         return;
       }
@@ -265,26 +298,84 @@ export async function runScan(
       // Honour a user-chosen thumbnail frame if one was set previously. Ignored for images.
       const offsetSec =
         kind === "video" ? (q.thumbOffsetOf(db, f.id) ?? undefined) : undefined;
-      const ok = await generateThumb(f.abs_path, kind, dest, signal, offsetSec);
+      const thumb = () =>
+        generateThumb(f.abs_path, kind, dest, signal, offsetSec);
+      // Only the expensive decodes take a slot: every video, and images big
+      // enough to cost hundreds of MB — or of unknown size (ffprobe failed),
+      // which are treated as big. Everything else runs at pool width.
+      const pixels =
+        meta.width != null && meta.height != null
+          ? meta.width * meta.height
+          : Infinity;
+      const expensive = kind === "video" || pixels >= LARGE_IMAGE_PIXELS;
+      const ok = expensive
+        ? await withScanDecodeSlot(thumb, signal)
+        : await thumb();
 
       // If aborted mid-flight, ffprobe/ffmpeg were killed and returned partial/empty
       // results. Don't persist them or mark the file 'error' (which filesNeedingThumb
       // skips on rescan) — leave it 'pending' so the next scan retries it.
       if (signal?.aborted) return;
 
+      // ffmpeg reporting failure counts too, so a broken ffmpeg (every file
+      // marked 'error') is caught by the all-failed check below.
+      if (!ok) failed++;
       // Workers share the event loop, so buffering + flushing is race-free.
-      buffer.push({ id: f.id, dest, ok, meta });
+      buffer.push({ id: f.id, kind, dest, ok, meta });
       if (buffer.length >= THUMB_FLUSH_EVERY) flush();
-    },
-    signal,
-  );
-  // Persist the tail batch. On abort the buffered results are from ffmpeg runs
-  // that completed before the signal fired, so they are safe to keep.
-  flush();
+    } catch (err) {
+      if (signal?.aborted) return;
+      failed++;
+      log.warn(`thumbnail worker failed for ${f.id}:`, err);
+    }
+  };
+  // Images and videos run in separate pools (mediaConcurrency.ts has the
+  // width and the reasoning): a run of videos must not block the cheap image
+  // side, and the expensive decodes are bounded process-wide inside
+  // processOne, together with the media server's. Both pools are awaited to
+  // completion regardless of failure, and whatever completed is persisted
+  // before any failure propagates.
+  const images = pending.filter((f) => f.kind !== "video");
+  const videos = pending.filter((f) => f.kind === "video");
+  try {
+    const results = await Promise.allSettled([
+      pool(images, SCAN_POOL_WIDTH, processOne, signal),
+      pool(videos, SCAN_POOL_WIDTH, processOne, signal),
+    ]);
+    for (const r of results) if (r.status === "rejected") throw r.reason;
+  } finally {
+    // Persist the tail batch. On abort the buffered results are from ffmpeg
+    // runs that completed before the signal fired, so they are safe to keep.
+    flush();
+  }
+
+  // Files classified as unchanged/moved never enter the pool above (syncFiles
+  // leaves their thumb_status alone), so an existing library only gains derived
+  // tags through this pass. It reads the ffprobe columns already on `files`, so
+  // no media file is touched.
+  if (!signal?.aborted && needsAutoMetaBackfill(db)) {
+    await backfillAutoMetaTags(db, {
+      signal,
+      onProgress: (d, t) =>
+        onEvent({ type: "progress", jobId, phase: "tags", done: d, total: t }),
+    });
+  }
 
   // Reclaim durable metadata whose file row no longer exists (mainly post-rebuild orphans).
   // Skipped on abort to avoid purging metadata for files not yet re-indexed (especially after rebuild).
   if (!signal?.aborted) q.pruneOrphanMeta(db);
+
+  // Every file failing points at the tooling, not the files. Reported
+  // regardless of batch size: a tiny incremental scan may flag a merely
+  // corrupt file, but the alternative — a broken ffmpeg hiding behind small
+  // scans and reporting success with zero thumbnails — is worse. Raised only
+  // after the backfill/prune passes above, so a file that fails on every scan
+  // cannot starve them indefinitely.
+  if (failed > 0 && failed === pending.length && !signal?.aborted) {
+    throw new Error(
+      `thumbnail extraction failed for all ${failed} pending file(s) (is ffmpeg/ffprobe working?)`,
+    );
+  }
 
   onEvent({ type: "done", jobId, stats, aborted: signal?.aborted });
   return stats;

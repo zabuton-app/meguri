@@ -1,6 +1,11 @@
 // Regression tests for the shared worker-pool helper used by scan + jobs.
 import { describe, expect, it } from "vitest";
-import { pool, Semaphore } from "../concurrency.js";
+import {
+  pool,
+  QueueFullError,
+  Semaphore,
+  withTimeout,
+} from "../concurrency.js";
 
 describe("Semaphore", () => {
   it("rejects a limit below 1", () => {
@@ -23,13 +28,72 @@ describe("Semaphore", () => {
     expect(peak).toBeLessThanOrEqual(2);
   });
 
-  it("release is idempotent", async () => {
+  it("release is idempotent (a double release cannot inflate the pool)", async () => {
     const sem = new Semaphore(1);
     const release = await sem.acquire();
     release();
     release();
     const release2 = await sem.acquire();
+    let third = false;
+    const pending = sem.acquire().then((r) => {
+      third = true;
+      r();
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(third).toBe(false); // still only one permit
     release2();
+    await pending;
+    expect(third).toBe(true);
+  });
+});
+
+describe("Semaphore.acquire(signal)", () => {
+  it("rejects a queued waiter on abort and leaves the queue intact", async () => {
+    const sem = new Semaphore(1);
+    const release = await sem.acquire();
+    const ctrl = new AbortController();
+    const aborted = sem.acquire({ signal: ctrl.signal });
+    const later = sem.acquire();
+    ctrl.abort();
+    await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+    release();
+    const r = await later; // the un-aborted waiter still gets the permit
+    r();
+  });
+
+  it("rejects immediately when the signal is already aborted", async () => {
+    const sem = new Semaphore(1);
+    const ctrl = new AbortController();
+    ctrl.abort();
+    await expect(sem.acquire({ signal: ctrl.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    (await sem.acquire())(); // permit was not consumed
+  });
+});
+
+describe("Semaphore.acquire({ maxWaiting })", () => {
+  it("sheds load once the queue is at the bound", async () => {
+    const sem = new Semaphore(1);
+    const release = await sem.acquire();
+    const queued = sem.acquire({ maxWaiting: 1 }); // 0 waiting → queues
+    await expect(sem.acquire({ maxWaiting: 1 })).rejects.toBeInstanceOf(
+      QueueFullError,
+    );
+    expect(sem.waiting).toBe(1);
+    release();
+    (await queued)();
+  });
+});
+
+describe("withTimeout", () => {
+  it("returns the value when the promise settles first", async () => {
+    expect(await withTimeout(Promise.resolve(7), 1000)).toBe(7);
+  });
+  it("returns undefined once the timeout elapses", async () => {
+    expect(
+      await withTimeout(new Promise<number>(() => {}), 10),
+    ).toBeUndefined();
   });
 });
 

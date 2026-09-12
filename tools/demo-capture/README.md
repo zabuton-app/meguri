@@ -20,6 +20,7 @@ node tools/demo-capture/fetch-media.mjs
 # 2. Capture (each writes straight into docs/assets/)
 node tools/demo-capture/record-demo.mjs      # demo.gif — overview tour
 node tools/demo-capture/record-discover.mjs  # discover.gif — Discovery showcase
+node tools/demo-capture/record-playlist.mjs  # playlist.gif — playlist player
 node tools/demo-capture/shoot-gallery.mjs    # theme-*.png / view-*.png
 node tools/demo-capture/shoot-history.mjs    # history.png — play-history view
 ```
@@ -52,7 +53,7 @@ xvfb-run -a -s "-screen 0 1400x1000x24" \
   untouched. Language is forced to English and the theme to the default so
   output is reproducible across machines.
 - The scripts locate UI elements by English aria-labels and testids
-  (`media-card`, `Discovery`, `Reshuffle`, …). If those change in the app,
-  update the scenarios here.
+  (`media-card`, `Discovery`, `Reshuffle`, `Play as playlist`, …). If those
+  change in the app, update the scenarios here.
 - GIF encoding defaults (800px wide, 8 fps, 128 colors) live in
   `lib.mjs#startRecording` — tweak there if a capture comes out too large.

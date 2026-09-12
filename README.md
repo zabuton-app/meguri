@@ -43,6 +43,18 @@ playback.
 
 ![Discovery demo — immersive random picks with a scene-preview rail and reshuffle](./docs/assets/discover.gif)
 
+## 📺 Playlist — press play and let it run
+
+**Any list can play itself.** A collection, Watch Later, a workspace listing or
+a search result — hit play and a full-screen player takes the list exactly as it
+is on screen and runs it hands-off: videos play to the end, images hold for a
+few seconds with a slow pan and zoom, and the player moves on by itself. Shuffle
+and repeat are one click away, collections can be dragged into the order you
+want, and pressing `I` steps out to the current file's detail view —
+coming back resumes right where it left off.
+
+![Playlist demo — a full-screen player running a list hands-off, with shuffle and auto-advance](./docs/assets/playlist.gif)
+
 ## Download
 
 Windows users can install Meguri from the
@@ -82,8 +94,10 @@ needs the one-time approval above.
 
 ### Arch Linux (AUR)
 
-[meguri-bin](https://aur.archlinux.org/packages/meguri-bin) is available on
-the AUR. Install it with your favorite AUR helper:
+[meguri-bin](https://aur.archlinux.org/packages/meguri-bin) is the package
+maintained by this project. It installs the prebuilt release binaries, so it
+is the recommended way to install Meguri on Arch. Install it with your favorite
+AUR helper:
 
 ```bash
 yay -S meguri-bin
@@ -97,6 +111,17 @@ git clone https://aur.archlinux.org/meguri-bin.git
 cd meguri-bin
 makepkg -si
 ```
+
+A third-party [meguri](https://aur.archlinux.org/packages/meguri) package, which
+builds from source against the distribution's Electron, is also available:
+
+```bash
+yay -S meguri
+```
+
+That one is maintained by a community packager, not by this project: it is
+unofficial, its build is not verified here, and it may lag behind the latest
+release. Check its version before installing if you want the newest features.
 
 Or run from source — see [Setup and Launch](#setup-and-launch).
 
@@ -121,6 +146,9 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 🔭 **Discovery** — an immersive shuffle mode that resurfaces random picks
   from your library full-screen with a scene-preview rail
   ([see above](#-discovery--find-something-new))
+- 📺 **Playlist playback** — play any list hands-off in a full-screen player,
+  with shuffle, repeat, manual ordering, and timed images
+  ([see above](#-playlist--press-play-and-let-it-run))
 - 📋 **Copy to clipboard** — copy any image to the clipboard from the detail
   view, ready to paste elsewhere
 - 🎨 **Themes** — base16-based multi-theme switching (gruvbox / solarized /

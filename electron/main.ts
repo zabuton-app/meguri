@@ -7,6 +7,7 @@ import {
   globalShortcut,
   Menu,
   nativeImage,
+  powerMonitor,
   session,
   shell,
   Tray,
@@ -17,22 +18,31 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { DEFAULT_LOGO, loadConfig, updateConfig } from "./core/appConfig.js";
 import type { Core } from "./core/index.js";
 import { handle } from "./core/ipcHandler.js";
+import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import { runScan } from "./core/jobs.js";
 import log, { setupLogger } from "./core/logger.js";
 import { exportFrame, generateThumb } from "./core/media.js";
+import { withVideoDecodeSlot } from "./core/mediaConcurrency.js";
+import { withTimeout } from "./core/concurrency.js";
 import { isInsideRoot } from "./core/paths.js";
 import * as q from "./core/queries.js";
 import type { QueryTarget } from "./core/queryExec.js";
-import { QueryWorkerClient } from "./core/queryWorkerClient.js";
+import {
+  DISPOSE_TIMEOUT_MS,
+  QueryWorkerClient,
+} from "./core/queryWorkerClient.js";
 import { startServer } from "./core/server.js";
+import * as tagAdmin from "./core/tagAdmin.js";
 import * as tags from "./core/tags.js";
 import type {
   DuplicatesResult,
   FileRow,
   HistoryPage,
   SearchResult,
+  TagList,
   WorkspaceStats,
 } from "./core/types.js";
 import {
@@ -44,15 +54,12 @@ import {
   updateDownloadUrl,
 } from "./core/updater.js";
 import { ALL_ID, COLLECTION_ID_PREFIX, Workspaces } from "./core/workspaces.js";
+import type { LogoId } from "../shared/ipc/schema.js";
 
 // Set up logging before anything else so early failures land in the log file.
 setupLogger();
 
 // In CJS output, __dirname exists globally (out/main/).
-
-// Tray icon. Embedded as base64 to avoid bundle path resolution.
-const TRAY_ICON_BASE64 =
-  "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";
 
 const ws = new Workspaces();
 // Heavy read-only list/search queries run on a worker thread so a slow query
@@ -73,8 +80,15 @@ const MEDIA_TOKEN_HEADER = "X-Api-Token";
 let scanSeq = 1;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-// When true, a close request actually quits instead of hiding to the tray.
-let isQuitting = false;
+// Quit lifecycle. "disposing" = async teardown in flight (see before-quit),
+// "done" = teardown finished (or skipped) and the quit may proceed. Any
+// non-idle phase means a window close must really close instead of hiding
+// to the tray, no new scans may start, and no crash recovery runs.
+let quitPhase: "idle" | "disposing" | "done" = "idle";
+const isQuitting = (): boolean => quitPhase !== "idle";
+let mediaServer: http.Server | null = null;
+let controlServer: http.Server | null = null;
+let relaunchAfterQuit = false;
 
 app.setName("Meguri");
 
@@ -99,7 +113,26 @@ const URL_SCHEME = "meguri";
 app.on("second-instance", (_e, argv) => {
   const url = argv.find((a) => a.startsWith(`${URL_SCHEME}://`));
   if (url) log.info("[url-scheme] received:", url);
-  showWindow();
+  if (isQuitting()) requestRelaunch();
+  else showWindow();
+});
+
+/**
+ * The user asked for the window while this instance is tearing down (the
+ * single-instance lock made any new process exit at once). Don't swallow the
+ * request: come back as a fresh process once the quit completes. Evaluated
+ * in will-quit so a request landing after finalizeQuit() still counts.
+ */
+function requestRelaunch(): void {
+  if (!relaunchAfterQuit) {
+    log.info("launch requested during quit; relaunching after teardown");
+  }
+  relaunchAfterQuit = true;
+}
+app.on("will-quit", () => {
+  if (!relaunchAfterQuit) return;
+  relaunchAfterQuit = false;
+  app.relaunch();
 });
 
 if (process.defaultApp) {
@@ -117,7 +150,8 @@ if (process.defaultApp) {
 app.on("open-url", (e, url) => {
   e.preventDefault();
   log.info("[url-scheme] received:", url);
-  showWindow();
+  if (isQuitting()) requestRelaunch();
+  else showWindow();
 });
 
 // Fast-path control endpoint. Relaying meguri:// through a second Electron
@@ -131,7 +165,7 @@ function controlFilePath(): string {
   return path.join(app.getPath("userData"), "control.json");
 }
 
-function startControlServer(): Promise<void> {
+function startControlServer(): Promise<http.Server | null> {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
       const header = req.headers[MEDIA_TOKEN_HEADER.toLowerCase()];
@@ -144,7 +178,8 @@ function startControlServer(): Promise<void> {
       const pathname = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
       if (pathname === "/show") {
         log.info("[control] show requested");
-        showWindow();
+        if (isQuitting()) requestRelaunch();
+        else showWindow();
         res.statusCode = 204;
         res.end();
         return;
@@ -154,7 +189,7 @@ function startControlServer(): Promise<void> {
     });
     server.on("error", (e) => {
       log.warn("[control] server error (fast-path disabled):", e);
-      resolve();
+      resolve(null);
     });
     server.listen(0, "127.0.0.1", () => {
       const { port } = server.address() as AddressInfo;
@@ -170,7 +205,7 @@ function startControlServer(): Promise<void> {
       } catch (e) {
         log.warn("[control] failed to write control file:", e);
       }
-      resolve();
+      resolve(server);
     });
   });
 }
@@ -191,9 +226,84 @@ function isAppUrl(url: string): boolean {
     return false;
   }
 }
-app.on("render-process-gone", (_e, _wc, details) => {
+// Renderer crash recovery. A crashed renderer (OOM, a decoder fault, ...)
+// otherwise leaves the tray-resident app with a blank window until the user
+// quits and relaunches. Reload the main window instead — with a growing
+// delay, so an OOM'd renderer isn't rebuilt before the OS has reclaimed its
+// memory — and bounded per minute so a renderer that dies on every load
+// cannot spin forever; past the bound the user is asked instead. Safe to
+// call from this event since Electron 42.4 (it fires after teardown).
+const RENDERER_RELOAD_WINDOW_MS = 60_000;
+// Delay before the n-th reload within the window; its length is the bound.
+const RENDERER_RELOAD_BACKOFF_MS = [0, 2_000, 5_000];
+let rendererReloadTimes: number[] = [];
+
+app.on("render-process-gone", (_e, wc, details) => {
   log.error("renderer process gone:", details);
+  if (details.reason === "clean-exit" || details.reason === "killed") return;
+  if (isQuitting() || !mainWindow || mainWindow.isDestroyed()) return;
+  if (wc !== mainWindow.webContents) return;
+  // A renderer that could not even launch, or that failed Chromium's code
+  // integrity check (a DLL injected into the renderer, a tampered binary),
+  // is not something to paper over with a reload: surface it instead.
+  if (
+    details.reason === "launch-failed" ||
+    details.reason === "integrity-failure"
+  ) {
+    void offerRendererRecovery(details.reason);
+    return;
+  }
+  const now = Date.now();
+  rendererReloadTimes = rendererReloadTimes.filter(
+    (t) => now - t < RENDERER_RELOAD_WINDOW_MS,
+  );
+  const attempt = rendererReloadTimes.length;
+  if (attempt >= RENDERER_RELOAD_BACKOFF_MS.length) {
+    log.error(
+      `renderer crashed again after ${attempt} reloads within ${RENDERER_RELOAD_WINDOW_MS / 1000}s; asking the user`,
+    );
+    void offerRendererRecovery(details.reason);
+    return;
+  }
+  rendererReloadTimes.push(now);
+  const delay = RENDERER_RELOAD_BACKOFF_MS[attempt] ?? 0;
+  log.warn(`reloading the main window after a renderer crash (in ${delay}ms)`);
+  setTimeout(() => {
+    if (isQuitting() || !mainWindow || mainWindow.isDestroyed()) return;
+    reloadRenderer(mainWindow);
+  }, delay).unref();
 });
+
+/**
+ * Reload the renderer. Plain reload() would replay whatever URL is current;
+ * anything that isn't the bundled app (should the navigation guards ever be
+ * bypassed) is replaced by the app entry instead of being revived.
+ */
+function reloadRenderer(win: BrowserWindow): void {
+  if (isAppUrl(win.webContents.getURL())) win.webContents.reload();
+  else loadRenderer(win);
+}
+
+/** Crash-loop / integrity fallback: let the user choose instead of a blank window. */
+async function offerRendererRecovery(reason: string): Promise<void> {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: "error",
+    title: "Meguri",
+    message: "The window stopped responding and could not be recovered.",
+    detail: `Reason: ${reason}. You can try reloading it, or quit Meguri.`,
+    buttons: ["Reload", "Quit"],
+    defaultId: 0,
+    cancelId: 0,
+  });
+  if (isQuitting() || !mainWindow || mainWindow.isDestroyed()) return;
+  if (response === 1) {
+    app.quit();
+    return;
+  }
+  rendererReloadTimes = []; // the user asked; give it a fresh budget
+  reloadRenderer(mainWindow);
+}
 app.on("child-process-gone", (_e, details) => {
   log.error("child process gone:", details);
 });
@@ -242,7 +352,8 @@ function resolveCliRoot(): string | null {
 }
 
 function emit(channel: string, payload: unknown): void {
-  mainWindow?.webContents.send(channel, payload);
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send(channel, payload);
 }
 
 // Launch an external file/URL in a fully detached child process.
@@ -279,6 +390,7 @@ function scanCore(
   wsId: string | null,
   opts: { includeExcluded?: boolean; rebuild?: boolean },
 ): string {
+  if (isQuitting()) return ""; // shutdown() has aborted scans; don't start new ones
   if (wsId && scanningWs.has(wsId)) return ""; // don't start again if already running
   const jobId = `job-${scanSeq++}`;
   if (wsId) scanningWs.add(wsId);
@@ -338,6 +450,12 @@ async function abortScan(wsId: string): Promise<void> {
   await scanPromises.get(wsId);
 }
 
+/** Abort every running scan. Resolves once they have all settled. */
+function abortAllScans(): Promise<unknown> {
+  for (const ctrl of scanControllers.values()) ctrl.abort();
+  return Promise.allSettled([...scanPromises.values()]);
+}
+
 function startScan(
   opts: { includeExcluded?: boolean; rebuild?: boolean } = {},
 ): string {
@@ -362,6 +480,23 @@ function coreById(wsId: string): Core {
   const core = ws.byId(wsId);
   if (!core) throw new Error("unknown workspace");
   return core;
+}
+
+/**
+ * Take a file off Watch Later because it has now been played. Called wherever a
+ * play is recorded — the in-app player's first `play` event, opening in an
+ * external player, and an image's detail view (images have no player, so the
+ * app already counts a view as a play). Merely opening the detail view of a
+ * video does not reach here, so queueing something and peeking at its metadata
+ * leaves it on the list.
+ *
+ * Deliberately no workspace:changed broadcast: that would refetch the list
+ * behind the open detail view, dropping the very file being viewed out of the
+ * prev/next navigation order mid-session. The renderer refreshes the affected
+ * lists when the detail view closes instead (see MediaDetail).
+ */
+function consumeWatchLater(workspaceId: string, id: number): void {
+  ws.removeFromWatchLater(workspaceId, id);
 }
 
 /** Resolve a file's absolute path and verify it lives under the workspace root. */
@@ -487,7 +622,8 @@ function registerWorkspaceHandlers(): void {
     const collection = ws.addCollection(name, emoji);
     emit("workspace:changed", { activeId: ws.activeId });
     // addCollection makes the new collection active, so it's always the active one here.
-    return { ...collection, active: true };
+    // User-created collections are never locked; only the built-in Watch Later is.
+    return { ...collection, active: true, locked: false };
   });
 
   handle("collection_remove", ({ id }) => {
@@ -498,6 +634,15 @@ function registerWorkspaceHandlers(): void {
   handle("collection_reorder", ({ ids }) => {
     ws.reorderCollections(ids);
     emit("workspace:changed", { activeId: ws.activeId });
+  });
+
+  handle("collection_reorder_items", ({ collectionId, items }) => {
+    ws.reorderCollectionItems(collectionId, items);
+    // Deliberately no workspace:changed broadcast. The rail listens for it by
+    // invalidating every files_search, which would refetch the pages the
+    // renderer just patched optimistically — on every single drop. Nothing in
+    // the rail depends on the order within a collection, and the renderer
+    // refetches itself if the write fails. Same reasoning as consumeWatchLater.
   });
 
   handle("collection_set_emoji", ({ id, emoji }) => {
@@ -532,11 +677,8 @@ function registerScanHandlers(): void {
   );
 
   handle("scan_cancel", ({ wsId }) => {
-    if (wsId) {
-      scanControllers.get(wsId)?.abort();
-    } else {
-      for (const ctrl of scanControllers.values()) ctrl.abort();
-    }
+    if (wsId) scanControllers.get(wsId)?.abort();
+    else void abortAllScans();
   });
 }
 
@@ -598,9 +740,10 @@ function registerFileHandlers(): void {
     }
     return deleted;
   });
-  handle("file_record_play", ({ id, workspaceId, via, position }) =>
-    q.recordPlay(coreById(workspaceId).db, id, via, position ?? null),
-  );
+  handle("file_record_play", ({ id, workspaceId, via, position }) => {
+    q.recordPlay(coreById(workspaceId).db, id, via, position ?? null);
+    consumeWatchLater(workspaceId, id);
+  });
   // A collection is a file set, not a history scope; while one is active (queryCores()
   // returns []) fall back to every workspace so the timeline is still meaningful.
   const historyCores = () =>
@@ -642,6 +785,63 @@ function registerTagHandlers(): void {
   handle("tags_list", ({ workspaceId, prefix, limit }) =>
     tags.listTagNames(coreById(workspaceId).db, prefix, limit ?? 20),
   );
+
+  // The catalog channels take no workspaceId: coreById(ALL_ID) throws by design,
+  // and a tag id means nothing across databases. Scope follows the active view,
+  // the same rule history_list and duplicates_list use.
+  const tagCores = () => (ws.isCollection() ? ws.allCores() : ws.queryCores());
+
+  /** Cores for a catalog mutation. allCores() silently skips workspaces whose DB
+   *  could not be opened, which for a rename means that workspace keeps the old
+   *  name while the others move on — worth a line in the log when it happens. */
+  const tagMutationCores = () => {
+    const cores = tagCores();
+    const expected =
+      ws.isCollection() || ws.isAll() ? ws.rootCount() : cores.length;
+    if (cores.length < expected) {
+      log.warn(
+        `tag mutation covers ${cores.length}/${expected} workspaces; the rest could not be opened`,
+      );
+    }
+    return cores;
+  };
+
+  handle("tags_list_all", () =>
+    queryClient.run<TagList>({
+      kind: "tagsList",
+      targets: queryTargets(tagCores()),
+    }),
+  );
+  // Mutations are addressed by name, so fanning them across every database in
+  // scope converges on the same end state even when one of them has a collision
+  // (rename there escalates to a merge) and another does not.
+  handle("tag_rename", ({ from, to }) => {
+    let merged = false;
+    let affectedFiles = 0;
+    for (const { core } of tagMutationCores()) {
+      const r = tagAdmin.renameTag(core.db, from, to);
+      merged ||= r.merged;
+      affectedFiles += r.affectedFiles;
+    }
+    return { merged, affectedFiles };
+  });
+  handle("tag_merge", ({ from, into }) => {
+    let affectedFiles = 0;
+    for (const { core } of tagMutationCores()) {
+      affectedFiles += tagAdmin.mergeTags(core.db, from, into).affectedFiles;
+    }
+    return { affectedFiles };
+  });
+  handle("tag_delete", ({ tags: refs }) => {
+    let removedTags = 0;
+    let affectedFiles = 0;
+    for (const { core } of tagMutationCores()) {
+      const r = tagAdmin.deleteTags(core.db, refs);
+      removedTags += r.removedTags;
+      affectedFiles += r.affectedFiles;
+    }
+    return { removedTags, affectedFiles };
+  });
 }
 
 function registerBookmarkHandlers(): void {
@@ -681,12 +881,8 @@ function registerThumbHandlers(): void {
     // On failure, leave file_meta.thumb_offset_sec untouched and surface the error to the
     // renderer; the UI will roll back its optimistic update.
     const dest = path.join(c.thumbsDir(), `${id}.webp`);
-    const ok = await generateThumb(
-      file.absPath,
-      "video",
-      dest,
-      undefined,
-      sec ?? undefined,
+    const ok = await withVideoDecodeSlot(() =>
+      generateThumb(file.absPath, "video", dest, undefined, sec ?? undefined),
     );
     if (!ok)
       throw new Error("failed to generate thumbnail at the requested offset");
@@ -749,7 +945,9 @@ function registerThumbHandlers(): void {
         // silently clobber a different existing file after rewriting it.
         for (let n = 1; fs.existsSync(dest); n++) dest = `${stem} (${n}).png`;
       }
-      const ok = await exportFrame(abs, dest, sec, format);
+      const ok = await withVideoDecodeSlot(() =>
+        exportFrame(abs, dest, sec, format),
+      );
       if (!ok) throw new Error("failed to export frame");
       return { saved: true, path: dest };
     } finally {
@@ -764,6 +962,7 @@ function registerShellHandlers(): void {
     const abs = ensureFileInsideRoot(c, id);
     openDetached(abs);
     q.recordPlay(c.db, id, "external", null);
+    consumeWatchLater(workspaceId, id);
   });
 
   handle("open_folder", ({ id, workspaceId }) => {
@@ -806,6 +1005,46 @@ function registerShellHandlers(): void {
   });
 }
 
+function trayImage(logo: LogoId): Electron.NativeImage {
+  return nativeImage.createFromDataURL(
+    `data:image/png;base64,${TRAY_ICON_BASE64[logo]}`,
+  );
+}
+
+function windowImage(logo: LogoId): Electron.NativeImage {
+  return nativeImage.createFromDataURL(
+    `data:image/png;base64,${WINDOW_ICON_BASE64[logo]}`,
+  );
+}
+
+/**
+ * Re-apply the logo variant to the live tray and window/dock icons.
+ *
+ * Live switches always use the embedded 256px bitmap, including a switch back
+ * to the default: there is no Electron API to restore the packaged icon on a
+ * live window/dock. The full-resolution packaged icon (.ico/.icns/.desktop)
+ * comes back on the next launch, where startup skips the override for the
+ * default logo.
+ */
+function applyLogo(logo: LogoId): void {
+  tray?.setImage(trayImage(logo));
+  if (process.platform === "darwin") {
+    // BrowserWindow icons are ignored on macOS; the dock icon is the app icon.
+    app.dock?.setIcon(windowImage(logo));
+  } else if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setIcon(windowImage(logo));
+  }
+}
+
+function registerLogoHandlers(): void {
+  handle("logo_get", () => loadConfig().logo);
+  handle("logo_set", ({ logo }) => {
+    updateConfig((c) => ({ ...c, logo }));
+    applyLogo(logo);
+    return logo;
+  });
+}
+
 function registerUpdateHandlers(): void {
   handle("update_check", ({ force }) => checkForUpdates({ force }));
   handle("update_get_settings", () => getUpdateSettings());
@@ -844,15 +1083,23 @@ function registerIpc(): void {
   registerThumbHandlers();
   registerShellHandlers();
   registerUpdateHandlers();
+  registerLogoHandlers();
 }
 
 function createWindow(): void {
+  const { logo } = loadConfig();
+  rendererReloadTimes = []; // a fresh window gets a fresh crash budget
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 640,
     minHeight: 480,
     title: "Meguri",
+    // Window/taskbar icon (Linux/Windows; macOS uses the dock icon instead).
+    // Only overridden for non-default logos: the packaged multi-size icon
+    // (exe-embedded .ico / .desktop entry) stays in charge for the default,
+    // and it carries more sizes than the embedded bitmap.
+    ...(logo !== DEFAULT_LOGO ? { icon: windowImage(logo) } : {}),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.js"),
@@ -868,22 +1115,32 @@ function createWindow(): void {
 
   // Closing the window hides it to the tray unless tray support is disabled.
   mainWindow.on("close", (e) => {
-    if (isTrayEnabled() && !isQuitting) {
+    if (isTrayEnabled() && !isQuitting()) {
       e.preventDefault();
       mainWindow?.hide();
     }
   });
 
+  // Windows shutdown / restart / log-off never reaches before-quit; this is
+  // the only notice the app gets before the OS kills it.
+  mainWindow.on("session-end", () => {
+    log.info("session ending; tearing down synchronously");
+    teardownSync();
+  });
+
+  loadRenderer(mainWindow);
+}
+
+/** Load the app entry (dev server in development, bundled renderer otherwise). */
+function loadRenderer(win: BrowserWindow): void {
   const devUrl = process.env["ELECTRON_RENDERER_URL"];
-  if (devUrl) {
-    void mainWindow.loadURL(devUrl);
-  } else {
-    void mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
-  }
+  if (devUrl) void win.loadURL(devUrl);
+  else void win.loadFile(path.join(__dirname, "../renderer/index.html"));
 }
 
 /** Show and focus the main window, recreating it if it was destroyed. */
 function showWindow(): void {
+  if (isQuitting()) return;
   if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow();
     return;
@@ -894,10 +1151,7 @@ function showWindow(): void {
 
 function createTray(): void {
   if (!isTrayEnabled()) return;
-  const icon = nativeImage.createFromDataURL(
-    `data:image/png;base64,${TRAY_ICON_BASE64}`,
-  );
-  tray = new Tray(icon);
+  tray = new Tray(trayImage(loadConfig().logo));
   tray.setToolTip("Meguri");
   const menu = Menu.buildFromTemplate([
     { label: "Show Meguri", click: () => showWindow() },
@@ -930,10 +1184,7 @@ function createTray(): void {
     { type: "separator" },
     {
       label: "Quit",
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      },
+      click: () => app.quit(),
     },
   ]);
   tray.setContextMenu(menu);
@@ -983,14 +1234,30 @@ void app.whenReady().then(async () => {
   ws.bootstrap(resolveCliRoot());
 
   // The media server resolves the DB by workspace ID to serve (independent of the active one).
-  ({ port: mediaPort } = await startServer((id) => ws.byId(id), mediaToken));
+  ({ port: mediaPort, server: mediaServer } = await startServer(
+    (id) => ws.byId(id),
+    mediaToken,
+  ));
   installMediaAuthHeader();
   log.info(`media server on http://127.0.0.1:${mediaPort}`);
 
-  await startControlServer();
+  controlServer = await startControlServer();
+
+  // System shutdown / reboot (macOS, Linux): no time for the async gate.
+  powerMonitor.on("shutdown", () => {
+    log.info("system shutting down; tearing down synchronously");
+    teardownSync();
+    app.quit();
+  });
 
   registerIpc();
   createTray();
+  // Dock icon override on macOS (BrowserWindow icons are ignored there).
+  // Skipped for the default logo so the packaged .icns keeps its full
+  // resolution set.
+  if (process.platform === "darwin" && loadConfig().logo !== DEFAULT_LOGO) {
+    applyLogo(loadConfig().logo);
+  }
   await installReactDevTools();
   createWindow();
   if (isDevMode()) {
@@ -1004,15 +1271,96 @@ void app.whenReady().then(async () => {
   app.on("activate", () => showWindow());
 });
 
-app.on("before-quit", () => {
-  globalShortcut.unregisterAll();
-  isQuitting = true;
-  void queryClient.dispose();
+// Async teardown before quit: leave no live better-sqlite3 handle behind
+// (worker read-only handles, the main-thread fallback, and the per-workspace
+// writers), since unloading the native addon over open connections is a
+// crash risk on exit. Order: abort scans and let them drain (their in-flight
+// ffmpeg runs are killed by the signal, so this is short — and bounded, since
+// a stuck scan must not stall quit), then dispose the query worker. The
+// writers are closed by the quit gate's finally below, so that step runs even
+// when the budget cuts this short.
+// Teardown is three steps, in this order, on every quit path:
+//   1. stopIntake()   — sync: hide the window, stop the local servers, abort
+//                       scans. Nothing new gets in after this.
+//   2. drain          — async (shutdown() only): wait, bounded, for scans to
+//                       settle and for the query worker to close its handles.
+//   3. finalizeQuit() — sync: close the writers, refuse reopening, remove the
+//                       control file. Always runs, even when 2 was cut short.
+// The async gate (before-quit below) runs 1→2→3; the synchronous paths
+// (teardownSync) run 1→3 with the worker torn down fire-and-forget.
+const SHUTDOWN_SCAN_WAIT_MS = 1_000;
+
+function stopIntake(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+  mediaServer?.close();
+  controlServer?.close();
+}
+
+async function shutdown(): Promise<void> {
+  stopIntake();
+  await withTimeout(abortAllScans(), SHUTDOWN_SCAN_WAIT_MS);
+  await queryClient.dispose();
+}
+
+function finalizeQuit(): void {
+  quitPhase = "done";
+  // Guarded so that a throw here can never leave quitPhase stuck (which
+  // would make the app impossible to quit).
+  try {
+    ws.closeAll();
+  } catch (e) {
+    log.error("closing workspaces on quit failed:", e);
+  }
   try {
     fs.rmSync(controlFilePath(), { force: true });
   } catch {
     /* best-effort cleanup */
   }
+}
+
+/**
+ * Tear down right now, without waiting for anything. Used where the async
+ * gate isn't an option: the OS is ending the session, or (macOS) before-quit
+ * runs inside applicationShouldTerminate, where cancelling the quit to wait
+ * would also cancel a log-out or shutdown in progress. On these paths the
+ * worker thread is only *being* terminated at exit (terminateNow), not
+ * confirmed closed — the best a synchronous path can do.
+ */
+function teardownSync(): void {
+  if (quitPhase === "done") return;
+  quitPhase = "disposing";
+  stopIntake();
+  void abortAllScans();
+  queryClient.terminateNow();
+  finalizeQuit();
+}
+
+// Quit gate. Electron does not await async listeners, so the first pass
+// cancels the quit, runs shutdown(), then re-enters app.quit(). A repeated
+// quit request while that is in flight is absorbed rather than started over.
+// The budget here is a backstop over shutdown()'s own bounds (scan drain +
+// worker dispose), derived from them so it always stays above their sum and
+// the normal path completes before it fires.
+const QUIT_BUDGET_MS = SHUTDOWN_SCAN_WAIT_MS + DISPOSE_TIMEOUT_MS + 2_000;
+app.on("before-quit", (e) => {
+  globalShortcut.unregisterAll();
+  if (quitPhase === "done") return;
+  if (process.platform === "darwin") {
+    // See teardownSync(): preventDefault() here would cancel an OS log-out.
+    teardownSync();
+    return;
+  }
+  e.preventDefault();
+  if (quitPhase === "disposing") return;
+  quitPhase = "disposing";
+  void withTimeout(shutdown(), QUIT_BUDGET_MS)
+    .catch(() => {})
+    .finally(() => {
+      // Runs on the timeout path too: the writers get closed regardless, and
+      // nothing can reopen them afterwards (Workspaces refuses).
+      finalizeQuit();
+      app.quit();
+    });
 });
 
 // With tray support enabled, closing windows keeps the app resident.

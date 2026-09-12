@@ -45,6 +45,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
       keys: formatChords([...g.up, ...g.down, ...g.left, ...g.right]),
     },
     { label: t("shortcuts.openFocused"), keys: formatChords(g.open) },
+    { label: t("shortcuts.watchLater"), keys: "W" },
     { label: t("shortcuts.scrollDown"), keys: formatChords(b.pageDown) },
     { label: t("shortcuts.scrollUp"), keys: formatChords(b.pageUp) },
     { label: t("shortcuts.help"), keys: "?" },
@@ -52,6 +53,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
   const detail: Row[] = [
     { label: t("media.prev"), keys: formatChords(b.prev) },
     { label: t("media.next"), keys: formatChords(b.next) },
+    { label: t("shortcuts.watchLater"), keys: "W" },
     { label: t("shortcuts.playPause"), keys: "Space / K" },
     { label: t("shortcuts.skip5"), keys: "← / →" },
     { label: t("shortcuts.skip10"), keys: "J / L" },

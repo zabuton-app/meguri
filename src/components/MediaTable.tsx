@@ -11,11 +11,26 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type Ref,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ImageIcon } from "lucide-react";
+import { MediaEmptyState } from "@/components/MediaEmptyState";
+import type { DraggableAttributes } from "@dnd-kit/core";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  MediaReorderProvider,
+  type MediaReorder,
+} from "@/components/MediaReorder";
+import { mediaSortId } from "@/lib/mediaSortId";
 import type { FileRow } from "@/ipc/types";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { WatchLaterButton } from "@/components/WatchLaterButton";
+import {
+  useWatchLater,
+  type WatchLaterMembership,
+} from "@/hooks/useWatchLater";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
@@ -27,6 +42,7 @@ import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
+import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 import { kindLabelKey } from "@/lib/mediaKind";
 
@@ -66,6 +82,10 @@ interface Props {
   isFetchingPreviousPage?: boolean;
   /** Whether keyboard focus navigation is active (list is foreground). */
   navActive?: boolean;
+  /** Whether the active view is the built-in Watch Later collection (changes empty-state copy). */
+  watchLater?: boolean;
+  /** Set only while a collection is shown in its manual order; enables drag-to-reorder. */
+  reorder?: MediaReorder;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -85,9 +105,12 @@ export const MediaTable = memo(function MediaTable({
   fetchPreviousPage,
   isFetchingPreviousPage,
   navActive = false,
+  watchLater = false,
+  reorder,
 }: Props) {
   const { t } = useI18n();
   const { activate } = useActivateFile();
+  const watchLaterMembership = useWatchLater();
 
   // Capture the scroll viewport into state so we can measure its width (the
   // element mounts after the loading→data transition, so a plain ref + effect
@@ -157,6 +180,10 @@ export const MediaTable = memo(function MediaTable({
     onOpen,
     scrollToRow,
   });
+  // Points at the focused row's toggle so "W" activates it through the button
+  // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
+  const focusedWatchLaterRef = useRef<HTMLButtonElement>(null);
+  useWatchLaterHotkey({ active: navActive, buttonRef: focusedWatchLaterRef });
 
   // Reset the scroll position to the top on workspace switch.
   useEffect(() => {
@@ -193,59 +220,59 @@ export const MediaTable = memo(function MediaTable({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
-        <ImageIcon className="size-10 opacity-50" />
-        <p>{t("grid.empty")}</p>
-        <p className="text-xs">{t("grid.emptyHint")}</p>
-      </div>
-    );
+    return <MediaEmptyState watchLater={watchLater} />;
   }
 
   return (
-    <ScrollArea className="page-scroll h-full" viewportRef={setScrollRef}>
-      <div role="table" style={{ width: tableWidth }} className="text-sm">
-        {/* Sticky header. Same grid columns as rows so cells line up. */}
-        <div
-          role="row"
-          className="sticky top-0 z-10 grid border-b border-border bg-surface text-muted"
-          style={{ gridTemplateColumns: GRID_COLS }}
-        >
-          <HeadCell />
-          <HeadCell>{t("table.name")}</HeadCell>
-          <HeadCell>{t("media.metaKind")}</HeadCell>
-          <HeadCell>{t("media.metaResolution")}</HeadCell>
-          <HeadCell>{t("media.metaDuration")}</HeadCell>
-          <HeadCell>{t("media.metaSize")}</HeadCell>
-          <HeadCell>{t("media.rating")}</HeadCell>
-          <HeadCell>{t("media.tags")}</HeadCell>
+    <MediaReorderProvider items={items} reorder={reorder}>
+      <ScrollArea className="page-scroll h-full" viewportRef={setScrollRef}>
+        <div role="table" style={{ width: tableWidth }} className="text-sm">
+          {/* Sticky header. Same grid columns as rows so cells line up. */}
+          <div
+            role="row"
+            className="sticky top-0 z-10 grid border-b border-border bg-surface text-muted"
+            style={{ gridTemplateColumns: GRID_COLS }}
+          >
+            <HeadCell />
+            <HeadCell>{t("table.name")}</HeadCell>
+            <HeadCell>{t("media.metaKind")}</HeadCell>
+            <HeadCell>{t("media.metaResolution")}</HeadCell>
+            <HeadCell>{t("media.metaDuration")}</HeadCell>
+            <HeadCell>{t("media.metaSize")}</HeadCell>
+            <HeadCell>{t("media.rating")}</HeadCell>
+            <HeadCell>{t("media.tags")}</HeadCell>
+          </div>
+          {/* Body. Height reserved for all rows; only visible rows are mounted. */}
+          <div
+            className="relative"
+            style={{ height: virtualizer.getTotalSize(), width: "100%" }}
+          >
+            {virtualRows.map((vr) => {
+              const file = items[vr.index];
+              const focused = vr.index === focusedIndex;
+              const rowProps = {
+                index: vr.index,
+                file,
+                version: thumbVersion[mediaSortId(file)] ?? 0,
+                mediaBase,
+                top: vr.start,
+                onTagClick,
+                focused,
+                watchLater: watchLaterMembership,
+                watchLaterRef: focused ? focusedWatchLaterRef : undefined,
+                onOpen: onRowOpen,
+                t,
+              };
+              return reorder ? (
+                <SortableTableRow key={mediaSortId(file)} {...rowProps} />
+              ) : (
+                <MediaTableRow key={mediaSortId(file)} {...rowProps} />
+              );
+            })}
+          </div>
         </div>
-        {/* Body. Height reserved for all rows; only visible rows are mounted. */}
-        <div
-          className="relative"
-          style={{ height: virtualizer.getTotalSize(), width: "100%" }}
-        >
-          {virtualRows.map((vr) => (
-            <MediaTableRow
-              key={`${items[vr.index].workspaceId}:${items[vr.index].id}`}
-              index={vr.index}
-              file={items[vr.index]}
-              version={
-                thumbVersion[
-                  `${items[vr.index].workspaceId}:${items[vr.index].id}`
-                ] ?? 0
-              }
-              mediaBase={mediaBase}
-              top={vr.start}
-              onTagClick={onTagClick}
-              focused={vr.index === focusedIndex}
-              onOpen={onRowOpen}
-              t={t}
-            />
-          ))}
-        </div>
-      </div>
-    </ScrollArea>
+      </ScrollArea>
+    </MediaReorderProvider>
   );
 });
 
@@ -269,8 +296,11 @@ const MediaTableRow = memo(function MediaTableRow({
   top,
   onTagClick,
   focused,
+  watchLater,
+  watchLaterRef,
   onOpen,
   t,
+  dnd,
 }: {
   index: number;
   file: FileRow;
@@ -279,9 +309,14 @@ const MediaTableRow = memo(function MediaTableRow({
   top: number;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  watchLater: WatchLaterMembership;
+  /** Set only on the focused row, so the "W" shortcut can drive this toggle. */
+  watchLaterRef?: Ref<HTMLButtonElement>;
   /** Opens the detail view. `autoplay=true` (thumbnail click) plays automatically. */
   onOpen: (index: number, autoplay: boolean) => void;
   t: TFunc;
+  /** Drag wiring, present only while the collection is in manual order. */
+  dnd?: DragWiring;
 }) {
   // The row's default click opens the detail view paused (treated as a
   // "metadata" click). The thumbnail cell stops propagation and opts in to
@@ -292,15 +327,23 @@ const MediaTableRow = memo(function MediaTableRow({
       role="row"
       aria-current={focused ? "true" : undefined}
       onClick={() => onOpen(index, false)}
+      ref={dnd?.ref}
       className={cn(
         "absolute left-0 top-0 grid w-full cursor-pointer items-center border-b border-border transition-colors hover:bg-overlay/50",
         focused && "bg-primary/15 ring-2 ring-inset ring-primary",
+        dnd && "touch-none",
+        dnd?.isDragging && "opacity-60",
       )}
       style={{
         height: ROW_HEIGHT,
-        transform: `translateY(${top}px)`,
+        // The virtual offset comes first; the drag offset rides on top of it.
+        transform: `translateY(${top}px) ${dnd?.transform ?? ""}`.trimEnd(),
+        transition: dnd?.transition,
+        zIndex: dnd?.isDragging ? 1 : undefined,
         gridTemplateColumns: GRID_COLS,
       }}
+      {...dnd?.attributes}
+      {...dnd?.listeners}
     >
       <div
         role="cell"
@@ -351,6 +394,13 @@ const MediaTableRow = memo(function MediaTableRow({
           favorite={file.favorite}
           size={14}
         />
+        <WatchLaterButton
+          ref={watchLaterRef}
+          fileId={file.id}
+          workspaceId={file.workspaceId}
+          watchLater={watchLater}
+          size={14}
+        />
         <RatingButton
           fileId={file.id}
           workspaceId={file.workspaceId}
@@ -366,3 +416,46 @@ const MediaTableRow = memo(function MediaTableRow({
     </div>
   );
 });
+
+/** Drag props MediaTableRow applies to its own element (it owns its positioning). */
+interface DragWiring {
+  ref: (node: HTMLElement | null) => void;
+  transform: string | undefined;
+  transition: string | undefined;
+  isDragging: boolean;
+  attributes: DraggableAttributes;
+  listeners: SyntheticListenerMap | undefined;
+}
+
+/**
+ * Table rows position themselves with a transform, so instead of nesting them in
+ * a sortable wrapper (which would fight over that transform) the drag wiring is
+ * handed down and composed inside the row.
+ */
+function SortableTableRow(
+  props: Omit<Parameters<typeof MediaTableRow>[0], "dnd">,
+) {
+  // Read during render by design (see SortableMedia in MediaReorder.tsx).
+  // dnd-kit's attributes default role to "button". Spread over a row that
+  // declares role="row" inside a role="table", that orphans its role="cell"
+  // children, so the row's own semantics are handed back to it here.
+  const sortable = useSortable({
+    id: mediaSortId(props.file),
+    attributes: { role: "row" },
+  });
+  const { setNodeRef, transition, isDragging, attributes, listeners } =
+    sortable;
+  return (
+    <MediaTableRow
+      {...props}
+      dnd={{
+        ref: setNodeRef,
+        transform: CSS.Transform.toString(sortable.transform) || undefined,
+        transition,
+        isDragging,
+        attributes,
+        listeners,
+      }}
+    />
+  );
+}

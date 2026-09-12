@@ -15,7 +15,10 @@ export function HistoryModal({
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      // A nested layer (a Radix dialog, ConfirmDialog) calls preventDefault on
+      // the Escape it consumed. Without this check, closing such a dialog would
+      // also tear down the modal underneath it.
+      if (e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
         onClose();
       }

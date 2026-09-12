@@ -14,6 +14,7 @@ export interface FileSeed {
   width?: number | null;
   height?: number | null;
   duration?: number | null;
+  codec?: string | null;
 }
 
 /** Open an in-memory DB with a single scan root registered; returns the DB and its rootId. */
@@ -30,8 +31,8 @@ export function insertFile(db: DB, rootId: number, seed: FileSeed): number {
     .prepare(
       `INSERT INTO files
         (root_id, rel_path, abs_path, kind, ext, size, mtime, btime, content_hash,
-         width, height, duration, captured_at, thumb_status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+         width, height, duration, codec, captured_at, thumb_status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     )
     .run(
       rootId,
@@ -46,6 +47,7 @@ export function insertFile(db: DB, rootId: number, seed: FileSeed): number {
       seed.width ?? null,
       seed.height ?? null,
       seed.duration ?? null,
+      seed.codec ?? null,
       seed.capturedAt ?? null,
       nowUnix(),
     );

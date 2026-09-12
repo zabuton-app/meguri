@@ -1,6 +1,9 @@
 // 日本語カタログ（原典）。キーはドット区切りのフラット構造。
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
+  // アプリ名（表示名の漢字1文字。ガイドライン00）
+  "app.name": "巡",
+
   // 共通
   "common.close": "閉じる",
   "common.cancel": "キャンセル",
@@ -29,6 +32,15 @@ export const ja = {
   "settings.light": "ライト",
   "settings.dark": "ダーク",
   "settings.theme": "テーマ",
+
+  // 外観トグル（ヘッダー）
+  "theme.switchToLight": "ライトモードに切り替え",
+  "theme.switchToDark": "ダークモードに切り替え",
+
+  "settings.tabGeneral": "一般",
+  "settings.tabLibrary": "ライブラリ表示",
+  "settings.tabPlayback": "プレイリスト再生",
+  "settings.tabApp": "アプリ",
   "settings.language": "言語",
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",
@@ -42,6 +54,18 @@ export const ja = {
   "settings.frameQualityLow": "低 (240px)",
   "settings.frameQualityStandard": "標準 (480px)",
   "settings.frameQualityHigh": "高 (960px)",
+  "settings.emojiStyle": "絵文字スタイル",
+  "settings.emojiStyleDesc":
+    "絵文字アイコンや文中の絵文字の見た目を切り替えます。",
+  "settings.emojiStyleNative": "システム標準",
+  "settings.emojiStyleTwemoji": "Twemoji",
+  "settings.emojiStyleNoto": "Noto Emoji",
+  "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.logo": "アプリのロゴ",
+  "settings.logoDesc": "ウィンドウ・トレイ・画面内のアイコンに反映されます。",
+  "logo.dark": "濃色",
+  "logo.light": "淡色",
+  "logo.enso": "円相",
   "settings.keybinding": "キーバインド",
   "settings.keybindingDesc":
     "一覧のフォーカス移動・ファイルの前後移動・スクロール・検索フォーカスのキー割り当て。",
@@ -63,8 +87,8 @@ export const ja = {
     "確認できませんでした（オフラインの可能性があります）。",
   "update.upToDate": "最新です（{version}）。",
   "settings.about": "このアプリについて",
-  "about.version": "バージョン {version}",
-  "about.appLicense": "Meguri は MIT License の下で公開されています。",
+  "about.version": "{name} バージョン {version}",
+  "about.appLicense": "{name}は MIT License の下で公開されています。",
   "about.ossTitle": "オープンソースライセンス",
   "about.ossDesc": "本アプリは以下のオープンソースソフトウェアを含んでいます。",
   "about.ffmpegNotice":
@@ -114,18 +138,24 @@ export const ja = {
   "command.shortcutHint": "{shortcut} で開けます",
 
   // フィルタ（FilterBar / 条件バッジ）
+  "filter.searchHint":
+    'ファイル名とタグを検索します。tag:旅行 や tag:4k で、手動タグも自動タグも完全一致で絞り込めます。空白を含むタグは tag:"夏 旅行" のように引用符で囲みます。',
   "filter.searchPlaceholder": "ファイル名・タグを検索",
+  "filter.tagSuggestions": "タグの候補",
   "filter.all": "すべて",
-  "filter.playAny": "視聴状態",
   "filter.played": "視聴済み",
   "filter.unplayed": "未視聴",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "最低レーティングで絞り込み",
   "filter.btime": "作成日",
-  "filter.btimeFilter": "作成日で絞り込み",
   "filter.dateFrom": "開始日",
   "filter.dateTo": "終了日",
-  "filter.dateClear": "クリア",
+  "filter.more": "他の条件",
+  "filter.moreActive": "他の条件（{count}件適用中）",
+  "filter.kindFilter": "種別で絞り込み",
+  "filter.playState": "視聴状態",
+  "filter.sortSection": "並び順",
+  "filter.otherSection": "その他",
 
   // スマートコレクション
   "smartCollection.title": "スマートコレクション",
@@ -137,10 +167,6 @@ export const ja = {
   "smartCollection.namePlaceholder": "コレクション名",
   "smartCollection.save": "保存",
   "smartCollection.allMedia": "すべてのメディア",
-  "smartCollection.defaultFavorites": "お気に入り",
-  "smartCollection.defaultRating": "★{rating}以上",
-  "smartCollection.defaultUnplayed": "未視聴",
-  "smartCollection.defaultName": "新しいコレクション",
 
   // メディア詳細（MediaDetail）
   "media.notFound": "ファイルが見つかりません。",
@@ -168,6 +194,7 @@ export const ja = {
   "shortcuts.scrollUp": "上へスクロール",
   "shortcuts.moveFocus": "フォーカス移動（上下左右）",
   "shortcuts.openFocused": "選択中の項目を開く",
+  "shortcuts.watchLater": "後で見るを切り替え",
   "shortcuts.help": "このヘルプ",
   "shortcuts.playPause": "再生 / 一時停止",
   "shortcuts.skip5": "5秒 戻る / 進む",
@@ -242,18 +269,20 @@ export const ja = {
   "scan.phaseHash": "ファイル照合",
   "scan.phaseIndex": "インデックス作成",
   "scan.phaseThumbnail": "サムネイル生成",
+  "scan.phaseTags": "タグ付与",
   "scan.cancel": "スキャンをキャンセル",
 
   // タグ編集
   "tag.none": "タグなし",
   "tag.addPlaceholder": "タグを追加して Enter",
   "tag.remove": "タグ削除",
+  "tag.addFailed": "タグを追加できませんでした",
 
   // メディアグリッド
   "grid.empty": "表示できるメディアがありません。",
   "grid.emptyHint":
     "「スキャン」を実行すると、配下の動画・画像がここに並びます。",
-  "grid.searchByTag": "「{name}」で検索",
+  "grid.searchByTag": "「{name}」で絞り込み",
   "view.grid": "グリッド表示",
   "view.list": "リスト表示",
   "view.table": "テーブル表示",
@@ -296,6 +325,64 @@ export const ja = {
   "duplicates.filter": "重複ファイルのみ表示",
   "duplicates.chip": "重複",
 
+  // タグ管理画面
+  "tags.title": "タグ管理",
+  "tags.summary": "{tags} タグ / 付与 {assignments} 件",
+  "tags.empty": "タグはまだありません。",
+  "tags.emptyHint": "詳細画面でタグを追加すると、ここに一覧が表示されます。",
+  "tags.searchPlaceholder": "タグを絞り込み",
+  "tags.noMatch": "一致するタグがありません。",
+  "tags.truncated": "タグ数が多いため上位 {max} 件のみ表示しています。",
+  "tags.fileCount": "{count} ファイル",
+  "tags.sortByName": "名前順",
+  "tags.sortByCount": "件数順",
+  "tags.groupManual": "手動タグ",
+  "tags.readOnly": "読み取り専用",
+  "tags.readOnlyHint":
+    "スキャン時に自動付与されるタグです。編集・削除はできません。",
+  "tags.filterByTag": "このタグで絞り込む",
+  "tags.source.manual": "手動",
+  "tags.source.autoMeta": "自動",
+  "tags.selected": "{count} 件選択中",
+  "tags.clearSelection": "選択を解除",
+  "tags.rename": "名前を変更",
+  "tags.renameTitle": "タグ名を変更",
+  "tags.renamePlaceholder": "新しいタグ名",
+  "tags.renameAction": "変更",
+  "tags.renamed": "「{from}」を「{to}」に変更しました",
+  "tags.renameFailed": "タグ名の変更に失敗しました",
+  "tags.renameConflict":
+    "「{name}」は既に存在します。2 つのタグを統合しますか?",
+  "tags.merge": "統合",
+  "tags.mergeTitle": "タグを統合",
+  "tags.mergeDescription":
+    "選択した {count} 個のタグを統合先にまとめます。統合元のタグは削除されます。",
+  "tags.mergeTarget": "統合先",
+  "tags.mergeAction": "統合する",
+  "tags.merged": "{count} 個のタグを統合しました",
+  "tags.mergeFailed": "タグの統合に失敗しました",
+  "tags.delete": "削除",
+  "tags.deleteAction": "削除",
+  "tags.deleteConfirm":
+    "タグ「{name}」を {count} ファイルから削除します。よろしいですか?",
+  "tags.deleteConfirmMany":
+    "選択した {count} 個のタグを削除します。よろしいですか?",
+  "tags.deleted": "タグを削除しました",
+  "tags.deleteFailed": "タグの削除に失敗しました",
+  "tags.addFailedReserved":
+    "「{prefix}:」は自動タグ用の予約語です。別の名前を指定してください。",
+  "tags.nameTooLong": "タグ名は{max}文字以内で指定してください。",
+  "tags.ns.res": "解像度",
+  "tags.ns.dur": "長さ",
+  "tags.ns.codec": "コーデック",
+  "tags.ns.orient": "向き",
+  "tags.value.durShort": "短尺",
+  "tags.value.durMedium": "中尺",
+  "tags.value.durLong": "長尺",
+  "tags.value.orientVertical": "縦長",
+  "tags.value.orientHorizontal": "横長",
+  "tags.value.orientSquare": "正方形",
+
   // ワークスペースレール
   "workspace.all": "すべて",
   "workspace.settings": "設定",
@@ -333,6 +420,17 @@ export const ja = {
   "collection.removedFromToast": "「{name}」から削除しました",
   "collection.actionFailed": "コレクションの更新に失敗しました",
 
+  // 後で見る（組み込みコレクション）
+  "watchLater.name": "後で見る",
+  "watchLater.add": "後で見るに追加",
+  "watchLater.remove": "後で見るから削除",
+  "watchLater.addedToast": "後で見るに追加しました",
+  "watchLater.removedToast": "後で見るから削除しました",
+  "watchLater.actionFailed": "後で見るの更新に失敗しました",
+  "watchLater.empty": "後で見るは空です。",
+  "watchLater.emptyHint":
+    "メディアの時計アイコンを押すと、ここに並びます。再生したものは自動的に外れます。",
+
   // 絵文字アイコン
   "emoji.choose": "絵文字を選択",
   "emoji.remove": "絵文字を削除",
@@ -356,6 +454,42 @@ export const ja = {
   "statusbar.status": "処理状況",
   "statusbar.scanning": "スキャン中",
   "statusbar.idle": "待機中",
+
+  // プレイリスト再生（自動再生）
+  "sort.manual": "手動順",
+  "playlist.start": "プレイリスト再生",
+  "playlist.play": "再生 (Space)",
+  "playlist.pause": "一時停止 (Space)",
+  "playlist.next": "次へ (N)",
+  "playlist.prev": "前へ (P)",
+  "playlist.shuffle": "シャッフル (S)",
+  "playlist.repeat": "繰り返し",
+  "playlist.openDetail": "詳細を開く (I)",
+  "playlist.fullscreen": "全画面 (F)",
+  "playlist.exitFullscreen": "全画面を解除 (F)",
+  "playlist.exit": "再生を終了 (Esc)",
+  "playlist.progress": "{current} / {total}",
+  "playlist.loading": "読み込み中…",
+  "playlist.empty": "再生できるメディアがありません。",
+  "playlist.emptyHint":
+    "動画や画像を含む一覧を開いてから再生を始めてください。",
+  "playlist.unplayable": "再生できるメディアがありませんでした。",
+  "playlist.reorderNeedsManual": "並び替えるには手動順に切り替えます。",
+  "settings.playlistImageSeconds": "画像の表示時間",
+  "settings.playlistImageSecondsHint": "自動再生で画像を次へ送るまでの秒数。",
+  "settings.playlistImageMotion": "画像に動きを付ける",
+  "settings.playlistImageMotionHint":
+    "表示中の画像をゆっくり拡大・移動させます。OS で動きを減らす設定が有効な場合は常に停止します。",
+  "settings.playlistFade": "フェード",
+  "settings.playlistFadeHint":
+    "アイテムが切り替わるとき、いったん暗くしてから次を表示します。",
+  "settings.playlistTransition": "トランジション",
+  "settings.playlistTransitionHint":
+    "アイテムが切り替わるとき、横方向にスライドさせます。フェードと同時に使えます。",
+  "settings.playlistShuffle": "ランダム",
+  "settings.playlistShuffleHint":
+    "再生順をランダムに入れ替えます。一巡のあいだ同じアイテムは繰り返されません。",
+  "settings.secondsValue": "{n} 秒",
 } as const;
 
 export type TranslationKey = keyof typeof ja;

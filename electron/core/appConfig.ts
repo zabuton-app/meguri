@@ -3,6 +3,7 @@
 import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
+import { LogoIdSchema, type LogoId } from "../../shared/ipc/schema.js";
 import log from "./logger.js";
 
 export interface AppConfig {
@@ -16,6 +17,18 @@ export interface AppConfig {
   workspaceEmojis: Record<string, string>;
   /** Update-check preferences (GitHub Releases). */
   update: UpdateConfig;
+  /**
+   * App logo variant applied to the window and tray icons. Lives here (not in
+   * the renderer's localStorage) because the tray and window are created
+   * before any renderer exists, so main must be able to read it on its own.
+   */
+  logo: LogoId;
+}
+
+export const DEFAULT_LOGO: LogoId = "dark";
+
+function parseLogo(value: unknown): LogoId {
+  return LogoIdSchema.catch(DEFAULT_LOGO).parse(value);
 }
 
 export interface UpdateConfig {
@@ -47,6 +60,13 @@ export interface UserCollectionConfig {
   items: UserCollectionItemConfig[];
   createdAt: number;
   updatedAt: number;
+  /**
+   * Built-in collections (currently only "Watch Later") set this. Locked
+   * collections can still gain and lose files, and their files can still be
+   * rearranged, but the collection itself cannot be removed, renamed, re-iconed
+   * or repositioned among the collections. Absent/false on every user-created one.
+   */
+  locked?: boolean;
 }
 
 function configPath(): string {
@@ -67,6 +87,7 @@ export function loadConfig(): AppConfig {
       collections: parseCollections(c.collections),
       workspaceEmojis: parseEmojiMap(c.workspaceEmojis),
       update: parseUpdateConfig(c.update),
+      logo: parseLogo(c.logo),
     };
   } catch {
     return {
@@ -75,6 +96,7 @@ export function loadConfig(): AppConfig {
       collections: [],
       workspaceEmojis: {},
       update: { ...DEFAULT_UPDATE_CONFIG },
+      logo: DEFAULT_LOGO,
     };
   }
 }
@@ -195,6 +217,7 @@ function parseCollections(value: unknown): UserCollectionConfig[] {
       items,
       createdAt: typeof c.createdAt === "number" ? c.createdAt : 0,
       updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : 0,
+      ...(c.locked === true ? { locked: true } : {}),
     });
   }
   return out;

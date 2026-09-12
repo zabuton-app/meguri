@@ -2,13 +2,24 @@
 // infinite-scroll grid. On thumb:done, reload the corresponding thumbnail.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FolderPlus, Sparkles } from "lucide-react";
-import { resolveSortDir } from "@shared/sortDir";
+import { FolderPlus, PlayCircle, Sparkles } from "lucide-react";
 import { api, events, ALL_ID, type ThumbDone } from "@/ipc/client";
-import type { SearchQuery, UserCollection, WorkspaceInfo } from "@/ipc/types";
+import { WATCH_LATER_ID } from "@shared/workspaceIds";
+import type {
+  FileRow,
+  SearchQuery,
+  SearchResult,
+  UserCollection,
+  WorkspaceInfo,
+} from "@/ipc/types";
 import { Button } from "@/components/ui/button";
+import { MANUAL_SORT } from "@shared/sortDir";
 import { MediaGrid } from "@/components/MediaGrid";
 import { MediaList } from "@/components/MediaList";
 import { MediaTable } from "@/components/MediaTable";
@@ -24,24 +35,25 @@ import { ScanProgress } from "@/components/ScanProgress";
 import { StatusBar } from "@/components/StatusBar";
 import { CommandMenu } from "@/components/CommandMenu";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { onOpenCommandMenu, onOpenShortcuts } from "@/lib/ui-events";
+import {
+  highlightSearchToken,
+  onApplyTagFilter,
+  onOpenCommandMenu,
+  onOpenShortcuts,
+} from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
-import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
-import { describeDateRange } from "@/lib/smartCollections";
 import { HomeHeader } from "./HomeHeader";
-import { ActiveFilterChips, type ChipEntry } from "./ActiveFilterChips";
-import { kindLabelKey } from "@/lib/mediaKind";
 import {
   VIEW_KEY,
   type ViewMode,
+  addSearchTokens,
   discoverPath,
   isViewMode,
   scrollListByPage,
-  sortLabel,
 } from "./utils";
 
 // A second Esc within this window (ms) confirms closing to tray.
@@ -49,6 +61,7 @@ const ESC_CLOSE_CONFIRM_MS = 2000;
 
 export default function Home() {
   const { t } = useI18n();
+  const qc = useQueryClient();
   const confirm = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
@@ -102,78 +115,72 @@ export default function Home() {
     [search.data],
   );
   const listOffset = filesSearchListOffset(search.data?.pageParams);
+  // Nothing to play means no entry point to playback at all, rather than a
+  // player that opens onto an empty screen (spec FR-016).
+  const canPlay = (status.data?.ready ?? false) && items.length > 0;
+
+  // Drag-to-reorder edits the collection's own item order, so it is offered only
+  // where that order is both stored (a collection) and visible (manual sort).
+  const manualSort = filter.sort === MANUAL_SORT;
+  const reorderCollectionId =
+    activeCollection && manualSort ? activeCollection.id : null;
+
+  // Manual order belongs to a collection. Leaving one would otherwise leave the
+  // sort set to a value the picker no longer offers — a blank control over a
+  // list the main process has quietly fallen back to the default order for.
+  useEffect(() => {
+    if (activeCollection || !manualSort) return;
+    // Settles in one pass: clearing the sort makes manualSort false, so the
+    // guard above stops the next run.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFilter((f) => {
+      const next = { ...f };
+      delete next.sort;
+      delete next.sortDir;
+      return next;
+    });
+  }, [activeCollection, manualSort]);
+  const reorder = useMemo(
+    () =>
+      reorderCollectionId
+        ? {
+            onReorder: (next: FileRow[]) => {
+              // Patch the loaded pages first so the drop lands instantly, then
+              // persist. Only the loaded window is described; the main process
+              // rearranges exactly those slots and leaves the rest alone.
+              qc.setQueryData<InfiniteData<SearchResult>>(
+                ["files_search", status.data?.workspaceId ?? null, filter],
+                (prev) => {
+                  if (!prev) return prev;
+                  let at = 0;
+                  const pages = prev.pages.map((page) => ({
+                    ...page,
+                    items: page.items.map(() => next[at++]),
+                  }));
+                  return { ...prev, pages };
+                },
+              );
+              void api
+                .collectionReorderItems(
+                  reorderCollectionId,
+                  next.map((f) => ({
+                    workspaceId: f.workspaceId,
+                    fileId: f.id,
+                  })),
+                )
+                .catch(() => {
+                  // Fall back to the stored order if the write did not land.
+                  void qc.invalidateQueries({ queryKey: ["files_search"] });
+                });
+            },
+          }
+        : undefined,
+    [reorderCollectionId, qc, filter, status.data?.workspaceId],
+  );
 
   // Keyboard focus navigation in the views runs only while the list is foreground
   // (no detail/settings/discover modal, and no help/command overlay on top).
   const navActive = location.pathname === "/" && !helpOpen && !commandOpen;
-
-  // Turn active search conditions into badges (remove individually via ✗).
-  const patchFilter = (p: Partial<SearchQuery>) =>
-    setFilter((f) => ({ ...f, ...p }));
-  const activeChips: ChipEntry[] = [];
-  if (filter.q)
-    activeChips.push({
-      key: "q",
-      label: `"${filter.q}"`,
-      clear: () => patchFilter({ q: undefined }),
-    });
-  if (filter.kind)
-    activeChips.push({
-      key: "kind",
-      label: t(kindLabelKey(filter.kind)),
-      clear: () => patchFilter({ kind: undefined }),
-    });
-  if (filter.ratingMin)
-    activeChips.push({
-      key: "rating",
-      label: `★${filter.ratingMin}+`,
-      clear: () => patchFilter({ ratingMin: undefined }),
-    });
-  if (filter.favorite)
-    activeChips.push({
-      key: "favorite",
-      label: `♥ ${t("favorite.chip")}`,
-      clear: () => patchFilter({ favorite: undefined }),
-    });
-  if (filter.duplicates)
-    activeChips.push({
-      key: "duplicates",
-      label: t("duplicates.chip"),
-      clear: () => patchFilter(toggleDuplicatesPatch(filter)),
-    });
-  if (filter.played != null)
-    activeChips.push({
-      key: "played",
-      label: filter.played ? t("filter.played") : t("filter.unplayed"),
-      clear: () => patchFilter({ played: undefined }),
-    });
-  if (filter.btimeFrom != null || filter.btimeTo != null) {
-    activeChips.push({
-      key: "btime",
-      label: `${t("filter.btime")}: ${describeDateRange(t, filter.btimeFrom, filter.btimeTo)}`,
-      clear: () => patchFilter({ btimeFrom: undefined, btimeTo: undefined }),
-    });
-  }
-  if (filter.sort || filter.sortDir) {
-    const sort = filter.sort ?? "added";
-    const sortDir = resolveSortDir(sort, filter.sortDir);
-    activeChips.push({
-      key: "sort",
-      label: `${sortLabel(t, sort)} / ${t(sortDir === "asc" ? "sort.asc" : "sort.desc")}`,
-      clear: () => patchFilter({ sort: undefined, sortDir: undefined }),
-    });
-  }
-  (filter.tags ?? []).forEach((tag, i) =>
-    activeChips.push({
-      key: `tag-${i}`,
-      label: `${t("media.tags")}: ${tag}`,
-      clear: () =>
-        setFilter((f) => ({
-          ...f,
-          tags: (f.tags ?? []).filter((_, j) => j !== i),
-        })),
-    }),
-  );
 
   useEffect(() => {
     document.title = status.data?.root
@@ -213,10 +220,24 @@ export default function Home() {
   }, []);
 
   // Stabilize the reference so MediaCard's memo stays effective.
-  const onTagClick = useCallback(
-    (name: string) => setFilter((f) => ({ ...f, q: name })),
-    [],
-  );
+  // A click AND-appends an exact tag condition rather than overwriting the
+  // free-text box, which used to also match file names.
+  // The click handler has to stay reference-stable for MediaCard's memo, but it
+  // also needs the current filter to tell "added" from "already there". A ref
+  // synced in an effect gives it both; an updater cannot, because dispatching an
+  // event from one is a side effect StrictMode would run twice.
+  const filterRef = useRef(filter);
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
+  const onTagClick = useCallback((token: string) => {
+    const current = filterRef.current;
+    const next = addSearchTokens(current, [token]);
+    // Same reference means the condition was already there. Point at the chip
+    // instead of doing nothing, which reads as a dead click.
+    if (next === current) highlightSearchToken(token);
+    else setFilter(next);
+  }, []);
 
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {
@@ -226,6 +247,9 @@ export default function Home() {
         setScanning(false);
         void status.refetch();
         void search.refetch();
+        // A scan can add tags (new files, the derived-tag backfill), so a tag
+        // screen left open would otherwise show a stale catalog.
+        void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
         const mode = manualScanJobs.current.get(done.jobId);
         manualScanJobs.current.delete(done.jobId);
         // Cancel/error are explicit, user-visible outcomes: notify regardless of
@@ -322,6 +346,10 @@ export default function Home() {
   const openDiscover = useCallback(() => {
     void navigate(discoverPath(filter));
   }, [filter, navigate]);
+
+  const openTags = useCallback(() => {
+    void navigate("/tags");
+  }, [navigate]);
 
   const openSettings = useCallback(() => {
     void navigate("/settings");
@@ -420,9 +448,15 @@ export default function Home() {
   useEffect(() => {
     const unCommand = onOpenCommandMenu(() => setCommandOpen(true));
     const unShortcuts = onOpenShortcuts(() => setHelpOpen(true));
+    // The tag screen is a child route, so it asks the list to filter rather than
+    // reaching into this component's state.
+    const unApplyTags = onApplyTagFilter((tokens) =>
+      setFilter((f) => addSearchTokens(f, tokens)),
+    );
     return () => {
       unCommand();
       unShortcuts();
+      unApplyTags();
     };
   }, []);
 
@@ -503,8 +537,9 @@ export default function Home() {
         t={t}
       />
 
+      {/* Selectable: this carries the raw main-process error users report. */}
       {status.data?.initError && (
-        <div className="border-b border-border bg-destructive px-4 py-2 text-sm text-destructive-foreground">
+        <div className="select-text border-b border-border bg-destructive px-4 py-2 text-sm text-destructive-foreground">
           <p>{t("home.initError", { msg: status.data.initError })}</p>
           {status.data.initErrorKind === "schema_mismatch" && (
             <p className="mt-1 text-xs">
@@ -514,13 +549,12 @@ export default function Home() {
         </div>
       )}
 
-      <FilterBar value={filter} onChange={setFilter} />
-
-      <ActiveFilterChips
-        chips={activeChips}
-        onClearAll={() => setFilter({})}
-        t={t}
+      <FilterBar
+        value={filter}
+        onChange={setFilter}
+        manualSortAvailable={!!activeCollection}
       />
+
       <ScanProgress onThumbDone={onThumbDone} wsId={status.data?.workspaceId} />
 
       <CommandMenu
@@ -534,6 +568,7 @@ export default function Home() {
         onRebuild={() => void onRebuild()}
         onSetView={setViewMode}
         onDiscover={openDiscover}
+        onTags={openTags}
         onSettings={openSettings}
         onHelp={() => setHelpOpen(true)}
         onOpenDevTools={openDevTools}
@@ -566,6 +601,8 @@ export default function Home() {
             fetchPreviousPage={fetchPreviousPage}
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
+            watchLater={activeCollection?.id === WATCH_LATER_ID}
+            reorder={reorder}
           />
         ) : view === "table" ? (
           <MediaTable
@@ -583,6 +620,8 @@ export default function Home() {
             fetchPreviousPage={fetchPreviousPage}
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
+            watchLater={activeCollection?.id === WATCH_LATER_ID}
+            reorder={reorder}
           />
         ) : (
           <MediaGrid
@@ -600,11 +639,34 @@ export default function Home() {
             fetchPreviousPage={fetchPreviousPage}
             isFetchingPreviousPage={search.isFetchingPreviousPage}
             navActive={navActive}
+            watchLater={activeCollection?.id === WATCH_LATER_ID}
+            reorder={reorder}
           />
         )}
       </main>
 
       <StatusBar workspaceId={status.data?.workspaceId} scanning={scanning} />
+
+      {/* Play the list as a playlist. No params: the player reads the very list
+          order shared through MediaNavContext below, so whatever sort/filter is
+          on screen is what plays — collection, Watch Later or plain search.
+          Accent-filled like the discovery button beside it: both start a way of
+          watching, and neither is subordinate to the other. */}
+      <Link
+        to="/play"
+        title={t("playlist.start")}
+        aria-label={t("playlist.start")}
+        aria-disabled={!canPlay}
+        tabIndex={canPlay ? undefined : -1}
+        className={cn(
+          // Stacked above the discovery button; both lift together when the
+          // audio player bar is showing (the variable is 0 otherwise).
+          "fixed bottom-[calc(6rem+var(--meguri-player-bar-h))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          !canPlay && "pointer-events-none opacity-45",
+        )}
+      >
+        <PlayCircle className="size-6" />
+      </Link>
 
       <Link
         to={discoverPath(filter)}

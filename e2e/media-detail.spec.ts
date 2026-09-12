@@ -42,7 +42,11 @@ test.describe("Media detail", () => {
 
     await dialog.getByRole("button", { name: "Remove tag" }).click();
     await expect(dialog.getByText("e2e-tag")).toHaveCount(0);
-    await expect(dialog.getByText("No tags")).toBeVisible();
+    // Not "No tags" any more: the scan classifies the fixture and the detail
+    // view is where those generated tags are shown, so the list is never empty.
+    await expect(
+      dialog.getByText("res:", { exact: false }).first(),
+    ).toBeVisible({ timeout: 60_000 });
   });
 
   test("inverts image background", async ({ ready }) => {

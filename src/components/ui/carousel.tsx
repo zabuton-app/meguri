@@ -177,6 +177,14 @@ const CarouselItem = React.forwardRef<
 });
 CarouselItem.displayName = "CarouselItem";
 
+// A disabled arrow must still swallow the click instead of letting it fall
+// through: when the arrows are positioned over the slides (rather than beside
+// them), the button's default `disabled:pointer-events-none` would hand the
+// click to whatever sits underneath. Hover feedback is neutralized so the
+// re-enabled hit area does not look interactive.
+const arrowSwallowsClickWhenDisabled =
+  "disabled:pointer-events-auto disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-inherit";
+
 const CarouselPrevious = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<typeof Button>
@@ -190,6 +198,7 @@ const CarouselPrevious = React.forwardRef<
       size={size}
       className={cn(
         "absolute size-8 rounded-full",
+        arrowSwallowsClickWhenDisabled,
         orientation === "horizontal"
           ? "-left-12 top-1/2 -translate-y-1/2"
           : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
@@ -219,6 +228,7 @@ const CarouselNext = React.forwardRef<
       size={size}
       className={cn(
         "absolute size-8 rounded-full",
+        arrowSwallowsClickWhenDisabled,
         orientation === "horizontal"
           ? "-right-12 top-1/2 -translate-y-1/2"
           : "-bottom-12 left-1/2 -translate-x-1/2 rotate-90",

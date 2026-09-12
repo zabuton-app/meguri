@@ -16,6 +16,7 @@ export const INVOKE_CHANNELS = [
   "collection_create",
   "collection_remove",
   "collection_reorder",
+  "collection_reorder_items",
   "collection_set_emoji",
   "collection_rename",
   "collection_add_file",
@@ -35,6 +36,10 @@ export const INVOKE_CHANNELS = [
   "file_add_tag",
   "file_remove_tag",
   "tags_list",
+  "tags_list_all",
+  "tag_rename",
+  "tag_merge",
+  "tag_delete",
   "bookmark_add",
   "bookmark_remove",
   "thumb_set_offset",
@@ -49,6 +54,8 @@ export const INVOKE_CHANNELS = [
   "update_get_settings",
   "update_set_auto_check",
   "update_ignore",
+  "logo_get",
+  "logo_set",
 ] as const;
 
 /** Main → renderer event channels (webContents.send). */

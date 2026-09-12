@@ -1,0 +1,69 @@
+/*
+ * Bundled emoji fonts and the data-attribute → font mapping.
+ *
+ * PreferencesProvider mirrors the emojiStyle pref to <html data-emoji-style>;
+ * each value selects a font family via --font-emoji, which sits at the END of
+ * the body font stack in styles.css (just before the sans-serif generic).
+ * Position matters: emoji fonts also carry glyphs for digits/#/* (keycap
+ * bases), so placing one early would hijack regular text. At the end, text is
+ * served by the UI fonts and only emoji clusters fall through to it — which is
+ * also what restyles emoji inside tag/file/collection names for free.
+ *
+ * "native" maps to a deliberately non-existent family: resolution falls
+ * through to the OS emoji font, pixel-identical to the pre-feature behavior.
+ * Glyphs missing from a bundled font fall through the same way (no tofu).
+ *
+ * Licenses/attribution: src/assets/fonts/emoji/LICENSES.md (mirrored in the
+ * About screen). Style ids are shared with EMOJI_STYLE_OPTIONS in
+ * src/settings/PreferencesProvider.tsx — keep both in sync.
+ */
+
+@font-face {
+  font-family: "Meguri Twemoji";
+  src: url("../assets/fonts/emoji/twemoji.woff2") format("woff2");
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Meguri Noto Emoji";
+  src: url("../assets/fonts/emoji/noto-emoji.woff2") format("woff2");
+  /* Variable font (wght 300–700): declare the range so bold contexts use the
+     real axis instead of synthetic bold. */
+  font-weight: 300 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Meguri OpenMoji";
+  src: url("../assets/fonts/emoji/openmoji.woff2") format("woff2");
+  font-display: block;
+}
+
+:root {
+  --font-emoji: "meguri-emoji-none";
+}
+
+html[data-emoji-style="twemoji"] {
+  --font-emoji: "Meguri Twemoji";
+}
+
+html[data-emoji-style="noto"] {
+  --font-emoji: "Meguri Noto Emoji";
+}
+
+html[data-emoji-style="openmoji"] {
+  --font-emoji: "Meguri OpenMoji";
+}
+
+/*
+ * emoji-mart picker: its shadow styles read var(--font-family) for most of the
+ * UI; a document-level rule on the host wins over the :host default, and custom
+ * properties inherit across the shadow boundary. The emoji grid itself
+ * hardcodes a font-family instead — that part is overridden by a rule injected
+ * into the shadow root (see src/components/EmojiPicker.tsx).
+ */
+em-emoji-picker {
+  --font-family:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP",
+    var(--font-emoji), sans-serif;
+}
