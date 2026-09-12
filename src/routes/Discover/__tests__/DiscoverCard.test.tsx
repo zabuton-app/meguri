@@ -123,3 +123,65 @@ describe("DiscoverCard watch later", () => {
     expect(mocks.collectionAddFile).not.toHaveBeenCalled();
   });
 });
+
+describe("DiscoverCard thumbnail fallback", () => {
+  function renderCard(overrides: Partial<FileRow>) {
+    function Harness() {
+      const { t } = useI18n();
+      return (
+        <DiscoverCard
+          file={{ ...file, ...overrides }}
+          mediaBase="http://127.0.0.1:1"
+          thumbVersion={0}
+          onRate={() => {}}
+          watchLater={membership(false)}
+          isActive={false}
+          t={t}
+        />
+      );
+    }
+    return renderWithProviders(<Harness />);
+  }
+
+  it("falls back to the kind icon when a recorded thumbnail fails to load", () => {
+    // hasThumb is 1 but the file behind it is gone (stale row, deleted thumbs
+    // dir). Without an onError handler the slide would show broken artwork.
+    const { container } = renderCard({
+      kind: "audio",
+      thumbStatus: "done",
+      hasThumb: 1,
+    });
+    const img = container.querySelector(`img[alt="${file.relPath}"]`);
+    expect(img).not.toBeNull();
+    fireEvent.error(img!);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg.lucide-music")).not.toBeNull();
+  });
+
+  it("retries a thumbnail whose URL changed after a failure", () => {
+    // Keyed on the failed URL, not a sticky flag: a thumb:done bump produces a
+    // new ?v= and deserves a fresh attempt.
+    const { container, rerender } = renderCard({
+      thumbStatus: "done",
+      hasThumb: 1,
+    });
+    fireEvent.error(container.querySelector(`img[alt="${file.relPath}"]`)!);
+    expect(container.querySelector("img")).toBeNull();
+    function Bumped() {
+      const { t } = useI18n();
+      return (
+        <DiscoverCard
+          file={{ ...file, thumbStatus: "done", hasThumb: 1 }}
+          mediaBase="http://127.0.0.1:1"
+          thumbVersion={1}
+          onRate={() => {}}
+          watchLater={membership(false)}
+          isActive={false}
+          t={t}
+        />
+      );
+    }
+    rerender(<Bumped />);
+    expect(container.querySelector("img")).not.toBeNull();
+  });
+});

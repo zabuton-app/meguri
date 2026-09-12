@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from "react";
+import { useState, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Film, ImageIcon, Music, Play } from "lucide-react";
@@ -64,9 +64,15 @@ export function DiscoverCard({
   // reaches here.
   const hasThumb =
     file.thumbStatus === "done" && file.hasThumb === 1 && mediaBase && wsId;
-  const src = hasThumb
+  const thumbUrl = hasThumb
     ? `${mediaBase}/ws/${wsId}/thumb/${file.id}?v=${thumbVersion}`
     : undefined;
+  // Same recovery as MediaThumbnail: a recorded thumbnail whose file has gone
+  // missing 404s, and without a fallback the card would show broken artwork.
+  // Keyed on the URL rather than a flag so a later version bump (or a different
+  // file rendered by a reused card) gets a fresh attempt.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const src = thumbUrl && failedSrc !== thumbUrl ? thumbUrl : undefined;
   const slash = file.relPath.lastIndexOf("/");
   const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
   const isVideo = file.kind === "video";
@@ -79,7 +85,7 @@ export function DiscoverCard({
   const { hoverPreview, frameQuality } = usePreferences();
   const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
     useHoverFramePreview({
-      enabled: Boolean(hoverPreview && hasThumb && isVideo),
+      enabled: Boolean(hoverPreview && src && isVideo),
       frameUrl: (t) =>
         `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
       duration: file.duration,
@@ -107,6 +113,7 @@ export function DiscoverCard({
             <img
               src={src}
               alt={file.relPath}
+              onError={() => setFailedSrc(src)}
               className="absolute inset-0 h-full w-full object-contain"
             />
             {previewSrc && (
