@@ -1,7 +1,14 @@
 // File detail + player. /file/:id. Plays via local HTTP serving, offers external-player launch,
 // tag editing, rating, and metadata display. Single-column YouTube-like layout: a large
 // player on top, title/controls right below, then meta, tags, scenes, and history stacked as cards.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
   type InfiniteData,
@@ -592,7 +599,10 @@ export default function MediaDetail() {
   // video or image the bar would sit over the modal while the track it shows is
   // paused anyway (starting the video pauses it). Playback is untouched; the
   // bar returns on close.
-  useEffect(() => {
+  // Layout effect so the bar is gone in the very frame this view first paints
+  // (and back in the frame it leaves) — otherwise the bar and the FABs above
+  // it visibly jump one frame later.
+  useLayoutEffect(() => {
     setBarSuppressed(true);
     return () => setBarSuppressed(false);
   }, []);
@@ -779,6 +789,9 @@ export default function MediaDetail() {
                   size="stage"
                   live={isCurrentAudio}
                   isPlaying={isCurrentAudio && audioPlaying}
+                  // Same guard as the cover button: before app_status resolves
+                  // there is no media origin to build the track URL from.
+                  disabled={!isCurrentAudio && (!mediaBase || !wsId)}
                   onTogglePlay={() => {
                     if (isCurrentAudio) toggleAudio();
                     else if (wsId) playAudio({ ...d, workspaceId: wsId }, wsId);

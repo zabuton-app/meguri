@@ -2,7 +2,7 @@
 // passed down by the route, and activating it hits the same collection IPC the
 // list views use. The mutation itself is covered by WatchLaterButton's own tests.
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   collectionRemoveFile: vi.fn(),
   openExternal: vi.fn(),
   fileSetFavorite: vi.fn(),
+  fileRecordPlay: vi.fn(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -25,6 +26,8 @@ vi.mock("@/ipc/client", () => ({
       mocks.openExternal(...args) as Promise<void>,
     fileSetFavorite: (...args: unknown[]): Promise<void> =>
       mocks.fileSetFavorite(...args) as Promise<void>,
+    fileRecordPlay: (...args: unknown[]): Promise<void> =>
+      mocks.fileRecordPlay(...args) as Promise<void>,
   },
   ALL_ID: "__all__",
   COLLECTION_ID_PREFIX: "collection:",
@@ -217,5 +220,40 @@ describe("DiscoverCard audio", () => {
     const { container } = renderAudio();
     const card = container.querySelector('a[href*="/file/"]');
     expect(card?.getAttribute("href")).toContain("autoplay=0");
+  });
+
+  it("flips Play to Pause once its track is playing, and hosts no transport", () => {
+    // Discover stays a browsing surface: the slide only reflects whether its
+    // own track is the one playing. Seeking and volume wait for the bar.
+    mocks.fileRecordPlay.mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+    let el: HTMLAudioElement | undefined;
+    const capture = (instance: HTMLAudioElement) => {
+      el = instance;
+    };
+    const OriginalAudio = window.Audio;
+    vi.stubGlobal(
+      "Audio",
+      class extends OriginalAudio {
+        constructor() {
+          super();
+          capture(this);
+        }
+      },
+    );
+    renderAudio();
+    fireEvent.click(screen.getAllByRole("button", { name: /^play$/i })[0]);
+    act(() => {
+      el?.dispatchEvent(new Event("play"));
+    });
+    const pauses = screen.getAllByRole("button", { name: /^pause$/i });
+    expect(pauses).toHaveLength(2);
+    for (const b of pauses) expect(b.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("slider", { name: /seek/i })).toBeNull();
+    expect(screen.queryByRole("region", { name: /audio player/i })).toBeNull();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 });

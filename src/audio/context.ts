@@ -37,6 +37,32 @@ export interface AudioPlayerState {
 
 export const AudioPlayerContext = createContext<AudioPlayerState | null>(null);
 
+/**
+ * The provider's actions alone, with a reference that never changes for the
+ * provider's lifetime. Anything that only needs to *do* something to the player
+ * (the list views' activation handlers, Discover's Play) subscribes to this and
+ * not to AudioPlayerContext, whose value changes on every play/pause, track
+ * switch and volume step — a context change punches through `memo`, so a
+ * subscriber inside a virtualized card would re-render every visible card on
+ * each of those.
+ */
+export interface AudioActions {
+  play: (file: FileRow, workspaceId: string) => void;
+  /** Play the file, or toggle it if it is the track already loaded. */
+  playOrToggle: (file: FileRow, workspaceId: string) => void;
+  /** Pause only if the given file is the loaded track (e.g. before opening it externally). */
+  pauseIfCurrent: (fileId: number, workspaceId: string) => void;
+  toggle: () => void;
+  pause: () => void;
+  seek: (sec: number) => void;
+  setVolume: (v: number) => void;
+  toggleMuted: () => void;
+  close: () => void;
+  dismissError: () => void;
+}
+
+export const AudioActionsContext = createContext<AudioActions | null>(null);
+
 // Split from AudioPlayerContext deliberately: position ticks several times a
 // second and the virtualized grid subscribes to context, so a combined value
 // would re-render every visible thumbnail on every tick. Only the seek bar and

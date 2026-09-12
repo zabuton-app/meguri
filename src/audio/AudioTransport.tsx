@@ -30,6 +30,8 @@ interface Props {
   onDismissError?: () => void;
   /** Larger play control for the detail view's stage. */
   size?: "bar" | "stage";
+  /** Play control unavailable (e.g. the media origin is not known yet). */
+  disabled?: boolean;
 }
 
 export function AudioTransport({
@@ -45,6 +47,7 @@ export function AudioTransport({
   error = null,
   onDismissError,
   size = "bar",
+  disabled = false,
 }: Props) {
   const { t } = useI18n();
   const seekable = live && duration != null && duration > 0;
@@ -56,11 +59,12 @@ export function AudioTransport({
       <button
         type="button"
         onClick={onTogglePlay}
+        disabled={disabled}
         title={playLabel}
         aria-label={playLabel}
         className={
           size === "stage"
-            ? "flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:opacity-90"
+            ? "flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             : CTRL_CLASS
         }
       >

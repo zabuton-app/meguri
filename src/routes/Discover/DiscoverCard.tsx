@@ -1,9 +1,9 @@
 import { createElement, useState, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, ImageIcon, Play } from "lucide-react";
+import { ExternalLink, ImageIcon, Pause, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
-import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import { useAudioActions, useAudioPlayer } from "@/audio/useAudioPlayer";
 import { useActivateFile } from "@/audio/useActivateFile";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
@@ -63,8 +63,13 @@ export function DiscoverCard({
   t: TFunc;
 }) {
   const qc = useQueryClient();
-  const { pause: pauseAudio, current: audioCurrent } = useAudioPlayer();
+  const { pause: pauseAudio } = useAudioActions();
   const { activate } = useActivateFile();
+  // Discover shows at most a handful of slides, so subscribing to the player
+  // state here is fine (unlike the virtualized lists): the slide has to say
+  // whether its own track is the one playing. Deliberately no transport here —
+  // Discover stays a browsing surface; seeking and volume wait for the bar.
+  const audio = useAudioPlayer();
   const wsId = file.workspaceId;
   // Same rule as MediaThumbnail: thumb_status alone can be 'done' with no file
   // produced (audio without embedded cover art), which would 404.
@@ -91,6 +96,14 @@ export function DiscoverCard({
     autoplay: !isAudio,
   });
   const playInBar = () => activate(file);
+  const isCurrentAudio =
+    isAudio &&
+    audio.current?.file.id === file.id &&
+    audio.current.workspaceId === wsId;
+  const audioPlaying = isCurrentAudio && audio.isPlaying;
+  const audioLabel = audioPlaying
+    ? t("player.audio.pause")
+    : t("discover.play");
   const showRail = isVideo && !!file.duration && file.duration > 0 && isActive;
 
   // Hover scrub preview on the main media (same behavior/preference as the
@@ -180,10 +193,15 @@ export function DiscoverCard({
         <button
           type="button"
           onClick={playInBar}
-          aria-label={t("discover.play")}
+          aria-label={audioLabel}
+          aria-pressed={audioPlaying}
           className={CENTER_PLAY_CLASS}
         >
-          <Play className="size-7 translate-x-0.5 fill-current" />
+          {audioPlaying ? (
+            <Pause className="size-7 fill-current" />
+          ) : (
+            <Play className="size-7 translate-x-0.5 fill-current" />
+          )}
         </button>
       )}
 
@@ -259,9 +277,14 @@ export function DiscoverCard({
               size="lg"
               className="px-7 font-bold shadow-lg"
               onClick={playInBar}
+              aria-pressed={audioPlaying}
             >
-              <ActionIcon className="fill-current" />
-              {t("discover.play")}
+              {audioPlaying ? (
+                <Pause className="fill-current" />
+              ) : (
+                <ActionIcon className="fill-current" />
+              )}
+              {audioLabel}
             </Button>
           ) : (
             <Button asChild size="lg" className="px-7 font-bold shadow-lg">
@@ -288,13 +311,9 @@ export function DiscoverCard({
             // entry, so mirror that once it confirms (it can refuse for a file
             // that has gone missing under the root).
             onClick={() => {
-              // Same courtesy the detail view extends: the external player is
-              // about to play the very file the bar may be playing.
-              if (
-                audioCurrent?.file.id === file.id &&
-                audioCurrent.workspaceId === wsId
-              )
-                pauseAudio();
+              // Same courtesy the detail view extends: an external player about
+              // to play audio must not sound over whatever the bar is playing.
+              if (isAudio) pauseAudio();
               void api
                 .openExternal(file.id, wsId)
                 .then(() => dropFromWatchLaterCache(qc, wsId, file.id))

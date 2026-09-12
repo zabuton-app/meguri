@@ -4,6 +4,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { useActivateFile } from "@/audio/useActivateFile";
+import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import { act } from "@testing-library/react";
 import {
   defaultAppStatus,
   sampleAudioRow,
@@ -133,5 +135,42 @@ describe("useActivateFile", () => {
     expect(window.location.hash).toBe(
       `#/file/${sampleFileRow.id}?ws=${sampleFileRow.workspaceId}`,
     );
+  });
+
+  it("does not re-render its host when the player's state changes", () => {
+    // The hook runs inside memoized virtualized cards: subscribing to the
+    // state context there would re-render every visible card on each
+    // play/pause/volume step, so it must only ever touch the actions context.
+    let hostRenders = 0;
+    function Host() {
+      hostRenders++;
+      useActivateFile();
+      return null;
+    }
+    function Driver() {
+      const { play, setVolume, toggleMuted } = useAudioPlayer();
+      return (
+        <>
+          <button onClick={() => play(sampleAudioRow, WS_ID)}>
+            drive-play
+          </button>
+          <button onClick={() => setVolume(0.3)}>drive-volume</button>
+          <button onClick={toggleMuted}>drive-mute</button>
+        </>
+      );
+    }
+    renderWithProviders(
+      <>
+        <Host />
+        <Driver />
+      </>,
+    );
+    const after_mount = hostRenders;
+    act(() => {
+      fireEvent.click(screen.getByText("drive-play"));
+      fireEvent.click(screen.getByText("drive-volume"));
+      fireEvent.click(screen.getByText("drive-mute"));
+    });
+    expect(hostRenders).toBe(after_mount);
   });
 });

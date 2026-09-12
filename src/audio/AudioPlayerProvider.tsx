@@ -6,6 +6,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -27,8 +28,10 @@ import {
 } from "@/hooks/useVolume";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import {
+  AudioActionsContext,
   AudioPlayerContext,
   AudioPositionContext,
+  type AudioActions,
   type AudioPlayerState,
   type AudioTrack,
 } from "./context";
@@ -49,6 +52,21 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const status = useAppStatus();
   const mediaBase = status.data?.mediaBase ?? "";
   const qc = useQueryClient();
+
+  // Live copies for the actions below, which must keep one identity for the
+  // provider's lifetime (see AudioActionsContext) and so cannot close over the
+  // state they were created with.
+  const currentRef = useRef<AudioTrack | null>(null);
+  const durationRef = useRef<number | null>(null);
+  const mediaBaseRef = useRef("");
+  // Synced before paint, so a click handled in the same frame sees the state
+  // that produced what is on screen (the rules-of-hooks lint forbids writing
+  // a ref during render itself).
+  useLayoutEffect(() => {
+    currentRef.current = current;
+    durationRef.current = duration;
+    mediaBaseRef.current = mediaBase;
+  }, [current, duration, mediaBase]);
 
   // Whether the element is sitting on a failed resource. Tracked apart from the
   // displayed `error` because dismissing the message must not also discard the
@@ -150,7 +168,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const el = ensureEl();
       // The track resolves by workspaceId + fileId, never via the *active*
       // workspace, so playback survives a workspace switch (including to All).
-      const src = `${mediaBase}/ws/${workspaceId}/media/${file.id}`;
+      const src = `${mediaBaseRef.current}/ws/${workspaceId}/media/${file.id}`;
       needsReload.current = false;
       setError(null);
       setDuration(null);
@@ -177,12 +195,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         })
         .catch((e: unknown) => log.warn("record play failed:", e));
     },
-    [ensureEl, mediaBase, startPlayback, qc],
+    [ensureEl, startPlayback, qc],
   );
 
   const toggle = useCallback(() => {
     const el = audioRef.current;
-    if (!el || !current) return;
+    if (!el || !currentRef.current) return;
     if (el.paused) {
       // After a failure the element holds an error state that play() alone
       // cannot clear, so reload the source to give the retry a real chance.
@@ -193,30 +211,42 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       }
       // After `ended` the element sits at the end; play() alone would be a no-op
       // in some engines, so rewind first to make the control mean "replay".
-      else if (duration != null && el.currentTime >= duration)
+      else if (
+        durationRef.current != null &&
+        el.currentTime >= durationRef.current
+      )
         el.currentTime = 0;
       startPlayback(el);
     } else {
       pauseEl(el);
     }
-  }, [current, duration, startPlayback, pauseEl]);
+  }, [startPlayback, pauseEl]);
+
+  const isCurrent = (fileId: number, workspaceId: string): boolean =>
+    currentRef.current?.file.id === fileId &&
+    currentRef.current.workspaceId === workspaceId;
+
+  const playOrToggle = useCallback(
+    (file: FileRow, workspaceId: string) => {
+      if (isCurrent(file.id, workspaceId)) toggle();
+      else play(file, workspaceId);
+    },
+    [play, toggle],
+  );
 
   const pause = useCallback(() => {
     const el = audioRef.current;
     if (el) pauseEl(el);
   }, [pauseEl]);
 
-  const seek = useCallback(
-    (sec: number) => {
-      const el = audioRef.current;
-      if (!el || !Number.isFinite(sec)) return;
-      const max = duration ?? 0;
-      const clamped = Math.min(max, Math.max(0, sec));
-      el.currentTime = clamped;
-      setPosition(clamped);
-    },
-    [duration],
-  );
+  const seek = useCallback((sec: number) => {
+    const el = audioRef.current;
+    if (!el || !Number.isFinite(sec)) return;
+    const max = durationRef.current ?? 0;
+    const clamped = Math.min(max, Math.max(0, sec));
+    el.currentTime = clamped;
+    setPosition(clamped);
+  }, []);
 
   // Dragging the slider is an explicit request to hear something, so the store
   // also unmutes — matching what the video player does on the same interaction.
@@ -244,6 +274,42 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const dismissError = useCallback(() => setError(null), []);
+
+  const pauseIfCurrent = useCallback(
+    (fileId: number, workspaceId: string) => {
+      if (isCurrent(fileId, workspaceId)) pause();
+    },
+    [pause],
+  );
+
+  // Every member is a stable callback (state comes in through refs), so this
+  // object is created once and AudioActionsContext never notifies.
+  const actions = useMemo<AudioActions>(
+    () => ({
+      play,
+      playOrToggle,
+      pauseIfCurrent,
+      toggle,
+      pause,
+      seek,
+      setVolume,
+      toggleMuted,
+      close,
+      dismissError,
+    }),
+    [
+      play,
+      playOrToggle,
+      pauseIfCurrent,
+      toggle,
+      pause,
+      seek,
+      setVolume,
+      toggleMuted,
+      close,
+      dismissError,
+    ],
+  );
 
   const value = useMemo<AudioPlayerState>(
     () => ({
@@ -281,10 +347,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AudioPlayerContext.Provider value={value}>
-      <AudioPositionContext.Provider value={position}>
-        {children}
-      </AudioPositionContext.Provider>
-    </AudioPlayerContext.Provider>
+    <AudioActionsContext.Provider value={actions}>
+      <AudioPlayerContext.Provider value={value}>
+        <AudioPositionContext.Provider value={position}>
+          {children}
+        </AudioPositionContext.Provider>
+      </AudioPlayerContext.Provider>
+    </AudioActionsContext.Provider>
   );
 }
