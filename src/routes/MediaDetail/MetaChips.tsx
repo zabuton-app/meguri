@@ -40,18 +40,21 @@ export function MetaChips({
         }
       />
       <Chip label={t("media.metaSize")} value={formatSize(detail.size, "—")} />
-      {detail.kind === "video" && (
+      {/* Anything with a timeline: video and audio share duration and codec. */}
+      {detail.kind !== "image" && (
         <>
           <Chip
             label={t("media.metaDuration")}
             value={formatDuration(total, { hours: true, fallback: "—" })}
           />
           <Chip label={t("media.metaCodec")} value={detail.codec ?? "—"} />
-          <Chip
-            label={t("media.metaFps")}
-            value={detail.fps ? detail.fps.toFixed(2) : "—"}
-          />
         </>
+      )}
+      {detail.kind === "video" && (
+        <Chip
+          label={t("media.metaFps")}
+          value={detail.fps ? detail.fps.toFixed(2) : "—"}
+        />
       )}
     </div>
   );

@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { useAudioPlayer, useAudioPosition } from "@/audio/useAudioPlayer";
+import { setVolume } from "@/hooks/useVolume";
 import { defaultAppStatus, sampleAudioRow, WS_ID } from "@/test/fixtures";
 
 const mocks = vi.hoisted(() => ({
@@ -34,6 +35,9 @@ beforeEach(() => {
   mocks.appStatus.mockReset().mockResolvedValue(defaultAppStatus);
   mocks.fileRecordPlay.mockReset().mockResolvedValue(undefined);
   localStorage.clear();
+  // Volume lives in a module-level store shared with the video players, so
+  // clearing storage alone would leave the previous case's level behind.
+  setVolume(1);
 
   playSpy = vi.fn().mockResolvedValue(undefined);
   pauseSpy = vi.fn();

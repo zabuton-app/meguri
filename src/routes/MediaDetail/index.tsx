@@ -18,6 +18,9 @@ import {
   FolderOpen,
   FolderPlus,
   ImageDown,
+  Music,
+  Pause,
+  Play,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +31,7 @@ import {
   reservedTagPrefix,
 } from "@shared/tags";
 import { applyTagFilter } from "@/lib/ui-events";
+import { cn } from "@/lib/utils";
 import { api, events, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import type { FileDetail, FileRow, SearchResult } from "@/ipc/types";
@@ -92,7 +96,13 @@ export default function MediaDetail() {
   const autoplay = searchParams.get("autoplay") !== "0";
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { play: playAudio, pause: pauseAudio } = useAudioPlayer();
+  const {
+    play: playAudio,
+    pause: pauseAudio,
+    toggle: toggleAudio,
+    current: audioCurrent,
+    isPlaying: audioPlaying,
+  } = useAudioPlayer();
   // Closing the modal = drop the child route. Return to Discovery or the playlist
   // player if we came from there, otherwise back to the list (the list stays
   // mounted underneath).
@@ -503,25 +513,47 @@ export default function MediaDetail() {
 
   const d = detail.data;
 
-  // Audio never reaches this route through normal activation (all three list views
-  // route it to the player bar), but a stale bookmark or a hand-edited hash URL can
-  // land here. Recover by closing the modal and starting playback rather than
-  // rendering the track inside an <img>.
+  // Audio opens this view like any other kind (it is where tags, rating and
+  // bookmarks live) but plays through the persistent bottom bar rather than an
+  // inline element, so the track survives closing the modal. Auto-start mirrors
+  // the video player's `autoplay` handling: a thumbnail click starts playback,
+  // a name click (`?autoplay=0`) opens the details silently.
   // Guarded by file id, not just by `d`: react-query can hand back a fresh
   // object for the same row, and re-running play() would restart the track the
   // user is already listening to.
-  const recoveredAudioFor = useRef<number | null>(null);
+  const isAudio = d?.kind === "audio";
+  const isCurrentAudio =
+    isAudio &&
+    audioCurrent?.file.id === fileId &&
+    audioCurrent.workspaceId === wsId;
+  const autoStartedAudioFor = useRef<number | null>(null);
   useEffect(() => {
-    if (!d || d.kind !== "audio" || recoveredAudioFor.current === d.id) return;
+    if (!d || d.kind !== "audio" || !autoplay) return;
+    if (autoStartedAudioFor.current === d.id) return;
     // `file_get` does not inject workspaceId into its row, so d.workspaceId is
     // undefined here — use the id resolved from the URL. Also wait for the media
     // base: on a direct URL the detail query can resolve before app_status, and
     // playing then would build a src against an empty origin.
     if (!wsId || !mediaBase) return;
-    recoveredAudioFor.current = d.id;
+    autoStartedAudioFor.current = d.id;
+    // Already loaded in the bar (e.g. reopened from the list while playing):
+    // leave it alone rather than restarting from zero.
+    if (audioCurrent?.file.id === d.id && audioCurrent.workspaceId === wsId)
+      return;
     playAudio({ ...d, workspaceId: wsId }, wsId);
-    onClose();
-  }, [d, wsId, mediaBase, playAudio, onClose]);
+  }, [d, wsId, mediaBase, autoplay, audioCurrent, playAudio]);
+  // The other half of the exclusivity the video player enforces through
+  // onPlaybackStart: resuming the bar (its own play button stays reachable under
+  // the modal) must pause an inline video, or both would sound at once.
+  useEffect(() => {
+    if (audioPlaying && d?.kind === "video") playerRef.current?.pause();
+  }, [audioPlaying, d?.kind]);
+  // Cover art is served from the thumbnail slot; audio without embedded art is
+  // 'done' with no file behind it (see FileRow.hasThumb), so key on both.
+  const coverSrc =
+    isAudio && d.thumbStatus === "done" && d.hasThumb === 1 && mediaBase && wsId
+      ? `${mediaBase}/ws/${wsId}/thumb/${fileId}`
+      : null;
 
   if (detail.isLoading) {
     return (
@@ -625,6 +657,58 @@ export default function MediaDetail() {
                 t={t}
               />
             </div>
+          ) : d.kind === "audio" ? (
+            // Mirrors the video player's paused state: the artwork itself is the
+            // click target, with the same round play glyph in the centre. While
+            // playing, the glyph swaps to pause and only shows on hover, so the
+            // cover stays unobstructed — the bottom bar is the primary control.
+            <button
+              type="button"
+              disabled={!mediaBase || !wsId}
+              onClick={() => {
+                if (isCurrentAudio) toggleAudio();
+                else if (wsId) playAudio({ ...d, workspaceId: wsId }, wsId);
+              }}
+              title={
+                isCurrentAudio && audioPlaying
+                  ? t("player.audio.pause")
+                  : t("player.play")
+              }
+              aria-label={
+                isCurrentAudio && audioPlaying
+                  ? t("player.audio.pause")
+                  : t("player.play")
+              }
+              className="group relative flex w-full items-center justify-center overflow-hidden rounded-xl bg-black py-8"
+            >
+              {coverSrc ? (
+                <img
+                  src={coverSrc}
+                  alt={d.relPath}
+                  className="max-h-[50vh] max-w-full rounded-lg object-contain"
+                />
+              ) : (
+                <div className="flex size-48 items-center justify-center rounded-lg bg-overlay text-muted">
+                  <Music className="size-24" aria-hidden />
+                </div>
+              )}
+              <span
+                className={cn(
+                  "absolute inset-0 flex items-center justify-center transition-opacity",
+                  isCurrentAudio &&
+                    audioPlaying &&
+                    "opacity-0 group-hover:opacity-100",
+                )}
+              >
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
+                  {isCurrentAudio && audioPlaying ? (
+                    <Pause size={30} />
+                  ) : (
+                    <Play size={30} className="translate-x-0.5" />
+                  )}
+                </span>
+              </span>
+            </button>
           ) : (
             <div
               className={`flex justify-center overflow-hidden rounded-xl ${
@@ -699,6 +783,9 @@ export default function MediaDetail() {
                 className="border-muted/35 bg-surface"
                 onClick={() => {
                   playerRef.current?.pause();
+                  // Same courtesy for a track the bar is playing: the external
+                  // player is about to play the very same file.
+                  if (isAudio) pauseAudio();
                   // The main process records the play and consumes the Watch
                   // Later entry, so mirror that once it confirms — it can also
                   // refuse (a file gone missing under the root), and patching

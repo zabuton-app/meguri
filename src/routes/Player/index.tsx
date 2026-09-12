@@ -8,7 +8,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
+import { Music } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useAudioPlayer } from "@/audio/useAudioPlayer";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -123,6 +125,14 @@ export default function Player() {
 
   const [paused, setPaused] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
+
+  // The playlist owns sound while it is open. A track left playing in the bottom
+  // bar would otherwise keep going underneath the first video — paused rather
+  // than closed, so it is still there to resume after leaving the player.
+  const { pause: pauseAudio } = useAudioPlayer();
+  useEffect(() => {
+    pauseAudio();
+  }, [pauseAudio]);
   // Shared with the detail view's player, so a level set in either place holds
   // for the other and survives both item switches and restarts.
   const { volume, muted } = useVolume();
@@ -180,6 +190,9 @@ export default function Player() {
   });
   const file = detail.data ?? null;
   const isImage = current?.kind === "image";
+  // Audio goes through the same <video> element as video (Chromium plays it
+  // fine, and `ended` advances the queue the same way); only the picture differs.
+  const isAudio = current?.kind === "audio";
 
   // Step out to this file's detail view. The detail route is a sibling of this
   // one, so this always ends playback for now — what makes it a detour rather
@@ -287,6 +300,9 @@ export default function Player() {
   const upcoming = queue.upcoming;
   useEffect(() => {
     if (!upcoming || !mediaBase) return;
+    // Audio may have no thumbnail at all (no embedded cover art), and the queue
+    // item cannot tell; a guaranteed 404 is not worth warming.
+    if (upcoming.kind === "audio") return;
     const kind = upcoming.kind === "image" ? "media" : "thumb";
     const img = new Image();
     img.src = `${mediaBase}/ws/${upcoming.workspaceId}/${kind}/${upcoming.fileId}`;
@@ -666,6 +682,23 @@ export default function Player() {
                   onFatalError={skipCurrent}
                   t={t}
                 />
+              )}
+              {current && isAudio && (
+                // The <video> element draws nothing for an audio file, so show
+                // the cover art (or the kind's glyph) where the picture would be.
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  {file?.thumbStatus === "done" &&
+                  file.hasThumb === 1 &&
+                  thumbSrc ? (
+                    <img
+                      src={thumbSrc}
+                      alt=""
+                      className="max-h-[70%] max-w-[70%] rounded-lg object-contain shadow-2xl"
+                    />
+                  ) : (
+                    <Music className="size-32 text-muted" aria-hidden />
+                  )}
+                </div>
               )}
             </PlayerStage>
           </div>

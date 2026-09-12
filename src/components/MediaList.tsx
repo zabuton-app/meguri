@@ -9,7 +9,7 @@ import {
   useState,
   type Ref,
 } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import {
@@ -33,7 +33,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { formatDuration, formatSize } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
-import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
@@ -94,7 +93,7 @@ export const MediaList = memo(function MediaList({
   watchLater = false,
   reorder,
 }: Props) {
-  const { activate } = useActivateFile();
+  const navigate = useNavigate();
   const watchLaterMembership = useWatchLater();
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -139,10 +138,9 @@ export const MediaList = memo(function MediaList({
   const onOpen = useCallback(
     (index: number) => {
       const f = items[index];
-      // Audio loads into the bottom player bar instead of navigating (FR-010).
-      if (f) activate(f);
+      if (f) void navigate(fileHref(f.id, f.workspaceId));
     },
-    [items, activate],
+    [items, navigate],
   );
   const { focusedIndex, setFocusedIndex } = useGridKeyboardNav({
     itemCount: items.length,
@@ -271,10 +269,8 @@ const MediaRow = memo(function MediaRow({
 }) {
   // The row is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
-  // metadata click → opens detail paused (`?autoplay=0`).
-  // Audio intercepts both and plays in the bottom bar instead of navigating.
-  const { onLinkClick } = useActivateFile();
-  const handleClick = onLinkClick(file);
+  // metadata click → opens detail paused (`?autoplay=0`). Audio follows the
+  // same path: its detail view starts the track in the bottom player bar.
   return (
     <div
       aria-current={focused ? "true" : undefined}
@@ -285,7 +281,6 @@ const MediaRow = memo(function MediaRow({
     >
       <Link
         to={fileHref(file.id, file.workspaceId)}
-        onClick={handleClick}
         className="group/thumb relative block aspect-video w-48 shrink-0 overflow-hidden rounded bg-overlay text-muted"
       >
         <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
@@ -301,7 +296,6 @@ const MediaRow = memo(function MediaRow({
 
       <Link
         to={fileHref(file.id, file.workspaceId, { autoplay: false })}
-        onClick={handleClick}
         className="flex min-w-0 flex-1 flex-col gap-1 py-0.5"
       >
         <div className="flex items-center gap-2">

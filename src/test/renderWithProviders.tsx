@@ -40,8 +40,8 @@ export function renderWithProviders(
           <I18nProvider>
             <PreferencesProvider>
               <ConfirmProvider>
-                {/* Outside the router, mirroring App.tsx: the list views call
-                    useActivateFile(), which requires this provider. */}
+                {/* Outside the router, mirroring App.tsx: MediaDetail drives the
+                    audio player bar through this provider. */}
                 <AudioPlayerProvider>
                   <HashRouter>{children}</HashRouter>
                 </AudioPlayerProvider>

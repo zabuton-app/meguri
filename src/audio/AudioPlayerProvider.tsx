@@ -16,8 +16,15 @@ import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import log from "@/lib/logger";
-import { invalidatePlayedSearches } from "@/lib/queryCache";
-import { loadMuted, loadVolume, saveVolume } from "@/lib/playerVolume";
+import {
+  dropFromWatchLaterCache,
+  invalidatePlayedSearches,
+} from "@/lib/queryCache";
+import {
+  setVolume as setSharedVolume,
+  toggleMuted as toggleSharedMuted,
+  useVolume,
+} from "@/hooks/useVolume";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import {
   AudioPlayerContext,
@@ -32,8 +39,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number | null>(null);
   const [position, setPosition] = useState(0);
-  const [volume, setVolumeState] = useState(loadVolume);
-  const [muted, setMuted] = useState(loadMuted);
+  // One volume for every player surface: the detail view, the playlist player
+  // and this bar all read and write the same store (hooks/useVolume.ts), so a
+  // level set in one place holds for the others within the session, not just
+  // after a restart.
+  const { volume, muted } = useVolume();
   const [error, setError] = useState<TranslationKey | null>(null);
 
   const status = useAppStatus();
@@ -153,6 +163,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           // and the history timeline would omit the track until a refetch.
           invalidatePlayedSearches(qc);
           void qc.invalidateQueries({ queryKey: ["history_list"] });
+          // The main process consumed the Watch Later entry along with the
+          // play; mirror that like the video player does on its first play.
+          dropFromWatchLaterCache(qc, workspaceId, file.id);
         })
         .catch((e: unknown) => log.warn("record play failed:", e));
     },
@@ -196,21 +209,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     [duration],
   );
 
-  const setVolume = useCallback((v: number) => {
-    const clamped = Math.min(1, Math.max(0, v));
-    setVolumeState(clamped);
-    // Dragging the slider is an explicit request to hear something, so it also
-    // unmutes — matching what the video player does on the same interaction.
-    setMuted(false);
-    saveVolume(clamped, false);
-  }, []);
-
-  const toggleMuted = useCallback(() => {
-    setMuted((m) => {
-      saveVolume(volume, !m);
-      return !m;
-    });
-  }, [volume]);
+  // Dragging the slider is an explicit request to hear something, so the store
+  // also unmutes — matching what the video player does on the same interaction.
+  const setVolume = useCallback((v: number) => setSharedVolume(v), []);
+  const toggleMuted = useCallback(() => toggleSharedMuted(), []);
 
   const close = useCallback(() => {
     // Invalidates any in-flight play() promise, so its rejection cannot resurrect
