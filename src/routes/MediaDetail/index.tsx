@@ -597,10 +597,16 @@ export default function MediaDetail() {
     return () => setBarSuppressed(false);
   }, []);
   // The other half of the exclusivity the video player enforces through
-  // onPlaybackStart: resuming from the bar (which renders above the modal)
-  // must pause an inline video, or both would sound at once.
+  // onPlaybackStart: audio *starting* while a video is on screen must pause
+  // the video, or both would sound at once. Only the false→true edge counts —
+  // audio that was already playing when this view opened is the video's to
+  // interrupt (its autoplay fires onPlaybackStart → pauseAudio), and reacting
+  // to that steady state here would pause the video before it ever started.
+  const wasAudioPlaying = useRef(audioPlaying);
   useEffect(() => {
-    if (audioPlaying && d?.kind === "video") playerRef.current?.pause();
+    const started = audioPlaying && !wasAudioPlaying.current;
+    wasAudioPlaying.current = audioPlaying;
+    if (started && d?.kind === "video") playerRef.current?.pause();
   }, [audioPlaying, d?.kind]);
   // Cover art is served from the thumbnail slot; audio without embedded art is
   // 'done' with no file behind it (see FileRow.hasThumb), so key on both.
