@@ -14,6 +14,13 @@
  * time, so a hardcoded copy would only be a second source of truth that drifts.
  */
 
+:root {
+  /* Distance from the viewport bottom to the top of the audio player bar,
+     published by AudioPlayerBar while it is showing. Bottom-anchored overlays
+     add it to their offset so they clear the bar; it stays 0 otherwise. */
+  --meguri-player-bar-inset: 0px;
+}
+
 /* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */
 @theme inline {
   --color-bg: var(--c-bg);

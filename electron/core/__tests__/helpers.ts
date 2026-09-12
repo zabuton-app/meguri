@@ -4,7 +4,7 @@ import { upsertScanRoot } from "../queries.js";
 
 export interface FileSeed {
   relPath: string;
-  kind?: "video" | "image";
+  kind?: "video" | "image" | "audio";
   ext?: string;
   size?: number;
   mtime?: number;

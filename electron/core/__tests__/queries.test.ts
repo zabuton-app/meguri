@@ -15,6 +15,7 @@ import {
   searchFiles,
   setFavorite,
   setRating,
+  setThumb,
   setThumbOffset,
   thumbOffsetOf,
 } from "../queries.js";
@@ -57,6 +58,32 @@ describe("searchFiles", () => {
     expect(searchFiles(db, { ratingMin: 3 }).items.map((f) => f.id)).toEqual([
       img,
     ]);
+  });
+
+  it("reports hasThumb from thumb_path, not from thumb_status", () => {
+    // Audio lands on 'done' whether or not it embeds cover art, so the renderer
+    // needs the path's presence to tell a real thumbnail from a deliberate absence.
+    const withCover = insertFile(db, rootId, {
+      relPath: "a.mp3",
+      kind: "audio",
+    });
+    const noCover = insertFile(db, rootId, {
+      relPath: "b.mp3",
+      kind: "audio",
+    });
+    setThumb(db, withCover, "/thumbs/1.webp", "done");
+    setThumb(db, noCover, null, "done");
+
+    const byId = new Map(
+      searchFiles(db, { limit: 100 }).items.map((f) => [f.id, f]),
+    );
+    expect(byId.get(withCover)?.thumbStatus).toBe("done");
+    expect(byId.get(noCover)?.thumbStatus).toBe("done");
+    expect(byId.get(withCover)?.hasThumb).toBe(1);
+    expect(byId.get(noCover)?.hasThumb).toBe(0);
+    // fileDetail extends the same column list.
+    expect(fileDetail(db, withCover)?.hasThumb).toBe(1);
+    expect(fileDetail(db, noCover)?.hasThumb).toBe(0);
   });
 
   it("filters by btime range; files without btime never match", () => {
@@ -246,6 +273,27 @@ describe("randomFiles", () => {
     const out = randomFiles(db, { kind: "video", limit: 3 });
     expect(out.length).toBe(3);
     expect(out.every((f) => f.kind === "video")).toBe(true);
+    db.close();
+  });
+
+  it("includes audio alongside video and images when no kind filter is set", () => {
+    const { db, rootId } = newDb();
+    insertFile(db, rootId, { relPath: "v.mp4", kind: "video" });
+    insertFile(db, rootId, { relPath: "p.jpg", kind: "image" });
+    insertFile(db, rootId, { relPath: "a.mp3", kind: "audio" });
+    const out = randomFiles(db, { limit: 10 });
+    expect(out.length).toBe(3);
+    expect(out.some((f) => f.kind === "audio")).toBe(true);
+    db.close();
+  });
+
+  it("returns only audio when it is requested by kind", () => {
+    const { db, rootId } = newDb();
+    insertFile(db, rootId, { relPath: "v.mp4", kind: "video" });
+    insertFile(db, rootId, { relPath: "a.mp3", kind: "audio" });
+    const out = randomFiles(db, { kind: "audio", limit: 10 });
+    expect(out.length).toBe(1);
+    expect(out[0].kind).toBe("audio");
     db.close();
   });
 });

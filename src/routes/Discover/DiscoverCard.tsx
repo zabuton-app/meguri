@@ -1,7 +1,10 @@
-import type { ReactNode, Ref } from "react";
+import { createElement, useState, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Film, ImageIcon, Play } from "lucide-react";
+import { ExternalLink, ImageIcon, Pause, Play } from "lucide-react";
+import { kindIcon } from "@/lib/mediaKind";
+import { useAudioActions, useAudioPlayer } from "@/audio/useAudioPlayer";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
@@ -28,6 +31,9 @@ import { SceneRail } from "./SceneRail";
 // scrims. The whole media area is a link to the detail/player; overlay
 // containers are pointer-events-none so empty overlay space still clicks
 // through, with interactive children opting back in.
+const CENTER_PLAY_CLASS =
+  "absolute left-1/2 top-1/2 z-20 flex size-[76px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-bg/40 text-bright-fg backdrop-blur-md transition hover:scale-105 hover:bg-bg/60";
+
 export function DiscoverCard({
   file,
   mediaBase,
@@ -57,16 +63,47 @@ export function DiscoverCard({
   t: TFunc;
 }) {
   const qc = useQueryClient();
+  const { pause: pauseAudio } = useAudioActions();
+  const { activate } = useActivateFile();
+  // Discover shows at most a handful of slides, so subscribing to the player
+  // state here is fine (unlike the virtualized lists): the slide has to say
+  // whether its own track is the one playing. Deliberately no transport here —
+  // Discover stays a browsing surface; seeking and volume wait for the bar.
+  const audio = useAudioPlayer();
   const wsId = file.workspaceId;
-  const hasThumb = file.thumbStatus === "done" && mediaBase && wsId;
-  const src = hasThumb
+  // Same rule as MediaThumbnail: thumb_status alone can be 'done' with no file
+  // produced (audio without embedded cover art), which would 404.
+  const hasThumb =
+    file.thumbStatus === "done" && file.hasThumb === 1 && mediaBase && wsId;
+  const thumbUrl = hasThumb
     ? `${mediaBase}/ws/${wsId}/thumb/${file.id}?v=${thumbVersion}`
     : undefined;
+  // Same recovery as MediaThumbnail: a recorded thumbnail whose file has gone
+  // missing 404s, and without a fallback the card would show broken artwork.
+  // Keyed on the URL rather than a flag so a later version bump (or a different
+  // file rendered by a reused card) gets a fresh attempt.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const src = thumbUrl && failedSrc !== thumbUrl ? thumbUrl : undefined;
   const slash = file.relPath.lastIndexOf("/");
   const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
   const isVideo = file.kind === "video";
-  const ActionIcon = isVideo ? Play : ImageIcon;
-  const detailTo = detailPath(file.id, wsId, filterParam);
+  const isAudio = file.kind === "audio";
+  const ActionIcon = isVideo || isAudio ? Play : ImageIcon;
+  // Audio follows the list views' gesture split: "Play" starts the track in the
+  // bottom bar without leaving Discover, and opening the card is the inspect
+  // gesture, so its detail view must not start playback on its own.
+  const detailTo = detailPath(file.id, wsId, filterParam, undefined, {
+    autoplay: !isAudio,
+  });
+  const playInBar = () => activate(file);
+  const isCurrentAudio =
+    isAudio &&
+    audio.current?.file.id === file.id &&
+    audio.current.workspaceId === wsId;
+  const audioPlaying = isCurrentAudio && audio.isPlaying;
+  const audioLabel = audioPlaying
+    ? t("player.audio.pause")
+    : t("discover.play");
   const showRail = isVideo && !!file.duration && file.duration > 0 && isActive;
 
   // Hover scrub preview on the main media (same behavior/preference as the
@@ -74,7 +111,7 @@ export function DiscoverCard({
   const { hoverPreview, frameQuality } = usePreferences();
   const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
     useHoverFramePreview({
-      enabled: Boolean(hoverPreview && hasThumb && isVideo),
+      enabled: Boolean(hoverPreview && src && isVideo),
       frameUrl: (t) =>
         `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
       duration: file.duration,
@@ -82,7 +119,15 @@ export function DiscoverCard({
     });
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-black">
+    // Black is the right ground behind a frame or a photo; with nothing to
+    // show it only leaves a dark slab that the light-toned scrims fade into,
+    // so a cover-less slide sits on the theme's surface instead.
+    <div
+      className={cn(
+        "relative h-full w-full overflow-hidden",
+        src ? "bg-black" : "bg-surface",
+      )}
+    >
       {/* Media layers. Click anywhere to open the detail/player. */}
       <Link
         to={detailTo}
@@ -102,6 +147,7 @@ export function DiscoverCard({
             <img
               src={src}
               alt={file.relPath}
+              onError={() => setFailedSrc(src)}
               className="absolute inset-0 h-full w-full object-contain"
             />
             {previewSrc && (
@@ -113,12 +159,17 @@ export function DiscoverCard({
             )}
           </>
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted">
-            {isVideo ? (
-              <Film className="size-16" />
-            ) : (
-              <ImageIcon className="size-16" />
-            )}
+          // The fallback covers every kind; audio without cover art lands here
+          // as a matter of course. A faint primary glow behind an album-sized
+          // tile, in the theme's own tones, so the slide reads as "a track
+          // with no artwork" rather than as a failed image.
+          <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(ellipse_70%_60%_at_50%_45%,color-mix(in_oklab,var(--c-primary)_14%,transparent),transparent_70%)] text-muted">
+            <div className="flex size-64 items-center justify-center rounded-[20px] border border-bright-fg/10 bg-gradient-to-br from-overlay to-surface shadow-2xl shadow-black/15">
+              {createElement(kindIcon(file.kind), {
+                className: "size-28",
+                strokeWidth: 1.5,
+              })}
+            </div>
           </div>
         )}
       </Link>
@@ -127,15 +178,31 @@ export function DiscoverCard({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[22%] bg-gradient-to-b from-bg/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-bg/90 via-bg/40 to-transparent" />
 
-      {/* Center play affordance (videos only). */}
+      {/* Center play affordance: opens the video, or plays the track in the
+          bottom bar. Images have nothing to play. */}
       {isVideo && (
         <Link
           to={detailTo}
           aria-label={t("discover.play")}
-          className="absolute left-1/2 top-1/2 z-20 flex size-[76px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-bg/40 text-bright-fg backdrop-blur-md transition hover:scale-105 hover:bg-bg/60"
+          className={CENTER_PLAY_CLASS}
         >
           <Play className="size-7 translate-x-0.5 fill-current" />
         </Link>
+      )}
+      {isAudio && (
+        <button
+          type="button"
+          onClick={playInBar}
+          aria-label={audioLabel}
+          aria-pressed={audioPlaying}
+          className={CENTER_PLAY_CLASS}
+        >
+          {audioPlaying ? (
+            <Pause className="size-7 fill-current" />
+          ) : (
+            <Play className="size-7 translate-x-0.5 fill-current" />
+          )}
+        </button>
       )}
 
       {/* Bottom overlay: scene rail, title, meta chips, actions. */}
@@ -205,12 +272,28 @@ export function DiscoverCard({
         </div>
 
         <div className="pointer-events-auto flex shrink-0 items-center gap-2.5">
-          <Button asChild size="lg" className="px-7 font-bold shadow-lg">
-            <Link to={detailTo}>
-              <ActionIcon className={isVideo ? "fill-current" : undefined} />
-              {isVideo ? t("discover.play") : t("discover.open")}
-            </Link>
-          </Button>
+          {isAudio ? (
+            <Button
+              size="lg"
+              className="px-7 font-bold shadow-lg"
+              onClick={playInBar}
+              aria-pressed={audioPlaying}
+            >
+              {audioPlaying ? (
+                <Pause className="fill-current" />
+              ) : (
+                <ActionIcon className="fill-current" />
+              )}
+              {audioLabel}
+            </Button>
+          ) : (
+            <Button asChild size="lg" className="px-7 font-bold shadow-lg">
+              <Link to={detailTo}>
+                <ActionIcon className={isVideo ? "fill-current" : undefined} />
+                {isVideo ? t("discover.play") : t("discover.open")}
+              </Link>
+            </Button>
+          )}
           {/* Styled to sit flush with the outline icon buttons around it; the
               control keeps its own primary hover/pressed colors. */}
           <WatchLaterButton
@@ -227,12 +310,15 @@ export function DiscoverCard({
             // Main-side this counts as a play and consumes the Watch Later
             // entry, so mirror that once it confirms (it can refuse for a file
             // that has gone missing under the root).
-            onClick={() =>
+            onClick={() => {
+              // Same courtesy the detail view extends: an external player about
+              // to play audio must not sound over whatever the bar is playing.
+              if (isAudio) pauseAudio();
               void api
                 .openExternal(file.id, wsId)
                 .then(() => dropFromWatchLaterCache(qc, wsId, file.id))
-                .catch((e: unknown) => log.error("open external", e))
-            }
+                .catch((e: unknown) => log.error("open external", e));
+            }}
             title={t("media.openExternal")}
             aria-label={t("media.openExternal")}
           >

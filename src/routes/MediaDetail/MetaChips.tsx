@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { hasTimeline, kindLabel } from "@/lib/mediaKind";
 
 interface Props {
   detail: FileDetail;
@@ -29,10 +30,7 @@ export function MetaChips({
         value={workspaceLabel ?? wsId}
         title={workspacePath || workspaceLabel || wsId}
       />
-      <Chip
-        label={t("media.metaKind")}
-        value={detail.kind === "video" ? t("kind.video") : t("kind.image")}
-      />
+      <Chip label={t("media.metaKind")} value={kindLabel(t, detail.kind)} />
       <Chip
         label={t("media.metaResolution")}
         value={
@@ -42,18 +40,20 @@ export function MetaChips({
         }
       />
       <Chip label={t("media.metaSize")} value={formatSize(detail.size, "—")} />
-      {detail.kind === "video" && (
+      {hasTimeline(detail.kind) && (
         <>
           <Chip
             label={t("media.metaDuration")}
             value={formatDuration(total, { hours: true, fallback: "—" })}
           />
           <Chip label={t("media.metaCodec")} value={detail.codec ?? "—"} />
-          <Chip
-            label={t("media.metaFps")}
-            value={detail.fps ? detail.fps.toFixed(2) : "—"}
-          />
         </>
+      )}
+      {detail.kind === "video" && (
+        <Chip
+          label={t("media.metaFps")}
+          value={detail.fps ? detail.fps.toFixed(2) : "—"}
+        />
       )}
     </div>
   );

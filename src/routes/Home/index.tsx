@@ -32,7 +32,6 @@ import { NAV_BINDINGS, isHelpKey, matchAny } from "@/settings/keybindings";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "@/components/FilterBar";
 import { ScanProgress } from "@/components/ScanProgress";
-import { StatusBar } from "@/components/StatusBar";
 import { CommandMenu } from "@/components/CommandMenu";
 import { useConfirm } from "@/components/ConfirmDialog";
 import {
@@ -44,6 +43,7 @@ import {
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
 import { HomeHeader } from "./HomeHeader";
@@ -66,7 +66,8 @@ export default function Home() {
   const location = useLocation();
   const navigate = useNavigate();
   const { keybindingPreset } = usePreferences();
-  const [scanning, setScanning] = useState(false);
+  // Shared with the StatusBar, which App mounts outside the router.
+  const scanning = useScanning();
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [filter, setFilter] = useState<SearchQuery>({});
@@ -645,8 +646,6 @@ export default function Home() {
         )}
       </main>
 
-      <StatusBar workspaceId={status.data?.workspaceId} scanning={scanning} />
-
       {/* Play the list as a playlist. No params: the player reads the very list
           order shared through MediaNavContext below, so whatever sort/filter is
           on screen is what plays — collection, Watch Later or plain search.
@@ -659,7 +658,9 @@ export default function Home() {
         aria-disabled={!canPlay}
         tabIndex={canPlay ? undefined : -1}
         className={cn(
-          "fixed bottom-24 right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          // Stacked above the discovery button; both lift together when the
+          // audio player bar is showing (the variable is 0 otherwise).
+          "fixed bottom-[calc(6rem+var(--meguri-player-bar-inset))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           !canPlay && "pointer-events-none opacity-45",
         )}
       >
@@ -673,7 +674,9 @@ export default function Home() {
         aria-disabled={!status.data?.ready}
         tabIndex={status.data?.ready ? undefined : -1}
         className={cn(
-          "fixed bottom-5 right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          // Lifted clear of the audio player bar when one is showing (the
+          // variable is 0 otherwise, keeping the original offset).
+          "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-inset))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           !status.data?.ready && "pointer-events-none opacity-45",
         )}
       >

@@ -3,6 +3,7 @@ import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { resolveSortDir } from "@shared/sortDir";
 import { parseQualifiedTagName } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { kindLabelKey } from "@/lib/mediaKind";
 import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
 
@@ -102,8 +103,10 @@ export function describeDateRange(
 export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   const parts: string[] = [];
   if (query.q) parts.push(`"${query.q}"`);
-  if (query.kind)
-    parts.push(query.kind === "video" ? t("kind.video") : t("kind.image"));
+  if (query.kind) {
+    const key = kindLabelKey(query.kind);
+    parts.push(key ? t(key) : query.kind);
+  }
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
   if (query.favorite) parts.push(t("favorite.chip"));
   if (query.duplicates) parts.push(t("duplicates.chip"));

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Film, ImageIcon, Play } from "lucide-react";
+import { createElement, useState } from "react";
+import { Play } from "lucide-react";
+import { kindIcon } from "@/lib/mediaKind";
 import type { FileRow } from "@/ipc/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
@@ -45,11 +46,23 @@ export function MediaThumbnail({
   playIconSize = "size-5",
   showPlayOverlay = true,
 }: Props) {
-  const hasThumb = file.thumbStatus === "done" && mediaBase && file.workspaceId;
+  // Keys on whether a thumbnail file actually exists, not on kind: audio is
+  // marked thumb_status 'done' whether or not it embeds cover art, so status
+  // alone would build a URL that 404s for the cover-less ones. Audio *with* a
+  // cover renders it like any other thumbnail.
+  const hasThumb =
+    file.thumbStatus === "done" &&
+    file.hasThumb === 1 &&
+    mediaBase &&
+    file.workspaceId;
   const src = hasThumb
     ? `${mediaBase}/ws/${file.workspaceId}/thumb/${file.id}?v=${version}`
     : undefined;
   const [imgLoaded, setImgLoaded] = useState(false);
+  // Holds the URL that failed rather than a bare flag: this component is reused
+  // across rows by the virtualizer, so a sticky `true` would hide a perfectly
+  // good thumbnail on whichever row recycled the instance.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const { hoverPreview } = usePreferences();
   const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
     useHoverFramePreview({
@@ -60,14 +73,14 @@ export function MediaThumbnail({
       fileId: file.id,
     });
 
-  if (!src) {
+  if (!src || failedSrc === src) {
+    // Reached for audio without embedded cover art, for any file whose
+    // thumbnail generation failed or has not run yet, and for a recorded
+    // thumbnail whose file has since gone missing (without the onError
+    // fallback that last case would sit on the skeleton forever).
     return (
       <div className="flex h-full w-full items-center justify-center">
-        {file.kind === "video" ? (
-          <Film className={fallbackIconSize} />
-        ) : (
-          <ImageIcon className={fallbackIconSize} />
-        )}
+        {createElement(kindIcon(file.kind), { className: fallbackIconSize })}
       </div>
     );
   }
@@ -85,6 +98,7 @@ export function MediaThumbnail({
         alt={file.relPath}
         loading="lazy"
         onLoad={() => setImgLoaded(true)}
+        onError={() => setFailedSrc(src)}
         className={cn(
           "absolute inset-0 h-full w-full object-cover transition-opacity",
           imgLoaded ? "opacity-100" : "opacity-0",

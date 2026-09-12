@@ -23,9 +23,12 @@ export function detailPath(
   wsId: string,
   filterParam?: string,
   sec?: number,
+  opts: { autoplay?: boolean } = {},
 ): string {
   const params = new URLSearchParams();
   if (sec != null) params.set("t", String(sec));
+  // Same opt-out the list views use for the "inspect" gesture (`?autoplay=0`).
+  if (opts.autoplay === false) params.set("autoplay", "0");
   params.set("from", "discover");
   params.set("ws", wsId);
   if (filterParam) params.set("filter", filterParam);

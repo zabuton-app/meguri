@@ -30,6 +30,7 @@ describe("syncFileRowAcrossCaches", () => {
       favorite: 0,
       rating: 2,
       thumbStatus: "done",
+      hasThumb: 1,
       capturedAt: null,
       btime: null,
       lastAccessedAt: null,

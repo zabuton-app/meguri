@@ -28,7 +28,7 @@ const MAX_LIMIT = 500;
 // is reached through a LEFT JOIN. COALESCE supplies defaults for files with no meta row.
 // Exported for queries that join files under the same `f`/`m` aliases (see history.ts).
 export const FILE_COLS =
-  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, m.last_accessed_at AS lastAccessedAt";
+  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, (f.thumb_path IS NOT NULL) AS hasThumb, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, m.last_accessed_at AS lastAccessedAt";
 
 export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
@@ -436,6 +436,10 @@ export function orderByFor(sort?: string, dir?: string): string {
  * the matching ids through a size-`lim` reservoir (Algorithm R) — memory stays
  * O(lim) rather than one array entry per matching row — and materialize only
  * the sampled rows via primary-key lookups.
+ *
+ * Every kind takes part, audio included: Discover renders a track's cover art
+ * (or the kind's glyph) and plays it through the bottom bar, so nothing here
+ * needs to be filtered beyond what the caller's SearchQuery asks for.
  */
 export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
   const lim = Math.max(1, Math.min(MAX_LIMIT, query.limit ?? 20));

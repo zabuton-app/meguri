@@ -1,7 +1,14 @@
 // File detail + player. /file/:id. Plays via local HTTP serving, offers external-player launch,
 // tag editing, rating, and metadata display. Single-column YouTube-like layout: a large
 // player on top, title/controls right below, then meta, tags, scenes, and history stacked as cards.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
   type InfiniteData,
@@ -18,6 +25,9 @@ import {
   FolderOpen,
   FolderPlus,
   ImageDown,
+  Music,
+  Pause,
+  Play,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +38,7 @@ import {
   reservedTagPrefix,
 } from "@shared/tags";
 import { applyTagFilter } from "@/lib/ui-events";
+import { cn } from "@/lib/utils";
 import { api, events, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import type { FileDetail, FileRow, SearchResult } from "@/ipc/types";
@@ -61,6 +72,9 @@ import {
   type ModalSize,
 } from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
+import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import { AudioTransport } from "@/audio/AudioTransport";
+import { setBarSuppressed } from "@/audio/barVisibility";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
 import { MetaChips } from "./MetaChips";
@@ -91,6 +105,22 @@ export default function MediaDetail() {
   const autoplay = searchParams.get("autoplay") !== "0";
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const {
+    play: playAudio,
+    pause: pauseAudio,
+    toggle: toggleAudio,
+    close: closeAudio,
+    seek: seekAudio,
+    setVolume: setAudioVolume,
+    toggleMuted: toggleAudioMuted,
+    dismissError: dismissAudioError,
+    current: audioCurrent,
+    isPlaying: audioPlaying,
+    duration: audioDuration,
+    volume: audioVolume,
+    muted: audioMuted,
+    error: audioError,
+  } = useAudioPlayer();
   // Closing the modal = drop the child route. Return to Discovery or the playlist
   // player if we came from there, otherwise back to the list (the list stays
   // mounted underneath).
@@ -209,13 +239,18 @@ export default function MediaDetail() {
     queryFn: () => api.fileGet(fileId, wsId),
     enabled: Number.isFinite(fileId) && wsId !== "",
   });
-  // Exit fullscreen when prev/next lands on an image: the image view has no
-  // fullscreen toggle, so staying fullscreen would strand the user (Esc only).
-  // Keyed on the resolved kind ("image"), not on !video, so the transient
-  // undefined while the next file loads doesn't drop video→video fullscreen.
+  // Exit fullscreen when prev/next lands on anything but a video: only the
+  // video player has a fullscreen toggle, so staying fullscreen on an image or
+  // an audio track would strand the user (Esc only). Keyed on the resolved
+  // kind, not on !video alone, so the transient undefined while the next file
+  // loads doesn't drop video→video fullscreen.
   const kind = detail.data?.kind;
   useEffect(() => {
-    if (kind === "image" && document.fullscreenElement === modalRef.current) {
+    if (
+      kind != null &&
+      kind !== "video" &&
+      document.fullscreenElement === modalRef.current
+    ) {
       void document.exitFullscreen().catch(() => {});
     }
   }, [kind]);
@@ -347,6 +382,12 @@ export default function MediaDetail() {
   });
   const deleteFromIndex = useMutation({
     mutationFn: () => api.fileDeleteFromIndex(fileId, wsId),
+    onSuccess: () => {
+      // The bar outlives this modal, so a track that was playing would keep
+      // going (and 404 on the next seek) after its row is gone.
+      if (audioCurrent?.file.id === fileId && audioCurrent.workspaceId === wsId)
+        closeAudio();
+    },
   });
   const invalidateCollections = () => {
     void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
@@ -501,6 +542,89 @@ export default function MediaDetail() {
 
   const d = detail.data;
 
+  // Audio opens this view like any other kind (it is where tags, rating and
+  // bookmarks live) but plays through the persistent bottom bar rather than an
+  // inline element, so the track survives closing the modal. Auto-start mirrors
+  // the video player's `autoplay` handling: a thumbnail click starts playback,
+  // a name click (`?autoplay=0`) opens the details silently.
+  // Guarded per visit of a track, not just by `d`: react-query can hand back a
+  // fresh object for the same row, and re-running play() would restart the
+  // track the user is already listening to. The key carries the workspace
+  // because file ids only mean something within one (the All view puts several
+  // side by side), and it is cleared whenever a non-audio file is shown so
+  // "A → video → A" starts A again.
+  const isAudio = d?.kind === "audio";
+  const isCurrentAudio =
+    isAudio &&
+    audioCurrent?.file.id === fileId &&
+    audioCurrent.workspaceId === wsId;
+  const autoStartedAudioFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!d) return;
+    if (d.kind !== "audio") {
+      autoStartedAudioFor.current = null;
+      return;
+    }
+    if (!autoplay) return;
+    // `file_get` does not inject workspaceId into its row, so d.workspaceId is
+    // undefined here — use the id resolved from the URL. Also wait for the media
+    // base: on a direct URL the detail query can resolve before app_status, and
+    // playing then would build a src against an empty origin.
+    if (!wsId || !mediaBase) return;
+    const visitKey = `${wsId}:${d.id}`;
+    if (autoStartedAudioFor.current === visitKey) return;
+    autoStartedAudioFor.current = visitKey;
+    const loaded =
+      audioCurrent?.file.id === d.id && audioCurrent.workspaceId === wsId;
+    // Already playing in the bar (reopened from the list mid-track): leave it
+    // alone rather than restarting from zero. Loaded but paused: the thumbnail
+    // click was a request to hear it, so resume from where it stopped.
+    if (loaded) {
+      if (!audioPlaying) toggleAudio();
+      return;
+    }
+    playAudio({ ...d, workspaceId: wsId }, wsId);
+  }, [
+    d,
+    wsId,
+    mediaBase,
+    autoplay,
+    audioCurrent,
+    audioPlaying,
+    playAudio,
+    toggleAudio,
+  ]);
+  // The bottom bar steps aside for as long as this view is open, whatever the
+  // kind: for audio the same transport lives under the cover art, and for a
+  // video or image the bar would sit over the modal while the track it shows is
+  // paused anyway (starting the video pauses it). Playback is untouched; the
+  // bar returns on close.
+  // Layout effect so the bar is gone in the very frame this view first paints
+  // (and back in the frame it leaves) — otherwise the bar and the FABs above
+  // it visibly jump one frame later.
+  useLayoutEffect(() => {
+    setBarSuppressed(true);
+    return () => setBarSuppressed(false);
+  }, []);
+  // The other half of the exclusivity the video player enforces through
+  // onPlaybackStart: audio *starting* while a video is on screen must pause
+  // the video, or both would sound at once. Only the false→true edge counts —
+  // audio that was already playing when this view opened is the video's to
+  // interrupt (its autoplay fires onPlaybackStart → pauseAudio), and reacting
+  // to that steady state here would pause the video before it ever started.
+  const wasAudioPlaying = useRef(audioPlaying);
+  useEffect(() => {
+    const started = audioPlaying && !wasAudioPlaying.current;
+    wasAudioPlaying.current = audioPlaying;
+    if (started && d?.kind === "video") playerRef.current?.pause();
+  }, [audioPlaying, d?.kind]);
+  // Cover art is served from the thumbnail slot; audio without embedded art is
+  // 'done' with no file behind it (see FileRow.hasThumb), so key on both.
+  const coverSrc =
+    isAudio && d.thumbStatus === "done" && d.hasThumb === 1 && mediaBase && wsId
+      ? `${mediaBase}/ws/${wsId}/thumb/${fileId}`
+      : null;
+
   if (detail.isLoading) {
     return (
       <MediaModal onClose={onClose} size={modalSize}>
@@ -597,8 +721,91 @@ export default function MediaDetail() {
                   dropFromWatchLaterCache(qc, wsId, fileId);
                 }}
                 onOpenExternal={() => dropFromWatchLaterCache(qc, wsId, fileId)}
+                // Video demands attention, background audio yields. Pause rather
+                // than close, so the bar stays visible and the user can resume.
+                onPlaybackStart={pauseAudio}
                 t={t}
               />
+            </div>
+          ) : d.kind === "audio" ? (
+            // Same anatomy as the video player: the artwork is the click target
+            // with the paused-state play glyph in its centre, and the transport
+            // (the bottom bar's controls, which steps aside while this is open)
+            // runs along the bottom edge.
+            <div className="flex flex-col overflow-hidden rounded-xl bg-black">
+              <button
+                type="button"
+                disabled={!mediaBase || !wsId}
+                onClick={() => {
+                  if (isCurrentAudio) toggleAudio();
+                  else if (wsId) playAudio({ ...d, workspaceId: wsId }, wsId);
+                }}
+                title={
+                  isCurrentAudio && audioPlaying
+                    ? t("player.audio.pause")
+                    : t("player.play")
+                }
+                aria-label={
+                  isCurrentAudio && audioPlaying
+                    ? t("player.audio.pause")
+                    : t("player.play")
+                }
+                className="group relative flex w-full items-center justify-center py-8"
+              >
+                {coverSrc ? (
+                  <img
+                    src={coverSrc}
+                    alt={d.relPath}
+                    className="max-h-[50vh] max-w-full rounded-lg object-contain"
+                  />
+                ) : (
+                  <div className="flex size-48 items-center justify-center rounded-lg bg-overlay text-muted">
+                    <Music className="size-24" aria-hidden />
+                  </div>
+                )}
+                <span
+                  className={cn(
+                    "absolute inset-0 flex items-center justify-center transition-opacity",
+                    isCurrentAudio &&
+                      audioPlaying &&
+                      "opacity-0 group-hover:opacity-100",
+                  )}
+                >
+                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
+                    {isCurrentAudio && audioPlaying ? (
+                      <Pause size={30} />
+                    ) : (
+                      <Play size={30} className="translate-x-0.5" />
+                    )}
+                  </span>
+                </span>
+              </button>
+              <div
+                role="region"
+                aria-label={t("player.audio.region")}
+                className="flex items-center gap-3 px-4 pb-4 text-sm text-fg"
+              >
+                <AudioTransport
+                  size="stage"
+                  live={isCurrentAudio}
+                  isPlaying={isCurrentAudio && audioPlaying}
+                  // Same guard as the cover button: before app_status resolves
+                  // there is no media origin to build the track URL from.
+                  disabled={!isCurrentAudio && (!mediaBase || !wsId)}
+                  onTogglePlay={() => {
+                    if (isCurrentAudio) toggleAudio();
+                    else if (wsId) playAudio({ ...d, workspaceId: wsId }, wsId);
+                  }}
+                  duration={isCurrentAudio ? audioDuration : d.duration}
+                  onSeek={seekAudio}
+                  volume={audioVolume}
+                  muted={audioMuted}
+                  onVolume={setAudioVolume}
+                  onToggleMuted={toggleAudioMuted}
+                  error={isCurrentAudio ? audioError : null}
+                  onDismissError={dismissAudioError}
+                />
+              </div>
             </div>
           ) : (
             <div
@@ -674,6 +881,9 @@ export default function MediaDetail() {
                 className="border-muted/35 bg-surface"
                 onClick={() => {
                   playerRef.current?.pause();
+                  // Same courtesy for a track the bar is playing: the external
+                  // player is about to play the very same file.
+                  if (isAudio) pauseAudio();
                   // The main process records the play and consumes the Watch
                   // Later entry, so mirror that once it confirms — it can also
                   // refuse (a file gone missing under the root), and patching

@@ -13,6 +13,7 @@ export const es: Record<TranslationKey, string> = {
   // kind
   "kind.video": "Vídeo",
   "kind.image": "Imagen",
+  "kind.audio": "Audio",
 
   // sort
   "sort.added": "Añadido",
@@ -254,6 +255,15 @@ export const es: Record<TranslationKey, string> = {
     "Este formato no se puede reproducir (MEDIA_ERR_SRC_NOT_SUPPORTED)",
   "player.errUnknown": "Error desconocido",
   "player.errCode": "Código de error {code}",
+
+  // Reproductor de audio (barra inferior)
+  "player.audio.region": "Reproductor de audio",
+  "player.audio.pause": "Pausar",
+  "player.audio.close": "Cerrar el reproductor",
+  "player.audio.openDetail": "Abrir los detalles",
+  "player.audio.unknownDuration": "--:--",
+  "player.audio.error": "No se pudo reproducir esta pista.",
+  "player.audio.dismissError": "Descartar el error",
 
   // scenes
   "scene.seekTo": "Ir a {time}",

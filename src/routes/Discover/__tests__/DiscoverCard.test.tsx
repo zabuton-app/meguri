@@ -2,7 +2,7 @@
 // passed down by the route, and activating it hits the same collection IPC the
 // list views use. The mutation itself is covered by WatchLaterButton's own tests.
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   collectionRemoveFile: vi.fn(),
   openExternal: vi.fn(),
   fileSetFavorite: vi.fn(),
+  fileRecordPlay: vi.fn(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -25,6 +26,8 @@ vi.mock("@/ipc/client", () => ({
       mocks.openExternal(...args) as Promise<void>,
     fileSetFavorite: (...args: unknown[]): Promise<void> =>
       mocks.fileSetFavorite(...args) as Promise<void>,
+    fileRecordPlay: (...args: unknown[]): Promise<void> =>
+      mocks.fileRecordPlay(...args) as Promise<void>,
   },
   ALL_ID: "__all__",
   COLLECTION_ID_PREFIX: "collection:",
@@ -121,5 +124,136 @@ describe("DiscoverCard watch later", () => {
       ),
     );
     expect(mocks.collectionAddFile).not.toHaveBeenCalled();
+  });
+});
+
+describe("DiscoverCard thumbnail fallback", () => {
+  function renderCard(overrides: Partial<FileRow>) {
+    function Harness() {
+      const { t } = useI18n();
+      return (
+        <DiscoverCard
+          file={{ ...file, ...overrides }}
+          mediaBase="http://127.0.0.1:1"
+          thumbVersion={0}
+          onRate={() => {}}
+          watchLater={membership(false)}
+          isActive={false}
+          t={t}
+        />
+      );
+    }
+    return renderWithProviders(<Harness />);
+  }
+
+  it("falls back to the kind icon when a recorded thumbnail fails to load", () => {
+    // hasThumb is 1 but the file behind it is gone (stale row, deleted thumbs
+    // dir). Without an onError handler the slide would show broken artwork.
+    const { container } = renderCard({
+      kind: "audio",
+      thumbStatus: "done",
+      hasThumb: 1,
+    });
+    const img = container.querySelector(`img[alt="${file.relPath}"]`);
+    expect(img).not.toBeNull();
+    fireEvent.error(img!);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg.lucide-music")).not.toBeNull();
+  });
+
+  it("retries a thumbnail whose URL changed after a failure", () => {
+    // Keyed on the failed URL, not a sticky flag: a thumb:done bump produces a
+    // new ?v= and deserves a fresh attempt.
+    const { container, rerender } = renderCard({
+      thumbStatus: "done",
+      hasThumb: 1,
+    });
+    fireEvent.error(container.querySelector(`img[alt="${file.relPath}"]`)!);
+    expect(container.querySelector("img")).toBeNull();
+    function Bumped() {
+      const { t } = useI18n();
+      return (
+        <DiscoverCard
+          file={{ ...file, thumbStatus: "done", hasThumb: 1 }}
+          mediaBase="http://127.0.0.1:1"
+          thumbVersion={1}
+          onRate={() => {}}
+          watchLater={membership(false)}
+          isActive={false}
+          t={t}
+        />
+      );
+    }
+    rerender(<Bumped />);
+    expect(container.querySelector("img")).not.toBeNull();
+  });
+});
+
+describe("DiscoverCard audio", () => {
+  function renderAudio() {
+    function Harness() {
+      const { t } = useI18n();
+      return (
+        <DiscoverCard
+          file={{ ...file, kind: "audio", relPath: "music/track.mp3" }}
+          mediaBase=""
+          thumbVersion={0}
+          onRate={() => {}}
+          watchLater={membership(false)}
+          isActive={false}
+          t={t}
+        />
+      );
+    }
+    return renderWithProviders(<Harness />);
+  }
+
+  it("offers Play as a button that stays in Discover, not a link to the detail view", () => {
+    renderAudio();
+    const plays = screen.getAllByRole("button", { name: /^play$/i });
+    // The centre affordance and the primary action, both buttons.
+    expect(plays).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: /^play$/i })).toBeNull();
+  });
+
+  it("opens the detail view without autoplay when the card itself is clicked", () => {
+    const { container } = renderAudio();
+    const card = container.querySelector('a[href*="/file/"]');
+    expect(card?.getAttribute("href")).toContain("autoplay=0");
+  });
+
+  it("flips Play to Pause once its track is playing, and hosts no transport", () => {
+    // Discover stays a browsing surface: the slide only reflects whether its
+    // own track is the one playing. Seeking and volume wait for the bar.
+    mocks.fileRecordPlay.mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+    let el: HTMLAudioElement | undefined;
+    const capture = (instance: HTMLAudioElement) => {
+      el = instance;
+    };
+    const OriginalAudio = window.Audio;
+    vi.stubGlobal(
+      "Audio",
+      class extends OriginalAudio {
+        constructor() {
+          super();
+          capture(this);
+        }
+      },
+    );
+    renderAudio();
+    fireEvent.click(screen.getAllByRole("button", { name: /^play$/i })[0]);
+    act(() => {
+      el?.dispatchEvent(new Event("play"));
+    });
+    const pauses = screen.getAllByRole("button", { name: /^pause$/i });
+    expect(pauses).toHaveLength(2);
+    for (const b of pauses) expect(b.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("slider", { name: /seek/i })).toBeNull();
+    expect(screen.queryByRole("region", { name: /audio player/i })).toBeNull();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 });

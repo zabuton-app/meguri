@@ -45,10 +45,17 @@ const IMAGE_EXTS = new Set([
   "heif",
 ]);
 
+// Restricted to what Chromium decodes natively, so playback needs no transcode path
+// and no new dependency. Extensions outside this set stay unlisted rather than being
+// registered as something the player cannot open. No collision with VIDEO_EXTS: that
+// set holds m4v, this one m4a.
+const AUDIO_EXTS = new Set(["mp3", "m4a", "aac", "flac", "ogg", "opus", "wav"]);
+
 export function kindForExt(ext: string): Kind | null {
   const e = ext.toLowerCase();
   if (VIDEO_EXTS.has(e)) return "video";
   if (IMAGE_EXTS.has(e)) return "image";
+  if (AUDIO_EXTS.has(e)) return "audio";
   return null;
 }
 
@@ -241,7 +248,13 @@ export async function syncFiles(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   );
   const moveCandidates = db.prepare(
-    "SELECT id, rel_path FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL",
+    "SELECT id, rel_path, kind, ext FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL",
+  );
+  // A move can change the extension, and with it the kind (the same MPEG-4 bytes
+  // are video as .mp4 and audio as .m4a). The row would otherwise keep the old
+  // kind forever, since later scans see it as unchanged.
+  const reclassifyMoved = db.prepare(
+    "UPDATE files SET kind = ?, ext = ?, thumb_path = NULL, thumb_status = 'pending' WHERE id = ?",
   );
 
   type Existing =
@@ -351,6 +364,8 @@ export async function syncFiles(
           ? (moveCandidates.all(rootId, hash, d.size) as {
               id: number;
               rel_path: string;
+              kind: string;
+              ext: string | null;
             }[])
           : [];
       const moved = cands.find((c) => !seen.has(c.rel_path));
@@ -364,6 +379,12 @@ export async function syncFiles(
           d.size,
           moved.id,
         );
+        // Re-derive kind/ext from the new name; a changed kind also invalidates
+        // the old thumbnail (audio has none, video and image differ).
+        if (moved.kind !== d.kind || moved.ext !== d.ext) {
+          reclassifyMoved.run(d.kind, d.ext, moved.id);
+          if (d.kind !== "audio") needsThumb.push(moved.id);
+        }
         ftsTargets.push(moved.id);
         stats.moved++;
       } else {

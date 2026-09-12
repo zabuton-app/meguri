@@ -12,6 +12,7 @@ export const ja = {
   // 種別
   "kind.video": "動画",
   "kind.image": "画像",
+  "kind.audio": "音声",
 
   // 並び順
   "sort.added": "追加順",
@@ -249,6 +250,15 @@ export const ja = {
     "この形式は再生できません (MEDIA_ERR_SRC_NOT_SUPPORTED)",
   "player.errUnknown": "不明なエラー",
   "player.errCode": "エラーコード {code}",
+
+  // オーディオプレイヤー（ボトムバー）
+  "player.audio.region": "オーディオプレイヤー",
+  "player.audio.pause": "一時停止",
+  "player.audio.close": "プレイヤーを閉じる",
+  "player.audio.openDetail": "詳細を開く",
+  "player.audio.unknownDuration": "--:--",
+  "player.audio.error": "このトラックを再生できませんでした。",
+  "player.audio.dismissError": "エラーを閉じる",
 
   // シーン
   "scene.seekTo": "{time} へシーク",

@@ -1,4 +1,4 @@
-// Bottom status bar: last scan time, visible file count, and processing status.
+// Bottom status bar (always the lowest strip of the window): last scan time, visible file count, and processing status.
 // File count and last-scan come from `workspaceStats` IPC (refetched on workspace
 // switch and after scans complete). The processing indicator subscribes to scan
 // events directly so the phase and progress reflect in real time.
@@ -7,6 +7,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Database, RefreshCw, Clock } from "lucide-react";
 import { api, events } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useAppStatus } from "@/hooks/useAppStatus";
+import { useScanning } from "@/hooks/useScanning";
 import type { TranslationKey } from "@/i18n/locales/ja";
 
 const PHASE_KEY: Record<string, TranslationKey> = {
@@ -31,14 +33,12 @@ function formatLastScan(t: number | null | undefined): string | null {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function StatusBar({
-  workspaceId,
-  scanning,
-}: {
-  workspaceId: string | null | undefined;
-  scanning: boolean;
-}) {
+export function StatusBar() {
   const { t } = useI18n();
+  // Mounted in App (below the audio player bar, outside the router), so the
+  // inputs Home used to pass as props are read from their shared sources.
+  const workspaceId = useAppStatus().data?.workspaceId;
+  const scanning = useScanning();
   const qc = useQueryClient();
   const [progress, setProgress] = useState<ProgressState | null>(null);
 

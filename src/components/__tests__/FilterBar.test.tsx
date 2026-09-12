@@ -92,7 +92,7 @@ describe("kind segments", () => {
   it("exposes exactly one checked radio", () => {
     setup({ kind: "video" });
     const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(3);
+    expect(radios).toHaveLength(4);
     expect(
       radios.filter((r) => r.getAttribute("aria-checked") === "true"),
     ).toHaveLength(1);
@@ -123,8 +123,8 @@ describe("kind segments", () => {
   it("jumps to the ends with Home and End", () => {
     const { latest } = setup({ kind: "video" });
     fireEvent.keyDown(screen.getAllByRole("radio")[1], { key: "End" });
-    expect(latest()?.kind).toBe("image");
-    fireEvent.keyDown(screen.getAllByRole("radio")[2], { key: "Home" });
+    expect(latest()?.kind).toBe("audio");
+    fireEvent.keyDown(screen.getAllByRole("radio")[3], { key: "Home" });
     expect(latest()?.kind).toBeUndefined();
   });
 
@@ -132,7 +132,7 @@ describe("kind segments", () => {
     // A saved search can hold any string. With no segment matching, roving
     // tabindex would put -1 on every button and strand the group off the Tab
     // order, so the neutral segment takes the focusable slot.
-    setup({ kind: "audio" });
+    setup({ kind: "document" });
     const radios = screen.getAllByRole("radio");
     expect(radios.filter((r) => r.tabIndex === 0)).toHaveLength(1);
     expect(radios[0].getAttribute("aria-checked")).toBe("true");

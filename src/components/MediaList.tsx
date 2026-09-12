@@ -9,7 +9,7 @@ import {
   useState,
   type Ref,
 } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import {
@@ -31,8 +31,10 @@ import { TagChips } from "@/components/TagChips";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { hasTimeline } from "@/lib/mediaKind";
 import { formatDuration, formatSize } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
@@ -93,7 +95,7 @@ export const MediaList = memo(function MediaList({
   watchLater = false,
   reorder,
 }: Props) {
-  const navigate = useNavigate();
+  const { activate } = useActivateFile();
   const watchLaterMembership = useWatchLater();
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -138,9 +140,9 @@ export const MediaList = memo(function MediaList({
   const onOpen = useCallback(
     (index: number) => {
       const f = items[index];
-      if (f) void navigate(fileHref(f.id, f.workspaceId));
+      if (f) activate(f);
     },
-    [items, navigate],
+    [items, activate],
   );
   const { focusedIndex, setFocusedIndex } = useGridKeyboardNav({
     itemCount: items.length,
@@ -269,7 +271,10 @@ const MediaRow = memo(function MediaRow({
 }) {
   // The row is split into two click regions so the click target controls
   // whether the detail view auto-plays. Thumbnail click → auto-play (default);
-  // metadata click → opens detail paused (`?autoplay=0`).
+  // metadata click → opens detail paused (`?autoplay=0`). For audio the
+  // thumbnail plays the track in the bottom bar instead of navigating, and the
+  // metadata region opens the detail view without starting playback.
+  const { onThumbnailClick } = useActivateFile();
   return (
     <div
       aria-current={focused ? "true" : undefined}
@@ -280,10 +285,11 @@ const MediaRow = memo(function MediaRow({
     >
       <Link
         to={fileHref(file.id, file.workspaceId)}
+        onClick={onThumbnailClick(file)}
         className="group/thumb relative block aspect-video w-48 shrink-0 overflow-hidden rounded bg-overlay text-muted"
       >
         <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
-        {file.kind === "video" && (
+        {hasTimeline(file.kind) && file.duration && (
           <span className="absolute bottom-0.5 right-0.5 rounded bg-bg/70 px-1 text-[10px] text-fg">
             {formatDuration(file.duration)}
           </span>
@@ -337,7 +343,7 @@ function metaLine(file: FileRow): string {
   const dims =
     file.width && file.height ? `${file.width}×${file.height}` : null;
   const dur =
-    file.kind === "video" && file.duration
+    hasTimeline(file.kind) && file.duration
       ? formatDuration(file.duration)
       : null;
   const size = formatSize(file.size);

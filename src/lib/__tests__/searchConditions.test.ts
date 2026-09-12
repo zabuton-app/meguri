@@ -220,8 +220,12 @@ describe("clear reducers", () => {
     });
   });
 
+  it("labels the audio kind", () => {
+    expect(find({ kind: "audio" }, "kind").label).toBe(t("kind.audio"));
+  });
+
   it("shows an unrecognized kind verbatim rather than mislabelling it", () => {
-    expect(find({ kind: "audio" }, "kind").label).toBe("audio");
+    expect(find({ kind: "document" }, "kind").label).toBe("document");
   });
 
   it("leaves an explicitly chosen sort alone when duplicates is cleared", () => {

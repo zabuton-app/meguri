@@ -125,6 +125,9 @@ export const VideoPlayer = forwardRef<
     onNativeDuration: (d: number | null) => void;
     /** Fired once per loaded file when playback first starts (used to refresh the list order). */
     onPlayed: () => void;
+    /** Fires on every play (not just the first), so the caller can enforce
+     *  audio/video exclusivity. Distinct from onPlayed, which fires once per file. */
+    onPlaybackStart?: () => void;
     /** Fired when the media plays through to its end (drives playlist auto-advance). */
     onEnded?: () => void;
     /** Mirrors the play/pause state out to an external control bar. */
@@ -173,6 +176,7 @@ export const VideoPlayer = forwardRef<
     onExportFrame,
     onNativeDuration,
     onPlayed,
+    onPlaybackStart,
     onEnded,
     onPlayingChange,
     onFatalError,
@@ -758,6 +762,7 @@ export const VideoPlayer = forwardRef<
         onClick={togglePlay}
         onPlay={() => {
           setPlaying(true);
+          onPlaybackStart?.();
           void api.fileRecordPlay(id, wsId, "browser", position);
           if (!playedRef.current) {
             playedRef.current = true;

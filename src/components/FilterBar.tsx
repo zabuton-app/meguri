@@ -57,6 +57,7 @@ export function FilterBar({ value, onChange, manualSortAvailable }: Props) {
             { value: undefined, label: t("filter.all") },
             { value: "video", label: t("kind.video") },
             { value: "image", label: t("kind.image") },
+            { value: "audio", label: t("kind.audio") },
           ]}
           onChange={(kind) => patch({ kind })}
         />
