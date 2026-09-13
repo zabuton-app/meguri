@@ -7,8 +7,10 @@ import {
   type Ref,
 } from "react";
 import {
+  AppWindow,
   ChevronLeft,
   ChevronRight,
+  EllipsisVertical,
   Maximize2,
   Minimize2,
   PanelRight,
@@ -99,19 +101,20 @@ export function MediaModal({
   // variant rather than in a shared base, so no utility of the base can
   // outrank a variant's (Tailwind orders the generated rules, not the class
   // string).
-  const innerBase = "flex min-h-0 flex-col overflow-hidden bg-bg";
+  // The modal clips its content to its rounded corners; the peek must not
+  // clip, or the grip that straddles its left edge loses its outer half.
+  const innerBase = "flex min-h-0 flex-col bg-bg";
   let outerClass: string;
   let innerClass: string;
   if (isPeek) {
     outerClass = "contents";
     // No backdrop: the list stays interactive beside the sheet, which takes
-    // its share of the row so the list narrows rather than being covered.
-    // While fullscreen only the decorations go: the UA stylesheet sizes the
-    // fullscreen element itself.
+    // its share of the row so the list narrows rather than being covered. A
+    // plain rule marks the edge (a shadow would be re-rasterised on every
+    // frame of a resize drag). While fullscreen only the decorations go: the
+    // UA stylesheet sizes the fullscreen element itself.
     innerClass = `${innerBase} relative shrink-0${
-      fullscreen
-        ? ""
-        : " border-l border-border shadow-[-24px_0_48px_rgba(0,0,0,0.25)]"
+      fullscreen ? "" : " border-l border-border"
     }`;
   } else {
     const outerBase = "fixed inset-0 z-50 flex bg-black/70 backdrop-blur-sm";
@@ -120,8 +123,8 @@ export function MediaModal({
         ? `${outerBase} justify-center p-4 sm:p-6 md:p-10`
         : `${outerBase} p-2 sm:p-4 md:p-6`;
     innerClass = fullscreen
-      ? `${innerBase} relative w-full`
-      : `${innerBase} relative w-full rounded-xl border border-border shadow-2xl${
+      ? `${innerBase} relative w-full overflow-hidden`
+      : `${innerBase} relative w-full overflow-hidden rounded-xl border border-border shadow-2xl${
           size === "small" ? " max-w-4xl" : ""
         }`;
   }
@@ -152,7 +155,8 @@ export function MediaModal({
       >
         {docked && (
           // Grab strip along the sheet's left edge. Wider than its 1px look
-          // (the hit area extends past the border) so it is easy to catch.
+          // (the hit area extends past the border) so it is easy to catch,
+          // with a grip glyph at mid-height to say it can be dragged.
           <div
             role="separator"
             aria-orientation="vertical"
@@ -164,8 +168,15 @@ export function MediaModal({
             title={t("media.peekResize")}
             onPointerDown={peek.onPointerDown}
             onKeyDown={peek.onKeyDown}
-            className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none"
-          />
+            className="group/handle absolute inset-y-0 -left-1 z-10 flex w-2 cursor-col-resize items-center justify-center touch-none hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none"
+          >
+            <span
+              aria-hidden
+              className="flex h-6 w-4 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-muted group-hover/handle:border-primary group-hover/handle:text-fg group-focus-visible/handle:border-primary group-focus-visible/handle:text-fg"
+            >
+              <EllipsisVertical className="size-3.5" />
+            </span>
+          </div>
         )}
         {children}
       </div>
@@ -260,7 +271,7 @@ export function TopBar({
               aria-label={t("media.openAsModal")}
               title={t("media.openAsModal")}
             >
-              <Maximize2 />
+              <AppWindow />
             </Button>
           )
         ) : (
