@@ -32,7 +32,7 @@ export function useAudioDetail({
   startAt,
   pauseVideo,
 }: Options) {
-  const { current, isPlaying, play, toggle, close } = useAudioPlayer();
+  const { current, isPlaying, play, close } = useAudioPlayer();
   const isAudio = file?.kind === "audio";
   const isCurrentAudio =
     isAudio && current?.file.id === file.id && current.workspaceId === wsId;
@@ -82,24 +82,12 @@ export function useAudioDetail({
     autoStartedFor.current = visitKey;
     const loaded = current?.file.id === file.id && current.workspaceId === wsId;
     // Already playing in the bar (reopened from the list mid-track): leave it
-    // alone rather than restarting from zero. Loaded but paused: the thumbnail
-    // click was a request to hear it, so resume from where it stopped.
-    if (loaded) {
-      if (!isPlaying) toggle();
-      return;
-    }
+    // alone rather than restarting from zero. Loaded but paused — in practice
+    // prev/next back to the track after a video interrupted it — starts over,
+    // like arriving at any other item, rather than resuming mid-track.
+    if (loaded && isPlaying) return;
     play({ ...file, workspaceId: wsId }, wsId, { startAt });
-  }, [
-    file,
-    wsId,
-    mediaBase,
-    autoplay,
-    startAt,
-    current,
-    isPlaying,
-    play,
-    toggle,
-  ]);
+  }, [file, wsId, mediaBase, autoplay, startAt, current, isPlaying, play]);
 
   /** For "delete from index": the bar outlives this modal, so a track that was
    *  playing would keep going (and 404 on the next seek) after its row is gone. */
