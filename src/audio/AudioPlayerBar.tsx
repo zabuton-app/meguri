@@ -4,11 +4,14 @@
 // floating over it, so it never occludes the last row of the list, and occupies zero
 // height when no track is loaded. Only the seek bar and the time readout consume useAudioPosition(), so the
 // per-tick re-render stays confined to those two small components.
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Music, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { events } from "@/ipc/client";
 import { fileHref } from "@/lib/fileHref";
+import { navigateOutsideRouter } from "@/lib/routerBridge";
+import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import type { AudioTrack } from "./context";
 import { useAudioPlayer } from "./useAudioPlayer";
 import { AudioTransport, CTRL_CLASS } from "./AudioTransport";
@@ -68,20 +71,7 @@ function usePublishBarInset(el: HTMLDivElement | null): void {
 }
 
 export function AudioPlayerBar() {
-  const {
-    current,
-    isPlaying,
-    duration,
-    volume,
-    muted,
-    error,
-    toggle,
-    seek,
-    setVolume,
-    toggleMuted,
-    close,
-    dismissError,
-  } = useAudioPlayer();
+  const { current, close } = useAudioPlayer();
   const { t } = useI18n();
   const suppressed = useBarSuppressed();
   const [barEl, setBarEl] = useState<HTMLDivElement | null>(null);
@@ -117,18 +107,16 @@ export function AudioPlayerBar() {
       />
       {/* Announced when the track changes; position updates are never announced.
           The name is the way back to the track's detail view (tags, rating).
-          The bar sits outside RouterProvider, so it navigates through the hash
-          the router listens to; `autoplay: false` so opening the details never
-          restarts or resumes what the bar is doing. */}
+          The bar sits outside RouterProvider, so it goes through the router
+          bridge; `autoplay: false` so opening the details never restarts or
+          resumes what the bar is doing. */}
       <button
         type="button"
         onClick={() => {
-          window.location.hash = fileHref(
-            current.file.id,
-            current.workspaceId,
-            {
+          navigateOutsideRouter(
+            fileHref(current.file.id, current.workspaceId, {
               autoplay: false,
-            },
+            }),
           );
         }}
         className="min-w-0 max-w-64 flex-1 truncate text-left transition hover:text-bright-fg hover:underline"
@@ -140,17 +128,7 @@ export function AudioPlayerBar() {
       </button>
 
       <AudioTransport
-        live
-        isPlaying={isPlaying}
-        onTogglePlay={toggle}
-        duration={duration}
-        onSeek={seek}
-        volume={volume}
-        muted={muted}
-        onVolume={setVolume}
-        onToggleMuted={toggleMuted}
-        error={error}
-        onDismissError={dismissError}
+        target={{ fileId: current.file.id, workspaceId: current.workspaceId }}
       />
 
       <button
@@ -170,16 +148,48 @@ export function AudioPlayerBar() {
  *  none (or the image fails to load). Square and bar-height, so a taller jacket
  *  cannot grow the bar and shift every bottom-anchored overlay with it.
  *
+ *  The row the track was started from is a snapshot: a track played while the
+ *  scan is still extracting covers has `hasThumb: 0` at that moment, and a cover
+ *  regenerated later sits behind the same URL. `thumb:done` for this file says
+ *  a cover now exists, so it flips availability and busts the cache.
+ *
  *  Decorative: the filename beside it already identifies the track, so an alt text
  *  here would only make screen readers announce the same name twice. */
 function Cover({ track }: { track: AudioTrack }) {
   const status = useAppStatus();
   const mediaBase = status.data?.mediaBase ?? "";
   const [failed, setFailed] = useState(false);
-  const src =
-    track.file.hasThumb === 1 && mediaBase
-      ? `${mediaBase}/ws/${track.workspaceId}/thumb/${track.file.id}`
-      : null;
+  const [hasCover, setHasCover] = useState(() => hasThumbFile(track.file));
+  const [version, setVersion] = useState<number | undefined>(undefined);
+  const { id: fileId } = track.file;
+  const { workspaceId } = track;
+  useEffect(() => {
+    // The unlisten arrives a microtask after the subscription is live, and this
+    // component is unmounted in the very same commit whenever the detail view
+    // opens over the bar — so a cleanup that runs before then must still take
+    // the subscription down, or every such open leaks one listener.
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void events
+      .onThumbDone((event) => {
+        if (event.id !== fileId) return;
+        if (event.workspaceId && event.workspaceId !== workspaceId) return;
+        setHasCover(true);
+        setFailed(false);
+        setVersion((v) => (v ?? 0) + 1);
+      })
+      .then((u) => {
+        if (cancelled) u();
+        else unlisten = u;
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [fileId, workspaceId]);
+  const src = hasCover
+    ? thumbUrl(mediaBase, workspaceId, fileId, version)
+    : null;
 
   if (!src || failed) {
     return (

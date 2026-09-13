@@ -9,7 +9,9 @@ import { I18nProvider } from "@/i18n/I18nProvider";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { useAudioPlayer } from "@/audio/useAudioPlayer";
-import { setBarSuppressed } from "@/audio/barVisibility";
+import { holdBarSuppressed } from "@/audio/barVisibility";
+import { registerRouterNavigate } from "@/lib/routerBridge";
+import type { ThumbDone } from "@/ipc/types";
 import {
   defaultAppStatus,
   sampleAudioRow,
@@ -21,6 +23,7 @@ import type { FileRow } from "@/ipc/types";
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
   fileRecordPlay: vi.fn(),
+  thumbDoneListeners: new Set<(event: ThumbDone) => void>(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -29,8 +32,25 @@ vi.mock("@/ipc/client", () => ({
     fileRecordPlay: (...args: unknown[]): Promise<void> =>
       mocks.fileRecordPlay(...args) as Promise<void>,
   },
+  events: {
+    onThumbDone: (cb: (event: ThumbDone) => void): Promise<() => void> => {
+      mocks.thumbDoneListeners.add(cb);
+      return Promise.resolve(() => mocks.thumbDoneListeners.delete(cb));
+    },
+  },
   ALL_ID: "__all__",
 }));
+
+/** Deliver a `thumb:done` the way the main process would. */
+async function thumbDone(event: ThumbDone) {
+  // The subscription is set up from a promise, so let it settle first.
+  await act(async () => {
+    await Promise.resolve();
+  });
+  act(() => {
+    mocks.thumbDoneListeners.forEach((cb) => cb(event));
+  });
+}
 
 let el: HTMLAudioElement;
 function capture(instance: HTMLAudioElement): void {
@@ -40,6 +60,7 @@ function capture(instance: HTMLAudioElement): void {
 beforeEach(() => {
   mocks.appStatus.mockReset().mockResolvedValue(defaultAppStatus);
   mocks.fileRecordPlay.mockReset().mockResolvedValue(undefined);
+  mocks.thumbDoneListeners.clear();
   localStorage.clear();
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
@@ -57,6 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  registerRouterNavigate(null);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -284,7 +306,10 @@ describe("AudioPlayerBar", () => {
     setup();
     loadTrack();
     expect(bar()).toBeTruthy();
-    act(() => setBarSuppressed(true));
+    let release!: () => void;
+    act(() => {
+      release = holdBarSuppressed();
+    });
     expect(bar()).toBeNull();
     expect(
       document.documentElement.style.getPropertyValue(
@@ -292,8 +317,59 @@ describe("AudioPlayerBar", () => {
       ),
     ).toBe("0px");
     // Not closed: the track is still loaded, so releasing brings it straight back.
-    act(() => setBarSuppressed(false));
+    act(() => release());
     expect(bar()).toBeTruthy();
+  });
+
+  it("stays hidden until every holder has released it", () => {
+    setup();
+    loadTrack();
+    let first!: () => void;
+    let second!: () => void;
+    act(() => {
+      first = holdBarSuppressed();
+      second = holdBarSuppressed();
+    });
+    // One view leaving (or a double-invoked cleanup) must not reveal the bar
+    // under a view that still needs it gone.
+    act(() => first());
+    act(() => first());
+    expect(bar()).toBeNull();
+    act(() => second());
+    expect(bar()).toBeTruthy();
+  });
+
+  it("picks up a cover extracted after the track was started", async () => {
+    // The row the bar was handed says "no cover" because the scan had not
+    // reached the file yet; thumb:done for it means one exists now.
+    setup();
+    loadTrack();
+    expect(screen.queryByRole("presentation")).toBeNull();
+    await thumbDone({ id: sampleAudioRow.id, workspaceId: WS_ID });
+    const img = await screen.findByRole("presentation");
+    expect(img.getAttribute("src")).toBe(
+      `${defaultAppStatus.mediaBase}/ws/${WS_ID}/thumb/${sampleAudioRow.id}?v=1`,
+    );
+  });
+
+  it("refetches a regenerated cover and ignores other files' events", async () => {
+    setup(sampleAudioRowWithCover);
+    loadTrack();
+    const before = await screen.findByRole("presentation");
+    expect(before.getAttribute("src")).not.toContain("?v=");
+    // Another file's cover (same id in another workspace, another id here).
+    await thumbDone({
+      id: sampleAudioRowWithCover.id,
+      workspaceId: "elsewhere",
+    });
+    await thumbDone({ id: 12345, workspaceId: WS_ID });
+    expect(screen.getByRole("presentation").getAttribute("src")).not.toContain(
+      "?v=",
+    );
+    await thumbDone({ id: sampleAudioRowWithCover.id, workspaceId: WS_ID });
+    expect(screen.getByRole("presentation").getAttribute("src")).toContain(
+      "?v=1",
+    );
   });
 
   it("opens the track's detail view from its name without touching playback", () => {
@@ -307,6 +383,33 @@ describe("AudioPlayerBar", () => {
     // Navigating is all it does: the bar stays up with the same track loaded.
     expect(bar()).toBeTruthy();
     expect(screen.getByText("track.mp3")).toBeTruthy();
+  });
+
+  it("drops its thumb:done subscription even when unmounted in the same tick", async () => {
+    // The detail view opening over the bar unmounts the cover in the very
+    // commit that subscribed it, before the unlisten has been handed back.
+    const { unmount } = render(<Harness />, { wrapper: Wrapper });
+    loadTrack();
+    expect(mocks.thumbDoneListeners.size).toBe(1);
+    unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mocks.thumbDoneListeners.size).toBe(0);
+  });
+
+  it("navigates through the router once App has registered it", () => {
+    const navigate = vi.fn();
+    registerRouterNavigate(navigate);
+    setup();
+    loadTrack();
+    window.location.hash = "";
+    fireEvent.click(screen.getByRole("button", { name: /open details/i }));
+    expect(navigate).toHaveBeenCalledWith(
+      `/file/${sampleAudioRow.id}?ws=${WS_ID}&autoplay=0`,
+    );
+    // Not also written to the hash behind the router's back.
+    expect(window.location.hash).toBe("");
   });
 
   it("hides the bar again when closed", () => {

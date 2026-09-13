@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import {
   AudioActionsContext,
   AudioPlayerContext,
@@ -32,4 +32,27 @@ export function useAudioPosition(): number {
   if (pos === null)
     throw new Error("useAudioPosition must be used within AudioPlayerProvider");
   return pos;
+}
+
+/**
+ * Only one thing sounds at a time. A video player (the detail view's, the
+ * playlist's) registers how it can be paused and gets back `claim`, which it
+ * calls when it starts: the bar's audio is paused then, and whenever the bar's
+ * audio starts, the registered pauser runs. Both directions of the exclusivity
+ * live here rather than in each host, so a new sound source only has to
+ * register once.
+ *
+ * `pause` is read through a ref, so callers may pass a fresh closure each render.
+ */
+export function useExclusivePlayback(pause: () => void): {
+  /** Call when this source starts playing: pauses the bar. */
+  claim: () => void;
+} {
+  const { registerPeer, pause: pauseAudio } = useAudioActions();
+  const pauseRef = useRef(pause);
+  useLayoutEffect(() => {
+    pauseRef.current = pause;
+  });
+  useEffect(() => registerPeer(() => pauseRef.current()), [registerPeer]);
+  return { claim: pauseAudio };
 }

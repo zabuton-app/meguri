@@ -194,6 +194,7 @@ export const ja = {
   "shortcuts.scrollUp": "上へスクロール",
   "shortcuts.moveFocus": "フォーカス移動（上下左右）",
   "shortcuts.openFocused": "選択中の項目を開く",
+  "shortcuts.inspectFocused": "選択中の項目の詳細を開く（再生しない）",
   "shortcuts.watchLater": "後で見るを切り替え",
   "shortcuts.help": "このヘルプ",
   "shortcuts.playPause": "再生 / 一時停止",

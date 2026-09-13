@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, ImageIcon, Pause, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
+import { fileHref } from "@/lib/fileHref";
+import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import { useAudioActions, useAudioPlayer } from "@/audio/useAudioPlayer";
 import { useActivateFile } from "@/audio/useActivateFile";
 import { api } from "@/ipc/client";
@@ -23,7 +25,6 @@ import { tagColorClass } from "@/lib/tagColorClass";
 import { tagHumanLabel } from "@/lib/tagLabel";
 import { TagChipLabel } from "@/components/TagChipLabel";
 import type { TFunc } from "@/i18n/I18nProvider";
-import { detailPath } from "./utils";
 import { SceneRail } from "./SceneRail";
 
 // Full-bleed immersive slide: the media fills the card (blurred cover backdrop
@@ -71,19 +72,15 @@ export function DiscoverCard({
   // Discover stays a browsing surface; seeking and volume wait for the bar.
   const audio = useAudioPlayer();
   const wsId = file.workspaceId;
-  // Same rule as MediaThumbnail: thumb_status alone can be 'done' with no file
-  // produced (audio without embedded cover art), which would 404.
-  const hasThumb =
-    file.thumbStatus === "done" && file.hasThumb === 1 && mediaBase && wsId;
-  const thumbUrl = hasThumb
-    ? `${mediaBase}/ws/${wsId}/thumb/${file.id}?v=${thumbVersion}`
+  const coverUrl = hasThumbFile(file)
+    ? (thumbUrl(mediaBase, wsId, file.id, thumbVersion) ?? undefined)
     : undefined;
   // Same recovery as MediaThumbnail: a recorded thumbnail whose file has gone
   // missing 404s, and without a fallback the card would show broken artwork.
   // Keyed on the URL rather than a flag so a later version bump (or a different
   // file rendered by a reused card) gets a fresh attempt.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const src = thumbUrl && failedSrc !== thumbUrl ? thumbUrl : undefined;
+  const src = coverUrl && failedSrc !== coverUrl ? coverUrl : undefined;
   const slash = file.relPath.lastIndexOf("/");
   const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
   const isVideo = file.kind === "video";
@@ -92,7 +89,9 @@ export function DiscoverCard({
   // Audio follows the list views' gesture split: "Play" starts the track in the
   // bottom bar without leaving Discover, and opening the card is the inspect
   // gesture, so its detail view must not start playback on its own.
-  const detailTo = detailPath(file.id, wsId, filterParam, undefined, {
+  const detailTo = fileHref(file.id, wsId, {
+    from: "discover",
+    filter: filterParam,
     autoplay: !isAudio,
   });
   const playInBar = () => activate(file);

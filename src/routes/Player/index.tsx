@@ -10,7 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
 import { Music } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
-import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import { useExclusivePlayback } from "@/audio/useAudioPlayer";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -30,6 +30,7 @@ import {
   invalidatePlayedSearches,
 } from "@/lib/queryCache";
 import { fileHref } from "@/lib/fileHref";
+import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import { queueKey, type PlaybackQueue } from "@/lib/playbackQueue";
 import { fileNameOf } from "@/lib/relPath";
 import {
@@ -126,17 +127,19 @@ export default function Player() {
   const [paused, setPaused] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
 
-  // The playlist owns sound while it is open. A track left playing in the bottom
-  // bar would otherwise keep going underneath the first video — paused rather
-  // than closed, so it is still there to resume after leaving the player.
-  const { pause: pauseAudio } = useAudioPlayer();
-  useEffect(() => {
-    pauseAudio();
-  }, [pauseAudio]);
   // Shared with the detail view's player, so a level set in either place holds
   // for the other and survives both item switches and restarts.
   const { volume, muted } = useVolume();
   const videoRef = useRef<PlayerHandle>(null);
+  // The playlist owns sound while it is open. A track left playing in the bottom
+  // bar would otherwise keep going underneath the first video — paused rather
+  // than closed, so it is still there to resume after leaving the player.
+  const { claim: claimPlayback } = useExclusivePlayback(() =>
+    videoRef.current?.pause(),
+  );
+  useEffect(() => {
+    claimPlayback();
+  }, [claimPlayback]);
 
   const exit = useCallback(() => {
     if (document.fullscreenElement)
@@ -563,10 +566,9 @@ export default function Player() {
   // fetched detail instead put an IPC round trip between the swap and the first
   // pixel, which is the gap that showed up on every next/previous. The detail
   // now only enriches what is already on screen (the file's name).
-  const thumbSrc =
-    mediaBase && current
-      ? `${mediaBase}/ws/${wsId}/thumb/${current.fileId}`
-      : undefined;
+  const thumbSrc = current
+    ? (thumbUrl(mediaBase, wsId, current.fileId) ?? undefined)
+    : undefined;
   const mediaSrc =
     mediaBase && current
       ? `${mediaBase}/ws/${wsId}/media/${current.fileId}`
@@ -671,6 +673,9 @@ export default function Player() {
                   fullscreenTargetRef={rootRef}
                   onNativeDuration={() => undefined}
                   onPlayed={() => invalidatePlayedSearches(qc)}
+                  // Reclaims the sound on every start (first play, resume,
+                  // item switch), not only when the player mounted.
+                  onPlaybackStart={claimPlayback}
                   chromeless
                   onEnded={goNext}
                   onPlayingChange={(playing) => {
@@ -687,9 +692,7 @@ export default function Player() {
                 // The <video> element draws nothing for an audio file, so show
                 // the cover art (or the kind's glyph) where the picture would be.
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  {file?.thumbStatus === "done" &&
-                  file.hasThumb === 1 &&
-                  thumbSrc ? (
+                  {file && hasThumbFile(file) && thumbSrc ? (
                     <img
                       src={thumbSrc}
                       alt=""

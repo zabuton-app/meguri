@@ -4,22 +4,27 @@
 // React because the bar is mounted in App, outside the router, where the detail
 // route cannot reach it with props. Playback itself is untouched: hiding the bar
 // never pauses anything.
-import { useSyncExternalStore } from "react";
+//
+// Counted rather than a plain boolean: each view that needs the bar gone takes a
+// hold and releases it on the way out, so two holders (StrictMode's double
+// mount, a view replaced by another in the same frame) cannot release each
+// other's hold, and a release that runs twice is harmless.
+import { createFlagStore } from "@/hooks/createFlagStore";
 
-let suppressed = false;
-const listeners = new Set<() => void>();
+const store = createFlagStore();
+let holds = 0;
 
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+/** Hide the bar until the returned release function is called. */
+export function holdBarSuppressed(): () => void {
+  holds++;
+  store.set(true);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    holds--;
+    if (holds === 0) store.set(false);
+  };
 }
 
-export function setBarSuppressed(value: boolean): void {
-  if (suppressed === value) return;
-  suppressed = value;
-  listeners.forEach((l) => l());
-}
-
-export function useBarSuppressed(): boolean {
-  return useSyncExternalStore(subscribe, () => suppressed);
-}
+export const useBarSuppressed: () => boolean = store.use;

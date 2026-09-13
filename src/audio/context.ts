@@ -59,6 +59,9 @@ export interface AudioActions {
   toggleMuted: () => void;
   close: () => void;
   dismissError: () => void;
+  /** Register another sound source (see useExclusivePlayback). The listener is
+   *  called whenever bar audio starts; returns the unregister function. */
+  registerPeer: (onAudioStart: () => void) => () => void;
 }
 
 export const AudioActionsContext = createContext<AudioActions | null>(null);

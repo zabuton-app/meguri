@@ -78,11 +78,15 @@ export interface GridBinding {
   /** Move the focused item left / right by one. */
   left: KeyChord[];
   right: KeyChord[];
-  /** Open the focused item (detail view). */
+  /** Activate the focused item: open the detail view, or for audio play it in the bar. */
   open: KeyChord[];
+  /** Open the focused item's detail view without starting playback (the
+   *  keyboard form of the name click). Matched before `open`. */
+  inspect: KeyChord[];
 }
 
-// Per-preset focus navigation for the list/grid/table views. Open is always Enter.
+// Per-preset focus navigation for the list/grid/table views. Open is always Enter,
+// inspect Shift+Enter.
 // These are consulted only while the list is foreground (no detail/settings modal on top),
 // so vim h/l and emacs C-b/C-f do not clash with the detail view's prev/next.
 export const GRID_BINDINGS: Record<KeybindingPreset, GridBinding> = {
@@ -91,21 +95,24 @@ export const GRID_BINDINGS: Record<KeybindingPreset, GridBinding> = {
     down: [{ code: "ArrowDown" }],
     left: [{ code: "ArrowLeft" }],
     right: [{ code: "ArrowRight" }],
-    open: [{ code: "Enter" }],
+    open: [{ code: "Enter", shift: false }],
+    inspect: [{ code: "Enter", shift: true }],
   },
   vim: {
     up: [{ code: "KeyK" }],
     down: [{ code: "KeyJ" }],
     left: [{ code: "KeyH" }],
     right: [{ code: "KeyL" }],
-    open: [{ code: "Enter" }],
+    open: [{ code: "Enter", shift: false }],
+    inspect: [{ code: "Enter", shift: true }],
   },
   emacs: {
     up: [{ code: "KeyP", ctrl: true }],
     down: [{ code: "KeyN", ctrl: true }],
     left: [{ code: "KeyB", ctrl: true }],
     right: [{ code: "KeyF", ctrl: true }],
-    open: [{ code: "Enter" }],
+    open: [{ code: "Enter", shift: false }],
+    inspect: [{ code: "Enter", shift: true }],
   },
 };
 

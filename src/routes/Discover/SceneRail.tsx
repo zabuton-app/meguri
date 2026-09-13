@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { formatDuration } from "@/lib/format";
 import type { TFunc } from "@/i18n/I18nProvider";
-import { detailPath } from "./utils";
+import { fileHref } from "@/lib/fileHref";
 
 // Base tile width + flex gap; used to compute how many tiles fit the rail.
 const TILE_W = 104;
@@ -60,7 +60,11 @@ export function SceneRail({
         {visible.map((sec, i) => (
           <Link
             key={i}
-            to={detailPath(id, wsId, filterParam, sec)}
+            to={fileHref(id, wsId, {
+              from: "discover",
+              filter: filterParam,
+              t: sec,
+            })}
             className="group/scene relative block w-[104px] shrink-0 overflow-hidden rounded-md border border-border/60 bg-black shadow-md transition-all duration-150 hover:z-10 hover:w-[132px] hover:-translate-y-1 hover:border-primary hover:shadow-lg"
           >
             <img

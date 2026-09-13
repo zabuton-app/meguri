@@ -16,6 +16,8 @@ interface Options {
   active: boolean;
   /** Open the item at the given index. */
   onOpen: (index: number) => void;
+  /** Open the item's detail view without autoplay (Shift+Enter). */
+  onInspect?: (index: number) => void;
   /** Scroll the virtual row into view (row = floor(index / columns)). */
   scrollToRow: (row: number) => void;
 }
@@ -33,6 +35,7 @@ export function useGridKeyboardNav({
   columns,
   active,
   onOpen,
+  onInspect,
   scrollToRow,
 }: Options) {
   const { keybindingPreset } = usePreferences();
@@ -44,6 +47,7 @@ export function useGridKeyboardNav({
     itemCount,
     columns,
     onOpen,
+    onInspect,
     scrollToRow,
     preset: keybindingPreset,
     focusedIndex,
@@ -55,6 +59,7 @@ export function useGridKeyboardNav({
       itemCount,
       columns,
       onOpen,
+      onInspect,
       scrollToRow,
       preset: keybindingPreset,
       focusedIndex,
@@ -81,14 +86,31 @@ export function useGridKeyboardNav({
           el.isContentEditable)
       )
         return;
-      const { itemCount, columns, onOpen, scrollToRow, preset, focusedIndex } =
-        ref.current;
+      const {
+        itemCount,
+        columns,
+        onOpen,
+        onInspect,
+        scrollToRow,
+        preset,
+        focusedIndex,
+      } = ref.current;
       if (itemCount === 0) return;
       const cols = Math.max(1, columns);
       const b = GRID_BINDINGS[preset];
 
+      const focused = focusedIndex >= 0 && focusedIndex < itemCount;
+      // Inspect first, so an open chord that leaves shift unspecified (and so
+      // also matches the shifted key) can never swallow it.
+      if (onInspect && matchAny(e, b.inspect)) {
+        if (focused) {
+          e.preventDefault();
+          onInspect(focusedIndex);
+        }
+        return;
+      }
       if (matchAny(e, b.open)) {
-        if (focusedIndex >= 0 && focusedIndex < itemCount) {
+        if (focused) {
           e.preventDefault();
           onOpen(focusedIndex);
         }

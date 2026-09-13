@@ -199,6 +199,8 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "Défiler vers le haut",
   "shortcuts.moveFocus": "Déplacer le focus (haut/bas/gauche/droite)",
   "shortcuts.openFocused": "Ouvrir l'élément ciblé",
+  "shortcuts.inspectFocused":
+    "Ouvrir les détails de l'élément ciblé (sans lecture)",
   "shortcuts.watchLater": "Basculer À regarder plus tard",
   "shortcuts.help": "Cette aide",
   "shortcuts.playPause": "Lecture / pause",

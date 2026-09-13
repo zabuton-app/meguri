@@ -16,6 +16,7 @@ import { StatusBar } from "@/components/StatusBar";
 import { useContentZoom } from "@/hooks/useContentZoom";
 import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
+import { registerRouterNavigate } from "@/lib/routerBridge";
 
 // In a webview, a hash router is more stable than a file-path-style history.
 // /file/:id, /play and /settings are child routes of Home so a modal overlays on top while the list stays mounted
@@ -35,6 +36,9 @@ const router = createHashRouter([
     ],
   },
 ]);
+// Lets the player bar (mounted beside the router below) navigate through the
+// router rather than by rewriting the hash behind its back.
+registerRouterNavigate((to) => void router.navigate(to));
 
 export default function App() {
   useContentZoom();

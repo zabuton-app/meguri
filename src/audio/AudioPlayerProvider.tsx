@@ -86,6 +86,17 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // is not a playback failure.
   const requestId = useRef(0);
 
+  // The track whose first `playing` event still has to be written to the play
+  // history. Set by play(), consumed once playback is actually under way, so a
+  // rejected autoplay, an unsupported codec or a file that has gone missing
+  // never counts as a play. (The video player records from its element the same
+  // way.) Replaced wholesale by the next play(), dropped by close().
+  const pendingRecord = useRef<AudioTrack | null>(null);
+
+  // Other sound sources (see useExclusivePlayback): each is paused when audio
+  // starts here. A Set, not state — registration must not re-render anything.
+  const peers = useRef(new Set<() => void>());
+
   /** Pause and disown any play() still in flight (see requestId). */
   const pauseEl = useCallback((el: HTMLAudioElement) => {
     requestId.current++;
@@ -103,6 +114,27 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /** One history entry per activation (see pendingRecord). Resuming from pause
+   *  goes through toggle() and is deliberately not recorded. */
+  const recordPlay = useCallback(
+    ({ file, workspaceId }: AudioTrack) => {
+      void api
+        .fileRecordPlay(file.id, workspaceId, "browser")
+        .then(() => {
+          // Same refresh the video player triggers: a played/unplayed filter or
+          // an "accessed" sort would otherwise keep showing stale membership,
+          // and the history timeline would omit the track until a refetch.
+          invalidatePlayedSearches(qc);
+          void qc.invalidateQueries({ queryKey: ["history_list"] });
+          // The main process consumed the Watch Later entry along with the
+          // play; mirror that like the video player does on its first play.
+          dropFromWatchLaterCache(qc, workspaceId, file.id);
+        })
+        .catch((e: unknown) => log.warn("record play failed:", e));
+    },
+    [qc],
+  );
+
   // Element events are the single source of playback state, so tests can step it
   // deterministically by dispatching events (jsdom decodes nothing and never
   // advances currentTime on its own).
@@ -114,7 +146,19 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       );
     };
     const onTime = () => setPosition(el.currentTime);
-    const onPlay = () => setIsPlaying(true);
+    const onPlay = () => {
+      setIsPlaying(true);
+      // Fires on every paused→playing edge, so this is exactly "audio starts":
+      // a video that is running yields here, once, and nothing reacts to audio
+      // that merely keeps playing.
+      peers.current.forEach((pauseOther) => pauseOther());
+    };
+    const onPlaying = () => {
+      const track = pendingRecord.current;
+      if (!track) return;
+      pendingRecord.current = null;
+      recordPlay(track);
+    };
     const onPause = () => setIsPlaying(false);
     const onEnded = () => {
       setIsPlaying(false);
@@ -131,6 +175,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     el.addEventListener("durationchange", onLoaded);
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("play", onPlay);
+    el.addEventListener("playing", onPlaying);
     el.addEventListener("pause", onPause);
     el.addEventListener("ended", onEnded);
     el.addEventListener("error", onError);
@@ -139,11 +184,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       el.removeEventListener("durationchange", onLoaded);
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("play", onPlay);
+      el.removeEventListener("playing", onPlaying);
       el.removeEventListener("pause", onPause);
       el.removeEventListener("ended", onEnded);
       el.removeEventListener("error", onError);
     };
-  }, [ensureEl]);
+  }, [ensureEl, recordPlay]);
 
   // Stop playback when the provider itself goes away (app teardown), so no
   // detached element keeps decoding.
@@ -176,26 +222,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       setCurrent({ file, workspaceId });
       el.src = src;
       el.currentTime = 0;
+      // Recorded once the element reports `playing`, not here: play() is only
+      // ever reached from an explicit activation (click / Enter / the detail
+      // route), but the activation is not the play — the load can still fail.
+      pendingRecord.current = { file, workspaceId };
       startPlayback(el);
-
-      // One entry per activation. play() is only ever reached from an explicit
-      // user activation (click / Enter / the detail-route recovery); resuming
-      // from pause goes through toggle() and is deliberately not recorded.
-      void api
-        .fileRecordPlay(file.id, workspaceId, "browser")
-        .then(() => {
-          // Same refresh the video player triggers: a played/unplayed filter or
-          // an "accessed" sort would otherwise keep showing stale membership,
-          // and the history timeline would omit the track until a refetch.
-          invalidatePlayedSearches(qc);
-          void qc.invalidateQueries({ queryKey: ["history_list"] });
-          // The main process consumed the Watch Later entry along with the
-          // play; mirror that like the video player does on its first play.
-          dropFromWatchLaterCache(qc, workspaceId, file.id);
-        })
-        .catch((e: unknown) => log.warn("record play failed:", e));
     },
-    [ensureEl, startPlayback, qc],
+    [ensureEl, startPlayback],
   );
 
   const toggle = useCallback(() => {
@@ -258,6 +291,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     // an error message after the bar is gone.
     requestId.current++;
     needsReload.current = false;
+    pendingRecord.current = null;
     const el = audioRef.current;
     if (el) {
       el.pause();
@@ -274,6 +308,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const dismissError = useCallback(() => setError(null), []);
+
+  const registerPeer = useCallback((onAudioStart: () => void) => {
+    peers.current.add(onAudioStart);
+    return () => {
+      peers.current.delete(onAudioStart);
+    };
+  }, []);
 
   const pauseIfCurrent = useCallback(
     (fileId: number, workspaceId: string) => {
@@ -296,6 +337,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       toggleMuted,
       close,
       dismissError,
+      registerPeer,
     }),
     [
       play,
@@ -308,6 +350,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       toggleMuted,
       close,
       dismissError,
+      registerPeer,
     ],
   );
 

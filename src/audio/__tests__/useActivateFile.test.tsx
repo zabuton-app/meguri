@@ -90,6 +90,10 @@ describe("useActivateFile", () => {
     // anchors, so the hash is asserted through defaultPrevented instead).
     expect(fireEvent.click(screen.getByText("audio-thumb"))).toBe(false);
     expect(playSpy).toHaveBeenCalledTimes(1);
+    // Recorded once the element reports that playback is under way.
+    act(() => {
+      el.dispatchEvent(new Event("playing"));
+    });
     expect(mocks.fileRecordPlay).toHaveBeenCalledWith(
       sampleAudioRow.id,
       WS_ID,

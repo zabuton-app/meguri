@@ -192,6 +192,7 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "위로 스크롤",
   "shortcuts.moveFocus": "포커스 이동(상하좌우)",
   "shortcuts.openFocused": "선택한 항목 열기",
+  "shortcuts.inspectFocused": "선택한 항목의 상세 열기(재생 안 함)",
   "shortcuts.watchLater": "나중에 보기 전환",
   "shortcuts.help": "이 도움말",
   "shortcuts.playPause": "재생 / 일시정지",

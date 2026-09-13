@@ -9,7 +9,11 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
-import { useAudioPlayer, useAudioPosition } from "@/audio/useAudioPlayer";
+import {
+  useAudioPlayer,
+  useAudioPosition,
+  useExclusivePlayback,
+} from "@/audio/useAudioPlayer";
 import { setVolume } from "@/hooks/useVolume";
 import { defaultAppStatus, sampleAudioRow, WS_ID } from "@/test/fixtures";
 
@@ -391,28 +395,61 @@ describe("AudioPlayerProvider", () => {
     expect(el.muted).toBe(true);
   });
 
-  it("records a play-history entry on every activation", () => {
+  it("records a play-history entry once each activation actually starts", () => {
     setup();
     click("play");
+    // The activation alone is not a play: nothing is written until the element
+    // reports that playback is under way.
+    expect(mocks.fileRecordPlay).not.toHaveBeenCalled();
+    emit("playing");
     expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(1);
     expect(mocks.fileRecordPlay).toHaveBeenCalledWith(
       sampleAudioRow.id,
       WS_ID,
       "browser",
     );
+    // A later `playing` (after buffering, after a seek) is the same listen.
+    emit("playing");
+    expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(1);
 
     // Re-activating the same track restarts it from the top, so it is a genuine
     // second play and belongs in the history.
     click("play");
+    emit("playing");
     expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(2);
 
     click("play-other");
+    emit("playing");
     expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not record a play that never starts", () => {
+    setup();
+    click("play");
+    // A missing file or an unsupported codec: the element errors instead of
+    // ever reaching `playing`.
+    emit("error");
+    expect(mocks.fileRecordPlay).not.toHaveBeenCalled();
+
+    // Neither does a track replaced before it got going: only the one that
+    // actually plays is written.
+    click("play");
+    click("play-other");
+    emit("playing");
+    expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(1);
+    expect(mocks.fileRecordPlay).toHaveBeenCalledWith(9, WS_ID, "browser");
+
+    // And close() before the start drops the pending record for good.
+    click("play");
+    click("close");
+    emit("playing");
+    expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(1);
   });
 
   it("does not record a history entry when merely resuming from pause", () => {
     setup();
     click("play");
+    emit("playing");
     expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(1);
 
     // Pause, then resume through toggle(): one continuous listen, one entry.
@@ -420,6 +457,67 @@ describe("AudioPlayerProvider", () => {
     click("toggle");
     Object.defineProperty(el, "paused", { value: true, configurable: true });
     click("toggle");
+    emit("playing");
     expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(1);
+  });
+
+  describe("useExclusivePlayback", () => {
+    function Peer({ onPause }: { onPause: () => void }) {
+      const { claim } = useExclusivePlayback(onPause);
+      return <button onClick={claim}>peer-claim</button>;
+    }
+
+    it("pauses the registered source whenever audio starts", () => {
+      const pauseVideo = vi.fn();
+      render(
+        <>
+          <Probe />
+          <Peer onPause={pauseVideo} />
+        </>,
+        { wrapper: Wrapper },
+      );
+      click("play");
+      expect(pauseVideo).not.toHaveBeenCalled();
+      // The element's `play` event is the start; it fires once per edge, so a
+      // track that keeps playing never pauses the other source again.
+      emit("play");
+      expect(pauseVideo).toHaveBeenCalledTimes(1);
+      emit("timeupdate");
+      expect(pauseVideo).toHaveBeenCalledTimes(1);
+      emit("pause");
+      emit("play");
+      expect(pauseVideo).toHaveBeenCalledTimes(2);
+    });
+
+    it("pauses the audio when the registered source claims playback", () => {
+      render(
+        <>
+          <Probe />
+          <Peer onPause={() => {}} />
+        </>,
+        { wrapper: Wrapper },
+      );
+      click("play");
+      emit("play");
+      click("peer-claim");
+      expect(pauseSpy).toHaveBeenCalledTimes(1);
+      // Paused, not closed: the bar stays up for the user to resume later.
+      expect(text("current")).toBe("music/track.mp3");
+    });
+
+    it("stops pausing a source once it unmounts", () => {
+      const pauseVideo = vi.fn();
+      const { rerender } = render(
+        <>
+          <Probe />
+          <Peer onPause={pauseVideo} />
+        </>,
+        { wrapper: Wrapper },
+      );
+      rerender(<Probe />);
+      click("play");
+      emit("play");
+      expect(pauseVideo).not.toHaveBeenCalled();
+    });
   });
 });
