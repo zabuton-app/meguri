@@ -23,6 +23,7 @@ node tools/demo-capture/record-discover.mjs  # discover.gif — Discovery showca
 node tools/demo-capture/record-playlist.mjs  # playlist.gif — playlist player
 node tools/demo-capture/shoot-gallery.mjs    # theme-*.png / view-*.png
 node tools/demo-capture/shoot-history.mjs    # history.png — play-history view
+node tools/demo-capture/shoot-peek.mjs       # side-peek.png — side peek
 ```
 
 To use your own media instead of the sample library:
@@ -45,6 +46,18 @@ skews the capture resolution. Running under a virtual framebuffer avoids both:
 xvfb-run -a -s "-screen 0 1400x1000x24" \
   env WAYLAND_DISPLAY= XDG_SESSION_TYPE=x11 ELECTRON_OZONE_PLATFORM_HINT=x11 \
   node tools/demo-capture/record-demo.mjs
+```
+
+`shoot-peek.mjs` needs a real display: under Xvfb the built-in player fails
+to decode the sample videos, and the sheet would show the fallback notice
+instead of a playing frame. On a tiling compositor, float the window first so
+it keeps the requested 1280×800 — on Hyprland, for example:
+
+```bash
+hyprctl keyword windowrulev2 "float, class:^([Mm]eguri|[Ee]lectron)$"
+hyprctl keyword windowrulev2 "size 1280 800, class:^([Mm]eguri|[Ee]lectron)$"
+node tools/demo-capture/shoot-peek.mjs
+hyprctl reload   # drop the temporary rules
 ```
 
 ## Notes

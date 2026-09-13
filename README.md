@@ -151,6 +151,9 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   ([see above](#-playlist--press-play-and-let-it-run))
 - 📋 **Copy to clipboard** — copy any image to the clipboard from the detail
   view, ready to paste elsewhere
+- 📑 **Side peek** — open any file's detail as a resizable sheet docked beside
+  the library instead of a modal, keeping the grid, search, and player bar in
+  use while you watch, tag, and rate; Meguri remembers which you prefer
 - 🎨 **Themes** — base16-based multi-theme switching (gruvbox / solarized /
   monokai / nord / dracula, etc.)
 - 🔎 **Content zoom** — Ctrl + wheel (and Ctrl +/-/0)
@@ -158,6 +161,10 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   communication ([see below](#privacy))
 
 ## Screenshots
+
+The detail view docked beside the library as a side peek:
+
+![Side peek](./docs/assets/side-peek.png)
 
 Grid, list, and table layouts for browsing:
 
