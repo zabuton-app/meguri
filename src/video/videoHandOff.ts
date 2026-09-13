@@ -19,6 +19,7 @@
 //
 // Public surface: announceVideoHandOff (the two routes) and the constants.
 // park / take / destroy are VideoElement's; resetVideoHandOff is for tests.
+import { isFatalMediaError } from "@/lib/mediaError";
 import { isSameMediaSource } from "@/lib/mediaSrc";
 
 /** How long an announcement stays valid: the navigation it precedes unmounts
@@ -40,6 +41,16 @@ let holder: HTMLDivElement | null = null;
 export function isSameSource(el: HTMLVideoElement, src: string): boolean {
   return isSameMediaSource(el.getAttribute("src"), src);
 }
+
+/** Whether an element is worth handing over: one that has failed, or whose
+ *  interrupted load never got as far as metadata, would leave its next host
+ *  waiting for a load that is not coming (its `error` event is already gone). */
+function isUsable(el: HTMLVideoElement): boolean {
+  if (!el.error) return true;
+  return !isFatalMediaError(el.error) && el.readyState >= HAVE_METADATA;
+}
+
+const HAVE_METADATA = 1;
 
 /** Announce that the route about to be shown plays `src`: the host playing it
  *  may park its element when it unmounts rather than tear it down. */
@@ -66,12 +77,12 @@ function dropParked(): void {
 
 /** A host is letting go of its element. Returns true when the element was
  *  parked for a hand-off (and so must not be torn down by the caller): only
- *  the element playing the announced source, and only a healthy one — an
- *  element that has failed would be adopted with no load left to wait for. */
+ *  the element playing the announced source, and only a usable one. */
 export function parkVideoForHandOff(el: HTMLVideoElement): boolean {
   if (!announced) return false;
   const { src, until } = announced;
-  if (Date.now() > until || !isSameSource(el, src) || el.error) return false;
+  if (Date.now() > until || !isSameSource(el, src) || !isUsable(el))
+    return false;
   announced = null;
   dropParked();
   if (!holder || !holder.isConnected) {
@@ -100,8 +111,12 @@ export function parkVideoForHandOff(el: HTMLVideoElement): boolean {
  *  coming, so the parked element is torn down rather than left playing out
  *  its grace period; a host with no source yet decides nothing. */
 export function takeHandedOffVideo(src: string): HTMLVideoElement | null {
+  // The announced route has arrived (the leaving host has already had its
+  // chance to park, since deletions commit before insertions), so whatever is
+  // left of the announcement must not be picked up by some later unmount.
+  if (src) announced = null;
   if (!parked) return null;
-  if (!isSameSource(parked.el, src) || parked.el.error) {
+  if (!isSameSource(parked.el, src) || !isUsable(parked.el)) {
     if (src) dropParked();
     return null;
   }

@@ -170,17 +170,49 @@ describe("VideoElement", () => {
   });
 
   it("parks only the element playing the announced source", () => {
+    const first = render(<Host src={SRC_A} />);
+    const video = first.container.querySelector("video")!;
     const other = render(<Host src={SRC_B} />);
-    const otherVideo = videos()[0];
+    const otherVideo = other.container.querySelector("video")!;
     announceVideoHandOff(SRC_A);
-    // An unrelated host leaving inside the window is torn down as usual.
+    // An unrelated host leaving inside the window is torn down as usual...
     other.unmount();
     expect(document.contains(otherVideo)).toBe(false);
-    // The announcement is still open for the right element.
-    const first = render(<Host src={SRC_A} />);
-    const video = videos()[0];
+    // ...and the announcement is still open for the right element.
     first.unmount();
     expect(document.contains(video)).toBe(true);
+  });
+
+  it("still hands over an element whose last load was merely interrupted", () => {
+    // MEDIA_ERR_ABORTED is what a src swap / load() during a stream seek leaves
+    // behind; with metadata in, the element is as usable as any other.
+    const first = render(<Host src={SRC_A} />);
+    const video = videos()[0];
+    Object.defineProperty(video, "error", {
+      configurable: true,
+      value: { code: 1 },
+    });
+    Object.defineProperty(video, "readyState", {
+      configurable: true,
+      value: 1,
+    });
+    announceVideoHandOff(SRC_A);
+    first.unmount();
+    expect(document.contains(video)).toBe(true);
+    render(<Host src={SRC_A} />);
+    expect(videos()[0]).toBe(video);
+  });
+
+  it("consumes the announcement when the announced host arrives", () => {
+    const first = render(<Host src={SRC_A} />);
+    announceVideoHandOff(SRC_A);
+    first.unmount();
+    const second = render(<Host src={SRC_A} />);
+    const video = videos()[0];
+    // Leaving again without a new announcement is an ordinary unmount, even
+    // though the first announcement is younger than its window.
+    second.unmount();
+    expect(document.contains(video)).toBe(false);
   });
 
   it("never parks an element that has failed", async () => {

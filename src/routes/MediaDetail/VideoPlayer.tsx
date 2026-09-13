@@ -41,14 +41,15 @@ import type { TFunc } from "@/i18n/I18nProvider";
 import { VideoElement } from "@/video/VideoElement";
 import { isSameSource } from "@/video/videoHandOff";
 import { streamOffsetOf, withStreamSeek } from "@/lib/mediaSrc";
+import {
+  isFatalMediaError,
+  MEDIA_ERR_ABORTED,
+  MEDIA_ERR_NETWORK,
+} from "@/lib/mediaError";
 import { fmtTime } from "./utils";
 
-// MediaError codes as plain numbers: the MediaError global exists in Chromium
-// but not in jsdom, so referencing it would break renderer tests.
-const MEDIA_ERR_ABORTED = 1;
-const MEDIA_ERR_NETWORK = 2;
 // readyState at which metadata is in (HTMLMediaElement.HAVE_METADATA), as a
-// plain number for the same reason.
+// plain number: the constant lives on a global jsdom does not provide.
 const HAVE_METADATA = 1;
 
 // Delay before the one automatic reload after a network error: an immediate
@@ -358,7 +359,13 @@ export const VideoPlayer = forwardRef<
     // connection slots) — reload once before surfacing the error. Only
     // before metadata has loaded: a mid-playback load() would silently
     // rewind Range-served files to the start.
-    if (code === MEDIA_ERR_NETWORK && !loaded && !netRetriedRef.current) {
+    // Through the ref, not `loaded`: on the adoption path this runs in the
+    // same effect that just set `loaded`, which the closure still sees as false.
+    if (
+      code === MEDIA_ERR_NETWORK &&
+      !haveMetadataRef.current &&
+      !netRetriedRef.current
+    ) {
       netRetriedRef.current = true;
       retryTimerRef.current = window.setTimeout(() => {
         retryTimerRef.current = null;
@@ -398,11 +405,28 @@ export const VideoPlayer = forwardRef<
    * HAVE_METADATA before this runs and must still take the normal path, or
    * its `startAt` would be lost.
    */
+  // The element and source whose adoption side effects (the start and end
+  // callbacks) have already run. StrictMode runs the effect below twice on
+  // mount; reporting the end twice would move the playlist on two items.
+  const adoptedOnceRef = useRef<{ el: HTMLVideoElement; src: string } | null>(
+    null,
+  );
   const adoptLoadedElement = () => {
     const v = ref.current;
     const attached = attachedRef.current;
     if (!v || attached?.el !== v || !attached.adopted) return;
-    if (v.readyState < HAVE_METADATA || !isSameSource(v, src)) return;
+    if (!isSameSource(v, src)) return;
+    const firstTime =
+      adoptedOnceRef.current?.el !== v || adoptedOnceRef.current.src !== src;
+    adoptedOnceRef.current = { el: v, src };
+    // What the element did while nobody was listening: the events that would
+    // have told this host are gone, so read the state instead. A failure comes
+    // first — one during the parked window commonly leaves no metadata behind.
+    if (isFatalMediaError(v.error)) {
+      handleElementError(v);
+      return;
+    }
+    if (v.readyState < HAVE_METADATA) return;
     haveMetadataRef.current = true;
     appliedStartRef.current = true;
     // A stream the other route re-served from `?t=` reports positions
@@ -415,26 +439,18 @@ export const VideoPlayer = forwardRef<
       setNativeDur(v.duration);
       onNativeDuration(v.duration);
     }
-    // What the element did while nobody was listening: the events that would
-    // have told this host are gone, so read the state instead.
-    if (v.error) {
-      handleElementError(v);
-      return;
-    }
     if (v.ended) {
       setPlaying(false);
-      onEnded?.();
+      if (firstTime) onEnded?.();
       return;
     }
     setPlaying(!v.paused);
-    if (!v.paused) {
+    if (!v.paused && firstTime) {
       // The `play` that started it went to the previous host, which recorded
       // the play; this host still owes its own callers the start.
       onPlaybackStart?.();
-      if (!playedRef.current) {
-        playedRef.current = true;
-        onPlayed();
-      }
+      playedRef.current = true;
+      onPlayed();
     }
   };
 

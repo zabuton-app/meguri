@@ -556,10 +556,17 @@ export default function MediaDetail() {
     setImageBgInverted((prev) => !prev);
   }, [setImageBgInverted]);
 
-  // Reset the total duration when switching files.
+  // Reset the total duration when switching files — not on mount, where a
+  // player adopting a handed-over <video> has already reported the duration
+  // from its layout effect and this would erase it.
   // Resetting the total duration when switching files is a legitimate prop-change initialization, so synchronous setState is allowed.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setNativeDur(null), [fileId]);
+  const nativeDurFileRef = useRef(fileId);
+  useEffect(() => {
+    if (nativeDurFileRef.current === fileId) return;
+    nativeDurFileRef.current = fileId;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNativeDur(null);
+  }, [fileId]);
 
   const { goPrev, goNext, canPrev, canNext, navBinding } =
     usePrevNextNavigation({

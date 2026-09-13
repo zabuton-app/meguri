@@ -99,6 +99,10 @@ function renderPlayerStrict(items: FileRow[], route: string) {
   );
 }
 
+// `resetVideoHandOff()` tears a parked element down through `load()`, which
+// jsdom does not implement.
+vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+
 /** Where the router ended up, without the leading "#". */
 const at = () => window.location.hash.slice(1);
 

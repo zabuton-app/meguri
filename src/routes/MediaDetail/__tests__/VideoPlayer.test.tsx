@@ -7,6 +7,7 @@ import {
   render,
   screen,
 } from "@testing-library/react";
+import { StrictMode } from "react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { NAV_BINDINGS } from "@/settings/keybindings";
 import {
@@ -168,6 +169,72 @@ describe("VideoPlayer", () => {
       const onEnded = vi.fn();
       renderPlayer({ onEnded });
       // The `ended` event went to nobody; the state says it happened.
+      expect(onEnded).toHaveBeenCalledTimes(1);
+    });
+
+    it("surfaces a failure that happened while the element was parked, even with no metadata", () => {
+      const first = renderPlayer();
+      loadVideo(first.video);
+      markPlaying(first.video, 10);
+      announceVideoHandOff("http://127.0.0.1:17345/ws/ws1/media/1");
+      cleanup();
+      // Failed during the hand-off: no metadata left, no event coming. The
+      // park check saw it healthy; the arriving host must not adopt it.
+      Object.defineProperty(first.video, "readyState", {
+        configurable: true,
+        value: 0,
+      });
+      Object.defineProperty(first.video, "error", {
+        configurable: true,
+        value: { code: 3 },
+      });
+      const { video } = renderPlayer();
+      // A fresh element and a fresh load — a real retry, whose outcome will
+      // arrive as an event — rather than a dead element with nothing to wait for.
+      expect(video).not.toBe(first.video);
+      expect(video.getAttribute("src")).toBe(
+        "http://127.0.0.1:17345/ws/ws1/media/1",
+      );
+      expect(screen.queryByText("player.playFailed")).toBeNull();
+    });
+
+    it("reports an ended element's end once under StrictMode", () => {
+      const first = renderPlayer();
+      loadVideo(first.video);
+      markPlaying(first.video, 120);
+      Object.defineProperty(first.video, "paused", {
+        configurable: true,
+        value: true,
+      });
+      Object.defineProperty(first.video, "ended", {
+        configurable: true,
+        value: true,
+      });
+      announceVideoHandOff("http://127.0.0.1:17345/ws/ws1/media/1");
+      cleanup();
+      const onEnded = vi.fn();
+      render(
+        <StrictMode>
+          <I18nProvider>
+            <VideoPlayer
+              id={1}
+              src="http://127.0.0.1:17345/ws/ws1/media/1"
+              duration={120}
+              width={1920}
+              height={1080}
+              mediaBase="http://127.0.0.1:17345"
+              wsId="ws1"
+              startAt={0}
+              navKeys={NAV_BINDINGS.normal}
+              onNativeDuration={() => undefined}
+              onPlayed={() => undefined}
+              onEnded={onEnded}
+              t={(key: string) => key}
+            />
+          </I18nProvider>
+        </StrictMode>,
+      );
+      // The effect ran twice; the playlist must move on one item, not two.
       expect(onEnded).toHaveBeenCalledTimes(1);
     });
 
