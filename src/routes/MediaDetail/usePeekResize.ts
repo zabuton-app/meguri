@@ -76,7 +76,11 @@ function publishInset(px: number): void {
 
 interface Drag {
   pointerId: number;
+  /** End the drag, committing the width reached. */
   finish: () => void;
+  /** Apply a new ceiling to the width in progress (the panel, the inset
+   *  and the handle's value follow). */
+  clampTo: (max: number) => void;
 }
 
 export function usePeekResize(
@@ -118,6 +122,14 @@ export function usePeekResize(
       // is for; it settles in one pass (the clamp is idempotent).
       setMax(m);
       maxRef.current = m;
+      // Mid-drag the live width is the DOM's, not the state's: clamp that
+      // one and leave the state alone, so the re-render for `max` does not
+      // write a stale width over the drag (React rewrites the style only
+      // when the state value changes).
+      if (dragRef.current) {
+        dragRef.current.clampTo(m);
+        return;
+      }
       const fitted = clamp(widthRef.current, m);
       if (fitted !== widthRef.current) setWidth(fitted);
     };
@@ -143,12 +155,12 @@ export function usePeekResize(
 
   // The drag in progress, if any: one pointer at a time, and finished on
   // unmount (Esc closes the view mid-drag) so the width reached is kept.
-  const drag = useRef<Drag | null>(null);
-  useEffect(() => () => drag.current?.finish(), []);
+  const dragRef = useRef<Drag | null>(null);
+  useEffect(() => () => dragRef.current?.finish(), []);
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     const panel = panelRef.current;
-    if (e.button !== 0 || !panel || drag.current) return;
+    if (e.button !== 0 || !panel || dragRef.current) return;
     e.preventDefault();
     const handle = e.currentTarget;
     // preventDefault above keeps the click from focusing the handle; do it
@@ -162,18 +174,29 @@ export function usePeekResize(
     // Live: the DOM and the inset move with the pointer, React state only
     // when the drag ends, so the frame (and the player inside it) is not
     // re-rendered per pointer move.
-    const onMove = (ev: globalThis.PointerEvent) => {
-      if (ev.pointerId !== pointerId) return;
-      moved = true;
-      // The edge moves left to grow: pointer travel is subtracted.
-      next = clamp(startWidth + (startX - ev.clientX), maxRef.current);
+    const apply = (width: number) => {
+      next = width;
       panel.style.width = `${next}px`;
       handle.setAttribute("aria-valuenow", String(next));
       publishInset(next);
     };
+    const onMove = (ev: globalThis.PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      moved = true;
+      // The edge moves left to grow: pointer travel is subtracted.
+      apply(clamp(startWidth + (startX - ev.clientX), maxRef.current));
+    };
+    const clampTo = (m: number) => {
+      const clamped = clamp(next, m);
+      if (clamped === next) return;
+      // A ceiling that moved under the drag counts as movement: the width
+      // it forced is the one to keep.
+      moved = true;
+      apply(clamped);
+    };
     const finish = () => {
-      if (drag.current?.pointerId !== pointerId) return;
-      drag.current = null;
+      if (dragRef.current?.pointerId !== pointerId) return;
+      dragRef.current = null;
       handle.removeEventListener("pointermove", onMove);
       handle.removeEventListener("pointerup", onEnd);
       handle.removeEventListener("pointercancel", onEnd);
@@ -188,7 +211,11 @@ export function usePeekResize(
     handle.addEventListener("pointerup", onEnd);
     handle.addEventListener("pointercancel", onEnd);
     handle.addEventListener("lostpointercapture", onEnd);
-    drag.current = { pointerId, finish };
+    // The compiler lint reads the fit effect's `dragRef.current.clampTo()`
+    // call as this ref being mutated during render; it is an event handler
+    // writing a ref that only effects and handlers read.
+    // eslint-disable-next-line react-hooks/immutability
+    dragRef.current = { pointerId, finish, clampTo };
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {

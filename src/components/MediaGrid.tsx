@@ -48,6 +48,7 @@ const GAP = 12; // gap-3 = 0.75rem
 const SIDE_PAD = 16; // px-4
 const ROW_ESTIMATE = 220; // initial row-height estimate (corrected by measurement)
 const THUMB_ASPECT = 9 / 16; // aspect-video on the card thumbnail
+const CARD_BORDER = 1; // border on the card: the thumbnail is inset by it on each side
 
 interface Props {
   items: FileRow[];
@@ -146,8 +147,11 @@ export const MediaGrid = memo(function MediaGrid({
   // the whole row height as "extra" and, with the column count unchanged,
   // never look again. So nothing is measured until the width is in.
   const ready = innerW > 0;
+  // The thumbnail spans the card's content box, not the grid track: the
+  // card's borders take a pixel on each side, and an estimate a pixel too
+  // tall per row would drift across a long list.
   const thumbH = ready
-    ? ((innerW - GAP * (cols - 1)) / cols) * THUMB_ASPECT
+    ? ((innerW - GAP * (cols - 1)) / cols - CARD_BORDER * 2) * THUMB_ASPECT
     : 0;
   // The part beyond the thumbnail depends on the fonts in use: measured
   // again once the fonts have loaded, and again after the emoji font

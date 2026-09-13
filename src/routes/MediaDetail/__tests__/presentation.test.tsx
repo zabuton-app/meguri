@@ -286,6 +286,31 @@ describe("MediaDetail presentation", () => {
     expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("620");
   });
 
+  it("follows a ceiling that moves under a drag", async () => {
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
+    await openDetail(`/file/1?ws=${WS_ID}`, "sample.mp4", 1200);
+    const panel = dialog();
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      width: 520,
+    } as DOMRect);
+    const handle = screen.getByRole("separator", { name: "Resize side peek" });
+    fireEvent.pointerDown(handle, { button: 0, clientX: 800, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 420, pointerId: 1 });
+    expect(panel.style.width).toBe("900px");
+    // The window narrows mid-drag: 700px row − 240px for the list = 460px.
+    Object.defineProperty(panel.parentElement!.parentElement!, "clientWidth", {
+      configurable: true,
+      get: () => 700,
+    });
+    fireEvent(window, new Event("resize"));
+    await waitFor(() => expect(panel.style.width).toBe("460px"));
+    expect(handle.getAttribute("aria-valuenow")).toBe("460");
+    expect(peekInset()).toBe("460px");
+    // Releasing keeps the clamped width, not the one the pointer reached.
+    fireEvent.pointerUp(handle, { pointerId: 1 });
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("460");
+  });
+
   it("keeps the width reached when the view closes mid-drag", async () => {
     localStorage.setItem("meguri.media.detail.presentation", "peek");
     await openDetail(`/file/1?ws=${WS_ID}`);
