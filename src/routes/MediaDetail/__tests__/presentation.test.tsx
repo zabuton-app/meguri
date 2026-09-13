@@ -4,7 +4,8 @@
 // peek lands on the modal size last chosen.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { Route, Routes } from "react-router";
+import { useEffect, useRef } from "react";
+import { Route, Routes, useNavigate } from "react-router";
 import "@/test/mockVirtualizer";
 import MediaDetail from "@/routes/MediaDetail";
 import { MediaNavProvider } from "@/components/MediaNavContext";
@@ -82,7 +83,22 @@ function BarProbe() {
   );
 }
 
-function DetailRoute() {
+/** What the bottom bar's title does with the peek open: a detour to the
+ *  playing track's detail, marked with where it started from. */
+function BarDetour({ to, origin }: { to: string; origin: string }) {
+  const navigate = useNavigate();
+  // Once: `navigate` changes identity with the location, and the detour
+  // must not be taken again after it has been left.
+  const taken = useRef(false);
+  useEffect(() => {
+    if (taken.current) return;
+    taken.current = true;
+    void navigate(to, { state: { outsideRouter: true, origin } });
+  }, [navigate, to, origin]);
+  return null;
+}
+
+function DetailRoute({ detour }: { detour?: { to: string; origin: string } }) {
   return (
     <MediaNavProvider
       value={{
@@ -97,6 +113,7 @@ function DetailRoute() {
       }}
     >
       <BarProbe />
+      {detour && <BarDetour to={detour.to} origin={detour.origin} />}
       <Routes>
         <Route path="file/:id" element={<MediaDetail />} />
       </Routes>
@@ -308,6 +325,43 @@ describe("MediaDetail presentation", () => {
     await openDetail(`/file/1?ws=${WS_ID}`);
     fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
     await waitFor(() => expect(window.location.hash.slice(1)).toBe("/"));
+  });
+
+  it("can leave a detail reached from the bar while another was docked", async () => {
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
+    mocks.fileGet.mockImplementation((id: number) =>
+      Promise.resolve(id === 2 ? audioDetail : sampleFileDetail),
+    );
+    const origin = `/file/1?ws=${WS_ID}`;
+    renderWithProviders(
+      <DetailRoute detour={{ to: `/file/2?ws=${WS_ID}&autoplay=0`, origin }} />,
+      { route: origin },
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "track.mp3" })).toBeTruthy();
+    });
+    // First Esc: back to the file the detour started from…
+    fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
+    });
+    expect(window.location.hash.slice(1)).toBe(origin);
+    // …and the second one leaves it, rather than returning to it again.
+    fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
+    await waitFor(() => expect(window.location.hash.slice(1)).toBe("/"));
+  });
+
+  it("keeps the handle's arrow keys from the player", async () => {
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    const video = document.querySelector("video")!;
+    video.currentTime = 30;
+    const handle = screen.getByRole("separator", { name: "Resize side peek" });
+    fireEvent.keyDown(handle, { key: "ArrowRight", code: "ArrowRight" });
+    expect(dialog().style.width).toBe("504px");
+    // The player also listens for the arrows on window (seek); a key spent on
+    // the handle must not reach it.
+    expect(video.currentTime).toBe(30);
   });
 
   it("leaves an Esc that a popup on top has already taken", async () => {

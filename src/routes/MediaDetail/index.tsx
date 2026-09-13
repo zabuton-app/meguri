@@ -132,7 +132,12 @@ export default function MediaDetail() {
       origin?: string;
     } | null;
     if (state?.outsideRouter) {
-      void navigate(state.origin || "/", { replace: true, state });
+      // The origin is restored without the detour marker: it is the route
+      // the detour started from, not itself a detour. Carrying the marker
+      // would matter when the origin is another file's detail (the bar is in
+      // reach while the detail is docked as a side peek): that detail would
+      // then "return" to itself on every close and could never be left.
+      void navigate(state.origin || "/", { replace: true });
       return;
     }
     const from = searchParams.get("from");

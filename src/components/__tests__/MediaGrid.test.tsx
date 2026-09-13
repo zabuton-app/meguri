@@ -61,9 +61,15 @@ describe("MediaGrid", () => {
       configurable: true,
       get: () => 380,
     });
+    // A 300px row whose thumbnail (aspect-video over a 348px column) takes
+    // 195.75px of it: the rest is what the grid keeps from the measurement.
     const rect = vi
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
-      .mockReturnValue({ height: 300 } as DOMRect);
+      .mockImplementation(function (this: HTMLElement) {
+        return {
+          height: this.hasAttribute("data-thumb") ? 195.75 : 300,
+        } as DOMRect;
+      });
     try {
       const items = [
         sampleFileRow,

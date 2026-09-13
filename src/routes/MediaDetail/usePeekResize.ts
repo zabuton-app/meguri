@@ -96,6 +96,9 @@ export function usePeekResize(
   // times it can move), and read from here by the key handler so a key
   // repeat never has to read layout.
   const [max, setMax] = useState(Infinity);
+  // The same ceiling for a drag in progress, which must follow a window
+  // resized mid-drag rather than the ceiling measured when it started.
+  const maxRef = useRef(Infinity);
   // Mirrors `width` for the paths that must not write when nothing moved:
   // useLocalStorage persists on every set, and a resize being dragged or a
   // key held at a limit would otherwise write to storage every frame.
@@ -114,6 +117,7 @@ export function usePeekResize(
       // Clamping a stored value to the measured layout is what this effect
       // is for; it settles in one pass (the clamp is idempotent).
       setMax(m);
+      maxRef.current = m;
       const fitted = clamp(widthRef.current, m);
       if (fitted !== widthRef.current) setWidth(fitted);
     };
@@ -153,8 +157,7 @@ export function usePeekResize(
     const { pointerId } = e;
     const startX = e.clientX;
     const startWidth = panel.getBoundingClientRect().width;
-    const m = maxWidthFor(panel);
-    let next = clamp(startWidth, m);
+    let next = clamp(startWidth, maxRef.current);
     let moved = false;
     // Live: the DOM and the inset move with the pointer, React state only
     // when the drag ends, so the frame (and the player inside it) is not
@@ -163,7 +166,7 @@ export function usePeekResize(
       if (ev.pointerId !== pointerId) return;
       moved = true;
       // The edge moves left to grow: pointer travel is subtracted.
-      next = clamp(startWidth + (startX - ev.clientX), m);
+      next = clamp(startWidth + (startX - ev.clientX), maxRef.current);
       panel.style.width = `${next}px`;
       handle.setAttribute("aria-valuenow", String(next));
       publishInset(next);
@@ -194,6 +197,9 @@ export function usePeekResize(
       e.key === "ArrowLeft" ? KEY_STEP : e.key === "ArrowRight" ? -KEY_STEP : 0;
     if (!delta) return;
     e.preventDefault();
+    // The player and the image viewer listen for the arrow keys on window
+    // (seek, previous/next); a key spent on the handle must not reach them.
+    e.stopPropagation();
     const next = clamp(widthRef.current + delta, max);
     if (next !== widthRef.current) setWidth(next);
   };

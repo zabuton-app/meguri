@@ -424,6 +424,9 @@ export default function Home() {
         return;
       }
       if (typing) return;
+      // Page keys pressed with focus inside the docked side peek page the
+      // peek's own content (the browser default), not the list beside it.
+      if (el?.closest('[data-presentation="peek"]')) return;
       if (matchAny(e, b.pageDown)) {
         e.preventDefault();
         scrollListByPage(1);

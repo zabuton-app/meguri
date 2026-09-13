@@ -149,20 +149,23 @@ export const MediaGrid = memo(function MediaGrid({
   const thumbH = ready
     ? ((innerW - GAP * (cols - 1)) / cols) * THUMB_ASPECT
     : 0;
-  // The part beyond the thumbnail depends on the font: measured again when
-  // the bundled theme fonts finish loading and when the skin (which picks
-  // the font) changes.
+  // The part beyond the thumbnail depends on the fonts in use: measured
+  // again once the fonts have loaded, and again after the emoji font
+  // changes (the emoji-style preference, mirrored to <html
+  // data-emoji-style>), each time waiting for the newly requested fonts.
   const [fontEpoch, setFontEpoch] = useState(0);
   useEffect(() => {
-    const bump = () => setFontEpoch((n) => n + 1);
     let cancelled = false;
-    void document.fonts?.ready.then(() => {
-      if (!cancelled) bump();
-    });
-    const mo = new MutationObserver(bump);
+    const remeasureWhenFontsSettle = () => {
+      void document.fonts?.ready.then(() => {
+        if (!cancelled) setFontEpoch((n) => n + 1);
+      });
+    };
+    remeasureWhenFontsSettle();
+    const mo = new MutationObserver(remeasureWhenFontsSettle);
     mo.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-skin"],
+      attributeFilter: ["data-emoji-style"],
     });
     return () => {
       cancelled = true;
@@ -175,13 +178,20 @@ export const MediaGrid = memo(function MediaGrid({
   const measureRow = useCallback(
     (node: HTMLDivElement | null) => {
       if (!node || !ready || measuredFor.current === measureKey) return;
+      // Both heights from the same layout: subtracting the thumbnail height
+      // derived from React's `innerW` would mix in a width one frame behind
+      // the DOM while the peek is being dragged, and bake the difference in
+      // until the next re-measure.
+      const thumb = node.querySelector("[data-thumb]");
+      const extra =
+        node.getBoundingClientRect().height -
+        (thumb?.getBoundingClientRect().height ?? 0);
+      // Only a usable measurement is kept; a row not yet laid out is
+      // measured again on the next attach.
+      if (!(extra > 0)) return;
       measuredFor.current = measureKey;
-      const extra = node.getBoundingClientRect().height - thumbH;
       setExtraH((prev) => (Math.abs(prev - extra) > 0.5 ? extra : prev));
     },
-    // thumbH is read at measure time only; a later width change must not
-    // re-measure (that is the point), so it is deliberately not a dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [measureKey, ready],
   );
   const rowEstimate = ready && extraH > 0 ? thumbH + extraH : ROW_ESTIMATE;
@@ -389,6 +399,7 @@ const MediaCard = memo(function MediaCard({
       <Link
         to={fileHref(file.id, file.workspaceId)}
         onClick={onThumbnailClick(file)}
+        data-thumb
         className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
       >
         <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
@@ -426,7 +437,7 @@ const MediaCard = memo(function MediaCard({
           once per column count and derives the rest from the width. */}
       <Link
         to={fileHref(file.id, file.workspaceId, { autoplay: false })}
-        className="flex flex-col gap-1 px-2 py-1.5"
+        className="flex flex-col gap-1 border-t border-border px-2 py-1.5"
       >
         <div className="truncate text-xs text-fg" title={file.relPath}>
           {fileNameOf(file.relPath)}
