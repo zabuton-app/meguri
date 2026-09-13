@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -37,12 +38,18 @@ import {
 } from "@/hooks/useVolume";
 import { matchAny, type NavBinding } from "@/settings/keybindings";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { VideoElement } from "@/video/VideoElement";
+import { isSameSource } from "@/video/videoHandOff";
+import { streamOffsetOf, withStreamSeek } from "@/lib/mediaSrc";
 import { fmtTime } from "./utils";
 
 // MediaError codes as plain numbers: the MediaError global exists in Chromium
 // but not in jsdom, so referencing it would break renderer tests.
 const MEDIA_ERR_ABORTED = 1;
 const MEDIA_ERR_NETWORK = 2;
+// readyState at which metadata is in (HTMLMediaElement.HAVE_METADATA), as a
+// plain number for the same reason.
+const HAVE_METADATA = 1;
 
 // Delay before the one automatic reload after a network error: an immediate
 // retry in the same tick would likely hit the same connection-slot starvation
@@ -186,7 +193,7 @@ export const VideoPlayer = forwardRef<
   },
   handleRef,
 ) {
-  const ref = useRef<HTMLVideoElement>(null);
+  const ref = useRef<HTMLVideoElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -318,11 +325,129 @@ export const VideoPlayer = forwardRef<
     }
   };
 
-  useEffect(() => {
+  // Set by VideoElement: the element it attached and whether that element was
+  // adopted from a hand-off (see videoHandOff.ts). Kept, not consumed — the
+  // effect below runs again under StrictMode and has to reach the same answer.
+  const attachedRef = useRef<{ el: HTMLVideoElement; adopted: boolean } | null>(
+    null,
+  );
+  const onAttach = useCallback((el: HTMLVideoElement, adopted: boolean) => {
+    attachedRef.current = { el, adopted };
+  }, []);
+
+  /** Map a MediaError to the message shown, or handle the transient cases.
+   *  Shared by the element's `error` event and adoption (an element that
+   *  failed while parked has no event left to deliver). */
+  const handleElementError = (v: HTMLVideoElement) => {
+    const code = v.error?.code;
+    // MEDIA_ERR_ABORTED fires on normal load interruptions (src swap /
+    // load() during seek), not on unplayable media — never fatal, and
+    // not worth an error-level log entry either.
+    if (code === MEDIA_ERR_ABORTED) {
+      log.debug("video load aborted", { src });
+      return;
+    }
+    log.error("video error", {
+      src,
+      currentSrc: v.currentSrc,
+      networkState: v.networkState,
+      code,
+    });
+    // A network error right after opening is often transient (the media
+    // request can be starved while frame previews hold the origin's
+    // connection slots) — reload once before surfacing the error. Only
+    // before metadata has loaded: a mid-playback load() would silently
+    // rewind Range-served files to the start.
+    if (code === MEDIA_ERR_NETWORK && !loaded && !netRetriedRef.current) {
+      netRetriedRef.current = true;
+      retryTimerRef.current = window.setTimeout(() => {
+        retryTimerRef.current = null;
+        const cur = ref.current;
+        if (!cur) return;
+        // The element may have recovered on its own while the delay
+        // elapsed — a forced load() would needlessly restart playback.
+        if (cur.readyState >= cur.HAVE_METADATA) return;
+        cur.load();
+        // Reloading must not change playback intent: only resume when
+        // the player was asked to autoplay in the first place.
+        if (autoplay) void cur.play().catch(() => {});
+      }, NETWORK_RETRY_DELAY_MS);
+      return;
+    }
+    const map: Record<number, string> = {
+      1: t("player.errAborted"),
+      2: t("player.errNetwork"),
+      3: t("player.errDecode"),
+      4: t("player.errSrcNotSupported"),
+    };
+    setError(
+      code
+        ? (map[code] ?? t("player.errCode", { code }))
+        : t("player.errUnknown"),
+    );
+  };
+
+  /**
+   * Pick up an element handed over already loaded (see videoHandOff.ts): the
+   * playlist and the detail view pass the very same <video> between them, and
+   * for that element `loadedmetadata` has long fired and will not fire again.
+   * Whatever it is doing continues untouched — playing stays playing, paused
+   * stays paused, and the position is wherever it is, so `startAt` (the second
+   * the other route reported, floored) is not applied on top of it. Only an
+   * element VideoElement reports as adopted qualifies: a fresh one can reach
+   * HAVE_METADATA before this runs and must still take the normal path, or
+   * its `startAt` would be lost.
+   */
+  const adoptLoadedElement = () => {
+    const v = ref.current;
+    const attached = attachedRef.current;
+    if (!v || attached?.el !== v || !attached.adopted) return;
+    if (v.readyState < HAVE_METADATA || !isSameSource(v, src)) return;
+    haveMetadataRef.current = true;
+    appliedStartRef.current = true;
+    // A stream the other route re-served from `?t=` reports positions
+    // relative to that second (see `offset`).
+    const streamOffset = streamOffsetOf(v.getAttribute("src"));
+    setOffset(streamOffset);
+    setPosition(streamOffset + v.currentTime);
+    setLoaded(true);
+    if (isFinite(v.duration)) {
+      setNativeDur(v.duration);
+      onNativeDuration(v.duration);
+    }
+    // What the element did while nobody was listening: the events that would
+    // have told this host are gone, so read the state instead.
+    if (v.error) {
+      handleElementError(v);
+      return;
+    }
+    if (v.ended) {
+      setPlaying(false);
+      onEnded?.();
+      return;
+    }
+    setPlaying(!v.paused);
+    if (!v.paused) {
+      // The `play` that started it went to the previous host, which recorded
+      // the play; this host still owes its own callers the start.
+      onPlaybackStart?.();
+      if (!playedRef.current) {
+        playedRef.current = true;
+        onPlayed();
+      }
+    }
+  };
+
+  // Layout effect, not passive: an adopted element is already on screen, and
+  // deciding `loaded` after the browser has painted would show it transparent
+  // for a frame and then fade it in.
+  useLayoutEffect(() => {
     // Resetting playback state when the file (id/src) changes is a legitimate prop-change initialization, so synchronous setState is allowed here.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     resetPlaybackState();
     playedRef.current = false;
+    adoptLoadedElement();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, src]);
 
   useEffect(
@@ -378,7 +503,7 @@ export const VideoPlayer = forwardRef<
       lastStreamSeekRef.current = Date.now();
       setOffset(t);
       setPosition(t);
-      v.src = `${src}?t=${Math.floor(t)}`;
+      v.src = withStreamSeek(src, t);
       v.load();
       void v.play().catch(() => {});
     }
@@ -748,8 +873,9 @@ export const VideoPlayer = forwardRef<
           aria-hidden="true"
         />
       )}
-      <video
-        ref={ref}
+      <VideoElement
+        videoRef={ref}
+        onAttach={onAttach}
         src={src}
         autoPlay={autoplay}
         className={`h-full w-full object-contain transition-opacity ${
@@ -821,57 +947,7 @@ export const VideoPlayer = forwardRef<
         }}
         onError={() => {
           const v = ref.current;
-          const code = v?.error?.code;
-          // MEDIA_ERR_ABORTED fires on normal load interruptions (src swap /
-          // load() during seek), not on unplayable media — never fatal, and
-          // not worth an error-level log entry either.
-          if (code === MEDIA_ERR_ABORTED) {
-            log.debug("video load aborted", { src });
-            return;
-          }
-          log.error("video error", {
-            src,
-            currentSrc: v?.currentSrc,
-            networkState: v?.networkState,
-            code,
-          });
-          // A network error right after opening is often transient (the media
-          // request can be starved while frame previews hold the origin's
-          // connection slots) — reload once before surfacing the error. Only
-          // before metadata has loaded: a mid-playback load() would silently
-          // rewind Range-served files to the start.
-          if (
-            code === MEDIA_ERR_NETWORK &&
-            v &&
-            !loaded &&
-            !netRetriedRef.current
-          ) {
-            netRetriedRef.current = true;
-            retryTimerRef.current = window.setTimeout(() => {
-              retryTimerRef.current = null;
-              const cur = ref.current;
-              if (!cur) return;
-              // The element may have recovered on its own while the delay
-              // elapsed — a forced load() would needlessly restart playback.
-              if (cur.readyState >= cur.HAVE_METADATA) return;
-              cur.load();
-              // Reloading must not change playback intent: only resume when
-              // the player was asked to autoplay in the first place.
-              if (autoplay) void cur.play().catch(() => {});
-            }, NETWORK_RETRY_DELAY_MS);
-            return;
-          }
-          const map: Record<number, string> = {
-            1: t("player.errAborted"),
-            2: t("player.errNetwork"),
-            3: t("player.errDecode"),
-            4: t("player.errSrcNotSupported"),
-          };
-          setError(
-            code
-              ? (map[code] ?? t("player.errCode", { code }))
-              : t("player.errUnknown"),
-          );
+          if (v) handleElementError(v);
         }}
       />
 

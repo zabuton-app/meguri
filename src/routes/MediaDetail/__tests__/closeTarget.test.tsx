@@ -16,6 +16,16 @@ import {
   WS_ID,
 } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
+import { sampleAudioRow } from "@/test/fixtures";
+
+const handOff = vi.hoisted(() => ({ announce: vi.fn() }));
+vi.mock("@/video/videoHandOff", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/video/videoHandOff")>();
+  return {
+    ...mod,
+    announceVideoHandOff: (src: string) => handOff.announce(src),
+  };
+});
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
@@ -126,6 +136,35 @@ describe("MediaDetail close target", () => {
     expect(query().get("resume")).toBe(`${WS_ID}:1`);
     // Nothing has played here, so there is no position worth handing back.
     expect(query().has("t")).toBe(false);
+  });
+
+  it("hands the playing video over to the player on close", async () => {
+    await openDetail(`/file/1?ws=${WS_ID}&from=player`);
+    close();
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(handOff.announce).toHaveBeenCalledWith(
+      `${defaultAppStatus.mediaBase}/ws/${WS_ID}/media/1`,
+    );
+  });
+
+  it("announces no hand-off for a file without a video player", async () => {
+    mocks.fileGet.mockResolvedValue({
+      ...sampleFileDetail,
+      ...sampleAudioRow,
+      id: 1,
+      absPath: "/media/music/track.mp3",
+      codec: "mp3",
+      fps: null,
+    });
+    renderWithProviders(<DetailRoute />, {
+      route: `/file/1?ws=${WS_ID}&from=player`,
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "track.mp3" })).toBeTruthy();
+    });
+    close();
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(handOff.announce).not.toHaveBeenCalled();
   });
 
   it("keeps the detour's position when closed before anything has played", async () => {

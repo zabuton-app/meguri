@@ -1,12 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { NAV_BINDINGS } from "@/settings/keybindings";
 import {
   VideoPlayer,
   type PlayerHandle,
 } from "@/routes/MediaDetail/VideoPlayer";
+import { announceVideoHandOff, resetVideoHandOff } from "@/video/videoHandOff";
 
 const fileRecordPlay = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/ipc/client", () => ({
@@ -95,6 +102,112 @@ function fireVideoError(video: HTMLVideoElement, code: number) {
 describe("VideoPlayer", () => {
   beforeEach(() => {
     fileRecordPlay.mockClear();
+  });
+  afterEach(() => {
+    resetVideoHandOff();
+  });
+
+  describe("adopting a handed-over element", () => {
+    /** What a playing element looks like by the time the next host mounts. */
+    function markPlaying(video: HTMLVideoElement, at: number) {
+      Object.defineProperty(video, "readyState", {
+        configurable: true,
+        value: 1,
+      });
+      Object.defineProperty(video, "paused", {
+        configurable: true,
+        value: false,
+      });
+      Object.defineProperty(video, "currentTime", {
+        configurable: true,
+        writable: true,
+        value: at,
+      });
+    }
+
+    it("continues where the element is instead of loading and seeking to startAt", () => {
+      const first = renderPlayer();
+      loadVideo(first.video);
+      markPlaying(first.video, 42.6);
+      announceVideoHandOff("http://127.0.0.1:17345/ws/ws1/media/1");
+      // The next host's route replaces this one.
+      cleanup();
+
+      const onNativeDuration = vi.fn();
+      // The other route reports whole seconds, so `startAt` lags the element;
+      // applying it would be the very jump the hand-off exists to avoid.
+      const second = renderPlayer({ startAt: 42, onNativeDuration });
+      expect(second.video).toBe(first.video);
+      expect(second.video.getAttribute("src")).not.toContain("t=");
+      expect(second.video.currentTime).toBe(42.6);
+      // Picked up as loaded and playing: the duration is reported, the centre
+      // play button (paused state) is not shown, and the handle knows where it is.
+      expect(onNativeDuration).toHaveBeenCalledWith(120);
+      expect(screen.queryByTitle("player.play")).toBeNull();
+      expect(second.ref.current?.currentTime()).toBe(42.6);
+      // This host's callers still get the start (the play that began it went
+      // to the previous host); the play itself is not recorded twice.
+      expect(second.onPlayed).toHaveBeenCalledTimes(1);
+      expect(fileRecordPlay).not.toHaveBeenCalled();
+    });
+
+    it("advances on an element that ended while nobody was listening", () => {
+      const first = renderPlayer();
+      loadVideo(first.video);
+      markPlaying(first.video, 120);
+      Object.defineProperty(first.video, "paused", {
+        configurable: true,
+        value: true,
+      });
+      Object.defineProperty(first.video, "ended", {
+        configurable: true,
+        value: true,
+      });
+      announceVideoHandOff("http://127.0.0.1:17345/ws/ws1/media/1");
+      cleanup();
+      const onEnded = vi.fn();
+      renderPlayer({ onEnded });
+      // The `ended` event went to nobody; the state says it happened.
+      expect(onEnded).toHaveBeenCalledTimes(1);
+    });
+
+    it("still applies startAt to a fresh element that loaded before the effect ran", () => {
+      // Not adopted, merely quick: metadata can be in before the host's effect
+      // runs, and that must not be mistaken for a hand-off.
+      const { video } = renderPlayer({ startAt: 30 });
+      Object.defineProperty(video, "readyState", {
+        configurable: true,
+        value: 1,
+      });
+      Object.defineProperty(video, "duration", {
+        configurable: true,
+        value: 120,
+      });
+      fireEvent.loadedMetadata(video);
+      // Nothing is seekable in jsdom, so the seek re-serves the stream.
+      expect(video.getAttribute("src")).toContain("t=30");
+    });
+
+    it("keeps a paused element paused", () => {
+      const first = renderPlayer();
+      loadVideo(first.video);
+      markPlaying(first.video, 10);
+      Object.defineProperty(first.video, "paused", {
+        configurable: true,
+        value: true,
+      });
+      announceVideoHandOff("http://127.0.0.1:17345/ws/ws1/media/1");
+      cleanup();
+      const play = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(first.video, "play", {
+        configurable: true,
+        value: play,
+      });
+      const second = renderPlayer({ startAt: 10 });
+      expect(second.video).toBe(first.video);
+      expect(play).not.toHaveBeenCalled();
+      expect(screen.queryByTitle("player.play")).not.toBeNull();
+    });
   });
 
   it("persists volume changes to localStorage", async () => {

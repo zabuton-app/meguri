@@ -34,6 +34,7 @@ import {
   invalidatePlayedSearches,
 } from "@/lib/queryCache";
 import { fileHref } from "@/lib/fileHref";
+import { announceVideoHandOff } from "@/video/videoHandOff";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import { queueKey, type PlaybackQueue } from "@/lib/playbackQueue";
 import { fileNameOf } from "@/lib/relPath";
@@ -227,6 +228,13 @@ export default function Player() {
     if (!current) return;
     const sec = isImage ? 0 : Math.floor(videoRef.current?.currentTime() ?? 0);
     resume = { queue: queue.queue, key: queueKey(current), sec };
+    // The detail view shows this very file: hand it the playing <video> rather
+    // than have it load its own and seek (see videoHandOff.ts). `t` stays as
+    // the fallback for when the hand-off does not happen.
+    if (current.kind === "video" && mediaBase)
+      announceVideoHandOff(
+        `${mediaBase}/ws/${current.workspaceId}/media/${current.fileId}`,
+      );
     void navigate(
       fileHref(current.fileId, current.workspaceId, {
         from: "player",
@@ -236,7 +244,7 @@ export default function Player() {
         autoplay: !isAudio,
       }),
     );
-  }, [current, isImage, isAudio, navigate, queue.queue]);
+  }, [current, isImage, isAudio, mediaBase, navigate, queue.queue]);
 
   // The second to come back to, offered only to the file the player left from.
   // The detail view hands back where *it* got to, which is ahead of the detour

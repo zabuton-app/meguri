@@ -1,7 +1,14 @@
 // File detail + player. /file/:id. Plays via local HTTP serving, offers external-player launch,
 // tag editing, rating, and metadata display. Single-column YouTube-like layout: a large
 // player on top, title/controls right below, then meta, tags, scenes, and history stacked as cards.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   useLocation,
   useNavigate,
@@ -68,6 +75,7 @@ import {
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
 import { useAudioActions } from "@/audio/useAudioPlayer";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { announceVideoHandOff } from "@/video/videoHandOff";
 import { AudioStage } from "./AudioStage";
 import { useAudioDetail } from "./useAudioDetail";
 import { Scenes } from "./Scenes";
@@ -148,6 +156,12 @@ export default function MediaDetail() {
           ? Math.floor(sec)
           : arrived;
       if (handBack > 0) params.set("t", String(handBack));
+      // The playlist resumes this very file: hand it the <video> as it is
+      // (see videoHandOff.ts) instead of having it reload and seek to `t`.
+      // Only a video has a player here; the source is read through a ref
+      // because it is derived further down.
+      if (playerRef.current && mediaSrcRef.current)
+        announceVideoHandOff(mediaSrcRef.current);
       // Replaced, not pushed: the detour is one round trip, and a growing
       // history would offer a "back" that lands on a pass already spent.
       void navigate(`/play?${params.toString()}`, { replace: true });
@@ -325,6 +339,10 @@ export default function MediaDetail() {
   // Include the workspace ID in the URL path (/ws/<id>/...) to avoid collisions with another DB after switching.
   const mediaSrc =
     mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
+  const mediaSrcRef = useRef("");
+  useLayoutEffect(() => {
+    mediaSrcRef.current = mediaSrc;
+  }, [mediaSrc]);
 
   // Bar suppression, auto-start and video↔audio exclusivity for audio files.
   const {
