@@ -47,6 +47,7 @@ import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
+import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { HomeHeader } from "./HomeHeader";
 import {
   VIEW_KEY,
@@ -679,43 +680,47 @@ export default function Home() {
         </MediaNavProvider>
       </div>
 
-      {/* Play the list as a playlist. No params: the player reads the very list
+      {/* The two FABs, wrapped so the side peek can publish its width on this
+          element alone (see PEEK_INSET_DOCK_PROPS) rather than on <html>. */}
+      <div className="contents" {...PEEK_INSET_DOCK_PROPS}>
+        {/* Play the list as a playlist. No params: the player reads the very list
           order shared through MediaNavContext below, so whatever sort/filter is
           on screen is what plays — collection, Watch Later or plain search.
           Accent-filled like the discovery button beside it: both start a way of
           watching, and neither is subordinate to the other. */}
-      <Link
-        to="/play"
-        title={t("playlist.start")}
-        aria-label={t("playlist.start")}
-        aria-disabled={!canPlay}
-        tabIndex={canPlay ? undefined : -1}
-        className={cn(
-          // Stacked above the discovery button; both lift together when the
-          // audio player bar is showing, and both move left of the detail
-          // side peek while it is docked (each variable is 0 otherwise).
-          "fixed bottom-[calc(6rem+var(--meguri-player-bar-inset))] right-[calc(1.25rem+var(--meguri-peek-inset))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          !canPlay && "pointer-events-none opacity-45",
-        )}
-      >
-        <PlayCircle className="size-6" />
-      </Link>
+        <Link
+          to="/play"
+          title={t("playlist.start")}
+          aria-label={t("playlist.start")}
+          aria-disabled={!canPlay}
+          tabIndex={canPlay ? undefined : -1}
+          className={cn(
+            // Stacked above the discovery button; both lift together when the
+            // audio player bar is showing, and both move left of the detail
+            // side peek while it is docked (each variable is 0 otherwise).
+            "fixed bottom-[calc(6rem+var(--meguri-player-bar-inset))] right-[calc(1.25rem+var(--meguri-peek-inset))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !canPlay && "pointer-events-none opacity-45",
+          )}
+        >
+          <PlayCircle className="size-6" />
+        </Link>
 
-      <Link
-        to={discoverPath(filter)}
-        title={t("discover.title")}
-        aria-label={t("discover.title")}
-        aria-disabled={!status.data?.ready}
-        tabIndex={status.data?.ready ? undefined : -1}
-        className={cn(
-          // Lifted clear of the audio player bar when one is showing (the
-          // variable is 0 otherwise, keeping the original offset).
-          "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-inset))] right-[calc(1.25rem+var(--meguri-peek-inset))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          !status.data?.ready && "pointer-events-none opacity-45",
-        )}
-      >
-        <Sparkles className="size-6" />
-      </Link>
+        <Link
+          to={discoverPath(filter)}
+          title={t("discover.title")}
+          aria-label={t("discover.title")}
+          aria-disabled={!status.data?.ready}
+          tabIndex={status.data?.ready ? undefined : -1}
+          className={cn(
+            // Lifted clear of the audio player bar when one is showing (the
+            // variable is 0 otherwise, keeping the original offset).
+            "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-inset))] right-[calc(1.25rem+var(--meguri-peek-inset))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !status.data?.ready && "pointer-events-none opacity-45",
+          )}
+        >
+          <Sparkles className="size-6" />
+        </Link>
+      </div>
 
       {helpOpen && <ShortcutsOverlay onClose={() => setHelpOpen(false)} />}
 

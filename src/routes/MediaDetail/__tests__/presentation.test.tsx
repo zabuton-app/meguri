@@ -260,11 +260,11 @@ describe("MediaDetail presentation", () => {
     expect(panel.style.width).toBe("620px");
     expect(handle.getAttribute("aria-valuenow")).toBe("620");
     expect(peekInset()).toBe("620px");
-    // Nothing is written until the drag ends (docking fitted and stored the
-    // default; the live width is DOM-only).
-    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("520");
+    // Nothing is written until the drag ends: the live width is DOM-only,
+    // and docking wrote nothing either since the default already fitted.
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBeNull();
     fireEvent.pointerUp(handle, { pointerId: 2 });
-    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("520");
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBeNull();
     fireEvent.pointerUp(handle, { pointerId: 1 });
     expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("620");
   });
