@@ -10,6 +10,10 @@ import { useAudioPlayer, useAudioPosition } from "./useAudioPlayer";
 
 export const CTRL_CLASS =
   "flex shrink-0 items-center justify-center rounded-full p-1.5 text-muted transition hover:bg-fg/10 hover:text-fg";
+// The stage variant sits on a dark gradient over the artwork, so it uses the
+// video controls' white rather than the theme's text colours.
+const STAGE_CTRL_CLASS =
+  "flex shrink-0 items-center justify-center rounded-full p-1.5 text-white/80 transition hover:bg-white/15 hover:text-white";
 
 interface Props {
   /** The track these controls stand for. Everything else — whether it is the
@@ -48,6 +52,8 @@ export function AudioTransport({
   const seekable = live && duration != null && duration > 0;
   const playLabel = isPlaying ? t("player.audio.pause") : t("player.play");
   const iconSize = size === "stage" ? 22 : 18;
+  const ctrl = size === "stage" ? STAGE_CTRL_CLASS : CTRL_CLASS;
+  const dim = size === "stage" ? "text-white/70" : "text-muted";
 
   return (
     <>
@@ -63,7 +69,7 @@ export function AudioTransport({
         className={
           size === "stage"
             ? "flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            : CTRL_CLASS
+            : ctrl
         }
       >
         {isPlaying ? (
@@ -81,7 +87,7 @@ export function AudioTransport({
             onClick={player.dismissError}
             title={t("player.audio.dismissError")}
             aria-label={t("player.audio.dismissError")}
-            className={CTRL_CLASS}
+            className={ctrl}
           >
             <X size={14} />
           </button>
@@ -95,7 +101,7 @@ export function AudioTransport({
         />
       )}
 
-      <TimeReadout live={live} duration={duration} />
+      <TimeReadout live={live} duration={duration} className={dim} />
 
       <div className="flex shrink-0 items-center">
         <button
@@ -103,7 +109,7 @@ export function AudioTransport({
           onClick={player.toggleMuted}
           title={player.muted ? t("player.unmute") : t("player.mute")}
           aria-label={player.muted ? t("player.unmute") : t("player.mute")}
-          className={CTRL_CLASS}
+          className={ctrl}
         >
           {player.muted || player.volume === 0 ? (
             <VolumeX size={18} />
@@ -171,14 +177,16 @@ function SeekBar({
 function TimeReadout({
   live,
   duration,
+  className,
 }: {
   live: boolean;
   duration: number | null;
+  className: string;
 }) {
   const position = useAudioPosition();
   const { t } = useI18n();
   return (
-    <span className="shrink-0 tabular-nums text-muted">
+    <span className={`shrink-0 tabular-nums ${className}`}>
       {fmtTime(live ? position : 0)}
       <span className="opacity-50"> / </span>
       {/* Never fabricate a total when the duration is indeterminate. */}

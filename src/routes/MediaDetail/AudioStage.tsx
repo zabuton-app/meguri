@@ -35,45 +35,55 @@ export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
   const label = playing ? t("player.audio.pause") : t("player.play");
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl bg-black">
+    // Same anatomy as the video player: the artwork is the stage, and the
+    // transport is laid over its bottom edge on a gradient, shown while paused
+    // and on hover, out of the way while the track plays.
+    <div className="group relative flex aspect-video max-h-[78vh] w-full items-center justify-center overflow-hidden rounded-xl bg-black">
+      {coverSrc ? (
+        <img
+          // Scaled up until its width or its height fits the stage (a square
+          // jacket is pillarboxed, a wide one letterboxed) rather than shown
+          // at whatever size it was embedded at.
+          src={coverSrc}
+          alt={file.relPath}
+          className="h-full w-full object-contain"
+        />
+      ) : (
+        // No embedded art: the placeholder takes the whole stage too, so a
+        // cover-less track does not shrink to a tile in a black field.
+        <div className="flex h-full w-full items-center justify-center bg-overlay text-muted">
+          <Music className="size-1/3" strokeWidth={1.5} aria-hidden />
+        </div>
+      )}
       <button
         type="button"
         disabled={disabled}
         onClick={start}
         title={label}
         aria-label={label}
-        className="group relative flex w-full items-center justify-center py-8"
+        className="absolute inset-0 flex items-center justify-center"
       >
-        {coverSrc ? (
-          <img
-            src={coverSrc}
-            alt={file.relPath}
-            className="max-h-[50vh] max-w-full rounded-lg object-contain"
-          />
-        ) : (
-          <div className="flex size-48 items-center justify-center rounded-lg bg-overlay text-muted">
-            <Music className="size-24" aria-hidden />
-          </div>
-        )}
         <span
           className={cn(
-            "absolute inset-0 flex items-center justify-center transition-opacity",
+            "flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70",
             playing && "opacity-0 group-hover:opacity-100",
           )}
         >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
-            {playing ? (
-              <Pause size={30} />
-            ) : (
-              <Play size={30} className="translate-x-0.5" />
-            )}
-          </span>
+          {playing ? (
+            <Pause size={30} />
+          ) : (
+            <Play size={30} className="translate-x-0.5" />
+          )}
         </span>
       </button>
       <div
         role="region"
         aria-label={t("player.audio.region")}
-        className="flex items-center gap-3 px-4 pb-4 text-sm text-fg"
+        className={cn(
+          "absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-3 pt-8 text-sm text-white transition-opacity",
+          playing &&
+            "opacity-0 group-hover:opacity-100 focus-within:opacity-100",
+        )}
       >
         <AudioTransport
           size="stage"
