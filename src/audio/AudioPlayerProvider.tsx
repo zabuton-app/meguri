@@ -34,6 +34,7 @@ import {
   type AudioActions,
   type AudioPlayerState,
   type AudioTrack,
+  type PlayOpts,
 } from "./context";
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
@@ -210,18 +211,26 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   }, [ensureEl, volume, muted]);
 
   const play = useCallback(
-    (file: FileRow, workspaceId: string) => {
+    (file: FileRow, workspaceId: string, opts: PlayOpts = {}) => {
       const el = ensureEl();
+      const startAt =
+        opts.startAt != null &&
+        Number.isFinite(opts.startAt) &&
+        opts.startAt > 0
+          ? opts.startAt
+          : 0;
       // The track resolves by workspaceId + fileId, never via the *active*
       // workspace, so playback survives a workspace switch (including to All).
       const src = `${mediaBaseRef.current}/ws/${workspaceId}/media/${file.id}`;
       needsReload.current = false;
       setError(null);
       setDuration(null);
-      setPosition(0);
+      setPosition(startAt);
       setCurrent({ file, workspaceId });
       el.src = src;
-      el.currentTime = 0;
+      // Assigned before any data has arrived, which the element honours as the
+      // position to begin at once it can (it is not a seek that could be lost).
+      el.currentTime = startAt;
       // Recorded once the element reports `playing`, not here: play() is only
       // ever reached from an explicit activation (click / Enter / the detail
       // route), but the activation is not the play — the load can still fail.
@@ -309,6 +318,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   const dismissError = useCallback(() => setError(null), []);
 
+  const positionOf = useCallback(
+    (fileId: number, workspaceId: string): number | null => {
+      if (!isCurrent(fileId, workspaceId)) return null;
+      const sec = audioRef.current?.currentTime ?? 0;
+      return Number.isFinite(sec) ? sec : 0;
+    },
+    [],
+  );
+
   const registerPeer = useCallback((onAudioStart: () => void) => {
     peers.current.add(onAudioStart);
     return () => {
@@ -337,6 +355,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       toggleMuted,
       close,
       dismissError,
+      positionOf,
       registerPeer,
     }),
     [
@@ -350,6 +369,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       toggleMuted,
       close,
       dismissError,
+      positionOf,
       registerPeer,
     ],
   );

@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import {
+  useAudioActions,
   useAudioPlayer,
   useAudioPosition,
   useExclusivePlayback,
@@ -459,6 +460,65 @@ describe("AudioPlayerProvider", () => {
     click("toggle");
     emit("playing");
     expect(mocks.fileRecordPlay).toHaveBeenCalledTimes(1);
+  });
+
+  describe("hand-over position", () => {
+    function HandOver() {
+      const { play, positionOf } = useAudioActions();
+      // positionOf is a read, not a subscription; re-render on the tick so the
+      // readouts below reflect it.
+      useAudioPosition();
+      return (
+        <>
+          <button
+            onClick={() => play(sampleAudioRow, WS_ID, { startAt: 83.5 })}
+          >
+            play-at
+          </button>
+          <span data-testid="pos-track">
+            {String(positionOf(sampleAudioRow.id, WS_ID))}
+          </span>
+          <span data-testid="pos-other">{String(positionOf(9, WS_ID))}</span>
+          <span data-testid="pos-other-ws">
+            {String(positionOf(sampleAudioRow.id, "elsewhere"))}
+          </span>
+        </>
+      );
+    }
+
+    it("play() can begin partway through, before any data has loaded", () => {
+      render(
+        <>
+          <Probe />
+          <HandOver />
+        </>,
+        { wrapper: Wrapper },
+      );
+      click("play-at");
+      expect(el.currentTime).toBe(83.5);
+      // Reported straight away, so the seek bar does not flash 0:00 first.
+      expect(text("position")).toBe("83.5");
+      expect(playSpy).toHaveBeenCalled();
+      // A plain play() still starts from the top.
+      click("play");
+      expect(el.currentTime).toBe(0);
+    });
+
+    it("positionOf() reads the loaded track's position and nothing else's", () => {
+      render(
+        <>
+          <Probe />
+          <HandOver />
+        </>,
+        { wrapper: Wrapper },
+      );
+      expect(text("pos-track")).toBe("null");
+      click("play-at");
+      setCurrentTime(95.25);
+      expect(text("pos-track")).toBe("95.25");
+      expect(text("pos-other")).toBe("null");
+      expect(text("pos-other-ws")).toBe("null");
+    });
   });
 
   describe("useExclusivePlayback", () => {

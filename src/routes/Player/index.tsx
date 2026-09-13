@@ -203,7 +203,16 @@ export default function Player() {
   // detail view reads when it closes.
   const openDetail = useCallback(() => {
     if (!current) return;
-    const sec = isImage ? 0 : Math.floor(videoRef.current?.currentTime() ?? 0);
+    const now = videoRef.current?.currentTime() ?? 0;
+    // Whole seconds for a video (a `?t=` on a remuxed stream re-encodes from
+    // there, and a frame or two of drift is invisible); the exact position for
+    // audio, where the detail view's bar picks the sound up from it and any
+    // rewind is heard.
+    const sec = isImage
+      ? 0
+      : isAudio
+        ? Math.round(now * 1000) / 1000
+        : Math.floor(now);
     resume = { queue: queue.queue, key: queueKey(current), sec };
     void navigate(
       fileHref(current.fileId, current.workspaceId, {
@@ -211,7 +220,7 @@ export default function Player() {
         t: sec >= RESUME_MIN_SEC ? sec : undefined,
       }),
     );
-  }, [current, isImage, navigate, queue.queue]);
+  }, [current, isImage, isAudio, navigate, queue.queue]);
 
   // The second to come back to, offered only to the file the player left from.
   // The detail view hands back where *it* got to, which is ahead of the detour
@@ -225,7 +234,10 @@ export default function Player() {
   const resumeSec =
     current && pickUp?.key === queueKey(current)
       ? handedBack != null && Number.isFinite(Number(handedBack))
-        ? Math.max(0, Math.floor(Number(handedBack)))
+        ? Math.max(
+            0,
+            isAudio ? Number(handedBack) : Math.floor(Number(handedBack)),
+          )
         : pickUp.sec
       : 0;
 

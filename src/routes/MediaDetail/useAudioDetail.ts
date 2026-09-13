@@ -17,6 +17,9 @@ interface Options {
   mediaBase: string;
   /** False when the route was opened with `?autoplay=0` (the inspect gesture). */
   autoplay: boolean;
+  /** `?t=`: where to begin, in seconds (the playlist handing over the track it
+   *  was playing). 0 when absent. */
+  startAt: number;
   /** Pause the video player, if one is mounted (a no-op otherwise). */
   pauseVideo: () => void;
 }
@@ -26,6 +29,7 @@ export function useAudioDetail({
   wsId,
   mediaBase,
   autoplay,
+  startAt,
   pauseVideo,
 }: Options) {
   const { current, isPlaying, play, toggle, close } = useAudioPlayer();
@@ -84,8 +88,18 @@ export function useAudioDetail({
       if (!isPlaying) toggle();
       return;
     }
-    play({ ...file, workspaceId: wsId }, wsId);
-  }, [file, wsId, mediaBase, autoplay, current, isPlaying, play, toggle]);
+    play({ ...file, workspaceId: wsId }, wsId, { startAt });
+  }, [
+    file,
+    wsId,
+    mediaBase,
+    autoplay,
+    startAt,
+    current,
+    isPlaying,
+    play,
+    toggle,
+  ]);
 
   /** For "delete from index": the bar outlives this modal, so a track that was
    *  playing would keep going (and 404 on the next seek) after its row is gone. */
