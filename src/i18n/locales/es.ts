@@ -184,6 +184,8 @@ export const es: Record<TranslationKey, string> = {
   "media.invertImageBackground": "Invertir fondo de imagen",
   "media.modalMaximize": "Ampliar ventana",
   "media.modalMinimize": "Reducir ventana",
+  "media.openAsPeek": "Abrir como panel lateral",
+  "media.openAsModal": "Abrir como ventana",
   "media.deleteFromIndex": "Eliminar del índice",
   "media.deleteFromIndexConfirm":
     "¿Eliminar este elemento del índice?\nNo se volverá a registrar en futuros escaneos.",

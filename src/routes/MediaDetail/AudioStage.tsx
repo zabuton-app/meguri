@@ -7,6 +7,7 @@ import { Music, Pause, Play } from "lucide-react";
 import type { FileDetail } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
+import { formatDuration, formatSize } from "@/lib/format";
 import { useAudioActions, useAudioPlayer } from "@/audio/useAudioPlayer";
 import { AudioTransport } from "@/audio/AudioTransport";
 
@@ -18,7 +19,8 @@ interface Props {
   coverSrc: string | null;
 }
 
-export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
+/** Playback state and the start/toggle action for the track on screen. */
+function useStageTrack({ file, wsId, mediaBase }: Omit<Props, "coverSrc">) {
   const { t } = useI18n();
   const { current, isPlaying } = useAudioPlayer();
   const { playOrToggle } = useAudioActions();
@@ -33,6 +35,89 @@ export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
   // resolved from the URL (the same track key the list views use).
   const start = () => playOrToggle({ ...file, workspaceId: wsId }, wsId);
   const label = playing ? t("player.audio.pause") : t("player.play");
+  return { playing, disabled, start, label };
+}
+
+// The side-peek counterpart of the stage: a tile of the artwork beside the
+// name and the vitals, with no transport of its own — in the peek the bottom
+// bar stays on screen and is the transport, so this only shows the track and
+// offers the click-to-play glyph.
+export function AudioCompact({ file, wsId, mediaBase, coverSrc }: Props) {
+  const { playing, disabled, start, label } = useStageTrack({
+    file,
+    wsId,
+    mediaBase,
+  });
+  const slash = file.relPath.lastIndexOf("/");
+  const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
+  const dir = slash >= 0 ? file.relPath.slice(0, slash) : "";
+  const vitals = [
+    dir,
+    formatDuration(file.duration, { hours: true }),
+    file.ext,
+    formatSize(file.size),
+  ].filter(Boolean);
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="group relative size-[120px] shrink-0 overflow-hidden rounded-xl bg-overlay text-muted">
+        {coverSrc ? (
+          <img
+            src={coverSrc}
+            alt={file.relPath}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <Music className="size-1/2" strokeWidth={1.5} aria-hidden />
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={start}
+          title={label}
+          aria-label={label}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          <span
+            className={cn(
+              "flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70",
+              playing && "opacity-0 group-hover:opacity-100",
+            )}
+          >
+            {playing ? (
+              <Pause size={20} />
+            ) : (
+              <Play size={20} className="translate-x-0.5" />
+            )}
+          </span>
+        </button>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div
+          className="truncate text-base font-semibold text-bright-fg"
+          title={file.relPath}
+        >
+          {basename}
+        </div>
+        {vitals.length > 0 && (
+          <div className="mt-1 truncate text-xs text-muted">
+            {vitals.join(" · ")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
+  const { t } = useI18n();
+  const { playing, disabled, start, label } = useStageTrack({
+    file,
+    wsId,
+    mediaBase,
+  });
 
   return (
     // Same anatomy as the video player: the artwork is the stage, and the

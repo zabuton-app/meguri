@@ -69,14 +69,16 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import {
   MediaModal,
   MODAL_SIZE_KEY,
+  PRESENTATION_KEY,
   TopBar,
   type ModalSize,
+  type Presentation,
 } from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
 import { useAudioActions } from "@/audio/useAudioPlayer";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import { announceVideoHandOff } from "@/video/videoHandOff";
-import { AudioStage } from "./AudioStage";
+import { AudioCompact, AudioStage } from "./AudioStage";
 import { useAudioDetail } from "./useAudioDetail";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
@@ -194,6 +196,15 @@ export default function MediaDetail() {
     () => setModalSize((prev) => (prev === "small" ? "large" : "small")),
     [setModalSize],
   );
+  // Modal or side peek. Both this and the modal size are remembered, so the
+  // view reopens the way it was last left, and going peek → modal lands on the
+  // modal size that was last chosen.
+  const [presentation, setPresentation] = useLocalStorage<Presentation>(
+    PRESENTATION_KEY,
+    "modal",
+    (raw) => (raw === "peek" ? "peek" : "modal"),
+  );
+  const isPeek = presentation === "peek";
   // Handle for calling the player's seek from a scene click.
   const playerRef = useRef<PlayerHandle>(null);
   // The modal panel is the fullscreen target (YouTube-style: video fills the
@@ -356,6 +367,9 @@ export default function MediaDetail() {
     autoplay,
     startAt,
     pauseVideo: () => playerRef.current?.pause(),
+    // The peek ends above the bar, so the bar stays — and for audio it is the
+    // transport, the compact tile in the sheet having none.
+    suppressBar: !isPeek,
   });
 
   const setRating = useMutation({
@@ -586,11 +600,17 @@ export default function MediaDetail() {
 
   if (detail.isLoading) {
     return (
-      <MediaModal onClose={onClose} size={modalSize}>
+      <MediaModal
+        onClose={onClose}
+        size={modalSize}
+        presentation={presentation}
+      >
         <TopBar
           onClose={onClose}
           size={modalSize}
           onToggleSize={toggleModalSize}
+          presentation={presentation}
+          onSetPresentation={setPresentation}
           t={t}
         />
         <div className="flex w-full flex-col gap-4 px-4 py-4">
@@ -604,11 +624,17 @@ export default function MediaDetail() {
   }
   if (!d) {
     return (
-      <MediaModal onClose={onClose} size={modalSize}>
+      <MediaModal
+        onClose={onClose}
+        size={modalSize}
+        presentation={presentation}
+      >
         <TopBar
           onClose={onClose}
           size={modalSize}
           onToggleSize={toggleModalSize}
+          presentation={presentation}
+          onSetPresentation={setPresentation}
           t={t}
         />
         <Centered>{t("media.notFound")}</Centered>
@@ -625,6 +651,7 @@ export default function MediaDetail() {
     <MediaModal
       onClose={onClose}
       size={modalSize}
+      presentation={presentation}
       fullscreen={isFullscreen}
       containerRef={modalRef}
     >
@@ -640,6 +667,8 @@ export default function MediaDetail() {
           nextHint={formatChords(navBinding.next)}
           size={modalSize}
           onToggleSize={toggleModalSize}
+          presentation={presentation}
+          onSetPresentation={setPresentation}
           t={t}
         />
       )}
@@ -687,12 +716,23 @@ export default function MediaDetail() {
               />
             </div>
           ) : d.kind === "audio" ? (
-            <AudioStage
-              file={d}
-              wsId={wsId}
-              mediaBase={mediaBase}
-              coverSrc={coverSrc}
-            />
+            // In the peek the bottom bar stays on screen as the transport, so
+            // the sheet shows the track as a tile rather than a second stage.
+            isPeek ? (
+              <AudioCompact
+                file={d}
+                wsId={wsId}
+                mediaBase={mediaBase}
+                coverSrc={coverSrc}
+              />
+            ) : (
+              <AudioStage
+                file={d}
+                wsId={wsId}
+                mediaBase={mediaBase}
+                coverSrc={coverSrc}
+              />
+            )
           ) : (
             <div
               className={`flex justify-center overflow-hidden rounded-xl ${

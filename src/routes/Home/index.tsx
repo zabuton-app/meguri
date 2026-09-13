@@ -575,76 +575,99 @@ export default function Home() {
         onOpenDevTools={openDevTools}
       />
 
-      <main id="list-main" className="min-h-0 flex-1">
-        {status.isFetched && !status.data?.ready ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted">
-            <FolderPlus className="size-10 opacity-60" />
-            <p className="text-sm">{t("home.noWorkspace")}</p>
-            <Button size="sm" onClick={() => void onAddWorkspace()}>
-              <FolderPlus />
-              {t("home.addDirectory")}
-            </Button>
-            <p className="text-xs opacity-70">{t("home.addFromSidebar")}</p>
-          </div>
-        ) : view === "list" ? (
-          <MediaList
-            items={items}
-            mediaBase={status.data?.mediaBase ?? ""}
-            workspaceId={status.data?.workspaceId ?? ""}
-            listOffset={listOffset}
-            loading={search.isLoading && (status.data?.ready ?? false)}
-            thumbVersion={thumbVersion}
-            onTagClick={onTagClick}
-            hasNextPage={search.hasNextPage}
-            fetchNextPage={fetchNextPage}
-            isFetchingNextPage={search.isFetchingNextPage}
-            hasPreviousPage={search.hasPreviousPage}
-            fetchPreviousPage={fetchPreviousPage}
-            isFetchingPreviousPage={search.isFetchingPreviousPage}
-            navActive={navActive}
-            watchLater={activeCollection?.id === WATCH_LATER_ID}
-            reorder={reorder}
-          />
-        ) : view === "table" ? (
-          <MediaTable
-            items={items}
-            mediaBase={status.data?.mediaBase ?? ""}
-            workspaceId={status.data?.workspaceId ?? ""}
-            listOffset={listOffset}
-            loading={search.isLoading && (status.data?.ready ?? false)}
-            thumbVersion={thumbVersion}
-            onTagClick={onTagClick}
-            hasNextPage={search.hasNextPage}
-            fetchNextPage={fetchNextPage}
-            isFetchingNextPage={search.isFetchingNextPage}
-            hasPreviousPage={search.hasPreviousPage}
-            fetchPreviousPage={fetchPreviousPage}
-            isFetchingPreviousPage={search.isFetchingPreviousPage}
-            navActive={navActive}
-            watchLater={activeCollection?.id === WATCH_LATER_ID}
-            reorder={reorder}
-          />
-        ) : (
-          <MediaGrid
-            items={items}
-            mediaBase={status.data?.mediaBase ?? ""}
-            workspaceId={status.data?.workspaceId ?? ""}
-            listOffset={listOffset}
-            loading={search.isLoading && (status.data?.ready ?? false)}
-            thumbVersion={thumbVersion}
-            onTagClick={onTagClick}
-            hasNextPage={search.hasNextPage}
-            fetchNextPage={fetchNextPage}
-            isFetchingNextPage={search.isFetchingNextPage}
-            hasPreviousPage={search.hasPreviousPage}
-            fetchPreviousPage={fetchPreviousPage}
-            isFetchingPreviousPage={search.isFetchingPreviousPage}
-            navActive={navActive}
-            watchLater={activeCollection?.id === WATCH_LATER_ID}
-            reorder={reorder}
-          />
-        )}
-      </main>
+      {/* The list area is the positioning box for the detail side peek (see
+          MediaModal): the sheet docks to its right edge, under the header and
+          filter bar and above the player and status bars. */}
+      <div className="relative flex min-h-0 flex-1">
+        <main id="list-main" className="min-h-0 min-w-0 flex-1">
+          {status.isFetched && !status.data?.ready ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted">
+              <FolderPlus className="size-10 opacity-60" />
+              <p className="text-sm">{t("home.noWorkspace")}</p>
+              <Button size="sm" onClick={() => void onAddWorkspace()}>
+                <FolderPlus />
+                {t("home.addDirectory")}
+              </Button>
+              <p className="text-xs opacity-70">{t("home.addFromSidebar")}</p>
+            </div>
+          ) : view === "list" ? (
+            <MediaList
+              items={items}
+              mediaBase={status.data?.mediaBase ?? ""}
+              workspaceId={status.data?.workspaceId ?? ""}
+              listOffset={listOffset}
+              loading={search.isLoading && (status.data?.ready ?? false)}
+              thumbVersion={thumbVersion}
+              onTagClick={onTagClick}
+              hasNextPage={search.hasNextPage}
+              fetchNextPage={fetchNextPage}
+              isFetchingNextPage={search.isFetchingNextPage}
+              hasPreviousPage={search.hasPreviousPage}
+              fetchPreviousPage={fetchPreviousPage}
+              isFetchingPreviousPage={search.isFetchingPreviousPage}
+              navActive={navActive}
+              watchLater={activeCollection?.id === WATCH_LATER_ID}
+              reorder={reorder}
+            />
+          ) : view === "table" ? (
+            <MediaTable
+              items={items}
+              mediaBase={status.data?.mediaBase ?? ""}
+              workspaceId={status.data?.workspaceId ?? ""}
+              listOffset={listOffset}
+              loading={search.isLoading && (status.data?.ready ?? false)}
+              thumbVersion={thumbVersion}
+              onTagClick={onTagClick}
+              hasNextPage={search.hasNextPage}
+              fetchNextPage={fetchNextPage}
+              isFetchingNextPage={search.isFetchingNextPage}
+              hasPreviousPage={search.hasPreviousPage}
+              fetchPreviousPage={fetchPreviousPage}
+              isFetchingPreviousPage={search.isFetchingPreviousPage}
+              navActive={navActive}
+              watchLater={activeCollection?.id === WATCH_LATER_ID}
+              reorder={reorder}
+            />
+          ) : (
+            <MediaGrid
+              items={items}
+              mediaBase={status.data?.mediaBase ?? ""}
+              workspaceId={status.data?.workspaceId ?? ""}
+              listOffset={listOffset}
+              loading={search.isLoading && (status.data?.ready ?? false)}
+              thumbVersion={thumbVersion}
+              onTagClick={onTagClick}
+              hasNextPage={search.hasNextPage}
+              fetchNextPage={fetchNextPage}
+              isFetchingNextPage={search.isFetchingNextPage}
+              hasPreviousPage={search.hasPreviousPage}
+              fetchPreviousPage={fetchPreviousPage}
+              isFetchingPreviousPage={search.isFetchingPreviousPage}
+              navActive={navActive}
+              watchLater={activeCollection?.id === WATCH_LATER_ID}
+              reorder={reorder}
+            />
+          )}
+        </main>
+
+        {/* The /file/:id detail overlays here — as a modal over the window or as
+          a side peek docked to this list area (the list stays mounted either
+          way). Share the current list order so the detail can step prev/next. */}
+        <MediaNavProvider
+          value={{
+            items,
+            listOffset,
+            fetchNextPage,
+            hasNextPage: search.hasNextPage,
+            isFetchingNextPage: search.isFetchingNextPage,
+            fetchPreviousPage,
+            hasPreviousPage: search.hasPreviousPage,
+            isFetchingPreviousPage: search.isFetchingPreviousPage,
+          }}
+        >
+          <Outlet />
+        </MediaNavProvider>
+      </div>
 
       {/* Play the list as a playlist. No params: the player reads the very list
           order shared through MediaNavContext below, so whatever sort/filter is
@@ -682,23 +705,6 @@ export default function Home() {
       >
         <Sparkles className="size-6" />
       </Link>
-
-      {/* The /file/:id detail overlays here as a modal (the list stays mounted).
-          Share the current list order so the detail can step prev/next. */}
-      <MediaNavProvider
-        value={{
-          items,
-          listOffset,
-          fetchNextPage,
-          hasNextPage: search.hasNextPage,
-          isFetchingNextPage: search.isFetchingNextPage,
-          fetchPreviousPage,
-          hasPreviousPage: search.hasPreviousPage,
-          isFetchingPreviousPage: search.isFetchingPreviousPage,
-        }}
-      >
-        <Outlet />
-      </MediaNavProvider>
 
       {helpOpen && <ShortcutsOverlay onClose={() => setHelpOpen(false)} />}
 
