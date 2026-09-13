@@ -1,5 +1,5 @@
 // What the detail view does for an audio file beyond showing its stage: it
-// hides the bottom bar for as long as it is open (whatever the kind), starts
+// hides the bottom bar for as long as it is open as a modal (whatever the kind), starts
 // the track on arrival unless told not to, and keeps the bar's audio and the
 // video player from sounding at once. Kept apart from index.tsx the way
 // VideoPlayer is, so the route stays about layout, queries and mutations.
@@ -22,6 +22,10 @@ interface Options {
   startAt: number;
   /** Pause the video player, if one is mounted (a no-op otherwise). */
   pauseVideo: () => void;
+  /** False when the view is docked as a side peek: the bar sits below the
+   *  list area, clear of the sheet, and is the audio transport there. Defaults
+   *  to true (the modal). */
+  suppressBar?: boolean;
 }
 
 export function useAudioDetail({
@@ -31,6 +35,7 @@ export function useAudioDetail({
   autoplay,
   startAt,
   pauseVideo,
+  suppressBar = true,
 }: Options) {
   const { current, isPlaying, play, close } = useAudioPlayer();
   const isAudio = file?.kind === "audio";
@@ -45,7 +50,12 @@ export function useAudioDetail({
   // Layout effect so the bar is gone in the very frame this view first paints
   // (and back in the frame it leaves) — otherwise the bar and the FABs above
   // it visibly jump one frame later.
-  useLayoutEffect(() => holdBarSuppressed(), []);
+  // Not while docked as a side peek: the sheet ends above the bar, and for an
+  // audio track the bar is the only transport on screen.
+  useLayoutEffect(() => {
+    if (!suppressBar) return;
+    return holdBarSuppressed();
+  }, [suppressBar]);
 
   // Video demands attention, background audio yields — and the other way
   // round, audio starting while a video is on screen pauses the video. The

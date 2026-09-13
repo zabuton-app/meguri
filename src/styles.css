@@ -19,6 +19,12 @@
      published by AudioPlayerBar while it is showing. Bottom-anchored overlays
      add it to their offset so they clear the bar; it stays 0 otherwise. */
   --meguri-player-bar-inset: 0px;
+  /* Width of the detail side peek while it is docked beside the list,
+     published by the peek on the element wrapping Home's FABs (see
+     PEEK_INSET_DOCK_PROPS in usePeekResize.ts). Right-anchored overlays add
+     it to their offset so they stay clear of the sheet; this is the value
+     they fall back to while it is not docked. */
+  --meguri-peek-inset: 0px;
 }
 
 /* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */

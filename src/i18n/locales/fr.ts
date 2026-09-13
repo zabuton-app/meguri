@@ -184,6 +184,9 @@ export const fr: Record<TranslationKey, string> = {
   "media.invertImageBackground": "Inverser l'arrière-plan de l'image",
   "media.modalMaximize": "Agrandir la fenêtre",
   "media.modalMinimize": "Réduire la fenêtre",
+  "media.openAsPeek": "Ouvrir en panneau latéral",
+  "media.openAsModal": "Ouvrir en fenêtre",
+  "media.peekResize": "Redimensionner le panneau latéral",
   "media.deleteFromIndex": "Supprimer de l'index",
   "media.deleteFromIndexConfirm":
     "Supprimer cet élément de l'index ?\nIl ne sera pas réenregistré lors des prochaines analyses.",

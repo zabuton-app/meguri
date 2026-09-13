@@ -180,6 +180,9 @@ export const en: Record<TranslationKey, string> = {
   "media.invertImageBackground": "Invert image background",
   "media.modalMaximize": "Enlarge modal",
   "media.modalMinimize": "Shrink modal",
+  "media.openAsPeek": "Open as side peek",
+  "media.openAsModal": "Open as modal",
+  "media.peekResize": "Resize side peek",
   "media.deleteFromIndex": "Delete From Index",
   "media.deleteFromIndexConfirm":
     "Delete this item from the index?\nIt will not be registered again by future scans.",

@@ -47,6 +47,8 @@ const MIN_COL = 180; // lower bound of minmax(180px,1fr)
 const GAP = 12; // gap-3 = 0.75rem
 const SIDE_PAD = 16; // px-4
 const ROW_ESTIMATE = 220; // initial row-height estimate (corrected by measurement)
+const THUMB_ASPECT = 9 / 16; // aspect-video on the card thumbnail
+const CARD_BORDER = 1; // border on the card: the thumbnail is inset by it on each side
 
 interface Props {
   items: FileRow[];
@@ -131,23 +133,72 @@ export const MediaGrid = memo(function MediaGrid({
     return () => ro.disconnect();
   }, [scrollEl]);
 
-  // Every row has the same height for a given container width (aspect-video thumb +
-  // fixed-height metadata), so instead of measuring every visible row with
-  // measureElement (one ResizeObserver + forced reflow per row), measure a single
-  // mounted row once per width change and feed it to estimateSize.
-  const [rowH, setRowH] = useState(0);
-  const measuredKey = useRef("");
-  const rowKey = `${cols}:${innerW}`;
+  // Every row has the same height for a given container width: an
+  // aspect-video thumbnail, whose height follows from the column width, plus
+  // the metadata block and the row padding, which do not. So instead of
+  // measuring every visible row with measureElement (one ResizeObserver +
+  // forced reflow per row), measure a single mounted row once per column
+  // count, keep the part beyond the thumbnail, and derive the rest from the
+  // width. A width change alone (the window or the side peek being resized,
+  // which fires every frame of a drag) then costs no layout read and no
+  // second render.
+  // Rows can mount before the width is known (innerW starts at 0 and is
+  // filled in by a passive effect, after refs run): measuring then would file
+  // the whole row height as "extra" and, with the column count unchanged,
+  // never look again. So nothing is measured until the width is in.
+  const ready = innerW > 0;
+  // The thumbnail spans the card's content box, not the grid track: the
+  // card's borders take a pixel on each side, and an estimate a pixel too
+  // tall per row would drift across a long list.
+  const thumbH = ready
+    ? ((innerW - GAP * (cols - 1)) / cols - CARD_BORDER * 2) * THUMB_ASPECT
+    : 0;
+  // The part beyond the thumbnail depends on the fonts in use: measured
+  // again once the fonts have loaded, and again after the emoji font
+  // changes (the emoji-style preference, mirrored to <html
+  // data-emoji-style>), each time waiting for the newly requested fonts.
+  const [fontEpoch, setFontEpoch] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const remeasureWhenFontsSettle = () => {
+      void document.fonts?.ready.then(() => {
+        if (!cancelled) setFontEpoch((n) => n + 1);
+      });
+    };
+    remeasureWhenFontsSettle();
+    const mo = new MutationObserver(remeasureWhenFontsSettle);
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-emoji-style"],
+    });
+    return () => {
+      cancelled = true;
+      mo.disconnect();
+    };
+  }, []);
+  const [extraH, setExtraH] = useState(0);
+  const measuredFor = useRef("");
+  const measureKey = `${cols}:${fontEpoch}`;
   const measureRow = useCallback(
     (node: HTMLDivElement | null) => {
-      if (!node || measuredKey.current === rowKey) return;
-      measuredKey.current = rowKey;
-      const h = node.getBoundingClientRect().height;
-      setRowH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
+      if (!node || !ready || measuredFor.current === measureKey) return;
+      // Both heights from the same layout: subtracting the thumbnail height
+      // derived from React's `innerW` would mix in a width one frame behind
+      // the DOM while the peek is being dragged, and bake the difference in
+      // until the next re-measure.
+      const thumb = node.querySelector("[data-thumb]");
+      const extra =
+        node.getBoundingClientRect().height -
+        (thumb?.getBoundingClientRect().height ?? 0);
+      // Only a usable measurement is kept; a row not yet laid out is
+      // measured again on the next attach.
+      if (!(extra > 0)) return;
+      measuredFor.current = measureKey;
+      setExtraH((prev) => (Math.abs(prev - extra) > 0.5 ? extra : prev));
     },
-    [rowKey],
+    [measureKey, ready],
   );
-  const rowEstimate = rowH || ROW_ESTIMATE;
+  const rowEstimate = ready && extraH > 0 ? thumbH + extraH : ROW_ESTIMATE;
 
   // Group items into rows by column count.
   const rows = useMemo(() => {
@@ -352,6 +403,7 @@ const MediaCard = memo(function MediaCard({
       <Link
         to={fileHref(file.id, file.workspaceId)}
         onClick={onThumbnailClick(file)}
+        data-thumb
         className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
       >
         <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
@@ -383,10 +435,13 @@ const MediaCard = memo(function MediaCard({
           className="absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
         />
       </Link>
-      {/* Metadata. Fixed height so the card height doesn't change with tag count. */}
+      {/* Metadata. Fixed height so the card height doesn't change with tag
+          count — and independent of the card width (single-line truncation,
+          no wrapping): the grid's row-height estimate measures this block
+          once per column count and derives the rest from the width. */}
       <Link
         to={fileHref(file.id, file.workspaceId, { autoplay: false })}
-        className="flex flex-col gap-1 px-2 py-1.5"
+        className="flex flex-col gap-1 border-t border-border px-2 py-1.5"
       >
         <div className="truncate text-xs text-fg" title={file.relPath}>
           {fileNameOf(file.relPath)}

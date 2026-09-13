@@ -179,6 +179,9 @@ export const ja = {
   "media.invertImageBackground": "画像の背景色を反転",
   "media.modalMaximize": "モーダルを拡大",
   "media.modalMinimize": "モーダルを縮小",
+  "media.openAsPeek": "サイドピークで開く",
+  "media.openAsModal": "モーダルで開く",
+  "media.peekResize": "サイドピークの幅を変更",
   "media.deleteFromIndex": "インデックスから削除",
   "media.deleteFromIndexConfirm":
     "この項目をインデックスから削除しますか？\n今後スキャンしても再登録されません。",

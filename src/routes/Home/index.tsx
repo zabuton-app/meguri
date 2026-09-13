@@ -46,6 +46,8 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
+import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
+import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { HomeHeader } from "./HomeHeader";
 import {
   VIEW_KEY,
@@ -179,8 +181,10 @@ export default function Home() {
     [reorderCollectionId, qc, filter, status.data?.workspaceId],
   );
 
-  // Keyboard focus navigation in the views runs only while the list is foreground
-  // (no detail/settings/discover modal, and no help/command overlay on top).
+  // Keyboard focus navigation in the views (arrow keys between cards) runs only
+  // while nothing else can want those keys: no detail/settings/discover route
+  // open — a docked side peek included, its player takes the arrows — and no
+  // help/command overlay on top.
   const navActive = location.pathname === "/" && !helpOpen && !commandOpen;
 
   useEffect(() => {
@@ -395,9 +399,14 @@ export default function Home() {
   }, [helpOpen]);
 
   // List-level keyboard: "/" focuses search, page keys scroll the list.
-  // Only while the list is foreground (no detail/settings/discover modal on top).
+  // Only while the list is foreground: no detail/settings/discover modal on
+  // top — or the detail docked beside it as a side peek, which leaves the
+  // list in use. (Card focus navigation stays off then: its arrow keys would
+  // fight the player's.)
+  const peekDocked = usePeekDocked();
+  const listShortcutsActive = location.pathname === "/" || peekDocked;
   useEffect(() => {
-    if (location.pathname !== "/") return;
+    if (!listShortcutsActive) return;
     const onKey = (e: KeyboardEvent) => {
       if (helpOpen) return;
       const el = document.activeElement as HTMLElement | null;
@@ -415,6 +424,9 @@ export default function Home() {
         return;
       }
       if (typing) return;
+      // Page keys pressed with focus inside the docked side peek page the
+      // peek's own content (the browser default), not the list beside it.
+      if (el?.closest('[data-presentation="peek"]')) return;
       if (matchAny(e, b.pageDown)) {
         e.preventDefault();
         scrollListByPage(1);
@@ -425,7 +437,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [location.pathname, keybindingPreset, helpOpen, focusSearch]);
+  }, [listShortcutsActive, keybindingPreset, helpOpen, focusSearch]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -575,130 +587,143 @@ export default function Home() {
         onOpenDevTools={openDevTools}
       />
 
-      <main id="list-main" className="min-h-0 flex-1">
-        {status.isFetched && !status.data?.ready ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted">
-            <FolderPlus className="size-10 opacity-60" />
-            <p className="text-sm">{t("home.noWorkspace")}</p>
-            <Button size="sm" onClick={() => void onAddWorkspace()}>
-              <FolderPlus />
-              {t("home.addDirectory")}
-            </Button>
-            <p className="text-xs opacity-70">{t("home.addFromSidebar")}</p>
-          </div>
-        ) : view === "list" ? (
-          <MediaList
-            items={items}
-            mediaBase={status.data?.mediaBase ?? ""}
-            workspaceId={status.data?.workspaceId ?? ""}
-            listOffset={listOffset}
-            loading={search.isLoading && (status.data?.ready ?? false)}
-            thumbVersion={thumbVersion}
-            onTagClick={onTagClick}
-            hasNextPage={search.hasNextPage}
-            fetchNextPage={fetchNextPage}
-            isFetchingNextPage={search.isFetchingNextPage}
-            hasPreviousPage={search.hasPreviousPage}
-            fetchPreviousPage={fetchPreviousPage}
-            isFetchingPreviousPage={search.isFetchingPreviousPage}
-            navActive={navActive}
-            watchLater={activeCollection?.id === WATCH_LATER_ID}
-            reorder={reorder}
-          />
-        ) : view === "table" ? (
-          <MediaTable
-            items={items}
-            mediaBase={status.data?.mediaBase ?? ""}
-            workspaceId={status.data?.workspaceId ?? ""}
-            listOffset={listOffset}
-            loading={search.isLoading && (status.data?.ready ?? false)}
-            thumbVersion={thumbVersion}
-            onTagClick={onTagClick}
-            hasNextPage={search.hasNextPage}
-            fetchNextPage={fetchNextPage}
-            isFetchingNextPage={search.isFetchingNextPage}
-            hasPreviousPage={search.hasPreviousPage}
-            fetchPreviousPage={fetchPreviousPage}
-            isFetchingPreviousPage={search.isFetchingPreviousPage}
-            navActive={navActive}
-            watchLater={activeCollection?.id === WATCH_LATER_ID}
-            reorder={reorder}
-          />
-        ) : (
-          <MediaGrid
-            items={items}
-            mediaBase={status.data?.mediaBase ?? ""}
-            workspaceId={status.data?.workspaceId ?? ""}
-            listOffset={listOffset}
-            loading={search.isLoading && (status.data?.ready ?? false)}
-            thumbVersion={thumbVersion}
-            onTagClick={onTagClick}
-            hasNextPage={search.hasNextPage}
-            fetchNextPage={fetchNextPage}
-            isFetchingNextPage={search.isFetchingNextPage}
-            hasPreviousPage={search.hasPreviousPage}
-            fetchPreviousPage={fetchPreviousPage}
-            isFetchingPreviousPage={search.isFetchingPreviousPage}
-            navActive={navActive}
-            watchLater={activeCollection?.id === WATCH_LATER_ID}
-            reorder={reorder}
-          />
-        )}
-      </main>
+      {/* The list row: the detail side peek (see MediaModal) docks here as a
+          flex sibling of the list, under the header and filter bar and above
+          the player and status bars, and the list narrows to make room. */}
+      <div className="relative flex min-h-0 flex-1">
+        {/* min-w-60 = the 240px the side peek leaves the list (LIST_MIN_WIDTH
+          in usePeekResize); the two must agree. */}
+        <main id="list-main" className="min-h-0 min-w-60 flex-1">
+          {status.isFetched && !status.data?.ready ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted">
+              <FolderPlus className="size-10 opacity-60" />
+              <p className="text-sm">{t("home.noWorkspace")}</p>
+              <Button size="sm" onClick={() => void onAddWorkspace()}>
+                <FolderPlus />
+                {t("home.addDirectory")}
+              </Button>
+              <p className="text-xs opacity-70">{t("home.addFromSidebar")}</p>
+            </div>
+          ) : view === "list" ? (
+            <MediaList
+              items={items}
+              mediaBase={status.data?.mediaBase ?? ""}
+              workspaceId={status.data?.workspaceId ?? ""}
+              listOffset={listOffset}
+              loading={search.isLoading && (status.data?.ready ?? false)}
+              thumbVersion={thumbVersion}
+              onTagClick={onTagClick}
+              hasNextPage={search.hasNextPage}
+              fetchNextPage={fetchNextPage}
+              isFetchingNextPage={search.isFetchingNextPage}
+              hasPreviousPage={search.hasPreviousPage}
+              fetchPreviousPage={fetchPreviousPage}
+              isFetchingPreviousPage={search.isFetchingPreviousPage}
+              navActive={navActive}
+              watchLater={activeCollection?.id === WATCH_LATER_ID}
+              reorder={reorder}
+            />
+          ) : view === "table" ? (
+            <MediaTable
+              items={items}
+              mediaBase={status.data?.mediaBase ?? ""}
+              workspaceId={status.data?.workspaceId ?? ""}
+              listOffset={listOffset}
+              loading={search.isLoading && (status.data?.ready ?? false)}
+              thumbVersion={thumbVersion}
+              onTagClick={onTagClick}
+              hasNextPage={search.hasNextPage}
+              fetchNextPage={fetchNextPage}
+              isFetchingNextPage={search.isFetchingNextPage}
+              hasPreviousPage={search.hasPreviousPage}
+              fetchPreviousPage={fetchPreviousPage}
+              isFetchingPreviousPage={search.isFetchingPreviousPage}
+              navActive={navActive}
+              watchLater={activeCollection?.id === WATCH_LATER_ID}
+              reorder={reorder}
+            />
+          ) : (
+            <MediaGrid
+              items={items}
+              mediaBase={status.data?.mediaBase ?? ""}
+              workspaceId={status.data?.workspaceId ?? ""}
+              listOffset={listOffset}
+              loading={search.isLoading && (status.data?.ready ?? false)}
+              thumbVersion={thumbVersion}
+              onTagClick={onTagClick}
+              hasNextPage={search.hasNextPage}
+              fetchNextPage={fetchNextPage}
+              isFetchingNextPage={search.isFetchingNextPage}
+              hasPreviousPage={search.hasPreviousPage}
+              fetchPreviousPage={fetchPreviousPage}
+              isFetchingPreviousPage={search.isFetchingPreviousPage}
+              navActive={navActive}
+              watchLater={activeCollection?.id === WATCH_LATER_ID}
+              reorder={reorder}
+            />
+          )}
+        </main>
 
-      {/* Play the list as a playlist. No params: the player reads the very list
+        {/* The /file/:id detail overlays here — as a modal over the window or as
+          a side peek docked to this list area (the list stays mounted either
+          way). Share the current list order so the detail can step prev/next. */}
+        <MediaNavProvider
+          value={{
+            items,
+            listOffset,
+            fetchNextPage,
+            hasNextPage: search.hasNextPage,
+            isFetchingNextPage: search.isFetchingNextPage,
+            fetchPreviousPage,
+            hasPreviousPage: search.hasPreviousPage,
+            isFetchingPreviousPage: search.isFetchingPreviousPage,
+          }}
+        >
+          <Outlet />
+        </MediaNavProvider>
+      </div>
+
+      {/* The two FABs, wrapped so the side peek can publish its width on this
+          element alone (see PEEK_INSET_DOCK_PROPS) rather than on <html>. */}
+      <div className="contents" {...PEEK_INSET_DOCK_PROPS}>
+        {/* Play the list as a playlist. No params: the player reads the very list
           order shared through MediaNavContext below, so whatever sort/filter is
           on screen is what plays — collection, Watch Later or plain search.
           Accent-filled like the discovery button beside it: both start a way of
           watching, and neither is subordinate to the other. */}
-      <Link
-        to="/play"
-        title={t("playlist.start")}
-        aria-label={t("playlist.start")}
-        aria-disabled={!canPlay}
-        tabIndex={canPlay ? undefined : -1}
-        className={cn(
-          // Stacked above the discovery button; both lift together when the
-          // audio player bar is showing (the variable is 0 otherwise).
-          "fixed bottom-[calc(6rem+var(--meguri-player-bar-inset))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          !canPlay && "pointer-events-none opacity-45",
-        )}
-      >
-        <PlayCircle className="size-6" />
-      </Link>
+        <Link
+          to="/play"
+          title={t("playlist.start")}
+          aria-label={t("playlist.start")}
+          aria-disabled={!canPlay}
+          tabIndex={canPlay ? undefined : -1}
+          className={cn(
+            // Stacked above the discovery button; both lift together when the
+            // audio player bar is showing, and both move left of the detail
+            // side peek while it is docked (each variable is 0 otherwise).
+            "fixed bottom-[calc(6rem+var(--meguri-player-bar-inset))] right-[calc(1.25rem+var(--meguri-peek-inset))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !canPlay && "pointer-events-none opacity-45",
+          )}
+        >
+          <PlayCircle className="size-6" />
+        </Link>
 
-      <Link
-        to={discoverPath(filter)}
-        title={t("discover.title")}
-        aria-label={t("discover.title")}
-        aria-disabled={!status.data?.ready}
-        tabIndex={status.data?.ready ? undefined : -1}
-        className={cn(
-          // Lifted clear of the audio player bar when one is showing (the
-          // variable is 0 otherwise, keeping the original offset).
-          "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-inset))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          !status.data?.ready && "pointer-events-none opacity-45",
-        )}
-      >
-        <Sparkles className="size-6" />
-      </Link>
-
-      {/* The /file/:id detail overlays here as a modal (the list stays mounted).
-          Share the current list order so the detail can step prev/next. */}
-      <MediaNavProvider
-        value={{
-          items,
-          listOffset,
-          fetchNextPage,
-          hasNextPage: search.hasNextPage,
-          isFetchingNextPage: search.isFetchingNextPage,
-          fetchPreviousPage,
-          hasPreviousPage: search.hasPreviousPage,
-          isFetchingPreviousPage: search.isFetchingPreviousPage,
-        }}
-      >
-        <Outlet />
-      </MediaNavProvider>
+        <Link
+          to={discoverPath(filter)}
+          title={t("discover.title")}
+          aria-label={t("discover.title")}
+          aria-disabled={!status.data?.ready}
+          tabIndex={status.data?.ready ? undefined : -1}
+          className={cn(
+            // Lifted clear of the audio player bar when one is showing (the
+            // variable is 0 otherwise, keeping the original offset).
+            "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-inset))] right-[calc(1.25rem+var(--meguri-peek-inset))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !status.data?.ready && "pointer-events-none opacity-45",
+          )}
+        >
+          <Sparkles className="size-6" />
+        </Link>
+      </div>
 
       {helpOpen && <ShortcutsOverlay onClose={() => setHelpOpen(false)} />}
 
