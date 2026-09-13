@@ -17,7 +17,9 @@ import {
 } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
-export const PEEK_WIDTH_KEY = "meguri.media.peekWidth";
+// Detail-only (unlike MODAL_SIZE_KEY, which Discover shares), hence the
+// `detail` segment.
+export const PEEK_WIDTH_KEY = "meguri.media.detail.peekWidth";
 export const PEEK_DEFAULT_WIDTH = 520;
 export const PEEK_MIN_WIDTH = 320;
 /** Room the list keeps beside the sheet. Home's `<main>` states the same
@@ -26,10 +28,10 @@ export const LIST_MIN_WIDTH = 240;
 const KEY_STEP = 16;
 const PEEK_INSET_VAR = "--meguri-peek-inset";
 
+/** Only the floor is checked here, since the ceiling depends on the window —
+ *  the fit effect applies it on docking. */
 function parseWidth(raw: string | null): number {
   const n = Number(raw);
-  // Only the floor is checked here: the ceiling depends on the window, and
-  // the fit effect below applies it as soon as the sheet is docked.
   return Number.isFinite(n) && n >= PEEK_MIN_WIDTH
     ? Math.round(n)
     : PEEK_DEFAULT_WIDTH;
@@ -72,6 +74,10 @@ export function usePeekResize(
   docked: boolean,
   panelRef: RefObject<HTMLDivElement | null>,
 ) {
+  // Unlike the modal size and the presentation, which the route owns, the
+  // width lives here in the frame: nothing but the frame reads it, and held
+  // by the route it would re-render the whole detail view (player included)
+  // on every keyboard step and every frame of a window resize.
   const [width, setWidth] = useLocalStorage<number>(
     PEEK_WIDTH_KEY,
     PEEK_DEFAULT_WIDTH,

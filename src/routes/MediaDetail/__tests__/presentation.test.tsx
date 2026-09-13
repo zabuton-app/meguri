@@ -9,6 +9,7 @@ import "@/test/mockVirtualizer";
 import MediaDetail from "@/routes/MediaDetail";
 import { MediaNavProvider } from "@/components/MediaNavContext";
 import { useBarSuppressed } from "@/audio/barVisibility";
+import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import type { FileDetail } from "@/ipc/types";
 import {
   defaultAppStatus,
@@ -68,10 +69,17 @@ const audioDetail: FileDetail = {
   fps: null,
 };
 
-/** Reports whether the bottom bar is told to step aside, as the bar would. */
+/** Reports the flags the detail view raises for the rest of the app: whether
+ *  the bottom bar is told to step aside, and whether the peek is docked. */
 function BarProbe() {
   const suppressed = useBarSuppressed();
-  return <output data-testid="bar-suppressed">{String(suppressed)}</output>;
+  const docked = usePeekDocked();
+  return (
+    <>
+      <output data-testid="bar-suppressed">{String(suppressed)}</output>
+      <output data-testid="peek-docked">{String(docked)}</output>
+    </>
+  );
 }
 
 function DetailRoute() {
@@ -126,6 +134,8 @@ async function openDetail(
 const dialog = () => screen.getByRole("dialog");
 const barSuppressed = () =>
   screen.getByTestId("bar-suppressed").textContent === "true";
+const peekDocked = () =>
+  screen.getByTestId("peek-docked").textContent === "true";
 const peekInset = () =>
   document.documentElement.style.getPropertyValue("--meguri-peek-inset");
 
@@ -167,7 +177,11 @@ describe("MediaDetail presentation", () => {
     expect(dialog().getAttribute("aria-modal")).toBeNull();
     expect(dialog().dataset.presentation).toBe("peek");
     expect(barSuppressed()).toBe(false);
-    expect(localStorage.getItem("meguri.media.presentation")).toBe("peek");
+    // …and Home is told the list is in use beside the sheet.
+    expect(peekDocked()).toBe(true);
+    expect(localStorage.getItem("meguri.media.detail.presentation")).toBe(
+      "peek",
+    );
     // The file is still on screen, just re-framed.
     expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
   });
@@ -184,7 +198,7 @@ describe("MediaDetail presentation", () => {
   });
 
   it("reopens as the peek and returns to the modal at its remembered size", async () => {
-    localStorage.setItem("meguri.media.presentation", "peek");
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
     localStorage.setItem("meguri.media.modalSize", "small");
     await openDetail(`/file/1?ws=${WS_ID}`);
     expect(dialog().dataset.presentation).toBe("peek");
@@ -194,15 +208,18 @@ describe("MediaDetail presentation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open as modal" }));
     expect(dialog().getAttribute("aria-modal")).toBe("true");
     expect(barSuppressed()).toBe(true);
-    expect(localStorage.getItem("meguri.media.presentation")).toBe("modal");
+    expect(peekDocked()).toBe(false);
+    expect(localStorage.getItem("meguri.media.detail.presentation")).toBe(
+      "modal",
+    );
     // Small, as it was last left — not reset to large by the round trip.
     const toggle = screen.getByRole("button", { name: "Enlarge modal" });
     expect(toggle.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("docks at the remembered width and publishes it for the FABs", async () => {
-    localStorage.setItem("meguri.media.presentation", "peek");
-    localStorage.setItem("meguri.media.peekWidth", "600");
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
+    localStorage.setItem("meguri.media.detail.peekWidth", "600");
     await openDetail(`/file/1?ws=${WS_ID}`);
     expect(dialog().style.width).toBe("600px");
     expect(peekInset()).toBe("600px");
@@ -213,13 +230,13 @@ describe("MediaDetail presentation", () => {
   });
 
   it("resizes from the keyboard on the handle, within the minimum", async () => {
-    localStorage.setItem("meguri.media.presentation", "peek");
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
     await openDetail(`/file/1?ws=${WS_ID}`);
     const handle = screen.getByRole("separator", { name: "Resize side peek" });
     // Left grows the sheet (its edge moves left), right shrinks it.
     fireEvent.keyDown(handle, { key: "ArrowLeft" });
     expect(dialog().style.width).toBe("536px");
-    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("536");
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("536");
     for (let i = 0; i < 20; i++) {
       fireEvent.keyDown(handle, { key: "ArrowRight" });
     }
@@ -227,7 +244,7 @@ describe("MediaDetail presentation", () => {
   });
 
   it("resizes by dragging the handle and remembers the result", async () => {
-    localStorage.setItem("meguri.media.presentation", "peek");
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
     await openDetail(`/file/1?ws=${WS_ID}`);
     const panel = dialog();
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
@@ -245,15 +262,15 @@ describe("MediaDetail presentation", () => {
     expect(peekInset()).toBe("620px");
     // Nothing is written until the drag ends (docking fitted and stored the
     // default; the live width is DOM-only).
-    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("520");
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("520");
     fireEvent.pointerUp(handle, { pointerId: 2 });
-    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("520");
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("520");
     fireEvent.pointerUp(handle, { pointerId: 1 });
-    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("620");
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("620");
   });
 
   it("keeps the width reached when the view closes mid-drag", async () => {
-    localStorage.setItem("meguri.media.presentation", "peek");
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
     await openDetail(`/file/1?ws=${WS_ID}`);
     const panel = dialog();
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
@@ -266,17 +283,17 @@ describe("MediaDetail presentation", () => {
     // ever reach the handle, so the drag is finished on the way out.
     fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
     await waitFor(() => expect(window.location.hash.slice(1)).toBe("/"));
-    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("570");
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("570");
     expect(peekInset()).toBe("0px");
   });
 
   it("never squeezes the list below its minimum, whatever width was remembered", async () => {
-    localStorage.setItem("meguri.media.presentation", "peek");
-    localStorage.setItem("meguri.media.peekWidth", "1400");
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
+    localStorage.setItem("meguri.media.detail.peekWidth", "1400");
     await openDetail(`/file/1?ws=${WS_ID}`, "sample.mp4", 700);
     // 700px row − 240px for the list = 460px at most, applied on docking…
     await waitFor(() => expect(dialog().style.width).toBe("460px"));
-    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("460");
+    expect(localStorage.getItem("meguri.media.detail.peekWidth")).toBe("460");
     const handle = screen.getByRole("separator", { name: "Resize side peek" });
     expect(handle.getAttribute("aria-valuemax")).toBe("460");
     // …and to every later change.
@@ -287,14 +304,32 @@ describe("MediaDetail presentation", () => {
   });
 
   it("closes the peek with Esc like the modal", async () => {
-    localStorage.setItem("meguri.media.presentation", "peek");
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
     await openDetail(`/file/1?ws=${WS_ID}`);
     fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
     await waitFor(() => expect(window.location.hash.slice(1)).toBe("/"));
   });
 
+  it("leaves an Esc that a popup on top has already taken", async () => {
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    // What a Radix dismissable layer does with the Esc that closes it: claim
+    // it on the way down, before window listeners see it.
+    const claim = (e: KeyboardEvent) => {
+      if (e.key === "Escape") e.preventDefault();
+    };
+    window.addEventListener("keydown", claim, true);
+    try {
+      fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
+    } finally {
+      window.removeEventListener("keydown", claim, true);
+    }
+    expect(window.location.hash.slice(1)).toBe(`/file/1?ws=${WS_ID}`);
+    expect(dialog().dataset.presentation).toBe("peek");
+  });
+
   it("shows an audio track as a tile without its own transport in the peek", async () => {
-    localStorage.setItem("meguri.media.presentation", "peek");
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
     mocks.fileGet.mockResolvedValue(audioDetail);
     await openDetail(`/file/2?ws=${WS_ID}&autoplay=0`, "track.mp3");
     // The bar is the transport here, so the stage's transport region is gone…

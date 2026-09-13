@@ -1,6 +1,7 @@
 import {
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   type ReactNode,
   type Ref,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { holdPeekDocked } from "./peekDocked";
 import { LIST_MIN_WIDTH, PEEK_MIN_WIDTH, usePeekResize } from "./usePeekResize";
 
 export type ModalSize = "large" | "small";
@@ -28,7 +30,8 @@ export type Presentation = "modal" | "peek";
 export const MODAL_SIZE_KEY = "meguri.media.modalSize";
 // Remembered separately from the size, so switching to the peek and back lands
 // on the modal size that was last chosen.
-export const PRESENTATION_KEY = "meguri.media.presentation";
+// Detail-only (unlike MODAL_SIZE_KEY above), hence the `detail` segment.
+export const PRESENTATION_KEY = "meguri.media.detail.presentation";
 
 // Frame around the detail view. Close on Esc, and on backdrop click when there
 // is a backdrop (the modal). `size` toggles the modal between a
@@ -59,6 +62,11 @@ export function MediaModal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // A popup on top (a Radix dropdown or popover, the confirm dialog)
+        // takes the key for itself and marks it so; only an Esc nobody
+        // claimed closes this view. Matters most in the peek, where the
+        // list's own popups are in reach.
+        if (e.defaultPrevented) return;
         // While in fullscreen, Esc exits fullscreen (browser default) — keep the modal open.
         if (document.fullscreenElement) return;
         e.preventDefault();
@@ -77,6 +85,11 @@ export function MediaModal({
   const panelRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(containerRef, () => panelRef.current as HTMLDivElement);
   const peek = usePeekResize(docked, panelRef);
+  // Tell Home the list is in use beside the sheet (see peekDocked.ts).
+  useLayoutEffect(() => {
+    if (!docked) return;
+    return holdPeekDocked();
+  }, [docked]);
 
   // One tree shape for both presentations: only classes and ARIA change, so
   // switching modal ↔ peek re-styles the frame without remounting what is

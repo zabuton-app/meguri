@@ -52,6 +52,51 @@ describe("MediaGrid", () => {
     mocks.collectionRemoveFile.mockClear();
   });
 
+  it("derives the row height from the width once the width is known", async () => {
+    // A list narrow enough for one column (e.g. beside a wide side peek).
+    // The setup stubs every element at 1200px; narrow it for this test.
+    const proto = Element.prototype;
+    const wide = Object.getOwnPropertyDescriptor(proto, "clientWidth")!;
+    Object.defineProperty(proto, "clientWidth", {
+      configurable: true,
+      get: () => 380,
+    });
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 300 } as DOMRect);
+    try {
+      const items = [
+        sampleFileRow,
+        { ...sampleFileRow, id: 2, relPath: "b.mp4" },
+      ];
+      const { container } = renderWithProviders(
+        <MediaGrid
+          items={items}
+          mediaBase="http://127.0.0.1:17345"
+          workspaceId={WS_ID}
+          loading={false}
+          thumbVersion={{}}
+        />,
+      );
+      await waitFor(() => {
+        expect(screen.getByText("b.mp4")).toBeTruthy();
+      });
+      // Rows mount before the width is measured; the height must come from
+      // a measurement taken after it (300px per row), not from one that
+      // filed the whole row as "beyond the thumbnail" while the width was 0.
+      await waitFor(() => {
+        const rows = container.querySelectorAll<HTMLElement>(
+          "[style*='translateY']",
+        );
+        expect(rows.length).toBe(2);
+        expect(rows[1].style.transform).toBe("translateY(300px)");
+      });
+    } finally {
+      rect.mockRestore();
+      Object.defineProperty(proto, "clientWidth", wide);
+    }
+  });
+
   it("renders file cards with detail links including workspace id", async () => {
     renderWithProviders(
       <MediaGrid

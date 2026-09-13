@@ -11,6 +11,39 @@ export interface FlagStore {
   use: () => boolean;
 }
 
+export interface HoldStore {
+  /** Raise the flag until the returned release function is called. */
+  hold: () => () => void;
+  /** Subscribe from a component. */
+  use: () => boolean;
+}
+
+/**
+ * A flag that is up while at least one holder wants it up. Counted rather
+ * than a plain boolean: each view that needs the flag takes a hold and
+ * releases it on the way out, so two holders (StrictMode's double mount, a
+ * view replaced by another in the same frame) cannot release each other's
+ * hold, and a release that runs twice is harmless.
+ */
+export function createHoldStore(): HoldStore {
+  const store = createFlagStore();
+  let holds = 0;
+  return {
+    hold() {
+      holds++;
+      store.set(true);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        holds--;
+        if (holds === 0) store.set(false);
+      };
+    },
+    use: store.use,
+  };
+}
+
 export function createFlagStore(initial = false): FlagStore {
   let value = initial;
   const listeners = new Set<() => void>();

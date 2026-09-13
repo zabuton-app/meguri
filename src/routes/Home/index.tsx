@@ -46,6 +46,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
+import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { HomeHeader } from "./HomeHeader";
 import {
   VIEW_KEY,
@@ -179,8 +180,10 @@ export default function Home() {
     [reorderCollectionId, qc, filter, status.data?.workspaceId],
   );
 
-  // Keyboard focus navigation in the views runs only while the list is foreground
-  // (no detail/settings/discover modal, and no help/command overlay on top).
+  // Keyboard focus navigation in the views (arrow keys between cards) runs only
+  // while nothing else can want those keys: no detail/settings/discover route
+  // open — a docked side peek included, its player takes the arrows — and no
+  // help/command overlay on top.
   const navActive = location.pathname === "/" && !helpOpen && !commandOpen;
 
   useEffect(() => {
@@ -395,9 +398,14 @@ export default function Home() {
   }, [helpOpen]);
 
   // List-level keyboard: "/" focuses search, page keys scroll the list.
-  // Only while the list is foreground (no detail/settings/discover modal on top).
+  // Only while the list is foreground: no detail/settings/discover modal on
+  // top — or the detail docked beside it as a side peek, which leaves the
+  // list in use. (Card focus navigation stays off then: its arrow keys would
+  // fight the player's.)
+  const peekDocked = usePeekDocked();
+  const listShortcutsActive = location.pathname === "/" || peekDocked;
   useEffect(() => {
-    if (location.pathname !== "/") return;
+    if (!listShortcutsActive) return;
     const onKey = (e: KeyboardEvent) => {
       if (helpOpen) return;
       const el = document.activeElement as HTMLElement | null;
@@ -425,7 +433,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [location.pathname, keybindingPreset, helpOpen, focusSearch]);
+  }, [listShortcutsActive, keybindingPreset, helpOpen, focusSearch]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
