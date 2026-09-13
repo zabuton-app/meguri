@@ -12,7 +12,6 @@ import { Music } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   useAudioActions,
-  useAudioPosition,
   useAudioPlayer,
   useExclusivePlayback,
 } from "@/audio/useAudioPlayer";
@@ -142,7 +141,6 @@ export default function Player() {
   // never interrupts the sound — the same reason Discover's playback survives
   // the trip. The bar itself stays hidden under this full-screen player.
   const audio = useAudioPlayer();
-  const audioPosition = useAudioPosition();
   const {
     play: playAudio,
     toggle: toggleAudio,
@@ -255,8 +253,9 @@ export default function Player() {
         ? Math.max(0, Math.floor(Number(handedBack)))
         : pickUp.sec
       : 0;
+  // Back from the detail view on the very item the pass was parked on: the
+  // bar's track is left in whatever state the user put it there.
   const isDetourPickUp = !!current && pickUp?.key === queueKey(current);
-  const parkedSec = pickUp?.sec ?? 0;
 
   // Without its details there is nothing to render for this item, so a failed
   // fetch would leave the stage blank for good. Treat it like any other
@@ -488,28 +487,17 @@ export default function Player() {
       }),
     [subscribeEnded],
   );
-  // While the detail route is open this component is unmounted, so it misses the
-  // provider's `ended` callback; if the detoured track reached its end there,
-  // advance now rather than restoring and restarting it.
+  // While the detail route is open this component is unmounted, so it misses
+  // the provider's `ended`; the provider keeps the fact as state, so a track
+  // that ran out during the detour advances the queue on return rather than
+  // being restored and restarted.
   useEffect(() => {
-    if (!isAudio || !isCurrentAudio || !isDetourPickUp) return;
-    if (audio.isPlaying || audio.duration == null) return;
-    if (audioPosition < audio.duration) return;
-    if (audioPosition <= parkedSec) return;
+    if (!isCurrentAudio || !isDetourPickUp || !audio.ended) return;
     if (detourEndedHandledFor.current === currentKey) return;
     detourEndedHandledFor.current = currentKey;
     startedAudioFor.current = null;
     goNextRef.current();
-  }, [
-    isAudio,
-    isCurrentAudio,
-    isDetourPickUp,
-    currentKey,
-    audio.isPlaying,
-    audio.duration,
-    audioPosition,
-    parkedSec,
-  ]);
+  }, [isCurrentAudio, isDetourPickUp, audio.ended, currentKey]);
   // An audio item that fails to play is skipped like a broken video.
   useEffect(() => {
     if (isCurrentAudio && audio.error) skipCurrent();

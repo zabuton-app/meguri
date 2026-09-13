@@ -104,13 +104,14 @@ function setCurrentTime(sec: number) {
 }
 
 function Probe() {
-  const { current, isPlaying, duration, volume, muted, error, ...ctl } =
+  const { current, isPlaying, ended, duration, volume, muted, error, ...ctl } =
     useAudioPlayer();
   const position = useAudioPosition();
   return (
     <div>
       <span data-testid="current">{current?.file.relPath ?? "none"}</span>
       <span data-testid="playing">{String(isPlaying)}</span>
+      <span data-testid="ended">{String(ended)}</span>
       <span data-testid="duration">{String(duration)}</span>
       <span data-testid="position">{String(position)}</span>
       <span data-testid="volume">{String(volume)}</span>
@@ -254,6 +255,8 @@ describe("AudioPlayerProvider", () => {
     emit("ended");
     expect(text("playing")).toBe("false");
     expect(text("position")).toBe("240");
+    // Kept as state for anyone who was not listening when it happened.
+    expect(text("ended")).toBe("true");
     // Still loaded: the bar stays visible.
     expect(text("current")).toBe("music/track.mp3");
 
@@ -268,6 +271,8 @@ describe("AudioPlayerProvider", () => {
     click("toggle");
     expect(el.currentTime).toBe(0);
     expect(playSpy).toHaveBeenCalled();
+    emit("play");
+    expect(text("ended")).toBe("false");
   });
 
   it("surfaces a dismissible error when playback fails", () => {

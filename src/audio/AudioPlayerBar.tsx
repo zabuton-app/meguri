@@ -24,42 +24,52 @@ function baseName(relPath: string): string {
 
 function outsideRouterOrigin(): string {
   const state = window.history.state as
-    | { usr?: { outsideRouter?: boolean; origin?: string } }
-    | undefined;
+    { usr?: { outsideRouter?: boolean; origin?: string } } | undefined;
   const carried = state?.usr;
   if (carried?.outsideRouter && carried.origin) return carried.origin;
   const hashPath = window.location.hash.slice(1) || "/";
   return hashPath.startsWith("/") ? hashPath : `/${hashPath}`;
 }
 
+/** Whether the loaded track has cover art, and the cache-busting version of it.
+ *
+ *  The row the track was started from is a snapshot: a track played while the
+ *  scan is still extracting covers has `hasThumb: 0` at that moment, and a cover
+ *  regenerated later sits behind the same URL. `thumb:done` for this file says
+ *  a cover now exists, so it flips availability and busts the cache.
+ *
+ *  Lives in the bar component (which stays mounted, rendering nothing, while
+ *  the detail view suppresses it) rather than in the cover element, so an
+ *  event delivered while the bar is hidden is not missed. State is keyed by
+ *  track: a value recorded for another track reads as the fresh snapshot. */
 function useTrackCover(track: AudioTrack | null): {
   hasCover: boolean;
   version: number | undefined;
 } {
-  const [hasCover, setHasCover] = useState(() =>
-    track ? hasThumbFile(track.file) : false,
-  );
-  const [version, setVersion] = useState<number | undefined>(undefined);
+  const key = track ? `${track.workspaceId}:${track.file.id}` : "";
+  const snapshotHasCover = track ? hasThumbFile(track.file) : false;
+  const [seen, setSeen] = useState<{
+    key: string;
+    hasCover: boolean;
+    version: number | undefined;
+  } | null>(null);
   const fileId = track?.file.id;
   const workspaceId = track?.workspaceId;
   useEffect(() => {
-    setHasCover(track ? hasThumbFile(track.file) : false);
-    setVersion(undefined);
-  }, [track]);
-  useEffect(() => {
-    if (!track) return;
-    // The unlisten arrives a microtask after the subscription is live, and this
-    // component is unmounted in the very same commit whenever the detail view
-    // opens over the bar — so a cleanup that runs before then must still take
-    // the subscription down, or every such open leaks one listener.
+    if (!key) return;
+    // The unlisten arrives a microtask after the subscription is live, and the
+    // track can change in the very same commit — so a cleanup that runs before
+    // then must still take the subscription down, or it leaks one listener.
     let cancelled = false;
     let unlisten: (() => void) | undefined;
     void events
       .onThumbDone((event) => {
         if (event.id !== fileId) return;
         if (event.workspaceId && event.workspaceId !== workspaceId) return;
-        setHasCover(true);
-        setVersion((v) => (v ?? 0) + 1);
+        setSeen((prev) => {
+          const version = prev?.key === key ? (prev.version ?? 0) + 1 : 1;
+          return { key, hasCover: true, version };
+        });
       })
       .then((u) => {
         if (cancelled) u();
@@ -69,8 +79,10 @@ function useTrackCover(track: AudioTrack | null): {
       cancelled = true;
       unlisten?.();
     };
-  }, [track, fileId, workspaceId]);
-  return { hasCover, version };
+  }, [key, fileId, workspaceId]);
+  if (seen && seen.key === key)
+    return { hasCover: seen.hasCover, version: seen.version };
+  return { hasCover: snapshotHasCover, version: undefined };
 }
 
 // Published so bottom-anchored overlays (the FABs, the scan-progress panel) can
@@ -208,11 +220,6 @@ export function AudioPlayerBar() {
  *  none (or the image fails to load). Square and bar-height, so a taller jacket
  *  cannot grow the bar and shift every bottom-anchored overlay with it.
  *
- *  The row the track was started from is a snapshot: a track played while the
- *  scan is still extracting covers has `hasThumb: 0` at that moment, and a cover
- *  regenerated later sits behind the same URL. `thumb:done` for this file says
- *  a cover now exists, so it flips availability and busts the cache.
- *
  *  Decorative: the filename beside it already identifies the track, so an alt text
  *  here would only make screen readers announce the same name twice. */
 function Cover({
@@ -226,13 +233,14 @@ function Cover({
 }) {
   const status = useAppStatus();
   const mediaBase = status.data?.mediaBase ?? "";
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [track]);
+  // The URL that failed rather than a flag, so a regenerated cover (a new
+  // version, hence a new URL) gets a fresh attempt.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = hasCover
     ? thumbUrl(mediaBase, track.workspaceId, track.file.id, version)
     : null;
 
-  if (!src || failed) {
+  if (!src || failedSrc === src) {
     return (
       <Music size={18} className="shrink-0 text-muted" aria-hidden="true" />
     );
@@ -241,7 +249,7 @@ function Cover({
     <img
       src={src}
       alt=""
-      onError={() => setFailed(true)}
+      onError={() => setFailedSrc(src)}
       className="size-8 shrink-0 rounded-sm object-cover"
     />
   );

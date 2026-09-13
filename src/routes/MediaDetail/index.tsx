@@ -2,7 +2,12 @@
 // tag editing, rating, and metadata display. Single-column YouTube-like layout: a large
 // player on top, title/controls right below, then meta, tags, scenes, and history stacked as cards.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import {
   type InfiniteData,
   useMutation,
@@ -112,9 +117,10 @@ export default function MediaDetail() {
   );
 
   const onClose = useCallback(() => {
-    const state = location.state as
-      | { outsideRouter?: boolean; origin?: string }
-      | null;
+    const state = location.state as {
+      outsideRouter?: boolean;
+      origin?: string;
+    } | null;
     if (state?.outsideRouter) {
       void navigate(state.origin || "/", { replace: true, state });
       return;

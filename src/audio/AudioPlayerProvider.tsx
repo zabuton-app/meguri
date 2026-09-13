@@ -41,6 +41,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [current, setCurrent] = useState<AudioTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [ended, setEnded] = useState(false);
   const [duration, setDuration] = useState<number | null>(null);
   const [position, setPosition] = useState(0);
   // One volume for every player surface: the detail view, the playlist player
@@ -151,6 +152,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const onTime = () => setPosition(el.currentTime);
     const onPlay = () => {
       setIsPlaying(true);
+      setEnded(false);
       // Fires on every paused→playing edge, so this is exactly "audio starts":
       // a video that is running yields here, once, and nothing reacts to audio
       // that merely keeps playing.
@@ -165,6 +167,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const onPause = () => setIsPlaying(false);
     const onEnded = () => {
       setIsPlaying(false);
+      setEnded(true);
       // Stop at the end rather than snapping to 0, so the bar shows the track at
       // its final position and stays replayable.
       setPosition(Number.isFinite(el.duration) ? el.duration : el.currentTime);
@@ -230,6 +233,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       setError(null);
       setDuration(null);
       setPosition(startAt);
+      setEnded(false);
       setCurrent({ file, workspaceId });
       el.src = src;
       // Assigned before any data has arrived, which the element honours as the
@@ -291,6 +295,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const max = durationRef.current ?? 0;
     const clamped = Math.min(max, Math.max(0, sec));
     el.currentTime = clamped;
+    setEnded(false);
     setPosition(clamped);
   }, []);
 
@@ -315,6 +320,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }
     setCurrent(null);
     setIsPlaying(false);
+    setEnded(false);
     setDuration(null);
     setPosition(0);
     setError(null);
@@ -383,6 +389,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     () => ({
       current,
       isPlaying,
+      ended,
       duration,
       volume,
       muted,
@@ -399,6 +406,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     [
       current,
       isPlaying,
+      ended,
       duration,
       volume,
       muted,

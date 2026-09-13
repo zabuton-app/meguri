@@ -19,6 +19,10 @@ export interface AudioPlayerState {
   /** The loaded track, or null when nothing is loaded (bar hidden). */
   current: AudioTrack | null;
   isPlaying: boolean;
+  /** True from the track playing to its end until it is started, sought or
+   *  replaced. Lets a consumer that was not mounted for the `ended` event (the
+   *  playlist during a detail detour) find out afterwards. */
+  ended: boolean;
   /** Track length in seconds; null when indeterminate. */
   duration: number | null;
   volume: number;
