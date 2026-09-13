@@ -14,7 +14,12 @@ import {
   sampleFileRow,
   WS_ID,
 } from "@/test/fixtures";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from "@/test/renderWithProviders";
+import type { QueryClient } from "@tanstack/react-query";
+import { resetVideoHandOff } from "@/video/videoHandOff";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
@@ -63,6 +68,11 @@ function nav(items: FileRow[], overrides: Partial<MediaNav> = {}): MediaNav {
   };
 }
 
+// One cache per test, shared by every mount in it, as in the app: a player
+// that comes back from the detail view knows the media origin at once (and so
+// adopts the <video> the detour parked for it, see video/videoHandOff.ts).
+let queryClient: QueryClient;
+
 function renderPlayer(
   items: FileRow[],
   route = "/play",
@@ -72,7 +82,7 @@ function renderPlayer(
     <MediaNavProvider value={nav(items, overrides)}>
       <Player />
     </MediaNavProvider>,
-    { route },
+    { route, queryClient },
   );
 }
 
@@ -85,9 +95,13 @@ function renderPlayerStrict(items: FileRow[], route: string) {
         <Player />
       </MediaNavProvider>
     </StrictMode>,
-    { route },
+    { route, queryClient },
   );
 }
+
+// `resetVideoHandOff()` tears a parked element down through `load()`, which
+// jsdom does not implement.
+vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
 
 /** Where the router ended up, without the leading "#". */
 const at = () => window.location.hash.slice(1);
@@ -115,6 +129,8 @@ function playTo(seconds: number) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetVideoHandOff();
+  queryClient = createTestQueryClient();
   localStorage.clear();
   mocks.appStatus.mockResolvedValue(defaultAppStatus);
   mocks.fileGet.mockImplementation((id: number) =>
