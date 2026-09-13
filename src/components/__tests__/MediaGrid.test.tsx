@@ -335,6 +335,27 @@ describe("MediaGrid", () => {
       await expectNoToggle();
     });
 
+    it("opens the focused card on Enter, and its details without autoplay on Shift+Enter", async () => {
+      renderGrid();
+      await ready();
+      fireEvent.keyDown(window, { code: "ArrowDown" });
+
+      fireEvent.keyDown(window, { code: "Enter", shiftKey: true });
+      await waitFor(() =>
+        expect(window.location.hash).toBe(
+          `#/file/${sampleFileRow.id}?ws=${WS_ID}&autoplay=0`,
+        ),
+      );
+
+      window.location.hash = "#/";
+      fireEvent.keyDown(window, { code: "Enter" });
+      await waitFor(() =>
+        expect(window.location.hash).toBe(
+          `#/file/${sampleFileRow.id}?ws=${WS_ID}`,
+        ),
+      );
+    });
+
     it("ignores auto-repeat from a held key", async () => {
       renderGrid();
       await ready();

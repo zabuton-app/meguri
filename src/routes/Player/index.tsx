@@ -10,7 +10,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
 import { Music } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
-import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import {
+  useAudioActions,
+  useAudioPlayer,
+  useExclusivePlayback,
+} from "@/audio/useAudioPlayer";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -30,6 +34,7 @@ import {
   invalidatePlayedSearches,
 } from "@/lib/queryCache";
 import { fileHref } from "@/lib/fileHref";
+import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import { queueKey, type PlaybackQueue } from "@/lib/playbackQueue";
 import { fileNameOf } from "@/lib/relPath";
 import {
@@ -126,17 +131,27 @@ export default function Player() {
   const [paused, setPaused] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
 
-  // The playlist owns sound while it is open. A track left playing in the bottom
-  // bar would otherwise keep going underneath the first video — paused rather
-  // than closed, so it is still there to resume after leaving the player.
-  const { pause: pauseAudio } = useAudioPlayer();
-  useEffect(() => {
-    pauseAudio();
-  }, [pauseAudio]);
   // Shared with the detail view's player, so a level set in either place holds
   // for the other and survives both item switches and restarts.
   const { volume, muted } = useVolume();
   const videoRef = useRef<PlayerHandle>(null);
+  // Audio items play through the bottom bar's element rather than a <video>
+  // of this route's own: that element lives outside the router, so stepping
+  // out to the detail view (a sibling route that unmounts this one) and back
+  // never interrupts the sound — the same reason Discover's playback survives
+  // the trip. The bar itself stays hidden under this full-screen player.
+  const audio = useAudioPlayer();
+  const {
+    play: playAudio,
+    toggle: toggleAudio,
+    subscribeEnded,
+  } = useAudioActions();
+  // The playlist owns sound while it is open. A track left playing in the bottom
+  // bar would otherwise keep going underneath a video or a picture — paused
+  // rather than closed, so it is still there to resume after leaving the player.
+  const { claim: claimPlayback } = useExclusivePlayback(() =>
+    videoRef.current?.pause(),
+  );
 
   const exit = useCallback(() => {
     if (document.fullscreenElement)
@@ -190,9 +205,19 @@ export default function Player() {
   });
   const file = detail.data ?? null;
   const isImage = current?.kind === "image";
-  // Audio goes through the same <video> element as video (Chromium plays it
-  // fine, and `ended` advances the queue the same way); only the picture differs.
   const isAudio = current?.kind === "audio";
+  const currentKey = current ? queueKey(current) : "";
+  const isCurrentAudio =
+    isAudio &&
+    !!current &&
+    audio.current?.file.id === current.fileId &&
+    audio.current.workspaceId === current.workspaceId;
+  const audioPlaying = isCurrentAudio && audio.isPlaying;
+  // Claimed per item, not once on mount: an audio item *is* the bar's sound,
+  // so only a video or a picture takes it over.
+  useEffect(() => {
+    if (currentKey && !isAudio) claimPlayback();
+  }, [currentKey, isAudio, claimPlayback]);
 
   // Step out to this file's detail view. The detail route is a sibling of this
   // one, so this always ends playback for now — what makes it a detour rather
@@ -206,9 +231,12 @@ export default function Player() {
       fileHref(current.fileId, current.workspaceId, {
         from: "player",
         t: sec >= RESUME_MIN_SEC ? sec : undefined,
+        // Audio keeps playing in the bar across the trip; the detail view must
+        // neither restart it nor resume a track the user had paused here.
+        autoplay: !isAudio,
       }),
     );
-  }, [current, isImage, navigate, queue.queue]);
+  }, [current, isImage, isAudio, navigate, queue.queue]);
 
   // The second to come back to, offered only to the file the player left from.
   // The detail view hands back where *it* got to, which is ahead of the detour
@@ -225,6 +253,9 @@ export default function Player() {
         ? Math.max(0, Math.floor(Number(handedBack)))
         : pickUp.sec
       : 0;
+  // Back from the detail view on the very item the pass was parked on: the
+  // bar's track is left in whatever state the user put it there.
+  const isDetourPickUp = !!current && pickUp?.key === queueKey(current);
 
   // Without its details there is nothing to render for this item, so a failed
   // fetch would leave the stage blank for good. Treat it like any other
@@ -313,8 +344,12 @@ export default function Player() {
       setPaused((p) => !p);
       return;
     }
+    if (isAudio) {
+      toggleAudio();
+      return;
+    }
     videoRef.current?.togglePlay();
-  }, [isImage]);
+  }, [isImage, isAudio, toggleAudio]);
 
   // Item changes animate rather than cut. Two independent effects compose:
   // "fade" dissolves between the two items, "transition" slides one over the
@@ -389,6 +424,96 @@ export default function Player() {
       }, 1),
     [next, transitionTo],
   );
+  // Read by the audio `ended` subscription, which is set up once.
+  const goNextRef = useRef(goNext);
+  useEffect(() => {
+    goNextRef.current = goNext;
+  }, [goNext]);
+  // Start the audio item in the bar once its row is known (play() needs the
+  // row; the detail is fetched anyway). Guarded per visit of an item so a
+  // refetch cannot restart it; the guard is dropped when the track ends so a
+  // one-item queue on repeat plays it again. A track already in the bar is
+  // resumed (or left alone if it is playing — coming back from the detail
+  // view, or opening the playlist on the track Discover started).
+  const startedAudioFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isAudio) {
+      startedAudioFor.current = null;
+      return;
+    }
+    if (!current || !file || !mediaBase) return;
+    if (startedAudioFor.current === currentKey) return;
+    startedAudioFor.current = currentKey;
+    if (isCurrentAudio) {
+      if (isDetourPickUp) return;
+      if (!audioPlaying) toggleAudio();
+      return;
+    }
+    playAudio(
+      { ...file, workspaceId: current.workspaceId },
+      current.workspaceId,
+      { startAt: resumeSec },
+    );
+  }, [
+    isAudio,
+    current,
+    currentKey,
+    file,
+    mediaBase,
+    isCurrentAudio,
+    isDetourPickUp,
+    audioPlaying,
+    playAudio,
+    toggleAudio,
+    resumeSec,
+  ]);
+  // `ended` advances the queue, the way the video's does.
+  const currentKeyForEnded = useRef(currentKey);
+  const detourEndedHandledFor = useRef<string | null>(null);
+  useEffect(() => {
+    currentKeyForEnded.current = currentKey;
+    detourEndedHandledFor.current = null;
+  }, [currentKey]);
+  useEffect(
+    () =>
+      subscribeEnded((track) => {
+        const key = queueKey({
+          fileId: track.file.id,
+          workspaceId: track.workspaceId,
+        });
+        if (key !== currentKeyForEnded.current) return;
+        startedAudioFor.current = null;
+        goNextRef.current();
+      }),
+    [subscribeEnded],
+  );
+  // While the detail route is open this component is unmounted, so it misses
+  // the provider's `ended`; the provider keeps the fact as state, so a track
+  // that ran out during the detour advances the queue on return rather than
+  // being restored and restarted.
+  useEffect(() => {
+    if (!isCurrentAudio || !isDetourPickUp || !audio.ended) return;
+    if (detourEndedHandledFor.current === currentKey) return;
+    detourEndedHandledFor.current = currentKey;
+    startedAudioFor.current = null;
+    goNextRef.current();
+  }, [isCurrentAudio, isDetourPickUp, audio.ended, currentKey]);
+  // An audio item that fails to play is skipped like a broken video.
+  useEffect(() => {
+    if (isCurrentAudio && audio.error) skipCurrent();
+  }, [isCurrentAudio, audio.error, skipCurrent]);
+  // The bar draws no chrome here, so a play/pause has to wake the control bar
+  // to be seen at all (the video reports the same through onPlayingChange).
+  const audioPlayingReady = useRef(false);
+  useEffect(() => {
+    if (!isAudio) return;
+    if (!audioPlayingReady.current) {
+      audioPlayingReady.current = true;
+      return;
+    }
+    wake();
+  }, [isAudio, audioPlaying, wake]);
+
   const goPrev = useCallback(
     () =>
       transitionTo(() => {
@@ -410,9 +535,11 @@ export default function Player() {
 
   // Keyboard control, so the whole session can run without a mouse (FR-020).
   // Space and the arrows are left to the video player while a video is on
-  // screen: it owns play/pause and seeking there.
+  // screen: it owns play/pause and seeking there. Images and audio (which has
+  // no player element of its own here) are handled below.
   const keyState = useRef({
     isImage,
+    isAudio,
     togglePlay,
     openDetail,
     goNext,
@@ -426,6 +553,7 @@ export default function Player() {
   useEffect(() => {
     keyState.current = {
       isImage,
+      isAudio,
       togglePlay,
       openDetail,
       goNext,
@@ -508,17 +636,17 @@ export default function Player() {
           s.openDetail();
           return;
         case "Space":
-          if (!s.isImage) return;
+          if (!s.isImage && !s.isAudio) return;
           e.preventDefault();
           s.togglePlay();
           return;
         case "ArrowRight":
-          if (!s.isImage) return;
+          if (!s.isImage && !s.isAudio) return;
           e.preventDefault();
           s.goNext();
           return;
         case "ArrowLeft":
-          if (!s.isImage) return;
+          if (!s.isImage && !s.isAudio) return;
           e.preventDefault();
           s.goPrev();
           return;
@@ -526,17 +654,17 @@ export default function Player() {
         // is on screen its own handler owns these keys, and acting here as well
         // would move the level twice per press.
         case "ArrowUp":
-          if (!s.isImage) return;
+          if (!s.isImage && !s.isAudio) return;
           e.preventDefault();
           bumpVolume(VOLUME_STEP);
           return;
         case "ArrowDown":
-          if (!s.isImage) return;
+          if (!s.isImage && !s.isAudio) return;
           e.preventDefault();
           bumpVolume(-VOLUME_STEP);
           return;
         case "KeyM":
-          if (!s.isImage) return;
+          if (!s.isImage && !s.isAudio) return;
           e.preventDefault();
           toggleMuted();
           return;
@@ -563,10 +691,9 @@ export default function Player() {
   // fetched detail instead put an IPC round trip between the swap and the first
   // pixel, which is the gap that showed up on every next/previous. The detail
   // now only enriches what is already on screen (the file's name).
-  const thumbSrc =
-    mediaBase && current
-      ? `${mediaBase}/ws/${wsId}/thumb/${current.fileId}`
-      : undefined;
+  const thumbSrc = current
+    ? (thumbUrl(mediaBase, wsId, current.fileId) ?? undefined)
+    : undefined;
   const mediaSrc =
     mediaBase && current
       ? `${mediaBase}/ws/${wsId}/media/${current.fileId}`
@@ -579,7 +706,7 @@ export default function Player() {
     thumbSrcRef.current = thumbSrc;
   });
   const imageMotion = playlistImageMotion && !reducedMotion;
-  const playing = isImage ? !paused : videoPlaying;
+  const playing = isImage ? !paused : isAudio ? audioPlaying : videoPlaying;
 
   const emptyMessage = queue.unplayable
     ? t("playlist.unplayable")
@@ -652,7 +779,7 @@ export default function Player() {
                   onError={skipCurrent}
                 />
               )}
-              {current && !isImage && (
+              {current && !isImage && !isAudio && (
                 <VideoPlayer
                   ref={videoRef}
                   key={`${wsId}:${current.fileId}`}
@@ -671,6 +798,9 @@ export default function Player() {
                   fullscreenTargetRef={rootRef}
                   onNativeDuration={() => undefined}
                   onPlayed={() => invalidatePlayedSearches(qc)}
+                  // Reclaims the sound on every start (first play, resume,
+                  // item switch), not only when the player mounted.
+                  onPlaybackStart={claimPlayback}
                   chromeless
                   onEnded={goNext}
                   onPlayingChange={(playing) => {
@@ -684,12 +814,10 @@ export default function Player() {
                 />
               )}
               {current && isAudio && (
-                // The <video> element draws nothing for an audio file, so show
+                // The sound comes from the bar's element, so the stage shows
                 // the cover art (or the kind's glyph) where the picture would be.
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  {file?.thumbStatus === "done" &&
-                  file.hasThumb === 1 &&
-                  thumbSrc ? (
+                  {file && hasThumbFile(file) && thumbSrc ? (
                     <img
                       src={thumbSrc}
                       alt=""

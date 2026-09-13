@@ -190,6 +190,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "向上滚动",
   "shortcuts.moveFocus": "移动焦点（上下左右）",
   "shortcuts.openFocused": "打开选中项",
+  "shortcuts.inspectFocused": "打开选中项的详情（不播放）",
   "shortcuts.watchLater": "切换稍后观看",
   "shortcuts.help": "本帮助",
   "shortcuts.playPause": "播放 / 暂停",

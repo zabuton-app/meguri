@@ -154,10 +154,14 @@ export function openDb(file: string): DB {
   db.pragma("synchronous = NORMAL");
   db.pragma("foreign_keys = ON");
   db.exec(CORE_DDL);
-  backfillColumns(db);
-  // Must run before migrateFtsToTrigram: that migration reads `files`, so it has to
-  // see the final table rather than one about to be rebuilt underneath it.
+  // Before backfillColumns: on a DB that pre-dates `btime`, the backfill would add
+  // the column and build its two indexes only for the table rebuild here to drop
+  // and recreate them (FILES_DDL already carries `btime`; the rebuild's own
+  // backfill pass then only adds the indexes). Before migrateFtsToTrigram: that
+  // migration reads `files`, so it has to see the final table rather than one
+  // about to be rebuilt underneath it.
   migrateKindCheck(db);
+  backfillColumns(db);
   migrateFtsToTrigram(db);
   return db;
 }
@@ -207,7 +211,8 @@ function backfillColumns(db: DB): void {
  *    (not content=files) whose rowid is set to files.id by syncFts, and searches
  *    join the two on it — renumbering would silently break every search result.
  *  - The column list is read from the live table so a DB that pre-dates `btime`
- *    (added by backfillColumns) copies only the columns it actually has.
+ *    (added by backfillColumns, which runs after this) copies only the columns it
+ *    actually has; the rebuilt table gets `btime` from FILES_DDL, NULL throughout.
  *  - `meta_key` is a VIRTUAL generated column and must be excluded from the INSERT;
  *    it re-derives itself from content_hash / root_id / rel_path.
  *  - DROP TABLE takes the indexes with it, so CORE_DDL and backfillColumns are re-run

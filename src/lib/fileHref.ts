@@ -8,6 +8,8 @@ export interface FileHrefOpts {
   t?: number;
   /** Origin marker for the modal-close fallback (e.g. "discover"). */
   from?: string;
+  /** Discovery's serialized filter, carried so closing lands on the same queue. */
+  filter?: string;
 }
 
 export function fileHref(
@@ -20,5 +22,6 @@ export function fileHref(
   if (opts.autoplay === false) params.set("autoplay", "0");
   if (opts.t) params.set("t", String(opts.t));
   if (opts.from) params.set("from", opts.from);
+  if (opts.filter) params.set("filter", opts.filter);
   return `/file/${fileId}?${params.toString()}`;
 }

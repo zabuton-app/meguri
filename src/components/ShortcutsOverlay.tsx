@@ -45,6 +45,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
       keys: formatChords([...g.up, ...g.down, ...g.left, ...g.right]),
     },
     { label: t("shortcuts.openFocused"), keys: formatChords(g.open) },
+    { label: t("shortcuts.inspectFocused"), keys: formatChords(g.inspect) },
     { label: t("shortcuts.watchLater"), keys: "W" },
     { label: t("shortcuts.scrollDown"), keys: formatChords(b.pageDown) },
     { label: t("shortcuts.scrollUp"), keys: formatChords(b.pageUp) },

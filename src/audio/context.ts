@@ -9,10 +9,20 @@ export interface AudioTrack {
   workspaceId: string;
 }
 
+export interface PlayOpts {
+  /** Start this many seconds in rather than from the top (a playlist handing
+   *  the track it was playing over to the bar). */
+  startAt?: number;
+}
+
 export interface AudioPlayerState {
   /** The loaded track, or null when nothing is loaded (bar hidden). */
   current: AudioTrack | null;
   isPlaying: boolean;
+  /** True from the track playing to its end until it is started, sought or
+   *  replaced. Lets a consumer that was not mounted for the `ended` event (the
+   *  playlist during a detail detour) find out afterwards. */
+  ended: boolean;
   /** Track length in seconds; null when indeterminate. */
   duration: number | null;
   volume: number;
@@ -22,7 +32,7 @@ export interface AudioPlayerState {
 
   // Declared as properties rather than methods: every one is an arrow function
   // from useCallback, so they carry no `this` and are safe to destructure.
-  play: (file: FileRow, workspaceId: string) => void;
+  play: (file: FileRow, workspaceId: string, opts?: PlayOpts) => void;
   toggle: () => void;
   /** Pause without unloading. Used for video exclusivity. */
   pause: () => void;
@@ -47,7 +57,7 @@ export const AudioPlayerContext = createContext<AudioPlayerState | null>(null);
  * each of those.
  */
 export interface AudioActions {
-  play: (file: FileRow, workspaceId: string) => void;
+  play: (file: FileRow, workspaceId: string, opts?: PlayOpts) => void;
   /** Play the file, or toggle it if it is the track already loaded. */
   playOrToggle: (file: FileRow, workspaceId: string) => void;
   /** Pause only if the given file is the loaded track (e.g. before opening it externally). */
@@ -59,6 +69,12 @@ export interface AudioActions {
   toggleMuted: () => void;
   close: () => void;
   dismissError: () => void;
+  /** Called with the track when it plays to its end (the playlist advances
+   *  on it). Returns the unsubscribe function. */
+  subscribeEnded: (listener: (track: AudioTrack) => void) => () => void;
+  /** Register another sound source (see useExclusivePlayback). The listener is
+   *  called whenever bar audio starts; returns the unregister function. */
+  registerPeer: (onAudioStart: () => void) => () => void;
 }
 
 export const AudioActionsContext = createContext<AudioActions | null>(null);

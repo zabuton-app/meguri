@@ -199,6 +199,8 @@ export const es: Record<TranslationKey, string> = {
   "shortcuts.scrollUp": "Desplazar arriba",
   "shortcuts.moveFocus": "Mover el foco (arriba/abajo/izquierda/derecha)",
   "shortcuts.openFocused": "Abrir el elemento enfocado",
+  "shortcuts.inspectFocused":
+    "Abrir los detalles del elemento enfocado (sin reproducir)",
   "shortcuts.watchLater": "Alternar Ver más tarde",
   "shortcuts.help": "Esta ayuda",
   "shortcuts.playPause": "Reproducir / pausar",

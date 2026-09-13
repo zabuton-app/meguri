@@ -185,11 +185,20 @@ export const MediaGrid = memo(function MediaGrid({
     },
     [items, activate],
   );
+  // Shift+Enter is the keyboard form of the name click: details, no playback.
+  const onInspect = useCallback(
+    (index: number) => {
+      const f = items[index];
+      if (f) activate(f, { autoplay: false });
+    },
+    [items, activate],
+  );
   const { focusedIndex, setFocusedIndex } = useGridKeyboardNav({
     itemCount: items.length,
     columns: cols,
     active: navActive,
     onOpen,
+    onInspect,
     scrollToRow,
   });
   // Points at the focused card's toggle so "W" activates it through the button

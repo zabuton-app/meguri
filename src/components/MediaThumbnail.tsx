@@ -1,6 +1,7 @@
 import { createElement, useState } from "react";
 import { Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
+import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import type { FileRow } from "@/ipc/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
@@ -50,14 +51,11 @@ export function MediaThumbnail({
   // marked thumb_status 'done' whether or not it embeds cover art, so status
   // alone would build a URL that 404s for the cover-less ones. Audio *with* a
   // cover renders it like any other thumbnail.
-  const hasThumb =
-    file.thumbStatus === "done" &&
-    file.hasThumb === 1 &&
-    mediaBase &&
-    file.workspaceId;
-  const src = hasThumb
-    ? `${mediaBase}/ws/${file.workspaceId}/thumb/${file.id}?v=${version}`
+  const src = hasThumbFile(file)
+    ? (thumbUrl(mediaBase, file.workspaceId, file.id, version) ?? undefined)
     : undefined;
+  // Also false until the media origin is known, so nothing tries to load early.
+  const hasThumb = src !== undefined;
   const [imgLoaded, setImgLoaded] = useState(false);
   // Holds the URL that failed rather than a bare flag: this component is reused
   // across rows by the virtualizer, so a sticky `true` would hide a perfectly
