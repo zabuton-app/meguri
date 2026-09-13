@@ -96,16 +96,38 @@ function DetailRoute() {
   );
 }
 
-async function openDetail(route: string, heading = "sample.mp4") {
+/** Open the detail view at `route`. `rowWidth` sizes the box the peek
+ *  measures itself against (the setup stubs every element at 1200px; the
+ *  frame's `display: contents` wrapper really measures 0 and is skipped). */
+async function openDetail(
+  route: string,
+  heading = "sample.mp4",
+  rowWidth?: number,
+) {
   renderWithProviders(<DetailRoute />, { route });
   await waitFor(() => {
     expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
   });
+  if (rowWidth != null) {
+    const wrapper = screen.getByRole("dialog").parentElement!;
+    Object.defineProperty(wrapper, "clientWidth", {
+      configurable: true,
+      get: () => 0,
+    });
+    Object.defineProperty(wrapper.parentElement!, "clientWidth", {
+      configurable: true,
+      get: () => rowWidth,
+    });
+    // The fit ran on docking, before the stubs above; a resize re-fits.
+    fireEvent(window, new Event("resize"));
+  }
 }
 
 const dialog = () => screen.getByRole("dialog");
 const barSuppressed = () =>
   screen.getByTestId("bar-suppressed").textContent === "true";
+const peekInset = () =>
+  document.documentElement.style.getPropertyValue("--meguri-peek-inset");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -117,6 +139,13 @@ beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+  // jsdom has no pointer capture; the drag handle asks for it.
+  if (!Element.prototype.setPointerCapture) {
+    Object.defineProperty(Element.prototype, "setPointerCapture", {
+      value: () => {},
+      configurable: true,
+    });
+  }
 });
 
 afterEach(() => {
@@ -169,6 +198,92 @@ describe("MediaDetail presentation", () => {
     // Small, as it was last left — not reset to large by the round trip.
     const toggle = screen.getByRole("button", { name: "Enlarge modal" });
     expect(toggle.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("docks at the remembered width and publishes it for the FABs", async () => {
+    localStorage.setItem("meguri.media.presentation", "peek");
+    localStorage.setItem("meguri.media.peekWidth", "600");
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    expect(dialog().style.width).toBe("600px");
+    expect(peekInset()).toBe("600px");
+    fireEvent.click(screen.getByRole("button", { name: "Open as modal" }));
+    // Back to a modal: no width of its own, and the FABs return to the edge.
+    expect(dialog().style.width).toBe("");
+    expect(peekInset()).toBe("0px");
+  });
+
+  it("resizes from the keyboard on the handle, within the minimum", async () => {
+    localStorage.setItem("meguri.media.presentation", "peek");
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    const handle = screen.getByRole("separator", { name: "Resize side peek" });
+    // Left grows the sheet (its edge moves left), right shrinks it.
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(dialog().style.width).toBe("536px");
+    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("536");
+    for (let i = 0; i < 20; i++) {
+      fireEvent.keyDown(handle, { key: "ArrowRight" });
+    }
+    expect(dialog().style.width).toBe("320px");
+  });
+
+  it("resizes by dragging the handle and remembers the result", async () => {
+    localStorage.setItem("meguri.media.presentation", "peek");
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    const panel = dialog();
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      width: 520,
+    } as DOMRect);
+    const handle = screen.getByRole("separator", { name: "Resize side peek" });
+    fireEvent.pointerDown(handle, { button: 0, clientX: 800, pointerId: 1 });
+    // A second pointer joining mid-drag is ignored rather than fought over.
+    fireEvent.pointerDown(handle, { button: 0, clientX: 300, pointerId: 2 });
+    // Dragging the edge 100px to the left widens the sheet by as much, live.
+    fireEvent.pointerMove(handle, { clientX: 700, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 100, pointerId: 2 });
+    expect(panel.style.width).toBe("620px");
+    expect(handle.getAttribute("aria-valuenow")).toBe("620");
+    expect(peekInset()).toBe("620px");
+    // Nothing is written until the drag ends (docking fitted and stored the
+    // default; the live width is DOM-only).
+    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("520");
+    fireEvent.pointerUp(handle, { pointerId: 2 });
+    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("520");
+    fireEvent.pointerUp(handle, { pointerId: 1 });
+    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("620");
+  });
+
+  it("keeps the width reached when the view closes mid-drag", async () => {
+    localStorage.setItem("meguri.media.presentation", "peek");
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    const panel = dialog();
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      width: 520,
+    } as DOMRect);
+    const handle = screen.getByRole("separator", { name: "Resize side peek" });
+    fireEvent.pointerDown(handle, { button: 0, clientX: 800, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 750, pointerId: 1 });
+    // Esc closes the view with the pointer still down: no pointerup will
+    // ever reach the handle, so the drag is finished on the way out.
+    fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
+    await waitFor(() => expect(window.location.hash.slice(1)).toBe("/"));
+    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("570");
+    expect(peekInset()).toBe("0px");
+  });
+
+  it("never squeezes the list below its minimum, whatever width was remembered", async () => {
+    localStorage.setItem("meguri.media.presentation", "peek");
+    localStorage.setItem("meguri.media.peekWidth", "1400");
+    await openDetail(`/file/1?ws=${WS_ID}`, "sample.mp4", 700);
+    // 700px row − 240px for the list = 460px at most, applied on docking…
+    await waitFor(() => expect(dialog().style.width).toBe("460px"));
+    expect(localStorage.getItem("meguri.media.peekWidth")).toBe("460");
+    const handle = screen.getByRole("separator", { name: "Resize side peek" });
+    expect(handle.getAttribute("aria-valuemax")).toBe("460");
+    // …and to every later change.
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(dialog().style.width).toBe("460px");
+    // The list keeps its side of the bargain in CSS as well.
+    expect(dialog().style.maxWidth).toBe("calc(100% - 240px)");
   });
 
   it("closes the peek with Esc like the modal", async () => {

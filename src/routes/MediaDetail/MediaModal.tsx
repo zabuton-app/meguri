@@ -1,4 +1,10 @@
-import { useEffect, type ReactNode, type Ref } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  type ReactNode,
+  type Ref,
+} from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { LIST_MIN_WIDTH, PEEK_MIN_WIDTH, usePeekResize } from "./usePeekResize";
 
 export type ModalSize = "large" | "small";
 
@@ -26,17 +33,19 @@ export const PRESENTATION_KEY = "meguri.media.presentation";
 // Frame around the detail view. Close on Esc, and on backdrop click when there
 // is a backdrop (the modal). `size` toggles the modal between a
 // near-fullscreen layout ("large") and a centered compact panel ("small");
-// `presentation: "peek"` renders the side sheet instead, positioned against the
-// nearest positioned ancestor (Home's list area). `containerRef` exposes the
-// inner panel so the player can request fullscreen on the whole frame
-// (YouTube-style); `fullscreen` drops the frame decorations while that element
-// is the fullscreen element.
+// `presentation: "peek"` renders the side sheet instead: an in-flow sibling
+// of Home's list that takes its width from the row, so the list narrows and
+// every part of it stays reachable. `containerRef` exposes the inner panel so
+// the player can request fullscreen on the whole frame (YouTube-style);
+// `fullscreen` drops the frame decorations while that element is the
+// fullscreen element.
 export function MediaModal({
   onClose,
   size = "large",
   presentation = "modal",
   fullscreen = false,
   containerRef,
+  t,
   children,
 }: {
   onClose: () => void;
@@ -44,6 +53,7 @@ export function MediaModal({
   presentation?: Presentation;
   fullscreen?: boolean;
   containerRef?: Ref<HTMLDivElement>;
+  t: TFunc;
   children: ReactNode;
 }) {
   useEffect(() => {
@@ -59,31 +69,36 @@ export function MediaModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const isPeek = presentation === "peek";
+  const docked = isPeek && !fullscreen;
+
+  // The panel element, for measuring and for live-resizing during a drag
+  // without a render per pointer move (the parent's ref is served too).
+  const panelRef = useRef<HTMLDivElement>(null);
+  useImperativeHandle(containerRef, () => panelRef.current as HTMLDivElement);
+  const peek = usePeekResize(docked, panelRef);
+
   // One tree shape for both presentations: only classes and ARIA change, so
   // switching modal ↔ peek re-styles the frame without remounting what is
   // inside it (a playing <video> keeps its position; a half-typed tag stays).
-  // In the peek the outer div is `display: contents`, so the sheet's
-  // `absolute` resolves against Home's list area, not against the frame.
-  // Position and width are set per variant rather than in a shared base, so
-  // no utility of the base can outrank a variant's (Tailwind orders the
-  // generated rules, not the class string).
-  const isPeek = presentation === "peek";
+  // In the peek the outer div is `display: contents`, so the sheet is laid
+  // out as a flex item of Home's list row. Position and width are set per
+  // variant rather than in a shared base, so no utility of the base can
+  // outrank a variant's (Tailwind orders the generated rules, not the class
+  // string).
   const innerBase = "flex min-h-0 flex-col overflow-hidden bg-bg";
   let outerClass: string;
   let innerClass: string;
   if (isPeek) {
     outerClass = "contents";
-    // No backdrop: the list stays interactive beside the sheet. The sheet
-    // overlays the list's right edge rather than pushing it, so opening and
-    // closing never reflows the grid. z-40 keeps it above the floating action
-    // buttons (z-30), which would otherwise sit on top of it. While
-    // fullscreen only the decorations go: the UA stylesheet sizes the
-    // fullscreen element itself, and keeping it positioned avoids one in-flow
-    // frame on the way out that would squeeze the list to nothing.
-    innerClass = `${innerBase} absolute inset-y-0 right-0 z-40 w-[520px] max-w-full${
+    // No backdrop: the list stays interactive beside the sheet, which takes
+    // its share of the row so the list narrows rather than being covered.
+    // While fullscreen only the decorations go: the UA stylesheet sizes the
+    // fullscreen element itself.
+    innerClass = `${innerBase} relative shrink-0${
       fullscreen
         ? ""
-        : " border-l border-border shadow-[-24px_0_48px_rgba(0,0,0,0.45)]"
+        : " border-l border-border shadow-[-24px_0_48px_rgba(0,0,0,0.25)]"
     }`;
   } else {
     const outerBase = "fixed inset-0 z-50 flex bg-black/70 backdrop-blur-sm";
@@ -106,12 +121,39 @@ export function MediaModal({
       aria-modal={isPeek ? undefined : "true"}
     >
       <div
-        ref={containerRef}
+        ref={panelRef}
         className={innerClass}
+        // Inline rather than a Tailwind class: the ceiling is derived from
+        // LIST_MIN_WIDTH, and a class built from it would not be scanned.
+        style={
+          docked
+            ? {
+                width: peek.width,
+                maxWidth: `calc(100% - ${LIST_MIN_WIDTH}px)`,
+              }
+            : undefined
+        }
         onClick={(e) => e.stopPropagation()}
         role={isPeek ? "dialog" : undefined}
         data-presentation={presentation}
       >
+        {docked && (
+          // Grab strip along the sheet's left edge. Wider than its 1px look
+          // (the hit area extends past the border) so it is easy to catch.
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t("media.peekResize")}
+            aria-valuenow={peek.width}
+            aria-valuemin={PEEK_MIN_WIDTH}
+            aria-valuemax={Number.isFinite(peek.max) ? peek.max : undefined}
+            tabIndex={0}
+            title={t("media.peekResize")}
+            onPointerDown={peek.onPointerDown}
+            onKeyDown={peek.onKeyDown}
+            className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none"
+          />
+        )}
         {children}
       </div>
     </div>

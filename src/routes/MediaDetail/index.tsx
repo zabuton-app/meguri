@@ -604,6 +604,7 @@ export default function MediaDetail() {
         onClose={onClose}
         size={modalSize}
         presentation={presentation}
+        t={t}
       >
         <TopBar
           onClose={onClose}
@@ -628,6 +629,7 @@ export default function MediaDetail() {
         onClose={onClose}
         size={modalSize}
         presentation={presentation}
+        t={t}
       >
         <TopBar
           onClose={onClose}
@@ -654,6 +656,7 @@ export default function MediaDetail() {
       presentation={presentation}
       fullscreen={isFullscreen}
       containerRef={modalRef}
+      t={t}
     >
       {!isFullscreen && (
         <TopBar

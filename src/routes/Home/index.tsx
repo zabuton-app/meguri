@@ -575,11 +575,13 @@ export default function Home() {
         onOpenDevTools={openDevTools}
       />
 
-      {/* The list area is the positioning box for the detail side peek (see
-          MediaModal): the sheet docks to its right edge, under the header and
-          filter bar and above the player and status bars. */}
+      {/* The list row: the detail side peek (see MediaModal) docks here as a
+          flex sibling of the list, under the header and filter bar and above
+          the player and status bars, and the list narrows to make room. */}
       <div className="relative flex min-h-0 flex-1">
-        <main id="list-main" className="min-h-0 min-w-0 flex-1">
+        {/* min-w-60 = the 240px the side peek leaves the list (LIST_MIN_WIDTH
+          in usePeekResize); the two must agree. */}
+        <main id="list-main" className="min-h-0 min-w-60 flex-1">
           {status.isFetched && !status.data?.ready ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted">
               <FolderPlus className="size-10 opacity-60" />
@@ -682,8 +684,9 @@ export default function Home() {
         tabIndex={canPlay ? undefined : -1}
         className={cn(
           // Stacked above the discovery button; both lift together when the
-          // audio player bar is showing (the variable is 0 otherwise).
-          "fixed bottom-[calc(6rem+var(--meguri-player-bar-inset))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          // audio player bar is showing, and both move left of the detail
+          // side peek while it is docked (each variable is 0 otherwise).
+          "fixed bottom-[calc(6rem+var(--meguri-player-bar-inset))] right-[calc(1.25rem+var(--meguri-peek-inset))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           !canPlay && "pointer-events-none opacity-45",
         )}
       >
@@ -699,7 +702,7 @@ export default function Home() {
         className={cn(
           // Lifted clear of the audio player bar when one is showing (the
           // variable is 0 otherwise, keeping the original offset).
-          "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-inset))] right-5 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "fixed bottom-[calc(1.25rem+var(--meguri-player-bar-inset))] right-[calc(1.25rem+var(--meguri-peek-inset))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-black/25 transition hover:scale-105 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           !status.data?.ready && "pointer-events-none opacity-45",
         )}
       >

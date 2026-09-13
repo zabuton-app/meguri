@@ -181,6 +181,7 @@ export const ja = {
   "media.modalMinimize": "モーダルを縮小",
   "media.openAsPeek": "サイドピークで開く",
   "media.openAsModal": "モーダルで開く",
+  "media.peekResize": "サイドピークの幅を変更",
   "media.deleteFromIndex": "インデックスから削除",
   "media.deleteFromIndexConfirm":
     "この項目をインデックスから削除しますか？\n今後スキャンしても再登録されません。",

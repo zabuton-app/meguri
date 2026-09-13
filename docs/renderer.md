@@ -13,9 +13,11 @@ choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `settings` (`src/routes/Settings/`) are its **children**. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
 stays mounted underneath. The file detail can alternatively dock as a **side
-peek** — a sheet against the right edge of the list area that leaves the list,
-the toolbar and the bottom player bar usable (`MediaModal`'s `presentation`
-prop; the choice and the modal size are both remembered in `localStorage`).
+peek** — a sheet docked beside the list as a flex sibling, so the list narrows
+and stays fully usable along with the toolbar and the bottom player bar
+(`MediaModal`'s `presentation` prop). Its left edge is a drag handle; the
+choice, the modal size and the peek width are all remembered in
+`localStorage`.
 
 Each route is a directory: `index.tsx` is the entry point, sitting alongside its
 companion components — for example
