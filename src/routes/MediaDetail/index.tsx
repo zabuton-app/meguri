@@ -2,7 +2,7 @@
 // tag editing, rating, and metadata display. Single-column YouTube-like layout: a large
 // player on top, title/controls right below, then meta, tags, scenes, and history stacked as cards.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import {
   type InfiniteData,
   useMutation,
@@ -95,6 +95,7 @@ export default function MediaDetail() {
   const autoplay = searchParams.get("autoplay") !== "0";
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const { pause: pauseAudio } = useAudioActions();
   // Closing the modal = drop the child route. Return to Discovery or the playlist
   // player if we came from there, otherwise back to the list (the list stays
@@ -111,6 +112,13 @@ export default function MediaDetail() {
   );
 
   const onClose = useCallback(() => {
+    const state = location.state as
+      | { outsideRouter?: boolean; origin?: string }
+      | null;
+    if (state?.outsideRouter) {
+      void navigate(state.origin || "/", { replace: true, state });
+      return;
+    }
     const from = searchParams.get("from");
     // The playlist player parked its pass on the way here, so closing hands
     // playback back rather than dropping the user on the list.
@@ -148,7 +156,7 @@ export default function MediaDetail() {
     if (filter) params.set("filter", filter);
     const query = params.toString();
     void navigate(query ? `/discover?${query}` : "/discover");
-  }, [fileId, navigate, searchParams]);
+  }, [fileId, location.state, navigate, searchParams]);
 
   // Total duration for scenes/history. Falls back to the natively obtained value when the DB duration is empty.
   const [nativeDur, setNativeDur] = useState<number | null>(null);

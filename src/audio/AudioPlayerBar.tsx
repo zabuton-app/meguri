@@ -22,6 +22,57 @@ function baseName(relPath: string): string {
   return parts[parts.length - 1] || relPath;
 }
 
+function outsideRouterOrigin(): string {
+  const state = window.history.state as
+    | { usr?: { outsideRouter?: boolean; origin?: string } }
+    | undefined;
+  const carried = state?.usr;
+  if (carried?.outsideRouter && carried.origin) return carried.origin;
+  const hashPath = window.location.hash.slice(1) || "/";
+  return hashPath.startsWith("/") ? hashPath : `/${hashPath}`;
+}
+
+function useTrackCover(track: AudioTrack | null): {
+  hasCover: boolean;
+  version: number | undefined;
+} {
+  const [hasCover, setHasCover] = useState(() =>
+    track ? hasThumbFile(track.file) : false,
+  );
+  const [version, setVersion] = useState<number | undefined>(undefined);
+  const fileId = track?.file.id;
+  const workspaceId = track?.workspaceId;
+  useEffect(() => {
+    setHasCover(track ? hasThumbFile(track.file) : false);
+    setVersion(undefined);
+  }, [track]);
+  useEffect(() => {
+    if (!track) return;
+    // The unlisten arrives a microtask after the subscription is live, and this
+    // component is unmounted in the very same commit whenever the detail view
+    // opens over the bar — so a cleanup that runs before then must still take
+    // the subscription down, or every such open leaks one listener.
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void events
+      .onThumbDone((event) => {
+        if (event.id !== fileId) return;
+        if (event.workspaceId && event.workspaceId !== workspaceId) return;
+        setHasCover(true);
+        setVersion((v) => (v ?? 0) + 1);
+      })
+      .then((u) => {
+        if (cancelled) u();
+        else unlisten = u;
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [track, fileId, workspaceId]);
+  return { hasCover, version };
+}
+
 // Published so bottom-anchored overlays (the FABs, the scan-progress panel) can
 // lift themselves clear of the bar: the distance from the viewport's bottom edge
 // to the bar's top edge, which also covers whatever sits below the bar (the
@@ -75,6 +126,7 @@ export function AudioPlayerBar() {
   const { t } = useI18n();
   const suppressed = useBarSuppressed();
   const [barEl, setBarEl] = useState<HTMLDivElement | null>(null);
+  const cover = useTrackCover(current);
   usePublishBarInset(barEl);
 
   // Occupies no space at all when nothing is loaded, or while the detail view
@@ -104,6 +156,8 @@ export function AudioPlayerBar() {
       <Cover
         key={`${current.workspaceId}:${current.file.id}`}
         track={current}
+        hasCover={cover.hasCover}
+        version={cover.version}
       />
       {/* Announced when the track changes; position updates are never announced.
           The name is the way back to the track's detail view (tags, rating).
@@ -117,6 +171,12 @@ export function AudioPlayerBar() {
             fileHref(current.file.id, current.workspaceId, {
               autoplay: false,
             }),
+            {
+              state: {
+                outsideRouter: true,
+                origin: outsideRouterOrigin(),
+              },
+            },
           );
         }}
         className="min-w-0 max-w-64 flex-1 truncate text-left transition hover:text-bright-fg hover:underline"
@@ -155,40 +215,21 @@ export function AudioPlayerBar() {
  *
  *  Decorative: the filename beside it already identifies the track, so an alt text
  *  here would only make screen readers announce the same name twice. */
-function Cover({ track }: { track: AudioTrack }) {
+function Cover({
+  track,
+  hasCover,
+  version,
+}: {
+  track: AudioTrack;
+  hasCover: boolean;
+  version: number | undefined;
+}) {
   const status = useAppStatus();
   const mediaBase = status.data?.mediaBase ?? "";
   const [failed, setFailed] = useState(false);
-  const [hasCover, setHasCover] = useState(() => hasThumbFile(track.file));
-  const [version, setVersion] = useState<number | undefined>(undefined);
-  const { id: fileId } = track.file;
-  const { workspaceId } = track;
-  useEffect(() => {
-    // The unlisten arrives a microtask after the subscription is live, and this
-    // component is unmounted in the very same commit whenever the detail view
-    // opens over the bar — so a cleanup that runs before then must still take
-    // the subscription down, or every such open leaks one listener.
-    let cancelled = false;
-    let unlisten: (() => void) | undefined;
-    void events
-      .onThumbDone((event) => {
-        if (event.id !== fileId) return;
-        if (event.workspaceId && event.workspaceId !== workspaceId) return;
-        setHasCover(true);
-        setFailed(false);
-        setVersion((v) => (v ?? 0) + 1);
-      })
-      .then((u) => {
-        if (cancelled) u();
-        else unlisten = u;
-      });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [fileId, workspaceId]);
+  useEffect(() => setFailed(false), [track]);
   const src = hasCover
-    ? thumbUrl(mediaBase, workspaceId, fileId, version)
+    ? thumbUrl(mediaBase, track.workspaceId, track.file.id, version)
     : null;
 
   if (!src || failed) {

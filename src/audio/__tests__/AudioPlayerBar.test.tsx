@@ -352,6 +352,20 @@ describe("AudioPlayerBar", () => {
     );
   });
 
+  it("keeps thumb:done cover updates while the bar is suppressed", async () => {
+    setup();
+    loadTrack();
+    let release!: () => void;
+    act(() => {
+      release = holdBarSuppressed();
+    });
+    await thumbDone({ id: sampleAudioRow.id, workspaceId: WS_ID });
+    act(() => release());
+    expect((await screen.findByRole("presentation")).getAttribute("src")).toBe(
+      `${defaultAppStatus.mediaBase}/ws/${WS_ID}/thumb/${sampleAudioRow.id}?v=1`,
+    );
+  });
+
   it("refetches a regenerated cover and ignores other files' events", async () => {
     setup(sampleAudioRowWithCover);
     loadTrack();
@@ -407,9 +421,27 @@ describe("AudioPlayerBar", () => {
     fireEvent.click(screen.getByRole("button", { name: /open details/i }));
     expect(navigate).toHaveBeenCalledWith(
       `/file/${sampleAudioRow.id}?ws=${WS_ID}&autoplay=0`,
+      { state: { outsideRouter: true, origin: "/" } },
     );
     // Not also written to the hash behind the router's back.
     expect(window.location.hash).toBe("");
+  });
+
+  it("preserves an existing outside-router origin in navigation state", () => {
+    const navigate = vi.fn();
+    registerRouterNavigate(navigate);
+    setup();
+    loadTrack();
+    window.history.replaceState(
+      { usr: { outsideRouter: true, origin: "/discover?filter=music" } },
+      "",
+      "#/play",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /open details/i }));
+    expect(navigate).toHaveBeenCalledWith(
+      `/file/${sampleAudioRow.id}?ws=${WS_ID}&autoplay=0`,
+      { state: { outsideRouter: true, origin: "/discover?filter=music" } },
+    );
   });
 
   it("hides the bar again when closed", () => {

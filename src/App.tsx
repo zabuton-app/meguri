@@ -38,7 +38,7 @@ const router = createHashRouter([
 ]);
 // Lets the player bar (mounted beside the router below) navigate through the
 // router rather than by rewriting the hash behind its back.
-registerRouterNavigate((to) => void router.navigate(to));
+registerRouterNavigate((to, opts) => void router.navigate(to, opts));
 
 export default function App() {
   useContentZoom();
