@@ -95,11 +95,7 @@ export default function MediaDetail() {
   const autoplay = searchParams.get("autoplay") !== "0";
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const {
-    pause: pauseAudio,
-    positionOf: audioPositionOf,
-    close: closeAudio,
-  } = useAudioActions();
+  const { pause: pauseAudio } = useAudioActions();
   // Closing the modal = drop the child route. Return to Discovery or the playlist
   // player if we came from there, otherwise back to the list (the list stays
   // mounted underneath).
@@ -123,30 +119,19 @@ export default function MediaDetail() {
       // Name the file the pass was parked on: the player restores only when
       // this matches what it put aside, so a stale pass can never be picked up
       // by an unrelated later playback (or by walking the history back here).
-      // The player always names the workspace on the way in (fileHref), so
-      // this is the same id the route resolves below.
-      const ws = searchParams.get("ws") ?? "";
-      params.set("resume", `${ws}:${fileId}`);
+      params.set("resume", `${searchParams.get("ws") ?? ""}:${fileId}`);
       // Hand back where this player got to, not where the playlist left off —
       // watching on for a few minutes here and then being rewound to the second
       // of the detour reads as a bug. Until its metadata has loaded this player
       // still reports 0, so closing straight away falls back to the second the
       // detour was taken at rather than rewinding to the top of the file.
+      // An audio track is not this view's to hand back: it plays in the bottom
+      // bar, which the playlist shares, so it simply carries on.
       const arrived = Number(searchParams.get("t")) || 0;
-      // An audio track plays in the bottom bar here rather than in a player
-      // of this view's own; the playlist takes it back through its own
-      // element, so the bar lets go of it (closed, not left paused under the
-      // player) and hands over where it got to — to the millisecond, since
-      // the sound stops and restarts across the hop and a whole second of
-      // rewind is audible.
-      const barSec = audioPositionOf(fileId, ws);
-      if (barSec != null) closeAudio();
-      const sec = playerRef.current?.currentTime() ?? barSec ?? undefined;
+      const sec = playerRef.current?.currentTime();
       const handBack =
         sec != null && Number.isFinite(sec) && sec > 0
-          ? barSec != null
-            ? Math.round(sec * 1000) / 1000
-            : Math.floor(sec)
+          ? Math.floor(sec)
           : arrived;
       if (handBack > 0) params.set("t", String(handBack));
       // Replaced, not pushed: the detour is one round trip, and a growing
@@ -163,7 +148,7 @@ export default function MediaDetail() {
     if (filter) params.set("filter", filter);
     const query = params.toString();
     void navigate(query ? `/discover?${query}` : "/discover");
-  }, [fileId, navigate, searchParams, audioPositionOf, closeAudio]);
+  }, [fileId, navigate, searchParams]);
 
   // Total duration for scenes/history. Falls back to the natively obtained value when the DB duration is empty.
   const [nativeDur, setNativeDur] = useState<number | null>(null);

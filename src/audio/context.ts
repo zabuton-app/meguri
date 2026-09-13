@@ -65,10 +65,9 @@ export interface AudioActions {
   toggleMuted: () => void;
   close: () => void;
   dismissError: () => void;
-  /** Where the given track is, in seconds, if it is the loaded one; null
-   *  otherwise. A read, not a subscription: for hand-offs (the detail view
-   *  returning a track to the playlist), never for display. */
-  positionOf: (fileId: number, workspaceId: string) => number | null;
+  /** Called with the track when it plays to its end (the playlist advances
+   *  on it). Returns the unsubscribe function. */
+  subscribeEnded: (listener: (track: AudioTrack) => void) => () => void;
   /** Register another sound source (see useExclusivePlayback). The listener is
    *  called whenever bar audio starts; returns the unregister function. */
   registerPeer: (onAudioStart: () => void) => () => void;

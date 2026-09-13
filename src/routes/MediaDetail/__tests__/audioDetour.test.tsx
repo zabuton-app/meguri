@@ -1,8 +1,7 @@
 // The playlist player stepping out to an audio track's detail view and back.
-// The playlist plays audio through its own <video>; the detail view plays it
-// through the bottom bar. So the hop is a hand-over in both directions: the
-// bar picks the track up where the playlist was, and closing gives the
-// playlist the bar's position back and lets go of the track.
+// Both play audio through the bottom bar's element, which lives outside the
+// router, so the trip is not a hand-over at all: the detail view leaves the
+// track exactly as it found it, and closing gives the playlist its pass back.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { Route, Routes } from "react-router";
@@ -17,6 +16,7 @@ import {
   WS_ID,
 } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
+import { useAudioPlayer } from "@/audio/useAudioPlayer";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
@@ -71,6 +71,8 @@ let el: HTMLAudioElement;
 function capture(instance: HTMLAudioElement): void {
   el = instance;
 }
+let playSpy: ReturnType<typeof vi.fn>;
+let pauseSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -78,8 +80,14 @@ beforeEach(() => {
   mocks.workspacesList.mockResolvedValue(defaultWorkspacesList);
   mocks.fileGet.mockResolvedValue(audioDetail);
   mocks.filesSearch.mockResolvedValue({ items: [], nextCursor: null });
-  vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
-  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  playSpy = vi.fn().mockResolvedValue(undefined);
+  pauseSpy = vi.fn();
+  vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(
+    playSpy as unknown as HTMLMediaElement["play"],
+  );
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(
+    pauseSpy as unknown as HTMLMediaElement["pause"],
+  );
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
   const OriginalAudio = window.Audio;
   vi.stubGlobal(
@@ -106,8 +114,20 @@ function DetailRoute() {
   );
 }
 
+/** What the playlist does before stepping out: the track is in the bar. */
+function BarDriver() {
+  const { play } = useAudioPlayer();
+  return <button onClick={() => play(sampleAudioRow, WS_ID)}>bar-play</button>;
+}
+
 async function openDetail(route: string) {
-  renderWithProviders(<DetailRoute />, { route });
+  renderWithProviders(
+    <>
+      <BarDriver />
+      <DetailRoute />
+    </>,
+    { route },
+  );
   await waitFor(() => {
     expect(screen.getByRole("heading", { name: "track.mp3" })).toBeTruthy();
   });
@@ -117,27 +137,28 @@ const at = () => window.location.hash.slice(1);
 const query = () => new URLSearchParams(at().split("?")[1] ?? "");
 
 describe("audio detour from the playlist", () => {
-  it("picks the track up in the bar where the playlist left it", async () => {
-    await openDetail(`/file/2?ws=${WS_ID}&from=player&t=83.5`);
-    await waitFor(() => expect(el?.src ?? "").toContain("/media/2"));
-    // Not from the top: the playlist was 83.5 s in when it stepped out.
-    expect(el.currentTime).toBe(83.5);
-  });
-
-  it("hands the bar's position back and lets go of the track on close", async () => {
-    await openDetail(`/file/2?ws=${WS_ID}&from=player&t=83.5`);
-    await waitFor(() => expect(el?.src ?? "").toContain("/media/2"));
-    // Listened on for a while here.
+  it("leaves the track playing in the bar, untouched, and hands the pass back on close", async () => {
+    await openDetail(`/file/2?ws=${WS_ID}&from=player&autoplay=0`);
+    // The playlist had the track going in the bar (it navigates with
+    // autoplay=0 for exactly this reason).
+    fireEvent.click(screen.getByText("bar-play"));
+    act(() => {
+      el.dispatchEvent(new Event("play"));
+    });
+    const playsBefore = playSpy.mock.calls.length;
     act(() => {
       el.currentTime = 95.25;
     });
+
     fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
     await waitFor(() => expect(at()).toContain("/play?"));
     expect(query().get("resume")).toBe(`${WS_ID}:2`);
-    // Exact, not floored: a second of rewind is audible across the hop.
-    expect(query().get("t")).toBe("95.25");
-    // The playlist plays it through its own element from here, so the bar
-    // is closed rather than left paused underneath the player.
-    expect(el.hasAttribute("src")).toBe(false);
+    // Nothing to hand back: the sound never left the bar.
+    expect(query().has("t")).toBe(false);
+    // Not restarted, not paused, not closed.
+    expect(playSpy.mock.calls.length).toBe(playsBefore);
+    expect(pauseSpy).not.toHaveBeenCalled();
+    expect(el.getAttribute("src")).toContain("/media/2");
+    expect(el.currentTime).toBe(95.25);
   });
 });

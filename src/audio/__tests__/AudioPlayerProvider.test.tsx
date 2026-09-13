@@ -464,25 +464,11 @@ describe("AudioPlayerProvider", () => {
 
   describe("hand-over position", () => {
     function HandOver() {
-      const { play, positionOf } = useAudioActions();
-      // positionOf is a read, not a subscription; re-render on the tick so the
-      // readouts below reflect it.
-      useAudioPosition();
+      const { play } = useAudioActions();
       return (
-        <>
-          <button
-            onClick={() => play(sampleAudioRow, WS_ID, { startAt: 83.5 })}
-          >
-            play-at
-          </button>
-          <span data-testid="pos-track">
-            {String(positionOf(sampleAudioRow.id, WS_ID))}
-          </span>
-          <span data-testid="pos-other">{String(positionOf(9, WS_ID))}</span>
-          <span data-testid="pos-other-ws">
-            {String(positionOf(sampleAudioRow.id, "elsewhere"))}
-          </span>
-        </>
+        <button onClick={() => play(sampleAudioRow, WS_ID, { startAt: 83.5 })}>
+          play-at
+        </button>
       );
     }
 
@@ -502,22 +488,6 @@ describe("AudioPlayerProvider", () => {
       // A plain play() still starts from the top.
       click("play");
       expect(el.currentTime).toBe(0);
-    });
-
-    it("positionOf() reads the loaded track's position and nothing else's", () => {
-      render(
-        <>
-          <Probe />
-          <HandOver />
-        </>,
-        { wrapper: Wrapper },
-      );
-      expect(text("pos-track")).toBe("null");
-      click("play-at");
-      setCurrentTime(95.25);
-      expect(text("pos-track")).toBe("95.25");
-      expect(text("pos-other")).toBe("null");
-      expect(text("pos-other-ws")).toBe("null");
     });
   });
 

@@ -97,6 +97,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // Other sound sources (see useExclusivePlayback): each is paused when audio
   // starts here. A Set, not state — registration must not re-render anything.
   const peers = useRef(new Set<() => void>());
+  // Told when a track plays to its end (see subscribeEnded).
+  const endedListeners = useRef(new Set<(track: AudioTrack) => void>());
 
   /** Pause and disown any play() still in flight (see requestId). */
   const pauseEl = useCallback((el: HTMLAudioElement) => {
@@ -166,6 +168,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       // Stop at the end rather than snapping to 0, so the bar shows the track at
       // its final position and stays replayable.
       setPosition(Number.isFinite(el.duration) ? el.duration : el.currentTime);
+      const track = currentRef.current;
+      if (track) endedListeners.current.forEach((l) => l(track));
     };
     const onError = () => {
       setIsPlaying(false);
@@ -318,11 +322,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   const dismissError = useCallback(() => setError(null), []);
 
-  const positionOf = useCallback(
-    (fileId: number, workspaceId: string): number | null => {
-      if (!isCurrent(fileId, workspaceId)) return null;
-      const sec = audioRef.current?.currentTime ?? 0;
-      return Number.isFinite(sec) ? sec : 0;
+  const subscribeEnded = useCallback(
+    (listener: (track: AudioTrack) => void) => {
+      endedListeners.current.add(listener);
+      return () => {
+        endedListeners.current.delete(listener);
+      };
     },
     [],
   );
@@ -355,7 +360,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       toggleMuted,
       close,
       dismissError,
-      positionOf,
+      subscribeEnded,
       registerPeer,
     }),
     [
@@ -369,7 +374,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       toggleMuted,
       close,
       dismissError,
-      positionOf,
+      subscribeEnded,
       registerPeer,
     ],
   );

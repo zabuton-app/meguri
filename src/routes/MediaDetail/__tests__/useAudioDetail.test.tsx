@@ -71,7 +71,7 @@ function Probe({ file }: { file: FileDetail }) {
   useAudioDetail({
     file,
     wsId: WS_ID,
-    mediaBase: defaultAppStatus.mediaBase,
+    mediaBase: defaultAppStatus.mediaBase ?? "",
     autoplay: true,
     startAt: 0,
     pauseVideo: () => {},
