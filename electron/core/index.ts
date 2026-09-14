@@ -10,12 +10,20 @@ export class Core {
   readonly root: string;
   readonly rootId: number;
   readonly dataDir: string;
+  /** The SQLite file behind `db`; the query worker opens its own handle on it. */
+  readonly dbPath: string;
 
   private constructor(db: DB, root: string, rootId: number, dataDir: string) {
     this.db = db;
     this.root = root;
     this.rootId = rootId;
     this.dataDir = dataDir;
+    this.dbPath = Core.dbPathFor(dataDir);
+  }
+
+  /** Where a root's database lives inside its data directory. */
+  static dbPathFor(dataDir: string): string {
+    return path.join(dataDir, "db.sqlite");
   }
 
   static init(rawRoot: string): Core {
@@ -28,7 +36,7 @@ export class Core {
     const dataDir = dataDirForRoot(root);
     fs.mkdirSync(path.join(dataDir, "thumbs"), { recursive: true });
 
-    const db = openDb(path.join(dataDir, "db.sqlite"));
+    const db = openDb(Core.dbPathFor(dataDir));
     const rootId = upsertScanRoot(db, root, pathHash(root));
 
     return new Core(db, root, rootId, dataDir);

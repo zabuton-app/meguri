@@ -168,7 +168,8 @@ export function syncFileRowAcrossCaches(
 }
 
 /**
- * Mirror the main process's `consumeWatchLater()` into the cached workspace list.
+ * Mirror the main process's `Workspaces.removeFromWatchLater()` into the cached
+ * workspace list.
  *
  * Playing a file (in the player, as an image view, or in an external player)
  * takes it off Watch Later main-side, but that removal is deliberately silent:

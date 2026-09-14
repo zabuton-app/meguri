@@ -7,12 +7,7 @@ import type {
   SearchResult,
 } from "../core/types.js";
 import type { IpcContext } from "./context.js";
-import {
-  consumeWatchLater,
-  coreById,
-  queryTargets,
-  scopedCores,
-} from "./helpers.js";
+import { coreById, queryTargets, scopedCores } from "./helpers.js";
 
 export function registerFileHandlers(ctx: IpcContext): void {
   const { ws, queryClient, emit } = ctx;
@@ -76,7 +71,8 @@ export function registerFileHandlers(ctx: IpcContext): void {
   });
   handle("file_record_play", ({ id, workspaceId, via, position }) => {
     q.recordPlay(coreById(ws, workspaceId).db, id, via, position ?? null);
-    consumeWatchLater(ws, workspaceId, id);
+    // Played means no longer "to watch later" (see Workspaces.removeFromWatchLater).
+    ws.removeFromWatchLater(workspaceId, id);
   });
   // History and duplicates follow the catalog scope rule (see scopedCores):
   // a collection is a file set, not a scope, so the timeline stays meaningful

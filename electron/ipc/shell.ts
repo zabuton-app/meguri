@@ -4,11 +4,7 @@ import { handle } from "../core/ipcHandler.js";
 import log from "../core/logger.js";
 import * as q from "../core/queries.js";
 import type { IpcContext } from "./context.js";
-import {
-  consumeWatchLater,
-  coreById,
-  ensureFileInsideRoot,
-} from "./helpers.js";
+import { coreById, ensureFileInsideRoot } from "./helpers.js";
 
 // Launch an external file/URL in a fully detached child process.
 // shell.openPath leaves the spawned process attached to Electron's process
@@ -38,7 +34,7 @@ export function registerShellHandlers(ctx: IpcContext): void {
     const abs = ensureFileInsideRoot(c, id);
     openDetached(abs);
     q.recordPlay(c.db, id, "external", null);
-    consumeWatchLater(ws, workspaceId, id);
+    ws.removeFromWatchLater(workspaceId, id);
   });
 
   handle("open_folder", ({ id, workspaceId }) => {

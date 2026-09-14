@@ -307,8 +307,9 @@ describe("Home + MediaDetail integration", () => {
     expect(await screen.findByText('Add to "Watch Later"')).toBeTruthy();
   });
 
-  // Watch Later removal rides on "a play was recorded" (see consumeWatchLater in
-  // electron/main.ts). Merely opening a video's detail must not record one, or
+  // Watch Later removal rides on "a play was recorded" (see
+  // Workspaces.removeFromWatchLater in electron/core/workspaces.ts). Merely
+  // opening a video's detail must not record one, or
   // queueing something and peeking at its metadata would silently consume it.
   it("does not record a play when only opening a video detail", async () => {
     renderWithProviders(<AppRoutes />, {

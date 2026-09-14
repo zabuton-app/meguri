@@ -8,8 +8,10 @@ ffmpeg/ffprobe binaries, whose path resolution is described at the end.
 
 `runScan()` in `electron/core/jobs.ts` drives the pipeline:
 walk → `syncFiles` → thumbnail/metadata extraction (via a parallel pool),
-reporting progress through a callback. The main process fires a scan with
-`startScan()` whenever a workspace is added, switched to, or re-scanned.
+reporting progress through a callback. `ScanManager` (`electron/scanManager.ts`)
+owns the scan state and fires a scan with `start()` whenever a workspace is
+added, switched to, or re-scanned; `main.ts` starts the initial scan and aborts
+them all on quit.
 
 ### Walk and incremental sync
 
@@ -45,8 +47,8 @@ a deliberate absence.
 ### Concurrency
 
 `electron/core/concurrency.ts` provides `pool()`, a bounded parallel worker that
-supports cancellation via `AbortSignal` while idle. The main process guards
-against concurrent scans of the same workspace with the `scanningWs` set, which
+supports cancellation via `AbortSignal` while idle. `ScanManager` guards
+against concurrent scans of the same workspace with its `scanning` set, which
 avoids chunked-transaction conflicts.
 
 ffmpeg processes that decode video are capped process-wide by the
