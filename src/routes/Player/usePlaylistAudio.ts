@@ -20,7 +20,7 @@ export function usePlaylistAudio({
   current,
   file,
   mediaBase,
-  isDetourPickUp,
+  isResumeItem,
   resumeSec,
   goNext,
   skipCurrent,
@@ -28,8 +28,11 @@ export function usePlaylistAudio({
   current: QueueItem | null;
   file: FileDetail | null;
   mediaBase: string;
-  /** Back from the detail view on the very item the pass was parked on. */
-  isDetourPickUp: boolean;
+  /**
+   * Back from the detail view on the very item the pass was parked on, as
+   * opposed to a fresh pass started from the detail view.
+   */
+  isResumeItem: boolean;
   resumeSec: number;
   goNext: () => void;
   skipCurrent: () => void;
@@ -64,7 +67,10 @@ export function usePlaylistAudio({
   // refetch cannot restart it; the guard is dropped when the track ends so a
   // one-item queue on repeat plays it again. A track already in the bar is
   // resumed (or left alone if it is playing — coming back from the detail
-  // view, or opening the playlist on the track Discover started).
+  // view, or opening the playlist on the track Discover started). Back on
+  // the item a detour was parked on, the bar's track is left in whatever
+  // state the user put it there; a pass *started* from the detail view was
+  // asked to play, so a track paused (or run out) there is picked up again.
   const startedAudioFor = useRef<string | null>(null);
   useEffect(() => {
     if (!isAudio) {
@@ -75,7 +81,7 @@ export function usePlaylistAudio({
     if (startedAudioFor.current === currentKey) return;
     startedAudioFor.current = currentKey;
     if (isCurrentAudio) {
-      if (isDetourPickUp) return;
+      if (isResumeItem) return;
       if (!audioPlaying) toggleAudio();
       return;
     }
@@ -91,7 +97,7 @@ export function usePlaylistAudio({
     file,
     mediaBase,
     isCurrentAudio,
-    isDetourPickUp,
+    isResumeItem,
     audioPlaying,
     playAudio,
     toggleAudio,
@@ -122,12 +128,12 @@ export function usePlaylistAudio({
   // ran out during the detour advances the queue on return rather than being
   // restored and restarted.
   useEffect(() => {
-    if (!isCurrentAudio || !isDetourPickUp || !audio.ended) return;
+    if (!isCurrentAudio || !isResumeItem || !audio.ended) return;
     if (detourEndedHandledFor.current === currentKey) return;
     detourEndedHandledFor.current = currentKey;
     startedAudioFor.current = null;
     goNextRef.current();
-  }, [isCurrentAudio, isDetourPickUp, audio.ended, currentKey]);
+  }, [isCurrentAudio, isResumeItem, audio.ended, currentKey]);
   // An audio item that fails to play is skipped like a broken video.
   useEffect(() => {
     if (isCurrentAudio && audio.error) skipCurrent();

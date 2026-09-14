@@ -188,6 +188,7 @@ export const es: Record<TranslationKey, string> = {
   "media.openAsPeek": "Abrir como panel lateral",
   "media.openAsModal": "Abrir como ventana",
   "media.peekResize": "Cambiar el ancho del panel lateral",
+  "media.playAsPlaylist": "Reproducir como lista desde aquí",
   "media.deleteFromIndex": "Eliminar del índice",
   "media.deleteFromIndexConfirm":
     "¿Eliminar este elemento del índice?\nNo se volverá a registrar en futuros escaneos.",

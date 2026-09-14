@@ -28,6 +28,22 @@ export function queueKey(item: {
   return `${item.workspaceId}:${item.fileId}`;
 }
 
+/** The inverse of queueKey, for a key carried through a URL (`/play?start=`).
+ *  Null for anything that does not read as `<workspaceId>:<fileId>`. */
+export function parseQueueKey(
+  key: string | null | undefined,
+): { workspaceId: string; fileId: number } | null {
+  if (!key) return null;
+  // Split on the last colon: the workspace id may carry colons of its own,
+  // the file id never does.
+  const at = key.lastIndexOf(":");
+  if (at <= 0) return null;
+  const workspaceId = key.slice(0, at);
+  const tail = key.slice(at + 1);
+  if (!/^\d+$/.test(tail)) return null;
+  return { workspaceId, fileId: Number(tail) };
+}
+
 export interface PlaybackQueue {
   /** Not yet played, in play order (shuffled when `shuffle` is on). */
   pool: SeqItem[];
@@ -71,10 +87,20 @@ function orderPool(pool: SeqItem[], shuffle: boolean, rng: Rng): SeqItem[] {
   return shuffle ? shuffled(pool, rng) : pool.slice().sort(bySeq);
 }
 
+/** Where the sequence numbers of a wrapped prefix start (see createQueue):
+ *  high enough that no list ever numbers its way up to them, and an integer
+ *  far enough below 2^53 that `WRAP_SEQ_BASE + i` stays exact and distinct. */
+const WRAP_SEQ_BASE = 2 ** 50;
+
 export interface QueueOptions {
   shuffle?: boolean;
   repeat?: boolean;
-  /** Start on this item instead of the first one. */
+  /** Start on this item instead of the first one: the items after it follow
+   *  in list order (and so does anything the list loads later), then the
+   *  items before it come round at the end — those before it *in `items`*,
+   *  that is: a list that has paged past its own head hands over only what
+   *  it still holds, and the wrap reaches no further back than that. Ignored
+   *  when the item is not in `items`. */
   startAt?: { workspaceId: string; fileId: number };
 }
 
@@ -94,16 +120,28 @@ export function createQueue(
     seq.push({ ...item, seq: seq.length });
   }
 
-  // An explicit start item leads; everything else follows in queue order. This
-  // keeps "play from here" working without reordering the underlying list.
+  // An explicit start item leads, the items after it follow in list order and
+  // the items before it come round at the end: "play from here" plays on to
+  // the end of the list and then wraps, without reordering the list itself.
+  // The sequence numbers follow that rotation, so turning shuffle off again
+  // lands on the same order rather than the list's. The wrapped prefix is
+  // numbered from the top of the range: pages the list loads later are
+  // numbered on from `nextSeq` (see extend) and belong after the tail, before
+  // the wrap — not after items the user has already been past.
   let head: SeqItem | null = null;
   let rest = seq;
+  let nextSeq = seq.length;
   if (options.startAt) {
     const wanted = queueKey(options.startAt);
     const at = seq.findIndex((it) => queueKey(it) === wanted);
     if (at >= 0) {
-      head = seq[at];
-      rest = seq.filter((_, i) => i !== at);
+      const tail = seq.slice(at).map((it, i) => ({ ...it, seq: i }));
+      const prefix = seq
+        .slice(0, at)
+        .map((it, i) => ({ ...it, seq: WRAP_SEQ_BASE + i }));
+      head = tail[0];
+      rest = [...tail.slice(1), ...prefix];
+      nextSeq = tail.length;
     }
   }
   const pool = orderPool(rest, shuffle, rng);
@@ -117,7 +155,7 @@ export function createQueue(
     repeat,
     skipped: [],
     seen,
-    nextSeq: seq.length,
+    nextSeq,
     ended: current == null,
   };
 }
@@ -208,6 +246,18 @@ export function setShuffle(
 
 export function setRepeat(q: PlaybackQueue, repeat: boolean): PlaybackQueue {
   return q.repeat === repeat ? q : { ...q, repeat };
+}
+
+/**
+ * How many unplayed items lie ahead before the pass wraps round to items it
+ * started past (see createQueue's `startAt`). This is what running dry looks
+ * like from the list's side: a wrapped prefix is still to play, but it is not
+ * a reason to hold off loading the pages that belong before it. Under shuffle
+ * the pool has no "before", so all of it counts.
+ */
+export function poolAhead(q: PlaybackQueue): number {
+  if (q.shuffle) return q.pool.length;
+  return q.pool.filter((it) => it.seq < WRAP_SEQ_BASE).length;
 }
 
 /** Total items admitted so far (played + pending + skipped + current). */

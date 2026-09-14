@@ -116,10 +116,12 @@ async function videoFor(fileId: number): Promise<HTMLVideoElement> {
   return video!;
 }
 
-/** Let the <video> report a position, the way playback would. */
+/** Let the <video> report a position, the way playback would (which means
+ *  its metadata has loaded — before that the player has no position). */
 function playTo(seconds: number) {
   const video = document.querySelector("video");
   expect(video).not.toBeNull();
+  fireEvent.loadedMetadata(video!);
   Object.defineProperty(video!, "currentTime", {
     configurable: true,
     value: seconds,

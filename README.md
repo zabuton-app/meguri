@@ -51,7 +51,9 @@ is on screen and runs it hands-off: videos play to the end, images hold for a
 few seconds with a slow pan and zoom, and the player moves on by itself. Shuffle
 and repeat are one click away, collections can be dragged into the order you
 want, and pressing `I` steps out to the current file's detail view —
-coming back resumes right where it left off.
+coming back resumes right where it left off. It works the other way round
+too: any file's detail view can start the playlist from that file, and
+whatever is playing there carries straight on.
 
 ![Playlist demo — a full-screen player running a list hands-off, with shuffle and auto-advance](./docs/assets/playlist.gif)
 

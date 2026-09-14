@@ -170,7 +170,13 @@ export default function MediaDetail() {
   // Include the workspace ID in the URL path (/ws/<id>/...) to avoid collisions with another DB after switching.
   const mediaSrc =
     mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
-  const onClose = useCloseTarget({ fileId, playerRef, mediaSrc });
+  const { onClose, openPlaylist } = useCloseTarget({
+    fileId,
+    wsId,
+    startAt,
+    playerRef,
+    mediaSrc,
+  });
 
   // Bar suppression, auto-start and video↔audio exclusivity for audio files.
   const {
@@ -252,12 +258,18 @@ export default function MediaDetail() {
     setNativeDur(null);
   }, [fileId]);
 
-  const { goPrev, goNext, canPrev, canNext, navBinding } =
+  const { goPrev, goNext, canPrev, canNext, hasList, inList, navBinding } =
     usePrevNextNavigation({
       fileId,
       wsId,
       kind,
     });
+  // The way into the playlist from here (see useCloseTarget). Offered only
+  // while a list is mounted underneath, and only for a file that list has
+  // loaded — the queue is built from that list, and a file it does not hold
+  // (opened from the bottom bar after the list moved on) would leave the
+  // player starting somewhere else.
+  const canOpenPlaylist = inList;
 
   const d = detail.data;
 
@@ -338,6 +350,8 @@ export default function MediaDetail() {
           canNext={canNext}
           prevHint={formatChords(navBinding.prev)}
           nextHint={formatChords(navBinding.next)}
+          onOpenPlaylist={hasList ? openPlaylist : undefined}
+          canOpenPlaylist={canOpenPlaylist}
           size={modalSize}
           onToggleSize={toggleModalSize}
           presentation={presentation}

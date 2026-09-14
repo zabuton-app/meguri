@@ -39,7 +39,7 @@ import {
   type PlayerHandle,
 } from "@/routes/MediaDetail/VideoPlayer";
 import { AudioArt } from "./AudioArt";
-import { claimPass, dropPass, parkPass } from "./detour";
+import { ARRIVAL_PARAMS, dropPass, parkPass, readArrival } from "./detour";
 import { ImageStage } from "./ImageStage";
 import { SnapshotStage } from "./SnapshotStage";
 import { enteringStyle, leavingStyle } from "./transition";
@@ -94,19 +94,27 @@ export default function Player() {
   const navBinding = NAV_BINDINGS[keybindingPreset];
 
   // Claimed on the first render, before the effect below empties the slot, and
-  // only when the file named in the URL is the one the pass was parked on.
-  const [searchParams] = useSearchParams();
-  const [pickUp, setPickUp] = useState(() =>
-    claimPass(searchParams.get("resume")),
-  );
+  // only when the file named in the URL is the one the pass was parked on
+  // (see readArrival for the `start` and `t` parameters).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [arrival, setArrival] = useState(() => readArrival(searchParams));
+  // Both are spent on arrival: the slot, and the parameters that named it.
+  // Left in the URL they would come back on a reload or by walking the
+  // history — as a stale second on a pass that has long moved on, or a
+  // fresh pass on a file the user was merely once started from.
   useEffect(() => {
     dropPass();
+    if (ARRIVAL_PARAMS.some((p) => searchParams.has(p)))
+      setSearchParams(new URLSearchParams(), { replace: true });
+    // Once, on mount: the parameters are read into state above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const queue = usePlaybackQueue({
     shuffle: playlistShuffle,
     repeat: playlistRepeat,
-    restore: pickUp?.queue,
+    restore: arrival?.queue,
+    startAt: arrival?.startAt,
   });
   const { current, next, prev, skipCurrent } = queue;
 
@@ -191,24 +199,16 @@ export default function Player() {
     );
   }, [current, isImage, isAudio, mediaBase, navigate, queue.queue]);
 
-  // The second to come back to, offered only to the file the player left from.
-  // The detail view hands back where *it* got to, which is ahead of the detour
-  // whenever the user kept watching there; the parked second is the fallback
-  // for an item with no player of its own (a picture).
-  //
-  // Dropped as soon as the pass steps somewhere else (goNext / goPrev below), so
-  // coming back to that file later in the same pass — or on the next lap with
-  // repeat on — starts it where any other item would.
-  const handedBack = searchParams.get("t");
-  const resumeSec =
-    current && pickUp?.key === queueKey(current)
-      ? handedBack != null && Number.isFinite(Number(handedBack))
-        ? Math.max(0, Math.floor(Number(handedBack)))
-        : pickUp.sec
-      : 0;
-  // Back from the detail view on the very item the pass was parked on: the
-  // bar's track is left in whatever state the user put it there.
-  const isDetourPickUp = !!current && pickUp?.key === queueKey(current);
+  // The second to come back to, offered only to the file the player arrived
+  // on. Dropped as soon as the pass steps somewhere else (goNext / goPrev
+  // below), so coming back to that file later in the same pass — or on the
+  // next lap with repeat on — starts it where any other item would.
+  const isArrivalItem = !!current && arrival?.key === queueKey(current);
+  // Back from the detail view on the very item the pass was parked on, as
+  // opposed to a fresh pass started from the detail view: the two differ in
+  // what they owe the bar's track (see usePlaylistAudio).
+  const isResumeItem = isArrivalItem && !!arrival?.queue;
+  const resumeSec = isArrivalItem && arrival ? arrival.sec : 0;
 
   // Without its details there is nothing to render for this item, so a failed
   // fetch would leave the stage blank for good. Treat it like any other
@@ -272,7 +272,7 @@ export default function Player() {
     () =>
       transitionTo(() => {
         setPaused(false);
-        setPickUp(null);
+        setArrival(null);
         next();
       }, 1),
     [next, transitionTo],
@@ -281,7 +281,7 @@ export default function Player() {
     () =>
       transitionTo(() => {
         setPaused(false);
-        setPickUp(null);
+        setArrival(null);
         prev();
       }, -1),
     [prev, transitionTo],
@@ -291,7 +291,7 @@ export default function Player() {
     current,
     file,
     mediaBase,
-    isDetourPickUp,
+    isResumeItem,
     resumeSec,
     goNext,
     skipCurrent,
