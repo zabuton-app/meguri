@@ -42,11 +42,16 @@ player bar, the detail stage, the side peek and the playlist stage — only
 drives that element; none has audio of its own.
 
 The **spectrum display** (`src/audio/AudioSpectrum.tsx`) draws a live
-frequency spectrum of that element on a canvas, in one of three patterns
-(`src/audio/spectrumPatterns.ts`: bars, a ring, or an LED meter — an "Audio"
-preference) and in a mode the host picks for its box (over the art, instead of
-missing art, or inside the side peek's tile). Hosts read
-`useSpectrumPattern()` and `PATTERN_LAYOUT` to place it. It reads from a Web Audio
+frequency spectrum of that element on a canvas, in one of thirteen patterns
+(`src/audio/spectrumPatterns.ts`: bars, a ring, an LED meter, mirrored bars,
+an oscilloscope, a filled area, particles, strings, a Lissajous figure, a
+ridgeline, ripples, orbs or a barcode — an "Audio" preference) and in a mode
+the host picks for its box (over the art, instead of missing art, or inside
+the side peek's tile). Hosts read `useSpectrumPattern()` and `PATTERN_LAYOUT`
+to place it. Each pattern is a drawer built by `createDrawer()`; the ones with
+motion of their own (falling sparks, a fading trail, a receding history) keep
+that state per display and report when it has played out, so the frame loop
+runs on after the track stops until nothing moves. It reads from a Web Audio
 `AnalyserNode` built lazily by `src/audio/analyser.ts` on the first display
 that asks for it: one `AudioContext`, one `MediaElementAudioSourceNode` (the
 platform allows exactly one per element) and the analyser wired between the

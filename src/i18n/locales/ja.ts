@@ -507,6 +507,16 @@ export const ja = {
   "settings.audioSpectrumPatternBars": "縦バー",
   "settings.audioSpectrumPatternRing": "円形リング",
   "settings.audioSpectrumPatternLed": "LEDメーター",
+  "settings.audioSpectrumPatternMirror": "ミラーバー",
+  "settings.audioSpectrumPatternWave": "オシロスコープ",
+  "settings.audioSpectrumPatternArea": "塗りつぶしエリア",
+  "settings.audioSpectrumPatternParticles": "パーティクル",
+  "settings.audioSpectrumPatternStrings": "弦（ストリング）",
+  "settings.audioSpectrumPatternLissajous": "リサージュ図形",
+  "settings.audioSpectrumPatternRidge": "リッジライン",
+  "settings.audioSpectrumPatternRipple": "リップル",
+  "settings.audioSpectrumPatternOrbs": "オーブ（蛍）",
+  "settings.audioSpectrumPatternBarcode": "バーコード",
   "settings.secondsValue": "{n} 秒",
 } as const;
 

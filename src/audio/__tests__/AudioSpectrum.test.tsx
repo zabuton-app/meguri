@@ -95,6 +95,7 @@ beforeEach(() => {
         }),
         moveTo: vi.fn(),
         lineTo: vi.fn(),
+        arc: vi.fn(),
         stroke: vi.fn(),
         globalAlpha: 1,
         fillStyle: "",
@@ -191,6 +192,25 @@ describe("AudioSpectrum", () => {
     expect(frames.size).toBe(1);
     flush();
     expect(rects).toHaveLength(14);
+  });
+
+  it("keeps the frames coming while a pattern's own motion plays out", () => {
+    setPrefs({ audioSpectrumPattern: "ripple" });
+    const { rerender } = renderWithProviders(
+      <AudioSpectrum active mode="full" />,
+    );
+    // Loud for a while: the kicks have thrown a few rings.
+    for (let i = 0; i < 30; i++) flush();
+    rerender(<AudioSpectrum active={false} mode="full" />);
+    // The levels drain in about a second; the rings live longer than that,
+    // so the loop is still running well after.
+    for (let i = 0; i < 90; i++) flush();
+    expect(frames.size).toBe(1);
+    // ...and rests once the last ring has faded.
+    let guard = 0;
+    while (frames.size > 0 && guard++ < 300) flush();
+    expect(frames.size).toBe(0);
+    expect(guard).toBeLessThan(300);
   });
 
   it("skips bands above Nyquist instead of reading past the data", () => {
