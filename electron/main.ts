@@ -645,7 +645,6 @@ void app.whenReady().then(async () => {
     startScan,
     abortScan,
     abortAllScans,
-    cancelScan: (wsId) => scanControllers.get(wsId)?.abort(),
     applyLogo,
   });
   createTray();

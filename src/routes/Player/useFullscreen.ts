@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, type RefObject } from "react";
+import { useIsFullscreen } from "@/hooks/useIsFullscreen";
 
 /**
  * Full screen for the player's root element.
@@ -15,13 +16,7 @@ export function useFullscreen(rootRef: RefObject<HTMLElement | null>): {
   /** Leave full screen if in it; a no-op otherwise. */
   exitFullscreen: () => void;
 } {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  useEffect(() => {
-    const onChange = () =>
-      setIsFullscreen(document.fullscreenElement === rootRef.current);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, [rootRef]);
+  const isFullscreen = useIsFullscreen(rootRef);
   const exitFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
       void document.exitFullscreen().catch(() => {});

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useIsFullscreen } from "@/hooks/useIsFullscreen";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import {
   MODAL_SIZE_KEY,
@@ -39,13 +40,7 @@ export function useDetailPresentation({
   );
 
   const modalRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  useEffect(() => {
-    const onFsChange = () =>
-      setIsFullscreen(document.fullscreenElement === modalRef.current);
-    document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
-  }, []);
+  const isFullscreen = useIsFullscreen(modalRef);
   // Exit fullscreen when prev/next lands on anything but a video: only the
   // video player has a fullscreen toggle, so staying fullscreen on an image or
   // an audio track would strand the user (Esc only). Keyed on the resolved

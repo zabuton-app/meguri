@@ -212,7 +212,6 @@ export default function MediaDetail() {
   } = useDetailMutations({
     fileId,
     wsId,
-    t,
     onDeletedFromIndex: closeAudioIfCurrent,
   });
 

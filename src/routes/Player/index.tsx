@@ -180,7 +180,7 @@ export default function Player() {
   const openDetail = useCallback(() => {
     if (!current) return;
     const sec = isImage ? 0 : Math.floor(videoRef.current?.currentTime() ?? 0);
-    parkPass({ queue: queue.queue, key: queueKey(current), sec });
+    parkPass({ queue: queue.queue, key: currentKey, sec });
     // The detail view shows this very file: hand it the playing <video> rather
     // than have it load its own and seek (see videoHandOff.ts). `t` stays as
     // the fallback for when the hand-off does not happen.
@@ -197,13 +197,13 @@ export default function Player() {
         autoplay: !isAudio,
       }),
     );
-  }, [current, isImage, isAudio, mediaBase, navigate, queue.queue]);
+  }, [current, currentKey, isImage, isAudio, mediaBase, navigate, queue.queue]);
 
   // The second to come back to, offered only to the file the player arrived
   // on. Dropped as soon as the pass steps somewhere else (goNext / goPrev
   // below), so coming back to that file later in the same pass — or on the
   // next lap with repeat on — starts it where any other item would.
-  const isArrivalItem = !!current && arrival?.key === queueKey(current);
+  const isArrivalItem = !!current && arrival?.key === currentKey;
   // Back from the detail view on the very item the pass was parked on, as
   // opposed to a fresh pass started from the detail view: the two differ in
   // what they owe the bar's track (see usePlaylistAudio).
@@ -289,6 +289,8 @@ export default function Player() {
 
   const { audioPlaying, toggleAudio } = usePlaylistAudio({
     current,
+    currentKey,
+    isAudio,
     file,
     mediaBase,
     isResumeItem,

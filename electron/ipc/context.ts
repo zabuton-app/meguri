@@ -30,8 +30,6 @@ export interface IpcContext {
   abortScan: (wsId: string) => Promise<void>;
   /** Abort every running scan without waiting. */
   abortAllScans: () => Promise<unknown>;
-  /** Request cancellation of one workspace's scan (fire-and-forget). */
-  cancelScan: (wsId: string) => void;
   /** Re-apply the logo variant to the live tray and window/dock icons. */
   applyLogo: (logo: LogoId) => void;
 }

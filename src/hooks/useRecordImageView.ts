@@ -49,9 +49,9 @@ export function useRecordImageView({
       .fileRecordPlay(fileId, wsId, "browser")
       .then(() => onRecordedRef.current?.(wsId, fileId))
       .catch(() => {
-        // Drop the guard on failure so a later effect run of this visit can
-        // retry; without this a transient IPC error would suppress the record
-        // for good.
+        // Drop the guard on failure so the next visit of this image (after
+        // stepping away and back) records again; without this a transient
+        // IPC error would suppress the record for good.
         if (recordedRef.current === key) recordedRef.current = null;
       });
   }, [kind, fileId, wsId]);

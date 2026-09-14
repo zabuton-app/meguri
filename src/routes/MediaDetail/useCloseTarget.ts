@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { playHref, type PlayHrefOpts } from "@/lib/playHref";
+import { DISCOVER_FILTER_PARAM } from "@/routes/Home/utils";
 import { announceVideoHandOff } from "@/video/videoHandOff";
 import type { PlayerHandle } from "./VideoPlayer";
 
@@ -27,7 +28,7 @@ export function useCloseTarget({
   /** The second this view arrived at (`?t=`). */
   startAt: number;
   playerRef: RefObject<PlayerHandle | null>;
-  /** The stream URL of a video on screen ("" for anything else). */
+  /** The file's media URL; handed across only while a video player is mounted. */
   mediaSrc: string;
 }): { onClose: () => void; openPlaylist: () => void } {
   const navigate = useNavigate();
@@ -114,8 +115,8 @@ export function useCloseTarget({
       return;
     }
     const params = new URLSearchParams();
-    const filter = searchParams.get("filter");
-    if (filter) params.set("filter", filter);
+    const filter = searchParams.get(DISCOVER_FILTER_PARAM);
+    if (filter) params.set(DISCOVER_FILTER_PARAM, filter);
     const query = params.toString();
     void navigate(query ? `/discover?${query}` : "/discover");
   }, [from, location.state, navigate, returnToParkedPass, searchParams]);

@@ -1,8 +1,4 @@
-import {
-  type InfiniteData,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   LIST_HIDDEN_SOURCES,
@@ -10,12 +6,13 @@ import {
   reservedTagPrefix,
 } from "@shared/tags";
 import { api } from "@/ipc/client";
-import type { FileDetail, FileRow, SearchResult } from "@/ipc/types";
-import type { TFunc } from "@/i18n/I18nProvider";
+import type { FileDetail } from "@/ipc/types";
+import { useI18n } from "@/i18n/I18nProvider";
 import {
   invalidateCollectionSearches,
   invalidateTagSearches,
   patchFileRowInCaches,
+  removeFileRowFromCaches,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
 
@@ -36,15 +33,14 @@ export interface CollectionRef {
 export function useDetailMutations({
   fileId,
   wsId,
-  t,
   onDeletedFromIndex,
 }: {
   fileId: number;
   wsId: string;
-  t: TFunc;
   /** Runs once the main process has dropped the file (before the caches are patched). */
   onDeletedFromIndex?: () => void;
 }) {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const detailKey = ["file_get", wsId, fileId] as const;
 
@@ -112,26 +108,7 @@ export function useDetailMutations({
   /** Drop the file from the index and from every list cache it appears in. */
   const removeFromIndex = async () => {
     const deleted = await deleteFromIndex.mutateAsync();
-    qc.setQueriesData<InfiniteData<SearchResult>>(
-      { queryKey: ["files_search"] },
-      (old) =>
-        old
-          ? {
-              ...old,
-              pages: old.pages.map((page) => ({
-                ...page,
-                items: page.items.filter(
-                  (item) => item.id !== deleted.id || item.workspaceId !== wsId,
-                ),
-              })),
-            }
-          : old,
-    );
-    qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, (old) =>
-      old?.filter(
-        (item) => item.id !== deleted.id || item.workspaceId !== wsId,
-      ),
-    );
+    removeFileRowFromCaches(qc, wsId, deleted.id);
     qc.removeQueries({ queryKey: ["file_get", wsId, deleted.id] });
     void qc.invalidateQueries({ queryKey: ["files_search"] });
     void qc.invalidateQueries({ queryKey: ["files_random"] });

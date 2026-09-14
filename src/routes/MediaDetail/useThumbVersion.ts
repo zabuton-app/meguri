@@ -17,7 +17,11 @@ export function useThumbVersion(fileId: number, wsId: string): number {
   const qc = useQueryClient();
   const [thumbVersion, setThumbVersion] = useState(0);
   useEffect(() => {
+    // The subscription resolves asynchronously; a cleanup that lands first
+    // (StrictMode's replay, a quick prev/next) must still drop it once it
+    // arrives, or the listener would outlive the file it was keyed on.
     let unlisten: (() => void) | undefined;
+    let cancelled = false;
     void events
       .onThumbDone((event) => {
         if (
@@ -34,8 +38,14 @@ export function useThumbVersion(fileId: number, wsId: string): number {
           );
         }
       })
-      .then((u) => (unlisten = u));
-    return () => unlisten?.();
+      .then((u) => {
+        if (cancelled) u();
+        else unlisten = u;
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, [fileId, wsId, qc]);
   return thumbVersion;
 }

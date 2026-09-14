@@ -27,13 +27,12 @@ export function registerTagHandlers(ctx: IpcContext): void {
   // The catalog channels take no workspaceId: coreById(ALL_ID) throws by design,
   // and a tag id means nothing across databases. Scope follows the active view
   // (see scopedCores).
-  const tagCores = () => scopedCores(ws);
 
   /** Cores for a catalog mutation. allCores() silently skips workspaces whose DB
    *  could not be opened, which for a rename means that workspace keeps the old
    *  name while the others move on — worth a line in the log when it happens. */
   const tagMutationCores = () => {
-    const cores = tagCores();
+    const cores = scopedCores(ws);
     const expected =
       ws.isCollection() || ws.isAll() ? ws.rootCount() : cores.length;
     if (cores.length < expected) {
@@ -47,7 +46,7 @@ export function registerTagHandlers(ctx: IpcContext): void {
   handle("tags_list_all", () =>
     queryClient.run<TagList>({
       kind: "tagsList",
-      targets: queryTargets(tagCores()),
+      targets: queryTargets(scopedCores(ws)),
     }),
   );
   // Mutations are addressed by name, so fanning them across every database in

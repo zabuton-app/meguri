@@ -18,6 +18,8 @@ import { queueKey, type QueueItem } from "@/lib/playbackQueue";
  */
 export function usePlaylistAudio({
   current,
+  currentKey,
+  isAudio,
   file,
   mediaBase,
   isResumeItem,
@@ -26,6 +28,9 @@ export function usePlaylistAudio({
   skipCurrent,
 }: {
   current: QueueItem | null;
+  /** `queueKey(current)`, or "" with no item — computed once by the route. */
+  currentKey: string;
+  isAudio: boolean;
   file: FileDetail | null;
   mediaBase: string;
   /**
@@ -37,8 +42,6 @@ export function usePlaylistAudio({
   goNext: () => void;
   skipCurrent: () => void;
 }): {
-  /** The current item is audio and is the track in the bar. */
-  isCurrentAudio: boolean;
   audioPlaying: boolean;
   toggleAudio: () => void;
 } {
@@ -48,8 +51,7 @@ export function usePlaylistAudio({
     toggle: toggleAudio,
     subscribeEnded,
   } = useAudioActions();
-  const isAudio = current?.kind === "audio";
-  const currentKey = current ? queueKey(current) : "";
+  // The current item is audio and is the track in the bar.
   const isCurrentAudio =
     isAudio &&
     !!current &&
@@ -139,5 +141,5 @@ export function usePlaylistAudio({
     if (isCurrentAudio && audio.error) skipCurrent();
   }, [isCurrentAudio, audio.error, skipCurrent]);
 
-  return { isCurrentAudio, audioPlaying, toggleAudio };
+  return { audioPlaying, toggleAudio };
 }

@@ -7,7 +7,7 @@ export function registerScanHandlers(ctx: IpcContext): void {
   );
 
   handle("scan_cancel", ({ wsId }) => {
-    if (wsId) ctx.cancelScan(wsId);
+    if (wsId) void ctx.abortScan(wsId);
     else void ctx.abortAllScans();
   });
 }
