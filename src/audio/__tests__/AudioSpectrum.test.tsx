@@ -83,6 +83,8 @@ beforeEach(() => {
     () =>
       ({
         setTransform: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
         clearRect: vi.fn(() => {
           rects = [];
         }),
@@ -192,6 +194,30 @@ describe("AudioSpectrum", () => {
     expect(frames.size).toBe(1);
     flush();
     expect(rects).toHaveLength(14);
+  });
+
+  it("sizes the bitmap only while drawing, and gives it up at rest", () => {
+    const { rerender } = renderWithProviders(
+      <AudioSpectrum active={false} mode="tile" />,
+    );
+    const canvas = screen.getByTestId<HTMLCanvasElement>("audio-spectrum");
+    // Not sounding: the first frame rests at once, without a bitmap or a
+    // paint (a display of a track that is not playing, like most cards).
+    flush();
+    expect(canvas.width).toBe(1);
+    expect(canvas.height).toBe(1);
+    expect(fills).toBe(0);
+    expect(frames.size).toBe(0);
+    // Sounding: sized to the box (320 × 100 at the test's DPR of 1).
+    rerender(<AudioSpectrum active mode="tile" />);
+    flush();
+    expect(canvas.width).toBe(320);
+    expect(canvas.height).toBe(100);
+    // Drained again: back to a pixel.
+    rerender(<AudioSpectrum active={false} mode="tile" />);
+    let guard = 0;
+    while (frames.size > 0 && guard++ < 300) flush();
+    expect(canvas.width).toBe(1);
   });
 
   it("keeps the frames coming while a pattern's own motion plays out", () => {

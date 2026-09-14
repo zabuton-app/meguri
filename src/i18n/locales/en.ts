@@ -511,7 +511,6 @@ export const en: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternArea": "Filled area",
   "settings.audioSpectrumPatternParticles": "Particles",
   "settings.audioSpectrumPatternStrings": "Strings",
-  "settings.audioSpectrumPatternLissajous": "Lissajous figure",
   "settings.audioSpectrumPatternRidge": "Ridgeline",
   "settings.audioSpectrumPatternRipple": "Ripples",
   "settings.audioSpectrumPatternOrbs": "Orbs",

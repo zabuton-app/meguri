@@ -495,7 +495,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternArea": "填充面积",
   "settings.audioSpectrumPatternParticles": "粒子",
   "settings.audioSpectrumPatternStrings": "琴弦",
-  "settings.audioSpectrumPatternLissajous": "李萨如图形",
   "settings.audioSpectrumPatternRidge": "山脊线",
   "settings.audioSpectrumPatternRipple": "涟漪",
   "settings.audioSpectrumPatternOrbs": "光球",

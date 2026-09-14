@@ -21,8 +21,8 @@ export function useCycleSpectrumPattern(): (dir: 1 | -1) => void {
     setAudioSpectrumPattern,
   } = usePreferences();
   const reducedMotion = usePrefersReducedMotion();
-  // The current pattern is kept in a ref and advanced on the spot, so a key
-  // repeat lands every step even when two presses arrive before a re-render.
+  // The current pattern is kept in a ref and advanced on the spot, so two
+  // quick presses both land even when they arrive before a re-render.
   const patternRef = useRef(audioSpectrumPattern);
   useEffect(() => {
     patternRef.current = audioSpectrumPattern;
@@ -40,9 +40,12 @@ export function useCycleSpectrumPattern(): (dir: 1 | -1) => void {
 }
 
 /** Is this the spectrum key: a plain V (Shift allowed) with no other
- *  modifier, and not typed into a field? */
+ *  modifier, not auto-repeating, and not typed into a field? */
 export function isSpectrumPatternKey(e: KeyboardEvent): boolean {
   if (e.code !== "KeyV" || e.ctrlKey || e.altKey || e.metaKey) return false;
+  // Each step rebuilds the display (and its bitmap); a held key would do
+  // that at the OS repeat rate for nothing anyone can follow.
+  if (e.repeat) return false;
   const el = document.activeElement as HTMLElement | null;
   if (
     el &&

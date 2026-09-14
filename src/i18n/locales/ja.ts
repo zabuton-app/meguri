@@ -514,7 +514,6 @@ export const ja = {
   "settings.audioSpectrumPatternArea": "塗りつぶしエリア",
   "settings.audioSpectrumPatternParticles": "パーティクル",
   "settings.audioSpectrumPatternStrings": "弦（ストリング）",
-  "settings.audioSpectrumPatternLissajous": "リサージュ図形",
   "settings.audioSpectrumPatternRidge": "リッジライン",
   "settings.audioSpectrumPatternRipple": "リップル",
   "settings.audioSpectrumPatternOrbs": "オーブ（蛍）",

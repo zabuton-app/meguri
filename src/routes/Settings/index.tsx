@@ -74,7 +74,6 @@ const SPECTRUM_PATTERN_LABELS: Record<SpectrumPattern, TranslationKey> = {
   area: "settings.audioSpectrumPatternArea",
   particles: "settings.audioSpectrumPatternParticles",
   strings: "settings.audioSpectrumPatternStrings",
-  lissajous: "settings.audioSpectrumPatternLissajous",
   ridge: "settings.audioSpectrumPatternRidge",
   ripple: "settings.audioSpectrumPatternRipple",
   orbs: "settings.audioSpectrumPatternOrbs",

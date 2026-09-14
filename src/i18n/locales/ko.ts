@@ -511,7 +511,6 @@ export const ko: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternArea": "채움 영역",
   "settings.audioSpectrumPatternParticles": "파티클",
   "settings.audioSpectrumPatternStrings": "현(스트링)",
-  "settings.audioSpectrumPatternLissajous": "리사주 도형",
   "settings.audioSpectrumPatternRidge": "리지라인",
   "settings.audioSpectrumPatternRipple": "리플",
   "settings.audioSpectrumPatternOrbs": "오브(반딧불)",

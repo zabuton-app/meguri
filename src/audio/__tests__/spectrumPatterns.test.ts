@@ -3,13 +3,12 @@ import {
   bandColors,
   bandCount,
   createDrawer,
-  createLissajous,
+  createArea,
   createOrbs,
   createParticles,
   createRidge,
   createRipple,
   cycleSpectrumPattern,
-  drawArea,
   drawBarcode,
   drawBars,
   drawLed,
@@ -23,6 +22,7 @@ import {
   rampColor,
   rgba,
   SPECTRUM_PATTERN_OPTIONS,
+  withAlpha,
   type SpectrumPalette,
   type SpectrumPattern,
 } from "@/audio/spectrumPatterns";
@@ -67,7 +67,10 @@ function fakeContext() {
     stroke: vi.fn(() => {
       alphaAtStroke.push(g.globalAlpha);
     }),
-    drawImage: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
     setTransform: vi.fn(),
     createLinearGradient: vi.fn(gradient),
     createRadialGradient: vi.fn(gradient),
@@ -114,6 +117,10 @@ describe("colours", () => {
     expect(rampColor(palette, 0)).toBe("rgb(131,165,152)");
     expect(rampColor(palette, 1)).toBe("rgb(211,134,155)");
     expect(rgba("#ebdbb2", 0.07)).toBe("rgba(235,219,178,0.07)");
+    // The ramp yields rgb() strings; withAlpha takes those and hex alike.
+    expect(withAlpha("rgb(131,165,152)", 0)).toBe("rgba(131,165,152,0)");
+    expect(withAlpha("#ebdbb2", 0.5)).toBe("rgba(235,219,178,0.5)");
+    expect(withAlpha("rgb(255 0 0)", 0.5)).toBe("rgba(255,0,0,0.5)");
   });
 
   it("steps the LED colour by height", () => {
@@ -290,20 +297,27 @@ describe("drawers", () => {
     expect(full.spies.stroke).toHaveBeenCalledTimes(3);
   });
 
-  it("area: two gradient-filled, stroked layers", () => {
+  it("area: two gradient-filled, stroked layers, the gradients made once", () => {
     const f = fakeContext();
-    drawArea({
-      ...f,
-      ...args(40),
-      w: 300,
-      h: 100,
-      mode: "full",
-      levels: flat(40, 0.5),
-    });
+    const draw = createArea();
+    const frame = () =>
+      draw({
+        ...f,
+        ...args(40),
+        w: 300,
+        h: 100,
+        mode: "full",
+        levels: flat(40, 0.5),
+      });
+    expect(frame()).toBe(false);
     expect(f.spies.createLinearGradient).toHaveBeenCalledTimes(2);
     expect(f.spies.fill).toHaveBeenCalledTimes(2);
     expect(f.spies.stroke).toHaveBeenCalledTimes(2);
     expect(f.spies.closePath).toHaveBeenCalledTimes(2);
+    // The next frame reuses them (they depend on the box and the theme).
+    frame();
+    expect(f.spies.createLinearGradient).toHaveBeenCalledTimes(2);
+    expect(f.spies.fill).toHaveBeenCalledTimes(4);
   });
 
   it("particles: sparks fly while it is loud and keep flying after it stops", () => {
@@ -323,6 +337,15 @@ describe("drawers", () => {
         }) === true;
     expect(busy).toBe(true);
     expect(f.spies.arc).toHaveBeenCalled();
+    // Sparks are filled in batches (band colour × alpha step), never one by
+    // one: far fewer fills than arcs.
+    f.spies.arc.mockClear();
+    f.spies.fill.mockClear();
+    draw({ ...f, ...args(24), w: 300, h: 100, mode: "full", levels: loud });
+    expect(f.spies.fill.mock.calls.length).toBeLessThan(
+      f.spies.arc.mock.calls.length,
+    );
+    expect(f.spies.fill.mock.calls.length).toBeLessThanOrEqual(24 * 4);
     // Silent and stopped: the sparks already up keep falling, then are gone.
     const quiet = fakeContext();
     let frames = 0;
@@ -356,105 +379,10 @@ describe("drawers", () => {
     expect(f.alphaAtStroke[0]).toBeCloseTo(0.35);
   });
 
-  it("lissajous: draws into a fading buffer and keeps the trail alive a moment", () => {
-    const buf = fakeContext();
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
-      () => buf.g,
-    );
-    const draw = createLissajous();
-    const f = fakeContext();
-    const on = draw({
-      ...f,
-      ...args(24),
-      w: 300,
-      h: 100,
-      mode: "full",
-      levels: flat(24, 0.5),
-    });
-    expect(on).toBe(true);
-    // The fade cuts the buffer's alpha (so the art stays visible under it)
-    // before the figure is stroked on top and the buffer is composited.
-    expect(buf.spies.fillRect).toHaveBeenCalledTimes(1);
-    expect(buf.compositeBy).toEqual(["destination-out"]);
-    expect(buf.spies.globalCompositeOperation).toBe("source-over");
-    expect(buf.spies.stroke).toHaveBeenCalledTimes(1);
-    expect(f.spies.drawImage).toHaveBeenCalledTimes(1);
-    // Stopped and drained: a few more frames of fade, then done.
-    let frames = 0;
-    while (
-      draw({
-        ...f,
-        ...args(24),
-        active: false,
-        w: 300,
-        h: 100,
-        mode: "full",
-        levels: flat(24),
-        dt: 0.1,
-      }) === true &&
-      frames++ < 100
-    );
-    expect(frames).toBeGreaterThan(0);
-    expect(frames).toBeLessThan(100);
-  });
-
-  it("lissajous: draws nothing where canvases have no context, frame after frame", () => {
-    const getContext = vi
-      .spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockImplementation(() => null);
-    const f = fakeContext();
-    const draw = createLissajous();
-    for (let i = 0; i < 3; i++)
-      expect(
-        draw({
-          ...f,
-          ...args(24),
-          w: 300,
-          h: 100,
-          mode: "full",
-          levels: flat(24, 1),
-        }),
-      ).toBe(false);
-    expect(f.spies.drawImage).not.toHaveBeenCalled();
-    // One failed attempt is remembered, not retried every frame.
-    expect(getContext).toHaveBeenCalledTimes(1);
-  });
-
-  it("lissajous: allocates no buffer while quiet, and lets it go afterwards", () => {
-    const buf = fakeContext();
-    const getContext = vi
-      .spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockImplementation(() => buf.g);
-    const draw = createLissajous();
-    const f = fakeContext();
-    const quiet = {
-      ...f,
-      ...args(24),
-      active: false,
-      w: 300,
-      h: 100,
-      mode: "full" as const,
-      levels: flat(24),
-      dt: 0.1,
-    };
-    // A display of a track that is not sounding (one of many cards).
-    expect(draw(quiet)).toBe(false);
-    expect(getContext).not.toHaveBeenCalled();
-    // Sounding: the buffer exists; quiet again: it is released once the
-    // trail is gone, and made anew when the sound returns.
-    draw({ ...quiet, active: true, levels: flat(24, 1) });
-    expect(getContext).toHaveBeenCalledTimes(1);
-    let frames = 0;
-    while (draw(quiet) === true && frames++ < 100);
-    expect(frames).toBeLessThan(100);
-    draw({ ...quiet, active: true, levels: flat(24, 1) });
-    expect(getContext).toHaveBeenCalledTimes(2);
-  });
-
   it("ridge: keeps a history of rows, cuts each body out and recedes when quiet", () => {
     const draw = createRidge();
     const f = fakeContext();
-    // The first frame seeds one row; each 70 ms adds another, up to 16.
+    // The first frame seeds one row; each 70 ms adds another, up to 10.
     draw({
       ...f,
       ...args(56),
@@ -485,7 +413,7 @@ describe("drawers", () => {
       levels: flat(56, 1),
       dt: 0.07,
     });
-    expect(f.spies.stroke).toHaveBeenCalledTimes(16);
+    expect(f.spies.stroke).toHaveBeenCalledTimes(10);
     // Stopped: the loud rows recede row by row, and then it is over.
     let frames = 0;
     while (
@@ -501,7 +429,7 @@ describe("drawers", () => {
       }) === true &&
       frames++ < 100
     );
-    expect(frames).toBeGreaterThanOrEqual(15);
+    expect(frames).toBeGreaterThanOrEqual(9);
     expect(frames).toBeLessThan(100);
   });
 
@@ -559,19 +487,37 @@ describe("drawers", () => {
     expect(frames).toBeLessThan(100);
   });
 
-  it("orbs: one glowing sphere per band with a core", () => {
+  it("orbs: one glowing sphere per band with a core, the glows made once", () => {
     const f = fakeContext();
-    createOrbs()({
-      ...f,
-      ...args(18),
-      w: 300,
-      h: 100,
-      mode: "full",
-      levels: flat(18, 0.5),
-    });
-    expect(f.spies.createRadialGradient).toHaveBeenCalledTimes(18);
-    expect(f.spies.arc).toHaveBeenCalledTimes(36);
+    const draw = createOrbs();
+    const n = 18;
+    // The host hands the same colours array every frame; so does this.
+    const shared = args(n);
+    const frame = () =>
+      draw({
+        ...f,
+        ...shared,
+        w: 300,
+        h: 100,
+        mode: "full",
+        levels: flat(n, 0.5),
+      });
+    frame();
+    // One unit gradient per band colour, fading to that colour (not white).
+    expect(f.spies.createRadialGradient).toHaveBeenCalledTimes(n);
+    const stops = f.spies.createRadialGradient.mock.results[0].value as {
+      addColorStop: ReturnType<typeof vi.fn>;
+    };
+    expect(stops.addColorStop).toHaveBeenLastCalledWith(
+      1,
+      withAlpha(rampColor(palette, 0), 0),
+    );
+    expect(f.spies.arc).toHaveBeenCalledTimes(2 * n);
     expect(f.spies.fillStyle).toBe(palette.fg);
+    // The next frame draws the same glows under a transform, building none.
+    frame();
+    expect(f.spies.createRadialGradient).toHaveBeenCalledTimes(n);
+    expect(f.spies.translate).toHaveBeenCalledTimes(2 * n);
   });
 
   it("barcode: one hairline per band, heavier when loud", () => {

@@ -12,7 +12,6 @@
 // - area: two layered, gradient-filled curves, one behind the other
 // - particles: sparks thrown up from each band and falling back
 // - strings: one string per band, plucked into vibration by its level
-// - lissajous: an XY-scope figure whose shape follows the bass, with a trail
 // - ridge: the last moments of the spectrum receding like a mountain range
 // - ripple: rings spreading on the beat and fading like drops on water
 // - orbs: glowing spheres, one per band, drifting and pulsing
@@ -28,8 +27,8 @@
 // here, keyed by the pattern so that adding one fails typecheck until every
 // table has a row. The drawers stay free of the DOM (a context and numbers
 // in) so they can be tested without a component; the ones that carry motion
-// of their own between frames (particles, ripples, a history, a trail) are
-// built by a factory so each display gets its own state, and report whether
+// of their own between frames (particles, ripples, a history) are built by a
+// factory so each display gets its own state, and report whether
 // they still have something moving once the levels have drained so the host
 // keeps the frames coming until they are done.
 
@@ -42,7 +41,6 @@ export const SPECTRUM_PATTERN_OPTIONS = [
   "area",
   "particles",
   "strings",
-  "lissajous",
   "ridge",
   "ripple",
   "orbs",
@@ -110,7 +108,6 @@ export function bandCount(
       // Half the columns plus the centre one: the rest are their mirror.
       return mode === "tile" ? 7 : 21;
     case "wave":
-    case "lissajous":
     case "ripple":
       // These read a low, a mid and a high band out of a coarse spectrum.
       return 24;
@@ -169,7 +166,6 @@ export const PATTERN_LAYOUT: Record<SpectrumPattern, PatternLayout> = {
   // The rest are sparse enough to lie over the whole picture.
   particles: { overlayBox: "absolute inset-0", glyph: "corner" },
   strings: { overlayBox: "absolute inset-0", glyph: "corner" },
-  lissajous: { overlayBox: "absolute inset-0", glyph: "corner" },
   ridge: { overlayBox: "absolute inset-0", glyph: "corner" },
   ripple: { overlayBox: "absolute inset-0", glyph: "corner" },
   orbs: { overlayBox: "absolute inset-0", glyph: "corner" },
@@ -200,6 +196,15 @@ export function mixHex(a: string, b: string, t: number): string {
 export function rgba(hex: string, alpha: number): string {
   const [r, g, b] = hexRgb(hex);
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** `color` (a hex string, or an `rgb(...)` string as the ramp produces)
+ *  at `alpha`. */
+export function withAlpha(color: string, alpha: number): string {
+  const m = /^rgba?\(([^)]+)\)$/.exec(color);
+  const parts = m ? m[1].split(/[\s,/]+/).filter(Boolean) : [];
+  if (parts.length < 3) return rgba(color, alpha);
+  return `rgba(${parts[0]},${parts[1]},${parts[2]},${alpha})`;
 }
 
 /** Colour at `f` (0..1) along the accent ramp. */
@@ -320,8 +325,9 @@ export interface DrawArgs {
 
 /** Draws one frame. Returns true while the drawer still has motion of its
  *  own to show (falling particles, a receding history) after the levels have
- *  drained, so the host keeps asking for frames. */
-export type Drawer = (args: DrawArgs) => boolean | void;
+ *  drained, so the host keeps asking for frames; a stateless drawer always
+ *  returns false. */
+export type Drawer = (args: DrawArgs) => boolean;
 
 /** The per-band colours a drawer wants, for `n` bands. */
 export function bandColors(palette: SpectrumPalette, n: number): string[] {
@@ -352,6 +358,7 @@ export function drawBars({ g, w, h, mode, levels, colors, active }: DrawArgs) {
     }
   }
   g.globalAlpha = 1;
+  return false;
 }
 
 export function drawRing({ g, w, h, mode, levels, colors }: DrawArgs) {
@@ -383,6 +390,7 @@ export function drawRing({ g, w, h, mode, levels, colors }: DrawArgs) {
     g.stroke();
   }
   g.globalAlpha = 1;
+  return false;
 }
 
 export function drawLed({ g, w, h, mode, levels, palette }: DrawArgs) {
@@ -423,6 +431,7 @@ export function drawLed({ g, w, h, mode, levels, palette }: DrawArgs) {
     g.fillStyle = shades[s]!;
     g.fill();
   }
+  return false;
 }
 
 /** Bars mirrored about the middle line, the lowest band in the centre
@@ -453,6 +462,7 @@ export function drawMirror({
     fillRect(g, pad + i * (bw + gap), cy - bh, bw, bh * 2, bw / 2);
   }
   g.globalAlpha = 1;
+  return false;
 }
 
 /** An oscilloscope trace: three sines (a low, a mid and a high band) summed
@@ -504,41 +514,54 @@ export function drawWave({ g, w, h, mode, levels, palette, t }: DrawArgs) {
   trace(mode === "tile" ? 5 : 8, 0.25, -0.35);
   trace(mode === "tile" ? 1.5 : 2.25, 1, 0);
   g.globalAlpha = 1;
+  return false;
 }
 
 /** Two smoothed, gradient-filled curves: a secondary-accent one behind
  *  (smaller, and shifted along the bands so it does not just echo the
- *  front) and the primary one in front. */
-export function drawArea({ g, w, h, mode, levels, palette }: DrawArgs) {
-  const n = levels.length;
-  const baseY = h;
-  const maxH = h * (mode === "full" ? 0.8 : 0.92);
-  const layer = (
-    color: string,
-    scale: number,
-    shift: number,
-    alpha: number,
-  ) => {
-    const shifted = new Float32Array(n);
-    for (let i = 0; i < n; i++) shifted[i] = levels[(i + shift) % n] * scale;
-    g.beginPath();
-    tracePeaks(g, shifted, 0, w, baseY, maxH);
-    g.lineTo(w, baseY);
-    g.closePath();
-    const grad = g.createLinearGradient(0, baseY - maxH, 0, baseY);
-    grad.addColorStop(0, color);
-    grad.addColorStop(1, rgba(color, 0));
-    g.fillStyle = grad;
-    g.globalAlpha = alpha;
-    g.fill();
-    g.strokeStyle = color;
-    g.lineWidth = 1.5;
-    g.globalAlpha = Math.min(1, alpha + 0.25);
-    g.stroke();
+ *  front) and the primary one in front. A factory only so the shifted copy
+ *  and the two gradients (which depend on the box height and the theme, not
+ *  the frame) are made once, not sixty times a second. */
+export function createArea(): Drawer {
+  let shifted = new Float32Array(0);
+  const gradients = new Map<string, CanvasGradient>();
+  return ({ g, w, h, mode, levels, palette }) => {
+    const n = levels.length;
+    const baseY = h;
+    const maxH = h * (mode === "full" ? 0.8 : 0.92);
+    const gradientFor = (color: string) => {
+      const key = `${color}|${h}|${mode}`;
+      let grad = gradients.get(key);
+      if (!grad) {
+        // A resize or a theme change makes a new key; drop the old ones.
+        if (gradients.size >= 4) gradients.clear();
+        grad = g.createLinearGradient(0, baseY - maxH, 0, baseY);
+        grad.addColorStop(0, color);
+        grad.addColorStop(1, withAlpha(color, 0));
+        gradients.set(key, grad);
+      }
+      return grad;
+    };
+    const layer = (color: string, values: ArrayLike<number>, alpha: number) => {
+      g.beginPath();
+      tracePeaks(g, values, 0, w, baseY, maxH);
+      g.lineTo(w, baseY);
+      g.closePath();
+      g.fillStyle = gradientFor(color);
+      g.globalAlpha = alpha;
+      g.fill();
+      g.strokeStyle = color;
+      g.lineWidth = 1.5;
+      g.globalAlpha = Math.min(1, alpha + 0.25);
+      g.stroke();
+    };
+    if (shifted.length !== n) shifted = new Float32Array(n);
+    for (let i = 0; i < n; i++) shifted[i] = levels[(i + 7) % n] * 0.72;
+    layer(palette.secondaryAccent, shifted, 0.5);
+    layer(palette.primary, levels, 0.75);
+    g.globalAlpha = 1;
+    return false;
   };
-  layer(palette.secondaryAccent, 0.72, 7, 0.5);
-  layer(palette.primary, 1, 0, 0.75);
-  g.globalAlpha = 1;
 }
 
 interface Particle {
@@ -548,12 +571,18 @@ interface Particle {
   vy: number;
   r: number;
   life: number;
-  color: string;
+  band: number;
 }
 
-// Enough for a loud passage on the stage; older sparks go first. Each is
-// its own path and fill, so the cap is also the frame's draw-call budget.
-const MAX_PARTICLES = 400;
+// Enough for a loud passage on the stage; older sparks go first. Fewer in
+// the tile, where the same count would read as noise.
+const MAX_PARTICLES = 240;
+const MAX_TILE_PARTICLES = 60;
+// Sparks a loud band throws per second (the design's 0.7 a frame at 60 Hz).
+const SPAWN_RATE = 42;
+// Sparks are drawn in batches: one path and fill per band colour and alpha
+// step rather than per spark.
+const ALPHA_STEPS = 4;
 
 /** Drop the items `dead` says are done, in place (no per-frame garbage). */
 function compact<T>(items: T[], dead: (item: T) => boolean): void {
@@ -569,15 +598,17 @@ function compact<T>(items: T[], dead: (item: T) => boolean): void {
  *  along the bottom. The sparks outlive the sound that threw them. */
 export function createParticles(): Drawer {
   const particles: Particle[] = [];
+  let buckets: number[][] = [];
   return ({ g, w, h, mode, levels, colors, active, dt }) => {
     const n = levels.length;
     // Throw less far, and fewer, in the tile.
     const k = modeScale(mode);
+    const cap = mode === "tile" ? MAX_TILE_PARTICLES : MAX_PARTICLES;
     const slot = w / n;
     if (active) {
       for (let i = 0; i < n; i++) {
         const lv = levels[i];
-        if (lv > 0.3 && Math.random() < lv * 0.7 * k) {
+        if (lv > 0.3 && Math.random() < lv * SPAWN_RATE * k * dt) {
           particles.push({
             x: (i + 0.5) * slot + (Math.random() - 0.5) * 14 * k,
             y: h - 8 * k,
@@ -585,11 +616,12 @@ export function createParticles(): Drawer {
             vy: -(40 + lv * 200 + Math.random() * 60) * k,
             r: (1.5 + lv * 3 + Math.random() * 1.5) * k,
             life: 1,
-            color: colors[i],
+            band: i,
           });
         }
       }
     }
+    if (particles.length > cap) particles.splice(0, particles.length - cap);
     // Embers along the baseline: a glowing stub while the track sounds,
     // nothing once it has drained (the sparks still up finish falling).
     g.globalAlpha = 0.5;
@@ -597,25 +629,40 @@ export function createParticles(): Drawer {
     for (let i = 0; i < n; i++) {
       const bh = (stub + levels[i] * 10) * k;
       if (bh <= 0) continue;
-      g.fillStyle = colors[i]!;
+      g.fillStyle = colors[i];
       g.fillRect((i + 0.15) * slot, h - bh, slot * 0.7, bh);
     }
-    for (const p of particles) {
+    // Move every spark, then sort the live ones into buckets.
+    if (buckets.length !== n * ALPHA_STEPS)
+      buckets = Array.from({ length: n * ALPHA_STEPS }, () => []);
+    else for (const bucket of buckets) bucket.length = 0;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.vy += 60 * k * dt; // a little gravity
       p.life -= dt * 0.9;
       if (p.life <= 0) continue;
-      g.globalAlpha = p.life * 0.9;
-      g.fillStyle = p.color;
+      const step = Math.min(ALPHA_STEPS - 1, Math.floor(p.life * ALPHA_STEPS));
+      buckets[p.band * ALPHA_STEPS + step].push(i);
+    }
+    for (let b = 0; b < buckets.length; b++) {
+      const members = buckets[b];
+      if (members.length === 0) continue;
+      const step = b % ALPHA_STEPS;
+      g.fillStyle = colors[(b - step) / ALPHA_STEPS];
+      g.globalAlpha = ((step + 1) / ALPHA_STEPS) * 0.9;
       g.beginPath();
-      g.arc(p.x, p.y, p.r * (0.5 + p.life * 0.5), 0, Math.PI * 2);
+      for (const i of members) {
+        const p = particles[i];
+        const r = p.r * (0.5 + p.life * 0.5);
+        g.moveTo(p.x + r, p.y);
+        g.arc(p.x, p.y, r, 0, Math.PI * 2);
+      }
       g.fill();
     }
     g.globalAlpha = 1;
     compact(particles, (p) => p.life <= 0 || p.y <= -10);
-    if (particles.length > MAX_PARTICLES)
-      particles.splice(0, particles.length - MAX_PARTICLES);
     return particles.length > 0;
   };
 }
@@ -665,115 +712,7 @@ export function drawStrings({
     g.fill();
   }
   g.globalAlpha = 1;
-}
-
-/** An offscreen canvas the size of the box in CSS pixels (a trail of
- *  strokes does not need the display's 2x bitmap, and the fade and the
- *  composite touch every pixel of it each frame), recreated (and so cleared)
- *  when the box changes size, and released with `drop()` so a display that
- *  has gone quiet holds no bitmap. `get()` is null where canvases have no 2D
- *  context (a test runtime), in which case the drawer draws nothing. */
-function createBuffer() {
-  let canvas: HTMLCanvasElement | null = null;
-  let ctx: CanvasRenderingContext2D | null = null;
-  let unavailable = false;
-  return {
-    get(w: number, h: number) {
-      if (unavailable) return null;
-      if (!canvas || !ctx) {
-        canvas = document.createElement("canvas");
-        ctx = canvas.getContext("2d");
-        if (!ctx) {
-          unavailable = true;
-          canvas = null;
-          return null;
-        }
-      }
-      const bw = Math.max(1, Math.round(w));
-      const bh = Math.max(1, Math.round(h));
-      if (canvas.width !== bw || canvas.height !== bh) {
-        canvas.width = bw;
-        canvas.height = bh;
-      }
-      return { canvas, ctx };
-    },
-    drop() {
-      if (canvas) canvas.width = canvas.height = 0;
-      canvas = null;
-      ctx = null;
-    },
-  };
-}
-
-// How fast a trail's alpha decays, in 1/s (about the design's 16 % a frame
-// at 60 Hz), and how long the trail is kept alive after the last stroke.
-const TRAIL_FADE = 11;
-const TRAIL_SECONDS = 0.6;
-
-/** An XY-scope figure: its size follows the bass, its lobes the mids, and a
- *  high-band wobble roughens the line. Drawn into a buffer that fades a
- *  little each frame, so the figure leaves a trail behind it. */
-export function createLissajous(): Drawer {
-  const buffer = createBuffer();
-  let trail = 0;
-  return ({ g, w, h, mode, levels, palette, active, t, dt }) => {
-    const sounding = active || peak(levels) > 0;
-    if (!sounding && trail <= 0) {
-      // Quiet, and the trail has gone: keep no bitmap around (a display
-      // that never sounds — one of many cards — never allocates one).
-      buffer.drop();
-      return false;
-    }
-    const buf = buffer.get(w, h);
-    if (!buf) return false;
-    const b = buf.ctx;
-    // Fade what is there by lowering its alpha rather than painting a
-    // background over it: over the cover art the buffer has to stay clear.
-    b.globalCompositeOperation = "destination-out";
-    b.fillStyle = `rgba(0,0,0,${1 - Math.exp(-TRAIL_FADE * dt)})`;
-    b.fillRect(0, 0, w, h);
-    b.globalCompositeOperation = "source-over";
-    if (sounding) {
-      trail = TRAIL_SECONDS;
-      const lo = levelAt(levels, 0.03);
-      const mid = levelAt(levels, 0.4);
-      const hi = levelAt(levels, 0.8);
-      const cx = w / 2;
-      const cy = h / 2;
-      const padX = mode === "tile" ? 8 : 20;
-      const padY = mode === "tile" ? 6 : 16;
-      const ax = (w / 2 - padX) * (0.35 + lo * 0.65);
-      const ay = (h / 2 - padY) * (0.35 + lo * 0.65);
-      const fx = 3 + Math.round(mid * 2);
-      const fy = 2;
-      const jitter = (mode === "tile" ? 3 : 8) * hi;
-      b.strokeStyle = mixHex(palette.primary, palette.secondaryAccent, hi);
-      b.lineWidth = (mode === "tile" ? 1 : 1.5) + lo * 1.5;
-      b.globalAlpha = 0.9;
-      b.beginPath();
-      const pts = 260;
-      for (let i = 0; i <= pts; i++) {
-        const p = (i / pts) * Math.PI * 2;
-        const x =
-          cx +
-          Math.sin(p * fx + t * 1.3) * ax +
-          Math.sin(p * 17 + t * 4) * jitter;
-        const y =
-          cy +
-          Math.sin(p * fy + t * 0.9) * ay +
-          Math.cos(p * 13 + t * 5) * jitter;
-        if (i === 0) b.moveTo(x, y);
-        else b.lineTo(x, y);
-      }
-      b.stroke();
-      b.globalAlpha = 1;
-    } else {
-      trail -= dt;
-    }
-    g.drawImage(buf.canvas, 0, 0, w, h);
-    if (trail <= 0) buffer.drop();
-    return trail > 0;
-  };
+  return false;
 }
 
 // A new row of the ridge every so often, and how many rows are kept.
@@ -788,7 +727,9 @@ export function createRidge(): Drawer {
   let hist: Float32Array[] = [];
   let acc = 0;
   return ({ g, w, h, mode, levels, palette, active, dt }) => {
-    const rows = mode === "tile" ? 8 : 16;
+    // Ten rows on the stage: each is a compositing erase over a wide body,
+    // so the count is the pattern's cost.
+    const rows = mode === "tile" ? 6 : 10;
     acc += dt;
     if (acc >= RIDGE_INTERVAL || hist.length === 0) {
       // Carry the remainder so the cadence holds at any frame rate.
@@ -869,9 +810,9 @@ export function createRipple(): Drawer {
           1.4,
         );
       }
-      if (mid > 0.4 && Math.random() < 0.0375)
+      if (mid > 0.4 && Math.random() < dt * 2.25)
         spawn(Math.random() * w, Math.random() * h, 3, 0.9);
-      if (Math.random() < dt * 0.625)
+      if (lo + mid > 0 && Math.random() < dt * 0.625)
         spawn(
           Math.random() * w,
           Math.random() * h,
@@ -919,6 +860,11 @@ interface Orb {
 export function createOrbs(): Drawer {
   // One per band, seeded on the first frame (there is no box size before).
   let orbs: Orb[] | null = null;
+  // The glow is one unit-radius gradient per band colour, made once per
+  // palette (the host hands the same `colors` array every frame) and drawn
+  // under a translate/scale, rather than a fresh gradient per orb per frame.
+  let glowColors: readonly string[] | null = null;
+  let glows: CanvasGradient[] = [];
   return ({ g, w, h, mode, levels, colors, palette, t, dt }) => {
     const n = levels.length;
     orbs ??= Array.from({ length: n }, () => ({
@@ -928,6 +874,16 @@ export function createOrbs(): Drawer {
       vy: (Math.random() - 0.5) * 10,
       ph: Math.random() * Math.PI * 2,
     }));
+    if (glowColors !== colors) {
+      glowColors = colors;
+      glows = colors.map((col) => {
+        const glow = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+        glow.addColorStop(0, col);
+        glow.addColorStop(0.35, col);
+        glow.addColorStop(1, withAlpha(col, 0));
+        return glow;
+      });
+    }
     const k = mode === "tile" ? 0.5 : 1;
     // Wrap a little beyond the edges so a glow leaves before it reappears.
     const mx = (20 * k) / w;
@@ -944,16 +900,15 @@ export function createOrbs(): Drawer {
       const y = o.fy * h;
       const lv = levels[i];
       const r = (3 + lv * 15) * k;
-      const col = colors[i];
-      const glow = g.createRadialGradient(x, y, 0, x, y, r * 2.6);
-      glow.addColorStop(0, col);
-      glow.addColorStop(0.35, col);
-      glow.addColorStop(1, rgba(col, 0));
+      g.save();
+      g.translate(x, y);
+      g.scale(r * 2.6, r * 2.6);
       g.globalAlpha = 0.25 + lv * 0.75;
-      g.fillStyle = glow;
+      g.fillStyle = glows[i];
       g.beginPath();
-      g.arc(x, y, r * 2.6, 0, Math.PI * 2);
+      g.arc(0, 0, 1, 0, Math.PI * 2);
       g.fill();
+      g.restore();
       g.globalAlpha = Math.min(1, 0.5 + lv);
       g.fillStyle = palette.fg;
       g.beginPath();
@@ -961,6 +916,7 @@ export function createOrbs(): Drawer {
       g.fill();
     }
     g.globalAlpha = 1;
+    return false;
   };
 }
 
@@ -982,6 +938,7 @@ export function drawBarcode({ g, w, h, mode, levels, colors }: DrawArgs) {
     g.stroke();
   }
   g.globalAlpha = 1;
+  return false;
 }
 
 /** A fresh drawer for a display: the stateless patterns share one function,
@@ -999,13 +956,11 @@ export function createDrawer(pattern: SpectrumPattern): Drawer {
     case "wave":
       return drawWave;
     case "area":
-      return drawArea;
+      return createArea();
     case "particles":
       return createParticles();
     case "strings":
       return drawStrings;
-    case "lissajous":
-      return createLissajous();
     case "ridge":
       return createRidge();
     case "ripple":

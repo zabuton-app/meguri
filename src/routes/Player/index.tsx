@@ -693,7 +693,7 @@ export default function Player() {
         // Next spectrum pattern; with Shift, the one before (the detail view
         // binds the same key). Audio only: no other kind shows the display.
         case "KeyV":
-          if (!s.isAudio) return;
+          if (!s.isAudio || e.repeat) return;
           e.preventDefault();
           s.cycleSpectrum(e.shiftKey ? -1 : 1);
           return;
