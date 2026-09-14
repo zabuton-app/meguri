@@ -200,3 +200,101 @@ describe("MediaDetail close target", () => {
     expect(at()).toContain("from=discover");
   });
 });
+
+// The trip the other way: the detail view's own button into the playlist
+// player, which plays the list from the file on screen and carries its
+// playback across — by name, so the player opens on this file and not the
+// head of the list.
+describe("MediaDetail playlist button", () => {
+  const button = () =>
+    screen.getByRole("button", { name: "Play as playlist from here" });
+
+  it("plays the list from this file, handing the video over", async () => {
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    fireEvent.click(button());
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(query().get("start")).toBe(`${WS_ID}:1`);
+    expect(query().has("resume")).toBe(false);
+    expect(handOff.announce).toHaveBeenCalledWith(
+      `${defaultAppStatus.mediaBase}/ws/${WS_ID}/media/1`,
+    );
+    // Nothing has played here, so there is no position worth handing over.
+    expect(query().has("t")).toBe(false);
+  });
+
+  it("carries the second it arrived at when nothing has played yet", async () => {
+    await openDetail(`/file/1?ws=${WS_ID}&t=90`);
+    fireEvent.click(button());
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(query().get("t")).toBe("90");
+  });
+
+  it("hands the parked pass back instead when it came from the player", async () => {
+    await openDetail(`/file/1?ws=${WS_ID}&from=player`);
+    fireEvent.click(button());
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(query().get("resume")).toBe(`${WS_ID}:1`);
+    // Named as the fallback too: a pass that is gone (the history walked
+    // back here) then starts afresh on this file rather than at the head.
+    expect(query().get("start")).toBe(`${WS_ID}:1`);
+  });
+
+  it("announces no hand-off for a file without a video player", async () => {
+    mocks.fileGet.mockResolvedValue({
+      ...sampleFileDetail,
+      ...sampleAudioRow,
+      id: 1,
+      absPath: "/media/music/track.mp3",
+      codec: "mp3",
+      fps: null,
+    });
+    renderWithProviders(<DetailRoute />, { route: `/file/1?ws=${WS_ID}` });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "track.mp3" })).toBeTruthy();
+    });
+    fireEvent.click(button());
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(query().get("start")).toBe(`${WS_ID}:1`);
+    expect(query().has("t")).toBe(false);
+    expect(handOff.announce).not.toHaveBeenCalled();
+  });
+
+  it("is disabled for a file the list does not hold", async () => {
+    // The queue is built from the list, so a file outside it (opened from the
+    // bottom bar after the list moved on) has no playlist to start.
+    mocks.fileGet.mockResolvedValue({ ...sampleFileDetail, id: 99 });
+    renderWithProviders(<DetailRoute />, { route: `/file/99?ws=${WS_ID}` });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
+    });
+    expect(button()).toHaveProperty("disabled", true);
+  });
+
+  it("is disabled for a file the list dropped, even on a detour from the player", async () => {
+    // The parked pass may be gone by now (the history walked back to this
+    // URL), and then the player would fall back to the list's head.
+    mocks.fileGet.mockResolvedValue({ ...sampleFileDetail, id: 99 });
+    renderWithProviders(<DetailRoute />, {
+      route: `/file/99?ws=${WS_ID}&from=player`,
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
+    });
+    expect(button()).toHaveProperty("disabled", true);
+  });
+
+  it("is absent without a list to play", async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="file/:id" element={<MediaDetail />} />
+      </Routes>,
+      { route: `/file/1?ws=${WS_ID}` },
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
+    });
+    expect(
+      screen.queryByRole("button", { name: "Play as playlist from here" }),
+    ).toBeNull();
+  });
+});

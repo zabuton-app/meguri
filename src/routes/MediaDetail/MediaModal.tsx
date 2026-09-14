@@ -14,6 +14,7 @@ import {
   Maximize2,
   Minimize2,
   PanelRight,
+  PlayCircle,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -193,6 +194,8 @@ export function TopBar({
   canNext,
   prevHint,
   nextHint,
+  onOpenPlaylist,
+  canOpenPlaylist = true,
   size,
   onToggleSize,
   presentation = "modal",
@@ -207,6 +210,11 @@ export function TopBar({
   canNext?: boolean;
   prevHint?: string;
   nextHint?: string;
+  /** Play the list from this file in the playlist player. Absent when there
+   *  is no list to play. */
+  onOpenPlaylist?: () => void;
+  /** False while the list does not hold this file. */
+  canOpenPlaylist?: boolean;
   size?: ModalSize;
   onToggleSize?: () => void;
   presentation?: Presentation;
@@ -259,6 +267,21 @@ export function TopBar({
         </span>
       )}
       <div className="ml-auto flex items-center gap-0.5">
+        {/* Not a toggle: this one leaves the detail view for the playlist,
+            the way the player's own detail button leaves the playlist. */}
+        {onOpenPlaylist && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            onClick={onOpenPlaylist}
+            disabled={!canOpenPlaylist}
+            aria-label={t("media.playAsPlaylist")}
+            title={t("media.playAsPlaylist")}
+          >
+            <PlayCircle />
+          </Button>
+        )}
         {/* Peek: one button back to the modal (at its remembered size).
             Modal: the size toggle, then the button over to the peek. */}
         {isPeek ? (

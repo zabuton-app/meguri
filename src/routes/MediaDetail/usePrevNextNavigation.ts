@@ -20,6 +20,8 @@ interface Result {
   goNext: () => void;
   canPrev: boolean;
   canNext: boolean;
+  /** Whether the list has this file among what it has loaded. */
+  inList: boolean;
   navBinding: NavBinding;
 }
 
@@ -183,5 +185,5 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
     // Handlers go through refs above, so registering once is enough.
   }, []);
 
-  return { goPrev, goNext, canPrev, canNext, navBinding };
+  return { goPrev, goNext, canPrev, canNext, inList: index >= 0, navBinding };
 }

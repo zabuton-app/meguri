@@ -37,9 +37,14 @@ import {
   invalidatePlayedSearches,
 } from "@/lib/queryCache";
 import { fileHref } from "@/lib/fileHref";
+import { PLAY_PARAMS } from "@/lib/playHref";
 import { announceVideoHandOff } from "@/video/videoHandOff";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
-import { queueKey, type PlaybackQueue } from "@/lib/playbackQueue";
+import {
+  parseQueueKey,
+  queueKey,
+  type PlaybackQueue,
+} from "@/lib/playbackQueue";
 import { fileNameOf } from "@/lib/relPath";
 import {
   VideoPlayer,
@@ -83,6 +88,24 @@ const RESUME_MIN_SEC = 3;
  */
 let resume: { queue: PlaybackQueue; key: string; sec: number } | null = null;
 
+/**
+ * The file the URL named on arrival, and what to make of it: a pass to pick
+ * back up (`?resume=`, with the queue it left behind) or a file to start a new
+ * pass on (`?start=<ws>:<id>`, the detail view handing the file it shows over
+ * to the playlist). Either way, the item's own media is already under way
+ * elsewhere — a video handed across (see videoHandOff.ts), a track in the
+ * bar — and must be carried on, not restarted.
+ */
+interface Arrival {
+  key: string;
+  /** The second to fall back to when nothing better is handed over. */
+  sec: number;
+  /** A resumed pass: the queue it left behind. */
+  queue?: PlaybackQueue;
+  /** A fresh pass: the file to seed the list's queue on. */
+  startAt?: { workspaceId: string; fileId: number };
+}
+
 export default function Player() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -116,10 +139,15 @@ export default function Player() {
 
   // Claimed on the first render, before the effect below empties the slot, and
   // only when the file named in the URL is the one the pass was parked on.
+  // A `start` needs no slot: the list itself is the queue, opened on that
+  // file — which is also where a `resume` whose pass is gone (the history
+  // walked back to it, the URL reopened) falls back to, when both are named.
   const [searchParams] = useSearchParams();
-  const [pickUp, setPickUp] = useState(() => {
-    const token = searchParams.get("resume");
-    return token && resume?.key === token ? resume : null;
+  const [arrival, setArrival] = useState<Arrival | null>(() => {
+    const token = searchParams.get(PLAY_PARAMS.resume);
+    if (token && resume?.key === token) return resume;
+    const startAt = parseQueueKey(searchParams.get(PLAY_PARAMS.start));
+    return startAt ? { key: queueKey(startAt), sec: 0, startAt } : null;
   });
   useEffect(() => {
     resume = null;
@@ -128,7 +156,8 @@ export default function Player() {
   const queue = usePlaybackQueue({
     shuffle: playlistShuffle,
     repeat: playlistRepeat,
-    restore: pickUp?.queue,
+    restore: arrival?.queue,
+    startAt: arrival?.startAt,
   });
   const { current, next, prev, skipCurrent } = queue;
 
@@ -255,24 +284,27 @@ export default function Player() {
     );
   }, [current, isImage, isAudio, mediaBase, navigate, queue.queue]);
 
-  // The second to come back to, offered only to the file the player left from.
-  // The detail view hands back where *it* got to, which is ahead of the detour
-  // whenever the user kept watching there; the parked second is the fallback
-  // for an item with no player of its own (a picture).
+  // The second to come back to, offered only to the file the player arrived
+  // on. The detail view hands over where *it* got to — ahead of the detour
+  // whenever the user kept watching there, or wherever it was when the user
+  // asked for the playlist from it; the parked second is the fallback for an
+  // item with no player of its own (a picture).
   //
   // Dropped as soon as the pass steps somewhere else (goNext / goPrev below), so
   // coming back to that file later in the same pass — or on the next lap with
   // repeat on — starts it where any other item would.
-  const handedBack = searchParams.get("t");
+  const handedBack = searchParams.get(PLAY_PARAMS.t);
+  const isArrivalItem = !!current && arrival?.key === queueKey(current);
+  // Back from the detail view on the very item the pass was parked on, as
+  // opposed to a fresh pass started from the detail view: the two differ in
+  // what they owe the bar's track (see the audio effects below).
+  const isResumeItem = isArrivalItem && !!arrival?.queue;
   const resumeSec =
-    current && pickUp?.key === queueKey(current)
+    isArrivalItem && arrival
       ? handedBack != null && Number.isFinite(Number(handedBack))
         ? Math.max(0, Math.floor(Number(handedBack)))
-        : pickUp.sec
+        : arrival.sec
       : 0;
-  // Back from the detail view on the very item the pass was parked on: the
-  // bar's track is left in whatever state the user put it there.
-  const isDetourPickUp = !!current && pickUp?.key === queueKey(current);
 
   // Without its details there is nothing to render for this item, so a failed
   // fetch would leave the stage blank for good. Treat it like any other
@@ -436,7 +468,7 @@ export default function Player() {
     () =>
       transitionTo(() => {
         setPaused(false);
-        setPickUp(null);
+        setArrival(null);
         next();
       }, 1),
     [next, transitionTo],
@@ -451,7 +483,10 @@ export default function Player() {
   // refetch cannot restart it; the guard is dropped when the track ends so a
   // one-item queue on repeat plays it again. A track already in the bar is
   // resumed (or left alone if it is playing — coming back from the detail
-  // view, or opening the playlist on the track Discover started).
+  // view, or opening the playlist on the track Discover started). Back on
+  // the item a detour was parked on, the bar's track is left in whatever
+  // state the user put it there; a pass *started* from the detail view was
+  // asked to play, so a track paused (or run out) there is picked up again.
   const startedAudioFor = useRef<string | null>(null);
   useEffect(() => {
     if (!isAudio) {
@@ -462,7 +497,7 @@ export default function Player() {
     if (startedAudioFor.current === currentKey) return;
     startedAudioFor.current = currentKey;
     if (isCurrentAudio) {
-      if (isDetourPickUp) return;
+      if (isResumeItem) return;
       if (!audioPlaying) toggleAudio();
       return;
     }
@@ -478,7 +513,7 @@ export default function Player() {
     file,
     mediaBase,
     isCurrentAudio,
-    isDetourPickUp,
+    isResumeItem,
     audioPlaying,
     playAudio,
     toggleAudio,
@@ -509,12 +544,12 @@ export default function Player() {
   // that ran out during the detour advances the queue on return rather than
   // being restored and restarted.
   useEffect(() => {
-    if (!isCurrentAudio || !isDetourPickUp || !audio.ended) return;
+    if (!isCurrentAudio || !isResumeItem || !audio.ended) return;
     if (detourEndedHandledFor.current === currentKey) return;
     detourEndedHandledFor.current = currentKey;
     startedAudioFor.current = null;
     goNextRef.current();
-  }, [isCurrentAudio, isDetourPickUp, audio.ended, currentKey]);
+  }, [isCurrentAudio, isResumeItem, audio.ended, currentKey]);
   // An audio item that fails to play is skipped like a broken video.
   useEffect(() => {
     if (isCurrentAudio && audio.error) skipCurrent();
@@ -535,7 +570,7 @@ export default function Player() {
     () =>
       transitionTo(() => {
         setPaused(false);
-        setPickUp(null);
+        setArrival(null);
         prev();
       }, -1),
     [prev, transitionTo],

@@ -179,6 +179,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "media.openAsPeek": "以侧边面板打开",
   "media.openAsModal": "以窗口打开",
   "media.peekResize": "调整侧边面板宽度",
+  "media.playAsPlaylist": "从此处作为播放列表播放",
   "media.deleteFromIndex": "从索引中删除",
   "media.deleteFromIndexConfirm":
     "要将此项目从索引中删除吗？\n以后扫描将不会再次注册它。",

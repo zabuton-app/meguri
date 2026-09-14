@@ -27,7 +27,9 @@ const PREFETCH_THRESHOLD = 3;
 export interface UsePlaybackQueueOptions {
   shuffle: boolean;
   repeat: boolean;
-  /** Start on this item instead of the head of the list. */
+  /** Start on this item instead of the head of the list, playing on to the
+   *  end and then wrapping round (see createQueue). Only read when the queue
+   *  is first seeded. */
   startAt?: { workspaceId: string; fileId: number };
   /**
    * Pick a previous queue back up instead of building a new one. Used when the
