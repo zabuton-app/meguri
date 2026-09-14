@@ -12,3 +12,8 @@ const store = createHoldStore();
 export const holdPeekDocked: () => () => void = store.hold;
 
 export const usePeekDocked: () => boolean = store.use;
+
+/** Read once, from an event handler: the list's activation handlers run in
+ *  every visible card, and subscribing there would re-render them all each
+ *  time the peek opens or closes. */
+export const isPeekDocked: () => boolean = store.get;

@@ -5,6 +5,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { useActivateFile } from "@/audio/useActivateFile";
 import { useAudioPlayer } from "@/audio/useAudioPlayer";
+import { holdPeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { act } from "@testing-library/react";
 import {
   defaultAppStatus,
@@ -139,6 +140,97 @@ describe("useActivateFile", () => {
     expect(window.location.hash).toBe(
       `#/file/${sampleFileRow.id}?ws=${sampleFileRow.workspaceId}`,
     );
+  });
+
+  describe("while the detail is docked as a side peek", () => {
+    let release: () => void;
+    beforeEach(() => {
+      release = holdPeekDocked();
+    });
+    afterEach(() => {
+      release();
+    });
+
+    it("moves the peek onto the track instead of playing it from the list", () => {
+      renderWithProviders(<Probe />, { route: "/" });
+      expect(fireEvent.click(screen.getByText("audio-thumb"))).toBe(false);
+      // The peek starts the track on arrival (useAudioDetail), so the list
+      // itself must not, or the track would be started twice.
+      expect(playSpy).not.toHaveBeenCalled();
+      expect(window.location.hash).toBe(
+        `#/file/${sampleAudioRow.id}?ws=${WS_ID}`,
+      );
+    });
+
+    it("treats Enter the same way", () => {
+      renderWithProviders(<Probe />, { route: "/" });
+      fireEvent.click(screen.getByText("audio-enter"));
+      expect(playSpy).not.toHaveBeenCalled();
+      expect(window.location.hash).toBe(
+        `#/file/${sampleAudioRow.id}?ws=${WS_ID}`,
+      );
+    });
+
+    it("plays from the bar when the peek already shows the track", () => {
+      // The peek is on the track but the bar was closed: the peek will not
+      // start it again on the same URL, so the list must.
+      renderWithProviders(<Probe />, {
+        route: `/file/${sampleAudioRow.id}?ws=${WS_ID}`,
+      });
+      fireEvent.click(screen.getByText("audio-thumb"));
+      expect(playSpy).toHaveBeenCalledTimes(1);
+      expect(window.location.hash).toBe(
+        `#/file/${sampleAudioRow.id}?ws=${WS_ID}`,
+      );
+    });
+
+    it("plays from the bar when the peek shows the track under other query flags", () => {
+      // Opened from the name link (`?autoplay=0`) after the peek had started
+      // it once: the same visit, so navigating would not start it either.
+      renderWithProviders(<Probe />, {
+        route: `/file/${sampleAudioRow.id}?ws=${WS_ID}&autoplay=0`,
+      });
+      fireEvent.click(screen.getByText("audio-thumb"));
+      expect(playSpy).toHaveBeenCalledTimes(1);
+      expect(window.location.hash).toBe(
+        `#/file/${sampleAudioRow.id}?ws=${WS_ID}&autoplay=0`,
+      );
+    });
+
+    it("moves the peek when it shows the same file id in another workspace", () => {
+      renderWithProviders(<Probe />, {
+        route: `/file/${sampleAudioRow.id}?ws=other-ws`,
+      });
+      fireEvent.click(screen.getByText("audio-thumb"));
+      expect(playSpy).not.toHaveBeenCalled();
+      expect(window.location.hash).toBe(
+        `#/file/${sampleAudioRow.id}?ws=${WS_ID}`,
+      );
+    });
+
+    it("still toggles the loaded track without moving the peek", () => {
+      function Loader() {
+        const { play } = useAudioPlayer();
+        return (
+          <button onClick={() => play(sampleAudioRow, WS_ID)}>load</button>
+        );
+      }
+      renderWithProviders(
+        <>
+          <Probe />
+          <Loader />
+        </>,
+        { route: "/" },
+      );
+      // The track is already in the bar (the peek started it earlier).
+      fireEvent.click(screen.getByText("load"));
+      expect(playSpy).toHaveBeenCalledTimes(1);
+      Object.defineProperty(el, "paused", { value: false, configurable: true });
+      fireEvent.click(screen.getByText("audio-enter"));
+      expect(pauseSpy).toHaveBeenCalledTimes(1);
+      expect(playSpy).toHaveBeenCalledTimes(1);
+      expect(window.location.hash).toBe("#/");
+    });
   });
 
   it("does not re-render its host when the player's state changes", () => {
