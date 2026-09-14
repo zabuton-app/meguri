@@ -5,6 +5,7 @@ import {
   Minimize,
   Pause,
   Play,
+  AudioLines,
   Repeat,
   Shuffle,
   SkipBack,
@@ -45,6 +46,8 @@ export function PlayerChrome({
   onToggleRepeat,
   onToggleFullscreen,
   onExit,
+  spectrum,
+  onToggleSpectrum,
   t,
 }: {
   title: string;
@@ -81,6 +84,11 @@ export function PlayerChrome({
   onToggleShuffle: () => void;
   onToggleRepeat: () => void;
   onToggleFullscreen: () => void;
+  /** The audio spectrum's state for an audio item: on, off, or null while
+   *  the OS reduce-motion setting overrides it. Undefined for anything that
+   *  is not audio, which hides the control. */
+  spectrum?: boolean | null;
+  onToggleSpectrum?: () => void;
   onExit: () => void;
   t: TFunc;
 }) {
@@ -165,6 +173,22 @@ export function PlayerChrome({
                 className="w-24 cursor-pointer accent-[var(--c-primary)]"
               />
             </div>
+            {spectrum !== undefined && (
+              <ChromeButton
+                onClick={() => onToggleSpectrum?.()}
+                active={spectrum === true}
+                disabled={spectrum === null}
+                title={
+                  spectrum === null
+                    ? t("player.audio.spectrumReducedMotion")
+                    : spectrum
+                      ? t("player.audio.spectrumHide")
+                      : t("player.audio.spectrumShow")
+                }
+              >
+                <AudioLines size={18} />
+              </ChromeButton>
+            )}
             <ChromeButton
               onClick={onToggleShuffle}
               active={shuffle}

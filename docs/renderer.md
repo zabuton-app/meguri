@@ -33,6 +33,38 @@ The provider stack is set up in `src/main.tsx`:
 QueryClientProvider → ThemeProvider → I18nProvider → PreferencesProvider → ConfirmProvider
 ```
 
+## Audio playback
+
+Audio plays through one `<audio>` element owned by `AudioPlayerProvider`
+(`src/audio/AudioPlayerProvider.tsx`), mounted in `App.tsx` outside the router
+so a track survives navigation. Every surface that shows audio — the bottom
+player bar, the detail stage, the side peek and the playlist stage — only
+drives that element; none has audio of its own.
+
+The **spectrum display** (`src/audio/AudioSpectrum.tsx`) draws a live
+frequency spectrum of that element on a canvas, in one of three patterns
+(`src/audio/spectrumPatterns.ts`: bars, a ring, or an LED meter — an "Audio"
+preference) and in a mode the host picks for its box (over the art, instead of
+missing art, or inside the side peek's tile). Hosts read
+`useSpectrumPattern()` and `PATTERN_LAYOUT` to place it. It reads from a Web Audio
+`AnalyserNode` built lazily by `src/audio/analyser.ts` on the first display
+that asks for it: one `AudioContext`, one `MediaElementAudioSourceNode` (the
+platform allows exactly one per element) and the analyser wired between the
+element and the speakers. Two invariants follow:
+
+- The element is loaded with `crossOrigin="anonymous"`. The media server is
+  a different origin from the renderer, and an opaque source feeds the
+  analyser silence; the server answers with `Access-Control-Allow-Origin: *`.
+- Once attached, the graph stays connected for the element's lifetime. The
+  tap follows the element's own events: `play` resumes the context (so a
+  suspended context cannot silence the track), and a pause or an end suspends
+  it a few seconds later so the audio thread does not stay awake for the rest
+  of a tray-resident session.
+
+The display is off under the "Audio spectrum" preference and under the OS
+reduce-motion setting; where Web Audio is unavailable it draws nothing and
+playback is unaffected.
+
 ## Data fetching
 
 Data fetching uses `@tanstack/react-query`. The file list is an

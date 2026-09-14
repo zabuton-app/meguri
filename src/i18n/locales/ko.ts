@@ -41,6 +41,7 @@ export const ko: Record<TranslationKey, string> = {
   "settings.tabLibrary": "라이브러리",
   "settings.tabPlayback": "재생 목록 재생",
   "settings.tabApp": "앱",
+  "settings.tabAudio": "오디오",
   "settings.language": "언어",
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",
@@ -261,6 +262,10 @@ export const ko: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "이 트랙을 재생할 수 없습니다.",
   "player.audio.dismissError": "오류 닫기",
+  "player.audio.spectrumShow": "스펙트럼 표시",
+  "player.audio.spectrumHide": "스펙트럼 숨기기",
+  "player.audio.spectrumReducedMotion":
+    "OS에서 동작 줄이기가 켜져 있어 스펙트럼을 표시할 수 없습니다.",
 
   // scenes
   "scene.seekTo": "{time} 로 이동",
@@ -490,5 +495,14 @@ export const ko: Record<TranslationKey, string> = {
   "settings.playlistShuffle": "랜덤",
   "settings.playlistShuffleHint":
     "재생 순서를 무작위로 섞습니다. 한 바퀴 도는 동안 같은 항목은 반복되지 않습니다.",
+  "settings.audioSpectrum": "오디오 스펙트럼",
+  "settings.audioSpectrumHint":
+    "오디오 재생 중 주파수별 음량을 표시합니다. OS에서 동작 줄이기가 켜져 있으면 항상 정지합니다.",
+  "settings.audioSpectrumPattern": "스펙트럼 패턴",
+  "settings.audioSpectrumPatternHint":
+    "스펙트럼의 모양입니다. 상세 보기, 사이드 피크, 재생목록 재생에 공통으로 적용됩니다.",
+  "settings.audioSpectrumPatternBars": "세로 막대",
+  "settings.audioSpectrumPatternRing": "원형 링",
+  "settings.audioSpectrumPatternLed": "LED 미터",
   "settings.secondsValue": "{n}초",
 };

@@ -42,6 +42,7 @@ export const es: Record<TranslationKey, string> = {
   "settings.tabLibrary": "Biblioteca",
   "settings.tabPlayback": "Reproducción de listas",
   "settings.tabApp": "Aplicación",
+  "settings.tabAudio": "Audio",
   "settings.language": "Idioma",
   "settings.languageDesc": "Cambia el idioma de la interfaz.",
   "settings.scenes": "Miniaturas de escena",
@@ -269,6 +270,10 @@ export const es: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "No se pudo reproducir esta pista.",
   "player.audio.dismissError": "Descartar el error",
+  "player.audio.spectrumShow": "Mostrar el espectro",
+  "player.audio.spectrumHide": "Ocultar el espectro",
+  "player.audio.spectrumReducedMotion":
+    "El espectro no está disponible mientras el sistema reduce el movimiento.",
 
   // scenes
   "scene.seekTo": "Ir a {time}",
@@ -504,5 +509,14 @@ export const es: Record<TranslationKey, string> = {
   "settings.playlistShuffle": "Aleatorio",
   "settings.playlistShuffleHint":
     "Reproduce en orden aleatorio. Ningún elemento se repite dentro de una misma vuelta.",
+  "settings.audioSpectrum": "Espectro de audio",
+  "settings.audioSpectrumHint":
+    "Muestra un espectro de frecuencias en directo mientras se reproduce audio. Siempre se desactiva si el sistema reduce el movimiento.",
+  "settings.audioSpectrumPattern": "Patrón del espectro",
+  "settings.audioSpectrumPatternHint":
+    "Aspecto del espectro, común a la vista de detalle, el panel lateral y el reproductor de listas.",
+  "settings.audioSpectrumPatternBars": "Barras",
+  "settings.audioSpectrumPatternRing": "Anillo",
+  "settings.audioSpectrumPatternLed": "Medidor LED",
   "settings.secondsValue": "{n} s",
 };

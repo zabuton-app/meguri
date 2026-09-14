@@ -122,6 +122,22 @@ describe("Player audio items", () => {
     expect(screen.queryByRole("region", { name: /audio player/i })).toBeNull();
   });
 
+  it("carries the spectrum toggle for an audio item", async () => {
+    vi.stubGlobal("AudioContext", undefined);
+    renderPlayer([audioRow(1)]);
+    await waitFor(() => expect(playSpy).toHaveBeenCalled());
+    const toggle = await screen.findByRole("button", { name: "Hide spectrum" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByTestId("audio-spectrum")).not.toBeNull();
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId("audio-spectrum")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Show spectrum" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+  });
+
   it("advances to the next item when the track ends", async () => {
     renderPlayer([audioRow(2), audioRow(4)]);
     await waitFor(() => expect(el?.src ?? "").toContain("/media/2"));

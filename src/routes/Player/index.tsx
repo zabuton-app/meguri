@@ -15,6 +15,9 @@ import {
   useAudioPlayer,
   useExclusivePlayback,
 } from "@/audio/useAudioPlayer";
+import { AudioSpectrum } from "@/audio/AudioSpectrum";
+import { useSpectrumPattern } from "@/audio/useSpectrumPattern";
+import { PATTERN_LAYOUT } from "@/audio/spectrumPatterns";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -96,8 +99,14 @@ export default function Player() {
     keybindingPreset,
     setPlaylistShuffle,
     setPlaylistRepeat,
+    audioSpectrum,
+    setAudioSpectrum,
   } = usePreferences();
   const reducedMotion = usePrefersReducedMotion();
+  const spectrumPattern = useSpectrumPattern();
+  const spectrumLayout = spectrumPattern
+    ? PATTERN_LAYOUT[spectrumPattern]
+    : null;
   // Plain black or plain white rather than the theme family's own background:
   // this is the ground a transparent image is composited onto, so it wants to be
   // the neutral extreme of the current appearance, not a tinted surface.
@@ -707,6 +716,9 @@ export default function Player() {
       ? `${mediaBase}/ws/${wsId}/media/${current.fileId}`
       : "";
   const title = file ? fileNameOf(file.relPath) : "";
+  // Whether an audio item has cover art on screen (the spectrum lays itself
+  // out around it, or takes its place).
+  const hasArt = Boolean(file && hasThumbFile(file) && thumbSrc);
   useEffect(() => {
     currentKeyRef.current = current
       ? `${current.workspaceId}:${current.fileId}`
@@ -825,14 +837,32 @@ export default function Player() {
                 // The sound comes from the bar's element, so the stage shows
                 // the cover art (or the kind's glyph) where the picture would be.
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  {file && hasThumbFile(file) && thumbSrc ? (
+                  {hasArt ? (
                     <img
                       src={thumbSrc}
                       alt=""
                       className="max-h-[70%] max-w-[70%] rounded-lg object-contain shadow-2xl"
                     />
                   ) : (
-                    <Music className="size-32 text-muted" aria-hidden />
+                    <Music
+                      className={cn(
+                        "text-muted",
+                        !spectrumLayout && "size-32",
+                        spectrumLayout?.glyph === "center" && "size-16",
+                        spectrumLayout?.glyph === "corner" &&
+                          "absolute left-5 top-5 size-8",
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  {spectrumLayout && (
+                    <AudioSpectrum
+                      active={audioPlaying}
+                      mode={hasArt ? "overlay" : "full"}
+                      className={
+                        hasArt ? spectrumLayout.overlayBox : "absolute inset-0"
+                      }
+                    />
                   )}
                 </div>
               )}
@@ -864,6 +894,10 @@ export default function Player() {
           onNext={goNext}
           onToggleShuffle={toggleShuffle}
           onToggleRepeat={toggleRepeat}
+          spectrum={
+            isAudio ? (reducedMotion ? null : audioSpectrum) : undefined
+          }
+          onToggleSpectrum={() => setAudioSpectrum(!audioSpectrum)}
           onToggleFullscreen={toggleFullscreen}
           onExit={exit}
           t={t}

@@ -173,6 +173,50 @@ describe("AudioPlayerBar", () => {
     ).toBeTruthy();
   });
 
+  it("bobs a now-playing glyph over the placeholder while the track sounds", () => {
+    setup();
+    loadTrack();
+    expect(screen.queryByTestId("now-playing")).toBeNull();
+    act(() => {
+      el.dispatchEvent(new Event("play"));
+    });
+    expect(screen.getByTestId("now-playing").dataset.playing).toBe("true");
+    act(() => {
+      el.dispatchEvent(new Event("pause"));
+    });
+    // Paused: the glyph goes rather than freezing; the placeholder stays.
+    expect(screen.queryByTestId("now-playing")).toBeNull();
+    expect(bar()?.querySelector("svg.lucide-music")).toBeTruthy();
+  });
+
+  it("lays the now-playing glyph over the cover art while the track sounds", async () => {
+    setup(sampleAudioRowWithCover);
+    loadTrack();
+    await screen.findByRole("presentation");
+    expect(screen.queryByTestId("now-playing")).toBeNull();
+    act(() => {
+      el.dispatchEvent(new Event("play"));
+    });
+    expect(screen.getByTestId("now-playing")).toBeTruthy();
+    // The jacket stays underneath.
+    expect(screen.getByRole("presentation")).toBeTruthy();
+  });
+
+  it("keeps the still icon under the OS reduce-motion setting", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("reduce"),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    setup();
+    loadTrack();
+    act(() => {
+      el.dispatchEvent(new Event("play"));
+    });
+    expect(screen.queryByTestId("now-playing")).toBeNull();
+    expect(bar()?.querySelector("svg.lucide-music")).toBeTruthy();
+  });
+
   it("falls back to the music icon when the cover image fails to load", async () => {
     setup(sampleAudioRowWithCover);
     loadTrack();
