@@ -76,6 +76,7 @@ let pauseSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   mocks.appStatus.mockResolvedValue(defaultAppStatus);
   mocks.workspacesList.mockResolvedValue(defaultWorkspacesList);
   mocks.fileGet.mockResolvedValue(audioDetail);
@@ -160,5 +161,39 @@ describe("audio detour from the playlist", () => {
     expect(pauseSpy).not.toHaveBeenCalled();
     expect(el.getAttribute("src")).toContain("/media/2");
     expect(el.currentTime).toBe(95.25);
+  });
+});
+
+describe("spectrum pattern key in the detail view", () => {
+  const pattern = () =>
+    screen.getByTestId("audio-spectrum").getAttribute("data-pattern");
+
+  it("V steps forward and Shift+V back, wrapping, and turns the display on", async () => {
+    localStorage.setItem(
+      "meguri.prefs",
+      JSON.stringify({ audioSpectrum: false, audioSpectrumPattern: "bars" }),
+    );
+    await openDetail(`/file/2?ws=${WS_ID}&autoplay=0`);
+    expect(screen.queryByTestId("audio-spectrum")).toBeNull();
+    fireEvent.keyDown(window, { code: "KeyV" });
+    expect(pattern()).toBe("ring");
+    fireEvent.keyDown(window, { code: "KeyV", shiftKey: true });
+    fireEvent.keyDown(window, { code: "KeyV", shiftKey: true });
+    expect(pattern()).toBe("barcode");
+  });
+
+  it("leaves V alone while typing, and with other modifiers", async () => {
+    await openDetail(`/file/2?ws=${WS_ID}&autoplay=0`);
+    expect(pattern()).toBe("bars");
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(window, { code: "KeyV" });
+    expect(pattern()).toBe("bars");
+    input.blur();
+    fireEvent.keyDown(window, { code: "KeyV", ctrlKey: true });
+    fireEvent.keyDown(window, { code: "KeyV", altKey: true });
+    expect(pattern()).toBe("bars");
+    input.remove();
   });
 });

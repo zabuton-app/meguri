@@ -18,7 +18,7 @@ import { bandEdges } from "./spectrumBands";
 import {
   bandColors,
   bandCount,
-  DRAWERS,
+  createDrawer,
   PALETTE_TOKENS,
   type SpectrumMode,
   type SpectrumPalette,
@@ -99,7 +99,9 @@ export function AudioSpectrum({ active, mode, className }: Props) {
     if (!levelsRef.current || levelsRef.current.length !== bars)
       levelsRef.current = new Float32Array(bars);
     const levels = levelsRef.current;
-    const draw = DRAWERS[pattern];
+    // Built per effect run: a pattern with motion of its own (particles, a
+    // trail) starts afresh with the pattern, the mode or the theme.
+    const draw = createDrawer(pattern);
 
     // The theme is an effect dependency, so the palette is read once per
     // theme — but from the first frame, not here: ThemeProvider writes the
@@ -116,7 +118,13 @@ export function AudioSpectrum({ active, mode, className }: Props) {
         MAX_DPR,
         MAX_BITMAP_EDGE / Math.max(1, canvas.clientWidth, canvas.clientHeight),
       );
+    // The bitmap is sized only for a frame that draws, and given up (to a
+    // single pixel) while the display rests: a stage-sized bitmap is several
+    // megabytes, and most displays — every card on Discovery but the one
+    // playing, a paused peek — are resting most of the time.
+    let dirty = true;
     const resize = () => {
+      dirty = false;
       dpr = wantedDpr();
       width = Math.max(1, canvas.clientWidth);
       height = Math.max(1, canvas.clientHeight);
@@ -125,22 +133,40 @@ export function AudioSpectrum({ active, mode, className }: Props) {
       if (canvas.width !== bw) canvas.width = bw;
       if (canvas.height !== bh) canvas.height = bh;
     };
-    resize();
+    const rest = () => {
+      if (canvas.width !== 1) canvas.width = 1;
+      if (canvas.height !== 1) canvas.height = 1;
+      dirty = true;
+    };
 
     let raf = 0;
     let last = 0;
+    // Whether the drawer still had motion of its own on the previous frame.
+    let busy = false;
+    // When the display was built, for the patterns that move on their own;
+    // unlike `last` it is not reset when the loop rests.
+    let start = 0;
     const frame = (now: number) => {
       raf = 0;
       if (!palette) {
         palette = readPalette(canvas);
         colors = bandColors(palette, bars);
       }
+      const active = activeRef.current;
+      // Nothing sounding, nothing on screen and nothing still moving: rest
+      // without painting a frame only to discard it.
+      if (!active && !busy && !levels.some((l) => l > 0)) {
+        last = 0;
+        rest();
+        return;
+      }
       // A move to a display with another scale changes the ratio without
       // changing the CSS box, which the ResizeObserver would not notice.
-      if (wantedDpr() !== dpr) resize();
+      if (dirty || wantedDpr() !== dpr) resize();
       const dt = last ? Math.min(MAX_DT, (now - last) / 1000) : 1 / 60;
       last = now;
-      const active = activeRef.current;
+      if (!start) start = now;
+      const t = (now - start) / 1000;
       if (active) analyser.getByteFrequencyData(data);
       let visible = false;
       for (let i = 0; i < bars; i++) {
@@ -160,11 +186,32 @@ export function AudioSpectrum({ active, mode, className }: Props) {
       }
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, width, height);
-      draw({ g, w: width, h: height, mode, levels, palette, colors, active });
-      // Keep going while there is something on screen (a fall in progress)
-      // or the track is sounding; a drained, paused display costs nothing.
-      if (active || visible) raf = requestAnimationFrame(frame);
-      else last = 0;
+      // The context outlives a pattern switch (same element, same context):
+      // save/restore around the drawer so none inherits another's state.
+      g.save();
+      busy = draw({
+        g,
+        w: width,
+        h: height,
+        mode,
+        levels,
+        palette,
+        colors,
+        active,
+        t,
+        dt,
+      });
+      g.restore();
+      // Keep going while there is something on screen (a fall in progress,
+      // a pattern's own motion still playing out) or the track is sounding;
+      // a drained, paused display costs nothing — and shows nothing, so a
+      // pattern that draws a resting trace at zero (a flat scope line, faint
+      // barcode lines) does not leave it behind.
+      if (active || visible || busy) raf = requestAnimationFrame(frame);
+      else {
+        last = 0;
+        rest();
+      }
     };
     const kick = () => {
       if (!raf) raf = requestAnimationFrame(frame);
@@ -177,7 +224,7 @@ export function AudioSpectrum({ active, mode, className }: Props) {
       typeof ResizeObserver === "undefined"
         ? null
         : new ResizeObserver(() => {
-            resize();
+            dirty = true;
             kick();
           });
     ro?.observe(canvas);

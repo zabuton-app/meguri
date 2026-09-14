@@ -204,6 +204,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "shortcuts.mute": "切换静音",
   "shortcuts.fullscreen": "切换全屏",
   "shortcuts.seekStart": "跳到开头",
+  "shortcuts.spectrumPattern":
+    "下一个 / 上一个频谱样式（播放列表播放器中的音频）",
   "media.rating": "评分",
   "media.tags": "标签",
   "media.metaWorkspace": "工作区",
@@ -488,5 +490,14 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternBars": "竖条",
   "settings.audioSpectrumPatternRing": "圆环",
   "settings.audioSpectrumPatternLed": "LED 电平表",
+  "settings.audioSpectrumPatternMirror": "镜像竖条",
+  "settings.audioSpectrumPatternWave": "示波器",
+  "settings.audioSpectrumPatternArea": "填充面积",
+  "settings.audioSpectrumPatternParticles": "粒子",
+  "settings.audioSpectrumPatternStrings": "琴弦",
+  "settings.audioSpectrumPatternRidge": "山脊线",
+  "settings.audioSpectrumPatternRipple": "涟漪",
+  "settings.audioSpectrumPatternOrbs": "光球",
+  "settings.audioSpectrumPatternBarcode": "条形码",
   "settings.secondsValue": "{n} 秒",
 };

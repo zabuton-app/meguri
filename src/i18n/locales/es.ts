@@ -214,6 +214,8 @@ export const es: Record<TranslationKey, string> = {
   "shortcuts.mute": "Alternar silencio",
   "shortcuts.fullscreen": "Alternar pantalla completa",
   "shortcuts.seekStart": "Ir al inicio",
+  "shortcuts.spectrumPattern":
+    "Patrón del espectro siguiente / anterior (audio en el reproductor de lista)",
   "media.rating": "Valoración",
   "media.tags": "Etiquetas",
   "media.metaWorkspace": "Espacio",
@@ -518,5 +520,14 @@ export const es: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternBars": "Barras",
   "settings.audioSpectrumPatternRing": "Anillo",
   "settings.audioSpectrumPatternLed": "Medidor LED",
+  "settings.audioSpectrumPatternMirror": "Barras en espejo",
+  "settings.audioSpectrumPatternWave": "Osciloscopio",
+  "settings.audioSpectrumPatternArea": "Área rellena",
+  "settings.audioSpectrumPatternParticles": "Partículas",
+  "settings.audioSpectrumPatternStrings": "Cuerdas",
+  "settings.audioSpectrumPatternRidge": "Crestas",
+  "settings.audioSpectrumPatternRipple": "Ondas",
+  "settings.audioSpectrumPatternOrbs": "Orbes",
+  "settings.audioSpectrumPatternBarcode": "Código de barras",
   "settings.secondsValue": "{n} s",
 };

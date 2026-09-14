@@ -69,6 +69,15 @@ const SPECTRUM_PATTERN_LABELS: Record<SpectrumPattern, TranslationKey> = {
   bars: "settings.audioSpectrumPatternBars",
   ring: "settings.audioSpectrumPatternRing",
   led: "settings.audioSpectrumPatternLed",
+  mirror: "settings.audioSpectrumPatternMirror",
+  wave: "settings.audioSpectrumPatternWave",
+  area: "settings.audioSpectrumPatternArea",
+  particles: "settings.audioSpectrumPatternParticles",
+  strings: "settings.audioSpectrumPatternStrings",
+  ridge: "settings.audioSpectrumPatternRidge",
+  ripple: "settings.audioSpectrumPatternRipple",
+  orbs: "settings.audioSpectrumPatternOrbs",
+  barcode: "settings.audioSpectrumPatternBarcode",
 };
 
 const EMOJI_STYLE_LABELS: Record<EmojiStyle, TranslationKey> = {

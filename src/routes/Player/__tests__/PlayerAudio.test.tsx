@@ -166,6 +166,79 @@ describe("Player audio items", () => {
     expect(playSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("V steps the spectrum pattern forward, Shift+V back, wrapping", async () => {
+    renderPlayer([audioRow(2)]);
+    await waitFor(() => expect(el?.src ?? "").toContain("/media/2"));
+    const pattern = () =>
+      screen.getByTestId("audio-spectrum").getAttribute("data-pattern");
+    expect(pattern()).toBe("bars");
+    fireEvent.keyDown(window, { code: "KeyV" });
+    expect(pattern()).toBe("ring");
+    fireEvent.keyDown(window, { code: "KeyV", shiftKey: true });
+    fireEvent.keyDown(window, { code: "KeyV", shiftKey: true });
+    expect(pattern()).toBe("barcode");
+    // The choice is the Settings preference, so it holds everywhere.
+    expect(
+      JSON.parse(localStorage.getItem("meguri.prefs") ?? "{}"),
+    ).toMatchObject({ audioSpectrumPattern: "barcode" });
+  });
+
+  it("V turns the display back on when it was off", async () => {
+    localStorage.setItem(
+      "meguri.prefs",
+      JSON.stringify({ audioSpectrum: false, audioSpectrumPattern: "led" }),
+    );
+    renderPlayer([audioRow(2)]);
+    await waitFor(() => expect(el?.src ?? "").toContain("/media/2"));
+    expect(screen.queryByTestId("audio-spectrum")).toBeNull();
+    fireEvent.keyDown(window, { code: "KeyV" });
+    expect(
+      screen.getByTestId("audio-spectrum").getAttribute("data-pattern"),
+    ).toBe("mirror");
+  });
+
+  const prefs = () =>
+    JSON.parse(localStorage.getItem("meguri.prefs") ?? "{}") as {
+      audioSpectrum?: boolean;
+      audioSpectrumPattern?: string;
+    };
+
+  it("V does nothing while a video is on screen", async () => {
+    localStorage.setItem(
+      "meguri.prefs",
+      JSON.stringify({ audioSpectrum: false, audioSpectrumPattern: "led" }),
+    );
+    renderPlayer([videoRow(3)]);
+    await screen.findByText("1 / 1");
+    fireEvent.keyDown(window, { code: "KeyV" });
+    expect(prefs()).toMatchObject({
+      audioSpectrum: false,
+      audioSpectrumPattern: "led",
+    });
+  });
+
+  it("V does nothing under the OS reduce-motion setting", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("reduce"),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    localStorage.setItem(
+      "meguri.prefs",
+      JSON.stringify({ audioSpectrum: false, audioSpectrumPattern: "led" }),
+    );
+    renderPlayer([audioRow(2)]);
+    await waitFor(() => expect(el?.src ?? "").toContain("/media/2"));
+    fireEvent.keyDown(window, { code: "KeyV" });
+    // Neither the pattern nor the on/off preference moves: the display could
+    // not be shown, and the chrome's own button is disabled here too.
+    expect(prefs()).toMatchObject({
+      audioSpectrum: false,
+      audioSpectrumPattern: "led",
+    });
+    expect(screen.queryByTestId("audio-spectrum")).toBeNull();
+  });
+
   it("a video item that follows takes the sound over", async () => {
     renderPlayer([audioRow(2), videoRow(3)]);
     await waitFor(() => expect(el?.src ?? "").toContain("/media/2"));

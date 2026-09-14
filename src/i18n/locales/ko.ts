@@ -206,6 +206,8 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.mute": "음소거 전환",
   "shortcuts.fullscreen": "전체 화면 전환",
   "shortcuts.seekStart": "처음으로 이동",
+  "shortcuts.spectrumPattern":
+    "스펙트럼 패턴 다음 / 이전 (플레이리스트 재생의 오디오)",
   "media.rating": "평가",
   "media.tags": "태그",
   "media.metaWorkspace": "워크스페이스",
@@ -504,5 +506,14 @@ export const ko: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternBars": "세로 막대",
   "settings.audioSpectrumPatternRing": "원형 링",
   "settings.audioSpectrumPatternLed": "LED 미터",
+  "settings.audioSpectrumPatternMirror": "미러 막대",
+  "settings.audioSpectrumPatternWave": "오실로스코프",
+  "settings.audioSpectrumPatternArea": "채움 영역",
+  "settings.audioSpectrumPatternParticles": "파티클",
+  "settings.audioSpectrumPatternStrings": "현(스트링)",
+  "settings.audioSpectrumPatternRidge": "리지라인",
+  "settings.audioSpectrumPatternRipple": "리플",
+  "settings.audioSpectrumPatternOrbs": "오브(반딧불)",
+  "settings.audioSpectrumPatternBarcode": "바코드",
   "settings.secondsValue": "{n}초",
 };

@@ -208,6 +208,8 @@ export const ja = {
   "shortcuts.mute": "ミュート切替",
   "shortcuts.fullscreen": "全画面切替",
   "shortcuts.seekStart": "先頭へ移動",
+  "shortcuts.spectrumPattern":
+    "スペクトラムのパターンを 次 / 前 へ（プレイリスト再生のオーディオ）",
   "media.rating": "評価",
   "media.tags": "タグ",
   "media.metaWorkspace": "ワークスペース",
@@ -507,6 +509,15 @@ export const ja = {
   "settings.audioSpectrumPatternBars": "縦バー",
   "settings.audioSpectrumPatternRing": "円形リング",
   "settings.audioSpectrumPatternLed": "LEDメーター",
+  "settings.audioSpectrumPatternMirror": "ミラーバー",
+  "settings.audioSpectrumPatternWave": "オシロスコープ",
+  "settings.audioSpectrumPatternArea": "塗りつぶしエリア",
+  "settings.audioSpectrumPatternParticles": "パーティクル",
+  "settings.audioSpectrumPatternStrings": "弦（ストリング）",
+  "settings.audioSpectrumPatternRidge": "リッジライン",
+  "settings.audioSpectrumPatternRipple": "リップル",
+  "settings.audioSpectrumPatternOrbs": "オーブ（蛍）",
+  "settings.audioSpectrumPatternBarcode": "バーコード",
   "settings.secondsValue": "{n} 秒",
 } as const;
 
