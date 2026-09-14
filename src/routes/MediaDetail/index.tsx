@@ -1,99 +1,50 @@
 // File detail + player. /file/:id. Plays via local HTTP serving, offers external-player launch,
 // tag editing, rating, and metadata display. Single-column YouTube-like layout: a large
 // player on top, title/controls right below, then meta, tags, scenes, and history stacked as cards.
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  useLocation,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router";
-import {
-  type InfiniteData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import {
-  ChevronDown,
-  Contrast,
-  Copy,
-  ExternalLink,
-  FolderMinus,
-  FolderOpen,
-  FolderPlus,
-  ImageDown,
-  Trash2,
-} from "lucide-react";
-import { toast } from "sonner";
+//
+// This file composes the route. The pieces live beside it: where closing lands
+// (useCloseTarget), modal / side peek / full screen (useDetailPresentation),
+// every write to the file (useDetailMutations), audio in the bottom bar
+// (useAudioDetail), prev/next (usePrevNextNavigation), and the title row,
+// rating/tags card and play history as components.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import log from "@/lib/logger";
-import {
-  LIST_HIDDEN_SOURCES,
-  RESERVED_TAG_ERROR,
-  reservedTagPrefix,
-} from "@shared/tags";
 import { applyTagFilter } from "@/lib/ui-events";
-import { api, events, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
+import { api, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
-import type { FileDetail, FileRow, SearchResult } from "@/ipc/types";
-import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
 import { useConfirm } from "@/components/ConfirmDialog";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RatingStars } from "@/components/RatingStars";
-import { FavoriteButton } from "@/components/FavoriteButton";
-import { WatchLaterButton } from "@/components/WatchLaterButton";
 import { useWatchLater } from "@/hooks/useWatchLater";
-import { playHref, type PlayHrefOpts } from "@/lib/playHref";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
+import { useRecordImageView } from "@/hooks/useRecordImageView";
 import { useSpectrumPatternHotkey } from "@/audio/useSpectrumPatternHotkey";
-import { TagEditor } from "@/components/TagEditor";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatChords } from "@/settings/keybindings";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import {
-  MediaModal,
-  MODAL_SIZE_KEY,
-  PRESENTATION_KEY,
-  TopBar,
-  type ModalSize,
-  type Presentation,
-} from "./MediaModal";
+import { MediaModal, TopBar } from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
 import { useAudioActions } from "@/audio/useAudioPlayer";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
-import { announceVideoHandOff } from "@/video/videoHandOff";
 import { AudioCompact, AudioStage } from "./AudioStage";
+import { DetailActions } from "./DetailActions";
+import { PlayHistory } from "./PlayHistory";
+import { RatingTagsCard } from "./RatingTagsCard";
 import { useAudioDetail } from "./useAudioDetail";
+import { useCloseTarget } from "./useCloseTarget";
+import { useDetailMutations } from "./useDetailMutations";
+import { useDetailPresentation } from "./useDetailPresentation";
+import { useThumbVersion } from "./useThumbVersion";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
 import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
-import { copyImageToClipboard } from "./utils";
 import {
   dropFromWatchLaterCache,
   invalidateCollectionSearches,
   invalidatePlayedSearches,
-  invalidateTagSearches,
-  patchFileRowInCaches,
-  syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
 
 const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
@@ -112,11 +63,7 @@ export default function MediaDetail() {
   const autoplay = searchParams.get("autoplay") !== "0";
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const location = useLocation();
   const { pause: pauseAudio } = useAudioActions();
-  // Closing the modal = drop the child route. Return to Discovery or the playlist
-  // player if we came from there, otherwise back to the list (the list stays
-  // mounted underneath).
   // Filtering the library by a tag only makes sense with the library visible, so
   // this closes the detail — to `/` rather than back to Discovery, since Discovery
   // has no notion of the list's filter.
@@ -128,86 +75,6 @@ export default function MediaDetail() {
     [navigate],
   );
 
-  // Hand this view's playback over to the playlist player, which is about to
-  // show this very file. Where this player got to goes into `t` — not where
-  // the playlist left off when it came here, since watching on for a few
-  // minutes and then being rewound to the second of the detour reads as a bug.
-  // Until its metadata has loaded this player has no position yet, so leaving
-  // straight away falls back to the second this view arrived at rather than
-  // rewinding to the top of the file. The <video> itself is handed across as
-  // it is (see videoHandOff.ts), so the playlist need not reload and seek to
-  // `t` at all; `t` is the fallback for when that hand-off does not happen.
-  // Navigates itself: the announcement is only good for the navigation that
-  // follows it at once, so the two are not offered separately.
-  // An audio track is not this view's to hand over: it plays in the bottom
-  // bar, which the playlist shares, so it simply carries on. Only a video has
-  // a player here; the source is read through a ref because it is derived
-  // further down.
-  //
-  // A video watched to its end is a different matter for a fresh pass: the
-  // player would adopt it at the end and, as with any item that has ended,
-  // move straight on — skipping the very file the user asked to start on. So
-  // a fresh pass gets no hand-off and no `t` then, and plays the file over
-  // from the top. (A detour resuming on an ended video *should* move on.)
-  const leaveForPlayer = useCallback(
-    (to: PlayHrefOpts, replace = false) => {
-      const player = playerRef.current;
-      if (!to.resume && player?.ended()) {
-        void navigate(playHref(to), { replace });
-        return;
-      }
-      const sec = player?.currentTime();
-      const handBack =
-        sec != null && Number.isFinite(sec) ? Math.floor(sec) : startAt;
-      if (player && mediaSrcRef.current)
-        announceVideoHandOff(mediaSrcRef.current);
-      void navigate(playHref({ ...to, t: handBack }), { replace });
-    },
-    [navigate, startAt],
-  );
-
-  const from = searchParams.get("from");
-  // The playlist player parked its pass on the way here (`from=player`), so
-  // leaving hands playback back rather than dropping the user on the list.
-  const returnToParkedPass = useCallback(() => {
-    // Name the file the pass was parked on: the player restores only when
-    // this matches what it put aside, so a stale pass can never be picked up
-    // by an unrelated later playback (or by walking the history back here) —
-    // that case starts a fresh pass on this file instead, hence `start` too.
-    const file = { workspaceId: searchParams.get("ws") ?? "", fileId };
-    // Replaced, not pushed: the detour is one round trip, and a growing
-    // history would offer a "back" that lands on a pass already spent.
-    leaveForPlayer({ resume: file, start: file }, true);
-  }, [fileId, leaveForPlayer, searchParams]);
-  const onClose = useCallback(() => {
-    const state = location.state as {
-      outsideRouter?: boolean;
-      origin?: string;
-    } | null;
-    if (state?.outsideRouter) {
-      // The origin is restored without the detour marker: it is the route
-      // the detour started from, not itself a detour. Carrying the marker
-      // would matter when the origin is another file's detail (the bar is in
-      // reach while the detail is docked as a side peek): that detail would
-      // then "return" to itself on every close and could never be left.
-      void navigate(state.origin || "/", { replace: true });
-      return;
-    }
-    if (from === "player") {
-      returnToParkedPass();
-      return;
-    }
-    if (from !== "discover") {
-      void navigate("/");
-      return;
-    }
-    const params = new URLSearchParams();
-    const filter = searchParams.get("filter");
-    if (filter) params.set("filter", filter);
-    const query = params.toString();
-    void navigate(query ? `/discover?${query}` : "/discover");
-  }, [from, location.state, navigate, returnToParkedPass, searchParams]);
-
   // Total duration for scenes/history. Falls back to the natively obtained value when the DB duration is empty.
   const [nativeDur, setNativeDur] = useState<number | null>(null);
   const [imageBgInverted, setImageBgInverted] = useLocalStorage<boolean>(
@@ -215,36 +82,8 @@ export default function MediaDetail() {
     false,
     (raw) => raw === "1",
   );
-  const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
-    MODAL_SIZE_KEY,
-    "large",
-    (raw) => (raw === "small" ? "small" : "large"),
-  );
-  const toggleModalSize = useCallback(
-    () => setModalSize((prev) => (prev === "small" ? "large" : "small")),
-    [setModalSize],
-  );
-  // Modal or side peek. Both this and the modal size are remembered, so the
-  // view reopens the way it was last left, and going peek → modal lands on the
-  // modal size that was last chosen.
-  const [presentation, setPresentation] = useLocalStorage<Presentation>(
-    PRESENTATION_KEY,
-    "modal",
-    (raw) => (raw === "peek" ? "peek" : "modal"),
-  );
-  const isPeek = presentation === "peek";
   // Handle for calling the player's seek from a scene click.
   const playerRef = useRef<PlayerHandle>(null);
-  // The modal panel is the fullscreen target (YouTube-style: video fills the
-  // screen, the rest of the detail content scrolls below it).
-  const modalRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  useEffect(() => {
-    const onFsChange = () =>
-      setIsFullscreen(document.fullscreenElement === modalRef.current);
-    document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
-  }, []);
   const status = useAppStatus();
   // The file's owning workspace: from "?ws=" (set by every list/grid link, required in "All"
   // and collection views), falling back to the active workspace ID for single-workspace
@@ -259,87 +98,40 @@ export default function MediaDetail() {
       : "";
   const wsId = searchParams.get("ws") ?? activeFallback;
 
-  // Cache-bust the on-page main-thumbnail preview after regeneration. The main process
-  // emits `thumb:done` once ffmpeg finishes; bumping the version flips the `?v=` query
-  // and forces the browser to refetch the rewritten WebP.
-  // The event also means a file now exists behind the slot: an audio track
-  // opened while the scan was still extracting covers was fetched with
-  // `hasThumb: 0`, and the cover would otherwise stay hidden until a refetch.
-  const [thumbVersion, setThumbVersion] = useState(0);
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void events
-      .onThumbDone((event) => {
-        if (
-          event.id === fileId &&
-          (!event.workspaceId || event.workspaceId === wsId)
-        ) {
-          setThumbVersion((v) => v + 1);
-          qc.setQueryData<FileDetail | null>(
-            ["file_get", wsId, fileId],
-            (old) =>
-              old && !hasThumbFile(old)
-                ? { ...old, thumbStatus: "done", hasThumb: 1 }
-                : old,
-          );
-        }
-      })
-      .then((u) => (unlisten = u));
-    return () => unlisten?.();
-  }, [fileId, wsId, qc]);
+  const thumbVersion = useThumbVersion(fileId, wsId);
 
   const detail = useQuery({
     queryKey: ["file_get", wsId, fileId],
     queryFn: () => api.fileGet(fileId, wsId),
     enabled: Number.isFinite(fileId) && wsId !== "",
   });
-  // Exit fullscreen when prev/next lands on anything but a video: only the
-  // video player has a fullscreen toggle, so staying fullscreen on an image or
-  // an audio track would strand the user (Esc only). Keyed on the resolved
-  // kind, not on !video alone, so the transient undefined while the next file
-  // loads doesn't drop video→video fullscreen.
   const kind = detail.data?.kind;
-  useEffect(() => {
-    if (
-      kind != null &&
-      kind !== "video" &&
-      document.fullscreenElement === modalRef.current
-    ) {
-      void document.exitFullscreen().catch(() => {});
-    }
-  }, [kind]);
+  const {
+    modalSize,
+    toggleModalSize,
+    presentation,
+    setPresentation,
+    isPeek,
+    modalRef,
+    isFullscreen,
+  } = useDetailPresentation({ kind });
   // Viewing an image counts as a play (images have no player to fire onPlay),
-  // so it shows up in the play history like videos do. The ref dedupes the
-  // refetches/re-renders of a single visit; prev/next to a different file and
-  // back records again, which matches "each view is a play".
-  const recordedViewRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (kind !== "image" || !wsId || !Number.isFinite(fileId)) {
-      // Once the viewer settles on a non-image, drop the guard so navigating
-      // back to the same image (e.g. image → video → image) records a new
-      // view. Keep it while kind is still undefined (the next file loading)
-      // so a transient fetch state can't cause double records.
-      if (kind !== undefined) recordedViewRef.current = null;
-      return;
-    }
-    const key = `${wsId}:${fileId}`;
-    if (recordedViewRef.current === key) return;
-    recordedViewRef.current = key;
-    api
-      .fileRecordPlay(fileId, wsId, "browser")
-      .then(() => {
-        // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
-        invalidatePlayedSearches(qc);
-        // Viewing an image counts as a play, so the main process just consumed
-        // this file's Watch Later entry. Mirror that into the cache.
-        dropFromWatchLaterCache(qc, wsId, fileId);
-      })
-      .catch(() => {
-        // Drop the guard on failure so a later effect run of this visit can retry;
-        // without this a transient IPC error would suppress the record for good.
-        if (recordedViewRef.current === key) recordedViewRef.current = null;
-      });
-  }, [kind, fileId, wsId, qc]);
+  // so it shows up in the play history like videos do.
+  useRecordImageView({
+    wsId,
+    fileId,
+    kind,
+    // The recorded ids, not this render's: prev/next may have moved on by
+    // the time the main process confirms, and it is the viewed image that
+    // has left Watch Later.
+    onRecorded: (recordedWs, recordedId) => {
+      // Keep the played/unplayed list filter in sync (same as VideoPlayer's onPlayed).
+      invalidatePlayedSearches(qc);
+      // Viewing an image counts as a play, so the main process just consumed
+      // this file's Watch Later entry. Mirror that into the cache.
+      dropFromWatchLaterCache(qc, recordedWs, recordedId);
+    },
+  });
   const workspaces = useQuery({
     queryKey: ["workspaces_list"],
     queryFn: api.workspacesList,
@@ -378,10 +170,13 @@ export default function MediaDetail() {
   // Include the workspace ID in the URL path (/ws/<id>/...) to avoid collisions with another DB after switching.
   const mediaSrc =
     mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
-  const mediaSrcRef = useRef("");
-  useLayoutEffect(() => {
-    mediaSrcRef.current = mediaSrc;
-  }, [mediaSrc]);
+  const { onClose, openPlaylist } = useCloseTarget({
+    fileId,
+    wsId,
+    startAt,
+    playerRef,
+    mediaSrc,
+  });
 
   // Bar suppression, auto-start and video↔audio exclusivity for audio files.
   const {
@@ -403,163 +198,21 @@ export default function MediaDetail() {
   // (the modal and the side peek alike; the playlist player binds it too).
   useSpectrumPatternHotkey(isAudio);
 
-  const setRating = useMutation({
-    mutationFn: (r: number) => api.fileSetRating(fileId, wsId, r),
-    onSuccess: (_d, r) => {
-      syncFileRowAcrossCaches(qc, wsId, fileId, { rating: r });
-    },
-  });
-  // After a tag edit, refetch the canonical detail (tag names are normalized
-  // server-side) and mirror its tags into the list caches, instead of
-  // refetching every page of every list. Only searches whose membership
-  // depends on tags (tag filter / text query) are invalidated.
-  const onTagsChanged = async () => {
-    try {
-      const fresh = await qc.fetchQuery({
-        queryKey: ["file_get", wsId, fileId],
-        queryFn: () => api.fileGet(fileId, wsId),
-      });
-      if (fresh) {
-        // FileRow omits pipeline sources (see attachTags); patching straight from
-        // the detail response would put them back into the list caches.
-        patchFileRowInCaches(qc, wsId, fileId, {
-          tags: fresh.tags.filter(
-            (tag) => !LIST_HIDDEN_SOURCES.includes(tag.source),
-          ),
-        });
-      }
-    } catch {
-      // The tag edit itself succeeded; if the refetch fails (transient IPC
-      // error), fall back to invalidating the detail so it reloads lazily.
-      void qc.invalidateQueries({ queryKey: ["file_get", wsId, fileId] });
-    }
-    invalidateTagSearches(qc);
-    void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
-  };
-  const addTag = useMutation({
-    mutationFn: (name: string) => api.fileAddTag(fileId, wsId, name),
-    onSuccess: onTagsChanged,
-    onError: (error, name) => {
-      // main rejects a name that impersonates a pipeline-owned namespace; any
-      // other failure (DB error, unknown workspace) deserves its own message.
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes(RESERVED_TAG_ERROR)) {
-        toast.error(
-          t("tags.addFailedReserved", {
-            prefix: reservedTagPrefix(name) ?? name,
-          }),
-        );
-      } else {
-        toast.error(t("tag.addFailed"), { description: message });
-      }
-    },
-  });
-  const removeTag = useMutation({
-    mutationFn: (tagId: number) => api.fileRemoveTag(fileId, wsId, tagId),
-    onSuccess: onTagsChanged,
-  });
-  const deleteFromIndex = useMutation({
-    mutationFn: () => api.fileDeleteFromIndex(fileId, wsId),
-    onSuccess: closeAudioIfCurrent,
-  });
-  const invalidateCollections = () => {
-    void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
-    // Membership changes only affect collection-scoped lists, not workspace lists.
-    invalidateCollectionSearches(qc);
-  };
-  const onCollectionError = (error: unknown) => {
-    toast.error(t("collection.actionFailed"), {
-      description: error instanceof Error ? error.message : String(error),
-    });
-  };
-  const addToCollection = useMutation({
-    mutationFn: (c: { id: string; name: string }) =>
-      api.collectionAddFile(c.id, fileId, wsId),
-    onSuccess: (_data, c) => {
-      invalidateCollections();
-      toast.success(t("collection.addedToast", { name: c.name }));
-    },
-    onError: onCollectionError,
-  });
-  const removeFromCollection = useMutation({
-    mutationFn: (c: { id: string; name: string }) =>
-      api.collectionRemoveFile(c.id, fileId, wsId),
-    onSuccess: (_data, c) => {
-      invalidateCollections();
-      toast.success(t("collection.removedFromToast", { name: c.name }));
-    },
-    onError: onCollectionError,
-  });
-  const addBookmark = useMutation({
-    mutationFn: (sec: number) => api.bookmarkAdd(fileId, wsId, sec),
-    onSuccess: (created) => {
-      if (!created) return;
-      qc.setQueryData<FileDetail | null>(["file_get", wsId, fileId], (old) =>
-        old
-          ? {
-              ...old,
-              bookmarks: [
-                ...old.bookmarks.filter((b) => b.id !== created.id),
-                created,
-              ].sort((a, b) => a.sec - b.sec || a.id - b.id),
-            }
-          : old,
-      );
-    },
-  });
-  const removeBookmark = useMutation({
-    mutationFn: (bookmarkId: number) =>
-      api.bookmarkRemove(fileId, wsId, bookmarkId),
-    onSuccess: (_void, bookmarkId) => {
-      qc.setQueryData<FileDetail | null>(["file_get", wsId, fileId], (old) =>
-        old
-          ? {
-              ...old,
-              bookmarks: old.bookmarks.filter((b) => b.id !== bookmarkId),
-            }
-          : old,
-      );
-    },
-  });
-  const setMainThumb = useMutation({
-    // `sec=null` reverts to the auto-extracted frame.
-    mutationFn: (sec: number | null) => api.thumbSetOffset(fileId, wsId, sec),
-    // Snap the highlighted star to the chosen scene immediately; if ffmpeg fails the
-    // backend throws and we roll back so the UI doesn't lie about the saved offset.
-    onMutate: async (sec) => {
-      await qc.cancelQueries({ queryKey: ["file_get", wsId, fileId] });
-      const prev = qc.getQueryData<FileDetail | null>([
-        "file_get",
-        wsId,
-        fileId,
-      ]);
-      qc.setQueryData<FileDetail | null>(["file_get", wsId, fileId], (old) =>
-        old ? { ...old, thumbOffsetSec: sec } : old,
-      );
-      return { prev };
-    },
-    onError: (_err, _sec, ctx) => {
-      if (ctx?.prev !== undefined) {
-        qc.setQueryData(["file_get", wsId, fileId], ctx.prev);
-      }
-    },
-    onSuccess: (res) => {
-      // Reconcile to the server-confirmed value (in case clamping happened).
-      // List/grid thumbnails refresh via the `thumb:done` event from the main process —
-      // no manual cache surgery needed for ["files_search"]/["files_random"].
-      qc.setQueryData<FileDetail | null>(["file_get", wsId, fileId], (old) =>
-        old ? { ...old, thumbOffsetSec: res.thumbOffsetSec } : old,
-      );
-    },
-  });
-
-  const exportFrame = useMutation({
-    mutationFn: (sec: number) => api.frameExport(fileId, wsId, sec),
-    onSuccess: (res) => {
-      // A canceled save dialog resolves with saved=false — stay silent.
-      if (res.saved) toast.success(t("player.frameExported"));
-    },
-    onError: () => toast.error(t("player.frameExportFailed")),
+  const {
+    setRating,
+    addTag,
+    removeTag,
+    removeFromIndex,
+    addToCollection,
+    removeFromCollection,
+    addBookmark,
+    removeBookmark,
+    setMainThumb,
+    exportFrame,
+  } = useDetailMutations({
+    fileId,
+    wsId,
+    onDeletedFromIndex: closeAudioIfCurrent,
   });
 
   const handleDeleteFromIndex = async () => {
@@ -570,31 +223,23 @@ export default function MediaDetail() {
       destructive: true,
     });
     if (!ok) return;
-    const deleted = await deleteFromIndex.mutateAsync();
-    qc.setQueriesData<InfiniteData<SearchResult>>(
-      { queryKey: ["files_search"] },
-      (old) =>
-        old
-          ? {
-              ...old,
-              pages: old.pages.map((page) => ({
-                ...page,
-                items: page.items.filter(
-                  (item) => item.id !== deleted.id || item.workspaceId !== wsId,
-                ),
-              })),
-            }
-          : old,
-    );
-    qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, (old) =>
-      old?.filter(
-        (item) => item.id !== deleted.id || item.workspaceId !== wsId,
-      ),
-    );
-    qc.removeQueries({ queryKey: ["file_get", wsId, deleted.id] });
-    void qc.invalidateQueries({ queryKey: ["files_search"] });
-    void qc.invalidateQueries({ queryKey: ["files_random"] });
+    await removeFromIndex();
     onClose();
+  };
+
+  const openExternal = () => {
+    playerRef.current?.pause();
+    // Same courtesy for a track the bar is playing: the external
+    // player is about to play the very same file.
+    if (isAudio) pauseAudio();
+    // The main process records the play and consumes the Watch
+    // Later entry, so mirror that once it confirms — it can also
+    // refuse (a file gone missing under the root), and patching
+    // regardless would show the file as consumed when it is not.
+    void api
+      .openExternal(fileId, wsId)
+      .then(() => dropFromWatchLaterCache(qc, wsId, fileId))
+      .catch((e: unknown) => log.error("open external", e));
   };
 
   const toggleImageBgInverted = useCallback(() => {
@@ -609,7 +254,6 @@ export default function MediaDetail() {
   useEffect(() => {
     if (nativeDurFileRef.current === fileId) return;
     nativeDurFileRef.current = fileId;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNativeDur(null);
   }, [fileId]);
 
@@ -617,27 +261,14 @@ export default function MediaDetail() {
     usePrevNextNavigation({
       fileId,
       wsId,
-      kind: detail.data?.kind,
+      kind,
     });
-
-  // The way into the playlist from here: play the list this file sits in,
-  // starting on this file, with its playback carried over (the mirror of the
-  // player's own "open details"). Offered only while a list is mounted
-  // underneath, and only for a file that list has loaded — the queue is built
-  // from that list, and a file it does not hold (opened from the bottom bar
-  // after the list moved on) would leave the player starting somewhere else.
-  // That holds for a detour from the player too: its parked pass may be gone
-  // by now (the history walked back here), and the fallback is the list.
+  // The way into the playlist from here (see useCloseTarget). Offered only
+  // while a list is mounted underneath, and only for a file that list has
+  // loaded — the queue is built from that list, and a file it does not hold
+  // (opened from the bottom bar after the list moved on) would leave the
+  // player starting somewhere else.
   const canOpenPlaylist = inList;
-  const openPlaylist = useCallback(() => {
-    // A detour from the player already has a pass waiting: go back to it
-    // rather than throw it away for a fresh one.
-    if (from === "player") {
-      returnToParkedPass();
-      return;
-    }
-    leaveForPlayer({ start: { workspaceId: wsId, fileId } });
-  }, [fileId, from, leaveForPlayer, returnToParkedPass, wsId]);
 
   const d = detail.data;
 
@@ -803,186 +434,22 @@ export default function MediaDetail() {
           )}
 
           {/* Title + controls */}
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              {/* File name and folder are the two strings users copy out. */}
-              <h1
-                className="select-text truncate text-lg font-semibold text-bright-fg"
-                title={d.relPath}
-              >
-                {basename}
-              </h1>
-              {dir && (
-                <p
-                  className="select-text truncate text-xs text-muted"
-                  title={d.relPath}
-                >
-                  {dir}
-                </p>
-              )}
-            </div>
-            <ButtonGroup className="shrink-0">
-              {d.kind === "image" && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-muted/35 bg-surface px-2"
-                    onClick={toggleImageBgInverted}
-                    aria-label={t("media.invertImageBackground")}
-                    aria-pressed={imageBgInverted}
-                    title={t("media.invertImageBackground")}
-                  >
-                    <Contrast />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-muted/35 bg-surface px-2"
-                    disabled={!mediaSrc}
-                    onClick={() => {
-                      if (!mediaSrc) return;
-                      void copyImageToClipboard(mediaSrc)
-                        .then(() => toast.success(t("media.imageCopied")))
-                        .catch((e: unknown) => {
-                          console.error("copy image failed:", e);
-                          toast.error(t("media.imageCopyFailed"));
-                        });
-                    }}
-                    aria-label={t("media.copyImage")}
-                    title={t("media.copyImage")}
-                  >
-                    <ImageDown />
-                  </Button>
-                </>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-muted/35 bg-surface"
-                onClick={() => {
-                  playerRef.current?.pause();
-                  // Same courtesy for a track the bar is playing: the external
-                  // player is about to play the very same file.
-                  if (isAudio) pauseAudio();
-                  // The main process records the play and consumes the Watch
-                  // Later entry, so mirror that once it confirms — it can also
-                  // refuse (a file gone missing under the root), and patching
-                  // regardless would show the file as consumed when it is not.
-                  void api
-                    .openExternal(fileId, wsId)
-                    .then(() => dropFromWatchLaterCache(qc, wsId, fileId))
-                    .catch((e: unknown) => log.error("open external", e));
-                }}
-              >
-                <ExternalLink />
-                {t("media.openExternal")}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-muted/35 bg-surface px-2"
-                    aria-label={t("media.moreActions")}
-                  >
-                    <ChevronDown />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="min-w-44 border border-muted/35 bg-surface p-0"
-                >
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      className="rounded-none px-3 py-2 text-xs"
-                      onSelect={() => void api.openFolder(fileId, wsId)}
-                    >
-                      <FolderOpen />
-                      {t("media.openFolder")}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="mx-0 my-0 bg-muted/35" />
-                    <DropdownMenuItem
-                      className="rounded-none px-3 py-2 text-xs"
-                      onSelect={() => void api.copyFilePath(fileId, wsId)}
-                    >
-                      <Copy />
-                      {t("media.copyFilePath")}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="mx-0 my-0 bg-muted/35" />
-                    <DropdownMenuItem
-                      className="rounded-none px-3 py-2 text-xs text-error data-[highlighted]:text-error"
-                      onSelect={() => void handleDeleteFromIndex()}
-                    >
-                      <Trash2 />
-                      {t("media.deleteFromIndex")}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </ButtonGroup>
-
-            {/* Collection actions: kept as a standalone dropdown, independent of the
-                open-external/more-actions button group. */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 border-muted/35 bg-surface px-2"
-                  aria-label={t("collection.addToMenu")}
-                  title={t("collection.addToMenu")}
-                >
-                  <FolderPlus />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="min-w-44 border border-muted/35 bg-surface p-0"
-              >
-                <DropdownMenuGroup>
-                  {/* Kept as a guard for a not-yet-loaded/failed workspaces_list
-                      query. In practice the list is never empty at rest: the
-                      built-in Watch Later collection is always seeded, and it
-                      shows up in this menu like any other collection. */}
-                  {collections.length === 0 ? (
-                    <DropdownMenuItem
-                      disabled
-                      className="rounded-none px-3 py-2 text-xs"
-                    >
-                      <FolderPlus />
-                      {t("collection.empty")}
-                    </DropdownMenuItem>
-                  ) : (
-                    collections.map((collection) => {
-                      const included = collection.items.some(
-                        (item) =>
-                          item.workspaceId === wsId && item.fileId === fileId,
-                      );
-                      return (
-                        <DropdownMenuItem
-                          key={collection.id}
-                          className="rounded-none px-3 py-2 text-xs"
-                          onSelect={() =>
-                            included
-                              ? removeFromCollection.mutate(collection)
-                              : addToCollection.mutate(collection)
-                          }
-                        >
-                          {included ? <FolderMinus /> : <FolderPlus />}
-                          {included
-                            ? t("collection.removeFrom", {
-                                name: collection.name,
-                              })
-                            : t("collection.addTo", { name: collection.name })}
-                        </DropdownMenuItem>
-                      );
-                    })
-                  )}
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DetailActions
+            detail={d}
+            basename={basename}
+            dir={dir}
+            fileId={fileId}
+            wsId={wsId}
+            mediaSrc={mediaSrc}
+            collections={collections}
+            imageBgInverted={imageBgInverted}
+            onToggleImageBg={toggleImageBgInverted}
+            onOpenExternal={openExternal}
+            onDeleteFromIndex={() => void handleDeleteFromIndex()}
+            onAddToCollection={(c) => addToCollection.mutate(c)}
+            onRemoveFromCollection={(c) => removeFromCollection.mutate(c)}
+            t={t}
+          />
 
           {/* Scenes: evenly spaced thumbnails. Click to seek to that position. */}
           {/* Only the scene currently being applied (sec or null = revert) should look busy;
@@ -1034,46 +501,18 @@ export default function MediaDetail() {
           )}
 
           {/* Rating + tags */}
-          <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4">
-            <div className="flex items-center gap-3">
-              <span className="w-16 shrink-0 text-xs font-semibold uppercase text-muted">
-                {t("media.rating")}
-              </span>
-              <RatingStars
-                value={d.rating}
-                onChange={(r) => setRating.mutate(r)}
-                size={20}
-              />
-              {/* Pushed to the far end of the row, favorite outermost. */}
-              <WatchLaterButton
-                ref={watchLaterRef}
-                fileId={fileId}
-                workspaceId={wsId}
-                watchLater={watchLater}
-                size={22}
-                deferListRefresh
-                className="ml-auto"
-              />
-              <FavoriteButton
-                fileId={fileId}
-                workspaceId={wsId}
-                favorite={d.favorite}
-                size={22}
-              />
-            </div>
-            <div className="flex flex-col gap-2 border-t border-border pt-4">
-              <span className="text-xs font-semibold uppercase text-muted">
-                {t("media.tags")}
-              </span>
-              <TagEditor
-                tags={d.tags}
-                workspaceId={wsId}
-                onAdd={(name) => addTag.mutate(name)}
-                onRemove={(tagId) => removeTag.mutate(tagId)}
-                onTagClick={onTagFilter}
-              />
-            </div>
-          </div>
+          <RatingTagsCard
+            detail={d}
+            fileId={fileId}
+            wsId={wsId}
+            watchLater={watchLater}
+            watchLaterRef={watchLaterRef}
+            onRate={(r) => setRating.mutate(r)}
+            onAddTag={(name) => addTag.mutate(name)}
+            onRemoveTag={(tagId) => removeTag.mutate(tagId)}
+            onTagClick={onTagFilter}
+            t={t}
+          />
 
           {/* Metadata chips */}
           <MetaChips
@@ -1085,26 +524,7 @@ export default function MediaDetail() {
             t={t}
           />
 
-          {/* Play history */}
-          {d.playHistory.length > 0 && (
-            <section className="rounded-xl border border-border bg-surface p-4">
-              <h3 className="mb-2 text-xs font-semibold uppercase text-muted">
-                {t("media.playHistory")}
-              </h3>
-              <ul className="space-y-1 text-xs text-muted">
-                {d.playHistory.slice(0, 8).map((p, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <span className="tabular-nums text-fg">
-                      {new Date(p.playedAt * 1000).toLocaleString()}
-                    </span>
-                    <Badge variant="outline" className="font-normal">
-                      {p.via}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <PlayHistory history={d.playHistory} t={t} />
         </div>
       </ScrollArea>
     </MediaModal>

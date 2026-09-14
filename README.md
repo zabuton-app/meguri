@@ -325,7 +325,8 @@ Meguri is **privacy-first**: everything stays on your machine.
 ```text
 Meguri/
 ├─ electron/                # main process (Node/TypeScript)
-│  ├─ main.ts               # startup, windows, IPC, auto scan
+│  ├─ main.ts               # startup, windows, tray, auto scan
+│  ├─ ipc/                  # IPC handlers, one module per domain
 │  ├─ preload.ts            # contextBridge (window.api)
 │  └─ core/                 # backend
 │     ├─ db.ts              # better-sqlite3 + FTS5

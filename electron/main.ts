@@ -1,8 +1,8 @@
-// Electron main process. Workspaces management, media server, IPC, and auto scan.
+// Electron main process. App lifecycle, window and tray, local servers, and
+// the auto scan. IPC handlers live under electron/ipc/ (see registerIpc).
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
   globalShortcut,
   Menu,
@@ -12,48 +12,30 @@ import {
   shell,
   Tray,
 } from "electron";
-import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import { DEFAULT_LOGO, loadConfig, updateConfig } from "./core/appConfig.js";
+import { DEFAULT_LOGO, loadConfig } from "./core/appConfig.js";
 import type { Core } from "./core/index.js";
-import { handle } from "./core/ipcHandler.js";
 import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import { runScan } from "./core/jobs.js";
 import log, { setupLogger } from "./core/logger.js";
-import { exportFrame, generateThumb } from "./core/media.js";
-import { withVideoDecodeSlot } from "./core/mediaConcurrency.js";
 import { withTimeout } from "./core/concurrency.js";
-import { isInsideRoot } from "./core/paths.js";
 import * as q from "./core/queries.js";
-import type { QueryTarget } from "./core/queryExec.js";
 import {
   DISPOSE_TIMEOUT_MS,
   QueryWorkerClient,
 } from "./core/queryWorkerClient.js";
 import { startServer } from "./core/server.js";
-import * as tagAdmin from "./core/tagAdmin.js";
-import * as tags from "./core/tags.js";
-import type {
-  DuplicatesResult,
-  FileRow,
-  HistoryPage,
-  SearchResult,
-  TagList,
-  WorkspaceStats,
-} from "./core/types.js";
 import {
   checkForUpdates,
-  getUpdateSettings,
-  ignoreVersion,
   isAutoCheckEnabled,
-  setAutoCheck,
   updateDownloadUrl,
 } from "./core/updater.js";
-import { ALL_ID, COLLECTION_ID_PREFIX, Workspaces } from "./core/workspaces.js";
+import { Workspaces } from "./core/workspaces.js";
+import { registerIpc, type ScanOptions } from "./ipc/index.js";
 import type { LogoId } from "../shared/ipc/schema.js";
 
 // Set up logging before anything else so early failures land in the log file.
@@ -67,13 +49,6 @@ const ws = new Workspaces();
 const queryClient = new QueryWorkerClient(
   path.join(__dirname, "queryWorker.js"),
 );
-/** Worker-side targets for a set of Cores (the worker opens its own read-only handles). */
-function queryTargets(cores: { id: string; core: Core }[]): QueryTarget[] {
-  return cores.map(({ id, core }) => ({
-    id,
-    dbPath: path.join(core.dataDir, "db.sqlite"),
-  }));
-}
 let mediaPort = 0;
 const mediaToken = randomBytes(32).toString("base64url");
 const MEDIA_TOKEN_HEADER = "X-Api-Token";
@@ -356,26 +331,6 @@ function emit(channel: string, payload: unknown): void {
   mainWindow.webContents.send(channel, payload);
 }
 
-// Launch an external file/URL in a fully detached child process.
-// shell.openPath leaves the spawned process attached to Electron's process
-// tree; on Wayland/Hyprland that makes the launched app's window a child of
-// Meguri and blocks the main window until the external app closes.
-// Windows uses shell.openPath directly: ShellExecuteExW doesn't reproduce the
-// child-process attachment issue, and routing through cmd.exe /c start would
-// open a command-injection surface for filenames containing &/|/^/( etc.
-function openDetached(target: string): void {
-  if (process.platform === "win32") {
-    void shell.openPath(target);
-    return;
-  }
-  const cmd = process.platform === "darwin" ? "open" : "xdg-open";
-  const child = spawn(cmd, [target], { detached: true, stdio: "ignore" });
-  child.on("error", (e) => {
-    log.error("[openDetached] failed to launch", cmd, target, e);
-  });
-  child.unref();
-}
-
 // Workspace IDs with a scan in progress. To avoid chunk-tx contention,
 // concurrent scans of the same workspace are suppressed.
 const scanningWs = new Set<string>();
@@ -385,11 +340,7 @@ const scanControllers = new Map<string, AbortController>();
 const scanPromises = new Map<string, Promise<void>>();
 
 /** Start a scan for a single workspace's Core. Returns the job id (empty if already scanning). */
-function scanCore(
-  core: Core,
-  wsId: string | null,
-  opts: { includeExcluded?: boolean; rebuild?: boolean },
-): string {
+function scanCore(core: Core, wsId: string | null, opts: ScanOptions): string {
   if (isQuitting()) return ""; // shutdown() has aborted scans; don't start new ones
   if (wsId && scanningWs.has(wsId)) return ""; // don't start again if already running
   const jobId = `job-${scanSeq++}`;
@@ -456,9 +407,7 @@ function abortAllScans(): Promise<unknown> {
   return Promise.allSettled([...scanPromises.values()]);
 }
 
-function startScan(
-  opts: { includeExcluded?: boolean; rebuild?: boolean } = {},
-): string {
+function startScan(opts: ScanOptions = {}): string {
   // In the virtual "All" view, scan every registered workspace concurrently
   // (each gets its own job/progress). Return the first job's id for tracking.
   if (ws.isAll()) {
@@ -472,537 +421,6 @@ function startScan(
   const core = ws.active();
   if (!core) return "";
   return scanCore(core, ws.activeId, opts);
-}
-
-// File operations are addressed by (workspaceId, fileId) since file IDs are unique
-// only within a workspace. The renderer always supplies the workspace ID.
-function coreById(wsId: string): Core {
-  const core = ws.byId(wsId);
-  if (!core) throw new Error("unknown workspace");
-  return core;
-}
-
-/**
- * Take a file off Watch Later because it has now been played. Called wherever a
- * play is recorded — the in-app player's first `play` event, opening in an
- * external player, and an image's detail view (images have no player, so the
- * app already counts a view as a play). Merely opening the detail view of a
- * video does not reach here, so queueing something and peeking at its metadata
- * leaves it on the list.
- *
- * Deliberately no workspace:changed broadcast: that would refetch the list
- * behind the open detail view, dropping the very file being viewed out of the
- * prev/next navigation order mid-session. The renderer refreshes the affected
- * lists when the detail view closes instead (see MediaDetail).
- */
-function consumeWatchLater(workspaceId: string, id: number): void {
-  ws.removeFromWatchLater(workspaceId, id);
-}
-
-/** Resolve a file's absolute path and verify it lives under the workspace root. */
-function ensureFileInsideRoot(c: Core, id: number): string {
-  const abs = tags.absPathOf(c.db, id);
-  if (!abs) throw new Error("file not found");
-  if (!isInsideRoot(abs, c.root)) throw new Error("path is outside scan root");
-  return abs;
-}
-
-function registerStatusHandlers(): void {
-  handle("workspace_stats", () =>
-    // Aggregate across every workspace under the virtual "All" view; for a single
-    // active workspace just read its DB directly. Returns zeros/null when nothing is mounted.
-    queryClient.run<WorkspaceStats>({
-      kind: "stats",
-      targets: queryTargets(ws.queryCores()),
-    }),
-  );
-
-  handle("app_status", () => {
-    if (ws.isAll()) {
-      return {
-        root: "All",
-        ready: ws.allCores().length > 0,
-        initError: null,
-        initErrorKind: null,
-        mediaBase: mediaPort ? `http://127.0.0.1:${mediaPort}` : null,
-        workspaceId: ALL_ID,
-        devMode: isDevMode(),
-      };
-    }
-    const activeCollection = ws.activeCollection();
-    if (activeCollection) {
-      return {
-        root: activeCollection.name,
-        ready: ws.allCores().length > 0,
-        initError: null,
-        initErrorKind: null,
-        mediaBase: mediaPort ? `http://127.0.0.1:${mediaPort}` : null,
-        workspaceId: ws.activeId,
-        devMode: isDevMode(),
-      };
-    }
-    const core = ws.active();
-    return {
-      root: core?.root ?? null,
-      ready: core != null,
-      initError: ws.initError(),
-      initErrorKind: ws.initErrorKind(),
-      mediaBase: mediaPort ? `http://127.0.0.1:${mediaPort}` : null,
-      workspaceId: ws.activeId,
-      devMode: isDevMode(),
-    };
-  });
-
-  // Static app/runtime versions for the Settings "About" section.
-  handle("about_info", () => ({
-    version: app.getVersion(),
-    electron: process.versions.electron ?? "",
-    chrome: process.versions.chrome ?? "",
-    node: process.versions.node ?? "",
-  }));
-}
-
-function registerWorkspaceHandlers(): void {
-  handle("workspaces_list", () => ({
-    workspaces: ws.list(),
-    collections: ws.collections(),
-    activeId: ws.activeId,
-  }));
-
-  handle("workspace_add", async () => {
-    const res = await dialog.showOpenDialog(mainWindow ?? undefined!, {
-      title: "Add video directory",
-      properties: ["openDirectory", "createDirectory"],
-    });
-    if (res.canceled || res.filePaths.length === 0) return { added: false };
-    const np = ws.add(res.filePaths[0]);
-    ws.setActive(np);
-    const scanJobId = startScan();
-    emit("workspace:changed", { activeId: ws.activeId });
-    return { added: true, id: Workspaces.idFor(np), scanJobId };
-  });
-
-  handle("workspace_remove", async ({ id }) => {
-    const p = ws.pathOf(id);
-    if (p) {
-      await abortScan(id);
-      // The worker holds a read-only handle on this workspace's DB; close it
-      // before ws.remove() deletes the data dir (open handles block removal
-      // on Windows).
-      await queryClient.closeWorkspace(id);
-      ws.remove(p);
-    }
-    if (ws.active()) startScan();
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("workspace_reorder", ({ ids }) => {
-    ws.reorder(ids);
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("workspace_switch", ({ id }) => {
-    if (id === ALL_ID) {
-      ws.setActive(ALL_ID); // the virtual "All" view is never scanned
-      emit("workspace:changed", { activeId: ws.activeId });
-      return;
-    }
-    if (id.startsWith(COLLECTION_ID_PREFIX)) {
-      ws.setActive(id);
-      emit("workspace:changed", { activeId: ws.activeId });
-      return;
-    }
-    const p = ws.pathOf(id);
-    if (p) ws.setActive(p);
-    startScan();
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("collection_create", ({ name, emoji }) => {
-    const collection = ws.addCollection(name, emoji);
-    emit("workspace:changed", { activeId: ws.activeId });
-    // addCollection makes the new collection active, so it's always the active one here.
-    // User-created collections are never locked; only the built-in Watch Later is.
-    return { ...collection, active: true, locked: false };
-  });
-
-  handle("collection_remove", ({ id }) => {
-    ws.removeCollection(id);
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("collection_reorder", ({ ids }) => {
-    ws.reorderCollections(ids);
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("collection_reorder_items", ({ collectionId, items }) => {
-    ws.reorderCollectionItems(collectionId, items);
-    // Deliberately no workspace:changed broadcast. The rail listens for it by
-    // invalidating every files_search, which would refetch the pages the
-    // renderer just patched optimistically — on every single drop. Nothing in
-    // the rail depends on the order within a collection, and the renderer
-    // refetches itself if the write fails. Same reasoning as consumeWatchLater.
-  });
-
-  handle("collection_set_emoji", ({ id, emoji }) => {
-    ws.setCollectionEmoji(id, emoji);
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("collection_rename", ({ id, name }) => {
-    ws.renameCollection(id, name);
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("workspace_set_emoji", ({ id, emoji }) => {
-    ws.setWorkspaceEmoji(id, emoji);
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("collection_add_file", ({ collectionId, workspaceId, id }) => {
-    ws.addToCollection(collectionId, workspaceId, id);
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-
-  handle("collection_remove_file", ({ collectionId, workspaceId, id }) => {
-    ws.removeFromCollection(collectionId, workspaceId, id);
-    emit("workspace:changed", { activeId: ws.activeId });
-  });
-}
-
-function registerScanHandlers(): void {
-  handle("scan_start", ({ includeExcluded, rebuild }) =>
-    startScan({ includeExcluded, rebuild }),
-  );
-
-  handle("scan_cancel", ({ wsId }) => {
-    if (wsId) scanControllers.get(wsId)?.abort();
-    else void abortAllScans();
-  });
-}
-
-function registerFileHandlers(): void {
-  // List queries can be invalidated by the renderer just as the active workspace
-  // disappears (e.g. removing the last workspace). Return empty instead of throwing
-  // so a brief race during workspace:changed doesn't surface as an error toast.
-  handle("files_search", ({ query }) => {
-    const collection = ws.activeCollection();
-    return collection
-      ? queryClient.run<SearchResult>({
-          kind: "search",
-          targets: queryTargets(ws.allCores()),
-          query,
-          refs: collection.items,
-        })
-      : queryClient.run<SearchResult>({
-          kind: "search",
-          targets: queryTargets(ws.queryCores()),
-          query,
-        });
-  });
-  handle("files_random", ({ query }) => {
-    const collection = ws.activeCollection();
-    return collection
-      ? queryClient.run<FileRow[]>({
-          kind: "random",
-          targets: queryTargets(ws.allCores()),
-          query: query ?? {},
-          refs: collection.items,
-        })
-      : queryClient.run<FileRow[]>({
-          kind: "random",
-          targets: queryTargets(ws.queryCores()),
-          query: query ?? {},
-        });
-  });
-  handle("file_get", ({ id, workspaceId }) => {
-    const db = coreById(workspaceId).db;
-    q.recordAccess(db, id);
-    return q.fileDetail(db, id);
-  });
-  handle("file_set_rating", ({ id, workspaceId, rating }) =>
-    q.setRating(coreById(workspaceId).db, id, rating),
-  );
-  handle("file_set_favorite", ({ id, workspaceId, favorite }) =>
-    q.setFavorite(coreById(workspaceId).db, id, favorite),
-  );
-  handle("file_delete_from_index", async ({ id, workspaceId }) => {
-    const deleted = q.deleteFromIndex(coreById(workspaceId).db, id);
-    // Await so the renderer's refetch after this resolves can't race a stale
-    // duplicate-refs cache (the scan path awaits for the same reason).
-    await queryClient.invalidateCaches();
-    // Drop any collection refs to the now-removed file so item counts stay accurate.
-    // Only broadcast when a collection actually changed; otherwise the renderer's
-    // own cache invalidation after delete already covers it.
-    if (ws.removeFileFromAllCollections(workspaceId, id)) {
-      emit("workspace:changed", { activeId: ws.activeId });
-    }
-    return deleted;
-  });
-  handle("file_record_play", ({ id, workspaceId, via, position }) => {
-    q.recordPlay(coreById(workspaceId).db, id, via, position ?? null);
-    consumeWatchLater(workspaceId, id);
-  });
-  // A collection is a file set, not a history scope; while one is active (queryCores()
-  // returns []) fall back to every workspace so the timeline is still meaningful.
-  const historyCores = () =>
-    ws.isCollection() ? ws.allCores() : ws.queryCores();
-  handle("history_list", ({ query }) =>
-    queryClient.run<HistoryPage>({
-      kind: "history",
-      targets: queryTargets(historyCores()),
-      query: query ?? {},
-    }),
-  );
-  // Same scope rule as history: a collection is a file set, not a duplicate
-  // scope, so fall back to every workspace while one is active.
-  handle("duplicates_list", () =>
-    queryClient.run<DuplicatesResult>({
-      kind: "duplicates",
-      targets: queryTargets(historyCores()),
-    }),
-  );
-  // Clear scope matches what history_list shows: the active workspace only, or
-  // every workspace when All / a collection is active.
-  handle("history_clear", () => {
-    for (const { core } of historyCores()) q.clearPlayHistory(core.db);
-  });
-}
-
-function registerTagHandlers(): void {
-  handle("file_add_tag", ({ id, workspaceId, name }) => {
-    const db = coreById(workspaceId).db;
-    const tagId = tags.addManualTag(db, id, name.trim());
-    tags.syncFts(db, id);
-    return tagId;
-  });
-  handle("file_remove_tag", ({ id, workspaceId, tagId }) => {
-    const db = coreById(workspaceId).db;
-    tags.removeManualTag(db, id, tagId);
-    tags.syncFts(db, id);
-  });
-  handle("tags_list", ({ workspaceId, prefix, limit }) =>
-    tags.listTagNames(coreById(workspaceId).db, prefix, limit ?? 20),
-  );
-
-  // The catalog channels take no workspaceId: coreById(ALL_ID) throws by design,
-  // and a tag id means nothing across databases. Scope follows the active view,
-  // the same rule history_list and duplicates_list use.
-  const tagCores = () => (ws.isCollection() ? ws.allCores() : ws.queryCores());
-
-  /** Cores for a catalog mutation. allCores() silently skips workspaces whose DB
-   *  could not be opened, which for a rename means that workspace keeps the old
-   *  name while the others move on — worth a line in the log when it happens. */
-  const tagMutationCores = () => {
-    const cores = tagCores();
-    const expected =
-      ws.isCollection() || ws.isAll() ? ws.rootCount() : cores.length;
-    if (cores.length < expected) {
-      log.warn(
-        `tag mutation covers ${cores.length}/${expected} workspaces; the rest could not be opened`,
-      );
-    }
-    return cores;
-  };
-
-  handle("tags_list_all", () =>
-    queryClient.run<TagList>({
-      kind: "tagsList",
-      targets: queryTargets(tagCores()),
-    }),
-  );
-  // Mutations are addressed by name, so fanning them across every database in
-  // scope converges on the same end state even when one of them has a collision
-  // (rename there escalates to a merge) and another does not.
-  handle("tag_rename", ({ from, to }) => {
-    let merged = false;
-    let affectedFiles = 0;
-    for (const { core } of tagMutationCores()) {
-      const r = tagAdmin.renameTag(core.db, from, to);
-      merged ||= r.merged;
-      affectedFiles += r.affectedFiles;
-    }
-    return { merged, affectedFiles };
-  });
-  handle("tag_merge", ({ from, into }) => {
-    let affectedFiles = 0;
-    for (const { core } of tagMutationCores()) {
-      affectedFiles += tagAdmin.mergeTags(core.db, from, into).affectedFiles;
-    }
-    return { affectedFiles };
-  });
-  handle("tag_delete", ({ tags: refs }) => {
-    let removedTags = 0;
-    let affectedFiles = 0;
-    for (const { core } of tagMutationCores()) {
-      const r = tagAdmin.deleteTags(core.db, refs);
-      removedTags += r.removedTags;
-      affectedFiles += r.affectedFiles;
-    }
-    return { removedTags, affectedFiles };
-  });
-}
-
-function registerBookmarkHandlers(): void {
-  handle("bookmark_add", ({ id, workspaceId, sec }) =>
-    q.addBookmark(coreById(workspaceId).db, id, sec),
-  );
-  handle("bookmark_remove", ({ id, workspaceId, bookmarkId }) =>
-    q.removeBookmark(coreById(workspaceId).db, id, bookmarkId),
-  );
-}
-
-function registerThumbHandlers(): void {
-  // Custom main thumbnail: regenerate the on-disk WebP from the given offset (video only).
-  // Passing sec=null reverts to the auto-extracted frame.
-  handle("thumb_set_offset", async ({ id, workspaceId, sec }) => {
-    const c = coreById(workspaceId);
-    const file = c.db
-      .prepare(
-        "SELECT abs_path AS absPath, kind, duration FROM files WHERE id = ? AND deleted_at IS NULL",
-      )
-      .get(id) as
-      { absPath: string; kind: string; duration: number | null } | undefined;
-    if (!file) throw new Error("file not found");
-    if (file.kind !== "video")
-      throw new Error("custom thumbnail is only supported for videos");
-    if (!isInsideRoot(file.absPath, c.root))
-      throw new Error("path is outside scan root");
-    if (sec != null) {
-      if (!Number.isFinite(sec) || sec < 0) {
-        throw new Error("invalid offset");
-      }
-      if (file.duration != null && sec >= file.duration) {
-        throw new Error("offset exceeds video duration");
-      }
-    }
-    // Regenerate FIRST so we never persist an offset whose frame couldn't be extracted.
-    // On failure, leave file_meta.thumb_offset_sec untouched and surface the error to the
-    // renderer; the UI will roll back its optimistic update.
-    const dest = path.join(c.thumbsDir(), `${id}.webp`);
-    const ok = await withVideoDecodeSlot(() =>
-      generateThumb(file.absPath, "video", dest, undefined, sec ?? undefined),
-    );
-    if (!ok)
-      throw new Error("failed to generate thumbnail at the requested offset");
-    q.setThumbOffset(c.db, id, sec);
-    q.setThumb(c.db, id, dest, "done");
-    emit("thumb:done", { id, workspaceId });
-    return { ok: true, thumbOffsetSec: sec };
-  });
-
-  // Export the frame at `sec` as a full-resolution still image via a native
-  // save dialog. Dialog cancellation is a normal outcome (saved=false).
-  // Serialized: a rapid double-click can invoke twice before the renderer's
-  // pending state disables the button, and stacking two modal save dialogs
-  // would be confusing — treat re-entry like a cancel.
-  let frameExportInFlight = false;
-  handle("frame_export", async ({ id, workspaceId, sec }) => {
-    if (frameExportInFlight) return { saved: false, path: null };
-    frameExportInFlight = true;
-    try {
-      const c = coreById(workspaceId);
-      const abs = ensureFileInsideRoot(c, id);
-      const base = path.parse(abs).name;
-      // Colons aren't filesystem-safe, so the timestamp uses dashes (hh-mm-ss).
-      const whole = Math.floor(sec);
-      const stamp = [
-        Math.floor(whole / 3600),
-        Math.floor((whole % 3600) / 60),
-        whole % 60,
-      ]
-        .map((n) => String(n).padStart(2, "0"))
-        .join("-");
-      // Default to the OS pictures folder, not the video's own directory —
-      // that one lives inside the scan root, and an image saved there would be
-      // indexed into the library on the next scan. getPath can throw on Linux
-      // when the XDG pictures dir is undefined; fall back to home.
-      let picturesDir: string;
-      try {
-        picturesDir = app.getPath("pictures");
-      } catch {
-        picturesDir = app.getPath("home");
-      }
-      const res = await dialog.showSaveDialog(mainWindow ?? undefined!, {
-        title: "Export frame",
-        defaultPath: path.join(picturesDir, `${base}_${stamp}.png`),
-        filters: [
-          { name: "PNG", extensions: ["png"] },
-          { name: "JPEG", extensions: ["jpg", "jpeg"] },
-        ],
-      });
-      if (res.canceled || !res.filePath) return { saved: false, path: null };
-      const ext = path.extname(res.filePath).toLowerCase();
-      const format = ext === ".jpg" || ext === ".jpeg" ? "jpeg" : "png";
-      // ffmpeg infers the output muxer from the extension; replace an unknown
-      // (or missing) extension with .png so extraction can't fail on that.
-      let dest = res.filePath;
-      if (format === "png" && ext !== ".png") {
-        const stem = ext ? res.filePath.slice(0, -ext.length) : res.filePath;
-        dest = `${stem}.png`;
-        // The dialog's overwrite prompt only covered the name as typed; never
-        // silently clobber a different existing file after rewriting it.
-        for (let n = 1; fs.existsSync(dest); n++) dest = `${stem} (${n}).png`;
-      }
-      const ok = await withVideoDecodeSlot(() =>
-        exportFrame(abs, dest, sec, format),
-      );
-      if (!ok) throw new Error("failed to export frame");
-      return { saved: true, path: dest };
-    } finally {
-      frameExportInFlight = false;
-    }
-  });
-}
-
-function registerShellHandlers(): void {
-  handle("open_external", ({ id, workspaceId }) => {
-    const c = coreById(workspaceId);
-    const abs = ensureFileInsideRoot(c, id);
-    openDetached(abs);
-    q.recordPlay(c.db, id, "external", null);
-    consumeWatchLater(workspaceId, id);
-  });
-
-  handle("open_folder", ({ id, workspaceId }) => {
-    const abs = ensureFileInsideRoot(coreById(workspaceId), id);
-    shell.showItemInFolder(abs);
-  });
-
-  handle("copy_file_path", ({ id, workspaceId }) => {
-    const abs = ensureFileInsideRoot(coreById(workspaceId), id);
-    clipboard.writeText(abs);
-  });
-
-  // Open an arbitrary external URL (e.g. the support/donation link). Only
-  // http(s) plus the MS Store deep link (update notification on Store installs)
-  // are allowed.
-  handle("open_url", ({ url }) => {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new Error("invalid url");
-    }
-    const allowed = ["http:", "https:", "ms-windows-store:"];
-    if (!allowed.includes(parsed.protocol)) {
-      throw new Error("unsupported protocol");
-    }
-    void shell.openExternal(parsed.toString());
-  });
-
-  handle("open_devtools", () => {
-    if (!isDevMode()) return false;
-    mainWindow?.webContents.openDevTools({ mode: "right" });
-    return true;
-  });
-
-  // Close the window from the renderer (Esc on the bare list screen). Goes
-  // through close() so the tray-hide behavior in the "close" handler applies.
-  handle("window_close", () => {
-    mainWindow?.close();
-  });
 }
 
 function trayImage(logo: LogoId): Electron.NativeImage {
@@ -1036,26 +454,6 @@ function applyLogo(logo: LogoId): void {
   }
 }
 
-function registerLogoHandlers(): void {
-  handle("logo_get", () => loadConfig().logo);
-  handle("logo_set", ({ logo }) => {
-    updateConfig((c) => ({ ...c, logo }));
-    applyLogo(logo);
-    return logo;
-  });
-}
-
-function registerUpdateHandlers(): void {
-  handle("update_check", ({ force }) => checkForUpdates({ force }));
-  handle("update_get_settings", () => getUpdateSettings());
-  handle("update_set_auto_check", ({ enabled }) => {
-    setAutoCheck(enabled);
-  });
-  handle("update_ignore", ({ version }) => {
-    ignoreVersion(version);
-  });
-}
-
 /**
  * On startup, check GitHub for a newer stable release (when auto-check is on)
  * and push an event to the renderer if one is available. Deferred so it never
@@ -1071,19 +469,6 @@ function scheduleStartupUpdateCheck(): void {
       })
       .catch((e) => log.warn("startup update check failed", e));
   }, 8_000);
-}
-
-function registerIpc(): void {
-  registerStatusHandlers();
-  registerWorkspaceHandlers();
-  registerScanHandlers();
-  registerFileHandlers();
-  registerTagHandlers();
-  registerBookmarkHandlers();
-  registerThumbHandlers();
-  registerShellHandlers();
-  registerUpdateHandlers();
-  registerLogoHandlers();
 }
 
 function createWindow(): void {
@@ -1250,7 +635,18 @@ void app.whenReady().then(async () => {
     app.quit();
   });
 
-  registerIpc();
+  registerIpc({
+    ws,
+    queryClient,
+    mainWindow: () => mainWindow,
+    mediaBase: () => (mediaPort ? `http://127.0.0.1:${mediaPort}` : null),
+    isDevMode,
+    emit,
+    startScan,
+    abortScan,
+    abortAllScans,
+    applyLogo,
+  });
   createTray();
   // Dock icon override on macOS (BrowserWindow icons are ignored there).
   // Skipped for the default logo so the packaged .icns keeps its full

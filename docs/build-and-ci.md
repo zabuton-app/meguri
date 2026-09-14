@@ -26,7 +26,8 @@ launching, so Electron does not accidentally start in node mode.
 `electron.vite.config.ts` builds main, preload, and renderer from one config.
 
 - Preload is emitted as **CommonJS** (`.js`); ESM `.mjs` preload can fail to
-  load, and `registerIpc`'s `__dirname` reference assumes CJS output.
+  load, and `electron/main.ts` resolves the preload, the renderer entry and
+  the query worker through `__dirname`, which assumes CJS output.
 - TypeScript uses separate tsconfigs for `src` and `electron`, both `strict` with
   `noUnusedLocals` / `noUnusedParameters`.
 

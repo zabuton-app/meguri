@@ -56,6 +56,32 @@ export function patchFileRowInCaches(
   );
 }
 
+/** Drop a file row from the list/search caches (infinite search + discovery queue). */
+export function removeFileRowFromCaches(
+  qc: QueryClient,
+  workspaceId: string,
+  fileId: number,
+): void {
+  qc.setQueriesData<InfiniteData<SearchResult>>(
+    { queryKey: ["files_search"] },
+    (old) =>
+      old
+        ? {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.filter(
+                (item) => !matchesFile(item, workspaceId, fileId),
+              ),
+            })),
+          }
+        : old,
+  );
+  qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, (old) =>
+    old?.filter((row) => !matchesFile(row, workspaceId, fileId)),
+  );
+}
+
 /** Patch the detail cache when the modal is open for the same file. */
 export function patchFileDetailInCache(
   qc: QueryClient,
