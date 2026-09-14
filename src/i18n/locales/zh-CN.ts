@@ -41,6 +41,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.tabLibrary": "媒体库",
   "settings.tabPlayback": "播放列表播放",
   "settings.tabApp": "应用",
+  "settings.tabAudio": "音频",
   "settings.language": "语言",
   "settings.languageDesc": "切换界面的显示语言。",
   "settings.scenes": "场景缩略图数量",
@@ -257,6 +258,10 @@ export const zhCN: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "无法播放此音轨。",
   "player.audio.dismissError": "关闭错误提示",
+  "player.audio.spectrumShow": "显示频谱",
+  "player.audio.spectrumHide": "隐藏频谱",
+  "player.audio.spectrumReducedMotion":
+    "系统已开启“减弱动态效果”，无法显示频谱。",
 
   // scenes
   "scene.seekTo": "跳转到 {time}",
@@ -474,5 +479,14 @@ export const zhCN: Record<TranslationKey, string> = {
     "切换项目时横向滑动。可与淡入淡出同时使用。",
   "settings.playlistShuffle": "随机",
   "settings.playlistShuffleHint": "以随机顺序播放。一轮之内不会重复同一项目。",
+  "settings.audioSpectrum": "音频频谱",
+  "settings.audioSpectrumHint":
+    "播放音频时实时显示频谱。当系统开启“减弱动态效果”时始终关闭。",
+  "settings.audioSpectrumPattern": "频谱样式",
+  "settings.audioSpectrumPatternHint":
+    "频谱的外观。详情视图、侧边预览和播放列表播放共用此设置。",
+  "settings.audioSpectrumPatternBars": "竖条",
+  "settings.audioSpectrumPatternRing": "圆环",
+  "settings.audioSpectrumPatternLed": "LED 电平表",
   "settings.secondsValue": "{n} 秒",
 };

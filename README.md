@@ -137,8 +137,10 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   its scenes like a seek bar (toggleable in Settings)
 - 🎵 **Audio** — music and other audio files are scanned alongside video and
   images, with embedded cover art as their thumbnails; a click plays them in a
-  bottom player bar that keeps going while you browse, and the detail view
-  holds their tags, rating, and history like any other file
+  bottom player bar that keeps going while you browse, the detail view holds
+  their tags, rating, and history like any other file, and a live spectrum
+  plays over the cover art while a track plays — bars, a ring, or an LED
+  meter, chosen in Settings
 - 🎬 **Smooth playback** — Range-enabled streaming from a local HTTP server;
   non-faststart containers are remuxed to fragmented MP4 on the fly (time seek
   via `?t`), and unplayable codecs are handed off to the OS default player

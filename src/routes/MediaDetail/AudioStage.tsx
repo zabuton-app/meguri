@@ -3,13 +3,18 @@
 // bar's controls, which steps aside while the detail view is open) runs along
 // the bottom edge. Playback itself happens in the provider's single element,
 // so this only drives it.
-import { Music, Pause, Play } from "lucide-react";
+import { AudioLines, Music, Pause, Play } from "lucide-react";
 import type { FileDetail } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import { formatDuration, formatSize } from "@/lib/format";
 import { useAudioActions, useAudioPlayer } from "@/audio/useAudioPlayer";
 import { AudioTransport } from "@/audio/AudioTransport";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { usePreferences } from "@/settings/PreferencesProvider";
+import { AudioSpectrum } from "@/audio/AudioSpectrum";
+import { useSpectrumPattern } from "@/audio/useSpectrumPattern";
+import { PATTERN_LAYOUT } from "@/audio/spectrumPatterns";
 
 interface Props {
   file: FileDetail;
@@ -48,6 +53,8 @@ export function AudioCompact({ file, wsId, mediaBase, coverSrc }: Props) {
     wsId,
     mediaBase,
   });
+  const pattern = useSpectrumPattern();
+  const layout = pattern ? PATTERN_LAYOUT[pattern] : null;
   const slash = file.relPath.lastIndexOf("/");
   const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
   const dir = slash >= 0 ? file.relPath.slice(0, slash) : "";
@@ -67,11 +74,25 @@ export function AudioCompact({ file, wsId, mediaBase, coverSrc }: Props) {
             alt={file.relPath}
             className="h-full w-full object-cover"
           />
-        ) : (
+        ) : layout?.glyph === "corner" ? null : (
+          // No art: a pattern that is the stage fills the tile on its own;
+          // the ring keeps the glyph in its middle, and with the display off
+          // the glyph stands in for the art.
           <div className="flex h-full w-full items-center justify-center">
-            <Music className="size-1/2" strokeWidth={1.5} aria-hidden />
+            <Music
+              className={layout ? "size-6" : "size-1/2"}
+              strokeWidth={1.5}
+              aria-hidden
+            />
           </div>
         )}
+        {/* The tile is the only room the peek has, so the display shares it
+            with the art, under the click-to-play glyph. */}
+        <AudioSpectrum
+          active={playing}
+          mode="tile"
+          className="absolute inset-0"
+        />
         <button
           type="button"
           disabled={disabled}
@@ -118,6 +139,16 @@ export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
     wsId,
     mediaBase,
   });
+  const pattern = useSpectrumPattern();
+  const layout = pattern ? PATTERN_LAYOUT[pattern] : null;
+  // The spectrum toggle: the same preference Settings holds, so a flip here
+  // holds everywhere (the peek, the playlist) and survives a restart. Inert
+  // under the OS reduce-motion setting, which overrides the preference.
+  const { audioSpectrum, setAudioSpectrum } = usePreferences();
+  const reducedMotion = usePrefersReducedMotion();
+  const spectrumLabel = audioSpectrum
+    ? t("player.audio.spectrumHide")
+    : t("player.audio.spectrumShow");
 
   return (
     // Same anatomy as the video player: the artwork is the stage, and the
@@ -128,17 +159,37 @@ export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
         <img
           // Scaled up until its width or its height fits the stage (a square
           // jacket is pillarboxed, a wide one letterboxed) rather than shown
-          // at whatever size it was embedded at.
+          // at whatever size it was embedded at. Every pattern draws over it
+          // as it is.
           src={coverSrc}
           alt={file.relPath}
           className="h-full w-full object-contain"
         />
       ) : (
         // No embedded art: the placeholder takes the whole stage too, so a
-        // cover-less track does not shrink to a tile in a black field.
+        // cover-less track does not shrink to a tile in a black field. With
+        // the display on, a pattern that is the stage sends the glyph aside
+        // into the corner; the ring keeps it in its middle.
         <div className="flex h-full w-full items-center justify-center bg-overlay text-muted">
-          <Music className="size-1/3" strokeWidth={1.5} aria-hidden />
+          <Music
+            className={cn(
+              !layout && "size-1/3",
+              layout?.glyph === "center" && "size-11",
+              layout?.glyph === "corner" && "absolute left-4 top-3.5 size-5",
+            )}
+            strokeWidth={1.5}
+            aria-hidden
+          />
         </div>
+      )}
+      {/* The display sits over the artwork (or takes its place), under the
+          play glyph and the transport (both keep their own contrast layers). */}
+      {layout && (
+        <AudioSpectrum
+          active={playing}
+          mode={coverSrc ? "overlay" : "full"}
+          className={coverSrc ? layout.overlayBox : "absolute inset-0"}
+        />
       )}
       <button
         type="button"
@@ -177,6 +228,24 @@ export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
           disabled={disabled}
           onStart={start}
         />
+        <button
+          type="button"
+          onClick={() => setAudioSpectrum(!audioSpectrum)}
+          disabled={reducedMotion}
+          aria-pressed={audioSpectrum}
+          title={
+            reducedMotion
+              ? t("player.audio.spectrumReducedMotion")
+              : spectrumLabel
+          }
+          aria-label={spectrumLabel}
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-full p-1.5 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-40",
+            audioSpectrum ? "text-white" : "text-white/50",
+          )}
+        >
+          <AudioLines size={18} />
+        </button>
       </div>
     </div>
   );

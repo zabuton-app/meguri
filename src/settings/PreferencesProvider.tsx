@@ -13,6 +13,11 @@ import {
   isKeybindingPreset,
   type KeybindingPreset,
 } from "@/settings/keybindings";
+import {
+  DEFAULT_SPECTRUM_PATTERN,
+  isSpectrumPattern,
+  type SpectrumPattern,
+} from "@/audio/spectrumPatterns";
 
 const LS_KEY = "meguri.prefs";
 
@@ -81,6 +86,14 @@ interface Prefs {
   playlistFade: boolean;
   /** Whether an item change slides sideways (the positional half of the switch). */
   playlistTransition: boolean;
+  /**
+   * Whether audio playback shows a live frequency spectrum on the detail
+   * stage, the side peek and the playlist stage. The OS "reduce motion"
+   * setting overrides this to off.
+   */
+  audioSpectrum: boolean;
+  /** Which look the spectrum takes (see src/audio/spectrumPatterns.ts). */
+  audioSpectrumPattern: SpectrumPattern;
 }
 
 const DEFAULTS: Prefs = {
@@ -96,6 +109,8 @@ const DEFAULTS: Prefs = {
   playlistImageMotion: true,
   playlistFade: true,
   playlistTransition: false,
+  audioSpectrum: true,
+  audioSpectrumPattern: DEFAULT_SPECTRUM_PATTERN,
 };
 
 function clampSceneCount(n: number): number {
@@ -163,6 +178,13 @@ function loadPrefs(): Prefs {
           typeof parsed.playlistTransition === "boolean"
             ? parsed.playlistTransition
             : DEFAULTS.playlistTransition,
+        audioSpectrum:
+          typeof parsed.audioSpectrum === "boolean"
+            ? parsed.audioSpectrum
+            : DEFAULTS.audioSpectrum,
+        audioSpectrumPattern: isSpectrumPattern(parsed.audioSpectrumPattern)
+          ? parsed.audioSpectrumPattern
+          : DEFAULTS.audioSpectrumPattern,
       };
     }
   } catch {
@@ -184,6 +206,8 @@ interface PrefsCtx extends Prefs {
   setPlaylistImageMotion: (enabled: boolean) => void;
   setPlaylistFade: (enabled: boolean) => void;
   setPlaylistTransition: (enabled: boolean) => void;
+  setAudioSpectrum: (enabled: boolean) => void;
+  setAudioSpectrumPattern: (p: SpectrumPattern) => void;
 }
 
 const Ctx = createContext<PrefsCtx | null>(null);
@@ -235,6 +259,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPrefs((p) => ({ ...p, playlistFade: enabled })),
       setPlaylistTransition: (enabled) =>
         setPrefs((p) => ({ ...p, playlistTransition: enabled })),
+      setAudioSpectrum: (enabled) =>
+        setPrefs((p) => ({ ...p, audioSpectrum: enabled })),
+      setAudioSpectrumPattern: (pattern) =>
+        setPrefs((p) => ({ ...p, audioSpectrumPattern: pattern })),
     }),
     [prefs],
   );

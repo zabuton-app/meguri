@@ -42,6 +42,7 @@ export const en: Record<TranslationKey, string> = {
   "settings.tabLibrary": "Library",
   "settings.tabPlayback": "Playlist playback",
   "settings.tabApp": "App",
+  "settings.tabAudio": "Audio",
   "settings.language": "Language",
   "settings.languageDesc": "Switch the display language of the UI.",
   "settings.scenes": "Scene thumbnails",
@@ -264,6 +265,10 @@ export const en: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "This track could not be played.",
   "player.audio.dismissError": "Dismiss error",
+  "player.audio.spectrumShow": "Show spectrum",
+  "player.audio.spectrumHide": "Hide spectrum",
+  "player.audio.spectrumReducedMotion":
+    "The spectrum is unavailable while the OS is set to reduce motion.",
 
   // scenes
   "scene.seekTo": "Seek to {time}",
@@ -490,5 +495,14 @@ export const en: Record<TranslationKey, string> = {
   "settings.playlistShuffle": "Shuffle",
   "settings.playlistShuffleHint":
     "Plays in a random order. No item repeats within a single pass.",
+  "settings.audioSpectrum": "Audio spectrum",
+  "settings.audioSpectrumHint":
+    "Shows a live frequency spectrum while audio plays. Always disabled when the OS is set to reduce motion.",
+  "settings.audioSpectrumPattern": "Spectrum pattern",
+  "settings.audioSpectrumPatternHint":
+    "How the spectrum looks, on the detail view, the side peek and the playlist player alike.",
+  "settings.audioSpectrumPatternBars": "Bars",
+  "settings.audioSpectrumPatternRing": "Ring",
+  "settings.audioSpectrumPatternLed": "LED meter",
   "settings.secondsValue": "{n}s",
 };

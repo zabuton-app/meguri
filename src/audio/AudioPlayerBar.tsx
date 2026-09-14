@@ -12,6 +12,8 @@ import { events } from "@/ipc/client";
 import { fileHref } from "@/lib/fileHref";
 import { navigateOutsideRouter } from "@/lib/routerBridge";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { NowPlayingBars } from "./NowPlayingBars";
 import type { AudioTrack } from "./context";
 import { useAudioPlayer } from "./useAudioPlayer";
 import { AudioTransport, CTRL_CLASS } from "./AudioTransport";
@@ -134,7 +136,7 @@ function usePublishBarInset(el: HTMLDivElement | null): void {
 }
 
 export function AudioPlayerBar() {
-  const { current, close } = useAudioPlayer();
+  const { current, close, isPlaying } = useAudioPlayer();
   const { t } = useI18n();
   const suppressed = useBarSuppressed();
   const [barEl, setBarEl] = useState<HTMLDivElement | null>(null);
@@ -170,6 +172,7 @@ export function AudioPlayerBar() {
         track={current}
         hasCover={cover.hasCover}
         version={cover.version}
+        playing={isPlaying}
       />
       {/* Announced when the track changes; position updates are never announced.
           The name is the way back to the track's detail view (tags, rating).
@@ -226,13 +229,21 @@ function Cover({
   track,
   hasCover,
   version,
+  playing,
 }: {
   track: AudioTrack;
   hasCover: boolean;
   version: number | undefined;
+  playing: boolean;
 }) {
   const status = useAppStatus();
   const mediaBase = status.data?.mediaBase ?? "";
+  // While the track sounds the bobbing glyph sits over the tile in a dark
+  // well — the same tile whether it holds the jacket or the placeholder, so
+  // nothing shifts between tracks with and without art. Not under reduce
+  // motion: the plain tile then.
+  const reducedMotion = usePrefersReducedMotion();
+  const bob = playing && !reducedMotion;
   // The URL that failed rather than a flag, so a regenerated cover (a new
   // version, hence a new URL) gets a fresh attempt.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -240,17 +251,26 @@ function Cover({
     ? thumbUrl(mediaBase, track.workspaceId, track.file.id, version)
     : null;
 
-  if (!src || failedSrc === src) {
-    return (
-      <Music size={18} className="shrink-0 text-muted" aria-hidden="true" />
-    );
-  }
+  const showArt = src != null && failedSrc !== src;
   return (
-    <img
-      src={src}
-      alt=""
-      onError={() => setFailedSrc(src)}
-      className="size-8 shrink-0 rounded-sm object-cover"
-    />
+    <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-overlay text-muted">
+      {showArt ? (
+        <img
+          src={src}
+          alt=""
+          onError={() => setFailedSrc(src)}
+          className="size-full object-cover"
+        />
+      ) : (
+        // No art: a grey placeholder tile of the same size, with the kind's
+        // glyph in it.
+        <Music size={16} aria-hidden="true" />
+      )}
+      {bob && (
+        <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white">
+          <NowPlayingBars playing />
+        </span>
+      )}
+    </span>
   );
 }

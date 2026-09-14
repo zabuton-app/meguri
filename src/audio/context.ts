@@ -75,6 +75,11 @@ export interface AudioActions {
   /** Register another sound source (see useExclusivePlayback). The listener is
    *  called whenever bar audio starts; returns the unregister function. */
   registerPeer: (onAudioStart: () => void) => () => void;
+  /** The analyser tapping the bar's element, for the spectrum display. The
+   *  first call routes the element through a Web Audio graph for good (see
+   *  analyser.ts); later calls return the same node. Null where Web Audio
+   *  is unavailable. */
+  ensureAnalyser: () => AnalyserNode | null;
 }
 
 export const AudioActionsContext = createContext<AudioActions | null>(null);

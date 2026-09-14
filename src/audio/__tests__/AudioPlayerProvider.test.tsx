@@ -168,6 +168,14 @@ describe("AudioPlayerProvider", () => {
     expect(text("duration")).toBe("null");
   });
 
+  it("loads its element with CORS, so the spectrum analyser can read it", () => {
+    // Without this the media server's response is opaque to Web Audio and
+    // the analyser hears silence (see analyser.ts). Set before any src.
+    setup();
+    click("play");
+    expect(el.crossOrigin).toBe("anonymous");
+  });
+
   it("play() loads the track and starts it", () => {
     setup();
     click("play");

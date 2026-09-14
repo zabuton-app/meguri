@@ -39,6 +39,11 @@ import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
+import {
+  isSpectrumPattern,
+  SPECTRUM_PATTERN_OPTIONS,
+  type SpectrumPattern,
+} from "@/audio/spectrumPatterns";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/amgsk";
 
@@ -58,6 +63,12 @@ const FRAME_QUALITY_LABELS: Record<FrameQuality, TranslationKey> = {
   low: "settings.frameQualityLow",
   standard: "settings.frameQualityStandard",
   high: "settings.frameQualityHigh",
+};
+
+const SPECTRUM_PATTERN_LABELS: Record<SpectrumPattern, TranslationKey> = {
+  bars: "settings.audioSpectrumPatternBars",
+  ring: "settings.audioSpectrumPatternRing",
+  led: "settings.audioSpectrumPatternLed",
 };
 
 const EMOJI_STYLE_LABELS: Record<EmojiStyle, TranslationKey> = {
@@ -86,7 +97,7 @@ const LOGO_LABELS: Record<LogoId, TranslationKey> = {
 };
 
 /** Tab ids. The tab bar's order comes from the `tabs` array below. */
-type TabId = "general" | "library" | "playback" | "app";
+type TabId = "general" | "library" | "playback" | "audio" | "app";
 
 export default function Settings() {
   const { mode, familyId, families, setMode, setFamily } = useTheme();
@@ -96,6 +107,7 @@ export default function Settings() {
       { id: "general", label: t("settings.tabGeneral") },
       { id: "library", label: t("settings.tabLibrary") },
       { id: "playback", label: t("settings.tabPlayback") },
+      { id: "audio", label: t("settings.tabAudio") },
       { id: "app", label: t("settings.tabApp") },
     ],
     [t],
@@ -118,6 +130,10 @@ export default function Settings() {
     setPlaylistFade,
     playlistTransition,
     setPlaylistTransition,
+    audioSpectrum,
+    setAudioSpectrum,
+    audioSpectrumPattern,
+    setAudioSpectrumPattern,
     playlistShuffle,
     setPlaylistShuffle,
     setFrameQuality,
@@ -561,6 +577,57 @@ export default function Settings() {
                   checked={playlistShuffle}
                   onCheckedChange={setPlaylistShuffle}
                 />
+              </section>
+            </>
+          )}
+
+          {tab === "audio" && (
+            <>
+              {/* The live spectrum on the detail / peek / playlist stages
+                  (the OS reduce-motion setting still wins) */}
+              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.audioSpectrum")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.audioSpectrumHint")}
+                  </span>
+                </div>
+                <Switch
+                  checked={audioSpectrum}
+                  onCheckedChange={setAudioSpectrum}
+                />
+              </section>
+
+              {/* Which look the spectrum takes */}
+              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.audioSpectrumPattern")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.audioSpectrumPatternHint")}
+                  </span>
+                </div>
+                <Select
+                  value={audioSpectrumPattern}
+                  onValueChange={(v) => {
+                    if (isSpectrumPattern(v)) setAudioSpectrumPattern(v);
+                  }}
+                  disabled={!audioSpectrum}
+                >
+                  <SelectTrigger className="min-w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SPECTRUM_PATTERN_OPTIONS.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {t(SPECTRUM_PATTERN_LABELS[p])}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </section>
             </>
           )}

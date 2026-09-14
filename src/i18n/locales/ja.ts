@@ -41,6 +41,7 @@ export const ja = {
   "settings.tabLibrary": "ライブラリ表示",
   "settings.tabPlayback": "プレイリスト再生",
   "settings.tabApp": "アプリ",
+  "settings.tabAudio": "オーディオ",
   "settings.language": "言語",
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",
@@ -263,6 +264,10 @@ export const ja = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "このトラックを再生できませんでした。",
   "player.audio.dismissError": "エラーを閉じる",
+  "player.audio.spectrumShow": "スペクトラムを表示",
+  "player.audio.spectrumHide": "スペクトラムを非表示",
+  "player.audio.spectrumReducedMotion":
+    "OS で動きを減らす設定が有効なため、スペクトラムは表示できません。",
 
   // シーン
   "scene.seekTo": "{time} へシーク",
@@ -493,6 +498,15 @@ export const ja = {
   "settings.playlistShuffle": "ランダム",
   "settings.playlistShuffleHint":
     "再生順をランダムに入れ替えます。一巡のあいだ同じアイテムは繰り返されません。",
+  "settings.audioSpectrum": "オーディオスペクトラム",
+  "settings.audioSpectrumHint":
+    "オーディオの再生中、周波数ごとの音量を表示します。OS で動きを減らす設定が有効な場合は常に停止します。",
+  "settings.audioSpectrumPattern": "スペクトラムのパターン",
+  "settings.audioSpectrumPatternHint":
+    "スペクトラムの見た目。詳細ビュー・サイドピーク・プレイリスト再生に共通で適用されます。",
+  "settings.audioSpectrumPatternBars": "縦バー",
+  "settings.audioSpectrumPatternRing": "円形リング",
+  "settings.audioSpectrumPatternLed": "LEDメーター",
   "settings.secondsValue": "{n} 秒",
 } as const;
 

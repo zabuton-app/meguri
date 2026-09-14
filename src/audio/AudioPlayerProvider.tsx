@@ -27,6 +27,7 @@ import {
   useVolume,
 } from "@/hooks/useVolume";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { attachAnalyser } from "./analyser";
 import {
   AudioActionsContext,
   AudioPlayerContext,
@@ -76,7 +77,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const needsReload = useRef(false);
 
   const ensureEl = useCallback((): HTMLAudioElement => {
-    if (!audioRef.current) audioRef.current = new Audio();
+    if (!audioRef.current) {
+      const el = new Audio();
+      // Loaded with CORS so the spectrum analyser (analyser.ts) can read the
+      // samples: an opaque cross-origin source feeds it silence. Set before
+      // any src, as the mode is fixed when the load starts.
+      el.crossOrigin = "anonymous";
+      audioRef.current = el;
+    }
     return audioRef.current;
   }, []);
 
@@ -352,6 +360,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     [pause],
   );
 
+  const ensureAnalyser = useCallback(
+    () => attachAnalyser(ensureEl()),
+    [ensureEl],
+  );
+
   // Every member is a stable callback (state comes in through refs), so this
   // object is created once and AudioActionsContext never notifies.
   const actions = useMemo<AudioActions>(
@@ -368,6 +381,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       dismissError,
       subscribeEnded,
       registerPeer,
+      ensureAnalyser,
     }),
     [
       play,
@@ -382,6 +396,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       dismissError,
       subscribeEnded,
       registerPeer,
+      ensureAnalyser,
     ],
   );
 

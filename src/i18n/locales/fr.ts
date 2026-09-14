@@ -42,6 +42,7 @@ export const fr: Record<TranslationKey, string> = {
   "settings.tabLibrary": "Bibliothèque",
   "settings.tabPlayback": "Lecture de liste",
   "settings.tabApp": "Application",
+  "settings.tabAudio": "Audio",
   "settings.language": "Langue",
   "settings.languageDesc": "Changer la langue d'affichage de l'interface.",
   "settings.scenes": "Miniatures de scène",
@@ -269,6 +270,10 @@ export const fr: Record<TranslationKey, string> = {
   "player.audio.unknownDuration": "--:--",
   "player.audio.error": "Impossible de lire cette piste.",
   "player.audio.dismissError": "Masquer l'erreur",
+  "player.audio.spectrumShow": "Afficher le spectre",
+  "player.audio.spectrumHide": "Masquer le spectre",
+  "player.audio.spectrumReducedMotion":
+    "Le spectre est indisponible tant que le système réduit les animations.",
 
   // scenes
   "scene.seekTo": "Aller à {time}",
@@ -504,5 +509,14 @@ export const fr: Record<TranslationKey, string> = {
   "settings.playlistShuffle": "Aléatoire",
   "settings.playlistShuffleHint":
     "Lit dans un ordre aléatoire. Aucun élément ne se répète au cours d’un même passage.",
+  "settings.audioSpectrum": "Spectre audio",
+  "settings.audioSpectrumHint":
+    "Affiche un spectre de fréquences en direct pendant la lecture audio. Toujours désactivé si le système réduit les animations.",
+  "settings.audioSpectrumPattern": "Motif du spectre",
+  "settings.audioSpectrumPatternHint":
+    "Apparence du spectre, commune à la vue détaillée, au panneau latéral et au lecteur de listes.",
+  "settings.audioSpectrumPatternBars": "Barres",
+  "settings.audioSpectrumPatternRing": "Anneau",
+  "settings.audioSpectrumPatternLed": "Vumètre LED",
   "settings.secondsValue": "{n} s",
 };
