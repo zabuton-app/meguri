@@ -597,6 +597,7 @@ export default function Settings() {
                 <Switch
                   checked={audioSpectrum}
                   onCheckedChange={setAudioSpectrum}
+                  aria-label={t("settings.audioSpectrum")}
                 />
               </section>
 
@@ -617,7 +618,10 @@ export default function Settings() {
                   }}
                   disabled={!audioSpectrum}
                 >
-                  <SelectTrigger className="min-w-36">
+                  <SelectTrigger
+                    className="min-w-36"
+                    aria-label={t("settings.audioSpectrumPattern")}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
