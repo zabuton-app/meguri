@@ -142,15 +142,38 @@ export default function Player() {
   // A `start` needs no slot: the list itself is the queue, opened on that
   // file — which is also where a `resume` whose pass is gone (the history
   // walked back to it, the URL reopened) falls back to, when both are named.
-  const [searchParams] = useSearchParams();
+  // The second handed over (`t`) is folded in here too: the detail view hands
+  // over where *it* got to — ahead of the detour whenever the user kept
+  // watching there, or wherever it was when the playlist was asked for from
+  // it; the parked second is the fallback for an item with no player of its
+  // own (a picture).
+  const [searchParams, setSearchParams] = useSearchParams();
   const [arrival, setArrival] = useState<Arrival | null>(() => {
+    const handedOver = searchParams.get(PLAY_PARAMS.t);
+    const sec =
+      handedOver != null && Number.isFinite(Number(handedOver))
+        ? Math.max(0, Math.floor(Number(handedOver)))
+        : null;
     const token = searchParams.get(PLAY_PARAMS.resume);
-    if (token && resume?.key === token) return resume;
+    if (token && resume?.key === token)
+      return { ...resume, sec: sec ?? resume.sec };
     const startAt = parseQueueKey(searchParams.get(PLAY_PARAMS.start));
-    return startAt ? { key: queueKey(startAt), sec: 0, startAt } : null;
+    return startAt ? { key: queueKey(startAt), sec: sec ?? 0, startAt } : null;
   });
+  // Both are spent on arrival: the slot, and the parameters that named it.
+  // Left in the URL they would come back on a reload or by walking the
+  // history — as a stale second on a pass that has long moved on, or a
+  // fresh pass on a file the user was merely once started from.
   useEffect(() => {
     resume = null;
+    if (
+      [PLAY_PARAMS.resume, PLAY_PARAMS.start, PLAY_PARAMS.t].some((p) =>
+        searchParams.has(p),
+      )
+    )
+      setSearchParams(new URLSearchParams(), { replace: true });
+    // Once, on mount: the parameters are read into state above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const queue = usePlaybackQueue({
@@ -285,26 +308,15 @@ export default function Player() {
   }, [current, isImage, isAudio, mediaBase, navigate, queue.queue]);
 
   // The second to come back to, offered only to the file the player arrived
-  // on. The detail view hands over where *it* got to — ahead of the detour
-  // whenever the user kept watching there, or wherever it was when the user
-  // asked for the playlist from it; the parked second is the fallback for an
-  // item with no player of its own (a picture).
-  //
-  // Dropped as soon as the pass steps somewhere else (goNext / goPrev below), so
-  // coming back to that file later in the same pass — or on the next lap with
-  // repeat on — starts it where any other item would.
-  const handedBack = searchParams.get(PLAY_PARAMS.t);
+  // on. Dropped as soon as the pass steps somewhere else (goNext / goPrev
+  // below), so coming back to that file later in the same pass — or on the
+  // next lap with repeat on — starts it where any other item would.
   const isArrivalItem = !!current && arrival?.key === queueKey(current);
   // Back from the detail view on the very item the pass was parked on, as
   // opposed to a fresh pass started from the detail view: the two differ in
   // what they owe the bar's track (see the audio effects below).
   const isResumeItem = isArrivalItem && !!arrival?.queue;
-  const resumeSec =
-    isArrivalItem && arrival
-      ? handedBack != null && Number.isFinite(Number(handedBack))
-        ? Math.max(0, Math.floor(Number(handedBack)))
-        : arrival.sec
-      : 0;
+  const resumeSec = isArrivalItem && arrival ? arrival.sec : 0;
 
   // Without its details there is nothing to render for this item, so a failed
   // fetch would leave the stage blank for good. Treat it like any other

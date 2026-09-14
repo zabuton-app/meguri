@@ -6,6 +6,7 @@ import {
   endedUnplayable,
   extend,
   parseQueueKey,
+  poolAhead,
   queueKey,
   queuePosition,
   queueSize,
@@ -136,6 +137,21 @@ describe("createQueue", () => {
       "ws1:1",
       "ws1:2",
     ]);
+  });
+
+  it("counts only the items ahead of the wrap as pending for prefetch", () => {
+    // Started near the loaded tail, most of the pool is the wrapped prefix;
+    // the next page is wanted long before that has played.
+    const q = createQueue(items(8), {
+      startAt: { workspaceId: "ws1", fileId: 7 },
+    });
+    expect(q.pool.length).toBe(7);
+    expect(poolAhead(q)).toBe(1);
+    expect(poolAhead(advance(q))).toBe(0);
+    // Under shuffle there is no "before the wrap": the whole pool counts.
+    expect(poolAhead(setShuffle(q, true, reverseRng))).toBe(7);
+    // Without a start item the two measures agree.
+    expect(poolAhead(createQueue(items(4)))).toBe(3);
   });
 
   it("starts from the head when the item is not in the list", () => {

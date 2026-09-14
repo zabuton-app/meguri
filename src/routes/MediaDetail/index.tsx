@@ -61,7 +61,6 @@ import { RatingStars } from "@/components/RatingStars";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import { useWatchLater } from "@/hooks/useWatchLater";
-import { useMediaNav } from "@/components/MediaNavContext";
 import { playHref, type PlayHrefOpts } from "@/lib/playHref";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { TagEditor } from "@/components/TagEditor";
@@ -132,27 +131,38 @@ export default function MediaDetail() {
   // show this very file. Where this player got to goes into `t` — not where
   // the playlist left off when it came here, since watching on for a few
   // minutes and then being rewound to the second of the detour reads as a bug.
-  // Until its metadata has loaded this player still reports 0, so leaving
+  // Until its metadata has loaded this player has no position yet, so leaving
   // straight away falls back to the second this view arrived at rather than
   // rewinding to the top of the file. The <video> itself is handed across as
   // it is (see videoHandOff.ts), so the playlist need not reload and seek to
   // `t` at all; `t` is the fallback for when that hand-off does not happen.
+  // Navigates itself: the announcement is only good for the navigation that
+  // follows it at once, so the two are not offered separately.
   // An audio track is not this view's to hand over: it plays in the bottom
   // bar, which the playlist shares, so it simply carries on. Only a video has
   // a player here; the source is read through a ref because it is derived
   // further down.
-  const handOverPlayback = useCallback(
-    (to: PlayHrefOpts) => {
-      const sec = playerRef.current?.currentTime();
+  //
+  // A video watched to its end is a different matter for a fresh pass: the
+  // player would adopt it at the end and, as with any item that has ended,
+  // move straight on — skipping the very file the user asked to start on. So
+  // a fresh pass gets no hand-off and no `t` then, and plays the file over
+  // from the top. (A detour resuming on an ended video *should* move on.)
+  const leaveForPlayer = useCallback(
+    (to: PlayHrefOpts, replace = false) => {
+      const player = playerRef.current;
+      if (!to.resume && player?.ended()) {
+        void navigate(playHref(to), { replace });
+        return;
+      }
+      const sec = player?.currentTime();
       const handBack =
-        sec != null && Number.isFinite(sec) && sec > 0
-          ? Math.floor(sec)
-          : startAt;
-      if (playerRef.current && mediaSrcRef.current)
+        sec != null && Number.isFinite(sec) ? Math.floor(sec) : startAt;
+      if (player && mediaSrcRef.current)
         announceVideoHandOff(mediaSrcRef.current);
-      return playHref(handBack > 0 ? { ...to, t: handBack } : to);
+      void navigate(playHref({ ...to, t: handBack }), { replace });
     },
-    [startAt],
+    [navigate, startAt],
   );
 
   const from = searchParams.get("from");
@@ -166,10 +176,8 @@ export default function MediaDetail() {
     const file = { workspaceId: searchParams.get("ws") ?? "", fileId };
     // Replaced, not pushed: the detour is one round trip, and a growing
     // history would offer a "back" that lands on a pass already spent.
-    void navigate(handOverPlayback({ resume: file, start: file }), {
-      replace: true,
-    });
-  }, [fileId, handOverPlayback, navigate, searchParams]);
+    leaveForPlayer({ resume: file, start: file }, true);
+  }, [fileId, leaveForPlayer, searchParams]);
   const onClose = useCallback(() => {
     const state = location.state as {
       outsideRouter?: boolean;
@@ -601,7 +609,7 @@ export default function MediaDetail() {
     setNativeDur(null);
   }, [fileId]);
 
-  const { goPrev, goNext, canPrev, canNext, inList, navBinding } =
+  const { goPrev, goNext, canPrev, canNext, hasList, inList, navBinding } =
     usePrevNextNavigation({
       fileId,
       wsId,
@@ -616,7 +624,6 @@ export default function MediaDetail() {
   // after the list moved on) would leave the player starting somewhere else.
   // That holds for a detour from the player too: its parked pass may be gone
   // by now (the history walked back here), and the fallback is the list.
-  const hasList = useMediaNav() != null;
   const canOpenPlaylist = inList;
   const openPlaylist = useCallback(() => {
     // A detour from the player already has a pass waiting: go back to it
@@ -625,8 +632,8 @@ export default function MediaDetail() {
       returnToParkedPass();
       return;
     }
-    void navigate(handOverPlayback({ start: { workspaceId: wsId, fileId } }));
-  }, [fileId, from, handOverPlayback, navigate, returnToParkedPass, wsId]);
+    leaveForPlayer({ start: { workspaceId: wsId, fileId } });
+  }, [fileId, from, leaveForPlayer, returnToParkedPass, wsId]);
 
   const d = detail.data;
 

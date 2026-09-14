@@ -97,7 +97,10 @@ export interface QueueOptions {
   repeat?: boolean;
   /** Start on this item instead of the first one: the items after it follow
    *  in list order (and so does anything the list loads later), then the
-   *  items before it come round at the end. Ignored when it is not in `items`. */
+   *  items before it come round at the end — those before it *in `items`*,
+   *  that is: a list that has paged past its own head hands over only what
+   *  it still holds, and the wrap reaches no further back than that. Ignored
+   *  when the item is not in `items`. */
   startAt?: { workspaceId: string; fileId: number };
 }
 
@@ -243,6 +246,18 @@ export function setShuffle(
 
 export function setRepeat(q: PlaybackQueue, repeat: boolean): PlaybackQueue {
   return q.repeat === repeat ? q : { ...q, repeat };
+}
+
+/**
+ * How many unplayed items lie ahead before the pass wraps round to items it
+ * started past (see createQueue's `startAt`). This is what running dry looks
+ * like from the list's side: a wrapped prefix is still to play, but it is not
+ * a reason to hold off loading the pages that belong before it. Under shuffle
+ * the pool has no "before", so all of it counts.
+ */
+export function poolAhead(q: PlaybackQueue): number {
+  if (q.shuffle) return q.pool.length;
+  return q.pool.filter((it) => it.seq < WRAP_SEQ_BASE).length;
 }
 
 /** Total items admitted so far (played + pending + skipped + current). */

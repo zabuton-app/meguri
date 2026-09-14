@@ -229,6 +229,50 @@ describe("MediaDetail playlist button", () => {
     expect(query().get("t")).toBe("90");
   });
 
+  it("hands over where the video really is, even wound back to the start", async () => {
+    // Arrived at 90 s, then seeked back to the top: the fallback second is
+    // the arrival one only while the player has no position of its own yet.
+    await openDetail(`/file/1?ws=${WS_ID}&t=90`);
+    const video = document.querySelector("video")!;
+    fireEvent.loadedMetadata(video);
+    // Home winds the player back to the start.
+    fireEvent.keyDown(window, { code: "Home" });
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      value: 0,
+    });
+    fireEvent.timeUpdate(video);
+    fireEvent.click(button());
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(query().has("t")).toBe(false);
+  });
+
+  it("neither hands over nor seeks a video that ran to its end", async () => {
+    // The player would adopt the ended element and move straight on, past the
+    // file the user asked to start on; instead it loads the file afresh.
+    await openDetail(`/file/1?ws=${WS_ID}&t=90`);
+    const video = document.querySelector("video")!;
+    fireEvent.loadedMetadata(video);
+    Object.defineProperty(video, "ended", { configurable: true, value: true });
+    fireEvent.click(button());
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(query().get("start")).toBe(`${WS_ID}:1`);
+    expect(query().has("t")).toBe(false);
+    expect(handOff.announce).not.toHaveBeenCalled();
+  });
+
+  it("still hands an ended video back to the pass it came from", async () => {
+    // A detour that ran the file out is the player's cue to move on, which it
+    // reads off the adopted element.
+    await openDetail(`/file/1?ws=${WS_ID}&from=player`);
+    const video = document.querySelector("video")!;
+    fireEvent.loadedMetadata(video);
+    Object.defineProperty(video, "ended", { configurable: true, value: true });
+    close();
+    await waitFor(() => expect(at()).toContain("/play?"));
+    expect(handOff.announce).toHaveBeenCalled();
+  });
+
   it("hands the parked pass back instead when it came from the player", async () => {
     await openDetail(`/file/1?ws=${WS_ID}&from=player`);
     fireEvent.click(button());

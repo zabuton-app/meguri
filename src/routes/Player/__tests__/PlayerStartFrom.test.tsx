@@ -180,6 +180,22 @@ describe("Player started from a file", () => {
     await waitFor(() => expect(video.getAttribute("src")).toContain("t=90"));
   });
 
+  it("spends the start and the second on arrival, clearing them from the URL", async () => {
+    // Left in place they would come back on a reload or by walking the
+    // history: a stale second on a pass that has moved on, or a fresh pass on
+    // a file the user was merely once started from.
+    renderPlayer(
+      [row(1, "video"), row(3, "video")],
+      `/play?start=${WS_ID}:3&t=90`,
+    );
+    const video = await videoFor(3);
+    await waitFor(() => expect(window.location.hash).toBe("#/play"));
+    // Yet what they said still holds for this pass.
+    fireEvent.loadedMetadata(video);
+    await waitFor(() => expect(video.getAttribute("src")).toContain("t=90"));
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+  });
+
   it("drops the handed-over second once the pass moves on", async () => {
     const items = [row(1, "video"), row(3, "video")];
     renderPlayer(items, `/play?start=${WS_ID}:1&t=90`);
