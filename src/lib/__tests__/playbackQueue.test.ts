@@ -5,6 +5,8 @@ import {
   createQueue,
   endedUnplayable,
   extend,
+  parseQueueKey,
+  poolAhead,
   queueKey,
   queuePosition,
   queueSize,
@@ -75,11 +77,88 @@ describe("createQueue", () => {
     expect(queueSize(q)).toBe(2);
   });
 
-  it("can start on a specific item without reordering the rest", () => {
+  it("can start on a specific item, playing on to the end and then wrapping", () => {
     const q = createQueue(items(4), {
       startAt: { workspaceId: "ws1", fileId: 3 },
     });
-    expect(playThrough(q)).toEqual(["ws1:3", "ws1:1", "ws1:2", "ws1:4"]);
+    expect(playThrough(q)).toEqual(["ws1:3", "ws1:4", "ws1:1", "ws1:2"]);
+  });
+
+  it("keeps that rotation when shuffle is turned off again", () => {
+    const q = createQueue(
+      items(4),
+      { startAt: { workspaceId: "ws1", fileId: 3 }, shuffle: true },
+      reverseRng,
+    );
+    expect(playThrough(setShuffle(q, false, reverseRng))).toEqual([
+      "ws1:3",
+      "ws1:4",
+      "ws1:1",
+      "ws1:2",
+    ]);
+  });
+
+  it("keeps a long wrapped prefix in list order through shuffle on and off", () => {
+    // The prefix is numbered from a high base; a base that is not exactly
+    // representable would make neighbouring items share a number and let
+    // the shuffle's order leak through when it is turned off again.
+    const q = createQueue(
+      items(8),
+      { startAt: { workspaceId: "ws1", fileId: 7 }, shuffle: true },
+      seqRng([0.3, 0.9, 0.1, 0.7, 0.5, 0.2, 0.8]),
+    );
+    expect(playThrough(setShuffle(q, false))).toEqual([
+      "ws1:7",
+      "ws1:8",
+      "ws1:1",
+      "ws1:2",
+      "ws1:3",
+      "ws1:4",
+      "ws1:5",
+      "ws1:6",
+    ]);
+  });
+
+  it("slots pages loaded later after the tail, before the wrap", () => {
+    // The list is still paging: what arrives after the start belongs to the
+    // run from the start item to the end, not after items already passed.
+    const q = createQueue(items(4), {
+      startAt: { workspaceId: "ws1", fileId: 3 },
+    });
+    const more = [
+      { workspaceId: "ws1", fileId: 5, kind: "video" },
+      { workspaceId: "ws1", fileId: 6, kind: "video" },
+    ];
+    expect(playThrough(extend(q, more))).toEqual([
+      "ws1:3",
+      "ws1:4",
+      "ws1:5",
+      "ws1:6",
+      "ws1:1",
+      "ws1:2",
+    ]);
+  });
+
+  it("counts only the items ahead of the wrap as pending for prefetch", () => {
+    // Started near the loaded tail, most of the pool is the wrapped prefix;
+    // the next page is wanted long before that has played.
+    const q = createQueue(items(8), {
+      startAt: { workspaceId: "ws1", fileId: 7 },
+    });
+    expect(q.pool.length).toBe(7);
+    expect(poolAhead(q)).toBe(1);
+    expect(poolAhead(advance(q))).toBe(0);
+    // Under shuffle there is no "before the wrap": the whole pool counts.
+    expect(poolAhead(setShuffle(q, true, reverseRng))).toBe(7);
+    // Without a start item the two measures agree.
+    expect(poolAhead(createQueue(items(4)))).toBe(3);
+  });
+
+  it("starts from the head when the item is not in the list", () => {
+    const q = createQueue(items(3), {
+      startAt: { workspaceId: "ws1", fileId: 9 },
+    });
+    expect(playThrough(q)).toEqual(["ws1:1", "ws1:2", "ws1:3"]);
   });
 
   it("keys items by workspace so ids from different workspaces never collide", () => {
@@ -339,5 +418,30 @@ describe("progress", () => {
     q = advance(q);
     expect(queuePosition(q)).toBe(2);
     expect(queueSize(q)).toBe(3);
+  });
+});
+
+describe("parseQueueKey", () => {
+  it("is the inverse of queueKey", () => {
+    const item = { workspaceId: "abc123", fileId: 42 };
+    expect(parseQueueKey(queueKey(item))).toEqual(item);
+  });
+
+  it("splits on the last colon so a workspace id may carry its own", () => {
+    expect(parseQueueKey("collection:x:7")).toEqual({
+      workspaceId: "collection:x",
+      fileId: 7,
+    });
+  });
+
+  it("rejects anything that does not read as <workspace>:<file>", () => {
+    expect(parseQueueKey(null)).toBeNull();
+    expect(parseQueueKey("")).toBeNull();
+    expect(parseQueueKey("garbage")).toBeNull();
+    expect(parseQueueKey(":7")).toBeNull();
+    expect(parseQueueKey("ws:")).toBeNull();
+    expect(parseQueueKey("ws:seven")).toBeNull();
+    expect(parseQueueKey("ws:-1")).toBeNull();
+    expect(parseQueueKey("ws:1.5")).toBeNull();
   });
 });

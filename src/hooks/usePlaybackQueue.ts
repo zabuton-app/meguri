@@ -12,6 +12,7 @@ import {
   createQueue,
   endedUnplayable,
   extend,
+  poolAhead,
   queuePosition,
   queueSize,
   setRepeat as setQueueRepeat,
@@ -27,7 +28,9 @@ const PREFETCH_THRESHOLD = 3;
 export interface UsePlaybackQueueOptions {
   shuffle: boolean;
   repeat: boolean;
-  /** Start on this item instead of the head of the list. */
+  /** Start on this item instead of the head of the list, playing on to the
+   *  end and then wrapping round (see createQueue). Only read when the queue
+   *  is first seeded. */
   startAt?: { workspaceId: string; fileId: number };
   /**
    * Pick a previous queue back up instead of building a new one. Used when the
@@ -126,12 +129,15 @@ export function usePlaybackQueue(
   }, [items, shuffle, repeat]);
 
   // Pull the next page in before the queue runs dry, so playback never stalls
-  // at the tail of what happens to be loaded.
+  // at the tail of what happens to be loaded. Measured up to the wrap, not
+  // over the whole pool: a pass started mid-list still has the items before
+  // its start to come round to, but those are not what the next page extends.
+  const ahead = useMemo(() => poolAhead(queue), [queue]);
   useEffect(() => {
     if (!nav?.hasNextPage || nav.isFetchingNextPage) return;
-    if (queue.pool.length > PREFETCH_THRESHOLD) return;
+    if (ahead > PREFETCH_THRESHOLD) return;
     nav.fetchNextPage();
-  }, [queue.pool.length, nav]);
+  }, [ahead, nav]);
 
   const next = useCallback(() => setQueue((q) => advance(q)), []);
   const prev = useCallback(() => setQueue((q) => back(q)), []);

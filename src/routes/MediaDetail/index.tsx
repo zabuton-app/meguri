@@ -61,6 +61,7 @@ import { RatingStars } from "@/components/RatingStars";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import { useWatchLater } from "@/hooks/useWatchLater";
+import { playHref, type PlayHrefOpts } from "@/lib/playHref";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useSpectrumPatternHotkey } from "@/audio/useSpectrumPatternHotkey";
 import { TagEditor } from "@/components/TagEditor";
@@ -127,6 +128,57 @@ export default function MediaDetail() {
     [navigate],
   );
 
+  // Hand this view's playback over to the playlist player, which is about to
+  // show this very file. Where this player got to goes into `t` — not where
+  // the playlist left off when it came here, since watching on for a few
+  // minutes and then being rewound to the second of the detour reads as a bug.
+  // Until its metadata has loaded this player has no position yet, so leaving
+  // straight away falls back to the second this view arrived at rather than
+  // rewinding to the top of the file. The <video> itself is handed across as
+  // it is (see videoHandOff.ts), so the playlist need not reload and seek to
+  // `t` at all; `t` is the fallback for when that hand-off does not happen.
+  // Navigates itself: the announcement is only good for the navigation that
+  // follows it at once, so the two are not offered separately.
+  // An audio track is not this view's to hand over: it plays in the bottom
+  // bar, which the playlist shares, so it simply carries on. Only a video has
+  // a player here; the source is read through a ref because it is derived
+  // further down.
+  //
+  // A video watched to its end is a different matter for a fresh pass: the
+  // player would adopt it at the end and, as with any item that has ended,
+  // move straight on — skipping the very file the user asked to start on. So
+  // a fresh pass gets no hand-off and no `t` then, and plays the file over
+  // from the top. (A detour resuming on an ended video *should* move on.)
+  const leaveForPlayer = useCallback(
+    (to: PlayHrefOpts, replace = false) => {
+      const player = playerRef.current;
+      if (!to.resume && player?.ended()) {
+        void navigate(playHref(to), { replace });
+        return;
+      }
+      const sec = player?.currentTime();
+      const handBack =
+        sec != null && Number.isFinite(sec) ? Math.floor(sec) : startAt;
+      if (player && mediaSrcRef.current)
+        announceVideoHandOff(mediaSrcRef.current);
+      void navigate(playHref({ ...to, t: handBack }), { replace });
+    },
+    [navigate, startAt],
+  );
+
+  const from = searchParams.get("from");
+  // The playlist player parked its pass on the way here (`from=player`), so
+  // leaving hands playback back rather than dropping the user on the list.
+  const returnToParkedPass = useCallback(() => {
+    // Name the file the pass was parked on: the player restores only when
+    // this matches what it put aside, so a stale pass can never be picked up
+    // by an unrelated later playback (or by walking the history back here) —
+    // that case starts a fresh pass on this file instead, hence `start` too.
+    const file = { workspaceId: searchParams.get("ws") ?? "", fileId };
+    // Replaced, not pushed: the detour is one round trip, and a growing
+    // history would offer a "back" that lands on a pass already spent.
+    leaveForPlayer({ resume: file, start: file }, true);
+  }, [fileId, leaveForPlayer, searchParams]);
   const onClose = useCallback(() => {
     const state = location.state as {
       outsideRouter?: boolean;
@@ -141,38 +193,8 @@ export default function MediaDetail() {
       void navigate(state.origin || "/", { replace: true });
       return;
     }
-    const from = searchParams.get("from");
-    // The playlist player parked its pass on the way here, so closing hands
-    // playback back rather than dropping the user on the list.
     if (from === "player") {
-      const params = new URLSearchParams();
-      // Name the file the pass was parked on: the player restores only when
-      // this matches what it put aside, so a stale pass can never be picked up
-      // by an unrelated later playback (or by walking the history back here).
-      params.set("resume", `${searchParams.get("ws") ?? ""}:${fileId}`);
-      // Hand back where this player got to, not where the playlist left off —
-      // watching on for a few minutes here and then being rewound to the second
-      // of the detour reads as a bug. Until its metadata has loaded this player
-      // still reports 0, so closing straight away falls back to the second the
-      // detour was taken at rather than rewinding to the top of the file.
-      // An audio track is not this view's to hand back: it plays in the bottom
-      // bar, which the playlist shares, so it simply carries on.
-      const arrived = Number(searchParams.get("t")) || 0;
-      const sec = playerRef.current?.currentTime();
-      const handBack =
-        sec != null && Number.isFinite(sec) && sec > 0
-          ? Math.floor(sec)
-          : arrived;
-      if (handBack > 0) params.set("t", String(handBack));
-      // The playlist resumes this very file: hand it the <video> as it is
-      // (see videoHandOff.ts) instead of having it reload and seek to `t`.
-      // Only a video has a player here; the source is read through a ref
-      // because it is derived further down.
-      if (playerRef.current && mediaSrcRef.current)
-        announceVideoHandOff(mediaSrcRef.current);
-      // Replaced, not pushed: the detour is one round trip, and a growing
-      // history would offer a "back" that lands on a pass already spent.
-      void navigate(`/play?${params.toString()}`, { replace: true });
+      returnToParkedPass();
       return;
     }
     if (from !== "discover") {
@@ -184,7 +206,7 @@ export default function MediaDetail() {
     if (filter) params.set("filter", filter);
     const query = params.toString();
     void navigate(query ? `/discover?${query}` : "/discover");
-  }, [fileId, location.state, navigate, searchParams]);
+  }, [from, location.state, navigate, returnToParkedPass, searchParams]);
 
   // Total duration for scenes/history. Falls back to the natively obtained value when the DB duration is empty.
   const [nativeDur, setNativeDur] = useState<number | null>(null);
@@ -591,12 +613,31 @@ export default function MediaDetail() {
     setNativeDur(null);
   }, [fileId]);
 
-  const { goPrev, goNext, canPrev, canNext, navBinding } =
+  const { goPrev, goNext, canPrev, canNext, hasList, inList, navBinding } =
     usePrevNextNavigation({
       fileId,
       wsId,
       kind: detail.data?.kind,
     });
+
+  // The way into the playlist from here: play the list this file sits in,
+  // starting on this file, with its playback carried over (the mirror of the
+  // player's own "open details"). Offered only while a list is mounted
+  // underneath, and only for a file that list has loaded — the queue is built
+  // from that list, and a file it does not hold (opened from the bottom bar
+  // after the list moved on) would leave the player starting somewhere else.
+  // That holds for a detour from the player too: its parked pass may be gone
+  // by now (the history walked back here), and the fallback is the list.
+  const canOpenPlaylist = inList;
+  const openPlaylist = useCallback(() => {
+    // A detour from the player already has a pass waiting: go back to it
+    // rather than throw it away for a fresh one.
+    if (from === "player") {
+      returnToParkedPass();
+      return;
+    }
+    leaveForPlayer({ start: { workspaceId: wsId, fileId } });
+  }, [fileId, from, leaveForPlayer, returnToParkedPass, wsId]);
 
   const d = detail.data;
 
@@ -677,6 +718,8 @@ export default function MediaDetail() {
           canNext={canNext}
           prevHint={formatChords(navBinding.prev)}
           nextHint={formatChords(navBinding.next)}
+          onOpenPlaylist={hasList ? openPlaylist : undefined}
+          canOpenPlaylist={canOpenPlaylist}
           size={modalSize}
           onToggleSize={toggleModalSize}
           presentation={presentation}

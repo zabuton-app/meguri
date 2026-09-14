@@ -181,6 +181,7 @@ export const ko: Record<TranslationKey, string> = {
   "media.openAsPeek": "사이드 피크로 열기",
   "media.openAsModal": "모달로 열기",
   "media.peekResize": "사이드 피크 너비 조절",
+  "media.playAsPlaylist": "여기부터 재생 목록으로 재생",
   "media.deleteFromIndex": "인덱스에서 삭제",
   "media.deleteFromIndexConfirm":
     "이 항목을 인덱스에서 삭제하시겠습니까?\n이후 스캔해도 다시 등록되지 않습니다.",
