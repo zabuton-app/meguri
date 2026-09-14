@@ -280,16 +280,19 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [startPlayback, pauseEl]);
 
-  const isCurrent = (fileId: number, workspaceId: string): boolean =>
-    currentRef.current?.file.id === fileId &&
-    currentRef.current.workspaceId === workspaceId;
+  const isCurrent = useCallback(
+    (fileId: number, workspaceId: string): boolean =>
+      currentRef.current?.file.id === fileId &&
+      currentRef.current.workspaceId === workspaceId,
+    [],
+  );
 
   const playOrToggle = useCallback(
     (file: FileRow, workspaceId: string) => {
       if (isCurrent(file.id, workspaceId)) toggle();
       else play(file, workspaceId);
     },
-    [play, toggle],
+    [isCurrent, play, toggle],
   );
 
   const pause = useCallback(() => {
@@ -357,7 +360,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     (fileId: number, workspaceId: string) => {
       if (isCurrent(fileId, workspaceId)) pause();
     },
-    [pause],
+    [isCurrent, pause],
   );
 
   const ensureAnalyser = useCallback(
@@ -371,6 +374,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     () => ({
       play,
       playOrToggle,
+      isCurrent,
       pauseIfCurrent,
       toggle,
       pause,
@@ -386,6 +390,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     [
       play,
       playOrToggle,
+      isCurrent,
       pauseIfCurrent,
       toggle,
       pause,

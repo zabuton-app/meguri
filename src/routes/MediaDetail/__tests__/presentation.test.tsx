@@ -10,6 +10,7 @@ import "@/test/mockVirtualizer";
 import MediaDetail from "@/routes/MediaDetail";
 import { MediaNavProvider } from "@/components/MediaNavContext";
 import { useBarSuppressed } from "@/audio/barVisibility";
+import { useActivateFile } from "@/audio/useActivateFile";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import type { FileDetail } from "@/ipc/types";
 import {
@@ -98,6 +99,12 @@ function BarDetour({ to, origin }: { to: string; origin: string }) {
   return null;
 }
 
+/** A list row's play gesture, the way MediaGrid wires it. */
+function ListRow() {
+  const { activate } = useActivateFile();
+  return <button onClick={() => activate(sampleAudioRow)}>play-audio</button>;
+}
+
 function DetailRoute({ detour }: { detour?: { to: string; origin: string } }) {
   return (
     <MediaNavProvider
@@ -113,6 +120,7 @@ function DetailRoute({ detour }: { detour?: { to: string; origin: string } }) {
       }}
     >
       <BarProbe />
+      <ListRow />
       {detour && <BarDetour to={detour.to} origin={detour.origin} />}
       <Routes>
         <Route path="file/:id" element={<MediaDetail />} />
@@ -405,6 +413,24 @@ describe("MediaDetail presentation", () => {
     }
     expect(window.location.hash.slice(1)).toBe(`/file/1?ws=${WS_ID}`);
     expect(dialog().dataset.presentation).toBe("peek");
+  });
+
+  it("moves a docked peek onto a track played from the list, and plays it", async () => {
+    localStorage.setItem("meguri.media.detail.presentation", "peek");
+    mocks.fileGet.mockImplementation((id: number) =>
+      Promise.resolve(id === 2 ? audioDetail : sampleFileDetail),
+    );
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    expect(peekDocked()).toBe(true);
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play");
+    fireEvent.click(screen.getByText("play-audio"));
+    // The peek, not the list, starts the track — and once.
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "track.mp3" })).toBeTruthy();
+    });
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+    expect(window.location.hash.slice(1)).toBe(`/file/2?ws=${WS_ID}`);
+    expect(peekDocked()).toBe(true);
   });
 
   it("shows an audio track as a tile without its own transport in the peek", async () => {

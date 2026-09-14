@@ -60,6 +60,11 @@ export interface AudioActions {
   play: (file: FileRow, workspaceId: string, opts?: PlayOpts) => void;
   /** Play the file, or toggle it if it is the track already loaded. */
   playOrToggle: (file: FileRow, workspaceId: string) => void;
+  /** Whether the given file is the track loaded in the bar (playing or paused).
+   *  Reads a ref, so it is for event handlers only: nothing re-renders when
+   *  the track changes. To render on the loaded track, read `current` from
+   *  AudioPlayerContext instead. */
+  isCurrent: (fileId: number, workspaceId: string) => boolean;
   /** Pause only if the given file is the loaded track (e.g. before opening it externally). */
   pauseIfCurrent: (fileId: number, workspaceId: string) => void;
   toggle: () => void;

@@ -7,6 +7,9 @@ import { useSyncExternalStore } from "react";
 export interface FlagStore {
   /** Set the flag; listeners are only notified when the value actually changes. */
   set: (value: boolean) => void;
+  /** Read the flag once, outside React (an event handler). Nothing re-renders
+   *  when it later changes — subscribe with `use` for that. */
+  get: () => boolean;
   /** Subscribe from a component. */
   use: () => boolean;
 }
@@ -14,6 +17,9 @@ export interface FlagStore {
 export interface HoldStore {
   /** Raise the flag until the returned release function is called. */
   hold: () => () => void;
+  /** Read the flag once, outside React (an event handler). Nothing re-renders
+   *  when it later changes — subscribe with `use` for that. */
+  get: () => boolean;
   /** Subscribe from a component. */
   use: () => boolean;
 }
@@ -40,6 +46,7 @@ export function createHoldStore(): HoldStore {
         if (holds === 0) store.set(false);
       };
     },
+    get: store.get,
     use: store.use,
   };
 }
@@ -60,6 +67,7 @@ export function createFlagStore(initial = false): FlagStore {
       value = next;
       listeners.forEach((l) => l());
     },
+    get,
     use: () => useSyncExternalStore(subscribe, get),
   };
 }
