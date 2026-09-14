@@ -309,7 +309,10 @@ export default function Discover() {
             opts={{ loop: false, align: "center" }}
             setApi={setEmbla}
           >
-            <CarouselContent containerClassName="h-full" className="ml-0 h-full">
+            <CarouselContent
+              containerClassName="h-full"
+              className="ml-0 h-full"
+            >
               {items.map((f, i) => (
                 <CarouselItem
                   key={`${f.workspaceId}:${f.id}`}

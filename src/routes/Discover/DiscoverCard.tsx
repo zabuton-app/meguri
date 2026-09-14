@@ -1,11 +1,15 @@
 import { createElement, useState, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, ImageIcon, Pause, Play } from "lucide-react";
+import { AudioLines, ExternalLink, ImageIcon, Pause, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import { fileHref } from "@/lib/fileHref";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import { useAudioActions, useAudioPlayer } from "@/audio/useAudioPlayer";
+import { AudioSpectrum } from "@/audio/AudioSpectrum";
+import { useSpectrumPattern } from "@/audio/useSpectrumPattern";
+import { PATTERN_LAYOUT } from "@/audio/spectrumPatterns";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useActivateFile } from "@/audio/useActivateFile";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
@@ -105,6 +109,19 @@ export function DiscoverCard({
     : t("discover.play");
   const showRail = isVideo && !!file.duration && file.duration > 0 && isActive;
 
+  // The audio spectrum over the slide's artwork, with the same on/off toggle
+  // the detail stage and the playlist carry (one preference for all of them;
+  // inert under the OS reduce-motion setting, which overrides it).
+  const spectrumPattern = useSpectrumPattern();
+  const spectrumLayout = spectrumPattern
+    ? PATTERN_LAYOUT[spectrumPattern]
+    : null;
+  const { audioSpectrum, setAudioSpectrum } = usePreferences();
+  const reducedMotion = usePrefersReducedMotion();
+  const spectrumLabel = audioSpectrum
+    ? t("player.audio.spectrumHide")
+    : t("player.audio.spectrumShow");
+
   // Hover scrub preview on the main media (same behavior/preference as the
   // list thumbnails): pointer X maps onto the video timeline.
   const { hoverPreview, frameQuality } = usePreferences();
@@ -172,6 +189,14 @@ export function DiscoverCard({
           </div>
         )}
       </Link>
+
+      {isAudio && spectrumLayout && (
+        <AudioSpectrum
+          active={audioPlaying}
+          mode={src ? "overlay" : "full"}
+          className={src ? spectrumLayout.overlayBox : "absolute inset-0"}
+        />
+      )}
 
       {/* Gradient scrims for overlay legibility. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[22%] bg-gradient-to-b from-bg/70 to-transparent" />
@@ -291,6 +316,27 @@ export function DiscoverCard({
                 <ActionIcon className={isVideo ? "fill-current" : undefined} />
                 {isVideo ? t("discover.play") : t("discover.open")}
               </Link>
+            </Button>
+          )}
+          {isAudio && (
+            <Button
+              variant="outline"
+              size="icon"
+              className={cn(
+                "size-11 shrink-0 border-border/60 bg-bg/50 backdrop-blur-md",
+                audioSpectrum && "text-primary",
+              )}
+              onClick={() => setAudioSpectrum(!audioSpectrum)}
+              disabled={reducedMotion}
+              aria-pressed={audioSpectrum}
+              title={
+                reducedMotion
+                  ? t("player.audio.spectrumReducedMotion")
+                  : spectrumLabel
+              }
+              aria-label={spectrumLabel}
+            >
+              <AudioLines />
             </Button>
           )}
           {/* Styled to sit flush with the outline icon buttons around it; the

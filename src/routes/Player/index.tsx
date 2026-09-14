@@ -99,6 +99,8 @@ export default function Player() {
     keybindingPreset,
     setPlaylistShuffle,
     setPlaylistRepeat,
+    audioSpectrum,
+    setAudioSpectrum,
   } = usePreferences();
   const reducedMotion = usePrefersReducedMotion();
   const spectrumPattern = useSpectrumPattern();
@@ -892,6 +894,10 @@ export default function Player() {
           onNext={goNext}
           onToggleShuffle={toggleShuffle}
           onToggleRepeat={toggleRepeat}
+          spectrum={
+            isAudio ? (reducedMotion ? null : audioSpectrum) : undefined
+          }
+          onToggleSpectrum={() => setAudioSpectrum(!audioSpectrum)}
           onToggleFullscreen={toggleFullscreen}
           onExit={exit}
           t={t}

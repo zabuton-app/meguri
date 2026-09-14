@@ -127,6 +127,28 @@ describe("DiscoverCard watch later", () => {
   });
 });
 
+describe("DiscoverCard non-audio", () => {
+  it("has no spectrum toggle for a video", () => {
+    function Harness() {
+      const { t } = useI18n();
+      return (
+        <DiscoverCard
+          file={{ ...file, kind: "video" }}
+          mediaBase=""
+          thumbVersion={0}
+          onRate={() => {}}
+          watchLater={membership(false)}
+          isActive={false}
+          t={t}
+        />
+      );
+    }
+    renderWithProviders(<Harness />);
+    expect(screen.queryByRole("button", { name: /spectrum/i })).toBeNull();
+    expect(screen.queryByTestId("audio-spectrum")).toBeNull();
+  });
+});
+
 describe("DiscoverCard thumbnail fallback", () => {
   function renderCard(overrides: Partial<FileRow>) {
     function Harness() {
@@ -214,6 +236,22 @@ describe("DiscoverCard audio", () => {
     // The centre affordance and the primary action, both buttons.
     expect(plays).toHaveLength(2);
     expect(screen.queryByRole("link", { name: /^play$/i })).toBeNull();
+  });
+
+  it("carries the spectrum toggle, which hides and shows the display", () => {
+    vi.stubGlobal("AudioContext", undefined);
+    renderAudio();
+    expect(screen.queryByTestId("audio-spectrum")).not.toBeNull();
+    const toggle = screen.getByRole("button", { name: "Hide spectrum" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId("audio-spectrum")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Show spectrum" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+    vi.unstubAllGlobals();
   });
 
   it("opens the detail view without autoplay when the card itself is clicked", () => {
