@@ -26,6 +26,18 @@ import { fileHref, type FileHrefOpts } from "@/lib/fileHref";
 import { isPeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { useAudioActions } from "./useAudioPlayer";
 
+/** Whether the detail route on screen is this file's. Read from the hash
+ *  rather than useLocation(), which would re-render every card on each
+ *  navigation; only the path and the workspace count, since the same detail
+ *  may be open under other query flags (`?autoplay=0` from the name link). */
+function peekShows(fileId: number, workspaceId: string): boolean {
+  const hash = window.location.hash.slice(1);
+  const q = hash.indexOf("?");
+  const path = q === -1 ? hash : hash.slice(0, q);
+  const ws = new URLSearchParams(q === -1 ? "" : hash.slice(q + 1)).get("ws");
+  return path === `/file/${fileId}` && ws === workspaceId;
+}
+
 export function useActivateFile() {
   const navigate = useNavigate();
   const { playOrToggle, isCurrent } = useAudioActions();
@@ -34,14 +46,11 @@ export function useActivateFile() {
   const activateAudio = useCallback(
     (file: FileRow) => {
       if (isPeekDocked() && !isCurrent(file.id, file.workspaceId)) {
-        const href = fileHref(file.id, file.workspaceId);
         // Unless the peek already shows this track (it was closed from the
-        // bar, say): arriving at the same URL again would not start it, as
-        // the peek only auto-starts once per visit, so the bar takes it.
-        // Read from the hash rather than useLocation(), which would re-render
-        // every card on each navigation.
-        if (window.location.hash.slice(1) !== href) {
-          void navigate(href);
+        // bar, say): arriving at it again would not start it, as the peek
+        // only auto-starts once per visit, so the bar takes it.
+        if (!peekShows(file.id, file.workspaceId)) {
+          void navigate(fileHref(file.id, file.workspaceId));
           return;
         }
       }

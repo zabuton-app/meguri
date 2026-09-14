@@ -184,6 +184,30 @@ describe("useActivateFile", () => {
       );
     });
 
+    it("plays from the bar when the peek shows the track under other query flags", () => {
+      // Opened from the name link (`?autoplay=0`) after the peek had started
+      // it once: the same visit, so navigating would not start it either.
+      renderWithProviders(<Probe />, {
+        route: `/file/${sampleAudioRow.id}?ws=${WS_ID}&autoplay=0`,
+      });
+      fireEvent.click(screen.getByText("audio-thumb"));
+      expect(playSpy).toHaveBeenCalledTimes(1);
+      expect(window.location.hash).toBe(
+        `#/file/${sampleAudioRow.id}?ws=${WS_ID}&autoplay=0`,
+      );
+    });
+
+    it("moves the peek when it shows the same file id in another workspace", () => {
+      renderWithProviders(<Probe />, {
+        route: `/file/${sampleAudioRow.id}?ws=other-ws`,
+      });
+      fireEvent.click(screen.getByText("audio-thumb"));
+      expect(playSpy).not.toHaveBeenCalled();
+      expect(window.location.hash).toBe(
+        `#/file/${sampleAudioRow.id}?ws=${WS_ID}`,
+      );
+    });
+
     it("still toggles the loaded track without moving the peek", () => {
       function Loader() {
         const { play } = useAudioPlayer();
