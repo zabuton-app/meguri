@@ -208,6 +208,8 @@ export const ja = {
   "shortcuts.mute": "ミュート切替",
   "shortcuts.fullscreen": "全画面切替",
   "shortcuts.seekStart": "先頭へ移動",
+  "shortcuts.spectrumPattern":
+    "スペクトラムのパターンを 次 / 前 へ（プレイリスト再生のオーディオ）",
   "media.rating": "評価",
   "media.tags": "タグ",
   "media.metaWorkspace": "ワークスペース",

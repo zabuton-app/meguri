@@ -18,6 +18,7 @@ import {
 import { AudioSpectrum } from "@/audio/AudioSpectrum";
 import { useSpectrumPattern } from "@/audio/useSpectrumPattern";
 import { PATTERN_LAYOUT } from "@/audio/spectrumPatterns";
+import { useCycleSpectrumPattern } from "@/audio/useSpectrumPatternHotkey";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -549,6 +550,8 @@ export default function Player() {
     () => setPlaylistRepeat(!playlistRepeat),
     [playlistRepeat, setPlaylistRepeat],
   );
+  // V / Shift+V step through the spectrum patterns (see the hook).
+  const cycleSpectrum = useCycleSpectrumPattern();
 
   // Keyboard control, so the whole session can run without a mouse (FR-020).
   // Space and the arrows are left to the video player while a video is on
@@ -563,6 +566,7 @@ export default function Player() {
     goPrev,
     toggleShuffle,
     toggleFullscreen,
+    cycleSpectrum,
     exit,
     navBinding,
     wake,
@@ -577,6 +581,7 @@ export default function Player() {
       goPrev,
       toggleShuffle,
       toggleFullscreen,
+      cycleSpectrum,
       exit,
       navBinding,
       wake,
@@ -684,6 +689,13 @@ export default function Player() {
           if (!s.isImage && !s.isAudio) return;
           e.preventDefault();
           toggleMuted();
+          return;
+        // Next spectrum pattern; with Shift, the one before (the detail view
+        // binds the same key). Audio only: no other kind shows the display.
+        case "KeyV":
+          if (!s.isAudio) return;
+          e.preventDefault();
+          s.cycleSpectrum(e.shiftKey ? -1 : 1);
           return;
         default:
       }

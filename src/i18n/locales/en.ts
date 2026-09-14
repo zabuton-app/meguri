@@ -209,6 +209,8 @@ export const en: Record<TranslationKey, string> = {
   "shortcuts.mute": "Toggle mute",
   "shortcuts.fullscreen": "Toggle fullscreen",
   "shortcuts.seekStart": "Jump to start",
+  "shortcuts.spectrumPattern":
+    "Next / previous spectrum pattern (audio in the playlist player)",
   "media.rating": "Rating",
   "media.tags": "Tags",
   "media.metaWorkspace": "Workspace",

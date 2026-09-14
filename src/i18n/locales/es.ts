@@ -214,6 +214,8 @@ export const es: Record<TranslationKey, string> = {
   "shortcuts.mute": "Alternar silencio",
   "shortcuts.fullscreen": "Alternar pantalla completa",
   "shortcuts.seekStart": "Ir al inicio",
+  "shortcuts.spectrumPattern":
+    "Patrón del espectro siguiente / anterior (audio en el reproductor de lista)",
   "media.rating": "Valoración",
   "media.tags": "Etiquetas",
   "media.metaWorkspace": "Espacio",

@@ -206,6 +206,8 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.mute": "음소거 전환",
   "shortcuts.fullscreen": "전체 화면 전환",
   "shortcuts.seekStart": "처음으로 이동",
+  "shortcuts.spectrumPattern":
+    "스펙트럼 패턴 다음 / 이전 (플레이리스트 재생의 오디오)",
   "media.rating": "평가",
   "media.tags": "태그",
   "media.metaWorkspace": "워크스페이스",

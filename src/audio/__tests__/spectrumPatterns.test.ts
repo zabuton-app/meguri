@@ -8,6 +8,7 @@ import {
   createParticles,
   createRidge,
   createRipple,
+  cycleSpectrumPattern,
   drawArea,
   drawBarcode,
   drawBars,
@@ -23,6 +24,7 @@ import {
   rgba,
   SPECTRUM_PATTERN_OPTIONS,
   type SpectrumPalette,
+  type SpectrumPattern,
 } from "@/audio/spectrumPatterns";
 
 const palette: SpectrumPalette = {
@@ -135,6 +137,16 @@ describe("geometry", () => {
     for (const p of SPECTRUM_PATTERN_OPTIONS)
       for (const m of ["overlay", "full", "tile"] as const)
         expect(bandCount(p, m)).toBeGreaterThan(1);
+  });
+
+  it("cycles through the patterns in settings order, wrapping", () => {
+    expect(cycleSpectrumPattern("bars", 1)).toBe("ring");
+    expect(cycleSpectrumPattern("bars", -1)).toBe("barcode");
+    expect(cycleSpectrumPattern("barcode", 1)).toBe("bars");
+    let p: SpectrumPattern = SPECTRUM_PATTERN_OPTIONS[0];
+    for (let i = 0; i < SPECTRUM_PATTERN_OPTIONS.length; i++)
+      p = cycleSpectrumPattern(p, 1);
+    expect(p).toBe(SPECTRUM_PATTERN_OPTIONS[0]);
   });
 
   it("has a layout and a drawer for every pattern", () => {
@@ -498,7 +510,7 @@ describe("drawers", () => {
     const draw = createRipple();
     const f = fakeContext();
     const loud = flat(24, 1);
-    // Two kicks: at t = 0 and, past the 0.22 s gap, at t = 0.3.
+    // Two kicks: at t = 0 and, past the 0.88 s gap, at t = 1.
     draw({
       ...f,
       ...args(24),
@@ -511,7 +523,7 @@ describe("drawers", () => {
     draw({
       ...f,
       ...args(24),
-      t: 0.1,
+      t: 0.4,
       w: 300,
       h: 100,
       mode: "full",
@@ -520,7 +532,7 @@ describe("drawers", () => {
     draw({
       ...f,
       ...args(24),
-      t: 0.3,
+      t: 1,
       w: 300,
       h: 100,
       mode: "full",

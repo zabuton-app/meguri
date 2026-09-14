@@ -62,6 +62,7 @@ import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
+import { useSpectrumPatternHotkey } from "@/audio/useSpectrumPatternHotkey";
 import { TagEditor } from "@/components/TagEditor";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatChords } from "@/settings/keybindings";
@@ -376,6 +377,9 @@ export default function MediaDetail() {
     // transport, the compact tile in the sheet having none.
     suppressBar: !isPeek,
   });
+  // V / Shift+V step the spectrum pattern while an audio track is on screen
+  // (the modal and the side peek alike; the playlist player binds it too).
+  useSpectrumPatternHotkey(isAudio);
 
   const setRating = useMutation({
     mutationFn: (r: number) => api.fileSetRating(fileId, wsId, r),

@@ -204,6 +204,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "shortcuts.mute": "切换静音",
   "shortcuts.fullscreen": "切换全屏",
   "shortcuts.seekStart": "跳到开头",
+  "shortcuts.spectrumPattern":
+    "下一个 / 上一个频谱样式（播放列表播放器中的音频）",
   "media.rating": "评分",
   "media.tags": "标签",
   "media.metaWorkspace": "工作区",

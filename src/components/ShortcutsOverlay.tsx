@@ -62,6 +62,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
     { label: t("shortcuts.mute"), keys: "M" },
     { label: t("shortcuts.fullscreen"), keys: "F" },
     { label: t("shortcuts.seekStart"), keys: "Home / 0" },
+    { label: t("shortcuts.spectrumPattern"), keys: "V / Shift+V" },
     { label: t("common.close"), keys: "Esc" },
   ];
 
@@ -90,7 +91,13 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
             <X />
           </Button>
         </header>
-        <ScrollArea className="min-h-0 flex-1" viewportClassName="px-4 py-4">
+        {/* The sheet is capped by max-height, not sized, so the viewport
+            cannot take a percentage height from it: make the scroll area a
+            flex column and let the viewport shrink as a flex item instead. */}
+        <ScrollArea
+          className="flex min-h-0 flex-1 flex-col"
+          viewportClassName="min-h-0 flex-1 px-4 py-4"
+        >
           <Section title={t("shortcuts.sectionList")} rows={list} />
           <Section title={t("shortcuts.sectionDetail")} rows={detail} />
         </ScrollArea>

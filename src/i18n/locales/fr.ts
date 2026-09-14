@@ -214,6 +214,8 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.mute": "Activer/couper le son",
   "shortcuts.fullscreen": "Basculer en plein écran",
   "shortcuts.seekStart": "Aller au début",
+  "shortcuts.spectrumPattern":
+    "Motif du spectre suivant / précédent (audio dans le lecteur de liste)",
   "media.rating": "Note",
   "media.tags": "Tags",
   "media.metaWorkspace": "Espace de travail",

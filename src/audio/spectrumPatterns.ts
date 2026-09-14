@@ -55,6 +55,17 @@ export function isSpectrumPattern(v: unknown): v is SpectrumPattern {
   return SPECTRUM_PATTERN_OPTIONS.includes(v as SpectrumPattern);
 }
 
+/** The pattern after (`1`) or before (`-1`) `current` in the settings order,
+ *  wrapping around at either end. */
+export function cycleSpectrumPattern(
+  current: SpectrumPattern,
+  dir: 1 | -1,
+): SpectrumPattern {
+  const n = SPECTRUM_PATTERN_OPTIONS.length;
+  const i = SPECTRUM_PATTERN_OPTIONS.indexOf(current);
+  return SPECTRUM_PATTERN_OPTIONS[(i + dir + n) % n];
+}
+
 export type SpectrumMode = "overlay" | "full" | "tile";
 
 /** The theme colours a pattern draws with, as hex strings. */
@@ -823,9 +834,11 @@ interface Ripple {
   color: string;
 }
 
-const MAX_RIPPLES = 80;
+const MAX_RIPPLES = 20;
 // The shortest gap between two beat rings.
-const KICK_GAP = 0.22;
+// A quarter of the design's rates throughout: at full rate the rings
+// crowded each other out and none could be followed.
+const KICK_GAP = 0.88;
 
 /** Rings spreading out and fading like drops on water: a big one in the
  *  middle on each kick, small ones scattered by the mids, and a few ambient
@@ -856,9 +869,9 @@ export function createRipple(): Drawer {
           1.4,
         );
       }
-      if (mid > 0.4 && Math.random() < 0.15)
+      if (mid > 0.4 && Math.random() < 0.0375)
         spawn(Math.random() * w, Math.random() * h, 3, 0.9);
-      if (Math.random() < dt * 2.5)
+      if (Math.random() < dt * 0.625)
         spawn(
           Math.random() * w,
           Math.random() * h,
