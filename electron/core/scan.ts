@@ -190,6 +190,11 @@ export interface ScanStats {
   unchanged: number;
 }
 
+/** Stats for a scan that did nothing (aborted before starting, or failed). */
+export function emptyScanStats(): ScanStats {
+  return { inserted: 0, updated: 0, moved: 0, deleted: 0, unchanged: 0 };
+}
+
 /**
  * Apply enumeration results to the DB. Returns the file ids of new/updated entries (which need thumbnails).
  *

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runScan = vi.hoisted(() => vi.fn());
-vi.mock("../jobs.js", () => ({ runScan }));
-vi.mock("../queries.js", () => ({ clearExcludedFiles: vi.fn() }));
-vi.mock("../logger.js", () => ({
+vi.mock("../core/jobs.js", () => ({ runScan }));
+vi.mock("../core/queries.js", () => ({ clearExcludedFiles: vi.fn() }));
+vi.mock("../core/logger.js", () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
-import { ScanManager } from "../../scanManager.js";
+import { ScanManager } from "../scanManager.js";
 
 type Deps = ConstructorParameters<typeof ScanManager>[0];
 

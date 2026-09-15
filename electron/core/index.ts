@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { openDb, type DB } from "./db.js";
-import { dataDirForRoot, pathHash } from "./paths.js";
+import { dataDirForRoot, dbPathForDataDir, pathHash } from "./paths.js";
 import { upsertScanRoot } from "./queries.js";
 
 export class Core {
@@ -18,12 +18,7 @@ export class Core {
     this.root = root;
     this.rootId = rootId;
     this.dataDir = dataDir;
-    this.dbPath = Core.dbPathFor(dataDir);
-  }
-
-  /** Where a root's database lives inside its data directory. */
-  static dbPathFor(dataDir: string): string {
-    return path.join(dataDir, "db.sqlite");
+    this.dbPath = dbPathForDataDir(dataDir);
   }
 
   static init(rawRoot: string): Core {
@@ -36,7 +31,7 @@ export class Core {
     const dataDir = dataDirForRoot(root);
     fs.mkdirSync(path.join(dataDir, "thumbs"), { recursive: true });
 
-    const db = openDb(Core.dbPathFor(dataDir));
+    const db = openDb(dbPathForDataDir(dataDir));
     const rootId = upsertScanRoot(db, root, pathHash(root));
 
     return new Core(db, root, rootId, dataDir);

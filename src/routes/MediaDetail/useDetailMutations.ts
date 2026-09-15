@@ -42,13 +42,15 @@ export interface DetailActions {
   pending: {
     bookmark: boolean;
     export: boolean;
-    /**
-     * The scene being applied as the main thumbnail (`null` = reverting to
-     * the auto frame), or undefined while none is. Only that scene should
-     * look busy; greying out the whole row read as the page freezing.
-     */
-    thumbSec: number | null | undefined;
+    mainThumb: boolean;
   };
+  /**
+   * The scene being applied as the main thumbnail (`null` = reverting to the
+   * auto frame), or undefined while none is — the shape the scene pickers
+   * take. Only that scene should look busy; greying out the whole row read as
+   * the page freezing.
+   */
+  pendingThumbSec: number | null | undefined;
 }
 
 /**
@@ -296,9 +298,10 @@ export function useDetailMutations({
     pending: {
       bookmark: addBookmark.isPending || removeBookmark.isPending,
       export: exportFrame.isPending,
-      thumbSec: setMainThumb.isPending
-        ? (setMainThumb.variables ?? null)
-        : undefined,
+      mainThumb: setMainThumb.isPending,
     },
+    pendingThumbSec: setMainThumb.isPending
+      ? (setMainThumb.variables ?? null)
+      : undefined,
   };
 }

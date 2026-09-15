@@ -419,7 +419,7 @@ export default function MediaDetail() {
               mediaBase={mediaBase}
               wsId={wsId}
               thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={actions.pending.thumbSec}
+              pendingThumbSec={actions.pendingThumbSec}
               // Status alone, not hasThumbFile: a video marked done always has
               // a frame behind it, and the scene picker shows the slot itself.
               mainThumbUrl={
@@ -427,7 +427,7 @@ export default function MediaDetail() {
                   ? thumbUrl(mediaBase, wsId, fileId, thumbVersion)
                   : null
               }
-              mainThumbPending={actions.pending.thumbSec !== undefined}
+              mainThumbPending={actions.pending.mainThumb}
               onSeek={(sec) => playerRef.current?.seek(sec)}
               onSetMainThumb={actions.setMainThumb}
               t={t}
@@ -442,7 +442,7 @@ export default function MediaDetail() {
               mediaBase={mediaBase}
               wsId={wsId}
               thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={actions.pending.thumbSec}
+              pendingThumbSec={actions.pendingThumbSec}
               onSeek={(sec) => playerRef.current?.seek(sec)}
               onRemove={actions.removeBookmark}
               onSetMainThumb={actions.setMainThumb}

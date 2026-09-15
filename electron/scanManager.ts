@@ -8,6 +8,7 @@ import type { Core } from "./core/index.js";
 import { runScan } from "./core/jobs.js";
 import log from "./core/logger.js";
 import * as q from "./core/queries.js";
+import { emptyScanStats } from "./core/scan.js";
 import type { QueryWorkerClient } from "./core/queryWorkerClient.js";
 import type { Workspaces } from "./core/workspaces.js";
 
@@ -105,17 +106,7 @@ export class ScanManager {
         );
       } catch (err) {
         log.error("scan failed", err);
-        emit("scan:done", {
-          jobId,
-          stats: {
-            inserted: 0,
-            updated: 0,
-            moved: 0,
-            deleted: 0,
-            unchanged: 0,
-          },
-          error: true,
-        });
+        emit("scan:done", { jobId, stats: emptyScanStats(), error: true });
       } finally {
         if (wsId) {
           this.scanning.delete(wsId);
