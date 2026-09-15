@@ -82,6 +82,18 @@ const AUDIO = [
     src: "anoisesrc=color=pink:duration=64:seed=3",
     filter: "lowpass=f=1200,volume=0.3",
   },
+  {
+    // Also without cover art, and with energy across the whole band plus a
+    // slow pulse, so the spectrum display has something to show on every
+    // pattern (the shoot-spectrum.mjs subject).
+    file: "Open Sky.mp3",
+    title: "Open Sky",
+    artist: "Meguri Samples",
+    album: "Sample Tracks",
+    src: "anoisesrc=color=pink:duration=90:seed=11",
+    filter:
+      "equalizer=f=80:t=q:w=1:g=8,equalizer=f=2500:t=q:w=1:g=4,apulsator=hz=0.6,volume=0.35",
+  },
 ];
 
 function synthesize({ file, title, artist, album, src, filter, cover }) {

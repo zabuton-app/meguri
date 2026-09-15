@@ -141,8 +141,9 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   images, with embedded cover art as their thumbnails; a click plays them in a
   bottom player bar that keeps going while you browse, the detail view holds
   their tags, rating, and history like any other file, and a live spectrum
-  plays over the cover art while a track plays — bars, a ring, or an LED
-  meter, chosen in Settings
+  plays over the cover art while a track plays — twelve patterns from bars
+  and an LED meter to particles and ripples, chosen in Settings or stepped
+  through with V
 - 🎬 **Smooth playback** — Range-enabled streaming from a local HTTP server;
   non-faststart containers are remuxed to fragmented MP4 on the fly (time seek
   via `?t`), and unplayable codecs are handed off to the OS default player
@@ -177,6 +178,13 @@ The detail view docked beside the library as a side peek:
 A track playing in the bottom player bar while browsing:
 
 ![Audio player bar](./docs/assets/audio.png)
+
+A live spectrum on the detail view while a track plays, in one of twelve
+patterns:
+
+![Audio spectrum](./docs/assets/spectrum.png)
+
+![The twelve spectrum patterns](./docs/assets/spectrum-patterns.png)
 
 Grid, list, and table layouts for browsing:
 
