@@ -427,6 +427,12 @@ export default function Home() {
     input?.select();
   }, [isHome]);
 
+  // "See all" on the Home view's Recently played shelf: the play history,
+  // a screen over the view (scoped to every workspace while Home is active).
+  const openHistory = useCallback(() => {
+    void navigate("/history");
+  }, [navigate]);
+
   const openTags = useCallback(() => {
     void navigate("/tags");
   }, [navigate]);
@@ -688,9 +694,11 @@ export default function Home() {
             <HomeShelves
               recent={shelves.recent}
               picks={shelves.picks}
+              played={shelves.played}
               mediaBase={status.data?.mediaBase ?? ""}
               thumbVersion={thumbVersion}
               onSeeAllRecent={onSeeAllRecent}
+              onSeeAllPlayed={openHistory}
               onOpenDiscover={openDiscover}
               onReshufflePicks={shelves.reshufflePicks}
               onTagClick={onTagClick}

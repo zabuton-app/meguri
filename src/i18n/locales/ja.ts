@@ -130,6 +130,7 @@ export const ja = {
   "home.scanAlreadyRunning": "スキャンは既に実行中です",
   "home.shelfTitle": "ホーム",
   "home.shelfRecent": "最近追加",
+  "home.shelfPlayed": "最近再生",
   "home.shelfSeeAll": "すべて見る",
   "home.shelfTodayPick": "今日の一本",
   "home.shelfMorePicks": "ほかのおすすめ",

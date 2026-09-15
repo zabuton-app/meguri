@@ -126,6 +126,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "home.scanAlreadyRunning": "扫描已在进行中",
   "home.shelfTitle": "首页",
   "home.shelfRecent": "最近添加",
+  "home.shelfPlayed": "最近播放",
   "home.shelfSeeAll": "查看全部",
   "home.shelfTodayPick": "今日一选",
   "home.shelfMorePicks": "更多推荐",

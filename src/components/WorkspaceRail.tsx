@@ -45,7 +45,7 @@ import type {
   WorkspaceInfo,
   WorkspacesList,
 } from "@/ipc/types";
-import { HOME_PICKS_KEY, HOME_RECENT_KEY } from "@/lib/queryCache";
+import { removeHomeShelves } from "@/lib/queryCache";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { CollectionEditDialog } from "@/components/CollectionEditDialog";
 import {
@@ -155,10 +155,8 @@ export function WorkspaceRail() {
       toast.success(t("workspace.removedToast"), {
         description: t("workspace.removedToastDetail", { label }),
       });
-      // The Home shelves may hold that workspace's files; drop them rather
-      // than invalidating, which would also redraw the day's picks.
-      qc.removeQueries({ queryKey: [HOME_RECENT_KEY] });
-      qc.removeQueries({ queryKey: [HOME_PICKS_KEY] });
+      // The Home shelves may hold that workspace's files.
+      removeHomeShelves(qc);
       void refreshAll();
     },
   });

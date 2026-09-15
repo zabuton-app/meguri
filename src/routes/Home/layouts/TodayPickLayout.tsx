@@ -1,11 +1,13 @@
-// Home layout "Today's pick": one of today's picks leads as a full-bleed
-// stage, the rest sit beside it in a grid sized to the stage's height (the
-// bar between them sets the balance), and the newest files fill a grid
-// below. Keyboard order: the stage, the picks beside it, then the rows.
+// Home layout "Today's pick": one of today's picks leads as a stage, the rest
+// sit beside it in a grid sized to the stage's height (the bar between them
+// sets the balance), and below come one row each of the newest files and the
+// most recently played. Keyboard order: the stage, the picks beside it, then
+// the rows.
 //
 // Everything below the stage is the `rows` list: keyboard order, sizes and
-// markup derive from it, so another row ("Continue watching", #122) is one
-// entry there plus its data in useHomeShelves.
+// markup derive from it. Another row ("Continue watching", #122) is its data
+// in useHomeShelves (with a key in lib/queryCache), a useSingleRow, and one
+// entry in `rows`.
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ChevronRight,
@@ -29,7 +31,7 @@ import {
   splitPercent,
   useHomeSplit,
 } from "../useHomeSplit";
-import { useSideFit } from "../useSideFit";
+import { useSideFit, useSingleRow } from "../useGridFit";
 import {
   HeroCard,
   PicksSkeleton,
@@ -45,9 +47,11 @@ import type { HomeLayoutProps } from "./types";
 export const TodayPickLayout = memo(function TodayPickLayout({
   recent,
   picks,
+  played,
   mediaBase,
   thumbVersion,
   onSeeAllRecent,
+  onSeeAllPlayed,
   onOpenDiscover,
   onReshufflePicks,
   onTagClick,
@@ -66,6 +70,11 @@ export const TodayPickLayout = memo(function TodayPickLayout({
     const rest = picks.files.slice(1);
     return sideFit === 0 ? rest : rest.slice(0, sideFit);
   }, [picks.files, sideFit]);
+
+  // The shelves below take a single row each: as many cards as their grid
+  // has columns.
+  const recentRow = useSingleRow(recent.files);
+  const playedRow = useSingleRow(played.files);
 
   // Retry / redraw the picks. It sits beside "Open in Discovery" on the row
   // of picks; with no such row (a single pick, or none) it stays reachable
@@ -116,7 +125,20 @@ export const TodayPickLayout = memo(function TodayPickLayout({
           </RowAction>
         ),
         data: recent,
-        files: recent.files,
+        ...recentRow,
+        gridClass: WRAP_GRID_CLASS,
+      },
+      {
+        id: "played",
+        title: t("home.shelfPlayed"),
+        action: (
+          <RowAction onClick={onSeeAllPlayed}>
+            {t("home.shelfSeeAll")}
+            <ChevronRight className="size-3.5" />
+          </RowAction>
+        ),
+        data: played,
+        ...playedRow,
         gridClass: WRAP_GRID_CLASS,
       },
     ],
@@ -125,8 +147,12 @@ export const TodayPickLayout = memo(function TodayPickLayout({
       picks,
       morePicks,
       recent,
+      recentRow,
+      played,
+      playedRow,
       onOpenDiscover,
       onSeeAllRecent,
+      onSeeAllPlayed,
       attachGrid,
       reshuffle,
     ],

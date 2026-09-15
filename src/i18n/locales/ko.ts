@@ -128,6 +128,7 @@ export const ko: Record<TranslationKey, string> = {
   "home.scanAlreadyRunning": "스캔이 이미 실행 중입니다",
   "home.shelfTitle": "홈",
   "home.shelfRecent": "최근 추가",
+  "home.shelfPlayed": "최근 재생",
   "home.shelfSeeAll": "모두 보기",
   "home.shelfTodayPick": "오늘의 한 편",
   "home.shelfMorePicks": "다른 추천",

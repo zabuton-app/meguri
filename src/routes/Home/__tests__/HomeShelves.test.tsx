@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   filesRandom: vi.fn<(query: unknown) => Promise<unknown>>(),
   workspaceSwitch: vi.fn<(id: string) => Promise<unknown>>(),
   workspaceStats: vi.fn<() => Promise<unknown>>(),
+  historyList: vi.fn<(query: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -31,6 +32,7 @@ vi.mock("@/ipc/client", () => ({
     filesRandom: (query: unknown) => mocks.filesRandom(query),
     workspaceSwitch: (id: string) => mocks.workspaceSwitch(id),
     workspaceStats: () => mocks.workspaceStats(),
+    historyList: (query: unknown) => mocks.historyList(query),
     fileSetFavorite: vi.fn().mockResolvedValue(undefined),
     fileSetRating: vi.fn().mockResolvedValue(undefined),
     scanStart: vi.fn().mockResolvedValue(null),
@@ -78,6 +80,8 @@ describe("Home view", () => {
     mocks.filesSearch.mockReset();
     mocks.filesRandom.mockReset();
     mocks.workspaceSwitch.mockReset();
+    mocks.historyList.mockReset();
+    mocks.historyList.mockResolvedValue({ items: [], nextCursor: null });
     mocks.appStatus.mockResolvedValue(homeStatus);
     mocks.workspacesList.mockResolvedValue(homeWorkspaces);
     mocks.workspaceStats.mockResolvedValue({ fileCount: 3, lastScanAt: null });
@@ -356,6 +360,103 @@ describe("Home view", () => {
     // A tag on a card takes the library to the "All" list, like the stage's.
     fireEvent.click(within(rated).getByText("beach"));
     expect(mocks.workspaceSwitch).toHaveBeenCalledWith("__all__");
+  });
+
+  it("lists the most recently played files once each, with the play history behind See all", async () => {
+    const played = (id: number, playedAt: number) => ({
+      ...sampleFileRow,
+      id,
+      relPath: `videos/played-${id}.mp4`,
+      historyId: playedAt,
+      playedAt,
+      via: "browser" as const,
+      position: null,
+      playCount: 1,
+    });
+    // The history repeats a file played again later: 41 shows once.
+    mocks.historyList.mockResolvedValue({
+      items: [played(41, 30), played(42, 20), played(41, 10)],
+      nextCursor: null,
+    });
+    renderWithProviders(<Home />);
+    const shelves = await screen.findByTestId("home-shelves");
+    await within(shelves).findByText("Recently played");
+    expect(within(shelves).getAllByText("played-41.mp4")).toHaveLength(1);
+    expect(within(shelves).getByText("played-42.mp4")).toBeTruthy();
+    // The shelf reads more history than it keeps (repeats are dropped).
+    expect(mocks.historyList).toHaveBeenCalledWith({ limit: 60 });
+
+    const header = within(shelves).getByText("Recently played").parentElement!;
+    fireEvent.click(within(header).getByRole("button", { name: /See all/ }));
+    await waitFor(() => expect(window.location.hash).toBe("#/history"));
+  });
+
+  it("hides Recently played while nothing has been played", async () => {
+    const shelves = await renderHomeView();
+    // Wait for the (empty) history to have answered, so the row is judged on
+    // its data rather than on a query still in flight (a row in flight shows
+    // a skeleton header instead of its title).
+    await waitFor(() => expect(mocks.historyList).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(
+        shelves.querySelectorAll('[data-slot="skeleton"].h-4.w-32'),
+      ).toHaveLength(0),
+    );
+    expect(within(shelves).queryByText("Recently played")).toBeNull();
+  });
+
+  it("keeps Recently added and Recently played to a single row each, as many as the grid has columns", async () => {
+    // jsdom lays nothing out: stand in for a three-column grid.
+    const originalStyle = window.getComputedStyle;
+    const styleSpy = vi
+      .spyOn(window, "getComputedStyle")
+      .mockImplementation((el: Element) => {
+        const style = originalStyle(el);
+        if ((el as HTMLElement).className.includes("minmax(160px,1fr)")) {
+          Object.defineProperty(style, "gridTemplateColumns", {
+            value: "160px 160px 160px",
+          });
+        }
+        return style;
+      });
+    try {
+      mocks.filesSearch.mockResolvedValue({
+        items: [11, 12, 13, 14, 15].map(recentRow),
+        nextCursor: null,
+      });
+      mocks.historyList.mockResolvedValue({
+        items: [51, 52, 53, 54, 55].map((id, i) => ({
+          ...sampleFileRow,
+          id,
+          relPath: `videos/played-${id}.mp4`,
+          historyId: id,
+          playedAt: 100 - i,
+          via: "browser" as const,
+          position: null,
+          playCount: 1,
+        })),
+        nextCursor: null,
+      });
+      renderWithProviders(<Home />);
+      const shelves = await screen.findByTestId("home-shelves");
+      await within(shelves).findByText("recent-11.mp4");
+      await waitFor(() =>
+        expect(
+          within(shelves)
+            .getAllByTestId("shelf-card")
+            .filter((c) => c.textContent?.includes("recent-")),
+        ).toHaveLength(3),
+      );
+      expect(within(shelves).queryByText("recent-14.mp4")).toBeNull();
+      await within(shelves).findByText("played-51.mp4");
+      expect(
+        within(shelves)
+          .getAllByTestId("shelf-card")
+          .filter((c) => c.textContent?.includes("played-")),
+      ).toHaveLength(3);
+    } finally {
+      styleSpy.mockRestore();
+    }
   });
 
   it("lets the bar between the hero and the picks set the split", async () => {

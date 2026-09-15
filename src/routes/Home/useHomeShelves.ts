@@ -1,23 +1,31 @@
 // Data for the Home view's shelves. Small queries of their own (a handful of
 // rows each, across every workspace), only while the view is active.
 //
-// Both are refreshed only by explicit invalidation (a scan, the tag catalog
-// changing, a workspace removed) rather than by staleness or window focus:
-// the shelves are entry points, not a live view, and the picks in particular
-// are meant to hold still for the day. The keys are owned by lib/queryCache
-// so the favorite / rating / removal patches reach the shelf rows.
+// None refreshes on staleness or window focus, only on explicit invalidation:
+// Recently added on a scan or a tag-catalog change; today's picks only when a
+// scan fills an empty sample (they hold still for the day); Recently played
+// on every recorded play, a scan, and clearing the history. A removed
+// workspace drops them all. The keys are owned by lib/queryCache so the
+// favorite / rating / removal patches reach the shelf rows.
 //
-// A third shelf ("Continue watching", #122) is one more `ShelfData` here and
-// one more entry in HomeShelves' shelf list.
+// Another shelf ("Continue watching", #122) is one more `ShelfData` here, a
+// key in lib/queryCache, and a row entry in the layout.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
-import { HOME_PICKS_KEY, HOME_RECENT_KEY } from "@/lib/queryCache";
+import {
+  HOME_PICKS_KEY,
+  HOME_PLAYED_KEY,
+  HOME_RECENT_KEY,
+} from "@/lib/queryCache";
 import {
   PICKS_LIMIT,
+  PLAYED_HISTORY_READ,
+  PLAYED_LIMIT,
   RECENT_LIMIT,
   RECENT_SORT,
+  distinctPlayed,
   msUntilNextDay,
   picksDayKey,
 } from "./shelves";
@@ -37,9 +45,11 @@ export interface ShelfData {
 export interface HomeShelvesData {
   recent: ShelfData;
   picks: ShelfData;
+  /** Files most recently played, newest first, each once. */
+  played: ShelfData;
   /** Draw a fresh sample of picks for today. Stable. */
   reshufflePicks: () => void;
-  /** Refresh after a scan: the newest files may have changed. Stable. */
+  /** Refresh after a scan: the newest and the played files may have changed. Stable. */
   refreshAfterScan: () => void;
 }
 
@@ -94,6 +104,20 @@ export function useHomeShelves(
     queryFn: () => api.filesRandom({ limit: PICKS_LIMIT }),
   });
 
+  // Refreshed by every recorded play (lib/queryCache's
+  // invalidatePlayedSearches) and by clearing the history.
+  const played = useQuery({
+    queryKey: [HOME_PLAYED_KEY, wsId],
+    enabled,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    queryFn: async () =>
+      distinctPlayed(
+        (await api.historyList({ limit: PLAYED_HISTORY_READ })).items,
+        PLAYED_LIMIT,
+      ),
+  });
+
   // Callbacks stay referentially stable (they feed the memoized view and a
   // long-lived event subscription); the values they read live in a ref.
   const refetchPicks = picks.refetch;
@@ -108,6 +132,8 @@ export function useHomeShelves(
   }, [picksEmpty]);
   const refreshAfterScan = useCallback(() => {
     void qc.invalidateQueries({ queryKey: [HOME_RECENT_KEY, wsId] });
+    // A scan can remove a played file, bring one back, or re-read its meta.
+    void qc.invalidateQueries({ queryKey: [HOME_PLAYED_KEY, wsId] });
     // A scan does not reshuffle a sample the user already has today; it only
     // fills an empty shelf (the workspace had nothing to pick from before).
     if (picksEmptyRef.current)
@@ -134,9 +160,20 @@ export function useHomeShelves(
     [picks.data, picks.isFetched, picks.isError, picks.isFetching],
   );
 
+  const playedData = useMemo<ShelfData>(
+    () => ({
+      files: played.data ?? NO_FILES,
+      loaded: played.isFetched,
+      error: played.isError,
+      fetching: played.isFetching,
+    }),
+    [played.data, played.isFetched, played.isError, played.isFetching],
+  );
+
   return {
     recent: recentData,
     picks: picksData,
+    played: playedData,
     reshufflePicks,
     refreshAfterScan,
   };

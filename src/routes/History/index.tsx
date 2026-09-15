@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { isVirtualWorkspaceId } from "@shared/workspaceIds";
+import { invalidatePlayHistory } from "@/lib/queryCache";
 import { api } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -128,7 +129,7 @@ export default function History() {
   const clear = useMutation({
     mutationFn: () => api.historyClear(),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["history_list"] });
+      invalidatePlayHistory(qc);
     },
   });
   const onClear = useCallback(async () => {

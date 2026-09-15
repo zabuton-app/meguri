@@ -22,6 +22,10 @@ export const HOME_RECENT_KEY = "home_recent";
  *  ["files_random"]: the broad invalidations aimed at the discovery queue
  *  would otherwise redraw the day's sample). */
 export const HOME_PICKS_KEY = "home_picks";
+/** Same for the Recently played shelf (rows from the play history). */
+export const HOME_PLAYED_KEY = "home_played";
+/** Every Home shelf key: patched, dropped and removed together. */
+const HOME_SHELF_KEYS = [HOME_RECENT_KEY, HOME_PICKS_KEY, HOME_PLAYED_KEY];
 
 /** The SearchQuery part of a ["files_search", wsId, filter] query key. */
 function searchFilterOf(queryKey: readonly unknown[]): SearchQuery | undefined {
@@ -65,8 +69,8 @@ export function patchFileRowInCaches(
       matchesFile(row, workspaceId, fileId) ? { ...row, ...patch } : row,
     );
   qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, patchRows);
-  qc.setQueriesData<FileRow[]>({ queryKey: [HOME_RECENT_KEY] }, patchRows);
-  qc.setQueriesData<FileRow[]>({ queryKey: [HOME_PICKS_KEY] }, patchRows);
+  for (const key of HOME_SHELF_KEYS)
+    qc.setQueriesData<FileRow[]>({ queryKey: [key] }, patchRows);
 }
 
 /** Drop a file row from the list/search caches (infinite search + discovery queue). */
@@ -93,8 +97,8 @@ export function removeFileRowFromCaches(
   const dropRow = (old: FileRow[] | undefined) =>
     old?.filter((row) => !matchesFile(row, workspaceId, fileId));
   qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, dropRow);
-  qc.setQueriesData<FileRow[]>({ queryKey: [HOME_RECENT_KEY] }, dropRow);
-  qc.setQueriesData<FileRow[]>({ queryKey: [HOME_PICKS_KEY] }, dropRow);
+  for (const key of HOME_SHELF_KEYS)
+    qc.setQueriesData<FileRow[]>({ queryKey: [key] }, dropRow);
 }
 
 /** Patch the detail cache when the modal is open for the same file. */
@@ -111,12 +115,33 @@ export function patchFileDetailInCache(
 }
 
 /**
+ * Drop every Home shelf's rows outright, after a workspace is removed: its
+ * files may be on any of them. Removing rather than invalidating keeps the
+ * day's picks from being redrawn for another reason than the removal itself.
+ */
+export function removeHomeShelves(qc: QueryClient): void {
+  for (const key of HOME_SHELF_KEYS) qc.removeQueries({ queryKey: [key] });
+}
+
+/**
+ * Refresh everything that lists the play history: the history screen and the
+ * Home view's Recently played shelf. After clearing the history; a recorded
+ * play reaches the same through invalidatePlayedSearches.
+ */
+export function invalidatePlayHistory(qc: QueryClient): void {
+  void qc.invalidateQueries({ queryKey: ["history_list"] });
+  void qc.invalidateQueries({ queryKey: [HOME_PLAYED_KEY] });
+}
+
+/**
  * Invalidate only the searches affected by recording a play: a played/unplayed
  * filter (membership changes) or an "accessed" sort (recording bumps
  * last_accessed_at, so the order changes). Other lists keep their cache
  * instead of refetching every page.
  */
 export function invalidatePlayedSearches(qc: QueryClient): void {
+  // The Home view's Recently played shelf is the play history itself.
+  void qc.invalidateQueries({ queryKey: [HOME_PLAYED_KEY] });
   void qc.invalidateQueries({
     queryKey: ["files_search"],
     predicate: (q) => {
@@ -155,6 +180,7 @@ export function invalidateTagCatalog(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["files_search"] });
   void qc.invalidateQueries({ queryKey: ["files_random"] });
   void qc.invalidateQueries({ queryKey: [HOME_RECENT_KEY] });
+  void qc.invalidateQueries({ queryKey: [HOME_PLAYED_KEY] });
   void qc.invalidateQueries({ queryKey: ["file_get"] });
 }
 

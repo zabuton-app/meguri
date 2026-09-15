@@ -131,6 +131,7 @@ export const en: Record<TranslationKey, string> = {
   "home.scanAlreadyRunning": "A scan is already in progress",
   "home.shelfTitle": "Home",
   "home.shelfRecent": "Recently added",
+  "home.shelfPlayed": "Recently played",
   "home.shelfSeeAll": "See all",
   "home.shelfTodayPick": "Today's pick",
   "home.shelfMorePicks": "More picks",

@@ -8,13 +8,16 @@ import type {
 } from "@/ipc/types";
 import {
   HOME_PICKS_KEY,
+  HOME_PLAYED_KEY,
   HOME_RECENT_KEY,
   dropFromWatchLaterCache,
   invalidateCollectionSearches,
+  invalidatePlayHistory,
   invalidatePlayedSearches,
   invalidateTagCatalog,
   invalidateTagSearches,
   removeFileRowFromCaches,
+  removeHomeShelves,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
 
@@ -46,6 +49,7 @@ describe("syncFileRowAcrossCaches", () => {
     qc.setQueryData<FileRow[]>(["files_random", "ws", {}], [row]);
     qc.setQueryData<FileRow[]>([HOME_RECENT_KEY, "ws"], [row]);
     qc.setQueryData<FileRow[]>([HOME_PICKS_KEY, "ws", "2026-09-15"], [row]);
+    qc.setQueryData<FileRow[]>([HOME_PLAYED_KEY, "ws"], [row]);
     qc.setQueryData<FileDetail>(["file_get", "ws", 1], {
       ...row,
       absPath: "/a.mp4",
@@ -81,6 +85,7 @@ describe("syncFileRowAcrossCaches", () => {
     for (const key of [
       [HOME_RECENT_KEY, "ws"],
       [HOME_PICKS_KEY, "ws", "2026-09-15"],
+      [HOME_PLAYED_KEY, "ws"],
     ]) {
       const shelf = qc.getQueryData<FileRow[]>(key);
       expect(shelf?.[0].favorite).toBe(1);
@@ -92,6 +97,44 @@ describe("syncFileRowAcrossCaches", () => {
     expect(
       qc.getQueryData<FileRow[]>([HOME_PICKS_KEY, "ws", "2026-09-15"]),
     ).toEqual([]);
+    expect(qc.getQueryData<FileRow[]>([HOME_PLAYED_KEY, "ws"])).toEqual([]);
+  });
+
+  it("removes every Home shelf when a workspace goes", () => {
+    const qc = new QueryClient();
+    qc.setQueryData<FileRow[]>([HOME_RECENT_KEY, "ws"], []);
+    qc.setQueryData<FileRow[]>([HOME_PICKS_KEY, "ws", "2026-09-15"], []);
+    qc.setQueryData<FileRow[]>([HOME_PLAYED_KEY, "ws"], []);
+    qc.setQueryData<FileRow[]>(["files_random", "ws", {}], []);
+    removeHomeShelves(qc);
+    expect(qc.getQueryData([HOME_RECENT_KEY, "ws"])).toBeUndefined();
+    expect(
+      qc.getQueryData([HOME_PICKS_KEY, "ws", "2026-09-15"]),
+    ).toBeUndefined();
+    expect(qc.getQueryData([HOME_PLAYED_KEY, "ws"])).toBeUndefined();
+    // Discovery's queue is not a Home shelf.
+    expect(qc.getQueryData(["files_random", "ws", {}])).toEqual([]);
+  });
+
+  it("refreshes the played shelf with every play and with the history", () => {
+    const qc = new QueryClient();
+    const invalidated = (key: unknown[]) =>
+      qc.getQueryCache().find({ queryKey: key })?.state.isInvalidated;
+    qc.setQueryData<FileRow[]>([HOME_PLAYED_KEY, "ws"], []);
+    invalidatePlayedSearches(qc);
+    expect(invalidated([HOME_PLAYED_KEY, "ws"])).toBe(true);
+
+    const qc2 = new QueryClient();
+    qc2.setQueryData<FileRow[]>([HOME_PLAYED_KEY, "ws"], []);
+    qc2.setQueryData(["history_list", "ws"], { pages: [], pageParams: [] });
+    invalidatePlayHistory(qc2);
+    for (const key of [
+      [HOME_PLAYED_KEY, "ws"],
+      ["history_list", "ws"],
+    ])
+      expect(
+        qc2.getQueryCache().find({ queryKey: key })?.state.isInvalidated,
+      ).toBe(true);
   });
 
   it("invalidateTagCatalog refreshes the newest shelf but keeps the day's picks", () => {

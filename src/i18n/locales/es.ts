@@ -135,6 +135,7 @@ export const es: Record<TranslationKey, string> = {
   "home.scanAlreadyRunning": "Ya hay un escaneo en curso",
   "home.shelfTitle": "Inicio",
   "home.shelfRecent": "Añadidos recientemente",
+  "home.shelfPlayed": "Reproducidos recientemente",
   "home.shelfSeeAll": "Ver todo",
   "home.shelfTodayPick": "La elección de hoy",
   "home.shelfMorePicks": "Más sugerencias",

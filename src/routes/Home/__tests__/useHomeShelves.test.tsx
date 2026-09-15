@@ -10,12 +10,14 @@ import { PICKS_LIMIT, RECENT_LIMIT } from "@/routes/Home/shelves";
 const mocks = vi.hoisted(() => ({
   filesSearch: vi.fn<(query: unknown) => Promise<unknown>>(),
   filesRandom: vi.fn<(query: unknown) => Promise<unknown>>(),
+  historyList: vi.fn<(query: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock("@/ipc/client", () => ({
   api: {
     filesSearch: (query: unknown) => mocks.filesSearch(query),
     filesRandom: (query: unknown) => mocks.filesRandom(query),
+    historyList: (query: unknown) => mocks.historyList(query),
   },
 }));
 
@@ -34,6 +36,7 @@ describe("useHomeShelves", () => {
       nextCursor: null,
     });
     mocks.filesRandom.mockResolvedValue([sampleFileRow]);
+    mocks.historyList.mockResolvedValue({ items: [], nextCursor: null });
   });
 
   afterEach(() => {

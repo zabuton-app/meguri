@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { msUntilNextDay, picksDayKey } from "@/routes/Home/shelves";
+import {
+  distinctPlayed,
+  msUntilNextDay,
+  picksDayKey,
+} from "@/routes/Home/shelves";
 
 describe("picksDayKey", () => {
   it("keys on the local calendar day", () => {
@@ -15,5 +19,22 @@ describe("msUntilNextDay", () => {
     expect(msUntilNextDay(new Date(2026, 8, 15, 0, 0, 0))).toBe(
       24 * 60 * 60 * 1000,
     );
+  });
+});
+
+describe("distinctPlayed", () => {
+  const e = (workspaceId: string, id: number) => ({ workspaceId, id });
+
+  it("keeps each file's newest play, in order", () => {
+    expect(
+      distinctPlayed([e("a", 1), e("a", 2), e("a", 1), e("b", 1)], 10),
+    ).toEqual([e("a", 1), e("a", 2), e("b", 1)]);
+  });
+
+  it("stops at the limit", () => {
+    expect(distinctPlayed([e("a", 1), e("a", 2), e("a", 3)], 2)).toEqual([
+      e("a", 1),
+      e("a", 2),
+    ]);
   });
 });
