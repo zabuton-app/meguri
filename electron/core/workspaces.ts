@@ -29,12 +29,15 @@ export interface WorkspaceInfo {
 
 export {
   ALL_ID,
+  HOME_ID,
   COLLECTION_ID_PREFIX,
   WATCH_LATER_ID,
   collectionTarget,
 } from "../../shared/workspaceIds.js";
 import {
   ALL_ID,
+  HOME_ID,
+  VIRTUAL_WORKSPACE_LABELS,
   COLLECTION_ID_PREFIX,
   WATCH_LATER_ID,
   collectionTarget,
@@ -114,14 +117,21 @@ export class Workspaces {
   }
 
   list(): WorkspaceInfo[] {
-    // The virtual "All" workspace is always listed first.
+    // The virtual views are always listed first: "Home", then "All".
+    const home: WorkspaceInfo = {
+      id: HOME_ID,
+      path: "",
+      label: VIRTUAL_WORKSPACE_LABELS[HOME_ID],
+      active: this.config.activePath === HOME_ID,
+    };
     const all: WorkspaceInfo = {
       id: ALL_ID,
       path: "",
-      label: "All",
+      label: VIRTUAL_WORKSPACE_LABELS[ALL_ID],
       active: this.config.activePath === ALL_ID,
     };
     return [
+      home,
       all,
       ...this.config.roots.map((p) => {
         const id = Workspaces.idFor(p);
@@ -152,6 +162,7 @@ export class Workspaces {
     const collectionId = activeCollectionId(this.config.activePath);
     if (collectionId) return collectionTarget(collectionId);
     if (this.config.activePath === ALL_ID) return ALL_ID;
+    if (this.config.activePath === HOME_ID) return HOME_ID;
     return this.config.activePath
       ? Workspaces.idFor(this.config.activePath)
       : null;
@@ -160,6 +171,29 @@ export class Workspaces {
   /** Whether the virtual "All" (cross-workspace) view is active. */
   isAll(): boolean {
     return this.config.activePath === ALL_ID;
+  }
+
+  /** Whether the virtual "Home" (landing) view is active. */
+  isHome(): boolean {
+    return this.config.activePath === HOME_ID;
+  }
+
+  /**
+   * Whether a virtual view spanning every workspace is active ("All" or
+   * "Home"): queries fan out to all Cores, and nothing is scanned or edited
+   * as a single workspace would be.
+   */
+  isCrossWorkspace(): boolean {
+    return this.isAll() || this.isHome();
+  }
+
+  /**
+   * Whether the active view has no Core of its own (a cross-workspace view
+   * or a collection): its activePath is not a root path and must never be
+   * resolved as one.
+   */
+  isVirtual(): boolean {
+    return this.isCrossWorkspace() || this.isCollection();
   }
 
   isCollection(): boolean {
@@ -206,7 +240,7 @@ export class Workspaces {
    * otherwise just the active one (empty if none/failed). Search handlers use only this.
    */
   queryCores(): { id: string; core: Core }[] {
-    if (this.isAll()) return this.allCores();
+    if (this.isCrossWorkspace()) return this.allCores();
     // A collection has no Core of its own; never resolve "collection:xxx" as a
     // root path (Core.init would create a bogus workspace DB for it).
     if (this.isCollection()) return [];
@@ -221,11 +255,10 @@ export class Workspaces {
 
   /** The active Core (null if none selected). */
   active(): Core | null {
-    // "All" and collections are virtual: they have no Core of their own, and
-    // their activePath is not a real root path (resolving it via coreForPath
-    // would make Core.init create a bogus workspace DB).
-    if (!this.config.activePath || this.isAll() || this.isCollection())
-      return null;
+    // "All", "Home" and collections are virtual: they have no Core of their
+    // own, and their activePath is not a real root path (resolving it via
+    // coreForPath would make Core.init create a bogus workspace DB).
+    if (!this.config.activePath || this.isVirtual()) return null;
     return this.coreForPath(this.config.activePath);
   }
 
@@ -235,14 +268,9 @@ export class Workspaces {
     return p ? this.coreForPath(p) : null;
   }
 
-  /** The active workspace's initialization error (if any). "All" has none of its own. */
+  /** The active workspace's initialization error (if any). The virtual views have none of their own. */
   initError(): string | null {
-    if (
-      !this.config.activePath ||
-      this.config.activePath === ALL_ID ||
-      this.isCollection()
-    )
-      return null;
+    if (!this.config.activePath || this.isVirtual()) return null;
     return (
       this.errors.get(Workspaces.idFor(this.config.activePath))?.message ?? null
     );
@@ -250,12 +278,7 @@ export class Workspaces {
 
   /** A broad classification for the active workspace's initialization error. */
   initErrorKind(): InitErrorKind | null {
-    if (
-      !this.config.activePath ||
-      this.config.activePath === ALL_ID ||
-      this.isCollection()
-    )
-      return null;
+    if (!this.config.activePath || this.isVirtual()) return null;
     return (
       this.errors.get(Workspaces.idFor(this.config.activePath))?.kind ?? null
     );
@@ -295,11 +318,8 @@ export class Workspaces {
     }
     if (this.config.activePath === p) {
       this.config.activePath = this.config.roots[0] ?? null;
-    } else if (
-      this.config.activePath === ALL_ID &&
-      this.config.roots.length === 0
-    ) {
-      // "All" is meaningless with no workspaces left.
+    } else if (this.isCrossWorkspace() && this.config.roots.length === 0) {
+      // "All" / "Home" are meaningless with no workspaces left.
       this.config.activePath = null;
     }
     this.persist();
@@ -585,10 +605,10 @@ export class Workspaces {
     this.persist();
   }
 
-  /** Switch the active workspace (accepts the "All" sentinel). */
+  /** Switch the active workspace (accepts the "All" / "Home" sentinels). */
   setActive(p: string): void {
-    if (p === ALL_ID) {
-      this.config.activePath = ALL_ID;
+    if (p === ALL_ID || p === HOME_ID) {
+      this.config.activePath = p;
       this.persist();
       return;
     }
@@ -611,8 +631,8 @@ export class Workspaces {
       const np = this.add(cliRoot);
       this.config.activePath = np;
     }
-    if (this.config.activePath === ALL_ID) {
-      // "All" is valid only when at least one workspace is registered.
+    if (this.isCrossWorkspace()) {
+      // "All" / "Home" are valid only when at least one workspace is registered.
       if (this.config.roots.length === 0) this.config.activePath = null;
     } else if (this.isCollection()) {
       if (!this.activeCollection())
@@ -624,12 +644,8 @@ export class Workspaces {
       this.config.activePath = this.config.roots[0] ?? null;
     }
     this.persist();
-    // Pre-open the active workspace (the virtual "All" has no Core of its own).
-    if (
-      this.config.activePath &&
-      this.config.activePath !== ALL_ID &&
-      !this.isCollection()
-    ) {
+    // Pre-open the active workspace (the virtual views have no Core of their own).
+    if (this.config.activePath && !this.isVirtual()) {
       this.coreForPath(this.config.activePath);
     }
   }

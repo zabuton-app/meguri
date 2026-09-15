@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { hasTimeline } from "@/lib/mediaKind";
 import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { metaLine } from "@/lib/mediaMeta";
 import { useActivateFile } from "@/audio/useActivateFile";
 import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
@@ -367,6 +368,9 @@ export const MediaGrid = memo(function MediaGrid({
 
 // The parent (MediaGrid) re-renders on every thumb:done, so memoize this and
 // only re-render cards whose version changed (onTagClick is stabilized in the parent).
+// The Home view's ShelfCard (src/routes/Home/shelfParts.tsx) is this card
+// compacted (rating over the picture, tags beside the meta); a change to the
+// thumbnail region belongs in both.
 const MediaCard = memo(function MediaCard({
   file,
   version,
@@ -462,14 +466,3 @@ const MediaCard = memo(function MediaCard({
     </div>
   );
 });
-
-/** Builds the resolution/duration metadata line (omitting missing items). */
-function metaLine(file: FileRow): string {
-  const dims =
-    file.width && file.height ? `${file.width}×${file.height}` : null;
-  const dur =
-    hasTimeline(file.kind) && file.duration
-      ? formatDuration(file.duration)
-      : null;
-  return [dims, dur].filter(Boolean).join(" · ") || "—";
-}

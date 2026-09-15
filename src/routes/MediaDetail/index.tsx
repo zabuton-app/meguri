@@ -11,7 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyTagFilter } from "@/lib/ui-events";
-import { api, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
+import { api, COLLECTION_ID_PREFIX } from "@/ipc/client";
+import { isVirtualWorkspaceId } from "@shared/workspaceIds";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -89,7 +90,7 @@ export default function MediaDetail() {
   const activeId = status.data?.workspaceId ?? "";
   const activeFallback =
     activeId &&
-    activeId !== ALL_ID &&
+    !isVirtualWorkspaceId(activeId) &&
     !activeId.startsWith(COLLECTION_ID_PREFIX)
       ? activeId
       : "";

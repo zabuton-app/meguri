@@ -3,3 +3,9 @@
 export function fileNameOf(relPath: string): string {
   return relPath.split(/[\\/]/).pop() || relPath;
 }
+
+/** The folder part of a relPath ("" for a file at the root), separators kept as given. */
+export function folderOf(relPath: string): string {
+  const i = Math.max(relPath.lastIndexOf("/"), relPath.lastIndexOf("\\"));
+  return i === -1 ? "" : relPath.slice(0, i);
+}

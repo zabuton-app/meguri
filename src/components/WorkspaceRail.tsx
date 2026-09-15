@@ -12,6 +12,7 @@ import {
   Pencil,
   Plus,
   Settings,
+  House,
   Star,
   X,
 } from "lucide-react";
@@ -38,11 +39,13 @@ import {
 } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import { api, events, ALL_ID, collectionTarget } from "@/ipc/client";
+import { HOME_ID, isVirtualWorkspaceId } from "@shared/workspaceIds";
 import type {
   UserCollection,
   WorkspaceInfo,
   WorkspacesList,
 } from "@/ipc/types";
+import { removeHomeShelves } from "@/lib/queryCache";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { CollectionEditDialog } from "@/components/CollectionEditDialog";
 import {
@@ -152,6 +155,8 @@ export function WorkspaceRail() {
       toast.success(t("workspace.removedToast"), {
         description: t("workspace.removedToastDetail", { label }),
       });
+      // The Home shelves may hold that workspace's files.
+      removeHomeShelves(qc);
       void refreshAll();
     },
   });
@@ -183,9 +188,10 @@ export function WorkspaceRail() {
   // if other locked collections ever exist.
   const watchLater = allCollections.find((c) => c.id === WATCH_LATER_ID);
   const collections = allCollections.filter((c) => c.id !== WATCH_LATER_ID);
+  const homeWorkspace = list.find((w) => w.id === HOME_ID);
   const allWorkspace = list.find((w) => w.id === ALL_ID);
-  const realWorkspaces = list.filter((w) => w.id !== ALL_ID);
-  // Only real workspaces are draggable; the virtual "All" stays pinned at the top.
+  const realWorkspaces = list.filter((w) => !isVirtualWorkspaceId(w.id));
+  // Only real workspaces are draggable; the virtual "Home" and "All" stay pinned at the top.
   const sortableIds = realWorkspaces.map((w) => w.id);
   const collectionIds = collections.map((c) => c.id);
 
@@ -231,11 +237,11 @@ export function WorkspaceRail() {
     if (oldIndex < 0 || newIndex < 0) return;
     const nextIds = arrayMove(sortableIds, oldIndex, newIndex);
 
-    // Optimistically reorder the cached list (keep "All" first), then persist.
+    // Optimistically reorder the cached list (keep the virtual views first), then persist.
     qc.setQueryData<WorkspacesList>(["workspaces_list"], (prev) => {
       if (!prev) return prev;
       const byId = new Map(prev.workspaces.map((w) => [w.id, w]));
-      const all = prev.workspaces.filter((w) => w.id === ALL_ID);
+      const all = prev.workspaces.filter((w) => isVirtualWorkspaceId(w.id));
       const reordered = nextIds
         .map((id) => byId.get(id))
         .filter((w): w is WorkspaceInfo => !!w);
@@ -282,6 +288,16 @@ export function WorkspaceRail() {
               ]}
               onDragEnd={onDragEnd}
             >
+              {homeWorkspace && (
+                <WorkspaceButton
+                  workspace={homeWorkspace}
+                  onClick={() => {
+                    if (!homeWorkspace.active)
+                      switchTo.mutate(homeWorkspace.id);
+                  }}
+                  t={t}
+                />
+              )}
               {allWorkspace && (
                 <WorkspaceButton
                   workspace={allWorkspace}
@@ -567,8 +583,10 @@ function WorkspaceButton({
   onRemove?: () => void;
   t: TFunc;
 }) {
-  const isAll = workspace.id === ALL_ID;
-  // "All" is pinned (not registered as a sortable item), so disable dragging for it.
+  const isAll = isVirtualWorkspaceId(workspace.id);
+  const virtualLabel =
+    workspace.id === HOME_ID ? t("workspace.home") : t("workspace.all");
+  // The virtual views are pinned (not registered as sortable items), so disable dragging for them.
   // Disable drop layout animation: the optimistic cache reorder already moves the
   // item to its final slot, so animating the layout change makes it jump on drop.
   const sortable = useSortable({
@@ -587,8 +605,8 @@ function WorkspaceButton({
     <button
       type="button"
       onClick={onClick}
-      title={isAll ? t("workspace.all") : workspace.path}
-      aria-label={isAll ? t("workspace.all") : workspace.label}
+      title={isAll ? virtualLabel : workspace.path}
+      aria-label={isAll ? virtualLabel : workspace.label}
       {...(isAll ? {} : sortable.attributes)}
       {...(isAll ? {} : sortable.listeners)}
       className={cn(
@@ -599,7 +617,9 @@ function WorkspaceButton({
           : "rounded-2xl bg-surface text-fg hover:rounded-xl hover:bg-overlay",
       )}
     >
-      {isAll ? (
+      {workspace.id === HOME_ID ? (
+        <House className={cn("size-5", workspace.active && "fill-current")} />
+      ) : isAll ? (
         <Star className={cn("size-5", workspace.active && "fill-current")} />
       ) : workspace.emoji ? (
         <span className="text-xl leading-none">{workspace.emoji}</span>

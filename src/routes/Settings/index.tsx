@@ -35,6 +35,7 @@ import {
   type KeybindingPreset,
 } from "@/settings/keybindings";
 import { LOGO_IDS, type LogoId } from "@shared/ipc/schema";
+import { HOME_LAYOUTS, isHomeLayoutId } from "@/routes/Home/layouts";
 import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
@@ -130,6 +131,8 @@ export default function Settings() {
     setHideSupportLink,
     hoverPreview,
     setHoverPreview,
+    homeLayout,
+    setHomeLayout,
     frameQuality,
     playlistImageSeconds,
     setPlaylistImageSeconds,
@@ -246,6 +249,38 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </section>
+
+              {/* Home layout: which arrangement the Home view takes. Offered
+                  only once there is more than one to choose from. */}
+              {HOME_LAYOUTS.length > 1 && (
+                <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-bright-fg">
+                      {t("settings.homeLayout")}
+                    </span>
+                    <span className="text-xs text-muted">
+                      {t("settings.homeLayoutDesc")}
+                    </span>
+                  </div>
+                  <Select
+                    value={homeLayout}
+                    onValueChange={(v) => {
+                      if (isHomeLayoutId(v)) setHomeLayout(v);
+                    }}
+                  >
+                    <SelectTrigger className="min-w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HOME_LAYOUTS.map((layout) => (
+                        <SelectItem key={layout.id} value={layout.id}>
+                          {t(layout.labelKey)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </section>
+              )}
 
               {/* Appearance switch */}
               <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">

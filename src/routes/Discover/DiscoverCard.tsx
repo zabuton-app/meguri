@@ -15,7 +15,10 @@ import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import log from "@/lib/logger";
-import { dropFromWatchLaterCache } from "@/lib/queryCache";
+import {
+  dropFromWatchLaterCache,
+  invalidatePlayedSearches,
+} from "@/lib/queryCache";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
@@ -361,7 +364,11 @@ export function DiscoverCard({
               if (isAudio) pauseAudio();
               void api
                 .openExternal(file.id, wsId)
-                .then(() => dropFromWatchLaterCache(qc, wsId, file.id))
+                .then(() => {
+                  dropFromWatchLaterCache(qc, wsId, file.id);
+                  // It is a play, so everything listing plays refreshes too.
+                  invalidatePlayedSearches(qc);
+                })
                 .catch((e: unknown) => log.error("open external", e));
             }}
             title={t("media.openExternal")}

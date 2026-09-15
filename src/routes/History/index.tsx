@@ -16,6 +16,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { isVirtualWorkspaceId } from "@shared/workspaceIds";
+import { invalidatePlayHistory } from "@/lib/queryCache";
 import { api } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -91,8 +93,10 @@ export default function History() {
     for (const w of wsList.data?.workspaces ?? []) map.set(w.id, w.label);
     return map;
   }, [wsList.data]);
-  // The list always contains the virtual "All" entry, so > 2 means multiple real roots.
-  const showWsLabel = wsLabels.size > 2;
+  // Only real roots count: the list also carries the virtual "Home" / "All" entries.
+  const showWsLabel =
+    (wsList.data?.workspaces ?? []).filter((w) => !isVirtualWorkspaceId(w.id))
+      .length > 1;
 
   const history = useInfiniteQuery({
     queryKey: ["history_list", wsId],
@@ -125,7 +129,7 @@ export default function History() {
   const clear = useMutation({
     mutationFn: () => api.historyClear(),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["history_list"] });
+      invalidatePlayHistory(qc);
     },
   });
   const onClear = useCallback(async () => {

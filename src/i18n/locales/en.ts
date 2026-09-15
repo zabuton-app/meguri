@@ -72,6 +72,8 @@ export const en: Record<TranslationKey, string> = {
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",
+  "settings.homeLayout": "Home layout",
+  "settings.homeLayoutDesc": "How the Home view is arranged.",
   "settings.support": "Support development",
   "settings.supportDesc":
     "If you enjoy this app, please consider supporting its development.",
@@ -127,6 +129,20 @@ export const en: Record<TranslationKey, string> = {
   "home.scanError": "An error occurred during the scan",
   "home.scanStartFailed": "Could not start scan",
   "home.scanAlreadyRunning": "A scan is already in progress",
+  "home.shelfTitle": "Home",
+  "home.shelfRecent": "Recently added",
+  "home.shelfPlayed": "Recently played",
+  "home.shelfSeeAll": "See all",
+  "home.shelfTodayPick": "Today's pick",
+  "home.shelfMorePicks": "More picks",
+  "home.shelfOpenDetail": "Open details",
+  "home.shelfOpenDiscover": "Open in Discovery",
+  "home.shelfEmpty":
+    "Nothing to show yet. Recently added fills in once a scan has run.",
+  "home.shelfError": "Could not load this shelf.",
+  "home.shelfSplit": "Adjust the split between today's pick and more picks",
+  "home.layoutTodayPick": "Today's pick",
+  "home.shelfReshuffle": "Reshuffle",
 
   // command menu
   "command.title": "Command menu",
@@ -394,6 +410,7 @@ export const en: Record<TranslationKey, string> = {
 
   // workspace rail
   "workspace.all": "All",
+  "workspace.home": "Home",
   "workspace.settings": "Settings",
   "workspace.edit": "Edit workspace",
   "workspace.editAction": "Save",
