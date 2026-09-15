@@ -110,6 +110,13 @@ describe("Home view", () => {
       ),
     ).toBeTruthy();
     expect(within(shelves).getByText("pick-22.mp4")).toBeTruthy();
+    // The reshuffle sits beside "Open in Discovery", not by the stage's title.
+    const reshuffle = within(shelves).getByRole("button", {
+      name: "Reshuffle",
+    });
+    expect(
+      reshuffle.parentElement?.textContent?.includes("Open in Discovery"),
+    ).toBe(true);
     // Only the shelf queries ran: no list page, no filter bar.
     expect(mocks.filesSearch).toHaveBeenCalledTimes(1);
     expect(mocks.filesSearch).toHaveBeenCalledWith({

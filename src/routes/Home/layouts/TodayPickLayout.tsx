@@ -67,16 +67,39 @@ export const TodayPickLayout = memo(function TodayPickLayout({
     return sideFit === 0 ? rest : rest.slice(0, sideFit);
   }, [picks.files, sideFit]);
 
+  // Retry / redraw the picks. It sits beside "Open in Discovery" on the row
+  // of picks; with no such row (a single pick, or none) it stays reachable
+  // next to the stage's title or the empty / error line.
+  const reshuffle = useMemo(
+    () => (
+      <Button
+        size="icon"
+        variant="outline"
+        className="size-6 [&_svg]:size-3.5"
+        title={t("home.shelfReshuffle")}
+        aria-label={t("home.shelfReshuffle")}
+        onClick={onReshufflePicks}
+        disabled={picks.fetching}
+      >
+        <RefreshCw className={cn(picks.fetching && "animate-spin")} />
+      </Button>
+    ),
+    [t, onReshufflePicks, picks.fetching],
+  );
+
   const rows = useMemo<Row[]>(
     () => [
       {
         id: "more-picks",
         title: t("home.shelfMorePicks"),
         action: (
-          <RowAction onClick={onOpenDiscover}>
-            {t("home.shelfOpenDiscover")}
-            <Sparkles className="size-3.5" />
-          </RowAction>
+          <div className="flex items-center gap-2">
+            <RowAction onClick={onOpenDiscover}>
+              {t("home.shelfOpenDiscover")}
+              <Sparkles className="size-3.5" />
+            </RowAction>
+            {reshuffle}
+          </div>
         ),
         data: picks,
         files: morePicks,
@@ -97,7 +120,16 @@ export const TodayPickLayout = memo(function TodayPickLayout({
         gridClass: WRAP_GRID_CLASS,
       },
     ],
-    [t, picks, morePicks, recent, onOpenDiscover, onSeeAllRecent, attachGrid],
+    [
+      t,
+      picks,
+      morePicks,
+      recent,
+      onOpenDiscover,
+      onSeeAllRecent,
+      attachGrid,
+      reshuffle,
+    ],
   );
   // Keyboard order: the hero, then each row — exactly what is on screen.
   const shelves = useMemo<FileRow[][]>(
@@ -156,20 +188,6 @@ export const TodayPickLayout = memo(function TodayPickLayout({
     !recent.error &&
     picks.files.length === 0 &&
     recent.files.length === 0;
-  // Retry / redraw the picks: on the hero, and on its own when there is none.
-  const reshuffle = (
-    <Button
-      size="icon"
-      variant="outline"
-      className="size-6 [&_svg]:size-3.5"
-      title={t("home.shelfReshuffle")}
-      aria-label={t("home.shelfReshuffle")}
-      onClick={onReshufflePicks}
-      disabled={picks.fetching}
-    >
-      <RefreshCw className={cn(picks.fetching && "animate-spin")} />
-    </Button>
-  );
 
   const sideRow = rows[0];
   const fullRows = rows.slice(1);
@@ -210,7 +228,10 @@ export const TodayPickLayout = memo(function TodayPickLayout({
             style={{ gridTemplateColumns: splitColumns(split.ratio) }}
           >
             <div className="flex min-w-0 flex-col gap-2">
-              <RowHeader title={t("home.shelfTodayPick")} action={reshuffle} />
+              <RowHeader
+                title={t("home.shelfTodayPick")}
+                action={morePicks.length > 0 ? null : reshuffle}
+              />
               <HeroCard
                 ref={attachHero}
                 file={hero}
