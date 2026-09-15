@@ -51,6 +51,9 @@ export const en: Record<TranslationKey, string> = {
   "settings.hoverPreview": "Hover preview",
   "settings.hoverPreviewDesc":
     "Preview the scene under the cursor while hovering over a video thumbnail.",
+  "settings.homeLanding": "Home landing",
+  "settings.homeLandingDesc":
+    "Show the Recently added and Picks for today shelves above the list.",
   "settings.frameQuality": "Preview quality",
   "settings.frameQualityDesc":
     "Quality of Discovery hover previews and scene rail frames. Higher is slower to generate.",
@@ -127,6 +130,14 @@ export const en: Record<TranslationKey, string> = {
   "home.scanError": "An error occurred during the scan",
   "home.scanStartFailed": "Could not start scan",
   "home.scanAlreadyRunning": "A scan is already in progress",
+  "home.landingTitle": "Home",
+  "home.landingCollapse": "Collapse",
+  "home.landingRecent": "Recently added",
+  "home.landingSeeAll": "See all",
+  "home.landingPicks": "Picks for today",
+  "home.landingPicksHint": "A new set every day",
+  "home.landingOpenDiscover": "Open in Discovery",
+  "home.landingReshuffle": "Reshuffle",
 
   // command menu
   "command.title": "Command menu",

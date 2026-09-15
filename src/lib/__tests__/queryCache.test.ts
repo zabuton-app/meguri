@@ -7,10 +7,14 @@ import type {
   SearchResult,
 } from "@/ipc/types";
 import {
+  HOME_PICKS_KEY,
+  HOME_RECENT_KEY,
   dropFromWatchLaterCache,
   invalidateCollectionSearches,
   invalidatePlayedSearches,
+  invalidateTagCatalog,
   invalidateTagSearches,
+  removeFileRowFromCaches,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
 
@@ -40,6 +44,8 @@ describe("syncFileRowAcrossCaches", () => {
       pageParams: [undefined],
     });
     qc.setQueryData<FileRow[]>(["files_random", "ws", {}], [row]);
+    qc.setQueryData<FileRow[]>([HOME_RECENT_KEY, "ws"], [row]);
+    qc.setQueryData<FileRow[]>([HOME_PICKS_KEY, "ws", "2026-09-15"], [row]);
     qc.setQueryData<FileDetail>(["file_get", "ws", 1], {
       ...row,
       absPath: "/a.mp4",
@@ -70,6 +76,37 @@ describe("syncFileRowAcrossCaches", () => {
     const detail = qc.getQueryData<FileDetail>(["file_get", "ws", 1]);
     expect(detail?.favorite).toBe(1);
     expect(detail?.rating).toBe(4);
+
+    // The home landing shelves hold plain rows like the discovery queue.
+    for (const key of [
+      [HOME_RECENT_KEY, "ws"],
+      [HOME_PICKS_KEY, "ws", "2026-09-15"],
+    ]) {
+      const shelf = qc.getQueryData<FileRow[]>(key);
+      expect(shelf?.[0].favorite).toBe(1);
+      expect(shelf?.[0].rating).toBe(4);
+    }
+
+    removeFileRowFromCaches(qc, "ws", 1);
+    expect(qc.getQueryData<FileRow[]>([HOME_RECENT_KEY, "ws"])).toEqual([]);
+    expect(
+      qc.getQueryData<FileRow[]>([HOME_PICKS_KEY, "ws", "2026-09-15"]),
+    ).toEqual([]);
+  });
+
+  it("invalidateTagCatalog refreshes the newest shelf but keeps the day's picks", () => {
+    // The picks are a sample meant to hold still for the day; a tag rename
+    // changes nothing about which files were drawn.
+    const qc = new QueryClient();
+    qc.setQueryData<FileRow[]>([HOME_RECENT_KEY, "ws"], []);
+    qc.setQueryData<FileRow[]>([HOME_PICKS_KEY, "ws", "2026-09-15"], []);
+    qc.setQueryData<FileRow[]>(["files_random", "ws", {}], []);
+    invalidateTagCatalog(qc);
+    const invalidated = (key: unknown[]) =>
+      qc.getQueryCache().find({ queryKey: key })?.state.isInvalidated;
+    expect(invalidated([HOME_RECENT_KEY, "ws"])).toBe(true);
+    expect(invalidated(["files_random", "ws", {}])).toBe(true);
+    expect(invalidated([HOME_PICKS_KEY, "ws", "2026-09-15"])).toBe(false);
   });
 });
 

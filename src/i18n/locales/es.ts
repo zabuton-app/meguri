@@ -51,6 +51,9 @@ export const es: Record<TranslationKey, string> = {
   "settings.hoverPreview": "Vista previa al pasar el cursor",
   "settings.hoverPreviewDesc":
     "Muestra la escena bajo el cursor al pasar sobre la miniatura de un vídeo.",
+  "settings.homeLanding": "Inicio con estantes",
+  "settings.homeLandingDesc":
+    "Muestra los estantes «Añadidos recientemente» y «Selección de hoy» encima de la lista.",
   "settings.frameQuality": "Calidad de la vista previa",
   "settings.frameQualityDesc":
     "Calidad de las vistas previas al pasar el cursor y de la fila de escenas en Descubrir. Cuanto más alta, más lenta la generación.",
@@ -131,6 +134,14 @@ export const es: Record<TranslationKey, string> = {
   "home.scanError": "Se produjo un error durante el escaneo",
   "home.scanStartFailed": "No se pudo iniciar el escaneo",
   "home.scanAlreadyRunning": "Ya hay un escaneo en curso",
+  "home.landingTitle": "Inicio",
+  "home.landingCollapse": "Contraer",
+  "home.landingRecent": "Añadidos recientemente",
+  "home.landingSeeAll": "Ver todo",
+  "home.landingPicks": "Selección de hoy",
+  "home.landingPicksHint": "Cambia cada día",
+  "home.landingOpenDiscover": "Abrir en Descubrir",
+  "home.landingReshuffle": "Volver a elegir",
 
   // command menu
   "command.title": "Menú de comandos",

@@ -51,6 +51,9 @@ export const fr: Record<TranslationKey, string> = {
   "settings.hoverPreview": "Aperçu au survol",
   "settings.hoverPreviewDesc":
     "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
+  "settings.homeLanding": "Accueil avec étagères",
+  "settings.homeLandingDesc":
+    "Affiche les étagères « Ajoutés récemment » et « Sélection du jour » au-dessus de la liste.",
   "settings.frameQuality": "Qualité des aperçus",
   "settings.frameQualityDesc":
     "Qualité des aperçus au survol et de la rangée de scènes dans Découverte. Plus elle est élevée, plus la génération est lente.",
@@ -131,6 +134,14 @@ export const fr: Record<TranslationKey, string> = {
   "home.scanError": "Une erreur s'est produite pendant le scan",
   "home.scanStartFailed": "Impossible de démarrer le scan",
   "home.scanAlreadyRunning": "Un scan est déjà en cours",
+  "home.landingTitle": "Accueil",
+  "home.landingCollapse": "Replier",
+  "home.landingRecent": "Ajoutés récemment",
+  "home.landingSeeAll": "Tout voir",
+  "home.landingPicks": "Sélection du jour",
+  "home.landingPicksHint": "Renouvelée chaque jour",
+  "home.landingOpenDiscover": "Ouvrir dans Découverte",
+  "home.landingReshuffle": "Repiocher",
 
   // command menu
   "command.title": "Menu de commandes",

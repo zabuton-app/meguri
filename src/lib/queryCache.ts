@@ -12,6 +12,17 @@ import type {
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
+/**
+ * Query key prefix of the home landing's Recently added shelf (a plain FileRow[]
+ * like the discovery queue). Declared here rather than imported from the route
+ * so lib/ does not depend on routes/.
+ */
+export const HOME_RECENT_KEY = "home_recent";
+/** Same for the landing's Picks for today shelf (deliberately not under
+ *  ["files_random"]: the broad invalidations aimed at the discovery queue
+ *  would otherwise redraw the day's sample). */
+export const HOME_PICKS_KEY = "home_picks";
+
 /** The SearchQuery part of a ["files_search", wsId, filter] query key. */
 function searchFilterOf(queryKey: readonly unknown[]): SearchQuery | undefined {
   return queryKey[2] as SearchQuery | undefined;
@@ -25,7 +36,7 @@ function matchesFile(
   return row.id === fileId && row.workspaceId === workspaceId;
 }
 
-/** Patch a file row across list/search caches (infinite search + discovery queue). */
+/** Patch a file row across list/search caches (infinite search, discovery queue, home shelves). */
 export function patchFileRowInCaches(
   qc: QueryClient,
   workspaceId: string,
@@ -49,11 +60,13 @@ export function patchFileRowInCaches(
           }
         : old,
   );
-  qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, (old) =>
+  const patchRows = (old: FileRow[] | undefined) =>
     old?.map((row) =>
       matchesFile(row, workspaceId, fileId) ? { ...row, ...patch } : row,
-    ),
-  );
+    );
+  qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, patchRows);
+  qc.setQueriesData<FileRow[]>({ queryKey: [HOME_RECENT_KEY] }, patchRows);
+  qc.setQueriesData<FileRow[]>({ queryKey: [HOME_PICKS_KEY] }, patchRows);
 }
 
 /** Drop a file row from the list/search caches (infinite search + discovery queue). */
@@ -77,9 +90,11 @@ export function removeFileRowFromCaches(
           }
         : old,
   );
-  qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, (old) =>
-    old?.filter((row) => !matchesFile(row, workspaceId, fileId)),
-  );
+  const dropRow = (old: FileRow[] | undefined) =>
+    old?.filter((row) => !matchesFile(row, workspaceId, fileId));
+  qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, dropRow);
+  qc.setQueriesData<FileRow[]>({ queryKey: [HOME_RECENT_KEY] }, dropRow);
+  qc.setQueriesData<FileRow[]>({ queryKey: [HOME_PICKS_KEY] }, dropRow);
 }
 
 /** Patch the detail cache when the modal is open for the same file. */
@@ -139,6 +154,7 @@ export function invalidateTagCatalog(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
   void qc.invalidateQueries({ queryKey: ["files_search"] });
   void qc.invalidateQueries({ queryKey: ["files_random"] });
+  void qc.invalidateQueries({ queryKey: [HOME_RECENT_KEY] });
   void qc.invalidateQueries({ queryKey: ["file_get"] });
 }
 

@@ -130,6 +130,8 @@ export default function Settings() {
     setHideSupportLink,
     hoverPreview,
     setHoverPreview,
+    homeLanding,
+    setHomeLanding,
     frameQuality,
     playlistImageSeconds,
     setPlaylistImageSeconds,
@@ -245,6 +247,22 @@ export default function Settings() {
                     ))}
                   </SelectContent>
                 </Select>
+              </section>
+
+              {/* Home landing shelves (Recently added / Picks for today) */}
+              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.homeLanding")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.homeLandingDesc")}
+                  </span>
+                </div>
+                <Switch
+                  checked={homeLanding}
+                  onCheckedChange={setHomeLanding}
+                />
               </section>
 
               {/* Appearance switch */}

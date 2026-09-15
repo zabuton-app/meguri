@@ -49,6 +49,9 @@ export const ko: Record<TranslationKey, string> = {
   "settings.hoverPreview": "호버 미리보기",
   "settings.hoverPreviewDesc":
     "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",
+  "settings.homeLanding": "홈 랜딩",
+  "settings.homeLandingDesc":
+    "목록 위에 「최근 추가」 「오늘의 추천」 선반을 표시합니다.",
   "settings.frameQuality": "미리보기 화질",
   "settings.frameQualityDesc":
     "디스커버리의 호버 미리보기와 장면 레일의 화질. 높을수록 생성이 느려집니다.",
@@ -124,6 +127,14 @@ export const ko: Record<TranslationKey, string> = {
   "home.scanError": "스캔 중 오류가 발생했습니다",
   "home.scanStartFailed": "스캔을 시작할 수 없습니다",
   "home.scanAlreadyRunning": "스캔이 이미 실행 중입니다",
+  "home.landingTitle": "홈",
+  "home.landingCollapse": "접기",
+  "home.landingRecent": "최근 추가",
+  "home.landingSeeAll": "모두 보기",
+  "home.landingPicks": "오늘의 추천",
+  "home.landingPicksHint": "매일 바뀝니다",
+  "home.landingOpenDiscover": "디스커버리에서 열기",
+  "home.landingReshuffle": "다시 뽑기",
 
   // command menu
   "command.title": "명령 메뉴",

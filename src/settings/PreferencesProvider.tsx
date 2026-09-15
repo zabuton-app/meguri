@@ -69,6 +69,8 @@ interface Prefs {
   keybindingPreset: KeybindingPreset;
   hideSupportLink: boolean;
   hoverPreview: boolean;
+  /** Whether the home list shows the landing shelves (Recently added / Picks) above it. */
+  homeLanding: boolean;
   frameQuality: FrameQuality;
   emojiStyle: EmojiStyle;
   /** Seconds a still image is shown in the playlist player before advancing. */
@@ -101,6 +103,7 @@ const DEFAULTS: Prefs = {
   keybindingPreset: DEFAULT_KEYBINDING_PRESET,
   hideSupportLink: false,
   hoverPreview: true,
+  homeLanding: true,
   frameQuality: DEFAULT_FRAME_QUALITY,
   emojiStyle: DEFAULT_EMOJI_STYLE,
   playlistImageSeconds: DEFAULT_PLAYLIST_IMAGE_SECONDS,
@@ -148,6 +151,10 @@ function loadPrefs(): Prefs {
           typeof parsed.hoverPreview === "boolean"
             ? parsed.hoverPreview
             : DEFAULTS.hoverPreview,
+        homeLanding:
+          typeof parsed.homeLanding === "boolean"
+            ? parsed.homeLanding
+            : DEFAULTS.homeLanding,
         frameQuality: isFrameQuality(parsed.frameQuality)
           ? parsed.frameQuality
           : DEFAULT_FRAME_QUALITY,
@@ -198,6 +205,7 @@ interface PrefsCtx extends Prefs {
   setKeybindingPreset: (p: KeybindingPreset) => void;
   setHideSupportLink: (hidden: boolean) => void;
   setHoverPreview: (enabled: boolean) => void;
+  setHomeLanding: (enabled: boolean) => void;
   setFrameQuality: (q: FrameQuality) => void;
   setEmojiStyle: (s: EmojiStyle) => void;
   setPlaylistImageSeconds: (n: number) => void;
@@ -242,6 +250,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPrefs((p) => ({ ...p, hideSupportLink: hidden })),
       setHoverPreview: (enabled) =>
         setPrefs((p) => ({ ...p, hoverPreview: enabled })),
+      setHomeLanding: (enabled) =>
+        setPrefs((p) => ({ ...p, homeLanding: enabled })),
       setFrameQuality: (q) => setPrefs((p) => ({ ...p, frameQuality: q })),
       setEmojiStyle: (s) => setPrefs((p) => ({ ...p, emojiStyle: s })),
       setPlaylistImageSeconds: (n) =>

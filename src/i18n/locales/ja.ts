@@ -49,6 +49,9 @@ export const ja = {
   "settings.hoverPreview": "ホバープレビュー",
   "settings.hoverPreviewDesc":
     "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
+  "settings.homeLanding": "ホームのランディング",
+  "settings.homeLandingDesc":
+    "一覧の上に「最近追加」「今日のおすすめ」の棚を表示します。",
   "settings.frameQuality": "プレビュー画質",
   "settings.frameQualityDesc":
     "ディスカバリーのホバープレビューとシーンレールの画質。高いほど生成が遅くなります。",
@@ -126,6 +129,14 @@ export const ja = {
   "home.scanError": "スキャン中にエラーが発生しました",
   "home.scanStartFailed": "スキャンを開始できませんでした",
   "home.scanAlreadyRunning": "スキャンは既に実行中です",
+  "home.landingTitle": "ホーム",
+  "home.landingCollapse": "折りたたむ",
+  "home.landingRecent": "最近追加",
+  "home.landingSeeAll": "すべて見る",
+  "home.landingPicks": "今日のおすすめ",
+  "home.landingPicksHint": "毎日入れ替わります",
+  "home.landingOpenDiscover": "ディスカバリーで開く",
+  "home.landingReshuffle": "引き直す",
 
   // コマンドメニュー
   "command.title": "コマンドメニュー",

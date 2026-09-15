@@ -52,6 +52,59 @@ describe("MediaGrid", () => {
     mocks.collectionRemoveFile.mockClear();
   });
 
+  it("offsets the rows by the leading block without shortening the spacer", async () => {
+    // The virtualizer's scrollMargin is the block's height: row starts include
+    // it (so rows are positioned relative to their own container by taking it
+    // off), the total size does not (so the spacer keeps every row reachable).
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        return {
+          height: this.dataset.testid === "leading" ? 300 : 0,
+        } as DOMRect;
+      });
+    try {
+      const items = [
+        sampleFileRow,
+        { ...sampleFileRow, id: 2, relPath: "b.mp4" },
+      ];
+      const proto = Element.prototype;
+      const wide = Object.getOwnPropertyDescriptor(proto, "clientWidth")!;
+      // One column, so the two items make two rows.
+      Object.defineProperty(proto, "clientWidth", {
+        configurable: true,
+        get: () => 380,
+      });
+      try {
+        const { container } = renderWithProviders(
+          <MediaGrid
+            items={items}
+            mediaBase="http://127.0.0.1:17345"
+            workspaceId={WS_ID}
+            loading={false}
+            thumbVersion={{}}
+            leadingBlock={<div data-testid="leading">shelves</div>}
+          />,
+        );
+        await waitFor(() => {
+          const rows = container.querySelectorAll<HTMLElement>(
+            "[style*='translateY']",
+          );
+          expect(rows.length).toBe(2);
+          // No row measurement lands (heights stub to 0), so the rows sit at
+          // the 220px estimate; the leading block's 300px is taken off.
+          expect(rows[0].style.transform).toBe("translateY(0px)");
+          expect(rows[1].style.transform).toBe("translateY(220px)");
+          expect(rows[0].parentElement?.style.height).toBe("440px");
+        });
+      } finally {
+        Object.defineProperty(proto, "clientWidth", wide);
+      }
+    } finally {
+      rect.mockRestore();
+    }
+  });
+
   it("derives the row height from the width once the width is known", async () => {
     // A list narrow enough for one column (e.g. beside a wide side peek).
     // The setup stubs every element at 1200px; narrow it for this test.

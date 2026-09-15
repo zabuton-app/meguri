@@ -49,6 +49,7 @@ import { filesSearchListOffset } from "@/lib/filesSearch";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { HomeHeader } from "./HomeHeader";
+import { useHomeLanding } from "./useHomeLanding";
 import {
   VIEW_KEY,
   type ViewMode,
@@ -118,6 +119,7 @@ export default function Home() {
     [search.data],
   );
   const listOffset = filesSearchListOffset(search.data?.pageParams);
+
   // Nothing to play means no entry point to playback at all, rather than a
   // player that opens onto an empty screen (spec FR-016).
   const canPlay = (status.data?.ready ?? false) && items.length > 0;
@@ -187,6 +189,25 @@ export default function Home() {
   // help/command overlay on top.
   const navActive = location.pathname === "/" && !helpOpen && !commandOpen;
 
+  const openDiscover = useCallback(() => {
+    void navigate(discoverPath(filter));
+  }, [filter, navigate]);
+
+  // Landing shelves above the list (issue #123): what shows, and who owns the
+  // arrow keys between the shelves and the list.
+  const landing = useHomeLanding({
+    filter,
+    setFilter,
+    collectionActive: !!activeCollection,
+    workspaceId: status.data?.workspaceId,
+    ready: status.data?.ready ?? false,
+    listLoaded: search.data !== undefined,
+    listOffset,
+    mediaBase: status.data?.mediaBase ?? "",
+    thumbVersion,
+    navActive,
+    openDiscover,
+  });
   useEffect(() => {
     document.title = status.data?.root
       ? `Meguri — ${status.data.root}`
@@ -252,6 +273,7 @@ export default function Home() {
         setScanning(false);
         void status.refetch();
         void search.refetch();
+        landing.refreshAfterScan();
         // A scan can add tags (new files, the derived-tag backfill), so a tag
         // screen left open would otherwise show a stale catalog.
         void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
@@ -289,7 +311,7 @@ export default function Home() {
     // search/status are react-query results; only their stable `refetch` is used.
     // Depending on the whole objects would re-subscribe the listener every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.refetch, status.refetch, t]);
+  }, [search.refetch, status.refetch, landing.refreshAfterScan, t]);
 
   // Empty-state add button (the rail's "+" lives in WorkspaceRail). Mirror its
   // toast + scan-job tracking so the first workspace also notifies on add/sync.
@@ -347,10 +369,6 @@ export default function Home() {
     input?.focus();
     input?.select();
   }, []);
-
-  const openDiscover = useCallback(() => {
-    void navigate(discoverPath(filter));
-  }, [filter, navigate]);
 
   const openTags = useCallback(() => {
     void navigate("/tags");
@@ -619,9 +637,12 @@ export default function Home() {
               hasPreviousPage={search.hasPreviousPage}
               fetchPreviousPage={fetchPreviousPage}
               isFetchingPreviousPage={search.isFetchingPreviousPage}
-              navActive={navActive}
+              navActive={landing.listNavActive}
               watchLater={activeCollection?.id === WATCH_LATER_ID}
               reorder={reorder}
+              leadingBlock={landing.element}
+              onExitTop={landing.onListExitTop}
+              enterToken={landing.listEnterToken}
             />
           ) : view === "table" ? (
             <MediaTable
@@ -638,9 +659,12 @@ export default function Home() {
               hasPreviousPage={search.hasPreviousPage}
               fetchPreviousPage={fetchPreviousPage}
               isFetchingPreviousPage={search.isFetchingPreviousPage}
-              navActive={navActive}
+              navActive={landing.listNavActive}
               watchLater={activeCollection?.id === WATCH_LATER_ID}
               reorder={reorder}
+              leadingBlock={landing.element}
+              onExitTop={landing.onListExitTop}
+              enterToken={landing.listEnterToken}
             />
           ) : (
             <MediaGrid
@@ -657,9 +681,12 @@ export default function Home() {
               hasPreviousPage={search.hasPreviousPage}
               fetchPreviousPage={fetchPreviousPage}
               isFetchingPreviousPage={search.isFetchingPreviousPage}
-              navActive={navActive}
+              navActive={landing.listNavActive}
               watchLater={activeCollection?.id === WATCH_LATER_ID}
               reorder={reorder}
+              leadingBlock={landing.element}
+              onExitTop={landing.onListExitTop}
+              enterToken={landing.listEnterToken}
             />
           )}
         </main>
