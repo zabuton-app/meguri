@@ -44,9 +44,10 @@ export interface Row {
   attachGrid?: (el: HTMLDivElement | null) => void;
 }
 
-/** The grid a full-width row of cards uses: as many 200px+ columns as fit. */
+/** The grid a full-width row of cards uses: as many 160px+ columns as fit
+ *  (the same card size as the picks beside the stage). */
 export const WRAP_GRID_CLASS =
-  "grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3";
+  "grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3";
 /** The picks beside the hero: as many 160px+ columns as fit, like the list
  *  grid (its cards are a little smaller than the list's 180px). */
 export const SIDE_GRID_CLASS =
@@ -238,16 +239,18 @@ export const HeroCard = memo(
         data-testid="shelf-hero"
         data-shelf-focused={focused ? "true" : undefined}
         aria-current={focused ? "true" : undefined}
-        className={cn(
-          "group relative aspect-video min-w-0 overflow-hidden rounded-lg bg-overlay",
-          focused && "ring-2 ring-primary",
-        )}
+        className="group flex min-w-0 flex-col gap-3"
       >
-        {/* The picture fills the stage, as on the playlist player; a click on it plays. */}
+        {/* The picture, as on every card: the shared thumbnail region, so the
+            hover scrub (and its seek line along the bottom edge) works here
+            exactly as in the grid. Nothing is laid over it. */}
         <Link
           to={fileHref(file.id, file.workspaceId)}
           onClick={onThumbnailClick(file)}
-          className="group/thumb absolute inset-0 block text-muted"
+          className={cn(
+            "group/thumb relative block aspect-video overflow-hidden rounded-lg bg-overlay text-muted",
+            focused && "ring-2 ring-primary",
+          )}
         >
           <MediaThumbnail
             file={file}
@@ -257,32 +260,36 @@ export const HeroCard = memo(
             playOverlaySize="size-16"
             playIconSize="size-8"
           />
-        </Link>
-        <FavoriteButton
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          favorite={file.favorite}
-          size={18}
-          className={cn(
-            "absolute right-3 top-3 rounded bg-bg/70 p-1.5 backdrop-blur-[1px] transition-opacity",
-            file.favorite
-              ? "opacity-100"
-              : "opacity-0 focus:opacity-100 group-hover:opacity-100",
+          {hasTimeline(file.kind) && file.duration && (
+            <span className="absolute bottom-2 right-2 rounded bg-bg/70 px-1.5 text-xs text-fg">
+              {formatDuration(file.duration)}
+            </span>
           )}
-        />
-        <WatchLaterButton
-          ref={watchLaterRef}
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          watchLater={watchLater}
-          size={18}
-          className="absolute right-3 top-12 rounded bg-bg/70 p-1.5 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
-        />
-        {/* Caption and controls over the lower edge, on the player's gradient. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-bg/90 via-bg/40 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-5 pb-4">
+          <FavoriteButton
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            favorite={file.favorite}
+            size={18}
+            className={cn(
+              "absolute right-2 top-2 rounded bg-bg/70 p-1.5 backdrop-blur-[1px] transition-opacity",
+              file.favorite
+                ? "opacity-100"
+                : "opacity-0 focus:opacity-100 group-hover:opacity-100",
+            )}
+          />
+          <WatchLaterButton
+            ref={watchLaterRef}
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            watchLater={watchLater}
+            size={18}
+            className="absolute right-2 top-11 rounded bg-bg/70 p-1.5 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
+          />
+        </Link>
+        {/* Caption and controls below the picture. */}
+        <div className="flex min-w-0 flex-col gap-1.5">
           {(folder || refreshFailed) && (
-            <div className="flex items-center gap-2 text-[11px] text-muted drop-shadow-md">
+            <div className="flex items-center gap-2 text-[11px] text-muted">
               {folder && <span className="truncate">{folder}</span>}
               {refreshFailed && (
                 <span className="truncate">{t("home.shelfError")}</span>
@@ -291,12 +298,12 @@ export const HeroCard = memo(
           )}
           <Link
             to={fileHref(file.id, file.workspaceId, { autoplay: false })}
-            className="truncate text-lg font-bold text-bright-fg drop-shadow-md"
+            className="truncate text-lg font-bold text-bright-fg"
             title={file.relPath}
           >
             {fileNameOf(file.relPath)}
           </Link>
-          <div className="flex min-w-0 items-center gap-3 text-xs text-fg drop-shadow-md">
+          <div className="flex min-w-0 items-center gap-3 text-xs text-muted">
             <span className="shrink-0">{metaLine(file)}</span>
             <div className="no-scrollbar flex h-6 min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden">
               <TagChips tags={file.tags} onTagClick={onTagClick} />
@@ -310,7 +317,6 @@ export const HeroCard = memo(
             <Button
               size="sm"
               variant="outline"
-              className="border-border/60 bg-bg/50 backdrop-blur-md"
               onClick={() => activate(file, { autoplay: false })}
             >
               {t("home.shelfOpenDetail")}

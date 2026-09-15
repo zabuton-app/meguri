@@ -283,6 +283,42 @@ describe("Home view", () => {
     }
   });
 
+  it("scrubs today's pick on hover like any card, with nothing laid over it", async () => {
+    // jsdom's Image never loads; record the frame requests instead.
+    const requested: string[] = [];
+    class RecordingImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(value: string) {
+        requested.push(value);
+      }
+    }
+    vi.stubGlobal("Image", RecordingImage);
+    try {
+      const shelves = await renderHomeView();
+      const hero = within(shelves).getByTestId("shelf-hero");
+      const [thumbLink, nameLink] = within(hero).getAllByRole("link");
+      // The caption sits below the picture, not inside it or laid over it:
+      // nothing but the picture itself is positioned on the stage (an overlay
+      // would take the pointer and hide the seek line along the bottom edge).
+      expect(thumbLink.contains(nameLink)).toBe(false);
+      for (const child of Array.from(hero.children))
+        expect(child.className).not.toMatch(/\babsolute\b/);
+      const scrubTarget = thumbLink.firstElementChild as HTMLElement;
+      // No layout in jsdom: give the picture a width to scrub across.
+      scrubTarget.getBoundingClientRect = () =>
+        ({ left: 0, width: 400, top: 0, height: 225 }) as DOMRect;
+      fireEvent.mouseEnter(scrubTarget, { clientX: 100 });
+      await waitFor(() =>
+        expect(requested.some((src) => src.includes("/frame/21?t="))).toBe(
+          true,
+        ),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("lets the bar between the hero and the picks set the split", async () => {
     const shelves = await renderHomeView();
     const bar = within(shelves).getByRole("separator", {
