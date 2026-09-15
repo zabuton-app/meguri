@@ -131,8 +131,10 @@ export function RowHeader({
   title: string;
   action: ReactNode;
 }) {
+  // Always as tall as its actions (h-6), with or without one, so headers set
+  // side by side start their content at the same height.
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex h-6 items-center gap-2">
       <h2 className="text-[13px] font-semibold text-bright-fg">{title}</h2>
       <span className="flex-1" />
       {action}
