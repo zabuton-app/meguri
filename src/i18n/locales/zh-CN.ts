@@ -48,8 +48,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.scenesDesc": "在详情页生成多少张场景缩略图。",
   "settings.hoverPreview": "悬停预览",
   "settings.hoverPreviewDesc": "预览视频缩略图上光标位置对应的场景。",
-  "settings.homeLanding": "首页推荐区",
-  "settings.homeLandingDesc": "在列表上方显示「最近添加」「今日推荐」栏。",
   "settings.frameQuality": "预览画质",
   "settings.frameQualityDesc":
     "发现页悬停预览和场景栏帧图像的画质。越高生成越慢。",
@@ -70,6 +68,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.keybinding": "键位绑定",
   "settings.keybindingDesc":
     "列表焦点移动、文件翻页、滚动和聚焦搜索的按键分配。",
+  "settings.homeLayout": "首页布局",
+  "settings.homeLayoutDesc": "选择首页的呈现方式。",
   "settings.support": "支持开发",
   "settings.supportDesc": "如果你喜欢这个应用，欢迎支持它的开发。",
   "settings.buyMeCoffee": "Buy Me a Coffee",
@@ -124,14 +124,19 @@ export const zhCN: Record<TranslationKey, string> = {
   "home.scanError": "扫描过程中发生错误",
   "home.scanStartFailed": "无法开始扫描",
   "home.scanAlreadyRunning": "扫描已在进行中",
-  "home.landingTitle": "首页",
-  "home.landingCollapse": "收起",
-  "home.landingRecent": "最近添加",
-  "home.landingSeeAll": "查看全部",
-  "home.landingPicks": "今日推荐",
-  "home.landingPicksHint": "每天更换",
-  "home.landingOpenDiscover": "在发现中打开",
-  "home.landingReshuffle": "重新抽取",
+  "home.shelfTitle": "首页",
+  "home.shelfRecent": "最近添加",
+  "home.shelfSeeAll": "查看全部",
+  "home.shelfTodayPick": "今日一选",
+  "home.shelfMorePicks": "更多推荐",
+  "home.shelfOpenDetail": "打开详情",
+  "home.shelfOpenDiscover": "在发现中打开",
+  "home.shelfEmpty":
+    "暂时没有可显示的内容。扫描完成后「最近添加」会出现在这里。",
+  "home.shelfError": "无法加载此栏。",
+  "home.shelfSplit": "调整今日一选与更多推荐的比例",
+  "home.layoutTodayPick": "今日一选",
+  "home.shelfReshuffle": "重新抽取",
 
   // command menu
   "command.title": "命令菜单",
@@ -391,6 +396,7 @@ export const zhCN: Record<TranslationKey, string> = {
 
   // workspace rail
   "workspace.all": "全部",
+  "workspace.home": "首页",
   "workspace.settings": "设置",
   "workspace.edit": "编辑工作区",
   "workspace.editAction": "保存",

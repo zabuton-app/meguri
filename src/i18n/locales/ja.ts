@@ -49,9 +49,6 @@ export const ja = {
   "settings.hoverPreview": "ホバープレビュー",
   "settings.hoverPreviewDesc":
     "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
-  "settings.homeLanding": "ホームのランディング",
-  "settings.homeLandingDesc":
-    "一覧の上に「最近追加」「今日のおすすめ」の棚を表示します。",
   "settings.frameQuality": "プレビュー画質",
   "settings.frameQualityDesc":
     "ディスカバリーのホバープレビューとシーンレールの画質。高いほど生成が遅くなります。",
@@ -73,6 +70,8 @@ export const ja = {
   "settings.keybinding": "キーバインド",
   "settings.keybindingDesc":
     "一覧のフォーカス移動・ファイルの前後移動・スクロール・検索フォーカスのキー割り当て。",
+  "settings.homeLayout": "ホームのレイアウト",
+  "settings.homeLayoutDesc": "ホーム画面の見せ方を選びます。",
   "settings.support": "開発を応援",
   "settings.supportDesc":
     "このアプリが気に入ったら、開発の支援をご検討ください。",
@@ -129,14 +128,19 @@ export const ja = {
   "home.scanError": "スキャン中にエラーが発生しました",
   "home.scanStartFailed": "スキャンを開始できませんでした",
   "home.scanAlreadyRunning": "スキャンは既に実行中です",
-  "home.landingTitle": "ホーム",
-  "home.landingCollapse": "折りたたむ",
-  "home.landingRecent": "最近追加",
-  "home.landingSeeAll": "すべて見る",
-  "home.landingPicks": "今日のおすすめ",
-  "home.landingPicksHint": "毎日入れ替わります",
-  "home.landingOpenDiscover": "ディスカバリーで開く",
-  "home.landingReshuffle": "引き直す",
+  "home.shelfTitle": "ホーム",
+  "home.shelfRecent": "最近追加",
+  "home.shelfSeeAll": "すべて見る",
+  "home.shelfTodayPick": "今日の一本",
+  "home.shelfMorePicks": "ほかのおすすめ",
+  "home.shelfOpenDetail": "詳細を開く",
+  "home.shelfOpenDiscover": "ディスカバリーで開く",
+  "home.shelfEmpty":
+    "まだ表示できるものがありません。スキャンが終わると「最近追加」に並びます。",
+  "home.shelfError": "棚を読み込めませんでした。",
+  "home.shelfSplit": "今日の一本と右側の割合を変更",
+  "home.layoutTodayPick": "今日の一本",
+  "home.shelfReshuffle": "引き直す",
 
   // コマンドメニュー
   "command.title": "コマンドメニュー",
@@ -408,6 +412,7 @@ export const ja = {
 
   // ワークスペースレール
   "workspace.all": "すべて",
+  "workspace.home": "ホーム",
   "workspace.settings": "設定",
   "workspace.edit": "ワークスペースを編集",
   "workspace.editAction": "保存",

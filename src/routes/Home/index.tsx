@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner";
 import { FolderPlus, PlayCircle, Sparkles } from "lucide-react";
 import { api, events, ALL_ID, type ThumbDone } from "@/ipc/client";
-import { WATCH_LATER_ID } from "@shared/workspaceIds";
+import { HOME_ID, WATCH_LATER_ID } from "@shared/workspaceIds";
 import type {
   FileRow,
   SearchQuery,
@@ -49,7 +49,9 @@ import { filesSearchListOffset } from "@/lib/filesSearch";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { HomeHeader } from "./HomeHeader";
-import { useHomeLanding } from "./useHomeLanding";
+import { HomeShelves } from "./HomeShelves";
+import { useHomeShelves } from "./useHomeShelves";
+import { RECENT_SORT } from "./shelves";
 import {
   VIEW_KEY,
   type ViewMode,
@@ -91,10 +93,18 @@ export default function Home() {
   });
   const activeCollection =
     workspaces.data?.collections.find((c) => c.active) ?? null;
-  // The active real workspace (excludes the virtual "All", which has no emoji).
+  // The active real workspace (excludes the virtual "Home" / "All", which have no emoji).
   const activeWorkspace =
-    workspaces.data?.workspaces.find((w) => w.active && w.id !== ALL_ID) ??
-    null;
+    workspaces.data?.workspaces.find(
+      (w) => w.active && w.id !== ALL_ID && w.id !== HOME_ID,
+    ) ?? null;
+  // The virtual "Home" view shows the shelves instead of a list. Long-lived
+  // handlers (scan events, key handlers) read the ref rather than the value.
+  const isHome = status.data?.workspaceId === HOME_ID;
+  const isHomeRef = useRef(isHome);
+  useEffect(() => {
+    isHomeRef.current = isHome;
+  }, [isHome]);
   // Snapshot the collection being edited when the dialog opens, so a background
   // workspace switch (which clears activeCollection) can't yank the dialog out
   // from under the user mid-edit and leave `pointer-events: none` stuck on <body>.
@@ -111,7 +121,13 @@ export default function Home() {
   const search = useFilesSearch(
     status.data?.workspaceId,
     filter,
-    status.data?.ready ?? false,
+    (status.data?.ready ?? false) && !isHome,
+  );
+  // The Home view's shelves (issue #123); its own small queries, across every
+  // workspace, only while the view is active.
+  const shelves = useHomeShelves(
+    status.data?.workspaceId,
+    (status.data?.ready ?? false) && isHome,
   );
 
   const items = useMemo(
@@ -122,7 +138,7 @@ export default function Home() {
 
   // Nothing to play means no entry point to playback at all, rather than a
   // player that opens onto an empty screen (spec FR-016).
-  const canPlay = (status.data?.ready ?? false) && items.length > 0;
+  const canPlay = (status.data?.ready ?? false) && !isHome && items.length > 0;
 
   // Drag-to-reorder edits the collection's own item order, so it is offered only
   // where that order is both stored (a collection) and visible (manual sort).
@@ -190,24 +206,40 @@ export default function Home() {
   const navActive = location.pathname === "/" && !helpOpen && !commandOpen;
 
   const openDiscover = useCallback(() => {
-    void navigate(discoverPath(filter));
-  }, [filter, navigate]);
+    // The Home view shows no filter, so none is handed to Discovery from it.
+    void navigate(discoverPath(isHome ? {} : filter));
+  }, [filter, isHome, navigate]);
 
-  // Landing shelves above the list (issue #123): what shows, and who owns the
-  // arrow keys between the shelves and the list.
-  const landing = useHomeLanding({
-    filter,
-    setFilter,
-    collectionActive: !!activeCollection,
-    workspaceId: status.data?.workspaceId,
-    ready: status.data?.ready ?? false,
-    listLoaded: search.data !== undefined,
-    listOffset,
-    mediaBase: status.data?.mediaBase ?? "",
-    thumbVersion,
-    navActive,
-    openDiscover,
-  });
+  // The one way out of the Home view into a list: the "All" workspace, with
+  // the filter the caller wants shown there (the view showed none, so nothing
+  // from before it carries over). The filter is set first so the list arrives
+  // already filtered; the rail refreshes the workspace-scoped caches on the
+  // switch event. A switch that fails leaves the Home view as it was.
+  // The current filter, readable from long-lived callbacks (see onTagClick).
+  const filterRef = useRef(filter);
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
+  const focusSearchPending = useRef(false);
+  const leaveHomeToList = useCallback(
+    (nextFilter: SearchQuery, opts: { focusSearch?: boolean } = {}) => {
+      const previous = filterRef.current;
+      setFilter(nextFilter);
+      focusSearchPending.current = opts.focusSearch ?? false;
+      api.workspaceSwitch(ALL_ID).catch(() => {
+        focusSearchPending.current = false;
+        setFilter(previous);
+      });
+    },
+    [],
+  );
+  // "See all" on the Home view's Recently added shelf: the "All" list in the
+  // same order.
+  const onSeeAllRecent = useCallback(
+    () => leaveHomeToList({ ...RECENT_SORT }),
+    [leaveHomeToList],
+  );
+
   useEffect(() => {
     document.title = status.data?.root
       ? `Meguri — ${status.data.root}`
@@ -252,18 +284,23 @@ export default function Home() {
   // also needs the current filter to tell "added" from "already there". A ref
   // synced in an effect gives it both; an updater cannot, because dispatching an
   // event from one is a side effect StrictMode would run twice.
-  const filterRef = useRef(filter);
-  useEffect(() => {
-    filterRef.current = filter;
-  }, [filter]);
-  const onTagClick = useCallback((token: string) => {
-    const current = filterRef.current;
-    const next = addSearchTokens(current, [token]);
-    // Same reference means the condition was already there. Point at the chip
-    // instead of doing nothing, which reads as a dead click.
-    if (next === current) highlightSearchToken(token);
-    else setFilter(next);
-  }, []);
+  const onTagClick = useCallback(
+    (token: string) => {
+      // From the Home view the tag is the whole filter (the view showed none),
+      // and it shows on the "All" list.
+      if (isHomeRef.current) {
+        leaveHomeToList(addSearchTokens({}, [token]));
+        return;
+      }
+      const current = filterRef.current;
+      const next = addSearchTokens(current, [token]);
+      // Same reference means the condition was already there. Point at the chip
+      // instead of doing nothing, which reads as a dead click.
+      if (next === current) highlightSearchToken(token);
+      else setFilter(next);
+    },
+    [leaveHomeToList],
+  );
 
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {
@@ -272,8 +309,11 @@ export default function Home() {
       .onScanDone((done) => {
         setScanning(false);
         void status.refetch();
-        void search.refetch();
-        landing.refreshAfterScan();
+        // refetch() runs the query even while it is disabled; on the Home
+        // view there is no list to refresh. The shelves are invalidated
+        // either way (an inactive query only refetches when shown again).
+        if (!isHomeRef.current) void search.refetch();
+        shelves.refreshAfterScan();
         // A scan can add tags (new files, the derived-tag backfill), so a tag
         // screen left open would otherwise show a stale catalog.
         void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
@@ -311,7 +351,7 @@ export default function Home() {
     // search/status are react-query results; only their stable `refetch` is used.
     // Depending on the whole objects would re-subscribe the listener every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.refetch, status.refetch, landing.refreshAfterScan, t]);
+  }, [search.refetch, status.refetch, shelves.refreshAfterScan, t]);
 
   // Empty-state add button (the rail's "+" lives in WorkspaceRail). Mirror its
   // toast + scan-job tracking so the first workspace also notifies on add/sync.
@@ -342,7 +382,9 @@ export default function Home() {
         rebuild ? "rebuild" : includeExcluded ? "resync" : "scan",
       );
       // Reflect into the list shortly after the walk (items appear gradually as the walk completes, so poll lightly).
-      setTimeout(() => void search.refetch(), 800);
+      setTimeout(() => {
+        if (!isHomeRef.current) void search.refetch();
+      }, 800);
     } catch (error) {
       setScanning(false);
       toast.error(t("home.scanStartFailed"), {
@@ -362,13 +404,28 @@ export default function Home() {
     if (ok) void onScan(false, true);
   };
 
+  // The search field lives on the list; from the Home view, switching to
+  // "All" brings it up and the focus follows once it is mounted.
   const focusSearch = useCallback(() => {
+    if (isHomeRef.current) {
+      leaveHomeToList({}, { focusSearch: true });
+      return;
+    }
     const input = document.getElementById(
       "list-search-input",
     ) as HTMLInputElement | null;
     input?.focus();
     input?.select();
-  }, []);
+  }, [leaveHomeToList]);
+  useEffect(() => {
+    if (isHome || !focusSearchPending.current) return;
+    focusSearchPending.current = false;
+    const input = document.getElementById(
+      "list-search-input",
+    ) as HTMLInputElement | null;
+    input?.focus();
+    input?.select();
+  }, [isHome]);
 
   const openTags = useCallback(() => {
     void navigate("/tags");
@@ -481,15 +538,17 @@ export default function Home() {
     const unShortcuts = onOpenShortcuts(() => setHelpOpen(true));
     // The tag screen is a child route, so it asks the list to filter rather than
     // reaching into this component's state.
-    const unApplyTags = onApplyTagFilter((tokens) =>
-      setFilter((f) => addSearchTokens(f, tokens)),
-    );
+    const unApplyTags = onApplyTagFilter((tokens) => {
+      // From the Home view the tags are the whole filter, shown on "All".
+      if (isHomeRef.current) leaveHomeToList(addSearchTokens({}, tokens));
+      else setFilter((f) => addSearchTokens(f, tokens));
+    });
     return () => {
       unCommand();
       unShortcuts();
       unApplyTags();
     };
-  }, []);
+  }, [leaveHomeToList]);
 
   // Esc on the bare list screen closes the window (hides to tray). Only when
   // nothing else consumes Esc: no child-route modal, no overlay/dialog/popup
@@ -560,6 +619,7 @@ export default function Home() {
         onEditWorkspace={() => setEditWorkspace(activeWorkspace)}
         view={view}
         onSetView={setViewMode}
+        isHome={isHome}
         scanning={scanning}
         ready={status.data?.ready ?? false}
         onScan={() => void onScan()}
@@ -580,11 +640,13 @@ export default function Home() {
         </div>
       )}
 
-      <FilterBar
-        value={filter}
-        onChange={setFilter}
-        manualSortAvailable={!!activeCollection}
-      />
+      {!isHome && (
+        <FilterBar
+          value={filter}
+          onChange={setFilter}
+          manualSortAvailable={!!activeCollection}
+        />
+      )}
 
       <ScanProgress onThumbDone={onThumbDone} wsId={status.data?.workspaceId} />
 
@@ -622,6 +684,18 @@ export default function Home() {
               </Button>
               <p className="text-xs opacity-70">{t("home.addFromSidebar")}</p>
             </div>
+          ) : isHome ? (
+            <HomeShelves
+              recent={shelves.recent}
+              picks={shelves.picks}
+              mediaBase={status.data?.mediaBase ?? ""}
+              thumbVersion={thumbVersion}
+              onSeeAllRecent={onSeeAllRecent}
+              onOpenDiscover={openDiscover}
+              onReshufflePicks={shelves.reshufflePicks}
+              onTagClick={onTagClick}
+              navActive={navActive}
+            />
           ) : view === "list" ? (
             <MediaList
               items={items}
@@ -637,12 +711,9 @@ export default function Home() {
               hasPreviousPage={search.hasPreviousPage}
               fetchPreviousPage={fetchPreviousPage}
               isFetchingPreviousPage={search.isFetchingPreviousPage}
-              navActive={landing.listNavActive}
+              navActive={navActive}
               watchLater={activeCollection?.id === WATCH_LATER_ID}
               reorder={reorder}
-              leadingBlock={landing.element}
-              onExitTop={landing.onListExitTop}
-              enterToken={landing.listEnterToken}
             />
           ) : view === "table" ? (
             <MediaTable
@@ -659,12 +730,9 @@ export default function Home() {
               hasPreviousPage={search.hasPreviousPage}
               fetchPreviousPage={fetchPreviousPage}
               isFetchingPreviousPage={search.isFetchingPreviousPage}
-              navActive={landing.listNavActive}
+              navActive={navActive}
               watchLater={activeCollection?.id === WATCH_LATER_ID}
               reorder={reorder}
-              leadingBlock={landing.element}
-              onExitTop={landing.onListExitTop}
-              enterToken={landing.listEnterToken}
             />
           ) : (
             <MediaGrid
@@ -681,12 +749,9 @@ export default function Home() {
               hasPreviousPage={search.hasPreviousPage}
               fetchPreviousPage={fetchPreviousPage}
               isFetchingPreviousPage={search.isFetchingPreviousPage}
-              navActive={landing.listNavActive}
+              navActive={navActive}
               watchLater={activeCollection?.id === WATCH_LATER_ID}
               reorder={reorder}
-              leadingBlock={landing.element}
-              onExitTop={landing.onListExitTop}
-              enterToken={landing.listEnterToken}
             />
           )}
         </main>

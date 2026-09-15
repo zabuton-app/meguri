@@ -20,16 +20,6 @@ interface Options {
   onInspect?: (index: number) => void;
   /** Scroll the virtual row into view (row = floor(index / columns)). */
   scrollToRow: (row: number) => void;
-  /**
-   * Up from the first row while an item is focused: hand focus to whatever
-   * sits above the list (the home landing shelves). Focus is cleared here.
-   */
-  onExitTop?: () => void;
-  /**
-   * Bumped by the parent when focus enters from above; the first item takes
-   * focus. 0 = never.
-   */
-  enterToken?: number;
 }
 
 /** Down one row, clamping to the last item when the row below is partially filled. */
@@ -47,8 +37,6 @@ export function useGridKeyboardNav({
   onOpen,
   onInspect,
   scrollToRow,
-  onExitTop,
-  enterToken = 0,
 }: Options) {
   const { keybindingPreset } = usePreferences();
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -61,7 +49,6 @@ export function useGridKeyboardNav({
     onOpen,
     onInspect,
     scrollToRow,
-    onExitTop,
     preset: keybindingPreset,
     focusedIndex,
   });
@@ -74,24 +61,10 @@ export function useGridKeyboardNav({
       onOpen,
       onInspect,
       scrollToRow,
-      onExitTop,
       preset: keybindingPreset,
       focusedIndex,
     };
   });
-
-  // Entering from above (the landing shelves) lands on the first item. Only a
-  // change counts: a view remounting with the last token must not focus.
-  const seenToken = useRef(enterToken);
-  useEffect(() => {
-    if (enterToken === seenToken.current) return;
-    seenToken.current = enterToken;
-    if (ref.current.itemCount === 0) return;
-    // Driven by the parent's token, not by user-advanced state, so setting
-    // state here is the intended handshake.
-    setFocusedIndex(0);
-    ref.current.scrollToRow(0);
-  }, [enterToken]);
 
   // Keep focus in range if the result set shrinks (filter/search change).
   useEffect(() => {
@@ -119,7 +92,6 @@ export function useGridKeyboardNav({
         onOpen,
         onInspect,
         scrollToRow,
-        onExitTop,
         preset,
         focusedIndex,
       } = ref.current;
@@ -148,16 +120,9 @@ export function useGridKeyboardNav({
       let next: number;
       if (matchAny(e, b.down))
         next = focusedIndex < 0 ? 0 : stepDown(focusedIndex, cols, itemCount);
-      else if (matchAny(e, b.up)) {
-        // On the first row with something above the list: leave upwards.
-        if (onExitTop && focused && focusedIndex < cols) {
-          e.preventDefault();
-          setFocusedIndex(-1);
-          onExitTop();
-          return;
-        }
+      else if (matchAny(e, b.up))
         next = focusedIndex < 0 ? 0 : Math.max(0, focusedIndex - cols);
-      } else if (matchAny(e, b.right))
+      else if (matchAny(e, b.right))
         next = focusedIndex < 0 ? 0 : Math.min(itemCount - 1, focusedIndex + 1);
       else if (matchAny(e, b.left))
         next = focusedIndex < 0 ? 0 : Math.max(0, focusedIndex - 1);

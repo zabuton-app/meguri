@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { sampleFileRow, WS_ID } from "@/test/fixtures";
 import { createTestQueryClient } from "@/test/renderWithProviders";
 import { useHomeShelves } from "@/routes/Home/useHomeShelves";
-import { PICKS_LIMIT, RECENT_LIMIT } from "@/routes/Home/landing";
+import { PICKS_LIMIT, RECENT_LIMIT } from "@/routes/Home/shelves";
 
 const mocks = vi.hoisted(() => ({
   filesSearch: vi.fn<(query: unknown) => Promise<unknown>>(),
@@ -46,18 +46,33 @@ describe("useHomeShelves", () => {
     const { result } = renderHook(() => useHomeShelves(WS_ID, true), {
       wrapper,
     });
-    await waitFor(() => expect(result.current.loaded).toBe(true));
+    await waitFor(() =>
+      expect(result.current.recent.loaded && result.current.picks.loaded).toBe(
+        true,
+      ),
+    );
     expect(mocks.filesSearch).toHaveBeenCalledWith({
       sort: "btime",
       sortDir: "desc",
       limit: RECENT_LIMIT,
     });
     expect(mocks.filesRandom).toHaveBeenCalledWith({ limit: PICKS_LIMIT });
-    expect(result.current.recent).toEqual([sampleFileRow]);
-    expect(result.current.picks).toEqual([sampleFileRow]);
+    expect(result.current.recent.files).toEqual([sampleFileRow]);
+    expect(result.current.picks.files).toEqual([sampleFileRow]);
   });
 
-  it("does nothing until enabled (the list's first page comes first)", () => {
+  it("reports an error apart from an empty shelf", async () => {
+    mocks.filesRandom.mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useHomeShelves(WS_ID, true), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.picks.loaded).toBe(true));
+    expect(result.current.picks.error).toBe(true);
+    expect(result.current.picks.files).toEqual([]);
+    expect(result.current.recent.error).toBe(false);
+  });
+
+  it("does nothing until enabled (the view is not active)", () => {
     renderHook(() => useHomeShelves(WS_ID, false), { wrapper });
     expect(mocks.filesSearch).not.toHaveBeenCalled();
     expect(mocks.filesRandom).not.toHaveBeenCalled();
@@ -69,7 +84,11 @@ describe("useHomeShelves", () => {
     const { result } = renderHook(() => useHomeShelves(WS_ID, true), {
       wrapper,
     });
-    await waitFor(() => expect(result.current.loaded).toBe(true));
+    await waitFor(() =>
+      expect(result.current.recent.loaded && result.current.picks.loaded).toBe(
+        true,
+      ),
+    );
     expect(mocks.filesRandom).toHaveBeenCalledTimes(1);
 
     // Still the same day: nothing is drawn again.
@@ -91,7 +110,11 @@ describe("useHomeShelves", () => {
     const { result } = renderHook(() => useHomeShelves(WS_ID, true), {
       wrapper,
     });
-    await waitFor(() => expect(result.current.loaded).toBe(true));
+    await waitFor(() =>
+      expect(result.current.recent.loaded && result.current.picks.loaded).toBe(
+        true,
+      ),
+    );
     act(() => result.current.reshufflePicks());
     await waitFor(() => expect(mocks.filesRandom).toHaveBeenCalledTimes(2));
   });
@@ -100,7 +123,11 @@ describe("useHomeShelves", () => {
     const { result } = renderHook(() => useHomeShelves(WS_ID, true), {
       wrapper,
     });
-    await waitFor(() => expect(result.current.loaded).toBe(true));
+    await waitFor(() =>
+      expect(result.current.recent.loaded && result.current.picks.loaded).toBe(
+        true,
+      ),
+    );
     act(() => result.current.refreshAfterScan());
     await waitFor(() => expect(mocks.filesSearch).toHaveBeenCalledTimes(2));
     expect(mocks.filesRandom).toHaveBeenCalledTimes(1);
@@ -111,9 +138,15 @@ describe("useHomeShelves", () => {
     const { result } = renderHook(() => useHomeShelves(WS_ID, true), {
       wrapper,
     });
-    await waitFor(() => expect(result.current.loaded).toBe(true));
-    expect(result.current.picks).toEqual([]);
+    await waitFor(() =>
+      expect(result.current.recent.loaded && result.current.picks.loaded).toBe(
+        true,
+      ),
+    );
+    expect(result.current.picks.files).toEqual([]);
     act(() => result.current.refreshAfterScan());
-    await waitFor(() => expect(result.current.picks).toEqual([sampleFileRow]));
+    await waitFor(() =>
+      expect(result.current.picks.files).toEqual([sampleFileRow]),
+    );
   });
 });

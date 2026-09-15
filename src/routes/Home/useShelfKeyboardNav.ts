@@ -1,13 +1,12 @@
-// Keyboard focus navigation over the landing shelves: a focused (shelf, item)
-// pair moved with the same per-preset bindings as the list views
+// Keyboard focus navigation over the Home view's shelves: a focused (shelf,
+// item) pair moved with the same per-preset bindings as the list views
 // (GRID_BINDINGS: arrows / hjkl / C-p,n,b,f). Left/right walk one shelf,
-// up/down step between shelves, and down past the last shelf hands focus to
-// the list below (`onExitBottom`); the list hands it back through `enterToken`.
+// up/down step between shelves; Enter opens, Shift+Enter inspects.
 import { useEffect, useRef, useState } from "react";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { GRID_BINDINGS, matchAny } from "@/settings/keybindings";
 
-export interface LandingFocus {
+export interface ShelfFocus {
   shelf: number;
   index: number;
 }
@@ -15,17 +14,10 @@ export interface LandingFocus {
 interface Options {
   /** Item count per shelf, in display order. Empty shelves are skipped. */
   shelfSizes: number[];
-  /** Only handle keys while the shelves own keyboard focus. */
+  /** Only handle keys while the Home view is foreground (no modal on top). */
   active: boolean;
-  /**
-   * Bumped by the parent when focus enters from the list below; the last
-   * shelf's first item takes focus.
-   */
-  enterToken: number;
-  /** Down on the last shelf: the list takes over. */
-  onExitBottom: () => void;
-  onOpen: (focus: LandingFocus) => void;
-  onInspect: (focus: LandingFocus) => void;
+  onOpen: (focus: ShelfFocus) => void;
+  onInspect: (focus: ShelfFocus) => void;
 }
 
 function nextShelf(sizes: number[], from: number, dir: 1 | -1): number {
@@ -34,21 +26,18 @@ function nextShelf(sizes: number[], from: number, dir: 1 | -1): number {
   return -1;
 }
 
-export function useLandingKeyboardNav({
+export function useShelfKeyboardNav({
   shelfSizes,
   active,
-  enterToken,
-  onExitBottom,
   onOpen,
   onInspect,
 }: Options) {
   const { keybindingPreset } = usePreferences();
-  const [focus, setFocus] = useState<LandingFocus | null>(null);
+  const [focus, setFocus] = useState<ShelfFocus | null>(null);
 
   // Read live values through a ref so the key listener never goes stale.
   const ref = useRef({
     shelfSizes,
-    onExitBottom,
     onOpen,
     onInspect,
     preset: keybindingPreset,
@@ -57,7 +46,6 @@ export function useLandingKeyboardNav({
   useEffect(() => {
     ref.current = {
       shelfSizes,
-      onExitBottom,
       onOpen,
       onInspect,
       preset: keybindingPreset,
@@ -65,28 +53,14 @@ export function useLandingKeyboardNav({
     };
   });
 
-  // Entering from the list lands on the last non-empty shelf's first item.
-  // Only a change counts: the shelves remount with the last token (a view
-  // switch, a filter cleared) and must not light up a focus ring on their own.
-  const seenToken = useRef(enterToken);
-  useEffect(() => {
-    if (enterToken === seenToken.current) return;
-    seenToken.current = enterToken;
-    const sizes = ref.current.shelfSizes;
-    const shelf = nextShelf(sizes, sizes.length, -1);
-    // Driven by the parent's token, not by user-advanced state, so setting
-    // state here is the intended handshake.
-    setFocus(shelf >= 0 ? { shelf, index: 0 } : null);
-  }, [enterToken]);
-
   // Keep focus on an item when its shelf shrinks: clamp to the last one, or
-  // move to a neighbouring shelf when this one emptied (below first, as the
-  // list is that way; above otherwise). Nothing left: no focus.
+  // move to a neighbouring shelf when this one emptied (the one below first,
+  // then above). Nothing left: no focus.
   useEffect(() => {
     if (!focus) return;
     const size = shelfSizes[focus.shelf] ?? 0;
     if (focus.index < size) return;
-    let next: LandingFocus | null = null;
+    let next: ShelfFocus | null = null;
     if (size > 0) next = { shelf: focus.shelf, index: size - 1 };
     else {
       const s =
@@ -111,8 +85,10 @@ export function useLandingKeyboardNav({
           el.isContentEditable)
       )
         return;
-      const { shelfSizes, onExitBottom, onOpen, onInspect, preset, focus } =
-        ref.current;
+      // A real control has the keyboard (a Tab-focused button or link on the
+      // hero): Enter is its own, and the arrows are left to it as well.
+      if (el?.closest("button, a, [role='button'], [role='separator']")) return;
+      const { shelfSizes, onOpen, onInspect, preset, focus } = ref.current;
       const b = GRID_BINDINGS[preset];
       const first = nextShelf(shelfSizes, -1, 1);
       if (first < 0) return;
@@ -146,7 +122,7 @@ export function useLandingKeyboardNav({
         return;
       }
       const cur = focus;
-      let next: LandingFocus | null;
+      let next: ShelfFocus | null;
       if (matchAny(e, b.right)) {
         next = {
           shelf: cur.shelf,
@@ -154,18 +130,13 @@ export function useLandingKeyboardNav({
         };
       } else if (matchAny(e, b.left)) {
         next = { shelf: cur.shelf, index: Math.max(0, cur.index - 1) };
-      } else if (matchAny(e, b.down)) {
-        const s = nextShelf(shelfSizes, cur.shelf, 1);
-        if (s < 0) {
-          e.preventDefault();
-          setFocus(null);
-          onExitBottom();
-          return;
-        }
-        next = { shelf: s, index: Math.min(shelfSizes[s] - 1, cur.index) };
-      } else if (matchAny(e, b.up)) {
-        const s = nextShelf(shelfSizes, cur.shelf, -1);
-        // Already on the top shelf: stay put (nothing above the shelves).
+      } else if (matchAny(e, b.down) || matchAny(e, b.up)) {
+        const s = nextShelf(
+          shelfSizes,
+          cur.shelf,
+          matchAny(e, b.down) ? 1 : -1,
+        );
+        // Already on the first / last shelf: stay put.
         if (s < 0) {
           e.preventDefault();
           return;
@@ -180,5 +151,5 @@ export function useLandingKeyboardNav({
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
-  return { focus, setFocus } as const;
+  return { focus } as const;
 }

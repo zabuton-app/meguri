@@ -1,7 +1,8 @@
 // Scan progress bar. Subscribes to scan IPC events and shows the walk/thumbnail phases.
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { api, events, ALL_ID } from "@/ipc/client";
+import { api, events } from "@/ipc/client";
+import { isVirtualWorkspaceId } from "@shared/workspaceIds";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { ThumbDone } from "@/ipc/client";
 import type { TranslationKey } from "@/i18n/locales/ja";
@@ -89,7 +90,9 @@ export function ScanProgress({
           <button
             type="button"
             onClick={() =>
-              void api.scanCancel(wsId && wsId !== ALL_ID ? wsId : undefined)
+              void api.scanCancel(
+                wsId && !isVirtualWorkspaceId(wsId) ? wsId : undefined,
+              )
             }
             title={t("scan.cancel")}
             aria-label={t("scan.cancel")}

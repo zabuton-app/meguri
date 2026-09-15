@@ -44,7 +44,6 @@ import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
-import { useLeadingBlock } from "@/hooks/useLeadingBlock";
 import { hasTimeline, kindLabel } from "@/lib/mediaKind";
 
 const ROW_HEIGHT = 114; // fixed row height (thumbnail 180×101.25 + padding)
@@ -87,15 +86,6 @@ interface Props {
   watchLater?: boolean;
   /** Set only while a collection is shown in its manual order; enables drag-to-reorder. */
   reorder?: MediaReorder;
-  /**
-   * Block rendered inside the scroll viewport before the rows (the home
-   * landing shelves); it scrolls away with the list.
-   */
-  leadingBlock?: ReactNode;
-  /** Keyboard "up" from the first row while `leadingBlock` is shown: focus leaves to it. */
-  onExitTop?: () => void;
-  /** Bumped when keyboard focus enters from `leadingBlock`; the first item takes focus. */
-  enterToken?: number;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -117,9 +107,6 @@ export const MediaTable = memo(function MediaTable({
   navActive = false,
   watchLater = false,
   reorder,
-  leadingBlock,
-  onExitTop,
-  enterToken,
 }: Props) {
   const { t } = useI18n();
   const { activate } = useActivateFile();
@@ -150,7 +137,6 @@ export const MediaTable = memo(function MediaTable({
   // The table is at least MIN_TABLE_WIDTH wide; below the viewport width it
   // overflows and scrolls horizontally rather than overlapping columns.
   const tableWidth = Math.max(width, MIN_TABLE_WIDTH);
-  const { leadingRef, leadingHeight } = useLeadingBlock();
 
   // TanStack Virtual returns functions React Compiler can't memoize; the skipped
   // memoization is expected and harmless here (the virtualizer drives its own state).
@@ -161,8 +147,6 @@ export const MediaTable = memo(function MediaTable({
     estimateSize: () => ROW_HEIGHT,
     overscan: 12,
     paddingStart: listOffset * ROW_HEIGHT,
-    // The leading block sits before the table inside the same scroll element.
-    scrollMargin: leadingHeight,
   });
   const virtualRows = virtualizer.getVirtualItems();
 
@@ -203,8 +187,6 @@ export const MediaTable = memo(function MediaTable({
     onOpen,
     onInspect,
     scrollToRow,
-    onExitTop: leadingBlock ? onExitTop : undefined,
-    enterToken,
   });
   // Points at the focused row's toggle so "W" activates it through the button
   // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
@@ -233,20 +215,15 @@ export const MediaTable = memo(function MediaTable({
   });
 
   if (loading) {
-    // The leading block stays put while the list reloads (a sort change),
-    // rather than blinking out with the rows.
     return (
-      <ScrollArea className="page-scroll h-full">
-        {leadingBlock && <div ref={leadingRef}>{leadingBlock}</div>}
-        <div className="flex flex-col gap-2 p-4">
-          {Array.from({ length: 14 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="aspect-video w-[180px] shrink-0 rounded" />
-              <Skeleton className="h-3.5 flex-1" />
-            </div>
-          ))}
-        </div>
-      </ScrollArea>
+      <div className="flex flex-col gap-2 p-4">
+        {Array.from({ length: 14 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <Skeleton className="aspect-video w-[180px] shrink-0 rounded" />
+            <Skeleton className="h-3.5 flex-1" />
+          </div>
+        ))}
+      </div>
     );
   }
 
@@ -257,7 +234,6 @@ export const MediaTable = memo(function MediaTable({
   return (
     <MediaReorderProvider items={items} reorder={reorder}>
       <ScrollArea className="page-scroll h-full" viewportRef={setScrollRef}>
-        {leadingBlock && <div ref={leadingRef}>{leadingBlock}</div>}
         <div role="table" style={{ width: tableWidth }} className="text-sm">
           {/* Sticky header. Same grid columns as rows so cells line up. */}
           <div
@@ -277,10 +253,7 @@ export const MediaTable = memo(function MediaTable({
           {/* Body. Height reserved for all rows; only visible rows are mounted. */}
           <div
             className="relative"
-            style={{
-              height: virtualizer.getTotalSize(),
-              width: "100%",
-            }}
+            style={{ height: virtualizer.getTotalSize(), width: "100%" }}
           >
             {virtualRows.map((vr) => {
               const file = items[vr.index];
@@ -290,7 +263,7 @@ export const MediaTable = memo(function MediaTable({
                 file,
                 version: thumbVersion[mediaSortId(file)] ?? 0,
                 mediaBase,
-                top: vr.start - leadingHeight,
+                top: vr.start,
                 onTagClick,
                 focused,
                 watchLater: watchLaterMembership,

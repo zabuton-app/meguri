@@ -73,12 +73,6 @@ function AppRoutes() {
 
 describe("Home + MediaDetail integration", () => {
   beforeEach(() => {
-    // The landing shelves (HomeLanding.test.tsx) would list the sample file a
-    // second time above the grid; these tests are about the grid itself.
-    localStorage.setItem(
-      "meguri.prefs",
-      JSON.stringify({ homeLanding: false }),
-    );
     mocks.appStatus.mockResolvedValue(defaultAppStatus);
     mocks.workspacesList.mockResolvedValue(defaultWorkspacesList);
     mocks.filesSearch.mockResolvedValue({

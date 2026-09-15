@@ -108,6 +108,12 @@ export const defaultWorkspacesList: WorkspacesList = {
       active: false,
     },
     {
+      id: "__home__",
+      path: "",
+      label: "Home",
+      active: false,
+    },
+    {
       id: "__all__",
       path: "",
       label: "All",

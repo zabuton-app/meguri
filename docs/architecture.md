@@ -157,6 +157,22 @@ workspace. It has no database of its own;
 query results from each `Core` in memory (a single-workspace set takes a fast
 path that skips merging). Scanning never targets `All`.
 
+### The virtual "Home" view
+
+`Home` (`HOME_ID`) is the other pinned view. It is a screen rather than a
+list: shelves of the newest files and a daily random sample, drawn across
+every workspace (`src/routes/Home/HomeShelves.tsx`, data in
+`useHomeShelves.ts`). In the main process it behaves exactly like `All`
+(`Workspaces.isCrossWorkspace()`): no database of its own, queries fan out to
+every `Core`, and a scan started from it covers every workspace. The renderer
+switches between the list and the shelves on `app_status.workspaceId`.
+
+The view's arrangement is a layout from `src/routes/Home/layouts/` (a
+registry; the `homeLayout` preference picks one, and Settings offers the
+choice once there is more than one), built from the shared pieces in
+`src/routes/Home/shelfParts.tsx`. A layout arranges the shelves' data and
+owns its keyboard order; fetching and navigation stay with the route.
+
 ## Collections
 
 Two unrelated mechanisms group files. They differ in where they persist and who

@@ -1,6 +1,28 @@
 /** Sentinel workspace ID for the virtual "All" (cross-workspace) view. */
 export const ALL_ID = "__all__";
 
+/**
+ * Sentinel workspace ID for the virtual "Home" view: the shelves screen
+ * (Recently added / Picks for today across every workspace) rather than a
+ * list. Like "All" it has no Core of its own and is never scanned.
+ */
+export const HOME_ID = "__home__";
+
+/** Whether an id names one of the pinned virtual views ("Home" / "All"). */
+export function isVirtualWorkspaceId(id: string): boolean {
+  return id === HOME_ID || id === ALL_ID;
+}
+
+/**
+ * Display names of the virtual views as the main process reports them
+ * (`app_status.root`, `WorkspaceInfo.label`); the renderer translates the
+ * rail's own labels itself.
+ */
+export const VIRTUAL_WORKSPACE_LABELS: Record<string, string> = {
+  [HOME_ID]: "Home",
+  [ALL_ID]: "All",
+};
+
 /** Prefix that marks an active-target string as a user collection. */
 export const COLLECTION_ID_PREFIX = "collection:";
 

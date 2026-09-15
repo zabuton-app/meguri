@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
   type Ref,
-  type ReactNode,
 } from "react";
 import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -40,7 +39,6 @@ import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
-import { useLeadingBlock } from "@/hooks/useLeadingBlock";
 
 const ROW_ESTIMATE = 124; // initial row-height estimate (corrected by measurement)
 
@@ -75,15 +73,6 @@ interface Props {
   watchLater?: boolean;
   /** Set only while a collection is shown in its manual order; enables drag-to-reorder. */
   reorder?: MediaReorder;
-  /**
-   * Block rendered inside the scroll viewport before the rows (the home
-   * landing shelves); it scrolls away with the list.
-   */
-  leadingBlock?: ReactNode;
-  /** Keyboard "up" from the first row while `leadingBlock` is shown: focus leaves to it. */
-  onExitTop?: () => void;
-  /** Bumped when keyboard focus enters from `leadingBlock`; the first item takes focus. */
-  enterToken?: number;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -105,9 +94,6 @@ export const MediaList = memo(function MediaList({
   navActive = false,
   watchLater = false,
   reorder,
-  leadingBlock,
-  onExitTop,
-  enterToken,
 }: Props) {
   const { activate } = useActivateFile();
   const watchLaterMembership = useWatchLater();
@@ -130,7 +116,6 @@ export const MediaList = memo(function MediaList({
     setRowH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
   }, []);
   const rowEstimate = rowH || ROW_ESTIMATE;
-  const { leadingRef, leadingHeight } = useLeadingBlock();
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -138,8 +123,6 @@ export const MediaList = memo(function MediaList({
     estimateSize: () => rowEstimate,
     overscan: 8,
     paddingStart: listOffset * rowEstimate,
-    // The leading block sits before the rows inside the same scroll element.
-    scrollMargin: leadingHeight,
   });
   const virtualRows = virtualizer.getVirtualItems();
 
@@ -176,8 +159,6 @@ export const MediaList = memo(function MediaList({
     onOpen,
     onInspect,
     scrollToRow,
-    onExitTop: leadingBlock ? onExitTop : undefined,
-    enterToken,
   });
   // Points at the focused row's toggle so "W" activates it through the button
   // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
@@ -206,27 +187,22 @@ export const MediaList = memo(function MediaList({
   });
 
   if (loading) {
-    // The leading block stays put while the list reloads (a sort change),
-    // rather than blinking out with the rows.
     return (
-      <ScrollArea className="page-scroll h-full">
-        {leadingBlock && <div ref={leadingRef}>{leadingBlock}</div>}
-        <div className="flex flex-col gap-2 p-4">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex gap-3 rounded-md border border-border bg-surface p-2"
-            >
-              <Skeleton className="aspect-video w-48 shrink-0 rounded" />
-              <div className="flex flex-1 flex-col gap-2 py-1">
-                <Skeleton className="h-3.5 w-2/3" />
-                <Skeleton className="h-2.5 w-1/3" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
+      <div className="flex flex-col gap-2 p-4">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex gap-3 rounded-md border border-border bg-surface p-2"
+          >
+            <Skeleton className="aspect-video w-48 shrink-0 rounded" />
+            <div className="flex flex-1 flex-col gap-2 py-1">
+              <Skeleton className="h-3.5 w-2/3" />
+              <Skeleton className="h-2.5 w-1/3" />
+              <Skeleton className="h-4 w-1/2" />
             </div>
-          ))}
-        </div>
-      </ScrollArea>
+          </div>
+        ))}
+      </div>
     );
   }
 
@@ -241,7 +217,6 @@ export const MediaList = memo(function MediaList({
         viewportClassName="pt-4"
         viewportRef={setScrollRef}
       >
-        {leadingBlock && <div ref={leadingRef}>{leadingBlock}</div>}
         <div
           style={{
             height: virtualizer.getTotalSize(),
@@ -254,9 +229,7 @@ export const MediaList = memo(function MediaList({
               key={vr.key}
               ref={measureRow}
               className="absolute left-0 top-0 w-full px-4 pb-2"
-              style={{
-                transform: `translateY(${vr.start - leadingHeight}px)`,
-              }}
+              style={{ transform: `translateY(${vr.start}px)` }}
             >
               {(() => {
                 const file = items[vr.index];

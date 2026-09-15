@@ -51,9 +51,6 @@ export const fr: Record<TranslationKey, string> = {
   "settings.hoverPreview": "Aperçu au survol",
   "settings.hoverPreviewDesc":
     "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
-  "settings.homeLanding": "Accueil avec étagères",
-  "settings.homeLandingDesc":
-    "Affiche les étagères « Ajoutés récemment » et « Sélection du jour » au-dessus de la liste.",
   "settings.frameQuality": "Qualité des aperçus",
   "settings.frameQualityDesc":
     "Qualité des aperçus au survol et de la rangée de scènes dans Découverte. Plus elle est élevée, plus la génération est lente.",
@@ -76,6 +73,8 @@ export const fr: Record<TranslationKey, string> = {
   "settings.keybinding": "Raccourcis clavier",
   "settings.keybindingDesc":
     "Raccourcis pour déplacer le focus dans la liste, naviguer entre les fichiers, faire défiler et cibler la recherche.",
+  "settings.homeLayout": "Disposition de l'accueil",
+  "settings.homeLayoutDesc": "Comment la vue Accueil est organisée.",
   "settings.support": "Soutenir le développement",
   "settings.supportDesc":
     "Si vous aimez cette application, envisagez de soutenir son développement.",
@@ -134,14 +133,20 @@ export const fr: Record<TranslationKey, string> = {
   "home.scanError": "Une erreur s'est produite pendant le scan",
   "home.scanStartFailed": "Impossible de démarrer le scan",
   "home.scanAlreadyRunning": "Un scan est déjà en cours",
-  "home.landingTitle": "Accueil",
-  "home.landingCollapse": "Replier",
-  "home.landingRecent": "Ajoutés récemment",
-  "home.landingSeeAll": "Tout voir",
-  "home.landingPicks": "Sélection du jour",
-  "home.landingPicksHint": "Renouvelée chaque jour",
-  "home.landingOpenDiscover": "Ouvrir dans Découverte",
-  "home.landingReshuffle": "Repiocher",
+  "home.shelfTitle": "Accueil",
+  "home.shelfRecent": "Ajoutés récemment",
+  "home.shelfSeeAll": "Tout voir",
+  "home.shelfTodayPick": "Le choix du jour",
+  "home.shelfMorePicks": "Autres suggestions",
+  "home.shelfOpenDetail": "Voir les détails",
+  "home.shelfOpenDiscover": "Ouvrir dans Découverte",
+  "home.shelfEmpty":
+    "Rien à afficher pour l’instant. « Ajoutés récemment » se remplira après un scan.",
+  "home.shelfError": "Impossible de charger cette étagère.",
+  "home.shelfSplit":
+    "Ajuster le partage entre le choix du jour et les autres suggestions",
+  "home.layoutTodayPick": "Le choix du jour",
+  "home.shelfReshuffle": "Repiocher",
 
   // command menu
   "command.title": "Menu de commandes",
@@ -417,6 +422,7 @@ export const fr: Record<TranslationKey, string> = {
 
   // workspace rail
   "workspace.all": "Tout",
+  "workspace.home": "Accueil",
   "workspace.settings": "Paramètres",
   "workspace.edit": "Modifier l'espace de travail",
   "workspace.editAction": "Enregistrer",

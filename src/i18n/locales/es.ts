@@ -51,9 +51,6 @@ export const es: Record<TranslationKey, string> = {
   "settings.hoverPreview": "Vista previa al pasar el cursor",
   "settings.hoverPreviewDesc":
     "Muestra la escena bajo el cursor al pasar sobre la miniatura de un vídeo.",
-  "settings.homeLanding": "Inicio con estantes",
-  "settings.homeLandingDesc":
-    "Muestra los estantes «Añadidos recientemente» y «Selección de hoy» encima de la lista.",
   "settings.frameQuality": "Calidad de la vista previa",
   "settings.frameQualityDesc":
     "Calidad de las vistas previas al pasar el cursor y de la fila de escenas en Descubrir. Cuanto más alta, más lenta la generación.",
@@ -76,6 +73,8 @@ export const es: Record<TranslationKey, string> = {
   "settings.keybinding": "Atajos de teclado",
   "settings.keybindingDesc":
     "Asignación de teclas para mover el foco en la lista, navegar archivos, desplazar y enfocar la búsqueda.",
+  "settings.homeLayout": "Diseño de Inicio",
+  "settings.homeLayoutDesc": "Cómo se organiza la vista de Inicio.",
   "settings.support": "Apoyar el desarrollo",
   "settings.supportDesc":
     "Si te gusta esta aplicación, considera apoyar su desarrollo.",
@@ -134,14 +133,20 @@ export const es: Record<TranslationKey, string> = {
   "home.scanError": "Se produjo un error durante el escaneo",
   "home.scanStartFailed": "No se pudo iniciar el escaneo",
   "home.scanAlreadyRunning": "Ya hay un escaneo en curso",
-  "home.landingTitle": "Inicio",
-  "home.landingCollapse": "Contraer",
-  "home.landingRecent": "Añadidos recientemente",
-  "home.landingSeeAll": "Ver todo",
-  "home.landingPicks": "Selección de hoy",
-  "home.landingPicksHint": "Cambia cada día",
-  "home.landingOpenDiscover": "Abrir en Descubrir",
-  "home.landingReshuffle": "Volver a elegir",
+  "home.shelfTitle": "Inicio",
+  "home.shelfRecent": "Añadidos recientemente",
+  "home.shelfSeeAll": "Ver todo",
+  "home.shelfTodayPick": "La elección de hoy",
+  "home.shelfMorePicks": "Más sugerencias",
+  "home.shelfOpenDetail": "Ver detalles",
+  "home.shelfOpenDiscover": "Abrir en Descubrir",
+  "home.shelfEmpty":
+    "Todavía no hay nada que mostrar. «Añadidos recientemente» se llenará tras un escaneo.",
+  "home.shelfError": "No se pudo cargar este estante.",
+  "home.shelfSplit":
+    "Ajustar el reparto entre la elección de hoy y más sugerencias",
+  "home.layoutTodayPick": "La elección de hoy",
+  "home.shelfReshuffle": "Volver a elegir",
 
   // command menu
   "command.title": "Menú de comandos",
@@ -417,6 +422,7 @@ export const es: Record<TranslationKey, string> = {
 
   // workspace rail
   "workspace.all": "Todo",
+  "workspace.home": "Inicio",
   "workspace.settings": "Ajustes",
   "workspace.edit": "Editar espacio de trabajo",
   "workspace.editAction": "Guardar",

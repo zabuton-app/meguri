@@ -51,9 +51,6 @@ export const en: Record<TranslationKey, string> = {
   "settings.hoverPreview": "Hover preview",
   "settings.hoverPreviewDesc":
     "Preview the scene under the cursor while hovering over a video thumbnail.",
-  "settings.homeLanding": "Home landing",
-  "settings.homeLandingDesc":
-    "Show the Recently added and Picks for today shelves above the list.",
   "settings.frameQuality": "Preview quality",
   "settings.frameQualityDesc":
     "Quality of Discovery hover previews and scene rail frames. Higher is slower to generate.",
@@ -75,6 +72,8 @@ export const en: Record<TranslationKey, string> = {
   "settings.keybinding": "Keybinds",
   "settings.keybindingDesc":
     "Key bindings for moving focus in the list, file paging, scrolling, and focusing search.",
+  "settings.homeLayout": "Home layout",
+  "settings.homeLayoutDesc": "How the Home view is arranged.",
   "settings.support": "Support development",
   "settings.supportDesc":
     "If you enjoy this app, please consider supporting its development.",
@@ -130,14 +129,19 @@ export const en: Record<TranslationKey, string> = {
   "home.scanError": "An error occurred during the scan",
   "home.scanStartFailed": "Could not start scan",
   "home.scanAlreadyRunning": "A scan is already in progress",
-  "home.landingTitle": "Home",
-  "home.landingCollapse": "Collapse",
-  "home.landingRecent": "Recently added",
-  "home.landingSeeAll": "See all",
-  "home.landingPicks": "Picks for today",
-  "home.landingPicksHint": "A new set every day",
-  "home.landingOpenDiscover": "Open in Discovery",
-  "home.landingReshuffle": "Reshuffle",
+  "home.shelfTitle": "Home",
+  "home.shelfRecent": "Recently added",
+  "home.shelfSeeAll": "See all",
+  "home.shelfTodayPick": "Today's pick",
+  "home.shelfMorePicks": "More picks",
+  "home.shelfOpenDetail": "Open details",
+  "home.shelfOpenDiscover": "Open in Discovery",
+  "home.shelfEmpty":
+    "Nothing to show yet. Recently added fills in once a scan has run.",
+  "home.shelfError": "Could not load this shelf.",
+  "home.shelfSplit": "Adjust the split between today's pick and more picks",
+  "home.layoutTodayPick": "Today's pick",
+  "home.shelfReshuffle": "Reshuffle",
 
   // command menu
   "command.title": "Command menu",
@@ -405,6 +409,7 @@ export const en: Record<TranslationKey, string> = {
 
   // workspace rail
   "workspace.all": "All",
+  "workspace.home": "Home",
   "workspace.settings": "Settings",
   "workspace.edit": "Edit workspace",
   "workspace.editAction": "Save",

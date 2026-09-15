@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
   type Ref,
 } from "react";
 import { Link } from "react-router";
@@ -42,7 +41,6 @@ import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
-import { useLeadingBlock } from "@/hooks/useLeadingBlock";
 
 const GRID_CLASS =
   "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 p-4";
@@ -84,15 +82,6 @@ interface Props {
   watchLater?: boolean;
   /** Set only while a collection is shown in its manual order; enables drag-to-reorder. */
   reorder?: MediaReorder;
-  /**
-   * Block rendered inside the scroll viewport before the rows (the home
-   * landing shelves); it scrolls away with the list.
-   */
-  leadingBlock?: ReactNode;
-  /** Keyboard "up" from the first row while `leadingBlock` is shown: focus leaves to it. */
-  onExitTop?: () => void;
-  /** Bumped when keyboard focus enters from `leadingBlock`; the first item takes focus. */
-  enterToken?: number;
 }
 
 // Memoized: Home re-renders on every thumbVersion flush and its other props are
@@ -114,9 +103,6 @@ export const MediaGrid = memo(function MediaGrid({
   navActive = false,
   watchLater = false,
   reorder,
-  leadingBlock,
-  onExitTop,
-  enterToken,
 }: Props) {
   const { activate } = useActivateFile();
   const watchLaterMembership = useWatchLater();
@@ -133,7 +119,6 @@ export const MediaGrid = memo(function MediaGrid({
   }, []);
   const [cols, setCols] = useState(1);
   const [innerW, setInnerW] = useState(0);
-  const { leadingRef, leadingHeight } = useLeadingBlock();
 
   // Compute the column count from the container width (equivalent to auto-fill minmax(180px,1fr)).
   useEffect(() => {
@@ -231,8 +216,6 @@ export const MediaGrid = memo(function MediaGrid({
     estimateSize: () => rowEstimate,
     overscan: 4,
     paddingStart: leadingRows * rowEstimate,
-    // The leading block sits before the rows inside the same scroll element.
-    scrollMargin: leadingHeight,
   });
   const virtualRows = virtualizer.getVirtualItems();
 
@@ -269,8 +252,6 @@ export const MediaGrid = memo(function MediaGrid({
     onOpen,
     onInspect,
     scrollToRow,
-    onExitTop: leadingBlock ? onExitTop : undefined,
-    enterToken,
   });
   // Points at the focused card's toggle so "W" activates it through the button
   // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
@@ -301,27 +282,22 @@ export const MediaGrid = memo(function MediaGrid({
   });
 
   if (loading) {
-    // The leading block stays put while the list reloads (a sort change),
-    // rather than blinking out with the rows.
     return (
-      <ScrollArea className="page-scroll h-full">
-        {leadingBlock && <div ref={leadingRef}>{leadingBlock}</div>}
-        <div className={GRID_CLASS}>
-          {Array.from({ length: 18 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex flex-col overflow-hidden rounded-md border border-border bg-surface"
-            >
-              <Skeleton className="aspect-video rounded-none" />
-              <div className="flex flex-col gap-1.5 px-2 py-1.5">
-                <Skeleton className="h-3 w-4/5" />
-                <Skeleton className="h-2.5 w-1/2" />
-                <Skeleton className="h-4 w-2/3" />
-              </div>
+      <div className={GRID_CLASS}>
+        {Array.from({ length: 18 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex flex-col overflow-hidden rounded-md border border-border bg-surface"
+          >
+            <Skeleton className="aspect-video rounded-none" />
+            <div className="flex flex-col gap-1.5 px-2 py-1.5">
+              <Skeleton className="h-3 w-4/5" />
+              <Skeleton className="h-2.5 w-1/2" />
+              <Skeleton className="h-4 w-2/3" />
             </div>
-          ))}
-        </div>
-      </ScrollArea>
+          </div>
+        ))}
+      </div>
     );
   }
 
@@ -339,7 +315,6 @@ export const MediaGrid = memo(function MediaGrid({
         viewportClassName="pt-4"
         viewportRef={setScrollRef}
       >
-        {leadingBlock && <div ref={leadingRef}>{leadingBlock}</div>}
         <div
           style={{
             height: virtualizer.getTotalSize(),
@@ -352,9 +327,7 @@ export const MediaGrid = memo(function MediaGrid({
               key={vr.key}
               ref={measureRow}
               className="absolute left-0 top-0 w-full"
-              style={{
-                transform: `translateY(${vr.start - leadingHeight}px)`,
-              }}
+              style={{ transform: `translateY(${vr.start}px)` }}
             >
               <div
                 className="grid gap-3 px-4 pb-3"
@@ -395,6 +368,8 @@ export const MediaGrid = memo(function MediaGrid({
 
 // The parent (MediaGrid) re-renders on every thumb:done, so memoize this and
 // only re-render cards whose version changed (onTagClick is stabilized in the parent).
+// The Home view's ShelfCard (src/routes/Home/HomeShelves.tsx) is this card
+// without rating and tags; a change to the thumbnail region belongs in both.
 const MediaCard = memo(function MediaCard({
   file,
   version,

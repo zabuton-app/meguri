@@ -145,6 +145,9 @@ describe("WorkspaceRail", () => {
       const labels = Array.from(
         container.querySelectorAll("button[aria-label]"),
       ).map((el) => el.getAttribute("aria-label"));
+      // The pinned virtual views lead: Home, then All, then Watch Later.
+      expect(labels.indexOf("Home")).toBe(0);
+      expect(labels.indexOf("All")).toBe(labels.indexOf("Home") + 1);
       expect(labels.indexOf("Watch Later")).toBe(labels.indexOf("All") + 1);
       expect(labels.indexOf("Watch Later")).toBeLessThan(
         labels.indexOf("Favourites"),

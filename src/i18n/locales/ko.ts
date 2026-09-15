@@ -49,9 +49,6 @@ export const ko: Record<TranslationKey, string> = {
   "settings.hoverPreview": "호버 미리보기",
   "settings.hoverPreviewDesc":
     "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",
-  "settings.homeLanding": "홈 랜딩",
-  "settings.homeLandingDesc":
-    "목록 위에 「최근 추가」 「오늘의 추천」 선반을 표시합니다.",
   "settings.frameQuality": "미리보기 화질",
   "settings.frameQualityDesc":
     "디스커버리의 호버 미리보기와 장면 레일의 화질. 높을수록 생성이 느려집니다.",
@@ -73,6 +70,8 @@ export const ko: Record<TranslationKey, string> = {
   "settings.keybinding": "키 바인딩",
   "settings.keybindingDesc":
     "목록 포커스 이동·파일 이동·스크롤·검색 포커스의 키 할당입니다.",
+  "settings.homeLayout": "홈 레이아웃",
+  "settings.homeLayoutDesc": "홈 화면의 구성을 선택합니다.",
   "settings.support": "개발 응원하기",
   "settings.supportDesc": "이 앱이 마음에 드신다면 개발 지원을 고려해 주세요.",
   "settings.buyMeCoffee": "Buy Me a Coffee",
@@ -127,14 +126,19 @@ export const ko: Record<TranslationKey, string> = {
   "home.scanError": "스캔 중 오류가 발생했습니다",
   "home.scanStartFailed": "스캔을 시작할 수 없습니다",
   "home.scanAlreadyRunning": "스캔이 이미 실행 중입니다",
-  "home.landingTitle": "홈",
-  "home.landingCollapse": "접기",
-  "home.landingRecent": "최근 추가",
-  "home.landingSeeAll": "모두 보기",
-  "home.landingPicks": "오늘의 추천",
-  "home.landingPicksHint": "매일 바뀝니다",
-  "home.landingOpenDiscover": "디스커버리에서 열기",
-  "home.landingReshuffle": "다시 뽑기",
+  "home.shelfTitle": "홈",
+  "home.shelfRecent": "최근 추가",
+  "home.shelfSeeAll": "모두 보기",
+  "home.shelfTodayPick": "오늘의 한 편",
+  "home.shelfMorePicks": "다른 추천",
+  "home.shelfOpenDetail": "상세 열기",
+  "home.shelfOpenDiscover": "디스커버리에서 열기",
+  "home.shelfEmpty":
+    "아직 표시할 항목이 없습니다. 스캔이 끝나면 「최근 추가」에 표시됩니다.",
+  "home.shelfError": "선반을 불러오지 못했습니다.",
+  "home.shelfSplit": "오늘의 한 편과 다른 추천의 비율 조절",
+  "home.layoutTodayPick": "오늘의 한 편",
+  "home.shelfReshuffle": "다시 뽑기",
 
   // command menu
   "command.title": "명령 메뉴",
@@ -404,6 +408,7 @@ export const ko: Record<TranslationKey, string> = {
 
   // workspace rail
   "workspace.all": "전체",
+  "workspace.home": "홈",
   "workspace.settings": "설정",
   "workspace.edit": "워크스페이스 편집",
   "workspace.editAction": "저장",

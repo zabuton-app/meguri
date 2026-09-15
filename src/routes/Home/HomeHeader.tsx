@@ -49,6 +49,7 @@ export function HomeHeader({
   onEditWorkspace,
   view,
   onSetView,
+  isHome,
   scanning,
   ready,
   onScan,
@@ -66,6 +67,8 @@ export function HomeHeader({
   onEditWorkspace: () => void;
   view: ViewMode;
   onSetView: (v: ViewMode) => void;
+  /** The Home view is showing (shelves, not a list): the view switch is hidden. */
+  isHome: boolean;
   scanning: boolean;
   ready: boolean;
   onScan: () => void;
@@ -151,43 +154,50 @@ export function HomeHeader({
         >
           <TagsIcon className="size-4" />
         </Link>
-        <div className="flex items-center rounded-md border border-border">
-          {(
-            [
-              {
-                mode: "grid",
-                label: t("view.grid"),
-                Icon: LayoutGrid,
-                rounded: "rounded-l-md",
-              },
-              { mode: "list", label: t("view.list"), Icon: List, rounded: "" },
-              {
-                mode: "table",
-                label: t("view.table"),
-                Icon: Table2,
-                rounded: "rounded-r-md",
-              },
-            ] as const
-          ).map(({ mode, label, Icon, rounded }) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => onSetView(mode)}
-              aria-label={label}
-              aria-pressed={view === mode}
-              title={label}
-              className={cn(
-                "flex size-7 items-center justify-center transition",
-                rounded,
-                view === mode
-                  ? "bg-primary/20 text-fg"
-                  : "text-muted hover:bg-fg/10 hover:text-fg",
-              )}
-            >
-              <Icon className="size-4" />
-            </button>
-          ))}
-        </div>
+        {!isHome && (
+          <div className="flex items-center rounded-md border border-border">
+            {(
+              [
+                {
+                  mode: "grid",
+                  label: t("view.grid"),
+                  Icon: LayoutGrid,
+                  rounded: "rounded-l-md",
+                },
+                {
+                  mode: "list",
+                  label: t("view.list"),
+                  Icon: List,
+                  rounded: "",
+                },
+                {
+                  mode: "table",
+                  label: t("view.table"),
+                  Icon: Table2,
+                  rounded: "rounded-r-md",
+                },
+              ] as const
+            ).map(({ mode, label, Icon, rounded }) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => onSetView(mode)}
+                aria-label={label}
+                aria-pressed={view === mode}
+                title={label}
+                className={cn(
+                  "flex size-7 items-center justify-center transition",
+                  rounded,
+                  view === mode
+                    ? "bg-primary/20 text-fg"
+                    : "text-muted hover:bg-fg/10 hover:text-fg",
+                )}
+              >
+                <Icon className="size-4" />
+              </button>
+            ))}
+          </div>
+        )}
         <ButtonGroup className="[&>button]:border [&>button]:border-muted/35 [&>button]:bg-surface [&>button:not(:first-child)]:relative [&>button:not(:first-child)]:z-[1]">
           <Button
             size="sm"
