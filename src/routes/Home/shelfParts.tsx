@@ -20,6 +20,8 @@ import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
+import { RatingButton } from "@/components/RatingButton";
+import { LIST_HIDDEN_SOURCES } from "@shared/tags";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fileHref } from "@/lib/fileHref";
@@ -67,6 +69,7 @@ export function ShelfRow({
   thumbVersion,
   watchLater,
   focusedWatchLaterRef,
+  onTagClick,
   t,
 }: {
   row: Row;
@@ -76,6 +79,8 @@ export function ShelfRow({
   thumbVersion: Record<string, number>;
   watchLater: WatchLaterMembership;
   focusedWatchLaterRef: RefObject<HTMLButtonElement | null>;
+  /** A tag on a card: filter the library by it. */
+  onTagClick?: (token: string) => void;
   t: TFunc;
 }) {
   const { loaded, error } = row.data;
@@ -109,6 +114,7 @@ export function ShelfRow({
                 watchLater={watchLater}
                 focused={focused}
                 watchLaterRef={focused ? focusedWatchLaterRef : undefined}
+                onTagClick={onTagClick}
               />
             );
           })}
@@ -329,8 +335,8 @@ export const HeroCard = memo(
 );
 
 // Same two click regions as the grid card (thumbnail → open with autoplay,
-// name → inspect), minus rating and tags: the shelf is an entry point, the
-// list views are where editing happens. Kept in step with MediaGrid's
+// name → inspect), in the same card size: the rating sits over the picture
+// and the tags trail the meta line, cut off at the card's edge. Kept in step with MediaGrid's
 // MediaCard by hand (see the note there).
 export const ShelfCard = memo(function ShelfCard({
   file,
@@ -339,6 +345,7 @@ export const ShelfCard = memo(function ShelfCard({
   watchLater,
   focused,
   watchLaterRef,
+  onTagClick,
 }: {
   file: FileRow;
   mediaBase: string;
@@ -346,8 +353,14 @@ export const ShelfCard = memo(function ShelfCard({
   watchLater: WatchLaterMembership;
   focused: boolean;
   watchLaterRef?: Ref<HTMLButtonElement>;
+  onTagClick?: (token: string) => void;
 }) {
   const { onThumbnailClick } = useActivateFile();
+  // Only tags a card would show (the metadata classifier's stay in the detail
+  // view); none means no chip row at all rather than a "No tags" label.
+  const hasTags = (file.tags ?? []).some(
+    (tag) => !LIST_HIDDEN_SOURCES.includes(tag.source),
+  );
   return (
     <div
       data-testid="shelf-card"
@@ -389,6 +402,24 @@ export const ShelfCard = memo(function ShelfCard({
           size={16}
           className="absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
         />
+        {/* Rating over the picture's lower-left corner (the duration holds the
+            right): shown while the file is rated, on hover otherwise. */}
+        <div
+          data-testid="shelf-card-rating"
+          className={cn(
+            "absolute bottom-1 left-1 rounded bg-bg/70 px-1 py-0.5 backdrop-blur-[1px] transition-opacity",
+            file.rating > 0
+              ? "opacity-100"
+              : "opacity-0 focus-within:opacity-100 group-hover:opacity-100",
+          )}
+        >
+          <RatingButton
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            rating={file.rating}
+            size={12}
+          />
+        </div>
       </Link>
       <Link
         to={fileHref(file.id, file.workspaceId, { autoplay: false })}
@@ -397,7 +428,15 @@ export const ShelfCard = memo(function ShelfCard({
         <div className="truncate text-xs text-fg" title={file.relPath}>
           {fileNameOf(file.relPath)}
         </div>
-        <div className="truncate text-[10px] text-muted">{metaLine(file)}</div>
+        {/* Meta, then the tags cut off at the card's edge on the same line. */}
+        <div className="flex h-4 min-w-0 items-center gap-2 overflow-hidden text-[10px] text-muted">
+          <span className="shrink-0">{metaLine(file)}</span>
+          {hasTags && (
+            <div className="flex min-w-0 items-center gap-1 overflow-hidden [mask-image:linear-gradient(to_right,black_80%,transparent)]">
+              <TagChips tags={file.tags} onTagClick={onTagClick} />
+            </div>
+          )}
+        </div>
       </Link>
     </div>
   );

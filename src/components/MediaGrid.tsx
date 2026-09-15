@@ -368,8 +368,9 @@ export const MediaGrid = memo(function MediaGrid({
 
 // The parent (MediaGrid) re-renders on every thumb:done, so memoize this and
 // only re-render cards whose version changed (onTagClick is stabilized in the parent).
-// The Home view's ShelfCard (src/routes/Home/HomeShelves.tsx) is this card
-// without rating and tags; a change to the thumbnail region belongs in both.
+// The Home view's ShelfCard (src/routes/Home/shelfParts.tsx) is this card
+// compacted (rating over the picture, tags beside the meta); a change to the
+// thumbnail region belongs in both.
 const MediaCard = memo(function MediaCard({
   file,
   version,

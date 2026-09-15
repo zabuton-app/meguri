@@ -319,6 +319,38 @@ describe("Home view", () => {
     }
   });
 
+  it("shows each card's rating over its picture and its tags beside the meta", async () => {
+    mocks.filesSearch.mockResolvedValue({
+      items: [
+        { ...recentRow(11), rating: 4, tags: sampleTags },
+        { ...recentRow(12), rating: 0, tags: [] },
+      ],
+      nextCursor: null,
+    });
+    const shelves = await renderHomeView();
+    const [rated, unrated] = within(shelves)
+      .getAllByTestId("shelf-card")
+      .filter((c) => c.textContent?.includes("recent-"));
+
+    // Rated: the stars stay on the picture; unrated: they wait for a hover.
+    expect(within(rated).getByTestId("shelf-card-rating").className).toContain(
+      "opacity-100",
+    );
+    expect(
+      within(unrated).getByTestId("shelf-card-rating").className,
+    ).toContain("opacity-0");
+
+    // Manual tags show; the metadata classifier's do not, and a card with no
+    // tags shows no chip row (nor a "No tags" label).
+    expect(within(rated).getByText("beach")).toBeTruthy();
+    expect(within(rated).queryByText("4k")).toBeNull();
+    expect(within(unrated).queryByText("No tags")).toBeNull();
+
+    // A tag on a card takes the library to the "All" list, like the stage's.
+    fireEvent.click(within(rated).getByText("beach"));
+    expect(mocks.workspaceSwitch).toHaveBeenCalledWith("__all__");
+  });
+
   it("lets the bar between the hero and the picks set the split", async () => {
     const shelves = await renderHomeView();
     const bar = within(shelves).getByRole("separator", {

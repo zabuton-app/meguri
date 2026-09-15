@@ -181,6 +181,7 @@ export const TodayPickLayout = memo(function TodayPickLayout({
     thumbVersion,
     watchLater,
     focusedWatchLaterRef,
+    onTagClick,
     t,
   };
 
