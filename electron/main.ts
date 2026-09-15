@@ -18,12 +18,9 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { DEFAULT_LOGO, loadConfig } from "./core/appConfig.js";
-import type { Core } from "./core/index.js";
 import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
-import { runScan } from "./core/jobs.js";
 import log, { setupLogger } from "./core/logger.js";
 import { withTimeout } from "./core/concurrency.js";
-import * as q from "./core/queries.js";
 import {
   DISPOSE_TIMEOUT_MS,
   QueryWorkerClient,
@@ -35,7 +32,8 @@ import {
   updateDownloadUrl,
 } from "./core/updater.js";
 import { Workspaces } from "./core/workspaces.js";
-import { registerIpc, type ScanOptions } from "./ipc/index.js";
+import { registerIpc } from "./ipc/index.js";
+import { ScanManager } from "./scanManager.js";
 import type { LogoId } from "../shared/ipc/schema.js";
 
 // Set up logging before anything else so early failures land in the log file.
@@ -52,7 +50,6 @@ const queryClient = new QueryWorkerClient(
 let mediaPort = 0;
 const mediaToken = randomBytes(32).toString("base64url");
 const MEDIA_TOKEN_HEADER = "X-Api-Token";
-let scanSeq = 1;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 // Quit lifecycle. "disposing" = async teardown in flight (see before-quit),
@@ -331,97 +328,14 @@ function emit(channel: string, payload: unknown): void {
   mainWindow.webContents.send(channel, payload);
 }
 
-// Workspace IDs with a scan in progress. To avoid chunk-tx contention,
-// concurrent scans of the same workspace are suppressed.
-const scanningWs = new Set<string>();
-// AbortControllers for in-progress scans, keyed by workspace ID.
-const scanControllers = new Map<string, AbortController>();
-// Completion promises for in-progress scans, keyed by workspace ID.
-const scanPromises = new Map<string, Promise<void>>();
-
-/** Start a scan for a single workspace's Core. Returns the job id (empty if already scanning). */
-function scanCore(core: Core, wsId: string | null, opts: ScanOptions): string {
-  if (isQuitting()) return ""; // shutdown() has aborted scans; don't start new ones
-  if (wsId && scanningWs.has(wsId)) return ""; // don't start again if already running
-  const jobId = `job-${scanSeq++}`;
-  if (wsId) scanningWs.add(wsId);
-  const controller = new AbortController();
-  if (wsId) scanControllers.set(wsId, controller);
-  const promise = (async () => {
-    try {
-      if (opts.includeExcluded) q.clearExcludedFiles(core.db, core.rootId);
-      await runScan(
-        core,
-        jobId,
-        (e) => {
-          if (e.type === "progress")
-            emit("scan:progress", {
-              jobId: e.jobId,
-              phase: e.phase,
-              done: e.done,
-              total: e.total,
-            });
-          else if (e.type === "thumbDone")
-            emit("thumb:done", { id: e.id, workspaceId: wsId });
-          else if (e.type === "done")
-            emit("scan:done", {
-              jobId: e.jobId,
-              stats: e.stats,
-              aborted: e.aborted,
-            });
-        },
-        { rebuild: opts.rebuild, signal: controller.signal },
-      );
-    } catch (err) {
-      log.error("scan failed", err);
-      emit("scan:done", {
-        jobId,
-        stats: { inserted: 0, updated: 0, moved: 0, deleted: 0, unchanged: 0 },
-        error: true,
-      });
-    } finally {
-      if (wsId) {
-        scanningWs.delete(wsId);
-        scanControllers.delete(wsId);
-        scanPromises.delete(wsId);
-      }
-      // Scans can change duplicate group membership; clear derived query caches.
-      // Runs after the bookkeeping above so a failure here can never leave the
-      // workspace stuck in the "scanning" state.
-      await queryClient.invalidateCaches();
-    }
-  })();
-  if (wsId) scanPromises.set(wsId, promise);
-  void promise;
-  return jobId;
-}
-
-async function abortScan(wsId: string): Promise<void> {
-  scanControllers.get(wsId)?.abort();
-  await scanPromises.get(wsId);
-}
-
-/** Abort every running scan. Resolves once they have all settled. */
-function abortAllScans(): Promise<unknown> {
-  for (const ctrl of scanControllers.values()) ctrl.abort();
-  return Promise.allSettled([...scanPromises.values()]);
-}
-
-function startScan(opts: ScanOptions = {}): string {
-  // In the virtual "All" view, scan every registered workspace concurrently
-  // (each gets its own job/progress). Return the first job's id for tracking.
-  if (ws.isAll()) {
-    let first = "";
-    for (const { id, core } of ws.allCores()) {
-      const jobId = scanCore(core, id, opts);
-      if (jobId && !first) first = jobId;
-    }
-    return first;
-  }
-  const core = ws.active();
-  if (!core) return "";
-  return scanCore(core, ws.activeId, opts);
-}
+// Scans are orchestrated by ScanManager (electron/scanManager.ts); main only
+// starts the initial one and aborts them all on quit.
+const scans = new ScanManager({
+  ws,
+  queryClient,
+  emit,
+  isQuitting,
+});
 
 function trayImage(logo: LogoId): Electron.NativeImage {
   return nativeImage.createFromDataURL(
@@ -642,9 +556,7 @@ void app.whenReady().then(async () => {
     mediaBase: () => (mediaPort ? `http://127.0.0.1:${mediaPort}` : null),
     isDevMode,
     emit,
-    startScan,
-    abortScan,
-    abortAllScans,
+    scans,
     applyLogo,
   });
   createTray();
@@ -661,7 +573,7 @@ void app.whenReady().then(async () => {
       mainWindow?.webContents.openDevTools({ mode: "right" });
     });
   }
-  startScan();
+  scans.start();
   scheduleStartupUpdateCheck();
 
   app.on("activate", () => showWindow());
@@ -694,7 +606,7 @@ function stopIntake(): void {
 
 async function shutdown(): Promise<void> {
   stopIntake();
-  await withTimeout(abortAllScans(), SHUTDOWN_SCAN_WAIT_MS);
+  await withTimeout(scans.abortAll(), SHUTDOWN_SCAN_WAIT_MS);
   await queryClient.dispose();
 }
 
@@ -726,7 +638,7 @@ function teardownSync(): void {
   if (quitPhase === "done") return;
   quitPhase = "disposing";
   stopIntake();
-  void abortAllScans();
+  void scans.abortAll();
   queryClient.terminateNow();
   finalizeQuit();
 }

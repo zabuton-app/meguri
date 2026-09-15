@@ -13,7 +13,7 @@ import { registerThumbHandlers } from "./thumbs.js";
 import { registerUpdateHandlers } from "./updates.js";
 import { registerWorkspaceHandlers } from "./workspaces.js";
 
-export type { IpcContext, ScanOptions } from "./context.js";
+export type { IpcContext } from "./context.js";
 
 export function registerIpc(ctx: IpcContext): void {
   registerStatusHandlers(ctx);

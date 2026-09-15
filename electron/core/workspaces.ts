@@ -429,12 +429,15 @@ export class Workspaces {
   }
 
   /**
-   * Drop a file from the built-in Watch Later collection. Called whenever a file
-   * is played (see `consumeWatchLater` in electron/ipc/helpers.ts): "watch
-   * later" means "not watched yet", so playing an entry is what takes it off
-   * the list. Opening a video's detail view without starting playback leaves
-   * it listed. Only the Watch Later membership changes — the file itself and
-   * every other collection are left alone.
+   * Drop a file from the built-in Watch Later collection. Called wherever a
+   * play is recorded (the `file_record_play` and `open_external` IPC handlers:
+   * the in-app player's first `play` event, opening in an external player, and
+   * an image's detail view, since images have no player and a view already
+   * counts as a play): "watch later" means "not watched yet", so playing an
+   * entry is what takes it off the list. Merely opening a video's detail view
+   * without starting playback leaves it listed. Only the Watch Later
+   * membership changes — the file itself and every other collection are left
+   * alone.
    *
    * Callers deliberately do not broadcast workspace:changed for this: refetching
    * the list while the detail view is open would drop the file being viewed out

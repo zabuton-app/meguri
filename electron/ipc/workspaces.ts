@@ -24,7 +24,7 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
     if (res.canceled || res.filePaths.length === 0) return { added: false };
     const np = ws.add(res.filePaths[0]);
     ws.setActive(np);
-    const scanJobId = ctx.startScan();
+    const scanJobId = ctx.scans.start();
     emit("workspace:changed", { activeId: ws.activeId });
     return { added: true, id: Workspaces.idFor(np), scanJobId };
   });
@@ -32,14 +32,14 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
   handle("workspace_remove", async ({ id }) => {
     const p = ws.pathOf(id);
     if (p) {
-      await ctx.abortScan(id);
+      await ctx.scans.abort(id);
       // The worker holds a read-only handle on this workspace's DB; close it
       // before ws.remove() deletes the data dir (open handles block removal
       // on Windows).
       await queryClient.closeWorkspace(id);
       ws.remove(p);
     }
-    if (ws.active()) ctx.startScan();
+    if (ws.active()) ctx.scans.start();
     emit("workspace:changed", { activeId: ws.activeId });
   });
 
@@ -61,7 +61,7 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
     }
     const p = ws.pathOf(id);
     if (p) ws.setActive(p);
-    ctx.startScan();
+    ctx.scans.start();
     emit("workspace:changed", { activeId: ws.activeId });
   });
 
@@ -89,7 +89,7 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
     // invalidating every files_search, which would refetch the pages the
     // renderer just patched optimistically — on every single drop. Nothing in
     // the rail depends on the order within a collection, and the renderer
-    // refetches itself if the write fails. Same reasoning as consumeWatchLater.
+    // refetches itself if the write fails. Same reasoning as removeFromWatchLater.
   });
 
   handle("collection_set_emoji", ({ id, emoji }) => {

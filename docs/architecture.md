@@ -78,12 +78,13 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
    `updates.ts`); `electron/ipc/index.ts` wires them up in `registerIpc()`.
    Each group receives an `IpcContext` (`electron/ipc/context.ts`) with what it
    needs from the main process — the `Workspaces`, the query worker client,
-   `emit()`, scan control, and live getters for the window and media server.
-   Shared helpers (`coreById`, `scopedCores`, `ensureFileInsideRoot`) are in
-   `electron/ipc/helpers.ts`; a handler that hands a file path to the OS must
-   resolve it through `ensureFileInsideRoot` so the path is checked against the
-   workspace root. The output type is checked against the channel definition
-   automatically.
+   `emit()`, the `ScanManager`, and live getters for the window and media
+   server.
+   Shared helpers (`coreById`, `queryTargets`, `scopedCores`,
+   `ensureFileInsideRoot`) are in `electron/ipc/helpers.ts`; a handler that
+   hands a file path to the OS must resolve it through `ensureFileInsideRoot`
+   so the path is checked against the workspace root. The output type is
+   checked against the channel definition automatically.
 5. Add `api.<method>` to `src/ipc/client.ts`. Its input and output types are
    inferred from the channel name.
 

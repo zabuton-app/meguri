@@ -3,7 +3,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
-import { walk, syncFiles, type ScanStats } from "./scan.js";
+import { emptyScanStats, syncFiles, walk, type ScanStats } from "./scan.js";
 import { coverArtStreamIndex, extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
 import { syncFts } from "./tags.js";
@@ -99,13 +99,7 @@ export async function runScan(
   );
 
   if (signal?.aborted) {
-    const empty: ScanStats = {
-      inserted: 0,
-      updated: 0,
-      moved: 0,
-      deleted: 0,
-      unchanged: 0,
-    };
+    const empty = emptyScanStats();
     onEvent({ type: "done", jobId, stats: empty, aborted: true });
     return empty;
   }

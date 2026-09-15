@@ -10,11 +10,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import log from "@/lib/logger";
 import { applyTagFilter } from "@/lib/ui-events";
 import { api, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
-import { useConfirm } from "@/components/ConfirmDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWatchLater } from "@/hooks/useWatchLater";
@@ -51,7 +49,6 @@ const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
 
 export default function MediaDetail() {
   const { t } = useI18n();
-  const confirm = useConfirm();
   const { id } = useParams();
   const fileId = Number(id);
   // Optional initial seek position (seconds), e.g. when arriving from a Discovery scene click.
@@ -198,49 +195,16 @@ export default function MediaDetail() {
   // (the modal and the side peek alike; the playlist player binds it too).
   useSpectrumPatternHotkey(isAudio);
 
-  const {
-    setRating,
-    addTag,
-    removeTag,
-    removeFromIndex,
-    addToCollection,
-    removeFromCollection,
-    addBookmark,
-    removeBookmark,
-    setMainThumb,
-    exportFrame,
-  } = useDetailMutations({
+  const actions = useDetailMutations({
     fileId,
     wsId,
-    onDeletedFromIndex: closeAudioIfCurrent,
+    onIndexEntryRemoved: closeAudioIfCurrent,
+    onDeleteFinished: onClose,
+    pauseVideo: () => playerRef.current?.pause(),
+    // Only when the bar's track *is* this file; a different track playing
+    // under a video detail is none of the external player's business.
+    pauseAudio: isAudio ? pauseAudio : undefined,
   });
-
-  const handleDeleteFromIndex = async () => {
-    const ok = await confirm({
-      title: t("media.deleteFromIndex"),
-      message: t("media.deleteFromIndexConfirm"),
-      confirmText: t("media.deleteFromIndex"),
-      destructive: true,
-    });
-    if (!ok) return;
-    await removeFromIndex();
-    onClose();
-  };
-
-  const openExternal = () => {
-    playerRef.current?.pause();
-    // Same courtesy for a track the bar is playing: the external
-    // player is about to play the very same file.
-    if (isAudio) pauseAudio();
-    // The main process records the play and consumes the Watch
-    // Later entry, so mirror that once it confirms — it can also
-    // refuse (a file gone missing under the root), and patching
-    // regardless would show the file as consumed when it is not.
-    void api
-      .openExternal(fileId, wsId)
-      .then(() => dropFromWatchLaterCache(qc, wsId, fileId))
-      .catch((e: unknown) => log.error("open external", e));
-  };
 
   const toggleImageBgInverted = useCallback(() => {
     setImageBgInverted((prev) => !prev);
@@ -380,15 +344,11 @@ export default function MediaDetail() {
                 navKeys={navBinding}
                 fullscreenTargetRef={modalRef}
                 bookmarks={d.bookmarks}
-                bookmarkPending={
-                  addBookmark.isPending || removeBookmark.isPending
-                }
-                onAddBookmark={(sec) => addBookmark.mutate(sec)}
-                onRemoveBookmark={(bookmarkId) =>
-                  removeBookmark.mutate(bookmarkId)
-                }
-                exportPending={exportFrame.isPending}
-                onExportFrame={(sec) => exportFrame.mutate(sec)}
+                bookmarkPending={actions.pending.bookmark}
+                onAddBookmark={actions.addBookmark}
+                onRemoveBookmark={actions.removeBookmark}
+                exportPending={actions.pending.export}
+                onExportFrame={actions.exportFrame}
                 onNativeDuration={setNativeDur}
                 onPlayed={() => {
                   invalidatePlayedSearches(qc);
@@ -444,16 +404,14 @@ export default function MediaDetail() {
             collections={collections}
             imageBgInverted={imageBgInverted}
             onToggleImageBg={toggleImageBgInverted}
-            onOpenExternal={openExternal}
-            onDeleteFromIndex={() => void handleDeleteFromIndex()}
-            onAddToCollection={(c) => addToCollection.mutate(c)}
-            onRemoveFromCollection={(c) => removeFromCollection.mutate(c)}
+            onOpenExternal={actions.openExternal}
+            onDeleteFromIndex={() => void actions.deleteFromIndex()}
+            onAddToCollection={actions.addToCollection}
+            onRemoveFromCollection={actions.removeFromCollection}
             t={t}
           />
 
           {/* Scenes: evenly spaced thumbnails. Click to seek to that position. */}
-          {/* Only the scene currently being applied (sec or null = revert) should look busy;
-              previously the whole row greyed out, which felt like the page had frozen. */}
           {d.kind === "video" && total && (
             <Scenes
               id={fileId}
@@ -461,11 +419,7 @@ export default function MediaDetail() {
               mediaBase={mediaBase}
               wsId={wsId}
               thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={
-                setMainThumb.isPending
-                  ? (setMainThumb.variables ?? null)
-                  : undefined
-              }
+              pendingThumbSec={actions.pendingThumbSec}
               // Status alone, not hasThumbFile: a video marked done always has
               // a frame behind it, and the scene picker shows the slot itself.
               mainThumbUrl={
@@ -473,9 +427,9 @@ export default function MediaDetail() {
                   ? thumbUrl(mediaBase, wsId, fileId, thumbVersion)
                   : null
               }
-              mainThumbPending={setMainThumb.isPending}
+              mainThumbPending={actions.pending.mainThumb}
               onSeek={(sec) => playerRef.current?.seek(sec)}
-              onSetMainThumb={(sec) => setMainThumb.mutate(sec)}
+              onSetMainThumb={actions.setMainThumb}
               t={t}
             />
           )}
@@ -488,14 +442,10 @@ export default function MediaDetail() {
               mediaBase={mediaBase}
               wsId={wsId}
               thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={
-                setMainThumb.isPending
-                  ? (setMainThumb.variables ?? null)
-                  : undefined
-              }
+              pendingThumbSec={actions.pendingThumbSec}
               onSeek={(sec) => playerRef.current?.seek(sec)}
-              onRemove={(bookmarkId) => removeBookmark.mutate(bookmarkId)}
-              onSetMainThumb={(sec) => setMainThumb.mutate(sec)}
+              onRemove={actions.removeBookmark}
+              onSetMainThumb={actions.setMainThumb}
               t={t}
             />
           )}
@@ -507,9 +457,9 @@ export default function MediaDetail() {
             wsId={wsId}
             watchLater={watchLater}
             watchLaterRef={watchLaterRef}
-            onRate={(r) => setRating.mutate(r)}
-            onAddTag={(name) => addTag.mutate(name)}
-            onRemoveTag={(tagId) => removeTag.mutate(tagId)}
+            onRate={actions.setRating}
+            onAddTag={actions.addTag}
+            onRemoveTag={actions.removeTag}
             onTagClick={onTagFilter}
             t={t}
           />

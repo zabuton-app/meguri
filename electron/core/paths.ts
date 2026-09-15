@@ -21,6 +21,11 @@ export function dataDirForRoot(root: string): string {
   return path.join(baseDataDir(), "roots", pathHash(root));
 }
 
+/** The SQLite file inside a root's data directory. */
+export function dbPathForDataDir(dataDir: string): string {
+  return path.join(dataDir, "db.sqlite");
+}
+
 /**
  * Whether an absolute path lies inside (or is equal to) a normalized root directory.
  * Plain `abs.startsWith(root)` would let "/home/u/videos2/x" match root "/home/u/videos".
