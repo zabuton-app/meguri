@@ -4,8 +4,10 @@
 
 # Meguri
 
-**A local-first media library for your videos and photos — scan, browse,
-search, and play, all offline.**
+**Redefining what a media manager is supposed to be.**
+
+A local-first media library for your videos and photos — scan, browse,
+search, and play, all offline.
 
 [![Test](https://github.com/zabuton-app/meguri/actions/workflows/test.yml/badge.svg)](https://github.com/zabuton-app/meguri/actions/workflows/test.yml)
 [![Build](https://github.com/zabuton-app/meguri/actions/workflows/build.yml/badge.svg)](https://github.com/zabuton-app/meguri/actions/workflows/build.yml)
@@ -31,6 +33,18 @@ native dependency is SQLite (better-sqlite3); ffmpeg/ffprobe ship as static
 binaries, so no system-side ffmpeg is required.
 
 ![Meguri demo — browsing, search, playback, and Discovery](./docs/assets/demo.gif)
+
+## Philosophy
+
+Meguri exists to redefine what a media manager is supposed to be. The
+category has settled into a set of assumptions — an account to sign up for, a
+cloud your files are uploaded to, a subscription to keep paying, a catalog
+that quietly reports what you watch. Meguri starts from the opposite premise: your library lives on
+your disk, it stays there, and the tool that browses it owes you nothing but a
+good time. Everything runs offline, nothing phones home, the whole thing is
+[free forever](#free-forever), and the source is yours to read. What is left
+once those assumptions are gone is the part that actually matters — finding,
+rediscovering, and enjoying what you already have.
 
 ## 🔭 Discovery — find something new
 
@@ -313,6 +327,16 @@ Electron's userData.
 > the directories you register, and all of its own data stays under
 > `userData` above. Nothing Meguri does can destroy or modify your videos
 > and images.
+
+## Free, forever
+
+Meguri is **free software and always will be**. There is no paid tier, no
+subscription, no in-app purchase, no license key, and no ads — and none will
+ever be added. Every feature, present and future, is available to everyone
+under the [MIT License](./LICENSE).
+
+The Buy Me a Coffee link above is purely optional. Supporting the project
+unlocks nothing and changes nothing about the app; it just helps keep it going.
 
 ## Privacy
 
