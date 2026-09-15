@@ -39,13 +39,13 @@ export class ScanManager {
   constructor(private readonly deps: ScanManagerDeps) {}
 
   /**
-   * Scan the active workspace, or — in the virtual "All" view — every
-   * registered workspace concurrently (each gets its own job/progress).
+   * Scan the active workspace, or — in the virtual "All" / "Home" views —
+   * every registered workspace concurrently (each gets its own job/progress).
    * Returns the first job's id for tracking ("" when nothing started).
    */
   start(opts: ScanOptions = {}): string {
     const { ws } = this.deps;
-    if (ws.isAll()) {
+    if (ws.isCrossWorkspace()) {
       let first = "";
       for (const { id, core } of ws.allCores()) {
         const jobId = this.scanCore(core, id, opts);

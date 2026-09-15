@@ -1,7 +1,7 @@
 import { app } from "electron";
 import { handle } from "../core/ipcHandler.js";
 import type { WorkspaceStats } from "../core/types.js";
-import { ALL_ID } from "../core/workspaces.js";
+import { VIRTUAL_WORKSPACE_LABELS } from "../../shared/workspaceIds.js";
 import type { IpcContext } from "./context.js";
 import { queryTargets } from "./helpers.js";
 
@@ -18,14 +18,14 @@ export function registerStatusHandlers(ctx: IpcContext): void {
   );
 
   handle("app_status", () => {
-    if (ws.isAll()) {
+    if (ws.isCrossWorkspace()) {
       return {
-        root: "All",
+        root: VIRTUAL_WORKSPACE_LABELS[ws.activeId ?? ""] ?? null,
         ready: ws.allCores().length > 0,
         initError: null,
         initErrorKind: null,
         mediaBase: ctx.mediaBase(),
-        workspaceId: ALL_ID,
+        workspaceId: ws.activeId,
         devMode: ctx.isDevMode(),
       };
     }

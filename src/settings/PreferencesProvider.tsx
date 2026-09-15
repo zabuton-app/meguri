@@ -18,6 +18,11 @@ import {
   isSpectrumPattern,
   type SpectrumPattern,
 } from "@/audio/spectrumPatterns";
+import {
+  DEFAULT_HOME_LAYOUT,
+  isHomeLayoutId,
+  type HomeLayoutId,
+} from "@/routes/Home/layouts/ids";
 
 const LS_KEY = "meguri.prefs";
 
@@ -69,6 +74,8 @@ interface Prefs {
   keybindingPreset: KeybindingPreset;
   hideSupportLink: boolean;
   hoverPreview: boolean;
+  /** Which arrangement the Home view takes (see src/routes/Home/layouts). */
+  homeLayout: HomeLayoutId;
   frameQuality: FrameQuality;
   emojiStyle: EmojiStyle;
   /** Seconds a still image is shown in the playlist player before advancing. */
@@ -101,6 +108,7 @@ const DEFAULTS: Prefs = {
   keybindingPreset: DEFAULT_KEYBINDING_PRESET,
   hideSupportLink: false,
   hoverPreview: true,
+  homeLayout: DEFAULT_HOME_LAYOUT,
   frameQuality: DEFAULT_FRAME_QUALITY,
   emojiStyle: DEFAULT_EMOJI_STYLE,
   playlistImageSeconds: DEFAULT_PLAYLIST_IMAGE_SECONDS,
@@ -148,6 +156,9 @@ function loadPrefs(): Prefs {
           typeof parsed.hoverPreview === "boolean"
             ? parsed.hoverPreview
             : DEFAULTS.hoverPreview,
+        homeLayout: isHomeLayoutId(parsed.homeLayout)
+          ? parsed.homeLayout
+          : DEFAULT_HOME_LAYOUT,
         frameQuality: isFrameQuality(parsed.frameQuality)
           ? parsed.frameQuality
           : DEFAULT_FRAME_QUALITY,
@@ -198,6 +209,7 @@ interface PrefsCtx extends Prefs {
   setKeybindingPreset: (p: KeybindingPreset) => void;
   setHideSupportLink: (hidden: boolean) => void;
   setHoverPreview: (enabled: boolean) => void;
+  setHomeLayout: (layout: HomeLayoutId) => void;
   setFrameQuality: (q: FrameQuality) => void;
   setEmojiStyle: (s: EmojiStyle) => void;
   setPlaylistImageSeconds: (n: number) => void;
@@ -242,6 +254,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPrefs((p) => ({ ...p, hideSupportLink: hidden })),
       setHoverPreview: (enabled) =>
         setPrefs((p) => ({ ...p, hoverPreview: enabled })),
+      setHomeLayout: (layout) =>
+        setPrefs((p) => ({ ...p, homeLayout: layout })),
       setFrameQuality: (q) => setPrefs((p) => ({ ...p, frameQuality: q })),
       setEmojiStyle: (s) => setPrefs((p) => ({ ...p, emojiStyle: s })),
       setPlaylistImageSeconds: (n) =>

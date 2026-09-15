@@ -68,6 +68,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.keybinding": "键位绑定",
   "settings.keybindingDesc":
     "列表焦点移动、文件翻页、滚动和聚焦搜索的按键分配。",
+  "settings.homeLayout": "首页布局",
+  "settings.homeLayoutDesc": "选择首页的呈现方式。",
   "settings.support": "支持开发",
   "settings.supportDesc": "如果你喜欢这个应用，欢迎支持它的开发。",
   "settings.buyMeCoffee": "Buy Me a Coffee",
@@ -122,6 +124,20 @@ export const zhCN: Record<TranslationKey, string> = {
   "home.scanError": "扫描过程中发生错误",
   "home.scanStartFailed": "无法开始扫描",
   "home.scanAlreadyRunning": "扫描已在进行中",
+  "home.shelfTitle": "首页",
+  "home.shelfRecent": "最近添加",
+  "home.shelfPlayed": "最近播放",
+  "home.shelfSeeAll": "查看全部",
+  "home.shelfTodayPick": "今日一选",
+  "home.shelfMorePicks": "更多推荐",
+  "home.shelfOpenDetail": "打开详情",
+  "home.shelfOpenDiscover": "在发现中打开",
+  "home.shelfEmpty":
+    "暂时没有可显示的内容。扫描完成后「最近添加」会出现在这里。",
+  "home.shelfError": "无法加载此栏。",
+  "home.shelfSplit": "调整今日一选与更多推荐的比例",
+  "home.layoutTodayPick": "今日一选",
+  "home.shelfReshuffle": "重新抽取",
 
   // command menu
   "command.title": "命令菜单",
@@ -381,6 +397,7 @@ export const zhCN: Record<TranslationKey, string> = {
 
   // workspace rail
   "workspace.all": "全部",
+  "workspace.home": "首页",
   "workspace.settings": "设置",
   "workspace.edit": "编辑工作区",
   "workspace.editAction": "保存",

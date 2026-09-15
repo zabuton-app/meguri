@@ -19,6 +19,8 @@ For what the app is, how to install it, and how to use it, see the top-level
   on-the-fly remux, frame previews).
 - [Renderer](renderer.md) — the React app: routing, providers, data fetching,
   internationalization, theming, and content zoom.
+- [Home View](home-view.md) — the Home screen's layouts and shared pieces,
+  and how to add a layout or a shelf.
 - [Build and CI](build-and-ci.md) — npm scripts, the electron-vite build, the
   two-project test setup, packaging, CI, and Docker-based development.
 
@@ -31,7 +33,8 @@ Read in this order for a top-down picture:
 2. [Data Model](data-model.md)
 3. [Media Pipeline](media-pipeline.md)
 4. [Renderer](renderer.md)
-5. [Build and CI](build-and-ci.md)
+5. [Home View](home-view.md)
+6. [Build and CI](build-and-ci.md)
 
 ## Relationship to other docs
 

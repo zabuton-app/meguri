@@ -52,7 +52,7 @@ function makeDeps(
   return {
     invalidateCaches,
     ws: {
-      isAll: () => false,
+      isCrossWorkspace: () => false,
       allCores: () => [a],
       active: () => a.core,
       activeId: "a",
@@ -105,7 +105,7 @@ describe("ScanManager", () => {
     pendingScan();
     const deps = makeDeps({
       ws: {
-        isAll: () => true,
+        isCrossWorkspace: () => true,
         allCores: () => [fakeCore("a"), fakeCore("b")],
         active: () => null,
         activeId: "all",

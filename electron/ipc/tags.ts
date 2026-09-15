@@ -34,7 +34,9 @@ export function registerTagHandlers(ctx: IpcContext): void {
   const tagMutationCores = () => {
     const cores = scopedCores(ws);
     const expected =
-      ws.isCollection() || ws.isAll() ? ws.rootCount() : cores.length;
+      ws.isCollection() || ws.isCrossWorkspace()
+        ? ws.rootCount()
+        : cores.length;
     if (cores.length < expected) {
       log.warn(
         `tag mutation covers ${cores.length}/${expected} workspaces; the rest could not be opened`,

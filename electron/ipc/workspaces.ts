@@ -2,6 +2,7 @@ import { dialog } from "electron";
 import { handle } from "../core/ipcHandler.js";
 import {
   ALL_ID,
+  HOME_ID,
   COLLECTION_ID_PREFIX,
   Workspaces,
 } from "../core/workspaces.js";
@@ -49,8 +50,8 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
   });
 
   handle("workspace_switch", ({ id }) => {
-    if (id === ALL_ID) {
-      ws.setActive(ALL_ID); // the virtual "All" view is never scanned
+    if (id === ALL_ID || id === HOME_ID) {
+      ws.setActive(id); // the virtual "All" / "Home" views are never scanned
       emit("workspace:changed", { activeId: ws.activeId });
       return;
     }
