@@ -25,6 +25,7 @@ node tools/demo-capture/shoot-gallery.mjs    # theme-*.png / view-*.png
 node tools/demo-capture/shoot-history.mjs    # history.png — play-history view
 node tools/demo-capture/shoot-peek.mjs       # side-peek.png — side peek
 node tools/demo-capture/shoot-audio.mjs      # audio.png — player bar
+node tools/demo-capture/shoot-spectrum.mjs   # spectrum*.png — audio spectrum
 ```
 
 To use your own media instead of the sample library:
@@ -53,9 +54,10 @@ xvfb-run -a -s "-screen 0 1400x1000x24" \
 with a photo embedded as cover art) into `Music/`; `--audio-only` rewrites
 just those.
 
-`shoot-peek.mjs` and `shoot-audio.mjs` need a real display: under Xvfb the
-built-in player fails to decode the sample videos, and the sheet would show
-the fallback notice instead of a playing frame. On a tiling compositor the
+`shoot-peek.mjs`, `shoot-audio.mjs` and `shoot-spectrum.mjs` need a real
+display: under Xvfb the built-in player fails to decode the sample videos,
+so the sheet would show the fallback notice instead of a playing frame, and
+no audio plays, so the spectrum would have nothing to draw. On a tiling compositor the
 window has to be floated so it keeps the requested 1280×800; on Hyprland,
 `hypr-float.sh` waits for the app window, floats it and sizes it — run it in
 the background right before the script:
