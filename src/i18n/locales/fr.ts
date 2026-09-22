@@ -55,6 +55,7 @@ export const fr: Record<TranslationKey, string> = {
   "settings.aiModels": "Modèles",
   "settings.aiNoModels":
     "Aucun modèle trouvé. Déposez un dossier au format transformers.js (onnx/vision_model*.onnx, onnx/text_model*.onnx, tokenizer.json, config.json) dans le dossier des modèles.",
+  "ai.vocabulary": "Vocabulaire des étiquettes",
   "ai.variantFp32": "fp32",
   "settings.aiUse": "Utiliser",
   "ai.active": "Utilisé",
@@ -261,6 +262,18 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.seekStart": "Aller au début",
   "shortcuts.spectrumPattern":
     "Motif du spectre suivant / précédent (audio dans le lecteur de liste)",
+  "media.analyze": "Analyse par IA",
+  "media.analyzeRun": "Analyser",
+  "media.analyzeAgain": "Analyser à nouveau",
+  "media.analyzeHint":
+    "Ce que le modèle a reconnu. Gardez celles que vous voulez comme étiquettes manuelles, ou ajoutez-les au vocabulaire pour qu'elles soient évaluées sur tous les fichiers.",
+  "media.analyzeNothing": "Rien n'a été reconnu.",
+  "media.analyzeInVocabulary": "dans le vocabulaire",
+  "media.analyzeTagged": "ajoutée",
+  "media.analyzeAddVocabulary": "Ajouter {count} au vocabulaire",
+  "media.analyzeAddTags": "Ajouter {count} comme étiquettes",
+  "media.similar": "Fichiers similaires",
+  "media.similarNone": "Pas encore analysé.",
   "media.rating": "Note",
   "media.tags": "Tags",
   "media.metaWorkspace": "Espace de travail",

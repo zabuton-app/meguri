@@ -54,6 +54,7 @@ export const ko: Record<TranslationKey, string> = {
   "settings.aiModels": "모델",
   "settings.aiNoModels":
     "모델을 찾을 수 없습니다. transformers.js 형식(onnx/vision_model*.onnx, onnx/text_model*.onnx, tokenizer.json, config.json)의 폴더를 위 모델 폴더에 넣어 주세요.",
+  "ai.vocabulary": "태그 어휘",
   "ai.variantFp32": "fp32",
   "settings.aiUse": "사용",
   "ai.active": "사용 중",
@@ -252,6 +253,18 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.seekStart": "처음으로 이동",
   "shortcuts.spectrumPattern":
     "스펙트럼 패턴 다음 / 이전 (플레이리스트 재생의 오디오)",
+  "media.analyze": "AI 분석",
+  "media.analyzeRun": "분석",
+  "media.analyzeAgain": "다시 분석",
+  "media.analyzeHint":
+    "모델이 인식한 항목입니다. 원하는 것을 수동 태그로 추가하거나, 어휘에 넣어 모든 파일에서 판정하게 할 수 있습니다.",
+  "media.analyzeNothing": "인식된 것이 없습니다.",
+  "media.analyzeInVocabulary": "어휘에 있음",
+  "media.analyzeTagged": "추가됨",
+  "media.analyzeAddVocabulary": "{count}개를 어휘에 추가",
+  "media.analyzeAddTags": "{count}개를 태그로 추가",
+  "media.similar": "비슷한 파일",
+  "media.similarNone": "아직 분석하지 않았습니다.",
   "media.rating": "평가",
   "media.tags": "태그",
   "media.metaWorkspace": "워크스페이스",

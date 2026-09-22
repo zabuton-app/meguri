@@ -54,6 +54,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.aiModels": "模型",
   "settings.aiNoModels":
     "未找到模型。请将 transformers.js 格式（onnx/vision_model*.onnx、onnx/text_model*.onnx、tokenizer.json、config.json）的文件夹放入上面的模型文件夹。",
+  "ai.vocabulary": "标签词表",
   "ai.variantFp32": "fp32",
   "settings.aiUse": "使用",
   "ai.active": "使用中",
@@ -249,6 +250,18 @@ export const zhCN: Record<TranslationKey, string> = {
   "shortcuts.seekStart": "跳到开头",
   "shortcuts.spectrumPattern":
     "下一个 / 上一个频谱样式（播放列表播放器中的音频）",
+  "media.analyze": "AI 分析",
+  "media.analyzeRun": "分析",
+  "media.analyzeAgain": "重新分析",
+  "media.analyzeHint":
+    "模型识别到的内容。可以把需要的项添加为手动标签，或加入词表，让之后所有文件都参与比对。",
+  "media.analyzeNothing": "没有识别到任何内容。",
+  "media.analyzeInVocabulary": "已在词表中",
+  "media.analyzeTagged": "已添加",
+  "media.analyzeAddVocabulary": "将 {count} 项加入词表",
+  "media.analyzeAddTags": "将 {count} 项添加为标签",
+  "media.similar": "相似文件",
+  "media.similarNone": "尚未分析。",
   "media.rating": "评分",
   "media.tags": "标签",
   "media.metaWorkspace": "工作区",

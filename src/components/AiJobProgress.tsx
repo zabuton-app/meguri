@@ -1,6 +1,6 @@
 // The AI index job's progress, as a labelled bar. Beside ScanProgress rather
-// than inside the settings screen: the detail view's Analyze panel wants the
-// same bar, and a job belongs to the app, not to one screen.
+// than inside the settings screen: a background job belongs to the app, not to
+// the one screen that happens to show it today.
 import { useI18n } from "@/i18n/I18nProvider";
 import type { AiJobState } from "@/ipc/client";
 

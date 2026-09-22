@@ -27,7 +27,8 @@ export interface CollectionRef {
 /** What the detail view can do to its file; see useDetailMutations. */
 export interface DetailActions {
   setRating: (rating: number) => void;
-  addTag: (name: string) => void;
+  /** Awaitable so the Analyze panel can add several in a row. */
+  addTag: (name: string) => Promise<unknown>;
   removeTag: (tagId: number) => void;
   addToCollection: (c: CollectionRef) => void;
   removeFromCollection: (c: CollectionRef) => void;
@@ -285,7 +286,7 @@ export function useDetailMutations({
   // it would pass the event there.
   return {
     setRating: (rating) => setRating.mutate(rating),
-    addTag: (name) => addTag.mutate(name),
+    addTag: (name) => addTag.mutateAsync(name),
     removeTag: (tagId) => removeTag.mutate(tagId),
     addToCollection: (c) => addToCollection.mutate(c),
     removeFromCollection: (c) => removeFromCollection.mutate(c),

@@ -54,6 +54,7 @@ export const ja = {
   "settings.aiModels": "モデル",
   "settings.aiNoModels":
     "モデルが見つかりません。transformers.js 形式（onnx/vision_model*.onnx・onnx/text_model*.onnx・tokenizer.json・config.json）のフォルダを、上のモデルフォルダに置いてください。",
+  "ai.vocabulary": "タグ語彙",
   "ai.variantFp32": "fp32",
   "settings.aiUse": "使用する",
   "ai.active": "使用中",
@@ -255,6 +256,18 @@ export const ja = {
   "shortcuts.seekStart": "先頭へ移動",
   "shortcuts.spectrumPattern":
     "スペクトラムのパターンを 次 / 前 へ（プレイリスト再生のオーディオ）",
+  "media.analyze": "AI 解析",
+  "media.analyzeRun": "解析する",
+  "media.analyzeAgain": "再解析",
+  "media.analyzeHint":
+    "モデルが認識したものです。チェックしたものを手動タグとして追加するか、語彙に加えて以後すべてのファイルで判定させられます。",
+  "media.analyzeNothing": "認識できるものがありませんでした。",
+  "media.analyzeInVocabulary": "語彙にあり",
+  "media.analyzeTagged": "追加済み",
+  "media.analyzeAddVocabulary": "{count} 件を語彙に追加",
+  "media.analyzeAddTags": "{count} 件をタグとして追加",
+  "media.similar": "似ているファイル",
+  "media.similarNone": "まだ解析されていません。",
   "media.rating": "評価",
   "media.tags": "タグ",
   "media.metaWorkspace": "ワークスペース",

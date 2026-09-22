@@ -55,6 +55,7 @@ export const en: Record<TranslationKey, string> = {
   "settings.aiModels": "Models",
   "settings.aiNoModels":
     "No models found. Put a folder in the transformers.js layout (onnx/vision_model*.onnx, onnx/text_model*.onnx, tokenizer.json, config.json) into the models folder above.",
+  "ai.vocabulary": "Tag vocabulary",
   "ai.variantFp32": "fp32",
   "settings.aiUse": "Use",
   "ai.active": "In use",
@@ -255,6 +256,18 @@ export const en: Record<TranslationKey, string> = {
   "shortcuts.seekStart": "Jump to start",
   "shortcuts.spectrumPattern":
     "Next / previous spectrum pattern (audio in the playlist player)",
+  "media.analyze": "AI analysis",
+  "media.analyzeRun": "Analyze",
+  "media.analyzeAgain": "Analyze again",
+  "media.analyzeHint":
+    "What the model recognized. Keep the ones you want as manual tags, or add them to the vocabulary so every file is scored against them.",
+  "media.analyzeNothing": "Nothing was recognized.",
+  "media.analyzeInVocabulary": "in vocabulary",
+  "media.analyzeTagged": "added",
+  "media.analyzeAddVocabulary": "Add {count} to vocabulary",
+  "media.analyzeAddTags": "Add {count} as tags",
+  "media.similar": "Similar files",
+  "media.similarNone": "Not analyzed yet.",
   "media.rating": "Rating",
   "media.tags": "Tags",
   "media.metaWorkspace": "Workspace",

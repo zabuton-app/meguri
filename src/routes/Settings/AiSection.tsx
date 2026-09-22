@@ -23,7 +23,7 @@ import { AiJobProgress } from "@/components/AiJobProgress";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import { api } from "@/ipc/client";
-import { useAiStatus } from "@/hooks/useAiStatus";
+import { useAiProgress, useAiStatus } from "@/hooks/useAiStatus";
 import {
   AI_THRESHOLD_MAX,
   AI_THRESHOLD_MIN,
@@ -52,7 +52,8 @@ function parseVocabulary(text: string): string[] {
 export function AiSection() {
   const { t } = useI18n();
   const confirm = useConfirm();
-  const { status, job, jobError, refresh, applySettings } = useAiStatus();
+  const { status, job, refresh, applySettings } = useAiStatus();
+  const jobError = useAiProgress();
 
   // The vocabulary and threshold are edited locally and saved on demand: every
   // save is a change the tags do not follow until a re-tag pass is run, so it

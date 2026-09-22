@@ -1,7 +1,10 @@
 // Mirror of main's AI state (models, active model, running job) for the
-// renderer. One cached query plus the live job: `ai_status` is a snapshot, and
-// `ai:progress` is what happens to it, so both are read through here rather
-// than reconciled again in every component that wants either.
+// renderer.
+//
+// Reading and subscribing are separate on purpose. `useAiStatus` only reads the
+// cached snapshot, so a screen that merely asks whether AI is on does not
+// become an event subscriber; `useAiProgress` is what listens, and the one
+// screen that watches a job running mounts it.
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -18,8 +21,6 @@ export interface AiState {
   status: AiStatus | undefined;
   /** The running job, kept current by the ai:progress event. */
   job: AiJobState | null;
-  /** Reported by the terminal ai:progress event when a job failed. */
-  jobError: string | null;
   refresh: () => Promise<void>;
   /** Fold settings main just confirmed into the cache, without a round trip. */
   applySettings: (settings: AiSettings) => void;
@@ -37,11 +38,58 @@ export function useAiStatus(): AiState {
     refetchOnMount: "always",
   });
 
-  // The job is part of the snapshot, so a progress event updates the snapshot
-  // rather than living beside it: one source of truth, and no question of which
-  // of the two is newer when the query refetches.
-  const [jobError, setJobError] = useState<string | null>(null);
+  const refresh = useCallback(
+    () => qc.invalidateQueries({ queryKey: AI_STATUS_KEY }),
+    [qc],
+  );
 
+  const applySettings = useCallback(
+    (settings: AiSettings) => {
+      qc.setQueryData(AI_STATUS_KEY, (old: AiStatus | undefined) =>
+        old ? { ...old, settings } : old,
+      );
+      // The settings decide `retagPending`, which only main can work out.
+      void qc.invalidateQueries({ queryKey: AI_STATUS_KEY });
+    },
+    [qc],
+  );
+
+  return {
+    status: data,
+    job: data?.job ?? null,
+    refresh,
+    applySettings,
+  };
+}
+
+/**
+ * Whether semantic search, similar files and Analyze can work right now.
+ *
+ * Its own observer with a `select`: this is read by the detail view, which
+ * would otherwise re-render on every progress tick for a boolean that did not
+ * change.
+ */
+export function useAiEnabled(): boolean {
+  const { data } = useQuery({
+    queryKey: AI_STATUS_KEY,
+    queryFn: () => api.aiStatus(),
+    staleTime: 30_000,
+    select: (s: AiStatus) => !!s.activeModelId,
+  });
+  return data ?? false;
+}
+
+/**
+ * Subscribe to the running job and keep the cached status in step with it.
+ * Returns the message of the last failure, if the job ended in one.
+ *
+ * Mounted by whatever is showing the job — the settings screen — rather than by
+ * every reader of the status, so a subscription exists only while someone is
+ * looking at it.
+ */
+export function useAiProgress(): string | null {
+  const qc = useQueryClient();
+  const [jobError, setJobError] = useState<string | null>(null);
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let active = true;
@@ -65,33 +113,5 @@ export function useAiStatus(): AiState {
       unlisten?.();
     };
   }, [qc]);
-
-  const refresh = useCallback(
-    () => qc.invalidateQueries({ queryKey: AI_STATUS_KEY }),
-    [qc],
-  );
-
-  const applySettings = useCallback(
-    (settings: AiSettings) => {
-      qc.setQueryData(AI_STATUS_KEY, (old: AiStatus | undefined) =>
-        old ? { ...old, settings } : old,
-      );
-      // The settings decide `retagPending`, which only main can work out.
-      void qc.invalidateQueries({ queryKey: AI_STATUS_KEY });
-    },
-    [qc],
-  );
-
-  return {
-    status: data,
-    job: data?.job ?? null,
-    jobError,
-    refresh,
-    applySettings,
-  };
-}
-
-/** Whether semantic search / similar files can work right now. */
-export function useAiEnabled(): boolean {
-  return !!useAiStatus().status?.activeModelId;
+  return jobError;
 }
