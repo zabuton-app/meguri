@@ -17,6 +17,8 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { AiService } from "./core/ai/aiService.js";
+import { ensureModelsDir } from "./core/ai/modelStore.js";
 import { DEFAULT_LOGO, loadConfig } from "./core/appConfig.js";
 import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import log, { setupLogger } from "./core/logger.js";
@@ -330,11 +332,19 @@ function emit(channel: string, payload: unknown): void {
 
 // Scans are orchestrated by ScanManager (electron/scanManager.ts); main only
 // starts the initial one and aborts them all on quit.
+// On-device AI (CLIP models the user puts in the models folder): embeddings,
+// zero-shot tags, semantic search. Its single background job reports on
+// ai:progress.
+const ai = new AiService((p) => emit("ai:progress", p));
+
 const scans = new ScanManager({
   ws,
   queryClient,
   emit,
   isQuitting,
+  onScanFinished: (e) => {
+    if (!isQuitting()) ai.onScanFinished(e);
+  },
 });
 
 function trayImage(logo: LogoId): Electron.NativeImage {
@@ -532,6 +542,10 @@ void app.whenReady().then(async () => {
 
   ws.bootstrap(resolveCliRoot());
 
+  // The AI models folder is where the user puts a model by hand, so it has to
+  // exist before anyone is told to open it.
+  ensureModelsDir();
+
   // The media server resolves the DB by workspace ID to serve (independent of the active one).
   ({ port: mediaPort, server: mediaServer } = await startServer(
     (id) => ws.byId(id),
@@ -557,6 +571,7 @@ void app.whenReady().then(async () => {
     isDevMode,
     emit,
     scans,
+    ai,
     applyLogo,
   });
   createTray();
@@ -597,6 +612,10 @@ void app.whenReady().then(async () => {
 // The async gate (before-quit below) runs 1→2→3; the synchronous paths
 // (teardownSync) run 1→3 with the worker torn down fire-and-forget.
 const SHUTDOWN_SCAN_WAIT_MS = 1_000;
+// An index run may be inside an ffmpeg decode or a graph run when the quit
+// arrives; aborting stops it at the next file, and this is how long to wait for
+// it to get there before closing the databases under it anyway.
+const SHUTDOWN_AI_WAIT_MS = 1_000;
 
 function stopIntake(): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
@@ -606,7 +625,10 @@ function stopIntake(): void {
 
 async function shutdown(): Promise<void> {
   stopIntake();
-  await withTimeout(scans.abortAll(), SHUTDOWN_SCAN_WAIT_MS);
+  await Promise.all([
+    withTimeout(scans.abortAll(), SHUTDOWN_SCAN_WAIT_MS),
+    withTimeout(ai.dispose(), SHUTDOWN_AI_WAIT_MS),
+  ]);
   await queryClient.dispose();
 }
 
@@ -639,6 +661,7 @@ function teardownSync(): void {
   quitPhase = "disposing";
   stopIntake();
   void scans.abortAll();
+  ai.cancelJob();
   queryClient.terminateNow();
   finalizeQuit();
 }
@@ -649,7 +672,10 @@ function teardownSync(): void {
 // The budget here is a backstop over shutdown()'s own bounds (scan drain +
 // worker dispose), derived from them so it always stays above their sum and
 // the normal path completes before it fires.
-const QUIT_BUDGET_MS = SHUTDOWN_SCAN_WAIT_MS + DISPOSE_TIMEOUT_MS + 2_000;
+const QUIT_BUDGET_MS =
+  Math.max(SHUTDOWN_SCAN_WAIT_MS, SHUTDOWN_AI_WAIT_MS) +
+  DISPOSE_TIMEOUT_MS +
+  2_000;
 app.on("before-quit", (e) => {
   globalShortcut.unregisterAll();
   if (quitPhase === "done") return;

@@ -5,6 +5,10 @@
 // renderer trusts data coming from main (no runtime check needed).
 import { z } from "zod";
 import type {
+  AiCandidate,
+  AiHit,
+  AiSettings,
+  AiStatus,
   AppStatus,
   DuplicatesResult,
   FileDetail,
@@ -20,6 +24,7 @@ import type {
   WorkspacesList,
 } from "./schema.js";
 import {
+  AiSettingsSchema,
   HistoryQuerySchema,
   LogoIdSchema,
   SearchQuerySchema,
@@ -150,6 +155,32 @@ export const ChannelInputs = {
   update_ignore: z.object({ version: z.string() }),
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
+  // On-device AI. Nothing is bundled and nothing is downloaded: the user puts a
+  // model directory into the models folder, which ai_status re-reads on every
+  // call. One background job (an index run) at a time.
+  ai_status: z.void(),
+  /** Reveal the models folder in the OS file manager. */
+  ai_models_open: z.void(),
+  ai_model_select: z.object({ id: z.string().min(1).nullable() }),
+  ai_settings_set: AiSettingsSchema.partial(),
+  // retagOnly re-runs zero-shot classification from stored embeddings (after a
+  // vocabulary / threshold change) without touching any media file.
+  ai_index_start: z.object({ retagOnly: z.boolean().optional() }).default({}),
+  ai_job_cancel: z.void(),
+  ai_search: z.object({
+    text: z.string().min(1).max(500),
+    limit: z.number().int().min(1).max(500).optional(),
+  }),
+  ai_similar: FileTarget.extend({
+    limit: z.number().int().min(1).max(500).optional(),
+  }),
+  // Embed one file right now (storing the vector and its auto tags like the
+  // index job would) and report the built-in labels it matches best.
+  ai_analyze_file: FileTarget,
+  /** Append entries to the zero-shot vocabulary (duplicates folded). */
+  ai_vocabulary_add: z.object({
+    entries: z.array(z.string().min(1).max(MAX_TAG_NAME)).min(1).max(100),
+  }),
 } as const satisfies Record<InvokeChannel, z.ZodTypeAny>;
 
 type ChannelInputKeys = keyof typeof ChannelInputs;
@@ -239,6 +270,23 @@ export interface ChannelOutputs {
   logo_get: LogoId;
   // Echoes the applied variant so the renderer can settle on main's value.
   logo_set: LogoId;
+  ai_status: AiStatus;
+  ai_models_open: void;
+  /** How many AI tags the switch dropped (see AiService.selectModel). */
+  ai_model_select: number;
+  /** The settings as stored after the patch (the vocabulary normalized). */
+  ai_settings_set: AiSettings;
+  // Resolves once the job has *started*; progress and completion arrive on
+  // ai:progress. Rejects when no model is active or another job is running.
+  ai_index_start: void;
+  // Resolves once the job has stopped.
+  ai_job_cancel: void;
+  ai_search: AiHit[];
+  ai_similar: AiHit[];
+  /** Best-matching built-in labels, best first. Rejects when no model is active. */
+  ai_analyze_file: AiCandidate[];
+  /** The vocabulary after the append. */
+  ai_vocabulary_add: string[];
 }
 
 type ChannelOutputKeys = keyof ChannelOutputs;

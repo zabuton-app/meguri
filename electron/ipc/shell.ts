@@ -1,30 +1,8 @@
 import { clipboard, shell } from "electron";
-import { spawn } from "node:child_process";
 import { handle } from "../core/ipcHandler.js";
-import log from "../core/logger.js";
 import * as q from "../core/queries.js";
 import type { IpcContext } from "./context.js";
-import { coreById, ensureFileInsideRoot } from "./helpers.js";
-
-// Launch an external file/URL in a fully detached child process.
-// shell.openPath leaves the spawned process attached to Electron's process
-// tree; on Wayland/Hyprland that makes the launched app's window a child of
-// Meguri and blocks the main window until the external app closes.
-// Windows uses shell.openPath directly: ShellExecuteExW doesn't reproduce the
-// child-process attachment issue, and routing through cmd.exe /c start would
-// open a command-injection surface for filenames containing &/|/^/( etc.
-function openDetached(target: string): void {
-  if (process.platform === "win32") {
-    void shell.openPath(target);
-    return;
-  }
-  const cmd = process.platform === "darwin" ? "open" : "xdg-open";
-  const child = spawn(cmd, [target], { detached: true, stdio: "ignore" });
-  child.on("error", (e) => {
-    log.error("[openDetached] failed to launch", cmd, target, e);
-  });
-  child.unref();
-}
+import { coreById, ensureFileInsideRoot, openDetached } from "./helpers.js";
 
 export function registerShellHandlers(ctx: IpcContext): void {
   const { ws } = ctx;

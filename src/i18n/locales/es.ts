@@ -43,6 +43,50 @@ export const es: Record<TranslationKey, string> = {
   "settings.tabPlayback": "Reproducción de listas",
   "settings.tabApp": "Aplicación",
   "settings.tabAudio": "Audio",
+  "settings.tabAi": "IA",
+  "settings.ai": "IA en el dispositivo",
+  "settings.aiDesc":
+    "Etiqueta imágenes y vídeos por su contenido y permite buscar con palabras. Todo se ejecuta en este equipo; no se envía nada fuera.",
+  "settings.aiModelsFolder": "Carpeta de modelos",
+  "settings.aiModelsFolderDesc":
+    "Coloca aquí la carpeta de un modelo de la familia CLIP y aparecerá en la lista. La aplicación nunca descarga ninguno.",
+  "settings.aiOpenFolder": "Abrir carpeta",
+  "settings.aiRefresh": "Recargar",
+  "settings.aiModels": "Modelos",
+  "settings.aiNoModels":
+    "No se encontraron modelos. Coloca una carpeta con el formato de transformers.js (onnx/vision_model*.onnx, onnx/text_model*.onnx, tokenizer.json, config.json) en la carpeta de modelos.",
+  "ai.variantFp32": "fp32",
+  "settings.aiUse": "Usar",
+  "ai.active": "En uso",
+  "settings.aiDisable": "Desactivar",
+  "ai.backend": "Ejecutando en {backend}",
+  "settings.aiSwitchTitle": "¿Cambiar de modelo?",
+  "settings.aiSwitchBody":
+    "Se eliminarán todas las etiquetas añadidas por la IA. Los vectores se conservan, así que volver al modelo anterior no exige reanalizar. Las etiquetas del nuevo modelo aparecerán tras ejecutar el indexado.",
+  "settings.aiSwitchOffTitle": "¿Desactivar la IA?",
+  "settings.aiSwitchOffBody":
+    "Se desactivará la IA y se eliminarán todas las etiquetas que añadió. Los vectores se conservan.",
+  "ai.tagsCleared": "Se eliminaron {count} etiquetas de IA.",
+  "settings.aiVocabulary": "Vocabulario de etiquetas",
+  "settings.aiVocabularyDesc":
+    "Una entrada por línea. Cada una se compara con la imagen y las que superan el umbral se añaden como etiqueta ai:. La mayoría de los modelos se entrenaron en inglés, así que el inglés funciona mejor.",
+  "settings.aiThreshold": "Umbral",
+  "settings.aiThresholdDesc":
+    "Solo se etiquetan las entradas por encima de esta probabilidad. Añadir entradas reduce todas las puntuaciones, conviene ajustar ambos a la vez.",
+  "settings.aiAutoIndex": "Analizar tras el escaneo",
+  "settings.aiAutoIndexDesc":
+    "Analiza los archivos nuevos en cuanto el escaneo los encuentra.",
+  "settings.aiSave": "Guardar",
+  "settings.aiRetagPending":
+    "El vocabulario y el umbral guardados aún no están en las etiquetas. Ejecuta un reetiquetado para aplicarlos.",
+  "settings.aiIndexNow": "Analizar archivos nuevos",
+  "settings.aiRetag": "Reetiquetar",
+  "settings.aiCancel": "Detener",
+  "ai.pending": "{count} archivos sin analizar",
+  "ai.pendingNone": "Todos los archivos están analizados",
+  "ai.jobEmbed": "Analizando",
+  "ai.jobTag": "Reetiquetando",
+  "ai.jobFailed": "Error: {error}",
   "settings.language": "Idioma",
   "settings.languageDesc": "Cambia el idioma de la interfaz.",
   "settings.scenes": "Miniaturas de escena",

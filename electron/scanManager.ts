@@ -24,6 +24,17 @@ export interface ScanManagerDeps {
   emit: (channel: string, payload: unknown) => void;
   /** Once the app is quitting no new scan may start. */
   isQuitting: () => boolean;
+  /**
+   * Called after a workspace's scan has settled, success or not, once the
+   * bookkeeping above is done. The hook for work that depends on the file set
+   * — kept as a callback so this class does not have to know who that is.
+   */
+  onScanFinished?: (e: {
+    wsId: string;
+    core: Core;
+    aborted: boolean;
+    failed: boolean;
+  }) => void;
 }
 
 export class ScanManager {
@@ -79,7 +90,11 @@ export class ScanManager {
     if (wsId) this.scanning.add(wsId);
     const controller = new AbortController();
     if (wsId) this.controllers.set(wsId, controller);
+    // Held in a box so the body can compare against its own promise: the check
+    // runs only after an await, by which time the box has been filled.
+    const self: { promise?: Promise<void> } = {};
     const promise = (async () => {
+      let failed = false;
       try {
         if (opts.includeExcluded) q.clearExcludedFiles(core.db, core.rootId);
         await runScan(
@@ -105,20 +120,40 @@ export class ScanManager {
           { rebuild: opts.rebuild, signal: controller.signal },
         );
       } catch (err) {
+        failed = true;
         log.error("scan failed", err);
         emit("scan:done", { jobId, stats: emptyScanStats(), error: true });
       } finally {
         if (wsId) {
           this.scanning.delete(wsId);
           this.controllers.delete(wsId);
-          this.promises.delete(wsId);
         }
         // Scans can change duplicate group membership; clear derived query caches.
         // Runs after the bookkeeping above so a failure here can never leave the
         // workspace stuck in the "scanning" state.
         await queryClient.invalidateCaches();
+        if (wsId) {
+          try {
+            this.deps.onScanFinished?.({
+              wsId,
+              core,
+              aborted: controller.signal.aborted,
+              failed,
+            });
+          } catch (e) {
+            log.warn("post-scan hook failed:", e);
+          }
+          // Released last, so abort() waits through the hook too: a workspace
+          // being removed must not see work started for it after abort returns.
+          // Guarded because a new scan of the same workspace may already have
+          // registered its own promise while this one was finishing.
+          if (this.promises.get(wsId) === self.promise) {
+            this.promises.delete(wsId);
+          }
+        }
       }
     })();
+    self.promise = promise;
     if (wsId) this.promises.set(wsId, promise);
     void promise;
     return jobId;

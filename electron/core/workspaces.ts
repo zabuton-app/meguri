@@ -60,14 +60,22 @@ export class Workspaces {
   }
 
   /**
-   * Persist our snapshot, refreshing the fields this class never owns first.
-   * `update` is written independently via `updateConfig()` (the update checker
-   * runs across awaits), so spreading our startup snapshot back wholesale would
-   * silently revert the user's update preferences. Every write below goes
-   * through here rather than calling saveConfig directly.
+   * Persist the fields this class owns on top of what is on disk. Other
+   * sections (`update`, `logo`, `ai`) are written independently through
+   * `updateConfig()`, often long after this snapshot was loaded, so writing the
+   * snapshot back wholesale would silently revert them. Listing what we own
+   * rather than what we don't means a new section cannot be forgotten here.
+   * Every write below goes through this rather than calling saveConfig directly.
    */
   private persist(): void {
-    this.config.update = loadConfig().update;
+    const onDisk = loadConfig();
+    const owned = {
+      roots: this.config.roots,
+      activePath: this.config.activePath,
+      collections: this.config.collections,
+      workspaceEmojis: this.config.workspaceEmojis,
+    } satisfies Partial<AppConfig>;
+    this.config = { ...onDisk, ...owned };
     saveConfig(this.config);
   }
 

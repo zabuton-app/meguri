@@ -43,6 +43,50 @@ export const fr: Record<TranslationKey, string> = {
   "settings.tabPlayback": "Lecture de liste",
   "settings.tabApp": "Application",
   "settings.tabAudio": "Audio",
+  "settings.tabAi": "IA",
+  "settings.ai": "IA locale",
+  "settings.aiDesc":
+    "Étiquette les images et les vidéos selon leur contenu et permet de chercher avec des mots. Tout s'exécute sur cet ordinateur ; rien n'est envoyé ailleurs.",
+  "settings.aiModelsFolder": "Dossier des modèles",
+  "settings.aiModelsFolderDesc":
+    "Déposez ici le dossier d'un modèle de la famille CLIP : il apparaîtra dans la liste. L'application n'en télécharge jamais.",
+  "settings.aiOpenFolder": "Ouvrir le dossier",
+  "settings.aiRefresh": "Recharger",
+  "settings.aiModels": "Modèles",
+  "settings.aiNoModels":
+    "Aucun modèle trouvé. Déposez un dossier au format transformers.js (onnx/vision_model*.onnx, onnx/text_model*.onnx, tokenizer.json, config.json) dans le dossier des modèles.",
+  "ai.variantFp32": "fp32",
+  "settings.aiUse": "Utiliser",
+  "ai.active": "Utilisé",
+  "settings.aiDisable": "Désactiver",
+  "ai.backend": "Exécution sur {backend}",
+  "settings.aiSwitchTitle": "Changer de modèle ?",
+  "settings.aiSwitchBody":
+    "Toutes les étiquettes ajoutées par l'IA seront supprimées. Les vecteurs sont conservés : revenir au modèle précédent ne demande aucune nouvelle analyse. Les étiquettes du nouveau modèle apparaîtront après l'indexation.",
+  "settings.aiSwitchOffTitle": "Désactiver l'IA ?",
+  "settings.aiSwitchOffBody":
+    "L'IA sera désactivée et toutes les étiquettes qu'elle a ajoutées seront supprimées. Les vecteurs sont conservés.",
+  "ai.tagsCleared": "{count} étiquettes IA supprimées.",
+  "settings.aiVocabulary": "Vocabulaire des étiquettes",
+  "settings.aiVocabularyDesc":
+    "Une entrée par ligne. Chacune est comparée à l'image, et celles au-dessus du seuil deviennent une étiquette ai:. La plupart des modèles ont été entraînés en anglais.",
+  "settings.aiThreshold": "Seuil",
+  "settings.aiThresholdDesc":
+    "Seules les entrées au-dessus de cette probabilité deviennent des étiquettes. Ajouter des entrées fait baisser tous les scores : ajustez les deux ensemble.",
+  "settings.aiAutoIndex": "Analyser après une analyse du dossier",
+  "settings.aiAutoIndexDesc":
+    "Analyse les nouveaux fichiers dès qu'ils sont trouvés.",
+  "settings.aiSave": "Enregistrer",
+  "settings.aiRetagPending":
+    "Le vocabulaire et le seuil enregistrés ne sont pas encore appliqués aux étiquettes. Lancez un réétiquetage.",
+  "settings.aiIndexNow": "Analyser les nouveaux fichiers",
+  "settings.aiRetag": "Réétiqueter",
+  "settings.aiCancel": "Arrêter",
+  "ai.pending": "{count} fichiers non analysés",
+  "ai.pendingNone": "Tous les fichiers sont analysés",
+  "ai.jobEmbed": "Analyse en cours",
+  "ai.jobTag": "Réétiquetage",
+  "ai.jobFailed": "Échec : {error}",
   "settings.language": "Langue",
   "settings.languageDesc": "Changer la langue d'affichage de l'interface.",
   "settings.scenes": "Miniatures de scène",

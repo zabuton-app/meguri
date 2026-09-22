@@ -10,6 +10,11 @@ import type {
   ChannelOutput,
 } from "@shared/ipc/channels";
 import type {
+  AiJobState,
+  AiModelInfo,
+  AiProgress,
+  AiSettings,
+  AiStatus,
   LogoId,
   ScanDone,
   ScanProgress,
@@ -144,6 +149,27 @@ export const api = {
   /** App logo variant (window + tray icon), persisted in main's config.json. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
+  /** On-device AI (Settings → AI). Models are directories in the models folder. */
+  aiStatus: () => invoke("ai_status"),
+  /** Reveal the models folder in the OS file manager. */
+  aiModelsOpen: () => invoke("ai_models_open"),
+  aiModelSelect: (id: string | null) => invoke("ai_model_select", { id }),
+  aiSettingsSet: (patch: Partial<AiSettings>) =>
+    invoke("ai_settings_set", patch),
+  /** Embed new files, then re-tag. retagOnly re-tags from stored embeddings only. */
+  aiIndexStart: (retagOnly?: boolean) =>
+    invoke("ai_index_start", { retagOnly }),
+  aiJobCancel: () => invoke("ai_job_cancel"),
+  aiSearch: (text: string, limit?: number) =>
+    invoke("ai_search", { text, limit }),
+  aiSimilar: (id: number, workspaceId: string, limit?: number) =>
+    invoke("ai_similar", { id, workspaceId, limit }),
+  /** Embed one file now and report the labels it matches (detail view "Analyze"). */
+  aiAnalyzeFile: (id: number, workspaceId: string) =>
+    invoke("ai_analyze_file", { id, workspaceId }),
+  /** Append entries to the zero-shot vocabulary; resolves to the merged list. */
+  aiVocabularyAdd: (entries: string[]) =>
+    invoke("ai_vocabulary_add", { entries }),
 };
 
 export {
@@ -156,6 +182,11 @@ export {
 // Re-exported for compatibility with components that imported these from this module.
 export type {
   AboutInfo,
+  AiJobState,
+  AiModelInfo,
+  AiProgress,
+  AiSettings,
+  AiStatus,
   LogoId,
   ScanDone,
   ScanProgress,
@@ -182,4 +213,6 @@ export const events = {
     ),
   onUpdateAvailable: (cb: (info: UpdateInfo) => void): Promise<Unlisten> =>
     Promise.resolve(bridge.on("update:available", (p) => cb(p as UpdateInfo))),
+  onAiProgress: (cb: (p: AiProgress) => void): Promise<Unlisten> =>
+    Promise.resolve(bridge.on("ai:progress", (p) => cb(p as AiProgress))),
 };

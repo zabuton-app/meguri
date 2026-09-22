@@ -117,6 +117,83 @@ describe("ScanManager", () => {
     await scans.abortAll();
   });
 
+  it("tells the post-scan hook which workspace settled, and whether it was aborted", async () => {
+    const onScanFinished = vi.fn();
+    const finish = pendingScan();
+    const deps = makeDeps({ onScanFinished });
+    const scans = new ScanManager(deps);
+
+    scans.start();
+    finish();
+    await vi.waitFor(() => expect(onScanFinished).toHaveBeenCalledTimes(1));
+    expect(onScanFinished).toHaveBeenLastCalledWith(
+      expect.objectContaining({ wsId: "a", aborted: false, failed: false }),
+    );
+    // After the caches: whatever the hook reads must already see the new files.
+    expect(deps.invalidateCaches).toHaveBeenCalledTimes(1);
+
+    pendingScan();
+    scans.start();
+    await scans.abort("a");
+    expect(onScanFinished).toHaveBeenLastCalledWith(
+      expect.objectContaining({ wsId: "a", aborted: true }),
+    );
+  });
+
+  it("tells the hook a scan failed, rather than calling it a success", async () => {
+    runScan.mockRejectedValue(new Error("boom"));
+    const onScanFinished = vi.fn();
+    const scans = new ScanManager(makeDeps({ onScanFinished }));
+    scans.start();
+    // Not abort(): that would mark the scan aborted before it settles.
+    await vi.waitFor(() =>
+      expect(onScanFinished).toHaveBeenCalledWith(
+        expect.objectContaining({ failed: true, aborted: false }),
+      ),
+    );
+  });
+
+  it("abort() waits through the post-scan hook, not just the scan", async () => {
+    // The hook runs after an await on the query worker. A workspace removed in
+    // that gap must not have abort() return before the hook has had its turn.
+    let releaseCaches!: () => void;
+    const onScanFinished = vi.fn();
+    const deps = makeDeps({ onScanFinished });
+    deps.invalidateCaches.mockReturnValueOnce(
+      new Promise<void>((r) => {
+        releaseCaches = r;
+      }),
+    );
+    const finish = pendingScan();
+    const scans = new ScanManager(deps);
+    scans.start();
+    finish();
+    await vi.waitFor(() => expect(deps.invalidateCaches).toHaveBeenCalled());
+
+    let aborted = false;
+    const abort = scans.abort("a").then(() => (aborted = true));
+    await Promise.resolve();
+    expect(aborted).toBe(false);
+    releaseCaches();
+    await abort;
+    expect(onScanFinished).toHaveBeenCalledTimes(1);
+  });
+
+  it("frees the workspace even when the post-scan hook throws", async () => {
+    pendingScan();
+    const scans = new ScanManager(
+      makeDeps({
+        onScanFinished: () => {
+          throw new Error("hook");
+        },
+      }),
+    );
+    scans.start();
+    await scans.abort("a");
+    pendingScan();
+    expect(scans.start()).not.toBe("");
+  });
+
   it("reports a failed scan as scan:done with an error flag and frees the workspace", async () => {
     runScan.mockRejectedValue(new Error("boom"));
     const deps = makeDeps();

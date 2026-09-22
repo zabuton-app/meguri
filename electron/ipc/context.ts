@@ -4,6 +4,7 @@
 // the groups can be registered — and read — one domain at a time. Helpers
 // shared by the groups live in helpers.ts.
 import type { BrowserWindow } from "electron";
+import type { AiService } from "../core/ai/aiService.js";
 import type { QueryWorkerClient } from "../core/queryWorkerClient.js";
 import type { Workspaces } from "../core/workspaces.js";
 import type { ScanManager } from "../scanManager.js";
@@ -22,6 +23,8 @@ export interface IpcContext {
   emit: (channel: string, payload: unknown) => void;
   /** Starts and aborts scans; owns the scan state. */
   scans: ScanManager;
+  /** On-device AI: model selection, the index job, semantic search. */
+  ai: AiService;
   /** Re-apply the logo variant to the live tray and window/dock icons. */
   applyLogo: (logo: LogoId) => void;
 }

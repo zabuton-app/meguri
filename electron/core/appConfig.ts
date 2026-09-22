@@ -3,7 +3,15 @@
 import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import { LogoIdSchema, type LogoId } from "../../shared/ipc/schema.js";
+import {
+  AI_THRESHOLD_MAX,
+  AI_THRESHOLD_MIN,
+  LogoIdSchema,
+  MAX_AI_VOCABULARY,
+  MAX_AI_VOCABULARY_ENTRY,
+  type AiSettings,
+  type LogoId,
+} from "../../shared/ipc/schema.js";
 import log from "./logger.js";
 
 export interface AppConfig {
@@ -23,6 +31,82 @@ export interface AppConfig {
    * before any renderer exists, so main must be able to read it on its own.
    */
   logo: LogoId;
+  /** On-device AI preferences. The models themselves live in <userData>/models. */
+  ai: AiConfig;
+}
+
+export interface AiConfig {
+  /** Model id (`<directory>:<variant>`) in use; null = AI features off. */
+  activeModelId: string | null;
+  settings: AiSettings;
+}
+
+/**
+ * A starter vocabulary so tagging does something before the user edits it.
+ * English on purpose: CLIP-family text encoders were trained on English captions.
+ */
+export const DEFAULT_AI_VOCABULARY: readonly string[] = [
+  "person",
+  "group of people",
+  "animal",
+  "cat",
+  "dog",
+  "landscape",
+  "city",
+  "building",
+  "vehicle",
+  "food",
+  "text document",
+  "screenshot",
+  "illustration",
+  "night",
+  "beach",
+  "indoor",
+];
+
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  vocabulary: [...DEFAULT_AI_VOCABULARY],
+  threshold: 0.3,
+  autoIndex: false,
+};
+
+/**
+ * Field by field rather than one schema parse: config.json is hand-editable,
+ * and a vocabulary that grew past the cap should cost the overflow, not the
+ * threshold and the auto-index switch along with it.
+ */
+function parseAiConfig(value: unknown): AiConfig {
+  const c =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+  const s =
+    c.settings && typeof c.settings === "object"
+      ? (c.settings as Record<string, unknown>)
+      : {};
+  const vocabulary = Array.isArray(s.vocabulary)
+    ? s.vocabulary
+        .filter(
+          (x): x is string =>
+            typeof x === "string" && x.length <= MAX_AI_VOCABULARY_ENTRY,
+        )
+        .slice(0, MAX_AI_VOCABULARY)
+    : [...DEFAULT_AI_VOCABULARY];
+  const threshold =
+    typeof s.threshold === "number" && Number.isFinite(s.threshold)
+      ? Math.min(AI_THRESHOLD_MAX, Math.max(AI_THRESHOLD_MIN, s.threshold))
+      : DEFAULT_AI_SETTINGS.threshold;
+  return {
+    activeModelId: typeof c.activeModelId === "string" ? c.activeModelId : null,
+    settings: {
+      vocabulary,
+      threshold,
+      autoIndex:
+        typeof s.autoIndex === "boolean"
+          ? s.autoIndex
+          : DEFAULT_AI_SETTINGS.autoIndex,
+    },
+  };
 }
 
 export const DEFAULT_LOGO: LogoId = "dark";
@@ -88,6 +172,7 @@ export function loadConfig(): AppConfig {
       workspaceEmojis: parseEmojiMap(c.workspaceEmojis),
       update: parseUpdateConfig(c.update),
       logo: parseLogo(c.logo),
+      ai: parseAiConfig(c.ai),
     };
   } catch {
     return {
@@ -97,6 +182,7 @@ export function loadConfig(): AppConfig {
       workspaceEmojis: {},
       update: { ...DEFAULT_UPDATE_CONFIG },
       logo: DEFAULT_LOGO,
+      ai: parseAiConfig(undefined),
     };
   }
 }
