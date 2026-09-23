@@ -36,6 +36,9 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.capturedTo != null) next.capturedTo = query.capturedTo;
   if (query.btimeFrom != null) next.btimeFrom = query.btimeFrom;
   if (query.btimeTo != null) next.btimeTo = query.btimeTo;
+  // `semantic` is deliberately absent: a saved search is expected to mean the
+  // same thing next year, and a semantic condition is answered by whichever AI
+  // model happens to be selected — or dropped entirely when none is.
   if (query.sort) next.sort = query.sort;
   if (query.sortDir) next.sortDir = query.sortDir;
   return next;

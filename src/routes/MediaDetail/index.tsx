@@ -7,7 +7,14 @@
 // every write to the file (useDetailMutations), audio in the bottom bar
 // (useAudioDetail), prev/next (usePrevNextNavigation), and the title row,
 // rating/tags card and play history as components.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  Fragment,
+} from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyTagFilter } from "@/lib/ui-events";
@@ -37,6 +44,9 @@ import { useDetailPresentation } from "./useDetailPresentation";
 import { useThumbVersion } from "./useThumbVersion";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
+import { useAiEnabled } from "@/hooks/useAiStatus";
+import { AnalyzePanel } from "./AnalyzePanel";
+import { SimilarFiles } from "./SimilarFiles";
 import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
 import {
@@ -164,6 +174,8 @@ export default function MediaDetail() {
   );
   // Serve via the local HTTP server (Chromium's <video> can handle http+Range).
   const mediaBase = status.data?.mediaBase ?? "";
+  // The AI panels below only mean anything with a model selected.
+  const aiEnabled = useAiEnabled();
   // Include the workspace ID in the URL path (/ws/<id>/...) to avoid collisions with another DB after switching.
   const mediaSrc =
     mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
@@ -458,11 +470,35 @@ export default function MediaDetail() {
             watchLater={watchLater}
             watchLaterRef={watchLaterRef}
             onRate={actions.setRating}
-            onAddTag={actions.addTag}
+            // The card fires and forgets; only the Analyze panel awaits it.
+            onAddTag={(name) => void actions.addTag(name)}
             onRemoveTag={actions.removeTag}
             onTagClick={onTagFilter}
             t={t}
           />
+
+          {/* What the model sees in this file, and its nearest neighbours.
+              Audio has no picture to embed, so neither applies to it. The key
+              remounts both per file: this component stays mounted across
+              prev/next, and one file's candidates must never be offered as
+              tags for the next one. */}
+          {aiEnabled && wsId && (d.kind === "video" || d.kind === "image") && (
+            <Fragment key={`${wsId}:${fileId}`}>
+              <AnalyzePanel
+                id={fileId}
+                wsId={wsId}
+                tags={d.tags}
+                onAdd={actions.addTag}
+                t={t}
+              />
+              <SimilarFiles
+                id={fileId}
+                wsId={wsId}
+                mediaBase={mediaBase}
+                t={t}
+              />
+            </Fragment>
+          )}
 
           {/* Metadata chips */}
           <MetaChips

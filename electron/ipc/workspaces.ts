@@ -37,6 +37,11 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
       // before ws.remove() deletes the data dir (open handles block removal
       // on Windows).
       await queryClient.closeWorkspace(id);
+      // An index run writes into this workspace's DB, which is about to be
+      // closed and deleted. Done last, with nothing awaited between it and
+      // remove(): no IPC call can start another run in that gap.
+      ctx.ai.forgetWorkspace(id);
+      await ctx.ai.stopJob();
       ws.remove(p);
     }
     if (ws.active()) ctx.scans.start();

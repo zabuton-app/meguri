@@ -2,6 +2,7 @@
 // IpcContext and calls registerIpc() once the app is ready; adding a channel
 // means adding a handle() to the matching group here (see docs/architecture.md).
 import type { IpcContext } from "./context.js";
+import { registerAiHandlers } from "./ai.js";
 import { registerBookmarkHandlers } from "./bookmarks.js";
 import { registerFileHandlers } from "./files.js";
 import { registerLogoHandlers } from "./logo.js";
@@ -26,4 +27,5 @@ export function registerIpc(ctx: IpcContext): void {
   registerShellHandlers(ctx);
   registerUpdateHandlers();
   registerLogoHandlers(ctx);
+  registerAiHandlers(ctx);
 }

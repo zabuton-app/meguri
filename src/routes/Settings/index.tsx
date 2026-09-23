@@ -37,6 +37,7 @@ import {
 import { LOGO_IDS, type LogoId } from "@shared/ipc/schema";
 import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
+import { AiSection } from "./AiSection";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
 import {
@@ -106,7 +107,7 @@ const LOGO_LABELS: Record<LogoId, TranslationKey> = {
 };
 
 /** Tab ids. The tab bar's order comes from the `tabs` array below. */
-type TabId = "general" | "library" | "playback" | "audio" | "app";
+type TabId = "general" | "library" | "playback" | "audio" | "ai" | "app";
 
 export default function Settings() {
   const { mode, familyId, families, setMode, setFamily } = useTheme();
@@ -117,6 +118,7 @@ export default function Settings() {
       { id: "library", label: t("settings.tabLibrary") },
       { id: "playback", label: t("settings.tabPlayback") },
       { id: "audio", label: t("settings.tabAudio") },
+      { id: "ai", label: t("settings.tabAi") },
       { id: "app", label: t("settings.tabApp") },
     ],
     [t],
@@ -644,6 +646,8 @@ export default function Settings() {
               </section>
             </>
           )}
+
+          {tab === "ai" && <AiSection />}
 
           {tab === "app" && (
             <>

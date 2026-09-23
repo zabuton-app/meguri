@@ -216,3 +216,28 @@ export function dropFromWatchLaterCache(
     };
   });
 }
+
+/** Query key of one file's nearest neighbours by AI embedding. */
+export function aiSimilarKey(workspaceId: string, fileId: number) {
+  return ["ai_similar", workspaceId, fileId] as const;
+}
+
+/**
+ * Invalidate what analyzing one file changed.
+ *
+ * `ai_analyze_file` does three things at once: it stores the file's embedding,
+ * rewrites its `ai:` tags from the current vocabulary, and takes the file off
+ * the pending list. So the detail view's tags, every neighbour list (this
+ * file's, and everyone else's now that a new vector competes in them) and the
+ * AI status are all out of date together.
+ */
+export function invalidateAfterAnalysis(
+  qc: QueryClient,
+  workspaceId: string,
+  fileId: number,
+): void {
+  void qc.invalidateQueries({ queryKey: ["file_get", workspaceId, fileId] });
+  void qc.invalidateQueries({ queryKey: ["ai_similar"] });
+  void qc.invalidateQueries({ queryKey: ["ai_status"] });
+  invalidateTagSearches(qc);
+}

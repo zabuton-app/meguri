@@ -14,6 +14,22 @@
 export const AUTO_META_SOURCE = "auto-meta";
 
 /**
+ * `meta_tags.source` written by the on-device AI tagger (zero-shot CLIP
+ * classification over the user's vocabulary). Its tags carry a score — the
+ * classifier's probability — unlike the score-less metadata tags.
+ */
+export const AI_TAG_SOURCE = "auto-ai";
+
+/**
+ * Namespace of every AI-generated tag (`ai:cat`). Namespaced like the metadata
+ * tags so the pipeline owns them: they are rewritten whenever the vocabulary,
+ * threshold or model changes, and the user edits the vocabulary instead of the
+ * tags. Unlike the metadata namespaces the value set is open (it *is* the
+ * vocabulary), so it is not part of AUTO_META_VALUES.
+ */
+export const AI_TAG_NAMESPACE = "ai";
+
+/**
  * Namespaces the metadata classifier emits, in the order the tag management
  * screen groups them. This is a presentation ordering hint and the v1 ruleset's
  * own vocabulary — never a matching rule. Namespaces are an open set: code that
@@ -113,7 +129,7 @@ export function parseQualifiedTagName(raw: string): {
   const i = raw.indexOf(":");
   if (i <= 0 || i === raw.length - 1) return { namespace: "", name: raw };
   const namespace = raw.slice(0, i);
-  return isAutoMetaNamespace(namespace)
+  return isAutoMetaNamespace(namespace) || namespace === AI_TAG_NAMESPACE
     ? { namespace, name: raw.slice(i + 1) }
     : { namespace: "", name: raw };
 }
@@ -144,6 +160,7 @@ export const TAG_SEARCH_PREFIX = "tag";
 /** Prefixes a manual tag name may not claim: the namespaces plus the directive. */
 export const RESERVED_TAG_PREFIXES: readonly string[] = [
   ...AUTO_META_NAMESPACES,
+  AI_TAG_NAMESPACE,
   TAG_SEARCH_PREFIX,
 ];
 

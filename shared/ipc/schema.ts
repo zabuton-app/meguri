@@ -4,7 +4,7 @@
 // values can be used at runtime (e.g. for .parse() validation in main); the
 // inferred types satisfy the prior hand-written interfaces.
 import { z } from "zod";
-import { MAX_TAG_REF_NAME } from "../tags.js";
+import { MAX_TAG_NAME, MAX_TAG_REF_NAME } from "../tags.js";
 
 export const KindSchema = z.enum(["video", "image", "audio"]);
 export type Kind = z.infer<typeof KindSchema>;
@@ -129,6 +129,12 @@ export const SearchQuerySchema = z.object({
   sort: z.string().optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
   fileIds: z.array(z.number()).optional(),
+  /**
+   * Natural-language query answered by the active AI model: the result set is
+   * narrowed to the nearest files by embedding similarity (see AI_SEARCH_LIMIT),
+   * then filtered and sorted like any other search. Ignored when no model is active.
+   */
+  semantic: z.string().max(500).optional(),
   // Number = plain offset (legacy / backward paging); object = keyset cursor.
   cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
   // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
@@ -345,3 +351,121 @@ export const UpdateInfoSchema = z.object({
   publishedAt: z.string().nullable().optional(),
 });
 export type UpdateInfo = z.infer<typeof UpdateInfoSchema>;
+
+// --- AI (on-device CLIP models) ---
+
+/**
+ * A CLIP-family model installed under `<userData>/models/<id>/`. Nothing is
+ * bundled with the app and nothing is downloaded by it: the user obtains a
+ * directory in the transformers.js layout (`onnx/vision_model*.onnx` +
+ * `onnx/text_model*.onnx` + tokenizer + configs) and imports it.
+ */
+export const AiModelInfoSchema = z.object({
+  /** Directory name under the models folder (derived from the imported name). */
+  id: z.string(),
+  /** Display name, the basename of the directory the user imported. */
+  name: z.string(),
+  /** File-name suffix of the chosen weights ("" = fp32, "quantized", "fp16", …). */
+  variant: z.string(),
+  /** Embedding dimension (`projection_dim` in config.json). */
+  dim: z.number(),
+  /** Total bytes on disk. */
+  bytes: z.number(),
+  /** Unix seconds when the import completed. */
+  installedAt: z.number(),
+});
+export type AiModelInfo = z.infer<typeof AiModelInfoSchema>;
+
+/** Nearest-neighbour candidates a semantic search narrows the list to. */
+export const AI_SEARCH_LIMIT = 200;
+
+export const AI_THRESHOLD_MIN = 0.05;
+export const AI_THRESHOLD_MAX = 0.95;
+
+/**
+ * Caps on the zero-shot vocabulary. Every entry is embedded once per model and
+ * then scored against every file, so the list is bounded here rather than left
+ * to whatever a paste into the settings box contains.
+ */
+export const MAX_AI_VOCABULARY = 1000;
+/** An entry becomes the name of an `ai:` tag, so it shares the tag-name cap. */
+export const MAX_AI_VOCABULARY_ENTRY = MAX_TAG_NAME;
+
+export const AiSettingsSchema = z.object({
+  /** Zero-shot vocabulary: one tag per entry, becomes `ai:<entry>`. */
+  vocabulary: z
+    .array(z.string().max(MAX_AI_VOCABULARY_ENTRY))
+    .max(MAX_AI_VOCABULARY),
+  /** Minimum softmax probability for a vocabulary entry to be attached as a tag. */
+  threshold: z.number().min(AI_THRESHOLD_MIN).max(AI_THRESHOLD_MAX),
+  /** Index new files automatically after every scan. */
+  autoIndex: z.boolean(),
+});
+export type AiSettings = z.infer<typeof AiSettingsSchema>;
+
+/** Live state of the single background AI job (an index run). */
+export const AiJobStateSchema = z.object({
+  kind: z.enum(["index"]),
+  /** Phase name: "embed" | "tag". */
+  label: z.string(),
+  done: z.number(),
+  total: z.number(),
+  workspaceId: z.string().nullable(),
+});
+export type AiJobState = z.infer<typeof AiJobStateSchema>;
+
+export const AiStatusSchema = z.object({
+  /** The folder the user drops model directories into (shown next to "Open"). */
+  modelsDir: z.string(),
+  models: z.array(AiModelInfoSchema),
+  activeModelId: z.string().nullable(),
+  settings: AiSettingsSchema,
+  /** Execution providers onnxruntime reports as usable on this machine. */
+  backends: z.array(z.string()),
+  /** The provider the loaded session actually runs on (null until a model has been loaded). */
+  activeBackend: z.string().nullable(),
+  job: AiJobStateSchema.nullable(),
+  /** Files (across the queried workspaces) still lacking an embedding for the active model. */
+  pending: z.number(),
+  /**
+   * The stored tags were produced with a different vocabulary, threshold or
+   * model than the current settings: they stay as they are until a re-tag pass
+   * is run, which is a deliberate choice — the pass rewrites every tag in the
+   * library and is not something a slider should set off.
+   */
+  retagPending: z.boolean(),
+});
+export type AiStatus = z.infer<typeof AiStatusSchema>;
+
+/** Pushed on `ai:progress` while a job runs, and once with `job: null` when it ends. */
+export const AiProgressSchema = z.object({
+  job: AiJobStateSchema.nullable(),
+  /** Set on the terminal event when the job failed. */
+  error: z.string().optional(),
+});
+export type AiProgress = z.infer<typeof AiProgressSchema>;
+
+/**
+ * One label the model recognized in a single file (`ai_analyze_file`). Labels
+ * come from the app's built-in discovery set (~1.5k everyday nouns, objects and
+ * scenes), not from the user's vocabulary, so "what is in this picture" does not
+ * depend on what the user already thought to list.
+ */
+export const AiCandidateSchema = z.object({
+  entry: z.string(),
+  /** Softmax probability over the whole discovery set. */
+  score: z.number(),
+  /** Raw cosine similarity between the file and the label prompt. */
+  similarity: z.number(),
+  /** Whether the label is already in the user's vocabulary. */
+  inVocabulary: z.boolean(),
+});
+export type AiCandidate = z.infer<typeof AiCandidateSchema>;
+
+/** One nearest-neighbour hit. Score is cosine similarity in [-1, 1]. */
+export const AiHitSchema = z.object({
+  workspaceId: z.string(),
+  id: z.number(),
+  score: z.number(),
+});
+export type AiHit = z.infer<typeof AiHitSchema>;

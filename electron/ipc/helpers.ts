@@ -1,6 +1,10 @@
 // Helpers shared by the IPC handler groups: resolving a workspace's Core,
-// scoping a query to the active view, and path checks on file operations.
+// scoping a query to the active view, path checks on file operations, and
+// handing a path to the OS.
+import { shell } from "electron";
+import { spawn } from "node:child_process";
 import type { Core } from "../core/index.js";
+import log from "../core/logger.js";
 import { isInsideRoot } from "../core/paths.js";
 import type { QueryTarget } from "../core/queryExec.js";
 import * as tags from "../core/tags.js";
@@ -42,4 +46,24 @@ export function ensureFileInsideRoot(c: Core, id: number): string {
   if (!abs) throw new Error("file not found");
   if (!isInsideRoot(abs, c.root)) throw new Error("path is outside scan root");
   return abs;
+}
+
+// Launch an external file/URL in a fully detached child process.
+// shell.openPath leaves the spawned process attached to Electron's process
+// tree; on Wayland/Hyprland that makes the launched app's window a child of
+// Meguri and blocks the main window until the external app closes.
+// Windows uses shell.openPath directly: ShellExecuteExW doesn't reproduce the
+// child-process attachment issue, and routing through cmd.exe /c start would
+// open a command-injection surface for filenames containing &/|/^/( etc.
+export function openDetached(target: string): void {
+  if (process.platform === "win32") {
+    void shell.openPath(target);
+    return;
+  }
+  const cmd = process.platform === "darwin" ? "open" : "xdg-open";
+  const child = spawn(cmd, [target], { detached: true, stdio: "ignore" });
+  child.on("error", (e) => {
+    log.error("[openDetached] failed to launch", cmd, target, e);
+  });
+  child.unref();
 }

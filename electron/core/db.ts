@@ -143,6 +143,21 @@ CREATE INDEX IF NOT EXISTS idx_scene_bookmarks_meta ON scene_bookmarks(meta_key)
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
+-- Image/video embeddings produced by the on-device AI model. Keyed by meta_key
+-- like the rest of the durable metadata, so they survive moves, renames and index
+-- rebuilds; keyed by model id as well, because vectors from different models are
+-- not comparable. vec is a little-endian float32 array of dim entries,
+-- L2-normalized, so cosine similarity is a plain dot product.
+CREATE TABLE IF NOT EXISTS meta_embeddings (
+  meta_key TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  dim INTEGER NOT NULL,
+  vec BLOB NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (meta_key, model_id)
+);
+CREATE INDEX IF NOT EXISTS idx_meta_embeddings_model ON meta_embeddings(model_id);
+
 ${FTS_DDL};
 `;
 

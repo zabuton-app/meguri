@@ -56,6 +56,16 @@ export const INVOKE_CHANNELS = [
   "update_ignore",
   "logo_get",
   "logo_set",
+  "ai_status",
+  "ai_models_open",
+  "ai_model_select",
+  "ai_settings_set",
+  "ai_index_start",
+  "ai_job_cancel",
+  "ai_search",
+  "ai_similar",
+  "ai_analyze_file",
+  "ai_vocabulary_add",
 ] as const;
 
 /** Main → renderer event channels (webContents.send). */
@@ -65,6 +75,7 @@ export const EVENT_CHANNELS = [
   "scan:done",
   "workspace:changed",
   "update:available",
+  "ai:progress",
 ] as const;
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[number];
