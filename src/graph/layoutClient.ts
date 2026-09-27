@@ -10,6 +10,10 @@ import type {
 
 export type LayoutInput = Omit<LayoutStart, "type" | "runId">;
 
+/** What a run is for: the graph's own layout (all of it, or its new nodes),
+ *  or a drag's local one. */
+export type LayoutKind = "full" | "partial" | "drag";
+
 export interface LayoutCallbacks {
   onPositions: (xy: Float32Array) => void;
   onDone: () => void;
@@ -22,6 +26,7 @@ export class LayoutClient {
   private pending: Float32Array | null = null;
   private frame = 0;
   private running = false;
+  private kind: LayoutKind | null = null;
   private listeners = new Set<() => void>();
 
   /** For useSyncExternalStore: whether a run is in progress. */
@@ -31,6 +36,11 @@ export class LayoutClient {
   };
 
   isRunning = (): boolean => this.running;
+
+  /** The kind of the run in progress, or null. */
+  currentKind(): LayoutKind | null {
+    return this.running ? this.kind : null;
+  }
 
   private setRunning(running: boolean): void {
     if (this.running === running) return;
@@ -58,9 +68,10 @@ export class LayoutClient {
   }
 
   /** Start a run; the previous one (if any) is abandoned without its onDone. */
-  run(input: LayoutInput, callbacks: LayoutCallbacks): void {
+  run(input: LayoutInput, callbacks: LayoutCallbacks, kind: LayoutKind): void {
     const worker = this.ensureWorker();
     this.runId += 1;
+    this.kind = kind;
     this.callbacks = callbacks;
     this.pending = null;
     this.setRunning(true);
@@ -78,6 +89,26 @@ export class LayoutClient {
       input.eb.buffer,
       input.weight.buffer,
     ]);
+  }
+
+  /** Move the node the current run holds (see LayoutStart.hold). */
+  drag(x: number, y: number): void {
+    if (!this.running) return;
+    this.worker?.postMessage({
+      type: "drag",
+      runId: this.runId,
+      x,
+      y,
+    } satisfies LayoutRequest);
+  }
+
+  /** Let go of the held node; the run then settles and ends. */
+  release(): void {
+    if (!this.running) return;
+    this.worker?.postMessage({
+      type: "release",
+      runId: this.runId,
+    } satisfies LayoutRequest);
   }
 
   stop(): void {

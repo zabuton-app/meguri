@@ -81,3 +81,35 @@ export function layoutPlan(
   if (unplaced === 0) return "none";
   return unplaced / total < PARTIAL_LAYOUT_SHARE ? "fixed-partial" : "full";
 }
+
+/** Most nodes a drag sets moving beyond the dragged node's own neighbours. */
+export const DRAG_REACH_MAX = 400;
+
+/**
+ * The nodes that move while `key` is dragged: its neighbours, and theirs too
+ * when that stays within DRAG_REACH_MAX. Everything else holds still, so a
+ * drag reshapes the part of the graph it touches rather than all of it.
+ * Nodes for which `skip` is true (generated tags) are left out.
+ */
+export function dragReach(
+  graph: MediaGraph,
+  key: string,
+  skip: (key: string) => boolean = () => false,
+): Set<string> {
+  const reach = new Set([key]);
+  const first: string[] = [];
+  graph.forEachNeighbor(key, (other) => {
+    if (skip(other) || reach.has(other)) return;
+    reach.add(other);
+    first.push(other);
+  });
+  const second = new Set<string>();
+  for (const node of first) {
+    graph.forEachNeighbor(node, (other) => {
+      if (!skip(other) && !reach.has(other)) second.add(other);
+    });
+    if (reach.size + second.size > DRAG_REACH_MAX) return reach;
+  }
+  for (const node of second) reach.add(node);
+  return reach;
+}

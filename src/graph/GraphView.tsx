@@ -23,6 +23,7 @@ import { fileHref } from "@/lib/fileHref";
 import log from "@/lib/logger";
 import { buildGraphology, emptyGraph } from "./model/buildGraphology";
 import {
+  dragReach,
   layoutPlan,
   placeNodes,
   seedPosition,
@@ -40,7 +41,11 @@ import { GraphSearch } from "./GraphSearch";
 import { GraphToolbar } from "./GraphToolbar";
 import { useGraphOptions } from "./graphOptions";
 import { LayoutClient } from "./layoutClient";
-import { LAYOUT_BUDGET_MS, maxIterationsFor } from "./layoutProtocol";
+import {
+  LAYOUT_BUDGET_MS,
+  SETTLE_BUDGET_MS,
+  maxIterationsFor,
+} from "./layoutProtocol";
 import { GRAPH_NODE_KEY_MAX } from "@shared/ipc/graph";
 import { useGraphColors } from "./useGraphColors";
 import { useGraphData } from "./useGraphData";
@@ -132,6 +137,9 @@ export function GraphView({
   // Where nodes that a filter took off the screen last stood, so they come
   // back there rather than at the (older) cached spot.
   const lastSeen = useRef(new Map<string, Point>());
+  // The node under the pointer: its position comes from the pointer, so the
+  // worker's (a frame behind) is not applied to it.
+  const holding = useRef<string | null>(null);
   // After a re-layout the cache describes the old picture.
   const cacheStale = useRef(false);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -166,8 +174,10 @@ export function GraphView({
     const xy: number[] = [];
     g.forEachNode((key, a) => {
       // A key past the boundary's limit (a very deep path with no content
-      // hash) would fail the whole save; that one node just is not cached.
+      // hash), or a position that is not a number, would fail the whole
+      // save; that one node just is not cached.
       if (key.length > GRAPH_NODE_KEY_MAX) return;
+      if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) return;
       keys.push(key);
       // Two decimals are plenty on a layout thousands of units wide, and
       // halve the file.
@@ -192,17 +202,28 @@ export function GraphView({
 
   // --- layout ---------------------------------------------------------------
   const runLayout = useCallback(
-    (graph: MediaGraph, plan: LayoutPlan, pinned: Set<string>) => {
+    (
+      graph: MediaGraph,
+      plan: LayoutPlan,
+      pinned: Set<string>,
+      /** A node being dragged, pinned under the pointer for the whole run.
+       *  `local`: only its neighbourhood is free (see LayoutStart.hold). */
+      hold?: { key: string; x: number; y: number; local: boolean },
+    ) => {
       if (plan === "none") return;
       const keys = graph.filterNodes((key) => !isAutoTag(graph, key));
       const index = new Map(keys.map((k, i) => [k, i]));
       const xy = new Float32Array(keys.length * 2);
       const fixed = new Uint8Array(keys.length);
+      // The nodes the run can move; on a drag's run only these change, so
+      // only these are written back each frame.
+      const moving: string[] = [];
       keys.forEach((k, i) => {
         const a = graph.getNodeAttributes(k);
         xy[i * 2] = a.x;
         xy[i * 2 + 1] = a.y;
         fixed[i] = plan === "fixed-partial" && pinned.has(k) ? 1 : 0;
+        if (!fixed[i]) moving.push(k);
       });
       const ea: number[] = [];
       const eb: number[] = [];
@@ -215,6 +236,8 @@ export function GraphView({
         eb.push(ib);
         w.push(attrs.weight);
       });
+      const local = !!hold?.local;
+      const held = hold ? index.get(hold.key) : undefined;
       layout.run(
         {
           xy,
@@ -223,25 +246,64 @@ export function GraphView({
           eb: Uint32Array.from(eb),
           weight: Float32Array.from(w),
           maxIterations: maxIterationsFor(keys.length),
-          budgetMs: LAYOUT_BUDGET_MS,
+          budgetMs: local ? SETTLE_BUDGET_MS : LAYOUT_BUDGET_MS,
+          hold:
+            hold && held != null
+              ? { index: held, x: hold.x, y: hold.y, local }
+              : undefined,
         },
         {
           onPositions: (pos) => {
-            graph.updateEachNodeAttributes(
-              (key, attrs) => {
-                const i = index.get(key);
-                if (i == null) return attrs;
-                return { ...attrs, x: pos[i * 2], y: pos[i * 2 + 1] };
-              },
-              { attributes: ["x", "y"] },
-            );
+            const at = (key: string): { x: number; y: number } | null => {
+              const i = index.get(key);
+              if (i == null || key === holding.current) return null;
+              const x = pos[i * 2];
+              const y = pos[i * 2 + 1];
+              return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+            };
+            if (local) {
+              // A few hundred nodes: one update each is far cheaper than
+              // having sigma revisit every node of the graph.
+              for (const key of moving) {
+                const p = at(key);
+                if (p && graph.hasNode(key)) graph.mergeNodeAttributes(key, p);
+              }
+            } else {
+              graph.updateEachNodeAttributes(
+                (key, attrs) => {
+                  const p = at(key);
+                  return p ? { ...attrs, ...p } : attrs;
+                },
+                { attributes: ["x", "y"] },
+              );
+            }
             centreAutoTags(graph);
           },
           onDone: scheduleSave,
         },
+        local ? "drag" : plan === "full" ? "full" : "partial",
       );
     },
     [layout, scheduleSave],
+  );
+
+  /** Start the run behind a drag of `key` (from its current position). */
+  const holdNode = useCallback(
+    (g: MediaGraph, key: string, x: number, y: number) => {
+      holding.current = key;
+      if (layout.currentKind() === "full") {
+        // The graph is still being laid out: keep that going with everything
+        // free, the dragged node held.
+        runLayout(g, "full", new Set(), { key, x, y, local: false });
+      } else {
+        // The dragged node pinned under the pointer, its neighbourhood free
+        // to follow (as in Obsidian), the rest of the graph holding still.
+        const reach = dragReach(g, key, (k) => isAutoTag(g, k));
+        const pinned = new Set(g.filterNodes((k) => !reach.has(k)));
+        runLayout(g, "fixed-partial", pinned, { key, x, y, local: true });
+      }
+    },
+    [layout, runLayout],
   );
 
   // --- a graph per payload --------------------------------------------------
@@ -273,18 +335,27 @@ export function GraphView({
       next.filterNodes((k) => !isAutoTag(next, k)).length,
       unplaced.size,
     );
-    // A layout still settling was working on the previous graph: carry on
-    // with this one rather than freeze half-way.
-    if (plan === "none" && layout.isRunning()) plan = "full";
+    // A layout of the whole graph still settling was working on the previous
+    // graph: carry on with this one rather than freeze half-way.
+    if (plan === "none" && layout.currentKind() === "full") plan = "full";
     graphRef.current = next;
     // The graph lives outside React; this hands the new one over (and drops
     // a selection or hover the new data no longer contains).
     setGraph(next);
     setSelected((sel) => (sel && next.hasNode(sel) ? sel : null));
     setHovered((h) => (h && next.hasNode(h) ? h : null));
-    if (plan !== "none") runLayout(next, plan, pinned);
-    else if (added.length > 0) scheduleSave();
-  }, [payload, cache, layout, runLayout, scheduleSave]);
+    // A drag in progress goes on over the new graph (its run was working on
+    // the old one); a node that left with the data ends it.
+    const held = holding.current;
+    if (held && next.hasNode(held)) {
+      const { x, y } = next.getNodeAttributes(held);
+      holdNode(next, held, x, y);
+    } else {
+      holding.current = null;
+      if (plan !== "none") runLayout(next, plan, pinned);
+      else if (added.length > 0) scheduleSave();
+    }
+  }, [payload, cache, layout, runLayout, holdNode, scheduleSave]);
 
   const relayout = useCallback(() => {
     const g = graphRef.current;
@@ -300,7 +371,30 @@ export function GraphView({
     lastSeen.current.clear();
     cacheStale.current = true;
     runLayout(g, "full", new Set());
+    // The frame a drag held still no longer fits the new picture.
+    canvas.current?.fit();
   }, [runLayout]);
+
+  // --- dragging -------------------------------------------------------------
+  const dragStart = useCallback(
+    (key: string) => {
+      const g = graphRef.current;
+      // Generated tags sit at their files' centre and are not laid out.
+      if (!g.hasNode(key) || isAutoTag(g, key)) return false;
+      const { x, y } = g.getNodeAttributes(key);
+      holdNode(g, key, x, y);
+      return true;
+    },
+    [holdNode],
+  );
+  const drag = useCallback(
+    (_key: string, x: number, y: number) => layout.drag(x, y),
+    [layout],
+  );
+  const dragEnd = useCallback(() => {
+    holding.current = null;
+    layout.release();
+  }, [layout]);
 
   // --- what shows ------------------------------------------------------------
   const localFocus = local && selected ? selected : null;
@@ -421,6 +515,9 @@ export function GraphView({
               onClickNode={select}
               onDoubleClickNode={onDoubleClickNode}
               onClickStage={clearSelection}
+              onDragStart={dragStart}
+              onDrag={drag}
+              onDragEnd={dragEnd}
             />
           </GraphErrorBoundary>
 

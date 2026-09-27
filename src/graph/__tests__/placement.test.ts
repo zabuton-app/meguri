@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  dragReach,
+  DRAG_REACH_MAX,
   layoutPlan,
   placeNodes,
   seedPosition,
@@ -53,5 +55,32 @@ describe("layoutPlan", () => {
     expect(layoutPlan(100, 20)).toBe("full");
     expect(layoutPlan(100, 0, true)).toBe("full");
     expect(layoutPlan(0, 0, true)).toBe("none");
+  });
+});
+
+describe("dragReach", () => {
+  const g = graphOf([
+    { path: "a.mp4", tags: ["sea", "res:4k"] },
+    { path: "b.mp4", tags: ["sea"] },
+    { path: "c.mp4", tags: ["cat"] },
+  ]);
+
+  it("frees the neighbours and their neighbours, skipping what it is told to", () => {
+    const reach = dragReach(g, fk("a.mp4"), (k) => k === tk("res:4k"));
+    expect([...reach].sort()).toEqual(
+      [fk("a.mp4"), tk("sea"), fk("b.mp4")].sort(),
+    );
+  });
+
+  it("stops at the neighbours when theirs would be too many", () => {
+    const files = Array.from({ length: DRAG_REACH_MAX + 10 }, (_, i) => ({
+      path: `f${i}.mp4`,
+      tags: ["hub"],
+    }));
+    const big = graphOf([{ path: "x.mp4", tags: ["hub", "small"] }, ...files]);
+    const reach = dragReach(big, fk("x.mp4"));
+    expect([...reach].sort()).toEqual(
+      [fk("x.mp4"), tk("hub"), tk("small")].sort(),
+    );
   });
 });

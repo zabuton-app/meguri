@@ -39,6 +39,11 @@ interface Props {
   onClickNode: (key: string) => void;
   onDoubleClickNode: (key: string) => void;
   onClickStage: () => void;
+  /** A press on a node that may become a drag; false refuses it. */
+  onDragStart: (key: string) => boolean;
+  /** The dragged node's new position, in graph coordinates. */
+  onDrag: (key: string, x: number, y: number) => void;
+  onDragEnd: (key: string) => void;
   ref?: Ref<GraphCanvasHandle>;
 }
 
@@ -50,6 +55,8 @@ const ANIMATION_MS = 300;
 function labelThreshold(order: number): number {
   return order <= 500 ? 0 : 6;
 }
+/** Pointer travel (px) that turns a press on a node into a drag. */
+const DRAG_START_PX = 4;
 /** Neighbours of the focus labelled regardless of room, up to this many. */
 const FORCED_LABELS_MAX = 40;
 
@@ -91,6 +98,9 @@ export function GraphCanvas({
   onClickNode,
   onDoubleClickNode,
   onClickStage,
+  onDragStart,
+  onDrag,
+  onDragEnd,
   ref,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
@@ -113,6 +123,9 @@ export function GraphCanvas({
     onClickNode,
     onDoubleClickNode,
     onClickStage,
+    onDragStart,
+    onDrag,
+    onDragEnd,
   });
   useEffect(() => {
     handlers.current = {
@@ -120,6 +133,9 @@ export function GraphCanvas({
       onClickNode,
       onDoubleClickNode,
       onClickStage,
+      onDragStart,
+      onDrag,
+      onDragEnd,
     };
   });
 
@@ -231,12 +247,89 @@ export function GraphCanvas({
       el.style.cursor = "";
       handlers.current.onHover(null);
     });
-    sigma.on("clickNode", ({ node }) => handlers.current.onClickNode(node));
+    // Dragging a node. A press alone is not a drag (a click selects): the
+    // drag, and the layout run behind it, start once the pointer has moved
+    // a few pixels with the left button down.
+    let pressed: { node: string; x: number; y: number } | null = null;
+    let dragged: string | null = null;
+    // Set when a drag ends. sigma counts no movement while its default is
+    // prevented, so it would take the release for a click on the node.
+    let justDragged = false;
+    sigma.on("downNode", ({ node, event }) => {
+      justDragged = false;
+      if (event.original instanceof MouseEvent && event.original.button !== 0)
+        return;
+      pressed = { node, x: event.x, y: event.y };
+    });
+    sigma.on("downStage", () => {
+      justDragged = false;
+    });
+    sigma.on("moveBody", ({ event }) => {
+      if (pressed && !dragged) {
+        if (
+          Math.hypot(event.x - pressed.x, event.y - pressed.y) < DRAG_START_PX
+        )
+          return;
+        if (handlers.current.onDragStart(pressed.node)) {
+          dragged = pressed.node;
+          // Hold the frame still: otherwise moving a node near the edge would
+          // rescale the whole view under the pointer. "Fit" lets go of it.
+          if (!sigma.getCustomBBox()) sigma.setCustomBBox(sigma.getBBox());
+        } else {
+          pressed = null;
+        }
+      }
+      if (!dragged) return;
+      // The data changed under the drag and the node went with it.
+      if (!sigma.getGraph().hasNode(dragged)) {
+        endDrag();
+        return;
+      }
+      const p = sigma.viewportToGraph(event);
+      sigma.getGraph().mergeNodeAttributes(dragged, { x: p.x, y: p.y });
+      handlers.current.onDrag(dragged, p.x, p.y);
+      // The pointer moves the node, not the camera.
+      event.preventSigmaDefault();
+      event.original.preventDefault();
+      event.original.stopPropagation();
+    });
+    function endDrag() {
+      pressed = null;
+      if (!dragged) return;
+      const node = dragged;
+      dragged = null;
+      justDragged = true;
+      handlers.current.onDragEnd(node);
+    }
+    sigma.on("upNode", endDrag);
+    sigma.on("upStage", endDrag);
+    // Released outside the canvas, or the window lost focus mid-drag (the
+    // release then never arrives): sigma never hears of either.
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("blur", endDrag);
+
+    const unlessDragged =
+      <T,>(fn: (e: T) => void) =>
+      (e: T) => {
+        if (justDragged) {
+          justDragged = false;
+          return;
+        }
+        fn(e);
+      };
+    sigma.on(
+      "clickNode",
+      unlessDragged(({ node }) => handlers.current.onClickNode(node)),
+    );
     sigma.on("doubleClickNode", (e) => {
       e.preventSigmaDefault();
+      if (justDragged) return;
       handlers.current.onDoubleClickNode(e.node);
     });
-    sigma.on("clickStage", () => handlers.current.onClickStage());
+    sigma.on(
+      "clickStage",
+      unlessDragged(() => handlers.current.onClickStage()),
+    );
 
     const canvas = el.querySelector("canvas");
     const onLost = () => setContextLost(true);
@@ -244,6 +337,8 @@ export function GraphCanvas({
     const resize = new ResizeObserver(() => sigma.resize());
     resize.observe(el);
     return () => {
+      window.removeEventListener("mouseup", endDrag);
+      window.removeEventListener("blur", endDrag);
       resize.disconnect();
       canvas?.removeEventListener("webglcontextlost", onLost);
       sigma.kill();
@@ -284,10 +379,15 @@ export function GraphCanvas({
   useImperativeHandle(
     ref,
     () => ({
-      fit: () =>
-        void sigmaRef.current
-          ?.getCamera()
-          .animatedReset({ duration: ANIMATION_MS }),
+      fit: () => {
+        const sigma = sigmaRef.current;
+        if (!sigma) return;
+        // Frame the graph as it is now, including what drags moved. The
+        // frame is only recomputed on a refresh.
+        sigma.setCustomBBox(null);
+        sigma.refresh();
+        void sigma.getCamera().animatedReset({ duration: ANIMATION_MS });
+      },
       zoomIn: () =>
         void sigmaRef.current
           ?.getCamera()

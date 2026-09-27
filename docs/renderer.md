@@ -153,6 +153,23 @@ never pay for it) draws the same list as a network of files and tags, from one
   new, with the cached ones pinned when few are, not at all when none are.
   Generated tags stay out of the layout and sit at their files' centroid. The
   settled positions are saved per scope (debounced, and on unmount).
+- **Dragging.** A node can be dragged with the left button (`GraphCanvas`:
+  the drag starts once the pointer has moved a few pixels, so a still press
+  stays a click, and the release of a drag is not taken for one). The layout
+  worker then runs with that node held under the pointer and its neighbourhood
+  free (`dragReach`: neighbours, and theirs while that stays under
+  `DRAG_REACH_MAX` nodes) under stronger, linear attraction and a coarser
+  Barnes-Hut, so the neighbours follow live while the rest of the graph holds
+  still; on release the neighbourhood relaxes with the normal settings and the
+  positions are saved. A drag during the graph's own full layout keeps that
+  layout going instead, and a drag outlives a refetch (it goes on over the new
+  graph). The worker works in slices of about a frame and rests while a held
+  node does not move. It drives ForceAtlas2's single iteration on matrices
+  built once (`layoutEngine.ts`), which is what lets the held node be moved
+  between iterations; that is the package's internal module, so the version is
+  pinned and a test compares the engine with the package's public API. While
+  dragging, the frame is held still (`setCustomBBox`); "fit" and "re-layout"
+  let go of it.
 - **Pure model.** Visibility (toggles, orphans, the local graph's BFS),
   related-file ranking, search and placement are plain functions under
   `src/graph/model/`, tested without WebGL.

@@ -52,6 +52,9 @@ vi.mock("../GraphCanvas", async () => {
       onClickNode: (key: string) => void;
       onDoubleClickNode: (key: string) => void;
       onClickStage: () => void;
+      onDragStart: (key: string) => boolean;
+      onDrag: (key: string, x: number, y: number) => void;
+      onDragEnd: (key: string) => void;
       ref?: React.Ref<unknown>;
     }) => {
       if (canvas.fail) throw new Error("no WebGL");
@@ -73,6 +76,10 @@ vi.mock("../GraphCanvas", async () => {
               data-testid={`node ${key}`}
               onClick={() => props.onClickNode(key)}
               onDoubleClick={() => props.onDoubleClickNode(key)}
+              onMouseDown={() => {
+                if (props.onDragStart(key)) props.onDrag(key, 123, 45);
+              }}
+              onMouseUp={() => props.onDragEnd(key)}
             />
           ))}
           <button
@@ -88,6 +95,7 @@ vi.mock("../GraphCanvas", async () => {
 
 // Imported after the mocks.
 const { GraphView } = await import("../GraphView");
+const { LayoutClient } = await import("../layoutClient");
 
 const FILES = [
   { path: "a.mp4", tags: ["sea", "summer"] },
@@ -297,6 +305,35 @@ describe("GraphView", () => {
     fireEvent.change(box, { target: { value: "B.J" } });
     fireEvent.keyDown(box, { key: "Enter" });
     await waitFor(() => expect(canvas.props?.selected).toBe(fk("b.jpg")));
+  });
+
+  it("drags a node through a local layout run and lets go on release", async () => {
+    const run = vi.spyOn(LayoutClient.prototype, "run");
+    const release = vi.spyOn(LayoutClient.prototype, "release");
+    render();
+    await ready();
+    await waitFor(() => expect(run).toHaveBeenCalled());
+    // Let the first layout end, so the drag is a local one.
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    run.mockClear();
+    fireEvent.mouseDown(screen.getByTestId(`node ${fk("a.mp4")}`));
+    expect(run).toHaveBeenCalledTimes(1);
+    const input = run.mock.calls[0][0];
+    expect(input.hold?.local).toBe(true);
+    expect(run.mock.calls[0][2]).toBe("drag");
+    // Its neighbourhood moves, the orphan-free rest of this small graph too;
+    // the held node itself is free in the matrix (the hold pins it).
+    expect(input.fixed[input.hold?.index ?? -1]).toBe(0);
+    fireEvent.mouseUp(screen.getByTestId(`node ${fk("a.mp4")}`));
+    expect(release).toHaveBeenCalled();
+    // Generated tags are not draggable.
+    run.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Auto tags" }));
+    const auto = await screen.findByTestId(`node ${tk("res:4k")}`);
+    fireEvent.mouseDown(auto);
+    expect(run).not.toHaveBeenCalled();
+    run.mockRestore();
+    release.mockRestore();
   });
 
   it("saves positions once the layout ends", async () => {
