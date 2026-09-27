@@ -90,6 +90,18 @@ vi.mock("@/ipc/client", () => ({
   collectionTarget: (id: string) => `collection:${id}`,
 }));
 
+// The graph view needs WebGL (not in jsdom); what matters here is when Home
+// shows it and what it hands over.
+const graphView = vi.hoisted(() => ({
+  props: null as null | Record<string, unknown>,
+}));
+vi.mock("@/graph/GraphView", () => ({
+  GraphView: (props: Record<string, unknown>) => {
+    graphView.props = props;
+    return <div data-testid="graph-view" />;
+  },
+}));
+
 function AppRoutes() {
   return (
     <Routes>
@@ -1306,5 +1318,62 @@ describe("Home folder view", () => {
         "list:videos/sample.mp4",
       ),
     );
+  });
+});
+
+describe("Home graph view", () => {
+  afterEach(() => {
+    localStorage.removeItem(VIEW_KEY);
+    localStorage.removeItem(BY_FOLDER_KEY);
+  });
+
+  beforeEach(() => {
+    graphView.props = null;
+    localStorage.setItem(VIEW_KEY, "grid");
+    localStorage.setItem(BY_FOLDER_KEY, "true");
+    mocks.appStatus.mockResolvedValue(defaultAppStatus);
+    mocks.workspacesList.mockResolvedValue(defaultWorkspacesList);
+    mocks.filesSearch.mockReset();
+    mocks.filesSearch.mockResolvedValue({
+      items: [sampleFileRow],
+      nextCursor: null,
+    });
+    mocks.foldersList.mockReset();
+    mocks.foldersList.mockResolvedValue({
+      path: "",
+      folders: [],
+      fileCount: 1,
+    });
+    mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
+  });
+
+  it("swaps the list for the graph, off the folder view, and back", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Show by folder" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Graph view" }));
+    await screen.findByTestId("graph-view");
+    expect(screen.queryByTestId("folder-card")).toBeNull();
+    expect(graphView.props?.scope).toBe(WS_ID);
+    expect(localStorage.getItem(VIEW_KEY)).toBe("graph");
+    const disabled = screen.getByRole("button", { name: "Show by folder" });
+    expect((disabled as HTMLButtonElement).disabled).toBe(true);
+    expect(disabled.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Grid view" }));
+    await waitFor(() => expect(screen.queryByTestId("graph-view")).toBeNull());
+    // The stored choice waited for the list views.
+    expect(localStorage.getItem(BY_FOLDER_KEY)).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: "Show by folder" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 });

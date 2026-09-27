@@ -148,7 +148,11 @@ export function fromFor(query: SearchQuery): string {
   return query.folder?.path ? FOLDER_FILE_FROM : FILE_FROM;
 }
 
-function appendSearchConditions(
+/**
+ * Append the WHERE conditions a SearchQuery asks for. Exported so the graph
+ * view (queries/graph.ts) narrows exactly the rows files_search would.
+ */
+export function appendSearchConditions(
   db: DB,
   sql: string,
   args: unknown[],

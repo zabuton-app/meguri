@@ -150,6 +150,8 @@ export function invalidateInProgressSearches(qc: QueryClient): void {
  * kept in sync separately via patchFileRowInCaches.
  */
 export function invalidateTagSearches(qc: QueryClient): void {
+  // The graph is drawn from tags whatever the filter, so it always goes.
+  void qc.invalidateQueries({ queryKey: ["graph_build"] });
   void qc.invalidateQueries({
     queryKey: ["files_search"],
     predicate: (q) => {
@@ -185,6 +187,7 @@ export function invalidateTagCatalog(qc: QueryClient): void {
  * known keeps the response instant, and this reconciles the rest.
  */
 export function invalidateFileCaches(qc: QueryClient): void {
+  void qc.invalidateQueries({ queryKey: ["graph_build"] });
   void qc.invalidateQueries({ queryKey: ["files_search"] });
   void qc.invalidateQueries({ queryKey: ["files_random"] });
   void qc.invalidateQueries({ queryKey: ["file_get"] });
@@ -197,6 +200,15 @@ export function invalidateFileCaches(qc: QueryClient): void {
  * on add/remove-from-collection); regular workspace lists are unaffected.
  */
 export function invalidateCollectionSearches(qc: QueryClient): void {
+  void qc.invalidateQueries({
+    queryKey: ["graph_build"],
+    predicate: (q) => {
+      const scope = q.queryKey[1];
+      return (
+        typeof scope === "string" && scope.startsWith(COLLECTION_ID_PREFIX)
+      );
+    },
+  });
   void qc.invalidateQueries({
     queryKey: ["files_search"],
     predicate: (q) => {

@@ -8,10 +8,10 @@ import type { SearchQuery } from "@/ipc/types";
 export const DISCOVER_FILTER_PARAM = "filter";
 export const VIEW_KEY = "meguri.view";
 
-export type ViewMode = "grid" | "list";
+export type ViewMode = "grid" | "list" | "graph";
 
 export function isViewMode(v: string | null): v is ViewMode {
-  return v === "grid" || v === "list";
+  return v === "grid" || v === "list" || v === "graph";
 }
 
 /**
@@ -35,11 +35,14 @@ export const BY_FOLDER_KEY = "meguri.byFolder";
 export function isFolderView({
   byFolder,
   folderAvailable,
+  view,
 }: {
   byFolder: boolean;
   folderAvailable: boolean;
+  /** The graph has no folder form; the stored option waits for the list views. */
+  view?: ViewMode;
 }): boolean {
-  return byFolder && folderAvailable;
+  return byFolder && folderAvailable && view !== "graph";
 }
 
 export function cleanDiscoverFilter(filter: SearchQuery): SearchQuery {

@@ -23,6 +23,8 @@ import type {
 } from "./schema.js";
 import {
   FolderPathSchema,
+  GraphNodeKeySchema,
+  GraphScopeSchema,
   HistoryQuerySchema,
   LogoIdSchema,
   SearchQuerySchema,
@@ -41,6 +43,11 @@ import {
   MAX_TAG_NAME,
 } from "../tags.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
+import {
+  GRAPH_LAYOUT_MAX_NODES,
+  GRAPH_MAX_FILES_HARD,
+  type GraphPayload,
+} from "./graph.js";
 import { MAX_FOLDER_FILES_PATHS } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
 
@@ -211,6 +218,22 @@ export const ChannelInputs = {
         message: "duplicate folder path",
       }),
   }),
+  // The whole graph for the active target in one call; cursor / limit / folder
+  // in the query are ignored (the graph does not page and has no folder view).
+  graph_build: z.object({
+    query: SearchQuerySchema,
+    maxFiles: z.number().int().min(1).max(GRAPH_MAX_FILES_HARD).optional(),
+  }),
+  graph_layout_get: z.object({ scope: GraphScopeSchema }),
+  graph_layout_set: z
+    .object({
+      scope: GraphScopeSchema,
+      keys: z.array(GraphNodeKeySchema).max(GRAPH_LAYOUT_MAX_NODES),
+      xy: z.array(z.number()).max(GRAPH_LAYOUT_MAX_NODES * 2),
+    })
+    .refine((v) => v.xy.length === v.keys.length * 2, {
+      message: "xy must hold two numbers per key",
+    }),
   file_get: FileTarget,
   file_set_rating: FileTarget.extend({ rating: z.number() }),
   file_set_favorite: FileTarget.extend({ favorite: z.boolean() }),
@@ -407,6 +430,10 @@ export interface ChannelOutputs {
   files_random: FileRow[];
   folders_list: FolderListing;
   folder_files: FolderFilesResult;
+  graph_build: GraphPayload;
+  /** The cached positions of the scope, or null when there are none usable. */
+  graph_layout_get: { keys: string[]; xy: number[] } | null;
+  graph_layout_set: void;
   file_get: FileDetail | null;
   file_set_rating: void;
   file_set_favorite: void;

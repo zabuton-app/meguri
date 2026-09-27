@@ -76,8 +76,8 @@ playback is unaffected.
 
 Data fetching uses `@tanstack/react-query`. The file list is an
 `useInfiniteQuery` combined with `@tanstack/react-virtual` for infinite scroll
-plus virtualization (`src/components/MediaGrid.tsx`). Two view modes — grid and
-list — are switchable.
+plus virtualization (`src/components/MediaGrid.tsx`). Three view modes — grid,
+list and graph — are switchable.
 
 Both views have a "show by folder" option (`BY_FOLDER_KEY`, remembered apart
 from the view mode) that browses one workspace like a file manager: the current
@@ -122,6 +122,44 @@ them through `folder_files` when the folder is picked, because the selection bar
 and the bulk tag dialog are computed from rows. Until they arrive the selection
 is `pending` and the bulk actions wait; the selection's `count` includes files
 beyond the cap so the bar can refuse an oversized edit.
+
+The graph view (`src/graph/`, loaded lazily with `React.lazy` so the list views
+never pay for it) draws the same list as a network of files and tags, from one
+`graph_build` payload (see docs/architecture.md, "Graph view"):
+
+- **Rendering.** `GraphCanvas` owns one sigma.js (WebGL) instance over a
+  graphology graph. Files are discs coloured by kind, tags ringed discs; the
+  colours are the theme's `--c-*` values read by `useGraphColors`, since WebGL
+  cannot see CSS variables. Highlighting, dimming, hidden kinds and the local
+  graph are all applied by sigma's node and edge reducers from state held in a
+  ref, so an interaction is a `refresh({ skipIndexation: true })`, never a
+  rebuild. Labels are thinned by sigma's label grid; a WebGL failure swaps the
+  canvas for a notice (`GraphErrorBoundary`).
+- **A graph per payload.** Each payload builds a new graphology graph that
+  takes over the previous one's positions by key (`model/buildGraphology.ts`),
+  and the one sigma instance (`GraphView` is keyed by scope in Home) switches
+  to it with `setGraph`, keeping the camera; the selection survives if its node
+  does. Building a fresh graph rather than trimming the shown one matters:
+  sigma v3 re-indexes the whole graph on every dropped node or edge, so
+  removing thousands after a filter change would freeze the view. For the same
+  reason sigma settings are only set when their value changes. Nodes a filter
+  takes off the screen remember where they stood and come back there.
+  `graph_build` is invalidated next to `files_search` (scan done, tag edits).
+- **Placement and layout.** A new node starts at its cached position, else near
+  its placed neighbours, else at a spot hashed from its key
+  (`model/placement.ts`), so the first frame never waits. ForceAtlas2 then runs
+  in a Web Worker (`layout.worker.ts`, driven by `LayoutClient`) in chunks whose
+  positions are applied once per animation frame: fully when most nodes are
+  new, with the cached ones pinned when few are, not at all when none are.
+  Generated tags stay out of the layout and sit at their files' centroid. The
+  settled positions are saved per scope (debounced, and on unmount).
+- **Pure model.** Visibility (toggles, orphans, the local graph's BFS),
+  related-file ranking, search and placement are plain functions under
+  `src/graph/model/`, tested without WebGL.
+- **Options.** The relationship-kind, generated-tag and orphan toggles persist in
+  `localStorage["meguri.graph.options"]`. The graph has no folder form: while it
+  shows, `isFolderView` is false and the "show by folder" button is disabled,
+  without changing the stored option; the selection bar is not offered.
 
 Toggling a favorite patches both the list and detail react-query caches so they
 stay in sync without a refetch. Discover pulls videos with `randomFiles`

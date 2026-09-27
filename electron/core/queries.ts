@@ -10,3 +10,4 @@ export * from "./queries/duplicates.js";
 export * from "./queries/settings.js";
 export * from "./queries/folderRange.js";
 export * from "./queries/folders.js";
+export * from "./queries/graph.js";
