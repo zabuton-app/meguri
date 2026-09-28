@@ -6,7 +6,7 @@ import { handle } from "../core/ipcHandler.js";
 import {
   keepRegisteredWorkspaces,
   layoutPathFor,
-  readLayout,
+  readLayoutSettled,
   writeLayout,
   type LayoutScopes,
 } from "../core/graph/layoutCache.js";
@@ -60,7 +60,7 @@ export function registerGraphHandlers(ctx: IpcContext): void {
 
   handle("graph_layout_get", async ({ scope }) => {
     const file = layoutPathFor(scope, layoutScopes(ws));
-    return file ? readLayout(file) : null;
+    return file ? readLayoutSettled(file) : null;
   });
 
   handle("graph_layout_set", async ({ scope, keys, xy }) => {

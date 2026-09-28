@@ -1,7 +1,9 @@
 // Where the graph's relationships come from. Each source turns a workspace's
 // files into edges; the graph builder merges them across workspaces. Adding a
 // relationship (e.g. AI similarity as weighted file-file edges) is one more
-// entry in EDGE_SOURCES plus the renderer's registry — nothing else changes.
+// entry in EDGE_SOURCES and a wider EdgeSourceId, then the renderer's side:
+// see docs/architecture.md, "Graph view", for the steps. The payload already
+// carries kinds and weights; the simulation uses links, not their weights.
 import type { DB } from "../db.js";
 import type { EdgeKind, EdgeSourceId } from "../../../shared/ipc/graph.js";
 

@@ -9,6 +9,7 @@ import {
   keepRegisteredWorkspaces,
   layoutPathFor,
   readLayout,
+  readLayoutSettled,
   removeLayout,
   writeLayout,
   type LayoutScopes,
@@ -35,13 +36,13 @@ afterEach(() => {
 });
 
 describe("layoutPathFor", () => {
-  it("puts a workspace's file in its data directory", async () => {
+  it("puts a workspace's file in its data directory", () => {
     expect(layoutPathFor("0123456789abcdef", scopes())).toBe(
       path.join(base, "roots", "0123456789abcdef", "graph-layout.json"),
     );
   });
 
-  it("puts All and collections under graph-layouts/, by a hash of the scope", async () => {
+  it("puts All and collections under graph-layouts/, by a hash of the scope", () => {
     const all = layoutPathFor("__all__", scopes());
     const col = layoutPathFor("collection:c1", scopes());
     expect(path.dirname(all ?? "")).toBe(path.join(base, "graph-layouts"));
@@ -50,7 +51,7 @@ describe("layoutPathFor", () => {
     expect(col).toBe(collectionLayoutPath(base, "c1"));
   });
 
-  it("has no file for a scope that does not exist", async () => {
+  it("has no file for a scope that does not exist", () => {
     expect(layoutPathFor("ffffffffffffffff", scopes())).toBeNull();
     expect(layoutPathFor("collection:gone", scopes())).toBeNull();
   });
@@ -134,5 +135,13 @@ describe("concurrent writes", () => {
       writeLayout(file, { keys: ["t::b"], xy: [3, 4] }),
     ]);
     expect((await readLayout(file))?.keys.sort()).toEqual(["t::a", "t::b"]);
+  });
+
+  it("reads what a save still in progress will leave", async () => {
+    const file = path.join(base, "s", "graph-layout.json");
+    await writeLayout(file, { keys: ["t::a"], xy: [1, 2] });
+    const saving = writeLayout(file, { keys: ["t::a"], xy: [5, 6] });
+    expect((await readLayoutSettled(file))?.xy).toEqual([5, 6]);
+    await saving;
   });
 });

@@ -62,8 +62,13 @@ describe("visibleSet", () => {
     }
   });
 
-  it("ignores a local focus that is not showing", () => {
+  it("centres on a file the filters alone would hide (no tags)", () => {
     const v = visibleSet(g, base, { node: fk("lone.mp4"), depth: 1 });
-    expect(v.nodes.has(fk("a.mp4"))).toBe(true);
+    expect([...v.nodes]).toEqual([fk("lone.mp4")]);
+  });
+
+  it("ignores a local focus that is gone or switched off", () => {
+    const gone = visibleSet(g, base, { node: fk("nowhere.mp4"), depth: 1 });
+    expect(gone.nodes.has(fk("a.mp4"))).toBe(true);
   });
 });

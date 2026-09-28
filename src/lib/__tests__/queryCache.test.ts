@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import type {
   FileDetail,
@@ -10,11 +10,11 @@ import {
   dropFromWatchLaterCache,
   forgetDeletedFile,
   invalidateCollectionSearches,
+  GRAPH_SIZED_BY_PLAYS,
   invalidatePlayedSearches,
   invalidateTagSearches,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
-import { GRAPH_SETTINGS_KEY } from "@/graph/graphSettings";
 
 describe("syncFileRowAcrossCaches", () => {
   it("patches favorite/rating across search, random, and detail caches", () => {
@@ -113,34 +113,50 @@ describe("targeted files_search invalidation", () => {
     expect(invalidated().sort()).toEqual(["accessed", "played", "unplayed"]);
   });
 
-  it("invalidatePlayedSearches refreshes the graph only when it sizes nodes by plays, once for a run", () => {
-    vi.useFakeTimers();
-    try {
-      const qc = new QueryClient();
-      const spy = vi.spyOn(qc, "invalidateQueries");
-      const graphCalls = () =>
-        spy.mock.calls.filter(
-          ([f]) =>
-            (f?.queryKey as unknown[] | undefined)?.[0] === "graph_build",
-        ).length;
-      localStorage.removeItem(GRAPH_SETTINGS_KEY);
-      invalidatePlayedSearches(qc);
-      vi.advanceTimersByTime(2_000);
-      expect(graphCalls()).toBe(0);
-      localStorage.setItem(
-        GRAPH_SETTINGS_KEY,
-        JSON.stringify({ display: { sizeBy: "plays" } }),
-      );
-      invalidatePlayedSearches(qc);
-      invalidatePlayedSearches(qc);
-      invalidatePlayedSearches(qc);
-      expect(graphCalls()).toBe(0);
-      vi.advanceTimersByTime(2_000);
-      expect(graphCalls()).toBe(1);
-    } finally {
-      localStorage.removeItem(GRAPH_SETTINGS_KEY);
-      vi.useRealTimers();
-    }
+  it("invalidatePlayedSearches refreshes a graph a play can change, and only those", async () => {
+    const qc = new QueryClient();
+    const fetched: string[] = [];
+    const graph = async (name: string, filter: object, byPlays: boolean) => {
+      await qc.fetchQuery({
+        queryKey: ["graph_build", "ws", filter],
+        queryFn: () => name,
+        meta: { [GRAPH_SIZED_BY_PLAYS]: byPlays },
+      });
+    };
+    await graph("plain", {}, false);
+    await graph("byPlays", { q: "x" }, true);
+    await graph("played", { played: false }, false);
+    await graph("accessed", { sort: "accessed" }, false);
+    qc.getQueryCache().subscribe((e) => {
+      if (e.type === "updated" && e.action.type === "invalidate")
+        fetched.push(String(e.query.state.data));
+    });
+    invalidatePlayedSearches(qc);
+    expect(fetched.sort()).toEqual(["accessed", "byPlays", "played"]);
+  });
+
+  it("syncFileRowAcrossCaches refreshes a graph filtered or sorted by the changed field", async () => {
+    const qc = new QueryClient();
+    const invalidated: string[] = [];
+    for (const [name, filter] of [
+      ["plain", {}],
+      ["favorite", { favorite: true }],
+      ["rated", { ratingMin: 3 }],
+      ["byRating", { sort: "rating" }],
+    ] as const)
+      await qc.fetchQuery({
+        queryKey: ["graph_build", "ws", filter],
+        queryFn: () => name,
+      });
+    qc.getQueryCache().subscribe((e) => {
+      if (e.type === "updated" && e.action.type === "invalidate")
+        invalidated.push(String(e.query.state.data));
+    });
+    syncFileRowAcrossCaches(qc, "ws", 1, { favorite: 1 });
+    expect(invalidated).toEqual(["favorite"]);
+    invalidated.length = 0;
+    syncFileRowAcrossCaches(qc, "ws", 1, { rating: 4 });
+    expect(invalidated.sort()).toEqual(["byRating", "rated"]);
   });
 
   it("invalidateTagSearches hits tag filters and text queries only", () => {

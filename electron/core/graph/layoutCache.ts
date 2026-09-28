@@ -158,6 +158,15 @@ async function mergeAndWrite(
   await fs.rename(tmp, file);
 }
 
+/** The positions once any save queued for the file has landed, so a view
+ *  reopened right after leaving starts from what it left. */
+export async function readLayoutSettled(
+  file: string,
+): Promise<LayoutPositions | null> {
+  await (writes.get(file) ?? Promise.resolve()).catch(() => undefined);
+  return readLayout(file);
+}
+
 /** Best effort: a file left behind is only a stale cache nobody reads. */
 export async function removeLayout(file: string): Promise<void> {
   await (writes.get(file) ?? Promise.resolve()).catch(() => undefined);

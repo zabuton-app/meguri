@@ -162,6 +162,7 @@ export function GraphView({
     scope,
     query,
     ready,
+    settings.display.sizeBy === "plays",
   );
 
   // --- saving positions -----------------------------------------------------

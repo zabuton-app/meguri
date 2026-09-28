@@ -56,7 +56,11 @@ export function visibleSet(
     nodes.add(key);
   });
 
-  if (!local || !nodes.has(local.node)) return { nodes, edges, degree };
+  // The centre shows even when the filters alone would hide it (a file
+  // without tags, say): it is what the local graph was asked for.
+  if (!local || !graph.hasNode(local.node) || !nodeAllowed(local.node))
+    return { nodes, edges, degree };
+  nodes.add(local.node);
 
   // Breadth-first from the focus, over the edges that are showing.
   const reached = new Set([local.node]);

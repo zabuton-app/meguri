@@ -10,7 +10,6 @@ import type {
   WorkspacesList,
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
-import { GRAPH_SETTINGS_KEY, parseGraphSettings } from "@/graph/graphSettings";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
 /** The SearchQuery part of a ["files_search", wsId, filter] query key. */
@@ -88,8 +87,8 @@ export function removeFileRowFromCaches(
  * the index: its list rows go at once, its detail is forgotten, and the
  * searches, the discovery queue, its workspace's folder listings (whose
  * counts and mosaics include it, and whose last file can take a folder with
- * it), the history timeline and the duplicate groups (both of which leave
- * deleted rows out) are re-read.
+ * it), the history timeline, the duplicate groups (both of which leave
+ * deleted rows out) and the graph are re-read.
  */
 export function forgetDeletedFile(
   qc: QueryClient,
@@ -103,6 +102,7 @@ export function forgetDeletedFile(
   void qc.invalidateQueries({ queryKey: ["folders_list", workspaceId] });
   void qc.invalidateQueries({ queryKey: ["history_list"] });
   void qc.invalidateQueries({ queryKey: ["duplicates_list"] });
+  void qc.invalidateQueries({ queryKey: ["graph_build"] });
 }
 
 /** Patch the detail cache when the modal is open for the same file. */
@@ -118,38 +118,28 @@ export function patchFileDetailInCache(
   );
 }
 
-/** Plays arriving closer together than this refresh the graph once. */
-const GRAPH_PLAYS_DEBOUNCE_MS = 1_000;
-let graphPlaysTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** The graph, when it sizes nodes by plays (it is rebuilt whole, so not for
- *  a play it would not show, and once for a run of them, as when stepping
- *  through images). */
-function invalidateGraphPlays(qc: QueryClient): void {
-  let byPlays = false;
-  try {
-    byPlays =
-      parseGraphSettings(localStorage.getItem(GRAPH_SETTINGS_KEY)).display
-        .sizeBy === "plays";
-  } catch {
-    /* storage unavailable: the default sizes by links */
-  }
-  if (!byPlays) return;
-  if (graphPlaysTimer) clearTimeout(graphPlaysTimer);
-  graphPlaysTimer = setTimeout(() => {
-    graphPlaysTimer = null;
-    void qc.invalidateQueries({ queryKey: ["graph_build"] });
-  }, GRAPH_PLAYS_DEBOUNCE_MS);
-}
+/** Marks a graph query whose nodes are sized by plays (see useGraphData). */
+export const GRAPH_SIZED_BY_PLAYS = "sizedByPlays";
 
 /**
  * Invalidate only what recording a play affects: a played/unplayed filter
- * (membership changes), an "accessed" sort (recording bumps
- * last_accessed_at, so the order changes), and the graph when it sizes nodes
- * by plays. Other lists keep their cache instead of refetching every page.
+ * (membership changes) or an "accessed" sort (recording bumps
+ * last_accessed_at, so the order changes), in the list and the graph, and a
+ * graph that sizes nodes by plays. Other lists keep their cache instead of
+ * refetching every page.
  */
 export function invalidatePlayedSearches(qc: QueryClient): void {
-  invalidateGraphPlays(qc);
+  void qc.invalidateQueries({
+    queryKey: ["graph_build"],
+    predicate: (q) => {
+      const filter = searchFilterOf(q.queryKey);
+      return (
+        q.meta?.[GRAPH_SIZED_BY_PLAYS] === true ||
+        filter?.played != null ||
+        filter?.sort === "accessed"
+      );
+    },
+  });
   void qc.invalidateQueries({
     queryKey: ["files_search"],
     predicate: (q) => {
@@ -253,6 +243,18 @@ export function syncFileRowAcrossCaches(
 ): void {
   patchFileRowInCaches(qc, workspaceId, fileId, patch);
   patchFileDetailInCache(qc, workspaceId, fileId, patch);
+  // The graph has no rows to patch: rebuild one this change can reshape.
+  void qc.invalidateQueries({
+    queryKey: ["graph_build"],
+    predicate: (q) => {
+      const filter = searchFilterOf(q.queryKey);
+      return (
+        ("favorite" in patch && filter?.favorite != null) ||
+        ("rating" in patch &&
+          (filter?.ratingMin != null || filter?.sort === "rating"))
+      );
+    },
+  });
 }
 
 /**
