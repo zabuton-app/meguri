@@ -141,13 +141,14 @@ describe("GraphView", () => {
     expect(screen.getByTestId(`node ${tk("sea")}`)).toBeTruthy();
     expect(screen.queryByTestId(`node ${tk("res:4k")}`)).toBeNull();
     expect(screen.queryByTestId(`node ${fk("lone.mp4")}`)).toBeNull();
-    // Every shown node has a real position, framed once.
+    // Every shown node has a real position, framed once (both done in an
+    // effect, which may land after the first paint).
+    await waitFor(() => expect(canvas.fit).toHaveBeenCalledWith(false));
     const g = canvas.props?.graph;
     for (const key of canvas.props?.visibility.nodes ?? []) {
       const { x, y } = g?.getNodeAttributes(key) ?? { x: NaN, y: NaN };
       expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
     }
-    expect(canvas.fit).toHaveBeenCalledWith(false);
   });
 
   it("draws without a cache when the cache cannot be read, and settles", async () => {
@@ -343,6 +344,10 @@ describe("GraphView", () => {
     expect(
       JSON.parse(localStorage.getItem(GRAPH_SETTINGS_KEY) ?? "{}"),
     ).toMatchObject({ forces: { repel: 2 } });
+    fireEvent.click(screen.getByRole("radio", { name: "Plays" }));
+    expect(
+      JSON.parse(localStorage.getItem(GRAPH_SETTINGS_KEY) ?? "{}"),
+    ).toMatchObject({ display: { sizeBy: "plays" } });
     fireEvent.click(screen.getByRole("button", { name: "Restore defaults" }));
     await waitFor(() =>
       expect(setPhysics).toHaveBeenLastCalledWith(

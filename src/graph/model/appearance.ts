@@ -1,4 +1,54 @@
 // How big nodes are and how faded things look, as in Obsidian's graph view.
+import type { MediaGraph } from "./types";
+import type { Visibility } from "./visibility";
+
+/** What a node's size grows with: its links (Obsidian's default) or how
+ *  often it was played or viewed (a tag: the plays of its files). */
+export type SizeBy = "links" | "plays";
+
+/**
+ * The weight each visible node's size grows with: its visible links, or how
+ * often it was played or viewed (a tag: the plays of the visible files it
+ * links to), as Obsidian lets a caller weigh nodes by something else.
+ */
+export function nodeWeights(
+  graph: MediaGraph,
+  visibility: Visibility,
+  by: SizeBy,
+): Map<string, number> {
+  switch (by) {
+    case "links":
+      return visibility.degree;
+    case "plays":
+      return playWeights(graph, visibility);
+    default: {
+      const never: never = by;
+      return never;
+    }
+  }
+}
+
+function playWeights(
+  graph: MediaGraph,
+  visibility: Visibility,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const key of visibility.nodes) {
+    const a = graph.getNodeAttributes(key);
+    if (a.type === "file") {
+      out.set(key, a.plays);
+      continue;
+    }
+    let sum = 0;
+    graph.forEachEdge(key, (edge, _attrs, s, t) => {
+      if (!visibility.edges.has(edge)) return;
+      const other = graph.getNodeAttributes(s === key ? t : s);
+      if (other.type === "file") sum += other.plays;
+    });
+    out.set(key, sum);
+  }
+  return out;
+}
 
 /** The node radius in graph units for a node with `links` visible links. */
 export function nodeRadius(links: number, multiplier = 1): number {

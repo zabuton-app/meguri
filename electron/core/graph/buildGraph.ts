@@ -12,7 +12,12 @@ import {
   type CoreTarget,
   type FileRef,
 } from "../crossWorkspace.js";
-import { graphFileCount, graphFiles, type GraphFileRow } from "../queries.js";
+import {
+  graphFileCount,
+  graphFiles,
+  graphPlayCounts,
+  type GraphFileRow,
+} from "../queries.js";
 import type { SearchQuery } from "../types.js";
 import { EDGE_SOURCES, type EdgeSource } from "./edgeSources.js";
 
@@ -32,7 +37,15 @@ type Row = GraphFileRow & { workspaceId: string };
 function emptyPayload(): GraphPayload {
   return {
     workspaces: [],
-    files: { ws: [], id: [], metaKey: [], relPath: [], kind: [], hasThumb: [] },
+    files: {
+      ws: [],
+      id: [],
+      metaKey: [],
+      relPath: [],
+      kind: [],
+      hasThumb: [],
+      plays: [],
+    },
     tags: { namespace: [], name: [] },
     edgeSets: [],
     totalFiles: 0,
@@ -145,6 +158,7 @@ export function buildGraph(
     f.relPath.push(row.relPath);
     f.kind.push(row.kind);
     f.hasThumb.push(row.thumbStatus === "done" && Number(row.hasThumb) === 1);
+    f.plays.push(0);
   }
 
   const tagIndex = new Map<string, number>();
@@ -154,6 +168,10 @@ export function buildGraph(
     const core = coreById.get(wsId);
     const localFiles = fileIndexByWs.get(wsId);
     if (!core || !localFiles) continue;
+    for (const [metaKey, plays] of graphPlayCounts(core.db, metaKeys)) {
+      const i = localFiles.get(metaKey);
+      if (i != null) payload.files.plays[i] = plays;
+    }
     for (const source of opts.sources ?? EDGE_SOURCES) {
       const res = source.build(core.db, metaKeys);
       if (res.a.length === 0) continue;

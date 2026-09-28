@@ -25,7 +25,7 @@ import type {
   PartialButFor,
 } from "sigma/types";
 import type { DisplaySettings } from "./graphSettings";
-import { fade, nodeRadius } from "./model/appearance";
+import { fade, nodeRadius, nodeWeights } from "./model/appearance";
 import type { EdgeAttrs, MediaGraph, NodeAttrs } from "./model/types";
 import type { Visibility } from "./model/visibility";
 import type { GraphColors } from "./useGraphColors";
@@ -186,6 +186,10 @@ export function GraphCanvas({
     visibility,
     focus,
     neighbours: new Set<string>(),
+    /** What each node's size grows with (see nodeWeights). */
+    weights: visibility.degree,
+    // Null so the first effect counts them for the current setting.
+    weightsBy: null as DisplaySettings["sizeBy"] | null,
   });
   const view = useRef<View>({
     s1: 1,
@@ -260,7 +264,7 @@ export function GraphCanvas({
                 : c.video;
         const out: Partial<NodeDisplayData> & Record<string, unknown> = {
           ...data,
-          size: nodeRadius(vis.degree.get(key) ?? 0, d.nodeSize),
+          size: nodeRadius(state.current.weights.get(key) ?? 0, d.nodeSize),
           color: fill,
         };
         if (!f) return out;
@@ -537,7 +541,22 @@ export function GraphCanvas({
         if (visibility.edges.has(edge)) neighbours.add(a === focus ? b : a);
       });
     }
-    state.current = { graph, visibility, focus, neighbours };
+    const prev = state.current;
+    // Recounted only when what they depend on changed, not on every hover.
+    const weights =
+      prev.graph === graph &&
+      prev.visibility === visibility &&
+      prev.weightsBy === display.sizeBy
+        ? prev.weights
+        : nodeWeights(graph, visibility, display.sizeBy);
+    state.current = {
+      graph,
+      visibility,
+      focus,
+      neighbours,
+      weights,
+      weightsBy: display.sizeBy,
+    };
     const colorsChanged = v.colors !== colors;
     v.colors = colors;
     if (colorsChanged) v.faded = new Map();

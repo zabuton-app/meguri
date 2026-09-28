@@ -216,7 +216,9 @@ the tags they carry. It is built in one call and cached per scope.
   Several databases merge with the same comparator as the `All` list
   (`comparatorFor`), and a collection sorted by hand keeps its stored order.
   Identical copies are collapsed before the cap, so they do not take places
-  meant for other files.
+  meant for other files. Each file also carries its play count (its
+  `play_history` rows, all time, one grouped query per database), which the
+  renderer can size nodes by.
   The result is column-oriented (`shared/ipc/graph.ts`): a handful of arrays
   rather than one object per node, so thousands of files cross IPC cheaply.
 - **Bipartite.** Files link to tags, not to each other, so the edge count grows

@@ -206,7 +206,11 @@ never pay for it) draws the same list as a network of files and tags, from one
   `localStorage["meguri.graph.settings"]` (`graphSettings.ts`) and mapped to
   the physics with Obsidian's curves: centre and link force ease in
   exponentially, repel is the cube of its slider. A change of forces reheats
-  the simulation to 0.3.
+  the simulation to 0.3. Display also chooses what node size follows: the
+  visible links (Obsidian's default) or how often the file was played or
+  viewed (the payload's `plays`; a tag weighs the plays of its visible
+  files), through the same radius formula (`nodeWeights`). Recording a play
+  invalidates `graph_build`, so sizes follow.
 - **Pure model.** Visibility (toggles, orphans, the local graph's BFS),
   search, placement and node appearance are plain functions under
   `src/graph/model/`, tested without WebGL.

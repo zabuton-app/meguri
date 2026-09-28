@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import type {
   FileDetail,
@@ -14,6 +14,7 @@ import {
   invalidateTagSearches,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
+import { GRAPH_SETTINGS_KEY } from "@/graph/graphSettings";
 
 describe("syncFileRowAcrossCaches", () => {
   it("patches favorite/rating across search, random, and detail caches", () => {
@@ -110,6 +111,36 @@ describe("targeted files_search invalidation", () => {
     });
     invalidatePlayedSearches(qc);
     expect(invalidated().sort()).toEqual(["accessed", "played", "unplayed"]);
+  });
+
+  it("invalidatePlayedSearches refreshes the graph only when it sizes nodes by plays, once for a run", () => {
+    vi.useFakeTimers();
+    try {
+      const qc = new QueryClient();
+      const spy = vi.spyOn(qc, "invalidateQueries");
+      const graphCalls = () =>
+        spy.mock.calls.filter(
+          ([f]) =>
+            (f?.queryKey as unknown[] | undefined)?.[0] === "graph_build",
+        ).length;
+      localStorage.removeItem(GRAPH_SETTINGS_KEY);
+      invalidatePlayedSearches(qc);
+      vi.advanceTimersByTime(2_000);
+      expect(graphCalls()).toBe(0);
+      localStorage.setItem(
+        GRAPH_SETTINGS_KEY,
+        JSON.stringify({ display: { sizeBy: "plays" } }),
+      );
+      invalidatePlayedSearches(qc);
+      invalidatePlayedSearches(qc);
+      invalidatePlayedSearches(qc);
+      expect(graphCalls()).toBe(0);
+      vi.advanceTimersByTime(2_000);
+      expect(graphCalls()).toBe(1);
+    } finally {
+      localStorage.removeItem(GRAPH_SETTINGS_KEY);
+      vi.useRealTimers();
+    }
   });
 
   it("invalidateTagSearches hits tag filters and text queries only", () => {

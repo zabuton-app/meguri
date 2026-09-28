@@ -4,11 +4,16 @@
 // Obsidian's curves: centre and link strength ease in exponentially, repel is
 // the cube of its slider.
 import { useCallback, useState } from "react";
+import type { SizeBy } from "./model/appearance";
 import type { Physics } from "./sim/physics";
 
 export const GRAPH_SETTINGS_KEY = "meguri.graph.settings";
 
+export type { SizeBy };
+export const SIZE_BY: readonly SizeBy[] = ["links", "plays"];
+
 export interface DisplaySettings {
+  sizeBy: SizeBy;
   /** Shifts the zoom at which labels fade in (-3..3; higher fades later). */
   textFade: number;
   nodeSize: number;
@@ -31,11 +36,11 @@ export interface GraphSettings {
   forces: ForceSettings;
 }
 
+/** The display settings that are sliders. */
+export type DisplayScale = Exclude<keyof DisplaySettings, "sizeBy">;
+
 /** Slider ranges: [min, max, step]. */
-export const DISPLAY_RANGE: Record<
-  keyof DisplaySettings,
-  [number, number, number]
-> = {
+export const DISPLAY_RANGE: Record<DisplayScale, [number, number, number]> = {
   textFade: [-3, 3, 0.1],
   nodeSize: [0.1, 5, 0.01],
   lineSize: [0.1, 5, 0.01],
@@ -64,7 +69,7 @@ export function uneased(strength: number): number {
 
 export function defaultGraphSettings(): GraphSettings {
   return {
-    display: { textFade: 0, nodeSize: 1, lineSize: 1 },
+    display: { sizeBy: "links", textFade: 0, nodeSize: 1, lineSize: 1 },
     forces: {
       center: uneased(0.1),
       repel: 10,
@@ -93,9 +98,9 @@ function clampTo(
     : fallback;
 }
 
-function section<T extends object>(
+function section<T extends object, K extends keyof T & string>(
   raw: unknown,
-  ranges: Record<keyof T, [number, number, number]>,
+  ranges: Record<K, [number, number, number]>,
   fallback: T,
 ): T {
   const o = (typeof raw === "object" && raw !== null ? raw : {}) as Record<
@@ -103,7 +108,7 @@ function section<T extends object>(
     unknown
   >;
   const out = { ...fallback };
-  for (const key of Object.keys(ranges) as (keyof T & string)[])
+  for (const key of Object.keys(ranges) as K[])
     (out as Record<string, number>)[key] = clampTo(
       o[key],
       ranges[key],
@@ -118,8 +123,11 @@ export function parseGraphSettings(raw: string | null): GraphSettings {
   if (!raw) return fallback;
   try {
     const v = JSON.parse(raw) as Record<string, unknown> | null;
+    const display = section(v?.display, DISPLAY_RANGE, fallback.display);
+    const sizeBy = (v?.display as Record<string, unknown> | undefined)?.sizeBy;
+    if (SIZE_BY.includes(sizeBy as SizeBy)) display.sizeBy = sizeBy as SizeBy;
     return {
-      display: section(v?.display, DISPLAY_RANGE, fallback.display),
+      display,
       forces: section(v?.forces, FORCE_RANGE, fallback.forces),
     };
   } catch {

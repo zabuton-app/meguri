@@ -13,6 +13,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import {
   dropFromWatchLaterCache,
   forgetDeletedFile,
+  invalidatePlayedSearches,
   invalidateCollectionSearches,
   invalidateTagSearches,
   patchFileRowInCaches,
@@ -176,7 +177,10 @@ export function useDetailMutations({
     // as consumed when it is not.
     void api
       .openExternal(fileId, wsId)
-      .then(() => dropFromWatchLaterCache(qc, wsId, fileId))
+      .then(() => {
+        dropFromWatchLaterCache(qc, wsId, fileId);
+        invalidatePlayedSearches(qc);
+      })
       .catch((e: unknown) => log.error("open external", e));
   };
 

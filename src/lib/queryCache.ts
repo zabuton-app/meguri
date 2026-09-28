@@ -10,6 +10,7 @@ import type {
   WorkspacesList,
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
+import { GRAPH_SETTINGS_KEY, parseGraphSettings } from "@/graph/graphSettings";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
 /** The SearchQuery part of a ["files_search", wsId, filter] query key. */
@@ -117,13 +118,38 @@ export function patchFileDetailInCache(
   );
 }
 
+/** Plays arriving closer together than this refresh the graph once. */
+const GRAPH_PLAYS_DEBOUNCE_MS = 1_000;
+let graphPlaysTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** The graph, when it sizes nodes by plays (it is rebuilt whole, so not for
+ *  a play it would not show, and once for a run of them, as when stepping
+ *  through images). */
+function invalidateGraphPlays(qc: QueryClient): void {
+  let byPlays = false;
+  try {
+    byPlays =
+      parseGraphSettings(localStorage.getItem(GRAPH_SETTINGS_KEY)).display
+        .sizeBy === "plays";
+  } catch {
+    /* storage unavailable: the default sizes by links */
+  }
+  if (!byPlays) return;
+  if (graphPlaysTimer) clearTimeout(graphPlaysTimer);
+  graphPlaysTimer = setTimeout(() => {
+    graphPlaysTimer = null;
+    void qc.invalidateQueries({ queryKey: ["graph_build"] });
+  }, GRAPH_PLAYS_DEBOUNCE_MS);
+}
+
 /**
- * Invalidate only the searches affected by recording a play: a played/unplayed
- * filter (membership changes) or an "accessed" sort (recording bumps
- * last_accessed_at, so the order changes). Other lists keep their cache
- * instead of refetching every page.
+ * Invalidate only what recording a play affects: a played/unplayed filter
+ * (membership changes), an "accessed" sort (recording bumps
+ * last_accessed_at, so the order changes), and the graph when it sizes nodes
+ * by plays. Other lists keep their cache instead of refetching every page.
  */
 export function invalidatePlayedSearches(qc: QueryClient): void {
+  invalidateGraphPlays(qc);
   void qc.invalidateQueries({
     queryKey: ["files_search"],
     predicate: (q) => {

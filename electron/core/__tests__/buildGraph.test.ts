@@ -5,7 +5,7 @@ import type { Core } from "../index.js";
 import type { DB } from "../db.js";
 import type { CoreTarget } from "../crossWorkspace.js";
 import { buildGraph } from "../graph/buildGraph.js";
-import { searchFiles, setFavorite, setRating } from "../queries.js";
+import { recordPlay, searchFiles, setFavorite, setRating } from "../queries.js";
 import { addFileTag, addManualTag, syncFts, upsertTag } from "../tags.js";
 import type { GraphPayload } from "../../../shared/ipc/graph.js";
 import { MANUAL_SORT } from "../../../shared/sortDir.js";
@@ -193,6 +193,32 @@ describe("buildGraph", () => {
     );
     expect(got.files.hasThumb).toEqual([true, false]);
     expect(got.files.kind).toEqual(["video", "image"]);
+  });
+});
+
+describe("buildGraph play counts", () => {
+  it("counts each file's plays, copies together, per workspace", () => {
+    const one = newDb();
+    const two = newDb();
+    const [a] = seed(one.db, one.rootId, ["a.mp4", "b.jpg"]);
+    const copy = insertFile(one.db, one.rootId, {
+      relPath: "copy/a.mp4",
+      contentHash: "h-a.mp4",
+    });
+    const [c] = seed(two.db, two.rootId, ["c.mp4"]);
+    recordPlay(one.db, a, "browser", null);
+    recordPlay(one.db, a, "external", null);
+    recordPlay(one.db, copy, "browser", 12);
+    recordPlay(two.db, c, "browser", null);
+    const got = buildGraph(
+      [target("w1", one.db), target("w2", two.db)],
+      { sort: "name", sortDir: "asc" },
+      { cap: 100 },
+    );
+    const plays = Object.fromEntries(
+      got.files.relPath.map((p, i) => [p, got.files.plays[i]]),
+    );
+    expect(plays).toEqual({ "a.mp4": 3, "b.jpg": 0, "c.mp4": 1 });
   });
 });
 

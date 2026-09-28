@@ -1,15 +1,18 @@
 // The floating panel of graph settings, laid out like Obsidian's: Display
-// (label fade, node size, link thickness) and Forces (centre, repel, link
-// force, link distance). Changes apply as the sliders move.
+// (what node size follows, label fade, node size, link thickness) and Forces
+// (centre, repel, link force, link distance). Changes apply as they are made.
 import { memo, useId } from "react";
 import { RotateCcw, X } from "lucide-react";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import {
   DISPLAY_RANGE,
   FORCE_RANGE,
+  SIZE_BY,
   defaultGraphSettings,
-  type DisplaySettings,
+  type DisplayScale,
+  type SizeBy,
   type ForceSettings,
   type GraphSettings,
 } from "./graphSettings";
@@ -49,7 +52,11 @@ function Slider({
   );
 }
 
-const DISPLAY_LABELS: Record<keyof DisplaySettings, TranslationKey> = {
+const SIZE_BY_LABELS: Record<SizeBy, TranslationKey> = {
+  links: "graph.settings.sizeBy.links",
+  plays: "graph.settings.sizeBy.plays",
+};
+const DISPLAY_LABELS: Record<DisplayScale, TranslationKey> = {
   textFade: "graph.settings.textFade",
   nodeSize: "graph.settings.nodeSize",
   lineSize: "graph.settings.lineSize",
@@ -107,22 +114,40 @@ export const GraphSettingsPanel = memo(function GraphSettingsPanel({
         <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
           {t("graph.settings.display")}
         </h3>
-        {(Object.keys(DISPLAY_LABELS) as (keyof DisplaySettings)[]).map(
-          (key) => (
-            <Slider
-              key={key}
-              label={t(DISPLAY_LABELS[key])}
-              value={settings.display[key]}
-              range={DISPLAY_RANGE[key]}
-              onChange={(v) =>
-                onChange({
-                  ...settings,
-                  display: { ...settings.display, [key]: v },
-                })
-              }
-            />
-          ),
-        )}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-secondary-fg">
+            {t("graph.settings.sizeBy")}
+          </span>
+          <SegmentedControl
+            value={settings.display.sizeBy}
+            options={SIZE_BY.map((v) => ({
+              value: v,
+              label: t(SIZE_BY_LABELS[v]),
+            }))}
+            onChange={(sizeBy) =>
+              onChange({
+                ...settings,
+                display: { ...settings.display, sizeBy },
+              })
+            }
+            label={t("graph.settings.sizeBy")}
+            slot="graph-size-by"
+          />
+        </div>
+        {(Object.keys(DISPLAY_LABELS) as DisplayScale[]).map((key) => (
+          <Slider
+            key={key}
+            label={t(DISPLAY_LABELS[key])}
+            value={settings.display[key]}
+            range={DISPLAY_RANGE[key]}
+            onChange={(v) =>
+              onChange({
+                ...settings,
+                display: { ...settings.display, [key]: v },
+              })
+            }
+          />
+        ))}
       </div>
       <div className="flex flex-col gap-3">
         <h3 className="text-xs font-medium uppercase tracking-wide text-muted">

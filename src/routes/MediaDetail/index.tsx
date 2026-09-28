@@ -392,7 +392,10 @@ export default function MediaDetail() {
                   invalidatePlayedSearches(qc);
                   dropFromWatchLaterCache(qc, wsId, fileId);
                 }}
-                onOpenExternal={() => dropFromWatchLaterCache(qc, wsId, fileId)}
+                onOpenExternal={() => {
+                  dropFromWatchLaterCache(qc, wsId, fileId);
+                  invalidatePlayedSearches(qc);
+                }}
                 // Video demands attention, background audio yields. Pause rather
                 // than close, so the bar stays visible and the user can resume.
                 onPlaybackStart={claimPlayback}

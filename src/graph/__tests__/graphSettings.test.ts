@@ -42,6 +42,15 @@ describe("graph settings", () => {
       }),
     );
     expect(got.display).toEqual({ ...d.display, nodeSize: 2, lineSize: 5 });
+    expect(d.display.sizeBy).toBe("links");
+    expect(
+      parseGraphSettings(JSON.stringify({ display: { sizeBy: "plays" } }))
+        .display.sizeBy,
+    ).toBe("plays");
+    expect(
+      parseGraphSettings(JSON.stringify({ display: { sizeBy: "size" } }))
+        .display.sizeBy,
+    ).toBe("links");
     expect(got.forces).toEqual({ ...d.forces, repel: 0, distance: 100 });
   });
 });

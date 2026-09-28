@@ -38,6 +38,23 @@ export function graphFiles(
   return db.prepare(sql).all(...args) as GraphFileRow[];
 }
 
+/** Plays recorded for each of `metaKeys` (play_history rows), by meta_key;
+ *  files never played are absent. */
+export function graphPlayCounts(
+  db: DB,
+  metaKeys: string[],
+): Map<string, number> {
+  if (metaKeys.length === 0) return new Map();
+  const rows = db
+    .prepare(
+      `SELECT meta_key AS metaKey, COUNT(*) AS plays FROM play_history
+        WHERE meta_key IN (SELECT value FROM json_each(?))
+        GROUP BY meta_key`,
+    )
+    .all(JSON.stringify(metaKeys)) as { metaKey: string; plays: number }[];
+  return new Map(rows.map((r) => [r.metaKey, r.plays]));
+}
+
 /** How many files the query matches before any cap: `rows` in all, `nodes`
  *  once identical copies (one meta_key) count as one, as the graph draws them. */
 export function graphFileCount(

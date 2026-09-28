@@ -34,6 +34,8 @@ export interface GraphPayload {
     relPath: string[];
     kind: string[];
     hasThumb: boolean[];
+    /** Times the file was played or viewed (its play history, all time). */
+    plays: number[];
   };
   /** Unique by (namespace, name); "" is a manual tag, anything else generated. */
   tags: {

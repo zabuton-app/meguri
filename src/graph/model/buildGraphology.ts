@@ -54,6 +54,7 @@ export function buildGraphology(
         workspaceId,
         fileId: id,
         hasThumb: files.hasThumb[i],
+        plays: files.plays[i] ?? 0,
       });
     }
     return key;

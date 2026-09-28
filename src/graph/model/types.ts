@@ -15,6 +15,8 @@ export interface FileNodeAttrs {
   workspaceId: string;
   fileId: number;
   hasThumb: boolean;
+  /** Times played or viewed. */
+  plays: number;
 }
 
 export interface TagNodeAttrs {

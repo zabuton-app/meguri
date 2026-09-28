@@ -9,12 +9,21 @@ export interface FileSpec {
   kind?: string;
   /** Qualified tag names ("sea", "res:4k"). */
   tags?: string[];
+  plays?: number;
 }
 
 export function payloadOf(files: FileSpec[]): GraphPayload {
   const p: GraphPayload = {
     workspaces: [],
-    files: { ws: [], id: [], metaKey: [], relPath: [], kind: [], hasThumb: [] },
+    files: {
+      ws: [],
+      id: [],
+      metaKey: [],
+      relPath: [],
+      kind: [],
+      hasThumb: [],
+      plays: [],
+    },
     tags: { namespace: [], name: [] },
     edgeSets: [],
     totalFiles: files.length,
@@ -33,6 +42,7 @@ export function payloadOf(files: FileSpec[]): GraphPayload {
     p.files.relPath.push(f.path);
     p.files.kind.push(f.kind ?? "video");
     p.files.hasThumb.push(false);
+    p.files.plays.push(f.plays ?? 0);
     for (const tag of f.tags ?? []) {
       let ti = tagIndex.get(tag);
       if (ti == null) {
