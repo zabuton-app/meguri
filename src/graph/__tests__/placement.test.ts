@@ -1,86 +1,95 @@
 import { describe, expect, it } from "vitest";
-import {
-  dragReach,
-  DRAG_REACH_MAX,
-  layoutPlan,
-  placeNodes,
-  seedPosition,
-  type Point,
-} from "../model/placement";
+import { placeNodes, type Point } from "../model/placement";
+import { visibleSet } from "../model/visibility";
 import { fk, graphOf, tk } from "./fixtures";
 
-describe("seedPosition", () => {
-  it("is deterministic and inside the disc", () => {
-    const a = seedPosition("k", 100);
-    expect(seedPosition("k", 100)).toEqual(a);
-    expect(Math.hypot(a[0], a[1])).toBeLessThanOrEqual(100);
-    expect(seedPosition("other", 100)).not.toEqual(a);
-  });
+const g = graphOf([
+  { path: "a.mp4", tags: ["sea"] },
+  { path: "b.mp4", tags: ["sea"] },
+  { path: "c.mp4", tags: ["cat"] },
+]);
+const all = visibleSet(g, {
+  edgeSources: {},
+  showAutoTags: true,
+  showOrphans: true,
 });
+
+/** A fixed sequence standing in for Math.random. */
+function sequence(...values: number[]): () => number {
+  let i = 0;
+  return () => values[i++ % values.length];
+}
 
 describe("placeNodes", () => {
-  const g = graphOf([
-    { path: "a.mp4", tags: ["sea"] },
-    { path: "b.mp4", tags: ["sea"] },
-    { path: "c.mp4", tags: ["cat"] },
-  ]);
-
-  it("uses a known position first", () => {
-    const known = new Map<string, Point>([[fk("a.mp4"), [5, 6]]]);
-    expect(placeNodes(g, [fk("a.mp4")], known).get(fk("a.mp4"))).toEqual([
-      5, 6,
+  it("seats a node at its seated neighbours' centroid, jittered by the newcomers' room", () => {
+    const seated = new Map<string, Point>([
+      [fk("a.mp4"), [100, 0]],
+      [fk("b.mp4"), [300, 0]],
     ]);
-  });
-
-  it("puts a new node next to its placed neighbours", () => {
-    const known = new Map<string, Point>([[tk("sea"), [1000, 1000]]]);
-    const [x, y] = placeNodes(g, [fk("b.mp4")], known).get(fk("b.mp4")) ?? [
-      0, 0,
-    ];
-    expect(Math.hypot(x - 1000, y - 1000)).toBeLessThan(10);
-  });
-
-  it("seeds a node with no placed neighbour from its key", () => {
-    const out = placeNodes(g, [fk("c.mp4")], new Map());
-    expect(out.get(fk("c.mp4"))).toEqual(
-      placeNodes(g, [fk("c.mp4")], new Map()).get(fk("c.mp4")),
+    const out = placeNodes(
+      g,
+      [tk("sea")],
+      all,
+      (k) => seated.get(k) ?? null,
+      sequence(0.5),
     );
+    // random() = 0.5 is no jitter at all.
+    expect(out.get(tk("sea"))).toEqual([200, 0]);
+    const jittered = placeNodes(
+      g,
+      [tk("sea")],
+      all,
+      (k) => seated.get(k) ?? null,
+      sequence(1),
+    ).get(tk("sea"));
+    // Half the side of a square of 60² per newcomer.
+    expect(jittered).toEqual([230, 30]);
   });
-});
 
-describe("layoutPlan", () => {
-  it("skips, pins or runs fully by the share of new nodes", () => {
-    expect(layoutPlan(100, 0)).toBe("none");
-    expect(layoutPlan(100, 10)).toBe("fixed-partial");
-    expect(layoutPlan(100, 20)).toBe("full");
-    expect(layoutPlan(100, 0, true)).toBe("full");
-    expect(layoutPlan(0, 0, true)).toBe("none");
+  it("seats a node with nothing seated around it in a ring outside the others", () => {
+    const seated = new Map<string, Point>([[fk("a.mp4"), [300, 400]]]);
+    for (const r of [0, 0.3, 0.99]) {
+      const [x, y] = placeNodes(
+        g,
+        [tk("cat"), fk("c.mp4")],
+        all,
+        (k) => seated.get(k) ?? null,
+        sequence(r),
+      ).get(tk("cat")) ?? [0, 0];
+      const d = Math.hypot(x, y);
+      const outer = Math.sqrt((3600 * 2) / Math.PI + 500 * 500);
+      expect(d).toBeGreaterThanOrEqual(500 - 1e-9);
+      expect(d).toBeLessThanOrEqual(outer + 1e-9);
+    }
   });
-});
 
-describe("dragReach", () => {
-  const g = graphOf([
-    { path: "a.mp4", tags: ["sea", "res:4k"] },
-    { path: "b.mp4", tags: ["sea"] },
-    { path: "c.mp4", tags: ["cat"] },
-  ]);
-
-  it("frees the neighbours and their neighbours, skipping what it is told to", () => {
-    const reach = dragReach(g, fk("a.mp4"), (k) => k === tk("res:4k"));
-    expect([...reach].sort()).toEqual(
-      [fk("a.mp4"), tk("sea"), fk("b.mp4")].sort(),
+  it("lets a newcomer seat the ones after it", () => {
+    const out = placeNodes(
+      g,
+      [tk("cat"), fk("c.mp4")],
+      all,
+      () => null,
+      sequence(0.5),
     );
+    expect(out.get(fk("c.mp4"))).toEqual(out.get(tk("cat")));
   });
 
-  it("stops at the neighbours when theirs would be too many", () => {
-    const files = Array.from({ length: DRAG_REACH_MAX + 10 }, (_, i) => ({
-      path: `f${i}.mp4`,
-      tags: ["hub"],
-    }));
-    const big = graphOf([{ path: "x.mp4", tags: ["hub", "small"] }, ...files]);
-    const reach = dragReach(big, fk("x.mp4"));
-    expect([...reach].sort()).toEqual(
-      [fk("x.mp4"), tk("hub"), tk("small")].sort(),
-    );
+  it("only follows links the simulation will have", () => {
+    const seated = new Map<string, Point>([[fk("a.mp4"), [1000, 0]]]);
+    const noLinks = { nodes: all.nodes, edges: new Set<string>() };
+    const [x, y] = placeNodes(
+      g,
+      [tk("sea")],
+      noLinks,
+      (k) => seated.get(k) ?? null,
+      sequence(0.5),
+    ).get(tk("sea")) ?? [0, 0];
+    // In the ring (radius 1000 and more), not next to a.mp4.
+    expect(Math.hypot(x, y)).toBeGreaterThanOrEqual(1000);
+    expect(x).toBeLessThan(0);
+  });
+
+  it("returns nothing for nothing", () => {
+    expect(placeNodes(g, [], all, () => null).size).toBe(0);
   });
 });

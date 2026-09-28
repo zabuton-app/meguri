@@ -879,13 +879,12 @@ export default function Home() {
               </div>
             ) : view === "graph" ? (
               // Keyed by scope: another workspace or collection is another
-              // graph, with its own positions, camera and selection.
+              // graph, with its own positions and camera.
               <Suspense fallback={null}>
                 <GraphView
                   key={status.data?.workspaceId ?? ""}
                   scope={status.data?.workspaceId ?? ""}
                   query={filter}
-                  mediaBase={status.data?.mediaBase ?? ""}
                   ready={
                     (status.data?.ready ?? false) && !!status.data?.workspaceId
                   }

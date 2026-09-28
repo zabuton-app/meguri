@@ -1,68 +1,75 @@
-// The graph view mode: the current list's files and their tags as a network.
-// Each payload builds a new graphology graph that takes over the positions of
-// the one before, so a refetch keeps the picture, the camera (one sigma for
-// the component, keyed by scope in Home) and the selection. Positions come
-// from what is on screen, the scope's layout cache, the force layout (in a
-// worker) or, for the first frame, placement.ts.
+// The graph view mode: the current list's files and their tags as a network,
+// simulated and drawn the way Obsidian's graph view is. Each payload builds a
+// new graphology graph that takes over the positions of the one before, so a
+// refetch keeps the picture and the camera (one sigma for the component,
+// keyed by scope in Home). What is visible is what the force simulation (a
+// worker, see sim/) moves: a change of data, filters or the local graph
+// reloads it with the visible nodes, seating any that have no position yet.
+// Positions come from what is on screen, where a node last stood, the
+// scope's layout cache, or placement.ts.
 import {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router";
+import { matchPath, useLocation, useNavigate } from "react-router";
 import { Maximize, Minus, Plus, Share2 } from "lucide-react";
 import { tagSearchToken, qualifiedTagName } from "@shared/tags";
+import { GRAPH_NODE_KEY_MAX } from "@shared/ipc/graph";
 import { api } from "@/ipc/client";
 import type { SearchQuery } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import { fileHref } from "@/lib/fileHref";
 import log from "@/lib/logger";
 import { buildGraphology, emptyGraph } from "./model/buildGraphology";
-import {
-  dragReach,
-  layoutPlan,
-  placeNodes,
-  seedPosition,
-  seedRadius,
-  type LayoutPlan,
-  type Point,
-} from "./model/placement";
+import { placeNodes, type Point } from "./model/placement";
 import type { MediaGraph } from "./model/types";
 import { visibleSet } from "./model/visibility";
 import { GraphCanvas, type GraphCanvasHandle } from "./GraphCanvas";
 import { GraphErrorBoundary } from "./GraphErrorBoundary";
-import { GraphInspector } from "./GraphInspector";
 import { GraphLegend } from "./GraphLegend";
 import { GraphSearch } from "./GraphSearch";
+import { GraphSettingsPanel } from "./GraphSettingsPanel";
 import { GraphToolbar } from "./GraphToolbar";
 import { useGraphOptions } from "./graphOptions";
-import { LayoutClient } from "./layoutClient";
-import {
-  LAYOUT_BUDGET_MS,
-  SETTLE_BUDGET_MS,
-  maxIterationsFor,
-} from "./layoutProtocol";
-import { GRAPH_NODE_KEY_MAX } from "@shared/ipc/graph";
+import { physicsOf, useGraphSettings } from "./graphSettings";
+import { REHEAT_ALPHA } from "./sim/physics";
+import { SimClient } from "./sim/simClient";
 import { useGraphColors } from "./useGraphColors";
 import { useGraphData } from "./useGraphData";
 
-/** Positions are written this long after the layout last settled. */
+/** Positions are written this long after the simulation last cooled down. */
 const SAVE_DEBOUNCE_MS = 2_000;
 
 interface Props {
   /** Active target: workspace id, "__all__" or "collection:<id>". */
   scope: string;
   query: SearchQuery;
-  mediaBase: string;
   ready: boolean;
   /** Keyboard shortcuts apply (the list is in front, no overlay). */
   keysActive: boolean;
-  /** Add a search token to the list's filter (a tag, from the inspector). */
+  /** Add a search token to the list's filter (a clicked tag). */
   onFilterToken: (token: string) => void;
+}
+
+/** What the simulation was last loaded with. */
+interface Simulated {
+  gen: number;
+  graph: MediaGraph;
+  /** Node key → its index in the simulation. */
+  index: Map<string, number>;
+  keys: string[];
+  links: Uint32Array;
+  epoch: number;
+}
+
+function sameArray<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 function isTyping(): boolean {
@@ -74,28 +81,6 @@ function isTyping(): boolean {
       el.tagName === "SELECT" ||
       el.isContentEditable)
   );
-}
-
-/** Generated tags stay out of the force layout (they would pull every file
- *  together) and sit at the centre of the files they tag instead. */
-function isAutoTag(graph: MediaGraph, key: string): boolean {
-  const a = graph.getNodeAttributes(key);
-  return a.type === "tag" && a.auto;
-}
-
-function centreAutoTags(graph: MediaGraph): void {
-  graph.forEachNode((key, attrs) => {
-    if (attrs.type !== "tag" || !attrs.auto) return;
-    let sx = 0;
-    let sy = 0;
-    let n = 0;
-    graph.forEachNeighbor(key, (_other, o) => {
-      sx += o.x;
-      sy += o.y;
-      n++;
-    });
-    if (n > 0) graph.mergeNodeAttributes(key, { x: sx / n, y: sy / n });
-  });
 }
 
 function CameraButton({
@@ -123,37 +108,55 @@ function CameraButton({
 export function GraphView({
   scope,
   query,
-  mediaBase,
   ready,
   keysActive,
   onFilterToken,
 }: Props) {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
   const colors = useGraphColors();
   const [graph, setGraph] = useState<MediaGraph>(emptyGraph);
   // The graph callbacks and the unmount save act on: always the latest.
   const graphRef = useRef(graph);
-  // Where nodes that a filter took off the screen last stood, so they come
+  // Nodes with a real position (the rest sit at a placeholder until shown).
+  const seated = useRef(new Set<string>());
+  // Where nodes that a filter took out of the data last stood, so they come
   // back there rather than at the (older) cached spot.
   const lastSeen = useRef(new Map<string, Point>());
-  // The node under the pointer: its position comes from the pointer, so the
-  // worker's (a frame behind) is not applied to it.
+  // The node under the pointer in a drag: its position comes from the
+  // pointer, so the worker's (a frame behind) is not applied to it.
   const holding = useRef<string | null>(null);
   // After a re-layout the cache describes the old picture.
   const cacheStale = useRef(false);
+  const simulated = useRef<Simulated>({
+    gen: 0,
+    graph,
+    index: new Map(),
+    keys: [],
+    links: new Uint32Array(0),
+    epoch: 0,
+  });
+  // The camera frames the graph when it first has nodes, and again once the
+  // first layout has settled (a fresh one spreads out), unless the user has
+  // moved the camera by then.
+  const framed = useRef(false);
+  const refit = useRef(false);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  // A node picked in the graph search, highlighted until dismissed.
   const [selected, setSelected] = useState<string | null>(null);
   const [local, setLocal] = useState(false);
   const [depth, setDepth] = useState(1);
+  const [localCenter, setLocalCenter] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  // Bumped by "Re-layout": reseats every visible node.
+  const [epoch, setEpoch] = useState(0);
   const [options, setOptions] = useGraphOptions();
+  const [settings, setSettings] = useGraphSettings();
   const canvas = useRef<GraphCanvasHandle>(null);
   const searchInput = useRef<HTMLInputElement>(null);
-  const layout = useMemo(() => new LayoutClient(), []);
-  const layoutRunning = useSyncExternalStore(
-    layout.subscribe,
-    layout.isRunning,
-  );
+  const sim = useMemo(() => new SimClient(), []);
 
   const { payload, cache, isLoading, isError } = useGraphData(
     scope,
@@ -173,10 +176,11 @@ export function GraphView({
     const keys: string[] = [];
     const xy: number[] = [];
     g.forEachNode((key, a) => {
-      // A key past the boundary's limit (a very deep path with no content
-      // hash), or a position that is not a number, would fail the whole
-      // save; that one node just is not cached.
-      if (key.length > GRAPH_NODE_KEY_MAX) return;
+      // A node never shown has no position of its own. A key past the
+      // boundary's limit (a very deep path with no content hash), or a
+      // position that is not a number, would fail the whole save; that one
+      // node just is not cached.
+      if (!seated.current.has(key) || key.length > GRAPH_NODE_KEY_MAX) return;
       if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) return;
       keys.push(key);
       // Two decimals are plenty on a layout thousands of units wide, and
@@ -194,117 +198,51 @@ export function GraphView({
   }, [saveNow]);
   useEffect(
     () => () => {
-      layout.dispose();
+      sim.dispose();
       saveNow();
     },
-    [layout, saveNow],
+    [sim, saveNow],
   );
 
-  // --- layout ---------------------------------------------------------------
-  const runLayout = useCallback(
-    (
-      graph: MediaGraph,
-      plan: LayoutPlan,
-      pinned: Set<string>,
-      /** A node being dragged, pinned under the pointer for the whole run.
-       *  `local`: only its neighbourhood is free (see LayoutStart.hold). */
-      hold?: { key: string; x: number; y: number; local: boolean },
-    ) => {
-      if (plan === "none") return;
-      const keys = graph.filterNodes((key) => !isAutoTag(graph, key));
-      const index = new Map(keys.map((k, i) => [k, i]));
-      const xy = new Float32Array(keys.length * 2);
-      const fixed = new Uint8Array(keys.length);
-      // The nodes the run can move; on a drag's run only these change, so
-      // only these are written back each frame.
-      const moving: string[] = [];
-      keys.forEach((k, i) => {
-        const a = graph.getNodeAttributes(k);
-        xy[i * 2] = a.x;
-        xy[i * 2 + 1] = a.y;
-        fixed[i] = plan === "fixed-partial" && pinned.has(k) ? 1 : 0;
-        if (!fixed[i]) moving.push(k);
-      });
-      const ea: number[] = [];
-      const eb: number[] = [];
-      const w: number[] = [];
-      graph.forEachEdge((_e, attrs, a, b) => {
-        const ia = index.get(a);
-        const ib = index.get(b);
-        if (ia == null || ib == null) return;
-        ea.push(ia);
-        eb.push(ib);
-        w.push(attrs.weight);
-      });
-      const local = !!hold?.local;
-      const held = hold ? index.get(hold.key) : undefined;
-      layout.run(
-        {
-          xy,
-          fixed,
-          ea: Uint32Array.from(ea),
-          eb: Uint32Array.from(eb),
-          weight: Float32Array.from(w),
-          maxIterations: maxIterationsFor(keys.length),
-          budgetMs: local ? SETTLE_BUDGET_MS : LAYOUT_BUDGET_MS,
-          hold:
-            hold && held != null
-              ? { index: held, x: hold.x, y: hold.y, local }
-              : undefined,
-        },
-        {
-          onPositions: (pos) => {
-            const at = (key: string): { x: number; y: number } | null => {
-              const i = index.get(key);
-              if (i == null || key === holding.current) return null;
-              const x = pos[i * 2];
-              const y = pos[i * 2 + 1];
-              return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
-            };
-            if (local) {
-              // A few hundred nodes: one update each is far cheaper than
-              // having sigma revisit every node of the graph.
-              for (const key of moving) {
-                const p = at(key);
-                if (p && graph.hasNode(key)) graph.mergeNodeAttributes(key, p);
-              }
-            } else {
-              graph.updateEachNodeAttributes(
-                (key, attrs) => {
-                  const p = at(key);
-                  return p ? { ...attrs, ...p } : attrs;
-                },
-                { attributes: ["x", "y"] },
-              );
+  // --- the simulation's output ----------------------------------------------
+  useEffect(() => {
+    sim.setCallbacks({
+      onPositions: (xy, gen) => {
+        const s = simulated.current;
+        if (gen !== s.gen) return;
+        // Leaving before the simulation cools down still saves where it got.
+        dirty.current = true;
+        const held = holding.current;
+        s.graph.updateEachNodeAttributes(
+          (key, attrs) => {
+            const i = s.index.get(key);
+            if (i == null || key === held) return attrs;
+            const x = xy[i * 2];
+            const y = xy[i * 2 + 1];
+            // In place: a fresh object per node per frame is GC churn.
+            if (Number.isFinite(x) && Number.isFinite(y)) {
+              attrs.x = x;
+              attrs.y = y;
             }
-            centreAutoTags(graph);
+            return attrs;
           },
-          onDone: scheduleSave,
-        },
-        local ? "drag" : plan === "full" ? "full" : "partial",
-      );
-    },
-    [layout, scheduleSave],
-  );
+          { attributes: ["x", "y"] },
+        );
+      },
+      onIdle: (gen) => {
+        if (gen !== simulated.current.gen || gen === 0) return;
+        scheduleSave();
+        if (refit.current) {
+          refit.current = false;
+          canvas.current?.fit();
+        }
+      },
+    });
+    return () => sim.setCallbacks(null);
+  }, [sim, scheduleSave]);
 
-  /** Start the run behind a drag of `key` (from its current position). */
-  const holdNode = useCallback(
-    (g: MediaGraph, key: string, x: number, y: number) => {
-      holding.current = key;
-      if (layout.currentKind() === "full") {
-        // The graph is still being laid out: keep that going with everything
-        // free, the dragged node held.
-        runLayout(g, "full", new Set(), { key, x, y, local: false });
-      } else {
-        // The dragged node pinned under the pointer, its neighbourhood free
-        // to follow (as in Obsidian), the rest of the graph holding still.
-        const reach = dragReach(g, key, (k) => isAutoTag(g, k));
-        const pinned = new Set(g.filterNodes((k) => !reach.has(k)));
-        runLayout(g, "fixed-partial", pinned, { key, x, y, local: true });
-      }
-    },
-    [layout, runLayout],
-  );
+  const physics = useMemo(() => physicsOf(settings.forces), [settings.forces]);
+  useEffect(() => sim.setPhysics(physics), [sim, physics]);
 
   // --- a graph per payload --------------------------------------------------
   useEffect(() => {
@@ -312,92 +250,50 @@ export function GraphView({
     const prev = graphRef.current;
     const { graph: next, added } = buildGraphology(payload, prev);
     prev.forEachNode((key, a) => {
-      if (!next.hasNode(key)) lastSeen.current.set(key, [a.x, a.y]);
+      if (!next.hasNode(key) && seated.current.has(key))
+        lastSeen.current.set(key, [a.x, a.y]);
     });
-    // On screen (carried over) wins; then where a node last stood; then the
-    // cache; then a fresh seat.
-    const addedSet = new Set(added);
-    const known = new Map<string, Point>(cacheStale.current ? [] : cache);
-    for (const [key, p] of lastSeen.current) known.set(key, p);
-    next.forEachNode((key, a) => {
-      if (!addedSet.has(key)) known.set(key, [a.x, a.y]);
-    });
-    const positions = placeNodes(next, added, known);
-    for (const [key, [x, y]] of positions)
-      next.mergeNodeAttributes(key, { x, y });
-    centreAutoTags(next);
-
-    const unplaced = new Set(
-      added.filter((k) => !known.has(k) && !isAutoTag(next, k)),
-    );
-    const pinned = new Set(next.filterNodes((k) => !unplaced.has(k)));
-    let plan = layoutPlan(
-      next.filterNodes((k) => !isAutoTag(next, k)).length,
-      unplaced.size,
-    );
-    // A layout of the whole graph still settling was working on the previous
-    // graph: carry on with this one rather than freeze half-way.
-    if (plan === "none" && layout.currentKind() === "full") plan = "full";
+    // Carried over, a node keeps its place; a newcomer takes where it last
+    // stood, else its cached spot, else waits to be seated when shown.
+    for (const key of added) {
+      const p =
+        lastSeen.current.get(key) ??
+        (cacheStale.current ? undefined : cache.get(key));
+      if (p) {
+        next.mergeNodeAttributes(key, { x: p[0], y: p[1] });
+        seated.current.add(key);
+      } else {
+        seated.current.delete(key);
+      }
+    }
     graphRef.current = next;
     // The graph lives outside React; this hands the new one over (and drops
-    // a selection or hover the new data no longer contains).
+    // a hover or pick the new data no longer contains).
     setGraph(next);
     setSelected((sel) => (sel && next.hasNode(sel) ? sel : null));
     setHovered((h) => (h && next.hasNode(h) ? h : null));
-    // A drag in progress goes on over the new graph (its run was working on
-    // the old one); a node that left with the data ends it.
-    const held = holding.current;
-    if (held && next.hasNode(held)) {
-      const { x, y } = next.getNodeAttributes(held);
-      holdNode(next, held, x, y);
-    } else {
-      holding.current = null;
-      if (plan !== "none") runLayout(next, plan, pinned);
-      else if (added.length > 0) scheduleSave();
-    }
-  }, [payload, cache, layout, runLayout, holdNode, scheduleSave]);
-
-  const relayout = useCallback(() => {
-    const g = graphRef.current;
-    const radius = seedRadius(g.order);
-    g.updateEachNodeAttributes(
-      (key, attrs) => {
-        const [x, y] = seedPosition(key, radius);
-        return { ...attrs, x, y };
-      },
-      { attributes: ["x", "y"] },
-    );
-    centreAutoTags(g);
-    lastSeen.current.clear();
-    cacheStale.current = true;
-    runLayout(g, "full", new Set());
-    // The frame a drag held still no longer fits the new picture.
-    canvas.current?.fit();
-  }, [runLayout]);
-
-  // --- dragging -------------------------------------------------------------
-  const dragStart = useCallback(
-    (key: string) => {
-      const g = graphRef.current;
-      // Generated tags sit at their files' centre and are not laid out.
-      if (!g.hasNode(key) || isAutoTag(g, key)) return false;
-      const { x, y } = g.getNodeAttributes(key);
-      holdNode(g, key, x, y);
-      return true;
-    },
-    [holdNode],
-  );
-  const drag = useCallback(
-    (_key: string, x: number, y: number) => layout.drag(x, y),
-    [layout],
-  );
-  const dragEnd = useCallback(() => {
-    holding.current = null;
-    layout.release();
-  }, [layout]);
+  }, [payload, cache]);
 
   // --- what shows ------------------------------------------------------------
-  const localFocus = local && selected ? selected : null;
+  // The local graph centres on the file open in the detail (a side peek next
+  // to the graph, typically), and stays on it once the detail closes.
+  const openKey = useMemo(() => {
+    const match = matchPath("/file/:id", location.pathname);
+    if (!match) return null;
+    const id = Number(match.params.id);
+    const ws = new URLSearchParams(location.search).get("ws");
+    return (
+      graph.findNode(
+        (_key, a) =>
+          a.type === "file" && a.fileId === id && (!ws || a.workspaceId === ws),
+      ) ?? null
+    );
+  }, [graph, location.pathname, location.search]);
+  // Adjusted while rendering (not in an effect), so the local graph never
+  // shows a frame centred on the previous file.
+  if (openKey && openKey !== localCenter) setLocalCenter(openKey);
+  const center = localCenter && graph.hasNode(localCenter) ? localCenter : null;
+  const localFocus = local && center ? center : null;
   const visibility = useMemo(
     () =>
       visibleSet(
@@ -407,40 +303,131 @@ export function GraphView({
       ),
     [graph, options, localFocus, depth],
   );
-  // A local graph already is the selection's neighbourhood: dimming the
-  // part of it past depth 1 would hide what was asked for. Hover still works.
-  const focus = hovered ?? (localFocus ? null : selected);
+  const focus = dragging ?? hovered ?? selected;
+
+  // --- simulate what shows --------------------------------------------------
+  useEffect(() => {
+    const keys = [...visibility.nodes];
+    const pending = keys.filter((k) => !seated.current.has(k));
+    const seats = placeNodes(graph, pending, visibility, (key) => {
+      if (!seated.current.has(key)) return null;
+      const { x, y } = graph.getNodeAttributes(key);
+      return [x, y];
+    });
+    if (seats.size > 0) {
+      graph.updateEachNodeAttributes(
+        (key, attrs) => {
+          const p = seats.get(key);
+          return p ? { ...attrs, x: p[0], y: p[1] } : attrs;
+        },
+        { attributes: ["x", "y"] },
+      );
+      for (const key of seats.keys()) seated.current.add(key);
+    }
+
+    const index = new Map(keys.map((k, i) => [k, i]));
+    const xy = new Float32Array(keys.length * 2);
+    keys.forEach((key, i) => {
+      const { x, y } = graph.getNodeAttributes(key);
+      xy[i * 2] = x;
+      xy[i * 2 + 1] = y;
+    });
+    const links = new Uint32Array(visibility.edges.size * 2);
+    let k = 0;
+    for (const edge of visibility.edges) {
+      const [a, b] = graph.extremities(edge);
+      links[k++] = index.get(a) ?? 0;
+      links[k++] = index.get(b) ?? 0;
+    }
+    const last = simulated.current;
+    if (
+      pending.length === 0 &&
+      epoch === last.epoch &&
+      sameArray(keys, last.keys) &&
+      sameArray(links, last.links)
+    ) {
+      // The same picture (a refetch that changed nothing shown): the running
+      // simulation already has it; only the graph it writes to is new.
+      simulated.current = { ...last, graph };
+      return;
+    }
+    // A drag in progress goes on over the new graph.
+    const pins: { index: number; x: number; y: number }[] = [];
+    const held = holding.current;
+    const heldIndex = held != null ? index.get(held) : undefined;
+    if (held != null && heldIndex != null) {
+      const { x, y } = graph.getNodeAttributes(held);
+      pins.push({ index: heldIndex, x, y });
+    }
+    const gen = sim.load({
+      xy,
+      links: links.slice(),
+      // Mostly new, the graph starts hot, as a fresh one does in Obsidian.
+      alpha: pending.length * 2 > keys.length ? 1 : REHEAT_ALPHA,
+      pins,
+    });
+    simulated.current = { gen, graph, index, keys, links, epoch };
+    if (!framed.current && keys.length > 0) {
+      framed.current = true;
+      refit.current = pending.length > 0;
+      canvas.current?.fit(false);
+    }
+  }, [graph, visibility, sim, epoch]);
+
+  const relayout = useCallback(() => {
+    for (const key of visibility.nodes) seated.current.delete(key);
+    lastSeen.current.clear();
+    cacheStale.current = true;
+    framed.current = false;
+    setEpoch((e) => e + 1);
+  }, [visibility]);
+
+  // --- dragging -------------------------------------------------------------
+  const dragStart = useCallback(
+    (key: string) => {
+      const i = simulated.current.index.get(key);
+      const g = graphRef.current;
+      if (i == null || !g.hasNode(key)) return false;
+      holding.current = key;
+      setDragging(key);
+      const { x, y } = g.getNodeAttributes(key);
+      sim.drag(i, x, y);
+      return true;
+    },
+    [sim],
+  );
+  const drag = useCallback(
+    (key: string, x: number, y: number) => {
+      const i = simulated.current.index.get(key);
+      if (i != null) sim.drag(i, x, y);
+    },
+    [sim],
+  );
+  const dragEnd = useCallback(
+    (key: string) => {
+      holding.current = null;
+      setDragging(null);
+      sim.release(simulated.current.index.get(key) ?? null);
+    },
+    [sim],
+  );
 
   // --- actions ---------------------------------------------------------------
-  const select = useCallback((key: string) => {
+  const pick = useCallback((key: string) => {
     setSelected(key);
     canvas.current?.focus(key);
   }, []);
-  const clearSelection = useCallback(() => {
-    setSelected(null);
-    setLocal(false);
-  }, []);
+  const clearPick = useCallback(() => setSelected(null), []);
+  // A click opens: a file in the detail, a tag as the list's filter.
   const open = useCallback(
     (key: string) => {
-      const a = graph.hasNode(key) ? graph.getNodeAttributes(key) : null;
+      const g = graphRef.current;
+      const a = g.hasNode(key) ? g.getNodeAttributes(key) : null;
       if (a?.type === "file") void navigate(fileHref(a.fileId, a.workspaceId));
-    },
-    [graph, navigate],
-  );
-  const filterTag = useCallback(
-    (key: string) => {
-      const a = graph.hasNode(key) ? graph.getNodeAttributes(key) : null;
-      if (a?.type === "tag")
+      else if (a?.type === "tag")
         onFilterToken(tagSearchToken(qualifiedTagName(a.namespace, a.name)));
     },
-    [graph, onFilterToken],
-  );
-  const onDoubleClickNode = useCallback(
-    (key: string) => {
-      if (graph.getNodeAttribute(key, "type") === "file") open(key);
-      else filterTag(key);
-    },
-    [graph, open, filterTag],
+    [navigate, onFilterToken],
   );
 
   useEffect(() => {
@@ -450,7 +437,7 @@ export function GraphView({
       if (e.key === "Escape" && selected) {
         // Claimed, so the list's "Esc twice closes the window" stands down.
         e.preventDefault();
-        clearSelection();
+        clearPick();
       } else if (e.key === "f" || e.key === "F") {
         e.preventDefault();
         canvas.current?.fit();
@@ -461,23 +448,27 @@ export function GraphView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [keysActive, selected, clearSelection]);
+  }, [keysActive, selected, clearPick]);
 
   const searchBox = useMemo(
     () => (
       <GraphSearch
         graph={graph}
         visibility={visibility}
-        onPick={select}
+        onPick={pick}
         inputRef={searchInput}
       />
     ),
-    [graph, visibility, select],
+    [graph, visibility, pick],
   );
 
   const zoomIn = useCallback(() => canvas.current?.zoomIn(), []);
   const zoomOut = useCallback(() => canvas.current?.zoomOut(), []);
   const fit = useCallback(() => canvas.current?.fit(), []);
+  const closePanel = useCallback(() => setPanelOpen(false), []);
+  const cameraInput = useCallback(() => {
+    refit.current = false;
+  }, []);
 
   const empty = !!payload && visibility.nodes.size === 0;
 
@@ -488,95 +479,94 @@ export function GraphView({
         options={options}
         onOptions={setOptions}
         local={local}
-        canLocal={!!selected}
+        canLocal={!!center}
         onLocal={setLocal}
         depth={depth}
         onDepth={setDepth}
-        layoutRunning={layoutRunning}
         onRelayout={relayout}
+        settingsOpen={panelOpen}
+        onSettings={setPanelOpen}
       />
-      <div className="flex min-h-0 flex-1">
-        <div className="relative min-w-0 flex-1 overflow-hidden bg-bg">
-          <GraphErrorBoundary
-            fallback={
-              <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted">
-                {t("graph.unavailable")}
-              </div>
-            }
-          >
-            <GraphCanvas
-              ref={canvas}
-              graph={graph}
-              colors={colors}
-              visibility={visibility}
-              focus={focus}
-              selected={selected}
-              onHover={setHovered}
-              onClickNode={select}
-              onDoubleClickNode={onDoubleClickNode}
-              onClickStage={clearSelection}
-              onDragStart={dragStart}
-              onDrag={drag}
-              onDragEnd={dragEnd}
-            />
-          </GraphErrorBoundary>
-
-          {(isLoading || isError || empty) && (
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center">
-              {isLoading ? (
-                <p className="text-sm text-muted">{t("graph.loading")}</p>
-              ) : isError ? (
-                <p className="text-sm text-muted">{t("graph.loadFailed")}</p>
-              ) : (
-                <>
-                  <Share2 className="size-10 text-muted opacity-60" />
-                  <p className="text-sm text-fg">{t("graph.empty.title")}</p>
-                  <p className="max-w-sm text-xs text-muted">
-                    {t("graph.empty.hint")}
-                  </p>
-                </>
-              )}
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-bg">
+        <GraphErrorBoundary
+          fallback={
+            <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted">
+              {t("graph.unavailable")}
             </div>
-          )}
+          }
+        >
+          <GraphCanvas
+            ref={canvas}
+            graph={graph}
+            colors={colors}
+            visibility={visibility}
+            focus={focus}
+            display={settings.display}
+            onHover={setHovered}
+            onClickNode={open}
+            onClickStage={clearPick}
+            onDragStart={dragStart}
+            onDrag={drag}
+            onDragEnd={dragEnd}
+            onCameraInput={cameraInput}
+          />
+        </GraphErrorBoundary>
 
-          {payload?.truncated && (
-            <p
-              role="status"
-              className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-border bg-surface/90 px-3 py-1 text-xs text-secondary-fg shadow"
-            >
-              {t("graph.truncated", {
-                shown: payload.files.id.length.toLocaleString(),
-                total: payload.totalFiles.toLocaleString(),
-              })}
-            </p>
-          )}
-
-          <div className="pointer-events-none absolute bottom-3 left-3">
-            <GraphLegend showAutoTags={options.showAutoTags} />
+        {(isLoading || isError || empty) && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center">
+            {isLoading ? (
+              <p className="text-sm text-muted">{t("graph.loading")}</p>
+            ) : isError ? (
+              <p className="text-sm text-muted">{t("graph.loadFailed")}</p>
+            ) : (
+              <>
+                <Share2 className="size-10 text-muted opacity-60" />
+                <p className="text-sm text-fg">{t("graph.empty.title")}</p>
+                <p className="max-w-sm text-xs text-muted">
+                  {t("graph.empty.hint")}
+                </p>
+              </>
+            )}
           </div>
+        )}
 
-          <div className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow">
-            <CameraButton label={t("graph.zoomIn")} onClick={zoomIn}>
-              <Plus className="size-4" />
-            </CameraButton>
-            <CameraButton label={t("graph.zoomOut")} onClick={zoomOut}>
-              <Minus className="size-4" />
-            </CameraButton>
-            <CameraButton label={t("graph.fit")} onClick={fit}>
-              <Maximize className="size-4" />
-            </CameraButton>
-          </div>
+        {payload?.truncated && (
+          <p
+            role="status"
+            className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-border bg-surface/90 px-3 py-1 text-xs text-secondary-fg shadow"
+          >
+            {t("graph.truncated", {
+              shown: payload.files.id.length.toLocaleString(),
+              total: payload.totalFiles.toLocaleString(),
+            })}
+          </p>
+        )}
+
+        <div className="pointer-events-none absolute bottom-3 left-3">
+          <GraphLegend showAutoTags={options.showAutoTags} />
         </div>
-        <GraphInspector
-          graph={graph}
-          visibility={visibility}
-          selected={selected}
-          mediaBase={mediaBase}
-          onSelect={select}
-          onOpen={open}
-          onFilterTag={filterTag}
-          onClear={clearSelection}
-        />
+
+        {panelOpen && (
+          <div className="absolute right-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] overflow-y-auto">
+            <GraphSettingsPanel
+              settings={settings}
+              onChange={setSettings}
+              onClose={closePanel}
+            />
+          </div>
+        )}
+
+        <div className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow">
+          <CameraButton label={t("graph.zoomIn")} onClick={zoomIn}>
+            <Plus className="size-4" />
+          </CameraButton>
+          <CameraButton label={t("graph.zoomOut")} onClick={zoomOut}>
+            <Minus className="size-4" />
+          </CameraButton>
+          <CameraButton label={t("graph.fit")} onClick={fit}>
+            <Maximize className="size-4" />
+          </CameraButton>
+        </div>
       </div>
     </div>
   );

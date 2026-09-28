@@ -7,7 +7,6 @@ import Graph from "graphology";
 import { fileNodeKey, tagNodeKey, type GraphPayload } from "@shared/ipc/graph";
 import { qualifiedTagName } from "@shared/tags";
 import { fileNameOf } from "@/lib/relPath";
-import { nodeSize } from "./labels";
 import type { MediaGraph } from "./types";
 
 export function emptyGraph(): MediaGraph {
@@ -49,7 +48,7 @@ export function buildGraphology(
         type: "file",
         label: fileNameOf(files.relPath[i]),
         ...position(key),
-        size: nodeSize(0),
+        size: 1,
         fileKind: files.kind[i],
         relPath: files.relPath[i],
         workspaceId,
@@ -67,7 +66,7 @@ export function buildGraphology(
         type: "tag",
         label: qualifiedTagName(namespace, name),
         ...position(key),
-        size: nodeSize(0),
+        size: 1,
         namespace,
         name,
         auto: namespace !== "",

@@ -12,11 +12,11 @@ export interface GraphColors {
   tag: string;
   autoTag: string;
   edge: string;
-  edgeHighlight: string;
-  dim: string;
+  /** The focused node and its links. */
+  highlight: string;
   label: string;
+  /** The canvas background, which faded things are mixed into. */
   bg: string;
-  surface: string;
   font: string;
 }
 
@@ -27,11 +27,9 @@ const FALLBACK: GraphColors = {
   tag: "#fabd2f",
   autoTag: "#bdae93",
   edge: "#665c54",
-  edgeHighlight: "#d5c4a1",
-  dim: "#504945",
+  highlight: "#d65d0e",
   label: "#d5c4a1",
   bg: "#282828",
-  surface: "#3c3836",
   font: "system-ui, sans-serif",
 };
 
@@ -46,11 +44,9 @@ export function readGraphColors(root: HTMLElement): GraphColors {
     tag: v("accent2", FALLBACK.tag),
     autoTag: v("secondary-fg", FALLBACK.autoTag),
     edge: v("muted", FALLBACK.edge),
-    edgeHighlight: v("fg", FALLBACK.edgeHighlight),
-    dim: v("border", FALLBACK.dim),
+    highlight: v("special", FALLBACK.highlight),
     label: v("fg", FALLBACK.label),
     bg: v("bg", FALLBACK.bg),
-    surface: v("surface", FALLBACK.surface),
     font: getComputedStyle(document.body).fontFamily || FALLBACK.font,
   };
 }

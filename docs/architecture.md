@@ -232,7 +232,8 @@ the tags they carry. It is built in one call and cached per scope.
   `weight` per edge), a wider `EdgeSourceId`, a row in the renderer's
   `EDGE_SOURCE_INFO` for its label, toggle and legend line, and its own look in
   `GraphCanvas`'s edge reducer (which today draws every kind alike). The
-  payload, the toggles and the layout already carry kinds and weights. A source
+  payload and the toggles already carry kinds and weights (the simulation
+  uses the links, not their weights, as Obsidian's does). A source
   sees one workspace at a time, so it can link files within a workspace; links
   across workspaces would need the builder to hand it every workspace at once.
 - **Layout cache.** Node positions are derived data, kept as JSON beside the

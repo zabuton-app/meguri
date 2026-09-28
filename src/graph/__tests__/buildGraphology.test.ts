@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { buildGraphology } from "../model/buildGraphology";
-import { MAX_NODE_SIZE, MIN_NODE_SIZE, nodeSize } from "../model/labels";
 import { fk, graphOf, payloadOf, tk } from "./fixtures";
 
 describe("buildGraphology", () => {
@@ -58,13 +57,5 @@ describe("buildGraphology", () => {
       { path: "x", tags: ["y|t::z"] },
     ]);
     expect(g.size).toBe(2);
-  });
-});
-
-describe("nodeSize", () => {
-  it("bounds node sizes", () => {
-    expect(nodeSize(0)).toBe(MIN_NODE_SIZE);
-    expect(nodeSize(100_000)).toBe(MAX_NODE_SIZE);
-    expect(nodeSize(9)).toBeGreaterThan(nodeSize(4));
   });
 });

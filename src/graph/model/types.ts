@@ -1,5 +1,5 @@
 // Attribute shapes of the graphology graph behind the graph view. `type` is
-// also sigma's program key: files draw as plain discs, tags as ringed discs.
+// also sigma's program key (both draw as discs).
 import type Graph from "graphology";
 import type { EdgeSourceId } from "@shared/ipc/graph";
 
@@ -8,7 +8,7 @@ export interface FileNodeAttrs {
   label: string;
   x: number;
   y: number;
-  /** Base size; the view recomputes it from the visible degree. */
+  /** A placeholder; the view sizes nodes by their visible links. */
   size: number;
   fileKind: string;
   relPath: string;

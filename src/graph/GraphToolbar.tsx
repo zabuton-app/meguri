@@ -1,7 +1,7 @@
 // The row above the canvas: search, relationship-kind toggles, generated tags,
-// orphans, the local graph and its depth, and re-layout.
+// orphans, the local graph and its depth, re-layout and the settings panel.
 import { memo, type ReactNode } from "react";
-import { LoaderCircle, RefreshCw } from "lucide-react";
+import { RefreshCw, Settings2 } from "lucide-react";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
@@ -13,17 +13,25 @@ function Toggle({
   disabled,
   onClick,
   children,
+  label,
+  hint,
 }: {
   /** Omitted for a plain action button. */
   pressed?: boolean;
   disabled?: boolean;
   onClick: () => void;
   children: ReactNode;
+  /** For a button that shows only an icon. */
+  label?: string;
+  /** A tooltip. */
+  hint?: string;
 }) {
   return (
     <button
       type="button"
       aria-pressed={pressed}
+      aria-label={label}
+      title={label ?? hint}
       disabled={disabled}
       onClick={onClick}
       className={cn(
@@ -45,12 +53,14 @@ interface Props {
   options: VisibilityOptions;
   onOptions: (patch: Partial<VisibilityOptions>) => void;
   local: boolean;
+  /** A file has been opened, so there is something to centre a local graph on. */
   canLocal: boolean;
   onLocal: (on: boolean) => void;
   depth: number;
   onDepth: (depth: number) => void;
-  layoutRunning: boolean;
   onRelayout: () => void;
+  settingsOpen: boolean;
+  onSettings: (open: boolean) => void;
 }
 
 export const GraphToolbar = memo(function GraphToolbar({
@@ -62,8 +72,9 @@ export const GraphToolbar = memo(function GraphToolbar({
   onLocal,
   depth,
   onDepth,
-  layoutRunning,
   onRelayout,
+  settingsOpen,
+  onSettings,
 }: Props) {
   const { t } = useI18n();
   return (
@@ -107,6 +118,7 @@ export const GraphToolbar = memo(function GraphToolbar({
         pressed={local && canLocal}
         disabled={!canLocal}
         onClick={() => onLocal(!local)}
+        hint={t("graph.localHint")}
       >
         {t("graph.toggle.local")}
       </Toggle>
@@ -122,18 +134,16 @@ export const GraphToolbar = memo(function GraphToolbar({
         />
       </div>
       <div className="mx-1 h-5 w-px bg-border" />
-      {layoutRunning && (
-        <span
-          className="flex items-center gap-1.5 text-xs text-muted"
-          role="status"
-        >
-          <LoaderCircle className="size-3.5 animate-spin" />
-          {t("graph.layoutRunning")}
-        </span>
-      )}
-      <Toggle disabled={layoutRunning} onClick={onRelayout}>
+      <Toggle onClick={onRelayout}>
         <RefreshCw className="size-3.5" />
         {t("graph.relayout")}
+      </Toggle>
+      <Toggle
+        pressed={settingsOpen}
+        onClick={() => onSettings(!settingsOpen)}
+        label={t("graph.settings.title")}
+      >
+        <Settings2 className="size-3.5" />
       </Toggle>
     </div>
   );

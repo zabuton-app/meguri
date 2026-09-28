@@ -1,7 +1,9 @@
-// The graph view around its canvas: data in, inspector, toggles, empty and
-// truncated states, keyboard, and the WebGL-unavailable fallback. sigma needs
-// WebGL, which jsdom lacks, so GraphCanvas is replaced by a stub that lists
-// the visible nodes as buttons and records what it was given.
+// The graph view around its canvas: data in, toggles, the local graph, the
+// settings panel, empty and truncated states, keyboard, and the
+// WebGL-unavailable fallback. sigma needs WebGL, which jsdom lacks, so
+// GraphCanvas is replaced by a stub that lists the visible nodes as buttons
+// and records what it was given. jsdom has no Worker either, so the
+// simulation keeps the placed positions and reports idle at once.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   act,
@@ -13,6 +15,7 @@ import {
 import type { GraphPayload } from "@shared/ipc/graph";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { GRAPH_OPTIONS_KEY } from "../graphOptions";
+import { GRAPH_SETTINGS_KEY } from "../graphSettings";
 import type { MediaGraph } from "../model/types";
 import type { Visibility } from "../model/visibility";
 import { fk, payloadOf, tk } from "./fixtures";
@@ -37,9 +40,9 @@ const canvas = vi.hoisted(() => ({
     graph: MediaGraph;
     visibility: Visibility;
     focus: string | null;
-    selected: string | null;
   },
   fit: vi.fn(),
+  focus: vi.fn(),
 }));
 vi.mock("../GraphCanvas", async () => {
   const React = await import("react");
@@ -48,9 +51,7 @@ vi.mock("../GraphCanvas", async () => {
       graph: MediaGraph;
       visibility: Visibility;
       focus: string | null;
-      selected: string | null;
       onClickNode: (key: string) => void;
-      onDoubleClickNode: (key: string) => void;
       onClickStage: () => void;
       onDragStart: (key: string) => boolean;
       onDrag: (key: string, x: number, y: number) => void;
@@ -64,8 +65,7 @@ vi.mock("../GraphCanvas", async () => {
         fit: canvas.fit,
         zoomIn: vi.fn(),
         zoomOut: vi.fn(),
-        focus: vi.fn(),
-        refresh: vi.fn(),
+        focus: canvas.focus,
       }));
       return (
         <div data-testid="canvas">
@@ -75,7 +75,6 @@ vi.mock("../GraphCanvas", async () => {
               type="button"
               data-testid={`node ${key}`}
               onClick={() => props.onClickNode(key)}
-              onDoubleClick={() => props.onDoubleClickNode(key)}
               onMouseDown={() => {
                 if (props.onDragStart(key)) props.onDrag(key, 123, 45);
               }}
@@ -95,7 +94,7 @@ vi.mock("../GraphCanvas", async () => {
 
 // Imported after the mocks.
 const { GraphView } = await import("../GraphView");
-const { LayoutClient } = await import("../layoutClient");
+const { SimClient } = await import("../sim/simClient");
 
 const FILES = [
   { path: "a.mp4", tags: ["sea", "summer"] },
@@ -104,16 +103,16 @@ const FILES = [
   { path: "lone.mp4" },
 ];
 
-function render(onFilterToken = vi.fn()) {
+function render(onFilterToken = vi.fn(), route = "/") {
   return renderWithProviders(
     <GraphView
       scope="w"
       query={{}}
-      mediaBase="http://127.0.0.1:1"
       ready
       keysActive
       onFilterToken={onFilterToken}
     />,
+    { route },
   );
 }
 
@@ -128,6 +127,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 async function ready() {
@@ -141,10 +141,13 @@ describe("GraphView", () => {
     expect(screen.getByTestId(`node ${tk("sea")}`)).toBeTruthy();
     expect(screen.queryByTestId(`node ${tk("res:4k")}`)).toBeNull();
     expect(screen.queryByTestId(`node ${fk("lone.mp4")}`)).toBeNull();
-    // Overview: 3 files, 2 tags, 6 links.
-    const inspector = screen.getByRole("complementary", { name: "Details" });
-    expect(inspector.textContent).toContain("Most connected");
-    expect(inspector.textContent).toMatch(/3\s*Files/);
+    // Every shown node has a real position, framed once.
+    const g = canvas.props?.graph;
+    for (const key of canvas.props?.visibility.nodes ?? []) {
+      const { x, y } = g?.getNodeAttributes(key) ?? { x: NaN, y: NaN };
+      expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+    }
+    expect(canvas.fit).toHaveBeenCalledWith(false);
   });
 
   it("draws without a cache when the cache cannot be read, and settles", async () => {
@@ -194,77 +197,63 @@ describe("GraphView", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     render();
     expect(await screen.findByText(/not available here/)).toBeTruthy();
-    expect(screen.getByRole("complementary", { name: "Details" })).toBeTruthy();
+    expect(screen.getByRole("toolbar")).toBeTruthy();
   });
 
-  it("selects a file, ranks related files and opens it", async () => {
-    render();
-    await ready();
-    fireEvent.click(screen.getByTestId(`node ${fk("a.mp4")}`));
-    const inspector = screen.getByRole("complementary", { name: "Details" });
-    await waitFor(() =>
-      expect(inspector.textContent).toContain("Related files"),
-    );
-    const rows = [...inspector.querySelectorAll("li button")].map(
-      (b) => b.textContent,
-    );
-    // Tag chips first, then b (2 shared) before c (1 shared).
-    const related = rows.filter(
-      (r) => r?.includes(".mp4") || r?.includes(".jpg"),
-    );
-    expect(related[0]).toContain("b.jpg");
-    expect(related[1]).toContain("c.mp4");
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
-    expect(nav.navigate).toHaveBeenCalledWith("/file/1?ws=w");
-  });
-
-  it("opens a file on double click and filters by a tag on double click", async () => {
+  it("opens a file on click and filters by a tag on click", async () => {
     const onFilter = vi.fn();
     render(onFilter);
     await ready();
-    fireEvent.doubleClick(screen.getByTestId(`node ${fk("b.jpg")}`));
+    fireEvent.click(screen.getByTestId(`node ${fk("b.jpg")}`));
     expect(nav.navigate).toHaveBeenCalledWith("/file/2?ws=w");
-    fireEvent.doubleClick(screen.getByTestId(`node ${tk("sea")}`));
+    fireEvent.click(screen.getByTestId(`node ${tk("sea")}`));
     expect(onFilter).toHaveBeenCalledWith("tag:sea");
   });
 
-  it("clears the selection with Escape and the stage, and fits with F", async () => {
+  it("highlights a node found by name until Escape or the stage, and fits with F", async () => {
     render();
     await ready();
-    fireEvent.click(screen.getByTestId(`node ${fk("a.mp4")}`));
-    await waitFor(() => expect(canvas.props?.selected).toBe(fk("a.mp4")));
+    const box = screen.getByRole("combobox", { name: "Search the graph" });
+    fireEvent.change(box, { target: { value: "B.J" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(canvas.props?.focus).toBe(fk("b.jpg")));
+    expect(canvas.focus).toHaveBeenCalledWith(fk("b.jpg"));
+    (document.activeElement as HTMLElement | null)?.blur();
     const esc = new KeyboardEvent("keydown", {
       key: "Escape",
       cancelable: true,
     });
     act(() => void window.dispatchEvent(esc));
     expect(esc.defaultPrevented).toBe(true);
-    await waitFor(() => expect(canvas.props?.selected).toBeNull());
-    fireEvent.click(screen.getByTestId(`node ${fk("a.mp4")}`));
+    await waitFor(() => expect(canvas.props?.focus).toBeNull());
+    fireEvent.change(box, { target: { value: "B.J" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(canvas.props?.focus).toBe(fk("b.jpg")));
     fireEvent.click(screen.getByTestId("stage"));
-    await waitFor(() => expect(canvas.props?.selected).toBeNull());
+    await waitFor(() => expect(canvas.props?.focus).toBeNull());
+    (document.activeElement as HTMLElement | null)?.blur();
     fireEvent.keyDown(window, { key: "f" });
-    expect(canvas.fit).toHaveBeenCalled();
+    expect(canvas.fit).toHaveBeenCalledWith();
   });
 
-  it("drops a selection the new data no longer has", async () => {
+  it("drops a highlight the new data no longer has", async () => {
     const { queryClient } = render();
     await ready();
-    fireEvent.click(screen.getByTestId(`node ${fk("c.mp4")}`));
-    await waitFor(() => expect(canvas.props?.selected).toBe(fk("c.mp4")));
+    const box = screen.getByRole("combobox", { name: "Search the graph" });
+    fireEvent.change(box, { target: { value: "c.mp4" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(canvas.props?.focus).toBe(fk("c.mp4")));
     api.graphBuild.mockResolvedValue(payloadOf(FILES.slice(0, 2)));
     await act(() =>
       queryClient.invalidateQueries({ queryKey: ["graph_build"] }),
     );
-    await waitFor(() => expect(canvas.props?.selected).toBeNull());
+    await waitFor(() => expect(canvas.props?.focus).toBeNull());
   });
 
-  it("limits the graph to the selection's neighbourhood in local mode", async () => {
-    render();
+  it("centres the local graph on the file open in the detail", async () => {
+    render(vi.fn(), "/file/3?ws=w");
     await ready();
     const local = screen.getByRole("button", { name: "Local" });
-    expect((local as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByTestId(`node ${fk("c.mp4")}`));
     await waitFor(() =>
       expect((local as HTMLButtonElement).disabled).toBe(false),
     );
@@ -278,6 +267,13 @@ describe("GraphView", () => {
     await waitFor(() =>
       expect(canvas.props?.visibility.nodes.has(fk("a.mp4"))).toBe(true),
     );
+  });
+
+  it("has no local graph before a file is opened", async () => {
+    render();
+    await ready();
+    const local = screen.getByRole("button", { name: "Local" });
+    expect((local as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("remembers the toggles", async () => {
@@ -298,45 +294,66 @@ describe("GraphView", () => {
     await screen.findByTestId(`node ${tk("res:4k")}`);
   });
 
-  it("finds a node by name and selects it", async () => {
+  it("drags a node: held where the pointer is, let go on release", async () => {
+    const drag = vi.spyOn(SimClient.prototype, "drag");
+    const release = vi.spyOn(SimClient.prototype, "release");
     render();
     await ready();
-    const box = screen.getByRole("combobox", { name: "Search the graph" });
-    fireEvent.change(box, { target: { value: "B.J" } });
-    fireEvent.keyDown(box, { key: "Enter" });
-    await waitFor(() => expect(canvas.props?.selected).toBe(fk("b.jpg")));
-  });
-
-  it("drags a node through a local layout run and lets go on release", async () => {
-    const run = vi.spyOn(LayoutClient.prototype, "run");
-    const release = vi.spyOn(LayoutClient.prototype, "release");
-    render();
-    await ready();
-    await waitFor(() => expect(run).toHaveBeenCalled());
-    // Let the first layout end, so the drag is a local one.
-    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
-    run.mockClear();
     fireEvent.mouseDown(screen.getByTestId(`node ${fk("a.mp4")}`));
-    expect(run).toHaveBeenCalledTimes(1);
-    const input = run.mock.calls[0][0];
-    expect(input.hold?.local).toBe(true);
-    expect(run.mock.calls[0][2]).toBe("drag");
-    // Its neighbourhood moves, the orphan-free rest of this small graph too;
-    // the held node itself is free in the matrix (the hold pins it).
-    expect(input.fixed[input.hold?.index ?? -1]).toBe(0);
+    // Pinned where it was, then moved with the pointer.
+    expect(drag).toHaveBeenCalledTimes(2);
+    const [index] = drag.mock.calls[0];
+    expect(drag.mock.calls[1]).toEqual([index, 123, 45]);
+    await waitFor(() => expect(canvas.props?.focus).toBe(fk("a.mp4")));
     fireEvent.mouseUp(screen.getByTestId(`node ${fk("a.mp4")}`));
-    expect(release).toHaveBeenCalled();
-    // Generated tags are not draggable.
-    run.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: "Auto tags" }));
-    const auto = await screen.findByTestId(`node ${tk("res:4k")}`);
-    fireEvent.mouseDown(auto);
-    expect(run).not.toHaveBeenCalled();
-    run.mockRestore();
-    release.mockRestore();
+    expect(release).toHaveBeenCalledWith(index);
+    await waitFor(() => expect(canvas.props?.focus).toBeNull());
   });
 
-  it("saves positions once the layout ends", async () => {
+  it("cools the graph down when the dragged node left with the data", async () => {
+    const release = vi.spyOn(SimClient.prototype, "release");
+    const { queryClient } = render();
+    await ready();
+    fireEvent.mouseDown(screen.getByTestId(`node ${fk("c.mp4")}`));
+    api.graphBuild.mockResolvedValue(payloadOf(FILES.slice(0, 2)));
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ["graph_build"] }),
+    );
+    await waitFor(() =>
+      expect(canvas.props?.visibility.nodes.has(fk("c.mp4"))).toBe(false),
+    );
+    // The canvas ends the drag of a node that is gone.
+    const props = canvas.props as unknown as { onDragEnd: (k: string) => void };
+    act(() => props.onDragEnd(fk("c.mp4")));
+    expect(release).toHaveBeenCalledWith(null);
+  });
+
+  it("applies and remembers the forces from the settings panel", async () => {
+    const setPhysics = vi.spyOn(SimClient.prototype, "setPhysics");
+    render();
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Graph settings" }));
+    const repel = screen.getByRole("slider", { name: "Repel force" });
+    fireEvent.change(repel, { target: { value: "2" } });
+    await waitFor(() =>
+      expect(setPhysics).toHaveBeenLastCalledWith(
+        expect.objectContaining({ repelStrength: 8 }),
+      ),
+    );
+    expect(
+      JSON.parse(localStorage.getItem(GRAPH_SETTINGS_KEY) ?? "{}"),
+    ).toMatchObject({ forces: { repel: 2 } });
+    fireEvent.click(screen.getByRole("button", { name: "Restore defaults" }));
+    await waitFor(() =>
+      expect(setPhysics).toHaveBeenLastCalledWith(
+        expect.objectContaining({ repelStrength: 1000 }),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("slider", { name: "Repel force" })).toBeNull();
+  });
+
+  it("saves positions once the simulation cools down", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       render();

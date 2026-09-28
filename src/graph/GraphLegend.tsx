@@ -1,4 +1,4 @@
-// What the colours, rings and lines on the canvas mean.
+// What the colours and lines on the canvas mean.
 import { useI18n } from "@/i18n/I18nProvider";
 import { kindLabelKey } from "@/lib/mediaKind";
 import { EDGE_SOURCE_INFO } from "./edgeSources";

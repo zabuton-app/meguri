@@ -1,4 +1,4 @@
-// The small swatch that stands for a node in the legend and the inspector,
+// The small swatch that stands for a node in the legend and the graph search,
 // drawn with the same semantic colours the canvas uses.
 import { cn } from "@/lib/utils";
 import type { NodeAttrs } from "./model/types";
@@ -8,10 +8,7 @@ function nodeDotClass(
   fileKind?: string,
   auto?: boolean,
 ): string {
-  if (type === "tag")
-    return auto
-      ? "border-2 border-secondary-fg bg-bg"
-      : "border-2 border-accent2 bg-bg";
+  if (type === "tag") return auto ? "bg-secondary-fg" : "bg-accent2";
   if (fileKind === "image") return "bg-secondary-accent";
   if (fileKind === "audio") return "bg-info";
   return "bg-primary";
