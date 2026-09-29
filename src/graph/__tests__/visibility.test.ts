@@ -45,30 +45,4 @@ describe("visibleSet", () => {
     expect(orphans.nodes.has(fk("a.mp4"))).toBe(true);
     expect(orphans.nodes.has(tk("sea"))).toBe(false);
   });
-
-  it("limits a local graph to the depth, over visible edges", () => {
-    const d1 = visibleSet(g, base, { node: fk("a.mp4"), depth: 1 });
-    expect([...d1.nodes].sort()).toEqual(
-      [fk("a.mp4"), tk("sea"), tk("summer")].sort(),
-    );
-    const d2 = visibleSet(g, base, { node: fk("a.mp4"), depth: 2 });
-    expect(d2.nodes.has(fk("b.mp4"))).toBe(true);
-    expect(d2.nodes.has(fk("c.mp4"))).toBe(true);
-    expect(d2.nodes.has(fk("d.mp4"))).toBe(false);
-    expect(d2.nodes.has(fk("e.mp4"))).toBe(false);
-    for (const e of d2.edges) {
-      const [x, y] = g.extremities(e);
-      expect(d2.nodes.has(x) && d2.nodes.has(y)).toBe(true);
-    }
-  });
-
-  it("centres on a file the filters alone would hide (no tags)", () => {
-    const v = visibleSet(g, base, { node: fk("lone.mp4"), depth: 1 });
-    expect([...v.nodes]).toEqual([fk("lone.mp4")]);
-  });
-
-  it("ignores a local focus that is gone or switched off", () => {
-    const gone = visibleSet(g, base, { node: fk("nowhere.mp4"), depth: 1 });
-    expect(gone.nodes.has(fk("a.mp4"))).toBe(true);
-  });
 });

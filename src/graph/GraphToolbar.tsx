@@ -1,8 +1,7 @@
 // The row above the canvas: search, relationship-kind toggles, generated tags,
-// orphans, the local graph and its depth, re-layout and the settings panel.
+// orphans, re-layout and the settings panel.
 import { memo, type ReactNode } from "react";
 import { RefreshCw, Settings2 } from "lucide-react";
-import { SegmentedControl } from "@/components/SegmentedControl";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import { EDGE_SOURCE_INFO } from "./edgeSources";
@@ -14,7 +13,6 @@ function Toggle({
   onClick,
   children,
   label,
-  hint,
 }: {
   /** Omitted for a plain action button. */
   pressed?: boolean;
@@ -23,15 +21,13 @@ function Toggle({
   children: ReactNode;
   /** For a button that shows only an icon. */
   label?: string;
-  /** A tooltip. */
-  hint?: string;
 }) {
   return (
     <button
       type="button"
       aria-pressed={pressed}
       aria-label={label}
-      title={label ?? hint}
+      title={label}
       disabled={disabled}
       onClick={onClick}
       className={cn(
@@ -46,18 +42,10 @@ function Toggle({
   );
 }
 
-const DEPTHS = [1, 2, 3] as const;
-
 interface Props {
   search: ReactNode;
   options: VisibilityOptions;
   onOptions: (patch: Partial<VisibilityOptions>) => void;
-  local: boolean;
-  /** A file has been opened, so there is something to centre a local graph on. */
-  canLocal: boolean;
-  onLocal: (on: boolean) => void;
-  depth: number;
-  onDepth: (depth: number) => void;
   onRelayout: () => void;
   settingsOpen: boolean;
   onSettings: (open: boolean) => void;
@@ -67,11 +55,6 @@ export const GraphToolbar = memo(function GraphToolbar({
   search,
   options,
   onOptions,
-  local,
-  canLocal,
-  onLocal,
-  depth,
-  onDepth,
   onRelayout,
   settingsOpen,
   onSettings,
@@ -113,26 +96,6 @@ export const GraphToolbar = memo(function GraphToolbar({
       >
         {t("graph.toggle.orphans")}
       </Toggle>
-      <div className="mx-1 h-5 w-px bg-border" />
-      <Toggle
-        pressed={local && canLocal}
-        disabled={!canLocal}
-        onClick={() => onLocal(!local)}
-        hint={t("graph.localHint")}
-      >
-        {t("graph.toggle.local")}
-      </Toggle>
-      <div
-        className={cn(!(local && canLocal) && "pointer-events-none opacity-40")}
-      >
-        <SegmentedControl
-          value={depth}
-          options={DEPTHS.map((d) => ({ value: d, label: String(d) }))}
-          onChange={onDepth}
-          label={t("graph.depth")}
-          slot="graph-depth"
-        />
-      </div>
       <div className="mx-1 h-5 w-px bg-border" />
       <Toggle onClick={onRelayout}>
         <RefreshCw className="size-3.5" />

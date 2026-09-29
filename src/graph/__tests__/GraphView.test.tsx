@@ -1,4 +1,4 @@
-// The graph view around its canvas: data in, toggles, the local graph, the
+// The graph view around its canvas: data in, toggles, the
 // settings panel, empty and truncated states, keyboard, and the
 // WebGL-unavailable fallback. sigma needs WebGL, which jsdom lacks, so
 // GraphCanvas is replaced by a stub that lists the visible nodes as buttons
@@ -249,32 +249,6 @@ describe("GraphView", () => {
       queryClient.invalidateQueries({ queryKey: ["graph_build"] }),
     );
     await waitFor(() => expect(canvas.props?.focus).toBeNull());
-  });
-
-  it("centres the local graph on the file open in the detail", async () => {
-    render(vi.fn(), "/file/3?ws=w");
-    await ready();
-    const local = screen.getByRole("button", { name: "Local" });
-    await waitFor(() =>
-      expect((local as HTMLButtonElement).disabled).toBe(false),
-    );
-    fireEvent.click(local);
-    await waitFor(() =>
-      expect([...(canvas.props?.visibility.nodes ?? [])].sort()).toEqual(
-        [fk("c.mp4"), tk("sea")].sort(),
-      ),
-    );
-    fireEvent.click(screen.getByRole("radio", { name: "2" }));
-    await waitFor(() =>
-      expect(canvas.props?.visibility.nodes.has(fk("a.mp4"))).toBe(true),
-    );
-  });
-
-  it("has no local graph before a file is opened", async () => {
-    render();
-    await ready();
-    const local = screen.getByRole("button", { name: "Local" });
-    expect((local as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("remembers the toggles", async () => {

@@ -3,8 +3,8 @@
 // new graphology graph that takes over the positions of the one before, so a
 // refetch keeps the picture and the camera (one sigma for the component,
 // keyed by scope in Home). What is visible is what the force simulation (a
-// worker, see sim/) moves: a change of data, filters or the local graph
-// reloads it with the visible nodes, seating any that have no position yet.
+// worker, see sim/) moves: a change of data or filters reloads it with the
+// visible nodes, seating any that have no position yet.
 // Positions come from what is on screen, where a node last stood, the
 // scope's layout cache, or placement.ts.
 import {
@@ -15,7 +15,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { matchPath, useLocation, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { Maximize, Minus, Plus, Share2 } from "lucide-react";
 import { tagSearchToken, qualifiedTagName } from "@shared/tags";
 import { GRAPH_NODE_KEY_MAX } from "@shared/ipc/graph";
@@ -114,7 +114,6 @@ export function GraphView({
 }: Props) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const location = useLocation();
   const colors = useGraphColors();
   const [graph, setGraph] = useState<MediaGraph>(emptyGraph);
   // The graph callbacks and the unmount save act on: always the latest.
@@ -146,9 +145,6 @@ export function GraphView({
   const [dragging, setDragging] = useState<string | null>(null);
   // A node picked in the graph search, highlighted until dismissed.
   const [selected, setSelected] = useState<string | null>(null);
-  const [local, setLocal] = useState(false);
-  const [depth, setDepth] = useState(1);
-  const [localCenter, setLocalCenter] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   // Bumped by "Re-layout": reseats every visible node.
   const [epoch, setEpoch] = useState(0);
@@ -276,33 +272,9 @@ export function GraphView({
   }, [payload, cache]);
 
   // --- what shows ------------------------------------------------------------
-  // The local graph centres on the file open in the detail (a side peek next
-  // to the graph, typically), and stays on it once the detail closes.
-  const openKey = useMemo(() => {
-    const match = matchPath("/file/:id", location.pathname);
-    if (!match) return null;
-    const id = Number(match.params.id);
-    const ws = new URLSearchParams(location.search).get("ws");
-    return (
-      graph.findNode(
-        (_key, a) =>
-          a.type === "file" && a.fileId === id && (!ws || a.workspaceId === ws),
-      ) ?? null
-    );
-  }, [graph, location.pathname, location.search]);
-  // Adjusted while rendering (not in an effect), so the local graph never
-  // shows a frame centred on the previous file.
-  if (openKey && openKey !== localCenter) setLocalCenter(openKey);
-  const center = localCenter && graph.hasNode(localCenter) ? localCenter : null;
-  const localFocus = local && center ? center : null;
   const visibility = useMemo(
-    () =>
-      visibleSet(
-        graph,
-        options,
-        localFocus ? { node: localFocus, depth } : null,
-      ),
-    [graph, options, localFocus, depth],
+    () => visibleSet(graph, options),
+    [graph, options],
   );
   const focus = dragging ?? hovered ?? selected;
 
@@ -479,11 +451,6 @@ export function GraphView({
         search={searchBox}
         options={options}
         onOptions={setOptions}
-        local={local}
-        canLocal={!!center}
-        onLocal={setLocal}
-        depth={depth}
-        onDepth={setDepth}
         onRelayout={relayout}
         settingsOpen={panelOpen}
         onSettings={setPanelOpen}

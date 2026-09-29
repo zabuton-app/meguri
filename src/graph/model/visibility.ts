@@ -1,6 +1,6 @@
-// Which nodes and edges the view shows, given the toggles and the local-graph
-// focus. Computed when those change (not per hover), and applied through
-// sigma's reducers, so the graph itself and the running layout are untouched.
+// Which nodes and edges the view shows, given the toggles. Computed when
+// those change (not per hover), and applied through the canvas's reducers,
+// so the graph itself and the running layout are untouched.
 import type { EdgeSourceId } from "@shared/ipc/graph";
 import type { EdgeAttrs, MediaGraph } from "./types";
 
@@ -9,11 +9,6 @@ export interface VisibilityOptions {
   edgeSources: Partial<Record<EdgeSourceId, boolean>>;
   showAutoTags: boolean;
   showOrphans: boolean;
-}
-
-export interface LocalFocus {
-  node: string;
-  depth: number;
 }
 
 export interface Visibility {
@@ -26,7 +21,6 @@ export interface Visibility {
 export function visibleSet(
   graph: MediaGraph,
   options: VisibilityOptions,
-  local: LocalFocus | null = null,
 ): Visibility {
   const nodeAllowed = (key: string): boolean => {
     const attrs = graph.getNodeAttributes(key);
@@ -56,32 +50,5 @@ export function visibleSet(
     nodes.add(key);
   });
 
-  // The centre shows even when the filters alone would hide it (a file
-  // without tags, say): it is what the local graph was asked for.
-  if (!local || !graph.hasNode(local.node) || !nodeAllowed(local.node))
-    return { nodes, edges, degree };
-  nodes.add(local.node);
-
-  // Breadth-first from the focus, over the edges that are showing.
-  const reached = new Set([local.node]);
-  let frontier = [local.node];
-  for (let d = 0; d < local.depth && frontier.length > 0; d++) {
-    const next: string[] = [];
-    for (const key of frontier) {
-      graph.forEachEdge(key, (edge, _attrs, a, b) => {
-        if (!edges.has(edge)) return;
-        const other = a === key ? b : a;
-        if (reached.has(other) || !nodes.has(other)) return;
-        reached.add(other);
-        next.push(other);
-      });
-    }
-    frontier = next;
-  }
-  const localEdges = new Set<string>();
-  for (const edge of edges) {
-    const [a, b] = graph.extremities(edge);
-    if (reached.has(a) && reached.has(b)) localEdges.add(edge);
-  }
-  return { nodes: reached, edges: localEdges, degree };
+  return { nodes, edges, degree };
 }

@@ -160,22 +160,21 @@ never pay for it) draws the same list as a network of files and tags, from one
   value changes. Nodes a filter takes out of the data remember where they
   stood and come back there. `graph_build` is invalidated next to
   `files_search` (scan done, tag edits).
-- **Simulation.** What is visible is what is simulated: every change of the
-  data, the toggles or the local graph reloads the simulation with the
-  visible nodes and links (unless nothing shown changed). It is d3-force's
-  model with Obsidian's forces (`sim/physics.ts`): forceX / forceY toward the
-  origin, forceLink at d3's default strength (1 / the smaller degree) times
-  the link force, a Barnes-Hut many-body force (θ 0.9, minimum distance 30),
-  forceCollide (radius 60, strength 0.5) and a velocity decay of 0.6. It runs
-  in a Web Worker (`sim/sim.worker.ts`, driven by `SimClient`) that ticks at
-  60 Hz while alpha cools from its last reheat (1 for a mostly new graph, 0.3
-  for a change) to 0.001, about 300 ticks, and posts each tick's positions,
-  applied once per animation frame. The tick itself is WebAssembly
-  (`assembly/forces.ts`, AssemblyScript; about a third of d3-force's time,
-  6 ms against 18 per tick for 5,000 files on the development machine), with
-  d3-force as the fallback where WebAssembly cannot start; the two give
-  identical results, which a test checks bit for bit.
-  The module is compiled by `npm run build:wasm` into
+- **Simulation.** What is visible is what is simulated: every change of the data
+  or the toggles reloads the simulation with the visible nodes and links (unless
+  nothing shown changed). It is d3-force's model with Obsidian's forces
+  (`sim/physics.ts`): forceX / forceY toward the origin, forceLink at d3's
+  default strength (1 / the smaller degree) times the link force, a Barnes-Hut
+  many-body force (θ 0.9, minimum distance 30), forceCollide (radius 60,
+  strength 0.5) and a velocity decay of 0.6. It runs in a Web Worker
+  (`sim/sim.worker.ts`, driven by `SimClient`) that ticks at 60 Hz while alpha
+  cools from its last reheat (1 for a mostly new graph, 0.3 for a change) to
+  0.001, about 300 ticks, and posts each tick's positions, applied once per
+  animation frame. The tick itself is WebAssembly (`assembly/forces.ts`,
+  AssemblyScript; about a third of d3-force's time, 6 ms against 18 per tick for
+  5,000 files on the development machine), with d3-force as the fallback where
+  WebAssembly cannot start; the two give identical results, which a test checks
+  bit for bit. The module is compiled by `npm run build:wasm` into
   `src/graph/sim/forcesWasm.ts` (base64, so the worker needs no fetch from
   `file://`), and a test fails when that file is older than the source.
   WebAssembly compiles in the worker only: the page's CSP would need
@@ -197,9 +196,6 @@ never pay for it) draws the same list as a network of files and tags, from one
   a tag as the list's filter. Holding the right button down pans the view,
   over nodes too (sigma pans with the left button only, and on a node that
   drags it); the canvas has no context menu.
-- **Local graph.** "Local" limits the graph to the file open in the detail
-  and its neighbourhood (depth 1–3); the centre stays on the last opened file
-  after the detail closes.
 - **Settings.** The settings panel has Obsidian's Display (text fade
   threshold, node size, link thickness) and Forces (centre, repel, link force,
   link distance) sliders, stored as slider positions in
@@ -211,7 +207,7 @@ never pay for it) draws the same list as a network of files and tags, from one
   viewed (the payload's `plays`; a tag weighs the plays of its visible
   files), through the same radius formula (`nodeWeights`). Recording a play
   invalidates `graph_build`, so sizes follow.
-- **Pure model.** Visibility (toggles, orphans, the local graph's BFS),
+- **Pure model.** Visibility (toggles, orphans),
   search, placement and node appearance are plain functions under
   `src/graph/model/`, tested without WebGL.
 - **Options.** The relationship-kind, generated-tag and orphan toggles persist in
