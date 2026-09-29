@@ -372,9 +372,12 @@ export function GraphCanvas3D({
           continue;
         }
         const a = at(i);
-        v.set(a.x, a.y, a.z);
-        const depth = v.distanceTo(camera.position);
-        v.project(camera);
+        // Perspective scales with the depth along the view axis, not the
+        // distance to the eye, which grows off-axis. project() in two steps,
+        // keeping that depth from the camera-space point.
+        v.set(a.x, a.y, a.z).applyMatrix4(camera.matrixWorldInverse);
+        const depth = -v.z;
+        v.applyMatrix4(camera.projectionMatrix);
         if (v.z > 1 || v.z < -1) {
           sd[i] = -1;
           continue;
