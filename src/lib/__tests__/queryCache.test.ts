@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
+import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
 import type {
   FileDetail,
   FileRow,
@@ -116,9 +117,14 @@ describe("targeted files_search invalidation", () => {
   it("invalidatePlayedSearches refreshes a graph a play can change, and only those", async () => {
     const qc = new QueryClient();
     const fetched: string[] = [];
-    const graph = async (name: string, filter: object, byPlays: boolean) => {
+    const graph = async (
+      name: string,
+      filter: object,
+      byPlays: boolean,
+      scope = "ws",
+    ) => {
       await qc.fetchQuery({
-        queryKey: ["graph_build", "ws", filter],
+        queryKey: ["graph_build", scope, filter],
         queryFn: () => name,
         meta: { [GRAPH_SIZED_BY_PLAYS]: byPlays },
       });
@@ -127,12 +133,19 @@ describe("targeted files_search invalidation", () => {
     await graph("byPlays", { q: "x" }, true);
     await graph("played", { played: false }, false);
     await graph("accessed", { sort: "accessed" }, false);
+    await graph("watchLater", {}, false, collectionTarget(WATCH_LATER_ID));
+    await graph("collection", {}, false, collectionTarget("other"));
     qc.getQueryCache().subscribe((e) => {
       if (e.type === "updated" && e.action.type === "invalidate")
         fetched.push(String(e.query.state.data));
     });
     invalidatePlayedSearches(qc);
-    expect(fetched.sort()).toEqual(["accessed", "byPlays", "played"]);
+    expect(fetched.sort()).toEqual([
+      "accessed",
+      "byPlays",
+      "played",
+      "watchLater",
+    ]);
   });
 
   it("syncFileRowAcrossCaches refreshes a graph filtered or sorted by the changed field", async () => {

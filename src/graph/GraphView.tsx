@@ -18,7 +18,7 @@ import {
 import { useNavigate } from "react-router";
 import { Maximize, Minus, Plus, Share2 } from "lucide-react";
 import { tagSearchToken, qualifiedTagName } from "@shared/tags";
-import { GRAPH_NODE_KEY_MAX } from "@shared/ipc/graph";
+import { GRAPH_LAYOUT_MAX_NODES, GRAPH_NODE_KEY_MAX } from "@shared/ipc/graph";
 import { api } from "@/ipc/client";
 import type { SearchQuery } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -173,6 +173,9 @@ export function GraphView({
     const keys: string[] = [];
     const xy: number[] = [];
     g.forEachNode((key, a) => {
+      // Tags are not bounded by the file cap, so a graph can outgrow what the
+      // boundary accepts; the nodes past it are just not cached.
+      if (keys.length >= GRAPH_LAYOUT_MAX_NODES) return;
       // A node never shown has no position of its own. A key past the
       // boundary's limit (a very deep path with no content hash), or a
       // position that is not a number, would fail the whole save; that one
@@ -428,11 +431,13 @@ export function GraphView({
       <GraphSearch
         graph={graph}
         visibility={visibility}
+        selected={selected}
         onPick={pick}
+        onOpen={open}
         inputRef={searchInput}
       />
     ),
-    [graph, visibility, pick],
+    [graph, visibility, selected, pick, open],
   );
 
   const zoomIn = useCallback(() => canvas.current?.zoomIn(), []);

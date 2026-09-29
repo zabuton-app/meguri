@@ -401,6 +401,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "graph.search.label": "在图谱中搜索",
   "graph.search.placeholder": "按文件名或标签查找",
   "graph.search.noMatch": "没有匹配的节点",
+  "graph.search.hint":
+    "按 Enter 选择匹配项，按 Shift+Enter 打开。搜索框为空时，按 Enter 打开已选中的节点。",
   "graph.empty.title": "没有可显示的关联",
   "graph.empty.hint": "为文件添加标签后，拥有相同标签的文件会在此相互连接。",
   "graph.truncated":

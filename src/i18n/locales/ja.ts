@@ -411,6 +411,8 @@ export const ja = {
   "graph.search.label": "グラフ内を検索",
   "graph.search.placeholder": "ファイル名・タグで探す",
   "graph.search.noMatch": "一致するノードがありません",
+  "graph.search.hint":
+    "Enterで候補を選択、Shift+Enterで開く。検索欄が空のときEnterで選択中のノードを開く。",
   "graph.empty.title": "表示できるつながりがありません",
   "graph.empty.hint":
     "ファイルにタグを付けると、同じタグを持つファイル同士がつながって表示されます。",

@@ -420,6 +420,8 @@ export const fr: Record<TranslationKey, string> = {
   "graph.search.label": "Rechercher dans le graphe",
   "graph.search.placeholder": "Chercher un fichier ou un tag",
   "graph.search.noMatch": "Aucun nœud correspondant",
+  "graph.search.hint":
+    "Entrée sélectionne le résultat, Maj+Entrée l’ouvre. Recherche vide, Entrée ouvre le nœud sélectionné.",
   "graph.empty.title": "Aucun lien à afficher",
   "graph.empty.hint":
     "Ajoutez des tags à vos fichiers : ceux qui partagent un tag seront reliés ici.",

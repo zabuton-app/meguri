@@ -410,6 +410,8 @@ export const ko: Record<TranslationKey, string> = {
   "graph.search.label": "그래프에서 검색",
   "graph.search.placeholder": "파일명·태그로 찾기",
   "graph.search.noMatch": "일치하는 노드가 없습니다",
+  "graph.search.hint":
+    "Enter로 후보를 선택하고 Shift+Enter로 엽니다. 검색창이 비어 있으면 Enter로 선택한 노드를 엽니다.",
   "graph.empty.title": "표시할 연결이 없습니다",
   "graph.empty.hint":
     "파일에 태그를 붙이면 같은 태그를 가진 파일끼리 연결되어 표시됩니다.",

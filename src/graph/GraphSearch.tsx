@@ -1,5 +1,7 @@
 // The graph's own search: type part of a file or tag name, pick a candidate,
-// and the view moves to that node and selects it.
+// and the view moves to that node and selects it. It is also the keyboard's
+// way to open a node, which the canvas offers only to the pointer: Shift+Enter
+// opens the candidate, and Enter with nothing typed opens the selected node.
 import { useId, useMemo, useState, type KeyboardEvent, type Ref } from "react";
 import { Search } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -12,13 +14,25 @@ import { NodeDot } from "./NodeDot";
 interface Props {
   graph: MediaGraph;
   visibility: Visibility;
+  /** The node picked last, which Enter on an empty search opens. */
+  selected: string | null;
   onPick: (key: string) => void;
+  /** Open a node as a click on it does. */
+  onOpen: (key: string) => void;
   inputRef?: Ref<HTMLInputElement>;
 }
 
-export function GraphSearch({ graph, visibility, onPick, inputRef }: Props) {
+export function GraphSearch({
+  graph,
+  visibility,
+  selected,
+  onPick,
+  onOpen,
+  inputRef,
+}: Props) {
   const { t } = useI18n();
   const listId = useId();
+  const hintId = useId();
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -42,11 +56,20 @@ export function GraphSearch({ graph, visibility, onPick, inputRef }: Props) {
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((i) => Math.max(0, i - 1));
-    } else if (e.key === "Enter") {
+    } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      // Not while an IME is composing: that Enter only confirms the text.
       const hit = hits[active];
-      if (hit) {
+      if (text.trim() === "") {
+        // A pick the toggles have since hidden stays selected, but is not
+        // there to open.
+        if (selected && visibility.nodes.has(selected)) {
+          e.preventDefault();
+          onOpen(selected);
+        }
+      } else if (hit) {
         e.preventDefault();
         pick(hit.key);
+        if (e.shiftKey) onOpen(hit.key);
       }
     } else if (e.key === "Escape" && showList) {
       // Close the list first; the next Esc reaches the view.
@@ -58,6 +81,10 @@ export function GraphSearch({ graph, visibility, onPick, inputRef }: Props) {
 
   return (
     <div className="relative w-64">
+      {/* Outside the label, whose text is the input's name. */}
+      <span id={hintId} className="sr-only">
+        {t("graph.search.hint")}
+      </span>
       <label className="flex h-8 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-muted focus-within:ring-2 focus-within:ring-ring">
         <Search className="size-4 shrink-0" />
         <span className="sr-only">{t("graph.search.label")}</span>
@@ -67,6 +94,7 @@ export function GraphSearch({ graph, visibility, onPick, inputRef }: Props) {
           role="combobox"
           aria-expanded={showList}
           aria-controls={listId}
+          aria-describedby={hintId}
           aria-activedescendant={
             showList && hits[active] ? `${listId}-${active}` : undefined
           }

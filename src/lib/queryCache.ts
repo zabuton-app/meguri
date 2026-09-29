@@ -10,7 +10,7 @@ import type {
   WorkspacesList,
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
-import { WATCH_LATER_ID } from "@shared/workspaceIds";
+import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
 
 /** The SearchQuery part of a ["files_search", wsId, filter] query key. */
 function searchFilterOf(queryKey: readonly unknown[]): SearchQuery | undefined {
@@ -124,16 +124,20 @@ export const GRAPH_SIZED_BY_PLAYS = "sizedByPlays";
 /**
  * Invalidate only what recording a play affects: a played/unplayed filter
  * (membership changes) or an "accessed" sort (recording bumps
- * last_accessed_at, so the order changes), in the list and the graph, and a
- * graph that sizes nodes by plays. Other lists keep their cache instead of
- * refetching every page.
+ * last_accessed_at, so the order changes), in the list and the graph, a graph
+ * that sizes nodes by plays, and the Watch Later graph (a play consumes the
+ * file from Watch Later; the list's membership is patched by
+ * dropFromWatchLaterCache). Other lists keep their cache instead of refetching
+ * every page.
  */
 export function invalidatePlayedSearches(qc: QueryClient): void {
+  const watchLater = collectionTarget(WATCH_LATER_ID);
   void qc.invalidateQueries({
     queryKey: ["graph_build"],
     predicate: (q) => {
       const filter = searchFilterOf(q.queryKey);
       return (
+        q.queryKey[1] === watchLater ||
         q.meta?.[GRAPH_SIZED_BY_PLAYS] === true ||
         filter?.played != null ||
         filter?.sort === "accessed"

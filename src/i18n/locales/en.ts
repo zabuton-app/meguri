@@ -411,6 +411,8 @@ export const en: Record<TranslationKey, string> = {
   "graph.search.label": "Search the graph",
   "graph.search.placeholder": "Find by file or tag name",
   "graph.search.noMatch": "No matching nodes",
+  "graph.search.hint":
+    "Enter selects the match, Shift+Enter opens it. With the search empty, Enter opens the selected node.",
   "graph.empty.title": "No connections to show",
   "graph.empty.hint":
     "Tag your files and files that share a tag will be linked here.",

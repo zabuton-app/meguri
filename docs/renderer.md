@@ -149,7 +149,9 @@ never pay for it) draws the same list as a network of files and tags, from one
   `--c-*` values read by `useGraphColors`, since WebGL cannot see CSS
   variables. All of this is applied by sigma's node and edge reducers from
   state held in a ref. A WebGL failure swaps the canvas for a notice
-  (`GraphErrorBoundary`).
+  (`GraphErrorBoundary`). The canvas takes only the pointer, so the graph
+  search is the keyboard's way in: Enter picks a match, Shift+Enter opens it
+  as a click does, and Enter on an empty search opens the picked node.
 - **A graph per payload.** Each payload builds a new graphology graph that
   takes over the previous one's positions by key (`model/buildGraphology.ts`),
   and the one sigma instance (`GraphView` is keyed by scope in Home) switches

@@ -211,6 +211,23 @@ describe("GraphView", () => {
     expect(onFilter).toHaveBeenCalledWith("tag:sea");
   });
 
+  it("opens from the search with Shift+Enter, or the picked node with Enter", async () => {
+    const onFilter = vi.fn();
+    render(onFilter);
+    await ready();
+    nav.navigate.mockClear();
+    const box = screen.getByRole("combobox", { name: "Search the graph" });
+    fireEvent.change(box, { target: { value: "B.J" } });
+    fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
+    expect(nav.navigate).toHaveBeenCalledWith("/file/2?ws=w");
+    fireEvent.change(box, { target: { value: "sea" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onFilter).not.toHaveBeenCalled();
+    await waitFor(() => expect(canvas.props?.focus).toBe(tk("sea")));
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onFilter).toHaveBeenCalledWith("tag:sea");
+  });
+
   it("highlights a node found by name until Escape or the stage, and fits with F", async () => {
     render();
     await ready();

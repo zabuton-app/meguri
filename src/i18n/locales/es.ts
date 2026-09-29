@@ -419,6 +419,8 @@ export const es: Record<TranslationKey, string> = {
   "graph.search.label": "Buscar en el grafo",
   "graph.search.placeholder": "Buscar por archivo o etiqueta",
   "graph.search.noMatch": "No hay nodos coincidentes",
+  "graph.search.hint":
+    "Enter selecciona la coincidencia y Mayús+Enter la abre. Con la búsqueda vacía, Enter abre el nodo seleccionado.",
   "graph.empty.title": "No hay conexiones que mostrar",
   "graph.empty.hint":
     "Etiqueta tus archivos y los que compartan etiqueta aparecerán enlazados aquí.",
