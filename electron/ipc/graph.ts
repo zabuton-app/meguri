@@ -71,7 +71,7 @@ export function registerGraphHandlers(ctx: IpcContext): void {
     if (!file) return;
     const keep =
       scope === ALL_ID || scope.startsWith(COLLECTION_ID_PREFIX)
-        ? keepRegisteredWorkspaces(scopes.workspaceIds())
+        ? keepRegisteredWorkspaces(() => scopes.workspaceIds())
         : undefined;
     try {
       await writeLayout(file, { keys, xy }, keep);

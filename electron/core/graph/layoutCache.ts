@@ -101,7 +101,8 @@ export async function readLayout(
  * Merge `update` into the stored positions and write them atomically. Keys
  * not in the update are kept: a filtered graph saves only what it shows, and
  * that must not erase the rest of the scope's layout. `keep` drops stored keys
- * that no longer belong (nodes of a removed workspace). Past the size cap the
+ * that no longer belong (nodes of a removed workspace), and the update's too:
+ * a save racing the removal must not write them back. Past the size cap the
  * keys the update did not touch go first, oldest first.
  */
 export function writeLayout(
@@ -138,6 +139,7 @@ async function mergeAndWrite(
     });
   }
   update.keys.forEach((k, i) => {
+    if (!keep(k)) return;
     // Re-inserted so the updated keys sit at the end, i.e. are the newest.
     merged.delete(k);
     merged.set(k, [update.xy[i * 2], update.xy[i * 2 + 1]]);
@@ -173,12 +175,20 @@ export async function removeLayout(file: string): Promise<void> {
   await fs.rm(file, { force: true }).catch(() => undefined);
 }
 
-/** For All's file: a file node survives only while its workspace is registered. */
+/**
+ * For All's file: a file node survives only while its workspace is registered.
+ * Given a getter, the ids are read on the first key tested, i.e. when the
+ * write runs rather than when it was queued behind another one, so a
+ * workspace removed in between is not written back.
+ */
 export function keepRegisteredWorkspaces(
-  ids: Set<string>,
+  ids: Set<string> | (() => Set<string>),
 ): (key: string) => boolean {
+  let registered = typeof ids === "function" ? null : ids;
   return (key) => {
     const ws = workspaceOfNodeKey(key);
-    return ws == null ? !key.startsWith("f:") : ids.has(ws);
+    if (ws == null) return !key.startsWith("f:");
+    registered ??= (ids as () => Set<string>)();
+    return registered.has(ws);
   };
 }

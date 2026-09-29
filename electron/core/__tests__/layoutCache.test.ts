@@ -92,6 +92,31 @@ describe("readLayout / writeLayout", () => {
     ]);
   });
 
+  it("does not write back an updated key the keep test rejects", async () => {
+    await writeLayout(
+      file(),
+      { keys: ["f:0123456789abcdef:h1", "f:gone:h2"], xy: [0, 0, 1, 1] },
+      keepRegisteredWorkspaces(new Set(["0123456789abcdef"])),
+    );
+    expect((await readLayout(file()))?.keys).toEqual(["f:0123456789abcdef:h1"]);
+  });
+
+  it("reads the registered workspaces when the write runs", async () => {
+    const ids = new Set(["0123456789abcdef", "fedcba9876543210"]);
+    const write = writeLayout(
+      file(),
+      {
+        keys: ["f:0123456789abcdef:h1", "f:fedcba9876543210:h2"],
+        xy: [0, 0, 1, 1],
+      },
+      keepRegisteredWorkspaces(() => ids),
+    );
+    // Removed after the save was sent, before it was written.
+    ids.delete("fedcba9876543210");
+    await write;
+    expect((await readLayout(file()))?.keys).toEqual(["f:0123456789abcdef:h1"]);
+  });
+
   it("drops the oldest untouched keys past the size cap", async () => {
     const n = GRAPH_LAYOUT_MAX_NODES;
     const keys = Array.from({ length: n }, (_, i) => `t::${i}`);

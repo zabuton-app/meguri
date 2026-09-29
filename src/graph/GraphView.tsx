@@ -250,8 +250,10 @@ export function GraphView({
     const prev = graphRef.current;
     const { graph: next, added } = buildGraphology(payload, prev);
     prev.forEachNode((key, a) => {
-      if (!next.hasNode(key) && seated.current.has(key))
-        lastSeen.current.set(key, [a.x, a.y]);
+      if (next.hasNode(key) || !seated.current.has(key)) return;
+      lastSeen.current.set(key, [a.x, a.y]);
+      // Seated again from lastSeen if it comes back (see below).
+      seated.current.delete(key);
     });
     // Carried over, a node keeps its place; a newcomer takes where it last
     // stood, else its cached spot, else waits to be seated when shown.

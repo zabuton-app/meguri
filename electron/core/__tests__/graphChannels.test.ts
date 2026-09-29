@@ -91,4 +91,20 @@ describe("graph_layout_set payload", () => {
         .success,
     ).toBe(false);
   });
+
+  it("refuses an oversized array before validating its items", () => {
+    const n = GRAPH_LAYOUT_MAX_NODES + 1;
+    // Every key is invalid too: only the size is reported, so no item was
+    // looked at.
+    const keys = new Array<string>(n).fill("");
+    const r = ChannelInputs.graph_layout_set.safeParse({
+      scope: "__all__",
+      keys,
+      xy: [],
+    });
+    expect(r.success).toBe(false);
+    const paths = r.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths).toContain("keys");
+    expect(paths.filter((p) => p.startsWith("keys."))).toEqual([]);
+  });
 });

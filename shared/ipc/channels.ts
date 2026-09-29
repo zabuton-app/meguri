@@ -135,6 +135,22 @@ const BulkTargets = z
 /** The parsed shape, so both processes and the renderer name one type. */
 export type BulkTargets = z.infer<typeof BulkTargets>;
 
+/**
+ * An array of at most `max` items whose length is checked on the raw value
+ * first, like BulkTargets: a plain `.max()` only reports the excess after
+ * every element has been validated, so an oversized payload would still cost
+ * the main process a pass over all of it. Worth it where the cap runs to
+ * thousands; a short list is fine with `.max()`.
+ */
+function boundedArray<T extends z.ZodType>(item: T, max: number) {
+  return z
+    .unknown()
+    .refine((raw) => !Array.isArray(raw) || raw.length <= max, {
+      message: `too many items (max ${max})`,
+    })
+    .pipe(z.array(item).max(max));
+}
+
 // Most file-mutating channels share the same (workspaceId, fileId) target.
 const FileTarget = z.object({
   id: z.number(),
@@ -228,8 +244,8 @@ export const ChannelInputs = {
   graph_layout_set: z
     .object({
       scope: GraphScopeSchema,
-      keys: z.array(GraphNodeKeySchema).max(GRAPH_LAYOUT_MAX_NODES),
-      xy: z.array(z.number()).max(GRAPH_LAYOUT_MAX_NODES * 2),
+      keys: boundedArray(GraphNodeKeySchema, GRAPH_LAYOUT_MAX_NODES),
+      xy: boundedArray(z.number(), GRAPH_LAYOUT_MAX_NODES * 2),
     })
     .refine((v) => v.xy.length === v.keys.length * 2, {
       message: "xy must hold two numbers per key",
