@@ -1,4 +1,4 @@
-// The graph view around its canvas: data in, toggles, the
+// The graph view around its canvas: data in, toggles, 2D / 3D, the
 // settings panel, empty and truncated states, keyboard, and the
 // WebGL-unavailable fallback. sigma needs WebGL, which jsdom lacks, so
 // GraphCanvas is replaced by a stub that lists the visible nodes as buttons
@@ -92,9 +92,16 @@ vi.mock("../GraphCanvas", async () => {
   };
 });
 
+// The 3D canvas is the same stand-in (it takes the same props and handle).
+vi.mock("../GraphCanvas3D", async () => {
+  const m = await import("../GraphCanvas");
+  return { GraphCanvas3D: m.GraphCanvas };
+});
+
 // Imported after the mocks.
 const { GraphView } = await import("../GraphView");
 const { SimClient } = await import("../sim/simClient");
+const { GRAPH_DIMS_KEY } = await import("../GraphView");
 
 const FILES = [
   { path: "a.mp4", tags: ["sea", "summer"] },
@@ -295,7 +302,7 @@ describe("GraphView", () => {
     // Pinned where it was, then moved with the pointer.
     expect(drag).toHaveBeenCalledTimes(2);
     const [index] = drag.mock.calls[0];
-    expect(drag.mock.calls[1]).toEqual([index, 123, 45]);
+    expect(drag.mock.calls[1]).toEqual([index, [123, 45]]);
     await waitFor(() => expect(canvas.props?.focus).toBe(fk("a.mp4")));
     fireEvent.mouseUp(screen.getByTestId(`node ${fk("a.mp4")}`));
     expect(release).toHaveBeenCalledWith(index);
@@ -318,6 +325,28 @@ describe("GraphView", () => {
     const props = canvas.props as unknown as { onDragEnd: (k: string) => void };
     act(() => props.onDragEnd(fk("c.mp4")));
     expect(release).toHaveBeenCalledWith(null);
+  });
+
+  it("switches to 3D: its own layout cache, a 3D simulation, remembered", async () => {
+    const load = vi.spyOn(SimClient.prototype, "load");
+    render();
+    await ready();
+    expect(load.mock.calls.at(-1)?.[0].dims).toBe(2);
+    fireEvent.click(screen.getByRole("radio", { name: "3D" }));
+    await waitFor(() =>
+      expect(api.graphLayoutGet).toHaveBeenCalledWith("w", 3),
+    );
+    await ready();
+    await waitFor(() => expect(load.mock.calls.at(-1)?.[0].dims).toBe(3));
+    const last = load.mock.calls.at(-1)?.[0];
+    expect(last?.pos.length).toBe(
+      (canvas.props?.visibility.nodes.size ?? 0) * 3,
+    );
+    expect(localStorage.getItem(GRAPH_DIMS_KEY)).toBe("3");
+    // Links are hairlines in 3D: no thickness to set.
+    fireEvent.click(screen.getByRole("button", { name: "Graph settings" }));
+    expect(screen.queryByRole("slider", { name: "Link thickness" })).toBeNull();
+    expect(screen.getByRole("slider", { name: "Node size" })).toBeTruthy();
   });
 
   it("applies and remembers the forces from the settings panel", async () => {

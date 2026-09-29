@@ -6,6 +6,7 @@ import { RotateCcw, X } from "lucide-react";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
+import type { GraphDims } from "@shared/ipc/graph";
 import {
   DISPLAY_RANGE,
   FORCE_RANGE,
@@ -69,10 +70,13 @@ const FORCE_LABELS: Record<keyof ForceSettings, TranslationKey> = {
 };
 
 export const GraphSettingsPanel = memo(function GraphSettingsPanel({
+  dims,
   settings,
   onChange,
   onClose,
 }: {
+  /** In 3D links are hairlines: their thickness does not apply. */
+  dims: GraphDims;
   settings: GraphSettings;
   onChange: (next: GraphSettings) => void;
   onClose: () => void;
@@ -134,20 +138,22 @@ export const GraphSettingsPanel = memo(function GraphSettingsPanel({
             slot="graph-size-by"
           />
         </div>
-        {(Object.keys(DISPLAY_LABELS) as DisplayScale[]).map((key) => (
-          <Slider
-            key={key}
-            label={t(DISPLAY_LABELS[key])}
-            value={settings.display[key]}
-            range={DISPLAY_RANGE[key]}
-            onChange={(v) =>
-              onChange({
-                ...settings,
-                display: { ...settings.display, [key]: v },
-              })
-            }
-          />
-        ))}
+        {(Object.keys(DISPLAY_LABELS) as DisplayScale[])
+          .filter((key) => dims === 2 || key !== "lineSize")
+          .map((key) => (
+            <Slider
+              key={key}
+              label={t(DISPLAY_LABELS[key])}
+              value={settings.display[key]}
+              range={DISPLAY_RANGE[key]}
+              onChange={(v) =>
+                onChange({
+                  ...settings,
+                  display: { ...settings.display, [key]: v },
+                })
+              }
+            />
+          ))}
       </div>
       <div className="flex flex-col gap-3">
         <h3 className="text-xs font-medium uppercase tracking-wide text-muted">

@@ -58,14 +58,14 @@ export function registerGraphHandlers(ctx: IpcContext): void {
         });
   });
 
-  handle("graph_layout_get", async ({ scope }) => {
-    const file = layoutPathFor(scope, layoutScopes(ws));
-    return file ? readLayoutSettled(file) : null;
+  handle("graph_layout_get", async ({ scope, dims = 2 }) => {
+    const file = layoutPathFor(scope, layoutScopes(ws), dims);
+    return file ? readLayoutSettled(file, dims) : null;
   });
 
-  handle("graph_layout_set", async ({ scope, keys, xy }) => {
+  handle("graph_layout_set", async ({ scope, keys, xy, dims = 2 }) => {
     const scopes = layoutScopes(ws);
-    const file = layoutPathFor(scope, scopes);
+    const file = layoutPathFor(scope, scopes, dims);
     // An unknown scope is a save that arrived after its workspace or
     // collection was removed: dropping it keeps the file from coming back.
     if (!file) return;
@@ -74,7 +74,7 @@ export function registerGraphHandlers(ctx: IpcContext): void {
         ? keepRegisteredWorkspaces(() => scopes.workspaceIds())
         : undefined;
     try {
-      await writeLayout(file, { keys, xy }, keep);
+      await writeLayout(file, { keys, xy }, keep, dims);
     } catch (e) {
       // A cache that cannot be written only costs a re-layout next time.
       log.warn(`failed to save the graph layout for ${scope}: ${String(e)}`);

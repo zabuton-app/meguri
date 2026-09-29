@@ -6,7 +6,7 @@ import {
   Workspaces,
 } from "../core/workspaces.js";
 import {
-  collectionLayoutPath,
+  collectionLayoutPaths,
   removeLayout,
 } from "../core/graph/layoutCache.js";
 import { baseDataDir, droppedDirectory } from "../core/paths.js";
@@ -103,7 +103,8 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
     ws.removeCollection(id);
     // The graph view's cached positions go with the collection (a workspace's
     // live in its data directory, which removal deletes anyway).
-    void removeLayout(collectionLayoutPath(baseDataDir(), id));
+    for (const file of collectionLayoutPaths(baseDataDir(), id))
+      void removeLayout(file);
     emit("workspace:changed", { activeId: ws.activeId });
   });
 

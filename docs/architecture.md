@@ -248,7 +248,9 @@ the tags they carry. It is built in one call and cached per scope.
   rescans. A save merges into the file (a filtered graph saves only what it
   shows), is atomic, and runs off the main thread's event loop (async file
   I/O, saves to one file queued so none loses the other's keys); a malformed
-  file reads as none.
+  file reads as none. The 3D view keeps its own file per scope
+  (`graph-layout-3d.json`, or the hash of `<scope>#3d`), with three numbers
+  per key; a file of the other dimension reads as none.
 
 ## Collections
 

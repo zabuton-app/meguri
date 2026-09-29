@@ -1,11 +1,13 @@
 // The row above the canvas: search, relationship-kind toggles, generated tags,
-// orphans, re-layout and the settings panel.
+// orphans, 2D / 3D, re-layout and the settings panel.
 import { memo, type ReactNode } from "react";
 import { RefreshCw, Settings2 } from "lucide-react";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import { EDGE_SOURCE_INFO } from "./edgeSources";
 import type { VisibilityOptions } from "./model/visibility";
+import type { GraphDims } from "@shared/ipc/graph";
 
 function Toggle({
   pressed,
@@ -49,7 +51,14 @@ interface Props {
   onRelayout: () => void;
   settingsOpen: boolean;
   onSettings: (open: boolean) => void;
+  dims: GraphDims;
+  onDims: (dims: GraphDims) => void;
 }
+
+const DIMS = [
+  { value: 2, label: "2D" },
+  { value: 3, label: "3D" },
+] as const satisfies readonly { value: GraphDims; label: string }[];
 
 export const GraphToolbar = memo(function GraphToolbar({
   search,
@@ -58,6 +67,8 @@ export const GraphToolbar = memo(function GraphToolbar({
   onRelayout,
   settingsOpen,
   onSettings,
+  dims,
+  onDims,
 }: Props) {
   const { t } = useI18n();
   return (
@@ -97,6 +108,13 @@ export const GraphToolbar = memo(function GraphToolbar({
         {t("graph.toggle.orphans")}
       </Toggle>
       <div className="mx-1 h-5 w-px bg-border" />
+      <SegmentedControl<GraphDims>
+        value={dims}
+        options={DIMS}
+        onChange={onDims}
+        label={t("graph.dims")}
+        slot="graph-dims"
+      />
       <Toggle onClick={onRelayout}>
         <RefreshCw className="size-3.5" />
         {t("graph.relayout")}

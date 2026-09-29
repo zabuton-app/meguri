@@ -54,6 +54,9 @@ export interface GraphPayload {
 export const GRAPH_MAX_FILES = 5_000;
 /** The most a caller may ask for at the IPC boundary. */
 export const GRAPH_MAX_FILES_HARD = 20_000;
+/** Dimensions a graph layout has: the flat view, or the 3D one. */
+export type GraphDims = 2 | 3;
+
 /** Positions one layout cache file keeps. */
 export const GRAPH_LAYOUT_MAX_NODES = 40_000;
 /** Length cap on a node key crossing IPC (keys embed a meta_key or tag name). */

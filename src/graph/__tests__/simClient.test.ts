@@ -36,7 +36,8 @@ afterEach(() => {
 
 function input() {
   return {
-    xy: new Float32Array([0, 0, 1, 1]),
+    dims: 2 as const,
+    pos: new Float32Array([0, 0, 1, 1]),
     links: new Uint32Array([0, 1]),
     alpha: 1,
     pins: [],
@@ -52,9 +53,9 @@ describe("SimClient", () => {
     const first = client.load(input());
     const second = client.load(input());
     const w = FakeWorker.last!;
-    w.reply({ type: "positions", gen: first, xy: new Float32Array([9, 9]) });
-    w.reply({ type: "positions", gen: second, xy: new Float32Array([1, 2]) });
-    w.reply({ type: "positions", gen: second, xy: new Float32Array([3, 4]) });
+    w.reply({ type: "positions", gen: first, pos: new Float32Array([9, 9]) });
+    w.reply({ type: "positions", gen: second, pos: new Float32Array([1, 2]) });
+    w.reply({ type: "positions", gen: second, pos: new Float32Array([3, 4]) });
     await new Promise((r) => setTimeout(r, 5));
     expect(onPositions).toHaveBeenCalledTimes(1);
     expect(Array.from(onPositions.mock.calls[0][0] as Float32Array)).toEqual([

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
 import { GRAPH_SIZED_BY_PLAYS } from "@/lib/queryCache";
 import type { SearchQuery } from "@/ipc/types";
+import type { GraphDims } from "@shared/ipc/graph";
 import type { Point } from "./model/placement";
 
 /** Stands in for the cache when it cannot be read: one instance, so the
@@ -26,6 +27,8 @@ export function useGraphData(
   enabled: boolean,
   /** Nodes are sized by plays, so a recorded play refreshes the payload. */
   sizedByPlays = false,
+  /** Which layout cache to read: the flat view's or the 3D one's. */
+  dims: GraphDims = 2,
 ) {
   const q = graphQuery(query);
   const graph = useQuery({
@@ -47,12 +50,12 @@ export function useGraphData(
     wasByPlays.current = sizedByPlays;
   }, [sizedByPlays, enabled, refetch]);
   const layout = useQuery({
-    queryKey: ["graph_layout", scope],
+    queryKey: ["graph_layout", scope, dims],
     queryFn: async () => {
-      const stored = await api.graphLayoutGet(scope);
+      const stored = await api.graphLayoutGet(scope, dims);
       const out = new Map<string, Point>();
       stored?.keys.forEach((k, i) =>
-        out.set(k, [stored.xy[i * 2], stored.xy[i * 2 + 1]]),
+        out.set(k, stored.xy.slice(i * dims, (i + 1) * dims)),
       );
       return out;
     },

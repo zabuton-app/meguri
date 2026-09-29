@@ -398,6 +398,7 @@ export const fr: Record<TranslationKey, string> = {
   "graph.edge.tag": "Taggé",
   "graph.toggle.autoTags": "Tags automatiques",
   "graph.toggle.orphans": "Nœuds orphelins",
+  "graph.dims": "Dimensions",
   "graph.relayout": "Réorganiser",
   "graph.settings.title": "Réglages du graphe",
   "graph.settings.reset": "Rétablir les valeurs par défaut",

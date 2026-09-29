@@ -1,8 +1,8 @@
 // The graph view's force simulation, off the main thread. Ticks at 60 Hz
 // while the simulation is warm, posting each tick's positions back; goes
 // quiet (and says so) once it has cooled down. Runs the WebAssembly engine,
-// or d3-force where WebAssembly cannot start.
-import { d3Engine, wasmEngine, type ForceEngine } from "./engine";
+// or d3-force-3d where WebAssembly cannot start.
+import { d3Engine, wasmEngine, type Dims, type ForceEngine } from "./engine";
 import { REHEAT_ALPHA, TICK_MS } from "./physics";
 import type { SimRequest, SimResponse } from "./protocol";
 import { Simulation } from "./simulation";
@@ -22,6 +22,7 @@ function createEngine(): ForceEngine {
 const sim = new Simulation(createEngine());
 let gen = 0;
 let size = 0;
+let dims: Dims = 2;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let idle = true;
 
@@ -39,8 +40,8 @@ function loop(): void {
   // Scheduled first, so ticks stay a frame apart whatever one costs.
   schedule();
   sim.step();
-  const xy = sim.engine.positions();
-  post({ type: "positions", gen, xy }, [xy.buffer]);
+  const pos = sim.engine.positions();
+  post({ type: "positions", gen, pos }, [pos.buffer]);
 }
 
 function schedule(): void {
@@ -54,20 +55,21 @@ self.onmessage = (e: MessageEvent<SimRequest>) => {
   const msg = e.data;
   switch (msg.type) {
     case "load": {
-      const n = msg.xy.length / 2;
+      const n = msg.pos.length / msg.dims;
       // Indices past the nodes would read and write outside the arrays in
       // the WebAssembly memory (it is built without bounds checks).
       if (msg.links.some((i) => i >= n)) {
         console.error("graph simulation: a link points past the nodes");
         return;
       }
+      dims = msg.dims;
       gen = msg.gen;
       size = n;
-      sim.engine.load(msg.xy, msg.links);
+      sim.engine.load(msg.pos, msg.links, dims);
       let pinned = false;
       for (const p of msg.pins)
-        if (p.index < size) {
-          sim.engine.pin(p.index, p.x, p.y);
+        if (p.index < size && p.at.length >= dims) {
+          sim.engine.pin(p.index, p.at);
           pinned = true;
         }
       // A drag keeps the graph warm; one whose node did not come along
@@ -81,9 +83,9 @@ self.onmessage = (e: MessageEvent<SimRequest>) => {
       break;
     case "pin":
       if (msg.gen !== gen || msg.index >= size) break;
-      if (msg.x == null || msg.y == null) sim.engine.unpin(msg.index);
-      else if (Number.isFinite(msg.x) && Number.isFinite(msg.y))
-        sim.engine.pin(msg.index, msg.x, msg.y);
+      if (msg.at == null) sim.engine.unpin(msg.index);
+      else if (msg.at.length >= dims && msg.at.every(Number.isFinite))
+        sim.engine.pin(msg.index, msg.at);
       break;
     case "heat":
       if (msg.alpha != null) sim.raise(msg.alpha);

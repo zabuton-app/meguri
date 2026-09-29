@@ -7,7 +7,13 @@
 // visible nodes, seating any that have no position yet.
 // Positions come from what is on screen, where a node last stood, the
 // scope's layout cache, or placement.ts.
+//
+// The graph shows flat (sigma) or in 3D (three.js, loaded on first use). The
+// two lay a graph out differently and keep their own layout cache, so
+// switching remounts the scene: state, simulation and camera start afresh.
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -18,7 +24,12 @@ import {
 import { useNavigate } from "react-router";
 import { Maximize, Minus, Plus, Share2 } from "lucide-react";
 import { tagSearchToken, qualifiedTagName } from "@shared/tags";
-import { GRAPH_LAYOUT_MAX_NODES, GRAPH_NODE_KEY_MAX } from "@shared/ipc/graph";
+import {
+  GRAPH_LAYOUT_MAX_NODES,
+  GRAPH_NODE_KEY_MAX,
+  type GraphDims,
+} from "@shared/ipc/graph";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { api } from "@/ipc/client";
 import type { SearchQuery } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -28,7 +39,11 @@ import { buildGraphology, emptyGraph } from "./model/buildGraphology";
 import { placeNodes, type Point } from "./model/placement";
 import type { MediaGraph } from "./model/types";
 import { visibleSet } from "./model/visibility";
-import { GraphCanvas, type GraphCanvasHandle } from "./GraphCanvas";
+import {
+  GraphCanvas,
+  type GraphCanvasHandle,
+  type GraphCanvasProps,
+} from "./GraphCanvas";
 import { GraphErrorBoundary } from "./GraphErrorBoundary";
 import { GraphLegend } from "./GraphLegend";
 import { GraphSearch } from "./GraphSearch";
@@ -43,6 +58,17 @@ import { useGraphData } from "./useGraphData";
 
 /** Positions are written this long after the simulation last cooled down. */
 const SAVE_DEBOUNCE_MS = 2_000;
+
+export const GRAPH_DIMS_KEY = "meguri.graph.dims";
+
+function parseDims(raw: string | null): GraphDims {
+  return raw === "3" ? 3 : 2;
+}
+
+// three.js is only loaded for the 3D view.
+const GraphCanvas3D = lazy(() =>
+  import("./GraphCanvas3D").then((m) => ({ default: m.GraphCanvas3D })),
+);
 
 interface Props {
   /** Active target: workspace id, "__all__" or "collection:<id>". */
@@ -64,6 +90,14 @@ interface Simulated {
   keys: string[];
   links: Uint32Array;
   epoch: number;
+}
+
+/** A node's position as the simulation of `dims` dimensions sees it. */
+function pointOf(
+  a: { x: number; y: number; z: number },
+  dims: GraphDims,
+): Point {
+  return dims === 3 ? [a.x, a.y, a.z] : [a.x, a.y];
 }
 
 function sameArray<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
@@ -105,13 +139,24 @@ function CameraButton({
   );
 }
 
-export function GraphView({
+export function GraphView(props: Props) {
+  const [dims, setDims] = useLocalStorage<GraphDims>(
+    GRAPH_DIMS_KEY,
+    2,
+    parseDims,
+  );
+  return <GraphScene key={dims} {...props} dims={dims} onDims={setDims} />;
+}
+
+function GraphScene({
   scope,
   query,
   ready,
   keysActive,
   onFilterToken,
-}: Props) {
+  dims,
+  onDims,
+}: Props & { dims: GraphDims; onDims: (dims: GraphDims) => void }) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const colors = useGraphColors();
@@ -159,6 +204,7 @@ export function GraphView({
     query,
     ready,
     settings.display.sizeBy === "plays",
+    dims,
   );
 
   // --- saving positions -----------------------------------------------------
@@ -181,16 +227,17 @@ export function GraphView({
       // position that is not a number, would fail the whole save; that one
       // node just is not cached.
       if (!seated.current.has(key) || key.length > GRAPH_NODE_KEY_MAX) return;
-      if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) return;
+      const p = pointOf(a, dims);
+      if (!p.every(Number.isFinite)) return;
       keys.push(key);
       // Two decimals are plenty on a layout thousands of units wide, and
       // halve the file.
-      xy.push(Math.round(a.x * 100) / 100, Math.round(a.y * 100) / 100);
+      for (const v of p) xy.push(Math.round(v * 100) / 100);
     });
-    api.graphLayoutSet(scope, keys, xy).catch((e: unknown) => {
+    api.graphLayoutSet(scope, keys, xy, dims).catch((e: unknown) => {
       log.warn("failed to save the graph layout:", e);
     });
-  }, [scope]);
+  }, [scope, dims]);
   const scheduleSave = useCallback(() => {
     dirty.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -207,7 +254,7 @@ export function GraphView({
   // --- the simulation's output ----------------------------------------------
   useEffect(() => {
     sim.setCallbacks({
-      onPositions: (xy, gen) => {
+      onPositions: (pos, gen) => {
         const s = simulated.current;
         if (gen !== s.gen) return;
         // Leaving before the simulation cools down still saves where it got.
@@ -217,16 +264,22 @@ export function GraphView({
           (key, attrs) => {
             const i = s.index.get(key);
             if (i == null || key === held) return attrs;
-            const x = xy[i * 2];
-            const y = xy[i * 2 + 1];
+            const x = pos[i * dims];
+            const y = pos[i * dims + 1];
+            const z = dims === 3 ? pos[i * dims + 2] : 0;
             // In place: a fresh object per node per frame is GC churn.
-            if (Number.isFinite(x) && Number.isFinite(y)) {
+            if (
+              Number.isFinite(x) &&
+              Number.isFinite(y) &&
+              Number.isFinite(z)
+            ) {
               attrs.x = x;
               attrs.y = y;
+              attrs.z = z;
             }
             return attrs;
           },
-          { attributes: ["x", "y"] },
+          { attributes: ["x", "y", "z"] },
         );
       },
       onIdle: (gen) => {
@@ -239,7 +292,7 @@ export function GraphView({
       },
     });
     return () => sim.setCallbacks(null);
-  }, [sim, scheduleSave]);
+  }, [sim, scheduleSave, dims]);
 
   const physics = useMemo(() => physicsOf(settings.forces), [settings.forces]);
   useEffect(() => sim.setPhysics(physics), [sim, physics]);
@@ -251,7 +304,7 @@ export function GraphView({
     const { graph: next, added } = buildGraphology(payload, prev);
     prev.forEachNode((key, a) => {
       if (next.hasNode(key) || !seated.current.has(key)) return;
-      lastSeen.current.set(key, [a.x, a.y]);
+      lastSeen.current.set(key, pointOf(a, dims));
       // Seated again from lastSeen if it comes back (see below).
       seated.current.delete(key);
     });
@@ -262,7 +315,7 @@ export function GraphView({
         lastSeen.current.get(key) ??
         (cacheStale.current ? undefined : cache.get(key));
       if (p) {
-        next.mergeNodeAttributes(key, { x: p[0], y: p[1] });
+        next.mergeNodeAttributes(key, { x: p[0], y: p[1], z: p[2] ?? 0 });
         seated.current.add(key);
       } else {
         seated.current.delete(key);
@@ -274,7 +327,7 @@ export function GraphView({
     setGraph(next);
     setSelected((sel) => (sel && next.hasNode(sel) ? sel : null));
     setHovered((h) => (h && next.hasNode(h) ? h : null));
-  }, [payload, cache]);
+  }, [payload, cache, dims]);
 
   // --- what shows ------------------------------------------------------------
   const visibility = useMemo(
@@ -287,29 +340,33 @@ export function GraphView({
   useEffect(() => {
     const keys = [...visibility.nodes];
     const pending = keys.filter((k) => !seated.current.has(k));
-    const seats = placeNodes(graph, pending, visibility, (key) => {
-      if (!seated.current.has(key)) return null;
-      const { x, y } = graph.getNodeAttributes(key);
-      return [x, y];
-    });
+    const seats = placeNodes(
+      graph,
+      pending,
+      visibility,
+      (key) =>
+        seated.current.has(key)
+          ? pointOf(graph.getNodeAttributes(key), dims)
+          : null,
+      Math.random,
+      dims,
+    );
     if (seats.size > 0) {
       graph.updateEachNodeAttributes(
         (key, attrs) => {
           const p = seats.get(key);
-          return p ? { ...attrs, x: p[0], y: p[1] } : attrs;
+          return p ? { ...attrs, x: p[0], y: p[1], z: p[2] ?? 0 } : attrs;
         },
-        { attributes: ["x", "y"] },
+        { attributes: ["x", "y", "z"] },
       );
       for (const key of seats.keys()) seated.current.add(key);
     }
 
     const index = new Map(keys.map((k, i) => [k, i]));
-    const xy = new Float32Array(keys.length * 2);
-    keys.forEach((key, i) => {
-      const { x, y } = graph.getNodeAttributes(key);
-      xy[i * 2] = x;
-      xy[i * 2 + 1] = y;
-    });
+    const pos = new Float32Array(keys.length * dims);
+    keys.forEach((key, i) =>
+      pos.set(pointOf(graph.getNodeAttributes(key), dims), i * dims),
+    );
     const links = new Uint32Array(visibility.edges.size * 2);
     let k = 0;
     for (const edge of visibility.edges) {
@@ -330,15 +387,17 @@ export function GraphView({
       return;
     }
     // A drag in progress goes on over the new graph.
-    const pins: { index: number; x: number; y: number }[] = [];
+    const pins: { index: number; at: number[] }[] = [];
     const held = holding.current;
     const heldIndex = held != null ? index.get(held) : undefined;
-    if (held != null && heldIndex != null) {
-      const { x, y } = graph.getNodeAttributes(held);
-      pins.push({ index: heldIndex, x, y });
-    }
+    if (held != null && heldIndex != null)
+      pins.push({
+        index: heldIndex,
+        at: pointOf(graph.getNodeAttributes(held), dims),
+      });
     const gen = sim.load({
-      xy,
+      dims,
+      pos,
       links: links.slice(),
       // Mostly new, the graph starts hot, as a fresh one does in Obsidian.
       alpha: pending.length * 2 > keys.length ? 1 : REHEAT_ALPHA,
@@ -350,7 +409,7 @@ export function GraphView({
       refit.current = pending.length > 0;
       canvas.current?.fit(false);
     }
-  }, [graph, visibility, sim, epoch]);
+  }, [graph, visibility, sim, epoch, dims]);
 
   const relayout = useCallback(() => {
     for (const key of visibility.nodes) seated.current.delete(key);
@@ -368,18 +427,17 @@ export function GraphView({
       if (i == null || !g.hasNode(key)) return false;
       holding.current = key;
       setDragging(key);
-      const { x, y } = g.getNodeAttributes(key);
-      sim.drag(i, x, y);
+      sim.drag(i, pointOf(g.getNodeAttributes(key), dims));
       return true;
     },
-    [sim],
+    [sim, dims],
   );
   const drag = useCallback(
-    (key: string, x: number, y: number) => {
+    (key: string, x: number, y: number, z = 0) => {
       const i = simulated.current.index.get(key);
-      if (i != null) sim.drag(i, x, y);
+      if (i != null) sim.drag(i, pointOf({ x, y, z }, dims));
     },
-    [sim],
+    [sim, dims],
   );
   const dragEnd = useCallback(
     (key: string) => {
@@ -451,6 +509,20 @@ export function GraphView({
   }, []);
 
   const empty = !!payload && visibility.nodes.size === 0;
+  const canvasProps: GraphCanvasProps = {
+    graph,
+    colors,
+    visibility,
+    focus,
+    display: settings.display,
+    onHover: setHovered,
+    onClickNode: open,
+    onClickStage: clearPick,
+    onDragStart: dragStart,
+    onDrag: drag,
+    onDragEnd: dragEnd,
+    onCameraInput: cameraInput,
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-slot="graph-view">
@@ -461,6 +533,8 @@ export function GraphView({
         onRelayout={relayout}
         settingsOpen={panelOpen}
         onSettings={setPanelOpen}
+        dims={dims}
+        onDims={onDims}
       />
       <div className="relative min-h-0 flex-1 overflow-hidden bg-bg">
         <GraphErrorBoundary
@@ -470,21 +544,13 @@ export function GraphView({
             </div>
           }
         >
-          <GraphCanvas
-            ref={canvas}
-            graph={graph}
-            colors={colors}
-            visibility={visibility}
-            focus={focus}
-            display={settings.display}
-            onHover={setHovered}
-            onClickNode={open}
-            onClickStage={clearPick}
-            onDragStart={dragStart}
-            onDrag={drag}
-            onDragEnd={dragEnd}
-            onCameraInput={cameraInput}
-          />
+          {dims === 3 ? (
+            <Suspense fallback={null}>
+              <GraphCanvas3D ref={canvas} {...canvasProps} />
+            </Suspense>
+          ) : (
+            <GraphCanvas ref={canvas} {...canvasProps} />
+          )}
         </GraphErrorBoundary>
 
         {(isLoading || isError || empty) && (
@@ -524,6 +590,7 @@ export function GraphView({
         {panelOpen && (
           <div className="absolute right-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] overflow-y-auto">
             <GraphSettingsPanel
+              dims={dims}
               settings={settings}
               onChange={setSettings}
               onClose={closePanel}

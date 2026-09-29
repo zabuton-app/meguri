@@ -50,6 +50,50 @@ function playWeights(
   return out;
 }
 
+/** Opacity of what is not next to the focused node. */
+export const FADED = 0.2;
+/** Gap between a node and the label under it, in graph units (drawn at
+ *  √scale like the node). */
+export const LABEL_GAP = 5;
+/** How far the focused node's label moves down, in pixels. */
+export const FOCUS_LABEL_DROP = 15;
+
+/** A node's fill: files by kind, tags by whether they are generated. */
+export function nodeFill(
+  a: { type: "file"; fileKind: string } | { type: "tag"; auto: boolean },
+  c: {
+    video: string;
+    image: string;
+    audio: string;
+    tag: string;
+    autoTag: string;
+  },
+): string {
+  if (a.type === "tag") return a.auto ? c.autoTag : c.tag;
+  if (a.fileKind === "image") return c.image;
+  if (a.fileKind === "audio") return c.audio;
+  return c.video;
+}
+
+/** Label font size (px) for a node drawn `radiusPx` wide at `scale`:
+ *  Obsidian's 14 + radius / 4 graph units, at √scale. */
+export function labelFontPx(scale: number, radiusPx: number): number {
+  return 14 * Math.sqrt(scale) + radiusPx / 4;
+}
+
+/** The focused node's label size: the same, but never smaller than at scale 1,
+ *  so it stays readable however far out the view is. */
+export function focusLabelFontPx(scale: number, radiusPx: number): number {
+  const root = Math.sqrt(scale);
+  return (14 + radiusPx / root / 4) * (scale < 1 ? 1 : root);
+}
+
+/** Label opacity at `scale` pixels per graph unit, as Obsidian fades labels:
+ *  log2(scale) + 1 − the text fade setting, clamped to 0..1. */
+export function textAlpha(scale: number, textFade: number): number {
+  return Math.min(1, Math.max(0, Math.log2(scale) + 1 - textFade));
+}
+
 /** The node radius in graph units for a node with `links` visible links. */
 export function nodeRadius(links: number, multiplier = 1): number {
   return multiplier * Math.min(30, Math.max(8, 3 * Math.sqrt(links + 1)));
