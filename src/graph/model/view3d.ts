@@ -14,6 +14,31 @@ export function pixelsPerUnit(
   return height / 2 / (Math.tan(half) * depth);
 }
 
+/**
+ * Whether a node's label can show in a `width` × `height` viewport, from the
+ * node's projected centre (`x`, `y`) and radius in pixels. The label is
+ * centred under the node: it spans `halfWidth` to either side and reaches
+ * `below` pixels past the node's bottom edge. Conservative inputs only admit
+ * more candidates; they never hide a label that shows.
+ */
+export function labelInView(
+  x: number,
+  y: number,
+  radius: number,
+  halfWidth: number,
+  below: number,
+  width: number,
+  height: number,
+): boolean {
+  const side = Math.max(radius, halfWidth);
+  return (
+    x + side >= 0 &&
+    x - side <= width &&
+    y + radius + below >= 0 &&
+    y - radius <= height
+  );
+}
+
 /** How far a camera must stand from the centre of a sphere of `radius` to see
  *  all of it, with a margin, given the vertical field of view and the
  *  viewport's aspect (width / height): the narrower of the two angles rules. */

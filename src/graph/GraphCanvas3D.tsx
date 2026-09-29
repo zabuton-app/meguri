@@ -55,13 +55,18 @@ import {
   textAlpha,
 } from "./model/appearance";
 import type { MediaGraph, NodeAttrs } from "./model/types";
-import { boundingSphere, fitDistance, pixelsPerUnit } from "./model/view3d";
+import {
+  boundingSphere,
+  fitDistance,
+  labelInView,
+  pixelsPerUnit,
+} from "./model/view3d";
 import type { GraphColors } from "./useGraphColors";
 
 const FOV = 50;
 /** Pointer travel (px) that turns a press into a drag, as in the flat view. */
 const DRAG_START_PX = 5;
-/** Most labels drawn in a frame (the nearest ones win). */
+/** Most labels drawn in a frame (the nearest on-screen ones win). */
 const MAX_LABELS = 400;
 /** Buttons and the wheel zoom by this factor, as in the flat view. */
 const ZOOM_STEP = 1.5;
@@ -364,6 +369,9 @@ export function GraphCanvas3D({
     const sy: number[] = [];
     const sd: number[] = [];
     const spx: number[] = [];
+    // Reused across frames by the label pass.
+    const order: number[] = [];
+    let alphas = new Float32Array(0);
     const v = new Vector3();
     function project() {
       for (let i = 0; i < keys.length; i++) {
@@ -412,20 +420,35 @@ export function GraphCanvas3D({
       const dpr = window.devicePixelRatio;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
-      const order: number[] = [];
-      for (let i = 0; i < keys.length; i++) if (sd[i] >= 0) order.push(i);
+      // Candidates are the labels that would show: nearer nodes off to the
+      // side must not take the places, and a shorter list is quicker to
+      // sort, which happens every frame.
+      order.length = 0;
+      if (alphas.length < keys.length) alphas = new Float32Array(keys.length);
+      for (let i = 0; i < keys.length; i++) {
+        if (sd[i] < 0 || keys[i] === f) continue;
+        const scale = pixelsPerUnit(sd[i], FOV, height);
+        const faded = !!f && !neighbours.has(keys[i]);
+        const alpha = textAlpha(scale, d.textFade) * (faded ? FADED : 1);
+        if (alpha <= 0.001) continue;
+        // A character is taken as a full em wide, so a label is never
+        // judged narrower than it is.
+        const fontPx = labelFontPx(scale, spx[i]);
+        const half = (at(i).label.length * fontPx) / 2;
+        const below = LABEL_GAP * Math.sqrt(scale) + fontPx;
+        if (!labelInView(sx[i], sy[i], spx[i], half, below, width, height))
+          continue;
+        alphas[i] = alpha;
+        order.push(i);
+      }
       order.sort((a, b) => sd[a] - sd[b]);
       const drawn = order.slice(0, MAX_LABELS).reverse();
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
       ctx.fillStyle = c.label;
       for (const i of drawn) {
-        const key = keys[i];
-        if (key === f) continue;
         const scale = pixelsPerUnit(sd[i], FOV, height);
-        const faded = !!f && !neighbours.has(key);
-        const alpha = textAlpha(scale, d.textFade) * (faded ? FADED : 1);
-        if (alpha <= 0.001) continue;
+        const alpha = alphas[i];
         const root = Math.sqrt(scale);
         ctx.globalAlpha = alpha;
         // Rounded, so the canvas can reuse a parsed font across labels.
