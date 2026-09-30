@@ -8,6 +8,7 @@ import type {
 } from "@/ipc/types";
 import {
   dropFromWatchLaterCache,
+  forgetDeletedFile,
   invalidateCollectionSearches,
   invalidatePlayedSearches,
   invalidateTagSearches,
@@ -220,5 +221,44 @@ describe("dropFromWatchLaterCache", () => {
 
     expect(itemsOf(qc)).toEqual([{ workspaceId: "ws", fileId: 1, addedAt: 0 }]);
     expect(qc.getQueryState(["workspaces_list"])?.status).toBe("success");
+  });
+});
+
+describe("forgetDeletedFile", () => {
+  it("re-reads every view that lists indexed files, and only those", () => {
+    const qc = new QueryClient();
+    const keys = {
+      search: ["files_search", "ws", {}],
+      random: ["files_random", "ws"],
+      folders: ["folders_list", "ws", ""],
+      otherFolders: ["folders_list", "other", ""],
+      history: ["history_list", "ws"],
+      duplicates: ["duplicates_list", "ws"],
+      tags: ["tags_list_all"],
+    };
+    for (const key of Object.values(keys)) qc.setQueryData(key, []);
+    // Search results are paged.
+    qc.setQueryData(keys.search, { pages: [], pageParams: [] });
+    qc.setQueryData(["file_get", "ws", 1], null);
+
+    forgetDeletedFile(qc, "ws", 1);
+
+    const invalidated = Object.entries(keys)
+      .filter(
+        ([, key]) =>
+          qc.getQueryCache().find({ queryKey: key, exact: true })?.state
+            .isInvalidated,
+      )
+      .map(([name]) => name);
+    expect(invalidated).toEqual([
+      "search",
+      "random",
+      "folders",
+      "history",
+      "duplicates",
+    ]);
+    expect(qc.getQueryCache().find({ queryKey: ["file_get", "ws", 1] })).toBe(
+      undefined,
+    );
   });
 });

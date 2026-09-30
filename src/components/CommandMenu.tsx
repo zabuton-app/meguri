@@ -36,7 +36,11 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { useSelection } from "@/components/SelectionContext";
-import { useFileActions, type FileActions } from "@/hooks/useFileActions";
+import {
+  useCollectionMembership,
+  useFileActions,
+  type FileActions,
+} from "@/hooks/useFileActions";
 import { useFocusedFile } from "@/hooks/useFocusedFile";
 import {
   clearRecentSearches,
@@ -297,6 +301,7 @@ function CommandMenuBody({
           <CollectionsPage
             t={t}
             typing={typed !== ""}
+            targets={targets}
             files={files}
             closeThen={closeThen}
           />
@@ -544,15 +549,18 @@ function RatingPage({
 function CollectionsPage({
   t,
   typing,
+  targets,
   files,
   closeThen,
 }: {
   t: TFunc;
   typing: boolean;
+  targets: FileRow[];
   files: FileActions;
   closeThen: (fn: () => void) => void;
 }) {
-  const { shown, hidden } = capped(files.collections, typing);
+  const collections = useCollectionMembership(targets);
+  const { shown, hidden } = capped(collections, typing);
   return (
     <CommandGroup heading={t("command.pageCollections")}>
       {shown.map((c) => (

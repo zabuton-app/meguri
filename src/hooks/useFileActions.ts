@@ -55,8 +55,7 @@ export interface FileActions {
   /** The rating every target shares, or null when they disagree. */
   rating: number | null;
   setRating: (rating: number) => void;
-  /** The user's collections (Watch Later has its own toggle), in rail order. */
-  collections: CollectionMembership[];
+  /** Membership comes from useCollectionMembership. */
   toggleCollection: (collection: CollectionMembership) => void;
   /** Set only when there is exactly one target. */
   single: SingleFileActions | null;
@@ -64,25 +63,20 @@ export interface FileActions {
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export function useFileActions(
+/**
+ * The user's collections (Watch Later has its own toggle), in rail order, with
+ * whether `rows` are in each. Apart from useFileActions: reading it scans
+ * every collection's items, so only the view that lists the collections pays
+ * for it, not every opening of a menu that merely offers them.
+ */
+export function useCollectionMembership(
   rows: FileRow[],
-  watchLater: WatchLaterMembership,
-  /**
-   * Skip the collection-search invalidation while the detail view is open;
-   * see useBulkEdit, whose rule this is.
-   */
-  deferListRefresh = false,
-): FileActions {
-  const { t } = useI18n();
-  const qc = useQueryClient();
-  const confirm = useConfirm();
-  const bulk = useBulkEdit(rows, watchLater.id, deferListRefresh);
+): CollectionMembership[] {
   const workspaces = useQuery({
     queryKey: ["workspaces_list"],
     queryFn: api.workspacesList,
   });
-
-  const collections = useMemo<CollectionMembership[]>(() => {
+  return useMemo(() => {
     const keys = new Set(rows.map((r) => `${r.workspaceId}:${r.id}`));
     return (workspaces.data?.collections ?? [])
       .filter((c) => c.id !== WATCH_LATER_ID)
@@ -98,6 +92,21 @@ export function useFileActions(
         };
       });
   }, [rows, workspaces.data]);
+}
+
+export function useFileActions(
+  rows: FileRow[],
+  watchLater: WatchLaterMembership,
+  /**
+   * Skip the collection-search invalidation while the detail view is open;
+   * see useBulkEdit, whose rule this is.
+   */
+  deferListRefresh = false,
+): FileActions {
+  const { t } = useI18n();
+  const qc = useQueryClient();
+  const confirm = useConfirm();
+  const bulk = useBulkEdit(rows, watchLater.id, deferListRefresh);
 
   const membership = useMutation({
     // Rows captured at click time and carried to onSuccess, for the same
@@ -194,7 +203,6 @@ export function useFileActions(
       : null,
     rating: uniformRating(rows),
     setRating: bulk.setRating,
-    collections,
     toggleCollection: (collection) =>
       membership.mutate({
         collection,
