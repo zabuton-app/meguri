@@ -115,6 +115,7 @@ export default tseslint.config(
       "src/settings/PreferencesProvider.tsx",
       "src/themes/ThemeProvider.tsx",
       "src/components/ConfirmDialog.tsx",
+      "src/components/SelectionContext.tsx",
     ],
     rules: {
       "react-refresh/only-export-components": "off",
