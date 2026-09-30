@@ -667,9 +667,12 @@ describe("folder selection", () => {
   function FolderHarness({
     folders,
     expand,
+    extra,
   }: {
     folders: FolderEntry[];
     expand: (paths: string[]) => Promise<FolderFilesResult>;
+    /** Rendered inside the provider, to reach the selection directly. */
+    extra?: React.ReactNode;
   }) {
     const [scope, setScope] = useState("root");
     return (
@@ -693,6 +696,7 @@ describe("folder selection", () => {
             onOpenFolder={() => {}}
           />
           <SelectionLayer active />
+          {extra}
         </SelectionProvider>
       </>
     );
@@ -737,6 +741,39 @@ describe("folder selection", () => {
     expect(
       within(bar()!).getByRole("button", { name: /Edit tags/ }),
     ).toHaveProperty("disabled", false);
+  });
+
+  it("forgets a deleted file wherever the selection holds it", async () => {
+    const { expand, calls } = deferredExpand();
+    function Forget({ file }: { file: FileRow }) {
+      const { forget } = useSelection();
+      return (
+        <button type="button" onClick={() => forget(file)}>
+          forget
+        </button>
+      );
+    }
+    renderWithProviders(
+      <FolderHarness
+        folders={[folder("Movie", 2)]}
+        expand={expand}
+        extra={<Forget file={items[0]} />}
+      />,
+    );
+    fireEvent.click(mediaBoxes()[0]);
+    fireEvent.click(folderBoxes()[0]);
+    const inFolder = filesOf("Movie", 1, 100)[0];
+    await act(async () => {
+      // One of the folder's files is also the file picked directly.
+      calls[0].resolve([
+        { path: "Movie", total: 2, rows: [items[0], inFolder] },
+      ]);
+      await Promise.resolve();
+    });
+    expect(selectedCount()).toBe(2);
+    fireEvent.click(screen.getByRole("button", { name: "forget" }));
+    // Gone from the direct picks and from the folder's files alike.
+    expect(selectedCount()).toBe(1);
   });
 
   it("adds folder files to picked files without counting any twice", async () => {

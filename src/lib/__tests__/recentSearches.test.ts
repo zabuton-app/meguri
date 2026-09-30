@@ -129,6 +129,17 @@ describe("recallRecentSearch", () => {
     ).toEqual({ q: "cat", sort: "size" });
   });
 
+  it("treats a direction alone (the default key) as a sort", () => {
+    // In use: added, ascending. Kept over a search saved without a sort.
+    expect(recallRecentSearch({ q: "cat" }, { sortDir: "asc" })).toEqual({
+      q: "cat",
+      sortDir: "asc",
+    });
+    // Saved: added, ascending. Applied as it was, without the current key.
+    const query = { q: "cat", sortDir: "asc" as const };
+    expect(recallRecentSearch(query, { sort: "name" })).toBe(query);
+  });
+
   it("returns the search as it is when no sort is in use", () => {
     const query = { q: "cat" };
     expect(recallRecentSearch(query, {})).toBe(query);

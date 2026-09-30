@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useSelection } from "@/components/SelectionContext";
 import { useBulkEdit } from "@/hooks/useBulkEdit";
 import type { WatchLaterMembership } from "@/hooks/useWatchLater";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -101,19 +102,18 @@ export interface FileActionsOptions {
    * see useBulkEdit, whose rule this is.
    */
   deferListRefresh?: boolean;
-  /** The file is gone from the index and the caches (to drop it from a selection). */
-  onDeleted?: (file: FileRow) => void;
 }
 
 export function useFileActions(
   rows: FileRow[],
   watchLater: WatchLaterMembership,
-  { deferListRefresh = false, onDeleted }: FileActionsOptions = {},
+  { deferListRefresh = false }: FileActionsOptions = {},
 ): FileActions {
   const { t } = useI18n();
   const qc = useQueryClient();
   const confirm = useConfirm();
   const bulk = useBulkEdit(rows, watchLater.id, deferListRefresh);
+  const { forget } = useSelection();
 
   const membership = useMutation({
     // Rows captured at click time and carried to onSuccess, for the same
@@ -195,7 +195,8 @@ export function useFileActions(
         try {
           const deleted = await api.fileDeleteFromIndex(id, workspaceId);
           forgetDeletedFile(qc, workspaceId, deleted.id);
-          onDeleted?.(file);
+          // A selected row outlives the list's copy of it (see forget).
+          forget(file);
         } catch (e) {
           toast.error(t("media.deleteFromIndexFailed"), {
             description: errorText(e),
@@ -203,7 +204,7 @@ export function useFileActions(
         }
       },
     };
-  }, [file, t, confirm, qc, onDeleted]);
+  }, [file, t, confirm, qc, forget]);
 
   return {
     favorite,

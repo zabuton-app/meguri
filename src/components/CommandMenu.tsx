@@ -91,17 +91,11 @@ interface CommandMenuProps {
   /** Sets the full-text query to what was typed. */
   onQuickSearch: (text: string) => void;
   /**
-   * The detail view is open beside or over the list. File actions defer the
-   * collection-list refresh then (see useBulkEdit), and leave deleting to the
-   * detail view: the file it shows may be the one focused here, and only the
-   * detail view knows how to close itself over a file that is gone.
-   */
-  detailOpen?: boolean;
-  /**
-   * The list, or the detail view opened from it, is what is on screen. Other
-   * screens (the player, Discovery, History, …) sit over a list whose focus
-   * is out of sight, so the menu offers no file actions there rather than
-   * act on a file other than the one the user is looking at.
+   * The list is what is on screen. Every other screen sits over it (the
+   * detail view, the player, Discovery, History, …), and the list's focus
+   * then names a file out of sight — not the one the detail view shows, which
+   * the list does not follow — so the menu offers no file actions there
+   * rather than act on a file other than the one the user is looking at.
    */
   fileActionsAvailable?: boolean;
 }
@@ -244,7 +238,6 @@ function CommandMenuBody({
   onApplySearch,
   onApplySaved,
   onQuickSearch,
-  detailOpen = false,
   fileActionsAvailable = true,
   focused,
   page,
@@ -259,12 +252,7 @@ function CommandMenuBody({
   const typed = search.trim();
   const targets = useCommandTargets(focused, fileActionsAvailable);
   const watchLater = useWatchLater();
-  const { forget } = useSelection();
-  const files = useFileActions(targets, watchLater, {
-    deferListRefresh: detailOpen,
-    // A deleted file would otherwise stay selected (see forget).
-    onDeleted: forget,
-  });
+  const files = useFileActions(targets, watchLater);
   const closeThen = (fn: () => void) => {
     onOpenChange(false);
     window.setTimeout(fn, 0);
@@ -342,7 +330,6 @@ function CommandMenuBody({
                 files={files}
                 closeThen={closeThen}
                 openPage={setPage}
-                canDelete={!detailOpen}
               />
             )}
             <RecentSearchesGroup
@@ -429,14 +416,12 @@ function FileActionsGroup({
   files,
   closeThen,
   openPage,
-  canDelete,
 }: {
   t: TFunc;
   targets: FileRow[];
   files: FileActions;
   closeThen: (fn: () => void) => void;
   openPage: (page: Page) => void;
-  canDelete: boolean;
 }) {
   const single = files.single;
   const name =
@@ -516,16 +501,14 @@ function FileActionsGroup({
               <Copy />
               <span>{t("media.copyFilePath")}</span>
             </CommandItem>
-            {canDelete && (
-              <CommandItem
-                value={t("media.deleteFromIndex")}
-                className="text-error data-[selected=true]:text-error"
-                onSelect={() => closeThen(() => void single.deleteFromIndex())}
-              >
-                <Trash2 />
-                <span>{t("media.deleteFromIndex")}</span>
-              </CommandItem>
-            )}
+            <CommandItem
+              value={t("media.deleteFromIndex")}
+              className="text-error data-[selected=true]:text-error"
+              onSelect={() => closeThen(() => void single.deleteFromIndex())}
+            >
+              <Trash2 />
+              <span>{t("media.deleteFromIndex")}</span>
+            </CommandItem>
           </>
         )}
       </CommandGroup>

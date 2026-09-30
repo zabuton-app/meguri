@@ -45,7 +45,6 @@ import {
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { recordRecentSearch } from "@/hooks/useRecentSearches";
-import { recallRecentSearch } from "@/lib/recentSearches";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
@@ -164,13 +163,14 @@ export default function Home() {
     [filter, folderView, folderNav.path, folderSearching],
   );
 
-  const { filterValue, onFilterChange, onApplySaved } = useFolderFilter({
-    folderView,
-    folderNav,
-    filter,
-    setFilter,
-    setByFolder,
-  });
+  const { filterValue, onFilterChange, onApplySaved, onApplyRecent } =
+    useFolderFilter({
+      folderView,
+      folderNav,
+      filter,
+      setFilter,
+      setByFolder,
+    });
 
   // Include the workspace ID in the key so switching workspaces (incl. "All") refetches separately.
   const search = useFilesSearch(
@@ -958,18 +958,10 @@ export default function Home() {
           onSettings={openSettings}
           onHelp={() => setHelpOpen(true)}
           onOpenDevTools={openDevTools}
-          onApplySearch={(query) =>
-            onFilterChange({
-              ...recallRecentSearch(query, filterValue),
-              folder: filterValue.folder,
-            })
-          }
+          onApplySearch={onApplyRecent}
           onApplySaved={onApplySaved}
           onQuickSearch={(text) => onFilterChange({ ...filterValue, q: text })}
-          detailOpen={location.pathname.startsWith("/file/")}
-          fileActionsAvailable={
-            location.pathname === "/" || location.pathname.startsWith("/file/")
-          }
+          fileActionsAvailable={location.pathname === "/"}
         />
       </SelectionProvider>
 

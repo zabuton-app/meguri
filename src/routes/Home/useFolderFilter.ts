@@ -13,6 +13,7 @@ import { api } from "@/ipc/client";
 import type { AppStatus, SearchQuery, WorkspacesList } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import { onShowFolderInLibrary } from "@/lib/ui-events";
+import { recallRecentSearch } from "@/lib/recentSearches";
 import type { SmartCollection } from "@/lib/smartCollections";
 import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import { ROOT_FOLDER } from "@shared/folderPath";
@@ -189,6 +190,17 @@ export function useFolderFilter({
     [openFolder, path, goTo, setFilter],
   );
 
+  // A recent search replaces the conditions but not the place: it was saved
+  // without a folder, and searches wherever the view is now.
+  const onApplyRecent = useCallback(
+    (query: SearchQuery) =>
+      onFilterChange({
+        ...recallRecentSearch(query, filterValue),
+        folder: filterValue.folder,
+      }),
+    [onFilterChange, filterValue],
+  );
+
   useEffect(
     () =>
       onShowFolderInLibrary(({ workspaceId: ws, path: folder }) => {
@@ -197,5 +209,5 @@ export function useFolderFilter({
     [openFolder],
   );
 
-  return { filterValue, onFilterChange, onApplySaved };
+  return { filterValue, onFilterChange, onApplySaved, onApplyRecent };
 }

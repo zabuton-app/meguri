@@ -230,11 +230,26 @@ class SelectionStore {
 
   forget = (file: FileRow): void => {
     const key = selectionKey(file);
-    if (!this.selected.has(key)) return;
-    const next = new Map(this.selected);
-    next.delete(key);
-    this.selected = next;
-    if (this.anchorKey === key) this.anchorKey = null;
+    let changed = false;
+    if (this.selected.has(key)) {
+      const next = new Map(this.selected);
+      next.delete(key);
+      this.selected = next;
+      if (this.anchorKey === key) this.anchorKey = null;
+      changed = true;
+    }
+    // A picked folder holds its files as fetched; the file goes from there
+    // too, and from the folder's count.
+    const folders = new Map(this.folders);
+    for (const [path, pick] of this.folders) {
+      if (!pick.rows) continue;
+      const rows = pick.rows.filter((row) => selectionKey(row) !== key);
+      if (rows.length === pick.rows.length) continue;
+      folders.set(path, { ...pick, rows, total: pick.total - 1 });
+      changed = true;
+    }
+    if (!changed) return;
+    this.folders = folders;
     this.rebuild(false);
   };
 

@@ -412,15 +412,4 @@ describe("pages and rows", () => {
     expect(options.some((o) => o.textContent === "Settings")).toBe(true);
     expect(screen.queryByText("No matching commands.")).toBeNull();
   });
-
-  it("leaves deleting to the detail view while it is open", () => {
-    act(() => setFocusedFile(file(7)));
-    const { unmount } = renderMenu();
-    expect(screen.getByText("Delete From Index")).toBeTruthy();
-    unmount();
-
-    renderMenu({ detailOpen: true });
-    expect(screen.getByText("Copy File Path")).toBeTruthy();
-    expect(screen.queryByText("Delete From Index")).toBeNull();
-  });
 });

@@ -2,32 +2,21 @@
 //
 // The focus ring is each view's own state (useGridKeyboardNav), while the
 // menu that acts on it is mounted by Home beside the views. The view publishes
-// the focused row here, and the menu reads it when it opens.
-import { useEffect, useSyncExternalStore } from "react";
+// the focused row here, and the menu reads it once, as it opens. Nothing
+// subscribes: the menu keeps the file it opened on (see CommandMenu), and
+// holding the focus in Home's state would re-render the memoized views on
+// every arrow key.
+import { useEffect } from "react";
 import type { FileRow } from "@/ipc/types";
 import type { FolderViewEntry } from "@/hooks/useFolderEntries";
 
 let value: FileRow | null = null;
-const listeners = new Set<() => void>();
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
 
 export const getFocusedFile = (): FileRow | null => value;
 
 /** Publish the focused file (null: none, or a folder card). */
 export function setFocusedFile(next: FileRow | null): void {
-  if (next === value) return;
   value = next;
-  listeners.forEach((l) => l());
-}
-
-export function useFocusedFile(): FileRow | null {
-  return useSyncExternalStore(subscribe, getFocusedFile);
 }
 
 /**

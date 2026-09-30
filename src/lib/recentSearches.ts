@@ -51,13 +51,19 @@ export function pushRecentSearch(
  * current ones, except that a search recorded without a sort keeps the sort
  * in use: what a recent search recalls is what it narrowed to, and a sort
  * picked since is the user's current choice, not part of an older search.
+ *
+ * The sort is its key and its direction together. The default key is stored
+ * as no key at all, so a direction alone is a sort too, and the two are never
+ * mixed between the search and the current conditions.
  */
 export function recallRecentSearch(
   query: SearchQuery,
   current: SearchQuery,
 ): SearchQuery {
-  if (query.sort != null || current.sort == null) return query;
-  const next: SearchQuery = { ...query, sort: current.sort };
+  if (query.sort != null || query.sortDir != null) return query;
+  if (current.sort == null && current.sortDir == null) return query;
+  const next: SearchQuery = { ...query };
+  if (current.sort != null) next.sort = current.sort;
   if (current.sortDir != null) next.sortDir = current.sortDir;
   return next;
 }
