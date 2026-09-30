@@ -9,8 +9,14 @@ import {
   it,
   vi,
 } from "vitest";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
-import { useEffect } from "react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { CommandMenu } from "@/components/CommandMenu";
 import { useSelection } from "@/components/SelectionContext";
 import { setFocusedFile } from "@/hooks/useFocusedFile";
@@ -24,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   filesBulkMeta: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   collectionSetMembership: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   copyFilePath: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  fileDeleteFromIndex: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -67,6 +74,8 @@ vi.mock("@/ipc/client", () => ({
       mocks.collectionSetMembership(...args),
     copyFilePath: (...args: unknown[]) => mocks.copyFilePath(...args),
     openFolder: vi.fn().mockResolvedValue(undefined),
+    fileDeleteFromIndex: (...args: unknown[]) =>
+      mocks.fileDeleteFromIndex(...args),
   },
   ALL_ID: "__all__",
 }));
@@ -81,6 +90,10 @@ beforeEach(() => {
   mocks.filesBulkMeta.mockResolvedValue({ files: 1, skipped: 0 });
   mocks.collectionSetMembership.mockResolvedValue({ changed: 1 });
   mocks.copyFilePath.mockResolvedValue(undefined);
+  mocks.fileDeleteFromIndex.mockResolvedValue({
+    id: 3,
+    relPath: "videos/clip-3.mp4",
+  });
 });
 
 afterEach(() => {
@@ -121,6 +134,39 @@ function renderMenu(
   return { props, ...renderWithProviders(<CommandMenu {...props} />) };
 }
 
+function baseProps(): Parameters<typeof CommandMenu>[0] {
+  return {
+    open: true,
+    onOpenChange: vi.fn(),
+    ready: true,
+    scanning: false,
+    devToolsEnabled: false,
+    onFocusSearch: vi.fn(),
+    onScan: vi.fn(),
+    onRebuild: vi.fn(),
+    onSetView: vi.fn(),
+    onToggleByFolder: vi.fn(),
+    onDiscover: vi.fn(),
+    onTags: vi.fn(),
+    onSettings: vi.fn(),
+    onHelp: vi.fn(),
+    onOpenDevTools: vi.fn(),
+    onApplySearch: vi.fn(),
+    onApplySaved: vi.fn(),
+    onQuickSearch: vi.fn(),
+  };
+}
+
+/** The menu with its open state held for real, so choosing a row closes it. */
+function ClosingMenu() {
+  const [open, setOpen] = useState(true);
+  return <CommandMenu {...baseProps()} open={open} onOpenChange={setOpen} />;
+}
+
+function SelectionCount() {
+  return <span data-testid="selection-count">{useSelection().count}</span>;
+}
+
 /** Builds a selection the way a Ctrl+click on each card would. */
 function Select({ rows }: { rows: FileRow[] }) {
   const { click } = useSelection();
@@ -158,12 +204,51 @@ describe("file actions group", () => {
     );
   });
 
-  it("goes away when the focus moves to a folder card", () => {
+  it("keeps the file focused when it opened, whatever the list does", () => {
+    act(() => setFocusedFile(file(6)));
+    const { rerender } = renderWithProviders(
+      <CommandMenu {...baseProps()} open={false} />,
+    );
+    // Focus moves while the menu is closed: the menu opens on the new one.
     act(() => setFocusedFile(file(7)));
-    renderMenu();
-    expect(screen.getByTestId("command-file-name")).toBeTruthy();
-    act(() => setFocusedFile(null));
+    rerender(<CommandMenu {...baseProps()} open />);
+    // The list changes under the open menu: it stays on the file it opened on.
+    act(() => setFocusedFile(file(8)));
+    expect(screen.getByTestId("command-file-name").textContent).toContain(
+      "clip-7.mp4",
+    );
+  });
+
+  it("offers no file actions over another screen", () => {
+    act(() => setFocusedFile(file(7)));
+    renderMenu({ fileActionsAvailable: false });
     expect(screen.queryByTestId("command-file-name")).toBeNull();
+  });
+
+  it("names the file when asking to delete it, and unselects it after", async () => {
+    renderWithProviders(
+      <>
+        <Select rows={[file(3)]} />
+        <SelectionCount />
+        <ClosingMenu />
+      </>,
+    );
+    expect(screen.getByTestId("selection-count").textContent).toBe("1");
+    fireEvent.click(screen.getByText("Delete From Index"));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("clip-3.mp4");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Delete From Index" }),
+    );
+    await waitFor(() =>
+      expect(mocks.fileDeleteFromIndex).toHaveBeenCalledWith(
+        3,
+        sampleFileRow.workspaceId,
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("selection-count").textContent).toBe("0"),
+    );
   });
 
   it("acts on the selection over the focused file", async () => {

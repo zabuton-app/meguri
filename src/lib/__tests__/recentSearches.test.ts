@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   parseRecentSearches,
   pushRecentSearch,
+  recallRecentSearch,
   RECENT_SEARCHES_KEY,
   RECENT_SEARCHES_MAX,
 } from "@/lib/recentSearches";
@@ -106,5 +107,30 @@ describe("recent searches store", () => {
     clearRecentSearches();
     expect(getRecentSearches()).toEqual([]);
     expect(localStorage.getItem(RECENT_SEARCHES_KEY)).toBe("[]");
+  });
+});
+
+describe("recallRecentSearch", () => {
+  it("keeps the sort in use when the search has none", () => {
+    expect(
+      recallRecentSearch(
+        { q: "cat" },
+        { q: "dog", sort: "name", sortDir: "asc" },
+      ),
+    ).toEqual({ q: "cat", sort: "name", sortDir: "asc" });
+  });
+
+  it("applies the search's own sort as it was", () => {
+    expect(
+      recallRecentSearch(
+        { q: "cat", sort: "size" },
+        { sort: "name", sortDir: "asc" },
+      ),
+    ).toEqual({ q: "cat", sort: "size" });
+  });
+
+  it("returns the search as it is when no sort is in use", () => {
+    const query = { q: "cat" };
+    expect(recallRecentSearch(query, {})).toBe(query);
   });
 });

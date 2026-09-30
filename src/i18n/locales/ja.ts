@@ -214,6 +214,8 @@ export const ja = {
   "media.deleteFromIndex": "インデックスから削除",
   "media.deleteFromIndexConfirm":
     "この項目をインデックスから削除しますか？\n今後スキャンしても再登録されません。",
+  "media.deleteFileFromIndexConfirm":
+    "「{name}」をインデックスから削除しますか？\n今後スキャンしても再登録されません。",
   "media.moreActions": "その他の操作",
   "media.prev": "前のファイル",
   "media.next": "次のファイル",

@@ -46,6 +46,22 @@ export function pushRecentSearch(
   );
 }
 
+/**
+ * The conditions to apply when a recent search is picked. It replaces the
+ * current ones, except that a search recorded without a sort keeps the sort
+ * in use: what a recent search recalls is what it narrowed to, and a sort
+ * picked since is the user's current choice, not part of an older search.
+ */
+export function recallRecentSearch(
+  query: SearchQuery,
+  current: SearchQuery,
+): SearchQuery {
+  if (query.sort != null || current.sort == null) return query;
+  const next: SearchQuery = { ...query, sort: current.sort };
+  if (current.sortDir != null) next.sortDir = current.sortDir;
+  return next;
+}
+
 export function parseRecentSearches(raw: string | null): SearchQuery[] {
   if (!raw) return [];
   try {

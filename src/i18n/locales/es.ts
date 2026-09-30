@@ -219,6 +219,8 @@ export const es: Record<TranslationKey, string> = {
   "media.deleteFromIndex": "Eliminar del índice",
   "media.deleteFromIndexConfirm":
     "¿Eliminar este elemento del índice?\nNo se volverá a registrar en futuros escaneos.",
+  "media.deleteFileFromIndexConfirm":
+    "¿Eliminar «{name}» del índice?\nNo se volverá a registrar en futuros escaneos.",
   "media.moreActions": "Más acciones",
   "media.prev": "Archivo anterior",
   "media.next": "Archivo siguiente",

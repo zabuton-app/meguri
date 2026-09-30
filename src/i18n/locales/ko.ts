@@ -212,6 +212,8 @@ export const ko: Record<TranslationKey, string> = {
   "media.deleteFromIndex": "인덱스에서 삭제",
   "media.deleteFromIndexConfirm":
     "이 항목을 인덱스에서 삭제하시겠습니까?\n이후 스캔해도 다시 등록되지 않습니다.",
+  "media.deleteFileFromIndexConfirm":
+    "「{name}」을(를) 인덱스에서 삭제하시겠습니까?\n이후 스캔해도 다시 등록되지 않습니다.",
   "media.moreActions": "기타 작업",
   "media.prev": "이전 파일",
   "media.next": "다음 파일",

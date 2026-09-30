@@ -220,6 +220,8 @@ export const fr: Record<TranslationKey, string> = {
   "media.deleteFromIndex": "Supprimer de l'index",
   "media.deleteFromIndexConfirm":
     "Supprimer cet élément de l'index ?\nIl ne sera pas réenregistré lors des prochaines analyses.",
+  "media.deleteFileFromIndexConfirm":
+    "Supprimer « {name} » de l'index ?\nIl ne sera pas réenregistré lors des prochaines analyses.",
   "media.moreActions": "Autres actions",
   "media.prev": "Fichier précédent",
   "media.next": "Fichier suivant",

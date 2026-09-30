@@ -45,6 +45,7 @@ import {
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { recordRecentSearch } from "@/hooks/useRecentSearches";
+import { recallRecentSearch } from "@/lib/recentSearches";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
@@ -958,11 +959,17 @@ export default function Home() {
           onHelp={() => setHelpOpen(true)}
           onOpenDevTools={openDevTools}
           onApplySearch={(query) =>
-            onFilterChange({ ...query, folder: filterValue.folder })
+            onFilterChange({
+              ...recallRecentSearch(query, filterValue),
+              folder: filterValue.folder,
+            })
           }
           onApplySaved={onApplySaved}
           onQuickSearch={(text) => onFilterChange({ ...filterValue, q: text })}
           detailOpen={location.pathname.startsWith("/file/")}
+          fileActionsAvailable={
+            location.pathname === "/" || location.pathname.startsWith("/file/")
+          }
         />
       </SelectionProvider>
 

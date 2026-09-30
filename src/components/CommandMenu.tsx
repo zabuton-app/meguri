@@ -41,7 +41,7 @@ import {
   useFileActions,
   type FileActions,
 } from "@/hooks/useFileActions";
-import { useFocusedFile } from "@/hooks/useFocusedFile";
+import { getFocusedFile } from "@/hooks/useFocusedFile";
 import {
   clearRecentSearches,
   useRecentSearches,
@@ -97,6 +97,13 @@ interface CommandMenuProps {
    * detail view knows how to close itself over a file that is gone.
    */
   detailOpen?: boolean;
+  /**
+   * The list, or the detail view opened from it, is what is on screen. Other
+   * screens (the player, Discovery, History, …) sit over a list whose focus
+   * is out of sight, so the menu offers no file actions there rather than
+   * act on a file other than the one the user is looking at.
+   */
+  fileActionsAvailable?: boolean;
 }
 
 interface CommandAction {
@@ -152,11 +159,18 @@ export function CommandMenu(props: CommandMenuProps) {
   const { open, onOpenChange } = props;
   const { t } = useI18n();
   const [page, setPage] = useState<Page>(null);
+  // The focused file is taken as the menu opens and kept until it closes:
+  // the focus follows a position in the list, and a list refetched while the
+  // menu is up (a scan landing) could put another file there.
+  const [focused, setFocused] = useState(() =>
+    open ? getFocusedFile() : null,
+  );
   // A menu closed from a sub-page opens again at the top.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (!open) setPage(null);
+    setFocused(open ? getFocusedFile() : null);
   }
 
   return (
@@ -181,6 +195,7 @@ export function CommandMenu(props: CommandMenuProps) {
       <CommandMenuBody
         key={page ?? "root"}
         {...props}
+        focused={focused}
         page={page}
         setPage={setPage}
       />
@@ -190,20 +205,22 @@ export function CommandMenu(props: CommandMenuProps) {
 
 /**
  * What the file actions act on: the selection while one is being built, and
- * otherwise the file under the keyboard focus. A selection whose folders are
- * still being fetched, or that is past the bulk cap, offers nothing — the
+ * otherwise the file focused when the menu opened. A selection whose folders
+ * are still being fetched, or that is past the bulk cap, offers nothing — the
  * same rule as the selection bar.
  */
-function useCommandTargets(): FileRow[] {
-  const selection = useSelection();
-  const focused = useFocusedFile();
-  const { active, count, pending, rows } = selection;
+function useCommandTargets(
+  focused: FileRow | null,
+  available: boolean,
+): FileRow[] {
+  const { active, count, pending, rows } = useSelection();
   return useMemo(() => {
+    if (!available) return NO_FILES;
     if (active && count > 0) {
       return pending || count > MAX_BULK_FILES ? NO_FILES : rows;
     }
     return focused ? [focused] : NO_FILES;
-  }, [active, count, pending, rows, focused]);
+  }, [available, active, count, pending, rows, focused]);
 }
 
 function CommandMenuBody({
@@ -228,15 +245,26 @@ function CommandMenuBody({
   onApplySaved,
   onQuickSearch,
   detailOpen = false,
+  fileActionsAvailable = true,
+  focused,
   page,
   setPage,
-}: CommandMenuProps & { page: Page; setPage: (page: Page) => void }) {
+}: CommandMenuProps & {
+  focused: FileRow | null;
+  page: Page;
+  setPage: (page: Page) => void;
+}) {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
   const typed = search.trim();
-  const targets = useCommandTargets();
+  const targets = useCommandTargets(focused, fileActionsAvailable);
   const watchLater = useWatchLater();
-  const files = useFileActions(targets, watchLater, detailOpen);
+  const { forget } = useSelection();
+  const files = useFileActions(targets, watchLater, {
+    deferListRefresh: detailOpen,
+    // A deleted file would otherwise stay selected (see forget).
+    onDeleted: forget,
+  });
   const closeThen = (fn: () => void) => {
     onOpenChange(false);
     window.setTimeout(fn, 0);

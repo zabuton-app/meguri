@@ -209,6 +209,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "media.deleteFromIndex": "从索引中删除",
   "media.deleteFromIndexConfirm":
     "要将此项目从索引中删除吗？\n以后扫描将不会再次注册它。",
+  "media.deleteFileFromIndexConfirm":
+    "要将“{name}”从索引中删除吗？\n以后扫描将不会再次注册它。",
   "media.moreActions": "更多操作",
   "media.prev": "上一个文件",
   "media.next": "下一个文件",

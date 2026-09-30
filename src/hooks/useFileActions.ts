@@ -17,6 +17,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { useBulkEdit } from "@/hooks/useBulkEdit";
 import type { WatchLaterMembership } from "@/hooks/useWatchLater";
 import { useI18n } from "@/i18n/I18nProvider";
+import { fileNameOf } from "@/lib/relPath";
 import {
   bulkFlagOf,
   bulkTargets,
@@ -94,14 +95,20 @@ export function useCollectionMembership(
   }, [rows, workspaces.data]);
 }
 
-export function useFileActions(
-  rows: FileRow[],
-  watchLater: WatchLaterMembership,
+export interface FileActionsOptions {
   /**
    * Skip the collection-search invalidation while the detail view is open;
    * see useBulkEdit, whose rule this is.
    */
-  deferListRefresh = false,
+  deferListRefresh?: boolean;
+  /** The file is gone from the index and the caches (to drop it from a selection). */
+  onDeleted?: (file: FileRow) => void;
+}
+
+export function useFileActions(
+  rows: FileRow[],
+  watchLater: WatchLaterMembership,
+  { deferListRefresh = false, onDeleted }: FileActionsOptions = {},
 ): FileActions {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -157,6 +164,7 @@ export function useFileActions(
   const single = useMemo<SingleFileActions | null>(() => {
     if (!file) return null;
     const { id, workspaceId } = file;
+    const name = fileNameOf(file.relPath);
     return {
       openFolder: () => {
         api
@@ -177,7 +185,9 @@ export function useFileActions(
       deleteFromIndex: async () => {
         const ok = await confirm({
           title: t("media.deleteFromIndex"),
-          message: t("media.deleteFromIndexConfirm"),
+          // Named: the menu that asked is closed by now, and a delete cannot
+          // be undone.
+          message: t("media.deleteFileFromIndexConfirm", { name }),
           confirmText: t("media.deleteFromIndex"),
           destructive: true,
         });
@@ -185,6 +195,7 @@ export function useFileActions(
         try {
           const deleted = await api.fileDeleteFromIndex(id, workspaceId);
           forgetDeletedFile(qc, workspaceId, deleted.id);
+          onDeleted?.(file);
         } catch (e) {
           toast.error(t("media.deleteFromIndexFailed"), {
             description: errorText(e),
@@ -192,7 +203,7 @@ export function useFileActions(
         }
       },
     };
-  }, [file, t, confirm, qc]);
+  }, [file, t, confirm, qc, onDeleted]);
 
   return {
     favorite,
