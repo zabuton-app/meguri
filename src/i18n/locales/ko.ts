@@ -141,6 +141,24 @@ export const ko: Record<TranslationKey, string> = {
   "command.focusSearch": "검색에 포커스",
   "command.openDevTools": "개발자 콘솔 열기",
   "command.shortcutHint": "{shortcut} 로 열기",
+  "command.groupFile": "파일",
+  "command.selectedFiles": "선택한 {count}개",
+  "command.rating": "별점 변경…",
+  "command.ratingStars": "별 {rating}개",
+  "command.ratingNone": "별점 없음",
+  "command.ratingMixed": "별점이 섞여 있음",
+  "command.current": "현재",
+  "command.collections": "컬렉션에 추가…",
+  "command.inCollection": "추가됨 · 선택하면 제거",
+  "command.inCollectionSome": "일부 추가됨 · 선택하면 모두 추가",
+  "command.pageRating": "별점",
+  "command.pageCollections": "컬렉션",
+  "command.ratingPlaceholder": "0~5를 입력해 선택...",
+  "command.collectionPlaceholder": "컬렉션 검색...",
+  "command.groupRecent": "최근 검색",
+  "command.clearRecent": "최근 검색 지우기",
+  "command.more": "{count}개 더 · 입력해서 좁히기",
+  "command.searchFor": "“{q}” 검색",
 
   // filter
   "filter.searchHint":
@@ -179,6 +197,8 @@ export const ko: Record<TranslationKey, string> = {
   "media.openExternal": "외부에서 열기",
   "media.openFolder": "폴더 열기",
   "media.copyFilePath": "파일 경로 복사",
+  "media.filePathCopied": "파일 경로를 복사했습니다",
+  "media.deleteFromIndexFailed": "인덱스에서 삭제하지 못했습니다",
   "media.copyImage": "이미지 복사",
   "media.imageCopied": "이미지를 클립보드에 복사했습니다",
   "media.imageCopyFailed": "이미지 복사에 실패했습니다",
@@ -198,7 +218,8 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.title": "키보드 단축키",
   "shortcuts.sectionList": "목록",
   "shortcuts.sectionDetail": "상세·플레이어",
-  "shortcuts.commandMenu": "명령 메뉴 열기",
+  "shortcuts.commandMenu":
+    "명령 메뉴 열기 (파일 작업, 최근 검색, 스마트 컬렉션)",
   "shortcuts.search": "검색에 포커스",
   "shortcuts.scrollDown": "아래로 스크롤",
   "shortcuts.scrollUp": "위로 스크롤",
@@ -534,6 +555,9 @@ export const ko: Record<TranslationKey, string> = {
   "collection.removeFrom": "「{name}」에서 삭제",
   "collection.addedToast": "「{name}」에 추가했습니다",
   "collection.removedFromToast": "「{name}」에서 삭제했습니다",
+  "collection.addedCountToast": "{count}개 파일을 「{name}」에 추가했습니다",
+  "collection.removedCountToast":
+    "{count}개 파일을 「{name}」에서 삭제했습니다",
   "collection.actionFailed": "컬렉션을 업데이트하지 못했습니다",
 
   // 나중에 볼 동영상 (기본 제공 컬렉션)

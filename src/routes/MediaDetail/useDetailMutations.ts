@@ -12,10 +12,10 @@ import type { FileDetail } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   dropFromWatchLaterCache,
+  forgetDeletedFile,
   invalidateCollectionSearches,
   invalidateTagSearches,
   patchFileRowInCaches,
-  removeFileRowFromCaches,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
 
@@ -162,13 +162,7 @@ export function useDetailMutations({
     });
     if (!ok) return;
     const deleted = await deleteFromIndexMutation.mutateAsync();
-    removeFileRowFromCaches(qc, wsId, deleted.id);
-    qc.removeQueries({ queryKey: ["file_get", wsId, deleted.id] });
-    void qc.invalidateQueries({ queryKey: ["files_search"] });
-    void qc.invalidateQueries({ queryKey: ["files_random"] });
-    // A folder's count and mosaic include the file, and its last file going
-    // takes the folder with it.
-    void qc.invalidateQueries({ queryKey: ["folders_list", wsId] });
+    forgetDeletedFile(qc, wsId, deleted.id);
     onDeleteFinished?.();
   };
 

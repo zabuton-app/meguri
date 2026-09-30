@@ -34,12 +34,17 @@ function CommandDialog({
   children,
   className,
   showCloseButton = false,
+  onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   title?: string;
   description?: string;
   className?: string;
   showCloseButton?: boolean;
+  /** preventDefault() keeps the dialog open (a sub-page stepping back). */
+  onEscapeKeyDown?: React.ComponentProps<
+    typeof DialogContent
+  >["onEscapeKeyDown"];
 }) {
   return (
     <Dialog {...props}>
@@ -49,6 +54,7 @@ function CommandDialog({
           className,
         )}
         showCloseButton={showCloseButton}
+        onEscapeKeyDown={onEscapeKeyDown}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>{title}</DialogTitle>
@@ -62,14 +68,26 @@ function CommandDialog({
 
 function CommandInput({
   className,
+  badge,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & {
+  /** Shown before the field: where in the menu the input is searching. */
+  badge?: React.ReactNode;
+}) {
   return (
     <div
       data-slot="command-input-wrapper"
       className="flex h-12 items-center gap-2 border-b border-border px-3"
     >
       <Search className="size-4 shrink-0 text-muted" />
+      {badge != null && (
+        <span
+          data-slot="command-input-badge"
+          className="max-w-[45%] shrink-0 truncate rounded-full bg-overlay px-2 py-0.5 text-xs text-fg"
+        >
+          {badge}
+        </span>
+      )}
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(

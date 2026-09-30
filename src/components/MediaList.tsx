@@ -50,6 +50,7 @@ import {
 } from "@/settings/PreferencesProvider";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
+import { usePublishFocusedFile } from "@/hooks/useFocusedFile";
 import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 
 const ROW_ESTIMATE = 118; // initial row-height estimate (corrected by measurement)
@@ -202,6 +203,8 @@ export const MediaList = memo(function MediaList({
   // itself (same mutation, toast, effect and disabled state). Mirrors Discovery.
   const focusedWatchLaterRef = useRef<HTMLButtonElement>(null);
   useWatchLaterHotkey({ active: navActive, buttonRef: focusedWatchLaterRef });
+  // The command menu acts on the focused file.
+  usePublishFocusedFile(entries, focusedIndex);
 
   // Reset the scroll position to the top on workspace switch and on a
   // resetKey change (another folder).

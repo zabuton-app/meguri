@@ -82,6 +82,25 @@ export function removeFileRowFromCaches(
   );
 }
 
+/**
+ * Everything the renderer caches about a file that has just been dropped from
+ * the index: its list rows go at once, its detail is forgotten, and the
+ * searches, the discovery queue and its workspace's folder listings (whose
+ * counts and mosaics include it, and whose last file can take a folder with
+ * it) are re-read.
+ */
+export function forgetDeletedFile(
+  qc: QueryClient,
+  workspaceId: string,
+  fileId: number,
+): void {
+  removeFileRowFromCaches(qc, workspaceId, fileId);
+  qc.removeQueries({ queryKey: ["file_get", workspaceId, fileId] });
+  void qc.invalidateQueries({ queryKey: ["files_search"] });
+  void qc.invalidateQueries({ queryKey: ["files_random"] });
+  void qc.invalidateQueries({ queryKey: ["folders_list", workspaceId] });
+}
+
 /** Patch the detail cache when the modal is open for the same file. */
 export function patchFileDetailInCache(
   qc: QueryClient,

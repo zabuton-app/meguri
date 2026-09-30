@@ -44,6 +44,7 @@ import {
 } from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { recordRecentSearch } from "@/hooks/useRecentSearches";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
@@ -75,6 +76,9 @@ import {
 const ESC_CLOSE_CONFIRM_MS = 2000;
 // Fewest ms between folder listing refreshes while thumbnails are generated.
 const FOLDER_REFRESH_MS = 2000;
+// A search is remembered for the command menu once it has stayed put this
+// long (ms), not at every keystroke on the way to it.
+const RECENT_SEARCH_SETTLE_MS = 1500;
 
 export default function Home() {
   const { t } = useI18n();
@@ -412,6 +416,16 @@ export default function Home() {
     },
     [scheduleFolderRefresh],
   );
+
+  // Recent searches for the command menu. A query that narrows nothing is
+  // ignored there (see pushRecentSearch).
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => recordRecentSearch(filter),
+      RECENT_SEARCH_SETTLE_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [filter]);
 
   // Stabilize the reference so MediaCard's memo stays effective.
   // A click AND-appends an exact tag condition rather than overwriting the
@@ -814,27 +828,6 @@ export default function Home() {
 
       <ScanProgress onThumbDone={onThumbDone} wsId={status.data?.workspaceId} />
 
-      <CommandMenu
-        open={commandOpen}
-        onOpenChange={setCommandOpen}
-        ready={status.data?.ready ?? false}
-        scanning={scanning}
-        devToolsEnabled={status.data?.devMode ?? false}
-        onFocusSearch={focusSearch}
-        onScan={(includeExcluded) => void onScan(includeExcluded)}
-        onRebuild={() => void onRebuild()}
-        onSetView={setViewMode}
-        onToggleByFolder={toggleByFolder}
-        folderView={folderView}
-        folderAvailable={folderAvailable}
-        onDiscover={openDiscover}
-        canDiscover={hasPool}
-        onTags={openTags}
-        onSettings={openSettings}
-        onHelp={() => setHelpOpen(true)}
-        onOpenDevTools={openDevTools}
-      />
-
       {/* The list row: the detail side peek (see MediaModal) docks here as a
           flex sibling of the list, under the header and filter bar and above
           the player and status bars, and the list narrows to make room. */}
@@ -942,6 +935,35 @@ export default function Home() {
 
           <SelectionLayer active={navActive} />
         </div>
+
+        {/* Inside the selection provider: its file actions act on the
+            selection when there is one. */}
+        <CommandMenu
+          open={commandOpen}
+          onOpenChange={setCommandOpen}
+          ready={status.data?.ready ?? false}
+          scanning={scanning}
+          devToolsEnabled={status.data?.devMode ?? false}
+          onFocusSearch={focusSearch}
+          onScan={(includeExcluded) => void onScan(includeExcluded)}
+          onRebuild={() => void onRebuild()}
+          onSetView={setViewMode}
+          onToggleByFolder={toggleByFolder}
+          folderView={folderView}
+          folderAvailable={folderAvailable}
+          onDiscover={openDiscover}
+          canDiscover={hasPool}
+          onTags={openTags}
+          onSettings={openSettings}
+          onHelp={() => setHelpOpen(true)}
+          onOpenDevTools={openDevTools}
+          onApplySearch={(query) =>
+            onFilterChange({ ...query, folder: filterValue.folder })
+          }
+          onApplySaved={onApplySaved}
+          onQuickSearch={(text) => onFilterChange({ ...filterValue, q: text })}
+          detailOpen={location.pathname.startsWith("/file/")}
+        />
       </SelectionProvider>
 
       {/* The two FABs, wrapped so the side peek can publish its width on this

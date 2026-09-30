@@ -148,6 +148,24 @@ export const es: Record<TranslationKey, string> = {
   "command.focusSearch": "Enfocar búsqueda",
   "command.openDevTools": "Abrir consola de desarrollador",
   "command.shortcutHint": "Abrir con {shortcut}",
+  "command.groupFile": "Archivo",
+  "command.selectedFiles": "{count} seleccionados",
+  "command.rating": "Cambiar valoración…",
+  "command.ratingStars": "{rating} estrellas",
+  "command.ratingNone": "Sin valoración",
+  "command.ratingMixed": "Valoraciones mixtas",
+  "command.current": "Actual",
+  "command.collections": "Añadir a colección…",
+  "command.inCollection": "Añadido · selecciona para quitar",
+  "command.inCollectionSome": "Algunos añadidos · selecciona para añadir todos",
+  "command.pageRating": "Valoración",
+  "command.pageCollections": "Colecciones",
+  "command.ratingPlaceholder": "Escribe 0–5 para elegir...",
+  "command.collectionPlaceholder": "Buscar colecciones...",
+  "command.groupRecent": "Búsquedas recientes",
+  "command.clearRecent": "Borrar búsquedas recientes",
+  "command.more": "{count} más · escribe para filtrar",
+  "command.searchFor": "Buscar «{q}»",
 
   // filter
   "filter.searchHint":
@@ -186,6 +204,8 @@ export const es: Record<TranslationKey, string> = {
   "media.openExternal": "Abrir externamente",
   "media.openFolder": "Abrir carpeta contenedora",
   "media.copyFilePath": "Copiar ruta del archivo",
+  "media.filePathCopied": "Ruta del archivo copiada",
+  "media.deleteFromIndexFailed": "No se pudo quitar del índice",
   "media.copyImage": "Copiar imagen",
   "media.imageCopied": "Imagen copiada al portapapeles",
   "media.imageCopyFailed": "No se pudo copiar la imagen",
@@ -205,7 +225,8 @@ export const es: Record<TranslationKey, string> = {
   "shortcuts.title": "Atajos de teclado",
   "shortcuts.sectionList": "Lista",
   "shortcuts.sectionDetail": "Detalle y reproductor",
-  "shortcuts.commandMenu": "Abrir menú de comandos",
+  "shortcuts.commandMenu":
+    "Abrir menú de comandos (acciones de archivo, búsquedas recientes, colecciones inteligentes)",
   "shortcuts.search": "Enfocar búsqueda",
   "shortcuts.scrollDown": "Desplazar abajo",
   "shortcuts.scrollUp": "Desplazar arriba",
@@ -552,6 +573,8 @@ export const es: Record<TranslationKey, string> = {
   "collection.removeFrom": "Quitar de «{name}»",
   "collection.addedToast": "Añadido a «{name}»",
   "collection.removedFromToast": "Quitado de «{name}»",
+  "collection.addedCountToast": "Se añadieron {count} archivos a «{name}»",
+  "collection.removedCountToast": "Se quitaron {count} archivos de «{name}»",
   "collection.actionFailed": "No se pudo actualizar la colección",
 
   // Ver más tarde (colección integrada)

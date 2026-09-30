@@ -148,6 +148,25 @@ export const fr: Record<TranslationKey, string> = {
   "command.focusSearch": "Cibler la recherche",
   "command.openDevTools": "Ouvrir la console développeur",
   "command.shortcutHint": "Ouvrir avec {shortcut}",
+  "command.groupFile": "Fichier",
+  "command.selectedFiles": "{count} sélectionnés",
+  "command.rating": "Changer la note…",
+  "command.ratingStars": "{rating} étoiles",
+  "command.ratingNone": "Aucune note",
+  "command.ratingMixed": "Notes mixtes",
+  "command.current": "Actuelle",
+  "command.collections": "Ajouter à une collection…",
+  "command.inCollection": "Ajouté · sélectionner pour retirer",
+  "command.inCollectionSome":
+    "Certains ajoutés · sélectionner pour tout ajouter",
+  "command.pageRating": "Note",
+  "command.pageCollections": "Collections",
+  "command.ratingPlaceholder": "Tapez 0–5 pour choisir...",
+  "command.collectionPlaceholder": "Rechercher des collections...",
+  "command.groupRecent": "Recherches récentes",
+  "command.clearRecent": "Effacer les recherches récentes",
+  "command.more": "{count} de plus · tapez pour filtrer",
+  "command.searchFor": "Rechercher « {q} »",
 
   // filter
   "filter.searchHint":
@@ -186,6 +205,8 @@ export const fr: Record<TranslationKey, string> = {
   "media.openExternal": "Ouvrir avec une application externe",
   "media.openFolder": "Ouvrir le dossier",
   "media.copyFilePath": "Copier le chemin du fichier",
+  "media.filePathCopied": "Chemin du fichier copié",
+  "media.deleteFromIndexFailed": "Impossible de retirer de l'index",
   "media.copyImage": "Copier l'image",
   "media.imageCopied": "Image copiée dans le presse-papiers",
   "media.imageCopyFailed": "Échec de la copie de l'image",
@@ -205,7 +226,8 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.title": "Raccourcis clavier",
   "shortcuts.sectionList": "Liste",
   "shortcuts.sectionDetail": "Détail et lecteur",
-  "shortcuts.commandMenu": "Ouvrir le menu de commandes",
+  "shortcuts.commandMenu":
+    "Ouvrir le menu de commandes (actions sur le fichier, recherches récentes, collections intelligentes)",
   "shortcuts.search": "Cibler la recherche",
   "shortcuts.scrollDown": "Défiler vers le bas",
   "shortcuts.scrollUp": "Défiler vers le haut",
@@ -553,6 +575,8 @@ export const fr: Record<TranslationKey, string> = {
   "collection.removeFrom": "Retirer de « {name} »",
   "collection.addedToast": "Ajouté à « {name} »",
   "collection.removedFromToast": "Retiré de « {name} »",
+  "collection.addedCountToast": "{count} fichiers ajoutés à « {name} »",
+  "collection.removedCountToast": "{count} fichiers retirés de « {name} »",
   "collection.actionFailed": "Impossible de mettre à jour la collection",
 
   // À regarder plus tard (collection intégrée)

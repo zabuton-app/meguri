@@ -1,16 +1,29 @@
+import { useMemo, useState } from "react";
 import {
+  Bookmark,
+  ChevronRight,
+  Clock,
+  Copy,
   DatabaseBackup,
+  FolderOpen,
+  FolderPlus,
   FolderTree,
   Grid3X3,
+  Heart,
   HelpCircle,
+  History,
   List,
   RefreshCw,
   Search,
   Settings,
   Sparkles,
+  Star,
   Tags as TagsIcon,
   Terminal,
+  Trash2,
+  X,
 } from "lucide-react";
+import { defaultFilter } from "cmdk";
 import {
   Command,
   CommandDialog,
@@ -22,9 +35,27 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { useSelection } from "@/components/SelectionContext";
+import { useFileActions, type FileActions } from "@/hooks/useFileActions";
+import { useFocusedFile } from "@/hooks/useFocusedFile";
+import {
+  clearRecentSearches,
+  useRecentSearches,
+} from "@/hooks/useRecentSearches";
+import { useSmartCollections } from "@/hooks/useSmartCollections";
+import { useWatchLater } from "@/hooks/useWatchLater";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
+import type { FileRow, SearchQuery } from "@/ipc/types";
+import { fileNameOf } from "@/lib/relPath";
+import { recentSearchKey } from "@/lib/recentSearches";
+import { describeConditions } from "@/lib/searchConditions";
+import {
+  describeSearchQuery,
+  type SmartCollection,
+} from "@/lib/smartCollections";
 import type { ViewMode } from "@/routes/Home/utils";
+import { MAX_BULK_FILES } from "@shared/tags";
 
 interface CommandMenuProps {
   open: boolean;
@@ -49,6 +80,19 @@ interface CommandMenuProps {
   onSettings: () => void;
   onHelp: () => void;
   onOpenDevTools: () => void;
+  /** Applies a recent search's conditions (the folder shown stays). */
+  onApplySearch: (query: SearchQuery) => void;
+  /** Applies a saved search, the way the filter bar's dropdown does. */
+  onApplySaved: (collection: SmartCollection) => void;
+  /** Sets the full-text query to what was typed. */
+  onQuickSearch: (text: string) => void;
+  /**
+   * The detail view is open beside or over the list. File actions defer the
+   * collection-list refresh then (see useBulkEdit), and leave deleting to the
+   * detail view: the file it shows may be the one focused here, and only the
+   * detail view knows how to close itself over a file that is gone.
+   */
+  detailOpen?: boolean;
 }
 
 interface CommandAction {
@@ -58,6 +102,28 @@ interface CommandAction {
   disabled?: boolean;
   icon: React.ComponentType<{ className?: string }>;
   run: () => void;
+}
+
+/** A sub-page the file actions open: picking a rating or a collection. */
+type Page = "rating" | "collections" | null;
+
+/** Recent searches and saved searches show this many until the user types. */
+export const COMMAND_GROUP_CAP = 5;
+
+const NO_FILES: FileRow[] = [];
+
+/**
+ * cmdk tracks the highlighted row by its value, so two rows sharing one (two
+ * collections or saved searches with the same name, two recent searches
+ * whose chips read alike) would highlight together and trap the arrow keys.
+ * Rows that can repeat therefore take a unique id as their value and carry
+ * their text as keywords, and a row with keywords is matched on them alone,
+ * so the id never matches what the user types.
+ */
+function matchKeywords(value: string, search: string, keywords?: string[]) {
+  return keywords?.length
+    ? defaultFilter(keywords.join(" "), search)
+    : defaultFilter(value, search);
 }
 
 function shortcutMeta(): string {
@@ -78,8 +144,65 @@ function action(
   return { ...props, label: t(key) };
 }
 
-export function CommandMenu({
-  open,
+export function CommandMenu(props: CommandMenuProps) {
+  const { open, onOpenChange } = props;
+  const { t } = useI18n();
+  const [page, setPage] = useState<Page>(null);
+  // A menu closed from a sub-page opens again at the top.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setPage(null);
+  }
+
+  return (
+    <CommandDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("command.title")}
+      description={t("command.placeholder")}
+      className="max-w-xl border-muted/35 bg-bg shadow-2xl"
+      onEscapeKeyDown={(e) => {
+        // Esc on a sub-page steps back rather than closing the menu.
+        if (page) {
+          e.preventDefault();
+          setPage(null);
+        }
+      }}
+    >
+      {/* The body mounts only while the dialog is open, so the selection,
+          recent and saved searches are read when the menu opens rather than
+          on every change behind it. Keyed by page so a page starts with an
+          empty field and the first row highlighted. */}
+      <CommandMenuBody
+        key={page ?? "root"}
+        {...props}
+        page={page}
+        setPage={setPage}
+      />
+    </CommandDialog>
+  );
+}
+
+/**
+ * What the file actions act on: the selection while one is being built, and
+ * otherwise the file under the keyboard focus. A selection whose folders are
+ * still being fetched, or that is past the bulk cap, offers nothing — the
+ * same rule as the selection bar.
+ */
+function useCommandTargets(): FileRow[] {
+  const selection = useSelection();
+  const focused = useFocusedFile();
+  const { active, count, pending, rows } = selection;
+  return useMemo(() => {
+    if (active && count > 0) {
+      return pending || count > MAX_BULK_FILES ? NO_FILES : rows;
+    }
+    return focused ? [focused] : NO_FILES;
+  }, [active, count, pending, rows, focused]);
+}
+
+function CommandMenuBody({
   onOpenChange,
   ready,
   scanning,
@@ -97,13 +220,537 @@ export function CommandMenu({
   onSettings,
   onHelp,
   onOpenDevTools,
-}: CommandMenuProps) {
+  onApplySearch,
+  onApplySaved,
+  onQuickSearch,
+  detailOpen = false,
+  page,
+  setPage,
+}: CommandMenuProps & { page: Page; setPage: (page: Page) => void }) {
   const { t } = useI18n();
+  const [search, setSearch] = useState("");
+  const typed = search.trim();
+  const targets = useCommandTargets();
+  const watchLater = useWatchLater();
+  const files = useFileActions(targets, watchLater, detailOpen);
   const closeThen = (fn: () => void) => {
     onOpenChange(false);
     window.setTimeout(fn, 0);
   };
 
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!page) return;
+    if (e.key === "Backspace" && search === "") {
+      e.preventDefault();
+      setPage(null);
+      return;
+    }
+    // A digit picks the rating outright.
+    if (
+      page === "rating" &&
+      /^[0-5]$/.test(e.key) &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      e.preventDefault();
+      const rating = Number(e.key);
+      closeThen(() => files.setRating(rating));
+    }
+  };
+
+  const badge =
+    page === "rating"
+      ? t("command.pageRating")
+      : page === "collections"
+        ? t("command.pageCollections")
+        : null;
+  const placeholder =
+    page === "rating"
+      ? t("command.ratingPlaceholder")
+      : page === "collections"
+        ? t("command.collectionPlaceholder")
+        : t("command.placeholder");
+
+  return (
+    <Command onKeyDown={onKeyDown} filter={matchKeywords}>
+      <CommandInput
+        placeholder={placeholder}
+        value={search}
+        onValueChange={setSearch}
+        badge={
+          badge &&
+          (targets.length > 1
+            ? `${badge} (${t("command.selectedFiles", { count: targets.length })})`
+            : badge)
+        }
+      />
+      <CommandList>
+        {/* Not while the quick search row is up: cmdk does not count a
+            force-mounted row, and would call a menu holding one empty. */}
+        {(page !== null || typed === "") && (
+          <CommandEmpty>{t("command.empty")}</CommandEmpty>
+        )}
+        {page === "rating" ? (
+          <RatingPage t={t} files={files} closeThen={closeThen} />
+        ) : page === "collections" ? (
+          <CollectionsPage
+            t={t}
+            typing={typed !== ""}
+            files={files}
+            closeThen={closeThen}
+          />
+        ) : (
+          <>
+            {targets.length > 0 && (
+              <FileActionsGroup
+                t={t}
+                targets={targets}
+                files={files}
+                closeThen={closeThen}
+                openPage={setPage}
+                canDelete={!detailOpen}
+              />
+            )}
+            <RecentSearchesGroup
+              t={t}
+              typing={typed !== ""}
+              onApply={(query) => closeThen(() => onApplySearch(query))}
+            />
+            <SmartCollectionsGroup
+              t={t}
+              typing={typed !== ""}
+              onApply={(c) => closeThen(() => onApplySaved(c))}
+            />
+            <FixedGroups
+              t={t}
+              ready={ready}
+              scanning={scanning}
+              devToolsEnabled={devToolsEnabled}
+              folderView={folderView}
+              folderAvailable={folderAvailable}
+              canDiscover={canDiscover}
+              closeThen={closeThen}
+              onFocusSearch={onFocusSearch}
+              onScan={onScan}
+              onRebuild={onRebuild}
+              onSetView={onSetView}
+              onToggleByFolder={onToggleByFolder}
+              onDiscover={onDiscover}
+              onTags={onTags}
+              onSettings={onSettings}
+              onHelp={onHelp}
+              onOpenDevTools={onOpenDevTools}
+            />
+            {typed !== "" && (
+              // Always offered, and always last: whatever else matched, the
+              // text can still be searched for as typed.
+              <CommandGroup forceMount>
+                <CommandItem
+                  forceMount
+                  value={`search-for ${typed}`}
+                  onSelect={() => closeThen(() => onQuickSearch(typed))}
+                >
+                  <Search />
+                  <span className="truncate">
+                    {t("command.searchFor", { q: typed })}
+                  </span>
+                  <CommandShortcut>↵</CommandShortcut>
+                </CommandItem>
+              </CommandGroup>
+            )}
+          </>
+        )}
+      </CommandList>
+      <div className="border-t border-border px-3 py-2 text-xs text-muted">
+        {t("command.shortcutHint", { shortcut: shortcutMeta() })}
+      </div>
+    </Command>
+  );
+}
+
+function Stars({ rating }: { rating: number }) {
+  return (
+    <span className="text-xs tracking-wider text-warn" aria-hidden>
+      {"★".repeat(rating)}
+      {"☆".repeat(5 - rating)}
+    </span>
+  );
+}
+
+/** A row with a second line under its label. */
+function Label({ text, sub }: { text: string; sub?: React.ReactNode }) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className="truncate">{text}</span>
+      {sub != null && (
+        <span className="truncate text-xs text-muted">{sub}</span>
+      )}
+    </span>
+  );
+}
+
+function FileActionsGroup({
+  t,
+  targets,
+  files,
+  closeThen,
+  openPage,
+  canDelete,
+}: {
+  t: TFunc;
+  targets: FileRow[];
+  files: FileActions;
+  closeThen: (fn: () => void) => void;
+  openPage: (page: Page) => void;
+  canDelete: boolean;
+}) {
+  const single = files.single;
+  const name =
+    targets.length === 1
+      ? fileNameOf(targets[0].relPath)
+      : t("command.selectedFiles", { count: targets.length });
+  const favoriteLabel =
+    files.favorite === "all" ? t("favorite.remove") : t("favorite.add");
+  const watchLaterLabel =
+    files.watchLater === "all" ? t("watchLater.remove") : t("watchLater.add");
+  const ratingLabel = t("command.rating");
+  const collectionsLabel = t("command.collections");
+  const { toggleFavorite, toggleWatchLater } = files;
+
+  return (
+    <>
+      <CommandGroup
+        heading={
+          <span className="flex min-w-0 items-baseline gap-1.5">
+            <span className="shrink-0">{t("command.groupFile")}</span>
+            <span className="truncate text-fg" data-testid="command-file-name">
+              {name}
+            </span>
+          </span>
+        }
+      >
+        <CommandItem
+          value={favoriteLabel}
+          onSelect={() => closeThen(toggleFavorite)}
+        >
+          <Heart />
+          <span>{favoriteLabel}</span>
+        </CommandItem>
+        <CommandItem
+          value={watchLaterLabel}
+          disabled={!toggleWatchLater}
+          onSelect={() => toggleWatchLater && closeThen(toggleWatchLater)}
+        >
+          <Clock />
+          <span>{watchLaterLabel}</span>
+        </CommandItem>
+        <CommandItem value={ratingLabel} onSelect={() => openPage("rating")}>
+          <Star />
+          <Label
+            text={ratingLabel}
+            sub={
+              files.rating == null ? (
+                t("command.ratingMixed")
+              ) : (
+                <Stars rating={files.rating} />
+              )
+            }
+          />
+          <ChevronRight className="text-muted" />
+        </CommandItem>
+        <CommandItem
+          value={collectionsLabel}
+          onSelect={() => openPage("collections")}
+        >
+          <FolderPlus />
+          <span className="flex-1">{collectionsLabel}</span>
+          <ChevronRight className="text-muted" />
+        </CommandItem>
+        {single && (
+          <>
+            <CommandItem
+              value={t("media.openFolder")}
+              onSelect={() => closeThen(single.openFolder)}
+            >
+              <FolderOpen />
+              <span>{t("media.openFolder")}</span>
+            </CommandItem>
+            <CommandItem
+              value={t("media.copyFilePath")}
+              onSelect={() => closeThen(single.copyPath)}
+            >
+              <Copy />
+              <span>{t("media.copyFilePath")}</span>
+            </CommandItem>
+            {canDelete && (
+              <CommandItem
+                value={t("media.deleteFromIndex")}
+                className="text-error data-[selected=true]:text-error"
+                onSelect={() => closeThen(() => void single.deleteFromIndex())}
+              >
+                <Trash2 />
+                <span>{t("media.deleteFromIndex")}</span>
+              </CommandItem>
+            )}
+          </>
+        )}
+      </CommandGroup>
+      <CommandSeparator />
+    </>
+  );
+}
+
+function RatingPage({
+  t,
+  files,
+  closeThen,
+}: {
+  t: TFunc;
+  files: FileActions;
+  closeThen: (fn: () => void) => void;
+}) {
+  return (
+    <CommandGroup heading={t("command.pageRating")}>
+      {[5, 4, 3, 2, 1, 0].map((n) => {
+        const label =
+          n === 0
+            ? t("command.ratingNone")
+            : t("command.ratingStars", { rating: n });
+        return (
+          <CommandItem
+            key={n}
+            value={label}
+            onSelect={() => closeThen(() => files.setRating(n))}
+          >
+            <Star />
+            <Label
+              text={label}
+              sub={n > 0 ? <Stars rating={n} /> : undefined}
+            />
+            {files.rating === n && (
+              <span className="text-xs text-primary">
+                {t("command.current")}
+              </span>
+            )}
+            <CommandShortcut>{n}</CommandShortcut>
+          </CommandItem>
+        );
+      })}
+    </CommandGroup>
+  );
+}
+
+function CollectionsPage({
+  t,
+  typing,
+  files,
+  closeThen,
+}: {
+  t: TFunc;
+  typing: boolean;
+  files: FileActions;
+  closeThen: (fn: () => void) => void;
+}) {
+  const { shown, hidden } = capped(files.collections, typing);
+  return (
+    <CommandGroup heading={t("command.pageCollections")}>
+      {shown.map((c) => (
+        <CommandItem
+          key={c.id}
+          value={`collection:${c.id}`}
+          keywords={[c.name]}
+          onSelect={() => closeThen(() => files.toggleCollection(c))}
+        >
+          {c.emoji ? (
+            <span className="w-4 shrink-0 text-center" aria-hidden>
+              {c.emoji}
+            </span>
+          ) : (
+            <FolderPlus />
+          )}
+          <Label
+            text={c.name}
+            sub={
+              c.included === "all"
+                ? t("command.inCollection")
+                : c.included === "some"
+                  ? t("command.inCollectionSome")
+                  : undefined
+            }
+          />
+        </CommandItem>
+      ))}
+      <MoreHint t={t} count={hidden} />
+    </CommandGroup>
+  );
+}
+
+/** Until the user types, a long group shows its first few and says how many more. */
+function capped<T>(
+  items: T[],
+  typing: boolean,
+): { shown: T[]; hidden: number } {
+  if (typing || items.length <= COMMAND_GROUP_CAP) {
+    return { shown: items, hidden: 0 };
+  }
+  return {
+    shown: items.slice(0, COMMAND_GROUP_CAP),
+    hidden: items.length - COMMAND_GROUP_CAP,
+  };
+}
+
+function MoreHint({ t, count }: { t: TFunc; count: number }) {
+  if (count === 0) return null;
+  return (
+    <div className="px-2 pb-1.5 pl-8 text-xs text-muted">
+      {t("command.more", { count })}
+    </div>
+  );
+}
+
+function RecentSearchesGroup({
+  t,
+  typing,
+  onApply,
+}: {
+  t: TFunc;
+  typing: boolean;
+  onApply: (query: SearchQuery) => void;
+}) {
+  const recent = useRecentSearches();
+  const entries = useMemo(
+    () =>
+      recent.map((query) => {
+        const labels = describeConditions(query, t)
+          .filter((c) => c.chip)
+          .map((c) => c.label);
+        return {
+          query,
+          key: recentSearchKey(query),
+          // A search narrowed only by something without a chip of its own
+          // still needs something to show and to match.
+          chips: labels.length ? labels : [describeSearchQuery(t, query)],
+        };
+      }),
+    [recent, t],
+  );
+  if (entries.length === 0) return null;
+  const { shown, hidden } = capped(entries, typing);
+  const clearLabel = t("command.clearRecent");
+
+  return (
+    <>
+      <CommandGroup heading={t("command.groupRecent")}>
+        {shown.map(({ query, key, chips }) => (
+          <CommandItem
+            key={key}
+            value={`recent:${key}`}
+            keywords={chips}
+            onSelect={() => onApply(query)}
+          >
+            <History />
+            <span className="flex min-w-0 flex-1 gap-1 overflow-hidden">
+              {chips.map((label, i) => (
+                <span
+                  key={i}
+                  className="shrink-0 whitespace-nowrap rounded-full bg-overlay px-2 py-0.5 text-xs text-fg"
+                >
+                  {label}
+                </span>
+              ))}
+            </span>
+          </CommandItem>
+        ))}
+        <MoreHint t={t} count={hidden} />
+        <CommandItem value={clearLabel} onSelect={clearRecentSearches}>
+          <X />
+          <span>{clearLabel}</span>
+        </CommandItem>
+      </CommandGroup>
+      <CommandSeparator />
+    </>
+  );
+}
+
+function SmartCollectionsGroup({
+  t,
+  typing,
+  onApply,
+}: {
+  t: TFunc;
+  typing: boolean;
+  onApply: (collection: SmartCollection) => void;
+}) {
+  // Read when the menu opens: the dropdown keeps its own copy, and saving
+  // there while the menu is closed is the only way the list changes.
+  const { collections } = useSmartCollections();
+  if (collections.length === 0) return null;
+  const { shown, hidden } = capped(collections, typing);
+
+  return (
+    <>
+      <CommandGroup heading={t("smartCollection.title")}>
+        {shown.map((c) => {
+          const summary = describeSearchQuery(t, c.query);
+          return (
+            <CommandItem
+              key={c.id}
+              value={`saved:${c.id}`}
+              keywords={[c.name, summary]}
+              onSelect={() => onApply(c)}
+            >
+              <Bookmark />
+              <Label text={c.name} sub={summary} />
+            </CommandItem>
+          );
+        })}
+        <MoreHint t={t} count={hidden} />
+      </CommandGroup>
+      <CommandSeparator />
+    </>
+  );
+}
+
+function FixedGroups({
+  t,
+  ready,
+  scanning,
+  devToolsEnabled,
+  folderView,
+  folderAvailable,
+  canDiscover,
+  closeThen,
+  onFocusSearch,
+  onScan,
+  onRebuild,
+  onSetView,
+  onToggleByFolder,
+  onDiscover,
+  onTags,
+  onSettings,
+  onHelp,
+  onOpenDevTools,
+}: {
+  t: TFunc;
+  ready: boolean;
+  scanning: boolean;
+  devToolsEnabled: boolean;
+  folderView: boolean;
+  folderAvailable: boolean;
+  canDiscover: boolean;
+  closeThen: (fn: () => void) => void;
+  onFocusSearch: () => void;
+  onScan: (includeExcluded?: boolean) => void;
+  onRebuild: () => void;
+  onSetView: (view: ViewMode) => void;
+  onToggleByFolder: () => void;
+  onDiscover: () => void;
+  onTags: () => void;
+  onSettings: () => void;
+  onHelp: () => void;
+  onOpenDevTools: () => void;
+}) {
   const navigation: CommandAction[] = [
     action(t, "command.focusSearch", {
       id: "focus-search",
@@ -188,34 +835,19 @@ export function CommandMenu({
   ];
 
   return (
-    <CommandDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t("command.title")}
-      description={t("command.placeholder")}
-      className="max-w-xl border-muted/35 bg-bg shadow-2xl"
-    >
-      <Command>
-        <CommandInput placeholder={t("command.placeholder")} />
-        <CommandList>
-          <CommandEmpty>{t("command.empty")}</CommandEmpty>
-          <CommandActionGroup
-            heading={t("command.groupNavigation")}
-            actions={navigation}
-          />
-          <CommandSeparator />
-          <CommandActionGroup
-            heading={t("command.groupWorkspace")}
-            actions={workspace}
-          />
-          <CommandSeparator />
-          <CommandActionGroup heading={t("command.groupView")} actions={view} />
-        </CommandList>
-        <div className="border-t border-border px-3 py-2 text-xs text-muted">
-          {t("command.shortcutHint", { shortcut: shortcutMeta() })}
-        </div>
-      </Command>
-    </CommandDialog>
+    <>
+      <CommandActionGroup
+        heading={t("command.groupNavigation")}
+        actions={navigation}
+      />
+      <CommandSeparator />
+      <CommandActionGroup
+        heading={t("command.groupWorkspace")}
+        actions={workspace}
+      />
+      <CommandSeparator />
+      <CommandActionGroup heading={t("command.groupView")} actions={view} />
+    </>
   );
 }
 

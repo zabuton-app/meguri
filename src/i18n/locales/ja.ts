@@ -143,6 +143,24 @@ export const ja = {
   "command.focusSearch": "検索にフォーカス",
   "command.openDevTools": "開発者コンソールを開く",
   "command.shortcutHint": "{shortcut} で開けます",
+  "command.groupFile": "ファイル操作",
+  "command.selectedFiles": "選択中の {count} 件",
+  "command.rating": "評価を変更…",
+  "command.ratingStars": "{rating} つ星",
+  "command.ratingNone": "評価なし",
+  "command.ratingMixed": "評価がまちまち",
+  "command.current": "現在",
+  "command.collections": "コレクションに追加…",
+  "command.inCollection": "登録済み・選ぶと外す",
+  "command.inCollectionSome": "一部が登録済み・選ぶと全件を追加",
+  "command.pageRating": "評価",
+  "command.pageCollections": "コレクション",
+  "command.ratingPlaceholder": "0〜5 を入力して選ぶ...",
+  "command.collectionPlaceholder": "コレクションを検索...",
+  "command.groupRecent": "最近の検索",
+  "command.clearRecent": "最近の検索を消去",
+  "command.more": "他 {count} 件 · 入力して絞り込む",
+  "command.searchFor": "「{q}」を検索",
 
   // フィルタ（FilterBar / 条件バッジ）
   "filter.searchHint":
@@ -181,6 +199,8 @@ export const ja = {
   "media.openExternal": "外部で開く",
   "media.openFolder": "フォルダを開く",
   "media.copyFilePath": "ファイルパスをコピー",
+  "media.filePathCopied": "ファイルパスをコピーしました",
+  "media.deleteFromIndexFailed": "インデックスから削除できませんでした",
   "media.copyImage": "画像をコピー",
   "media.imageCopied": "画像をクリップボードにコピーしました",
   "media.imageCopyFailed": "画像のコピーに失敗しました",
@@ -200,7 +220,8 @@ export const ja = {
   "shortcuts.title": "キーボードショートカット",
   "shortcuts.sectionList": "一覧",
   "shortcuts.sectionDetail": "詳細・プレイヤー",
-  "shortcuts.commandMenu": "コマンドメニューを開く",
+  "shortcuts.commandMenu":
+    "コマンドメニューを開く（ファイル操作・最近の検索・スマートコレクション）",
   "shortcuts.search": "検索にフォーカス",
   "shortcuts.scrollDown": "下へスクロール",
   "shortcuts.scrollUp": "上へスクロール",
@@ -539,6 +560,8 @@ export const ja = {
   "collection.removeFrom": "「{name}」から削除",
   "collection.addedToast": "「{name}」に追加しました",
   "collection.removedFromToast": "「{name}」から削除しました",
+  "collection.addedCountToast": "{count}件を「{name}」に追加しました",
+  "collection.removedCountToast": "{count}件を「{name}」から削除しました",
   "collection.actionFailed": "コレクションの更新に失敗しました",
 
   // 後で見る（組み込みコレクション）

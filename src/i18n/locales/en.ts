@@ -144,6 +144,24 @@ export const en: Record<TranslationKey, string> = {
   "command.focusSearch": "Focus search",
   "command.openDevTools": "Open developer console",
   "command.shortcutHint": "Open with {shortcut}",
+  "command.groupFile": "File",
+  "command.selectedFiles": "{count} selected",
+  "command.rating": "Set rating…",
+  "command.ratingStars": "{rating} stars",
+  "command.ratingNone": "No rating",
+  "command.ratingMixed": "Mixed ratings",
+  "command.current": "Current",
+  "command.collections": "Add to collection…",
+  "command.inCollection": "Added · select to remove",
+  "command.inCollectionSome": "Some added · select to add all",
+  "command.pageRating": "Rating",
+  "command.pageCollections": "Collections",
+  "command.ratingPlaceholder": "Type 0–5 to pick...",
+  "command.collectionPlaceholder": "Search collections...",
+  "command.groupRecent": "Recent searches",
+  "command.clearRecent": "Clear recent searches",
+  "command.more": "{count} more · type to filter",
+  "command.searchFor": "Search for “{q}”",
 
   // filter
   "filter.searchHint":
@@ -182,6 +200,8 @@ export const en: Record<TranslationKey, string> = {
   "media.openExternal": "Open externally",
   "media.openFolder": "Open containing folder",
   "media.copyFilePath": "Copy File Path",
+  "media.filePathCopied": "File path copied",
+  "media.deleteFromIndexFailed": "Could not remove from the index",
   "media.copyImage": "Copy image",
   "media.imageCopied": "Image copied to clipboard",
   "media.imageCopyFailed": "Failed to copy image",
@@ -201,7 +221,8 @@ export const en: Record<TranslationKey, string> = {
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.sectionList": "List",
   "shortcuts.sectionDetail": "Detail & player",
-  "shortcuts.commandMenu": "Open command menu",
+  "shortcuts.commandMenu":
+    "Open command menu (file actions, recent searches, smart collections)",
   "shortcuts.search": "Focus search",
   "shortcuts.scrollDown": "Scroll down",
   "shortcuts.scrollUp": "Scroll up",
@@ -535,6 +556,8 @@ export const en: Record<TranslationKey, string> = {
   "collection.removeFrom": 'Remove from "{name}"',
   "collection.addedToast": 'Added to "{name}"',
   "collection.removedFromToast": 'Removed from "{name}"',
+  "collection.addedCountToast": 'Added {count} files to "{name}"',
+  "collection.removedCountToast": 'Removed {count} files from "{name}"',
   "collection.actionFailed": "Could not update collection",
 
   // Watch Later (built-in collection)
