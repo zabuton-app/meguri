@@ -8,6 +8,8 @@ export interface FileNodeAttrs {
   label: string;
   x: number;
   y: number;
+  /** Depth, in the 3D view (0 in 2D). */
+  z: number;
   /** A placeholder; the view sizes nodes by their visible links. */
   size: number;
   fileKind: string;
@@ -24,6 +26,7 @@ export interface TagNodeAttrs {
   label: string;
   x: number;
   y: number;
+  z: number;
   size: number;
   namespace: string;
   name: string;

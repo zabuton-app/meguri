@@ -7,8 +7,9 @@ import { REHEAT_ALPHA, type Physics } from "./physics";
 import type { SimLoad, SimRequest, SimResponse } from "./protocol";
 
 export interface SimCallbacks {
-  /** New positions for the graph of generation `gen`, in load() order. */
-  onPositions: (xy: Float32Array, gen: number) => void;
+  /** New positions (dims per node) for the graph of generation `gen`, in
+   *  load() order. */
+  onPositions: (pos: Float32Array, gen: number) => void;
   /** The simulation of generation `gen` cooled down. */
   onIdle: (gen: number) => void;
 }
@@ -67,7 +68,7 @@ export class SimClient {
     this.pending = null;
     if (
       !this.post({ type: "load", gen, ...input }, [
-        input.xy.buffer,
+        input.pos.buffer,
         input.links.buffer,
       ])
     )
@@ -88,10 +89,10 @@ export class SimClient {
     this.post({ type: "heat", alpha });
   }
 
-  /** Hold node `index` of the current graph at (x, y) and keep it warm, as a
-   *  drag does in Obsidian: every move reheats. */
-  drag(index: number, x: number, y: number): void {
-    this.post({ type: "pin", gen: this.gen, index, x, y });
+  /** Hold node `index` of the current graph at `at` (dims coordinates) and
+   *  keep it warm, as a drag does in Obsidian: every move reheats. */
+  drag(index: number, at: number[]): void {
+    this.post({ type: "pin", gen: this.gen, index, at });
     this.post({ type: "heat", alpha: REHEAT_ALPHA, alphaTarget: REHEAT_ALPHA });
   }
 
@@ -119,7 +120,7 @@ export class SimClient {
       this.callbacks?.onIdle(msg.gen);
       return;
     }
-    this.pending = msg.xy;
+    this.pending = msg.pos;
     if (!this.frame)
       this.frame = requestAnimationFrame(() => {
         this.frame = 0;
@@ -128,8 +129,8 @@ export class SimClient {
   }
 
   private flush(): void {
-    const xy = this.pending;
+    const pos = this.pending;
     this.pending = null;
-    if (xy) this.callbacks?.onPositions(xy, this.gen);
+    if (pos) this.callbacks?.onPositions(pos, this.gen);
   }
 }

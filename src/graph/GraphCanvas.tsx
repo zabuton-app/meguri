@@ -25,39 +25,25 @@ import type {
   PartialButFor,
 } from "sigma/types";
 import type { DisplaySettings } from "./graphSettings";
-import { fade, nodeRadius, nodeWeights } from "./model/appearance";
-import type { EdgeAttrs, MediaGraph, NodeAttrs } from "./model/types";
-import type { Visibility } from "./model/visibility";
+import {
+  FADED,
+  FOCUS_LABEL_DROP,
+  LABEL_GAP,
+  fade,
+  focusLabelFontPx,
+  labelFontPx,
+  nodeFill,
+  nodeRadius,
+  nodeWeights,
+  textAlpha,
+} from "./model/appearance";
+import type { EdgeAttrs, NodeAttrs } from "./model/types";
+import type { GraphCanvasHandle, GraphCanvasProps } from "./canvasTypes";
 import type { GraphColors } from "./useGraphColors";
 
-export interface GraphCanvasHandle {
-  /** Frame the visible nodes. */
-  fit(animate?: boolean): void;
-  zoomIn(): void;
-  zoomOut(): void;
-  /** Centre the camera on a node, zooming in to where labels show. */
-  focus(key: string): void;
-}
+export type { GraphCanvasHandle, GraphCanvasProps };
 
-interface Props {
-  graph: MediaGraph;
-  colors: GraphColors;
-  visibility: Visibility;
-  /** The node whose neighbourhood is highlighted (the rest fades). */
-  focus: string | null;
-  display: DisplaySettings;
-  onHover: (key: string | null) => void;
-  onClickNode: (key: string) => void;
-  onClickStage: () => void;
-  /** A press on a node became a drag; false refuses it. */
-  onDragStart: (key: string) => boolean;
-  /** The dragged node's new position, in graph coordinates. */
-  onDrag: (key: string, x: number, y: number) => void;
-  onDragEnd: (key: string) => void;
-  /** The user moved the camera (wheel, pan, zoom buttons). */
-  onCameraInput?: () => void;
-  ref?: Ref<GraphCanvasHandle>;
-}
+type Props = GraphCanvasProps & { ref?: Ref<GraphCanvasHandle> };
 
 /** Past this many edges, edges are not drawn while the camera moves. */
 const HIDE_EDGES_ON_MOVE_ABOVE = 10_000;
@@ -77,13 +63,6 @@ const ZOOM_EASE = 0.85;
 const ANIMATION_MS = 300;
 /** Pointer travel (px) that turns a press on a node into a drag. */
 const DRAG_START_PX = 5;
-/** Opacity of what is not next to the focused node. */
-const FADED = 0.2;
-/** Gap between a node and the label under it, in graph units (drawn at √scale
- *  like the node). */
-const LABEL_GAP = 5;
-/** How far the focused node's label moves down, in pixels. */
-const FOCUS_LABEL_DROP = 15;
 
 type LabelData = PartialButFor<
   NodeDisplayData,
@@ -121,7 +100,7 @@ function drawLabel(view: View) {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = view.colors.label;
-    ctx.font = `${14 * root + data.size / 4}px ${view.colors.font}`;
+    ctx.font = `${labelFontPx(view.scale, data.size)}px ${view.colors.font}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText(data.label, data.x, data.y + data.size + LABEL_GAP * root);
@@ -142,9 +121,7 @@ function drawFocus(view: View) {
     ctx.stroke();
     const label = data.focusLabel ?? data.label;
     if (label) {
-      // Readable however far out the view is.
-      const px = data.size / root;
-      const font = (14 + px / 4) * (view.scale < 1 ? 1 : root);
+      const font = focusLabelFontPx(view.scale, data.size);
       ctx.fillStyle = view.colors.label;
       ctx.font = `${font}px ${view.colors.font}`;
       ctx.textAlign = "center";
@@ -252,16 +229,7 @@ export function GraphCanvas({
         const { colors: c, display: d } = view.current;
         if (!vis.nodes.has(key)) return { ...data, hidden: true };
 
-        const fill =
-          data.type === "tag"
-            ? data.auto
-              ? c.autoTag
-              : c.tag
-            : data.fileKind === "image"
-              ? c.image
-              : data.fileKind === "audio"
-                ? c.audio
-                : c.video;
+        const fill = nodeFill(data, c);
         const out: Partial<NodeDisplayData> & Record<string, unknown> = {
           ...data,
           size: nodeRadius(state.current.weights.get(key) ?? 0, d.nodeSize),
@@ -328,10 +296,7 @@ export function GraphCanvas({
 
     sigma.on("beforeRender", () => {
       v.scale = v.s1 / camera.ratio;
-      v.textAlpha = Math.min(
-        1,
-        Math.max(0, Math.log2(v.scale) + 1 - v.display.textFade),
-      );
+      v.textAlpha = textAlpha(v.scale, v.display.textFade);
     });
 
     // Smooth zoom, anchored at a viewport point (the pointer for the wheel).

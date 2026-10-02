@@ -65,6 +65,17 @@ describe("graph_layout_set payload", () => {
     expect(ChannelInputs.graph_layout_set.safeParse(ok).success).toBe(true);
   });
 
+  it("accepts three numbers per key for a 3D layout", () => {
+    const three = { ...ok, dims: 3, xy: [0, 1, 2, 3, 4, 5] };
+    expect(ChannelInputs.graph_layout_set.safeParse(three).success).toBe(true);
+    expect(
+      ChannelInputs.graph_layout_set.safeParse({ ...three, dims: 2 }).success,
+    ).toBe(false);
+    expect(
+      ChannelInputs.graph_layout_set.safeParse({ ...ok, dims: 4 }).success,
+    ).toBe(false);
+  });
+
   it.each([
     ["an odd xy length", { ...ok, xy: [0, 1, 2] }],
     ["a missing pair", { ...ok, xy: [0, 1] }],

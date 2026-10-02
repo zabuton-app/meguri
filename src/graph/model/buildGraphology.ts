@@ -31,13 +31,13 @@ export function buildGraphology(
   const graph = emptyGraph();
   const added: string[] = [];
   const { files, tags } = payload;
-  const position = (key: string): { x: number; y: number } => {
+  const position = (key: string): { x: number; y: number; z: number } => {
     if (prev?.hasNode(key)) {
-      const { x, y } = prev.getNodeAttributes(key);
-      return { x, y };
+      const { x, y, z } = prev.getNodeAttributes(key);
+      return { x, y, z };
     }
     added.push(key);
-    return { x: 0, y: 0 };
+    return { x: 0, y: 0, z: 0 };
   };
 
   const fileKeys = files.id.map((id, i) => {

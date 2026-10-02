@@ -5,26 +5,33 @@
 // A real workspace keeps its file in its own data directory, which is deleted
 // with the workspace. "All" and collections have no data directory, so theirs
 // go under <userData>/graph-layouts/, named by a hash of the scope string.
+// The 2D and 3D views lay a graph out differently, so each has its own file.
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
   GRAPH_LAYOUT_MAX_NODES,
   workspaceOfNodeKey,
+  type GraphDims,
 } from "../../../shared/ipc/graph.js";
 import { ALL_ID, COLLECTION_ID_PREFIX } from "../../../shared/workspaceIds.js";
 
-const FILE_NAME = "graph-layout.json";
+function fileName(dims: GraphDims): string {
+  return dims === 3 ? "graph-layout-3d.json" : "graph-layout.json";
+}
 const SHARED_DIR = "graph-layouts";
 
 export interface LayoutPositions {
   keys: string[];
-  /** [x0, y0, x1, y1, ...]: two numbers per key. */
+  /** The coordinates, one per dimension for each key ([x0, y0, x1, y1, ...]
+   *  in 2D, [x0, y0, z0, ...] in 3D). */
   xy: number[];
 }
 
 interface LayoutFile extends LayoutPositions {
   v: 1;
+  /** Absent in files written before the 3D view: those are 2D. */
+  dims?: GraphDims;
   savedAt: number;
 }
 
@@ -40,8 +47,9 @@ export interface LayoutScopes {
   workspaceIds(): Set<string>;
 }
 
-function sharedFile(baseDir: string, scope: string): string {
-  const hash = createHash("sha1").update(scope).digest("hex").slice(0, 16);
+function sharedFile(baseDir: string, scope: string, dims: GraphDims): string {
+  const key = dims === 3 ? `${scope}#3d` : scope;
+  const hash = createHash("sha1").update(key).digest("hex").slice(0, 16);
   return path.join(baseDir, SHARED_DIR, `${hash}.json`);
 }
 
@@ -50,30 +58,35 @@ function sharedFile(baseDir: string, scope: string): string {
 export function layoutPathFor(
   scope: string,
   scopes: LayoutScopes,
+  dims: GraphDims = 2,
 ): string | null {
-  if (scope === ALL_ID) return sharedFile(scopes.baseDir, scope);
+  if (scope === ALL_ID) return sharedFile(scopes.baseDir, scope, dims);
   if (scope.startsWith(COLLECTION_ID_PREFIX)) {
     const id = scope.slice(COLLECTION_ID_PREFIX.length);
-    return scopes.hasCollection(id) ? sharedFile(scopes.baseDir, scope) : null;
+    return scopes.hasCollection(id)
+      ? sharedFile(scopes.baseDir, scope, dims)
+      : null;
   }
   const dir = scopes.workspaceDataDir(scope);
-  return dir ? path.join(dir, FILE_NAME) : null;
+  return dir ? path.join(dir, fileName(dims)) : null;
 }
 
-/** Path a collection's file had, for deleting it with the collection. */
-export function collectionLayoutPath(baseDir: string, id: string): string {
-  return sharedFile(baseDir, `${COLLECTION_ID_PREFIX}${id}`);
+/** Paths a collection's files had (2D and 3D), for deleting them with it. */
+export function collectionLayoutPaths(baseDir: string, id: string): string[] {
+  const scope = `${COLLECTION_ID_PREFIX}${id}`;
+  return [sharedFile(baseDir, scope, 2), sharedFile(baseDir, scope, 3)];
 }
 
-function isLayoutFile(v: unknown): v is LayoutFile {
+function isLayoutFile(v: unknown, dims: GraphDims): v is LayoutFile {
   if (typeof v !== "object" || v === null) return false;
   const f = v as Partial<LayoutFile>;
   return (
     f.v === 1 &&
+    (f.dims ?? 2) === dims &&
     Array.isArray(f.keys) &&
     Array.isArray(f.xy) &&
     f.keys.length <= GRAPH_LAYOUT_MAX_NODES &&
-    f.xy.length === f.keys.length * 2 &&
+    f.xy.length === f.keys.length * dims &&
     f.keys.every((k) => typeof k === "string") &&
     f.xy.every((n) => typeof n === "number" && Number.isFinite(n))
   );
@@ -82,6 +95,7 @@ function isLayoutFile(v: unknown): v is LayoutFile {
 /** The stored positions, or null when there are none or the file is unusable. */
 export async function readLayout(
   file: string,
+  dims: GraphDims = 2,
 ): Promise<LayoutPositions | null> {
   let raw: string;
   try {
@@ -91,7 +105,9 @@ export async function readLayout(
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    return isLayoutFile(parsed) ? { keys: parsed.keys, xy: parsed.xy } : null;
+    return isLayoutFile(parsed, dims)
+      ? { keys: parsed.keys, xy: parsed.xy }
+      : null;
   } catch {
     return null;
   }
@@ -109,12 +125,13 @@ export function writeLayout(
   file: string,
   update: LayoutPositions,
   keep: (key: string) => boolean = () => true,
+  dims: GraphDims = 2,
 ): Promise<void> {
   // Each write reads, merges and replaces the file: two in flight for one
   // file would lose one's keys, so writes to a file run one after another.
   const run = (writes.get(file) ?? Promise.resolve())
     .catch(() => undefined)
-    .then(() => mergeAndWrite(file, update, keep));
+    .then(() => mergeAndWrite(file, update, keep, dims));
   writes.set(file, run);
   void run
     .finally(() => {
@@ -130,19 +147,21 @@ async function mergeAndWrite(
   file: string,
   update: LayoutPositions,
   keep: (key: string) => boolean,
+  dims: GraphDims,
 ): Promise<void> {
-  const merged = new Map<string, [number, number]>();
-  const prev = await readLayout(file);
+  const merged = new Map<string, number[]>();
+  const at = (xy: number[], i: number) => xy.slice(i * dims, (i + 1) * dims);
+  const prev = await readLayout(file, dims);
   if (prev) {
     prev.keys.forEach((k, i) => {
-      if (keep(k)) merged.set(k, [prev.xy[i * 2], prev.xy[i * 2 + 1]]);
+      if (keep(k)) merged.set(k, at(prev.xy, i));
     });
   }
   update.keys.forEach((k, i) => {
     if (!keep(k)) return;
     // Re-inserted so the updated keys sit at the end, i.e. are the newest.
     merged.delete(k);
-    merged.set(k, [update.xy[i * 2], update.xy[i * 2 + 1]]);
+    merged.set(k, at(update.xy, i));
   });
   let entries = [...merged];
   if (entries.length > GRAPH_LAYOUT_MAX_NODES)
@@ -150,6 +169,7 @@ async function mergeAndWrite(
 
   const out: LayoutFile = {
     v: 1,
+    ...(dims === 3 ? { dims } : {}),
     savedAt: Date.now(),
     keys: entries.map(([k]) => k),
     xy: entries.flatMap(([, p]) => p),
@@ -164,9 +184,10 @@ async function mergeAndWrite(
  *  reopened right after leaving starts from what it left. */
 export async function readLayoutSettled(
   file: string,
+  dims: GraphDims = 2,
 ): Promise<LayoutPositions | null> {
   await (writes.get(file) ?? Promise.resolve()).catch(() => undefined);
-  return readLayout(file);
+  return readLayout(file, dims);
 }
 
 /** Best effort: a file left behind is only a stale cache nobody reads. */

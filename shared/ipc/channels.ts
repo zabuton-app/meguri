@@ -23,6 +23,7 @@ import type {
 } from "./schema.js";
 import {
   FolderPathSchema,
+  GraphDimsSchema,
   GraphNodeKeySchema,
   GraphScopeSchema,
   HistoryQuerySchema,
@@ -240,15 +241,19 @@ export const ChannelInputs = {
     query: SearchQuerySchema,
     maxFiles: z.number().int().min(1).max(GRAPH_MAX_FILES_HARD).optional(),
   }),
-  graph_layout_get: z.object({ scope: GraphScopeSchema }),
+  graph_layout_get: z.object({
+    scope: GraphScopeSchema,
+    dims: GraphDimsSchema.optional(),
+  }),
   graph_layout_set: z
     .object({
       scope: GraphScopeSchema,
+      dims: GraphDimsSchema.optional(),
       keys: boundedArray(GraphNodeKeySchema, GRAPH_LAYOUT_MAX_NODES),
-      xy: boundedArray(z.number(), GRAPH_LAYOUT_MAX_NODES * 2),
+      xy: boundedArray(z.number(), GRAPH_LAYOUT_MAX_NODES * 3),
     })
-    .refine((v) => v.xy.length === v.keys.length * 2, {
-      message: "xy must hold two numbers per key",
+    .refine((v) => v.xy.length === v.keys.length * (v.dims ?? 2), {
+      message: "xy must hold one number per dimension per key",
     }),
   file_get: FileTarget,
   file_set_rating: FileTarget.extend({ rating: z.number() }),

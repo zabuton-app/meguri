@@ -388,6 +388,7 @@ export const ko: Record<TranslationKey, string> = {
   "graph.edge.tag": "태그 연결",
   "graph.toggle.autoTags": "자동 태그",
   "graph.toggle.orphans": "고립 노드",
+  "graph.dims": "표시 차원",
   "graph.relayout": "다시 배치",
   "graph.settings.title": "그래프 설정",
   "graph.settings.reset": "기본값으로 되돌리기",

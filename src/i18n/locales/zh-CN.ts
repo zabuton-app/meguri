@@ -379,6 +379,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "graph.edge.tag": "标签关联",
   "graph.toggle.autoTags": "自动标签",
   "graph.toggle.orphans": "孤立节点",
+  "graph.dims": "显示维度",
   "graph.relayout": "重新布局",
   "graph.settings.title": "图谱设置",
   "graph.settings.reset": "恢复默认",

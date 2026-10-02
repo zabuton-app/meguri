@@ -389,6 +389,7 @@ export const ja = {
   "graph.edge.tag": "タグ付け",
   "graph.toggle.autoTags": "自動付与タグ",
   "graph.toggle.orphans": "孤立ノード",
+  "graph.dims": "表示の次元",
   "graph.relayout": "再配置",
   "graph.settings.title": "グラフの設定",
   "graph.settings.reset": "既定値に戻す",

@@ -421,3 +421,6 @@ export const GraphScopeSchema = z.string().min(1).max(MAX_WORKSPACE_ID);
 /** A graph node key ("f:<ws>:<metaKey>" or "t:<namespace>:<name>"). Stored,
  *  never parsed, so only its length is bounded. */
 export const GraphNodeKeySchema = z.string().min(3).max(GRAPH_NODE_KEY_MAX);
+
+/** The graph view's layout dimensions (the flat view or the 3D one). */
+export const GraphDimsSchema = z.union([z.literal(2), z.literal(3)]);

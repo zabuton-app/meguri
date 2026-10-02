@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  collectionLayoutPath,
+  collectionLayoutPaths,
   keepRegisteredWorkspaces,
   layoutPathFor,
   readLayout,
@@ -48,7 +48,20 @@ describe("layoutPathFor", () => {
     expect(path.dirname(all ?? "")).toBe(path.join(base, "graph-layouts"));
     expect(path.basename(col ?? "")).toMatch(/^[0-9a-f]{16}\.json$/);
     expect(col).not.toBe(all);
-    expect(col).toBe(collectionLayoutPath(base, "c1"));
+    expect(col).toBe(collectionLayoutPaths(base, "c1")[0]);
+  });
+
+  it("keeps the 3D layout in a file of its own", () => {
+    const ws2 = layoutPathFor("0123456789abcdef", scopes());
+    const ws3 = layoutPathFor("0123456789abcdef", scopes(), 3);
+    expect(path.dirname(ws3 ?? "")).toBe(path.dirname(ws2 ?? ""));
+    expect(ws3).not.toBe(ws2);
+    const col3 = layoutPathFor("collection:c1", scopes(), 3);
+    expect(col3).not.toBe(layoutPathFor("collection:c1", scopes()));
+    expect(collectionLayoutPaths(base, "c1")).toContain(col3);
+    expect(layoutPathFor("__all__", scopes(), 3)).not.toBe(
+      layoutPathFor("__all__", scopes()),
+    );
   });
 
   it("has no file for a scope that does not exist", () => {
@@ -149,6 +162,32 @@ describe("readLayout / writeLayout", () => {
     await removeLayout(file());
     await removeLayout(file());
     expect(fs.existsSync(file())).toBe(false);
+  });
+});
+
+describe("3D layouts", () => {
+  it("round-trip three numbers per key and merge like 2D ones", async () => {
+    const file = path.join(base, "d", "graph-layout-3d.json");
+    await writeLayout(
+      file,
+      { keys: ["t::a", "t::b"], xy: [1, 2, 3, 4, 5, 6] },
+      undefined,
+      3,
+    );
+    await writeLayout(file, { keys: ["t::b"], xy: [7, 8, 9] }, undefined, 3);
+    expect(await readLayout(file, 3)).toEqual({
+      keys: ["t::a", "t::b"],
+      xy: [1, 2, 3, 7, 8, 9],
+    });
+  });
+
+  it("are not read as 2D, nor 2D ones as 3D", async () => {
+    const d3 = path.join(base, "d", "three.json");
+    const d2 = path.join(base, "d", "two.json");
+    await writeLayout(d3, { keys: ["t::a"], xy: [1, 2, 3] }, undefined, 3);
+    await writeLayout(d2, { keys: ["t::a"], xy: [1, 2] });
+    expect(await readLayout(d3)).toBeNull();
+    expect(await readLayout(d2, 3)).toBeNull();
   });
 });
 

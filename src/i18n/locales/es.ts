@@ -397,6 +397,7 @@ export const es: Record<TranslationKey, string> = {
   "graph.edge.tag": "Etiquetado",
   "graph.toggle.autoTags": "Etiquetas automáticas",
   "graph.toggle.orphans": "Nodos huérfanos",
+  "graph.dims": "Dimensiones",
   "graph.relayout": "Reorganizar",
   "graph.settings.title": "Ajustes del grafo",
   "graph.settings.reset": "Restablecer valores",

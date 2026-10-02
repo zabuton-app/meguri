@@ -18,6 +18,7 @@ import type {
   ThumbDone,
   UpdateInfo,
 } from "@shared/ipc/schema";
+import type { GraphDims } from "@shared/ipc/graph";
 
 interface Bridge {
   invoke<T = unknown>(channel: string, args?: unknown): Promise<T>;
@@ -114,9 +115,14 @@ export const api = {
     query: ChannelInput<"graph_build">["query"],
     maxFiles?: number,
   ) => invoke("graph_build", { query, maxFiles }),
-  graphLayoutGet: (scope: string) => invoke("graph_layout_get", { scope }),
-  graphLayoutSet: (scope: string, keys: string[], xy: number[]) =>
-    invoke("graph_layout_set", { scope, keys, xy }),
+  graphLayoutGet: (scope: string, dims: GraphDims = 2) =>
+    invoke("graph_layout_get", { scope, dims }),
+  graphLayoutSet: (
+    scope: string,
+    keys: string[],
+    xy: number[],
+    dims: GraphDims = 2,
+  ) => invoke("graph_layout_set", { scope, keys, xy, dims }),
   fileGet: (id: number, workspaceId: string) =>
     invoke("file_get", { id, workspaceId }),
   fileSetRating: (id: number, workspaceId: string, rating: number) =>

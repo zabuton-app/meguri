@@ -92,4 +92,33 @@ describe("placeNodes", () => {
   it("returns nothing for nothing", () => {
     expect(placeNodes(g, [], all, () => null).size).toBe(0);
   });
+
+  it("seats in 3D: near seated neighbours, else in a shell outside the others", () => {
+    const seated = new Map<string, number[]>([[fk("a.mp4"), [0, 0, 500]]]);
+    const out = placeNodes(
+      g,
+      [tk("sea"), tk("cat")],
+      all,
+      (k) => seated.get(k) ?? null,
+      sequence(0.5),
+      3,
+    );
+    expect(out.get(tk("sea"))).toEqual([0, 0, 500]);
+    for (const r of [0, 0.3, 0.99]) {
+      const p =
+        placeNodes(
+          g,
+          [tk("cat")],
+          all,
+          (k) => seated.get(k) ?? null,
+          sequence(r),
+          3,
+        ).get(tk("cat")) ?? [];
+      expect(p).toHaveLength(3);
+      const d = Math.hypot(p[0], p[1], p[2]);
+      const outer = Math.cbrt((3 * 60 ** 3) / (4 * Math.PI) + 500 ** 3);
+      expect(d).toBeGreaterThanOrEqual(500 - 1e-9);
+      expect(d).toBeLessThanOrEqual(outer + 1e-9);
+    }
+  });
 });
