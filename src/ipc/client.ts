@@ -109,6 +109,14 @@ export const api = {
   /** Selected folders expanded into their files, for a bulk edit. */
   folderFiles: (workspaceId: string, paths: string[]) =>
     invoke("folder_files", { workspaceId, paths }),
+  /** The whole graph of the active target for a query (graph view). */
+  graphBuild: (
+    query: ChannelInput<"graph_build">["query"],
+    maxFiles?: number,
+  ) => invoke("graph_build", { query, maxFiles }),
+  graphLayoutGet: (scope: string) => invoke("graph_layout_get", { scope }),
+  graphLayoutSet: (scope: string, keys: string[], xy: number[]) =>
+    invoke("graph_layout_set", { scope, keys, xy }),
   fileGet: (id: number, workspaceId: string) =>
     invoke("file_get", { id, workspaceId }),
   fileSetRating: (id: number, workspaceId: string, rating: number) =>

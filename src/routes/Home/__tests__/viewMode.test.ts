@@ -5,6 +5,7 @@ describe("parseViewMode", () => {
   it("keeps the view modes that exist", () => {
     expect(parseViewMode("grid")).toBe("grid");
     expect(parseViewMode("list")).toBe("list");
+    expect(parseViewMode("graph")).toBe("graph");
   });
 
   it("moves a stored table view to the list", () => {

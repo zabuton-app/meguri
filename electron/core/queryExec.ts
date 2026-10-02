@@ -5,6 +5,8 @@
 import * as cw from "./crossWorkspace.js";
 import { MANUAL_SORT } from "../../shared/sortDir.js";
 import { openDbReadonly, type DB } from "./db.js";
+import { buildGraph } from "./graph/buildGraph.js";
+import type { GraphPayload } from "../../shared/ipc/graph.js";
 import type { Core } from "./index.js";
 import { countFiles, lastScanAt } from "./queries.js";
 import type {
@@ -47,6 +49,13 @@ export type QueryRequest =
   // collections), so these take the first target and ignore the rest.
   | { kind: "folders"; targets: QueryTarget[]; path: string }
   | {
+      kind: "graph";
+      targets: QueryTarget[];
+      query: SearchQuery;
+      refs?: cw.FileRef[];
+      maxFiles: number;
+    }
+  | {
       kind: "folderFiles";
       targets: QueryTarget[];
       paths: string[];
@@ -62,7 +71,8 @@ export type QueryResponse =
   | TagList
   | WorkspaceStats
   | FolderListing
-  | FolderFilesResult;
+  | FolderFilesResult
+  | GraphPayload;
 
 const DUP_REFS_CACHE_TTL_MS = 5_000;
 const DUP_REFS_CACHE_MAX_ENTRIES = 16;
@@ -70,6 +80,17 @@ const DUP_REFS_CACHE_MAX_ENTRIES = 16;
 interface DupRefsCacheEntry {
   refs: cw.FileRef[];
   expiresAt: number;
+}
+
+/**
+ * Whether a query lists a collection in its hand-arranged order. That order is
+ * the collection's refs, so it applies only when the refs ARE that order: the
+ * duplicates filter also produces refs (duplicate-scan order, and intersected
+ * with the collection when both apply), and ordering by those would pass a
+ * derived list off as the order the user arranged by hand.
+ */
+function isStoredOrder(query: SearchQuery, refs?: cw.FileRef[]): boolean {
+  return query.sort === MANUAL_SORT && !!refs && !query.duplicates;
 }
 
 export class QueryExecutor {
@@ -174,13 +195,9 @@ export class QueryExecutor {
     switch (req.kind) {
       case "search": {
         const refs = this.resolveRefs(cores, req.query, req.refs);
-        // Manual order is the collection's stored order, so it applies only when
-        // the refs ARE that order. `refs` is not that test: the duplicates
-        // filter also produces refs (duplicate-scan order, and intersected with
-        // the collection when both apply), and ordering by those would be
-        // passing off a derived list as the order the user arranged by hand.
+        // Manual order is the collection's stored order (see isStoredOrder).
         const manual = req.query.sort === MANUAL_SORT;
-        const storedOrder = manual && !!req.refs && !req.query.duplicates;
+        const storedOrder = isStoredOrder(req.query, req.refs);
         if (!refs) {
           const query = manual
             ? { ...req.query, sort: undefined, sortDir: undefined }
@@ -190,6 +207,15 @@ export class QueryExecutor {
         return storedOrder
           ? cw.searchCollectionManual(cores, refs, req.query)
           : cw.searchCollection(cores, refs, req.query);
+      }
+      case "graph": {
+        // Same target and order resolution as "search" above.
+        const refs = this.resolveRefs(cores, req.query, req.refs);
+        return buildGraph(cores, req.query, {
+          cap: req.maxFiles,
+          refs,
+          storedOrder: isStoredOrder(req.query, req.refs),
+        });
       }
       case "random": {
         // Random ignores the sort key entirely, manual included.

@@ -6,6 +6,8 @@
 import { z } from "zod";
 import { MAX_TAG_REF_NAME } from "../tags.js";
 import { MAX_FOLDER_PATH, isNormalizedFolderPath } from "../folderPath.js";
+import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
+import { GRAPH_NODE_KEY_MAX } from "./graph.js";
 
 export const KindSchema = z.enum(["video", "image", "audio"]);
 export type Kind = z.infer<typeof KindSchema>;
@@ -410,3 +412,12 @@ export const UpdateInfoSchema = z.object({
   publishedAt: z.string().nullable().optional(),
 });
 export type UpdateInfo = z.infer<typeof UpdateInfoSchema>;
+
+/** Scope a graph layout is cached under: the active target string (a
+ *  workspace id, "__all__" or "collection:<id>"). Main resolves it against the
+ *  targets it holds; the cap only bounds what an id-shaped string can carry. */
+export const GraphScopeSchema = z.string().min(1).max(MAX_WORKSPACE_ID);
+
+/** A graph node key ("f:<ws>:<metaKey>" or "t:<namespace>:<name>"). Stored,
+ *  never parsed, so only its length is bounded. */
+export const GraphNodeKeySchema = z.string().min(3).max(GRAPH_NODE_KEY_MAX);

@@ -7,6 +7,7 @@ import {
   History,
   LayoutGrid,
   List,
+  Waypoints,
   Pencil,
   RefreshCw,
   Tags as TagsIcon,
@@ -172,6 +173,12 @@ export function HomeHeader({
                 mode: "list",
                 label: t("view.list"),
                 Icon: List,
+                rounded: "",
+              },
+              {
+                mode: "graph",
+                label: t("view.graph"),
+                Icon: Waypoints,
                 rounded: "rounded-r-md",
               },
             ] as const
@@ -203,9 +210,13 @@ export function HomeHeader({
           onClick={onToggleByFolder}
           aria-label={t("view.folder")}
           aria-pressed={folderView}
-          disabled={!folderAvailable}
+          disabled={!folderAvailable || view === "graph"}
           title={
-            folderAvailable ? t("view.folder") : t("view.folderUnavailable")
+            view === "graph"
+              ? t("view.folderUnavailableGraph")
+              : folderAvailable
+                ? t("view.folder")
+                : t("view.folderUnavailable")
           }
           className={cn(
             "flex size-7 items-center justify-center rounded-md border border-border transition disabled:cursor-not-allowed disabled:opacity-40",

@@ -960,7 +960,7 @@ export function randomCollection(
  * assumes each per-DB stream arrives in exactly this order, so any change to
  * one side must be applied to both.
  */
-function comparatorFor(
+export function comparatorFor(
   sort?: string,
   dir?: string,
 ): (a: FileRow, b: FileRow) => number {

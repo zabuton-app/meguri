@@ -202,6 +202,54 @@ need no bookkeeping.
   folder from elsewhere (a file's detail, a saved search) switches to its
   workspace first.
 
+### Graph view
+
+The graph view draws the current list — any workspace, `All` or a
+collection, with the search and filters applied — as a network of files and
+the tags they carry. It is built in one call and cached per scope.
+
+- **One payload.** `graph_build` runs on the query worker
+  (`electron/core/graph/buildGraph.ts`). Per database it reads the matching
+  files in the list's order (`queries/graph.ts`, which reuses files_search's
+  `appendSearchConditions`) up to a cap (`GRAPH_MAX_FILES`, 5,000; the payload
+  says when it cut), then asks each edge source for relationships among them.
+  Several databases merge with the same comparator as the `All` list
+  (`comparatorFor`), and a collection sorted by hand keeps its stored order.
+  Identical copies are collapsed before the cap, so they do not take places
+  meant for other files. Each file also carries its play count (its
+  `play_history` rows, all time, one grouped query per database), which the
+  renderer can size nodes by.
+  The result is column-oriented (`shared/ipc/graph.ts`): a handful of arrays
+  rather than one object per node, so thousands of files cross IPC cheaply.
+- **Bipartite.** Files link to tags, not to each other, so the edge count grows
+  with the number of (file, tag) pairs rather than the square of the files.
+  Same-named tags of different workspaces are one node, which is what links
+  files across roots in `All`. Identical copies inside one workspace (one
+  `meta_key`) are one node. Generated tags (`namespace <> ''`) are included and
+  flagged; the renderer hides them by default.
+- **Edge sources.** Relationships come from `EDGE_SOURCES`
+  (`electron/core/graph/edgeSources.ts`); tags are the only one today. A new
+  kind of relationship — AI similarity as weighted file-to-file kNN edges, say
+  — is one more `EdgeSource` (its `build()` returns `kind: "file-file"` with a
+  `weight` per edge), a wider `EdgeSourceId`, a row in the renderer's
+  `EDGE_SOURCE_INFO` for its label, toggle and legend line, and its own look in
+  `GraphCanvas`'s edge reducer (which today draws every kind alike). The
+  payload and the toggles already carry kinds and weights (the simulation
+  uses the links, not their weights, as Obsidian's does). A source
+  sees one workspace at a time, so it can link files within a workspace; links
+  across workspaces would need the builder to hand it every workspace at once.
+- **Layout cache.** Node positions are derived data, kept as JSON beside the
+  data rather than in the database (`electron/core/graph/layoutCache.ts`,
+  channels `graph_layout_get` / `graph_layout_set`). A real workspace's file is
+  `<userData>/roots/<hash>/graph-layout.json`, deleted with the workspace;
+  `All` and collections use `<userData>/graph-layouts/<sha1(scope)[:16]>.json`,
+  and a collection's goes with it. Node keys are `f:<workspaceId>:<meta_key>`
+  and `t:<namespace>:<name>`, so a position survives moves, renames and
+  rescans. A save merges into the file (a filtered graph saves only what it
+  shows), is atomic, and runs off the main thread's event loop (async file
+  I/O, saves to one file queued so none loses the other's keys); a malformed
+  file reads as none.
+
 ## Collections
 
 Two unrelated mechanisms group files. They differ in where they persist and who

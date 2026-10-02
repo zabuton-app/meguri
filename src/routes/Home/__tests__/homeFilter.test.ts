@@ -73,3 +73,14 @@ describe("isFolderView", () => {
     );
   });
 });
+
+describe("isFolderView in the graph", () => {
+  it("is off while the graph shows, whatever the stored option", () => {
+    expect(
+      isFolderView({ byFolder: true, folderAvailable: true, view: "graph" }),
+    ).toBe(false);
+    expect(
+      isFolderView({ byFolder: true, folderAvailable: true, view: "grid" }),
+    ).toBe(true);
+  });
+});

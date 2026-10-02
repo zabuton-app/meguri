@@ -6,9 +6,16 @@ import prettier from "eslint-config-prettier";
 import globals from "globals";
 
 export default tseslint.config(
-  // Build artifacts and generated output are out of scope
+  // Build artifacts and generated output are out of scope, and assembly/ is
+  // AssemblyScript (compiled by scripts/build-wasm.mjs), not TypeScript.
   {
-    ignores: ["out/**", "release/**", "dist/**", "node_modules/**"],
+    ignores: [
+      "out/**",
+      "release/**",
+      "dist/**",
+      "node_modules/**",
+      "assembly/**",
+    ],
   },
 
   // Base (shared across all TS/TSX)

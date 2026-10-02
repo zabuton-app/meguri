@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
+import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
 import type {
   FileDetail,
   FileRow,
@@ -10,6 +11,7 @@ import {
   dropFromWatchLaterCache,
   forgetDeletedFile,
   invalidateCollectionSearches,
+  GRAPH_SIZED_BY_PLAYS,
   invalidatePlayedSearches,
   invalidateTagSearches,
   syncFileRowAcrossCaches,
@@ -110,6 +112,64 @@ describe("targeted files_search invalidation", () => {
     });
     invalidatePlayedSearches(qc);
     expect(invalidated().sort()).toEqual(["accessed", "played", "unplayed"]);
+  });
+
+  it("invalidatePlayedSearches refreshes a graph a play can change, and only those", async () => {
+    const qc = new QueryClient();
+    const fetched: string[] = [];
+    const graph = async (
+      name: string,
+      filter: object,
+      byPlays: boolean,
+      scope = "ws",
+    ) => {
+      await qc.fetchQuery({
+        queryKey: ["graph_build", scope, filter],
+        queryFn: () => name,
+        meta: { [GRAPH_SIZED_BY_PLAYS]: byPlays },
+      });
+    };
+    await graph("plain", {}, false);
+    await graph("byPlays", { q: "x" }, true);
+    await graph("played", { played: false }, false);
+    await graph("accessed", { sort: "accessed" }, false);
+    await graph("watchLater", {}, false, collectionTarget(WATCH_LATER_ID));
+    await graph("collection", {}, false, collectionTarget("other"));
+    qc.getQueryCache().subscribe((e) => {
+      if (e.type === "updated" && e.action.type === "invalidate")
+        fetched.push(String(e.query.state.data));
+    });
+    invalidatePlayedSearches(qc);
+    expect(fetched.sort()).toEqual([
+      "accessed",
+      "byPlays",
+      "played",
+      "watchLater",
+    ]);
+  });
+
+  it("syncFileRowAcrossCaches refreshes a graph filtered or sorted by the changed field", async () => {
+    const qc = new QueryClient();
+    const invalidated: string[] = [];
+    for (const [name, filter] of [
+      ["plain", {}],
+      ["favorite", { favorite: true }],
+      ["rated", { ratingMin: 3 }],
+      ["byRating", { sort: "rating" }],
+    ] as const)
+      await qc.fetchQuery({
+        queryKey: ["graph_build", "ws", filter],
+        queryFn: () => name,
+      });
+    qc.getQueryCache().subscribe((e) => {
+      if (e.type === "updated" && e.action.type === "invalidate")
+        invalidated.push(String(e.query.state.data));
+    });
+    syncFileRowAcrossCaches(qc, "ws", 1, { favorite: 1 });
+    expect(invalidated).toEqual(["favorite"]);
+    invalidated.length = 0;
+    syncFileRowAcrossCaches(qc, "ws", 1, { rating: 4 });
+    expect(invalidated.sort()).toEqual(["byRating", "rated"]);
   });
 
   it("invalidateTagSearches hits tag filters and text queries only", () => {

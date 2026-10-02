@@ -5,7 +5,11 @@ import {
   COLLECTION_ID_PREFIX,
   Workspaces,
 } from "../core/workspaces.js";
-import { droppedDirectory } from "../core/paths.js";
+import {
+  collectionLayoutPath,
+  removeLayout,
+} from "../core/graph/layoutCache.js";
+import { baseDataDir, droppedDirectory } from "../core/paths.js";
 import type { WorkspaceAddResult } from "../../shared/ipc/channels.js";
 import type { IpcContext } from "./context.js";
 import { bulkTargetCores } from "./helpers.js";
@@ -97,6 +101,9 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
 
   handle("collection_remove", ({ id }) => {
     ws.removeCollection(id);
+    // The graph view's cached positions go with the collection (a workspace's
+    // live in its data directory, which removal deletes anyway).
+    void removeLayout(collectionLayoutPath(baseDataDir(), id));
     emit("workspace:changed", { activeId: ws.activeId });
   });
 

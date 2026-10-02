@@ -127,7 +127,8 @@ export default function History() {
     mutationFn: () => api.historyClear(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["history_list"] });
-      // Resume points go with the history (see clearPlayHistory); the lists'
+      // Nothing counts as played any more, and resume points go with the
+      // history (see clearPlayHistory); the lists' and graph's played state,
       // progress bars and the detail's start position are read from these.
       invalidateFileCaches(qc);
     },

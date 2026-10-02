@@ -70,6 +70,12 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
     { label: t("common.close"), keys: "Esc" },
   ];
 
+  const graph: Row[] = [
+    { label: t("shortcuts.graphFit"), keys: "F" },
+    { label: t("shortcuts.graphSearch"), keys: "G" },
+    { label: t("shortcuts.graphClear"), keys: "Esc" },
+  ];
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
@@ -103,6 +109,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
           viewportClassName="min-h-0 flex-1 px-4 py-4"
         >
           <Section title={t("shortcuts.sectionList")} rows={list} />
+          <Section title={t("shortcuts.sectionGraph")} rows={graph} />
           <Section title={t("shortcuts.sectionDetail")} rows={detail} />
         </ScrollArea>
       </div>

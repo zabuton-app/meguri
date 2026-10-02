@@ -21,6 +21,7 @@ import {
   Tags as TagsIcon,
   Terminal,
   Trash2,
+  Waypoints,
   X,
 } from "lucide-react";
 import { defaultFilter } from "cmdk";
@@ -843,6 +844,11 @@ function FixedGroups({
       id: "view-list",
       icon: List,
       run: () => closeThen(() => onSetView("list")),
+    }),
+    action(t, "view.graph", {
+      id: "view-graph",
+      icon: Waypoints,
+      run: () => closeThen(() => onSetView("graph")),
     }),
     // A toggle, unlike the view actions above it: named for what it will do.
     action(t, folderView ? "view.folderOff" : "view.folder", {

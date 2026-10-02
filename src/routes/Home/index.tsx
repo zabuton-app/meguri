@@ -1,6 +1,14 @@
 // List screen. Header (root/scan/theme) + filters + condition badges + progress +
 // infinite-scroll grid. On thumb:done, reload the corresponding thumbnail.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import {
   useQuery,
@@ -72,6 +80,12 @@ import {
   scrollListByPage,
 } from "./utils";
 
+// The graph view carries WebGL and graph libraries the list views never need,
+// so it is loaded the first time it is shown.
+const GraphView = lazy(() =>
+  import("@/graph/GraphView").then((m) => ({ default: m.GraphView })),
+);
+
 // A second Esc within this window (ms) confirms closing to tray.
 const ESC_CLOSE_CONFIRM_MS = 2000;
 // Fewest ms between folder listing refreshes while thumbnails are generated.
@@ -138,7 +152,7 @@ export default function Home() {
     !!workspaceId &&
     workspaceId !== ALL_ID &&
     !workspaceId.startsWith(COLLECTION_ID_PREFIX);
-  const folderView = isFolderView({ byFolder, folderAvailable });
+  const folderView = isFolderView({ byFolder, folderAvailable, view });
   // The one way the option changes, from the header and the command menu.
   const toggleByFolder = useCallback(
     () => setByFolder((on) => !on),
@@ -458,6 +472,7 @@ export default function Home() {
         void search.refetch();
         // Folders appear, fill up and empty out with a scan like files do.
         void qc.invalidateQueries({ queryKey: ["folders_list"] });
+        void qc.invalidateQueries({ queryKey: ["graph_build"] });
         // A scan can add tags (new files, the derived-tag backfill), so a tag
         // screen left open would otherwise show a stale catalog.
         void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
@@ -838,7 +853,7 @@ export default function Home() {
           quietly included them would act on files the user cannot see. */}
       <SelectionProvider
         items={items}
-        scope={`${status.data?.workspaceId ?? ""}|${folderView ? `folder:${folderNav.path}` : "flat"}|${JSON.stringify(filter)}`}
+        scope={`${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : folderView ? `folder:${folderNav.path}` : "flat"}|${JSON.stringify(filter)}`}
         // Only the folders on screen: once the window has moved past the top
         // neither view draws them, and "select all" must not pick them.
         folders={listOffset === 0 ? folderEntries : undefined}
@@ -862,6 +877,21 @@ export default function Home() {
                 </Button>
                 <p className="text-xs opacity-70">{t("home.addFromSidebar")}</p>
               </div>
+            ) : view === "graph" ? (
+              // Keyed by scope: another workspace or collection is another
+              // graph, with its own positions and camera.
+              <Suspense fallback={null}>
+                <GraphView
+                  key={status.data?.workspaceId ?? ""}
+                  scope={status.data?.workspaceId ?? ""}
+                  query={filter}
+                  ready={
+                    (status.data?.ready ?? false) && !!status.data?.workspaceId
+                  }
+                  keysActive={navActive}
+                  onFilterToken={onTagClick}
+                />
+              </Suspense>
             ) : view === "list" ? (
               <MediaList
                 items={items}
@@ -934,7 +964,9 @@ export default function Home() {
             </PlaylistNavProvider>
           </MediaNavProvider>
 
-          <SelectionLayer active={navActive} />
+          {/* The graph has no cards to pick; entering it also drops the
+              selection (see the scope key above). */}
+          {view !== "graph" && <SelectionLayer active={navActive} />}
         </div>
 
         {/* Inside the selection provider: its file actions act on the
@@ -951,7 +983,7 @@ export default function Home() {
           onSetView={setViewMode}
           onToggleByFolder={toggleByFolder}
           folderView={folderView}
-          folderAvailable={folderAvailable}
+          folderAvailable={folderAvailable && view !== "graph"}
           onDiscover={openDiscover}
           canDiscover={hasPool}
           onTags={openTags}

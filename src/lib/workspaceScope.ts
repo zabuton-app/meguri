@@ -12,4 +12,7 @@ export async function invalidateWorkspaceScoped(qc: QueryClient) {
   await qc.refetchQueries({ queryKey: ["app_status"] });
   await qc.invalidateQueries({ queryKey: ["workspaces_list"] });
   await qc.invalidateQueries({ queryKey: ["files_search"] });
+  // All and collections keep their scope when a workspace goes, so their
+  // graph would keep its files.
+  await qc.invalidateQueries({ queryKey: ["graph_build"] });
 }

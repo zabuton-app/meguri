@@ -76,8 +76,8 @@ playback is unaffected.
 
 Data fetching uses `@tanstack/react-query`. The file list is an
 `useInfiniteQuery` combined with `@tanstack/react-virtual` for infinite scroll
-plus virtualization (`src/components/MediaGrid.tsx`). Two view modes — grid and
-list — are switchable.
+plus virtualization (`src/components/MediaGrid.tsx`). Three view modes — grid,
+list and graph — are switchable.
 
 Both views have a "show by folder" option (`BY_FOLDER_KEY`, remembered apart
 from the view mode) that browses one workspace like a file manager: the current
@@ -122,6 +122,100 @@ them through `folder_files` when the folder is picked, because the selection bar
 and the bulk tag dialog are computed from rows. Until they arrive the selection
 is `pending` and the bulk actions wait; the selection's `count` includes files
 beyond the cap so the bar can refuse an oversized edit.
+
+The graph view (`src/graph/`, loaded lazily with `React.lazy` so the list views
+never pay for it) draws the same list as a network of files and tags, from one
+`graph_build` payload (see docs/architecture.md, "Graph view"):
+
+- **Behaviour.** The view follows Obsidian's graph view: the same forces and
+  defaults, the same drag, click and zoom, and the same way of drawing. It
+  was matched against Obsidian's own renderer and simulation, not copied
+  from them.
+- **Rendering.** `GraphCanvas` owns one sigma.js (WebGL) instance over a
+  graphology graph, framed by a fixed box (`setCustomBBox`) so the view never
+  rescales itself as the graph spreads out: the camera works like Obsidian's,
+  with `scale` (pixels per graph unit) as the frame's scale over the camera
+  ratio. Nodes are discs of radius clamp(3·√(links + 1), 8, 30) graph units
+  drawn at √scale (`zoomToSizeRatioFunction`), coloured by kind; links are a
+  constant width in pixels (`minEdgeThickness`). Labels sit under their node
+  and fade in with the zoom (opacity log2(scale) + 1 − the text fade
+  setting), drawn by a custom label drawer. Hovering (or dragging, or picking
+  from the graph search) highlights a node: it takes the highlight colour and
+  a ring, its label drops a little and always shows, its links take the
+  highlight colour, and everything not next to it fades to 20% (mixed into
+  the background, since sigma blends colours as premultiplied). The wheel
+  zooms by 1.5× a notch toward the pointer, eased over a few frames, between
+  scales 1/128 and 8; a resize keeps the scale. The colours are the theme's
+  `--c-*` values read by `useGraphColors`, since WebGL cannot see CSS
+  variables. All of this is applied by sigma's node and edge reducers from
+  state held in a ref. A WebGL failure swaps the canvas for a notice
+  (`GraphErrorBoundary`). The canvas takes only the pointer, so the graph
+  search is the keyboard's way in: Enter picks a match, Shift+Enter opens it
+  as a click does, and Enter on an empty search opens the picked node.
+- **A graph per payload.** Each payload builds a new graphology graph that
+  takes over the previous one's positions by key (`model/buildGraphology.ts`),
+  and the one sigma instance (`GraphView` is keyed by scope in Home) switches
+  to it with `setGraph`, keeping the camera. Building a fresh graph rather than
+  trimming the shown one matters: sigma v3 re-indexes the whole graph on every
+  dropped node or edge, so removing thousands after a filter change would
+  freeze the view. For the same reason sigma settings are only set when their
+  value changes. Nodes a filter takes out of the data remember where they
+  stood and come back there. `graph_build` is invalidated next to
+  `files_search` (scan done, tag edits).
+- **Simulation.** What is visible is what is simulated: every change of the data
+  or the toggles reloads the simulation with the visible nodes and links (unless
+  nothing shown changed). It is d3-force's model with Obsidian's forces
+  (`sim/physics.ts`): forceX / forceY toward the origin, forceLink at d3's
+  default strength (1 / the smaller degree) times the link force, a Barnes-Hut
+  many-body force (θ 0.9, minimum distance 30), forceCollide (radius 60,
+  strength 0.5) and a velocity decay of 0.6. It runs in a Web Worker
+  (`sim/sim.worker.ts`, driven by `SimClient`) that ticks at 60 Hz while alpha
+  cools from its last reheat (1 for a mostly new graph, 0.3 for a change) to
+  0.001, about 300 ticks, and posts each tick's positions, applied once per
+  animation frame. The tick itself is WebAssembly (`assembly/forces.ts`,
+  AssemblyScript; about a third of d3-force's time, 6 ms against 18 per tick for
+  5,000 files on the development machine), with d3-force as the fallback where
+  WebAssembly cannot start; the two give identical results, which a test checks
+  bit for bit. The module is compiled by `npm run build:wasm` into
+  `src/graph/sim/forcesWasm.ts` (base64, so the worker needs no fetch from
+  `file://`), and a test fails when that file is older than the source.
+  WebAssembly compiles in the worker only: the page's CSP would need
+  `'wasm-unsafe-eval'`, a module worker's does not.
+- **Placement.** A node shown for the first time takes where it last stood,
+  else its cached position, else Obsidian's seat for a newcomer
+  (`model/placement.ts`): near the centroid of its seated neighbours with a
+  jitter that grows with the number of newcomers, else in a ring outside the
+  nodes already there. The camera frames the graph when it first has nodes,
+  and once more when a fresh layout first settles unless the user has moved
+  the camera. Positions are saved per scope when the simulation cools down
+  (debounced, and on unmount); "Re-layout" seats every visible node afresh.
+- **Dragging and clicking.** A press that moves 5 pixels is a drag
+  (`GraphCanvas`); anything less is a click, and the release of a drag is not
+  taken for one. A drag pins the node under the pointer and keeps the whole
+  simulation warm (alpha and its target at 0.3) so everything linked to it
+  follows; on release the pin goes and the graph cools down. A drag outlives a
+  refetch. A click opens: a file in the detail (as a modal or the side peek),
+  a tag as the list's filter. Holding the right button down pans the view,
+  over nodes too (sigma pans with the left button only, and on a node that
+  drags it); the canvas has no context menu.
+- **Settings.** The settings panel has Obsidian's Display (text fade
+  threshold, node size, link thickness) and Forces (centre, repel, link force,
+  link distance) sliders, stored as slider positions in
+  `localStorage["meguri.graph.settings"]` (`graphSettings.ts`) and mapped to
+  the physics with Obsidian's curves: centre and link force ease in
+  exponentially, repel is the cube of its slider. A change of forces reheats
+  the simulation to 0.3. Display also chooses what node size follows: the
+  visible links (Obsidian's default) or how often the file was played or
+  viewed (the payload's `plays`; a tag weighs the plays of its visible
+  files), through the same radius formula (`nodeWeights`). Recording a play
+  invalidates `graph_build`, so sizes follow.
+- **Pure model.** Visibility (toggles, orphans),
+  search, placement and node appearance are plain functions under
+  `src/graph/model/`, tested without WebGL.
+- **Options.** The relationship-kind, generated-tag and orphan toggles persist in
+  `localStorage["meguri.graph.options"]`. The graph has no folder form: while it
+  shows, `isFolderView` is false and the "show by folder" button is disabled,
+  without changing the stored option; the selection bar is not offered.
 
 Toggling a favorite patches both the list and detail react-query caches so they
 stay in sync without a refetch. Discover pulls videos with `randomFiles`
