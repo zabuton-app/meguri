@@ -195,6 +195,24 @@ describe("Pet", () => {
     await waitFor(() => expect(shown()).toBe("idle"), { timeout: 3000 });
   });
 
+  it("keeps chewing for as long as the write takes", async () => {
+    let finish: (result: { changed: number }) => void = () => {};
+    mocks.collectionSetMembership.mockReturnValue(
+      new Promise<{ changed: number }>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    setup();
+    fireEvent.drop(pet(), {
+      dataTransfer: fileDrag([{ workspaceId: "ws-a", fileId: 1 }]),
+    });
+    // Well past one round of chewing (3 frames of 160 ms).
+    await act(() => new Promise((resolve) => setTimeout(resolve, 900)));
+    expect(shown()).toBe("munch");
+    finish({ changed: 1 });
+    await waitFor(() => expect(shown()).toBe("yum"));
+  });
+
   it("is not delighted when nothing was added after all", async () => {
     // The list here is stale: the write finds the file already queued.
     mocks.collectionSetMembership.mockResolvedValue({ changed: 0 });

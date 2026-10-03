@@ -39,6 +39,7 @@ export type PetEvent =
   | { type: "landed" }
   | { type: "react"; reactions: readonly PetReaction[] }
   | { type: "reactionDone" }
+  | { type: "reactionRepeat" }
   | { type: "wander"; dir: -1 | 1 }
   | { type: "rest" }
   | { type: "doze" }
@@ -115,6 +116,11 @@ export function reducePet(model: PetModel, event: PetEvent): PetModel {
         reactions: model.reactions.slice(1),
         seq: model.seq + 1,
       };
+    case "reactionRepeat":
+      // Play the head reaction through once more: it is still called for
+      // (chewing while the write behind it is under way).
+      if (model.reactions.length === 0) return model;
+      return { ...model, seq: model.seq + 1 };
     case "wander":
       if (!isQuiet(model)) return model;
       return { ...model, base: "walk", dir: event.dir };

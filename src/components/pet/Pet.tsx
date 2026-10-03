@@ -198,6 +198,8 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   const queued = useMemo(() => watchLater?.items ?? [], [watchLater?.items]);
   const members = useMemo(() => new Set(queued.map(queueKey)), [queued]);
 
+  /** Watch Later writes started by a drop that have not reported back yet. */
+  const pendingEats = useRef(0);
   // Eating: files dropped on the pet go to Watch Later, the same write as
   // dropping them on the rail entry.
   const dropOnto = useAddFilesToCollection();
@@ -210,12 +212,15 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
       dropOnto(WATCH_LATER_ID, name)(files);
       return;
     }
-    // It chews while the write is under way, and is only delighted once the
-    // write says something was actually added (the list here can be stale).
+    // It chews for as long as the write is under way (see onSpriteDone), and
+    // is only delighted once the write says something was actually added:
+    // the list here can be stale.
+    pendingEats.current += 1;
     dispatch({ type: "react", reactions: ["munch"] });
-    dropOnto(WATCH_LATER_ID, name, (changed) =>
-      dispatch({ type: "react", reactions: [changed ? "yum" : "headShake"] }),
-    )(files);
+    dropOnto(WATCH_LATER_ID, name, (changed) => {
+      pendingEats.current -= 1;
+      dispatch({ type: "react", reactions: [changed ? "yum" : "headShake"] });
+    })(files);
   });
 
   const raw = displayState(model, scanning);
@@ -655,6 +660,12 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   };
 
   const onSpriteDone = () => {
+    if (display === "munch" && pendingEats.current > 0) {
+      // Still being written: one more round of chewing rather than going
+      // back to standing around (and wandering off) before it is saved.
+      dispatch({ type: "reactionRepeat" });
+      return;
+    }
     if (!folding) {
       dispatch({ type: "reactionDone" });
       return;

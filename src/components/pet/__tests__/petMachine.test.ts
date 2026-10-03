@@ -60,6 +60,16 @@ describe("pet machine", () => {
     expect(second.seq).not.toBe(twice.seq);
   });
 
+  it("replays the reaction on screen when asked to repeat it", () => {
+    const chewing = run([{ type: "react", reactions: ["munch"] }]);
+    const again = run([{ type: "reactionRepeat" }], chewing);
+    expect(displayState(again)).toBe("munch");
+    expect(again.reactions).toEqual(["munch"]);
+    expect(again.seq).not.toBe(chewing.seq);
+    // Nothing on screen, nothing to repeat.
+    expect(run([{ type: "reactionRepeat" }])).toBe(INITIAL_PET_MODEL);
+  });
+
   it("drops reactions beyond the queue's limit", () => {
     const model = run(
       Array.from({ length: 6 }, () => ({
