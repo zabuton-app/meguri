@@ -352,13 +352,82 @@ describe("the default saved search", () => {
     store();
     const { seen } = setup({});
     openMenu();
-    const star = await screen.findByRole("button", { name: "Set as default" });
+    const star = await screen.findByRole("menuitem", {
+      name: "Set as default: Rated videos",
+    });
     fireEvent.click(star);
 
     expect(localStorage.getItem("meguri.smartCollections.default")).toBe(
       "sc-1",
     );
     expect(seen).not.toHaveBeenCalled();
+  });
+
+  it("is reached from its row with the arrow keys and toggled with Enter", async () => {
+    store();
+    const { seen } = setup({});
+    openMenu();
+    const row = await screen.findByRole("menuitem", {
+      name: /^Rated videos/,
+    });
+    row.focus();
+    fireEvent.keyDown(row, { key: "ArrowDown" });
+    const star = screen.getByRole("menuitem", { name: /^Set as default/ });
+    // Roving focus moves on a timeout.
+    await waitFor(() => expect(document.activeElement).toBe(star));
+
+    fireEvent.keyDown(star, { key: "Enter" });
+    expect(localStorage.getItem("meguri.smartCollections.default")).toBe(
+      "sc-1",
+    );
+    // Toggling neither opens the search nor closes the menu.
+    expect(seen).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("menuitem", {
+        name: "Remove default: Rated videos",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("deletes a saved search from its own item, leaving the menu open", async () => {
+    store("sc-1");
+    const { seen } = setup({});
+    openMenu();
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: "Delete collection: Rated videos",
+      }),
+    );
+
+    expect(screen.queryByRole("menuitem", { name: /Rated videos/ })).toBeNull();
+    expect(screen.getByText("No saved searches yet.")).toBeTruthy();
+    expect(seen).not.toHaveBeenCalled();
+    expect(localStorage.getItem("meguri.smartCollections.default")).toBeNull();
+  });
+
+  it("hands focus to the next row after a delete", async () => {
+    localStorage.setItem(
+      "meguri.smartCollections.v1",
+      JSON.stringify(
+        ["First", "Second"].map((name, i) => ({
+          id: `sc-${i}`,
+          name,
+          query: { kind: "video" },
+          createdAt: 0,
+          updatedAt: 0,
+        })),
+      ),
+    );
+    setup({});
+    openMenu();
+    const del = await screen.findByRole("menuitem", {
+      name: "Delete collection: First",
+    });
+    del.focus();
+    fireEvent.keyDown(del, { key: "Enter" });
+
+    const next = screen.getByRole("menuitem", { name: /^Second/ });
+    await waitFor(() => expect(document.activeElement).toBe(next));
   });
 
   it("is where Clear all returns", () => {

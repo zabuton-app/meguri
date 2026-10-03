@@ -117,58 +117,75 @@ export function SmartCollectionsMenu({
               const defaultLabel = isDefault
                 ? t("smartCollection.unsetDefault")
                 : t("smartCollection.setDefault");
+              // Three sibling items rather than buttons nested in one: the
+              // menu's roving focus treats an item as a single stop and
+              // swallows Tab, so a nested button cannot be reached from the
+              // keyboard. As items, the arrow keys reach each in turn.
               return (
-                <DropdownMenuItem
-                  key={collection.id}
-                  onSelect={() => onApply(collection)}
-                  className="items-start gap-2 pr-1"
-                >
-                  <Bookmark className="mt-0.5" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">
-                      {collection.name}
+                <div key={collection.id} className="flex items-start gap-0.5">
+                  <DropdownMenuItem
+                    onSelect={() => onApply(collection)}
+                    className="min-w-0 flex-1 items-start gap-2"
+                  >
+                    <Bookmark className="mt-0.5" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm">
+                        {collection.name}
+                      </span>
+                      <span className="block truncate text-xs text-muted">
+                        {describeSearchQuery(t, collection.query)}
+                      </span>
                     </span>
-                    <span className="block truncate text-xs text-muted">
-                      {describeSearchQuery(t, collection.query)}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    data-slot="smart-collection-default"
-                    aria-pressed={isDefault}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     title={defaultLabel}
-                    aria-label={defaultLabel}
+                    // Named with the search: every row has the same actions.
+                    aria-label={`${defaultLabel}: ${collection.name}`}
                     className={
-                      "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-surface " +
-                      (isDefault ? "text-primary" : "text-muted hover:text-fg")
+                      "mt-0.5 size-7 shrink-0 justify-center p-0 [&_svg]:size-3.5 " +
+                      (isDefault ? "text-primary" : "text-muted")
                     }
-                    onClick={(event) => {
-                      // Toggling the default is not opening the search.
+                    onSelect={(event) => {
+                      // Toggling the default is not opening the search, and
+                      // keeps the menu open to show the new state.
                       event.preventDefault();
-                      event.stopPropagation();
                       setDefaultId(isDefault ? null : collection.id);
                     }}
                   >
-                    <Star
-                      className={
-                        "size-3.5" + (isDefault ? " fill-current" : "")
-                      }
-                    />
-                  </button>
-                  <button
-                    type="button"
+                    <Star className={isDefault ? "fill-current" : undefined} />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     title={t("smartCollection.delete")}
-                    aria-label={t("smartCollection.delete")}
-                    className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={(event) => {
+                    aria-label={`${t("smartCollection.delete")}: ${collection.name}`}
+                    className="mt-0.5 size-7 shrink-0 justify-center p-0 text-muted data-[highlighted]:bg-destructive data-[highlighted]:text-destructive-foreground [&_svg]:size-3.5"
+                    onSelect={(event) => {
                       event.preventDefault();
-                      event.stopPropagation();
+                      // The focused item is about to unmount, which would drop
+                      // focus to the menu itself and send the next arrow key
+                      // back to the top. Hand it to the neighbouring row (or
+                      // the menu's first item when none is left) instead.
+                      const row = (event.currentTarget as HTMLElement)
+                        .parentElement;
+                      const menu = row?.closest<HTMLElement>('[role="menu"]');
+                      const next =
+                        row?.nextElementSibling?.querySelector<HTMLElement>(
+                          '[role="menuitem"]',
+                        ) ??
+                        row?.previousElementSibling?.querySelector<HTMLElement>(
+                          '[role="menuitem"]',
+                        );
                       removeCollection(collection.id);
+                      window.requestAnimationFrame(() =>
+                        (
+                          next ??
+                          menu?.querySelector<HTMLElement>('[role="menuitem"]')
+                        )?.focus(),
+                      );
                     }}
                   >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </DropdownMenuItem>
+                    <Trash2 />
+                  </DropdownMenuItem>
+                </div>
               );
             })
           )}

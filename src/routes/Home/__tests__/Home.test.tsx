@@ -977,7 +977,7 @@ describe("Home folder view", () => {
         { button: 0, ctrlKey: false },
       );
       fireEvent.click(
-        await screen.findByRole("menuitem", { name: /Old videos/ }),
+        await screen.findByRole("menuitem", { name: /^Old videos/ }),
       );
 
       // With a condition on, the view would only search the missing folder
@@ -1027,7 +1027,7 @@ describe("Home folder view", () => {
         screen.getByRole("button", { name: "Smart collections" }),
         { button: 0, ctrlKey: false },
       );
-      fireEvent.click(await screen.findByRole("menuitem", { name: /Videos/ }));
+      fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
       await waitFor(() => expect(lastSearch().kind).toBe("video"));
 
       // Turning the option back on opens at the root, not at Movie.
@@ -1107,7 +1107,7 @@ describe("Home folder view", () => {
         { button: 0, ctrlKey: false },
       );
       fireEvent.click(
-        await screen.findByRole("menuitem", { name: /Old videos/ }),
+        await screen.findByRole("menuitem", { name: /^Old videos/ }),
       );
 
       await waitFor(() =>
@@ -1190,7 +1190,7 @@ describe("Home folder view", () => {
         screen.getByRole("button", { name: "Smart collections" }),
         { button: 0, ctrlKey: false },
       );
-      fireEvent.click(await screen.findByRole("menuitem", { name: /Videos/ }));
+      fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
 
       // Every condition is replaced, the folder included.
       await waitFor(() =>
@@ -1228,7 +1228,7 @@ describe("Home folder view", () => {
         { button: 0, ctrlKey: false },
       );
       fireEvent.click(
-        await screen.findByRole("menuitem", { name: /Movie videos/ }),
+        await screen.findByRole("menuitem", { name: /^Movie videos/ }),
       );
 
       await waitFor(() =>

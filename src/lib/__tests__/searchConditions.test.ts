@@ -324,6 +324,13 @@ describe("the default saved search", () => {
     expect(clearAllTarget({ q: "cat" }, null)).toEqual({});
   });
 
+  it("matches tags in any order, repeats aside", () => {
+    expect(clearAllTarget({ tags: ["b", "a"] }, { tags: ["a", "b"] })).toEqual(
+      {},
+    );
+    expect(clearAllTarget({ tags: ["a", "a"] }, { tags: ["a"] })).toEqual({});
+  });
+
   it("matches a sort whose direction is only spelled out", () => {
     const def = { sort: "name" };
     expect(clearAllTarget({ sort: "name", sortDir: "asc" }, def)).toEqual({});

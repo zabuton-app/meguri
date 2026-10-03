@@ -250,6 +250,9 @@ function sameConditions(a: SearchQuery, b: SearchQuery): boolean {
     const clean = cleanConditions(q);
     delete clean.sort;
     delete clean.sortDir;
+    // Tags are ANDed, so neither their order nor a repeat is a difference.
+    // Local to this check: recentSearchKey still keys on the order as given.
+    if (clean.tags) clean.tags = [...new Set(clean.tags)].sort();
     return JSON.stringify(clean);
   };
   return strip(a) === strip(b) && sortKeyOf(a) === sortKeyOf(b);
