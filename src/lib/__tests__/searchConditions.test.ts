@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/locales/en";
 import type { SearchQuery } from "@/ipc/types";
 import {
+  clearAllTarget,
   collapsedConditionCount,
   describeConditions,
   type ConditionDescriptor,
@@ -308,5 +309,56 @@ describe("folder", () => {
 
   it("clears along with everything else", () => {
     expect(clearEverything({ ...EVERYTHING, folder })).toEqual({});
+  });
+});
+
+describe("the default saved search", () => {
+  it("is where Clear all returns, and from there Clear all empties", () => {
+    const def = { kind: "video" as const, sort: "btime" };
+    expect(clearAllTarget({ q: "cat" }, def)).toEqual(def);
+    expect(clearAllTarget({ sort: "btime", kind: "video" }, def)).toEqual({});
+    // A folder is where the view is, not a condition that differs.
+    expect(
+      clearAllTarget({ ...def, folder: { path: "A", recursive: true } }, def),
+    ).toEqual({});
+    expect(clearAllTarget({ q: "cat" }, null)).toEqual({});
+  });
+
+  it("matches tags in any order, repeats aside", () => {
+    expect(clearAllTarget({ tags: ["b", "a"] }, { tags: ["a", "b"] })).toEqual(
+      {},
+    );
+    expect(clearAllTarget({ tags: ["a", "a"] }, { tags: ["a"] })).toEqual({});
+  });
+
+  it("matches a sort whose direction is only spelled out", () => {
+    const def = { sort: "name" };
+    expect(clearAllTarget({ sort: "name", sortDir: "asc" }, def)).toEqual({});
+  });
+
+  it("gives its sort back when the sort chip is removed", () => {
+    const def = { sort: "btime", sortDir: "asc" as const };
+    const clear = (q: SearchQuery) =>
+      describeConditions(q, t, def)
+        .find((d) => d.key === "sort")!
+        .clear(q);
+    expect(clear({ sort: "name", kind: "image" })).toEqual({
+      kind: "image",
+      sort: "btime",
+      sortDir: "asc",
+    });
+    // Already on the default's sort, spelled out or not: the sort is dropped.
+    expect(clear({ sort: "btime", sortDir: "asc" })).toEqual({});
+    expect(
+      describeConditions({ sort: "name", sortDir: "asc" }, t, { sort: "name" })
+        .find((d) => d.key === "sort")!
+        .clear({ sort: "name", sortDir: "asc" }),
+    ).toEqual({});
+    // A default without a sort: the sort is just dropped.
+    expect(
+      describeConditions({ sort: "name" }, t, { kind: "video" })
+        .find((d) => d.key === "sort")!
+        .clear({ sort: "name" }),
+    ).toEqual({});
   });
 });

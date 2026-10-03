@@ -14,7 +14,10 @@ import {
 } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { applyTagFilter, showFolderInLibrary } from "@/lib/ui-events";
-import { SMART_COLLECTIONS_KEY } from "@/lib/smartCollections";
+import {
+  DEFAULT_SMART_COLLECTION_KEY,
+  SMART_COLLECTIONS_KEY,
+} from "@/lib/smartCollections";
 import { useMediaNav, usePlaylistNav } from "@/components/MediaNavContext";
 import { getListCounts } from "@/hooks/useListCounts";
 import { BY_FOLDER_KEY, VIEW_KEY } from "@/routes/Home/utils";
@@ -974,7 +977,7 @@ describe("Home folder view", () => {
         { button: 0, ctrlKey: false },
       );
       fireEvent.click(
-        await screen.findByRole("menuitem", { name: /Old videos/ }),
+        await screen.findByRole("menuitem", { name: /^Old videos/ }),
       );
 
       // With a condition on, the view would only search the missing folder
@@ -1024,7 +1027,7 @@ describe("Home folder view", () => {
         screen.getByRole("button", { name: "Smart collections" }),
         { button: 0, ctrlKey: false },
       );
-      fireEvent.click(await screen.findByRole("menuitem", { name: /Videos/ }));
+      fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
       await waitFor(() => expect(lastSearch().kind).toBe("video"));
 
       // Turning the option back on opens at the root, not at Movie.
@@ -1036,6 +1039,37 @@ describe("Home folder view", () => {
     } finally {
       localStorage.removeItem(SMART_COLLECTIONS_KEY);
     }
+  });
+
+  it("opens on the default saved search, without its folder", async () => {
+    localStorage.setItem(
+      SMART_COLLECTIONS_KEY,
+      JSON.stringify([
+        {
+          id: "1",
+          name: "Rated old videos",
+          query: {
+            kind: "video",
+            sort: "rating",
+            folder: { path: "Movie/Old", recursive: true },
+          },
+          workspaceId: WS_ID,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ]),
+    );
+    localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, "1");
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() =>
+      expect(lastSearch()).toMatchObject({ kind: "video", sort: "rating" }),
+    );
+    expect(
+      mocks.filesSearch.mock.calls.some(
+        ([q]) =>
+          (q as { folder?: { path: string } }).folder?.path === "Movie/Old",
+      ),
+    ).toBe(false);
   });
 
   it("opens a saved search whose folder is gone at its nearest ancestor", async () => {
@@ -1073,7 +1107,7 @@ describe("Home folder view", () => {
         { button: 0, ctrlKey: false },
       );
       fireEvent.click(
-        await screen.findByRole("menuitem", { name: /Old videos/ }),
+        await screen.findByRole("menuitem", { name: /^Old videos/ }),
       );
 
       await waitFor(() =>
@@ -1156,7 +1190,7 @@ describe("Home folder view", () => {
         screen.getByRole("button", { name: "Smart collections" }),
         { button: 0, ctrlKey: false },
       );
-      fireEvent.click(await screen.findByRole("menuitem", { name: /Videos/ }));
+      fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
 
       // Every condition is replaced, the folder included.
       await waitFor(() =>
@@ -1194,7 +1228,7 @@ describe("Home folder view", () => {
         { button: 0, ctrlKey: false },
       );
       fireEvent.click(
-        await screen.findByRole("menuitem", { name: /Movie videos/ }),
+        await screen.findByRole("menuitem", { name: /^Movie videos/ }),
       );
 
       await waitFor(() =>

@@ -61,7 +61,7 @@ import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { SelectionProvider } from "@/components/SelectionContext";
 import { FolderHeader } from "@/components/FolderHeader";
-import { hasFilterConditions } from "@/lib/smartCollections";
+import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
 import { setListCounts, type ListCounts } from "@/hooks/useListCounts";
@@ -105,7 +105,8 @@ export default function Home() {
   const scanning = useScanning();
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  const [filter, setFilter] = useState<SearchQuery>({});
+  // Opens on the default saved search, if one is set (see loadInitialFilter).
+  const [filter, setFilter] = useState<SearchQuery>(loadInitialFilter);
   const [thumbVersion, setThumbVersion] = useState<Record<string, number>>({});
   const manualScanJobs = useRef(
     new Map<string, "scan" | "resync" | "rebuild">(),

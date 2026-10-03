@@ -283,3 +283,14 @@ the root is kept as `folder: { path, recursive: true }` and saved together with
 the collection's `workspaceId`, since a folder path means nothing outside its
 own workspace; a folder with no workspace to place it in is dropped. Opening
 such a search switches to that workspace and browses the folder by folder.
+
+One saved search can be marked as the default (the star in the menu; its id is
+stored under `DEFAULT_SMART_COLLECTION_KEY`, apart from the collections). Its
+conditions and sort become Home's initial filter at launch
+(`loadInitialFilter()`), and "Clear all" returns to them — or empties the
+filter once it already shows exactly them (`clearAllTarget()` in
+`src/lib/searchConditions.ts`); removing the sort chip restores its sort. The
+default applies in every workspace, so its folder and a manual sort, both
+bound to one place, are left out (`defaultQueryOf()`). The hook is owned by
+`FilterBar`, which passes it to the menu, so the menu and "Clear all" read the
+same state.

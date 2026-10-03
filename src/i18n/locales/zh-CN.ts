@@ -184,6 +184,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "smartCollection.saveCurrent": "保存当前筛选",
   "smartCollection.empty": "还没有保存的搜索。",
   "smartCollection.delete": "删除收藏",
+  "smartCollection.setDefault": "设为默认",
+  "smartCollection.unsetDefault": "取消默认",
   "smartCollection.saveTitle": "保存搜索筛选",
   "smartCollection.namePlaceholder": "收藏名称",
   "smartCollection.save": "保存",

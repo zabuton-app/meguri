@@ -187,6 +187,8 @@ export const ko: Record<TranslationKey, string> = {
   "smartCollection.saveCurrent": "현재 조건 저장",
   "smartCollection.empty": "저장된 검색이 아직 없습니다.",
   "smartCollection.delete": "컬렉션 삭제",
+  "smartCollection.setDefault": "기본값으로 설정",
+  "smartCollection.unsetDefault": "기본값 해제",
   "smartCollection.saveTitle": "검색 조건 저장",
   "smartCollection.namePlaceholder": "컬렉션 이름",
   "smartCollection.save": "저장",

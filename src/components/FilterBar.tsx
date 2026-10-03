@@ -7,6 +7,7 @@ import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import {
   collapsedConditionCount,
+  clearAllTarget,
   describeConditions,
 } from "@/lib/searchConditions";
 import { ActiveFilterChips } from "./ActiveFilterChips";
@@ -16,6 +17,7 @@ import { SegmentedControl } from "./SegmentedControl";
 import { MoreFiltersPopover } from "./MoreFiltersPopover";
 import { useI18n } from "@/i18n/I18nProvider";
 import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
+import { useSmartCollections } from "@/hooks/useSmartCollections";
 import type { SmartCollection } from "@/lib/smartCollections";
 
 interface Props {
@@ -39,7 +41,15 @@ export function FilterBar({
   const { t } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
 
-  const descriptors = useMemo(() => describeConditions(value, t), [value, t]);
+  const smart = useSmartCollections();
+  const { defaultQuery } = smart;
+  // "Clear all" returns to the default saved search, if one is set.
+  const clearAll = () => onChange(clearAllTarget(value, defaultQuery));
+
+  const descriptors = useMemo(
+    () => describeConditions(value, t, defaultQuery),
+    [value, t, defaultQuery],
+  );
   const collapsedCount = collapsedConditionCount(descriptors);
 
   return (
@@ -105,6 +115,7 @@ export function FilterBar({
           onChange={onChange}
           collapsedCount={collapsedCount}
           hasConditions={descriptors.length > 0}
+          onClearAll={clearAll}
           manualSortAvailable={manualSortAvailable}
         />
 
@@ -115,6 +126,7 @@ export function FilterBar({
             value={value}
             workspaceId={workspaceId}
             onApply={onApplySaved ?? ((c) => onChange(c.query))}
+            smart={smart}
           />
         </div>
       </div>
@@ -122,7 +134,7 @@ export function FilterBar({
       <ActiveFilterChips
         chips={descriptors.filter((d) => d.chip)}
         onRemove={(chip) => onChange(chip.clear(value))}
-        onClearAll={() => onChange({})}
+        onClearAll={clearAll}
         t={t}
       />
     </div>

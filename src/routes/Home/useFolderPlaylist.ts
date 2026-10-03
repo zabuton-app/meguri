@@ -48,10 +48,13 @@ export function useFolderPlaylist({
       browsing
         ? {
             ...subtreeFilter,
-            ...(filter.sort ? {} : { sort: "name", sortDir: "asc" as const }),
+            // A lone direction is a chosen sort too (the "added" order).
+            ...(filter.sort || filter.sortDir
+              ? {}
+              : { sort: "name", sortDir: "asc" as const }),
           }
         : null,
-    [browsing, subtreeFilter, filter.sort],
+    [browsing, subtreeFilter, filter.sort, filter.sortDir],
   );
   const search = useFilesSearch(
     workspaceId,

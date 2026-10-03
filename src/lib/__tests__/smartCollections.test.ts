@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/locales/en";
 import {
   cleanSearchQuery,
+  DEFAULT_SMART_COLLECTION_KEY,
+  defaultQueryOf,
+  loadInitialFilter,
+  type SmartCollection,
   describeSearchQuery,
   hasFilterConditions,
   hasSearchConditions,
@@ -181,5 +185,51 @@ describe("folder condition", () => {
         kind: "video",
       }),
     ).toBe("Folder: a/b / Video");
+  });
+});
+
+describe("the default saved search", () => {
+  const saved: SmartCollection = {
+    id: "d1",
+    name: "Recent videos",
+    query: {
+      kind: "video",
+      sort: "btime",
+      folder: { path: "Movies", recursive: true },
+    },
+    workspaceId: "ws1",
+    createdAt: 1,
+    updatedAt: 1,
+  };
+
+  it("applies its conditions without the workspace-bound folder", () => {
+    expect(defaultQueryOf([saved], "d1")).toEqual({
+      kind: "video",
+      sort: "btime",
+    });
+  });
+
+  it("is absent with no default or a deleted one", () => {
+    expect(defaultQueryOf([saved], null)).toBeNull();
+    expect(defaultQueryOf([saved], "gone")).toBeNull();
+  });
+
+  it("is what the list starts with", () => {
+    expect(loadInitialFilter()).toEqual({});
+    saveSmartCollections([saved]);
+    localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, "d1");
+    expect(loadInitialFilter()).toEqual({ kind: "video", sort: "btime" });
+  });
+
+  it("drops a manual sort, which exists only inside a collection", () => {
+    const manual = {
+      ...saved,
+      query: {
+        kind: "video" as const,
+        sort: "manual",
+        sortDir: "asc" as const,
+      },
+    };
+    expect(defaultQueryOf([manual], "d1")).toEqual({ kind: "video" });
   });
 });
