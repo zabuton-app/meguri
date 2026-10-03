@@ -51,7 +51,7 @@ export function useBulkEdit(
   const { t } = useI18n();
   const qc = useQueryClient();
 
-  const { patch: patchSelection } = useSelection();
+  const { patch: patchSelection, refresh: refreshSelection } = useSelection();
 
   const fail = (e: unknown) =>
     toast.error(
@@ -92,7 +92,11 @@ export function useBulkEdit(
       }
       // The selection's own copies: a picked folder's files and rows the list
       // no longer holds are in no query cache for the patch above to reach.
+      // Patched for the same instant response, then read again: `written` is
+      // what was sent, and a file counted in `skipped` was not written at all
+      // — it is gone, and the read is what takes it out of the selection.
       patchSelection(written, rowPatch);
+      refreshSelection();
       invalidateFileCaches(qc);
       // One line per field the call actually set, so a future call that sets
       // both does not silently report only one of them.
@@ -120,8 +124,8 @@ export function useBulkEdit(
       // Each workspace commits on its own (see files_bulk_meta), so a call
       // that failed may still have written the workspaces ahead of the one
       // that threw: re-read rather than leave those showing the old values.
-      // (A selected row the list no longer holds keeps its snapshot: which
-      // workspaces were written is not something the failure says.)
+      // The selection too, for the rows the list no longer holds.
+      refreshSelection();
       invalidateFileCaches(qc);
       fail(e);
     },

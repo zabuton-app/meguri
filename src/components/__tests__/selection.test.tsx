@@ -670,6 +670,287 @@ describe("selection", () => {
   });
 });
 
+describe("reading the selection again after an edit", () => {
+  const tagged = (id: number, names: string[], favorite = 0): FileRow => ({
+    ...sampleFileRow,
+    id,
+    relPath: `videos/clip-${id}.mp4`,
+    favorite,
+    tags: names.map((name, i) => ({
+      id: i + 1,
+      name,
+      namespace: "",
+      source: "manual",
+      score: null,
+    })),
+  });
+
+  /** A read whose answers the test releases by hand. */
+  function deferredRead() {
+    const calls: {
+      files: FileRow[];
+      resolve: (rows: FileRow[]) => void;
+      reject: (e: unknown) => void;
+    }[] = [];
+    const read = vi.fn(
+      (files: FileRow[]) =>
+        new Promise<FileRow[]>((resolve, reject) => {
+          calls.push({ files, resolve, reject });
+        }),
+    );
+    return { read, calls };
+  }
+
+  /** Reaches the selection directly, and shows the rows it holds. */
+  function Controls() {
+    const { refresh, patch, rows } = useSelection();
+    return (
+      <>
+        <button type="button" onClick={refresh}>
+          refresh
+        </button>
+        <button type="button" onClick={() => patch(rows, { favorite: 1 })}>
+          patch
+        </button>
+        <output data-testid="held">
+          {rows
+            .map(
+              (row) =>
+                `${row.id}:${row.favorite}:${(row.tags ?? []).map((tag) => tag.name).join(",")}`,
+            )
+            .join(" ")}
+        </output>
+      </>
+    );
+  }
+
+  /** The list in stages, the way a refetch after an edit replaces it. */
+  function ReadHarness({
+    lists,
+    read,
+  }: {
+    lists: FileRow[][];
+    read: (files: FileRow[]) => Promise<FileRow[]>;
+  }) {
+    const [stage, setStage] = useState(0);
+    const shown = lists[Math.min(stage, lists.length - 1)];
+    return (
+      <>
+        <button type="button" onClick={() => setStage((n) => n + 1)}>
+          step
+        </button>
+        <SelectionProvider items={shown} scope="one" readFiles={read}>
+          <MediaGrid
+            items={shown}
+            mediaBase="http://127.0.0.1:17345"
+            workspaceId={WS_ID}
+            loading={false}
+            thumbVersion={{}}
+          />
+          <SelectionLayer active />
+          <Controls />
+        </SelectionProvider>
+      </>
+    );
+  }
+
+  const held = () => screen.getByTestId("held").textContent;
+  const press = (name: string) =>
+    fireEvent.click(screen.getByRole("button", { name }));
+  const settle = (run: () => void) =>
+    act(async () => {
+      run();
+      await Promise.resolve();
+    });
+
+  it("takes a row as it now stands once the edit has dropped it from the list", async () => {
+    // The tag the list is filtered by, removed: the refetch returns the list
+    // without the row, so the list never shows it edited.
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, ["beach"])], []]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    press("refresh");
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(calls[0].files.map((file) => file.id)).toEqual([1]);
+    press("step");
+    expect(held()).toBe("1:0:beach");
+    await settle(() => calls[0].resolve([tagged(1, [])]));
+    expect(held()).toBe("1:0:");
+    expect(selectedCount()).toBe(1);
+  });
+
+  it("lets go of a file that does not come back", async () => {
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, []), tagged(2, [])]]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    fireEvent.click(checkboxes()[1]);
+    press("refresh");
+    await settle(() => calls[0].resolve([tagged(2, [])]));
+    expect(selectedCount()).toBe(1);
+    expect(held()).toBe("2:0:");
+  });
+
+  it("keeps the rows it has when the read fails", async () => {
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, ["beach"])], []]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    press("refresh");
+    press("step");
+    await settle(() => calls[0].reject(new Error("gone")));
+    expect(held()).toBe("1:0:beach");
+  });
+
+  it("leaves a row deselected while the read was on its way alone", async () => {
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, []), tagged(2, [])]]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    fireEvent.click(checkboxes()[1]);
+    press("refresh");
+    fireEvent.click(checkboxes()[0]);
+    await settle(() => calls[0].resolve([tagged(1, []), tagged(2, [])]));
+    expect(selectedCount()).toBe(1);
+  });
+
+  it("takes only the latest read", async () => {
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, ["beach"])], []]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    press("refresh");
+    press("refresh");
+    press("step");
+    // Read before the second edit, for all this answer knows: not taken, in
+    // whichever order the two arrive.
+    await settle(() => calls[0].resolve([]));
+    expect(held()).toBe("1:0:beach");
+    await settle(() => calls[1].resolve([tagged(1, ["trip"])]));
+    expect(held()).toBe("1:0:trip");
+  });
+
+  it("does not let an earlier read that answers late undo the latest", async () => {
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, ["beach"])], []]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    press("refresh");
+    press("refresh");
+    press("step");
+    await settle(() => calls[1].resolve([tagged(1, ["trip"])]));
+    await settle(() => calls[0].resolve([]));
+    expect(held()).toBe("1:0:trip");
+    expect(selectedCount()).toBe(1);
+  });
+
+  it("keeps a row picked after the read was sent, which the answer cannot name", async () => {
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, []), tagged(2, [])]]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    press("refresh");
+    fireEvent.click(checkboxes()[1]);
+    await settle(() => calls[0].resolve([tagged(1, [], 1)]));
+    expect(selectedCount()).toBe(2);
+  });
+
+  it("reads once more rather than overwrite a row the list renewed meanwhile", async () => {
+    // The list's copy arrived while the read was out, and nothing says which
+    // of the two is the older: neither is trusted over the other.
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness
+        lists={[[tagged(1, [])], [tagged(1, [], 1)], []]}
+        read={read}
+      />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    press("refresh");
+    press("step");
+    await settle(() => calls[0].resolve([tagged(1, [], 0)]));
+    expect(read).toHaveBeenCalledTimes(2);
+    press("step");
+    expect(held()).toBe("1:1:");
+    await settle(() => calls[1].resolve([tagged(1, ["trip"], 1)]));
+    expect(held()).toBe("1:1:trip");
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  it("reads once more when an edit is patched in while a read is on its way", async () => {
+    const { read, calls } = deferredRead();
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, [])], []]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    press("refresh");
+    press("patch");
+    expect(read).toHaveBeenCalledTimes(2);
+    press("step");
+    await settle(() => calls[0].resolve([tagged(1, [], 0)]));
+    expect(held()).toBe("1:1:");
+    await settle(() => calls[1].resolve([tagged(1, [], 1)]));
+    expect(held()).toBe("1:1:");
+  });
+
+  it("drops a file a bulk favorite skipped because it was gone", async () => {
+    mocks.filesBulkMeta.mockResolvedValue({ files: 1, skipped: 1 });
+    const rows = [tagged(1, []), tagged(2, [])];
+    const read = vi
+      .fn<(files: FileRow[]) => Promise<FileRow[]>>()
+      .mockResolvedValue([tagged(1, [], 1)]);
+    renderWithProviders(<ReadHarness lists={[rows]} read={read} />);
+    fireEvent.click(checkboxes()[0]);
+    fireEvent.click(checkboxes()[1]);
+    fireEvent.click(within(bar()!).getByTitle("Favorite"));
+    await waitFor(() => expect(selectedCount()).toBe(1));
+    expect(read.mock.calls[0][0].map((file) => file.id)).toEqual([1, 2]);
+  });
+
+  it("reads the selection again when a bulk favorite fails partway", async () => {
+    mocks.filesBulkMeta.mockRejectedValue(new Error("disk"));
+    const read = vi
+      .fn<(files: FileRow[]) => Promise<FileRow[]>>()
+      .mockResolvedValue([tagged(1, [], 1)]);
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, [])], []]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    fireEvent.click(within(bar()!).getByTitle("Favorite"));
+    await waitFor(() => expect(read).toHaveBeenCalled());
+    press("step");
+    await waitFor(() => expect(held()).toBe("1:1:"));
+  });
+
+  it("reads the selection again when the tag dialog applies an edit", async () => {
+    const read = vi
+      .fn<(files: FileRow[]) => Promise<FileRow[]>>()
+      .mockResolvedValue([tagged(1, [])]);
+    renderWithProviders(
+      <ReadHarness lists={[[tagged(1, ["beach"])], []]} read={read} />,
+    );
+    fireEvent.click(checkboxes()[0]);
+    fireEvent.keyDown(window, { key: "t" });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Remove “beach” from every selected file",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply to 1" }));
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+    press("step");
+    await waitFor(() => expect(held()).toBe("1:0:"));
+  });
+});
+
 describe("folder selection", () => {
   const folder = (name: string, count: number): FolderEntry => ({
     name,
@@ -841,9 +1122,9 @@ describe("folder selection", () => {
   it("reads picked folders again on request, without going back to waiting", async () => {
     const { expand, calls } = deferredExpand();
     function Refresh() {
-      const { refreshFolders } = useSelection();
+      const { refresh } = useSelection();
       return (
-        <button type="button" onClick={refreshFolders}>
+        <button type="button" onClick={refresh}>
           refresh
         </button>
       );
@@ -879,9 +1160,9 @@ describe("folder selection", () => {
   it("keeps a folder's files when reading them again fails", async () => {
     const { expand, calls } = deferredExpand();
     function Refresh() {
-      const { refreshFolders } = useSelection();
+      const { refresh } = useSelection();
       return (
-        <button type="button" onClick={refreshFolders}>
+        <button type="button" onClick={refresh}>
           refresh
         </button>
       );
@@ -912,10 +1193,10 @@ describe("folder selection", () => {
     const { expand, calls } = deferredExpand();
     const first = filesOf("Movie", 2, 100);
     function Edits() {
-      const { refreshFolders, patch } = useSelection();
+      const { refresh, patch } = useSelection();
       return (
         <>
-          <button type="button" onClick={refreshFolders}>
+          <button type="button" onClick={refresh}>
             refresh
           </button>
           <button type="button" onClick={() => patch(first, { favorite: 1 })}>

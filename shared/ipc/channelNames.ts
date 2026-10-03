@@ -43,6 +43,7 @@ export const INVOKE_CHANNELS = [
   "file_add_tag",
   "files_bulk_tag",
   "files_bulk_meta",
+  "files_by_ids",
   "file_remove_tag",
   "tags_list",
   "tags_list_all",

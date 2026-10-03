@@ -12,6 +12,7 @@ import {
   duplicateHashCounts,
   fileIdsByContentHashes,
   filesByContentHashes,
+  filesByIds,
   folderFiles,
   listFolders,
   listPlayHistory,
@@ -143,6 +144,31 @@ export function folderFilesWorkspace(
   const result = folderFiles(target.core.db, paths, { limit });
   for (const entry of result) inject(entry.rows, target.id);
   return result;
+}
+
+/**
+ * Files read by identity, as (stamped) list rows with their tags.
+ *
+ * A file that is gone — its row deleted, or dropped from the index — is simply
+ * absent from the result: the caller reads a missing row as "no longer there".
+ * Which is why a workspace that is not among `cores` (its database could not
+ * be opened) fails the call instead: not read is not the same as gone.
+ */
+export function filesByIdsWorkspaces(
+  cores: CoreTarget[],
+  groups: { workspaceId: string; fileIds: number[] }[],
+): FileRow[] {
+  const byId = new Map(cores.map((target) => [target.id, target]));
+  const out: FileRow[] = [];
+  for (const { workspaceId, fileIds } of groups) {
+    const target = byId.get(workspaceId);
+    if (!target) throw new Error(`workspace ${workspaceId} is not readable`);
+    const rows = filesByIds(target.core.db, [...new Set(fileIds)]);
+    // List rows carry their tags.
+    attachTags(target.core.db, rows);
+    out.push(...inject(rows, workspaceId));
+  }
+  return out;
 }
 
 export function searchWorkspaces(

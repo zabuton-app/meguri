@@ -94,7 +94,7 @@ export function SelectionLayer({ active }: Props) {
           open
           onOpenChange={setTagsOpen}
           rows={selection.rows}
-          onApplied={selection.refreshFolders}
+          onApplied={selection.refresh}
         />
       )}
     </>

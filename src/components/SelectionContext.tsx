@@ -19,7 +19,9 @@
 // landing in the query cache is reflected without the selection having to be
 // told about it. A row the list does not hold — a picked folder's files, a row
 // scrolled out or filtered away — has only its snapshot, so a bulk edit tells
-// the selection what it wrote (patch, refreshFolders).
+// the selection what it wrote (patch) and has it read again (refresh): the
+// edit can be what takes a row off the list, and a file that turned out to be
+// gone has to leave the selection.
 //
 // In the folder view a folder card can be selected too. It stands for every
 // file below it, fetched (expandFolders) the moment it is picked: the bar and
@@ -72,6 +74,9 @@ export interface SelectionView {
 /** Fetches selected folders' files (folder_files), injected by the provider. */
 export type ExpandFolders = (paths: string[]) => Promise<FolderFilesResult>;
 
+/** Reads selected files as they now stand (files_by_ids), injected by the provider. */
+export type ReadFiles = (files: FileRow[]) => Promise<FileRow[]>;
+
 export interface SelectionApi extends SelectionView {
   isSelected: (file: FileRow) => boolean;
   /** A click on a card while selecting, or a modified click that starts it. */
@@ -86,13 +91,17 @@ export interface SelectionApi extends SelectionView {
    * Apply to the selection's own copies what a bulk edit wrote to `files`.
    * The list's rows follow the query cache; the rows the list does not hold
    * (see the header) would otherwise keep showing the values from before.
+   * If a `refresh` is still on its way, the rows are asked for once more: its
+   * answer may have been read before this edit.
    */
   patch: (files: FileKey[], patch: Partial<FileRow>) => void;
   /**
-   * Fetch the picked folders' files again, after an edit whose result cannot
-   * be patched in (a bulk tag edit reports counts, not rows).
+   * Read the selection again after an edit: the selected rows by identity and
+   * the picked folders' files. A bulk edit reports counts, not rows, so this
+   * is what tells a tag edit's result — and which files were skipped because
+   * they are gone, which then leave the selection.
    */
-  refreshFolders: () => void;
+  refresh: () => void;
   /** Every loaded row. "Loaded" is the honest scope; see the comment on it. */
   selectAll: () => void;
   /** Empty the selection but stay in selection mode. */
@@ -142,6 +151,14 @@ class SelectionStore {
   private folderItems: FolderEntry[] = [];
   private folders = new Map<string, FolderPick>();
   private expand: ExpandFolders | null = null;
+  private read: ReadFiles | null = null;
+  /** Names the latest read of the selected rows; an earlier one's answer is dropped. */
+  private rowsReadToken = 0;
+  /**
+   * That read has not answered yet. Unlike the view's `pending` this holds
+   * nothing back: the rows shown stay usable while they are read again.
+   */
+  private rowsReadInFlight = false;
   /**
    * Where a Shift-click measures its range from: the last row clicked without
    * Shift, held by key rather than by index. The list is a sliding window —
@@ -189,12 +206,17 @@ class SelectionStore {
   syncList(
     items: FileRow[],
     scope: string,
-    folderView: { folders?: FolderEntry[]; expand?: ExpandFolders } = {},
+    sources: {
+      folders?: FolderEntry[];
+      expand?: ExpandFolders;
+      read?: ReadFiles;
+    } = {},
   ): void {
     const listChanged = this.items !== items;
     this.items = items;
-    this.folderItems = folderView.folders ?? [];
-    this.expand = folderView.expand ?? null;
+    this.folderItems = sources.folders ?? [];
+    this.expand = sources.expand ?? null;
+    this.read = sources.read ?? null;
     if (this.scope !== scope) {
       const had =
         this.active || this.selected.size > 0 || this.folders.size > 0;
@@ -306,11 +328,15 @@ class SelectionStore {
     this.selected = selected;
     this.folders = folders;
     this.rebuild(false);
+    // A read on its way may predate this edit: ask again rather than let its
+    // answer put the old values back.
+    if (this.rowsReadInFlight) this.fetchRows();
   };
 
-  // The files shown stay until the new ones arrive, and stay if they never
+  // The rows shown stay until the new ones arrive, and stay if they never
   // do: the selection does not go back to pending.
-  refreshFolders = (): void => {
+  refresh = (): void => {
+    this.fetchRows();
     this.fetchFolders(
       [...this.folders]
         .filter(([, pick]) => pick.rows !== null)
@@ -371,13 +397,72 @@ class SelectionStore {
   };
 
   /**
+   * Read the selected rows again and take them as they now stand. A row that
+   * does not come back is gone, and leaves the selection.
+   *
+   * Only the latest read is taken: it asks for the whole selection, so an
+   * earlier answer has nothing to add, and may have been read before the edit
+   * the later one follows. A failed read leaves the snapshots as they are.
+   *
+   * A snapshot replaced while the read was on its way — renewed from the list,
+   * or the row picked again — is not overwritten either: the answer may be the
+   * older of the two. The rows are asked for once more instead, since the
+   * list's copy is not known to be the newer one (a refetch begun before the
+   * edit can land after it).
+   */
+  private fetchRows(): void {
+    const read = this.read;
+    if (!read || this.selected.size === 0) return;
+    const asked = [...this.selected.values()];
+    const token = ++this.rowsReadToken;
+    this.rowsReadInFlight = true;
+    read(asked).then(
+      (rows) => {
+        if (token !== this.rowsReadToken) return;
+        this.rowsReadInFlight = false;
+        const fresh = new Map(
+          rows.map((row) => [selectionKey(row), row] as const),
+        );
+        const next = new Map(this.selected);
+        let changed = false;
+        let again = false;
+        for (const file of asked) {
+          const key = selectionKey(file);
+          const current = next.get(key);
+          // Deselected while the read was on its way.
+          if (current === undefined) continue;
+          const row = fresh.get(key);
+          if (!row) {
+            next.delete(key);
+            if (this.anchorKey === key) this.anchorKey = null;
+          } else if (current !== file) {
+            again = true;
+            continue;
+          } else {
+            next.set(key, row);
+          }
+          changed = true;
+        }
+        if (changed) {
+          this.selected = next;
+          this.rebuild(false);
+        }
+        if (again) this.fetchRows();
+      },
+      () => {
+        if (token === this.rowsReadToken) this.rowsReadInFlight = false;
+      },
+    );
+  }
+
+  /**
    * Fetch picked folders' files and fill them in. A result is dropped when the
    * pick it answers is gone — deselected, re-picked, or swept away by a list
    * change — so a slow answer can never resurrect a selection. A failed first
    * fetch un-picks its folders rather than leaving them pending forever.
    *
    * A pick that already had its files when they were asked for again
-   * (refreshFolders) can be replaced while the answer is on its way, by an
+   * (refresh) can be replaced while the answer is on its way, by an
    * edit patched in or by another refresh. That answer may predate the edit,
    * so it is dropped like any other — and asked for once more, or the folder
    * would keep the files it had before the refresh.
@@ -498,7 +583,7 @@ export function useSelection(): SelectionApi {
       click: store.click,
       forget: store.forget,
       patch: store.patch,
-      refreshFolders: store.refreshFolders,
+      refresh: store.refresh,
       selectAll: store.selectAll,
       deselectAll: store.deselectAll,
       exit: store.exit,
@@ -582,6 +667,7 @@ export function SelectionProvider({
   scope = "",
   folders,
   expandFolders,
+  readFiles,
   children,
 }: {
   /** The list as currently loaded. Range selection and "select all" work on it. */
@@ -592,12 +678,18 @@ export function SelectionProvider({
   folders?: FolderEntry[];
   /** Fetches a picked folder's files. Without it folders cannot be selected. */
   expandFolders?: ExpandFolders;
+  /** Reads selected files again. Without it only picked folders are refreshed. */
+  readFiles?: ReadFiles;
   children: ReactNode;
 }) {
   const [store] = useState(() => new SelectionStore());
   // Read while rendering so the views below never paint one frame with a
   // selection that belongs to the previous list; announced after the commit.
-  store.syncList(items, scope, { folders, expand: expandFolders });
+  store.syncList(items, scope, {
+    folders,
+    expand: expandFolders,
+    read: readFiles,
+  });
   useEffect(() => store.flush());
   return (
     <StoreContext.Provider value={store}>{children}</StoreContext.Provider>

@@ -76,6 +76,21 @@ export function registerFileHandlers(ctx: IpcContext): void {
     }
     return total;
   });
+  // The rows a bulk edit was sent for, as they now stand: what the selection
+  // reads again afterwards, since a selected row need not be in any list.
+  handle("files_by_ids", ({ targets }) => {
+    const groups = bulkTargetCores(ws, targets);
+    return queryClient.run<FileRow[]>({
+      kind: "filesByIds",
+      targets: queryTargets(
+        groups.map(({ workspaceId, core }) => ({ id: workspaceId, core })),
+      ),
+      groups: groups.map(({ workspaceId, fileIds }) => ({
+        workspaceId,
+        fileIds,
+      })),
+    });
+  });
   handle("file_delete_from_index", async ({ id, workspaceId }) => {
     const deleted = q.deleteFromIndex(coreById(ws, workspaceId).db, id);
     // Await so the renderer's refetch after this resolves can't race a stale

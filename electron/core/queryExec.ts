@@ -61,6 +61,13 @@ export type QueryRequest =
       paths: string[];
       /** Rows to return across the whole call (see folderFiles). */
       limit: number;
+    }
+  // A selection read again by identity: one group per workspace, each matched
+  // to its target by id.
+  | {
+      kind: "filesByIds";
+      targets: QueryTarget[];
+      groups: { workspaceId: string; fileIds: number[] }[];
     };
 
 export type QueryResponse =
@@ -252,6 +259,8 @@ export class QueryExecutor {
         }
         return cw.folderFilesWorkspace(target, req.paths, req.limit);
       }
+      case "filesByIds":
+        return cw.filesByIdsWorkspaces(cores, req.groups);
     }
   }
 
