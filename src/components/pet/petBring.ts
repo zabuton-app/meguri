@@ -17,9 +17,9 @@ export const BRING_WEIGHTS: Readonly<Record<BringCategory, number>> = {
 /** Rating from which a file counts as highly rated. */
 const LIKED_RATING_MIN = 4;
 /** Most Watch Later ids sent as one filter. */
-const MAX_WATCH_LATER_IDS = 500;
-/** Rows asked for when the result still has to be matched against Watch Later. */
-const WATCH_LATER_SAMPLE = 50;
+const WATCH_LATER_CHUNK = 500;
+/** Rows asked for per chunk: the most files_random returns. */
+const WATCH_LATER_SAMPLE = 500;
 
 export interface Brought {
   category: BringCategory;
@@ -61,25 +61,43 @@ async function first(
   return rows[0] ?? null;
 }
 
+function shuffled<T>(items: readonly T[], rng: Random): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * An unplayed Watch Later item within the active scope. The id filter is not
+ * exact on its own: file ids are only unique within a workspace, so under
+ * "All" it also matches other workspaces' files, and while a collection is
+ * the scope the draw is over that collection's files. Either way only true
+ * members are kept, and every chunk of the queue is tried (in random order)
+ * before the category counts as empty.
+ */
 async function fromWatchLater(
   filesRandom: FilesRandom,
   items: readonly UserCollectionItem[],
+  rng: Random,
 ): Promise<FileRow | null> {
   if (items.length === 0) return null;
-  const queued = items.slice(0, MAX_WATCH_LATER_IDS);
-  // File ids are only unique within a workspace, so under "All" the id filter
-  // can match another workspace's file: keep only true members.
-  const members = new Set(queued.map(queueKey));
-  const rows = await filesRandom({
-    fileIds: [...new Set(queued.map((i) => i.fileId))],
-    played: false,
-    limit: WATCH_LATER_SAMPLE,
-  });
-  return (
-    rows.find((r) =>
+  const members = new Set(items.map(queueKey));
+  const ids = shuffled([...new Set(items.map((i) => i.fileId))], rng);
+  for (let at = 0; at < ids.length; at += WATCH_LATER_CHUNK) {
+    const rows = await filesRandom({
+      fileIds: ids.slice(at, at + WATCH_LATER_CHUNK),
+      played: false,
+      limit: WATCH_LATER_SAMPLE,
+    });
+    const hit = rows.find((r) =>
       members.has(queueKey({ workspaceId: r.workspaceId, fileId: r.id })),
-    ) ?? null
-  );
+    );
+    if (hit) return hit;
+  }
+  return null;
 }
 
 async function fromCategory(
@@ -90,7 +108,7 @@ async function fromCategory(
 ): Promise<FileRow | null> {
   switch (category) {
     case "watchLater":
-      return fromWatchLater(filesRandom, watchLater);
+      return fromWatchLater(filesRandom, watchLater, rng);
     case "inProgress":
       return first(filesRandom, { inProgress: true });
     case "liked": {

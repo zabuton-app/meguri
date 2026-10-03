@@ -195,6 +195,27 @@ describe("Pet", () => {
     await waitFor(() => expect(shown()).toBe("idle"), { timeout: 3000 });
   });
 
+  it("is not delighted when nothing was added after all", async () => {
+    // The list here is stale: the write finds the file already queued.
+    mocks.collectionSetMembership.mockResolvedValue({ changed: 0 });
+    setup();
+    fireEvent.drop(pet(), {
+      dataTransfer: fileDrag([{ workspaceId: "ws-a", fileId: 1 }]),
+    });
+    expect(shown()).toBe("munch");
+    await waitFor(() => expect(shown()).toBe("headShake"));
+  });
+
+  it("is not delighted when the write fails", async () => {
+    mocks.collectionSetMembership.mockRejectedValue(new Error("disk full"));
+    setup();
+    fireEvent.drop(pet(), {
+      dataTransfer: fileDrag([{ workspaceId: "ws-a", fileId: 1 }]),
+    });
+    await waitFor(() => expect(shown()).toBe("headShake"));
+    await waitFor(() => expect(shown()).toBe("idle"), { timeout: 3000 });
+  });
+
   it("begs while the dragged files are held right over it", () => {
     setup();
     const files = [{ workspaceId: "ws-a", fileId: 1 }];
@@ -221,24 +242,35 @@ describe("Pet", () => {
   it("works while a scan runs, cheers when it ends, looks around on a switch", async () => {
     setup();
     await waitFor(() => expect(mocks.listeners.scanDone).toBeTruthy());
-    act(() => mocks.listeners.scanProgress());
-    act(() => mocks.listeners.scanProgress());
+    act(() => mocks.listeners.scanProgress({ jobId: "a" }));
+    act(() => mocks.listeners.scanProgress({ jobId: "a" }));
     expect(shown()).toBe("work");
-    act(() => mocks.listeners.scanDone({}));
+    act(() => mocks.listeners.scanDone({ jobId: "a" }));
     expect(shown()).toBe("cheer");
     await waitFor(() => expect(shown()).toBe("idle"), { timeout: 3000 });
     act(() => mocks.listeners.workspaceChanged());
     expect(shown()).toBe("lookAround");
   });
 
+  it("keeps working until the last of several scans is done", async () => {
+    setup();
+    await waitFor(() => expect(mocks.listeners.scanDone).toBeTruthy());
+    act(() => mocks.listeners.scanProgress({ jobId: "a" }));
+    act(() => mocks.listeners.scanProgress({ jobId: "b" }));
+    act(() => mocks.listeners.scanDone({ jobId: "a" }));
+    expect(shown()).toBe("work");
+    act(() => mocks.listeners.scanDone({ jobId: "b" }));
+    expect(shown()).toBe("cheer");
+  });
+
   it("does not cheer for a scan that failed or was called off", async () => {
     setup();
     await waitFor(() => expect(mocks.listeners.scanDone).toBeTruthy());
-    act(() => mocks.listeners.scanProgress());
-    act(() => mocks.listeners.scanDone({ error: true }));
+    act(() => mocks.listeners.scanProgress({ jobId: "a" }));
+    act(() => mocks.listeners.scanDone({ jobId: "a", error: true }));
     expect(shown()).toBe("idle");
-    act(() => mocks.listeners.scanProgress());
-    act(() => mocks.listeners.scanDone({ aborted: true }));
+    act(() => mocks.listeners.scanProgress({ jobId: "a" }));
+    act(() => mocks.listeners.scanDone({ jobId: "a", aborted: true }));
     expect(shown()).toBe("idle");
   });
 
@@ -250,6 +282,32 @@ describe("Pet", () => {
     fireEvent.lostPointerCapture(pet());
     expect(shown()).toBe("fall");
     await waitFor(() => expect(shown()).toBe("idle"), { timeout: 3000 });
+  });
+
+  it("marks keyboard focus, but not focus that follows the mouse", () => {
+    setup();
+    const mark = () => document.querySelector("[data-pet-focus]");
+    fireEvent.pointerDown(document.body);
+    fireEvent.focus(pet());
+    expect(mark()).toBeNull();
+    fireEvent.blur(pet());
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    fireEvent.focus(pet());
+    expect(mark()).not.toBeNull();
+    fireEvent.blur(pet());
+    expect(mark()).toBeNull();
+  });
+
+  it("cannot be put away in mid-air", async () => {
+    setup();
+    fireEvent.pointerDown(pet(), { button: 0, clientX: 10, clientY: 700 });
+    fireEvent.pointerMove(pet(), { clientX: 200, clientY: 300 });
+    await openMenu();
+    expect(
+      screen
+        .getByRole("menuitem", { name: "Put away" })
+        .hasAttribute("data-disabled"),
+    ).toBe(true);
   });
 
   it("rests while a modal covers it", () => {

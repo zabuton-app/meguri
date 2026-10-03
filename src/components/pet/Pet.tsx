@@ -203,12 +203,19 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   const dropOnto = useAddFilesToCollection();
   const drop = useFileDropTarget((files: DraggedFile[]) => {
     touch();
-    const fresh = files.some((f) => !members.has(queueKey(f)));
-    dispatch({
-      type: "react",
-      reactions: fresh ? ["munch", "yum"] : ["headShake"],
-    });
-    dropOnto(WATCH_LATER_ID, t("watchLater.name"))(files);
+    const name = t("watchLater.name");
+    if (files.every((f) => members.has(queueKey(f)))) {
+      // Known to be queued already: nothing to eat.
+      dispatch({ type: "react", reactions: ["headShake"] });
+      dropOnto(WATCH_LATER_ID, name)(files);
+      return;
+    }
+    // It chews while the write is under way, and is only delighted once the
+    // write says something was actually added (the list here can be stale).
+    dispatch({ type: "react", reactions: ["munch"] });
+    dropOnto(WATCH_LATER_ID, name, (changed) =>
+      dispatch({ type: "react", reactions: [changed ? "yum" : "headShake"] }),
+    )(files);
   });
 
   const raw = displayState(model, scanning);
@@ -407,7 +414,7 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   }, []);
 
   // Scans and workspace switches. scan:progress fires many times a second,
-  // so only the running state changing is passed on; thumb:done is ignored.
+  // so only a job starting or ending is passed on; thumb:done is ignored.
   useEffect(() => {
     let cancelled = false;
     const unlistens: Array<() => void> = [];
@@ -416,17 +423,20 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
         if (cancelled) unlisten();
         else unlistens.push(unlisten);
       });
-    let running = false;
+    // Under "All" every workspace is scanned as a job of its own: the pet
+    // works until the last of them is done.
+    const jobs = new Set<string>();
     keep(
-      events.onScanProgress(() => {
-        if (running) return;
-        running = true;
-        dispatch({ type: "working", active: true });
+      events.onScanProgress(({ jobId }) => {
+        if (jobs.has(jobId)) return;
+        jobs.add(jobId);
+        if (jobs.size === 1) dispatch({ type: "working", active: true });
       }),
     );
     keep(
       events.onScanDone((done) => {
-        running = false;
+        jobs.delete(done.jobId);
+        if (jobs.size > 0) return;
         dispatch({ type: "working", active: false });
         // Nothing to cheer about when the scan failed or was called off.
         if (done.error || done.aborted) return;
@@ -466,6 +476,40 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
       { duration: HOP_MS },
     );
   }, [display, seq, reducedMotion, scale]);
+  // The jump outlasts the hop's frames, so it is not tied to the state: it
+  // is called off only when the pet is picked up or motion is turned off,
+  // and it waits while the pet is covered.
+  const jumpInterrupted =
+    display === "held" || display === "fall" || reducedMotion;
+  useEffect(() => {
+    if (jumpInterrupted) hopJump.current?.cancel();
+  }, [jumpInterrupted]);
+  useEffect(() => {
+    const jump = hopJump.current;
+    if (!jump) return;
+    if (!active && jump.playState === "running") jump.pause();
+    else if (active && jump.playState === "paused") jump.play();
+  }, [active]);
+
+  // A focus mark for keyboard users only. Focus also returns here whenever
+  // the menu closes, and after a mouse that would put a mark around the pet
+  // for no reason.
+  const lastInputWasKey = useRef(false);
+  const [keyboardFocus, setKeyboardFocus] = useState(false);
+  useEffect(() => {
+    const onKey = () => {
+      lastInputWasKey.current = true;
+    };
+    const onPointer = () => {
+      lastInputWasKey.current = false;
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("pointerdown", onPointer, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("pointerdown", onPointer, true);
+    };
+  }, []);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0 || folding) return;
@@ -638,9 +682,11 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
             type="button"
             aria-label={t("pet.label")}
             title={t("pet.hint")}
-            // No focus ring: it shows up around the pet whenever its menu
-            // closes (focus returns here), framing a character, not a control.
+            // No ring around the character: keyboard focus is marked by the
+            // line under its feet instead (see keyboardFocus).
             className="block size-full cursor-grab touch-none select-none outline-none active:cursor-grabbing"
+            onFocus={() => setKeyboardFocus(lastInputWasKey.current)}
+            onBlur={() => setKeyboardFocus(false)}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -700,15 +746,27 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
             {t("pet.bring")}
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem onSelect={putAway}>
+          {/* Reactions are ignored in mid-air, folding away included. */}
+          <ContextMenuItem
+            disabled={model.base === "held" || model.base === "fall"}
+            onSelect={putAway}
+          >
             <EyeOff />
             {t("pet.putAway")}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+      {keyboardFocus && (
+        <span
+          aria-hidden
+          data-pet-focus=""
+          className="pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-primary"
+        />
+      )}
       {bubble && (
         <PetBubble
           key={bubble.id}
+          paused={!active}
           line={bubble.line}
           file={bubble.file}
           shift={bubble.shift}

@@ -1,6 +1,6 @@
 // The pet's speech bubble: the file it brought back (thumbnail, a line saying
 // why) or a line saying it found nothing. Only ever shown on request.
-import { useEffect, useEffectEvent } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import type { FileRow } from "@/ipc/types";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
@@ -19,6 +19,8 @@ export interface PetBubbleProps {
   file: FileRow | null;
   /** Sideways offset (px) that keeps the bubble inside the window. */
   shift: number;
+  /** The pet is covered or out of sight: the bubble's time stops running. */
+  paused: boolean;
   onOpen: (file: FileRow) => void;
   onClose: () => void;
 }
@@ -27,15 +29,27 @@ export function PetBubble({
   line,
   file,
   shift,
+  paused,
   onOpen,
   onClose,
 }: PetBubbleProps) {
   const mediaBase = useAppStatus().data?.mediaBase ?? "";
   const close = useEffectEvent(onClose);
+  // Only time spent in view counts: a bubble covered by a modal is still
+  // there, with what was left of its time, once the modal is gone.
+  const remaining = useRef(BUBBLE_MS);
   useEffect(() => {
-    const id = setTimeout(close, BUBBLE_MS);
-    return () => clearTimeout(id);
-  }, []);
+    if (paused) return;
+    const started = Date.now();
+    const id = setTimeout(close, remaining.current);
+    return () => {
+      clearTimeout(id);
+      remaining.current = Math.max(
+        0,
+        remaining.current - (Date.now() - started),
+      );
+    };
+  }, [paused]);
 
   const thumb =
     file && hasThumbFile(file)

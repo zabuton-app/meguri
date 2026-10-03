@@ -54,6 +54,24 @@ describe("bringSomething", () => {
     );
   });
 
+  it("searches the whole Watch Later queue, not only its first items", async () => {
+    // 1,200 queued; only the last one is unplayed and in scope.
+    const queue = Array.from({ length: 1200 }, (_, i) => item("ws", i + 1));
+    const last = makeFileRow({ id: 1200, workspaceId: "ws" });
+    const filesRandom = vi.fn((query: SearchQuery): Promise<FileRow[]> =>
+      Promise.resolve(query.fileIds?.includes(1200) ? [last] : []),
+    );
+    const brought = await bringSomething({
+      filesRandom,
+      watchLater: queue,
+      rng: rolls(0),
+    });
+    expect(brought).toEqual({ category: "watchLater", file: last });
+    for (const [query] of filesRandom.mock.calls) {
+      expect(query.fileIds?.length).toBeLessThanOrEqual(500);
+    }
+  });
+
   it("skips empty categories", async () => {
     const file = makeFileRow({ id: 3 });
     const filesRandom = vi.fn((query: SearchQuery): Promise<FileRow[]> =>
