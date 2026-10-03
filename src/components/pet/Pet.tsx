@@ -455,7 +455,7 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
     const fresh = files.some((f) => !members.has(queueKey(f)));
     dispatch({
       type: "react",
-      reactions: fresh ? ["munch", "cheer"] : ["headShake"],
+      reactions: fresh ? ["munch", "yum"] : ["headShake"],
     });
     dropOnto(WATCH_LATER_ID, t("watchLater.name"))(files);
   });

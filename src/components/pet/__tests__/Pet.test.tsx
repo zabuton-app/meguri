@@ -190,7 +190,9 @@ describe("Pet", () => {
         "add",
       ),
     );
-    await waitFor(() => expect(shown()).toBe("cheer"));
+    // Then it is delighted: happy eyes and hearts.
+    await waitFor(() => expect(shown()).toBe("yum"));
+    await waitFor(() => expect(shown()).toBe("idle"), { timeout: 3000 });
   });
 
   it("shakes its head when everything dropped is already on Watch Later", async () => {

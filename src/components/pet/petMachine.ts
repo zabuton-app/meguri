@@ -9,7 +9,14 @@ import type { PetState } from "./petSprites";
 export type PetBase = "idle" | "walk" | "sleep" | "held" | "fall";
 
 export type PetReaction =
-  "land" | "hop" | "munch" | "headShake" | "cheer" | "lookAround" | "fold";
+  | "land"
+  | "hop"
+  | "munch"
+  | "headShake"
+  | "cheer"
+  | "yum"
+  | "lookAround"
+  | "fold";
 
 export interface PetModel {
   base: PetBase;
