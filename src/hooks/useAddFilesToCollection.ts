@@ -52,12 +52,12 @@ export function useAddFilesToCollection(): (
         description: e instanceof Error ? e.message : String(e),
       }),
   });
+  // Through the promise rather than mutate()'s per-call callbacks: when two
+  // writes overlap, only the latest call's callbacks are kept, and the first
+  // drop would never hear back. The toasts above still run for every write.
   return (collectionId, name, onResult) => (files) =>
-    add.mutate(
-      { collectionId, name, files },
-      onResult && {
-        onSuccess: ({ changed }) => onResult(changed),
-        onError: () => onResult(null),
-      },
+    void add.mutateAsync({ collectionId, name, files }).then(
+      ({ changed }) => onResult?.(changed),
+      () => onResult?.(null),
     );
 }

@@ -213,6 +213,32 @@ describe("Pet", () => {
     await waitFor(() => expect(shown()).toBe("yum"));
   });
 
+  it("stops chewing once every one of two overlapping writes is done", async () => {
+    const finish: Array<(result: { changed: number }) => void> = [];
+    mocks.collectionSetMembership.mockImplementation(
+      () =>
+        new Promise<{ changed: number }>((resolve) => {
+          finish.push(resolve);
+        }),
+    );
+    setup();
+    fireEvent.drop(pet(), {
+      dataTransfer: fileDrag([{ workspaceId: "ws-a", fileId: 1 }]),
+    });
+    fireEvent.drop(pet(), {
+      dataTransfer: fileDrag([{ workspaceId: "ws-a", fileId: 2 }]),
+    });
+    await waitFor(() => expect(finish).toHaveLength(2));
+    // The first write alone does not end the chewing: the second is pending.
+    finish[0]({ changed: 1 });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 700)));
+    expect(shown()).toBe("munch");
+    finish[1]({ changed: 1 });
+    // Both drops heard back, so it is delighted and then done.
+    await waitFor(() => expect(shown()).toBe("yum"));
+    await waitFor(() => expect(shown()).toBe("idle"), { timeout: 5000 });
+  }, 10_000);
+
   it("is not delighted when nothing was added after all", async () => {
     // The list here is stale: the write finds the file already queued.
     mocks.collectionSetMembership.mockResolvedValue({ changed: 0 });
