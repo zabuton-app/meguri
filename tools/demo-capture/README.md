@@ -21,14 +21,25 @@ node tools/demo-capture/fetch-media.mjs
 node tools/demo-capture/record-demo.mjs      # demo.gif — overview tour
 node tools/demo-capture/record-discover.mjs  # discover.gif — Discovery showcase
 node tools/demo-capture/record-playlist.mjs  # playlist.gif — playlist player
-node tools/demo-capture/shoot-gallery.mjs    # theme-*.png / view-*.png
+node tools/demo-capture/record-graph.mjs     # graph.gif, graph-2d.png / graph-3d.png — graph view
+node tools/demo-capture/record-folders.mjs   # folders.gif, view-folders.png — folder view
+node tools/demo-capture/record-bulk-edit.mjs # bulk-edit.gif, bulk-edit.png — multi-select and bulk edit
+node tools/demo-capture/record-pet.mjs       # pet.gif — the pet
+node tools/demo-capture/shoot-gallery.mjs    # theme-*.png / view-list.png
 node tools/demo-capture/shoot-history.mjs    # history.png — play-history view
 node tools/demo-capture/shoot-peek.mjs       # side-peek.png — side peek
 node tools/demo-capture/shoot-audio.mjs      # audio.png — player bar
 node tools/demo-capture/shoot-spectrum.mjs   # spectrum*.png — audio spectrum
 ```
 
-To use your own media instead of the sample library:
+`record-graph.mjs`, `record-folders.mjs`, `record-bulk-edit.mjs` and
+`record-pet.mjs` tag the sample library first (`lib.mjs#seedTags`, by file
+name), so the cards carry tag chips and the graph has hubs to draw. The first
+three also cut their stills from the same run, at the frame worth keeping.
+
+To use your own media instead of the sample library (not for the graph,
+folder and bulk-edit captures, which act on the sample's folders, file names
+and tags):
 
 ```bash
 MEGURI_DEMO_MEDIA=/path/to/media node tools/demo-capture/record-demo.mjs
@@ -72,7 +83,8 @@ tools/demo-capture/hypr-float.sh & node tools/demo-capture/shoot-peek.mjs
 ## Notes
 
 - Captures use a throwaway `--user-data-dir`, so your real app settings are
-  untouched. Language is forced to English and the theme to the default so
+  untouched. The startup update check is switched off there, so no capture
+  depends on the network or picks up its toast. Language is forced to English and the theme to the default so
   output is reproducible across machines.
 - The scripts locate UI elements by English aria-labels and testids
   (`media-card`, `Discovery`, `Reshuffle`, `Play as playlist`, …). If those

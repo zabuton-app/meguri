@@ -82,14 +82,18 @@
   <ul class="toc">
     <li><a href="#getting-started">Getting started</a></li>
     <li><a href="#browsing">Browsing your library</a></li>
+    <li><a href="#folders">Browsing by folder</a></li>
     <li><a href="#playing">Playing videos and viewing photos</a></li>
     <li><a href="#audio">Listening to audio</a></li>
     <li><a href="#search">Search and filters</a></li>
     <li><a href="#tags">Tags, ratings, and favorites</a></li>
+    <li><a href="#bulk-edit">Editing several files at once</a></li>
+    <li><a href="#graph">Graph view</a></li>
     <li><a href="#collections">Collections</a></li>
     <li><a href="#discovery">Discovery</a></li>
     <li><a href="#playlist">Playlist playback</a></li>
     <li><a href="#bookmarks">Scene bookmarks and history</a></li>
+    <li><a href="#pet">The pet</a></li>
     <li><a href="#workspaces">Workspaces</a></li>
     <li><a href="#tray">The tray icon and quitting</a></li>
     <li><a href="#appearance">Themes, language, and zoom</a></li>
@@ -132,14 +136,19 @@
   <h2 id="browsing">Browsing your library</h2>
   <img class="shot" src="./assets/theme-solarized-light.png" alt="Meguri browsing a media library in grid view">
   <p>The main screen shows your library as an endless, scrollable wall of
-  thumbnails. Two layouts are available from the header, so you can switch
-  between visual browsing and a detail-oriented list:</p>
+  thumbnails. Three layouts are available from the header, so you can switch
+  between visual browsing, a detail-oriented list, and a map of how your files
+  relate:</p>
   <ul>
     <li><strong>Grid</strong> — large thumbnails, best for visual scanning.</li>
     <li><strong>List</strong> — one row per file with its folder, tags,
     resolution, duration and size lined up in columns. The thumbnail size is
     set in <strong>Settings → List thumbnail size</strong>.</li>
+    <li><strong>Graph</strong> — files and their tags drawn as a network; see
+    <a href="#graph">Graph view</a>.</li>
   </ul>
+  <p>The grid and the list can also be shown <a href="#folders">by
+  folder</a> instead of as one flat library.</p>
   <p>Scrolling is infinite — items load as you go, even in very large
   libraries. Use <kbd>Ctrl</kbd> + mouse wheel (or <kbd>Ctrl</kbd> +
   <kbd>+</kbd>/<kbd>-</kbd>) to make everything larger or smaller at any
@@ -152,6 +161,27 @@
     it. If you prefer static thumbnails, turn it off in
     <strong>Settings → Hover preview</strong>.
   </div>
+
+  <h2 id="folders">Browsing by folder</h2>
+  <img class="shot" src="./assets/folders.gif" alt="The library shown by folder — opening a folder, going back up, and jumping to another from the breadcrumb menu">
+  <p>The <strong>Show by folder</strong> button in the header, next to the
+  layout switch, turns the grid or the list into your folder tree. Each folder
+  is a card with a preview of what is inside and a count of its items; click
+  one to step into it. It is available while a single workspace is open (not
+  in <strong>All</strong>, a collection, or the graph).</p>
+  <ul>
+    <li>The <strong>breadcrumb</strong> above the list shows where you are.
+    Its arrows go back to the previous folder (<kbd>Alt</kbd>+<kbd>←</kbd> or
+    <kbd>Backspace</kbd>) and up one level
+    (<kbd>Alt</kbd>+<kbd>↑</kbd>), and the menu on the current folder's name
+    jumps straight to one of its subfolders.</li>
+    <li><strong>Open in file manager</strong> and <strong>Copy path</strong>
+    act on the folder you are in.</li>
+    <li>Search and filters apply inside the current folder. Below the top
+    level, the folder shows up as a badge among the search conditions.</li>
+    <li>The play button plays the whole folder, subfolders included — see
+    <a href="#playlist">Playlist playback</a>.</li>
+  </ul>
 
   <h2 id="playing">Playing videos and viewing photos</h2>
   <img class="shot" src="./assets/side-peek.png" alt="The detail view docked beside the library as a side peek, with a video playing">
@@ -169,6 +199,10 @@
     <li><strong>Videos</strong> play immediately with full seeking. Hovering
     the seek bar shows frame previews so you can find a scene before jumping
     to it. Common formats (mp4, webm, mkv, avi, and more) play in-app.</li>
+    <li>A video or track you stopped partway <strong>resumes where you left
+    off</strong>, and its thumbnail carries a progress bar until you finish
+    it. To always start from the beginning, turn off <strong>Settings →
+    Resume where you left off</strong>.</li>
     <li><strong>Photos</strong> are shown full size. A <strong>Copy
     image</strong> button puts the picture on your clipboard, ready to paste
     into a chat or document.</li>
@@ -240,6 +274,54 @@
   workspace, your tags, rating, favorite mark, and history follow it
   automatically after the next scan.</p>
 
+  <h2 id="bulk-edit">Editing several files at once</h2>
+  <img class="shot" src="./assets/bulk-edit.gif" alt="Four files selected, then rated, favorited and tagged from the selection bar">
+  <p>Hover a file in the grid or the list and tick the <strong>checkbox</strong>
+  in its corner to start a selection. A bar appears along the bottom with the
+  number of files selected and everything you can do to them together:</p>
+  <ul>
+    <li><strong>Select all</strong> (<kbd>Ctrl</kbd>+<kbd>A</kbd>) takes
+    everything loaded in the list so far; <strong>Clear</strong> empties the
+    selection. Browsing by folder, a folder card can be ticked too, which
+    selects every file inside it.</li>
+    <li><strong>Edit tags</strong> (<kbd>T</kbd>) opens a dialog that adds
+    tags to every selected file and lists the tags already in the selection.
+    A tag with a dashed outline is on only some of the files: click its name
+    to put it on all of them, or its × to take it off all of them.</li>
+    <li>The <strong>stars</strong>, <strong>Favorite</strong> and
+    <strong>Watch Later</strong> apply to the whole selection in one
+    click.</li>
+  </ul>
+  <p>One edit covers up to 5,000 files. The × at the end of the bar leaves
+  selection mode.</p>
+
+  <h2 id="graph">Graph view</h2>
+  <img class="shot" src="./assets/graph.gif" alt="The graph view — picking a tag from the search to light up its files, then orbiting the same graph in 3D">
+  <p>The third layout in the header draws your library as a
+  <strong>network</strong>: files and tags are dots, and a line joins a file
+  to each of its tags. Files that share tags gather around them,
+  so clusters and odd ones out are easy to spot. It follows the same search
+  and filters as the list, and it needs tags to have anything to connect. Up to 5,000 files are drawn
+  at once; narrow the list down to see the rest.</p>
+  <ul>
+    <li><strong>Hover</strong> a dot to light up what it is linked to, and
+    <strong>drag</strong> it to pull the graph around. Clicking a file opens
+    its detail view; clicking a tag filters the library by that tag.</li>
+    <li>The <strong>search box</strong> above the graph (<kbd>G</kbd>) finds a
+    file or tag by name: <kbd>Enter</kbd> highlights the match and
+    <kbd>Shift</kbd>+<kbd>Enter</kbd> opens it. Click the background to clear
+    the highlight. <kbd>F</kbd> fits the whole graph on screen.</li>
+    <li><strong>2D / 3D</strong> switches between a flat map and one you can
+    orbit by dragging the background.</li>
+    <li><strong>Auto tags</strong> and <strong>Orphans</strong> show or hide
+    automatically generated tags and files with no links.
+    <strong>Re-layout</strong> arranges the graph afresh.</li>
+    <li>The settings button opens a panel for the look and the physics: size
+    the dots by their number of links or by how often a file was played, set
+    when labels fade in, and tune the forces that push and pull the
+    graph.</li>
+  </ul>
+
   <h2 id="collections">Collections</h2>
   <p>Meguri has two ways to group files, for two different jobs:</p>
   <table>
@@ -264,6 +346,11 @@
       show up automatically.</td>
     </tr>
   </table>
+
+  <p>One smart collection can be marked as the <strong>default</strong> with
+  the star beside it in the saved-search menu. It is then the filter Meguri
+  starts with on launch, and the one <strong>Clear all</strong> returns
+  to.</p>
 
   <h2 id="discovery">Discovery</h2>
   <img class="shot" src="./assets/discover.gif" alt="Discovery — immersive random picks with a scene-preview rail and reshuffle">
@@ -329,12 +416,34 @@
     history</strong> wipes the timeline if you want a fresh start.</li>
   </ul>
 
+  <h2 id="pet">The pet</h2>
+  <img class="shot" src="./assets/pet.gif" alt="The pixel-art zabuton pet picked up and dropped, fed a file, and bringing one back">
+  <p>A small pixel-art <em>zabuton</em> (a floor cushion) walks along the
+  bottom of the window. It is there for company, and it doubles as a
+  shortcut:</p>
+  <ul>
+    <li><strong>Drop a file on it</strong> and it eats it — the file is queued
+    in <strong>Watch Later</strong>.</li>
+    <li><strong>Double-click</strong> it to open
+    <a href="#discovery">Discovery</a>.</li>
+    <li><strong>Right-click</strong> it for more: play the current list, play
+    Watch Later, or <strong>Bring me something</strong>, which has it fetch a
+    file worth another look — one you queued, stopped partway through, liked,
+    or have not played yet.</li>
+    <li>You can pick it up and drop it anywhere; it falls back to the
+    floor.</li>
+  </ul>
+  <p><strong>Put away</strong> in its menu hides it. Bring it back, or change
+  its size, under <strong>Settings → General</strong>.</p>
+
   <h2 id="workspaces">Workspaces</h2>
   <p>Each folder you add is a <strong>workspace</strong> with its own
   independent library — its own database, thumbnails, and scan schedule. The
   icon rail on the far left (Slack-style) lets you add, switch between, and
   remove workspaces.</p>
   <ul>
+    <li>Dragging a folder from your file manager onto the window adds it as
+    a workspace too; Meguri asks before it starts scanning.</li>
     <li>Removing a workspace removes it from Meguri only — the folder and
     your media files on disk are untouched.</li>
     <li>The special <strong>All</strong> workspace searches across every

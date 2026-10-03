@@ -5,7 +5,8 @@
 // photo embedded as cover art on most of them. Everything lands in
 // tools/demo-capture/.media (or the directory given as the first CLI
 // argument). `--audio-only` skips the downloads and just (re)writes the
-// audio tracks.
+// audio tracks. lib.mjs#SAMPLE_TAGS tags these files by name: keep it in
+// step when renaming or adding one.
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";

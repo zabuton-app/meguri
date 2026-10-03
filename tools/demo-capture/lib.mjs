@@ -1,5 +1,6 @@
 // Shared helpers for the README demo capture scripts.
 // See tools/demo-capture/README.md for usage.
+/* global document, window -- used inside page.evaluate(), which runs in the app */
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -42,6 +43,13 @@ export async function launchApp({ mediaRoot, width = 1280, height = 800 }) {
   }
 
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-capture-"));
+  // No startup update check: its toast would land in any capture that shows
+  // toasts, and a capture should not depend on the network. The shape is
+  // UpdateConfig in electron/core/appConfig.ts; every other field defaults.
+  fs.writeFileSync(
+    path.join(userDataDir, "config.json"),
+    JSON.stringify({ update: { autoCheck: false } }),
+  );
   const app = await _electron.launch(
     electronLaunchOptions({
       args: [`--user-data-dir=${userDataDir}`, "--force-device-scale-factor=1"],
@@ -82,14 +90,87 @@ export async function waitReady(page) {
   await sleep(1500);
 }
 
+const HIDE_TOASTS_CSS =
+  'section[aria-label^="Notifications"] { display: none !important; }';
+
 /**
  * Hide the toast layer (scan-done / update notifications) so it neither
  * shows up in captures nor intercepts pointer events.
  */
 export async function hideToasts(page) {
-  await page.addStyleTag({
-    content: 'section[aria-label^="Notifications"] { display: none !important; }',
-  });
+  await page.addStyleTag({ content: HIDE_TOASTS_CSS });
+}
+
+/**
+ * Bring the toast layer back, for captures where a toast is part of the story.
+ * waitReady() hides it again, so call this after the last helper that waits
+ * (seedTags, setTheme).
+ */
+export async function showToasts(page) {
+  await page.evaluate((css) => {
+    for (const style of document.querySelectorAll("style")) {
+      if (style.textContent === css) style.remove();
+    }
+  }, HIDE_TOASTS_CSS);
+}
+
+// Manual tags for the sample library, by file name. Several are shared across
+// folders (sea, sunset, …) so the graph view has hubs to draw and the cards
+// have chips to show. Files not listed here (your own media) get none. The
+// names are the ones fetch-media.mjs writes; keep the two in step.
+const SAMPLE_TAGS = {
+  "bbb-10s.mp4": ["animation", "blender", "landscape"],
+  "jellyfish-10s.mp4": ["sea", "wildlife"],
+  "sintel-10s.mp4": ["animation", "blender", "fantasy"],
+  "sintel-trailer.mp4": ["animation", "blender", "fantasy"],
+  "tears-of-steel-60s.mp4": ["blender", "sci-fi"],
+  "photo-1.jpg": ["landscape", "wildlife"],
+  "photo-2.jpg": ["architecture"],
+  "photo-3.jpg": ["landscape"],
+  "photo-4.jpg": ["portrait"],
+  "photo-5.jpg": ["monochrome", "wildlife"],
+  "photo-6.jpg": ["sea", "architecture"],
+  "photo-7.jpg": ["landscape", "sunset"],
+  "photo-8.jpg": ["architecture", "sunset"],
+  "photo-9.jpg": ["still-life"],
+  "photo-10.jpg": ["sea", "landscape"],
+  "photo-11.jpg": ["sea", "architecture", "sunset"],
+  "photo-12.jpg": ["architecture", "monochrome"],
+  "Morning Coast.mp3": ["ambient", "sea"],
+  "Night Drive.mp3": ["ambient", "sci-fi"],
+  "Quiet Garden.mp3": ["ambient", "landscape"],
+  "Field Notes.mp3": ["ambient"],
+  "Open Sky.mp3": ["ambient"],
+};
+
+/**
+ * Tag the sample library through the app's own IPC, then reload so the list
+ * shows the chips. Call after waitReady(); leaves the page ready again. The
+ * reload also applies anything the caller put in localStorage beforehand.
+ */
+export async function seedTags(page) {
+  const tagged = await page.evaluate(async (tagsByName) => {
+    // One page of results, which covers the sample library many times over.
+    const { items } = await window.api.invoke("files_search", { query: {} });
+    let n = 0;
+    for (const { id, workspaceId, relPath } of items) {
+      const names = tagsByName[relPath.split("/").pop()];
+      if (!names) continue;
+      n += 1;
+      for (const name of names) {
+        await window.api.invoke("file_add_tag", { id, workspaceId, name });
+      }
+    }
+    return n;
+  }, SAMPLE_TAGS);
+  if (tagged === 0) {
+    console.warn(
+      "seedTags: no sample file found, so nothing was tagged " +
+        "(run fetch-media.mjs, or check SAMPLE_TAGS against it).",
+    );
+  }
+  await page.reload();
+  await waitReady(page);
 }
 
 /** Switch the base16 theme (persisted the same way the ThemeProvider does). */
