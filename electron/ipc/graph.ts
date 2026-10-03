@@ -74,7 +74,9 @@ export function registerGraphHandlers(ctx: IpcContext): void {
         ? keepRegisteredWorkspaces(() => scopes.workspaceIds())
         : undefined;
     try {
-      await writeLayout(file, { keys, xy }, keep, dims);
+      // Its scope may go while the write waits behind another one.
+      const alive = () => layoutPathFor(scope, scopes, dims) === file;
+      await writeLayout(file, { keys, xy }, keep, dims, alive);
     } catch (e) {
       // A cache that cannot be written only costs a re-layout next time.
       log.warn(`failed to save the graph layout for ${scope}: ${String(e)}`);

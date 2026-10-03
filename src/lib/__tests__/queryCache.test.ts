@@ -12,6 +12,7 @@ import {
   forgetDeletedFile,
   invalidateCollectionSearches,
   GRAPH_SIZED_BY_PLAYS,
+  invalidateInProgressSearches,
   invalidatePlayedSearches,
   invalidateTagSearches,
   syncFileRowAcrossCaches,
@@ -146,6 +147,35 @@ describe("targeted files_search invalidation", () => {
       "played",
       "watchLater",
     ]);
+  });
+
+  it("invalidateInProgressSearches hits the in-progress list and graph only", async () => {
+    const { qc, invalidated } = seed({
+      plain: { ws: "ws", filter: {} },
+      inProgress: { ws: "ws", filter: { inProgress: true } },
+    });
+    const graphs: string[] = [];
+    for (const [name, filter] of [
+      ["graphPlain", {}],
+      ["graphInProgress", { inProgress: true }],
+    ] as const)
+      await qc.fetchQuery({
+        queryKey: ["graph_build", "ws", filter],
+        queryFn: () => name,
+      });
+    qc.getQueryCache().subscribe((e) => {
+      // The list entries hold page data, not a name.
+      const data: unknown = e.query.state.data;
+      if (
+        e.type === "updated" &&
+        e.action.type === "invalidate" &&
+        typeof data === "string"
+      )
+        graphs.push(data);
+    });
+    invalidateInProgressSearches(qc);
+    expect(invalidated()).toEqual(["inProgress"]);
+    expect(graphs).toEqual(["graphInProgress"]);
   });
 
   it("syncFileRowAcrossCaches refreshes a graph filtered or sorted by the changed field", async () => {

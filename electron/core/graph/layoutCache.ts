@@ -119,19 +119,22 @@ export async function readLayout(
  * that must not erase the rest of the scope's layout. `keep` drops stored keys
  * that no longer belong (nodes of a removed workspace), and the update's too:
  * a save racing the removal must not write them back. Past the size cap the
- * keys the update did not touch go first, oldest first.
+ * keys the update did not touch go first, oldest first. `alive` is asked when
+ * the write runs, not when it is queued: false (its scope was removed in
+ * between) drops the write, so it cannot bring the removed directory back.
  */
 export function writeLayout(
   file: string,
   update: LayoutPositions,
   keep: (key: string) => boolean = () => true,
   dims: GraphDims = 2,
+  alive: () => boolean = () => true,
 ): Promise<void> {
   // Each write reads, merges and replaces the file: two in flight for one
   // file would lose one's keys, so writes to a file run one after another.
   const run = (writes.get(file) ?? Promise.resolve())
     .catch(() => undefined)
-    .then(() => mergeAndWrite(file, update, keep, dims));
+    .then(() => mergeAndWrite(file, update, keep, dims, alive));
   writes.set(file, run);
   void run
     .finally(() => {
@@ -148,6 +151,7 @@ async function mergeAndWrite(
   update: LayoutPositions,
   keep: (key: string) => boolean,
   dims: GraphDims,
+  alive: () => boolean,
 ): Promise<void> {
   const merged = new Map<string, number[]>();
   const at = (xy: number[], i: number) => xy.slice(i * dims, (i + 1) * dims);
@@ -174,6 +178,9 @@ async function mergeAndWrite(
     keys: entries.map(([k]) => k),
     xy: entries.flatMap(([, p]) => p),
   };
+  // Checked after the last wait before mkdir, which would recreate a removed
+  // workspace's data directory.
+  if (!alive()) return;
   await fs.mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(out));
@@ -194,6 +201,39 @@ export async function readLayoutSettled(
 export async function removeLayout(file: string): Promise<void> {
   await (writes.get(file) ?? Promise.resolve()).catch(() => undefined);
   await fs.rm(file, { force: true }).catch(() => undefined);
+}
+
+/**
+ * Run `remove`, which deletes a workspace's data directory, so that no save
+ * of the workspace's layouts writes into the directory as it goes or brings
+ * it back after. Saves under way land first; one queued later is dropped by
+ * its `alive` check (see writeLayout); one that passed that check just before
+ * `remove` may have recreated the directory, so its file is swept and the
+ * directory removed again if that left it empty. The sweep is skipped when
+ * `stillGone` says the workspace has been registered again meanwhile.
+ */
+export async function removeWorkspaceWithLayouts(
+  dataDir: string,
+  remove: () => Promise<void>,
+  stillGone: () => boolean,
+): Promise<void> {
+  const files = [
+    path.join(dataDir, fileName(2)),
+    path.join(dataDir, fileName(3)),
+  ];
+  await Promise.all(files.map(removeLayout));
+  await remove();
+  await Promise.all(
+    files.map((f) =>
+      (writes.get(f) ?? Promise.resolve()).catch(() => undefined),
+    ),
+  );
+  if (!stillGone()) return;
+  await Promise.all(
+    files.map((f) => fs.rm(f, { force: true }).catch(() => undefined)),
+  );
+  // Not recursive: anything else in it is not a layout's to delete.
+  await fs.rmdir(dataDir).catch(() => undefined);
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   readLayout,
   readLayoutSettled,
   removeLayout,
+  removeWorkspaceWithLayouts,
   writeLayout,
   type LayoutScopes,
 } from "../graph/layoutCache.js";
@@ -207,5 +208,89 @@ describe("concurrent writes", () => {
     const saving = writeLayout(file, { keys: ["t::a"], xy: [5, 6] });
     expect((await readLayoutSettled(file))?.xy).toEqual([5, 6]);
     await saving;
+  });
+
+  it("drops a save whose scope went while it waited, without recreating its directory", async () => {
+    const dir = path.join(base, "roots", "gone");
+    const file = path.join(dir, "graph-layout.json");
+    let alive = true;
+    const first = writeLayout(file, { keys: ["t::a"], xy: [1, 2] });
+    const queued = writeLayout(
+      file,
+      { keys: ["t::b"], xy: [3, 4] },
+      undefined,
+      2,
+      () => alive,
+    );
+    // The workspace is removed while the second save waits for the first.
+    await first;
+    alive = false;
+    fs.rmSync(dir, { recursive: true, force: true });
+    await queued;
+    expect(fs.existsSync(dir)).toBe(false);
+  });
+});
+
+describe("removeWorkspaceWithLayouts", () => {
+  it("lets a save under way land before the removal, and leaves no directory", async () => {
+    const dir = path.join(base, "roots", "ws");
+    const file = path.join(dir, "graph-layout.json");
+    let landed = false;
+    let landedBeforeRemove = false;
+    const saving = writeLayout(file, { keys: ["t::a"], xy: [1, 2] }).then(
+      () => {
+        landed = true;
+      },
+    );
+    await removeWorkspaceWithLayouts(
+      dir,
+      () => {
+        landedBeforeRemove = landed;
+        fs.rmSync(dir, { recursive: true, force: true });
+        return Promise.resolve();
+      },
+      () => true,
+    );
+    await saving;
+    expect(landedBeforeRemove).toBe(true);
+    expect(fs.existsSync(dir)).toBe(false);
+  });
+
+  it("sweeps a layout written back after the removal, but nothing else", async () => {
+    const dir = path.join(base, "roots", "ws");
+    const file = path.join(dir, "graph-layout.json");
+    await removeWorkspaceWithLayouts(
+      dir,
+      async () => {
+        fs.rmSync(dir, { recursive: true, force: true });
+        // A save that checked its scope just before the removal.
+        await writeLayout(file, { keys: ["t::a"], xy: [1, 2] });
+      },
+      () => true,
+    );
+    expect(fs.existsSync(dir)).toBe(false);
+
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "db.sqlite"), "");
+    await removeWorkspaceWithLayouts(
+      dir,
+      async () => {},
+      () => true,
+    );
+    expect(fs.existsSync(path.join(dir, "db.sqlite"))).toBe(true);
+  });
+
+  it("does not sweep a directory the workspace got back by being added again", async () => {
+    const dir = path.join(base, "roots", "ws");
+    await removeWorkspaceWithLayouts(
+      dir,
+      // Removed, then registered again at once: a new data dir.
+      () => {
+        fs.mkdirSync(dir, { recursive: true });
+        return Promise.resolve();
+      },
+      () => false,
+    );
+    expect(fs.existsSync(dir)).toBe(true);
   });
 });
