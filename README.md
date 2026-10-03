@@ -171,6 +171,11 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 🕸️ **Graph view** — see the library as a network of files and their tags,
   in 2D or 3D, with nodes you can drag, search, and size by how often they
   were played
+- 📁 **Folder view** — browse the grid or the list by folder instead of as
+  one flat library, with a breadcrumb, a subfolder menu, and folder cards
+  that preview what is inside
+- ☑️ **Multi-select & bulk edit** — select files across the list and tag,
+  rate, favorite, or queue them for later in one go
 - 🔭 **Discovery** — an immersive shuffle mode that resurfaces random picks
   from your library full-screen with a scene-preview rail
   ([see above](#-discovery--find-something-new))
@@ -182,6 +187,9 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 📑 **Side peek** — open any file's detail as a resizable sheet docked beside
   the library instead of a modal, keeping the grid, search, and player bar in
   use while you watch, tag, and rate; Meguri remembers which you prefer
+- 🐾 **A pet** — a pixel-art zabuton that wanders along the bottom of the
+  window: drop a file on it to queue it in Watch Later, double-click it for
+  Discovery, or put it away from its menu
 - 🎨 **Themes** — base16-based multi-theme switching (gruvbox / solarized /
   monokai / nord / dracula, etc.)
 - 🔎 **Content zoom** — Ctrl + wheel (and Ctrl +/-/0)
@@ -208,6 +216,23 @@ patterns:
 Grid and list layouts for browsing:
 
 ![List view](./docs/assets/view-list.png)
+
+The same library shown by folder, stepping in and out of folders:
+
+![Folder view demo — the grid shown by folder, opening a folder and jumping to another from the breadcrumb](./docs/assets/folders.gif)
+
+The graph view: files and their tags as a network, in 2D or 3D:
+
+![Graph view demo — picking a tag from the search to light up its files, then orbiting the same graph in 3D](./docs/assets/graph.gif)
+
+Selecting several files and rating, favoriting, and tagging them at once:
+
+![Bulk edit demo — four files selected, then rated, favorited and tagged from the selection bar](./docs/assets/bulk-edit.gif)
+
+The pet being picked up, fed a file for Watch Later, and asked to bring
+something back:
+
+![Pet demo — the pixel-art zabuton dragged and dropped, fed a file, and bringing one back](./docs/assets/pet.gif)
 
 Every corner of the UI follows your base16 theme:
 
