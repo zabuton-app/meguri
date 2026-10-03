@@ -34,6 +34,11 @@ import {
   type ListThumbSize,
 } from "@/settings/PreferencesProvider";
 import {
+  PET_SIZE_OPTIONS,
+  isPetSize,
+  type PetSize,
+} from "@/components/pet/petSize";
+import {
   KEYBINDING_PRESETS,
   type KeybindingPreset,
 } from "@/settings/keybindings";
@@ -66,6 +71,12 @@ const FRAME_QUALITY_LABELS: Record<FrameQuality, TranslationKey> = {
   low: "settings.frameQualityLow",
   standard: "settings.frameQualityStandard",
   high: "settings.frameQualityHigh",
+};
+
+const PET_SIZE_LABELS: Record<PetSize, TranslationKey> = {
+  small: "settings.petSizeSmall",
+  medium: "settings.petSizeMedium",
+  large: "settings.petSizeLarge",
 };
 
 const LIST_THUMB_SIZE_LABELS: Record<ListThumbSize, TranslationKey> = {
@@ -161,6 +172,10 @@ export default function Settings() {
     setResumePlayback,
     emojiStyle,
     setEmojiStyle,
+    petVisible,
+    setPetVisible,
+    petSize,
+    setPetSize,
   } = usePreferences();
   const navigate = useNavigate();
   // Not persisted: opening settings should always land on the first tab rather
@@ -428,6 +443,52 @@ export default function Settings() {
                     );
                   })}
                 </div>
+              </section>
+
+              {/* The zabuton pet: out in the window or put away */}
+              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.pet")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.petHint")}
+                  </span>
+                </div>
+                <Switch
+                  checked={petVisible}
+                  onCheckedChange={setPetVisible}
+                  aria-label={t("settings.pet")}
+                />
+              </section>
+
+              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.petSize")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.petSizeHint")}
+                  </span>
+                </div>
+                <Select
+                  value={petSize}
+                  onValueChange={(v) => {
+                    if (isPetSize(v)) setPetSize(v);
+                  }}
+                  disabled={!petVisible}
+                >
+                  <SelectTrigger className="min-w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PET_SIZE_OPTIONS.map((size) => (
+                      <SelectItem key={size} value={size}>
+                        {t(PET_SIZE_LABELS[size])}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </section>
             </>
           )}

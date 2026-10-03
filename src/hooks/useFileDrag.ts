@@ -12,6 +12,8 @@ import { useReadSelection } from "@/components/SelectionContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
 import { dragPayload, encodeFileDrag, FILE_DRAG_MIME } from "@/lib/fileDrag";
+import { setFileDragImage } from "@/lib/fileDragImage";
+import { fileNameOf } from "@/lib/relPath";
 import { MAX_BULK_FILES } from "@shared/tags";
 
 type DragProps = Pick<HTMLAttributes<HTMLElement>, "draggable" | "onDragStart">;
@@ -49,7 +51,16 @@ export function useFileDrag(
       dt.clearData();
       dt.setData(FILE_DRAG_MIME, encodeFileDrag(files));
       dt.effectAllowed = "copy";
-      if (files.length > 1) {
+      // The file's own thumbnail on a small card (a stack with a count for a
+      // selection) rather than Chromium's default for a dragged link, which
+      // is a chip with the title and URL.
+      const drawn = setFileDragImage(dt, {
+        thumb: e.currentTarget.querySelector("img"),
+        name: fileNameOf(file.relPath),
+        placeholder: (file.ext ?? file.kind).toUpperCase(),
+        count: files.length,
+      });
+      if (!drawn && files.length > 1) {
         setCountDragImage(dt, t("drag.fileCount", { count: files.length }));
       }
     },
@@ -60,8 +71,9 @@ export function useFileDrag(
 }
 
 /**
- * A small "N files" badge as the drag image, so dragging a selection shows how
- * much is being carried instead of a picture of the one card under the pointer.
+ * A small "N files" badge as the drag image: the fallback for a selection
+ * where the card cannot be drawn (no canvas), so the drag still shows how
+ * much is being carried.
  * setDragImage needs the element in the document at the moment it is called;
  * it is snapshotted then and can be removed right after.
  */

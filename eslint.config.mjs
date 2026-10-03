@@ -137,6 +137,14 @@ export default tseslint.config(
     },
   },
 
+  // The pet preview page is plain JS served to the browser by Vite
+  {
+    files: ["tools/pet-preview/**/*.mjs"],
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
+
   // Disable formatting rules that conflict with Prettier (must come last)
   prettier,
 );

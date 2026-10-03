@@ -16,10 +16,15 @@ interface Drop {
   files: DraggedFile[];
 }
 
-/** Returns a factory for one collection's drop handler. */
+/**
+ * Returns a factory for one collection's drop handler. `onResult` hears how
+ * the write went, for a caller that reacts to it beyond the toast: how many
+ * files were actually added, or null when the write failed.
+ */
 export function useAddFilesToCollection(): (
   collectionId: string,
   name: string,
+  onResult?: (changed: number | null) => void,
 ) => (files: DraggedFile[]) => void {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -47,6 +52,12 @@ export function useAddFilesToCollection(): (
         description: e instanceof Error ? e.message : String(e),
       }),
   });
-  return (collectionId, name) => (files) =>
-    add.mutate({ collectionId, name, files });
+  // Through the promise rather than mutate()'s per-call callbacks: when two
+  // writes overlap, only the latest call's callbacks are kept, and the first
+  // drop would never hear back. The toasts above still run for every write.
+  return (collectionId, name, onResult) => (files) =>
+    void add.mutateAsync({ collectionId, name, files }).then(
+      ({ changed }) => onResult?.(changed),
+      () => onResult?.(null),
+    );
 }

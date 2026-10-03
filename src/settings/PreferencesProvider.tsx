@@ -18,6 +18,11 @@ import {
   isSpectrumPattern,
   type SpectrumPattern,
 } from "@/audio/spectrumPatterns";
+import {
+  DEFAULT_PET_SIZE,
+  isPetSize,
+  type PetSize,
+} from "@/components/pet/petSize";
 
 const LS_KEY = "meguri.prefs";
 
@@ -112,6 +117,10 @@ interface Prefs {
    * the "In progress" filter keep working.
    */
   resumePlayback: boolean;
+  /** Whether the zabuton pet is out in the window ("Put away" turns it off). */
+  petVisible: boolean;
+  /** How large the pet is drawn (see src/components/pet/petSize.ts). */
+  petSize: PetSize;
 }
 
 const DEFAULTS: Prefs = {
@@ -131,6 +140,8 @@ const DEFAULTS: Prefs = {
   audioSpectrumPattern: DEFAULT_SPECTRUM_PATTERN,
   listThumbSize: DEFAULT_LIST_THUMB_SIZE,
   resumePlayback: true,
+  petVisible: true,
+  petSize: DEFAULT_PET_SIZE,
 };
 
 function clampSceneCount(n: number): number {
@@ -212,6 +223,11 @@ function loadPrefs(): Prefs {
           typeof parsed.resumePlayback === "boolean"
             ? parsed.resumePlayback
             : DEFAULTS.resumePlayback,
+        petVisible:
+          typeof parsed.petVisible === "boolean"
+            ? parsed.petVisible
+            : DEFAULTS.petVisible,
+        petSize: isPetSize(parsed.petSize) ? parsed.petSize : DEFAULT_PET_SIZE,
       };
     }
   } catch {
@@ -237,6 +253,8 @@ interface PrefsCtx extends Prefs {
   setAudioSpectrumPattern: (p: SpectrumPattern) => void;
   setListThumbSize: (s: ListThumbSize) => void;
   setResumePlayback: (enabled: boolean) => void;
+  setPetVisible: (visible: boolean) => void;
+  setPetSize: (size: PetSize) => void;
 }
 
 const Ctx = createContext<PrefsCtx | null>(null);
@@ -296,6 +314,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPrefs((p) => ({ ...p, listThumbSize: size })),
       setResumePlayback: (enabled) =>
         setPrefs((p) => ({ ...p, resumePlayback: enabled })),
+      setPetVisible: (visible) =>
+        setPrefs((p) => ({ ...p, petVisible: visible })),
+      setPetSize: (size) => setPrefs((p) => ({ ...p, petSize: size })),
     }),
     [prefs],
   );

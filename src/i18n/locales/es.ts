@@ -726,4 +726,31 @@ export const es: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternOrbs": "Orbes",
   "settings.audioSpectrumPatternBarcode": "Código de barras",
   "settings.secondsValue": "{n} s",
+
+  // pet
+  "pet.label": "Mascota zabuton",
+  "pet.hint": "Doble clic para Descubrimiento, clic derecho para más",
+  "pet.playList": "Reproducir esta lista",
+  "pet.resume": "Reanudar la reproducción",
+  "pet.playWatchLater": "Reproducir Ver más tarde",
+  "pet.bring": "Tráeme algo",
+  "pet.putAway": "Guardar",
+  "pet.bringWatchLater": "Aún no has visto el que me comí",
+  "pet.bringInProgress": "Este lo dejaste a medias",
+  "pet.bringLiked": "Este te gustó",
+  "pet.bringUnplayed": "Quizá no hayas visto este",
+  "pet.bringNothing": "Ahora no hay nada que traer",
+  "pet.bringFailed": "No se pudo traer ningún archivo",
+  "pet.playWatchLaterFailed": "No se pudo reproducir Ver más tarde",
+  "pet.putAwayToast":
+    "La mascota se ha guardado. Puedes volver a sacarla en Ajustes, en General.",
+  "settings.pet": "Mascota",
+  "settings.petHint":
+    "Muestra la mascota zabuton que camina por la parte inferior de la ventana",
+  "settings.petSize": "Tamaño de la mascota",
+  "settings.petSizeHint":
+    "Tamaño con el que se dibuja cada píxel de la mascota",
+  "settings.petSizeSmall": "Pequeño (×2)",
+  "settings.petSizeMedium": "Mediano (×3)",
+  "settings.petSizeLarge": "Grande (×4)",
 };

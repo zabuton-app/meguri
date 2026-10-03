@@ -4,6 +4,7 @@ import { Route, Routes } from "react-router";
 import "@/test/mockVirtualizer";
 import Home from "@/routes/Home";
 import MediaDetail from "@/routes/MediaDetail";
+import { parkPass, peekPass } from "@/routes/Player/detour";
 import {
   defaultAppStatus,
   defaultWorkspacesList,
@@ -272,6 +273,22 @@ describe("Home + MediaDetail integration", () => {
       // The chip re-renders once the refetch settles; clicking it again is a no-op.
       fireEvent.click(await screen.findByText("beach"));
       await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
+    });
+
+    it("drops a parked playlist pass once the list becomes another one", async () => {
+      renderWithProviders(<AppRoutes />);
+      const tag = await screen.findByText("beach");
+      // Parked on this list: it survives the list merely re-rendering.
+      parkPass({
+        queue: {} as Parameters<typeof parkPass>[0]["queue"],
+        key: `${sampleFileRow.workspaceId}:${sampleFileRow.id}`,
+        sec: 0,
+      });
+      expect(peekPass()).not.toBeNull();
+
+      fireEvent.click(tag);
+      await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
+      expect(peekPass()).toBeNull();
     });
 
     it("points at the existing chip when the tag is already a condition", async () => {

@@ -36,7 +36,8 @@
     "postinstall": "electron-builder install-app-deps",
     "dist": "electron-vite build && electron-builder",
     "install:local": "node scripts/install-local.mjs",
-    "build:wasm": "node scripts/build-wasm.mjs"
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "pet:preview": "vite tools/pet-preview"
   },
   "engines": {
     "node": ">=22.22"
