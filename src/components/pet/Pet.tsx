@@ -183,9 +183,44 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   const [parkedKey, setParkedKey] = useState<string | null>(null);
   const [bubble, setBubble] = useState<Bubble | null>(null);
 
-  // With reduced motion the pet does not walk: a walk under way reads as idle.
+  const lastTouch = useRef(0);
+  const touch = () => {
+    lastTouch.current = Date.now();
+  };
+
+  const workspaces = useQuery({
+    queryKey: ["workspaces_list"],
+    queryFn: api.workspacesList,
+  });
+  const watchLater = workspaces.data?.collections.find(
+    (c) => c.id === WATCH_LATER_ID,
+  );
+  const queued = useMemo(() => watchLater?.items ?? [], [watchLater?.items]);
+  const members = useMemo(() => new Set(queued.map(queueKey)), [queued]);
+
+  // Eating: files dropped on the pet go to Watch Later, the same write as
+  // dropping them on the rail entry.
+  const dropOnto = useAddFilesToCollection();
+  const drop = useFileDropTarget((files: DraggedFile[]) => {
+    touch();
+    const fresh = files.some((f) => !members.has(queueKey(f)));
+    dispatch({
+      type: "react",
+      reactions: fresh ? ["munch", "yum"] : ["headShake"],
+    });
+    dropOnto(WATCH_LATER_ID, t("watchLater.name"))(files);
+  });
+
   const raw = displayState(model, scanning);
-  const display = reducedMotion && raw === "walk" ? "idle" : raw;
+  const display =
+    // The dragged file is right over the pet: it begs for it.
+    raw === "mouthOpen" && drop.over
+      ? "beg"
+      : // With reduced motion the pet does not walk: a walk under way reads
+        // as idle.
+        reducedMotion && raw === "walk"
+        ? "idle"
+        : raw;
   const folding = display === "fold";
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -195,7 +230,6 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   const ratio = useRef(DEFAULT_RATIO);
   // Held or falling: the floor moving under it must not snap it back down.
   const airborne = useRef(false);
-  const lastTouch = useRef(0);
   const press = useRef<{
     startX: number;
     startY: number;
@@ -206,10 +240,6 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   const suppressClick = useRef(false);
   const hopJump = useRef<Animation | null>(null);
   const bubbleId = useRef(0);
-
-  const touch = () => {
-    lastTouch.current = Date.now();
-  };
 
   const place = useCallback(() => {
     const el = rootRef.current;
@@ -436,29 +466,6 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
       { duration: HOP_MS },
     );
   }, [display, seq, reducedMotion, scale]);
-
-  const workspaces = useQuery({
-    queryKey: ["workspaces_list"],
-    queryFn: api.workspacesList,
-  });
-  const watchLater = workspaces.data?.collections.find(
-    (c) => c.id === WATCH_LATER_ID,
-  );
-  const queued = useMemo(() => watchLater?.items ?? [], [watchLater?.items]);
-  const members = useMemo(() => new Set(queued.map(queueKey)), [queued]);
-
-  // Eating: files dropped on the pet go to Watch Later, the same write as
-  // dropping them on the rail entry.
-  const dropOnto = useAddFilesToCollection();
-  const drop = useFileDropTarget((files: DraggedFile[]) => {
-    touch();
-    const fresh = files.some((f) => !members.has(queueKey(f)));
-    dispatch({
-      type: "react",
-      reactions: fresh ? ["munch", "yum"] : ["headShake"],
-    });
-    dropOnto(WATCH_LATER_ID, t("watchLater.name"))(files);
-  });
 
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0 || folding) return;

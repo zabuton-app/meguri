@@ -195,6 +195,18 @@ describe("Pet", () => {
     await waitFor(() => expect(shown()).toBe("idle"), { timeout: 3000 });
   });
 
+  it("begs while the dragged files are held right over it", () => {
+    setup();
+    const files = [{ workspaceId: "ws-a", fileId: 1 }];
+    fireEvent.dragEnter(document.body, { dataTransfer: fileDrag(files) });
+    expect(shown()).toBe("mouthOpen");
+    fireEvent.dragEnter(pet(), { dataTransfer: fileDrag(files) });
+    expect(shown()).toBe("beg");
+    // Carried away again without a drop: back to waiting with its mouth open.
+    fireEvent.dragLeave(pet(), { dataTransfer: fileDrag(files) });
+    expect(shown()).toBe("mouthOpen");
+  });
+
   it("shakes its head when everything dropped is already on Watch Later", async () => {
     const files = [{ workspaceId: "ws-a", fileId: 1 }];
     mocks.workspacesList.mockResolvedValue(watchLater(files));
