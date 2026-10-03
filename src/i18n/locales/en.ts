@@ -707,4 +707,30 @@ export const en: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternOrbs": "Orbs",
   "settings.audioSpectrumPatternBarcode": "Barcode",
   "settings.secondsValue": "{n}s",
+
+  // pet
+  "pet.label": "Zabuton pet",
+  "pet.hint": "Double-click for Discovery, right-click for more",
+  "pet.playList": "Play this list",
+  "pet.resume": "Resume playback",
+  "pet.playWatchLater": "Play Watch Later",
+  "pet.bring": "Bring me something",
+  "pet.putAway": "Put away",
+  "pet.bringWatchLater": "You haven't watched the one I ate yet",
+  "pet.bringInProgress": "You were partway through this",
+  "pet.bringLiked": "You liked this one",
+  "pet.bringUnplayed": "Maybe you haven't seen this",
+  "pet.bringNothing": "Nothing to bring right now",
+  "pet.bringFailed": "Could not bring a file",
+  "pet.playWatchLaterFailed": "Could not play Watch Later",
+  "pet.putAwayToast":
+    "The pet was put away. Bring it back under General in Settings.",
+  "settings.pet": "Pet",
+  "settings.petHint":
+    "Show the zabuton mascot that walks along the bottom of the window",
+  "settings.petSize": "Pet size",
+  "settings.petSizeHint": "How large each pixel of the pet is drawn",
+  "settings.petSizeSmall": "Small (×2)",
+  "settings.petSizeMedium": "Medium (×3)",
+  "settings.petSizeLarge": "Large (×4)",
 };

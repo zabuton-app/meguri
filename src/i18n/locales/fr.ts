@@ -728,4 +728,31 @@ export const fr: Record<TranslationKey, string> = {
   "settings.audioSpectrumPatternOrbs": "Orbes",
   "settings.audioSpectrumPatternBarcode": "Code-barres",
   "settings.secondsValue": "{n} s",
+
+  // pet
+  "pet.label": "Mascotte zabuton",
+  "pet.hint": "Double-clic pour Découverte, clic droit pour plus",
+  "pet.playList": "Lire cette liste",
+  "pet.resume": "Reprendre la lecture",
+  "pet.playWatchLater": "Lire « À regarder plus tard »",
+  "pet.bring": "Apporte-moi quelque chose",
+  "pet.putAway": "Ranger",
+  "pet.bringWatchLater": "Tu n'as pas encore regardé celui que j'ai mangé",
+  "pet.bringInProgress": "Tu t'étais arrêté en cours de route",
+  "pet.bringLiked": "Tu avais aimé celui-ci",
+  "pet.bringUnplayed": "Tu n'as peut-être pas vu celui-ci",
+  "pet.bringNothing": "Rien à apporter pour l'instant",
+  "pet.bringFailed": "Impossible d'apporter un fichier",
+  "pet.playWatchLaterFailed": "Impossible de lire « À regarder plus tard »",
+  "pet.putAwayToast":
+    "La mascotte a été rangée. Vous pouvez la ressortir dans les Paramètres, sous Général.",
+  "settings.pet": "Mascotte",
+  "settings.petHint":
+    "Afficher la mascotte zabuton qui se promène en bas de la fenêtre",
+  "settings.petSize": "Taille de la mascotte",
+  "settings.petSizeHint":
+    "Taille à laquelle chaque pixel de la mascotte est dessiné",
+  "settings.petSizeSmall": "Petite (×2)",
+  "settings.petSizeMedium": "Moyenne (×3)",
+  "settings.petSizeLarge": "Grande (×4)",
 };

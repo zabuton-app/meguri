@@ -43,6 +43,8 @@ import { cn } from "@/lib/utils";
 import { FilterBar } from "@/components/FilterBar";
 import { ScanProgress } from "@/components/ScanProgress";
 import { CommandMenu } from "@/components/CommandMenu";
+import { Pet } from "@/components/pet/Pet";
+import { dropPass } from "@/routes/Player/detour";
 import { useConfirm } from "@/components/ConfirmDialog";
 import {
   highlightSearchToken,
@@ -75,6 +77,7 @@ import {
   addSearchTokens,
   discoverPath,
   BY_FOLDER_KEY,
+  LIST_MAIN_ID,
   isFolderView,
   parseViewMode,
   scrollListByPage,
@@ -753,6 +756,13 @@ export default function Home() {
     t,
   ]);
 
+  // Names the list on screen: the workspace, how it is browsed and the filter.
+  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : folderView ? `folder:${folderNav.path}` : "flat"}|${JSON.stringify(filter)}`;
+  // A pass the playlist parked belongs to the list it was playing. Once the
+  // list becomes another one it is dropped, so nothing (the pet's "Resume
+  // playback") can pick it back up and graft the new list onto the old queue.
+  useEffect(() => dropPass, [listScope]);
+
   return (
     <div className="flex h-full flex-col">
       <HomeHeader
@@ -854,7 +864,7 @@ export default function Home() {
           quietly included them would act on files the user cannot see. */}
       <SelectionProvider
         items={items}
-        scope={`${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : folderView ? `folder:${folderNav.path}` : "flat"}|${JSON.stringify(filter)}`}
+        scope={listScope}
         // Only the folders on screen: once the window has moved past the top
         // neither view draws them, and "select all" must not pick them.
         folders={listOffset === 0 ? folderEntries : undefined}
@@ -864,7 +874,7 @@ export default function Home() {
           {/* min-w-60 = the 240px the side peek leaves the list (LIST_MIN_WIDTH
           in usePeekResize); the two must agree. */}
           <main
-            id="list-main"
+            id={LIST_MAIN_ID}
             className="min-h-0 min-w-60 flex-1"
             onMouseUp={onListMouseUp}
           >
@@ -1040,6 +1050,15 @@ export default function Home() {
           <Sparkles className="size-6" />
         </Link>
       </div>
+
+      {/* The zabuton pet. It sits below the routed modals in the stacking
+          order, so their backdrop covers it — and it rests while one does.
+          Docked as a side peek the detail leaves the list in use, pet included. */}
+      <Pet
+        active={listShortcutsActive}
+        hasPool={hasPool}
+        onDiscover={openDiscover}
+      />
 
       {helpOpen && <ShortcutsOverlay onClose={() => setHelpOpen(false)} />}
 

@@ -72,6 +72,35 @@ The display is off under the "Audio spectrum" preference and under the OS
 reduce-motion setting; where Web Audio is unavailable it draws nothing and
 playback is unaffected.
 
+## Pet
+
+The pet (`src/components/pet/`) is a pixel-art zabuton that lives in the
+window. `Pet.tsx` is mounted in Home, below the routed modals in the stacking
+order, so a modal's backdrop covers it; it rests (no timers, no frame loop,
+`inert`) until the list is back in the foreground.
+
+- **Art**: `petSprites.ts` holds every frame as a text grid, one character per
+  pixel naming a color role. `petRender.ts` turns a grid into rects and maps
+  roles to colors; only the outline follows the theme's appearance.
+  `npm run pet:preview` serves `tools/pet-preview`, which draws every state
+  through the same conversion.
+- **Behaviour**: `petMachine.ts` is a pure reducer. Held or falling comes
+  first, then a queue of one-shot reactions, then the app-driven poses (a file
+  drag in progress, a scan running), then idle / walk / sleep.
+- **Movement**: `petMotion.ts` is pure too. The floor is the bottom edge of
+  Home's `<main>` (`LIST_MAIN_ID`), so it sits above the status bar, rises with the audio player
+  bar and gives way to the docked side peek. The position is saved as a ratio
+  of the floor's span (`meguri.pet.x`).
+- **Actions**: the context menu opens Discover through Home's handler and the
+  player through the playlist's URL helpers; "Play Watch Later" shows the
+  collection first, the way the rail does. Files dropped on the pet go through `useAddFilesToCollection`, the
+  same write as the rail's Watch Later entry. "Bring me something"
+  (`petBring.ts`) draws a category, then a file through `files_random`.
+
+Whether the pet is out and its size are preferences (`petVisible`,
+`petSize`). With reduced motion preferred it neither walks nor bounces and
+shows one frame per state.
+
 ## Data fetching
 
 Data fetching uses `@tanstack/react-query`. The file list is an

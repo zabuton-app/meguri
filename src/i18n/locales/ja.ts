@@ -710,6 +710,30 @@ export const ja = {
   "settings.audioSpectrumPatternOrbs": "オーブ（蛍）",
   "settings.audioSpectrumPatternBarcode": "バーコード",
   "settings.secondsValue": "{n} 秒",
+
+  // pet
+  "pet.label": "座布団のペット",
+  "pet.hint": "ダブルクリックでディスカバリー、右クリックでメニュー",
+  "pet.playList": "このリストを再生",
+  "pet.resume": "再生を再開",
+  "pet.playWatchLater": "「あとで見る」を再生",
+  "pet.bring": "何か持ってきて",
+  "pet.putAway": "しまう",
+  "pet.bringWatchLater": "さっき食べたやつ、まだ見てないよ",
+  "pet.bringInProgress": "これ、途中だったよ",
+  "pet.bringLiked": "これ、好きだったよね",
+  "pet.bringUnplayed": "これ、まだ見てないかも",
+  "pet.bringNothing": "いまは持ってこられるものがないよ",
+  "pet.bringFailed": "ファイルを持ってこられませんでした",
+  "pet.playWatchLaterFailed": "「あとで見る」を再生できませんでした",
+  "pet.putAwayToast": "ペットをしまいました。設定の「一般」からまた出せます",
+  "settings.pet": "ペット",
+  "settings.petHint": "ウィンドウの下を歩く座布団のマスコットを表示します",
+  "settings.petSize": "ペットの大きさ",
+  "settings.petSizeHint": "ドット絵1ピクセルあたりの表示倍率です",
+  "settings.petSizeSmall": "小（×2）",
+  "settings.petSizeMedium": "中（×3）",
+  "settings.petSizeLarge": "大（×4）",
 } as const;
 
 export type TranslationKey = keyof typeof ja;

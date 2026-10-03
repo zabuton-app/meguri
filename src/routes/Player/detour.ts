@@ -35,6 +35,15 @@ export function claimPass(token: string | null): DetourPass | null {
   return token && parked?.key === token ? parked : null;
 }
 
+/**
+ * The parked pass, whichever item it was parked on. For offering to pick the
+ * playlist back up from outside the detail view; going through with it still
+ * names the item in the URL, so the claim above stays the only way in.
+ */
+export function peekPass(): DetourPass | null {
+  return parked;
+}
+
 /** Forget the parked pass (called once the player has mounted). */
 export function dropPass(): void {
   parked = null;
