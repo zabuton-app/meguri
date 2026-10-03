@@ -646,7 +646,12 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
             onKeyDown={onKeyDown}
             {...drop.handlers}
           >
-            <span ref={spriteRef} className="block">
+            {/* The sprite takes no pointer events, so the button is always
+                the event target. The sprite is remounted whenever the state
+                changes; as a target it could be gone by the time React sees
+                the event — a drop ends the file drag, which swaps the sprite
+                before the drop itself reaches the handler here. */}
+            <span ref={spriteRef} className="pointer-events-none block">
               <PetSprite
                 key={`${display}:${seq}`}
                 state={display}

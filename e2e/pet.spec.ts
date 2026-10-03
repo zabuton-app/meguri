@@ -1,5 +1,10 @@
 import { test, expect } from "./fixtures/app";
-import { closeTopDialog, openSettings, statusBar } from "./fixtures/helpers";
+import {
+  closeTopDialog,
+  fileCard,
+  openSettings,
+  statusBar,
+} from "./fixtures/helpers";
 
 test.describe("Pet", () => {
   test("stands on the floor above the status bar", async ({ ready }) => {
@@ -28,6 +33,18 @@ test.describe("Pet", () => {
       .poll(async () => Math.round((await pet.boundingBox())!.y))
       .toBe(Math.round(start.y));
     expect((await pet.boundingBox())!.x).toBeGreaterThan(start.x + 100);
+  });
+
+  test("eats a file card dropped on it", async ({ ready }) => {
+    const pet = ready.getByRole("button", { name: "Zabuton pet" });
+    await fileCard(ready).dragTo(pet);
+    await expect(
+      ready.getByText('Added 1 file to "Watch Later"'),
+    ).toBeVisible();
+
+    // The same file again: already queued.
+    await fileCard(ready).dragTo(pet);
+    await expect(ready.getByText('Already in "Watch Later"')).toBeVisible();
   });
 
   test("is put away from its menu and brought back in Settings", async ({
