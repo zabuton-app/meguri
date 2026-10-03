@@ -194,6 +194,8 @@ export const es: Record<TranslationKey, string> = {
   "smartCollection.saveCurrent": "Guardar filtros actuales",
   "smartCollection.empty": "Aún no hay búsquedas guardadas.",
   "smartCollection.delete": "Eliminar colección",
+  "smartCollection.setDefault": "Establecer como predeterminada",
+  "smartCollection.unsetDefault": "Quitar predeterminada",
   "smartCollection.saveTitle": "Guardar filtros de búsqueda",
   "smartCollection.namePlaceholder": "Nombre de la colección",
   "smartCollection.save": "Guardar",

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, BookmarkPlus, Trash2 } from "lucide-react";
+import { Bookmark, BookmarkPlus, Star, Trash2 } from "lucide-react";
 import type { SearchQuery } from "@/ipc/types";
-import { useSmartCollections } from "@/hooks/useSmartCollections";
+import type { SmartCollectionsState } from "@/hooks/useSmartCollections";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,12 +31,27 @@ interface Props {
   /** The real workspace shown, saved with a folder condition (see makeSmartCollection). */
   workspaceId?: string | null;
   onApply: (collection: SmartCollection) => void;
+  /**
+   * The saved searches, owned by the filter bar: "Clear all" there returns to
+   * the default picked here, so both have to read the same state.
+   */
+  smart: SmartCollectionsState;
 }
 
-export function SmartCollectionsMenu({ value, workspaceId, onApply }: Props) {
+export function SmartCollectionsMenu({
+  value,
+  workspaceId,
+  onApply,
+  smart,
+}: Props) {
   const { t } = useI18n();
-  const { collections, addCollection, removeCollection } =
-    useSmartCollections();
+  const {
+    collections,
+    defaultId,
+    addCollection,
+    removeCollection,
+    setDefaultId,
+  } = smart;
   const [menuOpen, setMenuOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [name, setName] = useState("");
@@ -97,36 +112,65 @@ export function SmartCollectionsMenu({ value, workspaceId, onApply }: Props) {
               {t("smartCollection.empty")}
             </div>
           ) : (
-            collections.map((collection) => (
-              <DropdownMenuItem
-                key={collection.id}
-                onSelect={() => onApply(collection)}
-                className="items-start gap-2 pr-1"
-              >
-                <Bookmark className="mt-0.5" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">
-                    {collection.name}
-                  </span>
-                  <span className="block truncate text-xs text-muted">
-                    {describeSearchQuery(t, collection.query)}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  title={t("smartCollection.delete")}
-                  aria-label={t("smartCollection.delete")}
-                  className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-destructive hover:text-destructive-foreground"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    removeCollection(collection.id);
-                  }}
+            collections.map((collection) => {
+              const isDefault = collection.id === defaultId;
+              const defaultLabel = isDefault
+                ? t("smartCollection.unsetDefault")
+                : t("smartCollection.setDefault");
+              return (
+                <DropdownMenuItem
+                  key={collection.id}
+                  onSelect={() => onApply(collection)}
+                  className="items-start gap-2 pr-1"
                 >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </DropdownMenuItem>
-            ))
+                  <Bookmark className="mt-0.5" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm">
+                      {collection.name}
+                    </span>
+                    <span className="block truncate text-xs text-muted">
+                      {describeSearchQuery(t, collection.query)}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    data-slot="smart-collection-default"
+                    aria-pressed={isDefault}
+                    title={defaultLabel}
+                    aria-label={defaultLabel}
+                    className={
+                      "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-surface " +
+                      (isDefault ? "text-primary" : "text-muted hover:text-fg")
+                    }
+                    onClick={(event) => {
+                      // Toggling the default is not opening the search.
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setDefaultId(isDefault ? null : collection.id);
+                    }}
+                  >
+                    <Star
+                      className={
+                        "size-3.5" + (isDefault ? " fill-current" : "")
+                      }
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    title={t("smartCollection.delete")}
+                    aria-label={t("smartCollection.delete")}
+                    className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      removeCollection(collection.id);
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </DropdownMenuItem>
+              );
+            })
           )}
         </DropdownMenuContent>
       </DropdownMenu>

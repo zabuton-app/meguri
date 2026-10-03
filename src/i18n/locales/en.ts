@@ -190,6 +190,8 @@ export const en: Record<TranslationKey, string> = {
   "smartCollection.saveCurrent": "Save current filters",
   "smartCollection.empty": "No saved searches yet.",
   "smartCollection.delete": "Delete collection",
+  "smartCollection.setDefault": "Set as default",
+  "smartCollection.unsetDefault": "Remove default",
   "smartCollection.saveTitle": "Save search filters",
   "smartCollection.namePlaceholder": "Collection name",
   "smartCollection.save": "Save",

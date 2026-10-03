@@ -324,3 +324,62 @@ describe("the chip row", () => {
     expect(badge()).toBeNull();
   });
 });
+
+describe("the default saved search", () => {
+  const store = (defaultId?: string) => {
+    localStorage.setItem(
+      "meguri.smartCollections.v1",
+      JSON.stringify([
+        {
+          id: "sc-1",
+          name: "Rated videos",
+          query: { kind: "video", sort: "rating" },
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ]),
+    );
+    if (defaultId)
+      localStorage.setItem("meguri.smartCollections.default", defaultId);
+  };
+  const openMenu = () =>
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Smart collections" }),
+      { button: 0, ctrlKey: false, pointerType: "mouse" },
+    );
+
+  it("is picked from the menu without opening the search", async () => {
+    store();
+    const { seen } = setup({});
+    openMenu();
+    const star = await screen.findByRole("button", { name: "Set as default" });
+    fireEvent.click(star);
+
+    expect(localStorage.getItem("meguri.smartCollections.default")).toBe(
+      "sc-1",
+    );
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it("is where Clear all returns", () => {
+    store("sc-1");
+    const { latest } = setup({ q: "cat" });
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(latest()).toEqual({ kind: "video", sort: "rating" });
+  });
+
+  it("empties the filter on Clear all once it is shown", () => {
+    store("sc-1");
+    const { latest } = setup({ kind: "video", sort: "rating" });
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(latest()).toEqual({});
+  });
+
+  it("gives its sort back when the sort chip is removed", () => {
+    store("sc-1");
+    const { latest } = setup({ sort: "name" });
+    const sortChip = chips().find((c) => c.textContent?.includes("Sort order"));
+    fireEvent.click(within(sortChip!).getByRole("button"));
+    expect(latest()).toEqual({ sort: "rating" });
+  });
+});

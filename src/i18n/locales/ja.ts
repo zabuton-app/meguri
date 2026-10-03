@@ -189,6 +189,8 @@ export const ja = {
   "smartCollection.saveCurrent": "現在の条件を保存",
   "smartCollection.empty": "保存済みの検索はまだありません。",
   "smartCollection.delete": "コレクションを削除",
+  "smartCollection.setDefault": "既定にする",
+  "smartCollection.unsetDefault": "既定を解除",
   "smartCollection.saveTitle": "検索条件を保存",
   "smartCollection.namePlaceholder": "コレクション名",
   "smartCollection.save": "保存",

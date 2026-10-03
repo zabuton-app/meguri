@@ -100,6 +100,8 @@ interface Props {
   collapsedCount: number;
   /** Whether anything at all is filtering, for the clear-all action. */
   hasConditions: boolean;
+  /** Clears every condition (to the default saved search, if one is set). */
+  onClearAll: () => void;
   /** True while a collection is active: only then is there a manual order to sort by. */
   manualSortAvailable?: boolean;
 }
@@ -109,6 +111,7 @@ export function MoreFiltersPopover({
   onChange,
   collapsedCount,
   hasConditions,
+  onClearAll,
   manualSortAvailable = false,
 }: Props) {
   const { t } = useI18n();
@@ -291,7 +294,7 @@ export function MoreFiltersPopover({
           <button
             type="button"
             disabled={!hasConditions}
-            onClick={() => onChange({})}
+            onClick={onClearAll}
             className="h-8 text-xs text-muted underline-offset-2 transition-colors hover:text-fg hover:underline disabled:pointer-events-none disabled:opacity-50"
           >
             {t("home.clearAll")}

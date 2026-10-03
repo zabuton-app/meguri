@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { ROOT_FOLDER } from "@shared/folderPath";
-import { resolveSortDir } from "@shared/sortDir";
+import { MANUAL_SORT, resolveSortDir } from "@shared/sortDir";
 import { parseQualifiedTagName } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { kindLabelKey } from "@/lib/mediaKind";
@@ -60,6 +60,13 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   return next;
 }
 
+/** The saved conditions apart from the folder, which is where a view is. */
+export function cleanConditions(query: SearchQuery): SearchQuery {
+  const clean = cleanSearchQuery(query);
+  delete clean.folder;
+  return clean;
+}
+
 export function hasSearchConditions(query: SearchQuery): boolean {
   return Object.keys(cleanSearchQuery(query)).length > 0;
 }
@@ -94,6 +101,66 @@ export function saveSmartCollections(collections: SmartCollection[]): void {
     localStorage.setItem(SMART_COLLECTIONS_KEY, JSON.stringify(collections));
   } catch {
     // Storage can be unavailable; keep the in-memory UI responsive.
+  }
+}
+
+/**
+ * The saved search the list opens with (and "Clear all" returns to). Kept
+ * apart from the collections so their stored shape does not change.
+ */
+export const DEFAULT_SMART_COLLECTION_KEY = "meguri.smartCollections.default";
+
+export function loadDefaultSmartCollectionId(): string | null {
+  try {
+    return localStorage.getItem(DEFAULT_SMART_COLLECTION_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDefaultSmartCollectionId(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, id);
+    else localStorage.removeItem(DEFAULT_SMART_COLLECTION_KEY);
+  } catch {
+    // Storage can be unavailable; keep the in-memory UI responsive.
+  }
+}
+
+/**
+ * The conditions a default saved search applies. Its folder is left out: a
+ * folder belongs to one workspace, while the default applies in every one.
+ * So is a manual sort, which exists only inside a collection (Home drops it
+ * anywhere else, which would leave "Clear all" unable to settle).
+ * Null when there is no default, or it points at a deleted collection.
+ */
+export function defaultQueryOf(
+  collections: SmartCollection[],
+  defaultId: string | null,
+): SearchQuery | null {
+  const collection = defaultId
+    ? collections.find((c) => c.id === defaultId)
+    : undefined;
+  if (!collection) return null;
+  const query = cleanConditions(collection.query);
+  if (query.sort === MANUAL_SORT) {
+    delete query.sort;
+    delete query.sortDir;
+  }
+  return query;
+}
+
+/** The filter the list starts with: the default saved search, or nothing. */
+export function loadInitialFilter(): SearchQuery {
+  try {
+    return (
+      defaultQueryOf(
+        parseSmartCollections(localStorage.getItem(SMART_COLLECTIONS_KEY)),
+        loadDefaultSmartCollectionId(),
+      ) ?? {}
+    );
+  } catch {
+    return {};
   }
 }
 

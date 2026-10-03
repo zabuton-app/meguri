@@ -19,7 +19,11 @@ import {
 import type { SearchQuery } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
-import { describeDateRange, scopedFolderPath } from "@/lib/smartCollections";
+import {
+  cleanConditions,
+  describeDateRange,
+  scopedFolderPath,
+} from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
 
@@ -63,6 +67,8 @@ function tagLabel(t: TFunc, raw: string): string {
 export function describeConditions(
   query: SearchQuery,
   t: TFunc,
+  /** The default saved search, which removing the sort chip returns to. */
+  defaultQuery: SearchQuery | null = null,
 ): ConditionDescriptor[] {
   const out: ConditionDescriptor[] = [];
 
@@ -218,7 +224,7 @@ export function describeConditions(
       label: `${t("filter.sortSection")}: ${sortLabel(t, sort)} / ${t(dir === "asc" ? "sort.asc" : "sort.desc")}`,
       group: "collapsed",
       chip: true,
-      clear: (q) => without(q, "sort", "sortDir"),
+      clear: (q) => clearSortTarget(q, defaultQuery),
     });
   }
 
@@ -230,4 +236,50 @@ export function collapsedConditionCount(
   descriptors: ConditionDescriptor[],
 ): number {
   return descriptors.filter((d) => d.group === "collapsed").length;
+}
+
+/** A query's sort, resolved, so `{sort:"name"}` and `{sort:"name", sortDir:"asc"}` match. */
+function sortKeyOf(query: SearchQuery): string {
+  const sort = query.sort ?? "added";
+  return `${sort}/${resolveSortDir(sort, query.sortDir)}`;
+}
+
+/** Same conditions and same sort, the folder aside. */
+function sameConditions(a: SearchQuery, b: SearchQuery): boolean {
+  const strip = (q: SearchQuery) => {
+    const clean = cleanConditions(q);
+    delete clean.sort;
+    delete clean.sortDir;
+    return JSON.stringify(clean);
+  };
+  return strip(a) === strip(b) && sortKeyOf(a) === sortKeyOf(b);
+}
+
+/**
+ * What "Clear all" leaves: the default saved search, or — once the list
+ * already shows exactly that — nothing, so the default can still be cleared.
+ */
+export function clearAllTarget(
+  value: SearchQuery,
+  defaultQuery: SearchQuery | null,
+): SearchQuery {
+  return defaultQuery && !sameConditions(value, defaultQuery)
+    ? defaultQuery
+    : {};
+}
+
+/**
+ * Removing the sort chip returns to the default saved search's sort when it
+ * has one and a different sort is shown; otherwise the sort is just dropped.
+ */
+export function clearSortTarget(
+  value: SearchQuery,
+  defaultQuery: SearchQuery | null,
+): SearchQuery {
+  const next = without(value, "sort", "sortDir");
+  if (!defaultQuery?.sort && !defaultQuery?.sortDir) return next;
+  if (sortKeyOf(value) === sortKeyOf(defaultQuery)) return next;
+  if (defaultQuery.sort) next.sort = defaultQuery.sort;
+  if (defaultQuery.sortDir) next.sortDir = defaultQuery.sortDir;
+  return next;
 }
