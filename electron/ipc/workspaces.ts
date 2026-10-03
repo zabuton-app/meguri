@@ -60,7 +60,13 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
     return register(dir);
   });
 
-  handle("workspace_remove", async ({ id }) => {
+  // Removals in flight, by workspace id. A second request for one waits for
+  // it instead of running alongside: a second removal running alongside
+  // could delete the folder again after it was re-registered, and its layout
+  // hold would drop the re-registered workspace's saves.
+  const removing = new Map<string, Promise<void>>();
+
+  const removeWorkspace = async (id: string): Promise<void> => {
     const p = ws.pathOf(id);
     if (p) {
       await ctx.scans.abort(id);
@@ -77,6 +83,14 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
     }
     if (ws.active()) ctx.scans.start();
     emit("workspace:changed", { activeId: ws.activeId });
+  };
+
+  handle("workspace_remove", ({ id }) => {
+    const inFlight = removing.get(id);
+    if (inFlight) return inFlight;
+    const run = removeWorkspace(id).finally(() => removing.delete(id));
+    removing.set(id, run);
+    return run;
   });
 
   handle("workspace_reorder", ({ ids }) => {

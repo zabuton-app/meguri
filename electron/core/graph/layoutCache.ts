@@ -148,7 +148,8 @@ export function writeLayout(
 
 const writes = new Map<string, Promise<void>>();
 /** Files whose workspace is being removed (see removeWorkspaceWithLayouts),
- *  counted: two removals of one workspace may overlap. */
+ *  counted so the function holds up under overlapping calls for one
+ *  workspace, though workspace_remove already merges those. */
 const heldOff = new Map<string, number>();
 
 /** Wait until no write to `file` is queued. Writes queued while waiting chain
