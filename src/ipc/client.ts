@@ -146,6 +146,9 @@ export const api = {
     targets: ChannelInput<"files_bulk_meta">["targets"],
     patch: { favorite?: boolean; rating?: number },
   ) => invoke("files_bulk_meta", { targets, ...patch }),
+  /** The targets' rows as they now stand; one that is gone is left out. */
+  filesByIds: (targets: ChannelInput<"files_by_ids">["targets"]) =>
+    invoke("files_by_ids", { targets }),
   tagsList: (workspaceId: string, prefix: string, limit?: number) =>
     invoke("tags_list", { workspaceId, prefix, limit }),
   /** Whole tag catalog for the tag management screen (scope follows the active view). */

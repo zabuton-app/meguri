@@ -323,6 +323,9 @@ export const ChannelInputs = {
     .refine((v) => v.favorite !== undefined || v.rating !== undefined, {
       message: "nothing to set",
     }),
+  // The selection read again after a bulk edit, by the same per-workspace
+  // targets the edit was sent with (and so under the same cap).
+  files_by_ids: z.object({ targets: BulkTargets }),
   tags_list: z.object({
     workspaceId: z.string(),
     prefix: z.string(),
@@ -481,6 +484,10 @@ export interface ChannelOutputs {
   // setting a flag to what it already was is a write, and the UI has nothing to
   // say about the difference.
   files_bulk_meta: { files: number; skipped: number };
+  // List rows (tags attached) for the targets that still exist. A target whose
+  // file row is gone is left out rather than reported: its absence is the
+  // answer.
+  files_by_ids: FileRow[];
   tags_list: string[];
   tags_list_all: TagList;
   // The counters below are summed over the databases in scope, so in the "All"

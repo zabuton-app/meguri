@@ -12,6 +12,7 @@ import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/ipc/client";
+import { useAudioActions } from "@/audio/useAudioPlayer";
 import type { FileRow } from "@/ipc/types";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useSelection } from "@/components/SelectionContext";
@@ -114,6 +115,7 @@ export function useFileActions(
   const confirm = useConfirm();
   const bulk = useBulkEdit(rows, watchLater.id, deferListRefresh);
   const { forget } = useSelection();
+  const { isCurrent: isCurrentAudio, close: closeAudio } = useAudioActions();
 
   const membership = useMutation({
     // Rows captured at click time and carried to onSuccess, for the same
@@ -197,6 +199,9 @@ export function useFileActions(
           forgetDeletedFile(qc, workspaceId, deleted.id);
           // A selected row outlives the list's copy of it (see forget).
           forget(file);
+          // So does the audio bar's track, which would keep playing a file
+          // that is gone (the detail view closes it the same way).
+          if (isCurrentAudio(id, workspaceId)) closeAudio();
         } catch (e) {
           toast.error(t("media.deleteFromIndexFailed"), {
             description: errorText(e),
@@ -204,7 +209,7 @@ export function useFileActions(
         }
       },
     };
-  }, [file, t, confirm, qc, forget]);
+  }, [file, t, confirm, qc, forget, isCurrentAudio, closeAudio]);
 
   return {
     favorite,

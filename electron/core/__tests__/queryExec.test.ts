@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDb, type DB } from "../db.js";
-import { recordPlay, upsertScanRoot } from "../queries.js";
+import { recordPlay, setFavorite, upsertScanRoot } from "../queries.js";
 import { QueryExecutor } from "../queryExec.js";
 import type {
   DuplicatesResult,
@@ -66,6 +66,39 @@ describe("QueryExecutor", () => {
       targets: target(),
     }) as WorkspaceStats;
     expect(stats.fileCount).toBe(6);
+  });
+
+  it("reads files by identity as the writer last left them", () => {
+    // What a selection does after a bulk edit: the write is committed on the
+    // main connection, and the read that follows has to see it.
+    const groups = [{ workspaceId: "ws1", fileIds: [fileIds[0], fileIds[1]] }];
+    const read = () =>
+      exec.run({ kind: "filesByIds", targets: target(), groups }) as FileRow[];
+    expect(read().map((f) => f.favorite)).toEqual([0, 0]);
+
+    setFavorite(db, fileIds[0], true);
+    db.prepare("DELETE FROM files WHERE id = ?").run(fileIds[1]);
+
+    const rows = read();
+    expect(rows.map((f) => [f.workspaceId, f.id, f.favorite])).toEqual([
+      ["ws1", fileIds[0], 1],
+    ]);
+  });
+
+  it("fails a read by identity over a database it cannot open", () => {
+    // Skipping the workspace, as the list queries do, would read as "these
+    // files are gone" to a caller that drops whatever does not come back.
+    const missing = {
+      id: "ws2",
+      dbPath: path.join(dir, "nowhere", "db.sqlite"),
+    };
+    expect(() =>
+      exec.run({
+        kind: "filesByIds",
+        targets: [...target(), missing],
+        groups: [{ workspaceId: "ws2", fileIds: [1] }],
+      }),
+    ).toThrow(/not readable/);
   });
 
   it("runs random / history / collection-scoped queries", () => {

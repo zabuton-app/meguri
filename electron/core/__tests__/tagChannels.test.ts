@@ -238,3 +238,25 @@ describe("collection_set_membership payloads", () => {
     ).toBe(false);
   });
 });
+
+describe("files_by_ids payloads", () => {
+  const parse = (v: unknown) => ChannelInputs.files_by_ids.safeParse(v);
+
+  it("takes the targets a bulk edit is sent with", () => {
+    expect(
+      parse({
+        targets: [
+          { workspaceId: "a", fileIds: [1, 2] },
+          { workspaceId: "b", fileIds: [3] },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("is held to the bulk-edit cap", () => {
+    const fileIds = Array.from({ length: MAX_BULK_FILES + 1 }, (_, i) => i + 1);
+    expect(parse({ targets: [{ workspaceId: "a", fileIds }] }).success).toBe(
+      false,
+    );
+  });
+});

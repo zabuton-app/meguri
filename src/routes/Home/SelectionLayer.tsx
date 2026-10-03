@@ -90,7 +90,12 @@ export function SelectionLayer({ active }: Props) {
       />
       {/* Mounted only while open so each pass starts from a clean staged edit. */}
       {tagsOpen && (
-        <BulkTagDialog open onOpenChange={setTagsOpen} rows={selection.rows} />
+        <BulkTagDialog
+          open
+          onOpenChange={setTagsOpen}
+          rows={selection.rows}
+          onApplied={selection.refresh}
+        />
       )}
     </>
   );

@@ -196,7 +196,11 @@ need no bookkeeping.
   `folder_files` expands selected folders into their files for a bulk edit,
   spending one `MAX_BULK_FILES + 1` row budget across the call. The file list
   itself is the ordinary `files_search` with `SearchQuery.folder`
-  (`{ path, recursive }`). All three run on the query worker.
+  (`{ path, recursive }`). All three run on the query worker. So does
+  `files_by_ids`, which the selection reads itself again through after a bulk
+  edit: it takes the edit's per-workspace targets and returns the list rows of
+  those that still exist. A file that is gone is left out, while a workspace
+  that cannot be read fails the call, so "not read" is never taken for "gone".
 - **Scope.** Folders exist inside one real workspace only. The renderer does not
   offer the "show by folder" option over `All` or a collection; showing a
   folder from elsewhere (a file's detail, a saved search) switches to its

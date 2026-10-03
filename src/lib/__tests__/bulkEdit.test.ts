@@ -1,13 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   bulkFlagOf,
   bulkTargets,
   bulkToggleTarget,
   groupBulkTargets,
+  readInBulkBatches,
   uniformRating,
 } from "@/lib/bulkEdit";
 import { sampleFileRow } from "@/test/fixtures";
 import type { FileRow } from "@/ipc/types";
+import { ChannelInputs, type BulkTargets } from "@shared/ipc/channels";
+import { MAX_BULK_FILES } from "@shared/tags";
 
 const row = (over: Partial<FileRow> = {}): FileRow => ({
   ...sampleFileRow,
@@ -96,5 +99,73 @@ describe("uniformRating", () => {
   it("counts an unrated selection as agreeing on zero", () => {
     expect(uniformRating([row({ rating: 0 }), row({ rating: 0 })])).toBe(0);
     expect(uniformRating([])).toBe(0);
+  });
+});
+
+describe("readInBulkBatches", () => {
+  const many = (n: number): FileRow[] =>
+    Array.from({ length: n }, (_, i) =>
+      row({ id: i + 1, workspaceId: i % 2 ? "ws-a" : "ws-b" }),
+    );
+  const idsIn = (targets: BulkTargets) =>
+    targets.flatMap((group) => group.fileIds);
+  /** Answers every target, the way main does when the files are all there. */
+  const echo = (targets: BulkTargets): Promise<FileRow[]> =>
+    Promise.resolve(
+      targets.flatMap(({ workspaceId, fileIds }) =>
+        fileIds.map((id) => row({ id, workspaceId })),
+      ),
+    );
+
+  it("reads a selection within the cap in one call", async () => {
+    const read = vi.fn(echo);
+    const rows = await readInBulkBatches(many(MAX_BULK_FILES), read);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(rows).toHaveLength(MAX_BULK_FILES);
+  });
+
+  it("splits a selection that has outgrown the cap into calls main accepts", async () => {
+    // One file past the cap: what selecting one more while a full-size write
+    // is pending leaves the following read with.
+    const read = vi.fn(echo);
+    const rows = await readInBulkBatches(many(MAX_BULK_FILES + 1), read);
+    expect(read).toHaveBeenCalledTimes(2);
+    for (const [targets] of read.mock.calls) {
+      expect(ChannelInputs.files_by_ids.safeParse({ targets }).success).toBe(
+        true,
+      );
+    }
+    expect(read.mock.calls.flatMap(([targets]) => idsIn(targets))).toHaveLength(
+      MAX_BULK_FILES + 1,
+    );
+    expect(new Set(rows.map((r) => `${r.workspaceId}:${r.id}`)).size).toBe(
+      MAX_BULK_FILES + 1,
+    );
+  });
+
+  it("fills each call to the cap and no further", async () => {
+    const read = vi.fn(echo);
+    await readInBulkBatches(many(MAX_BULK_FILES * 2), read);
+    expect(read.mock.calls.map(([targets]) => idsIn(targets).length)).toEqual([
+      MAX_BULK_FILES,
+      MAX_BULK_FILES,
+    ]);
+  });
+
+  it("fails as a whole when one of the calls fails", async () => {
+    // A partial answer would read as "the rest are gone".
+    const read = vi
+      .fn(echo)
+      .mockImplementationOnce(echo)
+      .mockRejectedValueOnce(new Error("unreadable"));
+    await expect(
+      readInBulkBatches(many(MAX_BULK_FILES + 1), read),
+    ).rejects.toThrow("unreadable");
+  });
+
+  it("asks for nothing when there is nothing to read", async () => {
+    const read = vi.fn(echo);
+    expect(await readInBulkBatches([], read)).toEqual([]);
+    expect(read).not.toHaveBeenCalled();
   });
 });

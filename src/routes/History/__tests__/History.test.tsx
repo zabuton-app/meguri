@@ -8,7 +8,10 @@ import {
   sampleFileRow,
   WS_ID,
 } from "@/test/fixtures";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from "@/test/renderWithProviders";
 import type {
   AppStatus,
   HistoryEntryRow,
@@ -93,5 +96,21 @@ describe("History", () => {
     // ConfirmDialog: click the destructive confirm button ("Clear").
     fireEvent.click(await screen.findByText("Clear"));
     await waitFor(() => expect(mocks.historyClear).toHaveBeenCalledTimes(1));
+  });
+
+  it("drops cached file details on clear, resume points and all", async () => {
+    const queryClient = createTestQueryClient();
+    // A detail view closed a moment ago: cached, with nothing reading it.
+    queryClient.setQueryData(["file_get", "ws-test", 1], {
+      resumePosition: 600,
+    });
+    renderWithProviders(<HistoryRoute />, { route: "/history", queryClient });
+    fireEvent.click(await screen.findByText("Clear history"));
+    fireEvent.click(await screen.findByText("Clear"));
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(["file_get", "ws-test", 1]),
+      ).toBeUndefined(),
+    );
   });
 });

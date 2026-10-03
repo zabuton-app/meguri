@@ -41,9 +41,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** The selected rows, as the selection holds them. */
   rows: FileRow[];
+  /** The edit was written: the caller re-reads the rows it holds. */
+  onApplied?: () => void;
 }
 
-export function BulkTagDialog({ open, onOpenChange, rows }: Props) {
+export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const [input, setInput] = useState("");
@@ -115,10 +117,14 @@ export function BulkTagDialog({ open, onOpenChange, rows }: Props) {
   const apply = useMutation({
     mutationFn: () => api.filesBulkTag(bulkTargets(rows), adding, removing),
     onSuccess: (result) => {
-      // The refetch that follows flows back into the selection: the provider
-      // re-snapshots every selected row that is still loaded, so reopening this
-      // dialog tallies the tags as they now are.
+      // The refetch that follows flows back into the selection for the rows
+      // the list still holds. That is not all of them: a picked folder's
+      // files were never in the list, a row may have scrolled out of it, and
+      // this very edit can take a row off it (the tag the list is filtered by,
+      // removed). onApplied has the selection read those again, so reopening
+      // this dialog tallies the tags as they now are.
       invalidateTagCatalog(qc);
+      onApplied?.();
       onOpenChange(false);
       toast.success(
         t("select.tagsApplied", {
@@ -145,6 +151,10 @@ export function BulkTagDialog({ open, onOpenChange, rows }: Props) {
         );
         return;
       }
+      // Past the name check each workspace commits on its own (see
+      // files_bulk_tag), so the ones ahead of the failure may be written.
+      invalidateTagCatalog(qc);
+      onApplied?.();
       toast.error(t("select.tagsFailed", { msg }));
     },
   });

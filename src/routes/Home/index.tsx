@@ -60,6 +60,8 @@ import { filesSearchListOffset } from "@/lib/filesSearch";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { SelectionProvider } from "@/components/SelectionContext";
+import { walksPlaybackOrder } from "@/lib/playbackOrder";
+import { readInBulkBatches } from "@/lib/bulkEdit";
 import { FolderHeader } from "@/components/FolderHeader";
 import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
 import { useFolderNav } from "./useFolderNav";
@@ -107,6 +109,8 @@ export default function Home() {
   const [commandOpen, setCommandOpen] = useState(false);
   // Opens on the default saved search, if one is set (see loadInitialFilter).
   const [filter, setFilter] = useState<SearchQuery>(loadInitialFilter);
+  // Compared by identity below: every later filter is a new object.
+  const openedWith = useRef(filter);
   const [thumbVersion, setThumbVersion] = useState<Record<string, number>>({});
   const manualScanJobs = useRef(
     new Map<string, "scan" | "resync" | "rebuild">(),
@@ -178,13 +182,24 @@ export default function Home() {
     [filter, folderView, folderNav.path, folderSearching],
   );
 
+  // The graph has no folder form (see isFolderView): a folder opened from
+  // outside the list — a saved search that carries one, "show in library" —
+  // would be dropped without a word there, so it leaves the graph for the grid.
+  const showByFolder = useCallback(
+    (on: boolean) => {
+      setByFolder(on);
+      if (on) setViewMode((v) => (v === "graph" ? "grid" : v));
+    },
+    [setByFolder, setViewMode],
+  );
+
   const { filterValue, onFilterChange, onApplySaved, onApplyRecent } =
     useFolderFilter({
       folderView,
       folderNav,
       filter,
       setFilter,
-      setByFolder,
+      setByFolder: showByFolder,
     });
 
   // Include the workspace ID in the key so switching workspaces (incl. "All") refetches separately.
@@ -223,6 +238,11 @@ export default function Home() {
   const expandFolders = useCallback(
     (paths: string[]) => api.folderFiles(workspaceId ?? "", paths),
     [workspaceId],
+  );
+  // A bulk edit has the selection read its rows again (see SelectionContext).
+  const readFiles = useCallback(
+    (rows: FileRow[]) => readInBulkBatches(rows, api.filesByIds),
+    [],
   );
 
   const items = useMemo(
@@ -283,12 +303,13 @@ export default function Home() {
   // folder, in the list's chosen sort — by name when none is chosen, which
   // plays folder by folder. Fetched only while the player is open.
 
-  // The player, or the detail view it detoured to (`from=player`), is open:
-  // only then is the folder's playing order worth fetching.
+  // The player, or the detail view it detoured to (`from=player`, and the
+  // files stepped to from there), is open: only then is the folder's playing
+  // order worth fetching.
   const playing =
     location.pathname.startsWith("/play") ||
     (location.pathname.startsWith("/file/") &&
-      new URLSearchParams(location.search).get("from") === "player");
+      walksPlaybackOrder(new URLSearchParams(location.search)));
   const { subtreeFilter, playlistNav } = useFolderPlaylist({
     workspaceId: status.data?.workspaceId,
     ready: status.data?.ready ?? false,
@@ -434,8 +455,11 @@ export default function Home() {
   );
 
   // Recent searches for the command menu. A query that narrows nothing is
-  // ignored there (see pushRecentSearch).
+  // ignored there (see pushRecentSearch), and so is the one the list opened
+  // with: the default saved search was not searched for, and would otherwise
+  // head the recents after every launch.
   useEffect(() => {
+    if (filter === openedWith.current) return;
     const timer = window.setTimeout(
       () => recordRecentSearch(filter),
       RECENT_SEARCH_SETTLE_MS,
@@ -859,6 +883,7 @@ export default function Home() {
         // neither view draws them, and "select all" must not pick them.
         folders={listOffset === 0 ? folderEntries : undefined}
         expandFolders={expandFolders}
+        readFiles={readFiles}
       >
         <div className="relative flex min-h-0 flex-1">
           {/* min-w-60 = the 240px the side peek leaves the list (LIST_MIN_WIDTH

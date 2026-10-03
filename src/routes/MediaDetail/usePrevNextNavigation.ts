@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMediaNav, usePlaybackNav } from "@/components/MediaNavContext";
+import { keepPlaybackOrder, walksPlaybackOrder } from "@/lib/playbackOrder";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import {
   NAV_BINDINGS,
@@ -43,10 +44,12 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
   const { keybindingPreset } = usePreferences();
   const navBinding = NAV_BINDINGS[keybindingPreset];
   // Detoured to from the player, prev/next walks what the player was playing
-  // (browsing by folder, the folder's whole subtree, not only the list).
+  // (browsing by folder, the folder's whole subtree, not only the list), and
+  // keeps to it for every step after the first (see playbackOrder.ts).
   const listNav = useMediaNav();
   const playbackNav = usePlaybackNav();
-  const nav = searchParams.get("from") === "player" ? playbackNav : listNav;
+  const playbackOrder = walksPlaybackOrder(searchParams);
+  const nav = playbackOrder ? playbackNav : listNav;
   const navItems = useMemo(() => nav?.items ?? [], [nav?.items]);
   const index = useMemo(
     () =>
@@ -74,11 +77,12 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
       // pass is on the file we arrived with, so handing it back after the user
       // has walked off it would resume somewhere they no longer are.
       if (from && from !== "player") params.set("from", from);
+      if (playbackOrder) keepPlaybackOrder(params);
       const filter = searchParams.get("filter");
       if (filter) params.set("filter", filter);
       void navigate(`/file/${target.id}?${params.toString()}`);
     },
-    [navigate, searchParams],
+    [navigate, searchParams, playbackOrder],
   );
 
   const goPrev = useCallback(() => {

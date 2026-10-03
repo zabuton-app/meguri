@@ -19,6 +19,7 @@ import {
 import { useEffect, useState } from "react";
 import { CommandMenu } from "@/components/CommandMenu";
 import { useSelection } from "@/components/SelectionContext";
+import { useAudioActions, useAudioPlayer } from "@/audio/useAudioPlayer";
 import { setFocusedFile } from "@/hooks/useFocusedFile";
 import { resetRecentSearchesForTest } from "@/hooks/useRecentSearches";
 import { RECENT_SEARCHES_KEY } from "@/lib/recentSearches";
@@ -248,6 +249,39 @@ describe("file actions group", () => {
     );
     await waitFor(() =>
       expect(screen.getByTestId("selection-count").textContent).toBe("0"),
+    );
+  });
+
+  it("closes the audio bar when the track it plays is deleted", async () => {
+    // jsdom defines neither on the prototype.
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+    function Playing() {
+      const { play } = useAudioActions();
+      const { current } = useAudioPlayer();
+      useEffect(() => {
+        play(file(3), sampleFileRow.workspaceId);
+      }, [play]);
+      return <span data-testid="track">{current?.file.id ?? "none"}</span>;
+    }
+    act(() => setFocusedFile(file(3)));
+    renderWithProviders(
+      <>
+        <Playing />
+        <ClosingMenu />
+      </>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("track").textContent).toBe("3"),
+    );
+    fireEvent.click(screen.getByText("Delete From Index"));
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Delete From Index" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("track").textContent).toBe("none"),
     );
   });
 

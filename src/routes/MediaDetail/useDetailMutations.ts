@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import log from "@/lib/logger";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useForgetSelected } from "@/components/SelectionContext";
 import {
   LIST_HIDDEN_SOURCES,
   RESERVED_TAG_ERROR,
@@ -87,6 +88,7 @@ export function useDetailMutations({
   const { t } = useI18n();
   const confirm = useConfirm();
   const qc = useQueryClient();
+  const forgetSelected = useForgetSelected();
   const detailKey = ["file_get", wsId, fileId] as const;
 
   const setRating = useMutation({
@@ -164,6 +166,8 @@ export function useDetailMutations({
     if (!ok) return;
     const deleted = await deleteFromIndexMutation.mutateAsync();
     forgetDeletedFile(qc, wsId, deleted.id);
+    // A selected row outlives the list's copy of it (see forget).
+    forgetSelected({ id: deleted.id, workspaceId: wsId });
     onDeleteFinished?.();
   };
 

@@ -2,8 +2,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { Core } from "../index.js";
 import type { DB } from "../db.js";
-import { recordAccess, searchFiles, setRating } from "../queries.js";
 import {
+  recordAccess,
+  searchFiles,
+  setFavorite,
+  setRating,
+} from "../queries.js";
+import {
+  filesByIdsWorkspaces,
   listTagsWorkspaces,
   searchCollection,
   searchWorkspaces,
@@ -575,5 +581,71 @@ describe("listTagsWorkspaces", () => {
     });
     a.close();
     b.close();
+  });
+});
+
+describe("filesByIdsWorkspaces", () => {
+  it("returns each workspace's rows as they stand, stamped and tagged", () => {
+    const a = newDb();
+    const b = newDb();
+    const a1 = insertFile(a.db, a.rootId, { relPath: "a1.mp4" });
+    const a2 = insertFile(a.db, a.rootId, { relPath: "a2.mp4" });
+    const b1 = insertFile(b.db, b.rootId, { relPath: "b1.mp4" });
+    setFavorite(a.db, a1, true);
+    addManualTag(a.db, a2, "beach");
+
+    const rows = filesByIdsWorkspaces(
+      [coreTarget("w1", a.db), coreTarget("w2", b.db)],
+      [
+        { workspaceId: "w1", fileIds: [a1, a2] },
+        { workspaceId: "w2", fileIds: [b1] },
+      ],
+    );
+
+    expect(rows.map((r) => [r.workspaceId, r.id])).toEqual([
+      ["w1", a1],
+      ["w1", a2],
+      ["w2", b1],
+    ]);
+    expect(rows[0].favorite).toBe(1);
+    expect(rows[0].tags).toEqual([]);
+    expect(rows[1].tags?.map((tag) => tag.name)).toEqual(["beach"]);
+    a.db.close();
+    b.db.close();
+  });
+
+  it("leaves out a file that is gone, and one asked for twice comes back once", () => {
+    const { db, rootId } = newDb();
+    const kept = insertFile(db, rootId, { relPath: "kept.mp4" });
+    const dropped = insertFile(db, rootId, { relPath: "dropped.mp4" });
+    const removed = insertFile(db, rootId, { relPath: "removed.mp4" });
+    db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(dropped);
+    db.prepare("DELETE FROM files WHERE id = ?").run(removed);
+
+    const rows = filesByIdsWorkspaces(
+      [coreTarget("w1", db)],
+      [{ workspaceId: "w1", fileIds: [kept, dropped, removed, kept] }],
+    );
+
+    expect(rows.map((r) => r.id)).toEqual([kept]);
+    db.close();
+  });
+
+  it("fails rather than report a workspace it could not read as empty", () => {
+    // The caller drops every file that does not come back, so answering with
+    // nothing here would empty the selection over a database that only
+    // failed to open.
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "a.mp4" });
+    expect(() =>
+      filesByIdsWorkspaces(
+        [coreTarget("w1", db)],
+        [
+          { workspaceId: "w1", fileIds: [id] },
+          { workspaceId: "elsewhere", fileIds: [id] },
+        ],
+      ),
+    ).toThrow(/not readable/);
+    db.close();
   });
 });
