@@ -348,17 +348,21 @@ export class Workspaces {
     return this.config.collections.find((c) => c.id === id)?.locked === true;
   }
 
-  removeCollection(id: string): void {
-    if (this.isLocked(id)) return;
+  /** Whether the collection was removed: false for a locked or unknown one. */
+  removeCollection(id: string): boolean {
+    if (this.isLocked(id)) return false;
+    const before = this.config.collections.length;
     this.config.collections = this.config.collections.filter(
       (c) => c.id !== id,
     );
+    if (this.config.collections.length === before) return false;
     if (this.config.activePath === collectionTarget(id)) {
       // "All" is only valid with at least one registered workspace (same invariant
       // bootstrap() enforces); fall back to null when nothing is registered.
       this.config.activePath = this.config.roots.length > 0 ? ALL_ID : null;
     }
     this.persist();
+    return true;
   }
 
   /** Set (or clear, when emoji is null/empty) a collection's emoji icon. */

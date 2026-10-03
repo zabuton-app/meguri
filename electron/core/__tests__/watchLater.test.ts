@@ -203,7 +203,7 @@ describe("lock guards", () => {
 
   it("refuses to remove the collection", () => {
     const ws = new Workspaces();
-    ws.removeCollection(WATCH_LATER_ID);
+    expect(ws.removeCollection(WATCH_LATER_ID)).toBe(false);
 
     expect(watchLaterOf(ws)).toBeDefined();
     expect(watchLaterOf(new Workspaces())).toBeDefined();
@@ -263,8 +263,9 @@ describe("lock guards", () => {
       "Renamed",
     );
 
-    ws.removeCollection(mine.id);
+    expect(ws.removeCollection(mine.id)).toBe(true);
     expect(ws.collections().find((c) => c.id === mine.id)).toBeUndefined();
+    expect(ws.removeCollection(mine.id)).toBe(false);
   });
 
   it("still allows adding and removing files (membership is not locked)", () => {

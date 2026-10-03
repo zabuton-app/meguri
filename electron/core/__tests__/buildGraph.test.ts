@@ -239,4 +239,137 @@ describe("buildGraph with identical copies", () => {
     expect(got.totalFiles).toBe(3);
     expect(got.truncated).toBe(true);
   });
+  it("lets the first copy in a collection's stored order stand for the rest", () => {
+    const { db, rootId } = newDb();
+    const a1 = insertFile(db, rootId, {
+      relPath: "a1.mp4",
+      contentHash: "same",
+    });
+    const a2 = insertFile(db, rootId, {
+      relPath: "a2.mp4",
+      contentHash: "same",
+    });
+    const b = insertFile(db, rootId, { relPath: "b.mp4", contentHash: "b" });
+    const refs = [a2, b, a1].map((fileId) => ({ workspaceId: "w", fileId }));
+    const got = buildGraph(
+      [target("w", db)],
+      { sort: MANUAL_SORT },
+      { cap: 100, refs, storedOrder: true },
+    );
+    expect(files(got)).toEqual(["w/a2.mp4", "w/b.mp4"]);
+    expect(got.totalFiles).toBe(2);
+  });
+});
+
+/** Counts the file rows buildGraph reads from `db` (graphFiles' query). */
+function countFileRowsRead(db: DB): () => number {
+  let read = 0;
+  const prepare = db.prepare.bind(db);
+  db.prepare = ((sql: string) => {
+    const stmt = prepare(sql);
+    if (!sql.includes("AS metaKey")) return stmt;
+    const iterate = stmt.iterate.bind(stmt);
+    stmt.iterate = function* (...args: unknown[]) {
+      for (const row of iterate(...args)) {
+        read++;
+        yield row;
+      }
+    } as typeof stmt.iterate;
+    return stmt;
+  }) as typeof db.prepare;
+  return () => read;
+}
+
+describe("buildGraph reads no more rows than the graph draws", () => {
+  it("stops reading a search once the cap is reached", () => {
+    const { db, rootId } = newDb();
+    seed(
+      db,
+      rootId,
+      Array.from(
+        { length: 300 },
+        (_, i) => `f${String(i).padStart(3, "0")}.mp4`,
+      ),
+    );
+    const read = countFileRowsRead(db);
+    const got = buildGraph(
+      [target("w", db)],
+      { sort: "name", sortDir: "asc" },
+      { cap: 10 },
+    );
+    expect(got.files.id).toHaveLength(10);
+    expect(read()).toBe(10);
+  });
+
+  it("stops walking a collection's refs once the cap is reached", () => {
+    const { db, rootId } = newDb();
+    const ids = seed(
+      db,
+      rootId,
+      Array.from(
+        { length: 1200 },
+        (_, i) => `f${String(i).padStart(4, "0")}.mp4`,
+      ),
+    );
+    const refs = ids.map((fileId) => ({ workspaceId: "w", fileId }));
+    const read = countFileRowsRead(db);
+    const got = buildGraph(
+      [target("w", db)],
+      { sort: MANUAL_SORT },
+      { cap: 3, refs, storedOrder: true },
+    );
+    expect(got.files.id).toHaveLength(3);
+    // One chunk of refs, not the whole collection.
+    expect(read()).toBeLessThan(ids.length / 2);
+  });
+});
+
+describe("buildGraph over a large collection in its stored order", () => {
+  const n = 1200;
+  function bigCollection() {
+    const { db, rootId } = newDb();
+    const names = Array.from(
+      { length: n },
+      (_, i) => `f${String(i).padStart(4, "0")}.mp4`,
+    );
+    const ids = seed(db, rootId, names);
+    // Stored newest first, so the stored order is not the id order.
+    const refs = [...ids]
+      .reverse()
+      .map((fileId) => ({ workspaceId: "w", fileId }));
+    return { db, ids, names, refs };
+  }
+
+  it("keeps the stored order across chunks and cuts at the cap", () => {
+    const { db, names, refs } = bigCollection();
+    const got = buildGraph(
+      [target("w", db)],
+      { sort: MANUAL_SORT },
+      { cap: 700, refs, storedOrder: true },
+    );
+    expect(files(got)).toEqual(
+      [...names]
+        .reverse()
+        .slice(0, 700)
+        .map((name) => `w/${name}`),
+    );
+    expect(got.totalFiles).toBe(n);
+    expect(got.truncated).toBe(true);
+  });
+
+  it("walks on past chunks a filter empties until the graph is full", () => {
+    const { db, ids, names, refs } = bigCollection();
+    // Only the oldest files match, and they are stored last.
+    for (const id of ids.slice(0, 5)) setFavorite(db, id, true);
+    const got = buildGraph(
+      [target("w", db)],
+      { sort: MANUAL_SORT, favorite: true },
+      { cap: 3, refs, storedOrder: true },
+    );
+    expect(files(got)).toEqual(
+      [names[4], names[3], names[2]].map((name) => `w/${name}`),
+    );
+    expect(got.totalFiles).toBe(5);
+    expect(got.truncated).toBe(true);
+  });
 });

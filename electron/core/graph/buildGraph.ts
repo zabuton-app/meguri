@@ -57,6 +57,107 @@ function refKey(workspaceId: string, fileId: number): string {
   return `${workspaceId}:${fileId}`;
 }
 
+/**
+ * One node per (workspace, meta_key): identical copies of a file inside one
+ * workspace share user data, so they are one thing in the graph too. The
+ * returned test passes the first copy it is shown, which stands for the rest,
+ * and so copies do not use up places meant for other files.
+ */
+function firstCopies(): (row: Row) => boolean {
+  const seen = new Set<string>();
+  return (row) => {
+    const key = `${row.workspaceId}\u0000${row.metaKey}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  };
+}
+
+type FileCount = { rows: number; nodes: number };
+
+/** Up to `cap` files in the query's order, merged across workspaces. */
+function rowsInQueryOrder(
+  targets: CoreTarget[],
+  query: SearchQuery,
+  queryOf: (target: CoreTarget) => SearchQuery,
+  countOf: (target: CoreTarget) => FileCount,
+  cap: number,
+): Row[] {
+  const rows: Row[] = [];
+  for (const target of targets) {
+    const isFirst = firstCopies();
+    // Reading stops once the cap is reached; skipped copies can at most add
+    // their own number of rows to that, which bounds the query as well.
+    const { rows: matched, nodes } = countOf(target);
+    let taken = 0;
+    for (const row of graphFiles(
+      target.core.db,
+      queryOf(target),
+      cap + matched - nodes,
+    )) {
+      const r: Row = { ...row, workspaceId: target.id };
+      if (!isFirst(r)) continue;
+      rows.push(r);
+      if (++taken >= cap) break;
+    }
+  }
+  if (targets.length > 1) rows.sort(comparatorFor(query.sort, query.sortDir));
+  return rows.slice(0, cap);
+}
+
+/**
+ * Refs read per query when walking a collection in its stored order. Larger
+ * than searchCollectionManual's: that one fills a page, this a whole graph.
+ */
+const MANUAL_CHUNK = 500;
+
+/**
+ * Up to `cap` files of a collection in its stored order. The refs are walked
+ * a chunk at a time and the walk ends once the graph is full, so a large
+ * collection is not read whole for a capped graph (the same approach as
+ * searchCollectionManual).
+ */
+function rowsInStoredOrder(
+  targets: CoreTarget[],
+  query: SearchQuery,
+  refs: FileRef[],
+  cap: number,
+): Row[] {
+  const out: Row[] = [];
+  const isFirst = firstCopies();
+  for (let i = 0; i < refs.length && out.length < cap; i += MANUAL_CHUNK) {
+    const slice = refs.slice(i, i + MANUAL_CHUNK);
+    const idsByWs = idsByWorkspace(slice);
+    const byRef = new Map<string, Row>();
+    for (const target of targets) {
+      const ids = idsByWs.get(target.id);
+      if (!ids) continue;
+      for (const row of graphFiles(target.core.db, { ...query, fileIds: ids }))
+        byRef.set(refKey(target.id, row.id), {
+          ...row,
+          workspaceId: target.id,
+        });
+    }
+    for (const ref of slice) {
+      const row = byRef.get(refKey(ref.workspaceId, ref.fileId));
+      if (!row || !isFirst(row)) continue;
+      out.push(row);
+      if (out.length >= cap) break;
+    }
+  }
+  return out;
+}
+
+function idsByWorkspace(refs: FileRef[]): Map<string, number[]> {
+  const out = new Map<string, number[]>();
+  for (const ref of refs) {
+    const ids = out.get(ref.workspaceId) ?? [];
+    ids.push(ref.fileId);
+    out.set(ref.workspaceId, ids);
+  }
+  return out;
+}
+
 export function buildGraph(
   cores: CoreTarget[],
   query: SearchQuery,
@@ -74,62 +175,33 @@ export function buildGraph(
   let idsByWs: Map<string, number[]> | null = null;
   if (refs) {
     if (refs.length === 0) return emptyPayload();
-    idsByWs = new Map();
-    for (const ref of refs) {
-      const ids = idsByWs.get(ref.workspaceId) ?? [];
-      ids.push(ref.fileId);
-      idsByWs.set(ref.workspaceId, ids);
-    }
-    const byWs = idsByWs;
+    const byWs = idsByWorkspace(refs);
+    idsByWs = byWs;
     targets = cores.filter((t) => byWs.has(t.id));
   }
   if (targets.length === 0) return emptyPayload();
 
-  let total = 0;
-  let rows: Row[] = [];
-  for (const target of targets) {
+  const queryOf = (target: CoreTarget): SearchQuery => {
     const ids = idsByWs?.get(target.id);
-    const tq: SearchQuery = ids ? { ...q, fileIds: ids } : q;
-    // The stored order is not a SQL order, so every matching row of the
-    // collection is read and the cut is made after reordering below.
-    const db = target.core.db;
-    const count = graphFileCount(db, tq);
-    // Identical copies collapse into one node below; reading that many rows
-    // more keeps them from pushing unique files past the cap.
-    const copies = count.rows - count.nodes;
-    const limit = storedOrder && ids ? Math.max(cap, ids.length) : cap + copies;
-    for (const row of graphFiles(db, tq, limit))
-      rows.push({ ...row, workspaceId: target.id });
-    total += count.nodes;
-  }
-
-  // One node per (workspace, meta_key): identical copies of a file inside one
-  // workspace share user data, so they are one thing in the graph too. The
-  // first copy in the query's order stands for them. Done before the cap, so
-  // copies do not use up places meant for other files.
-  const firstCopy = (list: Row[]): Row[] => {
-    const seen = new Set<string>();
-    return list.filter((r) => {
-      const key = `${r.workspaceId}\u0000${r.metaKey}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    return ids ? { ...q, fileIds: ids } : q;
   };
+  const counts = new Map(
+    targets.map((t) => [t.id, graphFileCount(t.core.db, queryOf(t))]),
+  );
+  let total = 0;
+  for (const count of counts.values()) total += count.nodes;
 
-  if (storedOrder && refs) {
-    const order = new Map(
-      refs.map((r, i) => [refKey(r.workspaceId, r.fileId), i]),
-    );
-    rows.sort(
-      (a, b) =>
-        (order.get(refKey(a.workspaceId, a.id)) ?? Infinity) -
-        (order.get(refKey(b.workspaceId, b.id)) ?? Infinity),
-    );
-  } else if (targets.length > 1) {
-    rows.sort(comparatorFor(q.sort, q.sortDir));
-  }
-  rows = firstCopy(rows).slice(0, cap);
+  // The stored order is not a SQL order, so those rows are read by refs.
+  const rows =
+    storedOrder && refs
+      ? rowsInStoredOrder(targets, q, refs, cap)
+      : rowsInQueryOrder(
+          targets,
+          q,
+          queryOf,
+          (t) => counts.get(t.id) ?? { rows: 0, nodes: 0 },
+          cap,
+        );
   const truncated = total > rows.length;
 
   const payload = emptyPayload();

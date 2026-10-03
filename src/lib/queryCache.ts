@@ -154,13 +154,20 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
 }
 
 /**
- * Invalidate only the searches filtered on "In progress": saving where a file
- * was left can add it to them or (played to the end) take it out.
+ * Invalidate only the searches filtered on "In progress", in the list and the
+ * graph: saving where a file was left can add it to them or (played to the
+ * end) take it out.
  */
 export function invalidateInProgressSearches(qc: QueryClient): void {
+  const inProgress = (q: { queryKey: readonly unknown[] }) =>
+    searchFilterOf(q.queryKey)?.inProgress === true;
+  void qc.invalidateQueries({
+    queryKey: ["graph_build"],
+    predicate: inProgress,
+  });
   void qc.invalidateQueries({
     queryKey: ["files_search"],
-    predicate: (q) => searchFilterOf(q.queryKey)?.inProgress === true,
+    predicate: inProgress,
   });
 }
 

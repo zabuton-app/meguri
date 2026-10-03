@@ -11,6 +11,7 @@ import {
   readLayout,
   readLayoutSettled,
   removeLayout,
+  removeWorkspaceWithLayouts,
   writeLayout,
   type LayoutScopes,
 } from "../graph/layoutCache.js";
@@ -207,5 +208,91 @@ describe("concurrent writes", () => {
     const saving = writeLayout(file, { keys: ["t::a"], xy: [5, 6] });
     expect((await readLayoutSettled(file))?.xy).toEqual([5, 6]);
     await saving;
+  });
+
+  it("drops a save whose scope went while it waited, without recreating its directory", async () => {
+    const dir = path.join(base, "roots", "gone");
+    const file = path.join(dir, "graph-layout.json");
+    let alive = true;
+    const first = writeLayout(file, { keys: ["t::a"], xy: [1, 2] });
+    const queued = writeLayout(
+      file,
+      { keys: ["t::b"], xy: [3, 4] },
+      undefined,
+      2,
+      () => alive,
+    );
+    // The workspace is removed while the second save waits for the first.
+    await first;
+    alive = false;
+    fs.rmSync(dir, { recursive: true, force: true });
+    await queued;
+    expect(fs.existsSync(dir)).toBe(false);
+  });
+});
+
+describe("removeWorkspaceWithLayouts", () => {
+  const dir = () => path.join(base, "roots", "ws");
+  const file = () => path.join(dir(), "graph-layout.json");
+  const removeDir = () => {
+    fs.rmSync(dir(), { recursive: true, force: true });
+    return Promise.resolve();
+  };
+
+  it("waits for a save already past its check to write before removing", async () => {
+    let removing: Promise<void> | undefined;
+    let writtenBeforeRemove = false;
+    await writeLayout(
+      file(),
+      { keys: ["t::a"], xy: [1, 2] },
+      undefined,
+      2,
+      () => {
+        // The removal starts just as this save passes its check.
+        removing = removeWorkspaceWithLayouts(dir(), () => {
+          writtenBeforeRemove = fs.existsSync(file());
+          return removeDir();
+        });
+        return true;
+      },
+    );
+    await removing;
+    expect(writtenBeforeRemove).toBe(true);
+    expect(fs.existsSync(dir())).toBe(false);
+  });
+
+  it("drops a save that reaches its write while the workspace is being removed", async () => {
+    await writeLayout(file(), { keys: ["t::a"], xy: [1, 2] });
+    await removeWorkspaceWithLayouts(dir(), async () => {
+      // Sent while the DB is being closed: its scope still resolves, so only
+      // the hold keeps it from writing the directory back after the delete.
+      const late = writeLayout(file(), { keys: ["t::b"], xy: [3, 4] });
+      fs.rmSync(dir(), { recursive: true, force: true });
+      await late;
+    });
+    expect(fs.existsSync(dir())).toBe(false);
+  });
+
+  it("keeps holding saves until the last of two overlapping removals is done", async () => {
+    let releaseSecond = () => {};
+    const second = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    const slow = removeWorkspaceWithLayouts(dir(), async () => {
+      await second;
+      await removeDir();
+    });
+    await removeWorkspaceWithLayouts(dir(), removeDir);
+    // The first removal is done; the second still holds the files.
+    await writeLayout(file(), { keys: ["t::a"], xy: [1, 2] });
+    expect(fs.existsSync(dir())).toBe(false);
+    releaseSecond();
+    await slow;
+  });
+
+  it("lets a workspace registered again save as usual", async () => {
+    await removeWorkspaceWithLayouts(dir(), removeDir);
+    await writeLayout(file(), { keys: ["t::a"], xy: [1, 2] });
+    expect((await readLayout(file()))?.keys).toEqual(["t::a"]);
   });
 });

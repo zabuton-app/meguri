@@ -20,22 +20,27 @@ function graphQuery(query: SearchQuery): SearchQuery {
 }
 
 /**
- * Up to `cap` matching files in the query's order. `cap + 1` rows are read so
- * the caller can tell a cut list from one that fits exactly; the extra row is
- * left for the caller to drop (multi-workspace merges need it to compare).
+ * The matching files in the query's order, read as the caller consumes them:
+ * it stops once it has what it needs, so a query matching far more rows than
+ * the graph draws (identical copies, a large collection) is not read whole.
+ * `limit`, when the caller knows it, also lets SQLite keep only that many rows
+ * in a sort no index serves.
  */
-export function graphFiles(
+export function* graphFiles(
   db: DB,
   query: SearchQuery,
-  cap: number,
-): GraphFileRow[] {
+  limit?: number,
+): Generator<GraphFileRow, void, undefined> {
   const q = graphQuery(query);
   const args: unknown[] = [];
   let sql = `SELECT ${FILE_COLS}, f.meta_key AS metaKey ${FILE_FROM} WHERE f.deleted_at IS NULL`;
   sql = appendSearchConditions(db, sql, args, q);
-  sql += ` ORDER BY ${orderByFor(q.sort, q.sortDir)} LIMIT ?`;
-  args.push(cap + 1);
-  return db.prepare(sql).all(...args) as GraphFileRow[];
+  sql += ` ORDER BY ${orderByFor(q.sort, q.sortDir)}`;
+  if (limit != null) {
+    sql += " LIMIT ?";
+    args.push(limit);
+  }
+  yield* db.prepare(sql).iterate(...args) as IterableIterator<GraphFileRow>;
 }
 
 /** Plays recorded for each of `metaKeys` (play_history rows), by meta_key;
