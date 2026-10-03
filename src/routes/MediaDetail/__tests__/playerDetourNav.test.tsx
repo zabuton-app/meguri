@@ -2,7 +2,7 @@
 // player plays — browsing by folder, the folder's whole subtree — not the list,
 // which shows only the folder's direct files.
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { Route, Routes } from "react-router";
 import "@/test/mockVirtualizer";
 import MediaDetail from "@/routes/MediaDetail";
@@ -95,6 +95,32 @@ describe("detail view reached from the player", () => {
       expect(
         screen
           .getByRole("button", { name: "Next file" })
+          .hasAttribute("disabled"),
+      ).toBe(false),
+    );
+  });
+
+  it("keeps to the player's order after stepping off the detoured file", async () => {
+    renderWithProviders(<Detail />, {
+      route: `/file/5?ws=${WS_ID}&from=player`,
+    });
+    await screen.findByRole("heading", { name: "deep.mp4" });
+    const next = screen.getByRole("button", { name: "Next file" });
+    await waitFor(() => expect(next.hasAttribute("disabled")).toBe(false));
+    mocks.fileGet.mockResolvedValue({
+      ...sampleFileDetail,
+      id: 6,
+      relPath: "Movie/later.mp4",
+    });
+    fireEvent.click(next);
+    await screen.findByRole("heading", { name: "later.mp4" });
+    // The player's parked pass stays behind, the order does not: the file is
+    // not in the list, yet there is still a way back.
+    expect(window.location.hash).not.toContain("from=player");
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Previous file" })
           .hasAttribute("disabled"),
       ).toBe(false),
     );

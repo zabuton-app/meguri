@@ -15,8 +15,11 @@
 // A selected row is kept as a whole FileRow snapshot, not just its id, so a row
 // that has scrolled out of the loaded window still counts: the bar's number and
 // the dialog's totals can never drift apart. Reading a row prefers the version
-// the list currently holds, so an edit landing in the query cache is reflected
-// without the selection having to be told about it.
+// the list currently holds, and the snapshot is renewed from it, so an edit
+// landing in the query cache is reflected without the selection having to be
+// told about it. A row the list does not hold — a picked folder's files, a row
+// scrolled out or filtered away — has only its snapshot, so a bulk edit tells
+// the selection what it wrote (patch, refreshFolders).
 //
 // In the folder view a folder card can be selected too. It stands for every
 // file below it, fetched (expandFolders) the moment it is picked: the bar and
@@ -44,6 +47,9 @@ export interface SelectionClickMods {
   ctrlKey: boolean;
   metaKey: boolean;
 }
+
+/** What identifies a file to the selection. */
+export type FileKey = Pick<FileRow, "id" | "workspaceId">;
 
 /** The selection as a whole — what the bar and the dialog read. */
 export interface SelectionView {
@@ -75,7 +81,18 @@ export interface SelectionApi extends SelectionView {
    * from the index). A selected row is kept even when the list no longer
    * shows it, so a deleted one has to be removed explicitly.
    */
-  forget: (file: FileRow) => void;
+  forget: (file: FileKey) => void;
+  /**
+   * Apply to the selection's own copies what a bulk edit wrote to `files`.
+   * The list's rows follow the query cache; the rows the list does not hold
+   * (see the header) would otherwise keep showing the values from before.
+   */
+  patch: (files: FileKey[], patch: Partial<FileRow>) => void;
+  /**
+   * Fetch the picked folders' files again, after an edit whose result cannot
+   * be patched in (a bulk tag edit reports counts, not rows).
+   */
+  refreshFolders: () => void;
   /** Every loaded row. "Loaded" is the honest scope; see the comment on it. */
   selectAll: () => void;
   /** Empty the selection but stay in selection mode. */
@@ -191,7 +208,21 @@ class SelectionStore {
     }
     // A selected row that is still loaded is read from the list, so an edit that
     // refreshed the query shows through the next time the selection is read.
-    if (listChanged && this.selected.size > 0) this.rebuild(true);
+    // Its snapshot is renewed too: should the edit take the row off the list
+    // (unfavorited under a favorites filter), what is left must not be the
+    // row as it was before the edit.
+    if (listChanged && (this.selected.size > 0 || this.folders.size > 0)) {
+      let next: Map<string, FileRow> | null = null;
+      for (const item of items) {
+        const key = selectionKey(item);
+        const snapshot = this.selected.get(key);
+        if (snapshot === undefined || snapshot === item) continue;
+        next ??= new Map(this.selected);
+        next.set(key, item);
+      }
+      if (next) this.selected = next;
+      this.rebuild(true);
+    }
   }
 
   /** Announces what syncList changed: notifying during render is not allowed. */
@@ -228,7 +259,7 @@ class SelectionStore {
     this.rebuild(false);
   };
 
-  forget = (file: FileRow): void => {
+  forget = (file: FileKey): void => {
     const key = selectionKey(file);
     let changed = false;
     if (this.selected.has(key)) {
@@ -251,6 +282,40 @@ class SelectionStore {
     if (!changed) return;
     this.folders = folders;
     this.rebuild(false);
+  };
+
+  patch = (files: FileKey[], patch: Partial<FileRow>): void => {
+    const keys = new Set(files.map(selectionKey));
+    let changed = false;
+    const selected = new Map(this.selected);
+    for (const [key, row] of this.selected) {
+      if (!keys.has(key)) continue;
+      selected.set(key, { ...row, ...patch });
+      changed = true;
+    }
+    const folders = new Map(this.folders);
+    for (const [path, pick] of this.folders) {
+      if (!pick.rows?.some((row) => keys.has(selectionKey(row)))) continue;
+      const rows = pick.rows.map((row) =>
+        keys.has(selectionKey(row)) ? { ...row, ...patch } : row,
+      );
+      folders.set(path, { ...pick, rows });
+      changed = true;
+    }
+    if (!changed) return;
+    this.selected = selected;
+    this.folders = folders;
+    this.rebuild(false);
+  };
+
+  // The files shown stay until the new ones arrive, and stay if they never
+  // do: the selection does not go back to pending.
+  refreshFolders = (): void => {
+    this.fetchFolders(
+      [...this.folders]
+        .filter(([, pick]) => pick.rows !== null)
+        .map(([path]) => path),
+    );
   };
 
   // "All" is everything the list has loaded, not everything the filter matches:
@@ -308,8 +373,14 @@ class SelectionStore {
   /**
    * Fetch picked folders' files and fill them in. A result is dropped when the
    * pick it answers is gone — deselected, re-picked, or swept away by a list
-   * change — so a slow answer can never resurrect a selection. A failed fetch
-   * un-picks its folders rather than leaving them pending forever.
+   * change — so a slow answer can never resurrect a selection. A failed first
+   * fetch un-picks its folders rather than leaving them pending forever.
+   *
+   * A pick that already had its files when they were asked for again
+   * (refreshFolders) can be replaced while the answer is on its way, by an
+   * edit patched in or by another refresh. That answer may predate the edit,
+   * so it is dropped like any other — and asked for once more, or the folder
+   * would keep the files it had before the refresh.
    */
   private fetchFolders(paths: string[]): void {
     const expand = this.expand;
@@ -324,20 +395,33 @@ class SelectionStore {
       expand(batch).then(
         (results) => {
           let changed = false;
+          const again: string[] = [];
           const next = new Map(this.folders);
           for (const { path, rows, total } of results) {
             const pick = next.get(path);
-            if (!pick || pick !== picks.get(path)) continue;
+            if (!pick) continue;
+            if (pick !== picks.get(path)) {
+              // Not a fresh pick with a fetch of its own under way.
+              if (pick.rows !== null) again.push(path);
+              continue;
+            }
             next.set(path, { ...pick, rows, total });
             changed = true;
           }
-          if (!changed) return;
-          this.folders = next;
-          this.rebuild(false);
+          if (changed) {
+            this.folders = next;
+            this.rebuild(false);
+          }
+          this.fetchFolders(again);
         },
         () => {
+          // Only a pick still waiting for its first files: one being read
+          // again keeps the files it has.
           this.dropFolders(
-            batch.filter((p) => this.folders.get(p) === picks.get(p)),
+            batch.filter((p) => {
+              const pick = this.folders.get(p);
+              return pick === picks.get(p) && pick?.rows === null;
+            }),
           );
         },
       );
@@ -413,6 +497,8 @@ export function useSelection(): SelectionApi {
       isSelected: store.isSelected,
       click: store.click,
       forget: store.forget,
+      patch: store.patch,
+      refreshFolders: store.refreshFolders,
       selectAll: store.selectAll,
       deselectAll: store.deselectAll,
       exit: store.exit,
@@ -471,6 +557,17 @@ export function useFolderSelection(path: string): {
  */
 export function useReadSelection(): () => SelectionView {
   return useStore().getView;
+}
+
+const noForget = (): void => {};
+
+/**
+ * {@link SelectionApi.forget} for a view that may sit outside the list (the
+ * detail view opens from other screens too): a no-op where there is no
+ * selection to forget from.
+ */
+export function useForgetSelected(): SelectionApi["forget"] {
+  return useContext(StoreContext)?.forget ?? noForget;
 }
 
 /** Whether this one row is selected, as its own subscription. */

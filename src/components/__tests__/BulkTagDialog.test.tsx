@@ -93,6 +93,23 @@ describe("BulkTagDialog", () => {
     expect(mocks.filesBulkTag.mock.calls[0][2]).toEqual([]);
   });
 
+  it("tells its caller once the edit is written", async () => {
+    // The caller re-reads the rows no list refetch covers (a picked folder's).
+    const onApplied = vi.fn();
+    renderWithProviders(
+      <BulkTagDialog
+        open
+        onOpenChange={() => {}}
+        rows={rows}
+        onApplied={onApplied}
+      />,
+    );
+    fireEvent.click(screen.getByTitle("Put “trip” on every selected file"));
+    expect(onApplied).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Apply to 3" }));
+    await waitFor(() => expect(onApplied).toHaveBeenCalledTimes(1));
+  });
+
   it("stages a removal and lets it be taken back", () => {
     open();
     fireEvent.click(

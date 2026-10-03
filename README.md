@@ -168,6 +168,9 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 🏷️ **Tags, ratings & history** — manual tags with autocomplete, ★ ratings,
   and playback history that survive file moves and renames, plus a day-grouped
   history timeline across all workspaces
+- 🕸️ **Graph view** — see the library as a network of files and their tags,
+  in 2D or 3D, with nodes you can drag, search, and size by how often they
+  were played
 - 🔭 **Discovery** — an immersive shuffle mode that resurfaces random picks
   from your library full-screen with a scene-preview rail
   ([see above](#-discovery--find-something-new))

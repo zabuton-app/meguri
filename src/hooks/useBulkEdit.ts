@@ -9,6 +9,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/ipc/client";
+import { useSelection } from "@/components/SelectionContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { bulkTargets } from "@/lib/bulkEdit";
 import {
@@ -50,10 +51,14 @@ export function useBulkEdit(
   const { t } = useI18n();
   const qc = useQueryClient();
 
+  const { patch: patchSelection } = useSelection();
+
   const fail = (e: unknown) =>
-    toast.error(t("select.bulkFailed"), {
-      description: e instanceof Error ? e.message : String(e),
-    });
+    toast.error(
+      t("select.bulkFailed", {
+        msg: e instanceof Error ? e.message : String(e),
+      }),
+    );
 
   const meta = useMutation({
     // The rows are captured here, when the click happens, and carried through
@@ -85,6 +90,9 @@ export function useBulkEdit(
       for (const row of written) {
         syncFileRowAcrossCaches(qc, row.workspaceId, row.id, rowPatch);
       }
+      // The selection's own copies: a picked folder's files and rows the list
+      // no longer holds are in no query cache for the patch above to reach.
+      patchSelection(written, rowPatch);
       invalidateFileCaches(qc);
       // One line per field the call actually set, so a future call that sets
       // both does not silently report only one of them.
@@ -108,7 +116,15 @@ export function useBulkEdit(
       }
       if (lines.length > 0) toast.success(lines.join(" / "));
     },
-    onError: fail,
+    onError: (e) => {
+      // Each workspace commits on its own (see files_bulk_meta), so a call
+      // that failed may still have written the workspaces ahead of the one
+      // that threw: re-read rather than leave those showing the old values.
+      // (A selected row the list no longer holds keeps its snapshot: which
+      // workspaces were written is not something the failure says.)
+      invalidateFileCaches(qc);
+      fail(e);
+    },
   });
 
   const watchLater = useMutation({

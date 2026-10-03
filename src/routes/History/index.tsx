@@ -131,6 +131,10 @@ export default function History() {
       // history (see clearPlayHistory); the lists' and graph's played state,
       // progress bars and the detail's start position are read from these.
       invalidateFileCaches(qc);
+      // Dropped, not just marked stale: the detail view settles where to
+      // start from the first data it sees, and a cached copy would hand it
+      // the resume point that was just cleared (which it then writes back).
+      qc.removeQueries({ queryKey: ["file_get"], type: "inactive" });
     },
   });
   const onClear = useCallback(async () => {

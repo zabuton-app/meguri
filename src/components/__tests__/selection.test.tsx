@@ -271,6 +271,43 @@ describe("selection", () => {
       fireEvent.click(screen.getByRole("button", { name: "swap" }));
       expect(bar()).toBeNull();
     });
+
+    it("keeps a row as it last read once the list drops it", () => {
+      // An edit that takes the row off the list (unfavorited under a favorites
+      // filter): the list first shows the row edited, then without it.
+      const lists: FileRow[][] = [
+        [{ ...items[0], favorite: 1 }],
+        [{ ...items[0], favorite: 0 }],
+        [],
+      ];
+      function Stages() {
+        const [stage, setStage] = useState(0);
+        return (
+          <>
+            <button type="button" onClick={() => setStage((n) => n + 1)}>
+              step
+            </button>
+            <SelectionProvider items={lists[stage]} scope="one">
+              <MediaGrid
+                items={lists[stage]}
+                mediaBase="http://127.0.0.1:17345"
+                workspaceId={WS_ID}
+                loading={false}
+                thumbVersion={{}}
+              />
+              <SelectionLayer active />
+            </SelectionProvider>
+          </>
+        );
+      }
+      renderWithProviders(<Stages />);
+      fireEvent.click(checkboxes()[0]);
+      expect(within(bar()!).getByTitle("Remove from favorites")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "step" }));
+      fireEvent.click(screen.getByRole("button", { name: "step" }));
+      expect(selectedCount()).toBe(1);
+      expect(within(bar()!).getByTitle("Favorite")).toBeTruthy();
+    });
   });
   describe("the bar's bulk controls", () => {
     /** Rows where one is already a favorite: the mixed case. */
@@ -774,6 +811,147 @@ describe("folder selection", () => {
     fireEvent.click(screen.getByRole("button", { name: "forget" }));
     // Gone from the direct picks and from the folder's files alike.
     expect(selectedCount()).toBe(1);
+  });
+
+  it("shows a bulk edit on a folder's files, which no list holds", async () => {
+    const { expand, calls } = deferredExpand();
+    renderWithProviders(
+      <FolderHarness folders={[folder("Movie", 2)]} expand={expand} />,
+    );
+    fireEvent.click(folderBoxes()[0]);
+    await act(async () => {
+      calls[0].resolve([
+        { path: "Movie", total: 2, rows: filesOf("Movie", 2, 100) },
+      ]);
+      await Promise.resolve();
+    });
+    fireEvent.click(within(bar()!).getByTitle("Favorite"));
+    await waitFor(() =>
+      expect(mocks.filesBulkMeta).toHaveBeenCalledWith(
+        [{ workspaceId: WS_ID, fileIds: [100, 101] }],
+        { favorite: true },
+      ),
+    );
+    // The bar reads the folder's files as written, so the next click undoes.
+    await waitFor(() =>
+      expect(within(bar()!).getByTitle("Remove from favorites")).toBeTruthy(),
+    );
+  });
+
+  it("reads picked folders again on request, without going back to waiting", async () => {
+    const { expand, calls } = deferredExpand();
+    function Refresh() {
+      const { refreshFolders } = useSelection();
+      return (
+        <button type="button" onClick={refreshFolders}>
+          refresh
+        </button>
+      );
+    }
+    renderWithProviders(
+      <FolderHarness
+        folders={[folder("Movie", 2)]}
+        expand={expand}
+        extra={<Refresh />}
+      />,
+    );
+    fireEvent.click(folderBoxes()[0]);
+    await act(async () => {
+      calls[0].resolve([
+        { path: "Movie", total: 2, rows: filesOf("Movie", 2, 100) },
+      ]);
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    expect(expand).toHaveBeenLastCalledWith(["Movie"]);
+    // Still the files it had while the new ones are on their way.
+    expect(selectedCount()).toBe(2);
+    expect(within(bar()!).queryByText("Loading folder contents")).toBeNull();
+    await act(async () => {
+      calls[1].resolve([
+        { path: "Movie", total: 3, rows: filesOf("Movie", 3, 100) },
+      ]);
+      await Promise.resolve();
+    });
+    expect(selectedCount()).toBe(3);
+  });
+
+  it("keeps a folder's files when reading them again fails", async () => {
+    const { expand, calls } = deferredExpand();
+    function Refresh() {
+      const { refreshFolders } = useSelection();
+      return (
+        <button type="button" onClick={refreshFolders}>
+          refresh
+        </button>
+      );
+    }
+    renderWithProviders(
+      <FolderHarness
+        folders={[folder("Movie", 2)]}
+        expand={expand}
+        extra={<Refresh />}
+      />,
+    );
+    fireEvent.click(folderBoxes()[0]);
+    await act(async () => {
+      calls[0].resolve([
+        { path: "Movie", total: 2, rows: filesOf("Movie", 2, 100) },
+      ]);
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    await act(async () => {
+      calls[1].reject(new Error("gone"));
+      await Promise.resolve();
+    });
+    expect(selectedCount()).toBe(2);
+  });
+
+  it("reads a folder once more when an edit lands while it is being read again", async () => {
+    const { expand, calls } = deferredExpand();
+    const first = filesOf("Movie", 2, 100);
+    function Edits() {
+      const { refreshFolders, patch } = useSelection();
+      return (
+        <>
+          <button type="button" onClick={refreshFolders}>
+            refresh
+          </button>
+          <button type="button" onClick={() => patch(first, { favorite: 1 })}>
+            patch
+          </button>
+        </>
+      );
+    }
+    renderWithProviders(
+      <FolderHarness
+        folders={[folder("Movie", 2)]}
+        expand={expand}
+        extra={<Edits />}
+      />,
+    );
+    fireEvent.click(folderBoxes()[0]);
+    await act(async () => {
+      calls[0].resolve([{ path: "Movie", total: 2, rows: first }]);
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "patch" }));
+    await act(async () => {
+      // Read before the edit, for all this answer knows: not taken.
+      calls[1].resolve([{ path: "Movie", total: 2, rows: first }]);
+      await Promise.resolve();
+    });
+    expect(within(bar()!).getByTitle("Remove from favorites")).toBeTruthy();
+    expect(expand).toHaveBeenCalledTimes(3);
+    await act(async () => {
+      calls[2].resolve([
+        { path: "Movie", total: 3, rows: filesOf("Movie", 3, 100) },
+      ]);
+      await Promise.resolve();
+    });
+    expect(selectedCount()).toBe(3);
   });
 
   it("adds folder files to picked files without counting any twice", async () => {

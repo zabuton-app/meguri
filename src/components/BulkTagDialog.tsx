@@ -41,9 +41,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** The selected rows, as the selection holds them. */
   rows: FileRow[];
+  /** The edit was written: the caller re-reads the rows no list refetch covers. */
+  onApplied?: () => void;
 }
 
-export function BulkTagDialog({ open, onOpenChange, rows }: Props) {
+export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const [input, setInput] = useState("");
@@ -117,8 +119,10 @@ export function BulkTagDialog({ open, onOpenChange, rows }: Props) {
     onSuccess: (result) => {
       // The refetch that follows flows back into the selection: the provider
       // re-snapshots every selected row that is still loaded, so reopening this
-      // dialog tallies the tags as they now are.
+      // dialog tallies the tags as they now are. A picked folder's files are
+      // not in the list to be refetched; onApplied reads those again.
       invalidateTagCatalog(qc);
+      onApplied?.();
       onOpenChange(false);
       toast.success(
         t("select.tagsApplied", {
@@ -145,6 +149,10 @@ export function BulkTagDialog({ open, onOpenChange, rows }: Props) {
         );
         return;
       }
+      // Past the name check each workspace commits on its own (see
+      // files_bulk_tag), so the ones ahead of the failure may be written.
+      invalidateTagCatalog(qc);
+      onApplied?.();
       toast.error(t("select.tagsFailed", { msg }));
     },
   });

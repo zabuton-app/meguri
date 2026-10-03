@@ -20,6 +20,11 @@ import {
 } from "@/lib/smartCollections";
 import { useMediaNav, usePlaylistNav } from "@/components/MediaNavContext";
 import { getListCounts } from "@/hooks/useListCounts";
+import {
+  getRecentSearches,
+  resetRecentSearchesForTest,
+} from "@/hooks/useRecentSearches";
+import { RECENT_SEARCHES_KEY } from "@/lib/recentSearches";
 import { BY_FOLDER_KEY, VIEW_KEY } from "@/routes/Home/utils";
 
 const mocks = vi.hoisted(() => ({
@@ -1072,6 +1077,39 @@ describe("Home folder view", () => {
     ).toBe(false);
   });
 
+  it("does not count the search it opens on as a recent one", async () => {
+    localStorage.setItem(
+      SMART_COLLECTIONS_KEY,
+      JSON.stringify([
+        {
+          id: "1",
+          name: "Videos",
+          query: { kind: "video" },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ]),
+    );
+    localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, "1");
+    resetRecentSearchesForTest();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderWithProviders(<AppRoutes />);
+      await waitFor(() =>
+        expect(lastSearch()).toMatchObject({ kind: "video" }),
+      );
+      // Past the time a search takes to count as one.
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(getRecentSearches()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      localStorage.removeItem(SMART_COLLECTIONS_KEY);
+      localStorage.removeItem(DEFAULT_SMART_COLLECTION_KEY);
+      localStorage.removeItem(RECENT_SEARCHES_KEY);
+      resetRecentSearchesForTest();
+    }
+  });
+
   it("opens a saved search whose folder is gone at its nearest ancestor", async () => {
     // Movie/Old was removed after the search was saved; with a condition on,
     // the view only searches, so the folder is resolved when it is opened.
@@ -1379,6 +1417,53 @@ describe("Home graph view", () => {
       fileCount: 1,
     });
     mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
+  });
+
+  it("leaves the graph for a saved search that carries a folder", async () => {
+    // The graph has no folder form: applied there, the folder would be dropped
+    // and the graph would show the whole workspace under the search's name.
+    localStorage.setItem(VIEW_KEY, "graph");
+    localStorage.setItem(
+      SMART_COLLECTIONS_KEY,
+      JSON.stringify([
+        {
+          id: "1",
+          name: "Movie videos",
+          query: { kind: "video", folder: { path: "Movie", recursive: true } },
+          workspaceId: WS_ID,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ]),
+    );
+    mocks.foldersList.mockResolvedValue({
+      path: "Movie",
+      folders: [],
+      fileCount: 1,
+    });
+    try {
+      renderWithProviders(<AppRoutes />);
+      await screen.findByTestId("graph-view");
+      fireEvent.pointerDown(
+        screen.getByRole("button", { name: "Smart collections" }),
+        { button: 0, ctrlKey: false },
+      );
+      fireEvent.click(
+        await screen.findByRole("menuitem", { name: /^Movie videos/ }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByTestId("graph-view")).toBeNull(),
+      );
+      expect(localStorage.getItem(VIEW_KEY)).toBe("grid");
+      await waitFor(() =>
+        expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).toMatchObject({
+          kind: "video",
+          folder: { path: "Movie", recursive: true },
+        }),
+      );
+    } finally {
+      localStorage.removeItem(SMART_COLLECTIONS_KEY);
+    }
   });
 
   it("swaps the list for the graph, off the folder view, and back", async () => {
