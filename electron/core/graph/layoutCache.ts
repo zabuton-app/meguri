@@ -121,7 +121,9 @@ export async function readLayout(
  * a save racing the removal must not write them back. Past the size cap the
  * keys the update did not touch go first, oldest first. `alive` is asked when
  * the write runs, not when it is queued: false (its scope was removed in
- * between) drops the write, so it cannot bring the removed directory back.
+ * between) drops the write, so it cannot bring the removed directory back. A
+ * write to a workspace being removed is dropped the same way (see
+ * removeWorkspaceWithLayouts).
  */
 export function writeLayout(
   file: string,
@@ -145,6 +147,21 @@ export function writeLayout(
 }
 
 const writes = new Map<string, Promise<void>>();
+/** Files whose workspace is being removed (see removeWorkspaceWithLayouts),
+ *  counted: two removals of one workspace may overlap. */
+const heldOff = new Map<string, number>();
+
+/** Wait until no write to `file` is queued. Writes queued while waiting chain
+ *  onto the last one, so this waits until the queue's tail is one already
+ *  waited for. */
+async function drainWrites(file: string): Promise<void> {
+  let last: Promise<void> | undefined;
+  let w: Promise<void> | undefined;
+  while ((w = writes.get(file)) && w !== last) {
+    last = w;
+    await w.catch(() => undefined);
+  }
+}
 
 async function mergeAndWrite(
   file: string,
@@ -180,7 +197,7 @@ async function mergeAndWrite(
   };
   // Checked after the last wait before mkdir, which would recreate a removed
   // workspace's data directory.
-  if (!alive()) return;
+  if (heldOff.has(file) || !alive()) return;
   await fs.mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(out));
@@ -206,34 +223,31 @@ export async function removeLayout(file: string): Promise<void> {
 /**
  * Run `remove`, which deletes a workspace's data directory, so that no save
  * of the workspace's layouts writes into the directory as it goes or brings
- * it back after. Saves under way land first; one queued later is dropped by
- * its `alive` check (see writeLayout); one that passed that check just before
- * `remove` may have recreated the directory, so its file is swept and the
- * directory removed again if that left it empty. The sweep is skipped when
- * `stillGone` says the workspace has been registered again meanwhile.
+ * it back after. Saves to its files are held off from the start, those
+ * already queued are waited out (one that has not reached its write yet is
+ * dropped), and only then does `remove` run. Saves sent once it has returned
+ * are left to their `alive` check (see writeLayout), so a workspace
+ * registered again saves as usual.
  */
 export async function removeWorkspaceWithLayouts(
   dataDir: string,
   remove: () => Promise<void>,
-  stillGone: () => boolean,
 ): Promise<void> {
   const files = [
     path.join(dataDir, fileName(2)),
     path.join(dataDir, fileName(3)),
   ];
-  await Promise.all(files.map(removeLayout));
-  await remove();
-  await Promise.all(
-    files.map((f) =>
-      (writes.get(f) ?? Promise.resolve()).catch(() => undefined),
-    ),
-  );
-  if (!stillGone()) return;
-  await Promise.all(
-    files.map((f) => fs.rm(f, { force: true }).catch(() => undefined)),
-  );
-  // Not recursive: anything else in it is not a layout's to delete.
-  await fs.rmdir(dataDir).catch(() => undefined);
+  for (const f of files) heldOff.set(f, (heldOff.get(f) ?? 0) + 1);
+  try {
+    for (const f of files) await drainWrites(f);
+    await remove();
+  } finally {
+    for (const f of files) {
+      const n = (heldOff.get(f) ?? 1) - 1;
+      if (n > 0) heldOff.set(f, n);
+      else heldOff.delete(f);
+    }
+  }
 }
 
 /**

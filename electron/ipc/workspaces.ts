@@ -66,18 +66,14 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
       await ctx.scans.abort(id);
       // A graph layout save must not write into the data dir as it is
       // deleted, nor bring it back after.
-      await removeWorkspaceWithLayouts(
-        dataDirForRoot(p),
-        async () => {
-          // The worker holds a read-only handle on this workspace's DB; close
-          // it before ws.remove() deletes the data dir (open handles block
-          // removal on Windows), with nothing awaited in between that would
-          // let a query open it again.
-          await queryClient.closeWorkspace(id);
-          ws.remove(p);
-        },
-        () => !ws.pathOf(id),
-      );
+      await removeWorkspaceWithLayouts(dataDirForRoot(p), async () => {
+        // The worker holds a read-only handle on this workspace's DB; close
+        // it before ws.remove() deletes the data dir (open handles block
+        // removal on Windows), with nothing awaited in between that would
+        // let a query open it again.
+        await queryClient.closeWorkspace(id);
+        ws.remove(p);
+      });
     }
     if (ws.active()) ctx.scans.start();
     emit("workspace:changed", { activeId: ws.activeId });
@@ -114,9 +110,9 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
   });
 
   handle("collection_remove", ({ id }) => {
-    // The graph view's cached positions go with the collection (a workspace's
-    // live in its data directory, which removal deletes anyway); a locked or
-    // unknown one stays, and so do they.
+    // The graph view's cached positions go with the collection (a
+    // workspace's layouts live in its data directory, which removal deletes
+    // anyway); a locked or unknown one stays, and so do they.
     if (ws.removeCollection(id))
       for (const file of collectionLayoutPaths(baseDataDir(), id))
         void removeLayout(file);

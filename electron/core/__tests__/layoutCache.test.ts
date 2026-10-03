@@ -232,65 +232,67 @@ describe("concurrent writes", () => {
 });
 
 describe("removeWorkspaceWithLayouts", () => {
-  it("lets a save under way land before the removal, and leaves no directory", async () => {
-    const dir = path.join(base, "roots", "ws");
-    const file = path.join(dir, "graph-layout.json");
-    let landed = false;
-    let landedBeforeRemove = false;
-    const saving = writeLayout(file, { keys: ["t::a"], xy: [1, 2] }).then(
+  const dir = () => path.join(base, "roots", "ws");
+  const file = () => path.join(dir(), "graph-layout.json");
+  const removeDir = () => {
+    fs.rmSync(dir(), { recursive: true, force: true });
+    return Promise.resolve();
+  };
+
+  it("waits for a save already past its check to write before removing", async () => {
+    let removing: Promise<void> | undefined;
+    let writtenBeforeRemove = false;
+    await writeLayout(
+      file(),
+      { keys: ["t::a"], xy: [1, 2] },
+      undefined,
+      2,
       () => {
-        landed = true;
+        // The removal starts just as this save passes its check.
+        removing = removeWorkspaceWithLayouts(dir(), () => {
+          writtenBeforeRemove = fs.existsSync(file());
+          return removeDir();
+        });
+        return true;
       },
     );
-    await removeWorkspaceWithLayouts(
-      dir,
-      () => {
-        landedBeforeRemove = landed;
-        fs.rmSync(dir, { recursive: true, force: true });
-        return Promise.resolve();
-      },
-      () => true,
-    );
-    await saving;
-    expect(landedBeforeRemove).toBe(true);
-    expect(fs.existsSync(dir)).toBe(false);
+    await removing;
+    expect(writtenBeforeRemove).toBe(true);
+    expect(fs.existsSync(dir())).toBe(false);
   });
 
-  it("sweeps a layout written back after the removal, but nothing else", async () => {
-    const dir = path.join(base, "roots", "ws");
-    const file = path.join(dir, "graph-layout.json");
-    await removeWorkspaceWithLayouts(
-      dir,
-      async () => {
-        fs.rmSync(dir, { recursive: true, force: true });
-        // A save that checked its scope just before the removal.
-        await writeLayout(file, { keys: ["t::a"], xy: [1, 2] });
-      },
-      () => true,
-    );
-    expect(fs.existsSync(dir)).toBe(false);
-
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "db.sqlite"), "");
-    await removeWorkspaceWithLayouts(
-      dir,
-      async () => {},
-      () => true,
-    );
-    expect(fs.existsSync(path.join(dir, "db.sqlite"))).toBe(true);
+  it("drops a save that reaches its write while the workspace is being removed", async () => {
+    await writeLayout(file(), { keys: ["t::a"], xy: [1, 2] });
+    await removeWorkspaceWithLayouts(dir(), async () => {
+      // Sent while the DB is being closed: its scope still resolves, so only
+      // the hold keeps it from writing the directory back after the delete.
+      const late = writeLayout(file(), { keys: ["t::b"], xy: [3, 4] });
+      fs.rmSync(dir(), { recursive: true, force: true });
+      await late;
+    });
+    expect(fs.existsSync(dir())).toBe(false);
   });
 
-  it("does not sweep a directory the workspace got back by being added again", async () => {
-    const dir = path.join(base, "roots", "ws");
-    await removeWorkspaceWithLayouts(
-      dir,
-      // Removed, then registered again at once: a new data dir.
-      () => {
-        fs.mkdirSync(dir, { recursive: true });
-        return Promise.resolve();
-      },
-      () => false,
-    );
-    expect(fs.existsSync(dir)).toBe(true);
+  it("keeps holding saves until the last of two overlapping removals is done", async () => {
+    let releaseSecond = () => {};
+    const second = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    const slow = removeWorkspaceWithLayouts(dir(), async () => {
+      await second;
+      await removeDir();
+    });
+    await removeWorkspaceWithLayouts(dir(), removeDir);
+    // The first removal is done; the second still holds the files.
+    await writeLayout(file(), { keys: ["t::a"], xy: [1, 2] });
+    expect(fs.existsSync(dir())).toBe(false);
+    releaseSecond();
+    await slow;
+  });
+
+  it("lets a workspace registered again save as usual", async () => {
+    await removeWorkspaceWithLayouts(dir(), removeDir);
+    await writeLayout(file(), { keys: ["t::a"], xy: [1, 2] });
+    expect((await readLayout(file()))?.keys).toEqual(["t::a"]);
   });
 });
