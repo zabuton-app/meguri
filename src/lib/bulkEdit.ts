@@ -6,6 +6,7 @@
 // answers are the feature's actual rules.
 import type { FileRow } from "@/ipc/types";
 import type { BulkTargets } from "@shared/ipc/channels";
+import { MAX_BULK_FILES } from "@shared/tags";
 
 /**
  * Selection rows regrouped into the per-workspace targets every bulk channel
@@ -32,6 +33,30 @@ export function groupBulkTargets(
     workspaceId,
     fileIds,
   }));
+}
+
+/**
+ * Read rows again through a bulk channel, however many there are.
+ *
+ * One call may name MAX_BULK_FILES files at most. An edit is refused past
+ * that, but a selection is free to grow beyond it — while a write is still
+ * pending, among other times — and the read that follows the write covers the
+ * selection as it then is. So the rows go out in runs of the cap, one after
+ * another.
+ *
+ * All of the runs or nothing: the caller reads a row that is missing from the
+ * answer as a file that is gone, which a run that failed must never look like.
+ */
+export async function readInBulkBatches(
+  rows: FileRow[],
+  read: (targets: BulkTargets) => Promise<FileRow[]>,
+): Promise<FileRow[]> {
+  const out: FileRow[] = [];
+  for (let i = 0; i < rows.length; i += MAX_BULK_FILES) {
+    const found = await read(bulkTargets(rows.slice(i, i + MAX_BULK_FILES)));
+    for (const row of found) out.push(row);
+  }
+  return out;
 }
 
 /** A flag across the selection: on for all of it, some of it, or none. */

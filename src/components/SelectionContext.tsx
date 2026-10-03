@@ -74,7 +74,12 @@ export interface SelectionView {
 /** Fetches selected folders' files (folder_files), injected by the provider. */
 export type ExpandFolders = (paths: string[]) => Promise<FolderFilesResult>;
 
-/** Reads selected files as they now stand (files_by_ids), injected by the provider. */
+/**
+ * Reads selected files as they now stand (files_by_ids), injected by the
+ * provider. It is handed the whole selection, which can be larger than one
+ * call may carry, and must reject rather than answer with part of it: a row
+ * left out of the answer leaves the selection.
+ */
 export type ReadFiles = (files: FileRow[]) => Promise<FileRow[]>;
 
 export interface SelectionApi extends SelectionView {

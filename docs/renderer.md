@@ -128,7 +128,9 @@ picked folder's files, a row scrolled out, a row the edit itself filtered
 away). The list refetch after a bulk edit renews only the rows still loaded,
 so the edit also has the selection read itself again (`refresh`): the selected
 rows through `files_by_ids` and the picked folders through `folder_files`. A
-file that does not come back is gone and leaves the selection.
+file that does not come back is gone and leaves the selection. The selection
+can be larger than one call may name, so the rows are read in runs of
+`MAX_BULK_FILES` (`readInBulkBatches`), all of which must succeed.
 
 The graph view (`src/graph/`, loaded lazily with `React.lazy` so the list views
 never pay for it) draws the same list as a network of files and tags, from one

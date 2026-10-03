@@ -61,7 +61,7 @@ import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { SelectionProvider } from "@/components/SelectionContext";
 import { walksPlaybackOrder } from "@/lib/playbackOrder";
-import { bulkTargets } from "@/lib/bulkEdit";
+import { readInBulkBatches } from "@/lib/bulkEdit";
 import { FolderHeader } from "@/components/FolderHeader";
 import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
 import { useFolderNav } from "./useFolderNav";
@@ -241,7 +241,7 @@ export default function Home() {
   );
   // A bulk edit has the selection read its rows again (see SelectionContext).
   const readFiles = useCallback(
-    (rows: FileRow[]) => api.filesByIds(bulkTargets(rows)),
+    (rows: FileRow[]) => readInBulkBatches(rows, api.filesByIds),
     [],
   );
 
