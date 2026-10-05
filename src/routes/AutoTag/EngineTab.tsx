@@ -149,14 +149,28 @@ export function EngineTab({ state }: { state: AutoTagState }) {
     setBusy(false);
   };
 
-  const q = filter.trim().toLowerCase();
-  const keywords = q
+  // The filter only applies while its box is on screen: deleting entries can
+  // take the box away, and a filter nobody can see or clear must not keep
+  // hiding the list.
+  const filterable = config.keywords.length > FILTER_FROM;
+  const q = filterable ? filter.trim().toLowerCase() : "";
+  const matching = q
     ? config.keywords.filter((entry) =>
         [entry.tag, ...entry.aliases].some((term) =>
           term.toLowerCase().includes(q),
         ),
       )
     : config.keywords;
+  // The rows drawn — and the selected entry among them even when it sits past
+  // the cut, so what the pane edits is always marked in the list.
+  const keywords = matching.slice(0, MAX_ROWS);
+  if (
+    shownKeyword &&
+    matching.includes(shownKeyword) &&
+    !keywords.includes(shownKeyword)
+  ) {
+    keywords.push(shownKeyword);
+  }
 
   return (
     <>
@@ -280,7 +294,7 @@ export function EngineTab({ state }: { state: AutoTagState }) {
             </div>
             {!collapsed && (
               <>
-                {config.keywords.length > FILTER_FROM && (
+                {filterable && (
                   <input
                     className="mb-1 h-7 rounded-md border border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
                     value={filter}
@@ -289,7 +303,7 @@ export function EngineTab({ state }: { state: AutoTagState }) {
                     onChange={(e) => setFilter(e.target.value)}
                   />
                 )}
-                {keywords.slice(0, MAX_ROWS).map((entry) => (
+                {keywords.map((entry) => (
                   <button
                     key={entry.id}
                     type="button"
@@ -313,7 +327,12 @@ export function EngineTab({ state }: { state: AutoTagState }) {
                     </span>
                   </button>
                 ))}
-                <MoreRows t={t} hidden={keywords.length - MAX_ROWS} />
+                <MoreRows t={t} hidden={matching.length - keywords.length} />
+                {q !== "" && matching.length === 0 && (
+                  <p className="px-2 pb-1 text-xs text-muted">
+                    {t("autoTag.noKeywordsMatch")}
+                  </p>
+                )}
                 {config.keywords.length === 0 && (
                   <p className="px-2 pb-1 text-xs text-muted">
                     {t("autoTag.noKeywords")}
@@ -327,7 +346,10 @@ export function EngineTab({ state }: { state: AutoTagState }) {
                   aria-label={t("autoTag.addKeywordInline")}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") addKeyword();
+                    // Not while an IME is composing: that Enter only confirms the text.
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                      addKeyword();
+                    }
                   }}
                 />
               </>

@@ -132,7 +132,15 @@ export function keywordMatches(
   const rows: KeywordMatches = [];
   const compiled = compileKeyword(entry);
   if (compiled) {
+    // A plain substring test first: nearly every name fails it, and it costs a
+    // fraction of running the expression. The expression then decides (word
+    // boundaries, the extension), so the test may only ever let too much in.
+    const needles = [entry.tag, ...entry.aliases]
+      .map((term) => term.normalize("NFC").trim().toLowerCase())
+      .filter(Boolean);
     for (const name of names) {
+      const lower = name.toLowerCase();
+      if (!needles.some((needle) => lower.includes(needle))) continue;
       const hits = runKeyword(compiled, name);
       if (hits.length > 0) rows.push({ name, hits });
     }

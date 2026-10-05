@@ -119,13 +119,8 @@ export function Segmented<T extends string>({
 
 /**
  * The scrolling body of a tab. Scrollbars in the app are the ScrollArea's, never
- * the platform's.
- *
- * Radix wraps the content in a table-display box that is only as tall as the
- * content. It is made a flex column at least as tall as the viewport, and the
- * content grows inside it, so a pane's border or a footer pinned to the bottom
- * reaches the bottom even when the content is short. (A percentage min-height
- * on the content would not do: its parent's own height is still `auto`.)
+ * the platform's. The content fills the height when it is short, so a footer
+ * pinned to the bottom is at the bottom.
  */
 export function TabScroll({
   children,
@@ -135,10 +130,7 @@ export function TabScroll({
   className?: string;
 }) {
   return (
-    <ScrollArea
-      className="min-h-0 flex-1"
-      viewportClassName="[&>div]:!flex [&>div]:min-h-full [&>div]:flex-col"
-    >
+    <ScrollArea className="min-h-0 flex-1" fillViewport>
       <div className={cn("flex-1", className)}>{children}</div>
     </ScrollArea>
   );
@@ -166,12 +158,10 @@ export function SplitPane({
         <ScrollArea className="h-2/5 shrink-0 border-b border-border @[760px]:h-auto @[760px]:w-[360px] @[760px]:border-b-0 @[760px]:border-r">
           {aside}
         </ScrollArea>
-        <ScrollArea
-          className="min-h-0 min-w-0 flex-1"
-          // As in TabScroll: the pane fills the height when it is short.
-          viewportClassName="[&>div]:!flex [&>div]:min-h-full [&>div]:flex-col"
-        >
-          {children}
+        <ScrollArea className="min-h-0 min-w-0 flex-1" fillViewport>
+          {/* The pane fills the height when it is short; its own root need
+              not know to. */}
+          <div className="flex flex-1 flex-col">{children}</div>
         </ScrollArea>
       </div>
     </div>

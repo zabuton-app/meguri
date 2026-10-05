@@ -543,6 +543,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "autoTag.keywordsHint": "文件名包含时添加标签",
   "autoTag.filterKeywords": "筛选关键词",
   "autoTag.addKeywordInline": "＋ 添加关键词（标签, 别名, … 后按 Enter）",
+  "autoTag.noKeywordsMatch": "没有与筛选匹配的关键词。",
   "autoTag.noAliases": "无别名",
   "autoTag.noKeywords": "还没有关键词。",
   "autoTag.joinsExisting": "与现有标签“{tag}”同名，将加入该标签",

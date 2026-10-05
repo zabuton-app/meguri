@@ -559,6 +559,7 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.keywordsHint": "이름에 포함되면 태그를 붙임",
   "autoTag.filterKeywords": "키워드 필터",
   "autoTag.addKeywordInline": "+ 키워드 추가(태그, 별칭, … 후 Enter)",
+  "autoTag.noKeywordsMatch": "필터와 일치하는 키워드가 없습니다.",
   "autoTag.noAliases": "별칭 없음",
   "autoTag.noKeywords": "아직 키워드가 없습니다.",
   "autoTag.joinsExisting":

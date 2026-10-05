@@ -217,6 +217,7 @@ export function ReviewTab({
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName ?? "";
       if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+      if (e.isComposing) return;
       // Typing in a field keeps its keys, except Escape, which still closes
       // the token panel. A checkbox is not typing. Enter on a focused button
       // is that button's click.
@@ -867,7 +868,8 @@ export function ReviewTab({
                   aria-label={t("autoTag.review.addDirect")}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") addDraft();
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing)
+                      addDraft();
                   }}
                 />
               </div>

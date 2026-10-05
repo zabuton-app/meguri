@@ -241,6 +241,20 @@ describe("searchFiles", () => {
     expect(ids("yoga|")).toEqual([]);
   });
 
+  it("matches a long alternative as it would alone, whatever sits beside it", () => {
+    const ecole = insertFile(db, rootId, { relPath: "École de danse.mp4" });
+    const yoga = insertFile(db, rootId, { relPath: "ヨガ.mp4" });
+    for (const id of [ecole, yoga]) syncFts(db, id);
+    const ids = (q: string) =>
+      searchFiles(db, { q })
+        .items.map((f) => f.id)
+        .sort();
+    // The index folds case beyond ASCII; LIKE does not. A short alternative
+    // in the group must not drag the long one off the index.
+    expect(ids("école")).toEqual([ecole]);
+    expect(ids("école|ヨガ")).toEqual([ecole, yoga].sort());
+  });
+
   it("still finds a file whose name contains the separator itself", () => {
     const piped = insertFile(db, rootId, { relPath: "live|encore.mp4" });
     const live = insertFile(db, rootId, { relPath: "live show.mp4" });

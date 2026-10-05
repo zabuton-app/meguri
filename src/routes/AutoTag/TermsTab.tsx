@@ -485,7 +485,12 @@ export function TermsTab({
                           aria-label={t("autoTag.terms.otherTag")}
                           onChange={(e) => setMergeDraft(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") mergeInto(term, mergeDraft);
+                            if (
+                              e.key === "Enter" &&
+                              !e.nativeEvent.isComposing
+                            ) {
+                              mergeInto(term, mergeDraft);
+                            }
                           }}
                         />
                       </div>

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { onApplyTagFilter } from "@/lib/ui-events";
+import { onSearchLibrary } from "@/lib/ui-events";
 import AutoTag from "@/routes/AutoTag";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import {
@@ -156,7 +156,7 @@ describe("AutoTag", () => {
       ],
     });
     const asked: string[][] = [];
-    const off = onApplyTagFilter((tokens) => asked.push(tokens));
+    const off = onSearchLibrary((tokens) => asked.push(tokens));
     window.location.hash = "#/auto-tag";
     await renderScreen();
     fireEvent.click(screen.getByRole("button", { name: /Yoga/ }));
@@ -167,6 +167,41 @@ describe("AutoTag", () => {
     expect(asked).toEqual([['"Yoga|ヨガ|morning stretch"']]);
     // And the screen closes onto the library.
     expect(window.location.hash).toBe("#/");
+  });
+
+  it("stops filtering the dictionary once the filter box is gone", async () => {
+    const entry = (i: number) => ({
+      id: `k${i}`,
+      tag: i === 0 ? "Yoga" : `Word${i}`,
+      aliases: [],
+      mode: "word" as const,
+    });
+    mocks.autoTagGet.mockResolvedValue({
+      ...defaultAutoTagConfig(),
+      keywords: Array.from({ length: 9 }, (_, i) => entry(i)),
+    });
+    await renderScreen();
+    const filter = screen.getByLabelText("Filter keywords");
+    fireEvent.change(filter, { target: { value: "nothing" } });
+    expect(screen.getByText("No keyword matches the filter.")).toBeTruthy();
+
+    fireEvent.change(filter, { target: { value: "yoga" } });
+    fireEvent.click(screen.getByRole("button", { name: /Yoga/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    // Eight left: the box is gone, and so is its filter.
+    expect(screen.queryByLabelText("Filter keywords")).toBeNull();
+    expect(screen.getByRole("button", { name: /Word1/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Word8/ })).toBeTruthy();
+  });
+
+  it("does not take the Enter that confirms an IME conversion as submit", async () => {
+    await renderScreen();
+    const add = screen.getByLabelText(/Add a keyword/);
+    fireEvent.change(add, { target: { value: "ヨガ" } });
+    fireEvent.keyDown(add, { key: "Enter", isComposing: true });
+    expect(screen.queryByText("Creates a new tag")).toBeNull();
+    fireEvent.keyDown(add, { key: "Enter" });
+    expect(screen.getByText("Creates a new tag")).toBeTruthy();
   });
 
   it("edits the selected keyword: aliases, match mode, removal", async () => {

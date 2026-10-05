@@ -580,6 +580,7 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.filterKeywords": "Filtrer les mots-clés",
   "autoTag.addKeywordInline":
     "+ Ajouter un mot-clé (étiquette, alias, … puis Entrée)",
+  "autoTag.noKeywordsMatch": "Aucun mot-clé ne correspond au filtre.",
   "autoTag.noAliases": "Aucun alias",
   "autoTag.noKeywords": "Aucun mot-clé pour l’instant.",
   "autoTag.joinsExisting":

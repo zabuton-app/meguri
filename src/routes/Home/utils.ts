@@ -103,6 +103,26 @@ export function addSearchTokens(
 }
 
 /**
+ * Make these search-box tokens the whole text query, replacing what was there.
+ * Returns the same object reference when the query already reads that way.
+ */
+export function replaceSearchTokens(
+  filter: SearchQuery,
+  tokens: string[],
+): SearchQuery {
+  // Normalized through the tokenizer, like addSearchTokens: tokens arrive
+  // quoted where they need it and are stored the way the search box writes them.
+  const q = joinSearchTokens(
+    tokens.flatMap((token) => splitSearchTokens(token)),
+  );
+  if ((filter.q ?? "") === q) return filter;
+  const next = { ...filter };
+  if (q) next.q = q;
+  else delete next.q;
+  return next;
+}
+
+/**
  * DOM id of Home's `<main>`, the box the list lives in. Read from outside
  * Home's tree by id: the page-scroll keys below, and the pet, whose floor is
  * this box's bottom edge.

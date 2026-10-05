@@ -23,8 +23,7 @@ export function onOpenShortcuts(listener: () => void) {
 
 /**
  * Ask the library — which stays mounted underneath every child-route modal — to
- * AND these search-box tokens (`tag:beach`, `tag:4k`, or free text such as
- * `yoga|ヨガ`) into its query. Home owns
+ * AND these search-box tokens (`tag:beach`, `tag:4k`) into its query. Home owns
  * `filter` as local state, so a modal cannot set it directly.
  */
 export function applyTagFilter(tokens: string[]) {
@@ -37,6 +36,27 @@ export function onApplyTagFilter(listener: (tokens: string[]) => void) {
   const handler = (e: Event) => listener((e as CustomEvent<string[]>).detail);
   window.addEventListener(APPLY_TAG_FILTER, handler);
   return () => window.removeEventListener(APPLY_TAG_FILTER, handler);
+}
+
+const SEARCH_LIBRARY = "meguri:search-library";
+
+/**
+ * Ask the library to search for exactly these search-box tokens (`yoga|ヨガ`),
+ * in place of whatever its search box holds. Unlike {@link applyTagFilter} this
+ * starts a search rather than narrowing one: asked twice for two different
+ * things, the second must not be ANDed onto the first and come back empty.
+ * The other filters (kind, rating, folder…) are left as they are.
+ */
+export function searchLibrary(tokens: string[]) {
+  window.dispatchEvent(
+    new CustomEvent<string[]>(SEARCH_LIBRARY, { detail: tokens }),
+  );
+}
+
+export function onSearchLibrary(listener: (tokens: string[]) => void) {
+  const handler = (e: Event) => listener((e as CustomEvent<string[]>).detail);
+  window.addEventListener(SEARCH_LIBRARY, handler);
+  return () => window.removeEventListener(SEARCH_LIBRARY, handler);
 }
 
 /**

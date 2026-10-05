@@ -562,6 +562,7 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.keywordsHint": "tag a file whose name contains them",
   "autoTag.filterKeywords": "Filter keywords",
   "autoTag.addKeywordInline": "+ Add a keyword (tag, alias, … then Enter)",
+  "autoTag.noKeywordsMatch": "No keyword matches the filter.",
   "autoTag.noAliases": "No aliases",
   "autoTag.noKeywords": "No keywords yet.",
   "autoTag.joinsExisting":

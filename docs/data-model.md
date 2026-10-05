@@ -119,13 +119,18 @@ deduplicated across sources. Three places produce it — `syncFts()`,
 projection lives in a single `FTS_ROW_SELECT` constant in `db.ts`.
 
 Free-text tokens are ANDed. A token may carry alternatives separated by `|`
-(`yoga|ヨガ`, see `searchAlternatives()` in `shared/tags.ts`), any of which
-satisfies it: one `MATCH` with `OR` when every alternative is long enough for
-the trigram index, otherwise the same `LIKE` fallback short tokens use. `\|` is
-a literal `|`, for the file names that contain one. The
-auto-tagging screen uses this to search the library for a dictionary entry's
-tag and aliases — by the search box's rules (a substring of the path or of the
-tags), not by the entry's own word matching.
+(`yoga|ヨガ`), any of which satisfies it; `\|` is a literal `|`, for the file
+names that contain one. `searchTokenTerms()` in `shared/tags.ts` is the one
+place that reads this syntax. In the query, the alternatives long enough for
+the trigram index become one `MATCH` with `OR`, the short ones the same `LIKE`
+fallback short tokens use, and the two halves are ORed — a long alternative is
+never sent to `LIKE` because a short one sits beside it, since `LIKE` is slower
+and folds case for ASCII only.
+
+The auto-tagging screen uses this to search the library for a dictionary
+entry's tag and aliases (`searchLibrary()` in `src/lib/ui-events.ts`, which
+replaces the text query rather than adding to it) — by the search box's rules,
+a substring of the path or of the tags, not by the entry's own word matching.
 
 Generated tags are deliberately **not** indexed. The tokenizer is trigram, so
 indexing `dur:long` would make a plain search for "long" return every long

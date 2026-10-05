@@ -562,6 +562,7 @@ export const ja = {
   "autoTag.keywordsHint": "名前に含まれるとタグを付与",
   "autoTag.filterKeywords": "キーワードを絞り込む",
   "autoTag.addKeywordInline": "＋ キーワードを追加（タグ名, 別名, …でEnter）",
+  "autoTag.noKeywordsMatch": "絞り込みに一致するキーワードはありません。",
   "autoTag.noAliases": "別名なし",
   "autoTag.noKeywords": "キーワードはまだありません。",
   "autoTag.joinsExisting":

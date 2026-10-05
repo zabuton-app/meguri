@@ -5,7 +5,7 @@ import { useNavigate } from "react-router";
 import { Search } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
-import { applyTagFilter } from "@/lib/ui-events";
+import { searchLibrary } from "@/lib/ui-events";
 import { cn } from "@/lib/utils";
 import {
   KEYWORD_MODES,
@@ -54,10 +54,11 @@ export function KeywordEditor({
   const rows = keywordMatches(entry, names);
 
   // The library's own search, with the entry's terms as alternatives of one
-  // token. It is the search box's idea of a match, not the dictionary's: a
-  // substring of the whole path and of the tags, with no word boundaries.
+  // token, in place of whatever was being searched for. It is the search box's
+  // idea of a match, not the dictionary's: a substring of the whole path and
+  // of the tags, with no word boundaries.
   const searchInLibrary = () => {
-    applyTagFilter([anyOfSearchToken([entry.tag, ...entry.aliases])]);
+    searchLibrary([anyOfSearchToken([entry.tag, ...entry.aliases])]);
     void navigate("/");
   };
 
@@ -114,7 +115,10 @@ export function KeywordEditor({
             placeholder={t("autoTag.addAlias")}
             aria-label={t("autoTag.addAlias")}
             onChange={(e) => setAliasDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addAlias()}
+            onKeyDown={(e) => {
+              // Not while an IME is composing: that Enter only confirms the text.
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) addAlias();
+            }}
           />
         </div>
       </div>

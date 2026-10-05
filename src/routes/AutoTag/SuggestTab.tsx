@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
+import { MAX_AUTO_TAG_KEYWORDS } from "@shared/autoTag";
 import {
   candidateGroup,
   segments,
@@ -103,7 +104,9 @@ export function SuggestTab({
   // A candidate that comes from a rule or from the dictionary is already
   // managed there, so for those applying is all there is to do.
   const canRegister = (c: Candidate): boolean =>
-    candidateGroup(c) === "frequent" && !dictionary.has(c.key);
+    candidateGroup(c) === "frequent" &&
+    !dictionary.has(c.key) &&
+    config.keywords.length < MAX_AUTO_TAG_KEYWORDS;
 
   const apply = async (list: Candidate[], dict: boolean) => {
     if (list.length === 0 || busy) return;
