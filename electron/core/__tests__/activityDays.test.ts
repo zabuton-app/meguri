@@ -9,9 +9,16 @@ import { activityDays, searchFiles, setFavorite } from "../queries.js";
 import { ChannelInputs } from "../../../shared/ipc/channels.js";
 import {
   ACTIVITY_MAX_DAYS,
+  ACTIVITY_RANGE_FIELDS,
   type ActivityMetric,
 } from "../../../shared/ipc/activity.js";
-import { addDays, formatDay, parseDay } from "../../../shared/day.js";
+import {
+  addDays,
+  daySeconds,
+  formatDay,
+  parseDay,
+} from "../../../shared/day.js";
+import type { SearchQuery } from "../types.js";
 import { insertFile, newDb } from "./helpers.js";
 
 function target(id: string, db: DB): CoreTarget {
@@ -40,17 +47,26 @@ function setAdded(db: DB, fileId: number, createdAt: number): void {
   );
 }
 
+/** The search's date range for one day of a metric: what picking that day on
+ *  the heatmap sets. */
+function dayRange(metric: ActivityMetric, date: string): SearchQuery {
+  const [from, to] = ACTIVITY_RANGE_FIELDS[metric];
+  const [start, end] = daySeconds(parseDay(date)!);
+  return { [from]: start, [to]: end };
+}
+
 function listed(db: DB, metric: ActivityMetric, date: string): string[] {
-  return searchFiles(db, { day: { metric, date }, sort: "name" }).items.map(
-    (f) => f.relPath,
-  );
+  return searchFiles(db, {
+    ...dayRange(metric, date),
+    sort: "name",
+  }).items.map((f) => f.relPath);
 }
 
 const FROM = "2026-03-01";
 const TO = "2026-03-31";
 
 describe("activityDays", () => {
-  it("counts captured files by local day, falling back to the modification time", () => {
+  it("counts captured files by local day, leaving out files without a capture date", () => {
     const { db, rootId } = newDb();
     insertFile(db, rootId, {
       relPath: "a.jpg",
@@ -60,8 +76,8 @@ describe("activityDays", () => {
       relPath: "b.jpg",
       capturedAt: at("2026-03-10", 23, 59),
     });
+    // No capture date (most videos): on no day at all, whatever its mtime.
     insertFile(db, rootId, { relPath: "c.mp4", mtime: at("2026-03-11") });
-    // The capture date wins over a modification time on another day.
     insertFile(db, rootId, {
       relPath: "d.jpg",
       capturedAt: at("2026-03-12"),
@@ -74,10 +90,10 @@ describe("activityDays", () => {
 
     expect(
       Object.fromEntries(activityDays(db, {}, "captured", FROM, TO)),
-    ).toEqual({ "2026-03-10": 2, "2026-03-11": 1, "2026-03-12": 1 });
+    ).toEqual({ "2026-03-10": 2, "2026-03-12": 1 });
     expect(listed(db, "captured", "2026-03-10")).toEqual(["a.jpg", "b.jpg"]);
-    expect(listed(db, "captured", "2026-03-11")).toEqual(["c.mp4"]);
-    expect(listed(db, "captured", "2026-03-13")).toEqual([]);
+    expect(listed(db, "captured", "2026-03-11")).toEqual([]);
+    expect(listed(db, "captured", "2026-03-12")).toEqual(["d.jpg"]);
   });
 
   it("counts created files by their birth time, leaving out files without one", () => {
@@ -186,25 +202,25 @@ describe("activityDays", () => {
     expect(count({})).toBe(2);
     expect(count({ favorite: true })).toBe(1);
     expect(count({ kind: "video" })).toBe(1);
-    // Paging, a folder and a selected day belong to the list, not the counts.
+    // Paging, a folder and the day picked (the metric's own date range)
+    // belong to the list, not the counts.
     expect(
       count({
         limit: 1,
         cursor: 1,
         folder: { path: "elsewhere", recursive: true },
-        day: { metric: "captured", date: "2026-03-11" },
+        ...dayRange("captured", "2026-03-11"),
       }),
     ).toBe(2);
+    // Another metric's range is a condition like any other.
+    expect(count(dayRange("added", "2020-01-01"))).toBeUndefined();
   });
 
   it("returns nothing for a range that is not made of days", () => {
     const { db, rootId } = newDb();
     insertFile(db, rootId, { relPath: "a.jpg", capturedAt: at("2026-03-10") });
     expect(activityDays(db, {}, "captured", "nope", TO).size).toBe(0);
-    expect(
-      searchFiles(db, { day: { metric: "captured", date: "2026-02-31" } })
-        .items,
-    ).toEqual([]);
+    expect(activityDays(db, {}, "captured", FROM, "2026-02-31").size).toBe(0);
   });
 });
 

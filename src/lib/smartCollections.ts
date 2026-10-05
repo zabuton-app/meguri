@@ -52,6 +52,10 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.capturedTo != null) next.capturedTo = query.capturedTo;
   if (query.btimeFrom != null) next.btimeFrom = query.btimeFrom;
   if (query.btimeTo != null) next.btimeTo = query.btimeTo;
+  if (query.addedFrom != null) next.addedFrom = query.addedFrom;
+  if (query.addedTo != null) next.addedTo = query.addedTo;
+  if (query.playedFrom != null) next.playedFrom = query.playedFrom;
+  if (query.playedTo != null) next.playedTo = query.playedTo;
   if (query.sort) next.sort = query.sort;
   if (query.sortDir) next.sortDir = query.sortDir;
   // Kept as "everything under it", the way a saved search reopens.
@@ -201,8 +205,11 @@ export function describeDateRange(
   from: number | undefined,
   to: number | undefined,
 ): string {
-  if (from != null && to != null)
-    return `${formatDate(from)}–${formatDate(to)}`;
+  if (from != null && to != null) {
+    // One day (a day picked on the heatmap, say) reads as that day.
+    const [first, last] = [formatDate(from), formatDate(to)];
+    return first === last ? first : `${first}–${last}`;
+  }
   if (from != null) return `${t("filter.dateFrom")} ${formatDate(from)}`;
   if (to != null) return `${t("filter.dateTo")} ${formatDate(to)}`;
   return "";
@@ -227,12 +234,22 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   if (query.inProgress) parts.push(t("filter.inProgress"));
   if (query.capturedFrom != null || query.capturedTo != null) {
     parts.push(
-      `${t("sort.captured")}: ${describeDateRange(t, query.capturedFrom, query.capturedTo)}`,
+      `${t("filter.capturedAt")}: ${describeDateRange(t, query.capturedFrom, query.capturedTo)}`,
     );
   }
   if (query.btimeFrom != null || query.btimeTo != null) {
     parts.push(
       `${t("filter.btime")}: ${describeDateRange(t, query.btimeFrom, query.btimeTo)}`,
+    );
+  }
+  if (query.addedFrom != null || query.addedTo != null) {
+    parts.push(
+      `${t("filter.addedAt")}: ${describeDateRange(t, query.addedFrom, query.addedTo)}`,
+    );
+  }
+  if (query.playedFrom != null || query.playedTo != null) {
+    parts.push(
+      `${t("filter.playedAt")}: ${describeDateRange(t, query.playedFrom, query.playedTo)}`,
     );
   }
   for (const tag of query.tags ?? []) {

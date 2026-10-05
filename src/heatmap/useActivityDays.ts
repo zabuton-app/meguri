@@ -4,14 +4,21 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
 import type { SearchQuery } from "@/ipc/types";
 import type { ActivityMetric } from "@shared/ipc/activity";
+import { withoutPickedDays } from "./pickedDays";
 
-/** Parts of a query the counts ignore; dropped so they do not refetch them. */
-function activityQuery(query: SearchQuery): SearchQuery {
-  const q = { ...query };
+/**
+ * Parts of a query the counts ignore; dropped so they do not refetch them.
+ * Among them the metric's own date range, which is the day picked on the
+ * heatmap (the main process leaves it out as well).
+ */
+function activityQuery(
+  query: SearchQuery,
+  metric: ActivityMetric,
+): SearchQuery {
+  const q = { ...withoutPickedDays(query, metric) };
   delete q.cursor;
   delete q.limit;
   delete q.folder;
-  delete q.day;
   delete q.sort;
   delete q.sortDir;
   return q;
@@ -33,7 +40,7 @@ export function useActivityDays({
   to: string;
   enabled: boolean;
 }) {
-  const q = activityQuery(query);
+  const q = activityQuery(query, metric);
   const result = useQuery({
     // Scope and filter sit where files_search keeps them, so the cache
     // helpers in queryCache.ts read both keys the same way.

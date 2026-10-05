@@ -140,13 +140,6 @@ export const DaySchema = z
   .max(10)
   .refine((v) => parseDay(v) !== null, { message: "not a calendar day" });
 
-/** One day of the heatmap: the files a metric counts on it. */
-export const DayScopeSchema = z.object({
-  metric: ActivityMetricSchema,
-  date: DaySchema,
-});
-export type DayScope = z.infer<typeof DayScopeSchema>;
-
 export const SearchCursorSchema = z.object({
   offset: z.number().int().min(0),
   key: SearchSeekKeySchema.optional(),
@@ -171,12 +164,16 @@ export const SearchQuerySchema = z.object({
   /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
   btimeFrom: z.number().optional(),
   btimeTo: z.number().optional(),
+  /** Range of the time the file entered the index (created_at), Unix seconds. */
+  addedFrom: z.number().optional(),
+  addedTo: z.number().optional(),
+  /** Played-at range, Unix seconds: files with a play history row inside it. */
+  playedFrom: z.number().optional(),
+  playedTo: z.number().optional(),
   sort: z.string().optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
   /** Folder view: only files under this folder (see FolderScopeSchema). */
   folder: FolderScopeSchema.optional(),
-  /** Heatmap: only the files counted on this day (see DayScopeSchema). */
-  day: DayScopeSchema.optional(),
   fileIds: z.array(z.number()).optional(),
   // Number = plain offset (legacy / backward paging); object = keyset cursor.
   cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),

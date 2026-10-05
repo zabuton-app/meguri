@@ -1,6 +1,7 @@
 // The heatmap (the "contribution graph" of the UI): a year of days as a grid of week columns, each cell
-// shaded by how many files fall on it. Picking a day narrows the list drawn
-// below to that day's files (see Home).
+// shaded by how many files fall on it. Picking a day sets the filter's date
+// range for the metric shown to that day (see pickedDays.ts), which narrows
+// the list drawn below.
 import { memo, useMemo, useState, type KeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -18,6 +19,7 @@ import {
   rangeFor,
   WEEK_DAYS,
 } from "./calendar";
+import { isPicked, pickedDays, singleDay, type PickedDays } from "./pickedDays";
 import { useActivityDays } from "./useActivityDays";
 
 const METRIC_LABEL: Record<ActivityMetric, TranslationKey> = {
@@ -56,13 +58,14 @@ const SWATCH = "size-[11px] rounded-[2px]";
  */
 const MIN_WIDTH = "min-w-[30rem]";
 
-/** The page a picked day is shown on: the year ending today when it holds
- *  the day (or none is picked), else the day's own calendar year. */
-function pageOf(day: string | null, today: Date): number | null {
-  const picked = day ? parseDay(day) : null;
-  if (!picked) return null;
+/** The page a picked range is shown on: the year ending today when it holds
+ *  the range's first day (or nothing is picked), else that day's own year. */
+function pageOf(picked: PickedDays | null, today: Date): number | null {
+  const day = picked?.from ?? picked?.to;
+  const date = day ? parseDay(day) : null;
+  if (!date) return null;
   const { from, to } = rangeFor(null, today);
-  return picked >= from && picked <= to ? null : picked.getFullYear();
+  return date >= from && date <= to ? null : date.getFullYear();
 }
 
 const LIST_KEYS = new Set([
@@ -81,13 +84,16 @@ function stopListKeys(e: KeyboardEvent<HTMLElement>) {
 interface Props {
   /** The workspace or collection shown; part of the cache key. */
   scope: string;
-  /** The list's filter: the counts cover the files it matches. */
+  /**
+   * The list's filter. The counts cover the files it matches, its date range
+   * for the metric shown aside: that range is the day picked here.
+   */
   query: SearchQuery;
   ready: boolean;
   metric: ActivityMetric;
   onMetricChange: (metric: ActivityMetric) => void;
-  /** The day the list is narrowed to, "YYYY-MM-DD"; null for none. */
-  day: string | null;
+  /** Set the filter's range for the metric to this day ("YYYY-MM-DD"), or
+   *  remove it for null. */
   onDayChange: (day: string | null) => void;
 }
 
@@ -97,17 +103,19 @@ export const HeatmapView = memo(function HeatmapView({
   ready,
   metric,
   onMetricChange,
-  day,
   onDayChange,
 }: Props) {
   const { t, lang } = useI18n();
   // Read once per mount: a heatmap left open over midnight keeps its range
   // rather than shifting under the pointer.
   const [today] = useState(() => new Date());
-  // Null is the year ending today; a number is that calendar year. The day
-  // picked outlives this view (Home keeps it across view modes), so coming
-  // back opens on the page it is on.
-  const [year, setYear] = useState<number | null>(() => pageOf(day, today));
+  const picked = useMemo(() => pickedDays(query, metric), [query, metric]);
+  // The label and the clear button speak of one day; a longer range (set in
+  // the filter bar) only marks its cells.
+  const day = singleDay(picked);
+  // Null is the year ending today; a number is that calendar year. The range
+  // is part of the filter and outlives this view, so it opens on its page.
+  const [year, setYear] = useState<number | null>(() => pageOf(picked, today));
 
   const range = useMemo(() => rangeFor(year, today), [year, today]);
   const weeks = useMemo(() => buildWeeks(range), [range]);
@@ -143,11 +151,7 @@ export const HeatmapView = memo(function HeatmapView({
     [t],
   );
 
-  const showYear = (next: number | null) => {
-    setYear(next);
-    // The day picked belongs to the page it was picked on.
-    onDayChange(null);
-  };
+  const showYear = setYear;
   const thisYear = today.getFullYear();
 
   // One cell is in the tab order (the day picked, else the last one shown);
@@ -297,7 +301,7 @@ export const HeatmapView = memo(function HeatmapView({
                   date: dateLabel(d),
                   count,
                 });
-                const picked = day === d;
+                const marked = isPicked(picked, d);
                 return (
                   <button
                     key={d}
@@ -306,14 +310,16 @@ export const HeatmapView = memo(function HeatmapView({
                     data-level={levelOf(count, max)}
                     tabIndex={d === tabStop ? 0 : -1}
                     aria-label={label}
-                    aria-pressed={picked}
+                    aria-pressed={marked}
                     title={label}
-                    onClick={() => onDayChange(picked ? null : d)}
+                    // The one day picked lets go; any other cell, one inside a
+                    // longer range included, becomes the day.
+                    onClick={() => onDayChange(d === day ? null : d)}
                     className={cn(
                       CELL,
                       "outline-none transition hover:ring-1 hover:ring-fg/60 focus-visible:ring-2 focus-visible:ring-ring",
                       LEVEL_CLASS[levelOf(count, max)],
-                      picked && "ring-2 ring-fg hover:ring-2 hover:ring-fg",
+                      marked && "ring-2 ring-fg hover:ring-2 hover:ring-fg",
                     )}
                   />
                 );

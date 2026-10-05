@@ -140,6 +140,15 @@ export const GRAPH_SIZED_BY_PLAYS = "sizedByPlays";
  * dropFromWatchLaterCache). Other lists keep their cache instead of refetching
  * every page.
  */
+/** Whether recording a play can change which files a filter matches. */
+function filtersOnPlays(filter: SearchQuery | undefined): boolean {
+  return (
+    filter?.played != null ||
+    filter?.playedFrom != null ||
+    filter?.playedTo != null
+  );
+}
+
 export function invalidatePlayedSearches(qc: QueryClient): void {
   const watchLater = collectionTarget(WATCH_LATER_ID);
   void qc.invalidateQueries({
@@ -149,7 +158,7 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
       return (
         q.queryKey[1] === watchLater ||
         q.meta?.[GRAPH_SIZED_BY_PLAYS] === true ||
-        filter?.played != null ||
+        filtersOnPlays(filter) ||
         filter?.sort === "accessed"
       );
     },
@@ -158,12 +167,7 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
     queryKey: ["files_search"],
     predicate: (q) => {
       const filter = searchFilterOf(q.queryKey);
-      return (
-        filter?.played != null ||
-        filter?.sort === "accessed" ||
-        // The list under the heatmap, narrowed to a day's plays.
-        filter?.day?.metric === "played"
-      );
+      return filtersOnPlays(filter) || filter?.sort === "accessed";
     },
   });
   // The heatmap counting plays, or files by whether they were played.
@@ -171,7 +175,7 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
     queryKey: ["activity_days"],
     predicate: (q) =>
       activityMetricOf(q.queryKey) === "played" ||
-      searchFilterOf(q.queryKey)?.played != null,
+      filtersOnPlays(searchFilterOf(q.queryKey)),
   });
 }
 

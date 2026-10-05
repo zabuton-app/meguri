@@ -170,11 +170,14 @@ the 53 weeks ending today or one calendar year (`calendar.ts`, which also picks
 the shade: a square-root scale against the busiest day shown, so one large
 import does not flatten the rest). The week columns share out the full width,
 so the cells grow with the window; below a minimum width the grid scrolls
-sideways instead. Picking a day narrows the list below to that day's files:
-Home adds it to the query it sends as `SearchQuery.day`, the way the folder
-view adds `folder`, so it never enters the filter itself (saved searches,
-Discover and the counts keep reading the filter). Home keeps the day across
-view modes, and the view opens on the page that day is on. The view has no
+sideways instead. Picking a day is an edit of the filter, not state of the view: it sets
+the date range of the metric shown to that day (`pickedDays.ts`,
+`ACTIVITY_RANGE_FIELDS`), the same condition "More conditions" offers as a
+date range. So the day has the range's chip, shows in the panel's inputs, is
+carried by a saved search, and a range typed in the panel marks its cells. The
+counts leave the shown metric's own range out — with it, only the picked day
+would have anything on it. Changing the metric removes the range of the one
+left. The view opens on the page the range starts on. The view has no
 folder form (`hasFolderForm`). One cell is in the tab order and the arrow keys
 move between days; those keys are stopped at the view, since the grid below
 listens for them on the window.

@@ -109,10 +109,18 @@ describe("targeted files_search invalidation", () => {
       played: { ws: "ws", filter: { played: true } },
       unplayed: { ws: "ws", filter: { played: false } },
       accessed: { ws: "ws", filter: { sort: "accessed" } },
+      playedSince: { ws: "ws", filter: { playedFrom: 1 } },
+      playedUntil: { ws: "ws", filter: { playedTo: 2 } },
       byName: { ws: "ws", filter: { sort: "name" } },
     });
     invalidatePlayedSearches(qc);
-    expect(invalidated().sort()).toEqual(["accessed", "played", "unplayed"]);
+    expect(invalidated().sort()).toEqual([
+      "accessed",
+      "played",
+      "playedSince",
+      "playedUntil",
+      "unplayed",
+    ]);
   });
 
   it("invalidatePlayedSearches refreshes a graph a play can change, and only those", async () => {
@@ -196,21 +204,6 @@ describe("targeted files_search invalidation", () => {
     expect(
       after(() => syncFileRowAcrossCaches(qc, "ws", 1, { favorite: 1 })),
     ).toEqual([]);
-  });
-
-  it("invalidatePlayedSearches refreshes the list of a day's plays", () => {
-    const { qc, invalidated } = seed({
-      playedDay: {
-        ws: "ws",
-        filter: { day: { metric: "played", date: "2026-10-03" } },
-      },
-      addedDay: {
-        ws: "ws",
-        filter: { day: { metric: "added", date: "2026-10-03" } },
-      },
-    });
-    invalidatePlayedSearches(qc);
-    expect(invalidated()).toEqual(["playedDay"]);
   });
 
   it("invalidateInProgressSearches hits the in-progress list and graph only", async () => {

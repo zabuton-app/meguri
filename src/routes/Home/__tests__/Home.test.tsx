@@ -31,7 +31,7 @@ import {
   HEATMAP_METRIC_KEY,
   VIEW_KEY,
 } from "@/routes/Home/utils";
-import { addDays, formatDay } from "@shared/day";
+import { addDays, daySeconds, formatDay } from "@shared/day";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
@@ -1522,8 +1522,11 @@ describe("Home graph view", () => {
 });
 
 describe("Home heatmap", () => {
-  // A day the graph always shows, whatever today is.
-  const yesterday = formatDay(addDays(new Date(), -1));
+  // A day the heatmap always shows, whatever today is.
+  const date = addDays(new Date(), -1);
+  const yesterday = formatDay(date);
+  const [start, end] = daySeconds(date);
+  const shown = date.toLocaleDateString();
 
   /** The most recent files_search query the component issued. */
   function lastQuery(): Record<string, unknown> {
@@ -1536,6 +1539,11 @@ describe("Home heatmap", () => {
     if (!el) throw new Error(`no cell for ${day}`);
     return el;
   }
+
+  const chips = () => [
+    ...document.querySelectorAll<HTMLElement>('[data-slot="filter-chip"]'),
+  ];
+  const chipLabels = () => chips().map((c) => c.textContent);
 
   afterEach(() => {
     localStorage.removeItem(VIEW_KEY);
@@ -1565,58 +1573,126 @@ describe("Home heatmap", () => {
     mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
   });
 
-  it("draws the graph over the whole list, then narrows it to the day picked", async () => {
+  it("picks a day as the filter's date range for the metric, and lets it go", async () => {
     renderWithProviders(<AppRoutes />);
     await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
     await waitFor(() => expect(screen.getByText("sample.mp4")).toBeTruthy());
-    expect(lastQuery().day).toBeUndefined();
+    expect(lastQuery().playedFrom).toBeUndefined();
     expect(getListCounts()).toMatchObject({ files: null });
+    expect(chipLabels()).toEqual([]);
 
     fireEvent.click(cell(yesterday));
     await waitFor(() =>
-      expect(lastQuery().day).toEqual({ metric: "played", date: yesterday }),
+      expect(lastQuery()).toMatchObject({ playedFrom: start, playedTo: end }),
     );
+    // The same condition the filter bar offers: one chip, and the panel's
+    // inputs hold the day.
+    expect(chipLabels()).toEqual([`Played date: ${shown}`]);
+    fireEvent.click(
+      document.querySelector('[data-slot="more-filters-trigger"]')!,
+    );
+    expect(
+      screen.getByLabelText<HTMLInputElement>("Played date: From").value,
+    ).toBe(yesterday);
+    expect(
+      screen.getByLabelText<HTMLInputElement>("Played date: To").value,
+    ).toBe(yesterday);
     // The status bar counts the day's files, not the whole workspace.
     await waitFor(() => expect(getListCounts()).toMatchObject({ files: 1 }));
-    // The graph still counts the filter, not the day picked on it.
+    // The heatmap counts without its own range: every day keeps its count.
     for (const [input] of mocks.activityDays.mock.calls)
       expect((input as { query: object }).query).toEqual({});
 
     fireEvent.click(cell(yesterday));
-    await waitFor(() => expect(lastQuery().day).toBeUndefined());
+    await waitFor(() => expect(lastQuery().playedFrom).toBeUndefined());
+    expect(lastQuery().playedTo).toBeUndefined();
+    expect(chipLabels()).toEqual([]);
+  });
+
+  it("marks the day set from the filter bar, and follows its chip", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    fireEvent.click(
+      document.querySelector('[data-slot="more-filters-trigger"]')!,
+    );
+    fireEvent.change(screen.getByLabelText("Played date: From"), {
+      target: { value: yesterday },
+    });
+    fireEvent.change(screen.getByLabelText("Played date: To"), {
+      target: { value: yesterday },
+    });
+    await waitFor(() =>
+      expect(cell(yesterday).getAttribute("aria-pressed")).toBe("true"),
+    );
+
+    // Another condition keeps the day; the heatmap counts with it.
+    applyTagFilter(["tag:beach"]);
+    await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
+    expect(lastQuery()).toMatchObject({ playedFrom: start });
+    await waitFor(() =>
+      expect(
+        mocks.activityDays.mock.calls.some(
+          ([input]) =>
+            JSON.stringify((input as { query: object }).query) ===
+            JSON.stringify({ q: "tag:beach" }),
+        ),
+      ).toBe(true),
+    );
+
+    const chip = chips().find((c) => c.textContent?.startsWith("Played date"))!;
+    fireEvent.click(within(chip).getByRole("button"));
+    await waitFor(() => expect(lastQuery().playedFrom).toBeUndefined());
+    expect(lastQuery().q).toBe("tag:beach");
+    expect(cell(yesterday).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("drops the day picked when the metric changes, and remembers the metric", async () => {
     renderWithProviders(<AppRoutes />);
     await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
     fireEvent.click(cell(yesterday));
-    await waitFor(() => expect(lastQuery().day).toBeDefined());
+    await waitFor(() => expect(lastQuery().playedFrom).toBe(start));
 
     // Choosing the metric already shown keeps the day.
     fireEvent.click(screen.getByRole("radio", { name: "Played" }));
-    expect(lastQuery().day).toBeDefined();
+    expect(lastQuery().playedFrom).toBe(start);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Captured" }));
-    await waitFor(() => expect(lastQuery().day).toBeUndefined());
+    fireEvent.click(screen.getByRole("radio", { name: "Added" }));
+    await waitFor(() => expect(lastQuery().playedFrom).toBeUndefined());
     await waitFor(() =>
       expect(
         mocks.activityDays.mock.calls.some(
-          ([input]) => (input as { metric: string }).metric === "captured",
+          ([input]) => (input as { metric: string }).metric === "added",
         ),
       ).toBe(true),
     );
-    expect(localStorage.getItem(HEATMAP_METRIC_KEY)).toBe("captured");
+    expect(localStorage.getItem(HEATMAP_METRIC_KEY)).toBe("added");
+
+    // The day picked now is the new metric's range.
+    fireEvent.click(cell(yesterday));
+    await waitFor(() =>
+      expect(lastQuery()).toMatchObject({ addedFrom: start, addedTo: end }),
+    );
+    expect(chipLabels()).toEqual([`Added date: ${shown}`]);
   });
 
-  it("narrows only its own list: another view shows every file again", async () => {
+  it("keeps the day as a condition of the list in the other views", async () => {
     renderWithProviders(<AppRoutes />);
     await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
     fireEvent.click(cell(yesterday));
-    await waitFor(() => expect(lastQuery().day).toBeDefined());
+    await waitFor(() => expect(lastQuery().playedFrom).toBe(start));
 
     fireEvent.click(screen.getByRole("button", { name: "List view" }));
-    await waitFor(() => expect(lastQuery().day).toBeUndefined());
-    expect(document.querySelector("[data-day]")).toBeNull();
+    await waitFor(() =>
+      expect(document.querySelector("[data-day]")).toBeNull(),
+    );
+    expect(lastQuery().playedFrom).toBe(start);
+    expect(chipLabels()).toEqual([`Played date: ${shown}`]);
+
+    // Back on the heatmap the day is still the one marked.
+    fireEvent.click(screen.getByRole("button", { name: "Contribution graph" }));
+    await waitFor(() =>
+      expect(cell(yesterday).getAttribute("aria-pressed")).toBe("true"),
+    );
   });
 
   it("has no folder form: the stored option waits for the list views", async () => {

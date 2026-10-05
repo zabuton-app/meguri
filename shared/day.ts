@@ -37,3 +37,14 @@ export function daySpan(from: Date, to: Date): number {
   const utc = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
   return Math.round((utc(to) - utc(from)) / 86_400_000) + 1;
 }
+
+/**
+ * A day as a range of Unix seconds with both ends included — its first second
+ * and its last — the form the search's date ranges take.
+ */
+export function daySeconds(date: Date): [from: number, to: number] {
+  return [
+    Math.floor(date.getTime() / 1000),
+    Math.floor(addDays(date, 1).getTime() / 1000) - 1,
+  ];
+}

@@ -20,7 +20,6 @@ import { FolderPlus, PlayCircle, Sparkles } from "lucide-react";
 import { api, events, ALL_ID, type ThumbDone } from "@/ipc/client";
 import { COLLECTION_ID_PREFIX, WATCH_LATER_ID } from "@shared/workspaceIds";
 import type {
-  DayScope,
   FileRow,
   SearchQuery,
   SearchResult,
@@ -32,6 +31,7 @@ import { MANUAL_SORT } from "@shared/sortDir";
 import type { ActivityMetric } from "@shared/ipc/activity";
 import { MediaGrid } from "@/components/MediaGrid";
 import { HeatmapView } from "@/heatmap/HeatmapView";
+import { withPickedDay } from "@/heatmap/pickedDays";
 import { MediaList } from "@/components/MediaList";
 import {
   MediaNavProvider,
@@ -134,31 +134,12 @@ export default function Home() {
     false,
     (raw) => raw === "true",
   );
-  // The heatmap: what a day counts, and the day picked on it. The day is kept
-  // while another view shows and narrows the list only under the heatmap
-  // itself (see searchQuery).
+  // What a day of the heatmap counts. The day picked on it is not kept here:
+  // it is the filter's date range for this metric (see heatmap/pickedDays.ts).
   const [heatmapMetric, setHeatmapMetric] = useLocalStorage<ActivityMetric>(
     HEATMAP_METRIC_KEY,
     "played",
     parseHeatmapMetric,
-  );
-  const [heatmapDay, setHeatmapDay] = useState<string | null>(null);
-  // A day's files differ by metric: the one picked does not carry over.
-  const changeHeatmapMetric = useCallback(
-    (metric: ActivityMetric) => {
-      // Choosing the metric already shown changes nothing, the day included.
-      if (metric === heatmapMetric) return;
-      setHeatmapMetric(metric);
-      setHeatmapDay(null);
-    },
-    [heatmapMetric, setHeatmapMetric],
-  );
-  const dayScope = useMemo<DayScope | undefined>(
-    () =>
-      view === "heatmap" && heatmapDay
-        ? { metric: heatmapMetric, date: heatmapDay }
-        : undefined,
-    [view, heatmapDay, heatmapMetric],
   );
 
   const status = useAppStatus();
@@ -206,8 +187,6 @@ export default function Home() {
   // The folder rides on the query sent, never on `filter` itself: that state
   // is what Discover opens with, which scopes to the folder its own way. The
   // filter bar reads the folder back through `filterValue` instead.
-  // The day picked on the heatmap rides the same way: it narrows the list
-  // under the heatmap, not the filter the heatmap itself counts.
   const searchQuery = useMemo<SearchQuery>(
     () =>
       folderView
@@ -215,10 +194,8 @@ export default function Home() {
             ...filter,
             folder: { path: folderNav.path, recursive: folderSearching },
           }
-        : dayScope
-          ? { ...filter, day: dayScope }
-          : filter,
-    [filter, folderView, folderNav.path, folderSearching, dayScope],
+        : filter,
+    [filter, folderView, folderNav.path, folderSearching],
   );
 
   // The graph and the heatmap have no folder form (see hasFolderForm): a
@@ -241,6 +218,24 @@ export default function Home() {
       setFilter,
       setByFolder: showByFolder,
     });
+  // Picking a day on the heatmap edits the filter like any control of the
+  // bar: the day becomes the date range of the metric shown.
+  const pickHeatmapDay = useCallback(
+    (day: string | null) =>
+      onFilterChange(withPickedDay(filterValue, heatmapMetric, day)),
+    [onFilterChange, filterValue, heatmapMetric],
+  );
+  // Another metric dates the files another way: the range of the one left
+  // goes with it, so the list is not narrowed by a day no cell shows.
+  const changeHeatmapMetric = useCallback(
+    (metric: ActivityMetric) => {
+      if (metric === heatmapMetric) return;
+      setHeatmapMetric(metric);
+      const cleared = withPickedDay(filterValue, heatmapMetric, null);
+      if (cleared !== filterValue) onFilterChange(cleared);
+    },
+    [heatmapMetric, setHeatmapMetric, filterValue, onFilterChange],
+  );
 
   // Include the workspace ID in the key so switching workspaces (incl. "All") refetches separately.
   const search = useFilesSearch(
@@ -297,7 +292,7 @@ export default function Home() {
   // nothing narrowing it, the whole scope (null: the status bar's total).
   const browsing =
     folderView && !folderSearching && listedPath === folderNav.path;
-  const narrowed = folderView || !!dayScope || hasFilterConditions(filter);
+  const narrowed = folderView || hasFilterConditions(filter);
   const listCounts = useMemo<ListCounts>(
     () =>
       browsing && folderListing.data
@@ -818,13 +813,8 @@ export default function Home() {
     t,
   ]);
 
-  // Changing it scrolls the list back to its top: another folder or another
-  // day of the heatmap is another list.
-  const listResetKey = folderView
-    ? `folder:${folderNav.path}`
-    : dayScope
-      ? `day:${dayScope.metric}:${dayScope.date}`
-      : undefined;
+  // Changing it scrolls the list back to its top, as another folder does.
+  const listResetKey = folderView ? `folder:${folderNav.path}` : undefined;
   // Names the list on screen: the workspace, how it is browsed and the filter.
   const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : (listResetKey ?? "flat")}|${JSON.stringify(filter)}`;
   // A pass the playlist parked belongs to the list it was playing. Once the
@@ -997,8 +987,7 @@ export default function Home() {
                 inFolder={folderSearching}
               />
             ) : (
-              // The heatmap sits above a grid of its own: every file the
-              // filter matches, or the picked day's. Without it the wrappers
+              // The heatmap sits above a grid of its own. Without it the wrappers
               // take no box and the grid fills <main> as before.
               <div
                 className={
@@ -1015,8 +1004,7 @@ export default function Home() {
                     }
                     metric={heatmapMetric}
                     onMetricChange={changeHeatmapMetric}
-                    day={heatmapDay}
-                    onDayChange={setHeatmapDay}
+                    onDayChange={pickHeatmapDay}
                   />
                 )}
                 <div

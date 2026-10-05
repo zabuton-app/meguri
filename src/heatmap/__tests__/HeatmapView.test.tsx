@@ -3,6 +3,8 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { HeatmapView } from "@/heatmap/HeatmapView";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { ActivityMetric } from "@shared/ipc/activity";
+import { daySeconds, parseDay } from "@shared/day";
+import type { SearchQuery } from "@/ipc/types";
 
 interface Request {
   query: Record<string, unknown>;
@@ -30,6 +32,14 @@ function cell(day: string): HTMLElement {
   return el;
 }
 
+/** A query whose played range is exactly `day`: what picking it sets. */
+function playedOn(day: string, lastDay = day): SearchQuery {
+  return {
+    playedFrom: daySeconds(parseDay(day)!)[0],
+    playedTo: daySeconds(parseDay(lastDay)!)[1],
+  };
+}
+
 function renderGraph(props: Partial<Parameters<typeof HeatmapView>[0]> = {}) {
   const onDayChange = vi.fn();
   const onMetricChange = vi.fn();
@@ -40,7 +50,6 @@ function renderGraph(props: Partial<Parameters<typeof HeatmapView>[0]> = {}) {
       ready
       metric="played"
       onMetricChange={onMetricChange}
-      day={null}
       onDayChange={onDayChange}
       {...props}
     />,
@@ -93,8 +102,10 @@ describe("HeatmapView", () => {
   });
 
   it("marks the picked day, and lets it go on a second click", async () => {
-    const { onDayChange } = renderGraph({ day: "2026-10-03" });
+    const { onDayChange } = renderGraph({ query: playedOn("2026-10-03") });
     await waitFor(() => expect(cell("2026-10-03").dataset.level).toBe("4"));
+    // The range is the day picked, not a condition of the counts.
+    expect(lastRequest().query).toEqual({});
     expect(cell("2026-10-03").getAttribute("aria-pressed")).toBe("true");
     expect(cell("2026-10-01").getAttribute("aria-pressed")).toBe("false");
 
@@ -121,9 +132,34 @@ describe("HeatmapView", () => {
     expect(onMetricChange).toHaveBeenCalledWith("created");
   });
 
+  it("marks every day of a longer range, and narrows it to the cell clicked", async () => {
+    const { onDayChange } = renderGraph({
+      query: playedOn("2026-10-01", "2026-10-03"),
+    });
+    await waitFor(() => expect(mocks.activityDays).toHaveBeenCalled());
+    for (const day of ["2026-10-01", "2026-10-02", "2026-10-03"])
+      expect(cell(day).getAttribute("aria-pressed")).toBe("true");
+    expect(cell("2026-09-30").getAttribute("aria-pressed")).toBe("false");
+    expect(cell("2026-10-04").getAttribute("aria-pressed")).toBe("false");
+    // No one day to speak of: no label, no clear button.
+    expect(screen.queryByRole("button", { name: "Show all days" })).toBeNull();
+
+    fireEvent.click(cell("2026-10-02"));
+    expect(onDayChange).toHaveBeenLastCalledWith("2026-10-02");
+  });
+
+  it("leaves another metric's range to the counts", async () => {
+    const added = { addedFrom: 1, addedTo: 2 };
+    renderGraph({ query: added });
+    await waitFor(() => expect(lastRequest().query).toEqual(added));
+    expect(
+      document.querySelector('[data-day][aria-pressed="true"]'),
+    ).toBeNull();
+  });
+
   it("opens on the page of a day picked earlier", async () => {
-    // Home keeps the day across view modes; the page must follow it back.
-    renderGraph({ day: "2024-05-01" });
+    // The range is part of the filter and outlives the view.
+    renderGraph({ query: playedOn("2024-05-01") });
     await waitFor(() =>
       expect(lastRequest()).toMatchObject({
         from: "2024-01-01",
@@ -135,7 +171,7 @@ describe("HeatmapView", () => {
   });
 
   it("pages back through whole years and forward to today again", async () => {
-    const { onDayChange } = renderGraph({ day: "2026-10-03" });
+    const { onDayChange } = renderGraph({ query: playedOn("2026-10-03") });
     const next = screen.getByRole("button", { name: "Next year" });
     expect((next as HTMLButtonElement).disabled).toBe(true);
 
@@ -146,8 +182,8 @@ describe("HeatmapView", () => {
         to: "2025-12-31",
       }),
     );
-    // The day picked belonged to the page left behind.
-    expect(onDayChange).toHaveBeenLastCalledWith(null);
+    // Paging only looks elsewhere: the day stays a condition of the list.
+    expect(onDayChange).not.toHaveBeenCalled();
     expect(screen.getByText("2025")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Previous year" }));

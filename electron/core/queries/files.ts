@@ -9,7 +9,6 @@ import {
   folderCondition,
   folderRange,
 } from "./folderRange.js";
-import { dayBounds, dayCondition } from "./dayRange.js";
 import {
   LIST_HIDDEN_SOURCES,
   parseTagSearchToken,
@@ -198,17 +197,6 @@ export function appendSearchConditions(
       args.push(...cond.args);
     }
   }
-  if (query.day) {
-    const bounds = dayBounds(query.day.date, query.day.date);
-    if (!bounds) {
-      // Not a day at all (the IPC schema refuses these): nothing is on it.
-      sql += " AND 0";
-    } else {
-      const cond = dayCondition(query.day.metric, ...bounds);
-      sql += ` AND ${cond.sql}`;
-      args.push(...cond.args);
-    }
-  }
   if (query.kind) {
     sql += " AND f.kind = ?";
     args.push(query.kind);
@@ -242,6 +230,25 @@ export function appendSearchConditions(
   if (query.btimeTo != null) {
     sql += " AND f.btime <= ?";
     args.push(query.btimeTo);
+  }
+  if (query.addedFrom != null) {
+    sql += " AND f.created_at >= ?";
+    args.push(query.addedFrom);
+  }
+  if (query.addedTo != null) {
+    sql += " AND f.created_at <= ?";
+    args.push(query.addedTo);
+  }
+  if (query.playedFrom != null || query.playedTo != null) {
+    // An IN over the range of idx_play_history_played rather than an EXISTS
+    // per file: the latter probes the history of every file the sort walks
+    // past, on each page of the list.
+    sql +=
+      " AND f.meta_key IN (SELECT meta_key FROM play_history WHERE played_at >= ? AND played_at <= ?)";
+    args.push(
+      query.playedFrom ?? Number.MIN_SAFE_INTEGER,
+      query.playedTo ?? Number.MAX_SAFE_INTEGER,
+    );
   }
   for (const tag of (query.tags ?? []).filter(Boolean)) {
     const ids = resolveTagIds(db, tag);

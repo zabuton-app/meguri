@@ -180,6 +180,15 @@ export function describeConditions(
       clear: (q) => without(q, "inProgress"),
     });
 
+  if (query.capturedFrom != null || query.capturedTo != null)
+    out.push({
+      key: "capturedAt",
+      label: `${t("filter.capturedAt")}: ${describeDateRange(t, query.capturedFrom, query.capturedTo)}`,
+      group: "collapsed",
+      chip: true,
+      clear: (q) => without(q, "capturedFrom", "capturedTo"),
+    });
+
   if (query.btimeFrom != null || query.btimeTo != null)
     out.push({
       key: "btime",
@@ -187,6 +196,24 @@ export function describeConditions(
       group: "collapsed",
       chip: true,
       clear: (q) => without(q, "btimeFrom", "btimeTo"),
+    });
+
+  if (query.addedFrom != null || query.addedTo != null)
+    out.push({
+      key: "addedAt",
+      label: `${t("filter.addedAt")}: ${describeDateRange(t, query.addedFrom, query.addedTo)}`,
+      group: "collapsed",
+      chip: true,
+      clear: (q) => without(q, "addedFrom", "addedTo"),
+    });
+
+  if (query.playedFrom != null || query.playedTo != null)
+    out.push({
+      key: "playedAt",
+      label: `${t("filter.playedAt")}: ${describeDateRange(t, query.playedFrom, query.playedTo)}`,
+      group: "collapsed",
+      chip: true,
+      clear: (q) => without(q, "playedFrom", "playedTo"),
     });
 
   if (query.duplicates)
