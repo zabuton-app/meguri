@@ -382,6 +382,28 @@ export const ja = {
   "view.grid": "グリッド表示",
   "view.list": "リスト表示",
 
+  // contribution graph
+  "view.heatmap": "コントリビューショングラフ",
+  "view.folderUnavailableHeatmap":
+    "コントリビューショングラフではフォルダごとの表示は使えません",
+  "heatmap.metric.label": "集計対象",
+  "heatmap.metric.played": "再生",
+  "heatmap.metric.captured": "撮影",
+  "heatmap.metric.created": "作成",
+  "heatmap.metric.added": "追加",
+  "heatmap.cell.played": "{date}: {count}件を再生",
+  "heatmap.cell.captured": "{date}: {count}件を撮影",
+  "heatmap.cell.created": "{date}: {count}件を作成",
+  "heatmap.cell.added": "{date}: {count}件を追加",
+  "heatmap.range.last": "過去12か月",
+  "heatmap.range.prev": "前の年",
+  "heatmap.range.next": "次の年",
+  "heatmap.less": "少ない",
+  "heatmap.more": "多い",
+  "heatmap.hint": "日付を選ぶとその日のファイルを表示します",
+  "heatmap.clearDay": "すべての日を表示",
+  "heatmap.error": "集計を読み込めませんでした",
+
   // グラフ表示
   "view.graph": "グラフ表示",
   "view.folderUnavailableGraph": "グラフ表示ではフォルダごとの表示は使えません",

@@ -9,6 +9,7 @@ import {
   folderCondition,
   folderRange,
 } from "./folderRange.js";
+import { dayBounds, dayCondition } from "./dayRange.js";
 import {
   LIST_HIDDEN_SOURCES,
   parseTagSearchToken,
@@ -193,6 +194,17 @@ export function appendSearchConditions(
       query.folder.recursive,
     );
     if (cond.sql) {
+      sql += ` AND ${cond.sql}`;
+      args.push(...cond.args);
+    }
+  }
+  if (query.day) {
+    const bounds = dayBounds(query.day.date, query.day.date);
+    if (!bounds) {
+      // Not a day at all (the IPC schema refuses these): nothing is on it.
+      sql += " AND 0";
+    } else {
+      const cond = dayCondition(query.day.metric, ...bounds);
       sql += ` AND ${cond.sql}`;
       args.push(...cond.args);
     }

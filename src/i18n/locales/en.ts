@@ -381,6 +381,28 @@ export const en: Record<TranslationKey, string> = {
   "view.grid": "Grid view",
   "view.list": "List view",
 
+  // contribution graph
+  "view.heatmap": "Contribution graph",
+  "view.folderUnavailableHeatmap":
+    "Folder view is not available in the contribution graph",
+  "heatmap.metric.label": "Count by",
+  "heatmap.metric.played": "Played",
+  "heatmap.metric.captured": "Captured",
+  "heatmap.metric.created": "Created",
+  "heatmap.metric.added": "Added",
+  "heatmap.cell.played": "{date}: {count} played",
+  "heatmap.cell.captured": "{date}: {count} captured",
+  "heatmap.cell.created": "{date}: {count} created",
+  "heatmap.cell.added": "{date}: {count} added",
+  "heatmap.range.last": "Last 12 months",
+  "heatmap.range.prev": "Previous year",
+  "heatmap.range.next": "Next year",
+  "heatmap.less": "Less",
+  "heatmap.more": "More",
+  "heatmap.hint": "Select a day to list its files",
+  "heatmap.clearDay": "Show all days",
+  "heatmap.error": "Could not load the counts",
+
   // graph view
   "view.graph": "Graph view",
   "view.folderUnavailableGraph":

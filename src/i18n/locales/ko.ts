@@ -380,6 +380,28 @@ export const ko: Record<TranslationKey, string> = {
   "view.grid": "그리드 보기",
   "view.list": "리스트 보기",
 
+  // contribution graph
+  "view.heatmap": "기여 그래프",
+  "view.folderUnavailableHeatmap":
+    "기여 그래프에서는 폴더별 보기를 사용할 수 없습니다",
+  "heatmap.metric.label": "집계 기준",
+  "heatmap.metric.played": "재생",
+  "heatmap.metric.captured": "촬영",
+  "heatmap.metric.created": "생성",
+  "heatmap.metric.added": "추가",
+  "heatmap.cell.played": "{date}: {count}개 재생",
+  "heatmap.cell.captured": "{date}: {count}개 촬영",
+  "heatmap.cell.created": "{date}: {count}개 생성",
+  "heatmap.cell.added": "{date}: {count}개 추가",
+  "heatmap.range.last": "최근 12개월",
+  "heatmap.range.prev": "이전 연도",
+  "heatmap.range.next": "다음 연도",
+  "heatmap.less": "적음",
+  "heatmap.more": "많음",
+  "heatmap.hint": "날짜를 선택하면 그날의 파일을 표시합니다",
+  "heatmap.clearDay": "모든 날짜 표시",
+  "heatmap.error": "집계를 불러오지 못했습니다",
+
   // graph view
   "view.graph": "그래프 보기",
   "view.folderUnavailableGraph":

@@ -389,6 +389,28 @@ export const es: Record<TranslationKey, string> = {
   "view.grid": "Vista de cuadrícula",
   "view.list": "Vista de lista",
 
+  // contribution graph
+  "view.heatmap": "Gráfico de contribuciones",
+  "view.folderUnavailableHeatmap":
+    "La vista por carpetas no está disponible en el gráfico de contribuciones",
+  "heatmap.metric.label": "Contar por",
+  "heatmap.metric.played": "Reproducidos",
+  "heatmap.metric.captured": "Capturados",
+  "heatmap.metric.created": "Creados",
+  "heatmap.metric.added": "Añadidos",
+  "heatmap.cell.played": "{date}: {count} reproducidos",
+  "heatmap.cell.captured": "{date}: {count} capturados",
+  "heatmap.cell.created": "{date}: {count} creados",
+  "heatmap.cell.added": "{date}: {count} añadidos",
+  "heatmap.range.last": "Últimos 12 meses",
+  "heatmap.range.prev": "Año anterior",
+  "heatmap.range.next": "Año siguiente",
+  "heatmap.less": "Menos",
+  "heatmap.more": "Más",
+  "heatmap.hint": "Selecciona un día para ver sus archivos",
+  "heatmap.clearDay": "Mostrar todos los días",
+  "heatmap.error": "No se pudieron cargar los recuentos",
+
   // graph view
   "view.graph": "Vista de grafo",
   "view.folderUnavailableGraph":

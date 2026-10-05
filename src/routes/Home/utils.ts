@@ -3,15 +3,31 @@ import {
   splitSearchTokens,
   tagSearchKey,
 } from "@shared/tags";
+import { isActivityMetric, type ActivityMetric } from "@shared/ipc/activity";
 import type { SearchQuery } from "@/ipc/types";
 
 export const DISCOVER_FILTER_PARAM = "filter";
 export const VIEW_KEY = "meguri.view";
 
-export type ViewMode = "grid" | "list" | "graph";
+export type ViewMode = "grid" | "list" | "graph" | "heatmap";
 
 export function isViewMode(v: string | null): v is ViewMode {
-  return v === "grid" || v === "list" || v === "graph";
+  return v === "grid" || v === "list" || v === "graph" || v === "heatmap";
+}
+
+/**
+ * Whether a view can be drawn by folder. The graph and the heatmap have no
+ * folder form; the stored option waits for the grid and the list.
+ */
+export function hasFolderForm(view: ViewMode): boolean {
+  return view === "grid" || view === "list";
+}
+
+/** What the heatmap counts, remembered apart from the view mode. */
+export const HEATMAP_METRIC_KEY = "meguri.heatmapMetric";
+
+export function parseHeatmapMetric(raw: string | null): ActivityMetric {
+  return isActivityMetric(raw) ? raw : "played";
 }
 
 /**
@@ -39,10 +55,10 @@ export function isFolderView({
 }: {
   byFolder: boolean;
   folderAvailable: boolean;
-  /** The graph has no folder form; the stored option waits for the list views. */
+  /** Some views have no folder form (see hasFolderForm). */
   view?: ViewMode;
 }): boolean {
-  return byFolder && folderAvailable && view !== "graph";
+  return byFolder && folderAvailable && (!view || hasFolderForm(view));
 }
 
 export function cleanDiscoverFilter(filter: SearchQuery): SearchQuery {

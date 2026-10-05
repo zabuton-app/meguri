@@ -2,6 +2,7 @@
 // See shared/ipc/schema.ts for the canonical definitions.
 export type {
   AppStatus,
+  DayScope,
   DuplicateGroup,
   DuplicatesResult,
   FileDetail,

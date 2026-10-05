@@ -372,6 +372,27 @@ export const zhCN: Record<TranslationKey, string> = {
   "view.grid": "网格视图",
   "view.list": "列表视图",
 
+  // contribution graph
+  "view.heatmap": "贡献图",
+  "view.folderUnavailableHeatmap": "贡献图中无法按文件夹显示",
+  "heatmap.metric.label": "统计对象",
+  "heatmap.metric.played": "播放",
+  "heatmap.metric.captured": "拍摄",
+  "heatmap.metric.created": "创建",
+  "heatmap.metric.added": "添加",
+  "heatmap.cell.played": "{date}：播放 {count} 个",
+  "heatmap.cell.captured": "{date}：拍摄 {count} 个",
+  "heatmap.cell.created": "{date}：创建 {count} 个",
+  "heatmap.cell.added": "{date}：添加 {count} 个",
+  "heatmap.range.last": "过去 12 个月",
+  "heatmap.range.prev": "上一年",
+  "heatmap.range.next": "下一年",
+  "heatmap.less": "少",
+  "heatmap.more": "多",
+  "heatmap.hint": "选择日期以显示当天的文件",
+  "heatmap.clearDay": "显示所有日期",
+  "heatmap.error": "无法加载统计",
+
   // graph view
   "view.graph": "图谱视图",
   "view.folderUnavailableGraph": "图谱视图中无法按文件夹显示",

@@ -149,6 +149,70 @@ describe("targeted files_search invalidation", () => {
     ]);
   });
 
+  it("recounts the contribution graph only where a change can reach it", async () => {
+    const qc = new QueryClient();
+    const counts = async (
+      name: string,
+      filter: SearchQuery,
+      metric: string,
+      scope = "ws",
+    ) => {
+      await qc.fetchQuery({
+        queryKey: ["activity_days", scope, filter, metric, "a", "b"],
+        queryFn: () => name,
+      });
+    };
+    await counts("plays", {}, "played");
+    await counts("captured", {}, "captured");
+    await counts("unplayed", { played: false }, "added");
+    await counts("favorites", { favorite: true }, "added");
+    await counts("tagged", { tags: ["beach"] }, "added");
+    await counts("inProgress", { inProgress: true }, "added");
+    await counts("collection", {}, "added", collectionTarget("other"));
+    let hit: string[] = [];
+    qc.getQueryCache().subscribe((e) => {
+      if (e.type === "updated" && e.action.type === "invalidate")
+        hit.push(String(e.query.state.data));
+    });
+    const after = (run: () => void) => {
+      hit = [];
+      run();
+      return [...hit].sort();
+    };
+
+    expect(after(() => invalidatePlayedSearches(qc))).toEqual([
+      "plays",
+      "unplayed",
+    ]);
+    expect(after(() => invalidateInProgressSearches(qc))).toEqual([
+      "inProgress",
+    ]);
+    expect(after(() => invalidateTagSearches(qc))).toEqual(["tagged"]);
+    expect(after(() => invalidateCollectionSearches(qc))).toEqual([
+      "collection",
+    ]);
+    // Like the list under it, the heatmap keeps what it shows on a favorite
+    // or rating edit: a recount alone would disagree with the list.
+    expect(
+      after(() => syncFileRowAcrossCaches(qc, "ws", 1, { favorite: 1 })),
+    ).toEqual([]);
+  });
+
+  it("invalidatePlayedSearches refreshes the list of a day's plays", () => {
+    const { qc, invalidated } = seed({
+      playedDay: {
+        ws: "ws",
+        filter: { day: { metric: "played", date: "2026-10-03" } },
+      },
+      addedDay: {
+        ws: "ws",
+        filter: { day: { metric: "added", date: "2026-10-03" } },
+      },
+    });
+    invalidatePlayedSearches(qc);
+    expect(invalidated()).toEqual(["playedDay"]);
+  });
+
   it("invalidateInProgressSearches hits the in-progress list and graph only", async () => {
     const { qc, invalidated } = seed({
       plain: { ws: "ws", filter: {} },

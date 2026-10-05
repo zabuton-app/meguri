@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Bookmark,
+  CalendarDays,
   ChevronRight,
   Clock,
   Copy,
@@ -849,6 +850,11 @@ function FixedGroups({
       id: "view-graph",
       icon: Waypoints,
       run: () => closeThen(() => onSetView("graph")),
+    }),
+    action(t, "view.heatmap", {
+      id: "view-heatmap",
+      icon: CalendarDays,
+      run: () => closeThen(() => onSetView("heatmap")),
     }),
     // A toggle, unlike the view actions above it: named for what it will do.
     action(t, folderView ? "view.folderOff" : "view.folder", {

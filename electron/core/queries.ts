@@ -11,3 +11,5 @@ export * from "./queries/settings.js";
 export * from "./queries/folderRange.js";
 export * from "./queries/folders.js";
 export * from "./queries/graph.js";
+export * from "./queries/activity.js";
+export * from "./queries/dayRange.js";

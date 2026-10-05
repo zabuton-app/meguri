@@ -105,8 +105,8 @@ shows one frame per state.
 
 Data fetching uses `@tanstack/react-query`. The file list is an
 `useInfiniteQuery` combined with `@tanstack/react-virtual` for infinite scroll
-plus virtualization (`src/components/MediaGrid.tsx`). Three view modes — grid,
-list and graph — are switchable.
+plus virtualization (`src/components/MediaGrid.tsx`). Four view modes — grid,
+list, graph and heatmap — are switchable.
 
 Both views have a "show by folder" option (`BY_FOLDER_KEY`, remembered apart
 from the view mode) that browses one workspace like a file manager: the current
@@ -160,6 +160,24 @@ rows through `files_by_ids` and the picked folders through `folder_files`. A
 file that does not come back is gone and leaves the selection. The selection
 can be larger than one call may name, so the rows are read in runs of
 `MAX_BULK_FILES` (`readInBulkBatches`), all of which must succeed.
+
+The heatmap (`src/heatmap/`, "Contribution graph" in the UI) is a year of days
+drawn as week columns above a grid of its own, each cell shaded by how many of
+the files the filter matches fall on that day (`activity_days`; see
+docs/architecture.md, "Heatmap"). What a day counts is a metric — played,
+captured, created or added — remembered in `HEATMAP_METRIC_KEY`. The page is
+the 53 weeks ending today or one calendar year (`calendar.ts`, which also picks
+the shade: a square-root scale against the busiest day shown, so one large
+import does not flatten the rest). The week columns share out the full width,
+so the cells grow with the window; below a minimum width the grid scrolls
+sideways instead. Picking a day narrows the list below to that day's files:
+Home adds it to the query it sends as `SearchQuery.day`, the way the folder
+view adds `folder`, so it never enters the filter itself (saved searches,
+Discover and the counts keep reading the filter). Home keeps the day across
+view modes, and the view opens on the page that day is on. The view has no
+folder form (`hasFolderForm`). One cell is in the tab order and the arrow keys
+move between days; those keys are stopped at the view, since the grid below
+listens for them on the window.
 
 The graph view (`src/graph/`, loaded lazily with `React.lazy` so the list views
 never pay for it) draws the same list as a network of files and tags, from one

@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   ChevronDown,
   CopyCheck,
   DatabaseBackup,
@@ -28,7 +29,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
-import type { ViewMode } from "./utils";
+import { hasFolderForm, type ViewMode } from "./utils";
 
 /**
  * Display name for a collection. The built-in Watch Later stores an English
@@ -179,6 +180,12 @@ export function HomeHeader({
                 mode: "graph",
                 label: t("view.graph"),
                 Icon: Waypoints,
+                rounded: "",
+              },
+              {
+                mode: "heatmap",
+                label: t("view.heatmap"),
+                Icon: CalendarDays,
                 rounded: "rounded-r-md",
               },
             ] as const
@@ -210,13 +217,15 @@ export function HomeHeader({
           onClick={onToggleByFolder}
           aria-label={t("view.folder")}
           aria-pressed={folderView}
-          disabled={!folderAvailable || view === "graph"}
+          disabled={!folderAvailable || !hasFolderForm(view)}
           title={
             view === "graph"
               ? t("view.folderUnavailableGraph")
-              : folderAvailable
-                ? t("view.folder")
-                : t("view.folderUnavailable")
+              : view === "heatmap"
+                ? t("view.folderUnavailableHeatmap")
+                : folderAvailable
+                  ? t("view.folder")
+                  : t("view.folderUnavailable")
           }
           className={cn(
             "flex size-7 items-center justify-center rounded-md border border-border transition disabled:cursor-not-allowed disabled:opacity-40",

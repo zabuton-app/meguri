@@ -256,6 +256,36 @@ the tags they carry. It is built in one call and cached per scope.
   (`graph-layout-3d.json`, or the hash of `<scope>#3d`), with three numbers
   per key; a file of the other dimension reads as none.
 
+### Heatmap
+
+The heatmap ("Contribution graph" in the UI) counts the current list — any
+workspace, `All` or a collection, with the search and filters applied — per
+calendar day.
+
+- **One query per database.** `activity_days` runs on the query worker
+  (`electron/core/activityDays.ts`) with files_search's target resolution, and
+  sums the per-database counts (`queries/activity.ts`, which reuses
+  `appendSearchConditions`). A request names a metric and a range of days
+  (at most `ACTIVITY_MAX_DAYS`); only days with something on them come back.
+- **Metrics.** `played` counts the files with a `play_history` row that day,
+  `captured` dates a file by `captured_at` (its `mtime` where there is none),
+  `created` by `btime` (a file without one is on no day), and `added` by
+  `created_at`. A file counts once per day however often it was played.
+- **Counts and list agree.** The list under the heatmap reads a day's files
+  with `SearchQuery.day`, whose condition comes from `queries/dayRange.ts`.
+  The counts use the same condition for the metrics read off the file row;
+  `played` is driven from `play_history` instead, so that its index serves the
+  range. Either way a cell's number is the length of the list it opens
+  (identical copies included, as the list shows them), which
+  `activityDays.test.ts` pins per metric.
+- **Local days, one calendar.** Days cross IPC as `YYYY-MM-DD` strings
+  (`shared/day.ts`) and are resolved in the main process's time zone, so the
+  renderer never sends timestamps. The SQL only selects timestamps in the
+  range; they are put into days in JavaScript, against the same local
+  midnights the list's condition is built from. SQLite's `'localtime'` is
+  deliberately not used: it does not agree with `Date` for every year or on
+  every platform, and a file would land in a cell whose list leaves it out.
+
 ## Collections
 
 Two unrelated mechanisms group files. They differ in where they persist and who

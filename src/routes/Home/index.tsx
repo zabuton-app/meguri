@@ -20,6 +20,7 @@ import { FolderPlus, PlayCircle, Sparkles } from "lucide-react";
 import { api, events, ALL_ID, type ThumbDone } from "@/ipc/client";
 import { COLLECTION_ID_PREFIX, WATCH_LATER_ID } from "@shared/workspaceIds";
 import type {
+  DayScope,
   FileRow,
   SearchQuery,
   SearchResult,
@@ -28,7 +29,9 @@ import type {
 } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { MANUAL_SORT } from "@shared/sortDir";
+import type { ActivityMetric } from "@shared/ipc/activity";
 import { MediaGrid } from "@/components/MediaGrid";
+import { HeatmapView } from "@/heatmap/HeatmapView";
 import { MediaList } from "@/components/MediaList";
 import {
   MediaNavProvider,
@@ -79,8 +82,11 @@ import {
   addSearchTokens,
   discoverPath,
   BY_FOLDER_KEY,
+  HEATMAP_METRIC_KEY,
   LIST_MAIN_ID,
+  hasFolderForm,
   isFolderView,
+  parseHeatmapMetric,
   parseViewMode,
   scrollListByPage,
 } from "./utils";
@@ -128,6 +134,32 @@ export default function Home() {
     false,
     (raw) => raw === "true",
   );
+  // The heatmap: what a day counts, and the day picked on it. The day is kept
+  // while another view shows and narrows the list only under the heatmap
+  // itself (see searchQuery).
+  const [heatmapMetric, setHeatmapMetric] = useLocalStorage<ActivityMetric>(
+    HEATMAP_METRIC_KEY,
+    "played",
+    parseHeatmapMetric,
+  );
+  const [heatmapDay, setHeatmapDay] = useState<string | null>(null);
+  // A day's files differ by metric: the one picked does not carry over.
+  const changeHeatmapMetric = useCallback(
+    (metric: ActivityMetric) => {
+      // Choosing the metric already shown changes nothing, the day included.
+      if (metric === heatmapMetric) return;
+      setHeatmapMetric(metric);
+      setHeatmapDay(null);
+    },
+    [heatmapMetric, setHeatmapMetric],
+  );
+  const dayScope = useMemo<DayScope | undefined>(
+    () =>
+      view === "heatmap" && heatmapDay
+        ? { metric: heatmapMetric, date: heatmapDay }
+        : undefined,
+    [view, heatmapDay, heatmapMetric],
+  );
 
   const status = useAppStatus();
   const workspaces = useQuery({
@@ -174,6 +206,8 @@ export default function Home() {
   // The folder rides on the query sent, never on `filter` itself: that state
   // is what Discover opens with, which scopes to the folder its own way. The
   // filter bar reads the folder back through `filterValue` instead.
+  // The day picked on the heatmap rides the same way: it narrows the list
+  // under the heatmap, not the filter the heatmap itself counts.
   const searchQuery = useMemo<SearchQuery>(
     () =>
       folderView
@@ -181,17 +215,20 @@ export default function Home() {
             ...filter,
             folder: { path: folderNav.path, recursive: folderSearching },
           }
-        : filter,
-    [filter, folderView, folderNav.path, folderSearching],
+        : dayScope
+          ? { ...filter, day: dayScope }
+          : filter,
+    [filter, folderView, folderNav.path, folderSearching, dayScope],
   );
 
-  // The graph has no folder form (see isFolderView): a folder opened from
-  // outside the list — a saved search that carries one, "show in library" —
-  // would be dropped without a word there, so it leaves the graph for the grid.
+  // The graph and the heatmap have no folder form (see hasFolderForm): a
+  // folder opened from outside the list — a saved search that carries one,
+  // "show in library" — would be dropped without a word there, so it leaves
+  // them for the grid.
   const showByFolder = useCallback(
     (on: boolean) => {
       setByFolder(on);
-      if (on) setViewMode((v) => (v === "graph" ? "grid" : v));
+      if (on) setViewMode((v) => (hasFolderForm(v) ? v : "grid"));
     },
     [setByFolder, setViewMode],
   );
@@ -260,7 +297,7 @@ export default function Home() {
   // nothing narrowing it, the whole scope (null: the status bar's total).
   const browsing =
     folderView && !folderSearching && listedPath === folderNav.path;
-  const narrowed = folderView || hasFilterConditions(filter);
+  const narrowed = folderView || !!dayScope || hasFilterConditions(filter);
   const listCounts = useMemo<ListCounts>(
     () =>
       browsing && folderListing.data
@@ -501,6 +538,7 @@ export default function Home() {
         // Folders appear, fill up and empty out with a scan like files do.
         void qc.invalidateQueries({ queryKey: ["folders_list"] });
         void qc.invalidateQueries({ queryKey: ["graph_build"] });
+        void qc.invalidateQueries({ queryKey: ["activity_days"] });
         // A scan can add tags (new files, the derived-tag backfill), so a tag
         // screen left open would otherwise show a stale catalog.
         void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
@@ -780,8 +818,15 @@ export default function Home() {
     t,
   ]);
 
+  // Changing it scrolls the list back to its top: another folder or another
+  // day of the heatmap is another list.
+  const listResetKey = folderView
+    ? `folder:${folderNav.path}`
+    : dayScope
+      ? `day:${dayScope.metric}:${dayScope.date}`
+      : undefined;
   // Names the list on screen: the workspace, how it is browsed and the filter.
-  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : folderView ? `folder:${folderNav.path}` : "flat"}|${JSON.stringify(filter)}`;
+  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : (listResetKey ?? "flat")}|${JSON.stringify(filter)}`;
   // A pass the playlist parked belongs to the list it was playing. Once the
   // list becomes another one it is dropped, so nothing (the pet's "Resume
   // playback") can pick it back up and graft the new list onto the old queue.
@@ -948,34 +993,61 @@ export default function Home() {
                 reorder={reorder}
                 folders={folderEntries}
                 onOpenFolder={folderNav.enter}
-                resetKey={folderView ? `folder:${folderNav.path}` : undefined}
+                resetKey={listResetKey}
                 inFolder={folderSearching}
               />
             ) : (
-              // By folder, either view gets the folders ahead of the files
-              // (folders is unset otherwise).
-              <MediaGrid
-                items={items}
-                mediaBase={status.data?.mediaBase ?? ""}
-                workspaceId={status.data?.workspaceId ?? ""}
-                listOffset={listOffset}
-                loading={listLoading}
-                thumbVersion={thumbVersion}
-                onTagClick={onTagClick}
-                hasNextPage={search.hasNextPage}
-                fetchNextPage={fetchNextPage}
-                isFetchingNextPage={search.isFetchingNextPage}
-                hasPreviousPage={search.hasPreviousPage}
-                fetchPreviousPage={fetchPreviousPage}
-                isFetchingPreviousPage={search.isFetchingPreviousPage}
-                navActive={navActive}
-                watchLater={activeCollection?.id === WATCH_LATER_ID}
-                reorder={reorder}
-                folders={folderEntries}
-                onOpenFolder={folderNav.enter}
-                resetKey={folderView ? `folder:${folderNav.path}` : undefined}
-                inFolder={folderSearching}
-              />
+              // The heatmap sits above a grid of its own: every file the
+              // filter matches, or the picked day's. Without it the wrappers
+              // take no box and the grid fills <main> as before.
+              <div
+                className={
+                  view === "heatmap" ? "flex h-full flex-col" : "contents"
+                }
+              >
+                {view === "heatmap" && (
+                  <HeatmapView
+                    scope={status.data?.workspaceId ?? ""}
+                    query={filter}
+                    ready={
+                      (status.data?.ready ?? false) &&
+                      !!status.data?.workspaceId
+                    }
+                    metric={heatmapMetric}
+                    onMetricChange={changeHeatmapMetric}
+                    day={heatmapDay}
+                    onDayChange={setHeatmapDay}
+                  />
+                )}
+                <div
+                  className={view === "heatmap" ? "min-h-0 flex-1" : "contents"}
+                >
+                  {/* By folder, either view gets the folders ahead of the
+                      files (folders is unset otherwise). */}
+                  <MediaGrid
+                    items={items}
+                    mediaBase={status.data?.mediaBase ?? ""}
+                    workspaceId={status.data?.workspaceId ?? ""}
+                    listOffset={listOffset}
+                    loading={listLoading}
+                    thumbVersion={thumbVersion}
+                    onTagClick={onTagClick}
+                    hasNextPage={search.hasNextPage}
+                    fetchNextPage={fetchNextPage}
+                    isFetchingNextPage={search.isFetchingNextPage}
+                    hasPreviousPage={search.hasPreviousPage}
+                    fetchPreviousPage={fetchPreviousPage}
+                    isFetchingPreviousPage={search.isFetchingPreviousPage}
+                    navActive={navActive}
+                    watchLater={activeCollection?.id === WATCH_LATER_ID}
+                    reorder={reorder}
+                    folders={folderEntries}
+                    onOpenFolder={folderNav.enter}
+                    resetKey={listResetKey}
+                    inFolder={folderSearching}
+                  />
+                </div>
+              </div>
             )}
           </main>
 
@@ -1019,7 +1091,7 @@ export default function Home() {
           onSetView={setViewMode}
           onToggleByFolder={toggleByFolder}
           folderView={folderView}
-          folderAvailable={folderAvailable && view !== "graph"}
+          folderAvailable={folderAvailable && hasFolderForm(view)}
           onDiscover={openDiscover}
           canDiscover={hasPool}
           onTags={openTags}

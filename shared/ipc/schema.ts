@@ -8,6 +8,8 @@ import { MAX_TAG_REF_NAME } from "../tags.js";
 import { MAX_FOLDER_PATH, isNormalizedFolderPath } from "../folderPath.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
 import { GRAPH_NODE_KEY_MAX } from "./graph.js";
+import { ACTIVITY_METRICS } from "./activity.js";
+import { parseDay } from "../day.js";
 
 export const KindSchema = z.enum(["video", "image", "audio"]);
 export type Kind = z.infer<typeof KindSchema>;
@@ -130,6 +132,21 @@ export const FolderScopeSchema = z.object({
 });
 export type FolderScope = z.infer<typeof FolderScopeSchema>;
 
+export const ActivityMetricSchema = z.enum(ACTIVITY_METRICS);
+
+/** A calendar day, "YYYY-MM-DD", read in the main process's local time. */
+export const DaySchema = z
+  .string()
+  .max(10)
+  .refine((v) => parseDay(v) !== null, { message: "not a calendar day" });
+
+/** One day of the heatmap: the files a metric counts on it. */
+export const DayScopeSchema = z.object({
+  metric: ActivityMetricSchema,
+  date: DaySchema,
+});
+export type DayScope = z.infer<typeof DayScopeSchema>;
+
 export const SearchCursorSchema = z.object({
   offset: z.number().int().min(0),
   key: SearchSeekKeySchema.optional(),
@@ -158,6 +175,8 @@ export const SearchQuerySchema = z.object({
   sortDir: z.enum(["asc", "desc"]).optional(),
   /** Folder view: only files under this folder (see FolderScopeSchema). */
   folder: FolderScopeSchema.optional(),
+  /** Heatmap: only the files counted on this day (see DayScopeSchema). */
+  day: DayScopeSchema.optional(),
   fileIds: z.array(z.number()).optional(),
   // Number = plain offset (legacy / backward paging); object = keyset cursor.
   cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),

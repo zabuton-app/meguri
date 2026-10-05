@@ -26,12 +26,18 @@ import {
   resetRecentSearchesForTest,
 } from "@/hooks/useRecentSearches";
 import { RECENT_SEARCHES_KEY } from "@/lib/recentSearches";
-import { BY_FOLDER_KEY, VIEW_KEY } from "@/routes/Home/utils";
+import {
+  BY_FOLDER_KEY,
+  HEATMAP_METRIC_KEY,
+  VIEW_KEY,
+} from "@/routes/Home/utils";
+import { addDays, formatDay } from "@shared/day";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
   workspacesList: vi.fn(),
   filesSearch: vi.fn(),
+  activityDays: vi.fn<(input: unknown) => Promise<unknown>>(),
   fileGet: vi.fn(),
   fileSetFavorite: vi.fn(),
   fileSetRating: vi.fn(),
@@ -62,6 +68,7 @@ vi.mock("@/ipc/client", () => ({
     appStatus: () => mocks.appStatus(),
     workspacesList: () => mocks.workspacesList(),
     filesSearch: (query: unknown) => mocks.filesSearch(query),
+    activityDays: (input: unknown) => mocks.activityDays(input),
     fileGet: (id: number, ws: string) => mocks.fileGet(id, ws),
     fileSetFavorite: (...args: unknown[]) => mocks.fileSetFavorite(...args),
     fileSetRating: (...args: unknown[]) => mocks.fileSetRating(...args),
@@ -1511,5 +1518,118 @@ describe("Home graph view", () => {
         .getByRole("button", { name: "Show by folder" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
+  });
+});
+
+describe("Home heatmap", () => {
+  // A day the graph always shows, whatever today is.
+  const yesterday = formatDay(addDays(new Date(), -1));
+
+  /** The most recent files_search query the component issued. */
+  function lastQuery(): Record<string, unknown> {
+    const calls = mocks.filesSearch.mock.calls;
+    return calls[calls.length - 1][0] as Record<string, unknown>;
+  }
+
+  function cell(day: string): HTMLElement {
+    const el = document.querySelector<HTMLElement>(`[data-day="${day}"]`);
+    if (!el) throw new Error(`no cell for ${day}`);
+    return el;
+  }
+
+  afterEach(() => {
+    localStorage.removeItem(VIEW_KEY);
+    localStorage.removeItem(BY_FOLDER_KEY);
+    localStorage.removeItem(HEATMAP_METRIC_KEY);
+  });
+
+  beforeEach(() => {
+    localStorage.setItem(VIEW_KEY, "heatmap");
+    mocks.appStatus.mockResolvedValue(defaultAppStatus);
+    mocks.workspacesList.mockResolvedValue(defaultWorkspacesList);
+    mocks.filesSearch.mockReset();
+    mocks.filesSearch.mockResolvedValue({
+      items: [sampleFileRow],
+      nextCursor: null,
+    });
+    mocks.activityDays.mockReset();
+    mocks.activityDays.mockResolvedValue({
+      days: [{ date: yesterday, count: 3 }],
+    });
+    mocks.foldersList.mockReset();
+    mocks.foldersList.mockResolvedValue({
+      path: "",
+      folders: [],
+      fileCount: 1,
+    });
+    mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
+  });
+
+  it("draws the graph over the whole list, then narrows it to the day picked", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    await waitFor(() => expect(screen.getByText("sample.mp4")).toBeTruthy());
+    expect(lastQuery().day).toBeUndefined();
+    expect(getListCounts()).toMatchObject({ files: null });
+
+    fireEvent.click(cell(yesterday));
+    await waitFor(() =>
+      expect(lastQuery().day).toEqual({ metric: "played", date: yesterday }),
+    );
+    // The status bar counts the day's files, not the whole workspace.
+    await waitFor(() => expect(getListCounts()).toMatchObject({ files: 1 }));
+    // The graph still counts the filter, not the day picked on it.
+    for (const [input] of mocks.activityDays.mock.calls)
+      expect((input as { query: object }).query).toEqual({});
+
+    fireEvent.click(cell(yesterday));
+    await waitFor(() => expect(lastQuery().day).toBeUndefined());
+  });
+
+  it("drops the day picked when the metric changes, and remembers the metric", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    fireEvent.click(cell(yesterday));
+    await waitFor(() => expect(lastQuery().day).toBeDefined());
+
+    // Choosing the metric already shown keeps the day.
+    fireEvent.click(screen.getByRole("radio", { name: "Played" }));
+    expect(lastQuery().day).toBeDefined();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Captured" }));
+    await waitFor(() => expect(lastQuery().day).toBeUndefined());
+    await waitFor(() =>
+      expect(
+        mocks.activityDays.mock.calls.some(
+          ([input]) => (input as { metric: string }).metric === "captured",
+        ),
+      ).toBe(true),
+    );
+    expect(localStorage.getItem(HEATMAP_METRIC_KEY)).toBe("captured");
+  });
+
+  it("narrows only its own list: another view shows every file again", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    fireEvent.click(cell(yesterday));
+    await waitFor(() => expect(lastQuery().day).toBeDefined());
+
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+    await waitFor(() => expect(lastQuery().day).toBeUndefined());
+    expect(document.querySelector("[data-day]")).toBeNull();
+  });
+
+  it("has no folder form: the stored option waits for the list views", async () => {
+    localStorage.setItem(BY_FOLDER_KEY, "true");
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+
+    const toggle = screen.getByRole("button", { name: "Show by folder" });
+    expect((toggle as HTMLButtonElement).disabled).toBe(true);
+    expect(toggle.getAttribute("title")).toBe(
+      "Folder view is not available in the contribution graph",
+    );
+    expect(lastQuery().folder).toBeUndefined();
+    expect(localStorage.getItem(BY_FOLDER_KEY)).toBe("true");
   });
 });

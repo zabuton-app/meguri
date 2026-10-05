@@ -31,6 +31,7 @@ export const INVOKE_CHANNELS = [
   "graph_build",
   "graph_layout_get",
   "graph_layout_set",
+  "activity_days",
   "file_get",
   "file_set_rating",
   "file_set_favorite",

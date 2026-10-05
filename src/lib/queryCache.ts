@@ -12,9 +12,18 @@ import type {
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
 
-/** The SearchQuery part of a ["files_search", wsId, filter] query key. */
+/**
+ * The SearchQuery part of a ["files_search", wsId, filter] query key. The
+ * graph ("graph_build") and the heatmap ("activity_days") keep the
+ * scope and the filter in the same two places.
+ */
 function searchFilterOf(queryKey: readonly unknown[]): SearchQuery | undefined {
   return queryKey[2] as SearchQuery | undefined;
+}
+
+/** The metric of an ["activity_days", scope, filter, metric, from, to] key. */
+function activityMetricOf(queryKey: readonly unknown[]): unknown {
+  return queryKey[3];
 }
 
 function matchesFile(
@@ -103,6 +112,7 @@ export function forgetDeletedFile(
   void qc.invalidateQueries({ queryKey: ["history_list"] });
   void qc.invalidateQueries({ queryKey: ["duplicates_list"] });
   void qc.invalidateQueries({ queryKey: ["graph_build"] });
+  void qc.invalidateQueries({ queryKey: ["activity_days"] });
 }
 
 /** Patch the detail cache when the modal is open for the same file. */
@@ -148,8 +158,20 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
     queryKey: ["files_search"],
     predicate: (q) => {
       const filter = searchFilterOf(q.queryKey);
-      return filter?.played != null || filter?.sort === "accessed";
+      return (
+        filter?.played != null ||
+        filter?.sort === "accessed" ||
+        // The list under the heatmap, narrowed to a day's plays.
+        filter?.day?.metric === "played"
+      );
     },
+  });
+  // The heatmap counting plays, or files by whether they were played.
+  void qc.invalidateQueries({
+    queryKey: ["activity_days"],
+    predicate: (q) =>
+      activityMetricOf(q.queryKey) === "played" ||
+      searchFilterOf(q.queryKey)?.played != null,
   });
 }
 
@@ -169,6 +191,10 @@ export function invalidateInProgressSearches(qc: QueryClient): void {
     queryKey: ["files_search"],
     predicate: inProgress,
   });
+  void qc.invalidateQueries({
+    queryKey: ["activity_days"],
+    predicate: inProgress,
+  });
 }
 
 /**
@@ -179,13 +205,12 @@ export function invalidateInProgressSearches(qc: QueryClient): void {
 export function invalidateTagSearches(qc: QueryClient): void {
   // The graph is drawn from tags whatever the filter, so it always goes.
   void qc.invalidateQueries({ queryKey: ["graph_build"] });
-  void qc.invalidateQueries({
-    queryKey: ["files_search"],
-    predicate: (q) => {
-      const filter = searchFilterOf(q.queryKey);
-      return Boolean(filter?.q || filter?.tags?.length);
-    },
-  });
+  const byTags = (q: { queryKey: readonly unknown[] }) => {
+    const filter = searchFilterOf(q.queryKey);
+    return Boolean(filter?.q || filter?.tags?.length);
+  };
+  void qc.invalidateQueries({ queryKey: ["files_search"], predicate: byTags });
+  void qc.invalidateQueries({ queryKey: ["activity_days"], predicate: byTags });
 }
 
 /**
@@ -215,6 +240,7 @@ export function invalidateTagCatalog(qc: QueryClient): void {
  */
 export function invalidateFileCaches(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["graph_build"] });
+  void qc.invalidateQueries({ queryKey: ["activity_days"] });
   void qc.invalidateQueries({ queryKey: ["files_search"] });
   void qc.invalidateQueries({ queryKey: ["files_random"] });
   void qc.invalidateQueries({ queryKey: ["file_get"] });
@@ -236,12 +262,17 @@ export function invalidateCollectionSearches(qc: QueryClient): void {
       );
     },
   });
+  const inCollection = (q: { queryKey: readonly unknown[] }) => {
+    const ws = q.queryKey[1];
+    return typeof ws === "string" && ws.startsWith(COLLECTION_ID_PREFIX);
+  };
   void qc.invalidateQueries({
     queryKey: ["files_search"],
-    predicate: (q) => {
-      const ws = q.queryKey[1];
-      return typeof ws === "string" && ws.startsWith(COLLECTION_ID_PREFIX);
-    },
+    predicate: inCollection,
+  });
+  void qc.invalidateQueries({
+    queryKey: ["activity_days"],
+    predicate: inCollection,
   });
 }
 
@@ -266,6 +297,9 @@ export function syncFileRowAcrossCaches(
       );
     },
   });
+  // The heatmap is left as it is, like the list under it: a row that no
+  // longer matches a favorite or rating filter stays until the list is read
+  // again, and a recount alone would make a cell disagree with its list.
 }
 
 /**

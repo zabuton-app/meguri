@@ -171,6 +171,9 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 🕸️ **Graph view** — see the library as a network of files and their tags,
   in 2D or 3D, with nodes you can drag, search, and size by how often they
   were played
+- 🟩 **Contribution graph** — a year of days as a heatmap, shaded by how many
+  files you played, captured, created, or added on each; pick a day to list
+  its files
 - 📁 **Folder view** — browse the grid or the list by folder instead of as
   one flat library, with a breadcrumb, a subfolder menu, and folder cards
   that preview what is inside

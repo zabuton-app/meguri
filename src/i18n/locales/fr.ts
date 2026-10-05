@@ -390,6 +390,28 @@ export const fr: Record<TranslationKey, string> = {
   "view.grid": "Vue en grille",
   "view.list": "Vue en liste",
 
+  // contribution graph
+  "view.heatmap": "Graphique de contributions",
+  "view.folderUnavailableHeatmap":
+    "L’affichage par dossier n’est pas disponible dans le graphique de contributions",
+  "heatmap.metric.label": "Compter par",
+  "heatmap.metric.played": "Lus",
+  "heatmap.metric.captured": "Capturés",
+  "heatmap.metric.created": "Créés",
+  "heatmap.metric.added": "Ajoutés",
+  "heatmap.cell.played": "{date} : {count} lus",
+  "heatmap.cell.captured": "{date} : {count} capturés",
+  "heatmap.cell.created": "{date} : {count} créés",
+  "heatmap.cell.added": "{date} : {count} ajoutés",
+  "heatmap.range.last": "12 derniers mois",
+  "heatmap.range.prev": "Année précédente",
+  "heatmap.range.next": "Année suivante",
+  "heatmap.less": "Moins",
+  "heatmap.more": "Plus",
+  "heatmap.hint": "Sélectionnez un jour pour afficher ses fichiers",
+  "heatmap.clearDay": "Afficher tous les jours",
+  "heatmap.error": "Impossible de charger les décomptes",
+
   // graph view
   "view.graph": "Vue graphe",
   "view.folderUnavailableGraph":
