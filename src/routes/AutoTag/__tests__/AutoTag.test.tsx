@@ -310,7 +310,96 @@ describe("AutoTag", () => {
       { workspaceId: "ws", fileIds: [3, 4], tags: ["Harbor"] },
     ]);
     expect((await lastSaved()).keywords).toMatchObject([{ tag: "Harbor" }]);
-    await screen.findByText("✓ Applied and in keywords");
+    // Both are now so, and each is said: on the files, and in the keywords.
+    await within(word).findByText("✓ Applied");
+    expect(within(word).getByText("In keywords")).toBeTruthy();
+    expect(
+      within(word).queryByRole("button", { name: "Add to keywords" }),
+    ).toBeNull();
+  });
+
+  it("offers the keywords for a word they do not hold, tagged or not", async () => {
+    // Every file with "Harbor" in its name carries the tag already — applied
+    // once, earlier — but the keywords have no entry for it.
+    const tagged = library();
+    tagged.files[2].tags = ["trip", "Harbor"];
+    tagged.files[3].tags = ["Harbor"];
+    tagged.existingTags = ["trip", "Harbor"];
+    mocks.autoTagFiles.mockResolvedValue(tagged);
+    await renderScreen("Suggested Keywords");
+    const row = screen
+      .getByRole("checkbox", { name: "Harbor" })
+      .closest("div")!;
+    // Applied is what the files say; it is not a claim about the keywords.
+    expect(within(row).getByText("✓ Applied")).toBeTruthy();
+    expect(within(row).queryByText("In keywords")).toBeNull();
+    expect(within(row).queryByRole("button", { name: "Apply" })).toBeNull();
+
+    // Adding the entry tags nothing: there is nothing left to tag.
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Add to keywords" }),
+    );
+    expect((await lastSaved()).keywords).toMatchObject([{ tag: "Harbor" }]);
+    expect(mocks.autoTagApply).not.toHaveBeenCalled();
+    // The notice reports what happened: an entry added, no file tagged.
+    expect(screen.getByText("Added 1 to keywords.")).toBeTruthy();
+    expect(screen.queryByText(/^Applied/)).toBeNull();
+    await within(row).findByText("In keywords");
+    expect(
+      within(row).queryByRole("button", { name: "Add to keywords" }),
+    ).toBeNull();
+  });
+
+  it("takes back both applies when a candidate was applied twice", async () => {
+    // The second apply reaches a file the first did not: its tag had been
+    // taken off elsewhere in between, which the screen sees on a re-analysis.
+    mocks.autoTagApply
+      .mockResolvedValueOnce({ files: 1, added: 1, undoId: "undo-1" })
+      .mockResolvedValueOnce({ files: 1, added: 1, undoId: "undo-2" });
+    await renderScreen("Suggested Keywords");
+    const trip = () =>
+      screen.getByRole("checkbox", { name: "Trip" }).closest("div")!;
+    fireEvent.click(within(trip()).getByRole("button", { name: "Apply" }));
+    await within(trip()).findByText("✓ Applied");
+
+    mocks.autoTagFiles.mockResolvedValue(library());
+    fireEvent.click(
+      screen.getByRole("button", { name: "Re-analyze all files" }),
+    );
+    fireEvent.click(
+      await within(trip()).findByRole("button", { name: "Apply" }),
+    );
+    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(2));
+    await within(trip()).findByText("✓ Applied");
+
+    fireEvent.click(within(trip()).getByRole("button", { name: "Undo" }));
+    await waitFor(() =>
+      expect(mocks.autoTagUndo).toHaveBeenCalledWith(["undo-1", "undo-2"]),
+    );
+  });
+
+  it("stops saying a word is in the keywords once its entry is deleted", async () => {
+    await renderScreen("Suggested Keywords");
+    const harbor = () =>
+      screen.getByRole("checkbox", { name: "Harbor" }).closest("div")!;
+    fireEvent.click(
+      within(harbor()).getByRole("button", { name: "Add to keywords" }),
+    );
+    await within(harbor()).findByText("In keywords");
+
+    // The entry is deleted where entries are managed…
+    fireEvent.click(screen.getByRole("tab", { name: "Conditions" }));
+    fireEvent.click(screen.getByRole("button", { name: /Harbor/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(async () => expect((await lastSaved()).keywords).toEqual([]));
+
+    // …and the suggestion follows: still on the files, no longer a keyword.
+    fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
+    expect(within(harbor()).queryByText("In keywords")).toBeNull();
+    expect(within(harbor()).getByText("✓ Applied")).toBeTruthy();
+    expect(
+      within(harbor()).getByRole("button", { name: "Add to keywords" }),
+    ).toBeTruthy();
   });
 
   it("searches the library for a candidate's spellings", async () => {
@@ -452,32 +541,6 @@ describe("AutoTag", () => {
     expect(localStorage.getItem("meguri.autoTag.analyzing")).toBeNull();
   });
 
-  it("sorts terms into tags, applies them and remembers the decision", async () => {
-    await renderScreen("Sort terms");
-    const term = screen.getByRole("button", { name: /Harbor/ });
-    const row = term.closest("div")!;
-    fireEvent.click(within(row).getByRole("button", { name: "Make tag" }));
-    // Codes and bracket contents already come from the rules.
-    expect(screen.getAllByText("from a rule").length).toBe(2);
-
-    fireEvent.click(screen.getByRole("button", { name: "Apply 3 tags" }));
-    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
-    const sent = mocks.autoTagApply.mock.calls[0][0];
-    expect(sent).toContainEqual({
-      workspaceId: "ws",
-      fileIds: [1, 2],
-      tags: ["ABCD"],
-    });
-    expect(sent).toContainEqual({
-      workspaceId: "ws",
-      fileIds: [4],
-      tags: ["Harbor", "trip"],
-    });
-    // Only the decision made here goes to the dictionary.
-    expect((await lastSaved()).keywords).toMatchObject([{ tag: "Harbor" }]);
-    expect(await screen.findByRole("status")).toBeTruthy();
-  });
-
   describe("coming back to the screen", () => {
     /** Open the screen, as the route does each time it is entered. */
     async function open() {
@@ -487,7 +550,7 @@ describe("AutoTag", () => {
       return view;
     }
 
-    it("keeps what was applied, and its undo, while the file list is the same", async () => {
+    it("keeps the undo of what was applied while the file list is the same", async () => {
       const applyTrip = () => {
         const row = screen
           .getByRole("checkbox", { name: "Trip" })
@@ -500,6 +563,10 @@ describe("AutoTag", () => {
       await screen.findByText("✓ Applied");
       first.unmount();
 
+      // Reopened, the files are read again — and now carry the tag.
+      const tagged = library();
+      tagged.files[3].tags = ["trip"];
+      mocks.autoTagFiles.mockResolvedValue(tagged);
       const second = await open();
       fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
       await screen.findByText("✓ Applied");
@@ -514,6 +581,7 @@ describe("AutoTag", () => {
       await open();
       fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
       await screen.findByRole("checkbox", { name: "Trip" });
+      // Nothing says applied that the files do not: one of them lacks the tag.
       expect(screen.queryByText("✓ Applied")).toBeNull();
       expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
     });
@@ -529,19 +597,13 @@ describe("AutoTag", () => {
       // Suggested keywords: a filter.
       fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
       fireEvent.click(screen.getByRole("radio", { name: /Frequent words/ }));
-      // Terms: a search.
-      fireEvent.click(screen.getByRole("tab", { name: "Sort terms" }));
-      fireEvent.change(screen.getByLabelText("Search terms"), {
-        target: { value: "harb" },
-      });
       first.unmount();
 
       await open();
-      expect(screen.getByLabelText("Search terms")).toHaveProperty(
-        "value",
-        "harb",
-      );
-      fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
+      // The tab it was left on, with its filter.
+      expect(
+        screen.getByRole("tab", { name: /Suggested Keywords/ }),
+      ).toHaveProperty("ariaSelected", "true");
       expect(
         screen.getByRole("radio", { name: /Frequent words/ }),
       ).toHaveProperty("ariaChecked", "true");

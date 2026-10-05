@@ -1,6 +1,6 @@
-// Auto-tagging. /auto-tag. Rules and a keyword dictionary that tag files from
-// their names, and two ways to bring an existing library in line with them:
-// suggestions, and sorting the library's own vocabulary.
+// Auto-tagging. /auto-tag. Rules and keywords that tag files from
+// their names, and suggestions that bring an existing library in line with
+// them.
 // Overlays the library as a modal, like /tags and /history.
 import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
@@ -10,20 +10,22 @@ import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import { suggestCandidates } from "@shared/autoTagAnalysis";
 import { ConditionsTab } from "./ConditionsTab";
-import { isApplied } from "./helpers";
+import {
+  candidateContext,
+  candidateState,
+  type CandidateState,
+} from "./helpers";
 import { useAutoTagSession } from "./session";
 import { SuggestTab } from "./SuggestTab";
-import { TermsTab } from "./TermsTab";
 import { useAutoTag } from "./useAutoTag";
 import { useViewState } from "./viewState";
 
-const TABS = ["conditions", "suggest", "terms"] as const;
+const TABS = ["conditions", "suggest"] as const;
 type TabId = (typeof TABS)[number];
 
 const TAB_LABELS: Record<TabId, TranslationKey> = {
   conditions: "autoTag.tab.conditions",
   suggest: "autoTag.tab.suggest",
-  terms: "autoTag.tab.terms",
 };
 
 /** A word has to be in this many files before it is suggested on its own. */
@@ -62,20 +64,24 @@ export default function AutoTag() {
         : [],
     [engine, names, stop],
   );
+  // Where each candidate stands, worked out once for the badge and the tab
+  // alike, and only again when what it is read from changes: the keywords,
+  // the dismissed words, the files' tags.
+  const ignored = state?.config.ignored;
+  const keywords = state?.config.keywords;
+  const fileTags = state?.fileTags;
+  const states = useMemo(() => {
+    const map = new Map<string, CandidateState>();
+    if (!ignored || !keywords || !fileTags) return map;
+    const ctx = candidateContext({ ignored, keywords }, fileTags);
+    for (const c of candidates) map.set(c.key, candidateState(c, ctx));
+    return map;
+  }, [candidates, ignored, keywords, fileTags]);
   const pending = useMemo(() => {
-    if (!state) return 0;
-    const ignored = new Set(state.config.ignored);
-    // What is already in the dictionary is not waiting for a decision.
-    const registered = new Set(
-      state.config.keywords.map((k) => k.tag.toLowerCase()),
-    );
-    return candidates.filter(
-      (c) =>
-        !ignored.has(c.key) &&
-        !registered.has(c.key) &&
-        !isApplied(c, state.fileTags),
-    ).length;
-  }, [candidates, state]);
+    let count = 0;
+    for (const at of states.values()) if (at.pending) count++;
+    return count;
+  }, [states]);
 
   return (
     <div
@@ -180,14 +186,14 @@ export default function AutoTag() {
             </p>
           ) : tab === "conditions" ? (
             <ConditionsTab state={state} />
-          ) : tab === "suggest" ? (
+          ) : (
             <SuggestTab
               state={state}
               session={session}
               candidates={candidates}
+              states={states}
+              pending={pending}
             />
-          ) : (
-            <TermsTab state={state} session={session} candidates={candidates} />
           )}
         </div>
       </div>

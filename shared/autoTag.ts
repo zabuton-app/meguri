@@ -70,7 +70,11 @@ export interface AutoTagConfig {
   applyOnScan: boolean;
   /** Suggestions the user dismissed (lowercase), so they are not offered again. */
   ignored: string[];
-  /** Terms that are never offered as tags (lowercase). */
+  /**
+   * Terms that are never offered as tags (lowercase). Nothing on the screen
+   * edits this list at present — the tab that did was removed — but what is
+   * stored is still read, as stop words for the suggestions.
+   */
   excludedTerms: string[];
 }
 

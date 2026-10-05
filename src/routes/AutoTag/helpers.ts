@@ -13,9 +13,11 @@ import {
   type BuiltinRuleId,
   type KeywordEntry,
   type KeywordHit,
+  type AutoTagConfig,
   type TagRule,
 } from "@shared/autoTag";
-import type { Candidate } from "@shared/autoTagAnalysis";
+import { candidateGroup, type Candidate } from "@shared/autoTagAnalysis";
+import type { UndoHandle } from "./useAutoTag";
 
 const BUILTIN_RULE_NAMES: Record<BuiltinRuleId, TranslationKey> = {
   prefix: "autoTag.rule.prefix",
@@ -77,15 +79,79 @@ export function cleanAliases(
   return out.slice(0, MAX_AUTO_TAG_ALIASES);
 }
 
-/** A candidate is settled once every file it names already carries the tag. */
-export function isApplied(
-  c: Candidate,
+/**
+ * Where a suggestion stands. Two facts that do not follow from each other —
+ * whether the keywords hold the tag, and whether the files carry it — plus the
+ * user having dismissed it. Each is read from where it is kept (the
+ * configuration, the files' tags) every time; nothing here is remembered, so a
+ * row cannot say something the Conditions tab or the library does not.
+ */
+export interface CandidateState {
+  ignored: boolean;
+  /** The keywords have an entry for the tag. */
+  inKeywords: boolean;
+  /**
+   * An entry can be added: nothing on the Conditions tab produces the tag yet
+   * (a rule's or a keyword's candidate is already managed there), and the
+   * keywords have room.
+   */
+  canRegister: boolean;
+  /** Files it names that do not carry the tag yet. */
+  missing: number;
+  /**
+   * Something is still to be decided: files to tag, or an entry to add. Never
+   * for a tag the keywords hold — that was decided on the Conditions tab, and
+   * the row only reports it (and can still tag the files that lack it) — and
+   * never for a dismissed one: `ignored` comes before everything else here.
+   */
+  pending: boolean;
+}
+
+/** What `candidateState` reads; built once per render for the whole list. */
+export interface CandidateContext {
+  ignored: ReadonlySet<string>;
+  /** Lowercased tags of the keyword entries. */
+  keywordTags: ReadonlySet<string>;
+  keywordsFull: boolean;
+  fileTags: readonly Set<string>[];
+}
+
+export function candidateContext(
+  config: Pick<AutoTagConfig, "ignored" | "keywords">,
   fileTags: readonly Set<string>[],
-): boolean {
+): CandidateContext {
+  return {
+    ignored: new Set(config.ignored),
+    keywordTags: new Set(config.keywords.map((k) => k.tag.toLowerCase())),
+    keywordsFull: config.keywords.length >= MAX_AUTO_TAG_KEYWORDS,
+    fileTags,
+  };
+}
+
+export function candidateState(
+  c: Candidate,
+  ctx: CandidateContext,
+): CandidateState {
+  const ignored = ctx.ignored.has(c.key);
+  const inKeywords = ctx.keywordTags.has(c.key);
+  // The candidates come from the configuration as last analyzed, the context
+  // from the one being edited: a word can still read as "frequent" for a
+  // moment after its entry was added, hence the second test.
+  const unmanaged = candidateGroup(c) === "frequent" && !inKeywords;
+  const canRegister = unmanaged && !ctx.keywordsFull;
+  let missing = 0;
   for (const index of c.files.keys()) {
-    if (!fileTags[index].has(c.key)) return false;
+    if (!ctx.fileTags[index].has(c.key)) missing++;
   }
-  return true;
+  return {
+    ignored,
+    inKeywords,
+    canRegister,
+    missing,
+    // What could be done about it: with the keywords full and the files
+    // tagged there is nothing, and a row with no action is not waiting.
+    pending: !ignored && !inKeywords && (missing > 0 || canRegister),
+  };
 }
 
 // The two memos below are keyed per rule / entry object and per names array, so
@@ -147,4 +213,21 @@ export function keywordMatches(
   }
   keywordMatchCache.set(entry, { names, rows });
   return rows;
+}
+
+/**
+ * Two undo handles as one: applying to the same candidate twice (its files
+ * grew, a tag was taken off by hand in between) must leave both applies to be
+ * taken back, not just the later one.
+ */
+export function mergeUndo(
+  a: UndoHandle | undefined,
+  b: UndoHandle,
+): UndoHandle {
+  if (!a) return b;
+  const added = new Map(a.added);
+  for (const [index, tags] of b.added) {
+    added.set(index, [...(added.get(index) ?? []), ...tags]);
+  }
+  return { undoIds: [...a.undoIds, ...b.undoIds], added };
 }

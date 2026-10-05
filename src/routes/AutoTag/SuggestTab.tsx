@@ -1,13 +1,13 @@
 // Suggestions tab: every tag the engine would give the files in scope, plus
 // frequent words it does not pick up yet — to apply, register or dismiss.
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Search } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { searchLibrary } from "@/lib/ui-events";
 import { cn } from "@/lib/utils";
-import { MAX_AUTO_TAG_KEYWORDS } from "@shared/autoTag";
+import type { KeywordEntry } from "@shared/autoTag";
 import { anyOfSearchToken } from "@shared/tags";
 import {
   candidateGroup,
@@ -16,7 +16,7 @@ import {
   type CandidateOrigin,
 } from "@shared/autoTagAnalysis";
 import { isAutoMetaValue } from "./autoMeta";
-import { MONO, isApplied, newKeyword } from "./helpers";
+import { MONO, mergeUndo, newKeyword, type CandidateState } from "./helpers";
 import { usePaging } from "./paging";
 import {
   Badge,
@@ -42,7 +42,7 @@ const ORIGIN_LABELS: Record<CandidateOrigin, TranslationKey> = {
   frequent: "autoTag.origin.frequent",
 };
 
-// Rules and the dictionary are one group here, as they are one tab: both are
+// Rules and the keywords are one group here, as they are one tab: both are
 // what the Conditions tab already produces, as opposed to the frequent words
 // nothing produces yet.
 type Filter = "all" | "conditions" | "frequent";
@@ -56,6 +56,15 @@ const FILTER_LABELS: Record<Filter, TranslationKey> = {
 const filterOf = (c: Candidate): Exclude<Filter, "all"> =>
   candidateGroup(c) === "frequent" ? "frequent" : "conditions";
 
+/** For a candidate the screen has no state for; none is expected. */
+const NOT_PENDING: CandidateState = {
+  ignored: false,
+  inKeywords: false,
+  canRegister: false,
+  missing: 0,
+  pending: false,
+};
+
 /** Files shown when a candidate is expanded. */
 const MAX_EXPANDED_FILES = 50;
 
@@ -63,10 +72,16 @@ export function SuggestTab({
   state,
   session,
   candidates,
+  states,
+  pending: pendingTotal,
 }: {
   state: AutoTagState;
   session: AutoTagSession;
   candidates: Candidate[];
+  /** Where each candidate stands, by key (see candidateState). */
+  states: ReadonlyMap<string, CandidateState>;
+  /** How many of them are still to be decided. */
+  pending: number;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -77,27 +92,15 @@ export function SuggestTab({
     "suggest.expanded",
     null,
   );
-  const { done, setDone } = session;
+  const { undos, setUndos } = session;
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const ignored = useMemo(() => new Set(config.ignored), [config.ignored]);
-  const dictionary = useMemo(
-    () => new Set(config.keywords.map((k) => k.tag.toLowerCase())),
-    [config.keywords],
-  );
-
-  // "registered": the dictionary already has an entry for this tag. That is
-  // not a suggestion — it was decided on the Conditions tab, which is
-  // where it is managed — so the row says so instead of asking again.
-  type Status = "pending" | "applied" | "dict" | "ignored" | "registered";
-  const statusOf = (c: Candidate): Status => {
-    const session = done.get(c.key);
-    if (session) return session.dict ? "dict" : "applied";
-    if (ignored.has(c.key)) return "ignored";
-    if (dictionary.has(c.key)) return "registered";
-    return isApplied(c, fileTags) ? "applied" : "pending";
-  };
+  // Where each candidate stands is read from the configuration and the files,
+  // never kept here (see candidateState). The map covers every candidate; the
+  // fallback only keeps the types honest.
+  const stateOf = (c: Candidate): CandidateState =>
+    states.get(c.key) ?? NOT_PENDING;
 
   const counts: Record<Filter, number> = {
     all: candidates.length,
@@ -109,23 +112,22 @@ export function SuggestTab({
     (c) => filter === "all" || filterOf(c) === filter,
   );
   const paging = usePaging("suggest.page", filter, shown.length);
-  const pendingShown = shown.filter((c) => statusOf(c) === "pending");
+  const pendingShown = shown.filter((c) => stateOf(c).pending);
   const picked = pendingShown.filter((c) => selected.has(c.key));
   const allChecked =
     pendingShown.length > 0 && picked.length === pendingShown.length;
+  /** Files an apply of these would tag: the ones still lacking the tag. */
   const filesOf = (list: Candidate[]): number => {
     const set = new Set<number>();
-    for (const c of list) for (const index of c.files.keys()) set.add(index);
+    for (const c of list) {
+      for (const index of c.files.keys()) {
+        if (!fileTags[index].has(c.key)) set.add(index);
+      }
+    }
     return set.size;
   };
 
-  // Worth a dictionary entry: nothing on the Conditions tab produces it yet.
-  // A candidate that comes from a rule or from the dictionary is already
-  // managed there, so for those applying is all there is to do.
-  const canRegister = (c: Candidate): boolean =>
-    candidateGroup(c) === "frequent" &&
-    !dictionary.has(c.key) &&
-    config.keywords.length < MAX_AUTO_TAG_KEYWORDS;
+  const canRegister = (c: Candidate): boolean => stateOf(c).canRegister;
 
   // The library's own search for the spellings this candidate was found
   // under, in place of whatever was being searched for. By the search box's
@@ -140,9 +142,13 @@ export function SuggestTab({
     if (list.length === 0 || busy) return;
     setBusy(true);
     // One apply per candidate, so each row can be taken back on its own.
-    const next = new Map(done);
-    const applied: Candidate[] = [];
-    const registered: Candidate[] = [];
+    const next = new Map(undos);
+    // What really happened, which is what the notice reports: a candidate
+    // whose files all had the tag was not tagged, and an entry the keywords
+    // had no room for was not added.
+    const tagged: Candidate[] = [];
+    const entries: KeywordEntry[] = [];
+    let keywords = config.keywords;
     let files = 0;
     for (const cand of list) {
       const perFile = new Map<number, string[]>();
@@ -151,31 +157,48 @@ export function SuggestTab({
       // A failure was reported already; the rest of the batch would only fail
       // the same way, and nothing that did not happen is marked as done.
       if (!outcome.ok) break;
-      files += outcome.files;
-      applied.push(cand);
-      const registers = dict && canRegister(cand);
-      if (registers) registered.push(cand);
-      next.set(cand.key, { dict: registers, undo: outcome.undo });
-    }
-    if (registered.length > 0) {
-      update((c) => {
-        let keywords = c.keywords;
-        for (const cand of registered) {
-          const entry = newKeyword(keywords, cand.name, []);
-          if (entry) keywords = [...keywords, entry];
+      if (outcome.files > 0) {
+        files += outcome.files;
+        tagged.push(cand);
+      }
+      // Nothing to take back when every file had the tag already. An earlier
+      // handle for the same candidate is added to, not replaced.
+      if (outcome.undo) {
+        next.set(cand.key, mergeUndo(next.get(cand.key), outcome.undo));
+      }
+      if (dict && canRegister(cand)) {
+        // newKeyword is the one judge of whether an entry can be added.
+        const entry = newKeyword(keywords, cand.name, []);
+        if (entry) {
+          keywords = [...keywords, entry];
+          entries.push(entry);
         }
-        return { ...c, keywords };
+      }
+    }
+    if (entries.length > 0) {
+      update((c) => {
+        let merged = c.keywords;
+        for (const entry of entries) {
+          // Still by newKeyword's rules, against what is there by now.
+          if (newKeyword(merged, entry.tag, [])) merged = [...merged, entry];
+        }
+        return { ...c, keywords: merged };
       });
     }
-    setDone(next);
+    setUndos(next);
     setSelected(new Set());
-    setNotice(
-      applied.length === 0
+    const appliedText =
+      tagged.length === 0
         ? ""
-        : (applied.length === 1
-            ? t("autoTag.appliedOne", { tag: applied[0].name, files })
-            : t("autoTag.appliedMany", { tags: applied.length, files })) +
-            (registered.length > 0 ? t("autoTag.appliedDictSuffix") : ""),
+        : tagged.length === 1
+          ? t("autoTag.appliedOne", { tag: tagged[0].name, files })
+          : t("autoTag.appliedMany", { tags: tagged.length, files });
+    setNotice(
+      entries.length === 0
+        ? appliedText
+        : appliedText
+          ? appliedText + t("autoTag.appliedDictSuffix")
+          : t("autoTag.addedKeywords", { count: entries.length }),
     );
     setBusy(false);
   };
@@ -186,26 +209,27 @@ export function SuggestTab({
     setSelected(new Set());
   };
 
+  /** Take back the tags applied for it here. A keyword entry stays. */
   const revert = async (c: Candidate) => {
-    const session = done.get(c.key);
-    if (session?.undo) await state.undo(session.undo);
-    if (session) {
-      const next = new Map(done);
-      next.delete(c.key);
-      setDone(next);
-    }
-    if (ignored.has(c.key)) {
-      update((cfg) => ({
-        ...cfg,
-        ignored: cfg.ignored.filter((key) => key !== c.key),
-      }));
-    }
+    const handle = undos.get(c.key);
+    // One at a time, like an apply: each ends by writing the handles back.
+    if (!handle || busy) return;
+    setBusy(true);
+    await state.undo(handle);
+    const next = new Map(undos);
+    next.delete(c.key);
+    setUndos(next);
     setNotice("");
+    setBusy(false);
   };
 
-  const pendingTotal = candidates.filter(
-    (c) => statusOf(c) === "pending",
-  ).length;
+  const restore = (c: Candidate) => {
+    update((cfg) => ({
+      ...cfg,
+      ignored: cfg.ignored.filter((key) => key !== c.key),
+    }));
+    setNotice("");
+  };
 
   return (
     <>
@@ -276,17 +300,15 @@ export function SuggestTab({
           <span />
         </div>
         {shown.slice(paging.start, paging.end).map((c) => {
-          const status = statusOf(c);
+          const at = stateOf(c);
           const open = expanded === c.key;
-          const session = done.get(c.key);
-          const canRevert =
-            status === "ignored" || (session != null && session.undo != null);
+          const canRevert = undos.has(c.key);
           return (
             <div
               key={c.key}
               className={cn(
                 "border-b border-surface",
-                status === "ignored" && "opacity-45",
+                at.ignored && "opacity-45",
               )}
             >
               <div className="grid grid-cols-[28px_minmax(120px,1.4fr)_minmax(72px,1fr)_56px_minmax(0,auto)] items-center gap-x-3 px-3 py-2 hover:bg-fg/5">
@@ -294,8 +316,8 @@ export function SuggestTab({
                   type="checkbox"
                   className="size-3.5 accent-primary"
                   aria-label={c.name}
-                  disabled={status !== "pending"}
-                  checked={status === "pending" && selected.has(c.key)}
+                  disabled={!at.pending}
+                  checked={at.pending && selected.has(c.key)}
                   onChange={() => {
                     const next = new Set(selected);
                     if (!next.delete(c.key)) next.add(c.key);
@@ -359,12 +381,49 @@ export function SuggestTab({
                   >
                     <Search className="size-3.5" />
                   </button>
-                  {status === "pending" ? (
+                  {at.ignored ? (
                     <>
+                      <span className="whitespace-nowrap text-xs text-muted">
+                        {t("autoTag.status.ignored")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => restore(c)}
+                        className="h-[26px] px-2 text-xs text-muted underline underline-offset-2 hover:text-bright-fg"
+                      >
+                        {t("autoTag.revert")}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* The two facts side by side, each as what it is now:
+                          in the keywords or not, on the files or not. */}
+                      {at.inKeywords && (
+                        <span className="whitespace-nowrap text-xs text-primary">
+                          {t("autoTag.status.registered")}
+                        </span>
+                      )}
+                      {at.missing === 0 && (
+                        <span className="whitespace-nowrap text-xs text-success">
+                          {t("autoTag.status.applied")}
+                        </span>
+                      )}
+                      {canRevert && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void revert(c)}
+                          className="h-[26px] px-2 text-xs text-muted underline underline-offset-2 hover:text-bright-fg"
+                        >
+                          {t("autoTag.revert")}
+                        </button>
+                      )}
                       {/* Registering is the main action where it applies:
                           the tag then keeps being applied by the Conditions
-                          tab's dictionary instead of this once. */}
-                      {canRegister(c) && (
+                          tab's keywords instead of this once — and it is
+                          offered for as long as they do not have it, whether
+                          or not the files are tagged already. */}
+                      {at.canRegister && (
                         <SmallButton
                           variant="primary"
                           className="h-[26px]"
@@ -376,67 +435,30 @@ export function SuggestTab({
                           {t("autoTag.addToDictionary")}
                         </SmallButton>
                       )}
-                      <SmallButton
-                        variant={canRegister(c) ? "outline" : "primary"}
-                        className={cn(
-                          "h-[26px]",
-                          canRegister(c) && "border-border px-2",
-                        )}
-                        disabled={busy}
-                        onClick={() => void apply([c], false)}
-                      >
-                        {t("autoTag.apply")}
-                      </SmallButton>
-                      <SmallButton
-                        variant="ghost"
-                        className="h-[26px] px-2"
-                        onClick={() => ignore([c])}
-                      >
-                        {t("autoTag.ignore")}
-                      </SmallButton>
-                    </>
-                  ) : status === "registered" ? (
-                    <>
-                      <span className="whitespace-nowrap text-xs text-primary">
-                        {t("autoTag.status.registered")}
-                      </span>
-                      {/* Registered does not mean applied: files already in
-                          the library only get the tag from a scan, a re-apply
-                          — or here. */}
-                      {!isApplied(c, fileTags) && (
+                      {/* In the keywords does not mean on the files: those
+                          already in the library only get the tag from a scan,
+                          a re-apply — or here. */}
+                      {at.missing > 0 && (
                         <SmallButton
-                          className="h-[26px] border-border px-2"
+                          variant={at.canRegister ? "outline" : "primary"}
+                          className={cn(
+                            "h-[26px]",
+                            at.canRegister && "border-border px-2",
+                          )}
                           disabled={busy}
                           onClick={() => void apply([c], false)}
                         >
                           {t("autoTag.apply")}
                         </SmallButton>
                       )}
-                    </>
-                  ) : (
-                    <>
-                      <span
-                        className={cn(
-                          "whitespace-nowrap text-xs",
-                          status === "ignored" ? "text-muted" : "text-success",
-                        )}
-                      >
-                        {t(
-                          status === "ignored"
-                            ? "autoTag.status.ignored"
-                            : status === "dict"
-                              ? "autoTag.status.dict"
-                              : "autoTag.status.applied",
-                        )}
-                      </span>
-                      {canRevert && (
-                        <button
-                          type="button"
-                          onClick={() => void revert(c)}
-                          className="h-[26px] px-2 text-xs text-muted underline underline-offset-2 hover:text-bright-fg"
+                      {at.pending && (
+                        <SmallButton
+                          variant="ghost"
+                          className="h-[26px] px-2"
+                          onClick={() => ignore([c])}
                         >
-                          {t("autoTag.revert")}
-                        </button>
+                          {t("autoTag.ignore")}
+                        </SmallButton>
                       )}
                     </>
                   )}

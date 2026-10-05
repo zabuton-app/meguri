@@ -1,29 +1,17 @@
-// What the user has decided on the auto-tagging screen — kept above the tabs,
-// because a tab unmounts when another is shown and none of this may go with
-// it: least of all the handles that take an apply back. It also outlives the
-// screen itself (see `remembered`), for as long as the file list is the same.
+// The handles that take back what was applied from the auto-tagging screen —
+// kept above the tabs, because a tab unmounts when another is shown and these
+// may not go with it. They also outlive the screen itself (see `remembered`),
+// for as long as the file list is the same.
 import { useEffect, useMemo, useState } from "react";
 import type { UndoHandle } from "./useAutoTag";
 
-/** A suggestion applied in this visit, and how to take it back. */
-export interface SuggestDone {
-  dict: boolean;
-  undo: UndoHandle | null;
-}
-
-/** Where a term's decision came from when the user did not make it. */
-export type TermOrigin = "dictionary" | "rule";
-
-export interface TermDecision {
-  target: string;
-  origin?: TermOrigin;
-}
-
 interface SessionData {
-  /** Suggestions tab: candidate key → what was done with it. */
-  done: Map<string, SuggestDone>;
-  /** Terms tab: decisions made here; null puts a term back to undecided. */
-  overrides: Map<string, TermDecision | null>;
+  /**
+   * Suggestions tab: candidate key → how to take back the tags applied for it
+   * here. Only that: what a row says (applied, in the keywords) is read from
+   * the files and the configuration, never from a note kept on the side.
+   */
+  undos: Map<string, UndoHandle>;
 }
 
 export type AutoTagSession = SessionData & {
@@ -33,14 +21,12 @@ export type AutoTagSession = SessionData & {
 };
 
 const empty = (): SessionData => ({
-  done: new Map(),
-  overrides: new Map(),
+  undos: new Map(),
 });
 
 /**
  * The last session, kept after the screen is gone so that reopening it — after
- * searching the library from it, say — finds the same decisions and the same
- * undo.
+ * searching the library from it, say — can still take back what was applied.
  */
 let remembered: { listKey: string; data: SessionData } | null = null;
 
@@ -80,8 +66,7 @@ export function useAutoTagSession(listKey: string | null): AutoTagSession {
       (value: SessionData[K]) =>
         setState((prev) => ({ ...prev, data: { ...prev.data, [key]: value } }));
     return {
-      setDone: set("done"),
-      setOverrides: set("overrides"),
+      setUndos: set("undos"),
     };
   }, []);
   return { ...data, ...setters };

@@ -25,8 +25,6 @@ test.describe("Auto tagging", () => {
     await dialog.getByRole("button", { name: "Apply", exact: true }).click();
     await expect(dialog.getByText("✓ Applied")).toBeVisible();
 
-    await dialog.getByRole("tab", { name: "Sort terms" }).click();
-
     // The tag is the user's own: the tag screen lists it like any other.
     await closeTopDialog(ready);
     await ready.getByRole("link", { name: "Tags", exact: true }).click();

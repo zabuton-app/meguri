@@ -1,6 +1,6 @@
 /**
- * Analysis on top of the auto-tagging engine: what the screen's suggestion and
- * term views are computed from, and the file name cut into taggable parts that
+ * Analysis on top of the auto-tagging engine: what the screen's suggestions
+ * are computed from, and the file name cut into taggable parts that
  * the detail view shows. Pure; the library-wide parts are indexed by position
  * in the list of names the caller passes — the caller knows which file each
  * position is.
@@ -9,7 +9,6 @@
  * ranges reported here index straight into the string that is displayed.
  */
 import {
-  PREFIX_PATTERN,
   SPLIT_PATTERN,
   cleanTagName,
   isUsableTagName,
@@ -246,12 +245,6 @@ export function tokenizeName(name: string): NameToken[] {
 
 export type BracketKind = "square" | "sumi" | "kagi";
 
-export const BRACKET_PATTERNS: Record<BracketKind, string> = {
-  square: "\\[([^\\]]+)\\]",
-  sumi: "【([^】]+)】",
-  kagi: "「([^」]+)」",
-};
-
 export type TokenInfo =
   | { type: "bracket"; bracket: BracketKind; value: string }
   | { type: "code"; value: string }
@@ -331,101 +324,4 @@ export function nameTagParts(name: string): NameTagPart[] {
     out.push({ text: token.text[token.text.length - 1], tag: null });
   }
   return out;
-}
-
-// ---------------------------------------------------------------------------
-// Terms: every candidate word in the library, to be sorted into tags.
-// ---------------------------------------------------------------------------
-
-export const TERM_TYPES = ["code", "bracket", "word", "ja"] as const;
-export type TermType = (typeof TERM_TYPES)[number];
-
-export interface Term {
-  /** Lowercased text. */
-  key: string;
-  type: TermType;
-  /** The most common spelling. */
-  display: string;
-  variants: string[];
-  files: Map<number, Range[]>;
-  count: number;
-}
-
-const PREFIX_AT_START = new RegExp(PREFIX_PATTERN.replace("[A-Z]", "[A-Za-z]"));
-const BRACKET_SCANS = Object.values(BRACKET_PATTERNS);
-const JAPANESE_RUN = /[぀-ヿ一-鿿]{2,}/g;
-
-export function extractTerms(
-  names: readonly string[],
-  stop: ReadonlySet<string>,
-): Term[] {
-  const map = new Map<
-    string,
-    { type: TermType; texts: Map<string, number>; files: Map<number, Range[]> }
-  >();
-  const add = (text: string, type: TermType, file: number, range: Range) => {
-    const key = text.toLowerCase();
-    let term = map.get(key);
-    if (!term) {
-      term = { type, texts: new Map(), files: new Map() };
-      map.set(key, term);
-    }
-    term.texts.set(text, (term.texts.get(text) ?? 0) + 1);
-    const have = term.files.get(file);
-    if (have) have.push(range);
-    else term.files.set(file, [range]);
-  };
-
-  names.forEach((name, i) => {
-    const base = stripExt(name);
-    const taken: Range[] = [];
-    const free = (start: number, end: number): boolean =>
-      !taken.some((r) => start < r.end && end > r.start);
-
-    const code = PREFIX_AT_START.exec(base);
-    if (code) {
-      add(code[1], "code", i, { start: 0, end: code[1].length });
-      taken.push({ start: 0, end: code[0].length });
-    }
-    for (const source of BRACKET_SCANS) {
-      for (const match of base.matchAll(new RegExp(source, "g"))) {
-        const range = {
-          start: match.index,
-          end: match.index + match[0].length,
-        };
-        taken.push(range);
-        for (const part of match[1].split(SPLIT_PATTERN)) {
-          const value = part.trim();
-          if (value) add(value, "bracket", i, range);
-        }
-      }
-    }
-    for (const match of base.matchAll(/[A-Za-z]{3,}/g)) {
-      const end = match.index + match[0].length;
-      if (free(match.index, end) && !stop.has(match[0].toLowerCase())) {
-        add(match[0], "word", i, { start: match.index, end });
-      }
-    }
-    for (const match of base.matchAll(JAPANESE_RUN)) {
-      const end = match.index + match[0].length;
-      if (free(match.index, end)) {
-        add(match[0], "ja", i, { start: match.index, end });
-      }
-    }
-  });
-
-  return [...map.entries()]
-    .map(([key, term]) => {
-      const variants = mostCommonFirst(term.texts);
-      return {
-        key,
-        type: term.type,
-        display: variants[0],
-        variants,
-        files: term.files,
-        count: term.files.size,
-      };
-    })
-    .filter((term) => isUsableTagName(cleanTagName(term.display)))
-    .sort((a, b) => b.count - a.count || a.display.localeCompare(b.display));
 }

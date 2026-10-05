@@ -37,7 +37,6 @@ import {
 } from "../../../shared/autoTag.js";
 import {
   candidateGroup,
-  extractTerms,
   segments,
   suggestCandidates,
   nameTagParts,
@@ -308,23 +307,6 @@ describe("analysis", () => {
     const parts = nameTagParts("res:hd clip.mp4");
     expect(parts.find((p) => p.text === "res:hd")?.tag).toBeNull();
     expect(parts.find((p) => p.text === "clip")?.tag).toBe("clip");
-  });
-
-  it("extracts terms by kind, grouping spellings and counting files", () => {
-    const terms = extractTerms([...NAMES, "harbor_fog.mp4"], stop);
-    const by = new Map(terms.map((t) => [t.key, t]));
-    expect(by.get("abcd")).toMatchObject({ type: "code", count: 2 });
-    expect(by.get("trip")).toMatchObject({ type: "bracket", count: 2 });
-    expect(by.get("harbor")).toMatchObject({
-      type: "word",
-      display: "Harbor",
-      count: 4,
-    });
-    expect(by.get("harbor")!.variants).toEqual(["Harbor", "harbor"]);
-    expect(by.get("花火大会")).toMatchObject({ type: "ja", count: 1 });
-    // Inside a bracket it is a bracket term, not also a word.
-    expect(by.get("kyoto")).toMatchObject({ type: "bracket" });
-    expect(by.has("routine")).toBe(false);
   });
 });
 
