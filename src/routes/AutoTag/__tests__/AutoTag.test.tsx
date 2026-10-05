@@ -232,7 +232,7 @@ describe("AutoTag", () => {
   });
 
   it("applies a suggestion to the files that lack it, and takes it back", async () => {
-    await renderScreen("Suggestions");
+    await renderScreen("Suggested Keywords");
     const row = screen.getByRole("checkbox", { name: "Trip" }).closest("div")!;
     expect(within(row).getByText(/adds to existing tag/)).toBeTruthy();
     fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
@@ -254,7 +254,7 @@ describe("AutoTag", () => {
   });
 
   it("keeps the way back when another tab is visited in between", async () => {
-    await renderScreen("Suggestions");
+    await renderScreen("Suggested Keywords");
     const apply = () =>
       within(
         screen.getByRole("checkbox", { name: "Trip" }).closest("div")!,
@@ -263,7 +263,7 @@ describe("AutoTag", () => {
     await screen.findByText("✓ Applied");
 
     fireEvent.click(screen.getByRole("tab", { name: "Conditions" }));
-    fireEvent.click(screen.getByRole("tab", { name: /Suggestions/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
     await waitFor(() =>
       expect(mocks.autoTagUndo).toHaveBeenCalledWith(["undo-1"]),
@@ -272,7 +272,7 @@ describe("AutoTag", () => {
 
   it("does not call a suggestion applied when applying failed", async () => {
     mocks.autoTagApply.mockRejectedValue(new Error("disk full"));
-    await renderScreen("Suggestions");
+    await renderScreen("Suggested Keywords");
     const row = screen.getByRole("checkbox", { name: "Trip" }).closest("div")!;
     fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
     await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalled());
@@ -283,7 +283,7 @@ describe("AutoTag", () => {
   });
 
   it("leads with the dictionary for a word nothing produces yet", async () => {
-    await renderScreen("Suggestions");
+    await renderScreen("Suggested Keywords");
     // A frequent word: registering it is offered, ahead of a one-off apply.
     const word = screen
       .getByRole("checkbox", { name: "Harbor" })
@@ -291,7 +291,7 @@ describe("AutoTag", () => {
     const buttons = within(word)
       .getAllByRole("button")
       .map((b) => b.textContent);
-    expect(buttons.indexOf("Add to dictionary")).toBeLessThan(
+    expect(buttons.indexOf("Add to keywords")).toBeLessThan(
       buttons.indexOf("Apply"),
     );
     // A tag a rule already produces is managed by that rule: apply only.
@@ -299,18 +299,18 @@ describe("AutoTag", () => {
       .getByRole("checkbox", { name: "Trip" })
       .closest("div")!;
     expect(
-      within(ruled).queryByRole("button", { name: "Add to dictionary" }),
+      within(ruled).queryByRole("button", { name: "Add to keywords" }),
     ).toBeNull();
 
     fireEvent.click(
-      within(word).getByRole("button", { name: "Add to dictionary" }),
+      within(word).getByRole("button", { name: "Add to keywords" }),
     );
     await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
     expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
       { workspaceId: "ws", fileIds: [3, 4], tags: ["Harbor"] },
     ]);
     expect((await lastSaved()).keywords).toMatchObject([{ tag: "Harbor" }]);
-    await screen.findByText("✓ Applied and in dictionary");
+    await screen.findByText("✓ Applied and in keywords");
   });
 
   it("searches the library for a candidate's spellings", async () => {
@@ -320,7 +320,7 @@ describe("AutoTag", () => {
     });
     const asked: string[][] = [];
     const off = onSearchLibrary((tokens) => asked.push(tokens));
-    await renderScreen("Suggestions");
+    await renderScreen("Suggested Keywords");
     fireEvent.click(
       screen.getByRole("button", { name: "Search the library for “Yoga”" }),
     );
@@ -336,9 +336,9 @@ describe("AutoTag", () => {
       ...defaultAutoTagConfig(),
       keywords: [{ id: "k1", tag: "Yoga", aliases: [], mode: "word" }],
     });
-    await renderScreen("Suggestions");
+    await renderScreen("Suggested Keywords");
     const row = screen.getByRole("checkbox", { name: "Yoga" }).closest("div")!;
-    expect(within(row).getByText("In the dictionary")).toBeTruthy();
+    expect(within(row).getByText("In keywords")).toBeTruthy();
     // Not something to decide: it cannot be selected, registered or dismissed.
     expect(screen.getByRole("checkbox", { name: "Yoga" })).toHaveProperty(
       "disabled",
@@ -346,12 +346,14 @@ describe("AutoTag", () => {
     );
     expect(within(row).queryByRole("button", { name: "Ignore" })).toBeNull();
     expect(
-      within(row).queryByRole("button", { name: "Add to dictionary" }),
+      within(row).queryByRole("button", { name: "Add to keywords" }),
     ).toBeNull();
     // Nor does it count as open: the badge shows the other candidates only
     // (ABCD, Trip and Harbor — the file tagged "trip" still lacks none).
     expect(
-      within(screen.getByRole("tab", { name: /Suggestions/ })).getByText("3"),
+      within(screen.getByRole("tab", { name: /Suggested Keywords/ })).getByText(
+        "3",
+      ),
     ).toBeTruthy();
 
     // The files that do not carry the tag yet can still get it from here.
@@ -368,7 +370,7 @@ describe("AutoTag", () => {
       ...defaultAutoTagConfig(),
       keywords: [{ id: "k1", tag: "Yoga", aliases: [], mode: "word" }],
     });
-    await renderScreen("Suggestions");
+    await renderScreen("Suggested Keywords");
     const filters = within(screen.getByRole("radiogroup", { name: "Filter" }));
     expect(
       filters.getAllByRole("radio").map((radio) => radio.textContent),
@@ -383,7 +385,7 @@ describe("AutoTag", () => {
   });
 
   it("offers frequent words and remembers the ones dismissed", async () => {
-    await renderScreen("Suggestions");
+    await renderScreen("Suggested Keywords");
     // "Harbor" is in two names and no rule or keyword claims it.
     const row = screen
       .getByRole("checkbox", { name: "Harbor" })
@@ -447,7 +449,7 @@ describe("AutoTag", () => {
     await renderScreen("Review by file");
     fireEvent.click(screen.getByRole("button", { name: "yoga" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Add to dictionary and apply" }),
+      screen.getByRole("button", { name: "Add to keywords and apply" }),
     );
     await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalled());
     await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
@@ -469,7 +471,7 @@ describe("AutoTag", () => {
     await renderScreen("Review by file");
     fireEvent.click(screen.getByRole("button", { name: "yoga" }));
     expect(
-      screen.getByRole("button", { name: "Add to dictionary and apply" }),
+      screen.getByRole("button", { name: "Add to keywords and apply" }),
     ).toHaveProperty("disabled", true);
   });
 
@@ -477,7 +479,7 @@ describe("AutoTag", () => {
     await renderScreen("Review by file");
     fireEvent.click(screen.getByRole("button", { name: "yoga" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Add to dictionary and apply" }),
+      screen.getByRole("button", { name: "Add to keywords and apply" }),
     );
     await screen.findByRole("status");
 
@@ -528,7 +530,7 @@ describe("AutoTag", () => {
     // The option says how many files it would reach before anything is created.
     expect(screen.getByText("2 files match")).toBeTruthy();
     fireEvent.click(
-      screen.getByRole("button", { name: "Add to dictionary and apply" }),
+      screen.getByRole("button", { name: "Add to keywords and apply" }),
     );
 
     // Created, and applied to both files it matches — not only the open one.
@@ -538,7 +540,7 @@ describe("AutoTag", () => {
     ]);
     expect((await lastSaved()).keywords).toMatchObject([{ tag: "yoga" }]);
     expect((await screen.findByRole("status")).textContent).toContain(
-      "Added “yoga” to the dictionary and tagged 2 files",
+      "Added “yoga” to keywords and tagged 2 files",
     );
 
     // The tags can be taken back; the entry stays.
@@ -652,8 +654,8 @@ describe("AutoTag", () => {
       const first = await open();
       // Conditions: a keyword selected instead of the first rule.
       fireEvent.click(screen.getByRole("button", { name: /Yoga/ }));
-      // Suggestions: a filter and an expanded row.
-      fireEvent.click(screen.getByRole("tab", { name: /Suggestions/ }));
+      // Suggested keywords: a filter.
+      fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
       fireEvent.click(screen.getByRole("radio", { name: /Frequent words/ }));
       // Terms: a search.
       fireEvent.click(screen.getByRole("tab", { name: "Sort terms" }));
@@ -667,7 +669,7 @@ describe("AutoTag", () => {
         "value",
         "harb",
       );
-      fireEvent.click(screen.getByRole("tab", { name: /Suggestions/ }));
+      fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
       expect(
         screen.getByRole("radio", { name: /Frequent words/ }),
       ).toHaveProperty("ariaChecked", "true");

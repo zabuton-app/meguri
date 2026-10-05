@@ -21,7 +21,7 @@ test.describe("Auto tagging", () => {
     await expect(dialog.getByText("Creates a new tag")).toBeVisible();
 
     // It shows up as a suggestion; applying it tags the file for real.
-    await dialog.getByRole("tab", { name: /Suggestions/ }).click();
+    await dialog.getByRole("tab", { name: /Suggested Keywords/ }).click();
     await dialog.getByRole("button", { name: "Apply", exact: true }).click();
     await expect(dialog.getByText("✓ Applied")).toBeVisible();
 
@@ -40,13 +40,13 @@ test.describe("Auto tagging", () => {
     // Reopened, the screen is where it was left: the same tab is a click
     // away, and the apply made before can still be taken back.
     await ready.getByRole("link", { name: "Auto tagging" }).click();
-    await dialog.getByRole("tab", { name: /Suggestions/ }).click();
+    await dialog.getByRole("tab", { name: /Suggested Keywords/ }).click();
     await expect(dialog.getByText("✓ Applied")).toBeVisible();
     await dialog.getByRole("button", { name: "Undo" }).click();
 
     // Taken back, the entry reads as registered — it is in the dictionary, so
     // it is not offered as a suggestion — with the file left to apply it to.
-    await expect(dialog.getByText("In the dictionary")).toBeVisible();
+    await expect(dialog.getByText("In keywords")).toBeVisible();
     await expect(
       dialog.getByRole("button", { name: "Apply", exact: true }),
     ).toBeVisible();
