@@ -387,8 +387,7 @@ export const ja = {
 
   // contribution graph
   "view.heatmap": "コントリビューショングラフ",
-  "view.folderUnavailableHeatmap":
-    "コントリビューショングラフではフォルダごとの表示は使えません",
+  "view.heatmapOff": "コントリビューショングラフを隠す",
   "heatmap.metric.label": "集計対象",
   "heatmap.metric.played": "再生",
   "heatmap.metric.captured": "撮影",
@@ -403,8 +402,9 @@ export const ja = {
   "heatmap.range.next": "次の年",
   "heatmap.less": "少ない",
   "heatmap.more": "多い",
-  "heatmap.hint": "日付を選ぶとその日のファイルを表示します",
-  "heatmap.clearDay": "すべての日を表示",
+  "heatmap.hint":
+    "日付をクリック、またはドラッグで期間を選ぶと一覧を絞り込みます",
+  "heatmap.clearDay": "選んだ日付を解除",
   "heatmap.error": "集計を読み込めませんでした",
 
   // グラフ表示

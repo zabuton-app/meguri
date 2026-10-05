@@ -187,10 +187,9 @@ export default function Home() {
     [filter, folderView, folderNav.path, folderSearching],
   );
 
-  // The graph and the heatmap have no folder form (see hasFolderForm): a
-  // folder opened from outside the list — a saved search that carries one,
-  // "show in library" — would be dropped without a word there, so it leaves
-  // them for the grid.
+  // The graph has no folder form (see hasFolderForm): a folder opened from
+  // outside the list — a saved search that carries one, "show in library" —
+  // would be dropped without a word there, so it leaves the graph for the grid.
   const showByFolder = useCallback(
     (on: boolean) => {
       setByFolder(on);
@@ -208,6 +207,16 @@ export default function Home() {
       setByFolder: showByFolder,
     });
   const heatmap = useHeatmapFilter({ filterValue, onFilterChange });
+  // What the heatmap counts over: the filter, within the folder shown and
+  // everything below it — what the list becomes once a day narrows it (a
+  // condition turns a folder's own files into a search of its subtree).
+  const heatmapQuery = useMemo<SearchQuery>(
+    () =>
+      folderView
+        ? { ...filter, folder: { path: folderNav.path, recursive: true } }
+        : filter,
+    [filter, folderView, folderNav.path],
+  );
 
   // Include the workspace ID in the key so switching workspaces (incl. "All") refetches separately.
   const search = useFilesSearch(
@@ -834,7 +843,23 @@ export default function Home() {
         manualSortAvailable={!!activeCollection}
         workspaceId={folderAvailable ? workspaceId : null}
         onApplySaved={onApplySaved}
+        onToggleHeatmap={heatmap.toggle}
+        heatmapOpen={heatmap.open}
       />
+
+      {/* The heatmap: a panel under the filter bar, over whichever view is
+          shown. It counts what the list would hold (the folder shown
+          included) and writes the days picked into the filter. */}
+      {heatmap.open && (status.data?.ready ?? false) && (
+        <HeatmapView
+          scope={status.data?.workspaceId ?? ""}
+          query={heatmapQuery}
+          ready={!!status.data?.workspaceId}
+          metric={heatmap.metric}
+          onMetricChange={heatmap.setMetric}
+          onRangeChange={heatmap.pickRange}
+        />
+      )}
 
       {folderView && (
         <FolderHeader
@@ -959,55 +984,30 @@ export default function Home() {
                 inFolder={folderSearching}
               />
             ) : (
-              // The heatmap sits above a grid of its own. Without it the wrappers
-              // take no box and the grid fills <main> as before.
-              <div
-                className={
-                  view === "heatmap" ? "flex h-full flex-col" : "contents"
-                }
-              >
-                {view === "heatmap" && (
-                  <HeatmapView
-                    scope={status.data?.workspaceId ?? ""}
-                    query={filter}
-                    ready={
-                      (status.data?.ready ?? false) &&
-                      !!status.data?.workspaceId
-                    }
-                    metric={heatmap.metric}
-                    onMetricChange={heatmap.changeMetric}
-                    onDayChange={heatmap.pickDay}
-                  />
-                )}
-                <div
-                  className={view === "heatmap" ? "min-h-0 flex-1" : "contents"}
-                >
-                  {/* By folder, either view gets the folders ahead of the
-                      files (folders is unset otherwise). */}
-                  <MediaGrid
-                    items={items}
-                    mediaBase={status.data?.mediaBase ?? ""}
-                    workspaceId={status.data?.workspaceId ?? ""}
-                    listOffset={listOffset}
-                    loading={listLoading}
-                    thumbVersion={thumbVersion}
-                    onTagClick={onTagClick}
-                    hasNextPage={search.hasNextPage}
-                    fetchNextPage={fetchNextPage}
-                    isFetchingNextPage={search.isFetchingNextPage}
-                    hasPreviousPage={search.hasPreviousPage}
-                    fetchPreviousPage={fetchPreviousPage}
-                    isFetchingPreviousPage={search.isFetchingPreviousPage}
-                    navActive={navActive}
-                    watchLater={activeCollection?.id === WATCH_LATER_ID}
-                    reorder={reorder}
-                    folders={folderEntries}
-                    onOpenFolder={folderNav.enter}
-                    resetKey={listResetKey}
-                    inFolder={folderSearching}
-                  />
-                </div>
-              </div>
+              // By folder, either view gets the folders ahead of the files
+              // (folders is unset otherwise).
+              <MediaGrid
+                items={items}
+                mediaBase={status.data?.mediaBase ?? ""}
+                workspaceId={status.data?.workspaceId ?? ""}
+                listOffset={listOffset}
+                loading={listLoading}
+                thumbVersion={thumbVersion}
+                onTagClick={onTagClick}
+                hasNextPage={search.hasNextPage}
+                fetchNextPage={fetchNextPage}
+                isFetchingNextPage={search.isFetchingNextPage}
+                hasPreviousPage={search.hasPreviousPage}
+                fetchPreviousPage={fetchPreviousPage}
+                isFetchingPreviousPage={search.isFetchingPreviousPage}
+                navActive={navActive}
+                watchLater={activeCollection?.id === WATCH_LATER_ID}
+                reorder={reorder}
+                folders={folderEntries}
+                onOpenFolder={folderNav.enter}
+                resetKey={listResetKey}
+                inFolder={folderSearching}
+              />
             )}
           </main>
 
@@ -1050,6 +1050,8 @@ export default function Home() {
           onRebuild={() => void onRebuild()}
           onSetView={setViewMode}
           onToggleByFolder={toggleByFolder}
+          onToggleHeatmap={heatmap.toggle}
+          heatmapOpen={heatmap.open}
           folderView={folderView}
           folderAvailable={folderAvailable && hasFolderForm(view)}
           onDiscover={openDiscover}

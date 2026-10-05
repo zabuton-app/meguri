@@ -395,8 +395,7 @@ export const fr: Record<TranslationKey, string> = {
 
   // contribution graph
   "view.heatmap": "Graphique de contributions",
-  "view.folderUnavailableHeatmap":
-    "L’affichage par dossier n’est pas disponible dans le graphique de contributions",
+  "view.heatmapOff": "Masquer le graphique de contributions",
   "heatmap.metric.label": "Compter par",
   "heatmap.metric.played": "Lus",
   "heatmap.metric.captured": "Capturés",
@@ -411,8 +410,9 @@ export const fr: Record<TranslationKey, string> = {
   "heatmap.range.next": "Année suivante",
   "heatmap.less": "Moins",
   "heatmap.more": "Plus",
-  "heatmap.hint": "Sélectionnez un jour pour afficher ses fichiers",
-  "heatmap.clearDay": "Afficher tous les jours",
+  "heatmap.hint":
+    "Cliquez sur un jour ou faites glisser sur plusieurs pour restreindre la liste",
+  "heatmap.clearDay": "Effacer les jours sélectionnés",
   "heatmap.error": "Impossible de charger les décomptes",
 
   // graph view

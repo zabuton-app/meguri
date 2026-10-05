@@ -1,5 +1,6 @@
 // The heatmap's per-day counts, and the day condition the list
 // reads a cell's files with: the two must agree, cell by cell.
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Core } from "../index.js";
 import type { DB } from "../db.js";
@@ -202,18 +203,43 @@ describe("activityDays", () => {
     expect(count({})).toBe(2);
     expect(count({ favorite: true })).toBe(1);
     expect(count({ kind: "video" })).toBe(1);
-    // Paging, a folder and the day picked (the metric's own date range)
-    // belong to the list, not the counts.
+    // Paging and the day picked (the metric's own date range) belong to the
+    // list, not the counts.
     expect(
       count({
         limit: 1,
         cursor: 1,
-        folder: { path: "elsewhere", recursive: true },
         ...dayRange("captured", "2026-03-11"),
       }),
     ).toBe(2);
     // Another metric's range is a condition like any other.
     expect(count(dayRange("added", "2020-01-01"))).toBeUndefined();
+  });
+
+  it("counts within the folder the list is scoped to", () => {
+    const { db, rootId } = newDb();
+    const sep = path.sep;
+    for (const relPath of [
+      "top.jpg",
+      `trip${sep}a.jpg`,
+      `trip${sep}day1${sep}b.jpg`,
+      `trips${sep}c.jpg`,
+    ])
+      insertFile(db, rootId, { relPath, capturedAt: at("2026-03-10") });
+
+    const count = (folder?: { path: string; recursive: boolean }) =>
+      activityDays(db, { folder }, "captured", FROM, TO).get("2026-03-10");
+    expect(count()).toBe(4);
+    expect(count({ path: "", recursive: true })).toBe(4);
+    // Everything below the folder, and not its sibling "trips".
+    expect(count({ path: "trip", recursive: true })).toBe(2);
+    expect(count({ path: "trip", recursive: false })).toBe(1);
+    expect(count({ path: "trip", recursive: true })).toBe(
+      searchFiles(db, {
+        folder: { path: "trip", recursive: true },
+        ...dayRange("captured", "2026-03-10"),
+      }).items.length,
+    );
   });
 
   it("returns nothing for a range that is not made of days", () => {

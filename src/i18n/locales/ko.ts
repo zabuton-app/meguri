@@ -385,8 +385,7 @@ export const ko: Record<TranslationKey, string> = {
 
   // contribution graph
   "view.heatmap": "기여 그래프",
-  "view.folderUnavailableHeatmap":
-    "기여 그래프에서는 폴더별 보기를 사용할 수 없습니다",
+  "view.heatmapOff": "기여 그래프 숨기기",
   "heatmap.metric.label": "집계 기준",
   "heatmap.metric.played": "재생",
   "heatmap.metric.captured": "촬영",
@@ -401,8 +400,8 @@ export const ko: Record<TranslationKey, string> = {
   "heatmap.range.next": "다음 연도",
   "heatmap.less": "적음",
   "heatmap.more": "많음",
-  "heatmap.hint": "날짜를 선택하면 그날의 파일을 표시합니다",
-  "heatmap.clearDay": "모든 날짜 표시",
+  "heatmap.hint": "날짜를 클릭하거나 드래그해 기간을 선택하면 목록을 좁힙니다",
+  "heatmap.clearDay": "선택한 날짜 해제",
   "heatmap.error": "집계를 불러오지 못했습니다",
 
   // graph view

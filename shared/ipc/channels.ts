@@ -260,7 +260,7 @@ export const ChannelInputs = {
       message: "xy must hold one number per dimension per key",
     }),
   // Per-day counts for the heatmap, over the files the query matches; cursor /
-  // limit / folder and the metric's own date range in the query are ignored.
+  // limit and the metric's own date range in the query are ignored.
   activity_days: z
     .object({
       query: SearchQuerySchema,

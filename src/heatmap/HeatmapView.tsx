@@ -1,8 +1,16 @@
 // The heatmap (the "contribution graph" of the UI): a year of days as a grid of week columns, each cell
-// shaded by how many files fall on it. Picking a day sets the filter's date
-// range for the metric shown to that day (see pickedDays.ts), which narrows
-// the list drawn below.
-import { memo, useMemo, useState, type KeyboardEvent } from "react";
+// shaded by how many files fall on it. A panel over the list, in any view:
+// picking a day, or dragging across several, sets the filter's date range for
+// the metric shown (see pickedDays.ts), which narrows the list drawn below.
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
@@ -19,7 +27,14 @@ import {
   rangeFor,
   WEEK_DAYS,
 } from "./calendar";
-import { isPicked, pickedDays, singleDay, type PickedDays } from "./pickedDays";
+import {
+  isPicked,
+  orderedRange,
+  pickedDays,
+  singleDay,
+  type DayRange,
+  type PickedDays,
+} from "./pickedDays";
 import { useActivityDays } from "./useActivityDays";
 
 const METRIC_LABEL: Record<ActivityMetric, TranslationKey> = {
@@ -48,10 +63,15 @@ const LEVEL_CLASS = [
 /** Rows that get a weekday name, as GitHub does: Monday, Wednesday, Friday. */
 const NAMED_ROWS = new Set([1, 3, 5]);
 
-/** A day's square: as wide as its week column, which shares out the graph's width. */
-const CELL = "aspect-square w-full rounded-[2px]";
+/**
+ * A day's cell: as wide as its week column, which shares out the panel's
+ * width, and no taller than a few pixels — square while the columns are
+ * narrow, a low bar once they are wide, so a wide window does not make the
+ * panel tall at the list's expense.
+ */
+const CELL = "aspect-square max-h-2.5 w-full rounded-[2px]";
 /** The legend's swatches, which have no column to size them. */
-const SWATCH = "size-[11px] rounded-[2px]";
+const SWATCH = "size-2.5 rounded-[2px]";
 /**
  * Narrowest the graph is drawn before it scrolls sideways instead: below this
  * a year of columns leaves cells too small to pick.
@@ -94,9 +114,14 @@ interface Props {
   ready: boolean;
   metric: ActivityMetric;
   onMetricChange: (metric: ActivityMetric) => void;
-  /** Set the filter's range for the metric to this day ("YYYY-MM-DD"), or
-   *  remove it for null. */
-  onDayChange: (day: string | null) => void;
+  /** Set the filter's range for the metric to these days, or remove it for
+   *  null. */
+  onRangeChange: (range: DayRange | null) => void;
+}
+
+/** The day of the cell an event came from, if it came from one. */
+function dayOfTarget(target: EventTarget | null): string | null {
+  return target instanceof HTMLElement ? (target.dataset.day ?? null) : null;
 }
 
 export const HeatmapView = memo(function HeatmapView({
@@ -105,16 +130,25 @@ export const HeatmapView = memo(function HeatmapView({
   ready,
   metric,
   onMetricChange,
-  onDayChange,
+  onRangeChange,
 }: Props) {
   const { t, lang } = useI18n();
   // Read once per mount: a heatmap left open over midnight keeps its range
   // rather than shifting under the pointer.
   const [today] = useState(() => new Date());
   const picked = useMemo(() => pickedDays(query, metric), [query, metric]);
-  // The label and the clear button speak of one day; a longer range (set in
-  // the filter bar) only marks its cells.
-  const day = singleDay(picked);
+  // A drag in progress: where it started and the cell it is over now. Shown
+  // as the range it would pick, and written to the filter only on release.
+  const [drag, setDrag] = useState<{ anchor: string; head: string } | null>(
+    null,
+  );
+  // What the cells and the label show: the drag while there is one.
+  const shown = useMemo<PickedDays | null>(
+    () => (drag ? orderedRange(drag.anchor, drag.head) : picked),
+    [drag, picked],
+  );
+  // One day gets its count in the label; a longer range is named by its ends.
+  const day = singleDay(shown);
   // Null is the year ending today; a number is that calendar year. The range
   // is part of the filter and outlives this view, so it opens on its page.
   const [year, setYear] = useState<number | null>(() => pageOf(picked, today));
@@ -130,6 +164,57 @@ export const HeatmapView = memo(function HeatmapView({
     if (date && (date < page.from || date > page.to))
       setYear(pageOf(picked, today));
   }
+
+  // A press on the one day picked lets it go; on any other cell it becomes
+  // the day. With Shift, the range runs from where the one shown starts.
+  const pick = (range: DayRange, extend: boolean) => {
+    const start = picked?.from ?? picked?.to;
+    if (range.from !== range.to) onRangeChange(range);
+    else if (extend && start) onRangeChange(orderedRange(start, range.from));
+    else if (range.from === singleDay(picked)) onRangeChange(null);
+    else onRangeChange(range);
+  };
+  // The release is caught on the window: a drag may end outside the grid.
+  const latest = useRef({ drag, pick });
+  useEffect(() => {
+    latest.current = { drag, pick };
+  });
+  const dragging = drag !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    const end = (e: PointerEvent) => {
+      const { drag, pick } = latest.current;
+      setDrag(null);
+      if (drag && e.type === "pointerup")
+        pick(orderedRange(drag.anchor, drag.head), e.shiftKey);
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") setDrag(null);
+    };
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [dragging]);
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = dayOfTarget(e.target);
+    if (!d || e.button !== 0) return;
+    // A touch is captured by the cell it lands on; let go, so the cells it
+    // moves over report it.
+    const el = e.target as HTMLElement;
+    if (el.hasPointerCapture?.(e.pointerId))
+      el.releasePointerCapture(e.pointerId);
+    setDrag({ anchor: d, head: d });
+  };
+  const onPointerOver = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = dayOfTarget(e.target);
+    if (d)
+      setDrag((cur) => (cur && cur.head !== d ? { ...cur, head: d } : cur));
+  };
 
   const range = useMemo(() => rangeFor(year, today), [year, today]);
   const weeks = useMemo(() => buildWeeks(range), [range]);
@@ -169,9 +254,10 @@ export const HeatmapView = memo(function HeatmapView({
     day != null && day >= from && day <= to && !isLoading && !isStale;
   const thisYear = today.getFullYear();
 
-  // One cell is in the tab order (the day picked, else the last one shown);
-  // the arrow keys move between the rest.
-  const tabStop = day && day >= from && day <= to ? day : to;
+  // One cell is in the tab order (the first day picked, else the last one
+  // shown); the arrow keys move between the rest.
+  const first = picked?.from;
+  const tabStop = first && first >= from && first <= to ? first : to;
   const onGridKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const step =
       e.key === "ArrowLeft"
@@ -195,7 +281,7 @@ export const HeatmapView = memo(function HeatmapView({
   return (
     <section
       aria-label={t("view.heatmap")}
-      className="shrink-0 border-b border-border bg-bg px-4 py-2"
+      className="shrink-0 border-b border-border bg-bg px-4 py-1.5"
       // The list below listens on the window for the same keys (card focus,
       // open): one meant for a control or a cell here must not reach it.
       onKeyDown={stopListKeys}
@@ -240,25 +326,40 @@ export const HeatmapView = memo(function HeatmapView({
           </button>
         </div>
 
+        {/* On the controls' row rather than under the grid: a row of its own
+            is height the list below would rather have. */}
+        <div
+          aria-hidden
+          className="flex items-center gap-1 text-[10px] text-muted"
+        >
+          <span>{t("heatmap.less")}</span>
+          {Array.from({ length: LEVELS }, (_, level) => (
+            <span key={level} className={cn(SWATCH, LEVEL_CLASS[level])} />
+          ))}
+          <span>{t("heatmap.more")}</span>
+        </div>
+
         <div className="ml-auto flex min-w-0 items-center gap-1 text-xs text-muted">
           {isError ? (
             <span role="alert">{t("heatmap.error")}</span>
-          ) : day ? (
+          ) : shown ? (
             <>
               <span className="truncate text-fg">
                 {/* The counts cover the page shown: a day on another page (or
                     past today, or still loading) is named without one, rather
                     than with a zero the list below would contradict. */}
-                {dayCounted
-                  ? t(CELL_LABEL[metric], {
-                      date: dateLabel(day),
-                      count: counts.get(day) ?? 0,
-                    })
-                  : dateLabel(day)}
+                {day == null
+                  ? `${shown.from ? dateLabel(shown.from) : "…"} – ${shown.to ? dateLabel(shown.to) : "…"}`
+                  : dayCounted
+                    ? t(CELL_LABEL[metric], {
+                        date: dateLabel(day),
+                        count: counts.get(day) ?? 0,
+                      })
+                    : dateLabel(day)}
               </span>
               <button
                 type="button"
-                onClick={() => onDayChange(null)}
+                onClick={() => onRangeChange(null)}
                 aria-label={t("heatmap.clearDay")}
                 title={t("heatmap.clearDay")}
                 className="flex size-5 shrink-0 items-center justify-center rounded transition hover:bg-fg/10 hover:text-fg"
@@ -275,20 +376,22 @@ export const HeatmapView = memo(function HeatmapView({
       {/* A plain scroller, not ScrollArea: the page-scroll keys look for the
           list's ScrollArea viewport under the same <main> (see
           scrollListByPage) and must not find this one first. */}
-      <div className="mt-2 overflow-x-auto pb-1">
+      <div className="mt-1.5 overflow-x-auto pb-0.5">
         <div
           role="group"
           aria-label={t("view.heatmap")}
           aria-busy={isLoading || isStale}
           onKeyDown={onGridKey}
+          onPointerDown={onPointerDown}
+          onPointerOver={onPointerOver}
           className={cn(
-            "grid w-full grid-flow-col gap-[3px] transition-opacity",
+            "grid w-full select-none grid-flow-col gap-[3px] transition-opacity",
             MIN_WIDTH,
             (isLoading || isStale) && "opacity-60",
           )}
           style={{
-            // The weekday names, then one equal share of the width per week:
-            // the cells are squares, so the rows follow the columns.
+            // The weekday names, then one equal share of the width per week;
+            // the rows are as tall as the cells make them (see CELL).
             gridTemplateColumns: `auto repeat(${weeks.length}, minmax(0, 1fr))`,
             gridTemplateRows: `1rem repeat(${WEEK_DAYS}, auto)`,
           }}
@@ -321,7 +424,7 @@ export const HeatmapView = memo(function HeatmapView({
                   date: dateLabel(d),
                   count,
                 });
-                const marked = isPicked(picked, d);
+                const marked = isPicked(shown, d);
                 return (
                   <button
                     key={d}
@@ -332,9 +435,12 @@ export const HeatmapView = memo(function HeatmapView({
                     aria-label={label}
                     aria-pressed={marked}
                     title={label}
-                    // The one day picked lets go; any other cell, one inside a
-                    // longer range included, becomes the day.
-                    onClick={() => onDayChange(d === day ? null : d)}
+                    // The pointer picks on release (see the drag above); this
+                    // is the keyboard's Enter and Space, whose click carries
+                    // no press count.
+                    onClick={(e) => {
+                      if (e.detail === 0) pick({ from: d, to: d }, e.shiftKey);
+                    }}
                     className={cn(
                       CELL,
                       "outline-none transition hover:ring-1 hover:ring-fg/60 focus-visible:ring-2 focus-visible:ring-ring",
@@ -347,17 +453,6 @@ export const HeatmapView = memo(function HeatmapView({
             </div>
           ))}
         </div>
-      </div>
-
-      <div
-        aria-hidden
-        className="mt-1 flex items-center justify-end gap-1 text-[10px] text-muted"
-      >
-        <span>{t("heatmap.less")}</span>
-        {Array.from({ length: LEVELS }, (_, level) => (
-          <span key={level} className={cn(SWATCH, LEVEL_CLASS[level])} />
-        ))}
-        <span>{t("heatmap.more")}</span>
       </div>
     </section>
   );

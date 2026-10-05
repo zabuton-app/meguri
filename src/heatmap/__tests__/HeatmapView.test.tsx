@@ -41,7 +41,7 @@ function playedOn(day: string, lastDay = day): SearchQuery {
 }
 
 function renderGraph(props: Partial<Parameters<typeof HeatmapView>[0]> = {}) {
-  const onDayChange = vi.fn();
+  const onRangeChange = vi.fn();
   const onMetricChange = vi.fn();
   renderWithProviders(
     <HeatmapView
@@ -50,11 +50,11 @@ function renderGraph(props: Partial<Parameters<typeof HeatmapView>[0]> = {}) {
       ready
       metric="played"
       onMetricChange={onMetricChange}
-      onDayChange={onDayChange}
+      onRangeChange={onRangeChange}
       {...props}
     />,
   );
-  return { onDayChange, onMetricChange };
+  return { onRangeChange, onMetricChange };
 }
 
 describe("HeatmapView", () => {
@@ -98,15 +98,18 @@ describe("HeatmapView", () => {
   });
 
   it("picks a day", async () => {
-    const { onDayChange } = renderGraph();
+    const { onRangeChange } = renderGraph();
     await waitFor(() => expect(mocks.activityDays).toHaveBeenCalled());
 
     fireEvent.click(cell("2026-10-03"));
-    expect(onDayChange).toHaveBeenLastCalledWith("2026-10-03");
+    expect(onRangeChange).toHaveBeenLastCalledWith({
+      from: "2026-10-03",
+      to: "2026-10-03",
+    });
   });
 
   it("marks the picked day, and lets it go on a second click", async () => {
-    const { onDayChange } = renderGraph({ query: playedOn("2026-10-03") });
+    const { onRangeChange } = renderGraph({ query: playedOn("2026-10-03") });
     await waitFor(() => expect(cell("2026-10-03").dataset.level).toBe("4"));
     // The range is the day picked, not a condition of the counts.
     expect(lastRequest().query).toEqual({});
@@ -114,9 +117,11 @@ describe("HeatmapView", () => {
     expect(cell("2026-10-01").getAttribute("aria-pressed")).toBe("false");
 
     fireEvent.click(cell("2026-10-03"));
-    expect(onDayChange).toHaveBeenLastCalledWith(null);
-    fireEvent.click(screen.getByRole("button", { name: "Show all days" }));
-    expect(onDayChange).toHaveBeenCalledTimes(2);
+    expect(onRangeChange).toHaveBeenLastCalledWith(null);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear the days picked" }),
+    );
+    expect(onRangeChange).toHaveBeenCalledTimes(2);
   });
 
   it("offers the metrics as one choice", () => {
@@ -137,7 +142,7 @@ describe("HeatmapView", () => {
   });
 
   it("marks every day of a longer range, and narrows it to the cell clicked", async () => {
-    const { onDayChange } = renderGraph({
+    const { onRangeChange } = renderGraph({
       query: playedOn("2026-10-01", "2026-10-03"),
     });
     await waitFor(() => expect(mocks.activityDays).toHaveBeenCalled());
@@ -145,11 +150,125 @@ describe("HeatmapView", () => {
       expect(cell(day).getAttribute("aria-pressed")).toBe("true");
     expect(cell("2026-09-30").getAttribute("aria-pressed")).toBe("false");
     expect(cell("2026-10-04").getAttribute("aria-pressed")).toBe("false");
-    // No one day to speak of: no label, no clear button.
-    expect(screen.queryByRole("button", { name: "Show all days" })).toBeNull();
+    // No one day to count: the range is named by its ends.
+    expect(screen.getByText("Oct 1, 2026 – Oct 3, 2026")).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear the days picked" }),
+    );
+    expect(onRangeChange).toHaveBeenLastCalledWith(null);
 
     fireEvent.click(cell("2026-10-02"));
-    expect(onDayChange).toHaveBeenLastCalledWith("2026-10-02");
+    expect(onRangeChange).toHaveBeenLastCalledWith({
+      from: "2026-10-02",
+      to: "2026-10-02",
+    });
+  });
+
+  describe("dragging across days", () => {
+    const press = (day: string) =>
+      fireEvent.pointerDown(cell(day), { button: 0, pointerId: 1 });
+    const over = (day: string) =>
+      fireEvent.pointerOver(cell(day), { pointerId: 1 });
+    const pressed = () =>
+      [...document.querySelectorAll<HTMLElement>('[aria-pressed="true"]')]
+        .map((c) => c.dataset.day)
+        .filter(Boolean)
+        .sort();
+
+    it("picks the days between where it starts and where it ends", async () => {
+      const { onRangeChange } = renderGraph();
+      await waitFor(() => expect(mocks.activityDays).toHaveBeenCalled());
+
+      press("2026-09-29");
+      over("2026-09-30");
+      over("2026-10-02");
+      // Shown as it goes, written only on release.
+      expect(pressed()).toEqual([
+        "2026-09-29",
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+      ]);
+      expect(screen.getByText("Sep 29, 2026 – Oct 2, 2026")).toBeTruthy();
+      expect(onRangeChange).not.toHaveBeenCalled();
+
+      fireEvent.pointerUp(window);
+      expect(onRangeChange).toHaveBeenCalledTimes(1);
+      expect(onRangeChange).toHaveBeenLastCalledWith({
+        from: "2026-09-29",
+        to: "2026-10-02",
+      });
+      // Nothing is left of the drag: the filter is what marks the cells now.
+      expect(pressed()).toEqual([]);
+    });
+
+    it("runs backwards as well, and ends outside the grid", async () => {
+      const { onRangeChange } = renderGraph();
+      await waitFor(() => expect(mocks.activityDays).toHaveBeenCalled());
+      press("2026-10-03");
+      over("2026-09-30");
+      // Leaving the cells keeps the last one reached.
+      fireEvent.pointerOver(document.body, { pointerId: 1 });
+      fireEvent.pointerUp(window);
+      expect(onRangeChange).toHaveBeenLastCalledWith({
+        from: "2026-09-30",
+        to: "2026-10-03",
+      });
+    });
+
+    it("is a click when it goes nowhere: the one day picked lets go", async () => {
+      const { onRangeChange } = renderGraph({ query: playedOn("2026-10-03") });
+      await waitFor(() => expect(mocks.activityDays).toHaveBeenCalled());
+      press("2026-10-02");
+      fireEvent.pointerUp(window);
+      expect(onRangeChange).toHaveBeenLastCalledWith({
+        from: "2026-10-02",
+        to: "2026-10-02",
+      });
+      press("2026-10-03");
+      fireEvent.pointerUp(window);
+      expect(onRangeChange).toHaveBeenLastCalledWith(null);
+      // The click that follows a press is the pointer's, already handled.
+      fireEvent.click(cell("2026-10-03"), { detail: 1 });
+      expect(onRangeChange).toHaveBeenCalledTimes(2);
+    });
+
+    it("is given up on Escape or a cancelled pointer, and ignores other buttons", async () => {
+      const { onRangeChange } = renderGraph();
+      await waitFor(() => expect(mocks.activityDays).toHaveBeenCalled());
+      press("2026-09-29");
+      over("2026-10-01");
+      fireEvent.keyDown(window, { key: "Escape" });
+      expect(pressed()).toEqual([]);
+      fireEvent.pointerUp(window);
+
+      press("2026-09-29");
+      over("2026-10-01");
+      fireEvent.pointerCancel(window);
+      expect(pressed()).toEqual([]);
+
+      fireEvent.pointerDown(cell("2026-09-29"), { button: 2, pointerId: 1 });
+      over("2026-10-01");
+      fireEvent.pointerUp(window);
+      expect(onRangeChange).not.toHaveBeenCalled();
+    });
+
+    it("extends from the first day picked with Shift", async () => {
+      const { onRangeChange } = renderGraph({ query: playedOn("2026-10-01") });
+      await waitFor(() => expect(mocks.activityDays).toHaveBeenCalled());
+      // The keyboard's way to a range: Shift+Enter on another day.
+      fireEvent.click(cell("2026-10-04"), { shiftKey: true });
+      expect(onRangeChange).toHaveBeenLastCalledWith({
+        from: "2026-10-01",
+        to: "2026-10-04",
+      });
+      fireEvent.pointerDown(cell("2026-09-28"), { button: 0, pointerId: 1 });
+      fireEvent.pointerUp(window, { shiftKey: true });
+      expect(onRangeChange).toHaveBeenLastCalledWith({
+        from: "2026-09-28",
+        to: "2026-10-01",
+      });
+    });
   });
 
   it("leaves another metric's range to the counts", async () => {
@@ -182,7 +301,9 @@ describe("HeatmapView", () => {
     await waitFor(() => expect(lastRequest().from).toBe("2025-01-01"));
     // The list below still shows that day's files: no "0 played" over it.
     await waitFor(() => expect(screen.queryByText(/played$/)).toBeNull());
-    expect(screen.getByRole("button", { name: "Show all days" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Clear the days picked" }),
+    ).toBeTruthy();
   });
 
   it("turns to the page of a range set from outside the view", async () => {
@@ -193,7 +314,7 @@ describe("HeatmapView", () => {
         ready
         metric="played"
         onMetricChange={() => {}}
-        onDayChange={() => {}}
+        onRangeChange={() => {}}
       />
     );
     const { rerender } = renderWithProviders(view({}));
@@ -231,7 +352,7 @@ describe("HeatmapView", () => {
   );
 
   it("pages back through whole years and forward to today again", async () => {
-    const { onDayChange } = renderGraph({ query: playedOn("2026-10-03") });
+    const { onRangeChange } = renderGraph({ query: playedOn("2026-10-03") });
     const next = screen.getByRole("button", { name: "Next year" });
     expect((next as HTMLButtonElement).disabled).toBe(true);
 
@@ -243,7 +364,7 @@ describe("HeatmapView", () => {
       }),
     );
     // Paging only looks elsewhere: the day stays a condition of the list.
-    expect(onDayChange).not.toHaveBeenCalled();
+    expect(onRangeChange).not.toHaveBeenCalled();
     expect(screen.getByText("2025")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Previous year" }));

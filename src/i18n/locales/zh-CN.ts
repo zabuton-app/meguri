@@ -377,7 +377,7 @@ export const zhCN: Record<TranslationKey, string> = {
 
   // contribution graph
   "view.heatmap": "贡献图",
-  "view.folderUnavailableHeatmap": "贡献图中无法按文件夹显示",
+  "view.heatmapOff": "隐藏贡献图",
   "heatmap.metric.label": "统计对象",
   "heatmap.metric.played": "播放",
   "heatmap.metric.captured": "拍摄",
@@ -392,8 +392,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "heatmap.range.next": "下一年",
   "heatmap.less": "少",
   "heatmap.more": "多",
-  "heatmap.hint": "选择日期以显示当天的文件",
-  "heatmap.clearDay": "显示所有日期",
+  "heatmap.hint": "点击日期或拖动选择一段时间来筛选列表",
+  "heatmap.clearDay": "清除所选日期",
   "heatmap.error": "无法加载统计",
 
   // graph view

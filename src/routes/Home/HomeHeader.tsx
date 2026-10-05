@@ -1,5 +1,4 @@
 import {
-  CalendarDays,
   ChevronDown,
   CopyCheck,
   DatabaseBackup,
@@ -180,12 +179,6 @@ export function HomeHeader({
                 mode: "graph",
                 label: t("view.graph"),
                 Icon: Waypoints,
-                rounded: "",
-              },
-              {
-                mode: "heatmap",
-                label: t("view.heatmap"),
-                Icon: CalendarDays,
                 rounded: "rounded-r-md",
               },
             ] as const
@@ -221,11 +214,9 @@ export function HomeHeader({
           title={
             view === "graph"
               ? t("view.folderUnavailableGraph")
-              : view === "heatmap"
-                ? t("view.folderUnavailableHeatmap")
-                : folderAvailable
-                  ? t("view.folder")
-                  : t("view.folderUnavailable")
+              : folderAvailable
+                ? t("view.folder")
+                : t("view.folderUnavailable")
           }
           className={cn(
             "flex size-7 items-center justify-center rounded-md border border-border transition disabled:cursor-not-allowed disabled:opacity-40",

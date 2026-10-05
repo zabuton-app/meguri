@@ -79,6 +79,10 @@ interface CommandMenuProps {
   folderView?: boolean;
   /** Folders need one real workspace open (not All or a collection). */
   folderAvailable?: boolean;
+  /** Shows or hides the heatmap panel over the list. */
+  onToggleHeatmap: () => void;
+  /** Whether the heatmap panel is shown, which the command undoes. */
+  heatmapOpen?: boolean;
   onDiscover: () => void;
   /** Discovery has something to pick from (the same rule as its button). */
   canDiscover?: boolean;
@@ -231,6 +235,8 @@ function CommandMenuBody({
   onToggleByFolder,
   folderView = false,
   folderAvailable = false,
+  onToggleHeatmap,
+  heatmapOpen = false,
   onDiscover,
   canDiscover = ready,
   onTags,
@@ -351,6 +357,7 @@ function CommandMenuBody({
               devToolsEnabled={devToolsEnabled}
               folderView={folderView}
               folderAvailable={folderAvailable}
+              heatmapOpen={heatmapOpen}
               canDiscover={canDiscover}
               closeThen={closeThen}
               onFocusSearch={onFocusSearch}
@@ -358,6 +365,7 @@ function CommandMenuBody({
               onRebuild={onRebuild}
               onSetView={onSetView}
               onToggleByFolder={onToggleByFolder}
+              onToggleHeatmap={onToggleHeatmap}
               onDiscover={onDiscover}
               onTags={onTags}
               onSettings={onSettings}
@@ -740,6 +748,7 @@ function FixedGroups({
   devToolsEnabled,
   folderView,
   folderAvailable,
+  heatmapOpen,
   canDiscover,
   closeThen,
   onFocusSearch,
@@ -747,6 +756,7 @@ function FixedGroups({
   onRebuild,
   onSetView,
   onToggleByFolder,
+  onToggleHeatmap,
   onDiscover,
   onTags,
   onSettings,
@@ -759,6 +769,7 @@ function FixedGroups({
   devToolsEnabled: boolean;
   folderView: boolean;
   folderAvailable: boolean;
+  heatmapOpen: boolean;
   canDiscover: boolean;
   closeThen: (fn: () => void) => void;
   onFocusSearch: () => void;
@@ -766,6 +777,7 @@ function FixedGroups({
   onRebuild: () => void;
   onSetView: (view: ViewMode) => void;
   onToggleByFolder: () => void;
+  onToggleHeatmap: () => void;
   onDiscover: () => void;
   onTags: () => void;
   onSettings: () => void;
@@ -851,17 +863,18 @@ function FixedGroups({
       icon: Waypoints,
       run: () => closeThen(() => onSetView("graph")),
     }),
-    action(t, "view.heatmap", {
-      id: "view-heatmap",
-      icon: CalendarDays,
-      run: () => closeThen(() => onSetView("heatmap")),
-    }),
     // A toggle, unlike the view actions above it: named for what it will do.
     action(t, folderView ? "view.folderOff" : "view.folder", {
       id: "view-folder",
       icon: FolderTree,
       disabled: !folderAvailable,
       run: () => closeThen(onToggleByFolder),
+    }),
+    // A panel over the list in any view, toggled like the folder option.
+    action(t, heatmapOpen ? "view.heatmapOff" : "view.heatmap", {
+      id: "view-heatmap",
+      icon: CalendarDays,
+      run: () => closeThen(onToggleHeatmap),
     }),
   ];
 

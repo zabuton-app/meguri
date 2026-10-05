@@ -164,16 +164,17 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   non-faststart containers are remuxed to fragmented MP4 on the fly (time seek
   via `?t`), and unplayable codecs are handed off to the OS default player
 - 🔍 **Powerful search** — filter and sort by full text (FTS5), tags, kind,
-  rating, and capture date/time, with conditions shown as removable badges
+  rating, and captured, created, added, and played date ranges, with
+  conditions shown as removable badges
 - 🏷️ **Tags, ratings & history** — manual tags with autocomplete, ★ ratings,
   and playback history that survive file moves and renames, plus a day-grouped
   history timeline across all workspaces
 - 🕸️ **Graph view** — see the library as a network of files and their tags,
   in 2D or 3D, with nodes you can drag, search, and size by how often they
   were played
-- 🟩 **Contribution graph** — a year of days as a heatmap, shaded by how many
-  files you played, captured, created, or added on each; pick a day to list
-  its files
+- 🟩 **Contribution graph** — a panel over any view showing a year of days
+  as a heatmap, shaded by how many files you played, captured, created, or
+  added on each; click a day or drag across several to narrow the list to them
 - 📁 **Folder view** — browse the grid or the list by folder instead of as
   one flat library, with a breadcrumb, a subfolder menu, and folder cards
   that preview what is inside

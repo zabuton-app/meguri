@@ -1,7 +1,7 @@
 // The day picked on the heatmap is not state of its own: it is the search's
 // date range for the metric shown (see ACTIVITY_RANGE_FIELDS), the same
 // condition the filter bar offers under "More conditions". Reading the range
-// back marks the cells; picking a cell writes it.
+// back marks the cells; picking a cell, or dragging across several, writes it.
 import type { SearchQuery } from "@/ipc/types";
 import { daySeconds, formatDay, parseDay } from "@shared/day";
 import {
@@ -42,27 +42,42 @@ export function isPicked(picked: PickedDays | null, day: string): boolean {
   );
 }
 
+/** Days picked on the heatmap, first and last, both included. */
+export interface DayRange {
+  from: string;
+  to: string;
+}
+
+/** The two days in calendar order, whichever was picked first. */
+export function orderedRange(a: string, b: string): DayRange {
+  return a <= b ? { from: a, to: b } : { from: b, to: a };
+}
+
 /**
- * The query with its range for `metric` set to one day, or removed for null.
- * The same object comes back when there is nothing to remove, so clearing a
- * range that is not there refetches nothing.
+ * The query with its range for `metric` set to these days, or removed for
+ * null. The same object comes back when there is nothing to remove, so
+ * clearing a range that is not there refetches nothing.
  */
-export function withPickedDay(
+export function withPickedDays(
   query: SearchQuery,
   metric: ActivityMetric,
-  day: string | null,
+  range: DayRange | null,
 ): SearchQuery {
   const [from, to] = ACTIVITY_RANGE_FIELDS[metric];
-  const date = day ? parseDay(day) : null;
-  if (!date) {
+  const first = range ? parseDay(range.from) : null;
+  const last = range ? parseDay(range.to) : null;
+  if (!first || !last) {
     if (query[from] == null && query[to] == null) return query;
     const next = { ...query };
     delete next[from];
     delete next[to];
     return next;
   }
-  const [start, end] = daySeconds(date);
-  return { ...query, [from]: start, [to]: end };
+  return {
+    ...query,
+    [from]: daySeconds(first)[0],
+    [to]: daySeconds(last)[1],
+  };
 }
 
 /** The query without its range for `metric`: what the heatmap counts over. */
@@ -70,5 +85,5 @@ export function withoutPickedDays(
   query: SearchQuery,
   metric: ActivityMetric,
 ): SearchQuery {
-  return withPickedDay(query, metric, null);
+  return withPickedDays(query, metric, null);
 }

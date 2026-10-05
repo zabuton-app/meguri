@@ -6,7 +6,7 @@ import {
   type ActivityMetric,
 } from "../../../shared/ipc/activity.js";
 import { addDays, formatDay, parseDay } from "../../../shared/day.js";
-import { appendSearchConditions, FILE_FROM } from "./files.js";
+import { appendSearchConditions, fromFor } from "./files.js";
 import type { SearchQuery } from "../types.js";
 
 /**
@@ -23,17 +23,17 @@ const DAY_EXPR: Record<Exclude<ActivityMetric, "played">, string> = {
 };
 
 /**
- * What the counts ignore in a query: the folder (the heatmap has no folder
- * form) and the metric's own date range, which is the day picked on the
- * heatmap — counted with it, every other day would be empty. Paging and
- * sorting never reach the SQL.
+ * What the counts ignore in a query: the metric's own date range, which is
+ * the days picked on the heatmap — counted with it, every other day would be
+ * empty. Paging and sorting never reach the SQL. A folder stays: under the
+ * folder view the list is that folder's, and so are the counts.
  */
 function activityQuery(
   query: SearchQuery,
   metric: ActivityMetric,
 ): SearchQuery {
   const [from, to] = ACTIVITY_RANGE_FIELDS[metric];
-  return { ...query, folder: undefined, [from]: undefined, [to]: undefined };
+  return { ...query, [from]: undefined, [to]: undefined };
 }
 
 /**
@@ -96,7 +96,7 @@ export function activityDays(
     // the files and probes each one's history, which costs the same whatever
     // the range but stays cheap under a selective filter.
     let sql = `SELECT f.id AS id, ph.played_at AS ts
-      ${FILE_FROM} JOIN play_history ph ON ph.meta_key = f.meta_key
+      ${fromFor(q)} JOIN play_history ph ON ph.meta_key = f.meta_key
       WHERE f.deleted_at IS NULL AND ph.played_at >= ? AND ph.played_at < ?`;
     sql = appendSearchConditions(db, sql, args, q);
     const seen = new Set<number>();
@@ -114,7 +114,7 @@ export function activityDays(
   } else {
     const expr = DAY_EXPR[metric];
     let sql = `SELECT ${expr} AS ts
-      ${FILE_FROM} WHERE f.deleted_at IS NULL AND ${expr} >= ? AND ${expr} < ?`;
+      ${fromFor(q)} WHERE f.deleted_at IS NULL AND ${expr} >= ? AND ${expr} < ?`;
     sql = appendSearchConditions(db, sql, args, q);
     for (const ts of db
       .prepare(sql)

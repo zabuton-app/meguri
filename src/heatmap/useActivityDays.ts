@@ -18,7 +18,6 @@ function activityQuery(
   const q = { ...withoutPickedDays(query, metric) };
   delete q.cursor;
   delete q.limit;
-  delete q.folder;
   delete q.sort;
   delete q.sortDir;
   return q;

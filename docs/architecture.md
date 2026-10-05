@@ -258,9 +258,9 @@ the tags they carry. It is built in one call and cached per scope.
 
 ### Heatmap
 
-The heatmap ("Contribution graph" in the UI) counts the current list — any
-workspace, `All` or a collection, with the search and filters applied — per
-calendar day.
+The heatmap ("Contribution graph" in the UI) is a panel over the list that
+counts it — any workspace, `All` or a collection, with the search and filters
+applied, within the folder shown under the folder view — per calendar day.
 
 - **One query per database.** `activity_days` runs on the query worker
   (`electron/core/activityDays.ts`) with files_search's target resolution, and
@@ -274,11 +274,12 @@ calendar day.
 - **A day is a date range.** Each metric has a pair of `SearchQuery` range
   fields (`ACTIVITY_RANGE_FIELDS`: `playedFrom`/`playedTo`, `capturedFrom`/
   `capturedTo`, `btimeFrom`/`btimeTo`, `addedFrom`/`addedTo`) testing the same
-  column the counts read. Picking a day sets that pair, so a cell's number is
+  column the counts read. Picking a day, or dragging across several, sets that pair, so a cell's number is
   the length of the list the range gives (identical copies included, as the
   list shows them), which `activityDays.test.ts` pins per metric. The counts
   drop the shown metric's own pair from the query; other metrics' ranges
-  narrow them like any condition.
+  narrow them like any condition. A folder scope in the query is kept (a
+  collection, which has no folder view, drops it as `files_search` does).
 - **Local days, one calendar.** Days cross IPC as `YYYY-MM-DD` strings
   (`shared/day.ts`) and are resolved in the main process's time zone, so the
   renderer never sends timestamps. The SQL only selects timestamps in the

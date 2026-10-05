@@ -11,7 +11,6 @@ describe("parseViewMode", () => {
     expect(parseViewMode("grid")).toBe("grid");
     expect(parseViewMode("list")).toBe("list");
     expect(parseViewMode("graph")).toBe("graph");
-    expect(parseViewMode("heatmap")).toBe("heatmap");
   });
 
   it("moves a stored table view to the list", () => {
@@ -21,6 +20,8 @@ describe("parseViewMode", () => {
   it("falls back to the grid for nothing stored or an unknown value", () => {
     expect(parseViewMode(null)).toBe("grid");
     expect(parseViewMode("mosaic")).toBe("grid");
+    // The heatmap is a panel over the views, not one of them.
+    expect(parseViewMode("heatmap")).toBe("grid");
   });
 });
 
@@ -29,14 +30,12 @@ describe("hasFolderForm", () => {
     expect(hasFolderForm("grid")).toBe(true);
     expect(hasFolderForm("list")).toBe(true);
     expect(hasFolderForm("graph")).toBe(false);
-    expect(hasFolderForm("heatmap")).toBe(false);
   });
 
-  it("keeps the folder view off under the graphs, option or not", () => {
+  it("keeps the folder view off under the graph, option or not", () => {
     const on = { byFolder: true, folderAvailable: true };
     expect(isFolderView({ ...on, view: "list" })).toBe(true);
     expect(isFolderView({ ...on, view: "graph" })).toBe(false);
-    expect(isFolderView({ ...on, view: "heatmap" })).toBe(false);
     expect(isFolderView(on)).toBe(true);
   });
 });

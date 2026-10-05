@@ -15,7 +15,9 @@ export function registerActivityHandlers(ctx: IpcContext): void {
       ? queryClient.run<ActivityDays>({
           kind: "activity",
           targets: queryTargets(ws.allCores()),
-          query,
+          // A collection spans workspaces and has no folder view (see
+          // files_search).
+          query: { ...query, folder: undefined },
           refs: collection.items,
           metric,
           from,
