@@ -15,6 +15,7 @@ export default defineConfig({
           // "main"; queryWorker.js is loaded via new Worker() from main).
           main: resolve("electron/main.ts"),
           queryWorker: resolve("electron/queryWorker.ts"),
+          autoTagWorker: resolve("electron/autoTagWorker.ts"),
         },
       },
     },

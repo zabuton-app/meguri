@@ -45,8 +45,9 @@ The main tables:
 - `meta_tags` — tag associations.
 - `play_history` — playback history.
 - `scene_bookmarks` — user-created scene positions.
-- `settings` — a key/value store, currently holding the derived-tag ruleset
-  version (see [Derived tags](#derived-tags)).
+- `settings` — a key/value store, holding the derived-tag ruleset version (see
+  [Derived tags](#derived-tags)) and the files auto-tagging still owes (see
+  [Auto tagging](#auto-tagging)).
 - `files_fts` — the FTS5 virtual table (see below).
 
 ## Versionless migrations
@@ -204,6 +205,65 @@ file on the next scan.
 The set of namespaces is **not closed**. No code that decides tag _identity_ may
 enumerate it: search tokens resolve against the `tags` table itself, and the tag
 screen sorts unknown namespaces after the known ones rather than dropping them.
+
+## Auto tagging
+
+Rules and a keyword dictionary propose tags from a file's **name**. The engine
+is `shared/autoTag.ts`, shared by both processes so the auto-tagging screen
+previews with the code a scan runs:
+
+- A **rule** is a regular expression run globally over the name without its
+  extension. Each match names a tag through a template (`$1`), optionally split
+  on `, 、 / ／ ・`, case-folded, and dropped when it is in the rule's exclude
+  list. The built-in rules cover a leading code prefix and bracketed text.
+- A **keyword** is a tag with aliases. Finding any of them in the name (again
+  without its extension) proposes the tag; in `word` mode an ASCII term must
+  stand between non-alphanumerics.
+
+Unlike [derived tags](#derived-tags), what the engine proposes is attached as
+the user's **own** tags: no namespace, `source = 'manual'`, indexed in FTS,
+removable per file. A name that differs from an existing tag only by case
+reuses that tag — compared with JavaScript's case folding, the same one the
+engine and the screen use, not SQLite's ASCII-only `NOCASE`. This folding is
+particular to auto-tagging: tagging by hand still matches names exactly.
+Attaching only ever adds — changing a rule does not take back what it already
+tagged — and `attachAutoTags()` reports exactly the pairs it added, which is
+what the screen's undo removes (kept in memory in the main process for the
+session, not persisted).
+
+The configuration (`rules`, `keywords`, `applyOnScan`, dismissed suggestions and
+excluded terms) is app-wide, in `config.json` under `autoTag`. With `applyOnScan`
+on, `runScan()` runs the engine over the files the scan inserted, updated or
+moved, ahead of the FTS sync and the thumbnail pool. The ids still owed are kept
+in `settings` under `auto_tag_pending` until the pass completes, because a scan
+aborted in between reports those files as unchanged the next time round.
+
+In the main process the engine is evaluated in a worker thread
+(`electron/autoTagWorker.ts`, driven by `AutoTagWorkerClient`): a rule is an
+arbitrary regular expression, and one that backtracks without end cannot be
+interrupted on the thread running it. A chunk that exceeds its time budget gets
+the worker terminated, and a worker that cannot run fails closed — nothing is
+evaluated on the main thread in its place. Either way the scan logs it and
+carries on without auto-tagging; the files stay owed.
+
+`shared/autoTagAnalysis.ts` builds the screen's views on top of the engine —
+suggestions (including frequent words nothing claims yet), a file name cut into
+tokens, and the library's vocabulary by kind. Those run in the renderer over the
+names loaded by `auto_tag_files` (capped at `MAX_AUTO_TAG_FILES`); every write
+goes through `auto_tag_apply`, which only says which files get which tags.
+
+The renderer runs those analyses on its own thread, so a rule that hangs would
+hang the screen. Two things keep that from being permanent. The configuration
+is saved a moment after an edit, which a screen frozen by that edit never
+reaches. And a marker in `localStorage` is set before each analysis and cleared
+once it has been drawn: finding it still set on arrival opens the screen in a
+safe mode that runs no rules until the user resumes, leaving the rule at fault
+editable.
+
+`config.ignored` holds suggestions dismissed on the suggestions tab.
+`config.excludedTerms` holds words excluded on the terms tab; they also stop
+being offered as frequent words. Neither changes what the rules or the
+dictionary themselves produce.
 
 ## Query layer
 

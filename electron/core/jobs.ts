@@ -12,6 +12,12 @@ import {
   backfillAutoMetaTags,
   needsAutoMetaBackfill,
 } from "./autoMetaTags.js";
+import { applyAutoTagsOnScan, clearAutoTagPending } from "./autoTag.js";
+import {
+  AutoTagTimeoutError,
+  AutoTagUnavailableError,
+  type DeriveAutoTags,
+} from "./autoTagDeriver.js";
 import { pool } from "./concurrency.js";
 import {
   LARGE_IMAGE_PIXELS,
@@ -20,6 +26,7 @@ import {
 } from "./mediaConcurrency.js";
 import { scopedLog } from "./logger.js";
 import type { Kind } from "./types.js";
+import type { AutoTagConfig } from "../../shared/autoTag.js";
 
 const log = scopedLog("scan");
 
@@ -75,7 +82,14 @@ export async function runScan(
   core: Core,
   jobId: string,
   onEvent: (e: JobEvent) => void,
-  opts: { rebuild?: boolean; signal?: AbortSignal } = {},
+  opts: {
+    rebuild?: boolean;
+    signal?: AbortSignal;
+    /** Auto-tagging configuration (app config); nothing is tagged when omitted. */
+    autoTag?: AutoTagConfig;
+    /** Evaluates the engine; on the calling thread when omitted. */
+    deriveAutoTags?: DeriveAutoTags;
+  } = {},
 ): Promise<ScanStats> {
   const { signal } = opts;
   const { db } = core;
@@ -113,6 +127,41 @@ export async function runScan(
     signal,
   );
   q.touchScanRoot(db, core.rootId);
+
+  // Tag what this scan added or changed (ftsTargets is exactly that set). Ahead
+  // of the FTS sync and the thumbnail pool: the engine reads nothing but file
+  // names, so its tags need not wait for the slowest phase of the scan.
+  if (opts.autoTag?.applyOnScan) {
+    try {
+      await applyAutoTagsOnScan(db, {
+        engine: opts.autoTag,
+        derive: opts.deriveAutoTags,
+        changedIds: ftsTargets,
+        signal,
+        onProgress: (d, t) =>
+          onEvent({
+            type: "progress",
+            jobId,
+            phase: "tags",
+            done: d,
+            total: t,
+          }),
+      });
+    } catch (err) {
+      // A rule that does not terminate, or a worker that will not run, must not
+      // cost the scan its thumbnails. The files stay owed, so they are tagged
+      // by the next scan after the cause is fixed.
+      if (err instanceof AutoTagTimeoutError) {
+        log.warn("auto-tagging skipped: a rule did not finish on a file name");
+      } else if (err instanceof AutoTagUnavailableError) {
+        log.warn("auto-tagging skipped: the worker is unavailable");
+      } else {
+        throw err;
+      }
+    }
+  } else if (opts.autoTag) {
+    clearAutoTagPending(db);
+  }
 
   // Sync FTS only for new/moved/updated entries (unchanged ones need no re-sync).
   const ftsTotal = ftsTargets.length;

@@ -74,8 +74,8 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
 4. Add `handle("<channel>", (input) => ...)` inside the relevant
    `register*Handlers()` under `electron/ipc/`. Handlers are grouped by domain,
    one module each (`status.ts`, `workspaces.ts`, `scan.ts`, `files.ts`,
-   `tags.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`, `logo.ts`,
-   `updates.ts`); `electron/ipc/index.ts` wires them up in `registerIpc()`.
+   `tags.ts`, `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`,
+   `logo.ts`, `updates.ts`); `electron/ipc/index.ts` wires them up in `registerIpc()`.
    Each group receives an `IpcContext` (`electron/ipc/context.ts`) with what it
    needs from the main process — the `Workspaces`, the query worker client,
    `emit()`, the `ScanManager`, and live getters for the window and media
@@ -148,7 +148,7 @@ The root path is hashed (SHA1, first 16 hex characters) into a stable ID via
 holding the workspace's generated files.
 
 - `electron/core/appConfig.ts` is the lone layer that persists `roots`,
-  `activePath`, and `collections` to `<userData>/config.json`.
+  `activePath`, `collections`, and `autoTag` to `<userData>/config.json`.
 - `electron/core/workspaces.ts` reads the config and caches a `Core` per ID. It
   distinguishes `active()` (the active workspace) from `byId()` (any workspace by
   ID). Code that opens files should be deliberate about which it needs — the

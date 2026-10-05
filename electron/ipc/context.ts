@@ -4,6 +4,7 @@
 // the groups can be registered — and read — one domain at a time. Helpers
 // shared by the groups live in helpers.ts.
 import type { BrowserWindow } from "electron";
+import type { DeriveAutoTags } from "../core/autoTagDeriver.js";
 import type { PositionWriter } from "../core/positionWriter.js";
 import type { QueryWorkerClient } from "../core/queryWorkerClient.js";
 import type { Workspaces } from "../core/workspaces.js";
@@ -27,4 +28,6 @@ export interface IpcContext {
   scans: ScanManager;
   /** Re-apply the logo variant to the live tray and window/dock icons. */
   applyLogo: (logo: LogoId) => void;
+  /** Evaluates the auto-tagging engine off the main thread. */
+  deriveAutoTags: DeriveAutoTags;
 }

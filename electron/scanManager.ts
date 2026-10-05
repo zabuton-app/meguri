@@ -10,7 +10,9 @@ import log from "./core/logger.js";
 import * as q from "./core/queries.js";
 import { emptyScanStats } from "./core/scan.js";
 import type { QueryWorkerClient } from "./core/queryWorkerClient.js";
+import type { DeriveAutoTags } from "./core/autoTagDeriver.js";
 import type { Workspaces } from "./core/workspaces.js";
+import type { AutoTagConfig } from "../shared/autoTag.js";
 
 export interface ScanOptions {
   includeExcluded?: boolean;
@@ -24,6 +26,10 @@ export interface ScanManagerDeps {
   emit: (channel: string, payload: unknown) => void;
   /** Once the app is quitting no new scan may start. */
   isQuitting: () => boolean;
+  /** The auto-tagging configuration, read when a scan starts. */
+  autoTag: () => AutoTagConfig;
+  /** Evaluates it off the main thread (AutoTagWorkerClient). */
+  deriveAutoTags: DeriveAutoTags;
 }
 
 export class ScanManager {
@@ -102,7 +108,12 @@ export class ScanManager {
                 aborted: e.aborted,
               });
           },
-          { rebuild: opts.rebuild, signal: controller.signal },
+          {
+            rebuild: opts.rebuild,
+            signal: controller.signal,
+            autoTag: this.deps.autoTag(),
+            deriveAutoTags: this.deps.deriveAutoTags,
+          },
         );
       } catch (err) {
         log.error("scan failed", err);
