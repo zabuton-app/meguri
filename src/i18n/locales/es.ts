@@ -630,6 +630,9 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.appliedOne": "Se aplicó «{tag}» a {files} archivos.",
   "autoTag.appliedMany": "Se aplicaron {tags} etiquetas a {files} archivos.",
   "autoTag.appliedDictSuffix": " Los próximos escaneos también las aplicarán.",
+  "autoTag.searchFor": "Buscar «{tag}» en la biblioteca",
+  "autoTag.searchCandidateHint":
+    "Muestra los archivos que contienen las palabras de este candidato con la búsqueda de la biblioteca",
   "autoTag.noCandidates": "No hay candidatos para este filtro.",
   "autoTag.selection": "{count} seleccionadas · etiqueta {files} archivos",
   "autoTag.applySelected": "Aplicar selección",

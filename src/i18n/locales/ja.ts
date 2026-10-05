@@ -614,6 +614,9 @@ export const ja = {
   "autoTag.appliedOne": "「{tag}」を {files} ファイルに付与しました。",
   "autoTag.appliedMany": "{tags} 個のタグを {files} ファイルに付与しました。",
   "autoTag.appliedDictSuffix": "今後のスキャンでも自動付与されます。",
+  "autoTag.searchFor": "「{tag}」をライブラリで検索",
+  "autoTag.searchCandidateHint":
+    "この候補の語を含むファイルを、ライブラリの検索で表示します",
   "autoTag.noCandidates": "この条件の候補はありません。",
   "autoTag.selection": "{count} 件選択 · 計 {files} ファイルにタグ付け",
   "autoTag.applySelected": "選択を付与",

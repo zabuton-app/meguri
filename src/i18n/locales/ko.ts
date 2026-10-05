@@ -611,6 +611,9 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.appliedOne": '"{tag}"를 {files}개 파일에 붙였습니다.',
   "autoTag.appliedMany": "태그 {tags}개를 {files}개 파일에 붙였습니다.",
   "autoTag.appliedDictSuffix": " 앞으로의 스캔에서도 자동으로 붙습니다.",
+  "autoTag.searchFor": '라이브러리에서 "{tag}" 검색',
+  "autoTag.searchCandidateHint":
+    "이 후보의 단어를 포함한 파일을 라이브러리 검색으로 표시합니다",
   "autoTag.noCandidates": "이 조건의 후보가 없습니다.",
   "autoTag.selection": "{count}개 선택 · 총 {files}개 파일에 태그",
   "autoTag.applySelected": "선택 항목 붙이기",

@@ -633,6 +633,9 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.appliedMany": "{tags} étiquettes appliquées à {files} fichiers.",
   "autoTag.appliedDictSuffix":
     " Les prochaines analyses les appliqueront aussi.",
+  "autoTag.searchFor": "Rechercher « {tag} » dans la bibliothèque",
+  "autoTag.searchCandidateHint":
+    "Affiche les fichiers contenant les mots de ce candidat avec la recherche de la bibliothèque",
   "autoTag.noCandidates": "Aucun candidat pour ce filtre.",
   "autoTag.selection": "{count} sélectionnées · étiquette {files} fichiers",
   "autoTag.applySelected": "Appliquer la sélection",

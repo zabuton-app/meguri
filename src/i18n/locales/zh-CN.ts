@@ -593,6 +593,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "autoTag.appliedOne": "已将“{tag}”添加到 {files} 个文件。",
   "autoTag.appliedMany": "已将 {tags} 个标签添加到 {files} 个文件。",
   "autoTag.appliedDictSuffix": "今后的扫描也会自动添加。",
+  "autoTag.searchFor": "在媒体库中搜索“{tag}”",
+  "autoTag.searchCandidateHint": "用媒体库的搜索显示包含此候选词语的文件",
   "autoTag.noCandidates": "此条件下没有候选。",
   "autoTag.selection": "已选 {count} 项 · 共标记 {files} 个文件",
   "autoTag.applySelected": "添加所选",

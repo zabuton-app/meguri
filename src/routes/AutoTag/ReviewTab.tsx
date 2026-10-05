@@ -168,7 +168,21 @@ export function ReviewTab({
     setConfirmed(nextConfirmed);
     setNotice(null);
     const open = (i: number) => !nextConfirmed.has(i) && !settled(i);
-    select(all.find((i) => i > cur && open(i)) ?? all.find(open) ?? cur);
+    // "…and next" always goes somewhere. Within what the filter lists (as it
+    // will read once this file counts as reviewed): the next file still to
+    // review, wrapping round to an earlier one; and when none is left to
+    // review — the reviewed list, or a finished library — simply the next file.
+    const listed = all.filter(
+      (i) => filter === "all" || (filter === "done" ? !open(i) : open(i)),
+    );
+    const order = listed.length > 0 ? listed : all;
+    select(
+      order.find((i) => i > cur && open(i)) ??
+        order.find(open) ??
+        order.find((i) => i > cur) ??
+        all.find((i) => i > cur) ??
+        cur,
+    );
   };
 
   const confirmAll = async () => {

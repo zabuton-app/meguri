@@ -308,6 +308,25 @@ describe("AutoTag", () => {
     await screen.findByText("✓ Applied and in dictionary");
   });
 
+  it("searches the library for a candidate's spellings", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...defaultAutoTagConfig(),
+      keywords: [{ id: "k1", tag: "Yoga", aliases: ["stretch"], mode: "word" }],
+    });
+    const asked: string[][] = [];
+    const off = onSearchLibrary((tokens) => asked.push(tokens));
+    window.location.hash = "#/auto-tag";
+    await renderScreen("Suggestions");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Search the library for “Yoga”" }),
+    );
+    off();
+
+    // The tag and the spellings it was found under, as one token.
+    expect(asked).toEqual([["Yoga|stretch"]]);
+    expect(window.location.hash).toBe("#/");
+  });
+
   it("offers frequent words and remembers the ones dismissed", async () => {
     await renderScreen("Suggestions");
     // "Harbor" is in two names and no rule or keyword claims it.
@@ -332,6 +351,37 @@ describe("AutoTag", () => {
     ]);
     await screen.findByText("2 / 5");
     expect(screen.getByText("2 of 5 files reviewed")).toBeTruthy();
+  });
+
+  it("moves on from a reviewed file even when nothing is left to review", async () => {
+    await renderScreen("Review by file");
+    // Confirm everything, so no file is left to review.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm all 4 unreviewed files" }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
+    await screen.findByText("5 of 5 files reviewed");
+    expect(screen.getByText("1 / 5")).toBeTruthy();
+
+    // "Update and next" still goes to the next file, and the one after.
+    fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
+    await screen.findByText("2 / 5");
+    fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
+    await screen.findByText("3 / 5");
+  });
+
+  it("stays within the reviewed list when updating a reviewed file", async () => {
+    await renderScreen("Review by file");
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and next" }));
+    await screen.findByText("2 / 5");
+    // Reviewed: file 1 (just confirmed) and file 3 (already tagged).
+    fireEvent.click(screen.getByRole("radio", { name: /Reviewed/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /ABCD-123 Morning yoga routine/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
+    // The next reviewed file, not file 2, which this list does not show.
+    await screen.findByText("3 / 5");
   });
 
   it("leaves a file unconfirmed when tagging it failed", async () => {

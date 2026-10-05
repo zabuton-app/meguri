@@ -1,10 +1,14 @@
 // Suggestions tab: every tag the engine would give the files in scope, plus
 // frequent words it does not pick up yet — to apply, register or dismiss.
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router";
+import { Search } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
+import { searchLibrary } from "@/lib/ui-events";
 import { cn } from "@/lib/utils";
 import { MAX_AUTO_TAG_KEYWORDS } from "@shared/autoTag";
+import { anyOfSearchToken } from "@shared/tags";
 import {
   candidateGroup,
   segments,
@@ -58,6 +62,7 @@ export function SuggestTab({
   candidates: Candidate[];
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { config, update, fileTags, existing, names } = state;
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -107,6 +112,15 @@ export function SuggestTab({
     candidateGroup(c) === "frequent" &&
     !dictionary.has(c.key) &&
     config.keywords.length < MAX_AUTO_TAG_KEYWORDS;
+
+  // The library's own search for the spellings this candidate was found
+  // under, in place of whatever was being searched for. By the search box's
+  // rules — a substring of the path or of the tags — so it can list more than
+  // the files counted here.
+  const searchInLibrary = (c: Candidate) => {
+    searchLibrary([anyOfSearchToken([c.name, ...c.variants])]);
+    void navigate("/");
+  };
 
   const apply = async (list: Candidate[], dict: boolean) => {
     if (list.length === 0 || busy) return;
@@ -320,6 +334,17 @@ export function SuggestTab({
                   {c.count}
                 </span>
                 <span className="flex flex-wrap items-center justify-end gap-1">
+                  {/* Whatever was done with it: looking at the files is how
+                      one decides, and how one checks afterwards. */}
+                  <button
+                    type="button"
+                    onClick={() => searchInLibrary(c)}
+                    title={t("autoTag.searchCandidateHint")}
+                    aria-label={t("autoTag.searchFor", { tag: c.name })}
+                    className="flex size-[26px] shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-fg/10 hover:text-bright-fg"
+                  >
+                    <Search className="size-3.5" />
+                  </button>
                   {status === "pending" ? (
                     <>
                       {/* Registering is the main action where it applies:
