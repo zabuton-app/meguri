@@ -578,6 +578,9 @@ export const en: Record<TranslationKey, string> = {
     "Letters and digits match at word boundaries (“Art” does not match “Artist”). Japanese always matches as a substring.",
   "autoTag.mode.containsHint": "Matches anywhere in the file name.",
   "autoTag.matchingFiles": "Matching files",
+  "autoTag.searchInLibrary": "Search the library",
+  "autoTag.searchInLibraryHint":
+    "Shows files containing the tag or any alias, using the library’s search",
   "autoTag.noMatchingFiles": "No matching files.",
   "autoTag.analyzing": "Analyzing file names…",
   "autoTag.analyzed":

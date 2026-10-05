@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { onApplyTagFilter } from "@/lib/ui-events";
 import AutoTag from "@/routes/AutoTag";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import {
@@ -140,6 +141,32 @@ describe("AutoTag", () => {
     fireEvent.click(screen.getByRole("button", { name: /Square brackets/ }));
     expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
     expect(screen.queryByText("Matching files")).toBeNull();
+  });
+
+  it("searches the library for a keyword's terms as alternatives", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...defaultAutoTagConfig(),
+      keywords: [
+        {
+          id: "k1",
+          tag: "Yoga",
+          aliases: ["ヨガ", "morning stretch"],
+          mode: "word",
+        },
+      ],
+    });
+    const asked: string[][] = [];
+    const off = onApplyTagFilter((tokens) => asked.push(tokens));
+    window.location.hash = "#/auto-tag";
+    await renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: /Yoga/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Search the library" }));
+    off();
+
+    // One token, any of the terms; quoted because one of them has a space.
+    expect(asked).toEqual([['"Yoga|ヨガ|morning stretch"']]);
+    // And the screen closes onto the library.
+    expect(window.location.hash).toBe("#/");
   });
 
   it("edits the selected keyword: aliases, match mode, removal", async () => {

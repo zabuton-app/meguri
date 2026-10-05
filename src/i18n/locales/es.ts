@@ -594,6 +594,9 @@ export const es: Record<TranslationKey, string> = {
     "Las letras y cifras coinciden en límites de palabra («Art» no coincide con «Artist»). El japonés siempre coincide como subcadena.",
   "autoTag.mode.containsHint": "Coincide en cualquier parte del nombre.",
   "autoTag.matchingFiles": "Archivos coincidentes",
+  "autoTag.searchInLibrary": "Buscar en la biblioteca",
+  "autoTag.searchInLibraryHint":
+    "Muestra los archivos que contienen la etiqueta o algún alias con la búsqueda de la biblioteca",
   "autoTag.noMatchingFiles": "No hay archivos coincidentes.",
   "autoTag.analyzing": "Analizando nombres de archivo…",
   "autoTag.analyzed":

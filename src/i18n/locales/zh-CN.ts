@@ -558,6 +558,8 @@ export const zhCN: Record<TranslationKey, string> = {
     "字母和数字按词边界匹配（“Art”不匹配“Artist”）。日文始终按子串匹配。",
   "autoTag.mode.containsHint": "出现在文件名任意位置即匹配。",
   "autoTag.matchingFiles": "匹配的文件",
+  "autoTag.searchInLibrary": "在媒体库中搜索",
+  "autoTag.searchInLibraryHint": "用媒体库的搜索显示包含标签名或任一别名的文件",
   "autoTag.noMatchingFiles": "没有匹配的文件。",
   "autoTag.analyzing": "正在分析文件名…",
   "autoTag.analyzed":

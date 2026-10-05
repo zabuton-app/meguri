@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures/app";
-import { closeTopDialog } from "./fixtures/helpers";
+import { closeTopDialog, fileCard, searchInput } from "./fixtures/helpers";
 
 test.describe("Auto tagging", () => {
   test("opens from the header and closes with Escape", async ({ ready }) => {
@@ -42,5 +42,19 @@ test.describe("Auto tagging", () => {
     await ready.getByRole("link", { name: "Auto tagging" }).click();
     await dialog.getByRole("tab", { name: /Suggestions/ }).click();
     await expect(dialog.getByText("✓ Applied")).toBeVisible();
+  });
+
+  test("searches the library for a keyword's terms", async ({ ready }) => {
+    await ready.getByRole("link", { name: "Auto tagging" }).click();
+    const dialog = ready.getByRole("dialog");
+    const add = dialog.getByLabel(/Add a keyword/);
+    // The alias matches the fixture ("test.png"); the tag itself does not.
+    await add.fill("Sample, test");
+    await add.press("Enter");
+    await dialog.getByRole("button", { name: "Search the library" }).click();
+
+    await expect(ready).toHaveURL(/#\/$/);
+    await expect(searchInput(ready)).toHaveValue("Sample|test");
+    await expect(fileCard(ready)).toBeVisible();
   });
 });

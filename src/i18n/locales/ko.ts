@@ -575,6 +575,9 @@ export const ko: Record<TranslationKey, string> = {
     '영문·숫자는 단어 경계에서 일치합니다("Art"는 "Artist"에 일치하지 않음). 일본어는 부분 일치입니다.',
   "autoTag.mode.containsHint": "파일 이름 어디에든 있으면 일치합니다.",
   "autoTag.matchingFiles": "일치하는 파일",
+  "autoTag.searchInLibrary": "라이브러리에서 검색",
+  "autoTag.searchInLibraryHint":
+    "태그 이름이나 별칭 중 하나를 포함한 파일을 라이브러리 검색으로 표시합니다",
   "autoTag.noMatchingFiles": "일치하는 파일이 없습니다.",
   "autoTag.analyzing": "파일 이름 분석 중…",
   "autoTag.analyzed":

@@ -596,6 +596,9 @@ export const fr: Record<TranslationKey, string> = {
     "Lettres et chiffres correspondent aux limites de mot (« Art » ne correspond pas à « Artist »). Le japonais correspond toujours en sous-chaîne.",
   "autoTag.mode.containsHint": "Correspond n’importe où dans le nom.",
   "autoTag.matchingFiles": "Fichiers correspondants",
+  "autoTag.searchInLibrary": "Rechercher dans la bibliothèque",
+  "autoTag.searchInLibraryHint":
+    "Affiche les fichiers contenant l’étiquette ou un alias avec la recherche de la bibliothèque",
   "autoTag.noMatchingFiles": "Aucun fichier correspondant.",
   "autoTag.analyzing": "Analyse des noms de fichiers…",
   "autoTag.analyzed":

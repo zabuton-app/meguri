@@ -118,6 +118,15 @@ deduplicated across sources. Three places produce it — `syncFts()`,
 `resyncFtsForKeys()` and the trigram rebuild — and they must never drift, so the
 projection lives in a single `FTS_ROW_SELECT` constant in `db.ts`.
 
+Free-text tokens are ANDed. A token may carry alternatives separated by `|`
+(`yoga|ヨガ`, see `searchAlternatives()` in `shared/tags.ts`), any of which
+satisfies it: one `MATCH` with `OR` when every alternative is long enough for
+the trigram index, otherwise the same `LIKE` fallback short tokens use. `\|` is
+a literal `|`, for the file names that contain one. The
+auto-tagging screen uses this to search the library for a dictionary entry's
+tag and aliases — by the search box's rules (a substring of the path or of the
+tags), not by the entry's own word matching.
+
 Generated tags are deliberately **not** indexed. The tokenizer is trigram, so
 indexing `dur:long` would make a plain search for "long" return every long
 video — and likewise for "short", "square", "h264".

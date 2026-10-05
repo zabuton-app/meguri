@@ -313,6 +313,59 @@ export function joinSearchTokens(tokens: string[]): string {
 }
 
 /**
+ * Separates alternatives inside one free-text token: `yoga|ヨガ` matches a file
+ * that contains either. It lives inside the token — rather than as an `OR`
+ * between tokens — so the rule stays one sentence: tokens are ANDed, the
+ * alternatives of a token are ORed, and every chip in the search box is still
+ * one condition.
+ *
+ * A file name can contain the character itself, so `\|` is a literal one:
+ * `a\|b` searches for the text "a|b".
+ */
+export const SEARCH_OR = "|";
+
+const ESCAPED_OR = `\\${SEARCH_OR}`;
+/** Splits on separators that are not escaped. */
+const UNESCAPED_OR = /(?<!\\)\|/;
+
+/** A free-text token as the text it searches for: `\|` becomes `|`. */
+export function unescapeSearchOr(token: string): string {
+  return token.split(ESCAPED_OR).join(SEARCH_OR);
+}
+
+/**
+ * The alternatives of a free-text token, or null when it has none: a plain
+ * word, a `tag:` directive, or a separator with nothing on one side (searched
+ * as typed).
+ */
+export function searchAlternatives(token: string): string[] | null {
+  if (!token.includes(SEARCH_OR) || isTagDirective(token)) return null;
+  const parts = token
+    .split(UNESCAPED_OR)
+    .map((part) => unescapeSearchOr(part).trim())
+    .filter(Boolean);
+  return parts.length >= 2 ? parts : null;
+}
+
+/**
+ * The search-box token that matches any of `terms`, quoted where it needs to
+ * be. Terms are deduplicated without regard to case, as the search itself is.
+ */
+export function anyOfSearchToken(terms: readonly string[]): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const raw of terms) {
+    const term = raw.replace(/\s+/g, " ").trim();
+    const key = term.toLowerCase();
+    if (!term || seen.has(key)) continue;
+    seen.add(key);
+    // A separator inside a term is part of the term, not another alternative.
+    parts.push(term.split(SEARCH_OR).join(ESCAPED_OR));
+  }
+  return joinSearchTokens([parts.join(SEARCH_OR)]);
+}
+
+/**
  * The reserved prefix a would-be manual tag name impersonates, or null when it
  * claims none. Returned rather than just tested so the rejection message can
  * name the prefix without re-deriving it — `parseQualifiedTagName()` cannot,

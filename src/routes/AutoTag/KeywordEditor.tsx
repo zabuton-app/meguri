@@ -1,8 +1,11 @@
 // Editor for one dictionary entry: its aliases, how it matches, and the files
 // it finds.
 import { useState } from "react";
+import { useNavigate } from "react-router";
+import { Search } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
+import { applyTagFilter } from "@/lib/ui-events";
 import { cn } from "@/lib/utils";
 import {
   KEYWORD_MODES,
@@ -10,7 +13,7 @@ import {
   type KeywordMode,
 } from "@shared/autoTag";
 import { segments } from "@shared/autoTagAnalysis";
-import { MAX_TAG_NAME } from "@shared/tags";
+import { MAX_TAG_NAME, anyOfSearchToken } from "@shared/tags";
 import { MAX_ROWS, MONO, cleanAliases, keywordMatches } from "./helpers";
 import { Chip, Highlighted, MoreRows, Segmented, SmallButton } from "./parts";
 
@@ -39,6 +42,7 @@ export function KeywordEditor({
   onDelete: () => void;
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [aliasDraft, setAliasDraft] = useState("");
 
   const addAlias = () => {
@@ -48,6 +52,14 @@ export function KeywordEditor({
   };
 
   const rows = keywordMatches(entry, names);
+
+  // The library's own search, with the entry's terms as alternatives of one
+  // token. It is the search box's idea of a match, not the dictionary's: a
+  // substring of the whole path and of the tags, with no word boundaries.
+  const searchInLibrary = () => {
+    applyTagFilter([anyOfSearchToken([entry.tag, ...entry.aliases])]);
+    void navigate("/");
+  };
 
   return (
     <section className="flex min-w-0 flex-1 flex-col gap-4 px-5 py-4">
@@ -122,11 +134,19 @@ export function KeywordEditor({
       </div>
 
       <div className="flex flex-col overflow-hidden rounded-lg border border-border">
-        <div className="border-b border-border bg-surface px-3 py-2 text-xs text-fg">
-          <span className="font-semibold">{t("autoTag.matchingFiles")}</span>{" "}
+        <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2 text-xs text-fg">
+          <span className="font-semibold">{t("autoTag.matchingFiles")}</span>
           <span className="text-muted">
             {t("autoTag.fileCount", { count: rows.length })}
           </span>
+          <SmallButton
+            className="ml-auto h-[26px] gap-1 border-border px-2"
+            title={t("autoTag.searchInLibraryHint")}
+            onClick={searchInLibrary}
+          >
+            <Search className="mr-1 inline size-3.5" />
+            {t("autoTag.searchInLibrary")}
+          </SmallButton>
         </div>
         {rows.slice(0, MAX_ROWS).map((row, i) => (
           <div

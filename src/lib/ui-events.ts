@@ -23,7 +23,8 @@ export function onOpenShortcuts(listener: () => void) {
 
 /**
  * Ask the library — which stays mounted underneath every child-route modal — to
- * AND these search-box tokens (`tag:beach`, `tag:4k`) into its query. Home owns
+ * AND these search-box tokens (`tag:beach`, `tag:4k`, or free text such as
+ * `yoga|ヨガ`) into its query. Home owns
  * `filter` as local state, so a modal cannot set it directly.
  */
 export function applyTagFilter(tokens: string[]) {

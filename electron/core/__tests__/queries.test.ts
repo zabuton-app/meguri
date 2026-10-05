@@ -221,6 +221,44 @@ describe("searchFiles", () => {
     );
   });
 
+  it("matches any alternative of a token, long or short", () => {
+    const en = insertFile(db, rootId, { relPath: "morning yoga.mp4" });
+    const ja = insertFile(db, rootId, { relPath: "ヨガ 練習.mp4" });
+    const other = insertFile(db, rootId, { relPath: "harbor walk.mp4" });
+    for (const id of [en, ja, other]) syncFts(db, id);
+    const ids = (q: string) =>
+      searchFiles(db, { q })
+        .items.map((f) => f.id)
+        .sort();
+    // A short alternative ("ヨガ" has no trigram) takes the LIKE path.
+    expect(ids("yoga|ヨガ")).toEqual([en, ja].sort());
+    // All long: one MATCH with OR.
+    expect(ids("yoga|harbor")).toEqual([en, other].sort());
+    // Still ANDed with the other tokens.
+    expect(ids("yoga|ヨガ 練習")).toEqual([ja]);
+    expect(ids('"morning yoga|harbor walk"')).toEqual([en, other].sort());
+    // A separator with nothing beside it is searched as typed.
+    expect(ids("yoga|")).toEqual([]);
+  });
+
+  it("still finds a file whose name contains the separator itself", () => {
+    const piped = insertFile(db, rootId, { relPath: "live|encore.mp4" });
+    const live = insertFile(db, rootId, { relPath: "live show.mp4" });
+    const encore = insertFile(db, rootId, { relPath: "encore.mp4" });
+    for (const id of [piped, live, encore]) syncFts(db, id);
+    const ids = (q: string) =>
+      searchFiles(db, { q })
+        .items.map((f) => f.id)
+        .sort();
+    // Unescaped, it is "live" or "encore".
+    expect(ids("live|encore")).toEqual([piped, live, encore].sort());
+    // Escaped, it is the text itself — long or short.
+    expect(ids("live\\|encore")).toEqual([piped]);
+    expect(ids("e\\|e")).toEqual([piped]);
+    // And an escaped one can sit inside an alternative.
+    expect(ids("e\\|e|show")).toEqual([piped, live].sort());
+  });
+
   it("treats LIKE metacharacters in short tokens literally", () => {
     const percent = insertFile(db, rootId, { relPath: "sale_5%.mp4" });
     const plain = insertFile(db, rootId, { relPath: "sale_55.mp4" });

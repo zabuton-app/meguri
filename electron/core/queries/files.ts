@@ -12,7 +12,9 @@ import {
 import {
   LIST_HIDDEN_SOURCES,
   parseTagSearchToken,
+  searchAlternatives,
   splitSearchTokens,
+  unescapeSearchOr,
 } from "../../../shared/tags.js";
 import type {
   FileDetail,
@@ -57,20 +59,31 @@ function escapeLike(s: string): string {
  *  (codepoint count, not UTF-16 length, since the trigram tokenizer works on
  *  codepoints). Double quotes are stripped before the length split: a pasted
  *  `"beach"` means the word beach, not a literal quoted string — searching for
- *  the quote characters would return zero rows. */
+ *  the quote characters would return zero rows.
+ *
+ *  A token with alternatives (`yoga|ヨガ`, see searchAlternatives) is one
+ *  condition that any of them satisfies; those are returned apart, since they
+ *  cannot be folded into the ANDed MATCH expression. */
 function buildSearchTerms(q: string): {
   match: string | null;
   likeTokens: string[];
   tagTokens: string[];
+  anyOf: string[][];
 } {
   const tokens = splitSearchTokens(q);
   const matchTokens: string[] = [];
   const likeTokens: string[] = [];
   const tagTokens: string[] = [];
-  for (const t of tokens) {
-    const tag = parseTagSearchToken(t);
+  const anyOf: string[][] = [];
+  for (const raw of tokens) {
+    const tag = parseTagSearchToken(raw);
+    const alternatives = tag ? null : searchAlternatives(raw);
+    // What a plain token searches for: an escaped separator is the character.
+    const t = tag || alternatives ? raw : unescapeSearchOr(raw);
     if (tag) {
       tagTokens.push(tag);
+    } else if (alternatives) {
+      anyOf.push(alternatives);
     } else if ([...t].length >= 3) {
       // FTS5 phrase syntax: the token is delimited by quotes, so a quote inside
       // it has to be doubled or the whole MATCH expression is malformed.
@@ -83,6 +96,7 @@ function buildSearchTerms(q: string): {
     match: matchTokens.length ? matchTokens.join(" ") : null,
     likeTokens,
     tagTokens,
+    anyOf,
   };
 }
 
@@ -162,7 +176,7 @@ export function appendSearchConditions(
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : { match: null, likeTokens: [], tagTokens: [] };
+    : { match: null, likeTokens: [], tagTokens: [], anyOf: [] };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
@@ -175,6 +189,33 @@ export function appendSearchConditions(
       " AND EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'))";
     const pattern = `%${escapeLike(tok)}%`;
     args.push(pattern, pattern);
+  }
+  for (const alternatives of terms.anyOf) {
+    if (alternatives.every((term) => [...term].length >= 3)) {
+      // All long enough for the trigram index: one MATCH with OR between the
+      // phrases, quoted the same way as the ANDed ones.
+      sql +=
+        " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
+      args.push(
+        alternatives
+          .map((term) => `"${term.replace(/"/g, '""')}"`)
+          .join(" OR "),
+      );
+      continue;
+    }
+    // A short alternative cannot produce a trigram (two-character Japanese
+    // words are the common case), so the whole group falls back to LIKE, in
+    // the same correlated form as the short ANDed tokens.
+    const likes = alternatives
+      .map(
+        () => "x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'",
+      )
+      .join(" OR ");
+    sql += ` AND EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (${likes}))`;
+    for (const term of alternatives) {
+      const pattern = `%${escapeLike(term)}%`;
+      args.push(pattern, pattern);
+    }
   }
   for (const value of terms.tagTokens) {
     const ids = resolveSearchTagIds(db, value);

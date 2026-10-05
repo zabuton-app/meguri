@@ -578,6 +578,9 @@ export const ja = {
     "英数字は単語の境界で一致します（「Art」は「Artist」に一致しません）。日本語は部分一致です。",
   "autoTag.mode.containsHint": "ファイル名のどこかに含まれていれば一致します。",
   "autoTag.matchingFiles": "一致するファイル",
+  "autoTag.searchInLibrary": "ライブラリで検索",
+  "autoTag.searchInLibraryHint":
+    "タグ名と別名のいずれかを含むファイルを、ライブラリの検索で表示します",
   "autoTag.noMatchingFiles": "一致するファイルはありません。",
   "autoTag.analyzing": "ファイル名を解析中…",
   "autoTag.analyzed":
