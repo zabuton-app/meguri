@@ -22,6 +22,7 @@ import {
   Chip,
   Highlighted,
   MoreRows,
+  Pager,
   Notice,
   Segmented,
   SmallButton,
@@ -30,6 +31,7 @@ import {
 } from "./parts";
 import type { AutoTagSession, TermDecision } from "./session";
 import type { AutoTagState, UndoHandle } from "./useAutoTag";
+import { usePaging } from "./paging";
 import { useViewState } from "./viewState";
 
 const TYPE_LABELS: Record<TermType, TranslationKey> = {
@@ -148,6 +150,11 @@ export function TermsTab({
       (type === "all" || term.type === type) &&
       (!onlyOpen || undecided(term)) &&
       (!q || term.key.includes(q)),
+  );
+  const paging = usePaging(
+    "terms.page",
+    `${type}\0${onlyOpen ? 1 : 0}\0${q}`,
+    shown.length,
   );
 
   // --- the tags that would come out of the decisions ---------------------
@@ -325,7 +332,7 @@ export function TermsTab({
             <span className="text-right">{t("autoTag.col.files")}</span>
             <span>{t("autoTag.terms.colDecision")}</span>
           </div>
-          {shown.slice(0, MAX_ROWS).map((term) => {
+          {shown.slice(paging.start, paging.end).map((term) => {
             const decision = decisionOf(term.key);
             const isExcluded = excluded.has(term.key);
             const isOpen = open === term.key;
@@ -521,7 +528,6 @@ export function TermsTab({
               </div>
             );
           })}
-          <MoreRows t={t} hidden={shown.length - MAX_ROWS} />
           {shown.length === 0 && (
             <p className="p-8 text-center text-[13px] text-muted">
               {t("autoTag.terms.none")}
@@ -642,6 +648,7 @@ export function TermsTab({
           </div>
         </aside>
       </TabScroll>
+      <Pager t={t} paging={paging} />
     </>
   );
 }

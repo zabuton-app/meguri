@@ -11,7 +11,7 @@ const store = new Map<string, unknown>();
 
 /**
  * `useState` that remembers its value under `key` after the component is gone.
- * The key names one piece of the screen ("review.filter"), so two components
+ * The key names one piece of the screen ("suggest.filter"), so two components
  * must not share one.
  */
 export function useViewState<T>(
@@ -29,15 +29,6 @@ export function useViewState<T>(
     [key],
   );
   return [value, set];
-}
-
-/** Read a remembered value without subscribing (for one-off initializers). */
-export function peekViewState<T>(key: string): T | undefined {
-  return store.get(key) as T | undefined;
-}
-
-export function rememberViewState(key: string, value: unknown): void {
-  store.set(key, value);
 }
 
 /** Forget everything. Tests start each case from a screen never opened. */

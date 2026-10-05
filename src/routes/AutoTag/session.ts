@@ -22,19 +22,8 @@ export interface TermDecision {
 interface SessionData {
   /** Suggestions tab: candidate key → what was done with it. */
   done: Map<string, SuggestDone>;
-  /** Review tab: files confirmed, by position. */
-  confirmed: Set<number>;
-  /** Review tab: proposals switched off per file (lowercased tags). */
-  removed: Map<number, Set<string>>;
-  /** Review tab: tags added by hand per file. */
-  added: Map<number, string[]>;
   /** Terms tab: decisions made here; null puts a term back to undecided. */
   overrides: Map<string, TermDecision | null>;
-  /**
-   * Review tab: the result line of the last bulk apply. Here rather than in
-   * the tab because it carries the only way to take that apply back.
-   */
-  reviewNotice: { text: string; undo?: UndoHandle } | null;
 }
 
 export type AutoTagSession = SessionData & {
@@ -45,16 +34,13 @@ export type AutoTagSession = SessionData & {
 
 const empty = (): SessionData => ({
   done: new Map(),
-  confirmed: new Set(),
-  removed: new Map(),
-  added: new Map(),
   overrides: new Map(),
-  reviewNotice: null,
 });
 
 /**
  * The last session, kept after the screen is gone so that reopening it — after
- * looking at a file, say — finds the same decisions and the same undo.
+ * searching the library from it, say — finds the same decisions and the same
+ * undo.
  */
 let remembered: { listKey: string; data: SessionData } | null = null;
 
@@ -73,9 +59,10 @@ const sessionFor = (listKey: string | null) => ({
 
 /**
  * `listKey` identifies the list of files the screen has loaded (null while it
- * has none). Everything here is keyed by position in that list, so the session
- * lasts exactly as long as the list reads the same: a list that changed starts
- * a new one rather than letting old positions point at whatever sits there now.
+ * has none). The undo handles kept here name files by position in that list, so
+ * the session lasts exactly as long as the list reads the same: a list that
+ * changed starts a new one rather than letting old positions point at whatever
+ * sits there now.
  */
 export function useAutoTagSession(listKey: string | null): AutoTagSession {
   const [state, setState] = useState(() => sessionFor(listKey));
@@ -94,11 +81,7 @@ export function useAutoTagSession(listKey: string | null): AutoTagSession {
         setState((prev) => ({ ...prev, data: { ...prev.data, [key]: value } }));
     return {
       setDone: set("done"),
-      setConfirmed: set("confirmed"),
-      setRemoved: set("removed"),
-      setAdded: set("added"),
       setOverrides: set("overrides"),
-      setReviewNotice: set("reviewNotice"),
     };
   }, []);
   return { ...data, ...setters };

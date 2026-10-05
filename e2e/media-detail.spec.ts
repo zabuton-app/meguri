@@ -49,6 +49,18 @@ test.describe("Media detail", () => {
     ).toBeVisible({ timeout: 60_000 });
   });
 
+  test("tags the file from a part of its name", async ({ ready }) => {
+    const dialog = await openFileDetail(ready);
+    // The fixture is "test.png": its one word is offered as a tag.
+    await dialog.getByRole("button", { name: "Add tag “test”" }).click();
+    await expect(
+      dialog.getByRole("button", { name: "Already tagged “test”" }),
+    ).toBeDisabled();
+    await expect(
+      dialog.getByRole("button", { name: "Remove tag" }),
+    ).toBeVisible();
+  });
+
   test("inverts image background", async ({ ready }) => {
     const dialog = await openFileDetail(ready);
     const invert = dialog.getByRole("button", {

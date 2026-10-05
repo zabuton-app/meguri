@@ -7,7 +7,7 @@
  * names, no namespace — so applying them is the same act as tagging by hand.
  *
  * Everything here is pure. The scan runs it in a worker thread, and the
- * auto-tagging screen runs the very same code to preview, suggest and review,
+ * auto-tagging screen runs the very same code to preview and suggest,
  * so what the screen shows is what a scan writes.
  */
 import { MAX_TAG_NAME, isReservedTagName } from "./tags.js";

@@ -1,8 +1,9 @@
 /**
- * Library-wide analysis on top of the auto-tagging engine: what the screen's
- * suggestion, review and term views are computed from. Pure, and indexed by
- * position in the list of names the caller passes — the caller knows which file
- * each position is.
+ * Analysis on top of the auto-tagging engine: what the screen's suggestion and
+ * term views are computed from, and the file name cut into taggable parts that
+ * the detail view shows. Pure; the library-wide parts are indexed by position
+ * in the list of names the caller passes — the caller knows which file each
+ * position is.
  *
  * Names are expected in NFC (the screen normalizes them once on load), so the
  * ranges reported here index straight into the string that is displayed.
@@ -212,7 +213,8 @@ function mostCommonFirst(counts: Map<string, number>): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Review: a file name cut into clickable tokens.
+// A file name cut into clickable tokens (the detail view's "from the file
+// name" row).
 // ---------------------------------------------------------------------------
 
 export interface NameToken {
@@ -271,11 +273,64 @@ export function tokenInfo(text: string): TokenInfo {
   return { type: "word", value: text };
 }
 
-/** The tag values a token stands for, lowercased. */
-export function tokenValues(info: TokenInfo): string[] {
-  const parts =
-    info.type === "bracket" ? info.value.split(SPLIT_PATTERN) : [info.value];
-  return parts.map((p) => p.trim().toLowerCase()).filter(Boolean);
+/** SPLIT_PATTERN, capturing: `split` keeps the separators it cuts at. */
+const SPLIT_PIECES = new RegExp(`(${SPLIT_PATTERN.source})`);
+
+/** Punctuation around a word — `Trip,` `(2019)` `#live` — is not part of its tag. */
+const TAG_EDGES = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
+
+/** One stretch of a file name: plain text, or text that stands for a tag. */
+export interface NameTagPart {
+  text: string;
+  /** The tag clicking it adds; null for separators and unusable names. */
+  tag: string | null;
+}
+
+/**
+ * A file name as the parts it can be tagged from: each word, a code's prefix
+ * (`ABCD-123` → `ABCD`), and each entry inside a pair of brackets
+ * (`[Trip, Family]` → `Trip`, `Family`). The texts join back to the name.
+ */
+export function nameTagParts(name: string): NameTagPart[] {
+  // Nothing is offered for a part with no letter or digit in it (the dash of
+  // `Artist - Title`): what is left after the edges are trimmed is empty.
+  const tagOf = (raw: string): string | null => {
+    const tag = cleanTagName(raw.replace(TAG_EDGES, ""));
+    return isUsableTagName(tag) ? tag : null;
+  };
+  const out: NameTagPart[] = [];
+  for (const token of tokenizeName(name)) {
+    if (token.sep) {
+      out.push({ text: token.text, tag: null });
+      continue;
+    }
+    const info = tokenInfo(token.text);
+    if (info.type !== "bracket") {
+      // Read without the punctuation around it, so that `(ABCD-123)` is the
+      // code it is: tagged by its prefix like a bare one.
+      const bare = tokenInfo(token.text.replace(TAG_EDGES, ""));
+      out.push({ text: token.text, tag: tagOf(bare.value) });
+      continue;
+    }
+    // The brackets and the separators between entries stay as plain text.
+    out.push({ text: token.text[0], tag: null });
+    for (const piece of info.value.split(SPLIT_PIECES)) {
+      if (piece === "") continue;
+      const entry = piece.trim();
+      if (entry === "" || SPLIT_PATTERN.test(piece)) {
+        out.push({ text: piece, tag: null });
+        continue;
+      }
+      // Spaces around an entry belong to the separator, not to the tag.
+      const lead = piece.length - piece.trimStart().length;
+      if (lead > 0) out.push({ text: piece.slice(0, lead), tag: null });
+      out.push({ text: entry, tag: tagOf(entry) });
+      const tail = piece.slice(lead + entry.length);
+      if (tail) out.push({ text: tail, tag: null });
+    }
+    out.push({ text: token.text[token.text.length - 1], tag: null });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

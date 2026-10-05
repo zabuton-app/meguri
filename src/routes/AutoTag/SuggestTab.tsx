@@ -16,12 +16,14 @@ import {
   type CandidateOrigin,
 } from "@shared/autoTagAnalysis";
 import { isAutoMetaValue } from "./autoMeta";
-import { MAX_ROWS, MONO, isApplied, newKeyword } from "./helpers";
+import { MONO, isApplied, newKeyword } from "./helpers";
+import { usePaging } from "./paging";
 import {
   Badge,
   Chip,
   Highlighted,
   MoreRows,
+  Pager,
   Notice,
   Segmented,
   SmallButton,
@@ -106,6 +108,7 @@ export function SuggestTab({
   const shown = candidates.filter(
     (c) => filter === "all" || filterOf(c) === filter,
   );
+  const paging = usePaging("suggest.page", filter, shown.length);
   const pendingShown = shown.filter((c) => statusOf(c) === "pending");
   const picked = pendingShown.filter((c) => selected.has(c.key));
   const allChecked =
@@ -272,7 +275,7 @@ export function SuggestTab({
           <span className="text-right">{t("autoTag.col.files")}</span>
           <span />
         </div>
-        {shown.slice(0, MAX_ROWS).map((c) => {
+        {shown.slice(paging.start, paging.end).map((c) => {
           const status = statusOf(c);
           const open = expanded === c.key;
           const session = done.get(c.key);
@@ -457,13 +460,13 @@ export function SuggestTab({
             </div>
           );
         })}
-        <MoreRows t={t} hidden={shown.length - MAX_ROWS} />
         {shown.length === 0 && (
           <p className="p-8 text-center text-[13px] text-muted">
             {state.loading ? t("autoTag.analyzing") : t("autoTag.noCandidates")}
           </p>
         )}
       </TabScroll>
+      <Pager t={t} paging={paging} />
 
       {picked.length > 0 && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-surface px-3 py-2">

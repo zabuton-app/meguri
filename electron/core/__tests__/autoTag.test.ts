@@ -40,9 +40,9 @@ import {
   extractTerms,
   segments,
   suggestCandidates,
+  nameTagParts,
   tokenInfo,
   tokenizeName,
-  tokenValues,
 } from "../../../shared/autoTagAnalysis.js";
 import { AutoTagConfigSchema } from "../../../shared/ipc/schema.js";
 import { insertFile, newDb } from "./helpers.js";
@@ -246,8 +246,68 @@ describe("analysis", () => {
     expect(tokenInfo("ABCD-123")).toEqual({ type: "code", value: "ABCD" });
     const bracket = tokenInfo("[Trip, Family]");
     expect(bracket).toMatchObject({ type: "bracket", bracket: "square" });
-    expect(tokenValues(bracket)).toEqual(["trip", "family"]);
     expect(tokenInfo("harbor")).toEqual({ type: "word", value: "harbor" });
+  });
+
+  it("offers a name's words, code prefix and bracket entries as tags", () => {
+    const name = "ABCD-123 [Trip, Family]_harbor.mp4";
+    const parts = nameTagParts(name);
+    // Nothing of the name is lost or reordered.
+    expect(parts.map((p) => p.text).join("")).toBe(name);
+    expect(parts.filter((p) => p.tag !== null)).toEqual([
+      // A code is tagged by its prefix, not by the whole of it.
+      { text: "ABCD-123", tag: "ABCD" },
+      // Each entry inside the brackets is a tag of its own.
+      { text: "Trip", tag: "Trip" },
+      { text: "Family", tag: "Family" },
+      { text: "harbor", tag: "harbor" },
+    ]);
+    // The extension, the brackets and what separates entries are plain text.
+    expect(parts.filter((p) => p.tag === null).map((p) => p.text)).toEqual([
+      " ",
+      "[",
+      ",",
+      " ",
+      "]",
+      "_",
+      ".mp4",
+    ]);
+  });
+
+  it("tags a word without the punctuation around it, and never by punctuation alone", () => {
+    const tagsOf = (name: string) =>
+      nameTagParts(name)
+        .filter((p) => p.tag !== null)
+        .map((p) => [p.text, p.tag]);
+    // The dash between the two is not a tag.
+    expect(tagsOf("Artist - Title.mp4")).toEqual([
+      ["Artist", "Artist"],
+      ["Title", "Title"],
+    ]);
+    // Outside brackets as inside them: the comma is not part of the tag.
+    expect(tagsOf("Trip, Family.mp4")).toEqual([
+      ["Trip,", "Trip"],
+      ["Family", "Family"],
+    ]);
+    expect(tagsOf("(2019) #live 【旅行、家族】.mkv")).toEqual([
+      ["(2019)", "2019"],
+      ["#live", "live"],
+      ["旅行", "旅行"],
+      ["家族", "家族"],
+    ]);
+    // A code is still a code with punctuation around it.
+    expect(tagsOf("(ABCD-123) #EFGH-45.mp4")).toEqual([
+      ["(ABCD-123)", "ABCD"],
+      ["#EFGH-45", "EFGH"],
+    ]);
+    expect(tagsOf("[] [ , ] _-_.mp4")).toEqual([]);
+  });
+
+  it("offers no tag for a part that cannot be one", () => {
+    // A reserved prefix would impersonate a tag the app derives itself.
+    const parts = nameTagParts("res:hd clip.mp4");
+    expect(parts.find((p) => p.text === "res:hd")?.tag).toBeNull();
+    expect(parts.find((p) => p.text === "clip")?.tag).toBe("clip");
   });
 
   it("extracts terms by kind, grouping spellings and counting files", () => {

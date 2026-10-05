@@ -396,185 +396,45 @@ describe("AutoTag", () => {
     expect(within(row).getByText("Ignored")).toBeTruthy();
   });
 
-  it("confirms a file's proposed tags and moves to the next one", async () => {
-    await renderScreen("Review by file");
-    expect(screen.getByText("1 of 5 files reviewed")).toBeTruthy();
-    expect(screen.getByText("1 / 5")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Confirm and next" }));
-    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
-    expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
-      { workspaceId: "ws", fileIds: [1], tags: ["ABCD"] },
-    ]);
-    await screen.findByText("2 / 5");
-    expect(screen.getByText("2 of 5 files reviewed")).toBeTruthy();
-  });
-
-  it("moves on from a reviewed file even when nothing is left to review", async () => {
-    await renderScreen("Review by file");
-    // Confirm everything, so no file is left to review.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Confirm all 4 unreviewed files" }),
-    );
-    fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
-    await screen.findByText("5 of 5 files reviewed");
-    expect(screen.getByText("1 / 5")).toBeTruthy();
-
-    // "Update and next" still goes to the next file, and the one after.
-    fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
-    await screen.findByText("2 / 5");
-    fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
-    await screen.findByText("3 / 5");
-  });
-
-  it("stays within the reviewed list when updating a reviewed file", async () => {
-    await renderScreen("Review by file");
-    fireEvent.click(screen.getByRole("button", { name: "Confirm and next" }));
-    await screen.findByText("2 / 5");
-    // Reviewed: file 1 (just confirmed) and file 3 (already tagged).
-    fireEvent.click(screen.getByRole("radio", { name: /Reviewed/ }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /ABCD-123 Morning yoga routine/ }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
-    // The next reviewed file, not file 2, which this list does not show.
-    await screen.findByText("3 / 5");
-    // At the end of the list it wraps round, still without leaving the list.
-    fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
-    await screen.findByText("1 / 5");
-  });
-
-  it("creates nothing from a token when tagging the files failed", async () => {
-    mocks.autoTagApply.mockRejectedValue(new Error("disk full"));
-    await renderScreen("Review by file");
-    fireEvent.click(screen.getByRole("button", { name: "yoga" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Add to keywords and apply" }),
-    );
-    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalled());
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
-    // No entry, and no line claiming one was added.
-    expect(mocks.autoTagSet).not.toHaveBeenCalled();
-    expect(screen.queryByRole("status")).toBeNull();
-  });
-
-  it("does not offer a dictionary entry the dictionary has no room for", async () => {
-    mocks.autoTagGet.mockResolvedValue({
-      ...defaultAutoTagConfig(),
-      keywords: Array.from({ length: 500 }, (_, i) => ({
-        id: `k${i}`,
-        tag: `Word${i}`,
-        aliases: [],
-        mode: "word" as const,
-      })),
-    });
-    await renderScreen("Review by file");
-    fireEvent.click(screen.getByRole("button", { name: "yoga" }));
+  it("pages through a list too long to draw at once, and starts over when it is filtered", async () => {
+    // 250 words, each in two files: more candidates than one page holds.
+    const letter = (n: number) => String.fromCharCode(97 + (n % 26));
+    const wordAt = (n: number) =>
+      `kite${letter(Math.floor(n / 26))}${letter(n)}`;
+    const big = library();
+    big.files = Array.from({ length: 500 }, (_, i) => ({
+      workspaceId: "ws",
+      id: i + 1,
+      name: `${wordAt(Math.floor(i / 2))} clip.mp4`,
+      metaKey: `k${i}`,
+      tags: [],
+    }));
+    big.total = big.files.length;
+    mocks.autoTagFiles.mockResolvedValue(big);
+    await renderScreen("Suggested Keywords");
+    const pager = await screen.findByRole("navigation", { name: "Pages" });
+    const total = within(pager).getByText(/^1–200 of \d+$/).textContent;
+    const count = Number(total?.split(" of ")[1]);
+    expect(count).toBeGreaterThan(200);
+    expect(screen.getAllByRole("checkbox").length).toBeLessThanOrEqual(201);
     expect(
-      screen.getByRole("button", { name: "Add to keywords and apply" }),
+      within(pager).getByRole("button", { name: "Previous" }),
     ).toHaveProperty("disabled", true);
-  });
 
-  it("keeps the undo of a bulk apply through the next confirm and a tab switch", async () => {
-    await renderScreen("Review by file");
-    fireEvent.click(screen.getByRole("button", { name: "yoga" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Add to keywords and apply" }),
-    );
-    await screen.findByRole("status");
-
-    fireEvent.click(screen.getByRole("button", { name: /and next/ }));
-    await screen.findByText("2 / 5");
-    fireEvent.click(screen.getByRole("tab", { name: "Conditions" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Review by file" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
-    await waitFor(() => expect(mocks.autoTagUndo).toHaveBeenCalled());
-  });
-
-  it("leaves a file unconfirmed when tagging it failed", async () => {
-    mocks.autoTagApply.mockRejectedValue(new Error("disk full"));
-    await renderScreen("Review by file");
-    fireEvent.click(screen.getByRole("button", { name: "Confirm and next" }));
-    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalled());
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
-    expect(screen.getByText("1 of 5 files reviewed")).toBeTruthy();
-  });
-
-  it("closes the token panel on Escape, not the whole screen", async () => {
-    await renderScreen("Review by file");
-    fireEvent.click(screen.getByRole("button", { name: "yoga" }));
-    expect(screen.getByText("Create tagging from “yoga”")).toBeTruthy();
-
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByText("Create tagging from “yoga”")).toBeNull();
-    // Still on the screen: the modal did not take the key as well.
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(window.location.hash).toBe("#/auto-tag");
-    expect(screen.getByText("1 / 5")).toBeTruthy();
-  });
-
-  it("moves with J and K even after a checkbox was used", async () => {
-    await renderScreen("Review by file");
-    const box = screen.getByRole("checkbox", { name: "Apply “ABCD”" });
-    fireEvent.click(box);
-    fireEvent.keyDown(box, { key: "j" });
-    expect(screen.getByText("2 / 5")).toBeTruthy();
-    fireEvent.keyDown(window, { key: "k" });
-    expect(screen.getByText("1 / 5")).toBeTruthy();
-  });
-
-  it("makes a dictionary entry from a word and tags the files it matches", async () => {
-    await renderScreen("Review by file");
-    fireEvent.click(screen.getByRole("button", { name: "yoga" }));
-    expect(screen.getByText("Create tagging from “yoga”")).toBeTruthy();
-    // The option says how many files it would reach before anything is created.
-    expect(screen.getByText("2 files match")).toBeTruthy();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Add to keywords and apply" }),
+    fireEvent.click(within(pager).getByRole("button", { name: "Next" }));
+    expect(
+      within(pager).getByText(`201–${Math.min(400, count)} of ${count}`),
+    ).toBeTruthy();
+    // The last page is the end of it.
+    fireEvent.click(within(pager).getByRole("button", { name: "Next" }));
+    expect(within(pager).getByRole("button", { name: "Next" })).toHaveProperty(
+      "disabled",
+      true,
     );
 
-    // Created, and applied to both files it matches — not only the open one.
-    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
-    expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
-      { workspaceId: "ws", fileIds: [1, 2], tags: ["yoga"] },
-    ]);
-    expect((await lastSaved()).keywords).toMatchObject([{ tag: "yoga" }]);
-    expect((await screen.findByRole("status")).textContent).toContain(
-      "Added “yoga” to keywords and tagged 2 files",
-    );
-
-    // The tags can be taken back; the entry stays.
-    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    await waitFor(() =>
-      expect(mocks.autoTagUndo).toHaveBeenCalledWith(["undo-1"]),
-    );
-    expect((await lastSaved()).keywords).toMatchObject([{ tag: "yoga" }]);
-  });
-
-  it("makes a rule from a code and tags each file with what the rule gives it", async () => {
-    mocks.autoTagGet.mockResolvedValue({
-      ...defaultAutoTagConfig(),
-      // Without the built-in prefix rule, so the token offers to create it.
-      rules: defaultAutoTagConfig().rules.filter((r) => r.id !== "prefix"),
-    });
-    await renderScreen("Review by file");
-    fireEvent.click(screen.getByRole("button", { name: "ABCD-123" }));
-    fireEvent.click(
-      screen.getByRole("radio", { name: /Turn every code prefix into a tag/ }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Add rule and apply" }));
-
-    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
-    // The built-in rule again, excludes included: the camera file (IMG-2041)
-    // is not tagged.
-    expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
-      { workspaceId: "ws", fileIds: [1, 2], tags: ["ABCD"] },
-    ]);
-    expect((await lastSaved()).rules.at(-1)).toMatchObject({
-      kind: "prefix",
-      template: "$1",
-      exclude: "IMG, DSC, MVI",
-    });
+    // Another filter is another list: back to its first page.
+    fireEvent.click(screen.getByRole("radio", { name: /Frequent words/ }));
+    expect(screen.getByText(/^1–200 of \d+$/)).toBeTruthy();
   });
 
   it("leaves rules out of the analysis after a visit that never finished", async () => {
@@ -627,23 +487,35 @@ describe("AutoTag", () => {
       return view;
     }
 
-    it("shows the file being reviewed, and returns to it when reopened", async () => {
+    it("keeps what was applied, and its undo, while the file list is the same", async () => {
+      const applyTrip = () => {
+        const row = screen
+          .getByRole("checkbox", { name: "Trip" })
+          .closest("div")!;
+        fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
+      };
       const first = await open();
-      fireEvent.click(screen.getByRole("tab", { name: "Review by file" }));
-      fireEvent.keyDown(window, { key: "j" });
-      expect(screen.getByText("2 / 5")).toBeTruthy();
-
-      fireEvent.click(screen.getByRole("button", { name: "Show file" }));
-      // The file's own detail route, in its own workspace.
-      expect(window.location.hash).toBe("#/file/2?ws=ws");
+      fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
+      applyTrip();
+      await screen.findByText("✓ Applied");
       first.unmount();
 
+      const second = await open();
+      fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
+      await screen.findByText("✓ Applied");
+      expect(screen.getByRole("button", { name: "Undo" })).toBeTruthy();
+      second.unmount();
+
+      // A different list: the undo's positions no longer mean the same files.
+      const changed = library();
+      changed.files = changed.files.slice(1);
+      changed.total = changed.files.length;
+      mocks.autoTagFiles.mockResolvedValue(changed);
       await open();
-      // The same tab and the same file, not the first tab and the first file.
-      expect(
-        screen.getByRole("tab", { name: "Review by file" }),
-      ).toHaveProperty("ariaSelected", "true");
-      expect(screen.getByText("2 / 5")).toBeTruthy();
+      fireEvent.click(screen.getByRole("tab", { name: /Suggested Keywords/ }));
+      await screen.findByRole("checkbox", { name: "Trip" });
+      expect(screen.queryByText("✓ Applied")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
     });
 
     it("remembers what was selected and filtered on each tab", async () => {
@@ -675,26 +547,6 @@ describe("AutoTag", () => {
       ).toHaveProperty("ariaChecked", "true");
       fireEvent.click(screen.getByRole("tab", { name: "Conditions" }));
       expect(screen.getByText("Matching files")).toBeTruthy();
-    });
-
-    it("keeps the review's decisions while the file list is the same", async () => {
-      const first = await open();
-      fireEvent.click(screen.getByRole("tab", { name: "Review by file" }));
-      fireEvent.click(screen.getByRole("button", { name: "Confirm and next" }));
-      await screen.findByText("2 of 5 files reviewed");
-      first.unmount();
-
-      const second = await open();
-      expect(screen.getByText("2 of 5 files reviewed")).toBeTruthy();
-      second.unmount();
-
-      // A different list: positions no longer mean the same files.
-      const changed = library();
-      changed.files = changed.files.slice(1);
-      changed.total = changed.files.length;
-      mocks.autoTagFiles.mockResolvedValue(changed);
-      await open();
-      expect(screen.getByText("1 of 4 files reviewed")).toBeTruthy();
     });
   });
 });

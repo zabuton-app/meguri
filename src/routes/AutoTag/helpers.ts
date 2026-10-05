@@ -37,7 +37,7 @@ export const MONO = "font-mono";
 export const FIELD =
   "h-[30px] rounded-md border border-border-strong bg-transparent px-2 text-[13px] text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring";
 
-/** Rows drawn per list; past this a note says how many were left out. */
+/** Rows drawn per list at a time: a page of it, or all a preview shows. */
 export const MAX_ROWS = 200;
 
 /** A new dictionary entry, or null when the tag name is unusable or taken. */

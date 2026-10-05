@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Segment } from "@shared/autoTagAnalysis";
 import type { TFunc } from "@/i18n/I18nProvider";
+import type { Paging } from "./paging";
 
 /** A proposed tag, in the tint the design gives proposals. */
 export function Chip({
@@ -237,5 +238,49 @@ export function MoreRows({ t, hidden }: { t: TFunc; hidden: number }) {
     <p className="px-3 py-2 text-xs text-muted">
       {t("autoTag.moreRows", { count: hidden })}
     </p>
+  );
+}
+
+/**
+ * Previous / next for a list drawn a page at a time (see usePaging): a band
+ * under the tab's scrolling area, not at the end of the list inside it, so it
+ * is in reach wherever the list is scrolled to. Nothing for a list that fits
+ * on one page.
+ */
+export function Pager({ t, paging }: { t: TFunc; paging: Paging }) {
+  const { page, pages, start, end, total, setPage } = paging;
+  if (pages <= 1) return null;
+  const go = (next: number, from: HTMLElement) => {
+    setPage(next);
+    // The new page starts at its top, not wherever the last one was left. The
+    // list is the scrolling area this band sits under (TabScroll).
+    from
+      .closest("nav")
+      ?.parentElement?.querySelector(
+        ':scope > [data-slot="scroll-area"] > [data-slot="scroll-area-viewport"]',
+      )
+      ?.scrollTo?.({ top: 0 });
+  };
+  return (
+    <nav
+      aria-label={t("autoTag.page.label")}
+      className="flex shrink-0 items-center justify-center gap-3 border-t border-border bg-surface px-3 py-2 text-xs text-muted"
+    >
+      <SmallButton
+        disabled={page === 0}
+        onClick={(e) => go(page - 1, e.currentTarget)}
+      >
+        {t("autoTag.page.prev")}
+      </SmallButton>
+      <span className="tabular-nums" aria-live="polite">
+        {t("autoTag.page.range", { from: start + 1, to: end, total })}
+      </span>
+      <SmallButton
+        disabled={page >= pages - 1}
+        onClick={(e) => go(page + 1, e.currentTarget)}
+      >
+        {t("autoTag.page.next")}
+      </SmallButton>
+    </nav>
   );
 }

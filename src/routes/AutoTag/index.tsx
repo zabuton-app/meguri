@@ -1,6 +1,6 @@
 // Auto-tagging. /auto-tag. Rules and a keyword dictionary that tag files from
-// their names, and three ways to bring an existing library in line with them:
-// suggestions, a file-by-file review, and sorting the library's own vocabulary.
+// their names, and two ways to bring an existing library in line with them:
+// suggestions, and sorting the library's own vocabulary.
 // Overlays the library as a modal, like /tags and /history.
 import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
@@ -10,7 +10,6 @@ import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import { suggestCandidates } from "@shared/autoTagAnalysis";
 import { ConditionsTab } from "./ConditionsTab";
-import { ReviewTab } from "./ReviewTab";
 import { isApplied } from "./helpers";
 import { useAutoTagSession } from "./session";
 import { SuggestTab } from "./SuggestTab";
@@ -18,13 +17,12 @@ import { TermsTab } from "./TermsTab";
 import { useAutoTag } from "./useAutoTag";
 import { useViewState } from "./viewState";
 
-const TABS = ["conditions", "suggest", "review", "terms"] as const;
+const TABS = ["conditions", "suggest", "terms"] as const;
 type TabId = (typeof TABS)[number];
 
 const TAB_LABELS: Record<TabId, TranslationKey> = {
   conditions: "autoTag.tab.conditions",
   suggest: "autoTag.tab.suggest",
-  review: "autoTag.tab.review",
   terms: "autoTag.tab.terms",
 };
 
@@ -43,8 +41,8 @@ export default function AutoTag() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // A nested layer (the confirm dialog, the review tab's token panel)
-      // calls preventDefault on the Escape it consumed.
+      // A nested layer (the confirm dialog) calls preventDefault on the
+      // Escape it consumed.
       if (e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
         onClose();
@@ -188,8 +186,6 @@ export default function AutoTag() {
               session={session}
               candidates={candidates}
             />
-          ) : tab === "review" ? (
-            <ReviewTab state={state} session={session} />
           ) : (
             <TermsTab state={state} session={session} candidates={candidates} />
           )}
