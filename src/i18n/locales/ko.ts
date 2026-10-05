@@ -655,6 +655,7 @@ export const ko: Record<TranslationKey, string> = {
     "이 후보의 단어를 포함한 파일을 라이브러리 검색으로 표시합니다",
   "autoTag.noCandidates": "이 조건의 후보가 없습니다.",
   "autoTag.selection": "{count}개 선택 · 총 {files}개 파일에 태그",
+  "autoTag.selectionIgnored": "{count}개 선택",
   "autoTag.applySelected": "선택 항목 붙이기",
   "autoTag.applySelectedDict": "키워드에 추가하고 붙이기",
   "autoTag.clearSelection": "선택 해제",

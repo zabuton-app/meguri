@@ -660,6 +660,7 @@ export const ja = {
     "この候補の語を含むファイルを、ライブラリの検索で表示します",
   "autoTag.noCandidates": "この条件の候補はありません。",
   "autoTag.selection": "{count} 件選択 · 計 {files} ファイルにタグ付け",
+  "autoTag.selectionIgnored": "{count} 件選択",
   "autoTag.applySelected": "選択を付与",
   "autoTag.applySelectedDict": "キーワードに追加して付与",
   "autoTag.clearSelection": "選択を解除",

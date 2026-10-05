@@ -678,6 +678,7 @@ export const es: Record<TranslationKey, string> = {
     "Muestra los archivos que contienen las palabras de este candidato con la búsqueda de la biblioteca",
   "autoTag.noCandidates": "No hay candidatos para este filtro.",
   "autoTag.selection": "{count} seleccionadas · etiqueta {files} archivos",
+  "autoTag.selectionIgnored": "{count} seleccionadas",
   "autoTag.applySelected": "Aplicar selección",
   "autoTag.applySelectedDict": "Añadir a palabras clave y aplicar",
   "autoTag.clearSelection": "Quitar selección",

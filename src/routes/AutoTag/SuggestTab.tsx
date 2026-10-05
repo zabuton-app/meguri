@@ -44,16 +44,19 @@ const ORIGIN_LABELS: Record<CandidateOrigin, TranslationKey> = {
 
 // Rules and the keywords are one group here, as they are one tab: both are
 // what the Conditions tab already produces, as opposed to the frequent words
-// nothing produces yet.
-type Filter = "all" | "conditions" | "frequent";
+// nothing produces yet. The dismissed ones are a list of their own: out of the
+// way everywhere else, and here to be brought back.
+type Filter = "all" | "conditions" | "frequent" | "ignored";
+const FILTERS = ["all", "conditions", "frequent", "ignored"] as const;
 
 const FILTER_LABELS: Record<Filter, TranslationKey> = {
   all: "autoTag.filter.all",
   conditions: "autoTag.tab.conditions",
   frequent: "autoTag.filter.frequent",
+  ignored: "autoTag.status.ignored",
 };
 
-const filterOf = (c: Candidate): Exclude<Filter, "all"> =>
+const groupOf = (c: Candidate): "conditions" | "frequent" =>
   candidateGroup(c) === "frequent" ? "frequent" : "conditions";
 
 /** For a candidate the screen has no state for; none is expected. */
@@ -65,6 +68,9 @@ const NOT_PENDING: CandidateState = {
   tagged: 0,
   pending: false,
 };
+
+/** A row of the candidate list: its cells sit on the list's own columns. */
+const ROW = "col-span-full grid grid-cols-subgrid items-center";
 
 /** Files shown when a candidate is expanded. */
 const MAX_EXPANDED_FILES = 50;
@@ -101,17 +107,29 @@ export function SuggestTab({
   const stateOf = (c: Candidate): CandidateState =>
     states.get(c.key) ?? NOT_PENDING;
 
+  // Dismissing a candidate takes it out of the lists: what is left in them is
+  // what has not been decided yet.
+  const filterOf = (c: Candidate): Exclude<Filter, "all"> =>
+    stateOf(c).ignored ? "ignored" : groupOf(c);
   const counts: Record<Filter, number> = {
-    all: candidates.length,
+    all: 0,
     conditions: 0,
     frequent: 0,
+    ignored: 0,
   };
   for (const c of candidates) counts[filterOf(c)]++;
-  const shown = candidates.filter(
-    (c) => filter === "all" || filterOf(c) === filter,
-  );
+  counts.all = counts.conditions + counts.frequent;
+  const shown = candidates.filter((c) => {
+    const at = filterOf(c);
+    return filter === "all" ? at !== "ignored" : at === filter;
+  });
   const paging = usePaging("suggest.page", filter, shown.length);
-  const pendingShown = shown.filter((c) => stateOf(c).pending);
+  // What a row's checkbox is for: the candidates still to be decided — or,
+  // among the dismissed ones, any of them, to be brought back together.
+  const onIgnored = filter === "ignored";
+  const selectable = (c: Candidate): boolean =>
+    onIgnored ? stateOf(c).ignored : stateOf(c).pending;
+  const pendingShown = shown.filter(selectable);
   const picked = pendingShown.filter((c) => selected.has(c.key));
   const allChecked =
     pendingShown.length > 0 && picked.length === pendingShown.length;
@@ -230,11 +248,13 @@ export function SuggestTab({
     );
   };
 
-  const restore = (c: Candidate) => {
+  const restore = (list: Candidate[]) => {
+    const keys = new Set(list.map((c) => c.key));
     update((cfg) => ({
       ...cfg,
-      ignored: cfg.ignored.filter((key) => key !== c.key),
+      ignored: cfg.ignored.filter((key) => !keys.has(key)),
     }));
+    setSelected(new Set());
     setNotice("");
   };
 
@@ -246,7 +266,7 @@ export function SuggestTab({
             ? t("autoTag.analyzing")
             : t("autoTag.analyzed", {
                 files: names.length,
-                candidates: candidates.length,
+                candidates: counts.all,
                 pending: pendingTotal,
               })}
         </span>
@@ -255,13 +275,11 @@ export function SuggestTab({
           label={t("autoTag.filter.label")}
           value={filter}
           onChange={setFilter}
-          options={(["all", "conditions", "frequent"] as const).map(
-            (value) => ({
-              value,
-              label: t(FILTER_LABELS[value]),
-              count: counts[value],
-            }),
-          )}
+          options={FILTERS.map((value) => ({
+            value,
+            label: t(FILTER_LABELS[value]),
+            count: counts[value],
+          }))}
         />
         <SmallButton
           // Not while tags are being written: what comes back is applied to
@@ -279,97 +297,102 @@ export function SuggestTab({
       {notice && <Notice>{notice}</Notice>}
 
       <TabScroll>
-        <div className="sticky top-0 z-[1] grid grid-cols-[28px_minmax(120px,1.4fr)_minmax(72px,1fr)_56px_minmax(0,auto)] items-center gap-x-3 border-b border-border bg-bg px-3 py-1.5 text-[11px] text-muted">
-          <input
-            type="checkbox"
-            className="size-3.5 accent-primary"
-            aria-label={t("autoTag.selectAll")}
-            checked={allChecked}
-            onChange={() =>
-              setSelected(
-                allChecked
-                  ? new Set()
-                  : new Set(pendingShown.map((c) => c.key)),
-              )
-            }
-          />
-          <span>{t("autoTag.col.candidate")}</span>
-          <span>{t("autoTag.col.origin")}</span>
-          <span className="text-right">{t("autoTag.col.files")}</span>
-          <span />
-        </div>
-        {shown.slice(paging.start, paging.end).map((c) => {
-          const at = stateOf(c);
-          const open = expanded === c.key;
-          return (
-            <div
-              key={c.key}
-              className={cn(
-                "border-b border-surface",
-                at.ignored && "opacity-45",
-              )}
-            >
-              <div className="grid grid-cols-[28px_minmax(120px,1.4fr)_minmax(72px,1fr)_56px_minmax(0,auto)] items-center gap-x-3 px-3 py-2 hover:bg-fg/5">
-                <input
-                  type="checkbox"
-                  className="size-3.5 accent-primary"
-                  aria-label={c.name}
-                  disabled={!at.pending}
-                  checked={at.pending && selected.has(c.key)}
-                  onChange={() => {
-                    const next = new Set(selected);
-                    if (!next.delete(c.key)) next.add(c.key);
-                    setSelected(next);
-                  }}
-                />
-                <button
-                  type="button"
-                  aria-expanded={open}
-                  onClick={() => setExpanded(open ? null : c.key)}
-                  className="flex min-w-0 flex-col items-start gap-[3px] text-left"
-                >
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="inline-block w-3.5 text-center text-xs text-fg">
-                      {open ? "▾" : "▸"}
+        {/* One grid for the heading and every row (each a subgrid of it), so
+            a column is as wide in one row as in the next: each action has a
+            column of its own, left empty where a row does not offer it. */}
+        <div className="grid grid-cols-[28px_minmax(160px,1fr)_auto_auto_26px_auto_auto_auto_auto_auto] gap-x-2">
+          <div
+            className={cn(
+              ROW,
+              "sticky top-0 z-[1] border-b border-border bg-bg px-3 py-1.5 text-[11px] text-muted",
+            )}
+          >
+            <input
+              type="checkbox"
+              className="size-3.5 accent-primary"
+              aria-label={t("autoTag.selectAll")}
+              checked={allChecked}
+              onChange={() =>
+                setSelected(
+                  allChecked
+                    ? new Set()
+                    : new Set(pendingShown.map((c) => c.key)),
+                )
+              }
+            />
+            <span>{t("autoTag.col.candidate")}</span>
+            <span>{t("autoTag.col.origin")}</span>
+            <span className="text-right">{t("autoTag.col.files")}</span>
+            <span className="col-span-6" />
+          </div>
+          {shown.slice(paging.start, paging.end).map((c) => {
+            const at = stateOf(c);
+            const open = expanded === c.key;
+            return (
+              <div
+                key={c.key}
+                className="col-span-full grid grid-cols-subgrid border-b border-surface"
+              >
+                <div className={cn(ROW, "px-3 py-2 hover:bg-fg/5")}>
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-primary"
+                    aria-label={c.name}
+                    disabled={!selectable(c)}
+                    checked={selectable(c) && selected.has(c.key)}
+                    onChange={() => {
+                      const next = new Set(selected);
+                      if (!next.delete(c.key)) next.add(c.key);
+                      setSelected(next);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setExpanded(open ? null : c.key)}
+                    className="flex min-w-0 flex-col items-start gap-[3px] text-left"
+                  >
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="inline-block w-3.5 text-center text-xs text-fg">
+                        {open ? "▾" : "▸"}
+                      </span>
+                      <Chip className="text-[13px]">{c.name}</Chip>
+                      <span
+                        className={cn(
+                          "text-[11px]",
+                          existing.has(c.key) ? "text-primary" : "text-muted",
+                        )}
+                      >
+                        {existing.has(c.key)
+                          ? t("autoTag.toExisting", {
+                              tag: existing.get(c.key) ?? "",
+                            })
+                          : t("autoTag.newTag")}
+                      </span>
                     </span>
-                    <Chip className="text-[13px]">{c.name}</Chip>
-                    <span
-                      className={cn(
-                        "text-[11px]",
-                        existing.has(c.key) ? "text-primary" : "text-muted",
-                      )}
-                    >
-                      {existing.has(c.key)
-                        ? t("autoTag.toExisting", {
-                            tag: existing.get(c.key) ?? "",
-                          })
-                        : t("autoTag.newTag")}
-                    </span>
+                    {c.variants.length > 1 && (
+                      <span className="pl-5 text-[11px] text-muted">
+                        {t("autoTag.variants", {
+                          list: c.variants.join(" · "),
+                        })}
+                      </span>
+                    )}
+                    {isAutoMetaValue(c.key) && (
+                      <span className="pl-5 text-[11px] text-warn">
+                        {t("autoTag.autoMetaWarning")}
+                      </span>
+                    )}
+                  </button>
+                  <span className="flex gap-1">
+                    {c.origins.map((origin) => (
+                      <Badge key={origin}>{t(ORIGIN_LABELS[origin])}</Badge>
+                    ))}
                   </span>
-                  {c.variants.length > 1 && (
-                    <span className="pl-5 text-[11px] text-muted">
-                      {t("autoTag.variants", {
-                        list: c.variants.join(" · "),
-                      })}
-                    </span>
-                  )}
-                  {isAutoMetaValue(c.key) && (
-                    <span className="pl-5 text-[11px] text-warn">
-                      {t("autoTag.autoMetaWarning")}
-                    </span>
-                  )}
-                </button>
-                <span className="flex flex-wrap gap-1">
-                  {c.origins.map((origin) => (
-                    <Badge key={origin}>{t(ORIGIN_LABELS[origin])}</Badge>
-                  ))}
-                </span>
-                <span className="text-right text-xs tabular-nums text-fg">
-                  {c.count}
-                </span>
-                <span className="flex flex-wrap items-center justify-end gap-1">
+                  <span className="text-right text-xs tabular-nums text-fg">
+                    {c.count}
+                  </span>
                   {/* Whatever was done with it: looking at the files is how
-                      one decides, and how one checks afterwards. */}
+                    one decides, and how one checks afterwards. */}
                   <button
                     type="button"
                     onClick={() => searchInLibrary(c)}
@@ -379,104 +402,114 @@ export function SuggestTab({
                   >
                     <Search className="size-3.5" />
                   </button>
+                  {/* The two facts side by side, each as what it is now: in the
+                    keywords or not, on the files or not — the latter as the
+                    way to take it off them again. */}
+                  <span
+                    className={cn(
+                      "whitespace-nowrap text-xs",
+                      at.ignored ? "text-muted" : "text-primary",
+                    )}
+                  >
+                    {at.ignored
+                      ? t("autoTag.status.ignored")
+                      : at.inKeywords && t("autoTag.status.registered")}
+                  </span>
                   {at.ignored ? (
-                    <>
-                      <span className="whitespace-nowrap text-xs text-muted">
-                        {t("autoTag.status.ignored")}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => restore(c)}
-                        className="h-[26px] px-2 text-xs text-muted underline underline-offset-2 hover:text-bright-fg"
-                      >
-                        {t("autoTag.revert")}
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => restore([c])}
+                      className="h-[26px] justify-self-start px-2 text-xs text-muted underline underline-offset-2 hover:text-bright-fg"
+                    >
+                      {t("autoTag.revert")}
+                    </button>
+                  ) : at.tagged > 0 ? (
+                    <SmallButton
+                      variant="ghost"
+                      className="h-[26px] px-2"
+                      disabled={busy}
+                      title={t("autoTag.removeHint")}
+                      onClick={() => void remove(c)}
+                    >
+                      {t("autoTag.removeFromFiles", { count: at.tagged })}
+                    </SmallButton>
                   ) : (
-                    <>
-                      {/* The two facts side by side, each as what it is now:
-                          in the keywords or not, on the files or not — the
-                          latter as the way to take it off them again. */}
-                      {at.inKeywords && (
-                        <span className="whitespace-nowrap text-xs text-primary">
-                          {t("autoTag.status.registered")}
-                        </span>
-                      )}
-                      {at.tagged > 0 && (
-                        <SmallButton
-                          variant="ghost"
-                          className="h-[26px] px-2"
-                          disabled={busy}
-                          title={t("autoTag.removeHint")}
-                          onClick={() => void remove(c)}
-                        >
-                          {t("autoTag.removeFromFiles", { count: at.tagged })}
-                        </SmallButton>
-                      )}
-                      {/* Registering is the main action where it applies:
-                          the tag then keeps being applied by the Conditions
-                          tab's keywords instead of this once — and it is
-                          offered for as long as they do not have it, whether
-                          or not the files are tagged already. */}
-                      {at.canRegister && (
-                        <SmallButton
-                          variant="primary"
-                          className="h-[26px]"
-                          disabled={busy}
-                          // The short label fits the row; what it does in full.
-                          title={t("autoTag.applySelectedDict")}
-                          onClick={() => void apply([c], true)}
-                        >
-                          {t("autoTag.addToDictionary")}
-                        </SmallButton>
-                      )}
-                      {/* In the keywords does not mean on the files: those
-                          already in the library only get the tag from a scan,
-                          a re-apply — or here. */}
-                      {at.missing > 0 && (
-                        <SmallButton
-                          variant={at.canRegister ? "outline" : "primary"}
-                          className={cn(
-                            "h-[26px]",
-                            at.canRegister && "border-border px-2",
-                          )}
-                          disabled={busy}
-                          onClick={() => void apply([c], false)}
-                        >
-                          {t("autoTag.apply")}
-                        </SmallButton>
-                      )}
-                      {at.pending && (
-                        <SmallButton
-                          variant="ghost"
-                          className="h-[26px] px-2"
-                          onClick={() => ignore([c])}
-                        >
-                          {t("autoTag.ignore")}
-                        </SmallButton>
-                      )}
-                    </>
+                    <span />
                   )}
-                </span>
-              </div>
-              {open && (
-                <div className="flex flex-col gap-0.5 pb-2.5 pl-14 pr-3">
-                  {[...c.files.entries()]
-                    .slice(0, MAX_EXPANDED_FILES)
-                    .map(([index, ranges]) => (
-                      <div
-                        key={index}
-                        className={cn(MONO, "break-all py-0.5 text-xs text-fg")}
-                      >
-                        <Highlighted segs={segments(names[index], ranges)} />
-                      </div>
-                    ))}
-                  <MoreRows t={t} hidden={c.files.size - MAX_EXPANDED_FILES} />
+                  {/* Registering is the main action where it applies: the tag
+                    then keeps being applied by the Conditions tab's keywords
+                    instead of this once — and it is offered for as long as
+                    they do not have it, whether or not the files are tagged
+                    already. */}
+                  {!at.ignored && at.canRegister ? (
+                    <SmallButton
+                      variant="primary"
+                      className="h-[26px]"
+                      disabled={busy}
+                      // The short label fits the row; what it does in full.
+                      title={t("autoTag.applySelectedDict")}
+                      onClick={() => void apply([c], true)}
+                    >
+                      {t("autoTag.addToDictionary")}
+                    </SmallButton>
+                  ) : (
+                    <span />
+                  )}
+                  {/* In the keywords does not mean on the files: those already
+                    in the library only get the tag from a scan, a re-apply —
+                    or here. */}
+                  {!at.ignored && at.missing > 0 ? (
+                    <SmallButton
+                      variant={at.canRegister ? "outline" : "primary"}
+                      className={cn(
+                        "h-[26px]",
+                        at.canRegister && "border-border px-2",
+                      )}
+                      disabled={busy}
+                      onClick={() => void apply([c], false)}
+                    >
+                      {t("autoTag.apply")}
+                    </SmallButton>
+                  ) : (
+                    <span />
+                  )}
+                  {at.pending ? (
+                    <SmallButton
+                      variant="ghost"
+                      className="h-[26px] px-2"
+                      onClick={() => ignore([c])}
+                    >
+                      {t("autoTag.ignore")}
+                    </SmallButton>
+                  ) : (
+                    <span />
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+                {open && (
+                  <div className="col-span-full flex flex-col gap-0.5 pb-2.5 pl-14 pr-3">
+                    {[...c.files.entries()]
+                      .slice(0, MAX_EXPANDED_FILES)
+                      .map(([index, ranges]) => (
+                        <div
+                          key={index}
+                          className={cn(
+                            MONO,
+                            "break-all py-0.5 text-xs text-fg",
+                          )}
+                        >
+                          <Highlighted segs={segments(names[index], ranges)} />
+                        </div>
+                      ))}
+                    <MoreRows
+                      t={t}
+                      hidden={c.files.size - MAX_EXPANDED_FILES}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
         {shown.length === 0 && (
           <p className="p-8 text-center text-[13px] text-muted">
             {state.loading ? t("autoTag.analyzing") : t("autoTag.noCandidates")}
@@ -487,31 +520,44 @@ export function SuggestTab({
 
       {picked.length > 0 && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-surface px-3 py-2">
-          <span className="text-xs text-fg">
-            {t("autoTag.selection", {
-              count: picked.length,
-              files: filesOf(picked),
-            })}
-          </span>
-          {picked.some(canRegister) && (
-            <SmallButton
-              variant="primary"
-              disabled={busy}
-              onClick={() => void apply(picked, true)}
-            >
-              {t("autoTag.applySelectedDict")}
-            </SmallButton>
+          {onIgnored ? (
+            <>
+              <span className="text-xs text-fg">
+                {t("autoTag.selectionIgnored", { count: picked.length })}
+              </span>
+              <SmallButton variant="primary" onClick={() => restore(picked)}>
+                {t("autoTag.revert")}
+              </SmallButton>
+            </>
+          ) : (
+            <>
+              <span className="text-xs text-fg">
+                {t("autoTag.selection", {
+                  count: picked.length,
+                  files: filesOf(picked),
+                })}
+              </span>
+              {picked.some(canRegister) && (
+                <SmallButton
+                  variant="primary"
+                  disabled={busy}
+                  onClick={() => void apply(picked, true)}
+                >
+                  {t("autoTag.applySelectedDict")}
+                </SmallButton>
+              )}
+              <SmallButton
+                variant={picked.some(canRegister) ? "outline" : "primary"}
+                disabled={busy}
+                onClick={() => void apply(picked, false)}
+              >
+                {t("autoTag.applySelected")}
+              </SmallButton>
+              <SmallButton variant="ghost" onClick={() => ignore(picked)}>
+                {t("autoTag.ignore")}
+              </SmallButton>
+            </>
           )}
-          <SmallButton
-            variant={picked.some(canRegister) ? "outline" : "primary"}
-            disabled={busy}
-            onClick={() => void apply(picked, false)}
-          >
-            {t("autoTag.applySelected")}
-          </SmallButton>
-          <SmallButton variant="ghost" onClick={() => ignore(picked)}>
-            {t("autoTag.ignore")}
-          </SmallButton>
           <button
             type="button"
             onClick={() => setSelected(new Set())}

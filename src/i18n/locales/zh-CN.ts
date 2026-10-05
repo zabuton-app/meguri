@@ -635,6 +635,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "autoTag.searchCandidateHint": "用媒体库的搜索显示包含此候选词语的文件",
   "autoTag.noCandidates": "此条件下没有候选。",
   "autoTag.selection": "已选 {count} 项 · 共标记 {files} 个文件",
+  "autoTag.selectionIgnored": "已选 {count} 项",
   "autoTag.applySelected": "添加所选",
   "autoTag.applySelectedDict": "加入关键词并添加",
   "autoTag.clearSelection": "取消选择",

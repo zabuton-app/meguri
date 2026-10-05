@@ -618,7 +618,7 @@ describe("AutoTag", () => {
     const filters = within(screen.getByRole("radiogroup", { name: "Filter" }));
     expect(
       filters.getAllByRole("radio").map((radio) => radio.textContent),
-    ).toEqual(["All4", "Conditions3", "Frequent words1"]);
+    ).toEqual(["All4", "Conditions3", "Frequent words1", "Ignored0"]);
 
     // ABCD and Trip come from rules, Yoga from the dictionary; Harbor does not.
     fireEvent.click(filters.getByRole("radio", { name: /Conditions/ }));
@@ -635,9 +635,58 @@ describe("AutoTag", () => {
       .getByRole("checkbox", { name: "Harbor" })
       .closest("div")!;
     expect(within(row).getByText("Frequent word")).toBeTruthy();
+    const open = screen.getByText(/candidates \(\d+ open\)/).textContent;
     fireEvent.click(within(row).getByRole("button", { name: "Ignore" }));
     expect((await lastSaved()).ignored).toEqual(["harbor"]);
-    expect(within(row).getByText("Ignored")).toBeTruthy();
+    // Dismissed is out of the way: gone from the list and from its counts.
+    expect(screen.queryByRole("checkbox", { name: "Harbor" })).toBeNull();
+    expect(screen.getByText(/candidates \(\d+ open\)/).textContent).not.toBe(
+      open,
+    );
+
+    // It is kept where the dismissed ones are, and can be brought back.
+    fireEvent.click(screen.getByRole("radio", { name: /Ignored\s*1/ }));
+    const ignored = screen
+      .getByRole("checkbox", { name: "Harbor" })
+      .closest("div")!;
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+    fireEvent.click(within(ignored).getByRole("button", { name: "Undo" }));
+    await waitFor(async () => expect((await lastSaved()).ignored).toEqual([]));
+    expect(screen.queryByRole("checkbox", { name: "Harbor" })).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: /^All/ }));
+    expect(screen.getByRole("checkbox", { name: "Harbor" })).toBeTruthy();
+  });
+
+  it("brings several dismissed candidates back at once", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...sampleConfig(),
+      ignored: ["harbor", "trip", "abcd"],
+    });
+    await renderScreen("Keywords");
+    fireEvent.click(screen.getByRole("radio", { name: /Ignored\s*3/ }));
+    // Among the dismissed, a row's checkbox picks it to be brought back.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Harbor" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Trip" }));
+    const bar = screen.getByText("2 selected").closest("div")!;
+    // Nothing here applies or ignores: there is only the way back.
+    expect(within(bar).queryByRole("button", { name: /Apply/ })).toBeNull();
+    fireEvent.click(within(bar).getByRole("button", { name: "Undo" }));
+    await waitFor(async () =>
+      expect((await lastSaved()).ignored).toEqual(["abcd"]),
+    );
+    expect(screen.queryByRole("checkbox", { name: "Harbor" })).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "ABCD" })).toBeTruthy();
+    expect(screen.queryByText(/selected/)).toBeNull();
+
+    // The heading's checkbox takes all that are left.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select all" }));
+    fireEvent.click(
+      within(screen.getByText("1 selected").closest("div")!).getByRole(
+        "button",
+        { name: "Undo" },
+      ),
+    );
+    await waitFor(async () => expect((await lastSaved()).ignored).toEqual([]));
   });
 
   it("pages through a list too long to draw at once, and starts over when it is filtered", async () => {

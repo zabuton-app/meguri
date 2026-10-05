@@ -681,6 +681,7 @@ export const fr: Record<TranslationKey, string> = {
     "Affiche les fichiers contenant les mots de ce candidat avec la recherche de la bibliothèque",
   "autoTag.noCandidates": "Aucun candidat pour ce filtre.",
   "autoTag.selection": "{count} sélectionnées · étiquette {files} fichiers",
+  "autoTag.selectionIgnored": "{count} sélectionnées",
   "autoTag.applySelected": "Appliquer la sélection",
   "autoTag.applySelectedDict": "Ajouter aux mots-clés et appliquer",
   "autoTag.clearSelection": "Effacer la sélection",
