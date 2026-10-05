@@ -22,6 +22,8 @@ import type {
   WorkspacesList,
 } from "./schema.js";
 import {
+  ActivityMetricSchema,
+  DaySchema,
   FolderPathSchema,
   GraphDimsSchema,
   GraphNodeKeySchema,
@@ -49,6 +51,8 @@ import {
   GRAPH_MAX_FILES_HARD,
   type GraphPayload,
 } from "./graph.js";
+import { ACTIVITY_MAX_DAYS, type ActivityDays } from "./activity.js";
+import { daySpan, parseDay } from "../day.js";
 import { MAX_FOLDER_FILES_PATHS } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
 
@@ -255,6 +259,25 @@ export const ChannelInputs = {
     .refine((v) => v.xy.length === v.keys.length * (v.dims ?? 2), {
       message: "xy must hold one number per dimension per key",
     }),
+  // Per-day counts for the heatmap, over the files the query matches; cursor /
+  // limit and the metric's own date range in the query are ignored.
+  activity_days: z
+    .object({
+      query: SearchQuerySchema,
+      metric: ActivityMetricSchema,
+      from: DaySchema,
+      to: DaySchema,
+    })
+    .refine(
+      (v) => {
+        const from = parseDay(v.from);
+        const to = parseDay(v.to);
+        if (!from || !to) return false;
+        const span = daySpan(from, to);
+        return span >= 1 && span <= ACTIVITY_MAX_DAYS;
+      },
+      { message: "from must not be after to, nor the range too long" },
+    ),
   file_get: FileTarget,
   file_set_rating: FileTarget.extend({ rating: z.number() }),
   file_set_favorite: FileTarget.extend({ favorite: z.boolean() }),
@@ -458,6 +481,7 @@ export interface ChannelOutputs {
   /** The cached positions of the scope, or null when there are none usable. */
   graph_layout_get: { keys: string[]; xy: number[] } | null;
   graph_layout_set: void;
+  activity_days: ActivityDays;
   file_get: FileDetail | null;
   file_set_rating: void;
   file_set_favorite: void;

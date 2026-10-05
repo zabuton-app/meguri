@@ -15,4 +15,6 @@ export async function invalidateWorkspaceScoped(qc: QueryClient) {
   // All and collections keep their scope when a workspace goes, so their
   // graph would keep its files.
   await qc.invalidateQueries({ queryKey: ["graph_build"] });
+  // The heatmap counts the same files.
+  await qc.invalidateQueries({ queryKey: ["activity_days"] });
 }

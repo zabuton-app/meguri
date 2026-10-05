@@ -1,3 +1,4 @@
+import { DATE_RANGES } from "@/lib/dateRanges";
 import { z } from "zod";
 import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { ROOT_FOLDER } from "@shared/folderPath";
@@ -48,10 +49,10 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.played != null) next.played = query.played;
   if (query.inProgress) next.inProgress = true;
   if (query.playedVia) next.playedVia = query.playedVia;
-  if (query.capturedFrom != null) next.capturedFrom = query.capturedFrom;
-  if (query.capturedTo != null) next.capturedTo = query.capturedTo;
-  if (query.btimeFrom != null) next.btimeFrom = query.btimeFrom;
-  if (query.btimeTo != null) next.btimeTo = query.btimeTo;
+  for (const { from, to } of DATE_RANGES) {
+    if (query[from] != null) next[from] = query[from];
+    if (query[to] != null) next[to] = query[to];
+  }
   if (query.sort) next.sort = query.sort;
   if (query.sortDir) next.sortDir = query.sortDir;
   // Kept as "everything under it", the way a saved search reopens.
@@ -201,8 +202,11 @@ export function describeDateRange(
   from: number | undefined,
   to: number | undefined,
 ): string {
-  if (from != null && to != null)
-    return `${formatDate(from)}–${formatDate(to)}`;
+  if (from != null && to != null) {
+    // One day (a day picked on the heatmap, say) reads as that day.
+    const [first, last] = [formatDate(from), formatDate(to)];
+    return first === last ? first : `${first}–${last}`;
+  }
   if (from != null) return `${t("filter.dateFrom")} ${formatDate(from)}`;
   if (to != null) return `${t("filter.dateTo")} ${formatDate(to)}`;
   return "";
@@ -225,15 +229,11 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     parts.push(query.playedVia ? `${label} (${query.playedVia})` : label);
   }
   if (query.inProgress) parts.push(t("filter.inProgress"));
-  if (query.capturedFrom != null || query.capturedTo != null) {
-    parts.push(
-      `${t("sort.captured")}: ${describeDateRange(t, query.capturedFrom, query.capturedTo)}`,
-    );
-  }
-  if (query.btimeFrom != null || query.btimeTo != null) {
-    parts.push(
-      `${t("filter.btime")}: ${describeDateRange(t, query.btimeFrom, query.btimeTo)}`,
-    );
+  for (const { label, from, to } of DATE_RANGES) {
+    if (query[from] != null || query[to] != null)
+      parts.push(
+        `${t(label)}: ${describeDateRange(t, query[from], query[to])}`,
+      );
   }
   for (const tag of query.tags ?? []) {
     const { namespace, name } = parseQualifiedTagName(tag);

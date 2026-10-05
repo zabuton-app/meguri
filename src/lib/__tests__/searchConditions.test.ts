@@ -50,8 +50,12 @@ const EVERYTHING: SearchQuery = {
   ratingMin: 3,
   favorite: true,
   played: false,
+  capturedFrom: 1_700_000_000,
   btimeFrom: 1_700_000_000,
   btimeTo: 1_800_000_000,
+  addedTo: 1_800_000_000,
+  playedFrom: 1_700_000_000,
+  playedTo: 1_800_000_000,
   duplicates: true,
   sort: "name",
   sortDir: "desc",
@@ -76,7 +80,10 @@ describe("describeConditions", () => {
       "rating",
       "favorite",
       "played",
+      "capturedAt",
       "btime",
+      "addedAt",
+      "playedAt",
       "duplicates",
       "sort",
     ]);
@@ -93,7 +100,10 @@ describe("describeConditions", () => {
       rating: "primary",
       favorite: "primary",
       played: "collapsed",
+      capturedAt: "collapsed",
       btime: "collapsed",
+      addedAt: "collapsed",
+      playedAt: "collapsed",
       duplicates: "collapsed",
       sort: "collapsed",
     });
@@ -196,6 +206,15 @@ describe("clear reducers", () => {
   it("clears both ends of a date range together", () => {
     const before: SearchQuery = { btimeFrom: 1, btimeTo: 2 };
     expect(find(before, "btime").clear(before)).toEqual({});
+    const captured: SearchQuery = { capturedFrom: 1, capturedTo: 2 };
+    expect(find(captured, "capturedAt").clear(captured)).toEqual({});
+    const added: SearchQuery = { addedFrom: 1, addedTo: 2, kind: "video" };
+    expect(find(added, "addedAt").clear(added)).toEqual({ kind: "video" });
+    const played: SearchQuery = { playedFrom: 1, playedTo: 2, favorite: true };
+    expect(find(played, "playedAt").clear(played)).toEqual({ favorite: true });
+    expect(find({ playedTo: 1_700_000_000 }, "playedAt").label).toContain(
+      en["filter.playedAt"],
+    );
   });
 
   it("turns off the hash sort that the duplicates filter turned on", () => {
@@ -360,5 +379,19 @@ describe("the default saved search", () => {
         .find((d) => d.key === "sort")!
         .clear({ sort: "name" }),
     ).toEqual({});
+  });
+});
+
+describe("a date range of one day", () => {
+  it("reads as that day rather than as a range onto itself", () => {
+    const start = Math.floor(new Date(2026, 2, 7).getTime() / 1000);
+    const end = Math.floor(new Date(2026, 2, 8).getTime() / 1000) - 1;
+    const day = new Date(2026, 2, 7).toLocaleDateString();
+    expect(find({ addedFrom: start, addedTo: end }, "addedAt").label).toBe(
+      `Added date: ${day}`,
+    );
+    expect(
+      find({ addedFrom: start, addedTo: end + 86_400 }, "addedAt").label,
+    ).toContain("–");
   });
 });

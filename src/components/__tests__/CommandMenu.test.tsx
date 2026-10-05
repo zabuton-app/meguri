@@ -122,6 +122,7 @@ function renderMenu(
     onRebuild: vi.fn(),
     onSetView: vi.fn(),
     onToggleByFolder: vi.fn(),
+    onToggleHeatmap: vi.fn(),
     onDiscover: vi.fn(),
     onTags: vi.fn(),
     onSettings: vi.fn(),
@@ -147,6 +148,7 @@ function baseProps(): Parameters<typeof CommandMenu>[0] {
     onRebuild: vi.fn(),
     onSetView: vi.fn(),
     onToggleByFolder: vi.fn(),
+    onToggleHeatmap: vi.fn(),
     onDiscover: vi.fn(),
     onTags: vi.fn(),
     onSettings: vi.fn(),
@@ -301,6 +303,7 @@ describe("file actions group", () => {
           onRebuild={vi.fn()}
           onSetView={vi.fn()}
           onToggleByFolder={vi.fn()}
+          onToggleHeatmap={vi.fn()}
           onDiscover={vi.fn()}
           onTags={vi.fn()}
           onSettings={vi.fn()}

@@ -161,6 +161,43 @@ file that does not come back is gone and leaves the selection. The selection
 can be larger than one call may name, so the rows are read in runs of
 `MAX_BULK_FILES` (`readInBulkBatches`), all of which must succeed.
 
+The heatmap (`src/heatmap/`, "Contribution graph" in the UI) is not a view but
+a panel under the filter bar, over whichever view is shown, toggled from the
+filter bar (beside the favorites button) or the command menu and remembered in
+`HEATMAP_OPEN_KEY`. It draws a
+year of days as week columns, each cell shaded by how many of the files the
+list would hold fall on that day (`activity_days`; see docs/architecture.md,
+"Heatmap"). What a day counts is a metric — played, captured, created or
+added — remembered in `HEATMAP_METRIC_KEY`. The page is the 53 weeks ending
+today or one calendar year (`calendar.ts`, which also picks the shade: a
+square-root scale against the busiest day shown, so one large import does not
+flatten the rest). The week columns share out the full width, so the cells
+grow with the window; below a minimum width the grid scrolls sideways instead.
+
+Picking is an edit of the filter, not state of the panel: a click sets the
+date range of the metric shown to that day, and a drag across cells sets it to
+the days between where it started and where it was let go (`pickedDays.ts`,
+`ACTIVITY_RANGE_FIELDS`) — the same condition "More conditions" offers as a
+date range. So the days have the range's chip, show in the panel's inputs, are
+carried by a saved search, narrow the graph as well as the lists, and a range
+typed in the panel marks its cells. A drag is shown as it goes and written on
+release (caught on the window, so it may end outside the grid; Escape gives it
+up); a press that goes nowhere is a click, and on the one day picked it lets
+that day go. Shift extends from the first day picked, which is also the
+keyboard's way to a range (Shift+Enter). The counts leave the shown metric's
+own range out — with it, only the picked days would have anything on them.
+Changing the metric leaves the filter alone: a range already set stays a
+condition, named by its chip, and narrows the new counts. Under the folder
+view the counts cover the folder shown and everything below it, which is what
+the list becomes once a range narrows it. The panel shows the page the range
+starts on, and turns to it when the range is set from outside. `Home` keeps
+this in `useHeatmapFilter`. The table of date ranges
+(`src/lib/dateRanges.ts`) is what the panel of conditions, the chips, a saved
+search's description and the fields a saved search keeps all read; a new range
+is one row there plus its SQL in `queries/files.ts`. One cell is in the tab
+order and the arrow keys move between days; those keys are stopped at the
+panel, since the list below listens for them on the window.
+
 The graph view (`src/graph/`, loaded lazily with `React.lazy` so the list views
 never pay for it) draws the same list as a network of files and tags, from one
 `graph_build` payload (see docs/architecture.md, "Graph view"):

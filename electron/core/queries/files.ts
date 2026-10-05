@@ -231,6 +231,25 @@ export function appendSearchConditions(
     sql += " AND f.btime <= ?";
     args.push(query.btimeTo);
   }
+  if (query.addedFrom != null) {
+    sql += " AND f.created_at >= ?";
+    args.push(query.addedFrom);
+  }
+  if (query.addedTo != null) {
+    sql += " AND f.created_at <= ?";
+    args.push(query.addedTo);
+  }
+  if (query.playedFrom != null || query.playedTo != null) {
+    // An IN over the range of idx_play_history_played rather than an EXISTS
+    // per file: the latter probes the history of every file the sort walks
+    // past, on each page of the list.
+    sql +=
+      " AND f.meta_key IN (SELECT meta_key FROM play_history WHERE played_at >= ? AND played_at <= ?)";
+    args.push(
+      query.playedFrom ?? Number.MIN_SAFE_INTEGER,
+      query.playedTo ?? Number.MAX_SAFE_INTEGER,
+    );
+  }
   for (const tag of (query.tags ?? []).filter(Boolean)) {
     const ids = resolveTagIds(db, tag);
     if (ids.length === 0) {

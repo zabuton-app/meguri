@@ -26,12 +26,19 @@ import {
   resetRecentSearchesForTest,
 } from "@/hooks/useRecentSearches";
 import { RECENT_SEARCHES_KEY } from "@/lib/recentSearches";
-import { BY_FOLDER_KEY, VIEW_KEY } from "@/routes/Home/utils";
+import {
+  BY_FOLDER_KEY,
+  HEATMAP_METRIC_KEY,
+  HEATMAP_OPEN_KEY,
+  VIEW_KEY,
+} from "@/routes/Home/utils";
+import { addDays, daySeconds, formatDay } from "@shared/day";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
   workspacesList: vi.fn(),
   filesSearch: vi.fn(),
+  activityDays: vi.fn<(input: unknown) => Promise<unknown>>(),
   fileGet: vi.fn(),
   fileSetFavorite: vi.fn(),
   fileSetRating: vi.fn(),
@@ -62,6 +69,7 @@ vi.mock("@/ipc/client", () => ({
     appStatus: () => mocks.appStatus(),
     workspacesList: () => mocks.workspacesList(),
     filesSearch: (query: unknown) => mocks.filesSearch(query),
+    activityDays: (input: unknown) => mocks.activityDays(input),
     fileGet: (id: number, ws: string) => mocks.fileGet(id, ws),
     fileSetFavorite: (...args: unknown[]) => mocks.fileSetFavorite(...args),
     fileSetRating: (...args: unknown[]) => mocks.fileSetRating(...args),
@@ -1511,5 +1519,306 @@ describe("Home graph view", () => {
         .getByRole("button", { name: "Show by folder" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
+  });
+});
+
+describe("Home heatmap", () => {
+  // A day the heatmap always shows, whatever today is.
+  const date = addDays(new Date(), -1);
+  const yesterday = formatDay(date);
+  const [start, end] = daySeconds(date);
+  const shown = date.toLocaleDateString();
+
+  /** The most recent files_search query the component issued. */
+  function lastQuery(): Record<string, unknown> {
+    const calls = mocks.filesSearch.mock.calls;
+    return calls[calls.length - 1][0] as Record<string, unknown>;
+  }
+
+  function cell(day: string): HTMLElement {
+    const el = document.querySelector<HTMLElement>(`[data-day="${day}"]`);
+    if (!el) throw new Error(`no cell for ${day}`);
+    return el;
+  }
+
+  const chips = () => [
+    ...document.querySelectorAll<HTMLElement>('[data-slot="filter-chip"]'),
+  ];
+  const chipLabels = () => chips().map((c) => c.textContent);
+
+  afterEach(() => {
+    localStorage.removeItem(VIEW_KEY);
+    localStorage.removeItem(BY_FOLDER_KEY);
+    localStorage.removeItem(HEATMAP_METRIC_KEY);
+    localStorage.removeItem(HEATMAP_OPEN_KEY);
+  });
+
+  beforeEach(() => {
+    graphView.props = null;
+    localStorage.setItem(VIEW_KEY, "grid");
+    localStorage.setItem(HEATMAP_OPEN_KEY, "true");
+    mocks.appStatus.mockResolvedValue(defaultAppStatus);
+    mocks.workspacesList.mockResolvedValue(defaultWorkspacesList);
+    mocks.filesSearch.mockReset();
+    mocks.filesSearch.mockResolvedValue({
+      items: [sampleFileRow],
+      nextCursor: null,
+    });
+    mocks.activityDays.mockReset();
+    mocks.activityDays.mockResolvedValue({
+      days: [{ date: yesterday, count: 3 }],
+    });
+    mocks.foldersList.mockReset();
+    mocks.foldersList.mockResolvedValue({
+      path: "",
+      folders: [],
+      fileCount: 1,
+    });
+    mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
+  });
+
+  /** Every query the heatmap counted over, as sent. */
+  const counted = () =>
+    mocks.activityDays.mock.calls.map(
+      ([input]) => input as { metric: string; query: Record<string, unknown> },
+    );
+
+  it("is a panel shown on demand, remembered apart from the view", async () => {
+    localStorage.removeItem(HEATMAP_OPEN_KEY);
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(screen.getByText("sample.mp4")).toBeTruthy());
+    expect(document.querySelector("[data-day]")).toBeNull();
+    expect(mocks.activityDays).not.toHaveBeenCalled();
+
+    const toggle = screen.getByRole("button", { name: "Contribution graph" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    // With the conditions, right after the favorites button: it sets one.
+    expect(toggle.previousElementSibling?.getAttribute("aria-label")).toBe(
+      "Show favorites only",
+    );
+    fireEvent.click(toggle);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(localStorage.getItem(HEATMAP_OPEN_KEY)).toBe("true");
+    // The view is the one it was, with its files under the panel.
+    expect(localStorage.getItem(VIEW_KEY)).toBe("grid");
+    expect(screen.getByText("sample.mp4")).toBeTruthy();
+
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(document.querySelector("[data-day]")).toBeNull(),
+    );
+    expect(localStorage.getItem(HEATMAP_OPEN_KEY)).toBe("false");
+  });
+
+  it("picks a day as the filter's date range for the metric, and lets it go", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    await waitFor(() => expect(screen.getByText("sample.mp4")).toBeTruthy());
+    expect(lastQuery().playedFrom).toBeUndefined();
+    expect(getListCounts()).toMatchObject({ files: null });
+    expect(chipLabels()).toEqual([]);
+
+    fireEvent.click(cell(yesterday));
+    await waitFor(() =>
+      expect(lastQuery()).toMatchObject({ playedFrom: start, playedTo: end }),
+    );
+    // The same condition the filter bar offers: one chip, and the panel's
+    // inputs hold the day.
+    expect(chipLabels()).toEqual([`Played date: ${shown}`]);
+    fireEvent.click(
+      document.querySelector('[data-slot="more-filters-trigger"]')!,
+    );
+    expect(
+      screen.getByLabelText<HTMLInputElement>("Played date: From").value,
+    ).toBe(yesterday);
+    expect(
+      screen.getByLabelText<HTMLInputElement>("Played date: To").value,
+    ).toBe(yesterday);
+    // The status bar counts the day's files, not the whole workspace.
+    await waitFor(() => expect(getListCounts()).toMatchObject({ files: 1 }));
+    // The heatmap counts without its own range: every day keeps its count.
+    for (const { query } of counted()) expect(query).toEqual({});
+
+    fireEvent.click(cell(yesterday));
+    await waitFor(() => expect(lastQuery().playedFrom).toBeUndefined());
+    expect(lastQuery().playedTo).toBeUndefined();
+    expect(chipLabels()).toEqual([]);
+  });
+
+  it("picks the days dragged across as one range", async () => {
+    const before = addDays(date, -2);
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+
+    fireEvent.pointerDown(cell(formatDay(before)), { button: 0, pointerId: 1 });
+    fireEvent.pointerOver(cell(yesterday), { pointerId: 1 });
+    fireEvent.pointerUp(window);
+    await waitFor(() =>
+      expect(lastQuery()).toMatchObject({
+        playedFrom: daySeconds(before)[0],
+        playedTo: end,
+      }),
+    );
+    expect(chipLabels()).toEqual([
+      `Played date: ${before.toLocaleDateString()}–${shown}`,
+    ]);
+    for (const day of [
+      formatDay(before),
+      formatDay(addDays(date, -1)),
+      yesterday,
+    ])
+      expect(cell(day).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("marks the day set from the filter bar, and follows its chip", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    fireEvent.click(
+      document.querySelector('[data-slot="more-filters-trigger"]')!,
+    );
+    fireEvent.change(screen.getByLabelText("Played date: From"), {
+      target: { value: yesterday },
+    });
+    fireEvent.change(screen.getByLabelText("Played date: To"), {
+      target: { value: yesterday },
+    });
+    await waitFor(() =>
+      expect(cell(yesterday).getAttribute("aria-pressed")).toBe("true"),
+    );
+
+    // Another condition keeps the day; the heatmap counts with it.
+    applyTagFilter(["tag:beach"]);
+    await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
+    expect(lastQuery()).toMatchObject({ playedFrom: start });
+    await waitFor(() =>
+      expect(
+        counted().some(
+          ({ query }) =>
+            JSON.stringify(query) === JSON.stringify({ q: "tag:beach" }),
+        ),
+      ).toBe(true),
+    );
+
+    const chip = chips().find((c) => c.textContent?.startsWith("Played date"))!;
+    fireEvent.click(within(chip).getByRole("button"));
+    await waitFor(() => expect(lastQuery().playedFrom).toBeUndefined());
+    expect(lastQuery().q).toBe("tag:beach");
+    expect(cell(yesterday).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("keeps the range when the metric changes, as a condition of the new counts", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    fireEvent.click(cell(yesterday));
+    await waitFor(() => expect(lastQuery().playedFrom).toBe(start));
+
+    fireEvent.click(screen.getByRole("radio", { name: "Added" }));
+    // The played day stays in the filter, named by its chip, and narrows
+    // what the added counts cover; no cell is marked for it now.
+    await waitFor(() =>
+      expect(
+        counted().some(
+          ({ metric, query }) =>
+            metric === "added" && query.playedFrom === start,
+        ),
+      ).toBe(true),
+    );
+    expect(lastQuery().playedFrom).toBe(start);
+    expect(localStorage.getItem(HEATMAP_METRIC_KEY)).toBe("added");
+    expect(cell(yesterday).getAttribute("aria-pressed")).toBe("false");
+
+    // A day picked now is the new metric's range, beside the other.
+    fireEvent.click(cell(yesterday));
+    await waitFor(() =>
+      expect(lastQuery()).toMatchObject({
+        playedFrom: start,
+        addedFrom: start,
+        addedTo: end,
+      }),
+    );
+    expect(chipLabels().sort()).toEqual([
+      `Added date: ${shown}`,
+      `Played date: ${shown}`,
+    ]);
+  });
+
+  it("stays over the list and the graph, narrowing each", async () => {
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    fireEvent.click(cell(yesterday));
+    await waitFor(() => expect(lastQuery().playedFrom).toBe(start));
+
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "List view" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true"),
+    );
+    expect(cell(yesterday).getAttribute("aria-pressed")).toBe("true");
+    expect(lastQuery().playedFrom).toBe(start);
+
+    fireEvent.click(screen.getByRole("button", { name: "Graph view" }));
+    await screen.findByTestId("graph-view");
+    expect(cell(yesterday).getAttribute("aria-pressed")).toBe("true");
+    expect(graphView.props?.query).toMatchObject({
+      playedFrom: start,
+      playedTo: end,
+    });
+  });
+
+  it("counts within the folder shown, and everything below it", async () => {
+    localStorage.setItem(BY_FOLDER_KEY, "true");
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    // The folder option and the panel go together.
+    expect(
+      screen
+        .getByRole("button", { name: "Show by folder" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(counted().at(-1)?.query).toEqual({
+      folder: { path: "", recursive: true },
+    });
+
+    // A day turns the folder's own files into a search of its subtree: the
+    // scope the counts were taken over.
+    fireEvent.click(cell(yesterday));
+    await waitFor(() =>
+      expect(lastQuery()).toMatchObject({
+        playedFrom: start,
+        folder: { path: "", recursive: true },
+      }),
+    );
+  });
+
+  it("is toggled from the command menu too", async () => {
+    localStorage.removeItem(HEATMAP_OPEN_KEY);
+    // cmdk scrolls the highlighted option into view; jsdom has no layout.
+    if (!("scrollIntoView" in Element.prototype)) {
+      Object.defineProperty(Element.prototype, "scrollIntoView", {
+        configurable: true,
+        value: () => {},
+      });
+    }
+    renderWithProviders(<AppRoutes />);
+    await screen.findByText("sample.mp4");
+
+    const run = async (name: string) => {
+      fireEvent.keyDown(window, { key: "k", code: "KeyK", ctrlKey: true });
+      fireEvent.click(await screen.findByRole("option", { name }));
+    };
+
+    await run("Contribution graph");
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+
+    // Now shown, the same command is named for undoing it.
+    await run("Hide contribution graph");
+    await waitFor(() =>
+      expect(document.querySelector("[data-day]")).toBeNull(),
+    );
+    expect(localStorage.getItem(HEATMAP_OPEN_KEY)).toBe("false");
   });
 });

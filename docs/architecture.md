@@ -256,6 +256,38 @@ the tags they carry. It is built in one call and cached per scope.
   (`graph-layout-3d.json`, or the hash of `<scope>#3d`), with three numbers
   per key; a file of the other dimension reads as none.
 
+### Heatmap
+
+The heatmap ("Contribution graph" in the UI) is a panel over the list that
+counts it — any workspace, `All` or a collection, with the search and filters
+applied, within the folder shown under the folder view — per calendar day.
+
+- **One query per database.** `activity_days` runs on the query worker
+  (`electron/core/activityDays.ts`) with files_search's target resolution, and
+  sums the per-database counts (`queries/activity.ts`, which reuses
+  `appendSearchConditions`). A request names a metric and a range of days
+  (at most `ACTIVITY_MAX_DAYS`); only days with something on them come back.
+- **Metrics.** `played` counts the files with a `play_history` row that day,
+  `captured` dates a file by `captured_at`, `created` by `btime`, and `added`
+  by `created_at`. A file whose column is NULL is on no day, and a file counts
+  once per day however often it was played.
+- **A day is a date range.** Each metric has a pair of `SearchQuery` range
+  fields (`ACTIVITY_RANGE_FIELDS`: `playedFrom`/`playedTo`, `capturedFrom`/
+  `capturedTo`, `btimeFrom`/`btimeTo`, `addedFrom`/`addedTo`) testing the same
+  column the counts read. Picking a day, or dragging across several, sets that pair, so a cell's number is
+  the length of the list the range gives (identical copies included, as the
+  list shows them), which `activityDays.test.ts` pins per metric. The counts
+  drop the shown metric's own pair from the query; other metrics' ranges
+  narrow them like any condition. A folder scope in the query is kept (a
+  collection, which has no folder view, drops it as `files_search` does).
+- **Local days, one calendar.** Days cross IPC as `YYYY-MM-DD` strings
+  (`shared/day.ts`) and are resolved in the main process's time zone, so the
+  renderer never sends timestamps. The SQL only selects timestamps in the
+  range; they are put into days in JavaScript, against the same local
+  midnights a picked day's range is built from. SQLite's `'localtime'` is
+  deliberately not used: it does not agree with `Date` for every year or on
+  every platform, and a file would land in a cell whose list leaves it out.
+
 ## Collections
 
 Two unrelated mechanisms group files. They differ in where they persist and who

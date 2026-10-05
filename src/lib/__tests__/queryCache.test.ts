@@ -109,10 +109,18 @@ describe("targeted files_search invalidation", () => {
       played: { ws: "ws", filter: { played: true } },
       unplayed: { ws: "ws", filter: { played: false } },
       accessed: { ws: "ws", filter: { sort: "accessed" } },
+      playedSince: { ws: "ws", filter: { playedFrom: 1 } },
+      playedUntil: { ws: "ws", filter: { playedTo: 2 } },
       byName: { ws: "ws", filter: { sort: "name" } },
     });
     invalidatePlayedSearches(qc);
-    expect(invalidated().sort()).toEqual(["accessed", "played", "unplayed"]);
+    expect(invalidated().sort()).toEqual([
+      "accessed",
+      "played",
+      "playedSince",
+      "playedUntil",
+      "unplayed",
+    ]);
   });
 
   it("invalidatePlayedSearches refreshes a graph a play can change, and only those", async () => {
@@ -147,6 +155,76 @@ describe("targeted files_search invalidation", () => {
       "played",
       "watchLater",
     ]);
+  });
+
+  it("recounts the contribution graph only where a change can reach it", async () => {
+    const qc = new QueryClient();
+    const counts = async (
+      name: string,
+      filter: SearchQuery,
+      metric: string,
+      scope = "ws",
+    ) => {
+      await qc.fetchQuery({
+        queryKey: ["activity_days", scope, filter, metric, "a", "b"],
+        queryFn: () => name,
+      });
+    };
+    await counts("plays", {}, "played");
+    await counts("captured", {}, "captured");
+    await counts("unplayed", { played: false }, "added");
+    await counts("favorites", { favorite: true }, "added");
+    await counts("tagged", { tags: ["beach"] }, "added");
+    await counts("inProgress", { inProgress: true }, "added");
+    await counts("collection", {}, "added", collectionTarget("other"));
+    let hit: string[] = [];
+    qc.getQueryCache().subscribe((e) => {
+      if (e.type === "updated" && e.action.type === "invalidate")
+        hit.push(String(e.query.state.data));
+    });
+    const after = (run: () => void) => {
+      hit = [];
+      run();
+      return [...hit].sort();
+    };
+
+    expect(after(() => invalidatePlayedSearches(qc))).toEqual([
+      "plays",
+      "unplayed",
+    ]);
+    expect(after(() => invalidateInProgressSearches(qc))).toEqual([
+      "inProgress",
+    ]);
+    expect(after(() => invalidateTagSearches(qc))).toEqual(["tagged"]);
+    expect(after(() => invalidateCollectionSearches(qc))).toEqual([
+      "collection",
+    ]);
+    // Like the list under it, the heatmap keeps what it shows on a favorite
+    // or rating edit: a recount alone would disagree with the list.
+    expect(
+      after(() => syncFileRowAcrossCaches(qc, "ws", 1, { favorite: 1 })),
+    ).toEqual([]);
+  });
+
+  it("recounts any heatmap of Watch Later on a play, which takes the file off it", async () => {
+    const qc = new QueryClient();
+    const key = (scope: string) => [
+      "activity_days",
+      scope,
+      {},
+      "added",
+      "a",
+      "b",
+    ];
+    const watchLater = collectionTarget(WATCH_LATER_ID);
+    for (const scope of [watchLater, collectionTarget("other"), "ws"])
+      await qc.fetchQuery({ queryKey: key(scope), queryFn: () => scope });
+    invalidatePlayedSearches(qc);
+    const invalidated = (scope: string) =>
+      qc.getQueryCache().find({ queryKey: key(scope) })?.state.isInvalidated;
+    expect(invalidated(watchLater)).toBe(true);
+    expect(invalidated(collectionTarget("other"))).toBe(false);
+    expect(invalidated("ws")).toBe(false);
   });
 
   it("invalidateInProgressSearches hits the in-progress list and graph only", async () => {

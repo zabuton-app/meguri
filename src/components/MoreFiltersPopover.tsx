@@ -31,26 +31,7 @@ import {
 } from "@/components/ui/select";
 import { SegmentedControl } from "./SegmentedControl";
 import { useI18n } from "@/i18n/I18nProvider";
-
-/** Unix seconds → local YYYY-MM-DD for a date input's value. */
-function toDateInput(sec: number | undefined): string {
-  if (sec == null) return "";
-  const d = new Date(sec * 1000);
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
-/** Date-input value → Unix seconds at local start/end of that day. */
-function fromDateInput(
-  value: string,
-  edge: "start" | "end",
-): number | undefined {
-  if (!value) return undefined;
-  const t = new Date(`${value}T${edge === "start" ? "00:00:00" : "23:59:59"}`);
-  const sec = Math.floor(t.getTime() / 1000);
-  return Number.isFinite(sec) ? sec : undefined;
-}
+import { DATE_RANGES, fromDateInput, toDateInput } from "@/lib/dateRanges";
 
 type PlayState = "all" | "played" | "inProgress" | "unplayed";
 
@@ -90,6 +71,54 @@ function Section({
       </div>
       {children}
     </div>
+  );
+}
+
+/** Two date inputs for a range whose ends are both included; each bounds the other. */
+function DateRangeSection({
+  label,
+  from,
+  to,
+  fromLabel,
+  toLabel,
+  onChange,
+}: {
+  label: string;
+  from: number | undefined;
+  to: number | undefined;
+  fromLabel: string;
+  toLabel: string;
+  onChange: (range: {
+    from: number | undefined;
+    to: number | undefined;
+  }) => void;
+}) {
+  return (
+    <Section label={label}>
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="date"
+          value={toDateInput(from)}
+          max={toDateInput(to) || undefined}
+          aria-label={`${label}: ${fromLabel}`}
+          onChange={(e) =>
+            onChange({ from: fromDateInput(e.target.value, "start"), to })
+          }
+          className="min-w-0 flex-1"
+        />
+        <span className="text-muted">–</span>
+        <Input
+          type="date"
+          value={toDateInput(to)}
+          min={toDateInput(from) || undefined}
+          aria-label={`${label}: ${toLabel}`}
+          onChange={(e) =>
+            onChange({ from, to: fromDateInput(e.target.value, "end") })
+          }
+          className="min-w-0 flex-1"
+        />
+      </div>
+    </Section>
   );
 }
 
@@ -197,6 +226,20 @@ export function MoreFiltersPopover({
           />
         </Section>
 
+        {/* The date ranges come first and in pairs, so they line up two to a
+            row; the sort and the rest close the panel. */}
+        {DATE_RANGES.map(({ label, from, to }) => (
+          <DateRangeSection
+            key={from}
+            label={t(label)}
+            from={value[from]}
+            to={value[to]}
+            fromLabel={t("filter.dateFrom")}
+            toLabel={t("filter.dateTo")}
+            onChange={(range) => patch({ [from]: range.from, [to]: range.to })}
+          />
+        ))}
+
         <Section label={t("filter.sortSection")}>
           <div className="flex items-center gap-1.5">
             <Select
@@ -242,32 +285,6 @@ export function MoreFiltersPopover({
               {t("playlist.reorderNeedsManual")}
             </p>
           )}
-        </Section>
-
-        <Section label={t("filter.btime")}>
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="date"
-              value={toDateInput(value.btimeFrom)}
-              max={toDateInput(value.btimeTo) || undefined}
-              aria-label={t("filter.dateFrom")}
-              onChange={(e) =>
-                patch({ btimeFrom: fromDateInput(e.target.value, "start") })
-              }
-              className="min-w-0 flex-1"
-            />
-            <span className="text-muted">–</span>
-            <Input
-              type="date"
-              value={toDateInput(value.btimeTo)}
-              min={toDateInput(value.btimeFrom) || undefined}
-              aria-label={t("filter.dateTo")}
-              onChange={(e) =>
-                patch({ btimeTo: fromDateInput(e.target.value, "end") })
-              }
-              className="min-w-0 flex-1"
-            />
-          </div>
         </Section>
 
         <Section label={t("filter.otherSection")}>

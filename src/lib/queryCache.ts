@@ -12,9 +12,18 @@ import type {
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
 
-/** The SearchQuery part of a ["files_search", wsId, filter] query key. */
+/**
+ * The SearchQuery part of a ["files_search", wsId, filter] query key. The
+ * graph ("graph_build") and the heatmap ("activity_days") keep the
+ * scope and the filter in the same two places.
+ */
 function searchFilterOf(queryKey: readonly unknown[]): SearchQuery | undefined {
   return queryKey[2] as SearchQuery | undefined;
+}
+
+/** The metric of an ["activity_days", scope, filter, metric, from, to] key. */
+function activityMetricOf(queryKey: readonly unknown[]): unknown {
+  return queryKey[3];
 }
 
 function matchesFile(
@@ -103,6 +112,7 @@ export function forgetDeletedFile(
   void qc.invalidateQueries({ queryKey: ["history_list"] });
   void qc.invalidateQueries({ queryKey: ["duplicates_list"] });
   void qc.invalidateQueries({ queryKey: ["graph_build"] });
+  void qc.invalidateQueries({ queryKey: ["activity_days"] });
 }
 
 /** Patch the detail cache when the modal is open for the same file. */
@@ -130,6 +140,15 @@ export const GRAPH_SIZED_BY_PLAYS = "sizedByPlays";
  * dropFromWatchLaterCache). Other lists keep their cache instead of refetching
  * every page.
  */
+/** Whether recording a play can change which files a filter matches. */
+function filtersOnPlays(filter: SearchQuery | undefined): boolean {
+  return (
+    filter?.played != null ||
+    filter?.playedFrom != null ||
+    filter?.playedTo != null
+  );
+}
+
 export function invalidatePlayedSearches(qc: QueryClient): void {
   const watchLater = collectionTarget(WATCH_LATER_ID);
   void qc.invalidateQueries({
@@ -139,7 +158,7 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
       return (
         q.queryKey[1] === watchLater ||
         q.meta?.[GRAPH_SIZED_BY_PLAYS] === true ||
-        filter?.played != null ||
+        filtersOnPlays(filter) ||
         filter?.sort === "accessed"
       );
     },
@@ -148,8 +167,18 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
     queryKey: ["files_search"],
     predicate: (q) => {
       const filter = searchFilterOf(q.queryKey);
-      return filter?.played != null || filter?.sort === "accessed";
+      return filtersOnPlays(filter) || filter?.sort === "accessed";
     },
+  });
+  // The heatmap counting plays, or files by whether they were played, and
+  // any heatmap of Watch Later.
+  void qc.invalidateQueries({
+    queryKey: ["activity_days"],
+    predicate: (q) =>
+      // A play takes the file off Watch Later, whatever is counted there.
+      q.queryKey[1] === watchLater ||
+      activityMetricOf(q.queryKey) === "played" ||
+      filtersOnPlays(searchFilterOf(q.queryKey)),
   });
 }
 
@@ -169,6 +198,10 @@ export function invalidateInProgressSearches(qc: QueryClient): void {
     queryKey: ["files_search"],
     predicate: inProgress,
   });
+  void qc.invalidateQueries({
+    queryKey: ["activity_days"],
+    predicate: inProgress,
+  });
 }
 
 /**
@@ -179,13 +212,12 @@ export function invalidateInProgressSearches(qc: QueryClient): void {
 export function invalidateTagSearches(qc: QueryClient): void {
   // The graph is drawn from tags whatever the filter, so it always goes.
   void qc.invalidateQueries({ queryKey: ["graph_build"] });
-  void qc.invalidateQueries({
-    queryKey: ["files_search"],
-    predicate: (q) => {
-      const filter = searchFilterOf(q.queryKey);
-      return Boolean(filter?.q || filter?.tags?.length);
-    },
-  });
+  const byTags = (q: { queryKey: readonly unknown[] }) => {
+    const filter = searchFilterOf(q.queryKey);
+    return Boolean(filter?.q || filter?.tags?.length);
+  };
+  void qc.invalidateQueries({ queryKey: ["files_search"], predicate: byTags });
+  void qc.invalidateQueries({ queryKey: ["activity_days"], predicate: byTags });
 }
 
 /**
@@ -215,6 +247,7 @@ export function invalidateTagCatalog(qc: QueryClient): void {
  */
 export function invalidateFileCaches(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["graph_build"] });
+  void qc.invalidateQueries({ queryKey: ["activity_days"] });
   void qc.invalidateQueries({ queryKey: ["files_search"] });
   void qc.invalidateQueries({ queryKey: ["files_random"] });
   void qc.invalidateQueries({ queryKey: ["file_get"] });
@@ -236,12 +269,17 @@ export function invalidateCollectionSearches(qc: QueryClient): void {
       );
     },
   });
+  const inCollection = (q: { queryKey: readonly unknown[] }) => {
+    const ws = q.queryKey[1];
+    return typeof ws === "string" && ws.startsWith(COLLECTION_ID_PREFIX);
+  };
   void qc.invalidateQueries({
     queryKey: ["files_search"],
-    predicate: (q) => {
-      const ws = q.queryKey[1];
-      return typeof ws === "string" && ws.startsWith(COLLECTION_ID_PREFIX);
-    },
+    predicate: inCollection,
+  });
+  void qc.invalidateQueries({
+    queryKey: ["activity_days"],
+    predicate: inCollection,
   });
 }
 
@@ -266,6 +304,9 @@ export function syncFileRowAcrossCaches(
       );
     },
   });
+  // The heatmap is left as it is, like the list under it: a row that no
+  // longer matches a favorite or rating filter stays until the list is read
+  // again, and a recount alone would make a cell disagree with its list.
 }
 
 /**
