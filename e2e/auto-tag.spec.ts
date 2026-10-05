@@ -15,9 +15,9 @@ test.describe("Auto tagging", () => {
     const dialog = ready.getByRole("dialog");
 
     // The fixture is "test.png": register its name as a keyword.
-    await dialog.getByRole("tab", { name: "Keyword dictionary" }).click();
-    await dialog.getByLabel("Tag name").fill("Test");
-    await dialog.getByRole("button", { name: "Add keyword" }).click();
+    const add = dialog.getByLabel(/Add a keyword/);
+    await add.fill("Test");
+    await add.press("Enter");
     await expect(dialog.getByText("Creates a new tag")).toBeVisible();
 
     // It shows up as a suggestion; applying it tags the file for real.

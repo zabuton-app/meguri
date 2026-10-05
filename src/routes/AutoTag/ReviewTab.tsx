@@ -2,7 +2,6 @@
 // each, and turn a part of a file name into a rule or a dictionary entry.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
@@ -36,7 +35,7 @@ import {
   Notice,
   Segmented,
   SmallButton,
-  TabScroll,
+  SplitPane,
   Toolbar,
 } from "./parts";
 import type { AutoTagSession } from "./session";
@@ -199,6 +198,13 @@ export function ReviewTab({
       undo: outcome.undo ?? undefined,
     });
   };
+
+  // The list scrolls on its own, so moving with the keys has to bring the
+  // current row along.
+  const curRow = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    curRow.current?.scrollIntoView?.({ block: "nearest" });
+  }, [cur]);
 
   // Keys act on the current file; the handlers change every render, so the
   // listener reads them through a ref instead of re-subscribing.
@@ -509,11 +515,9 @@ export function ReviewTab({
         </Notice>
       )}
 
-      <TabScroll className="@container flex flex-wrap">
-        {/* Stacked (narrow), the list is a short scroller of its own above the
-            file being reviewed; side by side, it scrolls with the tab. */}
-        <aside className="flex-[1_1_300px] border-b border-border @[760px]:max-w-[380px] @[760px]:border-b-0 @[760px]:border-r">
-          <ScrollArea viewportClassName="max-h-52 @[760px]:max-h-none">
+      <SplitPane
+        aside={
+          <>
             <div className="flex flex-col">
               <MoreRows t={t} hidden={start} />
               {windowed.map((i) => {
@@ -522,6 +526,7 @@ export function ReviewTab({
                 return (
                   <button
                     key={i}
+                    ref={i === cur ? curRow : undefined}
                     type="button"
                     onClick={() => select(i)}
                     aria-current={i === cur}
@@ -580,10 +585,10 @@ export function ReviewTab({
                 </p>
               )}
             </div>
-          </ScrollArea>
-        </aside>
-
-        <section className="flex min-w-0 flex-[3_1_460px] flex-col gap-5 px-6 py-5">
+          </>
+        }
+      >
+        <section className="flex min-w-0 flex-1 flex-col gap-5 px-6 py-5">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs tabular-nums text-muted">
@@ -899,7 +904,7 @@ export function ReviewTab({
             </SmallButton>
           </div>
         </section>
-      </TabScroll>
+      </SplitPane>
     </>
   );
 }

@@ -121,21 +121,47 @@ describe("AutoTag", () => {
     expect((await lastSaved()).applyOnScan).toBe(true);
   });
 
-  it("registers a keyword with aliases and shows the files it finds", async () => {
-    await renderScreen("Keyword dictionary");
-    fireEvent.change(screen.getByLabelText("Tag name"), {
-      target: { value: "Yoga" },
-    });
-    fireEvent.change(screen.getByLabelText("Aliases (comma-separated)"), {
-      target: { value: "ヨガ, stretch" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Add keyword" }));
+  it("registers a keyword beside the rules and shows the files it finds", async () => {
+    await renderScreen();
+    // "Tag, alias, alias" in one line, then Enter.
+    const add = screen.getByLabelText(/Add a keyword/);
+    fireEvent.change(add, { target: { value: "Yoga, ヨガ, stretch" } });
+    fireEvent.keyDown(add, { key: "Enter" });
 
+    // The new entry is selected: the pane switches from the rule to it.
     expect(screen.getByText("Creates a new tag")).toBeTruthy();
+    expect(screen.getByText("Matching files")).toBeTruthy();
     expect(screen.getAllByText("2 files").length).toBeGreaterThan(0);
     expect((await lastSaved()).keywords).toMatchObject([
       { tag: "Yoga", aliases: ["ヨガ", "stretch"], mode: "word" },
     ]);
+
+    // Selecting a rule brings its editor back.
+    fireEvent.click(screen.getByRole("button", { name: /Square brackets/ }));
+    expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
+    expect(screen.queryByText("Matching files")).toBeNull();
+  });
+
+  it("edits the selected keyword: aliases, match mode, removal", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...defaultAutoTagConfig(),
+      keywords: [{ id: "k1", tag: "Yoga", aliases: [], mode: "word" }],
+    });
+    await renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: /Yoga/ }));
+
+    const alias = screen.getByLabelText("+ Add alias");
+    fireEvent.change(alias, { target: { value: "stretch" } });
+    fireEvent.keyDown(alias, { key: "Enter" });
+    fireEvent.click(screen.getByRole("radio", { name: "Contains" }));
+    expect((await lastSaved()).keywords).toMatchObject([
+      { tag: "Yoga", aliases: ["stretch"], mode: "contains" },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(async () => expect((await lastSaved()).keywords).toEqual([]));
+    // With the entry gone the pane falls back to the first rule.
+    expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
   });
 
   it("applies a suggestion to the files that lack it, and takes it back", async () => {
@@ -169,7 +195,7 @@ describe("AutoTag", () => {
     fireEvent.click(apply());
     await screen.findByText("✓ Applied");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Rules" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Rules and dictionary" }));
     fireEvent.click(screen.getByRole("tab", { name: /Suggestions/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
     await waitFor(() =>

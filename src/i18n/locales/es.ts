@@ -531,8 +531,7 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.undoFailed": "No se pudo deshacer.",
   "autoTag.moreRows": "{count} más sin mostrar",
   "autoTag.fileCount": "{count} archivos",
-  "autoTag.tab.rules": "Reglas",
-  "autoTag.tab.keywords": "Diccionario de palabras clave",
+  "autoTag.tab.rules": "Reglas y diccionario",
   "autoTag.tab.suggest": "Sugerencias",
   "autoTag.tab.review": "Revisar por archivo",
   "autoTag.tab.terms": "Ordenar términos",
@@ -574,11 +573,11 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.rule.paren": "Paréntesis ( )",
   "autoTag.rule.new": "Nueva regla",
   "autoTag.rule.untitled": "Regla sin nombre",
-  "autoTag.keywordTagPlaceholder": "Nombre de la etiqueta",
-  "autoTag.keywordAliasesPlaceholder": "Alias (separados por comas)",
-  "autoTag.addKeyword": "Añadir palabra clave",
-  "autoTag.keywordHint":
-    "Un archivo cuyo nombre contiene la etiqueta o un alias recibe la etiqueta.",
+  "autoTag.keywords": "Palabras clave",
+  "autoTag.keywordsHint": "etiquetan el archivo cuyo nombre las contiene",
+  "autoTag.filterKeywords": "Filtrar palabras clave",
+  "autoTag.addKeywordInline":
+    "+ Añadir palabra clave (etiqueta, alias, … e Intro)",
   "autoTag.noAliases": "Sin alias",
   "autoTag.noKeywords": "Aún no hay palabras clave.",
   "autoTag.joinsExisting":

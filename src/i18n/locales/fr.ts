@@ -533,8 +533,7 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.undoFailed": "Impossible d’annuler.",
   "autoTag.moreRows": "{count} autres non affichés",
   "autoTag.fileCount": "{count} fichiers",
-  "autoTag.tab.rules": "Règles",
-  "autoTag.tab.keywords": "Dictionnaire de mots-clés",
+  "autoTag.tab.rules": "Règles et dictionnaire",
   "autoTag.tab.suggest": "Suggestions",
   "autoTag.tab.review": "Revue par fichier",
   "autoTag.tab.terms": "Trier les termes",
@@ -576,11 +575,11 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.rule.paren": "Parenthèses ( )",
   "autoTag.rule.new": "Nouvelle règle",
   "autoTag.rule.untitled": "Règle sans nom",
-  "autoTag.keywordTagPlaceholder": "Nom de l’étiquette",
-  "autoTag.keywordAliasesPlaceholder": "Alias (séparés par des virgules)",
-  "autoTag.addKeyword": "Ajouter le mot-clé",
-  "autoTag.keywordHint":
-    "Un fichier dont le nom contient l’étiquette ou un alias reçoit l’étiquette.",
+  "autoTag.keywords": "Mots-clés",
+  "autoTag.keywordsHint": "étiquettent le fichier dont le nom les contient",
+  "autoTag.filterKeywords": "Filtrer les mots-clés",
+  "autoTag.addKeywordInline":
+    "+ Ajouter un mot-clé (étiquette, alias, … puis Entrée)",
   "autoTag.noAliases": "Aucun alias",
   "autoTag.noKeywords": "Aucun mot-clé pour l’instant.",
   "autoTag.joinsExisting":

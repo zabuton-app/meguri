@@ -5,9 +5,14 @@ import {
   MAX_AUTO_TAG_ALIASES,
   MAX_AUTO_TAG_KEYWORDS,
   cleanTagName,
+  compileKeyword,
+  compileRule,
   isUsableTagName,
+  runKeyword,
+  runRule,
   type BuiltinRuleId,
   type KeywordEntry,
+  type KeywordHit,
   type TagRule,
 } from "@shared/autoTag";
 import type { Candidate } from "@shared/autoTagAnalysis";
@@ -81,4 +86,57 @@ export function isApplied(
     if (!fileTags[index].has(c.key)) return false;
   }
   return true;
+}
+
+// The two memos below are keyed per rule / entry object and per names array, so
+// editing one leaves the results of the others alone. They rely on the
+// configuration being updated immutably, and live outside React on purpose:
+// they are pure.
+const ruleCountCache = new WeakMap<
+  TagRule,
+  { names: readonly string[]; count: number }
+>();
+
+/** Files a rule would tag. */
+export function ruleMatchCount(
+  rule: TagRule,
+  names: readonly string[],
+): number {
+  const cached = ruleCountCache.get(rule);
+  if (cached?.names === names) return cached.count;
+  let count = 0;
+  const compiled = compileRule(rule);
+  if (compiled) {
+    for (const name of names) {
+      if (runRule(compiled, name).some((hit) => hit.tags.length > 0)) count++;
+    }
+  }
+  ruleCountCache.set(rule, { names, count });
+  return count;
+}
+
+export type KeywordMatches = { name: string; hits: KeywordHit[] }[];
+
+const keywordMatchCache = new WeakMap<
+  KeywordEntry,
+  { names: readonly string[]; rows: KeywordMatches }
+>();
+
+/** The files a dictionary entry finds, and where in each name. */
+export function keywordMatches(
+  entry: KeywordEntry,
+  names: readonly string[],
+): KeywordMatches {
+  const cached = keywordMatchCache.get(entry);
+  if (cached?.names === names) return cached.rows;
+  const rows: KeywordMatches = [];
+  const compiled = compileKeyword(entry);
+  if (compiled) {
+    for (const name of names) {
+      const hits = runKeyword(compiled, name);
+      if (hits.length > 0) rows.push({ name, hits });
+    }
+  }
+  keywordMatchCache.set(entry, { names, rows });
+  return rows;
 }

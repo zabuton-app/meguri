@@ -9,21 +9,19 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import { suggestCandidates } from "@shared/autoTagAnalysis";
-import { KeywordsTab } from "./KeywordsTab";
+import { EngineTab } from "./EngineTab";
 import { ReviewTab } from "./ReviewTab";
-import { RulesTab } from "./RulesTab";
 import { isApplied } from "./helpers";
 import { useAutoTagSession } from "./session";
 import { SuggestTab } from "./SuggestTab";
 import { TermsTab } from "./TermsTab";
 import { useAutoTag } from "./useAutoTag";
 
-const TABS = ["rules", "keywords", "suggest", "review", "terms"] as const;
+const TABS = ["rules", "suggest", "review", "terms"] as const;
 type TabId = (typeof TABS)[number];
 
 const TAB_LABELS: Record<TabId, TranslationKey> = {
   rules: "autoTag.tab.rules",
-  keywords: "autoTag.tab.keywords",
   suggest: "autoTag.tab.suggest",
   review: "autoTag.tab.review",
   terms: "autoTag.tab.terms",
@@ -175,9 +173,7 @@ export default function AutoTag() {
               {t("autoTag.loading")}
             </p>
           ) : tab === "rules" ? (
-            <RulesTab state={state} />
-          ) : tab === "keywords" ? (
-            <KeywordsTab state={state} />
+            <EngineTab state={state} />
           ) : tab === "suggest" ? (
             <SuggestTab
               state={state}
