@@ -53,8 +53,12 @@ function nextVersion(): number {
   return lastVersion;
 }
 
-/** The cache buster for a file's thumbnail URL. */
-type ThumbVersionOf = (workspaceId: string, fileId: number) => number;
+interface ThumbVersions {
+  /** The cache buster for a file's thumbnail URL. */
+  versionOf: (workspaceId: string, fileId: number) => number;
+  /** A `thumb:done` came in for the file since the view was mounted. */
+  generated: (workspaceId: string, fileId: number) => boolean;
+}
 
 /**
  * The WebP is rewritten in place when a thumbnail is regenerated, and served
@@ -63,11 +67,14 @@ type ThumbVersionOf = (workspaceId: string, fileId: number) => number;
  * was regenerated while it was away (a 2D / 3D switch remounts it, and so
  * does a visit to the list). A file regenerated since then, by `thumb:done`,
  * gets a newer one, keyed "<workspaceId>:<fileId>" (or the id alone when the
- * event names no workspace).
+ * event names no workspace). The event also means a file now exists behind
+ * the slot: the graph's payload is not read again as a scan fills
+ * thumbnails in, so a file drawn before its thumbnail was made would
+ * otherwise never show one.
  * Kept here rather than taken from Home's counter: only the card re-renders,
  * not the graph view, on every thumbnail a scan finishes.
  */
-function useThumbVersionOf(): ThumbVersionOf {
+function useThumbVersions(): ThumbVersions {
   const [mounted] = useState(nextVersion);
   const [regenerated, setRegenerated] = useState<ReadonlyMap<string, number>>(
     () => new Map(),
@@ -109,18 +116,22 @@ function useThumbVersionOf(): ThumbVersionOf {
       if (timer) clearTimeout(timer);
     };
   }, []);
-  // The newest of the three: an event may name the workspace or not.
-  return (workspaceId, fileId) =>
+  // The newer of the two: an event may name the workspace or not.
+  const since = (workspaceId: string, fileId: number) =>
     Math.max(
-      mounted,
       regenerated.get(`${workspaceId}:${fileId}`) ?? 0,
       regenerated.get(String(fileId)) ?? 0,
     );
+  return {
+    versionOf: (workspaceId, fileId) =>
+      Math.max(mounted, since(workspaceId, fileId)),
+    generated: (workspaceId, fileId) => since(workspaceId, fileId) > 0,
+  };
 }
 
 interface Props {
   /** The file node under the pointer (one without a thumbnail shows
-   *  nothing); null hides the card. */
+   *  nothing, until one is made for it); null hides the card. */
   node: FileNodeAttrs | null;
   /** The positioned box around the canvas, which the card is placed in. */
   box: RefObject<HTMLElement | null>;
@@ -134,9 +145,11 @@ export function GraphHoverThumbnail({ node, box }: Props) {
   // the card appears in place rather than jumping there on the next move.
   const pointer = useRef<{ x: number; y: number } | null>(null);
 
-  const versionOf = useThumbVersionOf();
+  const { versionOf, generated } = useThumbVersions();
+  // `thumb:done` is only sent once a thumbnail file was written. Should it
+  // be gone again by the hover, the picture fails to load and nothing shows.
   const src =
-    node?.hasThumb === true
+    node && (node.hasThumb || generated(node.workspaceId, node.fileId))
       ? thumbUrl(
           mediaBase,
           node.workspaceId,
@@ -157,9 +170,16 @@ export function GraphHoverThumbnail({ node, box }: Props) {
     // its way up. A press too: a tap hovers a node without a move before it.
     el.addEventListener("pointermove", track, true);
     el.addEventListener("pointerdown", track, true);
+    // The box changed size under a pointer at rest (the window, the side
+    // peek): the card may no longer fit where it is.
+    const resize = new ResizeObserver(() =>
+      moveCard(el, card.current, pointer.current),
+    );
+    resize.observe(el);
     return () => {
       el.removeEventListener("pointermove", track, true);
       el.removeEventListener("pointerdown", track, true);
+      resize.disconnect();
     };
   }, [box]);
 

@@ -197,7 +197,8 @@ never pay for it) draws the same list as a network of files and tags, from one
   pointer on the box around them; `model/hoverThumbnail.ts` keeps it inside the
   box). It hides during a drag. Each mount of the view asks for thumbnails
   under a cache buster of its own, and it follows `thumb:done` itself, so a
-  regenerated thumbnail is never read back from the HTTP cache.
+  regenerated thumbnail is never read back from the HTTP cache, and one
+  made after the payload was built shows without a refetch.
 - **A graph per payload.** Each payload builds a new graphology graph that
   takes over the previous one's positions by key (`model/buildGraphology.ts`),
   and the one sigma instance (`GraphView` is keyed by scope in Home) switches

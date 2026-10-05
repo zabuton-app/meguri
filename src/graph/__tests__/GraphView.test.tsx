@@ -42,6 +42,10 @@ vi.mock("@/ipc/client", () => ({
   },
 }));
 
+// The callbacks of the ResizeObservers in use, to report a resize by hand
+// (jsdom lays nothing out).
+const resizes = vi.hoisted(() => new Set<() => void>());
+
 const nav = vi.hoisted(() => ({ navigate: vi.fn() }));
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router")>()),
@@ -142,6 +146,23 @@ function render(onFilterToken = vi.fn(), route = "/") {
 }
 
 beforeEach(() => {
+  resizes.clear();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      private notify: () => void;
+      constructor(cb: () => void) {
+        this.notify = cb;
+      }
+      observe() {
+        resizes.add(this.notify);
+      }
+      unobserve() {}
+      disconnect() {
+        resizes.delete(this.notify);
+      }
+    },
+  );
   canvas.fail = false;
   canvas.props = null;
   api.appStatus.mockResolvedValue({ mediaBase: "http://media" });
@@ -154,6 +175,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 async function ready() {
@@ -357,7 +379,10 @@ describe("GraphView", () => {
     const card = img.parentElement as HTMLElement;
     const stage = card.parentElement as HTMLElement;
     // jsdom lays nothing out: give the view and the card their sizes.
-    Object.defineProperty(stage, "clientWidth", { value: 1000 });
+    Object.defineProperty(stage, "clientWidth", {
+      value: 1000,
+      configurable: true,
+    });
     Object.defineProperty(stage, "clientHeight", { value: 800 });
     // Near the right edge, so the card sits to the left of the pointer,
     // where its place depends on its width.
@@ -371,6 +396,41 @@ describe("GraphView", () => {
     fireEvent.load(img);
     expect(card.style.width).toBe("81px");
     expect(card.style.transform).toBe("translate(853px, 140px)");
+
+    // The view narrows under a pointer at rest: the card moves back inside.
+    Object.defineProperty(stage, "clientWidth", { value: 900 });
+    act(() => resizes.forEach((notify) => notify()));
+    expect(card.style.transform).toBe("translate(813px, 140px)");
+  });
+
+  it("shows a thumbnail made after the graph was drawn", async () => {
+    const { container } = render();
+    await ready();
+    const src = () =>
+      container
+        .querySelector('[data-slot="graph-hover-thumbnail"] img')
+        ?.getAttribute("src");
+    // b.jpg had no thumbnail when the payload was built.
+    fireEvent.mouseEnter(screen.getByTestId(`node ${fk("b.jpg")}`));
+    expect(src()).toBeUndefined();
+    act(() => thumbDone.emit?.({ id: 2, workspaceId: "w" }));
+    await waitFor(() =>
+      expect(src()).toMatch(/^http:\/\/media\/ws\/w\/thumb\/2\?v=\d+$/),
+    );
+  });
+
+  it("shows a thumbnail made since, for an event that names no workspace", async () => {
+    const { container } = render();
+    await ready();
+    act(() => thumbDone.emit?.({ id: 2 }));
+    fireEvent.mouseEnter(screen.getByTestId(`node ${fk("b.jpg")}`));
+    await waitFor(() =>
+      expect(
+        container
+          .querySelector('[data-slot="graph-hover-thumbnail"] img')
+          ?.getAttribute("src"),
+      ).toMatch(/^http:\/\/media\/ws\/w\/thumb\/2\?v=\d+$/),
+    );
   });
 
   it("asks for a regenerated thumbnail under a new URL", async () => {
