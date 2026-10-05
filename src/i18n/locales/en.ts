@@ -503,6 +503,13 @@ export const en: Record<TranslationKey, string> = {
   // Tag management screen
   "tags.title": "Tags",
   "tags.summary": "{tags} tags / {assignments} assignments",
+  "tags.viewLabel": "View",
+  "tags.viewList": "List",
+  "tags.viewCloud": "Cloud",
+  "tags.cloudLimited": "Showing the {max} most used tags.",
+  "tags.cloudIncludeAuto": "Automatic tags",
+  "tags.cloudOnlyAuto":
+    "Only automatic tags to show. Turn on automatic tags to see them.",
   "tags.empty": "No tags yet.",
   "tags.emptyHint":
     "Add tags from the detail view and they will be listed here.",

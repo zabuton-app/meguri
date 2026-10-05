@@ -487,6 +487,12 @@ export const zhCN: Record<TranslationKey, string> = {
   // 标签管理界面
   "tags.title": "标签管理",
   "tags.summary": "{tags} 个标签 / {assignments} 次标注",
+  "tags.viewLabel": "视图",
+  "tags.viewList": "列表",
+  "tags.viewCloud": "标签云",
+  "tags.cloudLimited": "仅显示使用最多的前 {max} 个标签。",
+  "tags.cloudIncludeAuto": "自动标签",
+  "tags.cloudOnlyAuto": "只有自动标签可显示。开启自动标签即可查看。",
   "tags.empty": "还没有标签。",
   "tags.emptyHint": "在详情页添加标签后，会显示在这里。",
   "tags.searchPlaceholder": "筛选标签",

@@ -502,6 +502,13 @@ export const ko: Record<TranslationKey, string> = {
   // 태그 관리 화면
   "tags.title": "태그 관리",
   "tags.summary": "{tags}개 태그 / 부여 {assignments}건",
+  "tags.viewLabel": "보기",
+  "tags.viewList": "목록",
+  "tags.viewCloud": "클라우드",
+  "tags.cloudLimited": "가장 많이 쓰인 상위 {max}개만 표시합니다.",
+  "tags.cloudIncludeAuto": "자동 태그",
+  "tags.cloudOnlyAuto":
+    "표시할 수 있는 것은 자동 태그뿐입니다. 자동 태그를 켜면 표시됩니다.",
   "tags.empty": "아직 태그가 없습니다.",
   "tags.emptyHint": "상세 화면에서 태그를 추가하면 여기에 표시됩니다.",
   "tags.searchPlaceholder": "태그 검색",
