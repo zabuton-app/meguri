@@ -91,6 +91,12 @@ const SPIRAL_STEP = 6;
  * touches nothing already placed. Pass the boxes largest first so the big words
  * take the middle. `aspect` (width / height) stretches the spiral so the cloud
  * roughly follows the shape of the area it is drawn in.
+ *
+ * A box does not always start at the centre: every spot up to where an earlier
+ * box of the same height and no greater width came to rest is known to be
+ * taken (that box sat inside this one's outline at each of them, and found
+ * them all blocked), so the walk resumes from there. Same result, without each
+ * box re-searching the packed middle.
  */
 export function layoutCloud(boxes: CloudBox[], aspect = 1): CloudLayout {
   const stretch = Math.min(3, Math.max(1, aspect));
@@ -99,13 +105,20 @@ export function layoutCloud(boxes: CloudBox[], aspect = 1): CloudLayout {
   let minY = 0;
   let maxX = 0;
   let maxY = 0;
+  // Per height (which fixes the stride, hence the spots visited): where boxes
+  // of that height settled, with their width.
+  const settled = new Map<number, { w: number; theta: number }[]>();
 
   for (const box of boxes) {
     // A tall box cannot slot into a gap much smaller than itself, so it strides
     // further between attempts; without this a cloud of long, equally used
     // names costs several hundred milliseconds.
     const step = Math.max(SPIRAL_STEP, box.height / 2);
+    let peers = settled.get(box.height);
+    if (!peers) settled.set(box.height, (peers = []));
     let theta = 0;
+    for (const peer of peers)
+      if (peer.w <= box.width && peer.theta > theta) theta = peer.theta;
     for (;;) {
       const r = SPIRAL_GAIN * theta;
       const x = r * Math.cos(theta) * stretch - box.width / 2;
@@ -119,6 +132,7 @@ export function layoutCloud(boxes: CloudBox[], aspect = 1): CloudLayout {
       );
       if (free) {
         placed.push({ x, y, w: box.width, h: box.height });
+        peers.push({ w: box.width, theta });
         minX = Math.min(minX, x);
         minY = Math.min(minY, y);
         maxX = Math.max(maxX, x + box.width);

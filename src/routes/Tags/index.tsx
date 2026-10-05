@@ -388,7 +388,22 @@ export default function Tags() {
         </div>
       )}
 
-      {isCloud && !loading && all.length > 0 ? (
+      {/* Loading and "no tags at all" belong to the catalog, not to a view. */}
+      {loading ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-2 p-4">
+            {Array.from({ length: 8 }, (_, i) => (
+              <Skeleton key={i} className="h-7 w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
+      ) : all.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
+          <TagsIcon className="size-10 opacity-50" />
+          <p>{t("tags.empty")}</p>
+          <p className="text-xs">{t("tags.emptyHint")}</p>
+        </div>
+      ) : isCloud ? (
         <TagCloud
           tags={filtered}
           includeAuto={cloudIncludeAuto}
@@ -397,19 +412,7 @@ export default function Tags() {
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="flex flex-col gap-2 p-4">
-              {Array.from({ length: 8 }, (_, i) => (
-                <Skeleton key={i} className="h-7 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : all.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
-              <TagsIcon className="size-10 opacity-50" />
-              <p>{t("tags.empty")}</p>
-              <p className="text-xs">{t("tags.emptyHint")}</p>
-            </div>
-          ) : groups.length === 0 ? (
+          {groups.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center text-muted">
               <p>{t("tags.noMatch")}</p>
             </div>

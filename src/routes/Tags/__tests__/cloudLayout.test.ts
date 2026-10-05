@@ -145,6 +145,49 @@ describe("layoutCloud", () => {
     );
   });
 
+  it("lands every box on the first free spot of a walk from the centre", () => {
+    // The layout skips spots it can prove are taken; this is the plain walk it
+    // must still agree with. Repeated heights are what the shortcut keys on.
+    const mixed = Array.from({ length: 80 }, (_, i) => ({
+      width: 30 + ((i * 37) % 170),
+      height: [40, 40, 28, 28, 28, 16][i % 6],
+    }));
+    const naive = (aspect: number) => {
+      const placed: { x: number; y: number; w: number; h: number }[] = [];
+      for (const box of mixed) {
+        const step = Math.max(6, box.height / 2);
+        for (let theta = 0; ;) {
+          const r = 3 * theta;
+          const x = r * Math.cos(theta) * aspect - box.width / 2;
+          const y = r * Math.sin(theta) - box.height / 2;
+          if (
+            placed.every(
+              (p) =>
+                x + box.width + 2 <= p.x ||
+                p.x + p.w + 2 <= x ||
+                y + box.height + 2 <= p.y ||
+                p.y + p.h + 2 <= y,
+            )
+          ) {
+            placed.push({ x, y, w: box.width, h: box.height });
+            break;
+          }
+          theta += step / Math.max(r, step);
+        }
+      }
+      const minX = Math.min(...placed.map((p) => p.x));
+      const minY = Math.min(...placed.map((p) => p.y));
+      return placed.map((p) => ({ x: p.x - minX, y: p.y - minY }));
+    };
+    for (const aspect of [1, 1.75]) {
+      const expected = naive(aspect);
+      layoutCloud(mixed, aspect).positions.forEach((p, i) => {
+        expect(p.x).toBeCloseTo(expected[i].x, 6);
+        expect(p.y).toBeCloseTo(expected[i].y, 6);
+      });
+    }
+  });
+
   it("returns an empty layout for no boxes", () => {
     expect(layoutCloud([])).toEqual({ positions: [], width: 0, height: 0 });
   });

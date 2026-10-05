@@ -81,6 +81,9 @@ describe("Tags screen, cloud view", () => {
     await screen.findByText("beach");
     expect(fontSizeOf("beach")).toBeGreaterThan(fontSizeOf("summer trip"));
     expect(fontSizeOf("summer trip")).toBeGreaterThan(fontSizeOf("sunset"));
+    // Three words leave the area (1200x800 in this setup) mostly empty, so the
+    // cloud is blown up as far as it goes: the largest font times 1.6.
+    expect(fontSizeOf("beach")).toBeCloseTo(46 * 1.6, 3);
     expect(screen.getByLabelText("beach (12 files)")).toBeTruthy();
   });
 

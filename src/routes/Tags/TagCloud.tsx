@@ -1,6 +1,6 @@
 // The tag screen's cloud view: the tags packed around a centre, each sized by
 // how many files carry it. Clicking one filters the library by it.
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Cloud } from "lucide-react";
 import { MAX_TAG_LIST } from "@shared/tags";
 import type { TagSummary } from "@/ipc/types";
@@ -114,6 +114,18 @@ export function TagCloud({
     return () => observer.disconnect();
   }, []);
 
+  // A web font that arrives after the labels were measured (the bundled emoji
+  // faces load on first use) changes their width; measure again when one does.
+  const [fontsLoaded, setFontsLoaded] = useState(0);
+  useEffect(() => {
+    // Absent in jsdom.
+    const fonts = document.fonts as FontFaceSet | undefined;
+    if (!fonts) return;
+    const bump = () => setFontsLoaded((n) => n + 1);
+    fonts.addEventListener("loadingdone", bump);
+    return () => fonts.removeEventListener("loadingdone", bump);
+  }, []);
+
   const fontFamily = viewport?.fontFamily;
   // Quantised: the packing is re-run only when the area changes shape
   // noticeably, not on every pixel of a window resize.
@@ -141,7 +153,9 @@ export function TagCloud({
       };
     });
     return { words, ...layoutCloud(words, aspect) };
-  }, [shown, fontFamily, aspect]);
+    // fontsLoaded is not read: it only invalidates the measurements.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, fontFamily, aspect, fontsLoaded]);
 
   const scale =
     cloud && viewport
