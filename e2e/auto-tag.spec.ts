@@ -37,11 +37,19 @@ test.describe("Auto tagging", () => {
     ).toBeVisible();
     await closeTopDialog(ready);
 
-    // The configuration was saved as it was edited, and the suggestion now
-    // reads as settled because the file carries the tag.
+    // Reopened, the screen is where it was left: the same tab is a click
+    // away, and the apply made before can still be taken back.
     await ready.getByRole("link", { name: "Auto tagging" }).click();
     await dialog.getByRole("tab", { name: /Suggestions/ }).click();
     await expect(dialog.getByText("✓ Applied")).toBeVisible();
+    await dialog.getByRole("button", { name: "Undo" }).click();
+
+    // Taken back, the entry reads as registered — it is in the dictionary, so
+    // it is not offered as a suggestion — with the file left to apply it to.
+    await expect(dialog.getByText("In the dictionary")).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Apply", exact: true }),
+    ).toBeVisible();
   });
 
   test("searches the library for a keyword's terms", async ({ ready }) => {
@@ -56,5 +64,27 @@ test.describe("Auto tagging", () => {
     await expect(ready).toHaveURL(/#\/$/);
     await expect(searchInput(ready)).toHaveValue("Sample|test");
     await expect(fileCard(ready)).toBeVisible();
+  });
+
+  test("shows a file from the review and comes back to where it was", async ({
+    ready,
+  }) => {
+    await ready.getByRole("link", { name: "Auto tagging" }).click();
+    const dialog = ready.getByRole("dialog");
+    await dialog.getByRole("tab", { name: "Review by file" }).click();
+    await expect(dialog.getByText("1 / 1")).toBeVisible();
+
+    // The detail view replaces the screen…
+    await dialog.getByRole("button", { name: "Show file" }).click();
+    await expect(ready).toHaveURL(/#\/file\/\d+\?ws=/);
+    await closeTopDialog(ready);
+    await expect(ready).toHaveURL(/#\/$/);
+
+    // …and reopening it lands on the review again, not on the first tab.
+    await ready.getByRole("link", { name: "Auto tagging" }).click();
+    await expect(
+      dialog.getByRole("tab", { name: "Review by file" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(dialog.getByText("1 / 1")).toBeVisible();
   });
 });

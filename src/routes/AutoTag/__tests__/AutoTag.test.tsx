@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { onSearchLibrary } from "@/lib/ui-events";
 import AutoTag from "@/routes/AutoTag";
+import { resetAutoTagSession } from "@/routes/AutoTag/session";
+import { resetViewState } from "@/routes/AutoTag/viewState";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import {
   defaultAutoTagConfig,
@@ -55,7 +57,9 @@ function library(): AutoTagLibrary {
 }
 
 async function renderScreen(tab?: string) {
-  renderWithProviders(<AutoTag />);
+  // At the screen's own route: a test that expects to land on the library
+  // ("#/") would otherwise pass without anything having navigated.
+  renderWithProviders(<AutoTag />, { route: "/auto-tag" });
   await screen.findByText("Pattern rules");
   if (tab) fireEvent.click(screen.getByRole("tab", { name: new RegExp(tab) }));
 }
@@ -71,6 +75,8 @@ async function lastSaved(): Promise<AutoTagConfig> {
 describe("AutoTag", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetViewState();
+    resetAutoTagSession();
     localStorage.clear();
     localStorage.setItem("meguri.lang", "en");
     mocks.autoTagGet.mockResolvedValue(defaultAutoTagConfig());
@@ -157,7 +163,6 @@ describe("AutoTag", () => {
     });
     const asked: string[][] = [];
     const off = onSearchLibrary((tokens) => asked.push(tokens));
-    window.location.hash = "#/auto-tag";
     await renderScreen();
     fireEvent.click(screen.getByRole("button", { name: /Yoga/ }));
     fireEvent.click(screen.getByRole("button", { name: "Search the library" }));
@@ -257,7 +262,7 @@ describe("AutoTag", () => {
     fireEvent.click(apply());
     await screen.findByText("✓ Applied");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Rules and dictionary" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Conditions" }));
     fireEvent.click(screen.getByRole("tab", { name: /Suggestions/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
     await waitFor(() =>
@@ -315,7 +320,6 @@ describe("AutoTag", () => {
     });
     const asked: string[][] = [];
     const off = onSearchLibrary((tokens) => asked.push(tokens));
-    window.location.hash = "#/auto-tag";
     await renderScreen("Suggestions");
     fireEvent.click(
       screen.getByRole("button", { name: "Search the library for “Yoga”" }),
@@ -325,6 +329,57 @@ describe("AutoTag", () => {
     // The tag and the spellings it was found under, as one token.
     expect(asked).toEqual([["Yoga|stretch"]]);
     expect(window.location.hash).toBe("#/");
+  });
+
+  it("shows a tag the dictionary already has as registered, not as a suggestion", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...defaultAutoTagConfig(),
+      keywords: [{ id: "k1", tag: "Yoga", aliases: [], mode: "word" }],
+    });
+    await renderScreen("Suggestions");
+    const row = screen.getByRole("checkbox", { name: "Yoga" }).closest("div")!;
+    expect(within(row).getByText("In the dictionary")).toBeTruthy();
+    // Not something to decide: it cannot be selected, registered or dismissed.
+    expect(screen.getByRole("checkbox", { name: "Yoga" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    expect(within(row).queryByRole("button", { name: "Ignore" })).toBeNull();
+    expect(
+      within(row).queryByRole("button", { name: "Add to dictionary" }),
+    ).toBeNull();
+    // Nor does it count as open: the badge shows the other candidates only
+    // (ABCD, Trip and Harbor — the file tagged "trip" still lacks none).
+    expect(
+      within(screen.getByRole("tab", { name: /Suggestions/ })).getByText("3"),
+    ).toBeTruthy();
+
+    // The files that do not carry the tag yet can still get it from here.
+    fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
+    expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
+      { workspaceId: "ws", fileIds: [1, 2], tags: ["Yoga"] },
+    ]);
+    await within(row).findByText("✓ Applied");
+  });
+
+  it("groups rules and the dictionary under one filter, named like their tab", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...defaultAutoTagConfig(),
+      keywords: [{ id: "k1", tag: "Yoga", aliases: [], mode: "word" }],
+    });
+    await renderScreen("Suggestions");
+    const filters = within(screen.getByRole("radiogroup", { name: "Filter" }));
+    expect(
+      filters.getAllByRole("radio").map((radio) => radio.textContent),
+    ).toEqual(["All4", "Conditions3", "Frequent words1"]);
+
+    // ABCD and Trip come from rules, Yoga from the dictionary; Harbor does not.
+    fireEvent.click(filters.getByRole("radio", { name: /Conditions/ }));
+    for (const name of ["ABCD", "Trip", "Yoga"]) {
+      expect(screen.getByRole("checkbox", { name })).toBeTruthy();
+    }
+    expect(screen.queryByRole("checkbox", { name: "Harbor" })).toBeNull();
   });
 
   it("offers frequent words and remembers the ones dismissed", async () => {
@@ -382,6 +437,56 @@ describe("AutoTag", () => {
     fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
     // The next reviewed file, not file 2, which this list does not show.
     await screen.findByText("3 / 5");
+    // At the end of the list it wraps round, still without leaving the list.
+    fireEvent.click(screen.getByRole("button", { name: "Update and next" }));
+    await screen.findByText("1 / 5");
+  });
+
+  it("creates nothing from a token when tagging the files failed", async () => {
+    mocks.autoTagApply.mockRejectedValue(new Error("disk full"));
+    await renderScreen("Review by file");
+    fireEvent.click(screen.getByRole("button", { name: "yoga" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add to dictionary and apply" }),
+    );
+    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+    // No entry, and no line claiming one was added.
+    expect(mocks.autoTagSet).not.toHaveBeenCalled();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("does not offer a dictionary entry the dictionary has no room for", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...defaultAutoTagConfig(),
+      keywords: Array.from({ length: 500 }, (_, i) => ({
+        id: `k${i}`,
+        tag: `Word${i}`,
+        aliases: [],
+        mode: "word" as const,
+      })),
+    });
+    await renderScreen("Review by file");
+    fireEvent.click(screen.getByRole("button", { name: "yoga" }));
+    expect(
+      screen.getByRole("button", { name: "Add to dictionary and apply" }),
+    ).toHaveProperty("disabled", true);
+  });
+
+  it("keeps the undo of a bulk apply through the next confirm and a tab switch", async () => {
+    await renderScreen("Review by file");
+    fireEvent.click(screen.getByRole("button", { name: "yoga" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add to dictionary and apply" }),
+    );
+    await screen.findByRole("status");
+
+    fireEvent.click(screen.getByRole("button", { name: /and next/ }));
+    await screen.findByText("2 / 5");
+    fireEvent.click(screen.getByRole("tab", { name: "Conditions" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Review by file" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(mocks.autoTagUndo).toHaveBeenCalled());
   });
 
   it("leaves a file unconfirmed when tagging it failed", async () => {
@@ -402,7 +507,7 @@ describe("AutoTag", () => {
     expect(screen.queryByText("Create tagging from “yoga”")).toBeNull();
     // Still on the screen: the modal did not take the key as well.
     expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(window.location.hash).toBe("#/");
+    expect(window.location.hash).toBe("#/auto-tag");
     expect(screen.getByText("1 / 5")).toBeTruthy();
   });
 
@@ -416,17 +521,58 @@ describe("AutoTag", () => {
     expect(screen.getByText("1 / 5")).toBeTruthy();
   });
 
-  it("makes a dictionary entry from a word in the file name", async () => {
+  it("makes a dictionary entry from a word and tags the files it matches", async () => {
     await renderScreen("Review by file");
     fireEvent.click(screen.getByRole("button", { name: "yoga" }));
     expect(screen.getByText("Create tagging from “yoga”")).toBeTruthy();
     // The option says how many files it would reach before anything is created.
     expect(screen.getByText("2 files match")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Add to dictionary" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add to dictionary and apply" }),
+    );
 
+    // Created, and applied to both files it matches — not only the open one.
+    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
+    expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
+      { workspaceId: "ws", fileIds: [1, 2], tags: ["yoga"] },
+    ]);
     expect((await lastSaved()).keywords).toMatchObject([{ tag: "yoga" }]);
-    // The new entry shows up as a proposal for this file straight away.
-    await screen.findByText("Keyword dictionary", { selector: "span" });
+    expect((await screen.findByRole("status")).textContent).toContain(
+      "Added “yoga” to the dictionary and tagged 2 files",
+    );
+
+    // The tags can be taken back; the entry stays.
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() =>
+      expect(mocks.autoTagUndo).toHaveBeenCalledWith(["undo-1"]),
+    );
+    expect((await lastSaved()).keywords).toMatchObject([{ tag: "yoga" }]);
+  });
+
+  it("makes a rule from a code and tags each file with what the rule gives it", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...defaultAutoTagConfig(),
+      // Without the built-in prefix rule, so the token offers to create it.
+      rules: defaultAutoTagConfig().rules.filter((r) => r.id !== "prefix"),
+    });
+    await renderScreen("Review by file");
+    fireEvent.click(screen.getByRole("button", { name: "ABCD-123" }));
+    fireEvent.click(
+      screen.getByRole("radio", { name: /Turn every code prefix into a tag/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add rule and apply" }));
+
+    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
+    // The built-in rule again, excludes included: the camera file (IMG-2041)
+    // is not tagged.
+    expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
+      { workspaceId: "ws", fileIds: [1, 2], tags: ["ABCD"] },
+    ]);
+    expect((await lastSaved()).rules.at(-1)).toMatchObject({
+      kind: "prefix",
+      template: "$1",
+      exclude: "IMG, DSC, MVI",
+    });
   });
 
   it("leaves rules out of the analysis after a visit that never finished", async () => {
@@ -468,5 +614,85 @@ describe("AutoTag", () => {
     // Only the decision made here goes to the dictionary.
     expect((await lastSaved()).keywords).toMatchObject([{ tag: "Harbor" }]);
     expect(await screen.findByRole("status")).toBeTruthy();
+  });
+
+  describe("coming back to the screen", () => {
+    /** Open the screen, as the route does each time it is entered. */
+    async function open() {
+      const view = renderWithProviders(<AutoTag />, { route: "/auto-tag" });
+      await screen.findByRole("tablist");
+      await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
+      return view;
+    }
+
+    it("shows the file being reviewed, and returns to it when reopened", async () => {
+      const first = await open();
+      fireEvent.click(screen.getByRole("tab", { name: "Review by file" }));
+      fireEvent.keyDown(window, { key: "j" });
+      expect(screen.getByText("2 / 5")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Show file" }));
+      // The file's own detail route, in its own workspace.
+      expect(window.location.hash).toBe("#/file/2?ws=ws");
+      first.unmount();
+
+      await open();
+      // The same tab and the same file, not the first tab and the first file.
+      expect(
+        screen.getByRole("tab", { name: "Review by file" }),
+      ).toHaveProperty("ariaSelected", "true");
+      expect(screen.getByText("2 / 5")).toBeTruthy();
+    });
+
+    it("remembers what was selected and filtered on each tab", async () => {
+      mocks.autoTagGet.mockResolvedValue({
+        ...defaultAutoTagConfig(),
+        keywords: [{ id: "k1", tag: "Yoga", aliases: [], mode: "word" }],
+      });
+      const first = await open();
+      // Conditions: a keyword selected instead of the first rule.
+      fireEvent.click(screen.getByRole("button", { name: /Yoga/ }));
+      // Suggestions: a filter and an expanded row.
+      fireEvent.click(screen.getByRole("tab", { name: /Suggestions/ }));
+      fireEvent.click(screen.getByRole("radio", { name: /Frequent words/ }));
+      // Terms: a search.
+      fireEvent.click(screen.getByRole("tab", { name: "Sort terms" }));
+      fireEvent.change(screen.getByLabelText("Search terms"), {
+        target: { value: "harb" },
+      });
+      first.unmount();
+
+      await open();
+      expect(screen.getByLabelText("Search terms")).toHaveProperty(
+        "value",
+        "harb",
+      );
+      fireEvent.click(screen.getByRole("tab", { name: /Suggestions/ }));
+      expect(
+        screen.getByRole("radio", { name: /Frequent words/ }),
+      ).toHaveProperty("ariaChecked", "true");
+      fireEvent.click(screen.getByRole("tab", { name: "Conditions" }));
+      expect(screen.getByText("Matching files")).toBeTruthy();
+    });
+
+    it("keeps the review's decisions while the file list is the same", async () => {
+      const first = await open();
+      fireEvent.click(screen.getByRole("tab", { name: "Review by file" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm and next" }));
+      await screen.findByText("2 of 5 files reviewed");
+      first.unmount();
+
+      const second = await open();
+      expect(screen.getByText("2 of 5 files reviewed")).toBeTruthy();
+      second.unmount();
+
+      // A different list: positions no longer mean the same files.
+      const changed = library();
+      changed.files = changed.files.slice(1);
+      changed.total = changed.files.length;
+      mocks.autoTagFiles.mockResolvedValue(changed);
+      await open();
+      expect(screen.getByText("1 of 4 files reviewed")).toBeTruthy();
+    });
   });
 });

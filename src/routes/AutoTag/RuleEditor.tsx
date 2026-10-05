@@ -1,6 +1,6 @@
 // Editor for one pattern rule, with a live test of it against the library's own
 // file names.
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import {
 } from "@shared/autoTag";
 import { segments } from "@shared/autoTagAnalysis";
 import { FIELD, MAX_ROWS, MONO, ruleDisplayName } from "./helpers";
+import { useViewState } from "./viewState";
 import { Chip, Highlighted, MoreRows, Segmented, SmallButton } from "./parts";
 
 const CASE_LABELS: Record<CaseMode, TranslationKey> = {
@@ -39,7 +40,10 @@ export function RuleEditor({
   onDelete: () => void;
 }) {
   const { t } = useI18n();
-  const [onlyMatches, setOnlyMatches] = useState(false);
+  const [onlyMatches, setOnlyMatches] = useViewState(
+    "conditions.onlyMatches",
+    false,
+  );
 
   const pattern = compilePattern(rule.pattern, rule.ci);
   const patternError = rule.pattern && "error" in pattern ? pattern.error : "";

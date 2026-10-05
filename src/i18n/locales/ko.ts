@@ -514,7 +514,7 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.undoFailed": "되돌리지 못했습니다.",
   "autoTag.moreRows": "{count}개 더 있음(표시 안 함)",
   "autoTag.fileCount": "{count}개",
-  "autoTag.tab.rules": "규칙과 사전",
+  "autoTag.tab.conditions": "조건",
   "autoTag.tab.suggest": "제안",
   "autoTag.tab.review": "파일별 검토",
   "autoTag.tab.terms": "어구 정리",
@@ -586,8 +586,6 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.reanalyze": "모든 파일 다시 분석",
   "autoTag.filter.label": "필터",
   "autoTag.filter.all": "전체",
-  "autoTag.filter.rule": "규칙",
-  "autoTag.filter.keyword": "키워드",
   "autoTag.filter.frequent": "빈출어",
   "autoTag.origin.keyword": "키워드",
   "autoTag.origin.frequent": "빈출어",
@@ -607,6 +605,7 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.revert": "되돌리기",
   "autoTag.status.applied": "✓ 붙임",
   "autoTag.status.dict": "✓ 붙임·사전 등록됨",
+  "autoTag.status.registered": "사전에 등록됨",
   "autoTag.status.ignored": "무시됨",
   "autoTag.appliedOne": '"{tag}"를 {files}개 파일에 붙였습니다.',
   "autoTag.appliedMany": "태그 {tags}개를 {files}개 파일에 붙였습니다.",
@@ -631,6 +630,9 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.review.confirmAllOk": "확정",
   "autoTag.review.confirmedAll":
     "{count}개 파일의 태그를 확정했습니다({added}개 붙임)",
+  "autoTag.review.openFile": "파일 보기",
+  "autoTag.review.openFileHint":
+    "이 파일의 상세 화면을 엽니다. 자동 태그 화면을 다시 열면 이 파일로 돌아옵니다",
   "autoTag.review.tokenHint":
     "파일 이름의 일부를 클릭하면 규칙을 만들 수 있습니다",
   "autoTag.review.noProposals": "제안 없음",
@@ -648,12 +650,12 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.review.matches": "일치 {count}개 파일",
   "autoTag.review.moreFiles": "… 외 {count}개 파일",
   "autoTag.review.alreadyRegistered": "이미 등록되어 만들 수 없습니다",
-  "autoTag.review.createRule": "규칙 추가",
-  "autoTag.review.addTag": "태그 붙이기",
   "autoTag.review.ruleAdded":
-    '규칙 "{name}"을 추가했습니다 · {files}개 파일에 제안 반영',
+    '규칙 "{name}"을 추가하고 {files}개 파일에 태그를 붙였습니다',
   "autoTag.review.keywordAdded":
-    '키워드 "{tag}"를 사전에 등록했습니다 · {files}개 파일에 제안 반영',
+    '키워드 "{tag}"를 사전에 등록하고 {files}개 파일에 태그를 붙였습니다',
+  "autoTag.review.createRule": "규칙 추가 후 붙이기",
+  "autoTag.review.addTag": "태그 붙이기",
   "autoTag.review.tagsToApply": "붙일 태그",
   "autoTag.review.applyTag": '"{tag}" 붙이기',
   "autoTag.review.sourceRule": "규칙: {name}",

@@ -517,7 +517,7 @@ export const ja = {
   "autoTag.undoFailed": "元に戻せませんでした。",
   "autoTag.moreRows": "ほか{count}件は表示していません",
   "autoTag.fileCount": "{count} 件",
-  "autoTag.tab.rules": "ルールと辞書",
+  "autoTag.tab.conditions": "条件",
   "autoTag.tab.suggest": "既存ファイルから提案",
   "autoTag.tab.review": "ファイルごとにレビュー",
   "autoTag.tab.terms": "語句の整理",
@@ -589,8 +589,6 @@ export const ja = {
   "autoTag.reanalyze": "全ファイルを再解析",
   "autoTag.filter.label": "絞り込み",
   "autoTag.filter.all": "すべて",
-  "autoTag.filter.rule": "ルール",
-  "autoTag.filter.keyword": "キーワード",
   "autoTag.filter.frequent": "頻出語",
   "autoTag.origin.keyword": "キーワード",
   "autoTag.origin.frequent": "頻出語",
@@ -610,6 +608,7 @@ export const ja = {
   "autoTag.revert": "元に戻す",
   "autoTag.status.applied": "✓ 付与済み",
   "autoTag.status.dict": "✓ 付与・辞書登録済み",
+  "autoTag.status.registered": "辞書に登録済み",
   "autoTag.status.ignored": "無視",
   "autoTag.appliedOne": "「{tag}」を {files} ファイルに付与しました。",
   "autoTag.appliedMany": "{tags} 個のタグを {files} ファイルに付与しました。",
@@ -634,6 +633,9 @@ export const ja = {
   "autoTag.review.confirmAllOk": "確定する",
   "autoTag.review.confirmedAll":
     "{count} ファイルのタグを確定しました（{added} 件を付与）",
+  "autoTag.review.openFile": "ファイルを表示",
+  "autoTag.review.openFileHint":
+    "このファイルの詳細を開きます。自動タグ付けの画面は、開き直すとこのファイルに戻ります",
   "autoTag.review.tokenHint":
     "ファイル名の一部をクリックするとルールを作成できます",
   "autoTag.review.noProposals": "提案なし",
@@ -651,12 +653,12 @@ export const ja = {
   "autoTag.review.matches": "一致 {count} ファイル",
   "autoTag.review.moreFiles": "… 他 {count} ファイル",
   "autoTag.review.alreadyRegistered": "登録済みのため作成できません",
-  "autoTag.review.createRule": "ルールを追加",
+  "autoTag.review.createRule": "ルールを追加して付与",
   "autoTag.review.addTag": "タグを付与",
   "autoTag.review.ruleAdded":
-    "ルール「{name}」を追加しました · {files} ファイルに提案を反映",
+    "ルール「{name}」を追加し、{files} ファイルにタグを付与しました",
   "autoTag.review.keywordAdded":
-    "キーワード「{tag}」を辞書に登録しました · {files} ファイルに提案を反映",
+    "キーワード「{tag}」を辞書に登録し、{files} ファイルにタグを付与しました",
   "autoTag.review.tagsToApply": "付与するタグ",
   "autoTag.review.applyTag": "「{tag}」を付与する",
   "autoTag.review.sourceRule": "ルール: {name}",

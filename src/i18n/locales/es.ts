@@ -531,7 +531,7 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.undoFailed": "No se pudo deshacer.",
   "autoTag.moreRows": "{count} más sin mostrar",
   "autoTag.fileCount": "{count} archivos",
-  "autoTag.tab.rules": "Reglas y diccionario",
+  "autoTag.tab.conditions": "Condiciones",
   "autoTag.tab.suggest": "Sugerencias",
   "autoTag.tab.review": "Revisar por archivo",
   "autoTag.tab.terms": "Ordenar términos",
@@ -605,8 +605,6 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.reanalyze": "Volver a analizar todo",
   "autoTag.filter.label": "Filtro",
   "autoTag.filter.all": "Todo",
-  "autoTag.filter.rule": "Reglas",
-  "autoTag.filter.keyword": "Palabras clave",
   "autoTag.filter.frequent": "Palabras frecuentes",
   "autoTag.origin.keyword": "Palabra clave",
   "autoTag.origin.frequent": "Palabra frecuente",
@@ -626,6 +624,7 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.revert": "Deshacer",
   "autoTag.status.applied": "✓ Aplicada",
   "autoTag.status.dict": "✓ Aplicada y en el diccionario",
+  "autoTag.status.registered": "En el diccionario",
   "autoTag.status.ignored": "Ignorada",
   "autoTag.appliedOne": "Se aplicó «{tag}» a {files} archivos.",
   "autoTag.appliedMany": "Se aplicaron {tags} etiquetas a {files} archivos.",
@@ -650,6 +649,9 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.review.confirmAllOk": "Confirmar",
   "autoTag.review.confirmedAll":
     "{count} archivos confirmados ({added} etiquetas aplicadas)",
+  "autoTag.review.openFile": "Mostrar archivo",
+  "autoTag.review.openFileHint":
+    "Abre el detalle de este archivo. El etiquetado automático vuelve a este archivo al reabrirlo",
   "autoTag.review.tokenHint":
     "Haz clic en una parte del nombre para crear una regla",
   "autoTag.review.noProposals": "Sin propuestas",
@@ -669,12 +671,12 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.review.matches": "{count} archivos coinciden",
   "autoTag.review.moreFiles": "… y {count} archivos más",
   "autoTag.review.alreadyRegistered": "Ya está registrado; no se puede crear",
-  "autoTag.review.createRule": "Añadir regla",
+  "autoTag.review.createRule": "Añadir regla y aplicar",
   "autoTag.review.addTag": "Añadir etiqueta",
   "autoTag.review.ruleAdded":
-    "Regla «{name}» añadida · propuestas actualizadas en {files} archivos",
+    "Regla «{name}» añadida y {files} archivos etiquetados",
   "autoTag.review.keywordAdded":
-    "«{tag}» añadida al diccionario · propuestas actualizadas en {files} archivos",
+    "«{tag}» añadida al diccionario y {files} archivos etiquetados",
   "autoTag.review.tagsToApply": "Etiquetas a aplicar",
   "autoTag.review.applyTag": "Aplicar «{tag}»",
   "autoTag.review.sourceRule": "Regla: {name}",

@@ -1,6 +1,7 @@
-// Rules and dictionary tab: everything that decides which tags a file name
-// gets. Pattern rules and dictionary entries sit in one list — both are "found
-// in the name, so tag it" — and the pane beside it edits whichever is selected.
+// Conditions tab: everything that decides which tags a file name gets. Pattern
+// rules and dictionary entries sit in one list — both are conditions of the
+// form "found in the name, so tag it" — and the pane beside it edits whichever
+// is selected.
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -35,6 +36,7 @@ import {
 } from "./parts";
 import { RuleEditor } from "./RuleEditor";
 import type { AutoTagState } from "./useAutoTag";
+import { useViewState } from "./viewState";
 
 const KIND_LABELS: Record<RuleKind, TranslationKey> = {
   prefix: "autoTag.kind.prefix",
@@ -49,17 +51,20 @@ const FILTER_FROM = 8;
 
 type Selection = { kind: "rule" | "keyword"; id: string };
 
-export function EngineTab({ state }: { state: AutoTagState }) {
+export function ConditionsTab({ state }: { state: AutoTagState }) {
   const { t } = useI18n();
   const confirm = useConfirm();
   const { config, update, names, existing } = state;
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [selection, setSelection] = useViewState<Selection | null>(
+    "conditions.selection",
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ files: number; added: number } | null>(
     null,
   );
-  const [collapsed, setCollapsed] = useState(false);
-  const [filter, setFilter] = useState("");
+  const [collapsed, setCollapsed] = useViewState("conditions.collapsed", false);
+  const [filter, setFilter] = useViewState("conditions.filter", "");
   const [draft, setDraft] = useState("");
 
   // In safe mode no rule is run against the library: one of them hung the

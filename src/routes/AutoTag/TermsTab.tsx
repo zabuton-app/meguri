@@ -30,6 +30,7 @@ import {
 } from "./parts";
 import type { AutoTagSession, TermDecision } from "./session";
 import type { AutoTagState, UndoHandle } from "./useAutoTag";
+import { useViewState } from "./viewState";
 
 const TYPE_LABELS: Record<TermType, TranslationKey> = {
   code: "autoTag.terms.typeCode",
@@ -66,12 +67,12 @@ export function TermsTab({
   const terms = useMemo(() => extractTerms(names, BUILTIN_STOP), [names]);
 
   const { overrides, setOverrides } = session;
-  const [type, setType] = useState<TypeFilter>("all");
-  const [onlyOpen, setOnlyOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<string | null>(null);
+  const [type, setType] = useViewState<TypeFilter>("terms.type", "all");
+  const [onlyOpen, setOnlyOpen] = useViewState("terms.onlyOpen", false);
+  const [query, setQuery] = useViewState("terms.query", "");
+  const [open, setOpen] = useViewState<string | null>("terms.open", null);
   const [mergeDraft, setMergeDraft] = useState("");
-  const [saveDict, setSaveDict] = useState(true);
+  const [saveDict, setSaveDict] = useViewState("terms.saveDict", true);
   const [notice, setNotice] = useState<{
     text: string;
     undo?: UndoHandle;

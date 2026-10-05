@@ -13,7 +13,6 @@ import {
   candidateGroup,
   segments,
   type Candidate,
-  type CandidateGroup,
   type CandidateOrigin,
 } from "@shared/autoTagAnalysis";
 import { isAutoMetaValue } from "./autoMeta";
@@ -31,6 +30,7 @@ import {
 } from "./parts";
 import type { AutoTagSession } from "./session";
 import type { AutoTagState } from "./useAutoTag";
+import { useViewState } from "./viewState";
 
 const ORIGIN_LABELS: Record<CandidateOrigin, TranslationKey> = {
   prefix: "autoTag.kind.prefix",
@@ -40,14 +40,19 @@ const ORIGIN_LABELS: Record<CandidateOrigin, TranslationKey> = {
   frequent: "autoTag.origin.frequent",
 };
 
-type Filter = "all" | CandidateGroup;
+// Rules and the dictionary are one group here, as they are one tab: both are
+// what the Conditions tab already produces, as opposed to the frequent words
+// nothing produces yet.
+type Filter = "all" | "conditions" | "frequent";
 
 const FILTER_LABELS: Record<Filter, TranslationKey> = {
   all: "autoTag.filter.all",
-  rule: "autoTag.filter.rule",
-  keyword: "autoTag.filter.keyword",
+  conditions: "autoTag.tab.conditions",
   frequent: "autoTag.filter.frequent",
 };
+
+const filterOf = (c: Candidate): Exclude<Filter, "all"> =>
+  candidateGroup(c) === "frequent" ? "frequent" : "conditions";
 
 /** Files shown when a candidate is expanded. */
 const MAX_EXPANDED_FILES = 50;
@@ -64,9 +69,12 @@ export function SuggestTab({
   const { t } = useI18n();
   const navigate = useNavigate();
   const { config, update, fileTags, existing, names } = state;
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useViewState<Filter>("suggest.filter", "all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useViewState<string | null>(
+    "suggest.expanded",
+    null,
+  );
   const { done, setDone } = session;
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -77,23 +85,26 @@ export function SuggestTab({
     [config.keywords],
   );
 
-  type Status = "pending" | "applied" | "dict" | "ignored";
+  // "registered": the dictionary already has an entry for this tag. That is
+  // not a suggestion — it was decided on the Conditions tab, which is
+  // where it is managed — so the row says so instead of asking again.
+  type Status = "pending" | "applied" | "dict" | "ignored" | "registered";
   const statusOf = (c: Candidate): Status => {
     const session = done.get(c.key);
     if (session) return session.dict ? "dict" : "applied";
     if (ignored.has(c.key)) return "ignored";
+    if (dictionary.has(c.key)) return "registered";
     return isApplied(c, fileTags) ? "applied" : "pending";
   };
 
   const counts: Record<Filter, number> = {
     all: candidates.length,
-    rule: 0,
-    keyword: 0,
+    conditions: 0,
     frequent: 0,
   };
-  for (const c of candidates) counts[candidateGroup(c)]++;
+  for (const c of candidates) counts[filterOf(c)]++;
   const shown = candidates.filter(
-    (c) => filter === "all" || candidateGroup(c) === filter,
+    (c) => filter === "all" || filterOf(c) === filter,
   );
   const pendingShown = shown.filter((c) => statusOf(c) === "pending");
   const picked = pendingShown.filter((c) => selected.has(c.key));
@@ -105,7 +116,7 @@ export function SuggestTab({
     return set.size;
   };
 
-  // Worth a dictionary entry: nothing in "Rules and dictionary" produces it yet.
+  // Worth a dictionary entry: nothing on the Conditions tab produces it yet.
   // A candidate that comes from a rule or from the dictionary is already
   // managed there, so for those applying is all there is to do.
   const canRegister = (c: Candidate): boolean =>
@@ -220,7 +231,7 @@ export function SuggestTab({
           label={t("autoTag.filter.label")}
           value={filter}
           onChange={setFilter}
-          options={(["all", "rule", "keyword", "frequent"] as const).map(
+          options={(["all", "conditions", "frequent"] as const).map(
             (value) => ({
               value,
               label: t(FILTER_LABELS[value]),
@@ -348,13 +359,15 @@ export function SuggestTab({
                   {status === "pending" ? (
                     <>
                       {/* Registering is the main action where it applies:
-                          the tag then keeps being applied by "Rules and
-                          dictionary" instead of this once. */}
+                          the tag then keeps being applied by the Conditions
+                          tab's dictionary instead of this once. */}
                       {canRegister(c) && (
                         <SmallButton
                           variant="primary"
                           className="h-[26px]"
                           disabled={busy}
+                          // The short label fits the row; what it does in full.
+                          title={t("autoTag.applySelectedDict")}
                           onClick={() => void apply([c], true)}
                         >
                           {t("autoTag.addToDictionary")}
@@ -378,6 +391,24 @@ export function SuggestTab({
                       >
                         {t("autoTag.ignore")}
                       </SmallButton>
+                    </>
+                  ) : status === "registered" ? (
+                    <>
+                      <span className="whitespace-nowrap text-xs text-primary">
+                        {t("autoTag.status.registered")}
+                      </span>
+                      {/* Registered does not mean applied: files already in
+                          the library only get the tag from a scan, a re-apply
+                          — or here. */}
+                      {!isApplied(c, fileTags) && (
+                        <SmallButton
+                          className="h-[26px] border-border px-2"
+                          disabled={busy}
+                          onClick={() => void apply([c], false)}
+                        >
+                          {t("autoTag.apply")}
+                        </SmallButton>
+                      )}
                     </>
                   ) : (
                     <>

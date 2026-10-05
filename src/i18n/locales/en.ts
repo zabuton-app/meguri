@@ -516,7 +516,7 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.undoFailed": "Could not undo.",
   "autoTag.moreRows": "{count} more not shown",
   "autoTag.fileCount": "{count} files",
-  "autoTag.tab.rules": "Rules and dictionary",
+  "autoTag.tab.conditions": "Conditions",
   "autoTag.tab.suggest": "Suggestions",
   "autoTag.tab.review": "Review by file",
   "autoTag.tab.terms": "Sort terms",
@@ -589,8 +589,6 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.reanalyze": "Re-analyze all files",
   "autoTag.filter.label": "Filter",
   "autoTag.filter.all": "All",
-  "autoTag.filter.rule": "Rules",
-  "autoTag.filter.keyword": "Keywords",
   "autoTag.filter.frequent": "Frequent words",
   "autoTag.origin.keyword": "Keyword",
   "autoTag.origin.frequent": "Frequent word",
@@ -610,6 +608,7 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.revert": "Undo",
   "autoTag.status.applied": "✓ Applied",
   "autoTag.status.dict": "✓ Applied and in dictionary",
+  "autoTag.status.registered": "In the dictionary",
   "autoTag.status.ignored": "Ignored",
   "autoTag.appliedOne": "Applied “{tag}” to {files} files.",
   "autoTag.appliedMany": "Applied {tags} tags to {files} files.",
@@ -634,6 +633,9 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.review.confirmAllOk": "Confirm",
   "autoTag.review.confirmedAll":
     "Confirmed {count} files ({added} tags applied)",
+  "autoTag.review.openFile": "Show file",
+  "autoTag.review.openFileHint":
+    "Opens this file’s detail view. Auto tagging returns to this file when reopened",
   "autoTag.review.tokenHint":
     "Click a part of the file name to make a rule from it",
   "autoTag.review.noProposals": "No proposals",
@@ -652,12 +654,11 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.review.moreFiles": "… and {count} more files",
   "autoTag.review.alreadyRegistered":
     "Already registered, so it cannot be created",
-  "autoTag.review.createRule": "Add rule",
+  "autoTag.review.createRule": "Add rule and apply",
   "autoTag.review.addTag": "Add tag",
-  "autoTag.review.ruleAdded":
-    "Added rule “{name}” · proposals updated for {files} files",
+  "autoTag.review.ruleAdded": "Added rule “{name}” and tagged {files} files",
   "autoTag.review.keywordAdded":
-    "Added “{tag}” to the dictionary · proposals updated for {files} files",
+    "Added “{tag}” to the dictionary and tagged {files} files",
   "autoTag.review.tagsToApply": "Tags to apply",
   "autoTag.review.applyTag": "Apply “{tag}”",
   "autoTag.review.sourceRule": "Rule: {name}",

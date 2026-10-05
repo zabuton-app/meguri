@@ -63,8 +63,11 @@ export interface AutoTagState {
   /** Words never offered as tags. */
   stop: Set<string>;
   loading: boolean;
-  /** Counts loads of the file list; positions are only comparable within one. */
-  generation: number;
+  /**
+   * Identifies the loaded file list: the same files in the same order give the
+   * same key. Positions are only comparable between lists with the same key.
+   */
+  listKey: string;
   reload: () => void;
   /** Attach tags (file position → names). Tags a file already has are skipped. */
   apply: (perFile: Map<number, string[]>) => Promise<ApplyOutcome>;
@@ -158,7 +161,6 @@ export function useAutoTag(): AutoTagState | null {
   const [config, setConfig] = useState<AutoTagConfig | null>(null);
   const [library, setLibrary] = useState<AutoTagLibrary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [generation, setGeneration] = useState(0);
   /** Counts completed loads of the file list. */
   const [loadedAt, setLoadedAt] = useState(0);
 
@@ -177,7 +179,6 @@ export function useAutoTag(): AutoTagState | null {
   );
   const load = useCallback(() => {
     setLoading(true);
-    setGeneration((n) => n + 1);
     void fetchLibrary();
   }, [fetchLibrary]);
 
@@ -249,6 +250,20 @@ export function useAutoTag(): AutoTagState | null {
   );
 
   const files = library?.files;
+  // A cheap fingerprint of which files are listed, in which order. Keyed on
+  // the load like `names` below: applying tags never changes which files.
+  const listKey = useMemo(() => {
+    let hash = 0;
+    for (const file of files ?? []) {
+      const text = `${file.workspaceId}:${file.id}`;
+      for (let i = 0; i < text.length; i++) {
+        hash = (Math.imul(hash, 31) + text.charCodeAt(i)) | 0;
+      }
+    }
+    return `${files?.length ?? 0}:${hash}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedAt]);
+
   // Keyed on the load, not on `files`: applying tags replaces the file objects
   // but never their names, and a new array here would rerun every analysis.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -451,7 +466,7 @@ export function useAutoTag(): AutoTagState | null {
     loading,
     safeMode,
     leaveSafeMode: () => setSafeMode(false),
-    generation,
+    listKey,
     reload: load,
     apply,
     undo,

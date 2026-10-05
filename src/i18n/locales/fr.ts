@@ -533,7 +533,7 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.undoFailed": "Impossible d’annuler.",
   "autoTag.moreRows": "{count} autres non affichés",
   "autoTag.fileCount": "{count} fichiers",
-  "autoTag.tab.rules": "Règles et dictionnaire",
+  "autoTag.tab.conditions": "Conditions",
   "autoTag.tab.suggest": "Suggestions",
   "autoTag.tab.review": "Revue par fichier",
   "autoTag.tab.terms": "Trier les termes",
@@ -607,8 +607,6 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.reanalyze": "Réanalyser tous les fichiers",
   "autoTag.filter.label": "Filtre",
   "autoTag.filter.all": "Tout",
-  "autoTag.filter.rule": "Règles",
-  "autoTag.filter.keyword": "Mots-clés",
   "autoTag.filter.frequent": "Mots fréquents",
   "autoTag.origin.keyword": "Mot-clé",
   "autoTag.origin.frequent": "Mot fréquent",
@@ -628,6 +626,7 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.revert": "Annuler",
   "autoTag.status.applied": "✓ Appliquée",
   "autoTag.status.dict": "✓ Appliquée et au dictionnaire",
+  "autoTag.status.registered": "Dans le dictionnaire",
   "autoTag.status.ignored": "Ignorée",
   "autoTag.appliedOne": "« {tag} » appliquée à {files} fichiers.",
   "autoTag.appliedMany": "{tags} étiquettes appliquées à {files} fichiers.",
@@ -653,6 +652,9 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.review.confirmAllOk": "Confirmer",
   "autoTag.review.confirmedAll":
     "{count} fichiers confirmés ({added} étiquettes appliquées)",
+  "autoTag.review.openFile": "Afficher le fichier",
+  "autoTag.review.openFileHint":
+    "Ouvre le détail de ce fichier. L’étiquetage automatique revient à ce fichier à la réouverture",
   "autoTag.review.tokenHint":
     "Cliquez sur une partie du nom pour en faire une règle",
   "autoTag.review.noProposals": "Aucune proposition",
@@ -672,12 +674,12 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.review.matches": "{count} fichiers correspondent",
   "autoTag.review.moreFiles": "… et {count} autres fichiers",
   "autoTag.review.alreadyRegistered": "Déjà enregistré ; création impossible",
-  "autoTag.review.createRule": "Ajouter la règle",
+  "autoTag.review.createRule": "Ajouter la règle et appliquer",
   "autoTag.review.addTag": "Ajouter l’étiquette",
   "autoTag.review.ruleAdded":
-    "Règle « {name} » ajoutée · propositions mises à jour pour {files} fichiers",
+    "Règle « {name} » ajoutée et {files} fichiers étiquetés",
   "autoTag.review.keywordAdded":
-    "« {tag} » ajouté au dictionnaire · propositions mises à jour pour {files} fichiers",
+    "« {tag} » ajouté au dictionnaire et {files} fichiers étiquetés",
   "autoTag.review.tagsToApply": "Étiquettes à appliquer",
   "autoTag.review.applyTag": "Appliquer « {tag} »",
   "autoTag.review.sourceRule": "Règle : {name}",

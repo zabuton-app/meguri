@@ -2,26 +2,27 @@
 // their names, and three ways to bring an existing library in line with them:
 // suggestions, a file-by-file review, and sorting the library's own vocabulary.
 // Overlays the library as a modal, like /tags and /history.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import { suggestCandidates } from "@shared/autoTagAnalysis";
-import { EngineTab } from "./EngineTab";
+import { ConditionsTab } from "./ConditionsTab";
 import { ReviewTab } from "./ReviewTab";
 import { isApplied } from "./helpers";
 import { useAutoTagSession } from "./session";
 import { SuggestTab } from "./SuggestTab";
 import { TermsTab } from "./TermsTab";
 import { useAutoTag } from "./useAutoTag";
+import { useViewState } from "./viewState";
 
-const TABS = ["rules", "suggest", "review", "terms"] as const;
+const TABS = ["conditions", "suggest", "review", "terms"] as const;
 type TabId = (typeof TABS)[number];
 
 const TAB_LABELS: Record<TabId, TranslationKey> = {
-  rules: "autoTag.tab.rules",
+  conditions: "autoTag.tab.conditions",
   suggest: "autoTag.tab.suggest",
   review: "autoTag.tab.review",
   terms: "autoTag.tab.terms",
@@ -36,9 +37,9 @@ export default function AutoTag() {
   const onClose = useCallback(() => {
     void navigate("/");
   }, [navigate]);
-  const [tab, setTab] = useState<TabId>("rules");
+  const [tab, setTab] = useViewState<TabId>("tab", "conditions");
   const state = useAutoTag();
-  const session = useAutoTagSession(state?.generation ?? 0);
+  const session = useAutoTagSession(state?.listKey ?? null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -66,8 +67,15 @@ export default function AutoTag() {
   const pending = useMemo(() => {
     if (!state) return 0;
     const ignored = new Set(state.config.ignored);
+    // What is already in the dictionary is not waiting for a decision.
+    const registered = new Set(
+      state.config.keywords.map((k) => k.tag.toLowerCase()),
+    );
     return candidates.filter(
-      (c) => !ignored.has(c.key) && !isApplied(c, state.fileTags),
+      (c) =>
+        !ignored.has(c.key) &&
+        !registered.has(c.key) &&
+        !isApplied(c, state.fileTags),
     ).length;
   }, [candidates, state]);
 
@@ -172,8 +180,8 @@ export default function AutoTag() {
             <p className="p-8 text-center text-[13px] text-muted">
               {t("autoTag.loading")}
             </p>
-          ) : tab === "rules" ? (
-            <EngineTab state={state} />
+          ) : tab === "conditions" ? (
+            <ConditionsTab state={state} />
           ) : tab === "suggest" ? (
             <SuggestTab
               state={state}

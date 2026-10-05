@@ -1,22 +1,24 @@
 // Review tab: go through the files one by one, confirm the tags proposed for
 // each, and turn a part of a file name into a rule or a dictionary entry.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
+import { ExternalLink } from "lucide-react";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import {
   MAX_AUTO_TAG_RULES,
-  PREFIX_PATTERN,
   cleanTagName,
   compileKeyword,
   compileRule,
+  defaultRules,
   isUsableTagName,
   proposalsFor,
   runKeyword,
   runRule,
+  type KeywordEntry,
   type Proposal,
-  type RuleKind,
   type TagRule,
 } from "@shared/autoTag";
 import {
@@ -39,7 +41,8 @@ import {
   Toolbar,
 } from "./parts";
 import type { AutoTagSession } from "./session";
-import type { AutoTagState, UndoHandle } from "./useAutoTag";
+import type { AutoTagState } from "./useAutoTag";
+import { peekViewState, rememberViewState, useViewState } from "./viewState";
 
 type Filter = "todo" | "done" | "all";
 
@@ -49,21 +52,33 @@ const BRACKET_LABELS: Record<BracketKind, TranslationKey> = {
   kagi: "autoTag.rule.kagi",
 };
 
+const REVIEW_FILE_KEY = "review.file";
+type FileRef = { workspaceId: string; id: number };
+
 /** Rows of the file list drawn at once, as a window around the current file. */
 const LIST_WINDOW = 200;
 
+/**
+ * What a clicked token can be turned into. A rule option carries the rule it
+ * would create (without an id), so the files counted, the tags applied and the
+ * rule saved all come from the one object.
+ */
 type Option =
-  | {
-      kind: "rule";
-      title: string;
-      ruleKind: RuleKind;
-      ruleName: string;
-      pattern: string;
-      template: string;
-      split: boolean;
-    }
+  | { kind: "rule"; title: string; rule: Omit<TagRule, "id"> }
   | { kind: "keyword"; title: string; tag: string }
   | { kind: "once"; title: string; tag: string };
+
+const draftRule = (
+  rule: Pick<TagRule, "name" | "kind" | "pattern" | "template"> &
+    Partial<TagRule>,
+): Omit<TagRule, "id"> => ({
+  exclude: "",
+  ci: false,
+  split: false,
+  caseMode: "keep",
+  enabled: true,
+  ...rule,
+});
 
 const escapeRegExp = (s: string): string =>
   s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -77,23 +92,21 @@ export function ReviewTab({
 }) {
   const { t } = useI18n();
   const confirmDialog = useConfirm();
-  const { config, update, names, fileTags, existing, engine } = state;
+  const navigate = useNavigate();
+  const { config, update, files, names, fileTags, existing, engine } = state;
 
   const proposals = useMemo(
     () => names.map((name) => proposalsFor(engine, name)),
     [engine, names],
   );
 
-  const [filter, setFilter] = useState<Filter>("todo");
+  const [filter, setFilter] = useViewState<Filter>("review.filter", "todo");
   const { confirmed, setConfirmed, removed, setRemoved, added, setAdded } =
     session;
+  const { reviewNotice: notice, setReviewNotice: setNotice } = session;
   const [token, setToken] = useState<number | null>(null);
   const [choice, setChoice] = useState(0);
   const [draft, setDraft] = useState("");
-  const [notice, setNotice] = useState<{
-    text: string;
-    undo?: UndoHandle;
-  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Done without the user saying so: everything proposed is already on the file.
@@ -121,6 +134,16 @@ export function ReviewTab({
   );
 
   const [rawCur, setCur] = useState(() => {
+    // The file that was open last, if it is still in the list — remembered by
+    // identity, since a list loaded again may have shifted.
+    const last = peekViewState<FileRef>(REVIEW_FILE_KEY);
+    const at = last
+      ? files.findIndex(
+          (file) =>
+            file.id === last.id && file.workspaceId === last.workspaceId,
+        )
+      : -1;
+    if (at >= 0) return at;
     const first = names.findIndex(
       (_, i) =>
         !(
@@ -134,6 +157,13 @@ export function ReviewTab({
   const cur = Math.min(rawCur, Math.max(0, names.length - 1));
   const select = (i: number) => {
     setCur(i);
+    const file = files[i];
+    if (file) {
+      rememberViewState(REVIEW_FILE_KEY, {
+        workspaceId: file.workspaceId,
+        id: file.id,
+      } satisfies FileRef);
+    }
     setToken(null);
     setChoice(0);
     setDraft("");
@@ -157,21 +187,35 @@ export function ReviewTab({
   const confirm = async () => {
     if (busy || names.length === 0) return;
     const tags = finalTags(cur);
+    // Files this apply tagged — copies of the file included. `fileTags` still
+    // reads as it did before the apply, so they are told apart by hand.
+    const justTagged = new Set<number>();
     if (tags.length > 0) {
       setBusy(true);
       const outcome = await state.apply(new Map([[cur, tags]]));
       setBusy(false);
       // Not confirmed if it was not tagged: the file stays where it is.
       if (!outcome.ok) return;
+      for (const i of outcome.undo?.added.keys() ?? []) justTagged.add(i);
     }
     const nextConfirmed = new Set(confirmed).add(cur);
     setConfirmed(nextConfirmed);
-    setNotice(null);
-    const open = (i: number) => !nextConfirmed.has(i) && !settled(i);
-    // "…and next" always goes somewhere. Within what the filter lists (as it
-    // will read once this file counts as reviewed): the next file still to
-    // review, wrapping round to an earlier one; and when none is left to
-    // review — the reviewed list, or a finished library — simply the next file.
+    // A notice that can still take a bulk apply back stays until it is used.
+    if (!notice?.undo) setNotice(null);
+    const open = (i: number) =>
+      !nextConfirmed.has(i) &&
+      !settled(i) &&
+      !(
+        justTagged.has(i) &&
+        proposals[i].length > 0 &&
+        proposals[i].every((p) =>
+          tags.some((tag) => tag.toLowerCase() === p.key),
+        )
+      );
+    // "…and next" always goes somewhere, and stays within what the filter
+    // lists (as it will read once this file counts as reviewed): the next file
+    // still to review, wrapping round to an earlier one; when none is left to
+    // review, simply the next file, wrapping round at the end of the list.
     const listed = all.filter(
       (i) => filter === "all" || (filter === "done" ? !open(i) : open(i)),
     );
@@ -180,7 +224,7 @@ export function ReviewTab({
       order.find((i) => i > cur && open(i)) ??
         order.find(open) ??
         order.find((i) => i > cur) ??
-        all.find((i) => i > cur) ??
+        order[0] ??
         cur,
     );
   };
@@ -272,6 +316,20 @@ export function ReviewTab({
     );
   }
 
+  // The detail view is a sibling route, so showing the file closes this
+  // screen; it comes back to this file when reopened (see viewState.ts).
+  const openFile = () => {
+    const file = files[cur];
+    if (!file) return;
+    rememberViewState(REVIEW_FILE_KEY, {
+      workspaceId: file.workspaceId,
+      id: file.id,
+    } satisfies FileRef);
+    void navigate(
+      `/file/${file.id}?ws=${encodeURIComponent(file.workspaceId)}`,
+    );
+  };
+
   const name = names[cur] ?? "";
   const curTags = finalTags(cur);
   const curKeys = new Set(curTags.map((x) => x.toLowerCase()));
@@ -298,21 +356,23 @@ export function ReviewTab({
       options.push({
         kind: "rule",
         title: t("autoTag.review.optCode", { code: value }),
-        ruleKind: "regex",
-        ruleName: t("autoTag.review.codeRuleName", { code: value }),
-        pattern: `^${escapeRegExp(info.value)}-\\d+`,
-        template: value,
-        split: false,
+        rule: draftRule({
+          name: t("autoTag.review.codeRuleName", { code: value }),
+          kind: "regex",
+          pattern: `^${escapeRegExp(info.value)}-\\d+`,
+          template: value,
+        }),
       });
-      options.push({
-        kind: "rule",
-        title: t("autoTag.review.optAllCodes"),
-        ruleKind: "prefix",
-        ruleName: t("autoTag.rule.prefix"),
-        pattern: PREFIX_PATTERN,
-        template: "$1",
-        split: false,
-      });
+      // The built-in rule again, with what it excludes: recreating it must not
+      // start tagging camera files as IMG and DSC.
+      const builtin = defaultRules().find((rule) => rule.id === "prefix");
+      if (builtin) {
+        options.push({
+          kind: "rule",
+          title: t("autoTag.review.optAllCodes"),
+          rule: draftRule({ ...builtin, name: t("autoTag.rule.prefix") }),
+        });
+      }
     }
     if (info.type === "bracket") {
       options.push({
@@ -320,11 +380,13 @@ export function ReviewTab({
         title: t("autoTag.review.optBracket", {
           bracket: t(BRACKET_LABELS[info.bracket]),
         }),
-        ruleKind: "bracket",
-        ruleName: t(BRACKET_LABELS[info.bracket]),
-        pattern: BRACKET_PATTERNS[info.bracket],
-        template: "$1",
-        split: true,
+        rule: draftRule({
+          name: t(BRACKET_LABELS[info.bracket]),
+          kind: "bracket",
+          pattern: BRACKET_PATTERNS[info.bracket],
+          template: "$1",
+          split: true,
+        }),
       });
     }
     if (info.type !== "code") {
@@ -342,100 +404,92 @@ export function ReviewTab({
     });
   }
   const built = options.map((option) => {
-    let hits: number[] = [cur];
+    // The tags the option gives each file it reaches — which is also exactly
+    // what choosing it applies.
+    const perFile = new Map<number, string[]>();
     let exists = false;
+    // What creating it saves: the same rule or entry `perFile` was computed
+    // from, so what was shown is what is stored.
+    let rule: TagRule | null = null;
+    let entry: KeywordEntry | null = null;
     if (option.kind === "rule") {
-      const rule: TagRule = {
-        id: "",
-        name: "",
-        kind: option.ruleKind,
-        pattern: option.pattern,
-        template: option.template,
-        exclude: "",
-        ci: false,
-        split: option.split,
-        caseMode: "keep",
-        enabled: true,
-      };
+      // The id is given when it is saved; nothing here reads it.
+      rule = { ...option.rule, id: "" };
       const compiled = compileRule(rule);
-      hits = compiled
-        ? all.filter((i) =>
-            runRule(compiled, names[i]).some((hit) => hit.tags.length > 0),
-          )
-        : [];
+      if (compiled) {
+        for (const i of all) {
+          const tags = [
+            ...new Set(runRule(compiled, names[i]).flatMap((hit) => hit.tags)),
+          ];
+          if (tags.length > 0) perFile.set(i, tags);
+        }
+      }
       exists =
         config.rules.length >= MAX_AUTO_TAG_RULES ||
         config.rules.some(
-          (r) => r.pattern === option.pattern && r.template === option.template,
+          (r) =>
+            r.pattern === option.rule.pattern &&
+            r.template === option.rule.template,
         );
     } else if (option.kind === "keyword") {
-      const compiled = compileKeyword({
-        id: "",
-        tag: option.tag,
-        aliases: [],
-        mode: "word",
-      });
-      hits = compiled
-        ? all.filter((i) => runKeyword(compiled, names[i]).length > 0)
-        : [];
-      exists =
-        !isUsableTagName(option.tag) ||
-        config.keywords.some(
-          (k) => k.tag.toLowerCase() === option.tag.toLowerCase(),
-        );
+      // newKeyword is the one judge of whether an entry can be added: a name
+      // that cannot be a tag, one already in the dictionary, a full dictionary.
+      entry = newKeyword(config.keywords, option.tag, []);
+      const compiled = entry ? compileKeyword(entry) : null;
+      if (compiled) {
+        for (const i of all) {
+          if (runKeyword(compiled, names[i]).length > 0) {
+            perFile.set(i, [compiled.tag]);
+          }
+        }
+      }
+      exists = entry === null;
     } else {
+      perFile.set(cur, [option.tag]);
       exists =
         !isUsableTagName(option.tag) || curKeys.has(option.tag.toLowerCase());
     }
-    return { option, hits, exists };
+    return { option, hits: [...perFile.keys()], exists, perFile, rule, entry };
   });
   const chosen = built[choice];
 
-  const create = () => {
-    if (!chosen || chosen.exists) return;
-    const { option, hits } = chosen;
-    if (option.kind === "rule") {
-      update((c) => ({
-        ...c,
-        rules: [
-          ...c.rules,
-          {
-            id: crypto.randomUUID(),
-            name: option.ruleName,
-            kind: option.ruleKind,
-            pattern: option.pattern,
-            template: option.template,
-            exclude: "",
-            ci: false,
-            split: option.split,
-            caseMode: "keep",
-            enabled: true,
-          },
-        ],
-      }));
-      setNotice({
-        text: t("autoTag.review.ruleAdded", {
-          name: option.ruleName,
-          files: hits.length,
-        }),
-      });
-    } else if (option.kind === "keyword") {
-      update((c) => {
-        const entry = newKeyword(c.keywords, option.tag, []);
-        return entry ? { ...c, keywords: [...c.keywords, entry] } : c;
-      });
-      setNotice({
-        text: t("autoTag.review.keywordAdded", {
-          tag: option.tag,
-          files: hits.length,
-        }),
-      });
-    } else {
+  const create = async () => {
+    if (!chosen || chosen.exists || busy) return;
+    const { option, perFile, rule, entry } = chosen;
+    setToken(null);
+    if (option.kind === "once") {
       setAdded(
         new Map(added).set(cur, [...(added.get(cur) ?? []), option.tag]),
       );
+      return;
     }
-    setToken(null);
+    // The rule exists to tag the files it matches, so it does — now, rather
+    // than leaving each of them to be confirmed one by one. Tags first, as on
+    // the other tabs: a rule is only added once what it was shown to do has
+    // actually been done, and a failure (already reported) adds nothing.
+    setBusy(true);
+    const outcome = await state.apply(perFile);
+    setBusy(false);
+    if (!outcome.ok) return;
+    if (rule) {
+      const saved = { ...rule, id: crypto.randomUUID() };
+      update((c) => ({ ...c, rules: [...c.rules, saved] }));
+    } else if (entry) {
+      update((c) => ({ ...c, keywords: [...c.keywords, entry] }));
+    }
+    // The notice offers the way back for the tags; the rule itself stays.
+    setNotice({
+      text: rule
+        ? t("autoTag.review.ruleAdded", {
+            name: rule.name,
+            files: outcome.files,
+          })
+        : t("autoTag.review.keywordAdded", {
+            tag: entry?.tag ?? "",
+            files: outcome.files,
+          }),
+      undo: outcome.undo ?? undefined,
+    });
   };
 
   const addDraft = () => {
@@ -614,6 +668,14 @@ export function ReviewTab({
                   {t("autoTag.review.done")}
                 </span>
               )}
+              <SmallButton
+                className="h-6 gap-1 border-border px-2"
+                title={t("autoTag.review.openFileHint")}
+                onClick={openFile}
+              >
+                <ExternalLink className="mr-1 inline size-3.5" />
+                {t("autoTag.review.openFile")}
+              </SmallButton>
               <span className="ml-auto text-[11px] text-muted">
                 {t("autoTag.review.tokenHint")}
               </span>
@@ -731,9 +793,9 @@ export function ReviewTab({
                             "break-all pl-5 text-xs text-accent2",
                           )}
                         >
-                          {option.pattern}{" "}
+                          {option.rule.pattern}{" "}
                           <span className="text-muted">
-                            → {option.template}
+                            → {option.rule.template}
                           </span>
                         </span>
                       )}
@@ -775,13 +837,13 @@ export function ReviewTab({
                     variant="primary"
                     className="px-3"
                     disabled={!chosen || chosen.exists}
-                    onClick={create}
+                    onClick={() => void create()}
                   >
                     {t(
                       chosen?.option.kind === "rule"
                         ? "autoTag.review.createRule"
                         : chosen?.option.kind === "keyword"
-                          ? "autoTag.addToDictionary"
+                          ? "autoTag.applySelectedDict"
                           : "autoTag.review.addTag",
                     )}
                   </SmallButton>

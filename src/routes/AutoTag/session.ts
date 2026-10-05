@@ -1,7 +1,8 @@
-// What the user has decided on the auto-tagging screen since opening it — kept
-// above the tabs, because a tab unmounts when another is shown and none of this
-// may go with it: least of all the handles that take an apply back.
-import { useMemo, useState } from "react";
+// What the user has decided on the auto-tagging screen — kept above the tabs,
+// because a tab unmounts when another is shown and none of this may go with
+// it: least of all the handles that take an apply back. It also outlives the
+// screen itself (see `remembered`), for as long as the file list is the same.
+import { useEffect, useMemo, useState } from "react";
 import type { UndoHandle } from "./useAutoTag";
 
 /** A suggestion applied in this visit, and how to take it back. */
@@ -29,6 +30,11 @@ interface SessionData {
   added: Map<number, string[]>;
   /** Terms tab: decisions made here; null puts a term back to undecided. */
   overrides: Map<string, TermDecision | null>;
+  /**
+   * Review tab: the result line of the last bulk apply. Here rather than in
+   * the tab because it carries the only way to take that apply back.
+   */
+  reviewNotice: { text: string; undo?: UndoHandle } | null;
 }
 
 export type AutoTagSession = SessionData & {
@@ -43,19 +49,44 @@ const empty = (): SessionData => ({
   removed: new Map(),
   added: new Map(),
   overrides: new Map(),
+  reviewNotice: null,
 });
 
 /**
- * `generation` changes whenever the file list is loaded again. Everything here
- * is keyed by position in that list, so a new list starts a new session rather
- * than letting old positions point at whatever sits there now.
+ * The last session, kept after the screen is gone so that reopening it — after
+ * looking at a file, say — finds the same decisions and the same undo.
  */
-export function useAutoTagSession(generation: number): AutoTagSession {
-  const [state, setState] = useState({ generation, data: empty() });
-  if (state.generation !== generation) {
-    setState({ generation, data: empty() });
-  }
-  const data = state.generation === generation ? state.data : empty();
+let remembered: { listKey: string; data: SessionData } | null = null;
+
+/** Forget the remembered session. Tests start each case without one. */
+export function resetAutoTagSession(): void {
+  remembered = null;
+}
+
+const sessionFor = (listKey: string | null) => ({
+  listKey,
+  data:
+    listKey !== null && remembered?.listKey === listKey
+      ? remembered.data
+      : empty(),
+});
+
+/**
+ * `listKey` identifies the list of files the screen has loaded (null while it
+ * has none). Everything here is keyed by position in that list, so the session
+ * lasts exactly as long as the list reads the same: a list that changed starts
+ * a new one rather than letting old positions point at whatever sits there now.
+ */
+export function useAutoTagSession(listKey: string | null): AutoTagSession {
+  const [state, setState] = useState(() => sessionFor(listKey));
+  if (state.listKey !== listKey) setState(sessionFor(listKey));
+  const data =
+    state.listKey === listKey ? state.data : sessionFor(listKey).data;
+  useEffect(() => {
+    if (state.listKey !== null) {
+      remembered = { listKey: state.listKey, data: state.data };
+    }
+  }, [state]);
   const setters = useMemo(() => {
     const set =
       <K extends keyof SessionData>(key: K) =>
@@ -67,6 +98,7 @@ export function useAutoTagSession(generation: number): AutoTagSession {
       setRemoved: set("removed"),
       setAdded: set("added"),
       setOverrides: set("overrides"),
+      setReviewNotice: set("reviewNotice"),
     };
   }, []);
   return { ...data, ...setters };
