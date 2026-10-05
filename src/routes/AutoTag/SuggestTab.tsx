@@ -99,12 +99,19 @@ export function SuggestTab({
     return set.size;
   };
 
+  // Worth a dictionary entry: nothing in "Rules and dictionary" produces it yet.
+  // A candidate that comes from a rule or from the dictionary is already
+  // managed there, so for those applying is all there is to do.
+  const canRegister = (c: Candidate): boolean =>
+    candidateGroup(c) === "frequent" && !dictionary.has(c.key);
+
   const apply = async (list: Candidate[], dict: boolean) => {
     if (list.length === 0 || busy) return;
     setBusy(true);
     // One apply per candidate, so each row can be taken back on its own.
     const next = new Map(done);
     const applied: Candidate[] = [];
+    const registered: Candidate[] = [];
     let files = 0;
     for (const cand of list) {
       const perFile = new Map<number, string[]>();
@@ -115,12 +122,14 @@ export function SuggestTab({
       if (!outcome.ok) break;
       files += outcome.files;
       applied.push(cand);
-      next.set(cand.key, { dict, undo: outcome.undo });
+      const registers = dict && canRegister(cand);
+      if (registers) registered.push(cand);
+      next.set(cand.key, { dict: registers, undo: outcome.undo });
     }
-    if (dict && applied.length > 0) {
+    if (registered.length > 0) {
       update((c) => {
         let keywords = c.keywords;
-        for (const cand of applied) {
+        for (const cand of registered) {
           const entry = newKeyword(keywords, cand.name, []);
           if (entry) keywords = [...keywords, entry];
         }
@@ -135,7 +144,7 @@ export function SuggestTab({
         : (applied.length === 1
             ? t("autoTag.appliedOne", { tag: applied[0].name, files })
             : t("autoTag.appliedMany", { tags: applied.length, files })) +
-            (dict ? t("autoTag.appliedDictSuffix") : ""),
+            (registered.length > 0 ? t("autoTag.appliedDictSuffix") : ""),
     );
     setBusy(false);
   };
@@ -310,23 +319,30 @@ export function SuggestTab({
                 <span className="flex flex-wrap items-center justify-end gap-1">
                   {status === "pending" ? (
                     <>
-                      <SmallButton
-                        variant="primary"
-                        className="h-[26px]"
-                        disabled={busy}
-                        onClick={() => void apply([c], false)}
-                      >
-                        {t("autoTag.apply")}
-                      </SmallButton>
-                      {!dictionary.has(c.key) && (
+                      {/* Registering is the main action where it applies:
+                          the tag then keeps being applied by "Rules and
+                          dictionary" instead of this once. */}
+                      {canRegister(c) && (
                         <SmallButton
-                          className="h-[26px] border-border px-2"
+                          variant="primary"
+                          className="h-[26px]"
                           disabled={busy}
                           onClick={() => void apply([c], true)}
                         >
                           {t("autoTag.addToDictionary")}
                         </SmallButton>
                       )}
+                      <SmallButton
+                        variant={canRegister(c) ? "outline" : "primary"}
+                        className={cn(
+                          "h-[26px]",
+                          canRegister(c) && "border-border px-2",
+                        )}
+                        disabled={busy}
+                        onClick={() => void apply([c], false)}
+                      >
+                        {t("autoTag.apply")}
+                      </SmallButton>
                       <SmallButton
                         variant="ghost"
                         className="h-[26px] px-2"
@@ -398,15 +414,21 @@ export function SuggestTab({
               files: filesOf(picked),
             })}
           </span>
+          {picked.some(canRegister) && (
+            <SmallButton
+              variant="primary"
+              disabled={busy}
+              onClick={() => void apply(picked, true)}
+            >
+              {t("autoTag.applySelectedDict")}
+            </SmallButton>
+          )}
           <SmallButton
-            variant="primary"
+            variant={picked.some(canRegister) ? "outline" : "primary"}
             disabled={busy}
             onClick={() => void apply(picked, false)}
           >
             {t("autoTag.applySelected")}
-          </SmallButton>
-          <SmallButton disabled={busy} onClick={() => void apply(picked, true)}>
-            {t("autoTag.applySelectedDict")}
           </SmallButton>
           <SmallButton variant="ghost" onClick={() => ignore(picked)}>
             {t("autoTag.ignore")}

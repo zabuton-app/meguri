@@ -215,6 +215,37 @@ describe("AutoTag", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("leads with the dictionary for a word nothing produces yet", async () => {
+    await renderScreen("Suggestions");
+    // A frequent word: registering it is offered, ahead of a one-off apply.
+    const word = screen
+      .getByRole("checkbox", { name: "Harbor" })
+      .closest("div")!;
+    const buttons = within(word)
+      .getAllByRole("button")
+      .map((b) => b.textContent);
+    expect(buttons.indexOf("Add to dictionary")).toBeLessThan(
+      buttons.indexOf("Apply"),
+    );
+    // A tag a rule already produces is managed by that rule: apply only.
+    const ruled = screen
+      .getByRole("checkbox", { name: "Trip" })
+      .closest("div")!;
+    expect(
+      within(ruled).queryByRole("button", { name: "Add to dictionary" }),
+    ).toBeNull();
+
+    fireEvent.click(
+      within(word).getByRole("button", { name: "Add to dictionary" }),
+    );
+    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
+    expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
+      { workspaceId: "ws", fileIds: [3, 4], tags: ["Harbor"] },
+    ]);
+    expect((await lastSaved()).keywords).toMatchObject([{ tag: "Harbor" }]);
+    await screen.findByText("✓ Applied and in dictionary");
+  });
+
   it("offers frequent words and remembers the ones dismissed", async () => {
     await renderScreen("Suggestions");
     // "Harbor" is in two names and no rule or keyword claims it.
