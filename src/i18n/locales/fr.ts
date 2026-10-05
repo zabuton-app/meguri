@@ -179,7 +179,10 @@ export const fr: Record<TranslationKey, string> = {
   "filter.inProgress": "En cours",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "Filtrer par note minimale",
+  "filter.capturedAt": "Date de prise",
   "filter.btime": "Date de création",
+  "filter.addedAt": "Date d’ajout",
+  "filter.playedAt": "Date de lecture",
   "filter.dateFrom": "Du",
   "filter.dateTo": "Au",
   "filter.more": "Autres critères",
@@ -393,6 +396,28 @@ export const fr: Record<TranslationKey, string> = {
   "grid.searchByTag": "Filtrer par « {name} »",
   "view.grid": "Vue en grille",
   "view.list": "Vue en liste",
+
+  // contribution graph
+  "view.heatmap": "Graphique de contributions",
+  "view.heatmapOff": "Masquer le graphique de contributions",
+  "heatmap.metric.label": "Compter par",
+  "heatmap.metric.played": "Lus",
+  "heatmap.metric.captured": "Capturés",
+  "heatmap.metric.created": "Créés",
+  "heatmap.metric.added": "Ajoutés",
+  "heatmap.cell.played": "{date} : {count} lus",
+  "heatmap.cell.captured": "{date} : {count} capturés",
+  "heatmap.cell.created": "{date} : {count} créés",
+  "heatmap.cell.added": "{date} : {count} ajoutés",
+  "heatmap.range.last": "12 derniers mois",
+  "heatmap.range.prev": "Année précédente",
+  "heatmap.range.next": "Année suivante",
+  "heatmap.less": "Moins",
+  "heatmap.more": "Plus",
+  "heatmap.hint":
+    "Cliquez sur un jour ou faites glisser sur plusieurs pour restreindre la liste",
+  "heatmap.clearDay": "Effacer les jours sélectionnés",
+  "heatmap.error": "Impossible de charger les décomptes",
 
   // graph view
   "view.graph": "Vue graphe",
@@ -662,6 +687,13 @@ export const fr: Record<TranslationKey, string> = {
 
   "tags.title": "Tags",
   "tags.summary": "{tags} tags / {assignments} attributions",
+  "tags.viewLabel": "Affichage",
+  "tags.viewList": "Liste",
+  "tags.viewCloud": "Nuage",
+  "tags.cloudLimited": "Affichage des {max} tags les plus utilisés uniquement.",
+  "tags.cloudIncludeAuto": "Tags automatiques",
+  "tags.cloudOnlyAuto":
+    "Seuls des tags automatiques sont disponibles. Activez les tags automatiques pour les voir.",
   "tags.empty": "Aucun tag pour l'instant.",
   "tags.emptyHint":
     "Ajoutez des tags depuis la vue détaillée et ils apparaîtront ici.",

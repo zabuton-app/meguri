@@ -7,6 +7,7 @@
 // them from drifting: a condition added here shows up in the chips, in the badge,
 // and in "clear all" at once, instead of in whichever of the three the next
 // change remembered to update.
+import { DATE_RANGES } from "@/lib/dateRanges";
 import { kindLabel } from "@/lib/mediaKind";
 import { resolveSortDir } from "@shared/sortDir";
 import {
@@ -180,14 +181,16 @@ export function describeConditions(
       clear: (q) => without(q, "inProgress"),
     });
 
-  if (query.btimeFrom != null || query.btimeTo != null)
+  for (const { key, label, from, to } of DATE_RANGES) {
+    if (query[from] == null && query[to] == null) continue;
     out.push({
-      key: "btime",
-      label: `${t("filter.btime")}: ${describeDateRange(t, query.btimeFrom, query.btimeTo)}`,
+      key,
+      label: `${t(label)}: ${describeDateRange(t, query[from], query[to])}`,
       group: "collapsed",
       chip: true,
-      clear: (q) => without(q, "btimeFrom", "btimeTo"),
+      clear: (q) => without(q, from, to),
     });
+  }
 
   if (query.duplicates)
     out.push({

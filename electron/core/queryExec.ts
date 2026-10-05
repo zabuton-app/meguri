@@ -7,6 +7,11 @@ import { MANUAL_SORT } from "../../shared/sortDir.js";
 import { openDbReadonly, type DB } from "./db.js";
 import { buildGraph } from "./graph/buildGraph.js";
 import type { GraphPayload } from "../../shared/ipc/graph.js";
+import { buildActivityDays } from "./activityDays.js";
+import type {
+  ActivityDays,
+  ActivityMetric,
+} from "../../shared/ipc/activity.js";
 import type { Core } from "./index.js";
 import { countFiles, lastScanAt } from "./queries.js";
 import type {
@@ -56,6 +61,15 @@ export type QueryRequest =
       maxFiles: number;
     }
   | {
+      kind: "activity";
+      targets: QueryTarget[];
+      query: SearchQuery;
+      refs?: cw.FileRef[];
+      metric: ActivityMetric;
+      from: string;
+      to: string;
+    }
+  | {
       kind: "folderFiles";
       targets: QueryTarget[];
       paths: string[];
@@ -79,7 +93,8 @@ export type QueryResponse =
   | WorkspaceStats
   | FolderListing
   | FolderFilesResult
-  | GraphPayload;
+  | GraphPayload
+  | ActivityDays;
 
 const DUP_REFS_CACHE_TTL_MS = 5_000;
 const DUP_REFS_CACHE_MAX_ENTRIES = 16;
@@ -222,6 +237,16 @@ export class QueryExecutor {
           cap: req.maxFiles,
           refs,
           storedOrder: isStoredOrder(req.query, req.refs),
+        });
+      }
+      case "activity": {
+        // Same target resolution as "search" above.
+        const refs = this.resolveRefs(cores, req.query, req.refs);
+        return buildActivityDays(cores, req.query, {
+          metric: req.metric,
+          from: req.from,
+          to: req.to,
+          refs,
         });
       }
       case "random": {

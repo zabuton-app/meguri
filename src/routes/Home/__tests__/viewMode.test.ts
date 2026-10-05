@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseViewMode } from "@/routes/Home/utils";
+import {
+  hasFolderForm,
+  isFolderView,
+  parseHeatmapMetric,
+  parseViewMode,
+} from "@/routes/Home/utils";
 
 describe("parseViewMode", () => {
   it("keeps the view modes that exist", () => {
@@ -15,5 +20,32 @@ describe("parseViewMode", () => {
   it("falls back to the grid for nothing stored or an unknown value", () => {
     expect(parseViewMode(null)).toBe("grid");
     expect(parseViewMode("mosaic")).toBe("grid");
+    // The heatmap is a panel over the views, not one of them.
+    expect(parseViewMode("heatmap")).toBe("grid");
+  });
+});
+
+describe("hasFolderForm", () => {
+  it("is the grid and the list only", () => {
+    expect(hasFolderForm("grid")).toBe(true);
+    expect(hasFolderForm("list")).toBe(true);
+    expect(hasFolderForm("graph")).toBe(false);
+  });
+
+  it("keeps the folder view off under the graph, option or not", () => {
+    const on = { byFolder: true, folderAvailable: true };
+    expect(isFolderView({ ...on, view: "list" })).toBe(true);
+    expect(isFolderView({ ...on, view: "graph" })).toBe(false);
+    expect(isFolderView(on)).toBe(true);
+  });
+});
+
+describe("parseHeatmapMetric", () => {
+  it("keeps a stored metric and falls back to plays", () => {
+    expect(parseHeatmapMetric("captured")).toBe("captured");
+    expect(parseHeatmapMetric("created")).toBe("created");
+    expect(parseHeatmapMetric("added")).toBe("added");
+    expect(parseHeatmapMetric(null)).toBe("played");
+    expect(parseHeatmapMetric("liked")).toBe("played");
   });
 });

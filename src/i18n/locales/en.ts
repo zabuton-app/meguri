@@ -174,7 +174,10 @@ export const en: Record<TranslationKey, string> = {
   "filter.inProgress": "In progress",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "Filter by minimum rating",
+  "filter.capturedAt": "Captured date",
   "filter.btime": "Created date",
+  "filter.addedAt": "Added date",
+  "filter.playedAt": "Played date",
   "filter.dateFrom": "From",
   "filter.dateTo": "To",
   "filter.more": "More conditions",
@@ -383,6 +386,27 @@ export const en: Record<TranslationKey, string> = {
   "grid.searchByTag": 'Filter by "{name}"',
   "view.grid": "Grid view",
   "view.list": "List view",
+
+  // contribution graph
+  "view.heatmap": "Contribution graph",
+  "view.heatmapOff": "Hide contribution graph",
+  "heatmap.metric.label": "Count by",
+  "heatmap.metric.played": "Played",
+  "heatmap.metric.captured": "Captured",
+  "heatmap.metric.created": "Created",
+  "heatmap.metric.added": "Added",
+  "heatmap.cell.played": "{date}: {count} played",
+  "heatmap.cell.captured": "{date}: {count} captured",
+  "heatmap.cell.created": "{date}: {count} created",
+  "heatmap.cell.added": "{date}: {count} added",
+  "heatmap.range.last": "Last 12 months",
+  "heatmap.range.prev": "Previous year",
+  "heatmap.range.next": "Next year",
+  "heatmap.less": "Less",
+  "heatmap.more": "More",
+  "heatmap.hint": "Click a day, or drag across days, to narrow the list",
+  "heatmap.clearDay": "Clear the days picked",
+  "heatmap.error": "Could not load the counts",
 
   // graph view
   "view.graph": "Graph view",
@@ -640,6 +664,13 @@ export const en: Record<TranslationKey, string> = {
 
   "tags.title": "Tags",
   "tags.summary": "{tags} tags / {assignments} assignments",
+  "tags.viewLabel": "View",
+  "tags.viewList": "List",
+  "tags.viewCloud": "Cloud",
+  "tags.cloudLimited": "Showing the {max} most used tags.",
+  "tags.cloudIncludeAuto": "Automatic tags",
+  "tags.cloudOnlyAuto":
+    "Only automatic tags to show. Turn on automatic tags to see them.",
   "tags.empty": "No tags yet.",
   "tags.emptyHint":
     "Add tags from the detail view and they will be listed here.",

@@ -21,11 +21,30 @@ import type { Visibility } from "../model/visibility";
 import { fk, payloadOf, tk } from "./fixtures";
 
 const api = vi.hoisted(() => ({
+  appStatus: vi.fn(),
   graphBuild: vi.fn(),
   graphLayoutGet: vi.fn(),
   graphLayoutSet: vi.fn(),
 }));
-vi.mock("@/ipc/client", () => ({ api }));
+// The thumb:done listener the view registered, to fire the event by hand.
+const thumbDone = vi.hoisted(() => ({
+  emit: null as null | ((e: { id: number; workspaceId?: string }) => void),
+}));
+vi.mock("@/ipc/client", () => ({
+  api,
+  events: {
+    onThumbDone: (cb: (e: { id: number; workspaceId?: string }) => void) => {
+      thumbDone.emit = cb;
+      return Promise.resolve(() => {
+        thumbDone.emit = null;
+      });
+    },
+  },
+}));
+
+// The callbacks of the ResizeObservers in use, to report a resize by hand
+// (jsdom lays nothing out).
+const resizes = vi.hoisted(() => new Set<() => void>());
 
 const nav = vi.hoisted(() => ({ navigate: vi.fn() }));
 vi.mock("react-router", async (importOriginal) => ({
@@ -51,6 +70,7 @@ vi.mock("../GraphCanvas", async () => {
       graph: MediaGraph;
       visibility: Visibility;
       focus: string | null;
+      onHover: (key: string | null) => void;
       onClickNode: (key: string) => void;
       onClickStage: () => void;
       onDragStart: (key: string) => boolean;
@@ -75,6 +95,8 @@ vi.mock("../GraphCanvas", async () => {
               type="button"
               data-testid={`node ${key}`}
               onClick={() => props.onClickNode(key)}
+              onMouseEnter={() => props.onHover(key)}
+              onMouseLeave={() => props.onHover(null)}
               onMouseDown={() => {
                 if (props.onDragStart(key)) props.onDrag(key, 123, 45);
               }}
@@ -104,7 +126,7 @@ const { SimClient } = await import("../sim/simClient");
 const { GRAPH_DIMS_KEY } = await import("../GraphView");
 
 const FILES = [
-  { path: "a.mp4", tags: ["sea", "summer"] },
+  { path: "a.mp4", tags: ["sea", "summer"], thumb: true },
   { path: "b.jpg", kind: "image", tags: ["sea", "summer"] },
   { path: "c.mp4", tags: ["sea", "res:4k"] },
   { path: "lone.mp4" },
@@ -124,8 +146,26 @@ function render(onFilterToken = vi.fn(), route = "/") {
 }
 
 beforeEach(() => {
+  resizes.clear();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      private notify: () => void;
+      constructor(cb: () => void) {
+        this.notify = cb;
+      }
+      observe() {
+        resizes.add(this.notify);
+      }
+      unobserve() {}
+      disconnect() {
+        resizes.delete(this.notify);
+      }
+    },
+  );
   canvas.fail = false;
   canvas.props = null;
+  api.appStatus.mockResolvedValue({ mediaBase: "http://media" });
   api.graphBuild.mockResolvedValue(payloadOf(FILES));
   api.graphLayoutGet.mockResolvedValue(null);
   api.graphLayoutSet.mockResolvedValue(undefined);
@@ -135,6 +175,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 async function ready() {
@@ -291,6 +332,177 @@ describe("GraphView", () => {
     cleanup();
     render();
     await screen.findByTestId(`node ${tk("res:4k")}`);
+  });
+
+  it("shows a file's thumbnail while the pointer is on its node", async () => {
+    const { container } = render();
+    await ready();
+    const preview = () =>
+      container.querySelector('[data-slot="graph-hover-thumbnail"] img');
+    const a = screen.getByTestId(`node ${fk("a.mp4")}`);
+    fireEvent.mouseEnter(a);
+    await waitFor(() =>
+      expect(preview()?.getAttribute("src")).toMatch(
+        /^http:\/\/media\/ws\/w\/thumb\/1\?v=\d+$/,
+      ),
+    );
+    // Not during a drag, where it would be in the way.
+    fireEvent.mouseDown(a);
+    expect(preview()).toBeNull();
+    fireEvent.mouseUp(a);
+    expect(preview()).not.toBeNull();
+    fireEvent.mouseLeave(a);
+    expect(preview()).toBeNull();
+
+    // A file without a thumbnail, and a tag, have nothing to show.
+    const b = screen.getByTestId(`node ${fk("b.jpg")}`);
+    fireEvent.mouseEnter(b);
+    expect(canvas.props?.focus).toBe(fk("b.jpg"));
+    expect(preview()).toBeNull();
+    fireEvent.mouseLeave(b);
+    fireEvent.mouseEnter(screen.getByTestId(`node ${tk("sea")}`));
+    expect(canvas.props?.focus).toBe(tk("sea"));
+    expect(preview()).toBeNull();
+  });
+
+  it("keeps the thumbnail by the pointer once it takes the picture's shape", async () => {
+    const { container } = render();
+    await ready();
+    fireEvent.mouseEnter(screen.getByTestId(`node ${fk("a.mp4")}`));
+    const img = await waitFor(() => {
+      const el = container.querySelector<HTMLImageElement>(
+        '[data-slot="graph-hover-thumbnail"] img',
+      );
+      if (!el) throw new Error("no thumbnail yet");
+      return el;
+    });
+    const card = img.parentElement as HTMLElement;
+    const stage = card.parentElement as HTMLElement;
+    // jsdom lays nothing out: give the view and the card their sizes.
+    Object.defineProperty(stage, "clientWidth", {
+      value: 1000,
+      configurable: true,
+    });
+    Object.defineProperty(stage, "clientHeight", { value: 800 });
+    // Near the right edge, so the card sits to the left of the pointer,
+    // where its place depends on its width.
+    fireEvent.pointerMove(stage, { clientX: 950, clientY: 300 });
+    expect(card.style.transform).toBe("translate(744px, 142px)");
+
+    Object.defineProperty(img, "naturalWidth", { value: 1080 });
+    Object.defineProperty(img, "naturalHeight", { value: 1920 });
+    Object.defineProperty(card, "offsetWidth", { value: 83 });
+    Object.defineProperty(card, "offsetHeight", { value: 146 });
+    fireEvent.load(img);
+    expect(card.style.width).toBe("81px");
+    expect(card.style.transform).toBe("translate(853px, 140px)");
+
+    // The view narrows under a pointer at rest: the card moves back inside.
+    Object.defineProperty(stage, "clientWidth", { value: 900 });
+    act(() => resizes.forEach((notify) => notify()));
+    expect(card.style.transform).toBe("translate(813px, 140px)");
+  });
+
+  it("shows a thumbnail made after the graph was drawn", async () => {
+    const { container } = render();
+    await ready();
+    const src = () =>
+      container
+        .querySelector('[data-slot="graph-hover-thumbnail"] img')
+        ?.getAttribute("src");
+    // b.jpg had no thumbnail when the payload was built.
+    fireEvent.mouseEnter(screen.getByTestId(`node ${fk("b.jpg")}`));
+    expect(src()).toBeUndefined();
+    act(() => thumbDone.emit?.({ id: 2, workspaceId: "w" }));
+    await waitFor(() =>
+      expect(src()).toMatch(/^http:\/\/media\/ws\/w\/thumb\/2\?v=\d+$/),
+    );
+  });
+
+  it("shows a thumbnail made since, for an event that names no workspace", async () => {
+    const { container } = render();
+    await ready();
+    act(() => thumbDone.emit?.({ id: 2 }));
+    fireEvent.mouseEnter(screen.getByTestId(`node ${fk("b.jpg")}`));
+    await waitFor(() =>
+      expect(
+        container
+          .querySelector('[data-slot="graph-hover-thumbnail"] img')
+          ?.getAttribute("src"),
+      ).toMatch(/^http:\/\/media\/ws\/w\/thumb\/2\?v=\d+$/),
+    );
+  });
+
+  it("asks for a regenerated thumbnail under a new URL", async () => {
+    const { container } = render();
+    await ready();
+    const src = () =>
+      container
+        .querySelector('[data-slot="graph-hover-thumbnail"] img')
+        ?.getAttribute("src") ?? null;
+    const versionOf = (url: string | null) => {
+      const m = /^http:\/\/media\/ws\/w\/thumb\/1\?v=(\d+)$/.exec(url ?? "");
+      if (!m) throw new Error(`not file 1's thumbnail: ${url}`);
+      return Number(m[1]);
+    };
+    const hover = () =>
+      fireEvent.mouseEnter(screen.getByTestId(`node ${fk("a.mp4")}`));
+    hover();
+    await waitFor(() => expect(src()).not.toBeNull());
+    const first = versionOf(src());
+
+    // Another file's does not count.
+    act(() => thumbDone.emit?.({ id: 2, workspaceId: "w" }));
+    await new Promise((r) => setTimeout(r, 150));
+    expect(versionOf(src())).toBe(first);
+    // Its own does, while it shows.
+    act(() => thumbDone.emit?.({ id: 1, workspaceId: "w" }));
+    await waitFor(() => expect(versionOf(src())).toBeGreaterThan(first));
+    // So does an event that names no workspace.
+    const named = versionOf(src());
+    act(() => thumbDone.emit?.({ id: 1 }));
+    await waitFor(() => expect(versionOf(src())).toBeGreaterThan(named));
+    const second = versionOf(src());
+
+    // The other view is a fresh mount: it must not fall back to a URL the
+    // old picture may be cached under.
+    fireEvent.click(screen.getByRole("radio", { name: "3D" }));
+    await waitFor(() => expect(src()).toBeNull());
+    await ready();
+    hover();
+    await waitFor(() => expect(src()).not.toBeNull());
+    expect(versionOf(src())).toBeGreaterThan(second);
+  });
+
+  it("drops a thumbnail that fails to load, and tries again on the next hover", async () => {
+    const { container } = render();
+    await ready();
+    const preview = () =>
+      container.querySelector('[data-slot="graph-hover-thumbnail"] img');
+    const a = screen.getByTestId(`node ${fk("a.mp4")}`);
+    fireEvent.mouseEnter(a);
+    const img = await waitFor(() => {
+      const el = preview();
+      if (!el) throw new Error("no thumbnail yet");
+      return el;
+    });
+    // Out of sight until it has loaded.
+    expect(img.parentElement?.style.opacity).toBe("0");
+    fireEvent.error(img);
+    expect(preview()).toBeNull();
+    fireEvent.mouseLeave(a);
+    fireEvent.mouseEnter(a);
+    const again = preview();
+    expect(again).not.toBeNull();
+    if (!again) return;
+    // The card takes the picture's shape: no margin around it.
+    Object.defineProperty(again, "naturalWidth", { value: 1920 });
+    Object.defineProperty(again, "naturalHeight", { value: 1080 });
+    fireEvent.load(again);
+    const card = again.parentElement;
+    expect(card?.style.opacity).toBe("1");
+    expect(card?.style.width).toBe("192px");
+    expect(card?.style.height).toBe("108px");
   });
 
   it("drags a node: held where the pointer is, let go on release", async () => {

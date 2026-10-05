@@ -7,6 +7,12 @@ export function isTagSort(raw: string | null): raw is TagSort {
   return raw === "name" || raw === "count";
 }
 
+export type TagView = "list" | "cloud";
+
+export function isTagView(raw: string | null): raw is TagView {
+  return raw === "list" || raw === "cloud";
+}
+
 /** Case-insensitive match against the qualified name and the human-readable label. */
 export function filterTags(
   tags: TagSummary[],

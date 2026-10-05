@@ -24,6 +24,8 @@ import {
 import { MAX_FOLDER_PATH, isNormalizedFolderPath } from "../folderPath.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
 import { GRAPH_NODE_KEY_MAX } from "./graph.js";
+import { ACTIVITY_METRICS } from "./activity.js";
+import { parseDay } from "../day.js";
 
 export const KindSchema = z.enum(["video", "image", "audio"]);
 export type Kind = z.infer<typeof KindSchema>;
@@ -146,6 +148,14 @@ export const FolderScopeSchema = z.object({
 });
 export type FolderScope = z.infer<typeof FolderScopeSchema>;
 
+export const ActivityMetricSchema = z.enum(ACTIVITY_METRICS);
+
+/** A calendar day, "YYYY-MM-DD", read in the main process's local time. */
+export const DaySchema = z
+  .string()
+  .max(10)
+  .refine((v) => parseDay(v) !== null, { message: "not a calendar day" });
+
 export const SearchCursorSchema = z.object({
   offset: z.number().int().min(0),
   key: SearchSeekKeySchema.optional(),
@@ -170,6 +180,12 @@ export const SearchQuerySchema = z.object({
   /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
   btimeFrom: z.number().optional(),
   btimeTo: z.number().optional(),
+  /** Range of the time the file entered the index (created_at), Unix seconds. */
+  addedFrom: z.number().optional(),
+  addedTo: z.number().optional(),
+  /** Played-at range, Unix seconds: files with a play history row inside it. */
+  playedFrom: z.number().optional(),
+  playedTo: z.number().optional(),
   sort: z.string().optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
   /** Folder view: only files under this folder (see FolderScopeSchema). */

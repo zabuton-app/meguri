@@ -452,3 +452,43 @@ describe("the default saved search", () => {
     expect(latest()).toEqual({ sort: "rating" });
   });
 });
+
+describe("date ranges in the panel", () => {
+  /** Unix seconds of a local wall-clock time. */
+  const at = (y: number, m: number, d: number, h = 0, min = 0, sec = 0) =>
+    Math.floor(new Date(y, m - 1, d, h, min, sec).getTime() / 1000);
+  const input = (name: string) =>
+    within(panel() as HTMLElement).getByLabelText<HTMLInputElement>(name);
+
+  it.each([
+    ["Captured date", "capturedFrom", "capturedTo"],
+    ["Created date", "btimeFrom", "btimeTo"],
+    ["Added date", "addedFrom", "addedTo"],
+    ["Played date", "playedFrom", "playedTo"],
+  ] as const)("narrows by %s, whole days at both ends", (label, from, to) => {
+    const { latest } = setup();
+    fireEvent.click(trigger());
+
+    fireEvent.change(input(`${label}: From`), {
+      target: { value: "2026-03-10" },
+    });
+    expect(latest()).toEqual({ [from]: at(2026, 3, 10) });
+    fireEvent.change(input(`${label}: To`), {
+      target: { value: "2026-03-12" },
+    });
+    expect(latest()).toEqual({
+      [from]: at(2026, 3, 10),
+      [to]: at(2026, 3, 12, 23, 59, 59),
+    });
+    // Each end bounds the other, and the range reads back as one chip.
+    expect(input(`${label}: From`).max).toBe("2026-03-12");
+    expect(input(`${label}: To`).min).toBe("2026-03-10");
+    expect(chips().map((c) => c.textContent)).toEqual([
+      expect.stringContaining(`${label}: `),
+    ]);
+
+    fireEvent.change(input(`${label}: From`), { target: { value: "" } });
+    expect(latest()?.[from]).toBeUndefined();
+    expect(latest()?.[to]).toBe(at(2026, 3, 12, 23, 59, 59));
+  });
+});

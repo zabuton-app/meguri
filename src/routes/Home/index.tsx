@@ -29,6 +29,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { MANUAL_SORT } from "@shared/sortDir";
 import { MediaGrid } from "@/components/MediaGrid";
+import { HeatmapView } from "@/heatmap/HeatmapView";
 import { MediaList } from "@/components/MediaList";
 import {
   MediaNavProvider,
@@ -69,6 +70,7 @@ import { FolderHeader } from "@/components/FolderHeader";
 import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
+import { useHeatmapFilter } from "./useHeatmapFilter";
 import { setListCounts, type ListCounts } from "@/hooks/useListCounts";
 import { useFolderNavKeys } from "./useFolderNavKeys";
 import { useFolderPlaylist } from "./useFolderPlaylist";
@@ -82,6 +84,7 @@ import {
   discoverPath,
   BY_FOLDER_KEY,
   LIST_MAIN_ID,
+  hasFolderForm,
   isFolderView,
   parseViewMode,
   scrollListByPage,
@@ -130,7 +133,6 @@ export default function Home() {
     false,
     (raw) => raw === "true",
   );
-
   const status = useAppStatus();
   const workspaces = useQuery({
     queryKey: ["workspaces_list"],
@@ -187,13 +189,13 @@ export default function Home() {
     [filter, folderView, folderNav.path, folderSearching],
   );
 
-  // The graph has no folder form (see isFolderView): a folder opened from
+  // The graph has no folder form (see hasFolderForm): a folder opened from
   // outside the list — a saved search that carries one, "show in library" —
   // would be dropped without a word there, so it leaves the graph for the grid.
   const showByFolder = useCallback(
     (on: boolean) => {
       setByFolder(on);
-      if (on) setViewMode((v) => (v === "graph" ? "grid" : v));
+      if (on) setViewMode((v) => (hasFolderForm(v) ? v : "grid"));
     },
     [setByFolder, setViewMode],
   );
@@ -206,6 +208,17 @@ export default function Home() {
       setFilter,
       setByFolder: showByFolder,
     });
+  const heatmap = useHeatmapFilter({ filterValue, onFilterChange });
+  // What the heatmap counts over: the filter, within the folder shown and
+  // everything below it — what the list becomes once a day narrows it (a
+  // condition turns a folder's own files into a search of its subtree).
+  const heatmapQuery = useMemo<SearchQuery>(
+    () =>
+      folderView
+        ? { ...filter, folder: { path: folderNav.path, recursive: true } }
+        : filter,
+    [filter, folderView, folderNav.path],
+  );
 
   // Include the workspace ID in the key so switching workspaces (incl. "All") refetches separately.
   const search = useFilesSearch(
@@ -503,6 +516,7 @@ export default function Home() {
         // Folders appear, fill up and empty out with a scan like files do.
         void qc.invalidateQueries({ queryKey: ["folders_list"] });
         void qc.invalidateQueries({ queryKey: ["graph_build"] });
+        void qc.invalidateQueries({ queryKey: ["activity_days"] });
         // A scan can add tags (new files, the derived-tag backfill), so a tag
         // screen left open would otherwise show a stale catalog.
         void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
@@ -786,8 +800,10 @@ export default function Home() {
     t,
   ]);
 
+  // Changing it scrolls the list back to its top, as another folder does.
+  const listResetKey = folderView ? `folder:${folderNav.path}` : undefined;
   // Names the list on screen: the workspace, how it is browsed and the filter.
-  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : folderView ? `folder:${folderNav.path}` : "flat"}|${JSON.stringify(filter)}`;
+  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : (listResetKey ?? "flat")}|${JSON.stringify(filter)}`;
   // A pass the playlist parked belongs to the list it was playing. Once the
   // list becomes another one it is dropped, so nothing (the pet's "Resume
   // playback") can pick it back up and graft the new list onto the old queue.
@@ -833,7 +849,23 @@ export default function Home() {
         manualSortAvailable={!!activeCollection}
         workspaceId={folderAvailable ? workspaceId : null}
         onApplySaved={onApplySaved}
+        onToggleHeatmap={heatmap.toggle}
+        heatmapOpen={heatmap.open}
       />
+
+      {/* The heatmap: a panel under the filter bar, over whichever view is
+          shown. It counts what the list would hold (the folder shown
+          included) and writes the days picked into the filter. */}
+      {heatmap.open && (status.data?.ready ?? false) && (
+        <HeatmapView
+          scope={status.data?.workspaceId ?? ""}
+          query={heatmapQuery}
+          ready={!!status.data?.workspaceId}
+          metric={heatmap.metric}
+          onMetricChange={heatmap.setMetric}
+          onRangeChange={heatmap.pickRange}
+        />
+      )}
 
       {folderView && (
         <FolderHeader
@@ -954,7 +986,7 @@ export default function Home() {
                 reorder={reorder}
                 folders={folderEntries}
                 onOpenFolder={folderNav.enter}
-                resetKey={folderView ? `folder:${folderNav.path}` : undefined}
+                resetKey={listResetKey}
                 inFolder={folderSearching}
               />
             ) : (
@@ -979,7 +1011,7 @@ export default function Home() {
                 reorder={reorder}
                 folders={folderEntries}
                 onOpenFolder={folderNav.enter}
-                resetKey={folderView ? `folder:${folderNav.path}` : undefined}
+                resetKey={listResetKey}
                 inFolder={folderSearching}
               />
             )}
@@ -1024,8 +1056,10 @@ export default function Home() {
           onRebuild={() => void onRebuild()}
           onSetView={setViewMode}
           onToggleByFolder={toggleByFolder}
+          onToggleHeatmap={heatmap.toggle}
+          heatmapOpen={heatmap.open}
           folderView={folderView}
-          folderAvailable={folderAvailable && view !== "graph"}
+          folderAvailable={folderAvailable && hasFolderForm(view)}
           onDiscover={openDiscover}
           canDiscover={hasPool}
           onTags={openTags}

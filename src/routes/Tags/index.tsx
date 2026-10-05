@@ -1,5 +1,6 @@
 // Tag management. /tags. Lists every tag in the current scope with its file count
 // and origin, and lets the user rename, merge and delete the ones they created.
+// A second view draws the same catalog as a cloud, sized by use.
 // Overlays the library as a modal, like /duplicates and /history.
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -26,23 +27,29 @@ import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { invalidateTagCatalog } from "@/lib/queryCache";
 import { applyTagFilter } from "@/lib/ui-events";
 import { tagHumanLabel, tagNamespaceLabel } from "@/lib/tagLabel";
 import { useI18n } from "@/i18n/I18nProvider";
 import { TagRow } from "./TagRow";
+import { TagCloud } from "./TagCloud";
 import { TagRenameDialog } from "./TagRenameDialog";
 import { TagMergeDialog } from "./TagMergeDialog";
 import {
   filterTags,
   groupTagsByNamespace,
   isTagSort,
+  isTagView,
   sortTags,
   type TagSort,
+  type TagView,
 } from "./utils";
 
 const MODAL_SIZE_KEY = "meguri.tags.modalSize";
 const SORT_KEY = "meguri.tags.sort";
+const VIEW_KEY = "meguri.tags.view";
+const CLOUD_INCLUDE_AUTO_KEY = "meguri.tags.cloudIncludeAuto";
 
 const refOf = (tag: TagSummary): TagRef => ({
   namespace: tag.namespace,
@@ -70,6 +77,16 @@ export default function Tags() {
   const [sort, setSort] = useLocalStorage<TagSort>(SORT_KEY, "count", (raw) =>
     isTagSort(raw) ? raw : "count",
   );
+  const [view, setView] = useLocalStorage<TagView>(VIEW_KEY, "list", (raw) =>
+    isTagView(raw) ? raw : "list",
+  );
+  // Off by default: every file carries a few generated tags, and in a cloud
+  // they would drown the user's own.
+  const [cloudIncludeAuto, setCloudIncludeAuto] = useLocalStorage<boolean>(
+    CLOUD_INCLUDE_AUTO_KEY,
+    false,
+    (raw) => raw === "true",
+  );
 
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -94,9 +111,13 @@ export default function Tags() {
     (tag: TagSummary) => tagHumanLabel(t, tag.namespace, tag.name),
     [t],
   );
+  const filtered = useMemo(
+    () => filterTags(all, search, label),
+    [all, search, label],
+  );
   const groups = useMemo(
-    () => groupTagsByNamespace(sortTags(filterTags(all, search, label), sort)),
-    [all, search, sort, label],
+    () => groupTagsByNamespace(sortTags(filtered, sort)),
+    [filtered, sort],
   );
   // Sum of per-tag counts, i.e. assignments — a file with four generated tags
   // contributes four. The label says "assignments" for that reason; a true file
@@ -240,6 +261,7 @@ export default function Tags() {
   const mutating =
     renameTag.isPending || mergeTags.isPending || deleteTags.isPending;
   const loading = ready && catalog.isLoading;
+  const isCloud = view === "cloud";
   const isSmall = modalSize === "small";
   const toggleLabel = isSmall
     ? t("media.modalMaximize")
@@ -259,6 +281,17 @@ export default function Tags() {
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <SegmentedControl
+            value={view}
+            options={[
+              { value: "list", label: t("tags.viewList") },
+              { value: "cloud", label: t("tags.viewCloud") },
+            ]}
+            onChange={setView}
+            label={t("tags.viewLabel")}
+            slot="tags-view"
+            className="[&>button]:h-7 [&>button]:px-2 [&>button]:text-xs"
+          />
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -266,26 +299,38 @@ export default function Tags() {
             aria-label={t("tags.searchPlaceholder")}
             className="h-7 w-40 text-xs"
           />
-          <ButtonGroup>
+          {isCloud ? (
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={() => setSort("name")}
-              aria-pressed={sort === "name"}
+              className="h-7 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+              onClick={() => setCloudIncludeAuto((prev) => !prev)}
+              aria-pressed={cloudIncludeAuto}
             >
-              {t("tags.sortByName")}
+              {t("tags.cloudIncludeAuto")}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={() => setSort("count")}
-              aria-pressed={sort === "count"}
-            >
-              {t("tags.sortByCount")}
-            </Button>
-          </ButtonGroup>
+          ) : (
+            <ButtonGroup>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setSort("name")}
+                aria-pressed={sort === "name"}
+              >
+                {t("tags.sortByName")}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setSort("count")}
+                aria-pressed={sort === "count"}
+              >
+                {t("tags.sortByCount")}
+              </Button>
+            </ButtonGroup>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -310,7 +355,7 @@ export default function Tags() {
         </div>
       </header>
 
-      {selectedTags.length > 0 && (
+      {!isCloud && selectedTags.length > 0 && (
         <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-1.5">
           <span className="text-xs text-fg">
             {t("tags.selected", { count: selectedTags.length })}
@@ -343,86 +388,98 @@ export default function Tags() {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading ? (
+      {/* Loading and "no tags at all" belong to the catalog, not to a view. */}
+      {loading ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-2 p-4">
             {Array.from({ length: 8 }, (_, i) => (
               <Skeleton key={i} className="h-7 w-full rounded-lg" />
             ))}
           </div>
-        ) : all.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
-            <TagsIcon className="size-10 opacity-50" />
-            <p>{t("tags.empty")}</p>
-            <p className="text-xs">{t("tags.emptyHint")}</p>
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-center text-muted">
-            <p>{t("tags.noMatch")}</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 p-3">
-            {catalog.data?.truncated && (
-              <p className="px-1 text-xs text-muted">
-                {t("tags.truncated", { max: MAX_TAG_LIST })}
-              </p>
-            )}
-            {groups.map((group) => {
-              const isCollapsed = collapsed.has(group.namespace);
-              const pipelineOwned = group.namespace !== "";
-              return (
-                <section key={group.namespace || "manual"}>
-                  <h3 className="sticky top-0 z-10 flex items-baseline gap-2 bg-bg px-1 py-1.5 text-xs font-semibold text-muted">
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 text-fg"
-                      onClick={() => toggleGroup(group.namespace)}
-                      aria-expanded={!isCollapsed}
-                    >
-                      {isCollapsed ? (
-                        <ChevronRight className="size-3" />
-                      ) : (
-                        <ChevronDown className="size-3" />
+        </div>
+      ) : all.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
+          <TagsIcon className="size-10 opacity-50" />
+          <p>{t("tags.empty")}</p>
+          <p className="text-xs">{t("tags.emptyHint")}</p>
+        </div>
+      ) : isCloud ? (
+        <TagCloud
+          tags={filtered}
+          includeAuto={cloudIncludeAuto}
+          truncated={catalog.data?.truncated ?? false}
+          onFilter={onFilterByTag}
+        />
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {groups.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-center text-muted">
+              <p>{t("tags.noMatch")}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 p-3">
+              {catalog.data?.truncated && (
+                <p className="px-1 text-xs text-muted">
+                  {t("tags.truncated", { max: MAX_TAG_LIST })}
+                </p>
+              )}
+              {groups.map((group) => {
+                const isCollapsed = collapsed.has(group.namespace);
+                const pipelineOwned = group.namespace !== "";
+                return (
+                  <section key={group.namespace || "manual"}>
+                    <h3 className="sticky top-0 z-10 flex items-baseline gap-2 bg-bg px-1 py-1.5 text-xs font-semibold text-muted">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-fg"
+                        onClick={() => toggleGroup(group.namespace)}
+                        aria-expanded={!isCollapsed}
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="size-3" />
+                        ) : (
+                          <ChevronDown className="size-3" />
+                        )}
+                        {pipelineOwned && <Lock className="size-3" />}
+                        {pipelineOwned
+                          ? tagNamespaceLabel(t, group.namespace)
+                          : t("tags.groupManual")}
+                      </button>
+                      <span className="tabular-nums">{group.tags.length}</span>
+                      {pipelineOwned && (
+                        <span className="font-normal opacity-70">
+                          {t("tags.readOnly")}
+                        </span>
                       )}
-                      {pipelineOwned && <Lock className="size-3" />}
-                      {pipelineOwned
-                        ? tagNamespaceLabel(t, group.namespace)
-                        : t("tags.groupManual")}
-                    </button>
-                    <span className="tabular-nums">{group.tags.length}</span>
-                    {pipelineOwned && (
-                      <span className="font-normal opacity-70">
-                        {t("tags.readOnly")}
-                      </span>
+                    </h3>
+                    {pipelineOwned && !isCollapsed && (
+                      <p className="px-1 pb-1 text-xs text-muted">
+                        {t("tags.readOnlyHint")}
+                      </p>
                     )}
-                  </h3>
-                  {pipelineOwned && !isCollapsed && (
-                    <p className="px-1 pb-1 text-xs text-muted">
-                      {t("tags.readOnlyHint")}
-                    </p>
-                  )}
-                  {!isCollapsed && (
-                    <ul className="flex flex-col">
-                      {group.tags.map((tag) => (
-                        <TagRow
-                          key={tag.qualified}
-                          tag={tag}
-                          selected={selected.has(tag.qualified)}
-                          busy={mutating}
-                          onToggleSelect={toggleSelect}
-                          onFilter={onFilterByTag}
-                          onRename={setRenameTarget}
-                          onDelete={(target) => void onDeleteOne(target)}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </section>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                    {!isCollapsed && (
+                      <ul className="flex flex-col">
+                        {group.tags.map((tag) => (
+                          <TagRow
+                            key={tag.qualified}
+                            tag={tag}
+                            selected={selected.has(tag.qualified)}
+                            busy={mutating}
+                            onToggleSelect={toggleSelect}
+                            onFilter={onFilterByTag}
+                            onRename={setRenameTarget}
+                            onDelete={(target) => void onDeleteOne(target)}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <TagRenameDialog
         open={!!renameTarget}

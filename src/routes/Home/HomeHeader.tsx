@@ -29,7 +29,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
-import type { ViewMode } from "./utils";
+import { hasFolderForm, type ViewMode } from "./utils";
 
 /**
  * Display name for a collection. The built-in Watch Later stores an English
@@ -219,7 +219,7 @@ export function HomeHeader({
           onClick={onToggleByFolder}
           aria-label={t("view.folder")}
           aria-pressed={folderView}
-          disabled={!folderAvailable || view === "graph"}
+          disabled={!folderAvailable || !hasFolderForm(view)}
           title={
             view === "graph"
               ? t("view.folderUnavailableGraph")

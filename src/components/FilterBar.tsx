@@ -2,7 +2,7 @@
 // constantly — text, kind, rating, favorites — and everything rarer collapses
 // into MoreFiltersPopover, which reports how many of its conditions are on.
 import { useMemo } from "react";
-import { Heart } from "lucide-react";
+import { CalendarDays, Heart } from "lucide-react";
 import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import {
@@ -29,6 +29,13 @@ interface Props {
   workspaceId?: string | null;
   /** Opens a saved search; by default its query simply replaces `value`. */
   onApplySaved?: (collection: SmartCollection) => void;
+  /**
+   * Shows or hides the heatmap panel under the bar. The button sits with the
+   * conditions because that is what the panel is: a way to set a date range.
+   * Left out, the button is not drawn.
+   */
+  onToggleHeatmap?: () => void;
+  heatmapOpen?: boolean;
 }
 
 export function FilterBar({
@@ -37,6 +44,8 @@ export function FilterBar({
   manualSortAvailable,
   workspaceId,
   onApplySaved,
+  onToggleHeatmap,
+  heatmapOpen = false,
 }: Props) {
   const { t } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
@@ -109,6 +118,24 @@ export function FilterBar({
         >
           <Heart className={cn("size-4", value.favorite && "fill-current")} />
         </button>
+
+        {onToggleHeatmap && (
+          <button
+            type="button"
+            onClick={onToggleHeatmap}
+            aria-pressed={heatmapOpen}
+            title={t("view.heatmap")}
+            aria-label={t("view.heatmap")}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-md border border-border transition-colors",
+              heatmapOpen
+                ? "border-primary bg-primary/20 text-fg"
+                : "text-muted hover:text-fg",
+            )}
+          >
+            <CalendarDays className="size-4" />
+          </button>
+        )}
 
         <MoreFiltersPopover
           value={value}

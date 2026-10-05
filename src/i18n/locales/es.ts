@@ -178,7 +178,10 @@ export const es: Record<TranslationKey, string> = {
   "filter.inProgress": "En curso",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "Filtrar por valoración mínima",
+  "filter.capturedAt": "Fecha de captura",
   "filter.btime": "Fecha de creación",
+  "filter.addedAt": "Fecha de adición",
+  "filter.playedAt": "Fecha de reproducción",
   "filter.dateFrom": "Desde",
   "filter.dateTo": "Hasta",
   "filter.more": "Más filtros",
@@ -392,6 +395,28 @@ export const es: Record<TranslationKey, string> = {
   "grid.searchByTag": "Filtrar por «{name}»",
   "view.grid": "Vista de cuadrícula",
   "view.list": "Vista de lista",
+
+  // contribution graph
+  "view.heatmap": "Gráfico de contribuciones",
+  "view.heatmapOff": "Ocultar el gráfico de contribuciones",
+  "heatmap.metric.label": "Contar por",
+  "heatmap.metric.played": "Reproducidos",
+  "heatmap.metric.captured": "Capturados",
+  "heatmap.metric.created": "Creados",
+  "heatmap.metric.added": "Añadidos",
+  "heatmap.cell.played": "{date}: {count} reproducidos",
+  "heatmap.cell.captured": "{date}: {count} capturados",
+  "heatmap.cell.created": "{date}: {count} creados",
+  "heatmap.cell.added": "{date}: {count} añadidos",
+  "heatmap.range.last": "Últimos 12 meses",
+  "heatmap.range.prev": "Año anterior",
+  "heatmap.range.next": "Año siguiente",
+  "heatmap.less": "Menos",
+  "heatmap.more": "Más",
+  "heatmap.hint":
+    "Haz clic en un día o arrastra sobre varios para acotar la lista",
+  "heatmap.clearDay": "Quitar los días seleccionados",
+  "heatmap.error": "No se pudieron cargar los recuentos",
 
   // graph view
   "view.graph": "Vista de grafo",
@@ -659,6 +684,13 @@ export const es: Record<TranslationKey, string> = {
 
   "tags.title": "Etiquetas",
   "tags.summary": "{tags} etiquetas / {assignments} asignaciones",
+  "tags.viewLabel": "Vista",
+  "tags.viewList": "Lista",
+  "tags.viewCloud": "Nube",
+  "tags.cloudLimited": "Se muestran solo las {max} etiquetas más usadas.",
+  "tags.cloudIncludeAuto": "Etiquetas automáticas",
+  "tags.cloudOnlyAuto":
+    "Solo hay etiquetas automáticas. Activa las etiquetas automáticas para verlas.",
   "tags.empty": "Todavía no hay etiquetas.",
   "tags.emptyHint":
     "Añade etiquetas desde la vista de detalle y aparecerán aquí.",

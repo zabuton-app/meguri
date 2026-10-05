@@ -173,7 +173,10 @@ export const ja = {
   "filter.inProgress": "視聴途中",
   "filter.sortLabel": "{label}",
   "filter.ratingFilter": "最低レーティングで絞り込み",
+  "filter.capturedAt": "撮影日",
   "filter.btime": "作成日",
+  "filter.addedAt": "追加日",
+  "filter.playedAt": "再生日",
   "filter.dateFrom": "開始日",
   "filter.dateTo": "終了日",
   "filter.more": "他の条件",
@@ -384,6 +387,28 @@ export const ja = {
   "grid.searchByTag": "「{name}」で絞り込み",
   "view.grid": "グリッド表示",
   "view.list": "リスト表示",
+
+  // contribution graph
+  "view.heatmap": "コントリビューショングラフ",
+  "view.heatmapOff": "コントリビューショングラフを隠す",
+  "heatmap.metric.label": "集計対象",
+  "heatmap.metric.played": "再生",
+  "heatmap.metric.captured": "撮影",
+  "heatmap.metric.created": "作成",
+  "heatmap.metric.added": "追加",
+  "heatmap.cell.played": "{date}: {count}件を再生",
+  "heatmap.cell.captured": "{date}: {count}件を撮影",
+  "heatmap.cell.created": "{date}: {count}件を作成",
+  "heatmap.cell.added": "{date}: {count}件を追加",
+  "heatmap.range.last": "過去12か月",
+  "heatmap.range.prev": "前の年",
+  "heatmap.range.next": "次の年",
+  "heatmap.less": "少ない",
+  "heatmap.more": "多い",
+  "heatmap.hint":
+    "日付をクリック、またはドラッグで期間を選ぶと一覧を絞り込みます",
+  "heatmap.clearDay": "選んだ日付を解除",
+  "heatmap.error": "集計を読み込めませんでした",
 
   // グラフ表示
   "view.graph": "グラフ表示",
@@ -641,6 +666,13 @@ export const ja = {
 
   "tags.title": "タグ管理",
   "tags.summary": "{tags} タグ / 付与 {assignments} 件",
+  "tags.viewLabel": "表示",
+  "tags.viewList": "一覧",
+  "tags.viewCloud": "クラウド",
+  "tags.cloudLimited": "よく使われている上位 {max} 件のみ表示しています。",
+  "tags.cloudIncludeAuto": "自動タグ",
+  "tags.cloudOnlyAuto":
+    "表示できるのは自動タグのみです。自動タグをオンにすると表示されます。",
   "tags.empty": "タグはまだありません。",
   "tags.emptyHint": "詳細画面でタグを追加すると、ここに一覧が表示されます。",
   "tags.searchPlaceholder": "タグを絞り込み",

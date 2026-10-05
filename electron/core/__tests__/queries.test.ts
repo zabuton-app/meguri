@@ -102,6 +102,58 @@ describe("searchFiles", () => {
     expect(ids({ btimeFrom: 400 })).toEqual([]);
   });
 
+  it("filters by the range a file was added to the index in", () => {
+    const at = (id: number, createdAt: number) =>
+      db
+        .prepare("UPDATE files SET created_at = ? WHERE id = ?")
+        .run(createdAt, id);
+    const old = insertFile(db, rootId, { relPath: "old.mp4" });
+    const mid = insertFile(db, rootId, { relPath: "mid.mp4" });
+    const recent = insertFile(db, rootId, { relPath: "new.mp4" });
+    at(old, 100);
+    at(mid, 200);
+    at(recent, 300);
+
+    const ids = (q: Parameters<typeof searchFiles>[1]) =>
+      searchFiles(db, q)
+        .items.map((f) => f.id)
+        .sort();
+    expect(ids({ addedFrom: 150 })).toEqual([mid, recent].sort());
+    expect(ids({ addedTo: 250 })).toEqual([old, mid].sort());
+    expect(ids({ addedFrom: 200, addedTo: 200 })).toEqual([mid]);
+    expect(ids({ addedFrom: 400 })).toEqual([]);
+  });
+
+  it("filters by played-at range; files never played never match", () => {
+    const play = (id: number, at: number) =>
+      db
+        .prepare(
+          `INSERT INTO play_history (meta_key, played_at, position, via)
+           SELECT meta_key, ?, NULL, 'browser' FROM files WHERE id = ?`,
+        )
+        .run(at, id);
+    const old = insertFile(db, rootId, { relPath: "old.mp4" });
+    const mid = insertFile(db, rootId, { relPath: "mid.mp4" });
+    const both = insertFile(db, rootId, { relPath: "both.mp4" });
+    insertFile(db, rootId, { relPath: "never.mp4" });
+    play(old, 100);
+    play(mid, 200);
+    // One play inside a range is enough, whatever the others.
+    play(both, 100);
+    play(both, 300);
+
+    const ids = (q: Parameters<typeof searchFiles>[1]) =>
+      searchFiles(db, q)
+        .items.map((f) => f.id)
+        .sort();
+    expect(ids({ playedFrom: 150 })).toEqual([mid, both].sort());
+    expect(ids({ playedTo: 150 })).toEqual([old, both].sort());
+    expect(ids({ playedFrom: 150, playedTo: 250 })).toEqual([mid]);
+    // Both ends are included, as for the other date ranges.
+    expect(ids({ playedFrom: 200, playedTo: 200 })).toEqual([mid]);
+    expect(ids({ playedFrom: 400 })).toEqual([]);
+  });
+
   it("filters by fileIds (collection membership)", () => {
     const a = insertFile(db, rootId, { relPath: "a.mp4" });
     insertFile(db, rootId, { relPath: "b.mp4" });
