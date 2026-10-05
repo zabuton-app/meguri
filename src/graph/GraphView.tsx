@@ -45,6 +45,7 @@ import {
   type GraphCanvasProps,
 } from "./GraphCanvas";
 import { GraphErrorBoundary } from "./GraphErrorBoundary";
+import { GraphHoverThumbnail } from "./GraphHoverThumbnail";
 import { GraphLegend } from "./GraphLegend";
 import { GraphSearch } from "./GraphSearch";
 import { GraphSettingsPanel } from "./GraphSettingsPanel";
@@ -196,6 +197,7 @@ function GraphScene({
   const [options, setOptions] = useGraphOptions();
   const [settings, setSettings] = useGraphSettings();
   const canvas = useRef<GraphCanvasHandle>(null);
+  const stage = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const sim = useMemo(() => new SimClient(), []);
 
@@ -335,6 +337,13 @@ function GraphScene({
     [graph, options],
   );
   const focus = dragging ?? hovered ?? selected;
+  // The file whose thumbnail shows beside the pointer; not during a drag,
+  // where it would only be in the way.
+  const thumbnailed = useMemo(() => {
+    if (dragging || !hovered || !graph.hasNode(hovered)) return null;
+    const a = graph.getNodeAttributes(hovered);
+    return a.type === "file" ? a : null;
+  }, [graph, hovered, dragging]);
 
   // --- simulate what shows --------------------------------------------------
   useEffect(() => {
@@ -536,7 +545,10 @@ function GraphScene({
         dims={dims}
         onDims={onDims}
       />
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-bg">
+      <div
+        ref={stage}
+        className="relative min-h-0 flex-1 overflow-hidden bg-bg"
+      >
         <GraphErrorBoundary
           fallback={
             <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted">
@@ -551,6 +563,8 @@ function GraphScene({
           ) : (
             <GraphCanvas ref={canvas} {...canvasProps} />
           )}
+          {/* In here, so a canvas that failed does not leave a card behind. */}
+          <GraphHoverThumbnail node={thumbnailed} box={stage} />
         </GraphErrorBoundary>
 
         {(isLoading || isError || empty) && (
