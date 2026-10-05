@@ -532,7 +532,6 @@ export const es: Record<TranslationKey, string> = {
     "No se pudieron cargar los datos de etiquetado automático.",
   "autoTag.saveFailed": "No se pudo guardar la configuración.",
   "autoTag.applyFailed": "No se pudieron aplicar las etiquetas.",
-  "autoTag.undoFailed": "No se pudo deshacer.",
   "autoTag.moreRows": "{count} más sin mostrar",
   "autoTag.page.label": "Páginas",
   "autoTag.page.prev": "Anterior",
@@ -540,7 +539,7 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.page.range": "{from}–{to} de {total}",
   "autoTag.fileCount": "{count} archivos",
   "autoTag.tab.conditions": "Condiciones",
-  "autoTag.tab.suggest": "Palabras clave sugeridas",
+  "autoTag.tab.suggest": "Palabras clave",
   "autoTag.applyOnScan": "Aplicar al escanear",
   "autoTag.applyOnScanHint":
     "Ejecuta las reglas activas y las palabras clave en los archivos que un escaneo añade o cambia.",
@@ -551,6 +550,11 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.reapplyDone": "Se añadieron {added} etiquetas a {files} archivos",
   "autoTag.patternRules": "Reglas de patrón",
   "autoTag.evaluatedInOrder": "se evalúan de arriba abajo",
+  "autoTag.resetRules": "Restablecer",
+  "autoTag.resetRulesHint":
+    "Devuelve las reglas integradas a su estado inicial",
+  "autoTag.resetRulesConfirm":
+    "Se restauran las reglas integradas: sus patrones y opciones vuelven al estado inicial y quedan desactivadas. Las reglas que añadiste se conservan.",
   "autoTag.ruleEnabled": "Activar regla",
   "autoTag.addRule": "+ Añadir regla de regex",
   "autoTag.deleteRule": "Eliminar regla",
@@ -627,13 +631,23 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.addToDictionary": "Añadir a palabras clave",
   "autoTag.ignore": "Ignorar",
   "autoTag.revert": "Deshacer",
-  "autoTag.status.applied": "✓ Aplicada",
   "autoTag.status.registered": "En palabras clave",
   "autoTag.status.ignored": "Ignorada",
   "autoTag.appliedOne": "Se aplicó «{tag}» a {files} archivos.",
   "autoTag.appliedMany": "Se aplicaron {tags} etiquetas a {files} archivos.",
   "autoTag.appliedDictSuffix": " Los próximos escaneos también las aplicarán.",
   "autoTag.addedKeywords": "{count} añadidas a las palabras clave.",
+  "autoTag.keywordsFullSuffix":
+    " {count} no cupieron: las palabras clave están llenas.",
+  "autoTag.removeFromFiles": "Quitar de {count} archivos",
+  "autoTag.removeHint":
+    "Quita esta etiqueta de los archivos que la tienen, sin importar cómo llegó",
+  "autoTag.removeTitle": "¿Quitar «{tag}»?",
+  "autoTag.removeMessage":
+    "«{tag}» se quitará de {count} archivos y de sus copias, incluso donde se añadió a mano. No se puede deshacer desde aquí.",
+  "autoTag.removeConfirm": "Quitar",
+  "autoTag.removedOne": "«{tag}» quitada de {files} archivos.",
+  "autoTag.removeFailed": "No se pudo quitar la etiqueta.",
   "autoTag.searchFor": "Buscar «{tag}» en la biblioteca",
   "autoTag.searchCandidateHint":
     "Muestra los archivos que contienen las palabras de este candidato con la búsqueda de la biblioteca",

@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Search } from "lucide-react";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { searchLibrary } from "@/lib/ui-events";
 import { cn } from "@/lib/utils";
-import type { KeywordEntry } from "@shared/autoTag";
+import { MAX_AUTO_TAG_KEYWORDS, type KeywordEntry } from "@shared/autoTag";
 import { anyOfSearchToken } from "@shared/tags";
 import {
   candidateGroup,
@@ -16,7 +17,7 @@ import {
   type CandidateOrigin,
 } from "@shared/autoTagAnalysis";
 import { isAutoMetaValue } from "./autoMeta";
-import { MONO, mergeUndo, newKeyword, type CandidateState } from "./helpers";
+import { MONO, newKeyword, type CandidateState } from "./helpers";
 import { usePaging } from "./paging";
 import {
   Badge,
@@ -30,7 +31,6 @@ import {
   TabScroll,
   Toolbar,
 } from "./parts";
-import type { AutoTagSession } from "./session";
 import type { AutoTagState } from "./useAutoTag";
 import { useViewState } from "./viewState";
 
@@ -62,6 +62,7 @@ const NOT_PENDING: CandidateState = {
   inKeywords: false,
   canRegister: false,
   missing: 0,
+  tagged: 0,
   pending: false,
 };
 
@@ -70,13 +71,11 @@ const MAX_EXPANDED_FILES = 50;
 
 export function SuggestTab({
   state,
-  session,
   candidates,
   states,
   pending: pendingTotal,
 }: {
   state: AutoTagState;
-  session: AutoTagSession;
   candidates: Candidate[];
   /** Where each candidate stands, by key (see candidateState). */
   states: ReadonlyMap<string, CandidateState>;
@@ -92,7 +91,7 @@ export function SuggestTab({
     "suggest.expanded",
     null,
   );
-  const { undos, setUndos } = session;
+  const confirm = useConfirm();
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -141,8 +140,6 @@ export function SuggestTab({
   const apply = async (list: Candidate[], dict: boolean) => {
     if (list.length === 0 || busy) return;
     setBusy(true);
-    // One apply per candidate, so each row can be taken back on its own.
-    const next = new Map(undos);
     // What really happened, which is what the notice reports: a candidate
     // whose files all had the tag was not tagged, and an entry the keywords
     // had no room for was not added.
@@ -150,6 +147,7 @@ export function SuggestTab({
     const entries: KeywordEntry[] = [];
     let keywords = config.keywords;
     let files = 0;
+    let left = 0;
     for (const cand of list) {
       const perFile = new Map<number, string[]>();
       for (const index of cand.files.keys()) perFile.set(index, [cand.name]);
@@ -161,17 +159,15 @@ export function SuggestTab({
         files += outcome.files;
         tagged.push(cand);
       }
-      // Nothing to take back when every file had the tag already. An earlier
-      // handle for the same candidate is added to, not replaced.
-      if (outcome.undo) {
-        next.set(cand.key, mergeUndo(next.get(cand.key), outcome.undo));
-      }
       if (dict && canRegister(cand)) {
         // newKeyword is the one judge of whether an entry can be added.
         const entry = newKeyword(keywords, cand.name, []);
         if (entry) {
           keywords = [...keywords, entry];
           entries.push(entry);
+        } else if (keywords.length >= MAX_AUTO_TAG_KEYWORDS) {
+          // The keywords filled up partway through the batch.
+          left++;
         }
       }
     }
@@ -185,7 +181,6 @@ export function SuggestTab({
         return { ...c, keywords: merged };
       });
     }
-    setUndos(next);
     setSelected(new Set());
     const appliedText =
       tagged.length === 0
@@ -194,11 +189,12 @@ export function SuggestTab({
           ? t("autoTag.appliedOne", { tag: tagged[0].name, files })
           : t("autoTag.appliedMany", { tags: tagged.length, files });
     setNotice(
-      entries.length === 0
+      (entries.length === 0
         ? appliedText
         : appliedText
           ? appliedText + t("autoTag.appliedDictSuffix")
-          : t("autoTag.addedKeywords", { count: entries.length }),
+          : t("autoTag.addedKeywords", { count: entries.length })) +
+        (left > 0 ? t("autoTag.keywordsFullSuffix", { count: left }) : ""),
     );
     setBusy(false);
   };
@@ -209,18 +205,29 @@ export function SuggestTab({
     setSelected(new Set());
   };
 
-  /** Take back the tags applied for it here. A keyword entry stays. */
-  const revert = async (c: Candidate) => {
-    const handle = undos.get(c.key);
-    // One at a time, like an apply: each ends by writing the handles back.
-    if (!handle || busy) return;
+  /**
+   * Take the tag off every file the candidate names that carries it. There is
+   * no telling which of them the screen tagged and which were tagged by hand,
+   * so it asks first, and says how many.
+   */
+  const remove = async (c: Candidate) => {
+    const count = stateOf(c).tagged;
+    if (count === 0 || busy) return;
+    const ok = await confirm({
+      title: t("autoTag.removeTitle", { tag: c.name }),
+      message: t("autoTag.removeMessage", { tag: c.name, count }),
+      confirmText: t("autoTag.removeConfirm"),
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
-    await state.undo(handle);
-    const next = new Map(undos);
-    next.delete(c.key);
-    setUndos(next);
-    setNotice("");
+    const outcome = await state.remove([...c.files.keys()], c.key);
     setBusy(false);
+    setNotice(
+      outcome.ok
+        ? t("autoTag.removedOne", { tag: c.name, files: outcome.files })
+        : "",
+    );
   };
 
   const restore = (c: Candidate) => {
@@ -234,25 +241,15 @@ export function SuggestTab({
   return (
     <>
       <Toolbar>
-        <div className="flex min-w-[220px] flex-[1_1_260px] flex-col gap-1">
-          <span className="text-xs text-fg">
-            {state.loading
-              ? t("autoTag.analyzing")
-              : t("autoTag.analyzed", {
-                  files: names.length,
-                  candidates: candidates.length,
-                  pending: pendingTotal,
-                })}
-          </span>
-          <div className="h-1 max-w-[360px] overflow-hidden rounded-sm bg-overlay">
-            <div
-              className={cn(
-                "h-full bg-primary transition-[width]",
-                state.loading ? "w-1/3 animate-pulse" : "w-full",
-              )}
-            />
-          </div>
-        </div>
+        <span className="min-w-[220px] flex-[1_1_260px] text-xs text-fg">
+          {state.loading
+            ? t("autoTag.analyzing")
+            : t("autoTag.analyzed", {
+                files: names.length,
+                candidates: candidates.length,
+                pending: pendingTotal,
+              })}
+        </span>
         <Segmented
           tone="bg"
           label={t("autoTag.filter.label")}
@@ -267,7 +264,9 @@ export function SuggestTab({
           )}
         />
         <SmallButton
-          disabled={state.loading}
+          // Not while tags are being written: what comes back is applied to
+          // the list by position, and a reload would put another list there.
+          disabled={state.loading || busy}
           onClick={() => {
             setNotice("");
             setSelected(new Set());
@@ -302,7 +301,6 @@ export function SuggestTab({
         {shown.slice(paging.start, paging.end).map((c) => {
           const at = stateOf(c);
           const open = expanded === c.key;
-          const canRevert = undos.has(c.key);
           return (
             <div
               key={c.key}
@@ -397,26 +395,23 @@ export function SuggestTab({
                   ) : (
                     <>
                       {/* The two facts side by side, each as what it is now:
-                          in the keywords or not, on the files or not. */}
+                          in the keywords or not, on the files or not — the
+                          latter as the way to take it off them again. */}
                       {at.inKeywords && (
                         <span className="whitespace-nowrap text-xs text-primary">
                           {t("autoTag.status.registered")}
                         </span>
                       )}
-                      {at.missing === 0 && (
-                        <span className="whitespace-nowrap text-xs text-success">
-                          {t("autoTag.status.applied")}
-                        </span>
-                      )}
-                      {canRevert && (
-                        <button
-                          type="button"
+                      {at.tagged > 0 && (
+                        <SmallButton
+                          variant="ghost"
+                          className="h-[26px] px-2"
                           disabled={busy}
-                          onClick={() => void revert(c)}
-                          className="h-[26px] px-2 text-xs text-muted underline underline-offset-2 hover:text-bright-fg"
+                          title={t("autoTag.removeHint")}
+                          onClick={() => void remove(c)}
                         >
-                          {t("autoTag.revert")}
-                        </button>
+                          {t("autoTag.removeFromFiles", { count: at.tagged })}
+                        </SmallButton>
                       )}
                       {/* Registering is the main action where it applies:
                           the tag then keeps being applied by the Conditions

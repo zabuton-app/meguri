@@ -105,24 +105,58 @@ const builtin = (
   ci: false,
   split: kind === "bracket",
   caseMode: "keep",
-  enabled: true,
+  // Off until the user turns it on: what suits one library's file names
+  // makes noise in another's.
+  enabled: false,
   ...rest,
 });
 
+/** The built-in rules as they ship: all there to look at, none switched on. */
 export function defaultRules(): TagRule[] {
   return [
     builtin("prefix", "prefix", PREFIX_PATTERN, { exclude: "IMG, DSC, MVI" }),
     builtin("square", "bracket", "\\[([^\\]]+)\\]"),
     builtin("sumi", "bracket", "【([^】]+)】", { exclude: "公式" }),
     builtin("kagi", "bracket", "「([^」]+)」"),
-    builtin("paren", "bracket", "[(（]([^)）]+)[)）]", { enabled: false }),
+    builtin("paren", "bracket", "[(（]([^)）]+)[)）]"),
   ];
 }
 
+const isBuiltinRule = (rule: TagRule): boolean =>
+  (BUILTIN_RULE_IDS as readonly string[]).includes(rule.id);
+
 /**
- * The starting configuration. Scanning does not tag anything until the user
- * turns it on: the built-in rules are a starting point to look at, not
- * something to run over a library unasked.
+ * The rules with the built-in ones put back as they ship — restored where they
+ * were deleted, their patterns and options as they were before any edit, and
+ * switched off — ahead of the rules the user added. Those are all kept: when
+ * the list has no room for every built-in rule beside them, it is the last of
+ * the built-in ones that stay out.
+ */
+export function resetBuiltinRules(rules: readonly TagRule[]): TagRule[] {
+  const own = rules.filter((rule) => !isBuiltinRule(rule));
+  const room = Math.max(0, MAX_AUTO_TAG_RULES - own.length);
+  return [...defaultRules().slice(0, room), ...own];
+}
+
+/** Whether a reset would change nothing: the one definition of "as shipped". */
+export function builtinRulesAsShipped(rules: readonly TagRule[]): boolean {
+  const reset = resetBuiltinRules(rules);
+  return (
+    reset.length === rules.length &&
+    reset.every((rule, i) => {
+      const mine = rules[i];
+      // Field by field; every field of a rule is a plain value.
+      return (Object.keys(rule) as (keyof TagRule)[]).every(
+        (key) => mine[key] === rule[key],
+      );
+    })
+  );
+}
+
+/**
+ * The starting configuration. Nothing is tagged until the user turns it on —
+ * neither a rule nor the scan: the built-in rules are a starting point to look
+ * at, not something to run over a library unasked.
  */
 export function defaultAutoTagConfig(): AutoTagConfig {
   return {
@@ -447,6 +481,9 @@ export interface AutoTagApplyResult {
   files: number;
   /** (file, tag) pairs attached. */
   added: number;
-  /** Handle for taking exactly these pairs back; null when nothing was added. */
+  /**
+   * Handle for taking exactly these pairs back — used to roll an apply back
+   * when a later call of it fails. Null when nothing was added.
+   */
   undoId: string | null;
 }

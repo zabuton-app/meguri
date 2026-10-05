@@ -12,16 +12,18 @@ import { MAX_AUTO_TAG_FILES, type AutoTagFile } from "../../shared/autoTag.js";
 import type { IpcContext } from "./context.js";
 import { coreById, scopedCores } from "./helpers.js";
 
-/** Undo handles kept for the session; the oldest go first. */
+/** Rollback handles kept at a time; the oldest go first. */
 const MAX_UNDO_ENTRIES = 256;
 /** Pairs those handles may hold together, so a long session stays bounded. */
 const MAX_UNDO_PAIRS = 500_000;
 
 export function registerAutoTagHandlers(ctx: IpcContext): void {
   const { ws, queryClient } = ctx;
-  // What each apply attached, so "undo" removes exactly that and nothing the
-  // files already had. In memory on purpose: it is an undo for the open screen,
-  // not a history.
+  // What each apply attached, so it can be taken back exactly — nothing the
+  // files already had. The screen sends one apply as several calls when it is
+  // large, and when a later one fails it takes the earlier ones back with
+  // these, rather than leave the files half tagged. That is their only use:
+  // in memory on purpose, a rollback, not a history.
   const undo = new Map<string, { workspaceId: string; pairs: TagPair[] }[]>();
   let undoPairs = 0;
   const forget = (undoId: string) => {

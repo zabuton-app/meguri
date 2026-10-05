@@ -534,7 +534,6 @@ export const fr: Record<TranslationKey, string> = {
     "Impossible de charger les données d’étiquetage automatique.",
   "autoTag.saveFailed": "Impossible d’enregistrer les réglages.",
   "autoTag.applyFailed": "Impossible d’appliquer les étiquettes.",
-  "autoTag.undoFailed": "Impossible d’annuler.",
   "autoTag.moreRows": "{count} autres non affichés",
   "autoTag.page.label": "Pages",
   "autoTag.page.prev": "Précédent",
@@ -542,7 +541,7 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.page.range": "{from}–{to} sur {total}",
   "autoTag.fileCount": "{count} fichiers",
   "autoTag.tab.conditions": "Conditions",
-  "autoTag.tab.suggest": "Mots-clés suggérés",
+  "autoTag.tab.suggest": "Mots-clés",
   "autoTag.applyOnScan": "Appliquer lors de l’analyse",
   "autoTag.applyOnScanHint":
     "Exécute les règles actives et les mots-clés sur les fichiers ajoutés ou modifiés par une analyse.",
@@ -553,6 +552,11 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.reapplyDone": "{added} étiquettes ajoutées à {files} fichiers",
   "autoTag.patternRules": "Règles de motif",
   "autoTag.evaluatedInOrder": "évaluées de haut en bas",
+  "autoTag.resetRules": "Réinitialiser",
+  "autoTag.resetRulesHint":
+    "Remet les règles intégrées dans leur état d'origine",
+  "autoTag.resetRulesConfirm":
+    "Les règles intégrées sont restaurées : motifs et options d'origine, désactivées. Les règles que vous avez ajoutées sont conservées.",
   "autoTag.ruleEnabled": "Activer la règle",
   "autoTag.addRule": "+ Ajouter une règle regex",
   "autoTag.deleteRule": "Supprimer la règle",
@@ -629,7 +633,6 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.addToDictionary": "Ajouter aux mots-clés",
   "autoTag.ignore": "Ignorer",
   "autoTag.revert": "Annuler",
-  "autoTag.status.applied": "✓ Appliquée",
   "autoTag.status.registered": "Dans les mots-clés",
   "autoTag.status.ignored": "Ignorée",
   "autoTag.appliedOne": "« {tag} » appliquée à {files} fichiers.",
@@ -637,6 +640,17 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.appliedDictSuffix":
     " Les prochaines analyses les appliqueront aussi.",
   "autoTag.addedKeywords": "{count} ajoutés aux mots-clés.",
+  "autoTag.keywordsFullSuffix":
+    " {count} n'ont pas pu être ajoutés : les mots-clés sont pleins.",
+  "autoTag.removeFromFiles": "Retirer de {count} fichiers",
+  "autoTag.removeHint":
+    "Retire ce tag des fichiers qui le portent, quelle que soit son origine",
+  "autoTag.removeTitle": "Retirer « {tag} » ?",
+  "autoTag.removeMessage":
+    "« {tag} » sera retiré de {count} fichiers et de leurs copies, y compris là où il a été ajouté à la main. Impossible d'annuler ici.",
+  "autoTag.removeConfirm": "Retirer",
+  "autoTag.removedOne": "« {tag} » retiré de {files} fichiers.",
+  "autoTag.removeFailed": "Impossible de retirer le tag.",
   "autoTag.searchFor": "Rechercher « {tag} » dans la bibliothèque",
   "autoTag.searchCandidateHint":
     "Affiche les fichiers contenant les mots de ce candidat avec la recherche de la bibliothèque",

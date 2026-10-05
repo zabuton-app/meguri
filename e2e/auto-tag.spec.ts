@@ -21,9 +21,11 @@ test.describe("Auto tagging", () => {
     await expect(dialog.getByText("Creates a new tag")).toBeVisible();
 
     // It shows up as a suggestion; applying it tags the file for real.
-    await dialog.getByRole("tab", { name: /Suggested Keywords/ }).click();
+    await dialog.getByRole("tab", { name: /Keywords/ }).click();
     await dialog.getByRole("button", { name: "Apply", exact: true }).click();
-    await expect(dialog.getByText("✓ Applied")).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Remove from 1 files" }),
+    ).toBeVisible();
 
     // The tag is the user's own: the tag screen lists it like any other.
     await closeTopDialog(ready);
@@ -33,15 +35,15 @@ test.describe("Auto tagging", () => {
     ).toBeVisible();
     await closeTopDialog(ready);
 
-    // Reopened, the screen is where it was left: the same tab is a click
-    // away, and the apply made before can still be taken back.
+    // Reopened, the row reads what the file carries — nothing was remembered
+    // to say so — and the tag can be taken off it again, after a question.
     await ready.getByRole("link", { name: "Auto tagging" }).click();
-    await dialog.getByRole("tab", { name: /Suggested Keywords/ }).click();
-    await expect(dialog.getByText("✓ Applied")).toBeVisible();
-    await dialog.getByRole("button", { name: "Undo" }).click();
+    await dialog.getByRole("tab", { name: /Keywords/ }).click();
+    await dialog.getByRole("button", { name: "Remove from 1 files" }).click();
+    await ready.getByRole("button", { name: "Remove", exact: true }).click();
 
-    // Taken back, the entry reads as registered — it is in the dictionary, so
-    // it is not offered as a suggestion — with the file left to apply it to.
+    // Taken off, the entry still reads as registered — it is in the keywords,
+    // so it is not offered as a suggestion — with the file left to apply it to.
     await expect(dialog.getByText("In keywords")).toBeVisible();
     await expect(
       dialog.getByRole("button", { name: "Apply", exact: true }),

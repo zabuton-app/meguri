@@ -21,14 +21,17 @@ import {
 import { getSetting, searchFiles } from "../queries.js";
 import { addManualTag, fileTags } from "../tags.js";
 import {
+  MAX_AUTO_TAG_RULES,
   MAX_RULE_MATCHES,
   compileEngine,
   compileKeyword,
   compilePattern,
   compileRule,
   defaultAutoTagConfig,
+  builtinRulesAsShipped,
   defaultRules,
   proposalsFor,
+  resetBuiltinRules,
   runKeyword,
   runRule,
   tagsForName,
@@ -46,8 +49,15 @@ import {
 import { AutoTagConfigSchema } from "../../../shared/ipc/schema.js";
 import { insertFile, newDb } from "./helpers.js";
 
+/**
+ * The built-in rules switched on (they ship switched off), parentheses aside:
+ * the set the cases below were written against.
+ */
+const activeRules = (): TagRule[] =>
+  defaultRules().map((r) => ({ ...r, enabled: r.id !== "paren" }));
+
 const rule = (over: Partial<TagRule> = {}): TagRule => ({
-  ...defaultRules()[0],
+  ...activeRules()[0],
   ...over,
 });
 const keyword = (over: Partial<KeywordEntry> = {}): KeywordEntry => ({
@@ -75,17 +85,17 @@ const NAMES = [
 
 describe("rules", () => {
   it("tags a file by the code that leads its name, minus the excluded ones", () => {
-    const engine = engineOf(defaultRules());
+    const engine = engineOf(activeRules());
     expect(tagsForName(engine, NAMES[0])).toEqual(["ABCD"]);
     expect(tagsForName(engine, "IMG-2041.jpg")).toEqual([]);
   });
 
   it("takes every bracket pair and splits a list inside one", () => {
-    const engine = engineOf(defaultRules());
+    const engine = engineOf(activeRules());
     expect(tagsForName(engine, NAMES[3])).toEqual(["Trip", "Kyoto"]);
     expect(tagsForName(engine, NAMES[4])).toEqual(["Trip", "Family"]);
     expect(tagsForName(engine, NAMES[6])).toEqual(["夏休み"]);
-    // The round-bracket rule ships disabled.
+    // activeRules() leaves the round-bracket rule off.
     expect(tagsForName(engine, "(Draft) plan.mp4")).toEqual([]);
   });
 
@@ -124,7 +134,7 @@ describe("rules", () => {
   });
 
   it("keeps a tag name within the length the rest of the app accepts", () => {
-    const square = defaultRules()[1];
+    const square = activeRules()[1];
     // 63 letters and two emoji: cut by code point, to 64 UTF-16 units or fewer.
     const [tag] = hitsOf(square, `[${"x".repeat(63)}😀😀] y.mp4`)[0].tags;
     expect(tag).toBe("x".repeat(63));
@@ -139,7 +149,7 @@ describe("rules", () => {
   });
 
   it("keeps invisible characters and reserved names out of tags", () => {
-    const square = defaultRules()[1];
+    const square = activeRules()[1];
     expect(hitsOf(square, "[a​b‮] x.mp4")[0].tags).toEqual(["ab"]);
     expect(hitsOf(square, "[res:4k] x.mp4")[0].tags).toEqual([]);
   });
@@ -182,7 +192,7 @@ describe("keywords", () => {
 
 describe("proposals", () => {
   it("lists rules first, then the dictionary, one spelling per tag", () => {
-    const engine = engineOf(defaultRules(), [
+    const engine = engineOf(activeRules(), [
       keyword({ id: "trip", tag: "trip", aliases: [] }),
       keyword(),
     ]);
@@ -211,7 +221,7 @@ describe("analysis", () => {
 
   it("suggests what the engine yields plus frequent words it misses", () => {
     const cands = suggestCandidates(
-      engineOf(defaultRules(), [keyword()]),
+      engineOf(activeRules(), [keyword()]),
       NAMES,
       {
         minFreq: 2,
@@ -321,7 +331,42 @@ describe("configuration", () => {
       "kagi",
       "paren",
     ]);
+    // There to look at, none of them running until switched on.
+    expect(config.rules.some((r) => r.enabled)).toBe(false);
     expect(AutoTagConfigSchema.safeParse(config).success).toBe(true);
+  });
+
+  it("puts the built-in rules back as they ship, ahead of the rules added", () => {
+    const [prefix, , sumi] = activeRules();
+    const mine = rule({ id: "mine", name: "Mine", pattern: "^(Y+)" });
+    const reset = resetBuiltinRules([
+      mine,
+      // Edited, switched on, out of order; two others deleted.
+      { ...sumi, pattern: "x", exclude: "" },
+      { ...prefix, template: "$0" },
+    ]);
+    expect(reset).toEqual([...defaultRules(), mine]);
+    // Nothing to restore from: the defaults alone.
+    expect(resetBuiltinRules([])).toEqual(defaultRules());
+
+    // "As shipped" is whatever a reset would leave alone.
+    expect(builtinRulesAsShipped(reset)).toBe(true);
+    expect(builtinRulesAsShipped(defaultRules())).toBe(true);
+    expect(builtinRulesAsShipped(activeRules())).toBe(false);
+    expect(builtinRulesAsShipped(defaultRules().slice(1))).toBe(false);
+    expect(builtinRulesAsShipped([mine, ...defaultRules()])).toBe(false);
+  });
+
+  it("keeps every rule the user added when a reset has no room for all the built-in ones", () => {
+    const own = Array.from({ length: MAX_AUTO_TAG_RULES - 2 }, (_, i) =>
+      rule({ id: `mine-${i}`, pattern: `^(${i})` }),
+    );
+    const reset = resetBuiltinRules(own);
+    expect(reset).toHaveLength(MAX_AUTO_TAG_RULES);
+    expect(reset.slice(2)).toEqual(own);
+    expect(reset.slice(0, 2).map((r) => r.id)).toEqual(["prefix", "square"]);
+    // Which is as far as a reset can go: nothing more to offer.
+    expect(builtinRulesAsShipped(reset)).toBe(true);
   });
 
   it("stores a rule whose pattern is still being typed", () => {
@@ -405,7 +450,7 @@ describe("attaching tags", () => {
     const ids = NAMES.map((relPath) =>
       insertFile(db, rootId, { relPath: `dir/${relPath}` }),
     );
-    const engine = { rules: defaultRules(), keywords: [keyword()] };
+    const engine = { rules: activeRules(), keywords: [keyword()] };
 
     const some = await applyAutoTags(db, { engine, fileIds: [ids[0], ids[7]] });
     expect(some).toEqual({ files: 1, added: 2, completed: true });
@@ -422,7 +467,7 @@ describe("attaching tags", () => {
 
   it("keeps owing the files of a scan that was cut short", async () => {
     const id = insertFile(db, rootId, { relPath: NAMES[0] });
-    const engine = { rules: defaultRules(), keywords: [] };
+    const engine = { rules: activeRules(), keywords: [] };
     const controller = new AbortController();
     controller.abort();
     await applyAutoTagsOnScan(db, {
@@ -468,7 +513,7 @@ describe("AutoTagWorkerClient", () => {
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  const engine = { rules: defaultRules(), keywords: [] };
+  const engine = { rules: activeRules(), keywords: [] };
   function workerFile(body: string): string {
     const file = path.join(dir, "worker.cjs");
     fs.writeFileSync(

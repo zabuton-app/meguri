@@ -229,7 +229,8 @@ previews with the code a scan runs:
 - A **rule** is a regular expression run globally over the name without its
   extension. Each match names a tag through a template (`$1`), optionally split
   on `, 、 / ／ ・`, case-folded, and dropped when it is in the rule's exclude
-  list. The built-in rules cover a leading code prefix and bracketed text.
+  list. The built-in rules cover a leading code prefix and bracketed text;
+  they ship switched off, and the screen can reset them to that state.
 - A **keyword** is a tag with aliases. Finding any of them in the name (again
   without its extension) proposes the tag; in `word` mode an ASCII term must
   stand between non-alphanumerics.
@@ -242,8 +243,9 @@ engine and the screen use, not SQLite's ASCII-only `NOCASE`. This folding is
 particular to auto-tagging: tagging by hand still matches names exactly.
 Attaching only ever adds — changing a rule does not take back what it already
 tagged — and `attachAutoTags()` reports exactly the pairs it added, which is
-what the screen's undo removes (kept in memory in the main process for the
-session, not persisted).
+what rolls back an apply that failed partway (kept in memory in the main
+process, not persisted). The screen keeps no record of what it applied: taking
+a tag off again goes by what the files carry, through `files_bulk_tag`.
 
 The configuration (`rules`, `keywords`, `applyOnScan`, dismissed suggestions and
 excluded terms) is app-wide, in `config.json` under `autoTag`. With `applyOnScan`

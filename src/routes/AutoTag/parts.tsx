@@ -178,31 +178,14 @@ export function Toolbar({ children }: { children: ReactNode }) {
   );
 }
 
-/** A result line under the toolbar, with an optional way back. */
-export function Notice({
-  children,
-  onUndo,
-  undoLabel,
-}: {
-  children: ReactNode;
-  onUndo?: () => void;
-  undoLabel?: string;
-}) {
+/** A result line under the toolbar. */
+export function Notice({ children }: { children: ReactNode }) {
   return (
     <div
       role="status"
       className="flex shrink-0 items-center gap-3 border-b border-border bg-success/10 px-3 py-2 text-xs text-success"
     >
       <span>{children}</span>
-      {onUndo && (
-        <button
-          type="button"
-          onClick={onUndo}
-          className="text-muted underline underline-offset-2 hover:text-bright-fg"
-        >
-          {undoLabel}
-        </button>
-      )}
     </div>
   );
 }

@@ -17,7 +17,6 @@ import {
   type TagRule,
 } from "@shared/autoTag";
 import { candidateGroup, type Candidate } from "@shared/autoTagAnalysis";
-import type { UndoHandle } from "./useAutoTag";
 
 const BUILTIN_RULE_NAMES: Record<BuiltinRuleId, TranslationKey> = {
   prefix: "autoTag.rule.prefix",
@@ -83,8 +82,9 @@ export function cleanAliases(
  * Where a suggestion stands. Two facts that do not follow from each other —
  * whether the keywords hold the tag, and whether the files carry it — plus the
  * user having dismissed it. Each is read from where it is kept (the
- * configuration, the files' tags) every time; nothing here is remembered, so a
- * row cannot say something the Conditions tab or the library does not.
+ * configuration, the files' tags) every time; nothing is remembered, not even
+ * what the screen itself applied, so a row cannot say something the Conditions
+ * tab or the library does not.
  */
 export interface CandidateState {
   ignored: boolean;
@@ -98,6 +98,8 @@ export interface CandidateState {
   canRegister: boolean;
   /** Files it names that do not carry the tag yet. */
   missing: number;
+  /** Files it names that carry the tag, whoever put it there. */
+  tagged: number;
   /**
    * Something is still to be decided: files to tag, or an entry to add. Never
    * for a tag the keywords hold — that was decided on the Conditions tab, and
@@ -148,6 +150,7 @@ export function candidateState(
     inKeywords,
     canRegister,
     missing,
+    tagged: c.files.size - missing,
     // What could be done about it: with the keywords full and the files
     // tagged there is nothing, and a row with no action is not waiting.
     pending: !ignored && !inKeywords && (missing > 0 || canRegister),
@@ -213,21 +216,4 @@ export function keywordMatches(
   }
   keywordMatchCache.set(entry, { names, rows });
   return rows;
-}
-
-/**
- * Two undo handles as one: applying to the same candidate twice (its files
- * grew, a tag was taken off by hand in between) must leave both applies to be
- * taken back, not just the later one.
- */
-export function mergeUndo(
-  a: UndoHandle | undefined,
-  b: UndoHandle,
-): UndoHandle {
-  if (!a) return b;
-  const added = new Map(a.added);
-  for (const [index, tags] of b.added) {
-    added.set(index, [...(added.get(index) ?? []), ...tags]);
-  }
-  return { undoIds: [...a.undoIds, ...b.undoIds], added };
 }

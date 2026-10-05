@@ -517,7 +517,6 @@ export const ja = {
   "autoTag.loadFailed": "自動タグ付けの情報を読み込めませんでした。",
   "autoTag.saveFailed": "設定を保存できませんでした。",
   "autoTag.applyFailed": "タグを付与できませんでした。",
-  "autoTag.undoFailed": "元に戻せませんでした。",
   "autoTag.moreRows": "ほか{count}件は表示していません",
   "autoTag.page.label": "ページ",
   "autoTag.page.prev": "前へ",
@@ -525,7 +524,7 @@ export const ja = {
   "autoTag.page.range": "{total}件中{from}–{to}",
   "autoTag.fileCount": "{count} 件",
   "autoTag.tab.conditions": "条件",
-  "autoTag.tab.suggest": "キーワード候補",
+  "autoTag.tab.suggest": "キーワード",
   "autoTag.applyOnScan": "スキャン時に自動適用",
   "autoTag.applyOnScanHint":
     "新規・変更されたファイルの取り込み時に、有効なルールとキーワードを実行します。",
@@ -536,6 +535,10 @@ export const ja = {
   "autoTag.reapplyDone": "{files} ファイルに {added} 件のタグを追加しました",
   "autoTag.patternRules": "パターンルール",
   "autoTag.evaluatedInOrder": "上から順に評価",
+  "autoTag.resetRules": "リセット",
+  "autoTag.resetRulesHint": "組み込みルールを初期状態に戻します",
+  "autoTag.resetRulesConfirm":
+    "組み込みルールを復元します。パターンと設定は初期状態に戻り、無効になります。追加したルールは残ります。",
   "autoTag.ruleEnabled": "ルールを有効にする",
   "autoTag.addRule": "＋ 正規表現ルールを追加",
   "autoTag.deleteRule": "ルールを削除",
@@ -610,13 +613,23 @@ export const ja = {
   "autoTag.addToDictionary": "キーワードに追加",
   "autoTag.ignore": "無視",
   "autoTag.revert": "元に戻す",
-  "autoTag.status.applied": "✓ 付与済み",
   "autoTag.status.registered": "キーワードに登録済み",
   "autoTag.status.ignored": "無視",
   "autoTag.appliedOne": "「{tag}」を {files} ファイルに付与しました。",
   "autoTag.appliedMany": "{tags} 個のタグを {files} ファイルに付与しました。",
   "autoTag.appliedDictSuffix": "今後のスキャンでも自動付与されます。",
   "autoTag.addedKeywords": "{count}件をキーワードに追加しました。",
+  "autoTag.keywordsFullSuffix":
+    "{count}件はキーワードが上限のため追加できませんでした。",
+  "autoTag.removeFromFiles": "{count}ファイルから外す",
+  "autoTag.removeHint":
+    "付けた経緯に関わらず、このタグが付いているファイルから外します",
+  "autoTag.removeTitle": "「{tag}」を外しますか?",
+  "autoTag.removeMessage":
+    "「{tag}」を{count}ファイルとその複製から外します。手動で付けたものも含みます。この画面からは元に戻せません。",
+  "autoTag.removeConfirm": "外す",
+  "autoTag.removedOne": "「{tag}」を{files}ファイルから外しました。",
+  "autoTag.removeFailed": "タグを外せませんでした。",
   "autoTag.searchFor": "「{tag}」をライブラリで検索",
   "autoTag.searchCandidateHint":
     "この候補の語を含むファイルを、ライブラリの検索で表示します",

@@ -4,10 +4,12 @@
 // Overlays the library as a modal, like /tags and /history.
 import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
-import { X } from "lucide-react";
+import { Maximize2, Minimize2, X } from "lucide-react";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
+import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { suggestCandidates } from "@shared/autoTagAnalysis";
 import { ConditionsTab } from "./ConditionsTab";
 import {
@@ -15,7 +17,6 @@ import {
   candidateState,
   type CandidateState,
 } from "./helpers";
-import { useAutoTagSession } from "./session";
 import { SuggestTab } from "./SuggestTab";
 import { useAutoTag } from "./useAutoTag";
 import { useViewState } from "./viewState";
@@ -28,6 +29,9 @@ const TAB_LABELS: Record<TabId, TranslationKey> = {
   suggest: "autoTag.tab.suggest",
 };
 
+// Per screen, like the Tags and History modals' own.
+const MODAL_SIZE_KEY = "meguri.autoTag.modalSize";
+
 /** A word has to be in this many files before it is suggested on its own. */
 const MIN_FREQUENCY = 2;
 
@@ -37,9 +41,19 @@ export default function AutoTag() {
   const onClose = useCallback(() => {
     void navigate("/");
   }, [navigate]);
+  // "small" is the centred panel; "large" fills the window, as the other
+  // modals have it.
+  const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
+    MODAL_SIZE_KEY,
+    "small",
+    (raw) => (raw === "large" ? "large" : "small"),
+  );
+  const isSmall = modalSize === "small";
+  const toggleLabel = isSmall
+    ? t("media.modalMaximize")
+    : t("media.modalMinimize");
   const [tab, setTab] = useViewState<TabId>("tab", "conditions");
   const state = useAutoTag();
-  const session = useAutoTagSession(state?.listKey ?? null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -85,14 +99,21 @@ export default function AutoTag() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 backdrop-blur-sm sm:p-6"
+      className={cn(
+        "fixed inset-0 z-50 flex justify-center bg-black/70 backdrop-blur-sm",
+        isSmall ? "items-center p-2 sm:p-6" : "p-2 sm:p-4 md:p-6",
+      )}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="auto-tag-title"
     >
       <div
-        className="relative flex h-[min(880px,calc(100vh-48px))] min-h-[min(620px,100%)] w-full max-w-[1160px] flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl"
+        className={cn(
+          "relative flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl",
+          isSmall &&
+            "h-[min(880px,calc(100vh-48px))] min-h-[min(620px,100%)] max-w-[1160px]",
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2.5">
@@ -113,10 +134,24 @@ export default function AutoTag() {
           )}
           <button
             type="button"
+            onClick={() => setModalSize(isSmall ? "large" : "small")}
+            title={toggleLabel}
+            aria-label={toggleLabel}
+            aria-pressed={isSmall}
+            className="ml-auto flex h-7 items-center rounded-md px-2 text-fg transition hover:bg-fg/10 hover:text-bright-fg"
+          >
+            {isSmall ? (
+              <Maximize2 className="size-4" />
+            ) : (
+              <Minimize2 className="size-4" />
+            )}
+          </button>
+          <button
+            type="button"
             onClick={onClose}
             title={`${t("common.close")} (Esc)`}
             aria-label={t("common.close")}
-            className="ml-auto flex h-7 items-center rounded-md px-2 text-fg transition hover:bg-fg/10 hover:text-bright-fg"
+            className="flex h-7 items-center rounded-md px-2 text-fg transition hover:bg-fg/10 hover:text-bright-fg"
           >
             <X className="size-4" />
           </button>
@@ -189,7 +224,6 @@ export default function AutoTag() {
           ) : (
             <SuggestTab
               state={state}
-              session={session}
               candidates={candidates}
               states={states}
               pending={pending}

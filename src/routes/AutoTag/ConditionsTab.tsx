@@ -11,6 +11,8 @@ import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import {
   MAX_AUTO_TAG_RULES,
+  builtinRulesAsShipped,
+  resetBuiltinRules,
   type KeywordEntry,
   type RuleKind,
   type TagRule,
@@ -130,6 +132,21 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
     select("rule", id);
   };
 
+  // Nothing to reset — and nothing to ask about — while the built-in rules are
+  // as they ship already.
+  const builtinsAsShipped = builtinRulesAsShipped(config.rules);
+  const resetRules = async () => {
+    const ok = await confirm({
+      title: t("autoTag.resetRules"),
+      message: t("autoTag.resetRulesConfirm"),
+      confirmText: t("autoTag.resetRules"),
+    });
+    if (!ok) return;
+    // A result line from an earlier re-apply spoke of the rules as they were.
+    setResult(null);
+    update((c) => ({ ...c, rules: resetBuiltinRules(c.rules) }));
+  };
+
   // "Tag, alias, alias": the first value names the tag, the rest are aliases.
   const addKeyword = () => {
     const [tag, ...aliases] = draft.split(/[,、]/);
@@ -219,6 +236,15 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
               <span className="text-xs text-muted">
                 {t("autoTag.evaluatedInOrder")}
               </span>
+              <button
+                type="button"
+                onClick={() => void resetRules()}
+                disabled={builtinsAsShipped}
+                title={t("autoTag.resetRulesHint")}
+                className="ml-auto text-xs text-muted underline underline-offset-2 hover:text-bright-fg disabled:no-underline disabled:opacity-40"
+              >
+                {t("autoTag.resetRules")}
+              </button>
             </div>
             {config.rules.map((rule) => (
               <div
