@@ -21,11 +21,26 @@ import type { Visibility } from "../model/visibility";
 import { fk, payloadOf, tk } from "./fixtures";
 
 const api = vi.hoisted(() => ({
+  appStatus: vi.fn(),
   graphBuild: vi.fn(),
   graphLayoutGet: vi.fn(),
   graphLayoutSet: vi.fn(),
 }));
-vi.mock("@/ipc/client", () => ({ api }));
+// The thumb:done listener the view registered, to fire the event by hand.
+const thumbDone = vi.hoisted(() => ({
+  emit: null as null | ((e: { id: number; workspaceId?: string }) => void),
+}));
+vi.mock("@/ipc/client", () => ({
+  api,
+  events: {
+    onThumbDone: (cb: (e: { id: number; workspaceId?: string }) => void) => {
+      thumbDone.emit = cb;
+      return Promise.resolve(() => {
+        thumbDone.emit = null;
+      });
+    },
+  },
+}));
 
 const nav = vi.hoisted(() => ({ navigate: vi.fn() }));
 vi.mock("react-router", async (importOriginal) => ({
@@ -51,6 +66,7 @@ vi.mock("../GraphCanvas", async () => {
       graph: MediaGraph;
       visibility: Visibility;
       focus: string | null;
+      onHover: (key: string | null) => void;
       onClickNode: (key: string) => void;
       onClickStage: () => void;
       onDragStart: (key: string) => boolean;
@@ -75,6 +91,8 @@ vi.mock("../GraphCanvas", async () => {
               type="button"
               data-testid={`node ${key}`}
               onClick={() => props.onClickNode(key)}
+              onMouseEnter={() => props.onHover(key)}
+              onMouseLeave={() => props.onHover(null)}
               onMouseDown={() => {
                 if (props.onDragStart(key)) props.onDrag(key, 123, 45);
               }}
@@ -104,7 +122,7 @@ const { SimClient } = await import("../sim/simClient");
 const { GRAPH_DIMS_KEY } = await import("../GraphView");
 
 const FILES = [
-  { path: "a.mp4", tags: ["sea", "summer"] },
+  { path: "a.mp4", tags: ["sea", "summer"], thumb: true },
   { path: "b.jpg", kind: "image", tags: ["sea", "summer"] },
   { path: "c.mp4", tags: ["sea", "res:4k"] },
   { path: "lone.mp4" },
@@ -126,6 +144,7 @@ function render(onFilterToken = vi.fn(), route = "/") {
 beforeEach(() => {
   canvas.fail = false;
   canvas.props = null;
+  api.appStatus.mockResolvedValue({ mediaBase: "http://media" });
   api.graphBuild.mockResolvedValue(payloadOf(FILES));
   api.graphLayoutGet.mockResolvedValue(null);
   api.graphLayoutSet.mockResolvedValue(undefined);
@@ -291,6 +310,78 @@ describe("GraphView", () => {
     cleanup();
     render();
     await screen.findByTestId(`node ${tk("res:4k")}`);
+  });
+
+  it("shows a file's thumbnail while the pointer is on its node", async () => {
+    const { container } = render();
+    await ready();
+    const preview = () =>
+      container.querySelector('[data-slot="graph-hover-thumbnail"] img');
+    const a = screen.getByTestId(`node ${fk("a.mp4")}`);
+    fireEvent.mouseEnter(a);
+    await waitFor(() =>
+      expect(preview()?.getAttribute("src")).toBe("http://media/ws/w/thumb/1"),
+    );
+    // Not during a drag, where it would be in the way.
+    fireEvent.mouseDown(a);
+    expect(preview()).toBeNull();
+    fireEvent.mouseUp(a);
+    expect(preview()).not.toBeNull();
+    fireEvent.mouseLeave(a);
+    expect(preview()).toBeNull();
+
+    // A file without a thumbnail, and a tag, have nothing to show.
+    const b = screen.getByTestId(`node ${fk("b.jpg")}`);
+    fireEvent.mouseEnter(b);
+    expect(canvas.props?.focus).toBe(fk("b.jpg"));
+    expect(preview()).toBeNull();
+    fireEvent.mouseLeave(b);
+    fireEvent.mouseEnter(screen.getByTestId(`node ${tk("sea")}`));
+    expect(canvas.props?.focus).toBe(tk("sea"));
+    expect(preview()).toBeNull();
+  });
+
+  it("asks for a regenerated thumbnail under a new URL", async () => {
+    const { container } = render();
+    await ready();
+    const src = () =>
+      container
+        .querySelector('[data-slot="graph-hover-thumbnail"] img')
+        ?.getAttribute("src");
+    // Regenerated before the hover (another file's does not count).
+    act(() => {
+      thumbDone.emit?.({ id: 1, workspaceId: "w" });
+      thumbDone.emit?.({ id: 2, workspaceId: "w" });
+    });
+    fireEvent.mouseEnter(screen.getByTestId(`node ${fk("a.mp4")}`));
+    await waitFor(() => expect(src()).toBe("http://media/ws/w/thumb/1?v=1"));
+    // And again while it shows.
+    act(() => thumbDone.emit?.({ id: 1, workspaceId: "w" }));
+    await waitFor(() => expect(src()).toBe("http://media/ws/w/thumb/1?v=2"));
+  });
+
+  it("drops a thumbnail that fails to load, and tries again on the next hover", async () => {
+    const { container } = render();
+    await ready();
+    const preview = () =>
+      container.querySelector('[data-slot="graph-hover-thumbnail"] img');
+    const a = screen.getByTestId(`node ${fk("a.mp4")}`);
+    fireEvent.mouseEnter(a);
+    const img = await waitFor(() => {
+      const el = preview();
+      if (!el) throw new Error("no thumbnail yet");
+      return el;
+    });
+    // Out of sight until it has loaded.
+    expect(img.parentElement?.style.opacity).toBe("0");
+    fireEvent.error(img);
+    expect(preview()).toBeNull();
+    fireEvent.mouseLeave(a);
+    fireEvent.mouseEnter(a);
+    const again = preview();
+    expect(again).not.toBeNull();
+    if (again) fireEvent.load(again);
+    expect(again?.parentElement?.style.opacity).toBe("1");
   });
 
   it("drags a node: held where the pointer is, let go on release", async () => {

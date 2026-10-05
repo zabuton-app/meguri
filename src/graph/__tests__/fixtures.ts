@@ -10,6 +10,8 @@ export interface FileSpec {
   /** Qualified tag names ("sea", "res:4k"). */
   tags?: string[];
   plays?: number;
+  /** A thumbnail file exists for it. */
+  thumb?: boolean;
 }
 
 export function payloadOf(files: FileSpec[]): GraphPayload {
@@ -41,7 +43,7 @@ export function payloadOf(files: FileSpec[]): GraphPayload {
     p.files.metaKey.push(`h-${f.path}`);
     p.files.relPath.push(f.path);
     p.files.kind.push(f.kind ?? "video");
-    p.files.hasThumb.push(false);
+    p.files.hasThumb.push(f.thumb ?? false);
     p.files.plays.push(f.plays ?? 0);
     for (const tag of f.tags ?? []) {
       let ti = tagIndex.get(tag);

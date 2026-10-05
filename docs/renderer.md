@@ -190,6 +190,12 @@ never pay for it) draws the same list as a network of files and tags, from one
   (`GraphErrorBoundary`). The canvas takes only the pointer, so the graph
   search is the keyboard's way in: Enter picks a match, Shift+Enter opens it
   as a click does, and Enter on an empty search opens the picked node.
+  Hovering a file that has a thumbnail (a video's poster frame, an image, an
+  audio track's cover art) also shows it in a card beside the pointer
+  (`GraphHoverThumbnail`, an overlay shared by both canvases that tracks the
+  pointer on the box around them; `model/hoverThumbnail.ts` keeps it inside the
+  box). It hides during a drag, and follows `thumb:done` itself so a
+  regenerated thumbnail is asked for under a new URL.
 - **A graph per payload.** Each payload builds a new graphology graph that
   takes over the previous one's positions by key (`model/buildGraphology.ts`),
   and the one sigma instance (`GraphView` is keyed by scope in Home) switches
