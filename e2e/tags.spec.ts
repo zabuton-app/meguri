@@ -46,6 +46,21 @@ test.describe("Tags", () => {
     await expect(searchChips(ready)).toHaveCount(1);
   });
 
+  test("filters the library from a tag in the cloud view", async ({
+    ready,
+  }) => {
+    await waitForIndexedMedia(ready);
+    await ready.getByRole("link", { name: "Tags", exact: true }).click();
+    const dialog = ready.getByRole("dialog");
+    await dialog.getByRole("radio", { name: "Cloud" }).click();
+    // The fixture only carries generated tags, which the cloud hides by default.
+    await dialog.getByRole("button", { name: "Automatic tags" }).click();
+    await dialog.getByRole("button", { name: /^res:/ }).first().click();
+
+    await expect(ready).toHaveURL(/#\/$/);
+    await expect(searchChips(ready)).toHaveCount(1);
+  });
+
   test("filters the library from a tag in the detail view", async ({
     ready,
   }) => {

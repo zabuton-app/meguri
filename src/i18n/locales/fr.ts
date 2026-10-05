@@ -519,6 +519,13 @@ export const fr: Record<TranslationKey, string> = {
   // Écran de gestion des tags
   "tags.title": "Tags",
   "tags.summary": "{tags} tags / {assignments} attributions",
+  "tags.viewLabel": "Affichage",
+  "tags.viewList": "Liste",
+  "tags.viewCloud": "Nuage",
+  "tags.cloudLimited": "Affichage des {max} tags les plus utilisés uniquement.",
+  "tags.cloudIncludeAuto": "Tags automatiques",
+  "tags.cloudOnlyAuto":
+    "Seuls des tags automatiques sont disponibles. Activez les tags automatiques pour les voir.",
   "tags.empty": "Aucun tag pour l'instant.",
   "tags.emptyHint":
     "Ajoutez des tags depuis la vue détaillée et ils apparaîtront ici.",

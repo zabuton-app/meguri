@@ -504,6 +504,13 @@ export const ja = {
   // タグ管理画面
   "tags.title": "タグ管理",
   "tags.summary": "{tags} タグ / 付与 {assignments} 件",
+  "tags.viewLabel": "表示",
+  "tags.viewList": "一覧",
+  "tags.viewCloud": "クラウド",
+  "tags.cloudLimited": "よく使われている上位 {max} 件のみ表示しています。",
+  "tags.cloudIncludeAuto": "自動タグ",
+  "tags.cloudOnlyAuto":
+    "表示できるのは自動タグのみです。自動タグをオンにすると表示されます。",
   "tags.empty": "タグはまだありません。",
   "tags.emptyHint": "詳細画面でタグを追加すると、ここに一覧が表示されます。",
   "tags.searchPlaceholder": "タグを絞り込み",

@@ -517,6 +517,13 @@ export const es: Record<TranslationKey, string> = {
   // Pantalla de gestión de etiquetas
   "tags.title": "Etiquetas",
   "tags.summary": "{tags} etiquetas / {assignments} asignaciones",
+  "tags.viewLabel": "Vista",
+  "tags.viewList": "Lista",
+  "tags.viewCloud": "Nube",
+  "tags.cloudLimited": "Se muestran solo las {max} etiquetas más usadas.",
+  "tags.cloudIncludeAuto": "Etiquetas automáticas",
+  "tags.cloudOnlyAuto":
+    "Solo hay etiquetas automáticas. Activa las etiquetas automáticas para verlas.",
   "tags.empty": "Todavía no hay etiquetas.",
   "tags.emptyHint":
     "Añade etiquetas desde la vista de detalle y aparecerán aquí.",
