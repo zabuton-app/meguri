@@ -2,7 +2,6 @@
 // frequent words it does not pick up yet — to apply, register or dismiss.
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Search } from "lucide-react";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
@@ -56,6 +55,16 @@ const FILTER_LABELS: Record<Filter, TranslationKey> = {
   ignored: "autoTag.status.ignored",
 };
 
+type AppliedFilter = "any" | "unapplied" | "applied";
+
+const APPLIED_FILTERS = ["any", "unapplied", "applied"] as const;
+
+const APPLIED_LABELS: Record<AppliedFilter, TranslationKey> = {
+  any: "autoTag.filter.appliedAny",
+  unapplied: "autoTag.filter.unappliedOnly",
+  applied: "autoTag.filter.appliedOnly",
+};
+
 const groupOf = (c: Candidate): "conditions" | "frequent" =>
   candidateGroup(c) === "frequent" ? "frequent" : "conditions";
 
@@ -92,6 +101,12 @@ export function SuggestTab({
   const navigate = useNavigate();
   const { config, update, fileTags, existing, names } = state;
   const [filter, setFilter] = useViewState<Filter>("suggest.filter", "all");
+  // Whether the files carry the tag, as something to narrow by: the ones with
+  // files left to tag, or the ones that are on files (to take off again).
+  const [applied, setApplied] = useViewState<AppliedFilter>(
+    "suggest.applied",
+    "any",
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useViewState<string | null>(
     "suggest.expanded",
@@ -119,20 +134,43 @@ export function SuggestTab({
   };
   for (const c of candidates) counts[filterOf(c)]++;
   counts.all = counts.conditions + counts.frequent;
+  // Applying once leaves a frequent word listed (the keywords still do not
+  // hold it), so the ones with files left to tag can be asked for on their
+  // own.
   const shown = candidates.filter((c) => {
     const at = filterOf(c);
-    return filter === "all" ? at !== "ignored" : at === filter;
+    if (filter === "all" ? at === "ignored" : at !== filter) return false;
+    if (applied === "unapplied") return stateOf(c).missing > 0;
+    if (applied === "applied") return stateOf(c).tagged > 0;
+    return true;
   });
-  const paging = usePaging("suggest.page", filter, shown.length);
-  // What a row's checkbox is for: the candidates still to be decided — or,
-  // among the dismissed ones, any of them, to be brought back together.
+  const paging = usePaging(
+    "suggest.page",
+    `${filter}\0${applied}`,
+    shown.length,
+  );
+  // What a row's checkbox is for: the candidates something can be done with —
+  // still to be decided, or on files and so to be taken off them — or, among
+  // the dismissed ones, any of them, to be brought back together.
   const onIgnored = filter === "ignored";
-  const selectable = (c: Candidate): boolean =>
-    onIgnored ? stateOf(c).ignored : stateOf(c).pending;
+  const selectable = (c: Candidate): boolean => {
+    const at = stateOf(c);
+    return onIgnored ? at.ignored : at.pending || at.tagged > 0;
+  };
   const pendingShown = shown.filter(selectable);
   const picked = pendingShown.filter((c) => selected.has(c.key));
   const allChecked =
     pendingShown.length > 0 && picked.length === pendingShown.length;
+  /** Files a removal of these would reach: the ones carrying the tag. */
+  const taggedFilesOf = (list: Candidate[]): number => {
+    const set = new Set<number>();
+    for (const c of list) {
+      for (const index of c.files.keys()) {
+        if (fileTags[index].has(c.key)) set.add(index);
+      }
+    }
+    return set.size;
+  };
   /** Files an apply of these would tag: the ones still lacking the tag. */
   const filesOf = (list: Candidate[]): number => {
     const set = new Set<number>();
@@ -248,6 +286,35 @@ export function SuggestTab({
     );
   };
 
+  /** The same for several at once, asked about once. */
+  const removeMany = async (list: Candidate[]) => {
+    const targets = list.filter((c) => stateOf(c).tagged > 0);
+    if (targets.length === 0 || busy) return;
+    const ok = await confirm({
+      title: t("autoTag.removeManyTitle", { tags: targets.length }),
+      message: t("autoTag.removeManyMessage", {
+        tags: targets.length,
+        files: taggedFilesOf(targets),
+      }),
+      confirmText: t("autoTag.removeConfirm"),
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    let tags = 0;
+    let files = 0;
+    for (const c of targets) {
+      const outcome = await state.remove([...c.files.keys()], c.key);
+      // A failure was reported already, and the list read again.
+      if (!outcome.ok) break;
+      tags++;
+      files += outcome.files;
+    }
+    setBusy(false);
+    setSelected(new Set());
+    setNotice(tags > 0 ? t("autoTag.removedMany", { tags, files }) : "");
+  };
+
   const restore = (list: Candidate[]) => {
     const keys = new Set(list.map((c) => c.key));
     update((cfg) => ({
@@ -281,6 +348,19 @@ export function SuggestTab({
             count: counts[value],
           }))}
         />
+        {/* One of the three, as a switch: a candidate can be on some of its
+            files and not on others, so "applied" and "not applied" are not
+            two boxes to tick together. */}
+        <Segmented
+          tone="bg"
+          label={t("autoTag.filter.appliedLabel")}
+          value={applied}
+          onChange={setApplied}
+          options={APPLIED_FILTERS.map((value) => ({
+            value,
+            label: t(APPLIED_LABELS[value]),
+          }))}
+        />
         <SmallButton
           // Not while tags are being written: what comes back is applied to
           // the list by position, and a reload would put another list there.
@@ -300,7 +380,7 @@ export function SuggestTab({
         {/* One grid for the heading and every row (each a subgrid of it), so
             a column is as wide in one row as in the next: each action has a
             column of its own, left empty where a row does not offer it. */}
-        <div className="grid grid-cols-[28px_minmax(160px,1fr)_auto_auto_26px_auto_auto_auto_auto_auto] gap-x-2">
+        <div className="grid grid-cols-[28px_minmax(160px,1fr)_auto_auto_auto_auto_auto_auto_auto_auto] gap-x-2">
           <div
             className={cn(
               ROW,
@@ -393,15 +473,14 @@ export function SuggestTab({
                   </span>
                   {/* Whatever was done with it: looking at the files is how
                     one decides, and how one checks afterwards. */}
-                  <button
-                    type="button"
+                  <SmallButton
+                    variant="ghost"
+                    className="h-[26px] px-2"
                     onClick={() => searchInLibrary(c)}
                     title={t("autoTag.searchCandidateHint")}
-                    aria-label={t("autoTag.searchFor", { tag: c.name })}
-                    className="flex size-[26px] shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-fg/10 hover:text-bright-fg"
                   >
-                    <Search className="size-3.5" />
-                  </button>
+                    {t("autoTag.viewFiles")}
+                  </SmallButton>
                   {/* The two facts side by side, each as what it is now: in the
                     keywords or not, on the files or not — the latter as the
                     way to take it off them again. */}
@@ -532,10 +611,12 @@ export function SuggestTab({
           ) : (
             <>
               <span className="text-xs text-fg">
-                {t("autoTag.selection", {
-                  count: picked.length,
-                  files: filesOf(picked),
-                })}
+                {picked.some((c) => stateOf(c).missing > 0)
+                  ? t("autoTag.selection", {
+                      count: picked.length,
+                      files: filesOf(picked),
+                    })
+                  : t("autoTag.selectionIgnored", { count: picked.length })}
               </span>
               {picked.some(canRegister) && (
                 <SmallButton
@@ -546,16 +627,35 @@ export function SuggestTab({
                   {t("autoTag.applySelectedDict")}
                 </SmallButton>
               )}
-              <SmallButton
-                variant={picked.some(canRegister) ? "outline" : "primary"}
-                disabled={busy}
-                onClick={() => void apply(picked, false)}
-              >
-                {t("autoTag.applySelected")}
-              </SmallButton>
-              <SmallButton variant="ghost" onClick={() => ignore(picked)}>
-                {t("autoTag.ignore")}
-              </SmallButton>
+              {picked.some((c) => stateOf(c).missing > 0) && (
+                <SmallButton
+                  variant={picked.some(canRegister) ? "outline" : "primary"}
+                  disabled={busy}
+                  onClick={() => void apply(picked, false)}
+                >
+                  {t("autoTag.applySelected")}
+                </SmallButton>
+              )}
+              {picked.some((c) => stateOf(c).tagged > 0) && (
+                <SmallButton
+                  disabled={busy}
+                  onClick={() => void removeMany(picked)}
+                >
+                  {t("autoTag.removeSelected", {
+                    files: taggedFilesOf(picked),
+                  })}
+                </SmallButton>
+              )}
+              {picked.some((c) => stateOf(c).pending) && (
+                <SmallButton
+                  variant="ghost"
+                  onClick={() =>
+                    ignore(picked.filter((c) => stateOf(c).pending))
+                  }
+                >
+                  {t("autoTag.ignore")}
+                </SmallButton>
+              )}
             </>
           )}
           <button

@@ -2,7 +2,7 @@
 // rules and dictionary entries sit in one list — both are conditions of the
 // form "found in the name, so tag it" — and the pane beside it edits whichever
 // is selected.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -147,6 +147,36 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
     update((c) => ({ ...c, rules: resetBuiltinRules(c.rules) }));
   };
 
+  // Delete an entry; with `next`, that entry is selected and its row focused
+  // in its stead (the keyboard's way of deleting, which carries on from there).
+  const listRef = useRef<HTMLDivElement>(null);
+  const focusNext = useRef<string | null>(null);
+  const deleteKeyword = (id: string, next?: string) => {
+    setResult(null);
+    update((c) => ({
+      ...c,
+      keywords: c.keywords.filter((k) => k.id !== id),
+    }));
+    if (next) {
+      setSelection({ kind: "keyword", id: next });
+      focusNext.current = next;
+    } else {
+      setSelection(null);
+    }
+  };
+  // After the render that took the deleted row away: the row asked for, if
+  // there is one, gets the focus the deleted one had.
+  useEffect(() => {
+    const id = focusNext.current;
+    if (!id) return;
+    focusNext.current = null;
+    for (const row of listRef.current?.querySelectorAll<HTMLElement>(
+      "[data-keyword]",
+    ) ?? []) {
+      if (row.dataset.keyword === id) row.focus();
+    }
+  });
+
   // "Tag, alias, alias": the first value names the tag, the rest are aliases.
   const addKeyword = () => {
     const [tag, ...aliases] = draft.split(/[,、]/);
@@ -228,7 +258,7 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
 
       <SplitPane
         aside={
-          <div className="flex flex-col gap-0.5 p-3">
+          <div ref={listRef} className="flex flex-col gap-0.5 p-3">
             <div className="flex items-baseline gap-2 px-1 pb-2 pt-0.5">
               <span className="text-xs font-semibold text-fg">
                 {t("autoTag.patternRules")}
@@ -334,11 +364,28 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
                     onChange={(e) => setFilter(e.target.value)}
                   />
                 )}
-                {keywords.map((entry) => (
+                {keywords.map((entry, at) => (
                   <button
                     key={entry.id}
                     type="button"
+                    data-keyword={entry.id}
                     onClick={() => select("keyword", entry.id)}
+                    // Delete on the row deletes the entry and moves on to the
+                    // one that takes its place, so a run of them can go one
+                    // key press each. Only here: in a field the key edits text.
+                    onKeyDown={(e) => {
+                      if (e.key !== "Delete" || e.nativeEvent.isComposing) {
+                        return;
+                      }
+                      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+                        return;
+                      }
+                      e.preventDefault();
+                      deleteKeyword(
+                        entry.id,
+                        (keywords[at + 1] ?? keywords[at - 1])?.id,
+                      );
+                    }}
                     aria-current={isSelected("keyword", entry.id)}
                     className={cn(
                       "flex items-center gap-2.5 rounded-lg p-2 text-left",
@@ -409,13 +456,7 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
             names={names}
             existing={existing}
             onChange={(change) => patchKeyword(shownKeyword.id, change)}
-            onDelete={() => {
-              update((c) => ({
-                ...c,
-                keywords: c.keywords.filter((k) => k.id !== shownKeyword.id),
-              }));
-              setSelection(null);
-            }}
+            onDelete={() => deleteKeyword(shownKeyword.id)}
           />
         ) : null}
       </SplitPane>

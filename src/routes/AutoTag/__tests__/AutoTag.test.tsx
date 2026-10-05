@@ -325,6 +325,41 @@ describe("AutoTag", () => {
     expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
   });
 
+  it("deletes keywords with the Delete key, one press each", async () => {
+    mocks.autoTagGet.mockResolvedValue({
+      ...sampleConfig(),
+      keywords: [
+        { id: "k1", tag: "Yoga", aliases: [], mode: "word" },
+        { id: "k2", tag: "Harbor", aliases: [], mode: "word" },
+        { id: "k3", tag: "Trip", aliases: [], mode: "word" },
+      ],
+    });
+    await renderScreen();
+    const row = (name: RegExp) => screen.getByRole("button", { name });
+    fireEvent.click(row(/^Harbor/));
+    fireEvent.keyDown(row(/^Harbor/), { key: "Delete" });
+    await waitFor(async () =>
+      expect((await lastSaved()).keywords.map((k) => k.tag)).toEqual([
+        "Yoga",
+        "Trip",
+      ]),
+    );
+    // The entry that took its place is selected and has the focus, so the
+    // next press goes on from there — and at the end, back to the one before.
+    await waitFor(() => expect(document.activeElement).toBe(row(/^Trip/)));
+    expect(row(/^Trip/).getAttribute("aria-current")).toBe("true");
+    fireEvent.keyDown(row(/^Trip/), { key: "Delete" });
+    await waitFor(() => expect(document.activeElement).toBe(row(/^Yoga/)));
+    await waitFor(async () =>
+      expect((await lastSaved()).keywords.map((k) => k.tag)).toEqual(["Yoga"]),
+    );
+
+    // In a field the key belongs to the text being edited.
+    const alias = screen.getByLabelText("+ Add alias");
+    fireEvent.keyDown(alias, { key: "Delete" });
+    expect(row(/^Yoga/)).toBeTruthy();
+  });
+
   it("applies a suggestion to the files that lack it, and takes the tag off again", async () => {
     await renderScreen("Keywords");
     const row = screen.getByRole("checkbox", { name: "Trip" }).closest("div")!;
@@ -526,7 +561,7 @@ describe("AutoTag", () => {
     expect(mocks.autoTagApply).not.toHaveBeenCalled();
     // The notice reports what happened: an entry added, no file tagged.
     expect(screen.getByText("Added 1 to keywords.")).toBeTruthy();
-    expect(screen.queryByText(/^Applied/)).toBeNull();
+    expect(screen.queryByText(/^Applied “/)).toBeNull();
     await within(row).findByText("In keywords");
     expect(
       within(row).queryByRole("button", { name: "Add to keywords" }),
@@ -567,9 +602,8 @@ describe("AutoTag", () => {
     const asked: string[][] = [];
     const off = onSearchLibrary((tokens) => asked.push(tokens));
     await renderScreen("Keywords");
-    fireEvent.click(
-      screen.getByRole("button", { name: "Search the library for “Yoga”" }),
-    );
+    const row = screen.getByRole("checkbox", { name: "Yoga" }).closest("div")!;
+    fireEvent.click(within(row).getByRole("button", { name: "View Files" }));
     off();
 
     // The tag and the spellings it was found under, as one token.
@@ -649,12 +683,90 @@ describe("AutoTag", () => {
     const ignored = screen
       .getByRole("checkbox", { name: "Harbor" })
       .closest("div")!;
+    // Its row's and the heading's.
     expect(screen.getAllByRole("checkbox")).toHaveLength(2);
     fireEvent.click(within(ignored).getByRole("button", { name: "Undo" }));
     await waitFor(async () => expect((await lastSaved()).ignored).toEqual([]));
     expect(screen.queryByRole("checkbox", { name: "Harbor" })).toBeNull();
     fireEvent.click(screen.getByRole("radio", { name: /^All/ }));
     expect(screen.getByRole("checkbox", { name: "Harbor" })).toBeTruthy();
+  });
+
+  it("narrows to the candidates with files still to tag", async () => {
+    // "Harbor" is on both of its files already — applied once, not a keyword
+    // — while the other candidates have files that lack their tag.
+    const tagged = library();
+    tagged.files[2].tags = ["trip", "Harbor"];
+    tagged.files[3].tags = ["Harbor"];
+    tagged.existingTags = ["trip", "Harbor"];
+    mocks.autoTagFiles.mockResolvedValue(tagged);
+    await renderScreen("Keywords");
+    // Listed all the same: the keywords do not hold it.
+    expect(screen.getByRole("checkbox", { name: "Harbor" })).toBeTruthy();
+
+    const applied = within(
+      screen.getByRole("radiogroup", { name: "Tags on files" }),
+    );
+    fireEvent.click(applied.getByRole("radio", { name: "Not applied" }));
+    expect(screen.queryByRole("checkbox", { name: "Harbor" })).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "ABCD" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "Trip" })).toBeTruthy();
+
+    // It holds across the filters, and comes off again.
+    fireEvent.click(screen.getByRole("radio", { name: /Frequent words/ }));
+    expect(screen.queryByRole("checkbox", { name: "Harbor" })).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "yoga" })).toBeTruthy();
+    fireEvent.click(applied.getByRole("radio", { name: "Any" }));
+    expect(screen.getByRole("checkbox", { name: "Harbor" })).toBeTruthy();
+  });
+
+  it("narrows to the candidates on files, and takes several off at once", async () => {
+    // "Harbor" is on both of its files and "trip" on one of Trip's two; ABCD
+    // and yoga are on none.
+    const tagged = library();
+    tagged.files[2].tags = ["trip", "Harbor"];
+    tagged.files[3].tags = ["Harbor"];
+    tagged.existingTags = ["trip", "Harbor"];
+    mocks.autoTagFiles.mockResolvedValue(tagged);
+    await renderScreen("Keywords");
+    const applied = within(
+      screen.getByRole("radiogroup", { name: "Tags on files" }),
+    );
+    fireEvent.click(applied.getByRole("radio", { name: "Applied" }));
+    expect(screen.getByRole("checkbox", { name: "Harbor" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "Trip" })).toBeTruthy();
+    expect(screen.queryByRole("checkbox", { name: "ABCD" })).toBeNull();
+    // One of the three at a time.
+    expect(applied.getByRole("radio", { name: "Not applied" })).toHaveProperty(
+      "ariaChecked",
+      "false",
+    );
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select all" }));
+    const bar = screen.getByText(/2 selected/).closest("div")!;
+    fireEvent.click(
+      within(bar).getByRole("button", { name: "Remove from 2 files" }),
+    );
+    // Asked about once for all of them, with what it comes to.
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Remove 2 tags?")).toBeTruthy();
+    expect(mocks.filesBulkTag).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(mocks.filesBulkTag).toHaveBeenCalledTimes(2));
+    expect(mocks.filesBulkTag).toHaveBeenCalledWith(
+      [{ workspaceId: "ws", fileIds: [3, 4] }],
+      [],
+      ["Harbor"],
+    );
+    expect(mocks.filesBulkTag).toHaveBeenCalledWith(
+      [{ workspaceId: "ws", fileIds: [3] }],
+      [],
+      ["trip"],
+    );
+    await screen.findByText("Removed 2 tags from 3 files.");
+    // Nothing is on files any more: the narrowed list is empty.
+    expect(screen.queryByRole("checkbox", { name: "Harbor" })).toBeNull();
+    expect(screen.queryByText(/selected/)).toBeNull();
   });
 
   it("brings several dismissed candidates back at once", async () => {
@@ -709,6 +821,7 @@ describe("AutoTag", () => {
     const total = within(pager).getByText(/^1–200 of \d+$/).textContent;
     const count = Number(total?.split(" of ")[1]);
     expect(count).toBeGreaterThan(200);
+    // A page of rows, plus the heading's.
     expect(screen.getAllByRole("checkbox").length).toBeLessThanOrEqual(201);
     expect(
       within(pager).getByRole("button", { name: "Previous" }),
