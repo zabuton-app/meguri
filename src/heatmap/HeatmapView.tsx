@@ -58,14 +58,16 @@ const SWATCH = "size-[11px] rounded-[2px]";
  */
 const MIN_WIDTH = "min-w-[30rem]";
 
-/** The page a picked range is shown on: the year ending today when it holds
- *  the range's first day (or nothing is picked), else that day's own year. */
+/** The page a picked range is shown on: the year ending today unless the
+ *  range's first day is before it, which opens that day's own year. */
 function pageOf(picked: PickedDays | null, today: Date): number | null {
   const day = picked?.from ?? picked?.to;
   const date = day ? parseDay(day) : null;
   if (!date) return null;
-  const { from, to } = rangeFor(null, today);
-  return date >= from && date <= to ? null : date.getFullYear();
+  const { from } = rangeFor(null, today);
+  // A day past today has no page of its own (no year runs beyond today): it
+  // stays on the year ending today, where it simply has no cell.
+  return date >= from ? null : date.getFullYear();
 }
 
 const LIST_KEYS = new Set([

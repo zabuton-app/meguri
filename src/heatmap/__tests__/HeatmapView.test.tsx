@@ -170,6 +170,22 @@ describe("HeatmapView", () => {
     expect(screen.getByText("2024")).toBeTruthy();
   });
 
+  it.each(["2026-12-24", "2027-03-01"])(
+    "stays on the year ending today for a day past it (%s)",
+    async (day) => {
+      // The filter bar's date inputs take any date; no year runs past today.
+      renderGraph({ query: playedOn(day) });
+      await waitFor(() =>
+        expect(lastRequest()).toMatchObject({
+          from: "2025-10-05",
+          to: "2026-10-05",
+        }),
+      );
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.getByText("Last 12 months")).toBeTruthy();
+    },
+  );
+
   it("pages back through whole years and forward to today again", async () => {
     const { onDayChange } = renderGraph({ query: playedOn("2026-10-03") });
     const next = screen.getByRole("button", { name: "Next year" });
