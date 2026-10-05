@@ -30,13 +30,19 @@ export function pickCloudTags(
 /** Longest label drawn in full; the tooltip always carries the whole name. */
 export const CLOUD_MAX_LABEL = 32;
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
 /**
  * The text drawn for a tag. Cut short because one very long name (names that
  * predate the length cap can run to a kilobyte) would otherwise set the width
  * of the whole cloud and shrink every other word with it.
  */
 export function cloudLabel(qualified: string): string {
-  const glyphs = Array.from(qualified);
+  // Cheap way out for nearly every name: graphemes never outnumber code units.
+  if (qualified.length <= CLOUD_MAX_LABEL) return qualified;
+  // By grapheme, not code point: a flag, a ZWJ emoji or a letter with combining
+  // marks is one glyph on screen and must not be cut in the middle.
+  const glyphs = Array.from(graphemes.segment(qualified), (g) => g.segment);
   return glyphs.length > CLOUD_MAX_LABEL
     ? `${glyphs.slice(0, CLOUD_MAX_LABEL - 1).join("")}…`
     : qualified;

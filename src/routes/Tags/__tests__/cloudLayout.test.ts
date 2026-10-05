@@ -88,6 +88,19 @@ describe("cloudLabel", () => {
     expect(Array.from(label)).toHaveLength(CLOUD_MAX_LABEL);
     expect(label.endsWith("…")).toBe(true);
   });
+
+  it("never cuts inside a glyph built from several code points", () => {
+    // A ZWJ family is seven code points, a flag two, "é" here two.
+    for (const glyph of ["👨‍👩‍👧‍👦", "🇯🇵", "e\u0301"]) {
+      expect(cloudLabel(glyph.repeat(100))).toBe(
+        `${glyph.repeat(CLOUD_MAX_LABEL - 1)}…`,
+      );
+      // Exactly at the cap it is drawn whole, however many code points that is.
+      expect(cloudLabel(glyph.repeat(CLOUD_MAX_LABEL))).toBe(
+        glyph.repeat(CLOUD_MAX_LABEL),
+      );
+    }
+  });
 });
 
 describe("layoutCloud", () => {
