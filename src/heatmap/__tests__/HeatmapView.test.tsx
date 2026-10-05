@@ -63,11 +63,15 @@ describe("HeatmapView", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 5, 12));
     mocks.activityDays.mockReset();
-    mocks.activityDays.mockResolvedValue({
-      days: [
-        { date: "2026-10-01", count: 1 },
-        { date: "2026-10-03", count: 16 },
-      ],
+    // Like the main process: only the days of the range asked for.
+    mocks.activityDays.mockImplementation((input) => {
+      const { from, to } = input as Request;
+      return Promise.resolve({
+        days: [
+          { date: "2026-10-01", count: 1 },
+          { date: "2026-10-03", count: 16 },
+        ].filter((d) => d.date >= from && d.date <= to),
+      });
     });
   });
 
@@ -168,6 +172,46 @@ describe("HeatmapView", () => {
     );
     expect(cell("2024-05-01").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("2024")).toBeTruthy();
+  });
+
+  it("names a day on another page without a count", async () => {
+    renderGraph({ query: playedOn("2026-10-03") });
+    await screen.findByText(/: 16 played$/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous year" }));
+    await waitFor(() => expect(lastRequest().from).toBe("2025-01-01"));
+    // The list below still shows that day's files: no "0 played" over it.
+    await waitFor(() => expect(screen.queryByText(/played$/)).toBeNull());
+    expect(screen.getByRole("button", { name: "Show all days" })).toBeTruthy();
+  });
+
+  it("turns to the page of a range set from outside the view", async () => {
+    const view = (query: SearchQuery) => (
+      <HeatmapView
+        scope="ws"
+        query={query}
+        ready
+        metric="played"
+        onMetricChange={() => {}}
+        onDayChange={() => {}}
+      />
+    );
+    const { rerender } = renderWithProviders(view({}));
+    await waitFor(() => expect(lastRequest().from).toBe("2025-10-05"));
+
+    // The panel, or a saved search: a day three years back.
+    rerender(view(playedOn("2023-05-01")));
+    await waitFor(() =>
+      expect(lastRequest()).toMatchObject({
+        from: "2023-01-01",
+        to: "2023-12-31",
+      }),
+    );
+    expect(cell("2023-05-01").getAttribute("aria-pressed")).toBe("true");
+
+    // Back to a day of the last twelve months.
+    rerender(view(playedOn("2026-10-03")));
+    await waitFor(() => expect(lastRequest().from).toBe("2025-10-05"));
   });
 
   it.each(["2026-12-24", "2027-03-01"])(

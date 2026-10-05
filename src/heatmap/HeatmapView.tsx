@@ -118,6 +118,18 @@ export const HeatmapView = memo(function HeatmapView({
   // Null is the year ending today; a number is that calendar year. The range
   // is part of the filter and outlives this view, so it opens on its page.
   const [year, setYear] = useState<number | null>(() => pageOf(picked, today));
+  // A range set from outside the view (the panel, a saved search) turns to
+  // its page as well. One picked here is already on the page shown, so paging
+  // away from it afterwards is left alone.
+  const pickedFrom = picked?.from ?? picked?.to ?? null;
+  const [followed, setFollowed] = useState(pickedFrom);
+  if (pickedFrom !== followed) {
+    setFollowed(pickedFrom);
+    const page = rangeFor(year, today);
+    const date = pickedFrom ? parseDay(pickedFrom) : null;
+    if (date && (date < page.from || date > page.to))
+      setYear(pageOf(picked, today));
+  }
 
   const range = useMemo(() => rangeFor(year, today), [year, today]);
   const weeks = useMemo(() => buildWeeks(range), [range]);
@@ -153,7 +165,8 @@ export const HeatmapView = memo(function HeatmapView({
     [t],
   );
 
-  const showYear = setYear;
+  const dayCounted =
+    day != null && day >= from && day <= to && !isLoading && !isStale;
   const thisYear = today.getFullYear();
 
   // One cell is in the tab order (the day picked, else the last one shown);
@@ -199,7 +212,7 @@ export const HeatmapView = memo(function HeatmapView({
         <div className="flex items-center gap-1 text-xs text-fg">
           <button
             type="button"
-            onClick={() => showYear((year ?? thisYear) - 1)}
+            onClick={() => setYear((year ?? thisYear) - 1)}
             aria-label={t("heatmap.range.prev")}
             title={t("heatmap.range.prev")}
             className="flex size-6 items-center justify-center rounded-md text-muted transition hover:bg-fg/10 hover:text-fg"
@@ -216,7 +229,7 @@ export const HeatmapView = memo(function HeatmapView({
             type="button"
             // Past the last whole year comes the year ending today.
             onClick={() =>
-              showYear(year !== null && year < thisYear - 1 ? year + 1 : null)
+              setYear(year !== null && year < thisYear - 1 ? year + 1 : null)
             }
             disabled={year === null}
             aria-label={t("heatmap.range.next")}
@@ -233,10 +246,15 @@ export const HeatmapView = memo(function HeatmapView({
           ) : day ? (
             <>
               <span className="truncate text-fg">
-                {t(CELL_LABEL[metric], {
-                  date: dateLabel(day),
-                  count: counts.get(day) ?? 0,
-                })}
+                {/* The counts cover the page shown: a day on another page (or
+                    past today, or still loading) is named without one, rather
+                    than with a zero the list below would contradict. */}
+                {dayCounted
+                  ? t(CELL_LABEL[metric], {
+                      date: dateLabel(day),
+                      count: counts.get(day) ?? 0,
+                    })
+                  : dateLabel(day)}
               </span>
               <button
                 type="button"

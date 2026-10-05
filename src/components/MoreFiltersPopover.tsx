@@ -31,46 +31,7 @@ import {
 } from "@/components/ui/select";
 import { SegmentedControl } from "./SegmentedControl";
 import { useI18n } from "@/i18n/I18nProvider";
-import type { TranslationKey } from "@/i18n/locales/ja";
-
-/** Unix seconds → local YYYY-MM-DD for a date input's value. */
-function toDateInput(sec: number | undefined): string {
-  if (sec == null) return "";
-  const d = new Date(sec * 1000);
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
-/** Date-input value → Unix seconds at local start/end of that day. */
-function fromDateInput(
-  value: string,
-  edge: "start" | "end",
-): number | undefined {
-  if (!value) return undefined;
-  const t = new Date(`${value}T${edge === "start" ? "00:00:00" : "23:59:59"}`);
-  const sec = Math.floor(t.getTime() / 1000);
-  return Number.isFinite(sec) ? sec : undefined;
-}
-
-/** A SearchQuery field holding one end of a date range (Unix seconds). */
-type DateField = {
-  [K in keyof SearchQuery]-?: NonNullable<SearchQuery[K]> extends number
-    ? K
-    : never;
-}[keyof SearchQuery];
-
-/** The date ranges a list can be narrowed by, in the order they are offered. */
-const DATE_RANGES: readonly {
-  label: TranslationKey;
-  from: DateField;
-  to: DateField;
-}[] = [
-  { label: "filter.capturedAt", from: "capturedFrom", to: "capturedTo" },
-  { label: "filter.btime", from: "btimeFrom", to: "btimeTo" },
-  { label: "filter.addedAt", from: "addedFrom", to: "addedTo" },
-  { label: "filter.playedAt", from: "playedFrom", to: "playedTo" },
-];
+import { DATE_RANGES, fromDateInput, toDateInput } from "@/lib/dateRanges";
 
 type PlayState = "all" | "played" | "inProgress" | "unplayed";
 

@@ -1,3 +1,4 @@
+import { DATE_RANGES } from "@/lib/dateRanges";
 import { z } from "zod";
 import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { ROOT_FOLDER } from "@shared/folderPath";
@@ -48,14 +49,10 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.played != null) next.played = query.played;
   if (query.inProgress) next.inProgress = true;
   if (query.playedVia) next.playedVia = query.playedVia;
-  if (query.capturedFrom != null) next.capturedFrom = query.capturedFrom;
-  if (query.capturedTo != null) next.capturedTo = query.capturedTo;
-  if (query.btimeFrom != null) next.btimeFrom = query.btimeFrom;
-  if (query.btimeTo != null) next.btimeTo = query.btimeTo;
-  if (query.addedFrom != null) next.addedFrom = query.addedFrom;
-  if (query.addedTo != null) next.addedTo = query.addedTo;
-  if (query.playedFrom != null) next.playedFrom = query.playedFrom;
-  if (query.playedTo != null) next.playedTo = query.playedTo;
+  for (const { from, to } of DATE_RANGES) {
+    if (query[from] != null) next[from] = query[from];
+    if (query[to] != null) next[to] = query[to];
+  }
   if (query.sort) next.sort = query.sort;
   if (query.sortDir) next.sortDir = query.sortDir;
   // Kept as "everything under it", the way a saved search reopens.
@@ -232,25 +229,11 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     parts.push(query.playedVia ? `${label} (${query.playedVia})` : label);
   }
   if (query.inProgress) parts.push(t("filter.inProgress"));
-  if (query.capturedFrom != null || query.capturedTo != null) {
-    parts.push(
-      `${t("filter.capturedAt")}: ${describeDateRange(t, query.capturedFrom, query.capturedTo)}`,
-    );
-  }
-  if (query.btimeFrom != null || query.btimeTo != null) {
-    parts.push(
-      `${t("filter.btime")}: ${describeDateRange(t, query.btimeFrom, query.btimeTo)}`,
-    );
-  }
-  if (query.addedFrom != null || query.addedTo != null) {
-    parts.push(
-      `${t("filter.addedAt")}: ${describeDateRange(t, query.addedFrom, query.addedTo)}`,
-    );
-  }
-  if (query.playedFrom != null || query.playedTo != null) {
-    parts.push(
-      `${t("filter.playedAt")}: ${describeDateRange(t, query.playedFrom, query.playedTo)}`,
-    );
+  for (const { label, from, to } of DATE_RANGES) {
+    if (query[from] != null || query[to] != null)
+      parts.push(
+        `${t(label)}: ${describeDateRange(t, query[from], query[to])}`,
+      );
   }
   for (const tag of query.tags ?? []) {
     const { namespace, name } = parseQualifiedTagName(tag);

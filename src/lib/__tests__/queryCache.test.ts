@@ -206,6 +206,27 @@ describe("targeted files_search invalidation", () => {
     ).toEqual([]);
   });
 
+  it("recounts any heatmap of Watch Later on a play, which takes the file off it", async () => {
+    const qc = new QueryClient();
+    const key = (scope: string) => [
+      "activity_days",
+      scope,
+      {},
+      "added",
+      "a",
+      "b",
+    ];
+    const watchLater = collectionTarget(WATCH_LATER_ID);
+    for (const scope of [watchLater, collectionTarget("other"), "ws"])
+      await qc.fetchQuery({ queryKey: key(scope), queryFn: () => scope });
+    invalidatePlayedSearches(qc);
+    const invalidated = (scope: string) =>
+      qc.getQueryCache().find({ queryKey: key(scope) })?.state.isInvalidated;
+    expect(invalidated(watchLater)).toBe(true);
+    expect(invalidated(collectionTarget("other"))).toBe(false);
+    expect(invalidated("ws")).toBe(false);
+  });
+
   it("invalidateInProgressSearches hits the in-progress list and graph only", async () => {
     const { qc, invalidated } = seed({
       plain: { ws: "ws", filter: {} },

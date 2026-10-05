@@ -1675,6 +1675,39 @@ describe("Home heatmap", () => {
     expect(chipLabels()).toEqual([`Added date: ${shown}`]);
   });
 
+  it("keeps a longer range typed in the panel when the metric changes", async () => {
+    const twoDaysAgo = formatDay(addDays(new Date(), -2));
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
+    fireEvent.click(
+      document.querySelector('[data-slot="more-filters-trigger"]')!,
+    );
+    fireEvent.change(screen.getByLabelText("Played date: From"), {
+      target: { value: twoDaysAgo },
+    });
+    fireEvent.change(screen.getByLabelText("Played date: To"), {
+      target: { value: yesterday },
+    });
+    await waitFor(() => expect(lastQuery().playedTo).toBe(end));
+
+    // Not a day picked on the heatmap: looking at another metric keeps it,
+    // and that metric's counts are narrowed by it like by any condition.
+    fireEvent.click(screen.getByRole("radio", { name: "Added" }));
+    await waitFor(() =>
+      expect(
+        mocks.activityDays.mock.calls.some(([input]) => {
+          const { metric, query } = input as {
+            metric: string;
+            query: { playedTo?: number };
+          };
+          return metric === "added" && query.playedTo === end;
+        }),
+      ).toBe(true),
+    );
+    expect(lastQuery().playedTo).toBe(end);
+    expect(chipLabels()).toHaveLength(1);
+  });
+
   it("keeps the day as a condition of the list in the other views", async () => {
     renderWithProviders(<AppRoutes />);
     await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));

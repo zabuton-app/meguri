@@ -176,8 +176,12 @@ the date range of the metric shown to that day (`pickedDays.ts`,
 date range. So the day has the range's chip, shows in the panel's inputs, is
 carried by a saved search, and a range typed in the panel marks its cells. The
 counts leave the shown metric's own range out — with it, only the picked day
-would have anything on it. Changing the metric removes the range of the one
-left. The view opens on the page the range starts on. The view has no
+would have anything on it. Changing the metric removes a day picked under the one left, but
+keeps a longer or open range, which was typed in the panel. The view shows the
+page the range starts on, and turns to it when the range is set from outside.
+The table of date ranges (`src/lib/dateRanges.ts`) is what the panel, the
+chips, a saved search's description and the fields a saved search keeps all
+read; a new range is one row there plus its SQL in `queries/files.ts`. The view has no
 folder form (`hasFolderForm`). One cell is in the tab order and the arrow keys
 move between days; those keys are stopped at the view, since the grid below
 listens for them on the window.

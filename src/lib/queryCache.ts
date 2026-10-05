@@ -170,10 +170,13 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
       return filtersOnPlays(filter) || filter?.sort === "accessed";
     },
   });
-  // The heatmap counting plays, or files by whether they were played.
+  // The heatmap counting plays, or files by whether they were played, and
+  // any heatmap of Watch Later.
   void qc.invalidateQueries({
     queryKey: ["activity_days"],
     predicate: (q) =>
+      // A play takes the file off Watch Later, whatever is counted there.
+      q.queryKey[1] === watchLater ||
       activityMetricOf(q.queryKey) === "played" ||
       filtersOnPlays(searchFilterOf(q.queryKey)),
   });

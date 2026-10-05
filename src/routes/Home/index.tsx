@@ -28,10 +28,8 @@ import type {
 } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { MANUAL_SORT } from "@shared/sortDir";
-import type { ActivityMetric } from "@shared/ipc/activity";
 import { MediaGrid } from "@/components/MediaGrid";
 import { HeatmapView } from "@/heatmap/HeatmapView";
-import { withPickedDay } from "@/heatmap/pickedDays";
 import { MediaList } from "@/components/MediaList";
 import {
   MediaNavProvider,
@@ -71,6 +69,7 @@ import { FolderHeader } from "@/components/FolderHeader";
 import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
+import { useHeatmapFilter } from "./useHeatmapFilter";
 import { setListCounts, type ListCounts } from "@/hooks/useListCounts";
 import { useFolderNavKeys } from "./useFolderNavKeys";
 import { useFolderPlaylist } from "./useFolderPlaylist";
@@ -82,11 +81,9 @@ import {
   addSearchTokens,
   discoverPath,
   BY_FOLDER_KEY,
-  HEATMAP_METRIC_KEY,
   LIST_MAIN_ID,
   hasFolderForm,
   isFolderView,
-  parseHeatmapMetric,
   parseViewMode,
   scrollListByPage,
 } from "./utils";
@@ -134,14 +131,6 @@ export default function Home() {
     false,
     (raw) => raw === "true",
   );
-  // What a day of the heatmap counts. The day picked on it is not kept here:
-  // it is the filter's date range for this metric (see heatmap/pickedDays.ts).
-  const [heatmapMetric, setHeatmapMetric] = useLocalStorage<ActivityMetric>(
-    HEATMAP_METRIC_KEY,
-    "played",
-    parseHeatmapMetric,
-  );
-
   const status = useAppStatus();
   const workspaces = useQuery({
     queryKey: ["workspaces_list"],
@@ -218,24 +207,7 @@ export default function Home() {
       setFilter,
       setByFolder: showByFolder,
     });
-  // Picking a day on the heatmap edits the filter like any control of the
-  // bar: the day becomes the date range of the metric shown.
-  const pickHeatmapDay = useCallback(
-    (day: string | null) =>
-      onFilterChange(withPickedDay(filterValue, heatmapMetric, day)),
-    [onFilterChange, filterValue, heatmapMetric],
-  );
-  // Another metric dates the files another way: the range of the one left
-  // goes with it, so the list is not narrowed by a day no cell shows.
-  const changeHeatmapMetric = useCallback(
-    (metric: ActivityMetric) => {
-      if (metric === heatmapMetric) return;
-      setHeatmapMetric(metric);
-      const cleared = withPickedDay(filterValue, heatmapMetric, null);
-      if (cleared !== filterValue) onFilterChange(cleared);
-    },
-    [heatmapMetric, setHeatmapMetric, filterValue, onFilterChange],
-  );
+  const heatmap = useHeatmapFilter({ filterValue, onFilterChange });
 
   // Include the workspace ID in the key so switching workspaces (incl. "All") refetches separately.
   const search = useFilesSearch(
@@ -1002,9 +974,9 @@ export default function Home() {
                       (status.data?.ready ?? false) &&
                       !!status.data?.workspaceId
                     }
-                    metric={heatmapMetric}
-                    onMetricChange={changeHeatmapMetric}
-                    onDayChange={pickHeatmapDay}
+                    metric={heatmap.metric}
+                    onMetricChange={heatmap.changeMetric}
+                    onDayChange={heatmap.pickDay}
                   />
                 )}
                 <div
