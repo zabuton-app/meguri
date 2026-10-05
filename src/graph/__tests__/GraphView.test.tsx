@@ -320,7 +320,9 @@ describe("GraphView", () => {
     const a = screen.getByTestId(`node ${fk("a.mp4")}`);
     fireEvent.mouseEnter(a);
     await waitFor(() =>
-      expect(preview()?.getAttribute("src")).toBe("http://media/ws/w/thumb/1"),
+      expect(preview()?.getAttribute("src")).toMatch(
+        /^http:\/\/media\/ws\/w\/thumb\/1\?v=\d+$/,
+      ),
     );
     // Not during a drag, where it would be in the way.
     fireEvent.mouseDown(a);
@@ -377,17 +379,39 @@ describe("GraphView", () => {
     const src = () =>
       container
         .querySelector('[data-slot="graph-hover-thumbnail"] img')
-        ?.getAttribute("src");
-    // Regenerated before the hover (another file's does not count).
-    act(() => {
-      thumbDone.emit?.({ id: 1, workspaceId: "w" });
-      thumbDone.emit?.({ id: 2, workspaceId: "w" });
-    });
-    fireEvent.mouseEnter(screen.getByTestId(`node ${fk("a.mp4")}`));
-    await waitFor(() => expect(src()).toBe("http://media/ws/w/thumb/1?v=1"));
-    // And again while it shows.
+        ?.getAttribute("src") ?? null;
+    const versionOf = (url: string | null) => {
+      const m = /^http:\/\/media\/ws\/w\/thumb\/1\?v=(\d+)$/.exec(url ?? "");
+      if (!m) throw new Error(`not file 1's thumbnail: ${url}`);
+      return Number(m[1]);
+    };
+    const hover = () =>
+      fireEvent.mouseEnter(screen.getByTestId(`node ${fk("a.mp4")}`));
+    hover();
+    await waitFor(() => expect(src()).not.toBeNull());
+    const first = versionOf(src());
+
+    // Another file's does not count.
+    act(() => thumbDone.emit?.({ id: 2, workspaceId: "w" }));
+    await new Promise((r) => setTimeout(r, 150));
+    expect(versionOf(src())).toBe(first);
+    // Its own does, while it shows.
     act(() => thumbDone.emit?.({ id: 1, workspaceId: "w" }));
-    await waitFor(() => expect(src()).toBe("http://media/ws/w/thumb/1?v=2"));
+    await waitFor(() => expect(versionOf(src())).toBeGreaterThan(first));
+    // So does an event that names no workspace.
+    const named = versionOf(src());
+    act(() => thumbDone.emit?.({ id: 1 }));
+    await waitFor(() => expect(versionOf(src())).toBeGreaterThan(named));
+    const second = versionOf(src());
+
+    // The other view is a fresh mount: it must not fall back to a URL the
+    // old picture may be cached under.
+    fireEvent.click(screen.getByRole("radio", { name: "3D" }));
+    await waitFor(() => expect(src()).toBeNull());
+    await ready();
+    hover();
+    await waitFor(() => expect(src()).not.toBeNull());
+    expect(versionOf(src())).toBeGreaterThan(second);
   });
 
   it("drops a thumbnail that fails to load, and tries again on the next hover", async () => {

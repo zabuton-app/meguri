@@ -43,20 +43,37 @@ function moveCard(
 
 /** `thumb:done` events are gathered this long before they re-render the card. */
 const VERSION_FLUSH_MS = 100;
-const NO_VERSIONS: ReadonlyMap<string, number> = new Map();
+
+// The last cache buster handed out. Each is larger than any before it, in
+// this run of the app or an earlier one (the HTTP cache outlives both a
+// remount of the view and a restart).
+let lastVersion = 0;
+function nextVersion(): number {
+  lastVersion = Math.max(lastVersion + 1, Date.now());
+  return lastVersion;
+}
+
+/** The cache buster for a file's thumbnail URL. */
+type ThumbVersionOf = (workspaceId: string, fileId: number) => number;
 
 /**
- * How many times each file's thumbnail was regenerated while the graph has
- * been open, keyed "<workspaceId>:<fileId>" (or the id alone when the event
- * names no workspace). The WebP is rewritten in place and served with a
- * max-age, so without a new URL a later hover would show the old picture.
+ * The WebP is rewritten in place when a thumbnail is regenerated, and served
+ * with a max-age, so the URL has to change for the new picture to show.
+ * Every mount starts from a version of its own: the view cannot know what
+ * was regenerated while it was away (a 2D / 3D switch remounts it, and so
+ * does a visit to the list). A file regenerated since then, by `thumb:done`,
+ * gets a newer one, keyed "<workspaceId>:<fileId>" (or the id alone when the
+ * event names no workspace).
  * Kept here rather than taken from Home's counter: only the card re-renders,
  * not the graph view, on every thumbnail a scan finishes.
  */
-function useThumbVersions(): ReadonlyMap<string, number> {
-  const [versions, setVersions] = useState(NO_VERSIONS);
+function useThumbVersionOf(): ThumbVersionOf {
+  const [mounted] = useState(nextVersion);
+  const [regenerated, setRegenerated] = useState<ReadonlyMap<string, number>>(
+    () => new Map(),
+  );
   useEffect(() => {
-    let pending = new Map<string, number>();
+    let pending = new Set<string>();
     let timer: ReturnType<typeof setTimeout> | null = null;
     // The unlisten arrives a microtask after the subscription is live; a
     // cleanup that runs first must still take the subscription down.
@@ -64,18 +81,20 @@ function useThumbVersions(): ReadonlyMap<string, number> {
     let unlisten: (() => void) | undefined;
     void events
       .onThumbDone((event) => {
-        const key = event.workspaceId
-          ? `${event.workspaceId}:${event.id}`
-          : String(event.id);
-        pending.set(key, (pending.get(key) ?? 0) + 1);
+        pending.add(
+          event.workspaceId
+            ? `${event.workspaceId}:${event.id}`
+            : String(event.id),
+        );
         // Dozens arrive per second during a scan: one update per window.
         timer ??= setTimeout(() => {
           timer = null;
           const batch = pending;
-          pending = new Map();
-          setVersions((prev) => {
+          pending = new Set();
+          const version = nextVersion();
+          setRegenerated((prev) => {
             const next = new Map(prev);
-            for (const [k, n] of batch) next.set(k, (next.get(k) ?? 0) + n);
+            for (const key of batch) next.set(key, version);
             return next;
           });
         }, VERSION_FLUSH_MS);
@@ -90,7 +109,13 @@ function useThumbVersions(): ReadonlyMap<string, number> {
       if (timer) clearTimeout(timer);
     };
   }, []);
-  return versions;
+  // The newest of the three: an event may name the workspace or not.
+  return (workspaceId, fileId) =>
+    Math.max(
+      mounted,
+      regenerated.get(`${workspaceId}:${fileId}`) ?? 0,
+      regenerated.get(String(fileId)) ?? 0,
+    );
 }
 
 interface Props {
@@ -109,15 +134,14 @@ export function GraphHoverThumbnail({ node, box }: Props) {
   // the card appears in place rather than jumping there on the next move.
   const pointer = useRef<{ x: number; y: number } | null>(null);
 
-  const versions = useThumbVersions();
+  const versionOf = useThumbVersionOf();
   const src =
     node?.hasThumb === true
       ? thumbUrl(
           mediaBase,
           node.workspaceId,
           node.fileId,
-          versions.get(`${node.workspaceId}:${node.fileId}`) ??
-            versions.get(String(node.fileId)),
+          versionOf(node.workspaceId, node.fileId),
         )
       : null;
 
