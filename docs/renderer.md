@@ -191,7 +191,8 @@ never pay for it) draws the same list as a network of files and tags, from one
   search is the keyboard's way in: Enter picks a match, Shift+Enter opens it
   as a click does, and Enter on an empty search opens the picked node.
   Hovering a file that has a thumbnail (a video's poster frame, an image, an
-  audio track's cover art) also shows it in a card beside the pointer
+  audio track's cover art) also shows it in a card beside the pointer, sized
+  to the picture's own shape within 192 × 144
   (`GraphHoverThumbnail`, an overlay shared by both canvases that tracks the
   pointer on the box around them; `model/hoverThumbnail.ts` keeps it inside the
   box). It hides during a drag, and follows `thumb:done` itself so a

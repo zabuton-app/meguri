@@ -341,6 +341,36 @@ describe("GraphView", () => {
     expect(preview()).toBeNull();
   });
 
+  it("keeps the thumbnail by the pointer once it takes the picture's shape", async () => {
+    const { container } = render();
+    await ready();
+    fireEvent.mouseEnter(screen.getByTestId(`node ${fk("a.mp4")}`));
+    const img = await waitFor(() => {
+      const el = container.querySelector<HTMLImageElement>(
+        '[data-slot="graph-hover-thumbnail"] img',
+      );
+      if (!el) throw new Error("no thumbnail yet");
+      return el;
+    });
+    const card = img.parentElement as HTMLElement;
+    const stage = card.parentElement as HTMLElement;
+    // jsdom lays nothing out: give the view and the card their sizes.
+    Object.defineProperty(stage, "clientWidth", { value: 1000 });
+    Object.defineProperty(stage, "clientHeight", { value: 800 });
+    // Near the right edge, so the card sits to the left of the pointer,
+    // where its place depends on its width.
+    fireEvent.pointerMove(stage, { clientX: 950, clientY: 300 });
+    expect(card.style.transform).toBe("translate(744px, 142px)");
+
+    Object.defineProperty(img, "naturalWidth", { value: 1080 });
+    Object.defineProperty(img, "naturalHeight", { value: 1920 });
+    Object.defineProperty(card, "offsetWidth", { value: 83 });
+    Object.defineProperty(card, "offsetHeight", { value: 146 });
+    fireEvent.load(img);
+    expect(card.style.width).toBe("81px");
+    expect(card.style.transform).toBe("translate(853px, 140px)");
+  });
+
   it("asks for a regenerated thumbnail under a new URL", async () => {
     const { container } = render();
     await ready();
@@ -380,8 +410,15 @@ describe("GraphView", () => {
     fireEvent.mouseEnter(a);
     const again = preview();
     expect(again).not.toBeNull();
-    if (again) fireEvent.load(again);
-    expect(again?.parentElement?.style.opacity).toBe("1");
+    if (!again) return;
+    // The card takes the picture's shape: no margin around it.
+    Object.defineProperty(again, "naturalWidth", { value: 1920 });
+    Object.defineProperty(again, "naturalHeight", { value: 1080 });
+    fireEvent.load(again);
+    const card = again.parentElement;
+    expect(card?.style.opacity).toBe("1");
+    expect(card?.style.width).toBe("192px");
+    expect(card?.style.height).toBe("108px");
   });
 
   it("drags a node: held where the pointer is, let go on release", async () => {
