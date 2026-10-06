@@ -6,7 +6,6 @@ import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import {
   CASE_MODES,
-  MAX_AUTO_TAG_EXCLUDE,
   MAX_AUTO_TAG_PATTERN,
   MAX_AUTO_TAG_RULE_NAME,
   MAX_AUTO_TAG_TEMPLATE,
@@ -17,6 +16,7 @@ import {
   type TagRule,
 } from "@shared/autoTag";
 import { segments } from "@shared/autoTagAnalysis";
+import { ExcludeList } from "./ExcludeList";
 import { FIELD, MAX_ROWS, MONO, ruleDisplayName } from "./helpers";
 import { useViewState } from "./viewState";
 import { Chip, Highlighted, MoreRows, Segmented, SmallButton } from "./parts";
@@ -108,17 +108,13 @@ export function RuleEditor({
             </span>
           )}
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted">{t("autoTag.exclude")}</span>
-          <input
-            className={cn(FIELD, MONO)}
-            value={rule.exclude}
-            placeholder="IMG, DSC"
-            maxLength={MAX_AUTO_TAG_EXCLUDE}
-            spellCheck={false}
-            onChange={(e) => onChange({ exclude: e.target.value })}
-          />
-        </label>
+        <ExcludeList
+          // Per rule: the value being typed belongs to the list it is for.
+          key={rule.id}
+          exclude={rule.exclude}
+          onChange={(exclude) => onChange({ exclude })}
+          t={t}
+        />
         <div className="flex flex-col gap-1">
           <span className="text-xs text-muted">{t("autoTag.letterCase")}</span>
           <Segmented

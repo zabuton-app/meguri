@@ -17,7 +17,11 @@ export const MAX_AUTO_TAG_KEYWORDS = 500;
 export const MAX_AUTO_TAG_ALIASES = 32;
 export const MAX_AUTO_TAG_PATTERN = 256;
 export const MAX_AUTO_TAG_TEMPLATE = 64;
-export const MAX_AUTO_TAG_EXCLUDE = 512;
+/**
+ * Characters of a rule's exclude list, one value to a line: room for a few
+ * thousand values, which is a list kept by hand for a long time.
+ */
+export const MAX_AUTO_TAG_EXCLUDE = 32_768;
 export const MAX_AUTO_TAG_RULE_NAME = 64;
 export const MAX_AUTO_TAG_TERMS = 5000;
 /** Matches one rule may take from one name; a pattern that matches everywhere stops here. */
@@ -114,7 +118,9 @@ const builtin = (
 /** The built-in rules as they ship: all there to look at, none switched on. */
 export function defaultRules(): TagRule[] {
   return [
-    builtin("prefix", "prefix", PREFIX_PATTERN, { exclude: "IMG, DSC, MVI" }),
+    builtin("prefix", "prefix", PREFIX_PATTERN, {
+      exclude: formatExclude(["IMG", "DSC", "MVI"]),
+    }),
     builtin("square", "bracket", "\\[([^\\]]+)\\]"),
     builtin("sumi", "bracket", "【([^】]+)】", { exclude: "公式" }),
     builtin("kagi", "bracket", "「([^」]+)」"),
@@ -145,9 +151,14 @@ export function builtinRulesAsShipped(rules: readonly TagRule[]): boolean {
     reset.length === rules.length &&
     reset.every((rule, i) => {
       const mine = rules[i];
-      // Field by field; every field of a rule is a plain value.
-      return (Object.keys(rule) as (keyof TagRule)[]).every(
-        (key) => mine[key] === rule[key],
+      // Field by field; every field of a rule is a plain value. The exclude
+      // list is compared by what it holds, not by how it is laid out: a list
+      // kept on one line with commas is the same list.
+      return (Object.keys(rule) as (keyof TagRule)[]).every((key) =>
+        key === "exclude"
+          ? formatExclude(excludeValues(mine.exclude)) ===
+            formatExclude(excludeValues(rule.exclude))
+          : mine[key] === rule[key],
       );
     })
   );
@@ -213,11 +224,32 @@ export function isUsableTagName(name: string): boolean {
 
 export const SPLIT_PATTERN = /[,、/／・]/;
 
-export function parseExclude(exclude: string): string[] {
-  return exclude
-    .split(/[,、]+/)
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+/**
+ * The values of an exclude list as written, one to a line — a comma separates
+ * them as well, which is how the list was kept before it had lines. Blank
+ * entries go, and so does a value that repeats an earlier one in another case.
+ */
+export function excludeValues(exclude: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of exclude.split(/[\n\r,、]+/)) {
+    const value = part.trim();
+    const key = value.toLowerCase();
+    if (value === "" || seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out;
+}
+
+/** The list as it is stored and shown: one value to a line. */
+export function formatExclude(values: readonly string[]): string {
+  return values.join("\n");
+}
+
+/** What a rule's matches are checked against: the values, lowercased. */
+export function parseExclude(exclude: string): Set<string> {
+  return new Set(excludeValues(exclude).map((value) => value.toLowerCase()));
 }
 
 /**
@@ -258,7 +290,8 @@ export interface RuleHit extends Range {
 export interface CompiledRule {
   rule: TagRule;
   regex: RegExp;
-  exclude: string[];
+  /** Lowercased; a set, since the list can run to thousands of values. */
+  exclude: ReadonlySet<string>;
 }
 
 export function compileRule(rule: TagRule): CompiledRule | null {
@@ -290,8 +323,7 @@ export function runRule(compiled: CompiledRule, name: string): RuleHit[] {
             ? part.toUpperCase()
             : part;
       const tag = cleanTagName(cased);
-      if (!isUsableTagName(tag) || exclude.includes(tag.toLowerCase()))
-        continue;
+      if (!isUsableTagName(tag) || exclude.has(tag.toLowerCase())) continue;
       tags.push(tag);
     }
     const start = match.index ?? 0;

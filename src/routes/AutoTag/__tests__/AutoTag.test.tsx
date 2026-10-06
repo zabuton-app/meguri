@@ -204,6 +204,55 @@ describe("AutoTag", () => {
     expect(panel().className).toContain("max-w-[1160px]");
   });
 
+  it("lists a rule's excluded values, to add to, find in and remove from", async () => {
+    await renderScreen();
+    // The built-in rule's own list, a row each.
+    expect(screen.getByText("3 values")).toBeTruthy();
+    const remove = (value: string) =>
+      screen.queryByRole("button", { name: `Remove “${value}”` });
+    expect(remove("IMG")).toBeTruthy();
+    expect(remove("MVI")).toBeTruthy();
+
+    // Adding takes several at once and passes over what is listed already,
+    // whatever its case.
+    const field = screen.getByLabelText("Add a value, or type to find one");
+    const add = screen.getByRole("button", { name: "Add" });
+    expect(add).toHaveProperty("disabled", true);
+    fireEvent.change(field, { target: { value: "img" } });
+    expect(add).toHaveProperty("disabled", true);
+    fireEvent.change(field, { target: { value: "ABCD, img" } });
+    // A list pasted a value to a line is taken apart, not run together.
+    fireEvent.paste(field, {
+      clipboardData: { getData: () => "GOPR\r\nimg\n" },
+    });
+    expect(field).toHaveProperty("value", "ABCD, img, GOPR, img");
+    fireEvent.click(add);
+    expect((await lastSaved()).rules[0].exclude).toBe(
+      "IMG\nDSC\nMVI\nABCD\nGOPR",
+    );
+    expect(screen.getByText("5 values")).toBeTruthy();
+    expect(field).toHaveProperty("value", "");
+    // It counts at once: ABCD is excluded now.
+    expect(screen.getByText("0 of 5 would be tagged")).toBeTruthy();
+
+    // The same field finds a value among the many.
+    fireEvent.change(field, { target: { value: "gop" } });
+    expect(remove("GOPR")).toBeTruthy();
+    expect(remove("IMG")).toBeNull();
+    fireEvent.click(remove("GOPR")!);
+    fireEvent.change(field, { target: { value: "" } });
+    fireEvent.click(remove("ABCD")!);
+    await waitFor(async () =>
+      expect((await lastSaved()).rules[0].exclude).toBe("IMG\nDSC\nMVI"),
+    );
+    expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
+
+    // Enter adds as the button does.
+    fireEvent.change(field, { target: { value: "PXL" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(remove("PXL")).toBeTruthy();
+  });
+
   it("flags an invalid pattern and still saves the edit", async () => {
     await renderScreen();
     fireEvent.change(screen.getByDisplayValue("^([A-Z]{2,6})-\\d{2,5}"), {

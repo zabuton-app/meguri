@@ -21,6 +21,7 @@ import {
 import { getSetting, searchFiles } from "../queries.js";
 import { addManualTag, fileTags } from "../tags.js";
 import {
+  MAX_AUTO_TAG_EXCLUDE,
   MAX_AUTO_TAG_RULES,
   MAX_RULE_MATCHES,
   compileEngine,
@@ -30,6 +31,8 @@ import {
   defaultAutoTagConfig,
   builtinRulesAsShipped,
   defaultRules,
+  excludeValues,
+  formatExclude,
   proposalsFor,
   resetBuiltinRules,
   runKeyword,
@@ -97,6 +100,46 @@ describe("rules", () => {
     expect(tagsForName(engine, NAMES[6])).toEqual(["夏休み"]);
     // activeRules() leaves the round-bracket rule off.
     expect(tagsForName(engine, "(Draft) plan.mp4")).toEqual([]);
+  });
+
+  it("keeps the exclude list one value to a line, and still reads a comma-separated one", () => {
+    // As typed: blank lines, stray spaces, a repeat in another case, and a
+    // run with commas, which is how the list was kept before it had lines.
+    const typed = "IMG\n\n  dsc \nimg\nMVI, GOPR、PXL\r\nDJI";
+    expect(excludeValues(typed)).toEqual([
+      "IMG",
+      "dsc",
+      "MVI",
+      "GOPR",
+      "PXL",
+      "DJI",
+    ]);
+    expect(formatExclude(excludeValues(typed))).toBe(
+      "IMG\ndsc\nMVI\nGOPR\nPXL\nDJI",
+    );
+    // Matched without regard to case, whichever way the list was written.
+    for (const exclude of ["img\ndsc", "IMG, DSC"]) {
+      const engine = engineOf([rule({ exclude })]);
+      expect(tagsForName(engine, "IMG-2041.jpg")).toEqual([]);
+      expect(tagsForName(engine, "DSC-0001.jpg")).toEqual([]);
+      expect(tagsForName(engine, "ABCD-123 clip.mp4")).toEqual(["ABCD"]);
+    }
+  });
+
+  it("holds a long exclude list, and checks it by lookup", () => {
+    // A couple of thousand values: what the list is meant to hold.
+    const values = Array.from({ length: 2000 }, (_, i) => `CODE${i}`);
+    const exclude = formatExclude(values);
+    expect(exclude.length).toBeLessThanOrEqual(MAX_AUTO_TAG_EXCLUDE);
+    expect(
+      AutoTagConfigSchema.safeParse({
+        ...defaultAutoTagConfig(),
+        rules: [rule({ exclude })],
+      }).success,
+    ).toBe(true);
+    const compiled = compileRule(rule({ exclude }));
+    expect(compiled?.exclude.size).toBe(2000);
+    expect(compiled?.exclude.has("code1999")).toBe(true);
   });
 
   it("reports where it matched, and marks a match that was excluded", () => {
