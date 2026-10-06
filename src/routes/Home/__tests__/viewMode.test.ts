@@ -56,14 +56,14 @@ describe("parseHeatmapMetric", () => {
 });
 
 describe("parseTimelineAxis", () => {
-  it("keeps a stored axis and falls back to the capture date", () => {
+  it("keeps a stored axis and falls back to the birth time", () => {
     expect(parseTimelineAxis("captured")).toBe("captured");
     expect(parseTimelineAxis("btime")).toBe("btime");
     expect(parseTimelineAxis("added")).toBe("added");
-    expect(parseTimelineAxis(null)).toBe("captured");
+    expect(parseTimelineAxis(null)).toBe("btime");
     // The heatmap's other metrics are not axes.
-    expect(parseTimelineAxis("played")).toBe("captured");
-    expect(parseTimelineAxis("created")).toBe("captured");
+    expect(parseTimelineAxis("played")).toBe("btime");
+    expect(parseTimelineAxis("created")).toBe("btime");
   });
 });
 

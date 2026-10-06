@@ -1560,20 +1560,29 @@ describe("Home timeline view", () => {
     fireEvent.click(screen.getByRole("button", { name: "Timeline view" }));
     await screen.findAllByText("October 15, 2026");
     expect(localStorage.getItem(VIEW_KEY)).toBe("timeline");
+    // The birth time by default.
     await waitFor(() =>
       expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).toMatchObject({
-        sort: "captured",
+        sort: "btime",
         sortDir: "desc",
       }),
     );
     expect(mocks.timelineCounts.mock.calls.at(-1)?.[0]).toMatchObject({
-      axis: "captured",
+      axis: "btime",
     });
-    // The months are counted without the paging and the sort.
+    // The days are counted without the paging and the sort.
     expect(
       (mocks.timelineCounts.mock.calls.at(-1)?.[0] as { query: unknown }).query,
     ).not.toHaveProperty("sort");
-    expect(screen.getByRole("radio", { name: "Captured" })).toBeTruthy();
+    // Offered in this order.
+    expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual(
+      expect.arrayContaining(["Created", "Added", "Captured"]),
+    );
+    const axes = screen
+      .getAllByRole("radio")
+      .map((r) => r.textContent)
+      .filter((n) => ["Created", "Added", "Captured"].includes(n ?? ""));
+    expect(axes).toEqual(["Created", "Added", "Captured"]);
 
     // Back on the grid the list is read in the filter's own order again.
     fireEvent.click(screen.getByRole("button", { name: "Grid view" }));
@@ -1589,26 +1598,26 @@ describe("Home timeline view", () => {
 
   it("remembers the axis and reads the list by it", async () => {
     localStorage.setItem(VIEW_KEY, "timeline");
-    localStorage.setItem(TIMELINE_AXIS_KEY, "btime");
+    localStorage.setItem(TIMELINE_AXIS_KEY, "captured");
     renderWithProviders(<AppRoutes />);
     await screen.findAllByText("October 15, 2026");
     expect(
       screen
-        .getByRole("radio", { name: "Created" })
+        .getByRole("radio", { name: "Captured" })
         .getAttribute("aria-checked"),
     ).toBe("true");
     await waitFor(() =>
       expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).toMatchObject({
-        sort: "btime",
+        sort: "captured",
         sortDir: "desc",
       }),
     );
 
-    fireEvent.click(screen.getByRole("radio", { name: "Captured" }));
-    expect(localStorage.getItem(TIMELINE_AXIS_KEY)).toBe("captured");
+    fireEvent.click(screen.getByRole("radio", { name: "Added" }));
+    expect(localStorage.getItem(TIMELINE_AXIS_KEY)).toBe("added");
     await waitFor(() =>
       expect(mocks.timelineCounts.mock.calls.at(-1)?.[0]).toMatchObject({
-        axis: "captured",
+        axis: "added",
       }),
     );
   });
@@ -1647,6 +1656,7 @@ describe("Home timeline view", () => {
 
   it("gathers the files without a date at the end", async () => {
     localStorage.setItem(VIEW_KEY, "timeline");
+    localStorage.setItem(TIMELINE_AXIS_KEY, "captured");
     mocks.timelineCounts.mockResolvedValue({
       days: [{ day: "2026-10-15", count: 1 }],
       undated: 2,

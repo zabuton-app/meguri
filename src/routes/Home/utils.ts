@@ -42,7 +42,7 @@ export function parseHeatmapMetric(raw: string | null): ActivityMetric {
 export const TIMELINE_AXIS_KEY = "meguri.timelineAxis";
 
 export function parseTimelineAxis(raw: string | null): TimelineAxis {
-  return isTimelineAxis(raw) ? raw : "captured";
+  return isTimelineAxis(raw) ? raw : "btime";
 }
 
 /**

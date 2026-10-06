@@ -170,9 +170,9 @@ per pixel row: of the days on a row only the fullest is drawn) — the years
 written beside it and a grip at the list's position. Dragging the grip, or
 pressing the track, scrolls the list there (`scrollToOffset`), a chip naming
 the day under the pointer (at the grip while dragging); as a slider, the
-arrow keys step a month at a time. The date is an axis — the capture date, the
-filesystem's birth time or the day the file was added to the index — switched
-in the pinned header and remembered in
+arrow keys step a month at a time. The date is an axis — the filesystem's birth time (the
+default), the day the file was added to the index or the capture date —
+switched in the pinned header and remembered in
 `TIMELINE_AXIS_KEY`; its values are the search's sort keys, so the list under
 the sections is the same windowed `files_search` every other view reads, with
 `sort`/`sortDir` put on the query sent (`timelineQuery`) and the filter's own

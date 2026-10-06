@@ -43,19 +43,19 @@ test.describe("Home", () => {
     await expect(
       ready.getByRole("button", { name: "Timeline view", pressed: true }),
     ).toBeVisible();
-    // The fixture file has no capture date: the one section is "No date".
+    // Along the file's creation date (the default) it is in this month.
     await expect(
       ready.locator('[data-slot="timeline-pinned-header"]'),
-    ).toContainText("No date");
+    ).not.toContainText("No date");
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
     await expect(
       ready.getByRole("navigation", { name: "Jump to a month" }),
     ).toBeVisible();
-    // Along the file's creation date it is in this month instead.
-    await ready.getByRole("radio", { name: "Created" }).click();
+    // The fixture file has no capture date: there the one section is "No date".
+    await ready.getByRole("radio", { name: "Captured" }).click();
     await expect(
       ready.locator('[data-slot="timeline-pinned-header"]'),
-    ).not.toContainText("No date");
+    ).toContainText("No date");
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
 
     await ready.getByRole("button", { name: "Grid view" }).click();

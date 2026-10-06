@@ -4,14 +4,14 @@
 /**
  * The date a timeline is ordered and cut into days by (each has a sort key
  * of the same date, TIMELINE_SORT_KEYS, so the list under the days is
- * files_search sorted by the axis):
- * - "captured": the capture date,
- * - "btime": the filesystem's birth time,
- * - "added": when the file entered the index.
+ * files_search sorted by the axis), in the order they are offered:
+ * - "btime": the filesystem's birth time (the default),
+ * - "added": when the file entered the index,
+ * - "captured": the capture date.
  * A file without the date is on no day (see TimelineCounts.undated); every
  * file has the day it was added.
  */
-export const TIMELINE_AXES = ["captured", "btime", "added"] as const;
+export const TIMELINE_AXES = ["btime", "added", "captured"] as const;
 export type TimelineAxis = (typeof TIMELINE_AXES)[number];
 
 export function isTimelineAxis(v: unknown): v is TimelineAxis {
@@ -20,9 +20,9 @@ export function isTimelineAxis(v: unknown): v is TimelineAxis {
 
 /** The search's sort key ordering the list by each axis. */
 export const TIMELINE_SORT_KEYS: Record<TimelineAxis, string> = {
-  captured: "captured",
   btime: "btime",
   added: "addedAt",
+  captured: "captured",
 };
 
 /** One calendar day and the files dated on it. */

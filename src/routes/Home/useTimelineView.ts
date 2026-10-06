@@ -33,7 +33,7 @@ export function useTimelineView({
   const qc = useQueryClient();
   const [axis, setAxis] = useLocalStorage<TimelineAxis>(
     TIMELINE_AXIS_KEY,
-    "captured",
+    "btime",
     parseTimelineAxis,
   );
   // The query the list is read with under the timeline: the filter ordered
