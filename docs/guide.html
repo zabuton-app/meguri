@@ -88,6 +88,7 @@
     <li><a href="#search">Search and filters</a></li>
     <li><a href="#tags">Tags, ratings, and favorites</a></li>
     <li><a href="#bulk-edit">Editing several files at once</a></li>
+    <li><a href="#timeline">Timeline view</a></li>
     <li><a href="#graph">Graph view</a></li>
     <li><a href="#collections">Collections</a></li>
     <li><a href="#discovery">Discovery</a></li>
@@ -136,14 +137,16 @@
   <h2 id="browsing">Browsing your library</h2>
   <img class="shot" src="./assets/theme-solarized-light.png" alt="Meguri browsing a media library in grid view">
   <p>The main screen shows your library as an endless, scrollable wall of
-  thumbnails. Three layouts are available from the header, so you can switch
-  between visual browsing, a detail-oriented list, and a map of how your files
-  relate:</p>
+  thumbnails. Four layouts are available from the header, so you can switch
+  between visual browsing, a detail-oriented list, a walk through time, and a
+  map of how your files relate:</p>
   <ul>
     <li><strong>Grid</strong> — large thumbnails, best for visual scanning.</li>
     <li><strong>List</strong> — one row per file with its folder, tags,
     resolution, duration and size lined up in columns. The thumbnail size is
     set in <strong>Settings → List thumbnail size</strong>.</li>
+    <li><strong>Timeline</strong> — the library in date order, day by day;
+    see <a href="#timeline">Timeline view</a>.</li>
     <li><strong>Graph</strong> — files and their tags drawn as a network; see
     <a href="#graph">Graph view</a>.</li>
   </ul>
@@ -295,9 +298,37 @@
   <p>One edit covers up to 5,000 files. The × at the end of the bar leaves
   selection mode.</p>
 
+  <h2 id="timeline">Timeline view</h2>
+  <p>The third layout in the header lays your library out <strong>by
+  date</strong>, newest first, in a section per day with the date and its
+  number of files above it. The heading stays put at the top while you scroll
+  through that day, so you always know when you are. Thumbnails look and
+  work as they do in the grid: open, favorite, rate, select and edit files
+  the same way, and step through them in the detail view across the days.
+  It follows the same search and filters as the other layouts.</p>
+  <ul>
+    <li>The <strong>rail</strong> down the right edge is the whole library
+    at the height of the window, as a column of dots — a larger dot for
+    each month, a smaller one for each day — with the years written beside
+    it. A grip shows where you are. Drag the grip — or press anywhere on
+    the rail — to move through the library, and a chip names the day as you
+    go; hovering over the rail names the day under the pointer too. From the keyboard, <kbd>Tab</kbd> to the rail
+    and the arrow keys move a month at a time.</li>
+    <li><strong>Created / Added / Captured</strong> in the heading chooses
+    the date the timeline runs along: when the file was created on disk
+    (the default), when Meguri first indexed it, or when a photo or video
+    was taken (from its metadata — many files carry none). Files with no
+    date of that kind are gathered in a <strong>No date</strong> section at
+    the end, which the rail reaches as well.</li>
+    <li>The sort order in the filters does not apply here — the timeline is
+    always by date — and it is left as it was for the other layouts. The
+    timeline has no by-folder form; folders are for the grid and the
+    list.</li>
+  </ul>
+
   <h2 id="graph">Graph view</h2>
   <img class="shot" src="./assets/graph.gif" alt="The graph view — picking a tag from the search to light up its files, then orbiting the same graph in 3D">
-  <p>The third layout in the header draws your library as a
+  <p>The fourth layout in the header draws your library as a
   <strong>network</strong>: files and tags are dots, and a line joins a file
   to each of its tags. Files that share tags gather around them,
   so clusters and odd ones out are easy to spot. It follows the same search

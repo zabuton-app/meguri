@@ -105,42 +105,12 @@ interface Props {
 
 const noop = () => {};
 
-// Memoized: Home re-renders on every thumbVersion flush and its other props are
-// referentially stable, so the grid only re-renders when the data actually changes.
-export const MediaGrid = memo(function MediaGrid({
-  items,
-  mediaBase,
-  workspaceId: wsId,
-  listOffset = 0,
-  loading,
-  thumbVersion,
-  onTagClick,
-  hasNextPage,
-  fetchNextPage,
-  isFetchingNextPage,
-  hasPreviousPage,
-  fetchPreviousPage,
-  isFetchingPreviousPage,
-  navActive = false,
-  watchLater = false,
-  reorder,
-  folders,
-  onOpenFolder,
-  resetKey,
-  inFolder = false,
-}: Props) {
-  const watchLaterMembership = useWatchLater();
-
-  // Scroll parent. Virtualization DOM-renders only the visible rows relative to this element.
-  // Because the scroll element mounts later when transitioning from loading to data,
-  // a normal ref + initial effect measures nothing and gets stuck at cols=1 (single column).
-  // Capture the moment the element is attached into state via a callback ref, and measure each time.
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
-  const setScrollRef = useCallback((node: HTMLDivElement | null) => {
-    scrollRef.current = node;
-    setScrollEl(node);
-  }, []);
+/**
+ * The column count and row height of a grid of media cards in a scroll
+ * element, and the ref that measures one mounted row. Shared by the views that
+ * lay cards out in rows (the grid, the timeline).
+ */
+export function useCardGridMetrics(scrollEl: HTMLDivElement | null) {
   const [cols, setCols] = useState(1);
   const [innerW, setInnerW] = useState(0);
 
@@ -224,6 +194,46 @@ export const MediaGrid = memo(function MediaGrid({
     [measureKey, ready],
   );
   const rowEstimate = ready && extraH > 0 ? thumbH + extraH : ROW_ESTIMATE;
+  return { cols, rowEstimate, measureRow };
+}
+
+// Memoized: Home re-renders on every thumbVersion flush and its other props are
+// referentially stable, so the grid only re-renders when the data actually changes.
+export const MediaGrid = memo(function MediaGrid({
+  items,
+  mediaBase,
+  workspaceId: wsId,
+  listOffset = 0,
+  loading,
+  thumbVersion,
+  onTagClick,
+  hasNextPage,
+  fetchNextPage,
+  isFetchingNextPage,
+  hasPreviousPage,
+  fetchPreviousPage,
+  isFetchingPreviousPage,
+  navActive = false,
+  watchLater = false,
+  reorder,
+  folders,
+  onOpenFolder,
+  resetKey,
+  inFolder = false,
+}: Props) {
+  const watchLaterMembership = useWatchLater();
+
+  // Scroll parent. Virtualization DOM-renders only the visible rows relative to this element.
+  // Because the scroll element mounts later when transitioning from loading to data,
+  // a normal ref + initial effect measures nothing and gets stuck at cols=1 (single column).
+  // Capture the moment the element is attached into state via a callback ref, and measure each time.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const setScrollRef = useCallback((node: HTMLDivElement | null) => {
+    scrollRef.current = node;
+    setScrollEl(node);
+  }, []);
+  const { cols, rowEstimate, measureRow } = useCardGridMetrics(scrollEl);
 
   // Folder cards lead the list, packed into the same rows as the files so the
   // row height and the 2D keyboard movement need no special case.
@@ -417,7 +427,7 @@ export const MediaGrid = memo(function MediaGrid({
 
 // The parent (MediaGrid) re-renders on every thumb:done, so memoize this and
 // only re-render cards whose version changed (onTagClick is stabilized in the parent).
-const MediaCard = memo(function MediaCard({
+export const MediaCard = memo(function MediaCard({
   file,
   index,
   version,

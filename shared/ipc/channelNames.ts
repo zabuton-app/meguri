@@ -32,6 +32,7 @@ export const INVOKE_CHANNELS = [
   "graph_layout_get",
   "graph_layout_set",
   "activity_days",
+  "timeline_counts",
   "file_get",
   "file_set_rating",
   "file_set_favorite",

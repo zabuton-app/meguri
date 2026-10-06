@@ -17,4 +17,5 @@ export async function invalidateWorkspaceScoped(qc: QueryClient) {
   await qc.invalidateQueries({ queryKey: ["graph_build"] });
   // The heatmap counts the same files.
   await qc.invalidateQueries({ queryKey: ["activity_days"] });
+  await qc.invalidateQueries({ queryKey: ["timeline_counts"] });
 }

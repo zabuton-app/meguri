@@ -405,6 +405,22 @@ export const en: Record<TranslationKey, string> = {
   "heatmap.clearDay": "Clear the days picked",
   "heatmap.error": "Could not load the counts",
 
+  // Timeline view
+  "view.timeline": "Timeline view",
+  "view.folderUnavailableTimeline":
+    "The folder view is not available in the timeline view",
+  "timeline.axis.label": "Date",
+  "timeline.axis.captured": "Captured",
+  "timeline.axis.btime": "Created",
+  "timeline.axis.added": "Added",
+  "timeline.undated": "No date",
+  "timeline.count": "{count} files",
+  "timeline.scrubber": "Jump to a month",
+  "timeline.month": "{month}: {count} files",
+  "timeline.day": "{day}: {count} files",
+  "timeline.sortLocked": "The timeline view lists files newest first by date",
+  "timeline.error": "Could not load the timeline",
+
   // graph view
   "view.graph": "Graph view",
   "view.folderUnavailableGraph":

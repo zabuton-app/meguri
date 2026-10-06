@@ -4,20 +4,25 @@ import {
   tagSearchKey,
 } from "@shared/tags";
 import { isActivityMetric, type ActivityMetric } from "@shared/ipc/activity";
+import {
+  isTimelineAxis,
+  TIMELINE_SORT_KEYS,
+  type TimelineAxis,
+} from "@shared/ipc/timeline";
 import type { SearchQuery } from "@/ipc/types";
 
 export const DISCOVER_FILTER_PARAM = "filter";
 export const VIEW_KEY = "meguri.view";
 
-export type ViewMode = "grid" | "list" | "graph";
+export type ViewMode = "grid" | "list" | "graph" | "timeline";
 
 export function isViewMode(v: string | null): v is ViewMode {
-  return v === "grid" || v === "list" || v === "graph";
+  return v === "grid" || v === "list" || v === "graph" || v === "timeline";
 }
 
 /**
- * Whether a view can be drawn by folder. The graph has no folder form; the
- * stored option waits for the grid and the list.
+ * Whether a view can be drawn by folder. The graph and the timeline have no
+ * folder form; the stored option waits for the grid and the list.
  */
 export function hasFolderForm(view: ViewMode): boolean {
   return view === "grid" || view === "list";
@@ -31,6 +36,25 @@ export const HEATMAP_METRIC_KEY = "meguri.heatmapMetric";
 
 export function parseHeatmapMetric(raw: string | null): ActivityMetric {
   return isActivityMetric(raw) ? raw : "played";
+}
+
+/** The date the timeline is ordered by, remembered apart from the view mode. */
+export const TIMELINE_AXIS_KEY = "meguri.timelineAxis";
+
+export function parseTimelineAxis(raw: string | null): TimelineAxis {
+  return isTimelineAxis(raw) ? raw : "btime";
+}
+
+/**
+ * The query the timeline reads its list with: the filter, ordered by the axis
+ * newest first. The filter's own sort is left out rather than overwritten —
+ * it is what the other views go back to.
+ */
+export function timelineQuery(
+  filter: SearchQuery,
+  axis: TimelineAxis,
+): SearchQuery {
+  return { ...filter, sort: TIMELINE_SORT_KEYS[axis], sortDir: "desc" };
 }
 
 /**

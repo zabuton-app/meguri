@@ -37,6 +37,7 @@ describe("syncFileRowAcrossCaches", () => {
       hasThumb: 1,
       capturedAt: null,
       btime: null,
+      addedAt: 1_700_000_000,
       lastAccessedAt: null,
       resumePosition: null,
       progress: null,

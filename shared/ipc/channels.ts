@@ -23,6 +23,7 @@ import type {
 } from "./schema.js";
 import {
   ActivityMetricSchema,
+  TimelineAxisSchema,
   DaySchema,
   FolderPathSchema,
   GraphDimsSchema,
@@ -52,6 +53,7 @@ import {
   type GraphPayload,
 } from "./graph.js";
 import { ACTIVITY_MAX_DAYS, type ActivityDays } from "./activity.js";
+import type { TimelineCounts } from "./timeline.js";
 import { daySpan, parseDay } from "../day.js";
 import { MAX_FOLDER_FILES_PATHS } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
@@ -278,6 +280,12 @@ export const ChannelInputs = {
       },
       { message: "from must not be after to, nor the range too long" },
     ),
+  // Per-day counts for the timeline, over the files the query matches;
+  // cursor / limit and the sort are ignored.
+  timeline_counts: z.object({
+    query: SearchQuerySchema,
+    axis: TimelineAxisSchema,
+  }),
   file_get: FileTarget,
   file_set_rating: FileTarget.extend({ rating: z.number() }),
   file_set_favorite: FileTarget.extend({ favorite: z.boolean() }),
@@ -482,6 +490,7 @@ export interface ChannelOutputs {
   graph_layout_get: { keys: string[]; xy: number[] } | null;
   graph_layout_set: void;
   activity_days: ActivityDays;
+  timeline_counts: TimelineCounts;
   file_get: FileDetail | null;
   file_set_rating: void;
   file_set_favorite: void;

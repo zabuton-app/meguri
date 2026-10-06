@@ -3,7 +3,9 @@ import {
   hasFolderForm,
   isFolderView,
   parseHeatmapMetric,
+  parseTimelineAxis,
   parseViewMode,
+  timelineQuery,
 } from "@/routes/Home/utils";
 
 describe("parseViewMode", () => {
@@ -11,6 +13,7 @@ describe("parseViewMode", () => {
     expect(parseViewMode("grid")).toBe("grid");
     expect(parseViewMode("list")).toBe("list");
     expect(parseViewMode("graph")).toBe("graph");
+    expect(parseViewMode("timeline")).toBe("timeline");
   });
 
   it("moves a stored table view to the list", () => {
@@ -30,12 +33,14 @@ describe("hasFolderForm", () => {
     expect(hasFolderForm("grid")).toBe(true);
     expect(hasFolderForm("list")).toBe(true);
     expect(hasFolderForm("graph")).toBe(false);
+    expect(hasFolderForm("timeline")).toBe(false);
   });
 
   it("keeps the folder view off under the graph, option or not", () => {
     const on = { byFolder: true, folderAvailable: true };
     expect(isFolderView({ ...on, view: "list" })).toBe(true);
     expect(isFolderView({ ...on, view: "graph" })).toBe(false);
+    expect(isFolderView({ ...on, view: "timeline" })).toBe(false);
     expect(isFolderView(on)).toBe(true);
   });
 });
@@ -47,5 +52,36 @@ describe("parseHeatmapMetric", () => {
     expect(parseHeatmapMetric("added")).toBe("added");
     expect(parseHeatmapMetric(null)).toBe("played");
     expect(parseHeatmapMetric("liked")).toBe("played");
+  });
+});
+
+describe("parseTimelineAxis", () => {
+  it("keeps a stored axis and falls back to the birth time", () => {
+    expect(parseTimelineAxis("captured")).toBe("captured");
+    expect(parseTimelineAxis("btime")).toBe("btime");
+    expect(parseTimelineAxis("added")).toBe("added");
+    expect(parseTimelineAxis(null)).toBe("btime");
+    // The heatmap's other metrics are not axes.
+    expect(parseTimelineAxis("played")).toBe("btime");
+    expect(parseTimelineAxis("created")).toBe("btime");
+  });
+});
+
+describe("timelineQuery", () => {
+  it("orders the filter by the axis, newest first, leaving the filter alone", () => {
+    const filter = {
+      kind: "video" as const,
+      sort: "name",
+      sortDir: "asc" as const,
+    };
+    expect(timelineQuery(filter, "captured")).toEqual({
+      kind: "video",
+      sort: "captured",
+      sortDir: "desc",
+    });
+    expect(timelineQuery(filter, "btime").sort).toBe("btime");
+    // The index's own date has a sort key of its own ("added" is the id order).
+    expect(timelineQuery(filter, "added").sort).toBe("addedAt");
+    expect(filter.sort).toBe("name");
   });
 });

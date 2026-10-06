@@ -3,6 +3,8 @@
 import type { TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 
+// "added" is the id order. The search also takes "addedAt" (created_at order),
+// the timeline's added axis, which is deliberately not offered here.
 export const SORT_KEYS: Record<string, TranslationKey> = {
   added: "sort.added",
   manual: "sort.manual",

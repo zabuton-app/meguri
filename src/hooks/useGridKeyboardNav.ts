@@ -25,6 +25,19 @@ interface Options {
    * mid-row keeps its items in their columns (see MediaGrid). 0 by default.
    */
   leadingCells?: number;
+  /**
+   * A layout that is not one even grid (the timeline's sections) says where
+   * each move lands, and which row that is; `columns` and `leadingCells` are
+   * not read then.
+   */
+  layout?: GridNavLayout;
+}
+
+export type GridNavDirection = "up" | "down" | "left" | "right";
+
+export interface GridNavLayout {
+  step: (index: number, direction: GridNavDirection) => number;
+  rowOf: (index: number) => number;
 }
 
 /**
@@ -46,6 +59,7 @@ export function useGridKeyboardNav({
   onInspect,
   scrollToRow,
   leadingCells = 0,
+  layout,
 }: Options) {
   const { keybindingPreset } = usePreferences();
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -59,6 +73,7 @@ export function useGridKeyboardNav({
     onInspect,
     scrollToRow,
     leadingCells,
+    layout,
     preset: keybindingPreset,
     focusedIndex,
   });
@@ -72,6 +87,7 @@ export function useGridKeyboardNav({
       onInspect,
       scrollToRow,
       leadingCells,
+      layout,
       preset: keybindingPreset,
       focusedIndex,
     };
@@ -104,6 +120,7 @@ export function useGridKeyboardNav({
         onInspect,
         scrollToRow,
         leadingCells,
+        layout,
         preset,
         focusedIndex,
       } = ref.current;
@@ -130,6 +147,23 @@ export function useGridKeyboardNav({
       }
 
       let next: number;
+      if (layout) {
+        const direction = matchAny(e, b.down)
+          ? "down"
+          : matchAny(e, b.up)
+            ? "up"
+            : matchAny(e, b.right)
+              ? "right"
+              : matchAny(e, b.left)
+                ? "left"
+                : null;
+        if (!direction) return;
+        next = focusedIndex < 0 ? 0 : layout.step(focusedIndex, direction);
+        e.preventDefault();
+        if (next !== focusedIndex) setFocusedIndex(next);
+        scrollToRow(layout.rowOf(next));
+        return;
+      }
       if (matchAny(e, b.down))
         next =
           focusedIndex < 0

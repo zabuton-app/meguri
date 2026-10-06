@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Bookmark,
   CalendarDays,
+  CalendarRange,
   ChevronRight,
   Clock,
   Copy,
@@ -857,6 +858,11 @@ function FixedGroups({
       id: "view-list",
       icon: List,
       run: () => closeThen(() => onSetView("list")),
+    }),
+    action(t, "view.timeline", {
+      id: "view-timeline",
+      icon: CalendarRange,
+      run: () => closeThen(() => onSetView("timeline")),
     }),
     action(t, "view.graph", {
       id: "view-graph",

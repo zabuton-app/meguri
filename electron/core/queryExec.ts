@@ -8,6 +8,11 @@ import { openDbReadonly, type DB } from "./db.js";
 import { buildGraph } from "./graph/buildGraph.js";
 import type { GraphPayload } from "../../shared/ipc/graph.js";
 import { buildActivityDays } from "./activityDays.js";
+import { buildTimelineCounts } from "./timelineCounts.js";
+import type {
+  TimelineAxis,
+  TimelineCounts,
+} from "../../shared/ipc/timeline.js";
 import type {
   ActivityDays,
   ActivityMetric,
@@ -70,6 +75,13 @@ export type QueryRequest =
       to: string;
     }
   | {
+      kind: "timeline";
+      targets: QueryTarget[];
+      query: SearchQuery;
+      refs?: cw.FileRef[];
+      axis: TimelineAxis;
+    }
+  | {
       kind: "folderFiles";
       targets: QueryTarget[];
       paths: string[];
@@ -94,7 +106,8 @@ export type QueryResponse =
   | FolderListing
   | FolderFilesResult
   | GraphPayload
-  | ActivityDays;
+  | ActivityDays
+  | TimelineCounts;
 
 const DUP_REFS_CACHE_TTL_MS = 5_000;
 const DUP_REFS_CACHE_MAX_ENTRIES = 16;
@@ -248,6 +261,11 @@ export class QueryExecutor {
           to: req.to,
           refs,
         });
+      }
+      case "timeline": {
+        // Same target resolution as "search" above.
+        const refs = this.resolveRefs(cores, req.query, req.refs);
+        return buildTimelineCounts(cores, req.query, { axis: req.axis, refs });
       }
       case "random": {
         // Random ignores the sort key entirely, manual included.

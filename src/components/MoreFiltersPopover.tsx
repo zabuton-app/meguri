@@ -133,6 +133,8 @@ interface Props {
   onClearAll: () => void;
   /** True while a collection is active: only then is there a manual order to sort by. */
   manualSortAvailable?: boolean;
+  /** The view orders the list itself: the sort is switched off, for this reason. */
+  sortNote?: string;
 }
 
 export function MoreFiltersPopover({
@@ -142,6 +144,7 @@ export function MoreFiltersPopover({
   hasConditions,
   onClearAll,
   manualSortAvailable = false,
+  sortNote,
 }: Props) {
   const { t } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
@@ -246,6 +249,7 @@ export function MoreFiltersPopover({
               open={sortOpen}
               onOpenChange={setSortOpen}
               value={sort}
+              disabled={!!sortNote}
               onValueChange={(v) =>
                 patch({
                   sort: v === "added" ? undefined : v,
@@ -272,18 +276,24 @@ export function MoreFiltersPopover({
                 onClick={() =>
                   patch({ sortDir: sortDir === "asc" ? "desc" : "asc" })
                 }
+                disabled={!!sortNote}
                 title={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
                 aria-label={sortDir === "asc" ? t("sort.asc") : t("sort.desc")}
-                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:text-fg"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <SortDirIcon className="size-4" />
               </button>
             )}
           </div>
-          {manualSortAvailable && sort !== MANUAL_SORT && (
-            <p className="mt-1.5 text-xs text-muted">
-              {t("playlist.reorderNeedsManual")}
-            </p>
+          {sortNote ? (
+            <p className="mt-1.5 text-xs text-muted">{sortNote}</p>
+          ) : (
+            manualSortAvailable &&
+            sort !== MANUAL_SORT && (
+              <p className="mt-1.5 text-xs text-muted">
+                {t("playlist.reorderNeedsManual")}
+              </p>
+            )
           )}
         </Section>
 

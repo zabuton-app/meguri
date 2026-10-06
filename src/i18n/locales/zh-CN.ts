@@ -396,6 +396,21 @@ export const zhCN: Record<TranslationKey, string> = {
   "heatmap.clearDay": "清除所选日期",
   "heatmap.error": "无法加载统计",
 
+  // 时间线视图
+  "view.timeline": "时间线视图",
+  "view.folderUnavailableTimeline": "时间线视图中无法按文件夹显示",
+  "timeline.axis.label": "时间轴",
+  "timeline.axis.captured": "拍摄日期",
+  "timeline.axis.btime": "创建日期",
+  "timeline.axis.added": "添加日期",
+  "timeline.undated": "无日期",
+  "timeline.count": "{count} 个",
+  "timeline.scrubber": "跳转到月份",
+  "timeline.month": "{month}：{count} 个",
+  "timeline.day": "{day}：{count} 个",
+  "timeline.sortLocked": "时间线视图按日期从新到旧排列",
+  "timeline.error": "无法加载时间线",
+
   // graph view
   "view.graph": "图谱视图",
   "view.folderUnavailableGraph": "图谱视图中无法按文件夹显示",

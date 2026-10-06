@@ -38,6 +38,33 @@ test.describe("Home", () => {
     }
   });
 
+  test("switches to the timeline view and back", async ({ ready }) => {
+    await ready.getByRole("button", { name: "Timeline view" }).click();
+    await expect(
+      ready.getByRole("button", { name: "Timeline view", pressed: true }),
+    ).toBeVisible();
+    // Along the file's creation date (the default) it is in this month.
+    await expect(
+      ready.locator('[data-slot="timeline-pinned-header"]'),
+    ).not.toContainText("No date");
+    await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
+    await expect(
+      ready.getByRole("navigation", { name: "Jump to a month" }),
+    ).toBeVisible();
+    // The fixture file has no capture date: there the one section is "No date".
+    await ready.getByRole("radio", { name: "Captured" }).click();
+    await expect(
+      ready.locator('[data-slot="timeline-pinned-header"]'),
+    ).toContainText("No date");
+    await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
+
+    await ready.getByRole("button", { name: "Grid view" }).click();
+    await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
+    await expect(
+      ready.locator('[data-slot="timeline-pinned-header"]'),
+    ).toHaveCount(0);
+  });
+
   test("filters files by search query", async ({ ready }) => {
     const input = searchInput(ready);
     await input.fill("test");

@@ -60,6 +60,8 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
+import { TimelineView } from "@/timeline/TimelineView";
+import { useTimelineView } from "./useTimelineView";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { SelectionProvider } from "@/components/SelectionContext";
@@ -176,15 +178,27 @@ export default function Home() {
   // The folder rides on the query sent, never on `filter` itself: that state
   // is what Discover opens with, which scopes to the folder its own way. The
   // filter bar reads the folder back through `filterValue` instead.
+  // The timeline orders the list itself, by its axis: the sort rides on the
+  // query the same way, and the filter keeps the one the other views use.
+  const timeline = useTimelineView({ view, workspaceId, filter });
   const searchQuery = useMemo<SearchQuery>(
     () =>
-      folderView
-        ? {
-            ...filter,
-            folder: { path: folderNav.path, recursive: folderSearching },
-          }
-        : filter,
-    [filter, folderView, folderNav.path, folderSearching],
+      view === "timeline"
+        ? timeline.searchQuery
+        : folderView
+          ? {
+              ...filter,
+              folder: { path: folderNav.path, recursive: folderSearching },
+            }
+          : filter,
+    [
+      filter,
+      view,
+      timeline.searchQuery,
+      folderView,
+      folderNav.path,
+      folderSearching,
+    ],
   );
 
   // The graph has no folder form (see hasFolderForm): a folder opened from
@@ -223,6 +237,7 @@ export default function Home() {
     status.data?.workspaceId,
     searchQuery,
     status.data?.ready ?? false,
+    timeline.anchor,
   );
 
   const folderListing = useQuery({
@@ -339,8 +354,11 @@ export default function Home() {
   // Drag-to-reorder edits the collection's own item order, so it is offered only
   // where that order is both stored (a collection) and visible (manual sort).
   const manualSort = filter.sort === MANUAL_SORT;
+  // (The timeline shows its own order whatever the sort says.)
   const reorderCollectionId =
-    activeCollection && manualSort ? activeCollection.id : null;
+    activeCollection && manualSort && view !== "timeline"
+      ? activeCollection.id
+      : null;
 
   // Manual order belongs to a collection. Leaving one would otherwise leave the
   // sort set to a value the picker no longer offers — a blank control over a
@@ -515,6 +533,7 @@ export default function Home() {
         void qc.invalidateQueries({ queryKey: ["folders_list"] });
         void qc.invalidateQueries({ queryKey: ["graph_build"] });
         void qc.invalidateQueries({ queryKey: ["activity_days"] });
+        void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
         // A scan can add tags (new files, the derived-tag backfill), so a tag
         // screen left open would otherwise show a stale catalog.
         void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
@@ -797,7 +816,7 @@ export default function Home() {
   // Changing it scrolls the list back to its top, as another folder does.
   const listResetKey = folderView ? `folder:${folderNav.path}` : undefined;
   // Names the list on screen: the workspace, how it is browsed and the filter.
-  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : (listResetKey ?? "flat")}|${JSON.stringify(filter)}`;
+  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : view === "timeline" ? `timeline:${timeline.axis}` : (listResetKey ?? "flat")}|${JSON.stringify(filter)}`;
   // A pass the playlist parked belongs to the list it was playing. Once the
   // list becomes another one it is dropped, so nothing (the pet's "Resume
   // playback") can pick it back up and graft the new list onto the old queue.
@@ -841,6 +860,7 @@ export default function Home() {
         value={filterValue}
         onChange={onFilterChange}
         manualSortAvailable={!!activeCollection}
+        sortNote={view === "timeline" ? t("timeline.sortLocked") : undefined}
         workspaceId={folderAvailable ? workspaceId : null}
         onApplySaved={onApplySaved}
         onToggleHeatmap={heatmap.toggle}
@@ -960,6 +980,31 @@ export default function Home() {
                   onFilterToken={onTagClick}
                 />
               </Suspense>
+            ) : view === "timeline" ? (
+              <TimelineView
+                scope={status.data?.workspaceId ?? ""}
+                query={filter}
+                axis={timeline.axis}
+                onAxisChange={timeline.setAxis}
+                ready={
+                  (status.data?.ready ?? false) && !!status.data?.workspaceId
+                }
+                items={items}
+                listOffset={listOffset}
+                loading={listLoading}
+                mediaBase={status.data?.mediaBase ?? ""}
+                thumbVersion={thumbVersion}
+                onTagClick={onTagClick}
+                hasNextPage={search.hasNextPage}
+                fetchNextPage={fetchNextPage}
+                isFetchingNextPage={search.isFetchingNextPage}
+                hasPreviousPage={search.hasPreviousPage}
+                fetchPreviousPage={fetchPreviousPage}
+                isFetchingPreviousPage={search.isFetchingPreviousPage}
+                onAnchor={timeline.onAnchor}
+                navActive={navActive}
+                watchLater={activeCollection?.id === WATCH_LATER_ID}
+              />
             ) : view === "list" ? (
               <MediaList
                 items={items}

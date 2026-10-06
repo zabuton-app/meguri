@@ -407,6 +407,22 @@ export const ja = {
   "heatmap.clearDay": "選んだ日付を解除",
   "heatmap.error": "集計を読み込めませんでした",
 
+  // タイムライン表示
+  "view.timeline": "タイムライン表示",
+  "view.folderUnavailableTimeline":
+    "タイムライン表示ではフォルダごとの表示は使えません",
+  "timeline.axis.label": "時間軸",
+  "timeline.axis.captured": "撮影日",
+  "timeline.axis.btime": "作成日",
+  "timeline.axis.added": "追加日",
+  "timeline.undated": "日付なし",
+  "timeline.count": "{count}件",
+  "timeline.scrubber": "年月へ移動",
+  "timeline.month": "{month}: {count}件",
+  "timeline.day": "{day}: {count}件",
+  "timeline.sortLocked": "タイムライン表示では日付の新しい順に並びます",
+  "timeline.error": "タイムラインを読み込めませんでした",
+
   // グラフ表示
   "view.graph": "グラフ表示",
   "view.folderUnavailableGraph": "グラフ表示ではフォルダごとの表示は使えません",

@@ -25,6 +25,11 @@ interface Props {
   onChange: (q: SearchQuery) => void;
   /** True while a collection is active, which is where manual ordering applies. */
   manualSortAvailable?: boolean;
+  /**
+   * Set while the view orders the list itself (the timeline): the sort
+   * control is shown switched off, with this as the reason.
+   */
+  sortNote?: string;
   /** The real workspace shown, which a saved folder condition belongs to. */
   workspaceId?: string | null;
   /** Opens a saved search; by default its query simply replaces `value`. */
@@ -42,6 +47,7 @@ export function FilterBar({
   value,
   onChange,
   manualSortAvailable,
+  sortNote,
   workspaceId,
   onApplySaved,
   onToggleHeatmap,
@@ -144,6 +150,7 @@ export function FilterBar({
           hasConditions={descriptors.length > 0}
           onClearAll={clearAll}
           manualSortAvailable={manualSortAvailable}
+          sortNote={sortNote}
         />
 
         {/* Pushed to the far end: saved searches are a way *into* a set of

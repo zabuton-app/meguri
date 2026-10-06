@@ -115,6 +115,29 @@ describe("index query plans", () => {
     expect(p).not.toContain("TEMP B-TREE");
   });
 
+  it("sort=addedAt (the timeline's added axis) uses idx_files_alive_added", () => {
+    const p = plan(db, searchSql("addedAt", "desc"));
+    expect(p).toContain("idx_files_alive_added");
+    expect(p).not.toContain("TEMP B-TREE");
+  });
+
+  it("seeking into the added axis uses idx_files_alive_added too", () => {
+    // A jump to a day's head (every row on that second kept)…
+    const head = plan(
+      db,
+      `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL AND (f.created_at <= 1700000000) ORDER BY ${orderByFor("addedAt", "desc")} LIMIT 101`,
+    );
+    expect(head).toContain("idx_files_alive_added");
+    expect(head).not.toContain("TEMP B-TREE");
+    // …and the next page after a row.
+    const next = plan(
+      db,
+      `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL AND (f.created_at < 1700000000 OR (f.created_at = 1700000000 AND f.id > 5)) ORDER BY ${orderByFor("addedAt", "desc")} LIMIT 101`,
+    );
+    expect(next).toContain("idx_files_alive_added");
+    expect(next).not.toContain("TEMP B-TREE");
+  });
+
   it("sort=btime (default desc) uses idx_files_alive_btime", () => {
     const p = plan(db, searchSql("btime", "desc"));
     expect(p).toContain("idx_files_alive_btime");
