@@ -32,8 +32,16 @@ import {
   HistoryQuerySchema,
   LogoIdSchema,
   SearchQuerySchema,
+  AutoTagConfigSchema,
   TagRefSchema,
 } from "./schema.js";
+import {
+  MAX_AUTO_TAGS_PER_FILE,
+  MAX_AUTO_TAG_PAIRS,
+  type AutoTagApplyResult,
+  type AutoTagConfig,
+  type AutoTagLibrary,
+} from "../autoTag.js";
 import {
   EVENT_CHANNELS,
   INVOKE_CHANNELS,
@@ -141,6 +149,46 @@ const BulkTargets = z
 
 /** The parsed shape, so both processes and the renderer name one type. */
 export type BulkTargets = z.infer<typeof BulkTargets>;
+
+/**
+ * BulkTargets whose groups each carry the tags their files receive. Gated on
+ * the raw value the same way, for the same reason.
+ */
+const AutoTagAssignments = z
+  .unknown()
+  .refine(
+    (raw) =>
+      !Array.isArray(raw) ||
+      (raw.length <= MAX_BULK_FILES &&
+        bulkTargetFileCount(raw) <= MAX_BULK_FILES &&
+        !hasOversizedWorkspaceId(raw)),
+    { message: `too many files (max ${MAX_BULK_FILES})` },
+  )
+  .pipe(
+    z
+      .array(
+        z.object({
+          workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+          fileIds: z
+            .array(z.number().int().positive())
+            .min(1)
+            .max(MAX_BULK_FILES),
+          tags: z
+            .array(z.string().min(1).max(MAX_TAG_NAME))
+            .min(1)
+            .max(MAX_AUTO_TAGS_PER_FILE),
+        }),
+      )
+      .min(1)
+      // The cross product is what costs, and the file gate above does not
+      // bound it: 5,000 files with 64 tags each is 320,000 statements.
+      .refine(
+        (groups) =>
+          groups.reduce((n, g) => n + g.fileIds.length * g.tags.length, 0) <=
+          MAX_AUTO_TAG_PAIRS,
+        { message: `too many tags to attach (max ${MAX_AUTO_TAG_PAIRS})` },
+      ),
+  );
 
 /**
  * An array of at most `max` items whose length is checked on the raw value
@@ -365,7 +413,9 @@ export const ChannelInputs = {
   // The tag-catalog channels take no workspaceId: scope comes from the active
   // view (like duplicates_list), and tags are addressed by name because ids are
   // per-database and meaningless across the "All" view.
-  tags_list_all: z.void(),
+  // The whole library on request: the search box completes a tag from every
+  // workspace, so a tag held elsewhere can be found and said to be elsewhere.
+  tags_list_all: z.object({ allWorkspaces: z.boolean() }).optional(),
   tag_rename: z.object({
     from: TagRefSchema,
     /** New plain name; the namespace is always "" since only manual tags are editable. */
@@ -411,6 +461,12 @@ export const ChannelInputs = {
   update_get_settings: z.void(),
   update_set_auto_check: z.object({ enabled: z.boolean() }),
   update_ignore: z.object({ version: z.string() }),
+  auto_tag_get: z.void(),
+  auto_tag_set: z.object({ config: AutoTagConfigSchema }),
+  auto_tag_files: z.void(),
+  auto_tag_apply: z.object({ assignments: AutoTagAssignments }),
+  auto_tag_undo: z.object({ undoIds: z.array(z.string().max(64)).max(256) }),
+  auto_tag_reapply: z.void(),
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
 } as const satisfies Record<InvokeChannel, z.ZodTypeAny>;
@@ -550,6 +606,16 @@ export interface ChannelOutputs {
   update_get_settings: UpdateSettings;
   update_set_auto_check: void;
   update_ignore: void;
+  auto_tag_get: AutoTagConfig;
+  auto_tag_set: void;
+  // Files of every workspace (a sample when there are more than the cap).
+  auto_tag_files: AutoTagLibrary;
+  auto_tag_apply: AutoTagApplyResult;
+  // Pairs removed. Handles the session no longer holds are no-ops.
+  auto_tag_undo: number;
+  // Runs the conditions over every file of every workspace and attaches
+  // what they give.
+  auto_tag_reapply: { files: number; added: number };
   logo_get: LogoId;
   // Echoes the applied variant so the renderer can settle on main's value.
   logo_set: LogoId;

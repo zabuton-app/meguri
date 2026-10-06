@@ -38,6 +38,27 @@ export function onApplyTagFilter(listener: (tokens: string[]) => void) {
   return () => window.removeEventListener(APPLY_TAG_FILTER, handler);
 }
 
+const SEARCH_LIBRARY = "meguri:search-library";
+
+/**
+ * Ask the library to search for exactly these search-box tokens (`yoga|ヨガ`),
+ * in place of whatever its search box holds. Unlike {@link applyTagFilter} this
+ * starts a search rather than narrowing one: asked twice for two different
+ * things, the second must not be ANDed onto the first and come back empty.
+ * The other filters (kind, rating, folder…) are left as they are.
+ */
+export function searchLibrary(tokens: string[]) {
+  window.dispatchEvent(
+    new CustomEvent<string[]>(SEARCH_LIBRARY, { detail: tokens }),
+  );
+}
+
+export function onSearchLibrary(listener: (tokens: string[]) => void) {
+  const handler = (e: Event) => listener((e as CustomEvent<string[]>).detail);
+  window.addEventListener(SEARCH_LIBRARY, handler);
+  return () => window.removeEventListener(SEARCH_LIBRARY, handler);
+}
+
 /**
  * Point at the chip a token already occupies in the search box.
  *

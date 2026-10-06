@@ -45,8 +45,9 @@ The main tables:
 - `meta_tags` — tag associations.
 - `play_history` — playback history.
 - `scene_bookmarks` — user-created scene positions.
-- `settings` — a key/value store, currently holding the derived-tag ruleset
-  version (see [Derived tags](#derived-tags)).
+- `settings` — a key/value store, holding the derived-tag ruleset version (see
+  [Derived tags](#derived-tags)) and the files auto-tagging still owes (see
+  [Auto tagging](#auto-tagging)).
 - `files_fts` — the FTS5 virtual table (see below).
 
 ## Versionless migrations
@@ -116,6 +117,20 @@ files — a tag rename, a merge, the derived-tag backfill — use
 deduplicated across sources. Three places produce it — `syncFts()`,
 `resyncFtsForKeys()` and the trigram rebuild — and they must never drift, so the
 projection lives in a single `FTS_ROW_SELECT` constant in `db.ts`.
+
+Free-text tokens are ANDed. A token may carry alternatives separated by `|`
+(`yoga|ヨガ`), any of which satisfies it; `\|` is a literal `|`, for the file
+names that contain one. `searchTokenTerms()` in `shared/tags.ts` is the one
+place that reads this syntax. In the query, the alternatives long enough for
+the trigram index become one `MATCH` with `OR`, the short ones the same `LIKE`
+fallback short tokens use, and the two halves are ORed — a long alternative is
+never sent to `LIKE` because a short one sits beside it, since `LIKE` is slower
+and folds case for ASCII only.
+
+The auto-tagging screen uses this to search the library for a dictionary
+entry's terms (`searchLibrary()` in `src/lib/ui-events.ts`, which
+replaces the text query rather than adding to it) — by the search box's rules,
+a substring of the path or of the tags, not by the entry's own word matching.
 
 Generated tags are deliberately **not** indexed. The tokenizer is trigram, so
 indexing `dur:long` would make a plain search for "long" return every long
@@ -204,6 +219,84 @@ file on the next scan.
 The set of namespaces is **not closed**. No code that decides tag _identity_ may
 enumerate it: search tokens resolve against the `tags` table itself, and the tag
 screen sorts unknown namespaces after the known ones rather than dropping them.
+
+## Auto tagging
+
+Rules and a keyword dictionary propose tags from a file's **name**, and folder
+rules from where the file is. The engine
+is `shared/autoTag.ts`, shared by both processes so the auto-tagging screen
+previews with the code a scan runs:
+
+- A **rule** is a regular expression run globally over the name without its
+  extension. Each match names a tag through a template (`$1`), optionally split
+  on `, 、 / ／ ・`, case-folded, and dropped when it is in the rule's exclude
+  list. The built-in rules cover a leading code prefix and bracketed text;
+  they ship switched off, and the screen can reset them to that state.
+- A **folder rule** goes by where a file is rather than by its name: every
+  file under a folder of one workspace — subfolders included — gets the rule's
+  tags. The folder is kept as the workspace id plus the path inside it, in the
+  normalized form of `shared/folderPath.ts` (`""` is the whole workspace).
+  Comparing paths cannot hang, so a scan adds these in the main process to
+  what the worker returned for the names. `withFolderTags()` is the one place
+  the two are put together; the screen's Folders tab lists the files under a
+  rule by the same comparison.
+- A **keyword** is some terms to find and the tags to add: finding any of the
+  terms in the name (again without its extension) proposes every one of the
+  tags; in `word` mode an ASCII term must stand between non-alphanumerics. An
+  entry written before it had tags of its own (one `tag` plus `aliases`) is
+  read as those terms, adding that tag.
+
+Unlike [derived tags](#derived-tags), what the engine proposes is attached as
+the user's **own** tags: no namespace, `source = 'manual'`, indexed in FTS,
+removable per file. A name that differs from an existing tag only by case
+reuses that tag — compared with JavaScript's case folding, the same one the
+engine and the screen use, not SQLite's ASCII-only `NOCASE`. This folding is
+particular to auto-tagging: tagging by hand still matches names exactly.
+Attaching only ever adds — changing a rule does not take back what it already
+tagged — and `attachAutoTags()` reports exactly the pairs it added, which is
+what rolls back an apply that failed partway (kept in memory in the main
+process, not persisted). The screen keeps no record of what it applied: taking
+a tag off again goes by what the files carry, through `files_bulk_tag`. Renaming
+a tag of a keyword or folder rule on the screen offers to move the files the
+condition reaches from the old tag to the new one, by the same reading; a
+rename on the tag screen does not reach the conditions.
+
+The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed suggestions and
+excluded terms) is app-wide, in `config.json` under `autoTag`. With `applyOnScan`
+on, `runScan()` runs the engine over the files the scan inserted, updated or
+moved, ahead of the FTS sync and the thumbnail pool. The ids still owed are kept
+in `settings` under `auto_tag_pending` until the pass completes, because a scan
+aborted in between reports those files as unchanged the next time round.
+
+In the main process the part of the engine that reads names is evaluated in a
+worker thread
+(`electron/autoTagWorker.ts`, driven by `AutoTagWorkerClient`): a rule is an
+arbitrary regular expression, and one that backtracks without end cannot be
+interrupted on the thread running it. A chunk that exceeds its time budget gets
+the worker terminated, and a worker that cannot run fails closed — nothing is
+evaluated on the main thread in its place. Either way the scan logs it and
+carries on without auto-tagging; the files stay owed.
+
+`shared/autoTagAnalysis.ts` builds the screen's views on top of the engine —
+suggestions (frequent words of the names that no rule or keyword produces
+yet) and a file name cut into taggable parts for the detail view. Those
+run in the renderer over the names loaded by `auto_tag_files` (capped at
+`MAX_AUTO_TAG_FILES`); every write goes through `auto_tag_apply`, which only
+says which files get which tags.
+
+The renderer runs those analyses on its own thread, so a rule that hangs would
+hang the screen. Two things keep that from being permanent. The configuration
+is saved a moment after an edit, which a screen frozen by that edit never
+reaches. And a marker in `localStorage` is set before each analysis and cleared
+once it has been drawn: finding it still set on arrival opens the screen in a
+safe mode that runs no rules until the user resumes, leaving the rule at fault
+editable.
+
+`config.ignored` holds suggestions dismissed on the suggestions tab.
+`config.excludedTerms` holds words that are never suggested (no screen edits
+it any more; what is stored is still read); they also stop
+being offered as frequent words. Neither changes what the rules or the
+dictionary themselves produce.
 
 ## Query layer
 

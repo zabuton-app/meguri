@@ -5,6 +5,7 @@ import {
   joinSearchTokens,
   splitSearchTokens,
 } from "@shared/tags";
+import { ALL_ID, COLLECTION_ID_PREFIX } from "@shared/workspaceIds";
 import type { TagSummary } from "@/ipc/types";
 
 /**
@@ -57,11 +58,16 @@ export const MAX_TAG_SUGGESTIONS = 10;
  * remembered by a word in the middle of it as by its first letters — with prefix
  * hits ranked first so the obvious completion still comes out on top, then by how
  * many files carry the tag.
+ *
+ * With `held`, the tags it says are on view come before the ones held only
+ * elsewhere: a catalog of the whole library is offered against one workspace,
+ * and a tag the workspace does not carry would find nothing in it.
  */
 export function tagSuggestions(
   tags: TagSummary[],
   pending: PendingDirective,
   limit: number = MAX_TAG_SUGGESTIONS,
+  held: (tag: TagSummary) => boolean = () => true,
 ): TagSummary[] {
   const q = pending.value.trim().toLowerCase();
   const hits = tags.filter(
@@ -70,7 +76,7 @@ export function tagSuggestions(
       tag.qualified.toLowerCase().includes(q),
   );
   const rank = (tag: TagSummary) =>
-    tag.name.toLowerCase().startsWith(q) ? 0 : 1;
+    (held(tag) ? 0 : 2) + (tag.name.toLowerCase().startsWith(q) ? 0 : 1);
   return hits
     .sort(
       (a, b) =>
@@ -79,4 +85,17 @@ export function tagSuggestions(
         a.name.localeCompare(b.name),
     )
     .slice(0, limit);
+}
+
+/**
+ * Whether the view is of one workspace, as opposed to all of them or a
+ * collection (which spans them): only then is a tag held elsewhere out of
+ * reach of a search.
+ */
+export function viewIsOneWorkspace(workspaceId: string | null): boolean {
+  return (
+    workspaceId !== null &&
+    workspaceId !== ALL_ID &&
+    !workspaceId.startsWith(COLLECTION_ID_PREFIX)
+  );
 }

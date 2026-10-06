@@ -24,15 +24,22 @@ const FTS_DDL =
  * SearchQuery.tags[] filter, neither of which goes through FTS.
  *
  * Callers append their own scope to the trailing WHERE clause.
+ *
+ * The join order in the subquery is pinned (CROSS JOIN), and callers may pin
+ * the index on `files` through `from`. Workspace databases are never ANALYZEd,
+ * and without statistics the planner starts the subquery from `tags` — every
+ * one of the user's tags, for every file — which went unnoticed while a library
+ * had a few dozen of them and takes seconds once it has thousands.
  */
-const FTS_ROW_SELECT = `
+const ftsRowSelect = (from = "files f"): string => `
   SELECT f.id, f.rel_path,
          COALESCE((SELECT group_concat(name, ' ') FROM
            (SELECT DISTINCT t.name AS name
-            FROM meta_tags mt JOIN tags t ON t.id = mt.tag_id
+            FROM meta_tags mt CROSS JOIN tags t ON t.id = mt.tag_id
             WHERE mt.meta_key = f.meta_key AND t.namespace = ''
             ORDER BY name)), '')
-  FROM files f WHERE f.deleted_at IS NULL`;
+  FROM ${from} WHERE f.deleted_at IS NULL`;
+const FTS_ROW_SELECT = ftsRowSelect();
 
 /** Chunk size for meta_key batches passed to resyncFtsForKeys as one JSON array. */
 const FTS_RESYNC_CHUNK = 5000;
@@ -297,7 +304,8 @@ export function resyncFtsForKeys(db: DB, metaKeys: string[]): void {
   );
   const ins = db.prepare(
     `INSERT INTO files_fts (rowid, rel_path, tags_text)
-     ${FTS_ROW_SELECT} AND f.meta_key IN (SELECT value FROM json_each(?))`,
+     ${ftsRowSelect("files f INDEXED BY idx_files_meta_key")}
+       AND f.meta_key IN (SELECT value FROM json_each(?))`,
   );
   for (let i = 0; i < metaKeys.length; i += FTS_RESYNC_CHUNK) {
     const chunk = JSON.stringify(metaKeys.slice(i, i + FTS_RESYNC_CHUNK));

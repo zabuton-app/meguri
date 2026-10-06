@@ -3,7 +3,23 @@
 import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import { LogoIdSchema, type LogoId } from "../../shared/ipc/schema.js";
+import {
+  AutoTagFolderSchema,
+  AutoTagKeywordSchema,
+  AutoTagRuleSchema,
+  LogoIdSchema,
+  type LogoId,
+} from "../../shared/ipc/schema.js";
+import {
+  MAX_AUTO_TAG_KEYWORD_TERMS,
+  MAX_AUTO_TAG_KEYWORDS,
+  MAX_AUTO_TAG_FOLDER_RULES,
+  MAX_AUTO_TAG_RULES,
+  MAX_AUTO_TAG_TERMS,
+  defaultAutoTagConfig,
+  type AutoTagConfig,
+} from "../../shared/autoTag.js";
+import { MAX_TAG_NAME } from "../../shared/tags.js";
 import log from "./logger.js";
 
 export interface AppConfig {
@@ -23,6 +39,8 @@ export interface AppConfig {
    * before any renderer exists, so main must be able to read it on its own.
    */
   logo: LogoId;
+  /** Auto-tagging rules and dictionary, shared by every workspace (shared/autoTag.ts). */
+  autoTag: AutoTagConfig;
 }
 
 export const DEFAULT_LOGO: LogoId = "dark";
@@ -88,6 +106,7 @@ export function loadConfig(): AppConfig {
       workspaceEmojis: parseEmojiMap(c.workspaceEmojis),
       update: parseUpdateConfig(c.update),
       logo: parseLogo(c.logo),
+      autoTag: parseAutoTag(c.autoTag),
     };
   } catch {
     return {
@@ -97,8 +116,78 @@ export function loadConfig(): AppConfig {
       workspaceEmojis: {},
       update: { ...DEFAULT_UPDATE_CONFIG },
       logo: DEFAULT_LOGO,
+      autoTag: defaultAutoTagConfig(),
     };
   }
+}
+
+/**
+ * Entry by entry, like the other fields here: one rule that stopped validating
+ * must not take the rest of the configuration with it. A config that has never
+ * held the key gets the built-in rules; an emptied list stays empty.
+ */
+function parseAutoTag(value: unknown): AutoTagConfig {
+  if (!value || typeof value !== "object") return defaultAutoTagConfig();
+  const c = value as Record<string, unknown>;
+  const list = <T>(
+    raw: unknown,
+    max: number,
+    parse: (item: unknown) => T | undefined,
+  ): T[] => {
+    if (!Array.isArray(raw)) return [];
+    const out: T[] = [];
+    for (const item of raw.slice(0, max)) {
+      const parsed = parse(item);
+      if (parsed !== undefined) out.push(parsed);
+    }
+    return out;
+  };
+  const term = (item: unknown): string | undefined =>
+    typeof item === "string" && item !== "" && item.length <= MAX_TAG_NAME
+      ? item
+      : undefined;
+  return {
+    rules: list(
+      c.rules,
+      MAX_AUTO_TAG_RULES,
+      (item) => AutoTagRuleSchema.safeParse(item).data,
+    ),
+    keywords: list(
+      c.keywords,
+      MAX_AUTO_TAG_KEYWORDS,
+      (item) => AutoTagKeywordSchema.safeParse(keywordFromLegacy(item)).data,
+    ),
+    // Absent from a configuration written before folder rules existed.
+    folders: list(
+      c.folders,
+      MAX_AUTO_TAG_FOLDER_RULES,
+      (item) => AutoTagFolderSchema.safeParse(item).data,
+    ),
+    // Off only when the user turned it off.
+    applyOnScan: c.applyOnScan !== false,
+    ignored: list(c.ignored, MAX_AUTO_TAG_TERMS, term),
+    excludedTerms: list(c.excludedTerms, MAX_AUTO_TAG_TERMS, term),
+  };
+}
+
+/**
+ * A keyword entry written before an entry had tags of its own, brought to
+ * the current shape: its one tag was also the first of its terms, the aliases
+ * the rest — one more than the terms may hold, so the last alias goes.
+ */
+function keywordFromLegacy(item: unknown): unknown {
+  if (!item || typeof item !== "object" || "terms" in item) return item;
+  const { tag, aliases, ...rest } = item as Record<string, unknown>;
+  if (typeof tag !== "string") return item;
+  const terms = [
+    tag,
+    ...(Array.isArray(aliases) ? (aliases as unknown[]) : []),
+  ];
+  return {
+    ...rest,
+    terms: terms.slice(0, MAX_AUTO_TAG_KEYWORD_TERMS),
+    tags: [tag],
+  };
 }
 
 function parseUpdateConfig(value: unknown): UpdateConfig {

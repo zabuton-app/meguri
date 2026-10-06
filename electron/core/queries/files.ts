@@ -12,6 +12,7 @@ import {
 import {
   LIST_HIDDEN_SOURCES,
   parseTagSearchToken,
+  searchTokenTerms,
   splitSearchTokens,
 } from "../../../shared/tags.js";
 import type {
@@ -57,33 +58,55 @@ function escapeLike(s: string): string {
  *  (codepoint count, not UTF-16 length, since the trigram tokenizer works on
  *  codepoints). Double quotes are stripped before the length split: a pasted
  *  `"beach"` means the word beach, not a literal quoted string — searching for
- *  the quote characters would return zero rows. */
+ *  the quote characters would return zero rows.
+ *
+ *  A token may carry alternatives (`yoga|ヨガ`, see searchTokenTerms), any of
+ *  which satisfies it. Each token becomes one `anyOf` group — a plain token is
+ *  a group of one — split by whether each term can use the trigram index. */
 function buildSearchTerms(q: string): {
+  /** Plain tokens long enough for the index, as one ANDed MATCH expression. */
   match: string | null;
-  likeTokens: string[];
+  /** Everything else: per token, a MATCH expression and/or LIKE terms, ORed. */
+  anyOf: { match: string | null; likes: string[] }[];
   tagTokens: string[];
 } {
-  const tokens = splitSearchTokens(q);
   const matchTokens: string[] = [];
-  const likeTokens: string[] = [];
+  const anyOf: { match: string | null; likes: string[] }[] = [];
   const tagTokens: string[] = [];
-  for (const t of tokens) {
-    const tag = parseTagSearchToken(t);
+  for (const raw of splitSearchTokens(q)) {
+    const tag = parseTagSearchToken(raw);
     if (tag) {
       tagTokens.push(tag);
-    } else if ([...t].length >= 3) {
-      // FTS5 phrase syntax: the token is delimited by quotes, so a quote inside
-      // it has to be doubled or the whole MATCH expression is malformed.
-      matchTokens.push(`"${t.replace(/"/g, '""')}"`);
+      continue;
+    }
+    const terms = searchTokenTerms(raw);
+    const long = terms.filter(isTrigramSearchable).map(ftsPhrase);
+    const likes = terms.filter((term) => !isTrigramSearchable(term));
+    if (terms.length === 1 && long.length === 1) {
+      matchTokens.push(long[0]);
     } else {
-      likeTokens.push(t);
+      anyOf.push({ match: long.length ? long.join(" OR ") : null, likes });
     }
   }
   return {
     match: matchTokens.length ? matchTokens.join(" ") : null,
-    likeTokens,
+    anyOf,
     tagTokens,
   };
+}
+
+/** A term the trigram tokenizer can index: three code points or more. */
+function isTrigramSearchable(term: string): boolean {
+  return [...term].length >= 3;
+}
+
+/**
+ * FTS5 phrase syntax: the term is delimited by quotes, so a quote inside it has
+ * to be doubled or the whole MATCH expression is malformed. Being a phrase is
+ * also what keeps FTS5 operators typed by the user (`OR`, `NEAR`, `*`) literal.
+ */
+function ftsPhrase(term: string): string {
+  return `"${term.replace(/"/g, '""')}"`;
 }
 
 /**
@@ -162,19 +185,44 @@ export function appendSearchConditions(
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : { match: null, likeTokens: [], tagTokens: [] };
+    : { match: null, anyOf: [], tagTokens: [] };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
   }
-  for (const tok of terms.likeTokens) {
-    // Correlated EXISTS (rowid = f.id) instead of an independent IN-subquery:
-    // the latter LIKE-scans the whole files_fts table per token, while this
-    // form only probes the rows already narrowed by MATCH and other filters.
-    sql +=
-      " AND EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'))";
-    const pattern = `%${escapeLike(tok)}%`;
-    args.push(pattern, pattern);
+  for (const group of terms.anyOf) {
+    const parts: string[] = [];
+    if (group.match) {
+      // The terms the index can serve stay on the index, whatever else is in
+      // the group. Besides the cost, MATCH folds case for every script while
+      // LIKE only does for ASCII — sending `école` to LIKE because `ヨガ` sat
+      // beside it would silently stop it matching `École`.
+      parts.push(
+        "f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)",
+      );
+      args.push(group.match);
+    }
+    if (group.likes.length > 0) {
+      // Too short for a trigram (two-character Japanese words are the common
+      // case): LIKE, as a correlated EXISTS (rowid = f.id) rather than an
+      // independent IN-subquery — the latter LIKE-scans the whole files_fts
+      // table per term, while this form only probes the rows already narrowed
+      // by MATCH and the other filters.
+      const likes = group.likes
+        .map(
+          () =>
+            "x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'",
+        )
+        .join(" OR ");
+      parts.push(
+        `EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (${likes}))`,
+      );
+      for (const term of group.likes) {
+        const pattern = `%${escapeLike(term)}%`;
+        args.push(pattern, pattern);
+      }
+    }
+    sql += ` AND (${parts.join(" OR ")})`;
   }
   for (const value of terms.tagTokens) {
     const ids = resolveSearchTagIds(db, value);

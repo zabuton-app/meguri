@@ -74,10 +74,12 @@ export function registerTagHandlers(ctx: IpcContext): void {
     return cores;
   };
 
-  handle("tags_list_all", () =>
+  handle("tags_list_all", (input) =>
     queryClient.run<TagList>({
       kind: "tagsList",
-      targets: queryTargets(scopedCores(ws)),
+      targets: queryTargets(
+        input?.allWorkspaces ? ws.allCores() : scopedCores(ws),
+      ),
     }),
   );
   // Mutations are addressed by name, so fanning them across every database in

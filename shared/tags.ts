@@ -1,5 +1,7 @@
 /**
- * Tag naming contract, shared by both processes.
+ * Tag naming contract, shared by both processes — and, further down, the
+ * grammar of the search box (tokens, quoting, the `tag:` directive, and
+ * alternatives), since the two meet in `tag:` tokens.
  *
  * A tag is `(namespace, name)`. An empty namespace means the tag is the user's
  * own — created by hand, freely renamed, merged and deleted. A non-empty
@@ -310,6 +312,64 @@ export function joinSearchTokens(tokens: string[]): string {
       return needsQuoting(token) ? `"${token.replace(/"/g, '""')}"` : token;
     })
     .join(" ");
+}
+
+/**
+ * Separates alternatives inside one free-text token: `yoga|ヨガ` matches a file
+ * that contains either. It lives inside the token — rather than as an `OR`
+ * between tokens — so the rule stays one sentence: tokens are ANDed, the
+ * alternatives of a token are ORed, and a token is still one condition.
+ *
+ * A file name can contain the character itself, so `\|` is a literal one:
+ * `a\|b` searches for the text "a|b".
+ */
+const SEARCH_OR = "|";
+const ESCAPED_OR = `\\${SEARCH_OR}`;
+/** Splits on separators that are not escaped. */
+const UNESCAPED_OR = /(?<!\\)\|/;
+
+/** Alternatives one token may carry; the rest are dropped. */
+export const MAX_SEARCH_ALTERNATIVES = 64;
+
+/**
+ * What a free-text token (not a `tag:` directive) searches for: its
+ * alternatives when it has several, otherwise the one text — with `\|` turned
+ * back into `|` either way. A separator with nothing on one side is not a
+ * separator: `yoga|` is searched as typed.
+ *
+ * The one place that reads this syntax; the query layer only ever sees terms.
+ */
+export function searchTokenTerms(token: string): string[] {
+  const literal = (text: string) => text.split(ESCAPED_OR).join(SEARCH_OR);
+  if (!token.includes(SEARCH_OR)) return [token];
+  const parts = token
+    .split(UNESCAPED_OR)
+    .map((part) => literal(part).trim())
+    .filter(Boolean);
+  return parts.length >= 2
+    ? parts.slice(0, MAX_SEARCH_ALTERNATIVES)
+    : [literal(token)];
+}
+
+/**
+ * The search-box token that matches any of `terms`, quoted where it needs to
+ * be. Terms are deduplicated without regard to case, as the search itself is.
+ */
+export function anyOfSearchToken(terms: readonly string[]): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const raw of terms) {
+    // A trailing backslash would escape the separator that follows the term.
+    const term = raw.replace(/\s+/g, " ").trim().replace(/\\+$/, "");
+    const key = term.toLowerCase();
+    if (!term || seen.has(key)) continue;
+    seen.add(key);
+    // A separator inside a term is part of the term, not another alternative.
+    parts.push(term.split(SEARCH_OR).join(ESCAPED_OR));
+  }
+  return joinSearchTokens([
+    parts.slice(0, MAX_SEARCH_ALTERNATIVES).join(SEARCH_OR),
+  ]);
 }
 
 /**

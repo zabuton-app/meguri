@@ -6,10 +6,15 @@ import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import { TagEditor } from "@/components/TagEditor";
 import type { WatchLaterMembership } from "@/hooks/useWatchLater";
+import { NameTags } from "./NameTags";
 
-/** Rating, Watch Later and favorite toggles, and the tag editor, as one card. */
+/**
+ * Rating, Watch Later and favorite toggles, the tag editor and the tags the
+ * file's name offers, as one card.
+ */
 export function RatingTagsCard({
   detail,
+  basename,
   fileId,
   wsId,
   watchLater,
@@ -21,6 +26,8 @@ export function RatingTagsCard({
   t,
 }: {
   detail: FileDetail;
+  /** The file's name without its folders: what the name row offers tags from. */
+  basename: string;
   fileId: number;
   wsId: string;
   watchLater: WatchLaterMembership;
@@ -66,6 +73,12 @@ export function RatingTagsCard({
           onAdd={onAddTag}
           onRemove={onRemoveTag}
           onTagClick={onTagClick}
+        />
+        <NameTags
+          basename={basename}
+          tags={detail.tags}
+          onAdd={onAddTag}
+          t={t}
         />
       </div>
     </div>
