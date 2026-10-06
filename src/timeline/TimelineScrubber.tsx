@@ -29,37 +29,43 @@ export interface RailDay {
   /** "YYYY-MM-DD". */
   key: string;
   count: number;
-  /** Scroll offset of the day's header. */
+  /** Scroll offset of the day's header (see RailMonth.top). */
   top: number;
 }
 
-/** One section of the list as the rail sees it: where it starts and its size. */
-export interface RailSection {
+/**
+ * One month of the list as the rail sees it: where its first day starts and
+ * how many files it holds. The undated tail is one more, keyed UNDATED.
+ */
+export interface RailMonth {
   /** "YYYY-MM", or UNDATED for the tail. */
   key: string;
   count: number;
-  /** Scroll offset of the section's header. */
+  /**
+   * Scroll offset of the month's first header, on the scale of `totalSize`:
+   * TimelineView sums the same estimates the virtualizer places rows by.
+   */
   top: number;
 }
 
 interface Props {
-  sections: RailSection[];
+  months: RailMonth[];
   /** The days with files, newest first (the undated tail is not a day). */
   days: RailDay[];
   /** The list's whole height, and the height of the view onto it. */
   totalSize: number;
   viewHeight: number;
   scrollTop: number;
-  /** Key of the section at the top of the list. */
+  /** Month key (or UNDATED) of the section at the top of the list. */
   current: string | null;
   /** Scrolls the list to an offset (dragging, pressing the track). */
   onScrollTo: (offset: number) => void;
-  /** Scrolls the list to a section's header (the keyboard). */
+  /** Scrolls the list to a month's first header (the keyboard). */
   onJump: (key: string) => void;
 }
 
 export const TimelineScrubber = memo(function TimelineScrubber({
-  sections,
+  months,
   days,
   totalSize,
   viewHeight,
@@ -91,7 +97,7 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     Math.min(1, Math.max(0, offset / span));
 
   const label = useCallback(
-    (section: RailSection) =>
+    (section: RailMonth) =>
       t("timeline.month", {
         month:
           section.key === UNDATED
@@ -108,7 +114,7 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     const out: { key: string; text: string; top: number }[] = [];
     let seen = "";
     let lastY = -Infinity;
-    for (const s of sections) {
+    for (const s of months) {
       const text = s.key === UNDATED ? t("timeline.undated") : yearOf(s.key);
       if (text === seen) continue;
       seen = text;
@@ -120,14 +126,14 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     return out;
     // fractionOf changes with span alone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sections, trackHeight, span, t]);
+  }, [months, trackHeight, span, t]);
 
   // The days, one dot per pixel row of the track: of the days that land on
   // the same row only the fullest stands, so a library of thousands of days
   // is a few hundred dots. A row holding a month's first day is the month's.
   const dayDots = useMemo(() => {
     const monthRows = new Set(
-      sections.map((s) => Math.round(fractionOf(s.top) * trackHeight)),
+      months.map((s) => Math.round(fractionOf(s.top) * trackHeight)),
     );
     const byRow = new Map<number, RailDay>();
     for (const d of days) {
@@ -139,16 +145,16 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     return [...byRow.values()];
     // fractionOf changes with span alone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, sections, trackHeight, span]);
+  }, [days, months, trackHeight, span]);
 
-  /** The section holding a scroll offset: the last one starting at or before it. */
-  const sectionAt = (offset: number): RailSection | null => {
-    let found: RailSection | null = null;
-    for (const s of sections) {
+  /** The month holding a scroll offset: the last one starting at or before it. */
+  const monthAt = (offset: number): RailMonth | null => {
+    let found: RailMonth | null = null;
+    for (const s of months) {
       if (s.top <= offset) found = s;
       else break;
     }
-    return found ?? sections[0] ?? null;
+    return found ?? months[0] ?? null;
   };
   /** The day holding a scroll offset, or null in the undated tail. */
   const dayAt = (offset: number): RailDay | null => {
@@ -157,7 +163,7 @@ export const TimelineScrubber = memo(function TimelineScrubber({
       if (d.top <= offset) found = d;
       else break;
     }
-    const section = sectionAt(offset);
+    const section = monthAt(offset);
     return section?.key === UNDATED ? null : (found ?? days[0] ?? null);
   };
   const chipFor = (offset: number): string | null => {
@@ -167,7 +173,7 @@ export const TimelineScrubber = memo(function TimelineScrubber({
         day: dayLabel(day.key, lang),
         count: day.count,
       });
-    const section = sectionAt(offset);
+    const section = monthAt(offset);
     return section ? label(section) : null;
   };
 
@@ -207,38 +213,38 @@ export const TimelineScrubber = memo(function TimelineScrubber({
   };
   const onPointerLeave = () => setPointer((p) => (p?.dragging ? p : null));
 
-  // The arrows walk the sections, newest first; none of the keys may reach
+  // The arrows walk the months, newest first; none of the keys may reach
   // the window, where the list's own key handling would take the same press.
   // Near the end of the list a step may not change the section at the top
   // (the list cannot scroll that far), so the steps are counted from the
   // last one taken until the list moves on its own.
   const currentIndex = Math.max(
     0,
-    sections.findIndex((s) => s.key === current),
+    months.findIndex((s) => s.key === current),
   );
   const stepped = useRef<string | null>(null);
   useEffect(() => {
     stepped.current = null;
   }, [current]);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const steppedIndex = sections.findIndex((s) => s.key === stepped.current);
+    const steppedIndex = months.findIndex((s) => s.key === stepped.current);
     const from = steppedIndex >= 0 ? steppedIndex : currentIndex;
     let next: number | null = null;
     if (e.key === "ArrowDown" || e.key === "ArrowRight")
-      next = Math.min(sections.length - 1, from + 1);
+      next = Math.min(months.length - 1, from + 1);
     else if (e.key === "ArrowUp" || e.key === "ArrowLeft")
       next = Math.max(0, from - 1);
     else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = sections.length - 1;
+    else if (e.key === "End") next = months.length - 1;
     else if (e.key === "Enter" || e.key === " ") {
       e.stopPropagation();
       return;
     }
-    if (next == null || sections.length === 0) return;
+    if (next == null || months.length === 0) return;
     e.preventDefault();
     e.stopPropagation();
-    stepped.current = sections[next].key;
-    if (next !== from) onJump(sections[next].key);
+    stepped.current = months[next].key;
+    if (next !== from) onJump(months[next].key);
   };
 
   const gripTop = fractionOf(scrollTop);
@@ -250,7 +256,7 @@ export const TimelineScrubber = memo(function TimelineScrubber({
       : pointer.offset
     : null;
   const chip = chipAt == null ? null : chipFor(chipAt);
-  const currentSection = sections[currentIndex];
+  const currentSection = months[currentIndex];
 
   return (
     <nav
@@ -266,7 +272,7 @@ export const TimelineScrubber = memo(function TimelineScrubber({
         tabIndex={0}
         aria-orientation="vertical"
         aria-valuemin={0}
-        aria-valuemax={Math.max(0, sections.length - 1)}
+        aria-valuemax={Math.max(0, months.length - 1)}
         aria-valuenow={currentIndex}
         aria-valuetext={currentSection ? label(currentSection) : undefined}
         onKeyDown={onKeyDown}
@@ -277,39 +283,12 @@ export const TimelineScrubber = memo(function TimelineScrubber({
         onPointerLeave={onPointerLeave}
         className="absolute inset-x-0 bottom-40 top-3 cursor-pointer touch-none outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {/* One column of dots: a small one per day, a larger one per month. */}
-        {dayDots.map((d) => (
-          <span
-            key={d.key}
-            data-day={d.key}
-            aria-hidden
-            className="absolute right-[13px] size-1 -translate-y-1/2 rounded-full bg-fg/30"
-            style={{ top: `${fractionOf(d.top) * 100}%` }}
-          />
-        ))}
-        {sections.map((s) => (
-          <span
-            key={s.key}
-            data-month={s.key}
-            aria-hidden
-            className={cn(
-              "absolute right-3 size-1.5 -translate-y-1/2 rounded-full",
-              s.key === UNDATED ? "bg-fg/35" : "bg-fg/60",
-            )}
-            style={{ top: `${fractionOf(s.top) * 100}%` }}
-          />
-        ))}
-        {yearLabels.map((y) => (
-          <span
-            key={y.key}
-            data-year={y.text}
-            aria-hidden
-            className="absolute right-7 -translate-y-1/2 whitespace-nowrap text-[11px] leading-none text-fg/70"
-            style={{ top: `${fractionOf(y.top) * 100}%` }}
-          >
-            {y.text}
-          </span>
-        ))}
+        <RailMarks
+          dayDots={dayDots}
+          months={months}
+          yearLabels={yearLabels}
+          span={span}
+        />
         {/* The grip: where the list is, with a line across the rail. */}
         <div
           aria-hidden
@@ -339,5 +318,62 @@ export const TimelineScrubber = memo(function TimelineScrubber({
         )}
       </div>
     </nav>
+  );
+});
+
+/**
+ * The dots and the years: the part of the rail that does not move with the
+ * list. Drawn apart from the grip and the chip, which follow every scroll
+ * frame and would otherwise have the hundreds of dots diffed each time.
+ */
+const RailMarks = memo(function RailMarks({
+  dayDots,
+  months,
+  yearLabels,
+  span,
+}: {
+  dayDots: RailDay[];
+  months: RailMonth[];
+  yearLabels: { key: string; text: string; top: number }[];
+  span: number;
+}) {
+  const pct = (offset: number) =>
+    `${Math.min(1, Math.max(0, offset / span)) * 100}%`;
+  return (
+    <>
+      {/* One column of dots: a small one per day, a larger one per month. */}
+      {dayDots.map((d) => (
+        <span
+          key={d.key}
+          data-day={d.key}
+          aria-hidden
+          className="absolute right-[13px] size-1 -translate-y-1/2 rounded-full bg-fg/30"
+          style={{ top: pct(d.top) }}
+        />
+      ))}
+      {months.map((s) => (
+        <span
+          key={s.key}
+          data-month={s.key}
+          aria-hidden
+          className={cn(
+            "absolute right-3 size-1.5 -translate-y-1/2 rounded-full",
+            s.key === UNDATED ? "bg-fg/35" : "bg-fg/60",
+          )}
+          style={{ top: pct(s.top) }}
+        />
+      ))}
+      {yearLabels.map((y) => (
+        <span
+          key={y.key}
+          data-year={y.text}
+          aria-hidden
+          className="absolute right-7 -translate-y-1/2 whitespace-nowrap text-[11px] leading-none text-fg/70"
+          style={{ top: pct(y.top) }}
+        >
+          {y.text}
+        </span>
+      ))}
+    </>
   );
 });

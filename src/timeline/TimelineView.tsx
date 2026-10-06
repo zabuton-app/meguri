@@ -46,11 +46,12 @@ import { TimelineAxisToggle } from "./TimelineAxisToggle";
 import {
   TimelineScrubber,
   type RailDay,
-  type RailSection,
+  type RailMonth,
 } from "./TimelineScrubber";
 import { useTimelineCounts } from "./useTimelineCounts";
 
-/** Height of a section header row (h-10). */
+/** Height of a section header row (h-10). The rail's offsets are built from
+ *  this and the row estimate, so they are on the virtualizer's scale. */
 const HEADER_H = 40;
 /** Space under a row of cards (pb-3), which a placeholder row keeps too. */
 const ROW_GAP = 12;
@@ -355,23 +356,23 @@ export const TimelineView = memo(function TimelineView({
   // gathered under it, at the first's offset), from the same estimates the
   // rows are placed by; the days themselves, for the rail's ticks; and, for
   // a key the rail hands back, the header row of the month's first day.
-  const { railSections, railDays, railHeads } = useMemo(() => {
-    const railSections: RailSection[] = [];
+  const { railMonths, railDays, railHeads } = useMemo(() => {
+    const railMonths: RailMonth[] = [];
     const railDays: RailDay[] = [];
     const railHeads = new Map<string, number>();
     let top = 0;
     for (const s of layout.sections) {
       const key = railKeyOf(s.key);
-      const last = railSections[railSections.length - 1];
+      const last = railMonths[railMonths.length - 1];
       if (last && last.key === key) last.count += s.count;
       else {
-        railSections.push({ key, count: s.count, top });
+        railMonths.push({ key, count: s.count, top });
         railHeads.set(key, s.headerRow);
       }
       if (s.key !== UNDATED) railDays.push({ key: s.key, count: s.count, top });
       top += HEADER_H + s.rows * rowEstimate;
     }
-    return { railSections, railDays, railHeads };
+    return { railMonths, railDays, railHeads };
   }, [layout, rowEstimate]);
 
   // A key from the rail names a month: the list goes to its first day.
@@ -537,7 +538,7 @@ export const TimelineView = memo(function TimelineView({
         )}
       </div>
       <TimelineScrubber
-        sections={railSections}
+        months={railMonths}
         days={railDays}
         totalSize={totalSize}
         viewHeight={viewHeight}

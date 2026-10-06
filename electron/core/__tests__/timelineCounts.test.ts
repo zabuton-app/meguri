@@ -228,6 +228,62 @@ describe("timelineCounts by the day added", () => {
   });
 });
 
+describe("the added axis across workspaces", () => {
+  function seed() {
+    const a = newDb();
+    const b = newDb();
+    const stamp = (db: DB, id: number, ts: number) =>
+      db.prepare("UPDATE files SET created_at = ? WHERE id = ?").run(ts, id);
+    // Newest first: b-400, a-300, a-200 and b-200 (the same second, in two
+    // workspaces), b-100.
+    stamp(a.db, insertFile(a.db, a.rootId, { relPath: "a-300.jpg" }), 300);
+    stamp(a.db, insertFile(a.db, a.rootId, { relPath: "a-200.jpg" }), 200);
+    stamp(b.db, insertFile(b.db, b.rootId, { relPath: "b-400.jpg" }), 400);
+    stamp(b.db, insertFile(b.db, b.rootId, { relPath: "b-200.jpg" }), 200);
+    stamp(b.db, insertFile(b.db, b.rootId, { relPath: "b-100.jpg" }), 100);
+    return [target("ws-a", a.db), target("ws-b", b.db)];
+  }
+
+  it("merges the workspaces in date order, page by page, without loss", () => {
+    const cores = seed();
+    const names: string[] = [];
+    let cursor: SearchQuery["cursor"] = undefined;
+    for (let i = 0; i < 10; i++) {
+      const res = searchWorkspaces(cores, {
+        sort: "addedAt",
+        sortDir: "desc",
+        limit: 2,
+        cursor,
+      });
+      names.push(...res.items.map((f) => f.relPath));
+      if (res.nextCursor == null) break;
+      cursor = res.nextCursor;
+    }
+    expect(names).toEqual([
+      "b-400.jpg",
+      "a-300.jpg",
+      "a-200.jpg",
+      "b-200.jpg",
+      "b-100.jpg",
+    ]);
+  });
+
+  it("is read newest first when no direction is given", () => {
+    const cores = seed();
+    expect(
+      searchWorkspaces(cores, { sort: "addedAt", limit: 10 }).items.map(
+        (f) => f.relPath,
+      ),
+    ).toEqual([
+      "b-400.jpg",
+      "a-300.jpg",
+      "a-200.jpg",
+      "b-200.jpg",
+      "b-100.jpg",
+    ]);
+  });
+});
+
 describe("timelineCounts by day", () => {
   it("puts the first and last second of a day on that day", () => {
     const { db, rootId } = newDb();

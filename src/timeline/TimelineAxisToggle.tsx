@@ -1,13 +1,13 @@
-// The date the timeline runs along: the capture date or the birth time.
+// The date the timeline runs along, one of TIMELINE_AXES (in their order).
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { TIMELINE_AXES, type TimelineAxis } from "@shared/ipc/timeline";
 
 const AXIS_LABEL: Record<TimelineAxis, TranslationKey> = {
-  captured: "timeline.axis.captured",
   btime: "timeline.axis.btime",
   added: "timeline.axis.added",
+  captured: "timeline.axis.captured",
 };
 
 export function TimelineAxisToggle({

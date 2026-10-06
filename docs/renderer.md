@@ -178,7 +178,7 @@ the sections is the same windowed `files_search` every other view reads, with
 `sort`/`sortDir` put on the query sent (`timelineQuery`) and the filter's own
 sort left as it was for the other views (the sort control is shown switched
 off meanwhile). Files with no date on the axis sort last and make a "No date"
-section at the end. The rail runs by month: the days of a month are gathered under one mark. The
+section at the end. The rail's keyboard steps are months, its dots and chip go down to days. The
 rows are laid out from the day counts alone
 (`timeline_counts`; see docs/architecture.md, "Timeline") by `layout.ts`: each
 section is a header row and its files packed `cols` to a row, with the cards,

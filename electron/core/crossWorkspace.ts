@@ -1000,6 +1000,10 @@ export function comparatorFor(
     case "btime":
       return (a, b) =>
         cmpNullableNum(a.btime, b.btime, direction) || tiebreak(a, b);
+    case "addedAt":
+      // Never NULL (see sortSpecFor).
+      return (a, b) =>
+        cmpNullableNum(a.addedAt, b.addedAt, direction) || tiebreak(a, b);
     case "name":
       // orderByFor()'s name sort tiebreaks on id following the sort direction
       // (so the index can serve the DESC scan); mirror that here.

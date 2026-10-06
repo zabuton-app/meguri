@@ -169,8 +169,6 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 🏷️ **Tags, ratings & history** — manual tags with autocomplete, ★ ratings,
   and playback history that survive file moves and renames, plus a day-grouped
   history timeline across all workspaces
-- 📅 **Timeline view** — the library in date order, month by month, with a
-  rail of every month down the side to jump straight to any of them.
 - 📅 **Timeline view** — the library in date order, a section per day, with a
   rail of every month and day down the side to drag straight to any of them.
 - 🕸️ **Graph view** — see the library as a network of files and their tags,

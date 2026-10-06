@@ -294,8 +294,8 @@ export function appendSearchConditions(
  * including the key row), "all" = later workspace (keep every tie), "none" =
  * earlier workspace (ties already emitted).
  */
-// The renderer builds one keyed cursor of its own, to open a list at a month
-// (src/timeline/anchor.ts): the month's last second with an empty workspace
+// The renderer builds one keyed cursor of its own, to open a list at a day
+// (src/timeline/anchor.ts): the day's last second with an empty workspace
 // id, which these tie rules keep every row on that second for. Changing the
 // cursor's shape or the tiebreak changes what that cursor means.
 export interface SeekPosition {

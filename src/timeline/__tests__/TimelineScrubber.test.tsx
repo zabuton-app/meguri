@@ -4,7 +4,7 @@ import { TimelineScrubber } from "@/timeline/TimelineScrubber";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
 // A list 10,000px tall under an 800px view (the setup stubs clientHeight).
-const sections = [
+const months = [
   { key: "2026-10", count: 300, top: 0 },
   { key: "2026-08", count: 2, top: 4000 },
   { key: "2021-03", count: 30, top: 6000 },
@@ -27,7 +27,7 @@ function rail(
 ) {
   return (
     <TimelineScrubber
-      sections={sections}
+      months={months}
       days={days}
       totalSize={totalSize}
       viewHeight={viewHeight}
@@ -162,7 +162,7 @@ describe("TimelineScrubber", () => {
   it("has nothing to walk when the list is empty", () => {
     const onJump = vi.fn();
     renderWithProviders(
-      rail({ sections: [], days: [], totalSize: 0, current: null, onJump }),
+      rail({ months: [], days: [], totalSize: 0, current: null, onJump }),
     );
     fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowDown" });
     expect(onJump).not.toHaveBeenCalled();
