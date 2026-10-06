@@ -21,6 +21,7 @@ import {
   addKeywordTags,
   cleanTerms,
   keywordMatches,
+  renameTag,
 } from "./helpers";
 import {
   ChipListField,
@@ -46,6 +47,7 @@ export function KeywordEditor({
   existing,
   onChange,
   onDelete,
+  onTagRenamed,
 }: {
   entry: KeywordEntry;
   names: readonly string[];
@@ -53,6 +55,8 @@ export function KeywordEditor({
   existing: ReadonlyMap<string, string>;
   onChange: (change: Partial<KeywordEntry>) => void;
   onDelete: () => void;
+  /** One of the tags was renamed (the change itself went through onChange). */
+  onTagRenamed: (from: string, to: string) => void;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -103,6 +107,15 @@ export function KeywordEditor({
         max={MAX_AUTO_TAG_KEYWORD_TAGS}
         addLabel={t("autoTag.keyword.addTag")}
         removeLabel={(tag) => t("autoTag.keyword.removeTag", { tag })}
+        rename={{
+          label: (tag) => t("autoTag.renameTag", { tag }),
+          onRename: (from, raw) => {
+            const renamed = renameTag(entry.tags, from, raw, existing);
+            if (!renamed) return;
+            onChange({ tags: renamed.tags });
+            onTagRenamed(from, renamed.to);
+          },
+        }}
         empty={t("autoTag.keyword.noTags")}
         onAdd={(raw) => {
           const tags = addKeywordTags(entry.tags, raw, existing);

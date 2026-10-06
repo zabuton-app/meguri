@@ -82,6 +82,16 @@ export interface AutoTagState {
    * files' copies lose it with them.
    */
   remove: (indexes: readonly number[], key: string) => Promise<RemoveOutcome>;
+  /**
+   * {@link remove}, with `to` put on the same files in the tag's place — one
+   * edit per file, so a file ends up with the one tag or the other, never
+   * with neither. `files` is how many changed.
+   */
+  retag: (
+    indexes: readonly number[],
+    key: string,
+    to: string,
+  ) => Promise<RemoveOutcome>;
   reapply: () => Promise<{ files: number; added: number } | null>;
 }
 
@@ -403,8 +413,16 @@ export function useAutoTag(): AutoTagState | null {
   );
 
   const remove = useCallback(
-    async (indexes: readonly number[], key: string): Promise<RemoveOutcome> => {
+    async (
+      indexes: readonly number[],
+      key: string,
+      to?: string,
+    ): Promise<RemoveOutcome> => {
       if (!library) return { ok: false };
+      // What goes on in its place, if anything: in the spelling already in
+      // use, since files_bulk_tag matches a name exactly.
+      const put =
+        to === undefined ? [] : [existing.get(to.toLowerCase()) ?? to];
       // The tag as the files spell it: `trip` and `Trip` are two rows of the
       // tag table, and both are what this candidate reads as "tagged".
       const spellings = new Set<string>();
@@ -418,7 +436,7 @@ export function useAutoTag(): AutoTagState | null {
       }
       // What one call can name; more spellings of one tag than that is not a
       // case worth a second pass, and what is not sent is not dropped below.
-      const names = [...spellings].slice(0, MAX_BULK_TAG_NAMES);
+      const names = [...spellings].slice(0, MAX_BULK_TAG_NAMES - put.length);
       if (names.length === 0) return { ok: true, files: 0 };
       const gone = new Set(names);
 
@@ -430,10 +448,13 @@ export function useAutoTag(): AutoTagState | null {
       let filesChanged = 0;
       try {
         for (const targets of calls) {
-          filesChanged += (await api.filesBulkTag(targets, [], names)).files;
+          filesChanged += (await api.filesBulkTag(targets, put, names)).files;
         }
       } catch (error) {
-        toast.error(t("autoTag.removeFailed"), { description: String(error) });
+        toast.error(
+          t(put.length > 0 ? "autoTag.applyFailed" : "autoTag.removeFailed"),
+          { description: String(error) },
+        );
         // Some calls may have landed: show what the files really carry, here
         // and in every other view of them.
         load();
@@ -454,17 +475,23 @@ export function useAutoTag(): AutoTagState | null {
         for (const index of touched) {
           const file = nextFiles[index];
           if (!file.tags.some((tag) => gone.has(tag))) continue;
-          nextFiles[index] = {
-            ...file,
-            tags: file.tags.filter((tag) => !gone.has(tag)),
-          };
+          const tags = file.tags.filter((tag) => !gone.has(tag));
+          for (const tag of put) {
+            const putKey = tag.toLowerCase();
+            if (!tags.some((x) => x.toLowerCase() === putKey)) tags.push(tag);
+          }
+          nextFiles[index] = { ...file, tags };
         }
-        return { ...prev, files: nextFiles };
+        return {
+          ...prev,
+          files: nextFiles,
+          existingTags: [...new Set([...prev.existingTags, ...put])],
+        };
       });
       invalidateTagCatalog(qc);
       return { ok: true, files: filesChanged };
     },
-    [library, load, qc, siblings, t],
+    [existing, library, load, qc, siblings, t],
   );
 
   const reapply = useCallback(async () => {
@@ -499,6 +526,7 @@ export function useAutoTag(): AutoTagState | null {
     reload: load,
     apply,
     remove,
+    retag: remove,
     reapply,
   };
 }

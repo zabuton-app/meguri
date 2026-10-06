@@ -16,7 +16,6 @@ import type { TFunc } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import {
   MAX_AUTO_TAG_FOLDER_TAGS,
-  isUnderFolder,
   type AutoTagFile,
   type FolderRule,
 } from "@shared/autoTag";
@@ -27,7 +26,9 @@ import {
   MONO,
   addFolderTags,
   folderCountKey,
+  folderFileIndexes,
   folderCounts,
+  renameTag,
 } from "./helpers";
 import { ChipListField, MoreRows, SmallButton } from "./parts";
 
@@ -123,6 +124,7 @@ export function FolderEditor({
   existing,
   onChange,
   onDelete,
+  onTagRenamed,
 }: {
   rule: FolderRule;
   /** Every workspace; the rule's own is listed even when it is gone. */
@@ -134,6 +136,8 @@ export function FolderEditor({
   existing: ReadonlyMap<string, string>;
   onChange: (change: Partial<FolderRule>) => void;
   onDelete: () => void;
+  /** One of the tags was renamed (the change itself went through onChange). */
+  onTagRenamed: (from: string, to: string) => void;
 }) {
   const { t } = useI18n();
 
@@ -172,11 +176,10 @@ export function FolderEditor({
 
   const under = useMemo(
     () =>
-      files.filter(
-        (file) =>
-          file.workspaceId === rule.workspaceId &&
-          isUnderFolder(file.folder, rule.folder),
-      ),
+      folderFileIndexes(files, {
+        workspaceId: rule.workspaceId,
+        folder: rule.folder,
+      }).map((index) => files[index]),
     [files, rule.folder, rule.workspaceId],
   );
 
@@ -290,6 +293,15 @@ export function FolderEditor({
         max={MAX_AUTO_TAG_FOLDER_TAGS}
         addLabel={t("autoTag.folder.addTag")}
         removeLabel={(tag) => t("autoTag.folder.removeTag", { tag })}
+        rename={{
+          label: (tag) => t("autoTag.renameTag", { tag }),
+          onRename: (from, raw) => {
+            const renamed = renameTag(rule.tags, from, raw, existing);
+            if (!renamed) return;
+            onChange({ tags: renamed.tags });
+            onTagRenamed(from, renamed.to);
+          },
+        }}
         empty={t("autoTag.folder.noTags")}
         onAdd={(raw) => {
           const tags = addFolderTags(rule.tags, raw, existing);

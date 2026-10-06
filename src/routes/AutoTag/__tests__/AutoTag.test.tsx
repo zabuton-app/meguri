@@ -388,6 +388,157 @@ describe("AutoTag", () => {
     expect(screen.getByRole("button", { name: /^Word8/ })).toBeTruthy();
   });
 
+  describe("renaming a condition's tag", () => {
+    /** "Harbor" finds files 3 and 4; file 3 carries the tag. */
+    const withKeyword = () => {
+      mocks.autoTagGet.mockResolvedValue({
+        ...sampleConfig(),
+        keywords: [
+          { id: "k1", terms: ["Harbor"], tags: ["Harbor"], mode: "word" },
+        ],
+      });
+      mocks.autoTagFiles.mockResolvedValue(harborOnOne());
+    };
+    /** Click the tag's chip, type over it, Enter. */
+    const rename = (from: string, to: string) => {
+      fireEvent.click(
+        screen.getByRole("button", { name: `Rename tag “${from}”` }),
+      );
+      const field = screen.getByLabelText(`Rename tag “${from}”`);
+      fireEvent.change(field, { target: { value: to } });
+      fireEvent.keyDown(field, { key: "Enter" });
+    };
+
+    it("moves the files the keyword finds to the new tag, after a question", async () => {
+      withKeyword();
+      await renderScreen("Keywords");
+      rename("Harbor", "Port");
+      expect((await lastSaved()).keywords).toMatchObject([{ tags: ["Port"] }]);
+
+      // Only the file that carries the old tag is asked about.
+      const dialog = await screen.findByRole("alertdialog");
+      expect(within(dialog).getByText("Move files to “Port”?")).toBeTruthy();
+      expect(mocks.filesBulkTag).not.toHaveBeenCalled();
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "Replace on 1 files" }),
+      );
+      // One edit: the new tag on, the old one — as the file spells it — off,
+      // so no file is left with neither.
+      await waitFor(() =>
+        expect(mocks.filesBulkTag).toHaveBeenCalledWith(
+          [{ workspaceId: "ws", fileIds: [3] }],
+          ["Port"],
+          ["harbor"],
+        ),
+      );
+      expect(mocks.filesBulkTag).toHaveBeenCalledTimes(1);
+      expect(mocks.autoTagApply).not.toHaveBeenCalled();
+
+      // The screen reads the file as carrying the new tag: renamed back, it
+      // is the one asked about again.
+      rename("Port", "Quay");
+      const again = await screen.findByRole("alertdialog");
+      expect(within(again).getByText("Move files to “Quay”?")).toBeTruthy();
+      expect(
+        within(again).getByRole("button", { name: "Replace on 1 files" }),
+      ).toBeTruthy();
+    });
+
+    it("shows what the files carry when the edit failed", async () => {
+      withKeyword();
+      mocks.filesBulkTag.mockRejectedValue(new Error("locked"));
+      await renderScreen("Keywords");
+      rename("Harbor", "Port");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Replace on 1 files" }),
+      );
+      // Read again rather than guessed at; the setting stays renamed.
+      await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+      expect((await lastSaved()).keywords).toMatchObject([{ tags: ["Port"] }]);
+    });
+
+    it("changes the setting only when the question is declined", async () => {
+      withKeyword();
+      await renderScreen("Keywords");
+      rename("Harbor", "Port");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Setting only" }),
+      );
+      expect((await lastSaved()).keywords).toMatchObject([{ tags: ["Port"] }]);
+      expect(mocks.filesBulkTag).not.toHaveBeenCalled();
+    });
+
+    it("asks nothing for another spelling of the same tag", async () => {
+      // File 3 carries "harbor"; the entry's tag is spelt "Harbor".
+      withKeyword();
+      await renderScreen("Keywords");
+      rename("Harbor", "HARBOR");
+      // The library's own spelling is the one kept, and it is the same tag.
+      expect((await lastSaved()).keywords).toMatchObject([
+        { tags: ["harbor"] },
+      ]);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("asks nothing when no file carries the old tag, or the rename is given up", async () => {
+      mocks.autoTagGet.mockResolvedValue({
+        ...sampleConfig(),
+        keywords: [
+          { id: "k1", terms: ["Harbor"], tags: ["Harbor"], mode: "word" },
+        ],
+      });
+      await renderScreen("Keywords");
+      // Escape leaves the tag as it was, and the screen open.
+      fireEvent.click(
+        screen.getByRole("button", { name: "Rename tag “Harbor”" }),
+      );
+      fireEvent.keyDown(screen.getByLabelText("Rename tag “Harbor”"), {
+        key: "Escape",
+      });
+      expect(
+        screen.getByRole("button", { name: "Rename tag “Harbor”" }),
+      ).toBeTruthy();
+
+      rename("Harbor", "Port");
+      expect((await lastSaved()).keywords).toMatchObject([{ tags: ["Port"] }]);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("moves the files under a folder rule's folder", async () => {
+      const placed = harborOnOne();
+      placed.files[2].folder = "Trips/2024";
+      placed.files[3].folder = "Trips";
+      // Carries the tag too, but is not under the folder.
+      placed.files[4].tags = ["harbor"];
+      mocks.autoTagFiles.mockResolvedValue(placed);
+      mocks.autoTagGet.mockResolvedValue({
+        ...sampleConfig(),
+        folders: [
+          {
+            id: "f1",
+            workspaceId: "ws",
+            folder: "Trips",
+            tags: ["harbor"],
+            enabled: true,
+          },
+        ],
+      });
+      await renderScreen("Folders");
+      rename("harbor", "Port");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Replace on 1 files" }),
+      );
+      await waitFor(() =>
+        expect(mocks.filesBulkTag).toHaveBeenCalledWith(
+          [{ workspaceId: "ws", fileIds: [3] }],
+          ["Port"],
+          ["harbor"],
+        ),
+      );
+      expect((await lastSaved()).folders).toMatchObject([{ tags: ["Port"] }]);
+    });
+  });
+
   it("filters a long list of folder rules by workspace, folder or tag", async () => {
     const rule = (i: number) => ({
       id: `f${i}`,

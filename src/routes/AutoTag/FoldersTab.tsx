@@ -10,9 +10,16 @@ import { cn } from "@/lib/utils";
 import { MAX_AUTO_TAG_FOLDER_RULES, type FolderRule } from "@shared/autoTag";
 import { ALL_ID } from "@shared/workspaceIds";
 import { FolderEditor, type FolderWorkspace } from "./FolderEditor";
-import { MAX_ROWS, MONO, folderCountKey, folderCounts } from "./helpers";
+import {
+  MAX_ROWS,
+  MONO,
+  folderCountKey,
+  folderCounts,
+  folderFileIndexes,
+} from "./helpers";
 import { MoreRows, SplitPane } from "./parts";
 import type { AutoTagState } from "./useAutoTag";
+import { useTagMigration } from "./useTagMigration";
 import { useViewState } from "./viewState";
 
 /** Rules past which the list gets a filter box. */
@@ -26,6 +33,7 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
     null,
   );
   const [filter, setFilter] = useViewState("folders.filter", "");
+  const migrate = useTagMigration(state);
 
   // What is selected, falling back to the first rule when nothing is, or when
   // the selected one was deleted.
@@ -206,6 +214,11 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
           workspaceLabel={workspaceLabel(shown.workspaceId)}
           onChange={(change) => patchFolder(shown.id, change)}
           onDelete={() => deleteFolder(shown.id)}
+          // The files under the rule's folder — which the rename left alone
+          // — are the ones its tag may be on.
+          onTagRenamed={(from, to) =>
+            void migrate(folderFileIndexes(state.files, shown), from, to)
+          }
         />
       )}
     </SplitPane>

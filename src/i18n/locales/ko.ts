@@ -646,6 +646,16 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.keyword.noTags":
     "아직 태그가 없습니다. 이 항목은 아무것도 붙이지 않습니다.",
   "autoTag.keyword.noTagsShort": "태그 없음",
+  "autoTag.renameTag": "태그 “{tag}” 이름 변경",
+  "autoTag.migrate.title": "파일을 “{to}”(으)로 바꿀까요?",
+  "autoTag.migrate.message":
+    "이 조건에 해당하는 파일 중 {count}개에 “{from}” 태그가 있습니다. “{to}”(으)로 바꿀까요? 사본도 함께 바뀝니다. 바꾸지 않으면 설정만 바뀌고 파일에는 “{from}”이(가) 남습니다.",
+  "autoTag.migrate.sampled":
+    " 이 화면에 불러온 처음 {count}개 파일만 대상입니다.",
+  "autoTag.migrate.confirm": "{count}개 파일에서 바꾸기",
+  "autoTag.migrate.cancel": "설정만 변경",
+  "autoTag.migrate.done":
+    "{count}개 파일에서 “{from}”을(를) “{to}”(으)로 바꿨습니다.",
   "autoTag.matchMode": "일치 방식",
   "autoTag.mode.word": "단어 단위",
   "autoTag.mode.contains": "부분 일치",

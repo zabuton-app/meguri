@@ -33,12 +33,26 @@ test.describe("Auto tagging", () => {
       .click();
     await expect(dialog.getByText("Added 1 tags to 1 files")).toBeVisible();
 
-    // The tag is the user's own: the tag screen lists it like any other.
+    // Renaming the entry's tag — typed over the chip, with a real Enter, which
+    // must open the question and not answer it — moves the file to the new one.
+    await dialog.getByRole("button", { name: "Rename tag “Test”" }).click();
+    const rename = dialog.getByLabel("Rename tag “Test”");
+    await rename.fill("Sample");
+    await rename.press("Enter");
+    const question = ready.getByRole("alertdialog");
+    await expect(question.getByText("Move files to “Sample”?")).toBeVisible();
+    await question.getByRole("button", { name: "Replace on 1 files" }).click();
+    await expect(
+      ready.getByText("Replaced “Test” with “Sample” on 1 files."),
+    ).toBeVisible();
+
+    // The tag is the user's own: the tag screen lists it like any other, and
+    // the old one is gone with its last file.
     await closeTopDialog(ready);
     await ready.getByRole("link", { name: "Tags", exact: true }).click();
-    await expect(
-      ready.getByRole("dialog").getByText("Test", { exact: true }),
-    ).toBeVisible();
+    const tags = ready.getByRole("dialog");
+    await expect(tags.getByText("Sample", { exact: true })).toBeVisible();
+    await expect(tags.getByText("Test", { exact: true })).toHaveCount(0);
   });
 
   test("searches the library for a keyword's terms", async ({ ready }) => {

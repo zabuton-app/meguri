@@ -668,6 +668,16 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.keyword.removeTag": "Retirer le tag « {tag} »",
   "autoTag.keyword.noTags": "Pas encore de tags : cette entrée n'ajoute rien.",
   "autoTag.keyword.noTagsShort": "aucun tag",
+  "autoTag.renameTag": "Renommer le tag « {tag} »",
+  "autoTag.migrate.title": "Passer les fichiers à « {to} » ?",
+  "autoTag.migrate.message":
+    "{count} fichiers atteints par cette condition portent « {from} ». Le remplacer par « {to} » sur ceux-ci ? Leurs copies changent avec eux. Sinon, seul le réglage change et les fichiers gardent « {from} ».",
+  "autoTag.migrate.sampled":
+    " Seuls les {count} premiers fichiers, ceux chargés ici, sont examinés.",
+  "autoTag.migrate.confirm": "Remplacer sur {count} fichiers",
+  "autoTag.migrate.cancel": "Réglage seulement",
+  "autoTag.migrate.done":
+    "« {from} » remplacé par « {to} » sur {count} fichiers.",
   "autoTag.matchMode": "Correspondance",
   "autoTag.mode.word": "Mot entier",
   "autoTag.mode.contains": "Contient",

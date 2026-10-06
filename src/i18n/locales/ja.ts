@@ -646,6 +646,16 @@ export const ja = {
   "autoTag.keyword.removeTag": "タグ「{tag}」を削除",
   "autoTag.keyword.noTags": "タグがまだありません。この項目は何も付けません。",
   "autoTag.keyword.noTagsShort": "タグなし",
+  "autoTag.renameTag": "タグ「{tag}」の名前を変更",
+  "autoTag.migrate.title": "ファイルを「{to}」に付け替えますか？",
+  "autoTag.migrate.message":
+    "この条件に一致するファイルのうち {count} 件に「{from}」が付いています。「{to}」に付け替えますか？ コピーも一緒に変わります。付け替えない場合は設定だけが変わり、ファイルには「{from}」が残ります。",
+  "autoTag.migrate.sampled":
+    " この画面に読み込まれている先頭 {count} 件だけが対象です。",
+  "autoTag.migrate.confirm": "{count} 件を付け替える",
+  "autoTag.migrate.cancel": "設定だけ変更",
+  "autoTag.migrate.done":
+    "{count} 件のファイルで「{from}」を「{to}」に付け替えました。",
   "autoTag.matchMode": "一致方法",
   "autoTag.mode.word": "単語単位",
   "autoTag.mode.contains": "部分一致",

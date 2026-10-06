@@ -256,7 +256,10 @@ Attaching only ever adds — changing a rule does not take back what it already
 tagged — and `attachAutoTags()` reports exactly the pairs it added, which is
 what rolls back an apply that failed partway (kept in memory in the main
 process, not persisted). The screen keeps no record of what it applied: taking
-a tag off again goes by what the files carry, through `files_bulk_tag`.
+a tag off again goes by what the files carry, through `files_bulk_tag`. Renaming
+a tag of a keyword or folder rule on the screen offers to move the files the
+condition reaches from the old tag to the new one, by the same reading; a
+rename on the tag screen does not reach the conditions.
 
 The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed suggestions and
 excluded terms) is app-wide, in `config.json` under `autoTag`. With `applyOnScan`

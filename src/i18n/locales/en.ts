@@ -643,6 +643,15 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.keyword.removeTag": "Remove tag “{tag}”",
   "autoTag.keyword.noTags": "No tags yet: this entry adds nothing.",
   "autoTag.keyword.noTagsShort": "no tags yet",
+  "autoTag.renameTag": "Rename tag “{tag}”",
+  "autoTag.migrate.title": "Move files to “{to}”?",
+  "autoTag.migrate.message":
+    "{count} files this condition reaches carry “{from}”. Replace it with “{to}” on them? Their copies change with them. Otherwise only the setting changes and the files keep “{from}”.",
+  "autoTag.migrate.sampled":
+    " Only the first {count} files, the ones loaded here, are looked at.",
+  "autoTag.migrate.confirm": "Replace on {count} files",
+  "autoTag.migrate.cancel": "Setting only",
+  "autoTag.migrate.done": "Replaced “{from}” with “{to}” on {count} files.",
   "autoTag.matchMode": "Matching",
   "autoTag.mode.word": "Whole word",
   "autoTag.mode.contains": "Contains",

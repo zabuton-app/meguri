@@ -10,6 +10,7 @@ import { MAX_ROWS, MONO, keywordMatches, newKeyword } from "./helpers";
 import { KeywordEditor } from "./KeywordEditor";
 import { MoreRows, SplitPane } from "./parts";
 import type { AutoTagState } from "./useAutoTag";
+import { useTagMigration } from "./useTagMigration";
 import { useViewState } from "./viewState";
 
 /** Entries past which the list gets a filter box. */
@@ -24,6 +25,7 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
   );
   const [filter, setFilter] = useViewState("keywords.filter", "");
   const [draft, setDraft] = useState("");
+  const migrate = useTagMigration(state);
 
   // What is selected, falling back to the first entry when nothing is, or
   // when the selected one was deleted.
@@ -192,6 +194,15 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
           existing={existing}
           onChange={(change) => patchKeyword(shown.id, change)}
           onDelete={() => deleteKeyword(shown.id)}
+          // The files the entry finds — by its terms, which the rename left
+          // alone — are the ones its tag may be on.
+          onTagRenamed={(from, to) =>
+            void migrate(
+              keywordMatches(shown, names).map((row) => row.index),
+              from,
+              to,
+            )
+          }
         />
       )}
     </SplitPane>

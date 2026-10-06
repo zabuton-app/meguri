@@ -292,6 +292,7 @@ export function ChipListField({
   heading,
   onAdd,
   onRemove,
+  rename,
 }: {
   label: string;
   items: readonly string[];
@@ -306,12 +307,25 @@ export function ChipListField({
   heading?: ReactNode;
   onAdd: (raw: string[]) => void;
   onRemove: (item: string) => void;
+  /**
+   * With this, a value is renamed in place: click it, type, Enter. `onRename`
+   * gets the value and the raw text typed over it.
+   */
+  rename?: {
+    label: (item: string) => string;
+    onRename: (item: string, raw: string) => void;
+  };
 }) {
   const [draft, setDraft] = useState("");
   const add = () => {
     onAdd(draft.split(/[,、]/));
     setDraft("");
   };
+  // The value being renamed, and what has been typed over it.
+  const [renaming, setRenaming] = useState<{
+    item: string;
+    text: string;
+  } | null>(null);
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
@@ -330,9 +344,52 @@ export function ChipListField({
               ×
             </button>
           );
+          if (rename && renaming?.item === item) {
+            return (
+              <input
+                key={item}
+                autoFocus
+                className="h-6 w-36 rounded-md border border-ring bg-transparent px-2 text-xs text-bright-fg outline-none"
+                value={renaming.text}
+                maxLength={MAX_TAG_NAME}
+                aria-label={rename.label(item)}
+                onChange={(e) => setRenaming({ item, text: e.target.value })}
+                onFocus={(e) => e.target.select()}
+                // Only Enter renames: leaving the field leaves the value.
+                onBlur={() => setRenaming(null)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    // Consumed here, so it does not also close the screen.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setRenaming(null);
+                  } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    // Consumed here: whatever the rename opens, the rest
+                    // of this key press must not reach it.
+                    e.preventDefault();
+                    setRenaming(null);
+                    rename.onRename(item, renaming.text);
+                  }
+                }}
+              />
+            );
+          }
+          const name = rename ? (
+            <button
+              type="button"
+              aria-label={rename.label(item)}
+              title={rename.label(item)}
+              onClick={() => setRenaming({ item, text: item })}
+              className="hover:underline"
+            >
+              {item}
+            </button>
+          ) : (
+            item
+          );
           return kind === "tag" ? (
             <Chip key={item} className="flex items-center gap-1 pr-1">
-              {item}
+              {name}
               {remove}
             </Chip>
           ) : (
@@ -343,7 +400,7 @@ export function ChipListField({
                 "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border pl-2 pr-1 text-xs text-fg",
               )}
             >
-              {item}
+              {name}
               {remove}
             </span>
           );

@@ -9,6 +9,7 @@ import {
   cleanTagName,
   compileKeyword,
   compileRule,
+  isUnderFolder,
   isUsableTagName,
   runKeyword,
   runRule,
@@ -107,6 +108,33 @@ export function mergeTags(
     out.push(existing.get(key) ?? tag);
   }
   return out;
+}
+
+/**
+ * `tags` with `from` renamed to what `raw` cleans to — in the spelling already
+ * in use for a tag the library has, and without a repeat when the list holds
+ * the new name already. Null when nothing changes: an unusable name, or the
+ * same one.
+ */
+export function renameTag(
+  tags: readonly string[],
+  from: string,
+  raw: string,
+  existing: ReadonlyMap<string, string>,
+): { tags: string[]; to: string } | null {
+  const cleaned = cleanTagName(raw);
+  if (!isUsableTagName(cleaned)) return null;
+  const key = cleaned.toLowerCase();
+  // The list's own spelling of the name, when it holds it already.
+  const held = tags.find((tag) => tag !== from && tag.toLowerCase() === key);
+  const to = held ?? existing.get(key) ?? cleaned;
+  if (to === from || !tags.includes(from)) return null;
+  const out: string[] = [];
+  for (const tag of tags) {
+    if (tag !== from) out.push(tag);
+    else if (held === undefined) out.push(to);
+  }
+  return { tags: out, to };
 }
 
 /** {@link mergeTags} for a keyword entry. */
@@ -215,7 +243,12 @@ export function ruleMatchCount(
   return count;
 }
 
-export type KeywordMatches = { name: string; hits: KeywordHit[] }[];
+export type KeywordMatches = {
+  /** The file's position in the names. */
+  index: number;
+  name: string;
+  hits: KeywordHit[];
+}[];
 
 const keywordMatchCache = new WeakMap<
   KeywordEntry,
@@ -237,14 +270,35 @@ export function keywordMatches(
   const needles = entry.terms
     .map((term) => term.normalize("NFC").trim().toLowerCase())
     .filter(Boolean);
-  for (const name of names) {
+  names.forEach((name, index) => {
     const lower = name.toLowerCase();
-    if (!needles.some((needle) => lower.includes(needle))) continue;
+    if (!needles.some((needle) => lower.includes(needle))) return;
     const hits = runKeyword(compiled, name);
-    if (hits.length > 0) rows.push({ name, hits });
-  }
+    if (hits.length > 0) rows.push({ index, name, hits });
+  });
   keywordMatchCache.set(entry, { names, rows });
   return rows;
+}
+
+/**
+ * The files a folder rule reaches, by position: the ones of its workspace
+ * under its folder, subfolders included — as a scan decides it (foldersFor).
+ * What the editor lists and what a renamed tag is moved on are both this.
+ */
+export function folderFileIndexes(
+  files: readonly AutoTagFile[],
+  rule: { workspaceId: string; folder: string },
+): number[] {
+  const out: number[] = [];
+  files.forEach((file, index) => {
+    if (
+      file.workspaceId === rule.workspaceId &&
+      isUnderFolder(file.folder, rule.folder)
+    ) {
+      out.push(index);
+    }
+  });
+  return out;
 }
 
 /**

@@ -666,6 +666,15 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.keyword.removeTag": "Quitar la etiqueta «{tag}»",
   "autoTag.keyword.noTags": "Aún sin etiquetas: esta entrada no añade nada.",
   "autoTag.keyword.noTagsShort": "sin etiquetas",
+  "autoTag.renameTag": "Cambiar el nombre de la etiqueta «{tag}»",
+  "autoTag.migrate.title": "¿Pasar los archivos a «{to}»?",
+  "autoTag.migrate.message":
+    "{count} archivos que alcanza esta condición llevan «{from}». ¿Sustituirla por «{to}» en ellos? Sus copias cambian con ellos. Si no, solo cambia el ajuste y los archivos conservan «{from}».",
+  "autoTag.migrate.sampled":
+    " Solo se revisan los primeros {count} archivos, los cargados aquí.",
+  "autoTag.migrate.confirm": "Sustituir en {count} archivos",
+  "autoTag.migrate.cancel": "Solo el ajuste",
+  "autoTag.migrate.done": "«{from}» sustituida por «{to}» en {count} archivos.",
   "autoTag.matchMode": "Coincidencia",
   "autoTag.mode.word": "Palabra completa",
   "autoTag.mode.contains": "Contiene",
