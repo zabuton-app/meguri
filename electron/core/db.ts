@@ -210,6 +210,11 @@ function backfillColumns(db: DB): void {
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_files_alive_btime ON files((btime IS NULL), btime DESC, id) WHERE deleted_at IS NULL",
   );
+  // Drives sort=addedAt (the timeline's "added" axis) in its default DESC
+  // direction; created_at is never NULL, so no NULLs-last term.
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_alive_added ON files(created_at DESC, id) WHERE deleted_at IS NULL",
+  );
 }
 
 /** Versionless idempotent migration: DBs created before audio support carry a

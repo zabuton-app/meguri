@@ -163,13 +163,16 @@ can be larger than one call may name, so the rows are read in runs of
 
 The timeline (`src/timeline/`) is the list ordered by a date, newest first, cut
 into a section per calendar day under a header that stays at the top while
-its files are shown, with a rail down the right edge (`TimelineScrubber`), a minimap of the list:
-the whole list at the height of the view, the years written along it and a
-bar per month as long and as dark as the month is full, with a window over
-the part on screen — dragging it, or pressing the track, scrolls the list so
-the point pressed is mid-view (`scrollToOffset`), a label naming the month
-under the pointer; as a slider, the arrow keys step a month at a time. The date is an axis — the capture date or the
-filesystem's birth time — switched in the pinned header and remembered in
+its files are shown, with a rail down the right edge (`TimelineScrubber`) in the manner of a photo
+library's scrollbar: the distance the list scrolls at the height of the view,
+as one column of dots — a larger one per month, a smaller one per day (one
+per pixel row: of the days on a row only the fullest is drawn) — the years
+written beside it and a grip at the list's position. Dragging the grip, or
+pressing the track, scrolls the list there (`scrollToOffset`), a chip naming
+the day under the pointer (at the grip while dragging); as a slider, the
+arrow keys step a month at a time. The date is an axis — the capture date, the
+filesystem's birth time or the day the file was added to the index — switched
+in the pinned header and remembered in
 `TIMELINE_AXIS_KEY`; its values are the search's sort keys, so the list under
 the sections is the same windowed `files_search` every other view reads, with
 `sort`/`sortDir` put on the query sent (`timelineQuery`) and the filter's own

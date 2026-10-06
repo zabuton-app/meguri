@@ -411,10 +411,12 @@ export const ko: Record<TranslationKey, string> = {
   "timeline.axis.label": "기준 날짜",
   "timeline.axis.captured": "촬영일",
   "timeline.axis.btime": "생성일",
+  "timeline.axis.added": "추가일",
   "timeline.undated": "날짜 없음",
   "timeline.count": "{count}개",
   "timeline.scrubber": "연월로 이동",
   "timeline.month": "{month}: {count}개",
+  "timeline.day": "{day}: {count}개",
   "timeline.sortLocked": "타임라인 보기에서는 날짜가 최신인 순서로 정렬됩니다",
   "timeline.error": "타임라인을 불러오지 못했습니다",
 

@@ -43,7 +43,11 @@ import {
 } from "./layout";
 import { dayLabel, railKeyOf, sectionKeyOf } from "./dates";
 import { TimelineAxisToggle } from "./TimelineAxisToggle";
-import { TimelineScrubber, type RailSection } from "./TimelineScrubber";
+import {
+  TimelineScrubber,
+  type RailDay,
+  type RailSection,
+} from "./TimelineScrubber";
 import { useTimelineCounts } from "./useTimelineCounts";
 
 /** Height of a section header row (h-10). */
@@ -349,10 +353,11 @@ export const TimelineView = memo(function TimelineView({
   }, [virtualizer]);
   // The sections as the rail draws them: a month each (the days of one are
   // gathered under it, at the first's offset), from the same estimates the
-  // rows are placed by; and, for a key the rail hands back, the header row
-  // of the month's first day.
-  const { railSections, railHeads } = useMemo(() => {
+  // rows are placed by; the days themselves, for the rail's ticks; and, for
+  // a key the rail hands back, the header row of the month's first day.
+  const { railSections, railDays, railHeads } = useMemo(() => {
     const railSections: RailSection[] = [];
+    const railDays: RailDay[] = [];
     const railHeads = new Map<string, number>();
     let top = 0;
     for (const s of layout.sections) {
@@ -363,9 +368,10 @@ export const TimelineView = memo(function TimelineView({
         railSections.push({ key, count: s.count, top });
         railHeads.set(key, s.headerRow);
       }
+      if (s.key !== UNDATED) railDays.push({ key: s.key, count: s.count, top });
       top += HEADER_H + s.rows * rowEstimate;
     }
-    return { railSections, railHeads };
+    return { railSections, railDays, railHeads };
   }, [layout, rowEstimate]);
 
   // A key from the rail names a month: the list goes to its first day.
@@ -532,6 +538,7 @@ export const TimelineView = memo(function TimelineView({
       </div>
       <TimelineScrubber
         sections={railSections}
+        days={railDays}
         totalSize={totalSize}
         viewHeight={viewHeight}
         scrollTop={scrollTop}

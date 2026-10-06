@@ -14,6 +14,7 @@ import type { SearchQuery } from "../types.js";
 const AXIS_EXPR: Record<TimelineAxis, string> = {
   captured: "f.captured_at",
   btime: "f.btime",
+  added: "f.created_at",
 };
 
 export interface DayCounts {

@@ -115,6 +115,12 @@ describe("index query plans", () => {
     expect(p).not.toContain("TEMP B-TREE");
   });
 
+  it("sort=addedAt (the timeline's added axis) uses idx_files_alive_added", () => {
+    const p = plan(db, searchSql("addedAt", "desc"));
+    expect(p).toContain("idx_files_alive_added");
+    expect(p).not.toContain("USE TEMP B-TREE");
+  });
+
   it("sort=btime (default desc) uses idx_files_alive_btime", () => {
     const p = plan(db, searchSql("btime", "desc"));
     expect(p).toContain("idx_files_alive_btime");

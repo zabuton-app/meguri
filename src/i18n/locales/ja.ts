@@ -414,10 +414,12 @@ export const ja = {
   "timeline.axis.label": "時間軸",
   "timeline.axis.captured": "撮影日",
   "timeline.axis.btime": "作成日",
+  "timeline.axis.added": "追加日",
   "timeline.undated": "日付なし",
   "timeline.count": "{count}件",
   "timeline.scrubber": "年月へ移動",
   "timeline.month": "{month}: {count}件",
+  "timeline.day": "{day}: {count}件",
   "timeline.sortLocked": "タイムライン表示では日付の新しい順に並びます",
   "timeline.error": "タイムラインを読み込めませんでした",
 

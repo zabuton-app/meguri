@@ -402,10 +402,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "timeline.axis.label": "时间轴",
   "timeline.axis.captured": "拍摄日期",
   "timeline.axis.btime": "创建日期",
+  "timeline.axis.added": "添加日期",
   "timeline.undated": "无日期",
   "timeline.count": "{count} 个",
   "timeline.scrubber": "跳转到月份",
   "timeline.month": "{month}：{count} 个",
+  "timeline.day": "{day}：{count} 个",
   "timeline.sortLocked": "时间线视图按日期从新到旧排列",
   "timeline.error": "无法加载时间线",
 

@@ -291,8 +291,9 @@ applied, within the folder shown under the folder view — per calendar day.
 ### Timeline
 
 The timeline is the list cut into calendar days. The files come from
-`files_search` sorted by the axis (`captured` or `btime`, newest first; NULLs
-last make the "No date" tail); only the counts are its own.
+`files_search` sorted by the axis (`captured`, `btime` or `addedAt` for the
+"added" axis, newest first; NULLs last make the "No date" tail); only the
+counts are its own.
 
 - **One query per database.** `timeline_counts` runs on the query worker
   (`electron/core/timelineCounts.ts`) with files_search's target resolution

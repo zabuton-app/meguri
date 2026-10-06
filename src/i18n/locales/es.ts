@@ -421,10 +421,12 @@ export const es: Record<TranslationKey, string> = {
   "timeline.axis.label": "Fecha",
   "timeline.axis.captured": "Captura",
   "timeline.axis.btime": "Creación",
+  "timeline.axis.added": "Añadido",
   "timeline.undated": "Sin fecha",
   "timeline.count": "{count} archivos",
   "timeline.scrubber": "Ir a un mes",
   "timeline.month": "{month}: {count} archivos",
+  "timeline.day": "{day}: {count} archivos",
   "timeline.sortLocked":
     "La vista de cronología ordena los archivos por fecha, del más reciente al más antiguo",
   "timeline.error": "No se pudo cargar la cronología",

@@ -1,10 +1,10 @@
-// The timeline's rail, a minimap of the list: the whole list at the height
-// of the view, the years written along it and a bar per month as long and as
-// dark as the month is full. A window on it shows the part of the list on
-// screen; dragging the window, or pressing anywhere on the track, scrolls
-// the list there while a label names the month under the pointer. From the
-// keyboard it is a slider over the months: the arrows move the list a month
-// at a time.
+// The timeline's rail, in the manner of a photo library's scrollbar: the
+// whole list at the height of the view as one column of dots — a larger dot
+// per month, a smaller one per day — with the years written beside it and a
+// grip at the list's position. Dragging the grip, or pressing anywhere on
+// the track, scrolls the list there while a chip names the day under the
+// pointer. From the keyboard it is a slider over the months: the arrows move
+// the list a month at a time.
 import {
   memo,
   useCallback,
@@ -15,23 +15,23 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { ChevronsUpDown } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
-import { levelOf } from "@/heatmap/calendar";
 import { UNDATED } from "./layout";
-import { monthLabel, yearOf } from "./dates";
-
-/** Bar fill per level (see levelOf; the heatmap's shades). */
-const LEVEL_CLASS = [
-  "bg-fg/10",
-  "bg-primary/30",
-  "bg-primary/55",
-  "bg-primary/80",
-  "bg-primary",
-];
+import { dayLabel, monthLabel, yearOf } from "./dates";
 
 /** Pixels two year labels must be apart to both be written. */
 const LABEL_GAP = 18;
+
+/** One day of the list as the rail sees it. */
+export interface RailDay {
+  /** "YYYY-MM-DD". */
+  key: string;
+  count: number;
+  /** Scroll offset of the day's header. */
+  top: number;
+}
 
 /** One section of the list as the rail sees it: where it starts and its size. */
 export interface RailSection {
@@ -44,6 +44,8 @@ export interface RailSection {
 
 interface Props {
   sections: RailSection[];
+  /** The days with files, newest first (the undated tail is not a day). */
+  days: RailDay[];
   /** The list's whole height, and the height of the view onto it. */
   totalSize: number;
   viewHeight: number;
@@ -58,6 +60,7 @@ interface Props {
 
 export const TimelineScrubber = memo(function TimelineScrubber({
   sections,
+  days,
   totalSize,
   viewHeight,
   scrollTop,
@@ -78,9 +81,12 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     return () => ro.disconnect();
   }, []);
 
-  const span = Math.max(1, totalSize);
+  // The track is the distance the list scrolls: the grip at the bottom is
+  // the list at its end, and a dot's place is where the list stands when
+  // that date is at the top (dates in the last screenful sit at the end).
   const maxScroll = Math.max(0, totalSize - viewHeight);
-  /** Where on the track (0..1) an offset into the list sits. */
+  const span = Math.max(1, maxScroll);
+  /** Where on the track (0..1) a scroll offset sits. */
   const fractionOf = (offset: number) =>
     Math.min(1, Math.max(0, offset / span));
 
@@ -96,7 +102,6 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     [t, lang],
   );
 
-  const max = sections.reduce((n, s) => Math.max(n, s.count), 0);
   // A year is written at its newest month; one too close to the year above
   // it on the track is left out, and the undated tail is named like a year.
   const yearLabels = useMemo(() => {
@@ -117,6 +122,25 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections, trackHeight, span, t]);
 
+  // The days, one dot per pixel row of the track: of the days that land on
+  // the same row only the fullest stands, so a library of thousands of days
+  // is a few hundred dots. A row holding a month's first day is the month's.
+  const dayDots = useMemo(() => {
+    const monthRows = new Set(
+      sections.map((s) => Math.round(fractionOf(s.top) * trackHeight)),
+    );
+    const byRow = new Map<number, RailDay>();
+    for (const d of days) {
+      const row = Math.round(fractionOf(d.top) * trackHeight);
+      if (monthRows.has(row)) continue;
+      const held = byRow.get(row);
+      if (!held || d.count > held.count) byRow.set(row, d);
+    }
+    return [...byRow.values()];
+    // fractionOf changes with span alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days, sections, trackHeight, span]);
+
   /** The section holding a scroll offset: the last one starting at or before it. */
   const sectionAt = (offset: number): RailSection | null => {
     let found: RailSection | null = null;
@@ -126,8 +150,28 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     }
     return found ?? sections[0] ?? null;
   };
+  /** The day holding a scroll offset, or null in the undated tail. */
+  const dayAt = (offset: number): RailDay | null => {
+    let found: RailDay | null = null;
+    for (const d of days) {
+      if (d.top <= offset) found = d;
+      else break;
+    }
+    const section = sectionAt(offset);
+    return section?.key === UNDATED ? null : (found ?? days[0] ?? null);
+  };
+  const chipFor = (offset: number): string | null => {
+    const day = dayAt(offset);
+    if (day)
+      return t("timeline.day", {
+        day: dayLabel(day.key, lang),
+        count: day.count,
+      });
+    const section = sectionAt(offset);
+    return section ? label(section) : null;
+  };
 
-  /** The offset into the list under the pointer. */
+  /** The scroll offset under the pointer. */
   const offsetAtPointer = (e: { clientY: number }) => {
     const el = track.current;
     if (!el) return 0;
@@ -135,11 +179,8 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     const f = rect.height > 0 ? (e.clientY - rect.top) / rect.height : 0;
     return Math.min(1, Math.max(0, f)) * span;
   };
-  /** The scroll that puts the pointed offset in the middle of the view. */
-  const scrollFor = (offset: number) =>
-    Math.min(maxScroll, Math.max(0, offset - viewHeight / 2));
 
-  // The pointer over the track, and whether it is dragging: the label follows
+  // The pointer over the track, and whether it is dragging: the chip follows
   // it, and the list too while dragging.
   const [pointer, setPointer] = useState<{
     offset: number;
@@ -151,13 +192,13 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     e.currentTarget.setPointerCapture(e.pointerId);
     const offset = offsetAtPointer(e);
     setPointer({ offset, dragging: true });
-    onScrollTo(scrollFor(offset));
+    onScrollTo(offset);
   };
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const offset = offsetAtPointer(e);
     const dragging = e.currentTarget.hasPointerCapture(e.pointerId);
     setPointer({ offset, dragging });
-    if (dragging) onScrollTo(scrollFor(offset));
+    if (dragging) onScrollTo(offset);
   };
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId))
@@ -200,19 +241,22 @@ export const TimelineScrubber = memo(function TimelineScrubber({
     if (next !== from) onJump(sections[next].key);
   };
 
-  const shown = pointer ? sectionAt(pointer.offset) : null;
-  const windowTop = fractionOf(scrollTop);
-  const windowHeight = Math.max(
-    0.01,
-    fractionOf(scrollTop + viewHeight) - windowTop,
-  );
+  const gripTop = fractionOf(scrollTop);
+  // The chip sits by the grip while dragging (the two move together) and by
+  // the pointer while it only hovers.
+  const chipAt = pointer
+    ? pointer.dragging
+      ? scrollTop
+      : pointer.offset
+    : null;
+  const chip = chipAt == null ? null : chipFor(chipAt);
   const currentSection = sections[currentIndex];
 
   return (
     <nav
       aria-label={t("timeline.scrubber")}
       data-slot="timeline-scrubber"
-      className="relative w-20 shrink-0 select-none border-l border-border"
+      className="relative w-16 shrink-0 select-none"
     >
       {/* The bottom padding keeps the end of the track clear of the two
           round buttons floating over this corner. */}
@@ -233,21 +277,26 @@ export const TimelineScrubber = memo(function TimelineScrubber({
         onPointerLeave={onPointerLeave}
         className="absolute inset-x-0 bottom-40 top-3 cursor-pointer touch-none outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {/* A bar per month, where it sits on the track, as long and as dark
-            as the month is full. */}
+        {/* One column of dots: a small one per day, a larger one per month. */}
+        {dayDots.map((d) => (
+          <span
+            key={d.key}
+            data-day={d.key}
+            aria-hidden
+            className="absolute right-[13px] size-1 -translate-y-1/2 rounded-full bg-fg/30"
+            style={{ top: `${fractionOf(d.top) * 100}%` }}
+          />
+        ))}
         {sections.map((s) => (
           <span
             key={s.key}
             data-month={s.key}
             aria-hidden
             className={cn(
-              "absolute left-1/2 h-0.5 -translate-x-1/2 rounded-full",
-              LEVEL_CLASS[s.key === UNDATED ? 1 : levelOf(s.count, max)],
+              "absolute right-3 size-1.5 -translate-y-1/2 rounded-full",
+              s.key === UNDATED ? "bg-fg/35" : "bg-fg/60",
             )}
-            style={{
-              top: `${fractionOf(s.top) * 100}%`,
-              width: `${s.key === UNDATED ? 6 : 6 + 26 * Math.sqrt(s.count / Math.max(1, max))}px`,
-            }}
+            style={{ top: `${fractionOf(s.top) * 100}%` }}
           />
         ))}
         {yearLabels.map((y) => (
@@ -255,33 +304,37 @@ export const TimelineScrubber = memo(function TimelineScrubber({
             key={y.key}
             data-year={y.text}
             aria-hidden
-            className="absolute right-[calc(50%+0.75rem)] -translate-y-1/2 whitespace-nowrap text-[10px] leading-none text-muted"
+            className="absolute right-7 -translate-y-1/2 whitespace-nowrap text-[11px] leading-none text-fg/70"
             style={{ top: `${fractionOf(y.top) * 100}%` }}
           >
             {y.text}
           </span>
         ))}
-        {/* The window: the part of the list on screen. */}
-        <span
+        {/* The grip: where the list is, with a line across the rail. */}
+        <div
           aria-hidden
           data-slot="timeline-handle"
-          className={cn(
-            "absolute left-1/2 w-10 -translate-x-1/2 rounded-sm border border-fg/25 bg-fg/10 transition-colors",
-            pointer?.dragging && "border-primary/60 bg-primary/20",
-          )}
-          style={{
-            top: `${windowTop * 100}%`,
-            height: `${windowHeight * 100}%`,
-          }}
-        />
-        {/* The month under the pointer, beside it. */}
-        {pointer && shown && (
+          className="pointer-events-none absolute inset-x-0 -translate-y-1/2"
+          style={{ top: `${gripTop * 100}%` }}
+        >
+          <span className="absolute inset-x-1 top-1/2 h-px bg-fg/40" />
+          <span
+            className={cn(
+              "absolute right-[9px] top-1/2 flex h-7 w-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-fg text-bg shadow transition-colors",
+              pointer?.dragging && "bg-primary text-primary-foreground",
+            )}
+          >
+            <ChevronsUpDown className="size-3" />
+          </span>
+        </div>
+        {/* The date under the pointer, or at the grip while dragging. */}
+        {chipAt != null && chip && (
           <span
             data-slot="timeline-label"
-            className="pointer-events-none absolute right-full top-0 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg shadow"
-            style={{ top: `${fractionOf(pointer.offset) * 100}%` }}
+            className="pointer-events-none absolute right-full top-0 mr-1 -translate-y-1/2 whitespace-nowrap rounded-md bg-fg px-2 py-1 text-xs font-medium text-bg shadow"
+            style={{ top: `${fractionOf(chipAt) * 100}%` }}
           >
-            {label(shown)}
+            {chip}
           </span>
         )}
       </div>

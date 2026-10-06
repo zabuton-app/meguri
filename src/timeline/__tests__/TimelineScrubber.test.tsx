@@ -10,6 +10,15 @@ const sections = [
   { key: "2021-03", count: 30, top: 6000 },
   { key: "undated", count: 4, top: 9000 },
 ];
+const days = [
+  { key: "2026-10-20", count: 200, top: 0 },
+  { key: "2026-10-03", count: 100, top: 2000 },
+  { key: "2026-08-09", count: 2, top: 4000 },
+  // Two days on the same pixel row of the track (800px tall in the test
+  // setup, 12.5px of list per row): only the fuller is drawn.
+  { key: "2021-03-11", count: 20, top: 6200 },
+  { key: "2021-03-10", count: 10, top: 6203 },
+];
 const totalSize = 10_000;
 const viewHeight = 800;
 
@@ -19,6 +28,7 @@ function rail(
   return (
     <TimelineScrubber
       sections={sections}
+      days={days}
       totalSize={totalSize}
       viewHeight={viewHeight}
       scrollTop={0}
@@ -64,12 +74,22 @@ describe("TimelineScrubber", () => {
       e.textContent,
       (e as HTMLElement).style.top,
     ]);
+    const pct = (top: number) => `${(top / 9200) * 100}%`;
     expect(years).toEqual([
       ["2026", "0%"],
-      ["2021", "60%"],
-      ["No date", "90%"],
+      ["2021", pct(6000)],
+      ["No date", pct(9000)],
     ]);
     expect(document.querySelectorAll("[data-month]")).toHaveLength(4);
+  });
+
+  it("draws a dot per day, one per pixel row, where no month dot is", () => {
+    renderWithProviders(rail());
+    expect(
+      [...document.querySelectorAll("[data-day]")].map((e) =>
+        e.getAttribute("data-day"),
+      ),
+    ).toEqual(["2026-10-03", "2021-03-11"]);
   });
 
   it("is a slider over the months, naming the one shown", () => {
@@ -80,13 +100,12 @@ describe("TimelineScrubber", () => {
     expect(slider.getAttribute("aria-valuetext")).toBe("March 2021: 30 files");
   });
 
-  it("puts the window over the part of the list on screen", () => {
+  it("puts the grip where the list is", () => {
     renderWithProviders(rail({ scrollTop: 4600 }));
-    const window = document.querySelector(
+    const grip = document.querySelector(
       '[data-slot="timeline-handle"]',
     ) as HTMLElement;
-    expect(window.style.top).toBe("46%");
-    expect(parseFloat(window.style.height)).toBeCloseTo(8);
+    expect(grip.style.top).toBe("50%");
   });
 
   it("walks the months from the keyboard", () => {
@@ -108,18 +127,20 @@ describe("TimelineScrubber", () => {
     const onScrollTo = vi.fn();
     renderWithProviders(rail({ onScrollTo }));
     const el = track();
-    // Halfway down a 400px track from y=100.
+    // Halfway down a 400px track from y=100: the list scrolled halfway.
     fireEvent.pointerDown(el, { button: 0, clientY: 300, pointerId: 1 });
     expect(onScrollTo).toHaveBeenLastCalledWith(4600);
-    expect(screen.getByText("August 2026: 2 files")).toBeTruthy();
+    // Named by the day at the grip (the list itself has not moved here).
+    expect(screen.getByText("October 20, 2026: 200 files")).toBeTruthy();
     fireEvent.pointerMove(el, { clientY: 400, pointerId: 1 });
-    expect(onScrollTo).toHaveBeenLastCalledWith(7100);
-    expect(screen.getByText("March 2021: 30 files")).toBeTruthy();
+    expect(onScrollTo).toHaveBeenLastCalledWith(6900);
     fireEvent.pointerUp(el, { pointerId: 1 });
     // Moving without the button down only names the month.
     fireEvent.pointerMove(el, { clientY: 496, pointerId: 1 });
     expect(onScrollTo).toHaveBeenCalledTimes(2);
     expect(screen.getByText("No date: 4 files")).toBeTruthy();
+    fireEvent.pointerMove(el, { clientY: 400, pointerId: 1 });
+    expect(screen.getByText("March 10, 2021: 10 files")).toBeTruthy();
     fireEvent.pointerLeave(el);
     expect(screen.queryByText("No date: 4 files")).toBeNull();
   });
@@ -141,7 +162,7 @@ describe("TimelineScrubber", () => {
   it("has nothing to walk when the list is empty", () => {
     const onJump = vi.fn();
     renderWithProviders(
-      rail({ sections: [], totalSize: 0, current: null, onJump }),
+      rail({ sections: [], days: [], totalSize: 0, current: null, onJump }),
     );
     fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowDown" });
     expect(onJump).not.toHaveBeenCalled();

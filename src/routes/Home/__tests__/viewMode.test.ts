@@ -59,10 +59,11 @@ describe("parseTimelineAxis", () => {
   it("keeps a stored axis and falls back to the capture date", () => {
     expect(parseTimelineAxis("captured")).toBe("captured");
     expect(parseTimelineAxis("btime")).toBe("btime");
+    expect(parseTimelineAxis("added")).toBe("added");
     expect(parseTimelineAxis(null)).toBe("captured");
-    // The heatmap's metrics are not axes.
+    // The heatmap's other metrics are not axes.
     expect(parseTimelineAxis("played")).toBe("captured");
-    expect(parseTimelineAxis("added")).toBe("captured");
+    expect(parseTimelineAxis("created")).toBe("captured");
   });
 });
 
@@ -79,6 +80,8 @@ describe("timelineQuery", () => {
       sortDir: "desc",
     });
     expect(timelineQuery(filter, "btime").sort).toBe("btime");
+    // The index's own date has a sort key of its own ("added" is the id order).
+    expect(timelineQuery(filter, "added").sort).toBe("addedAt");
     expect(filter.sort).toBe("name");
   });
 });

@@ -202,6 +202,32 @@ describe("timelineCounts", () => {
   });
 });
 
+describe("timelineCounts by the day added", () => {
+  it("dates every file by when it entered the index", () => {
+    const { db, rootId } = newDb();
+    const a = insertFile(db, rootId, { relPath: "a.jpg" });
+    const b = insertFile(db, rootId, { relPath: "b.mp4", capturedAt: 5 });
+    db.prepare("UPDATE files SET created_at = ? WHERE id = ?").run(
+      at("2026-03", 10),
+      a,
+    );
+    db.prepare("UPDATE files SET created_at = ? WHERE id = ?").run(
+      at("2026-03", 11),
+      b,
+    );
+    expect(byDay(db, "added")).toEqual({
+      days: { "2026-03-10": 1, "2026-03-11": 1 },
+      undated: 0,
+    });
+    // The list in the same order, newest first.
+    expect(
+      searchFiles(db, { sort: "addedAt", sortDir: "desc" }).items.map(
+        (f) => f.relPath,
+      ),
+    ).toEqual(["b.mp4", "a.jpg"]);
+  });
+});
+
 describe("timelineCounts by day", () => {
   it("puts the first and last second of a day on that day", () => {
     const { db, rootId } = newDb();
@@ -396,7 +422,7 @@ describe("timeline_counts input", () => {
   });
 
   it("refuses an axis the timeline does not have", () => {
-    expect(schema.safeParse({ query: {}, axis: "added" }).success).toBe(false);
+    expect(schema.safeParse({ query: {}, axis: "played" }).success).toBe(false);
     expect(schema.safeParse({ query: {} }).success).toBe(false);
   });
 });

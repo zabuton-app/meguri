@@ -412,10 +412,12 @@ export const en: Record<TranslationKey, string> = {
   "timeline.axis.label": "Date",
   "timeline.axis.captured": "Captured",
   "timeline.axis.btime": "Created",
+  "timeline.axis.added": "Added",
   "timeline.undated": "No date",
   "timeline.count": "{count} files",
   "timeline.scrubber": "Jump to a month",
   "timeline.month": "{month}: {count} files",
+  "timeline.day": "{day}: {count} files",
   "timeline.sortLocked": "The timeline view lists files newest first by date",
   "timeline.error": "Could not load the timeline",
 

@@ -4,7 +4,11 @@ import {
   tagSearchKey,
 } from "@shared/tags";
 import { isActivityMetric, type ActivityMetric } from "@shared/ipc/activity";
-import { isTimelineAxis, type TimelineAxis } from "@shared/ipc/timeline";
+import {
+  isTimelineAxis,
+  TIMELINE_SORT_KEYS,
+  type TimelineAxis,
+} from "@shared/ipc/timeline";
 import type { SearchQuery } from "@/ipc/types";
 
 export const DISCOVER_FILTER_PARAM = "filter";
@@ -50,7 +54,7 @@ export function timelineQuery(
   filter: SearchQuery,
   axis: TimelineAxis,
 ): SearchQuery {
-  return { ...filter, sort: axis, sortDir: "desc" };
+  return { ...filter, sort: TIMELINE_SORT_KEYS[axis], sortDir: "desc" };
 }
 
 /**

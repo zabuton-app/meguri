@@ -33,7 +33,7 @@ const MAX_LIMIT = 500;
 // is reached through a LEFT JOIN. COALESCE supplies defaults for files with no meta row.
 // Exported for queries that join files under the same `f`/`m` aliases (see history.ts).
 export const FILE_COLS =
-  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, (f.thumb_path IS NOT NULL) AS hasThumb, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, m.last_accessed_at AS lastAccessedAt, m.resume_position AS resumePosition, CASE WHEN m.resume_position IS NOT NULL AND f.duration > 0 THEN MIN(1.0, m.resume_position / f.duration) END AS progress";
+  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, (f.thumb_path IS NOT NULL) AS hasThumb, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, f.created_at AS addedAt, m.last_accessed_at AS lastAccessedAt, m.resume_position AS resumePosition, CASE WHEN m.resume_position IS NOT NULL AND f.duration > 0 THEN MIN(1.0, m.resume_position / f.duration) END AS progress";
 
 export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
@@ -330,6 +330,10 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
       return { expr: "f.captured_at", nullable: true, cmp, idCmp: ">" };
     case "btime":
       return { expr: "f.btime", nullable: true, cmp, idCmp: ">" };
+    case "addedAt":
+      // When the file entered the index; never NULL. Not offered by the sort
+      // picker ("added" there is the id order): the timeline's "added" axis.
+      return { expr: "f.created_at", nullable: false, cmp, idCmp: ">" };
     case "name":
       return { expr: "f.rel_path", nullable: false, cmp, idCmp: cmp };
     case "accessed":
@@ -354,6 +358,8 @@ export function sortValueOf(
       return row.capturedAt;
     case "btime":
       return row.btime;
+    case "addedAt":
+      return row.addedAt;
     case "name":
       return row.relPath;
     case "accessed":
@@ -474,6 +480,8 @@ export function orderByFor(sort?: string, dir?: string): string {
       return `f.captured_at IS NULL ASC, f.captured_at ${direction}, f.id ASC`;
     case "btime":
       return `f.btime IS NULL ASC, f.btime ${direction}, f.id ASC`;
+    case "addedAt":
+      return `f.created_at ${direction}, f.id ASC`;
     case "name":
       // The id tiebreak follows the main direction so both directions map onto
       // a single scan of idx_files_alive_rel_path (forward/backward); a fixed

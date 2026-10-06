@@ -43,7 +43,12 @@ export function dayLabel(day: string, lang: string): string {
  * side of the main process's AXIS_EXPR).
  */
 export function sectionKeyOf(file: FileRow, axis: TimelineAxis): string {
-  const ts = axis === "captured" ? file.capturedAt : file.btime;
+  const ts =
+    axis === "captured"
+      ? file.capturedAt
+      : axis === "btime"
+        ? file.btime
+        : file.addedAt;
   return ts == null ? UNDATED : formatDay(new Date(ts * 1000));
 }
 

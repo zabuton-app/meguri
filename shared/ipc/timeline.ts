@@ -2,19 +2,28 @@
 // main → renderer, so it is typed rather than Zod-validated (see channels.ts).
 
 /**
- * The date a timeline is ordered and cut into days by. The values are the
- * search's sort keys of the same dates, so the list under the days is
- * files_search sorted by the axis:
+ * The date a timeline is ordered and cut into days by (each has a sort key
+ * of the same date, TIMELINE_SORT_KEYS, so the list under the days is
+ * files_search sorted by the axis):
  * - "captured": the capture date,
- * - "btime": the filesystem's birth time.
- * A file without the date is on no day (see TimelineCounts.undated).
+ * - "btime": the filesystem's birth time,
+ * - "added": when the file entered the index.
+ * A file without the date is on no day (see TimelineCounts.undated); every
+ * file has the day it was added.
  */
-export const TIMELINE_AXES = ["captured", "btime"] as const;
+export const TIMELINE_AXES = ["captured", "btime", "added"] as const;
 export type TimelineAxis = (typeof TIMELINE_AXES)[number];
 
 export function isTimelineAxis(v: unknown): v is TimelineAxis {
   return TIMELINE_AXES.includes(v as TimelineAxis);
 }
+
+/** The search's sort key ordering the list by each axis. */
+export const TIMELINE_SORT_KEYS: Record<TimelineAxis, string> = {
+  captured: "captured",
+  btime: "btime",
+  added: "addedAt",
+};
 
 /** One calendar day and the files dated on it. */
 export interface TimelineDay {

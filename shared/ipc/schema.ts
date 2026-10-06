@@ -73,6 +73,8 @@ export const FileRowSchema = z.object({
   capturedAt: z.number().nullable(),
   /** Filesystem creation time (birthtime, Unix seconds). Null where the FS doesn't provide it. */
   btime: z.number().nullable(),
+  /** When the file entered the index (created_at, Unix seconds). */
+  addedAt: z.number(),
   /** Last time the file's detail was opened (Unix seconds). Null if never opened. */
   lastAccessedAt: z.number().nullable(),
   /** Where playback was last stopped (seconds), or null when there is nothing to

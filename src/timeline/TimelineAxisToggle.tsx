@@ -7,6 +7,7 @@ import { TIMELINE_AXES, type TimelineAxis } from "@shared/ipc/timeline";
 const AXIS_LABEL: Record<TimelineAxis, TranslationKey> = {
   captured: "timeline.axis.captured",
   btime: "timeline.axis.btime",
+  added: "timeline.axis.added",
 };
 
 export function TimelineAxisToggle({
