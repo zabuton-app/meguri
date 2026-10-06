@@ -599,12 +599,13 @@ export interface ChannelOutputs {
   update_ignore: void;
   auto_tag_get: AutoTagConfig;
   auto_tag_set: void;
-  // Files of the active scope (a sample when it is larger than the cap).
+  // Files of every workspace (a sample when there are more than the cap).
   auto_tag_files: AutoTagLibrary;
   auto_tag_apply: AutoTagApplyResult;
   // Pairs removed. Handles the session no longer holds are no-ops.
   auto_tag_undo: number;
-  // Runs the engine over every file in scope and attaches what it proposes.
+  // Runs the conditions over every file of every workspace and attaches
+  // what they give.
   auto_tag_reapply: { files: number; added: number };
   logo_get: LogoId;
   // Echoes the applied variant so the renderer can settle on main's value.

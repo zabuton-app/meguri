@@ -15,6 +15,9 @@ import { MoreRows, SplitPane } from "./parts";
 import type { AutoTagState } from "./useAutoTag";
 import { useViewState } from "./viewState";
 
+/** Rules past which the list gets a filter box. */
+const FILTER_FROM = 8;
+
 export function FoldersTab({ state }: { state: AutoTagState }) {
   const { t } = useI18n();
   const { config, update, existing } = state;
@@ -22,6 +25,7 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
     "folders.selection",
     null,
   );
+  const [filter, setFilter] = useViewState("folders.filter", "");
 
   // What is selected, falling back to the first rule when nothing is, or when
   // the selected one was deleted.
@@ -85,6 +89,23 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
     setSelection(null);
   };
 
+  // The filter only applies while its box is on screen (see KeywordsTab).
+  const filterable = config.folders.length > FILTER_FROM;
+  const q = filterable ? filter.trim().toLowerCase() : "";
+  const matching = q
+    ? config.folders.filter((rule) =>
+        [workspaceLabel(rule.workspaceId), rule.folder, ...rule.tags].some(
+          (text) => text.toLowerCase().includes(q),
+        ),
+      )
+    : config.folders;
+  // The rows drawn — and the selected rule among them even when it sits past
+  // the cut, so what the pane edits is always marked in the list.
+  const folders = matching.slice(0, MAX_ROWS);
+  if (shown && matching.includes(shown) && !folders.includes(shown)) {
+    folders.push(shown);
+  }
+
   return (
     <SplitPane
       aside={
@@ -100,7 +121,16 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
               {t("autoTag.foldersHint")}
             </span>
           </div>
-          {config.folders.slice(0, MAX_ROWS).map((rule) => (
+          {filterable && (
+            <input
+              className="mb-1 h-7 rounded-md border border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
+              value={filter}
+              placeholder={t("autoTag.filterFolders")}
+              aria-label={t("autoTag.filterFolders")}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          )}
+          {folders.map((rule) => (
             <div
               key={rule.id}
               className={cn(
@@ -140,7 +170,12 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
               </button>
             </div>
           ))}
-          <MoreRows t={t} hidden={config.folders.length - MAX_ROWS} />
+          <MoreRows t={t} hidden={matching.length - folders.length} />
+          {q !== "" && matching.length === 0 && (
+            <p className="px-1 pb-1 text-xs text-muted">
+              {t("autoTag.noFoldersMatch")}
+            </p>
+          )}
           {config.folders.length === 0 && (
             <p className="px-1 pb-1 text-xs text-muted">
               {t("autoTag.noFolders")}

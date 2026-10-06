@@ -241,12 +241,15 @@ export function useAutoTag(): AutoTagState | null {
       compileEngine({
         rules: safeMode ? [] : (deferred?.rules ?? []),
         keywords: deferred?.keywords ?? [],
-        folders: deferred?.folders ?? [],
+        // The screen's analyses read names only: the Folders tab goes by the
+        // files' places itself, and editing a folder rule must not rerun the
+        // analysis of every name.
+        folders: [],
       }),
     // What the engine runs only: dismissing a suggestion or renaming a rule
     // changes the configuration, not what the engine does, and every analysis
     // downstream is keyed on this object.
-    [deferred?.rules, deferred?.keywords, deferred?.folders, safeMode],
+    [deferred?.rules, deferred?.keywords, safeMode],
   );
   const stop = useMemo(
     () => new Set([...STOP_WORDS, ...(deferred?.excludedTerms ?? [])]),

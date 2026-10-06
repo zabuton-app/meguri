@@ -576,7 +576,7 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.reapply": "Appliquer aux fichiers existants",
   "autoTag.reapplying": "Application…",
   "autoTag.reapplyConfirm":
-    "Exécuter les règles et les mots-clés sur les {count} fichiers et ajouter les étiquettes obtenues. Cet ajout en masse ne peut pas être annulé.",
+    "Exécuter les règles, les mots-clés et les règles de dossier sur les {count} fichiers et ajouter les étiquettes obtenues. Cet ajout en masse ne peut pas être annulé.",
   "autoTag.reapplyDone": "{added} étiquettes ajoutées à {files} fichiers",
   "autoTag.patternRules": "Règles de motif",
   "autoTag.evaluatedInOrder": "évaluées de haut en bas",
@@ -628,6 +628,8 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.addKeywordInline":
     "+ Ajouter un mot-clé (terme, terme, … puis Entrée)",
   "autoTag.noKeywordsMatch": "Aucun mot-clé ne correspond au filtre.",
+  "autoTag.filterFolders": "Filtrer les règles de dossier",
+  "autoTag.noFoldersMatch": "Aucune règle de dossier ne correspond au filtre.",
   "autoTag.noKeywords": "Aucun mot-clé pour l’instant.",
   "autoTag.folders": "Dossiers",
   "autoTag.foldersHint": "tague tout ce qui se trouve sous un dossier",

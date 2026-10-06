@@ -540,7 +540,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "autoTag.reapply": "应用到现有文件",
   "autoTag.reapplying": "正在应用…",
   "autoTag.reapplyConfirm":
-    "对全部 {count} 个文件运行规则和关键词并添加相应标签。此批量添加无法撤销。",
+    "对全部 {count} 个文件运行规则、关键词和文件夹规则并添加相应标签。此批量添加无法撤销。",
   "autoTag.reapplyDone": "已为 {files} 个文件添加 {added} 个标签",
   "autoTag.patternRules": "模式规则",
   "autoTag.evaluatedInOrder": "自上而下评估",
@@ -588,6 +588,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "autoTag.filterKeywords": "筛选关键词",
   "autoTag.addKeywordInline": "＋ 添加关键词（词语, 词语, … 后按 Enter）",
   "autoTag.noKeywordsMatch": "没有与筛选匹配的关键词。",
+  "autoTag.filterFolders": "筛选文件夹规则",
+  "autoTag.noFoldersMatch": "没有与筛选匹配的文件夹规则。",
   "autoTag.noKeywords": "还没有关键词。",
   "autoTag.folders": "文件夹",
   "autoTag.foldersHint": "为文件夹下的所有文件添加标签",

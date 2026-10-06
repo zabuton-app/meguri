@@ -388,6 +388,32 @@ describe("AutoTag", () => {
     expect(screen.getByRole("button", { name: /^Word8/ })).toBeTruthy();
   });
 
+  it("filters a long list of folder rules by workspace, folder or tag", async () => {
+    const rule = (i: number) => ({
+      id: `f${i}`,
+      workspaceId: i === 0 ? "other" : "ws",
+      folder: i === 0 ? "Scans" : `Trips/${2000 + i}`,
+      tags: [i === 0 ? "Scan" : `Trip${i}`],
+      enabled: true,
+    });
+    mocks.autoTagGet.mockResolvedValue({
+      ...sampleConfig(),
+      folders: Array.from({ length: 9 }, (_, i) => rule(i)),
+    });
+    await renderScreen("Folders");
+    const filter = screen.getByLabelText("Filter folder rules");
+    fireEvent.change(filter, { target: { value: "nothing" } });
+    expect(screen.getByText("No folder rule matches the filter.")).toBeTruthy();
+    // By the workspace's name as the app shows it, once the names are known.
+    fireEvent.change(filter, { target: { value: "other" } });
+    await screen.findByRole("button", { name: /Other \/ Scans/ });
+    expect(screen.queryByRole("button", { name: /Trips\/2001/ })).toBeNull();
+    // By a tag.
+    fireEvent.change(filter, { target: { value: "trip3" } });
+    expect(screen.getByRole("button", { name: /Trips\/2003/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Trips\/2001/ })).toBeNull();
+  });
+
   it("does not take the Enter that confirms an IME conversion as submit", async () => {
     await renderScreen("Keywords");
     const add = screen.getByLabelText(/Add a keyword/);

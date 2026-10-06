@@ -559,7 +559,7 @@ export const ja = {
   "autoTag.reapply": "既存ファイルに再適用",
   "autoTag.reapplying": "適用中…",
   "autoTag.reapplyConfirm":
-    "{count} ファイルすべてにルールとキーワードを適用し、該当するタグを追加します。この一括追加は取り消せません。",
+    "{count} ファイルすべてにルール・キーワード・フォルダルールを適用し、該当するタグを追加します。この一括追加は取り消せません。",
   "autoTag.reapplyDone": "{files} ファイルに {added} 件のタグを追加しました",
   "autoTag.patternRules": "パターンルール",
   "autoTag.evaluatedInOrder": "上から順に評価",
@@ -607,6 +607,8 @@ export const ja = {
   "autoTag.filterKeywords": "キーワードを絞り込む",
   "autoTag.addKeywordInline": "＋ キーワードを追加（語, 語, …でEnter）",
   "autoTag.noKeywordsMatch": "絞り込みに一致するキーワードはありません。",
+  "autoTag.filterFolders": "フォルダルールを絞り込む",
+  "autoTag.noFoldersMatch": "絞り込みに一致するフォルダルールはありません。",
   "autoTag.noKeywords": "キーワードはまだありません。",
   "autoTag.folders": "フォルダ",
   "autoTag.foldersHint": "フォルダ配下のファイルにタグを付ける",

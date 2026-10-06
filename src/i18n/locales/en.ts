@@ -557,7 +557,7 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.reapply": "Apply to existing files",
   "autoTag.reapplying": "Applying…",
   "autoTag.reapplyConfirm":
-    "Run the rules and the keywords over all {count} files and add the tags they produce. This bulk addition cannot be undone.",
+    "Run the rules, the keywords and the folder rules over all {count} files and add the tags they produce. This bulk addition cannot be undone.",
   "autoTag.reapplyDone": "Added {added} tags to {files} files",
   "autoTag.patternRules": "Pattern rules",
   "autoTag.evaluatedInOrder": "evaluated top to bottom",
@@ -606,6 +606,8 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.filterKeywords": "Filter keywords",
   "autoTag.addKeywordInline": "+ Add a keyword (term, term, … then Enter)",
   "autoTag.noKeywordsMatch": "No keyword matches the filter.",
+  "autoTag.filterFolders": "Filter folder rules",
+  "autoTag.noFoldersMatch": "No folder rule matches the filter.",
   "autoTag.noKeywords": "No keywords yet.",
   "autoTag.folders": "Folders",
   "autoTag.foldersHint": "tag everything under a folder",

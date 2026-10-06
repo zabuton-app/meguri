@@ -56,7 +56,7 @@ export interface TagRule {
   pattern: string;
   /** Tag name per match: `$1`–`$9` are capture groups; plain text is allowed. */
   template: string;
-  /** Comma-separated values that never become tags (case-insensitive). */
+  /** Values that never become tags, one per line (case-insensitive). */
   exclude: string;
   /** Case-insensitive matching. */
   ci: boolean;
@@ -517,8 +517,7 @@ const NO_FOLDERS: readonly CompiledFolder[] = [];
 /**
  * `tags` (what the name gave) with the tags of the folder rules reaching the
  * file after them. The one place the two are put together: the scan adds
- * folder tags to what its worker returned with this, and the screen's
- * analysis lists a folder rule's tags for the files this would give them to.
+ * folder tags to what its worker returned with this.
  * Compared without regard to case; the first spelling wins.
  */
 export function withFolderTags(

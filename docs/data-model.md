@@ -238,8 +238,8 @@ previews with the code a scan runs:
   normalized form of `shared/folderPath.ts` (`""` is the whole workspace).
   Comparing paths cannot hang, so a scan adds these in the main process to
   what the worker returned for the names. `withFolderTags()` is the one place
-  the two are put together, and the screen's analysis lists a folder rule's
-  tags for exactly the files it would give them to.
+  the two are put together; the screen's Folders tab lists the files under a
+  rule by the same comparison.
 - A **keyword** is some terms to find and the tags to add: finding any of the
   terms in the name (again without its extension) proposes every one of the
   tags; in `word` mode an ASCII term must stand between non-alphanumerics. An
@@ -276,7 +276,7 @@ carries on without auto-tagging; the files stay owed.
 
 `shared/autoTagAnalysis.ts` builds the screen's views on top of the engine —
 suggestions (frequent words of the names that no rule or keyword produces
-yet), a file name cut into tokens, and the library's vocabulary by kind. Those
+yet) and a file name cut into taggable parts for the detail view. Those
 run in the renderer over the names loaded by `auto_tag_files` (capped at
 `MAX_AUTO_TAG_FILES`); every write goes through `auto_tag_apply`, which only
 says which files get which tags.
@@ -290,7 +290,8 @@ safe mode that runs no rules until the user resumes, leaving the rule at fault
 editable.
 
 `config.ignored` holds suggestions dismissed on the suggestions tab.
-`config.excludedTerms` holds words excluded on the terms tab; they also stop
+`config.excludedTerms` holds words that are never suggested (no screen edits
+it any more; what is stored is still read); they also stop
 being offered as frequent words. Neither changes what the rules or the
 dictionary themselves produce.
 

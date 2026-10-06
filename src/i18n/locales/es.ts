@@ -574,7 +574,7 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.reapply": "Aplicar a los archivos existentes",
   "autoTag.reapplying": "Aplicando…",
   "autoTag.reapplyConfirm":
-    "Ejecutar las reglas y las palabras clave sobre los {count} archivos y añadir las etiquetas resultantes. Esta adición masiva no se puede deshacer.",
+    "Ejecutar las reglas, las palabras clave y las reglas de carpeta sobre los {count} archivos y añadir las etiquetas resultantes. Esta adición masiva no se puede deshacer.",
   "autoTag.reapplyDone": "Se añadieron {added} etiquetas a {files} archivos",
   "autoTag.patternRules": "Reglas de patrón",
   "autoTag.evaluatedInOrder": "se evalúan de arriba abajo",
@@ -626,6 +626,8 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.addKeywordInline":
     "+ Añadir palabra clave (término, término, … e Intro)",
   "autoTag.noKeywordsMatch": "Ninguna palabra clave coincide con el filtro.",
+  "autoTag.filterFolders": "Filtrar reglas de carpeta",
+  "autoTag.noFoldersMatch": "Ninguna regla de carpeta coincide con el filtro.",
   "autoTag.noKeywords": "Aún no hay palabras clave.",
   "autoTag.folders": "Carpetas",
   "autoTag.foldersHint": "etiqueta todo lo que hay bajo una carpeta",

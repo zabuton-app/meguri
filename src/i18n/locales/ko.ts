@@ -556,7 +556,7 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.reapply": "기존 파일에 다시 적용",
   "autoTag.reapplying": "적용 중…",
   "autoTag.reapplyConfirm":
-    "{count}개 파일 전체에 규칙과 키워드를 적용해 해당 태그를 추가합니다. 이 일괄 추가는 되돌릴 수 없습니다.",
+    "{count}개 파일 전체에 규칙·키워드·폴더 규칙을 적용해 해당 태그를 추가합니다. 이 일괄 추가는 되돌릴 수 없습니다.",
   "autoTag.reapplyDone": "{files}개 파일에 태그 {added}개를 추가했습니다",
   "autoTag.patternRules": "패턴 규칙",
   "autoTag.evaluatedInOrder": "위에서부터 평가",
@@ -604,6 +604,8 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.filterKeywords": "키워드 필터",
   "autoTag.addKeywordInline": "+ 키워드 추가(단어, 단어, … 후 Enter)",
   "autoTag.noKeywordsMatch": "필터와 일치하는 키워드가 없습니다.",
+  "autoTag.filterFolders": "폴더 규칙 필터",
+  "autoTag.noFoldersMatch": "필터와 일치하는 폴더 규칙이 없습니다.",
   "autoTag.noKeywords": "아직 키워드가 없습니다.",
   "autoTag.folders": "폴더",
   "autoTag.foldersHint": "폴더 아래의 파일에 태그를 붙입니다",
