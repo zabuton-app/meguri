@@ -1,14 +1,14 @@
-// Keywords tab: the dictionary — each entry a tag with its aliases, tagging a
-// file whose name holds any of them — and the pane beside it editing whichever
-// is selected.
+// Keywords tab: the dictionary — each entry some terms to find in a name and
+// the tags a file whose name holds any of them gets — and the pane beside it
+// editing whichever is selected.
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import type { KeywordEntry } from "@shared/autoTag";
 import { MAX_TAG_NAME } from "@shared/tags";
-import { MAX_ROWS, keywordMatches, newKeyword } from "./helpers";
+import { MAX_ROWS, MONO, keywordMatches, newKeyword } from "./helpers";
 import { KeywordEditor } from "./KeywordEditor";
-import { Chip, MoreRows, SplitPane } from "./parts";
+import { MoreRows, SplitPane } from "./parts";
 import type { AutoTagState } from "./useAutoTag";
 import { useViewState } from "./viewState";
 
@@ -62,10 +62,9 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
     }
   });
 
-  // "Tag, alias, alias": the first value names the tag, the rest are aliases.
+  // "Term, term, term": the first one also names the tag, to begin with.
   const addKeyword = () => {
-    const [tag, ...aliases] = draft.split(/[,、]/);
-    const entry = newKeyword(config.keywords, tag ?? "", aliases);
+    const entry = newKeyword(config.keywords, draft.split(/[,、]/), existing);
     if (!entry) return;
     update((c) => ({ ...c, keywords: [...c.keywords, entry] }));
     setSelection(entry.id);
@@ -80,8 +79,8 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
   const q = filterable ? filter.trim().toLowerCase() : "";
   const matching = q
     ? config.keywords.filter((entry) =>
-        [entry.tag, ...entry.aliases].some((term) =>
-          term.toLowerCase().includes(q),
+        [...entry.terms, ...entry.tags].some((text) =>
+          text.toLowerCase().includes(q),
         ),
       )
     : config.keywords;
@@ -103,7 +102,7 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
             <span className="text-xs tabular-nums text-muted">
               {config.keywords.length}
             </span>
-            <span className="truncate text-xs text-muted">
+            <span className="min-w-0 truncate text-xs text-muted">
               {t("autoTag.keywordsHint")}
             </span>
           </div>
@@ -140,9 +139,15 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
                 shown?.id === entry.id ? "bg-overlay" : "hover:bg-surface",
               )}
             >
-              <Chip className="shrink-0">{entry.tag}</Chip>
-              <span className="min-w-0 flex-1 truncate text-xs text-muted">
-                {entry.aliases.join(", ") || t("autoTag.noAliases")}
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span
+                  className={cn(MONO, "truncate text-[13px] text-bright-fg")}
+                >
+                  {entry.terms.join(", ") || t("autoTag.keyword.noTermsShort")}
+                </span>
+                <span className="truncate text-[11px] text-muted">
+                  {entry.tags.join(", ") || t("autoTag.keyword.noTagsShort")}
+                </span>
               </span>
               <span className="shrink-0 text-xs tabular-nums text-muted">
                 {t("autoTag.fileCount", {
@@ -179,7 +184,8 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
     >
       {shown && (
         <KeywordEditor
-          // Per entry: the alias being typed belongs to the one it was typed for.
+          // Per entry: a term or tag being typed belongs to the one it was
+          // typed for.
           key={shown.id}
           entry={shown}
           names={names}

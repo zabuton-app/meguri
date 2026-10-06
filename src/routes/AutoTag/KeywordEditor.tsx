@@ -1,6 +1,5 @@
-// Editor for one dictionary entry: its aliases, how it matches, and the files
-// it finds.
-import { useState } from "react";
+// Editor for one dictionary entry: the terms it finds, the tags it then adds,
+// how it matches, and the files it finds.
 import { useNavigate } from "react-router";
 import { Search } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -9,13 +8,27 @@ import { searchLibrary } from "@/lib/ui-events";
 import { cn } from "@/lib/utils";
 import {
   KEYWORD_MODES,
+  MAX_AUTO_TAG_KEYWORD_TAGS,
+  MAX_AUTO_TAG_KEYWORD_TERMS,
   type KeywordEntry,
   type KeywordMode,
 } from "@shared/autoTag";
 import { segments } from "@shared/autoTagAnalysis";
-import { MAX_TAG_NAME, anyOfSearchToken } from "@shared/tags";
-import { MAX_ROWS, MONO, cleanAliases, keywordMatches } from "./helpers";
-import { Chip, Highlighted, MoreRows, Segmented, SmallButton } from "./parts";
+import { anyOfSearchToken } from "@shared/tags";
+import {
+  MAX_ROWS,
+  MONO,
+  addKeywordTags,
+  cleanTerms,
+  keywordMatches,
+} from "./helpers";
+import {
+  ChipListField,
+  Highlighted,
+  MoreRows,
+  Segmented,
+  SmallButton,
+} from "./parts";
 
 const MODE_LABELS: Record<KeywordMode, TranslationKey> = {
   word: "autoTag.mode.word",
@@ -43,13 +56,6 @@ export function KeywordEditor({
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [aliasDraft, setAliasDraft] = useState("");
-
-  const addAlias = () => {
-    const aliases = cleanAliases([...entry.aliases, aliasDraft], entry.tag);
-    if (aliases.length !== entry.aliases.length) onChange({ aliases });
-    setAliasDraft("");
-  };
 
   const rows = keywordMatches(entry, names);
 
@@ -58,70 +64,54 @@ export function KeywordEditor({
   // idea of a match, not the dictionary's: a substring of the whole path and
   // of the tags, with no word boundaries.
   const searchInLibrary = () => {
-    searchLibrary([anyOfSearchToken([entry.tag, ...entry.aliases])]);
+    searchLibrary([anyOfSearchToken(entry.terms)]);
     void navigate("/");
   };
 
   return (
     <section className="flex min-w-0 flex-1 flex-col gap-4 px-5 py-4">
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Chip className="px-2 text-sm leading-5">{entry.tag}</Chip>
-        <span className="text-xs text-muted">
-          {existing.has(entry.tag.toLowerCase())
-            ? t("autoTag.joinsExisting", {
-                tag: existing.get(entry.tag.toLowerCase()) ?? "",
-              })
-            : t("autoTag.createsNew")}
-        </span>
-        <SmallButton
-          variant="ghost"
-          className="ml-auto h-[26px] hover:text-error"
-          onClick={onDelete}
-        >
-          {t("autoTag.deleteKeyword")}
-        </SmallButton>
-      </div>
+      <ChipListField
+        kind="term"
+        label={t("autoTag.keyword.terms")}
+        items={entry.terms}
+        max={MAX_AUTO_TAG_KEYWORD_TERMS}
+        addLabel={t("autoTag.keyword.addTerm")}
+        removeLabel={(term) => t("autoTag.keyword.removeTerm", { term })}
+        empty={t("autoTag.keyword.noTerms")}
+        heading={
+          <SmallButton
+            variant="ghost"
+            className="ml-auto h-[26px] hover:text-error"
+            onClick={onDelete}
+          >
+            {t("autoTag.deleteKeyword")}
+          </SmallButton>
+        }
+        onAdd={(raw) => {
+          const terms = cleanTerms([...entry.terms, ...raw]);
+          if (terms.length !== entry.terms.length) onChange({ terms });
+        }}
+        onRemove={(term) =>
+          onChange({ terms: entry.terms.filter((x) => x !== term) })
+        }
+      />
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted">{t("autoTag.aliases")}</span>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {entry.aliases.map((alias) => (
-            <span
-              key={alias}
-              className={cn(
-                MONO,
-                "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border pl-2 pr-1 text-xs text-fg",
-              )}
-            >
-              {alias}
-              <button
-                type="button"
-                aria-label={t("autoTag.removeAlias", { alias })}
-                onClick={() =>
-                  onChange({
-                    aliases: entry.aliases.filter((a) => a !== alias),
-                  })
-                }
-                className="px-1 text-[13px] text-muted hover:text-bright-fg"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          <input
-            className="h-6 w-36 rounded-md border border-dashed border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
-            value={aliasDraft}
-            maxLength={MAX_TAG_NAME}
-            placeholder={t("autoTag.addAlias")}
-            aria-label={t("autoTag.addAlias")}
-            onChange={(e) => setAliasDraft(e.target.value)}
-            onKeyDown={(e) => {
-              // Not while an IME is composing: that Enter only confirms the text.
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) addAlias();
-            }}
-          />
-        </div>
-      </div>
+      <ChipListField
+        kind="tag"
+        label={t("autoTag.keyword.tags")}
+        items={entry.tags}
+        max={MAX_AUTO_TAG_KEYWORD_TAGS}
+        addLabel={t("autoTag.keyword.addTag")}
+        removeLabel={(tag) => t("autoTag.keyword.removeTag", { tag })}
+        empty={t("autoTag.keyword.noTags")}
+        onAdd={(raw) => {
+          const tags = addKeywordTags(entry.tags, raw, existing);
+          if (tags.length !== entry.tags.length) onChange({ tags });
+        }}
+        onRemove={(tag) =>
+          onChange({ tags: entry.tags.filter((x) => x !== tag) })
+        }
+      />
 
       <div className="flex flex-col gap-1.5">
         <span className="text-xs text-muted">{t("autoTag.matchMode")}</span>

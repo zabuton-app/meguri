@@ -16,16 +16,20 @@ import type { TFunc } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import {
   MAX_AUTO_TAG_FOLDER_TAGS,
-  cleanTagName,
   isUnderFolder,
-  isUsableTagName,
   type AutoTagFile,
   type FolderRule,
 } from "@shared/autoTag";
 import { ROOT_FOLDER, folderNameOf, parentOf } from "@shared/folderPath";
-import { MAX_TAG_NAME } from "@shared/tags";
-import { FIELD, MAX_ROWS, MONO, folderCountKey, folderCounts } from "./helpers";
-import { Chip, MoreRows, SmallButton } from "./parts";
+import {
+  FIELD,
+  MAX_ROWS,
+  MONO,
+  addFolderTags,
+  folderCountKey,
+  folderCounts,
+} from "./helpers";
+import { ChipListField, MoreRows, SmallButton } from "./parts";
 
 /** A workspace a folder rule can be for. */
 export interface FolderWorkspace {
@@ -132,7 +136,6 @@ export function FolderEditor({
   onDelete: () => void;
 }) {
   const { t } = useI18n();
-  const [tagDraft, setTagDraft] = useState("");
 
   // The workspace's folders as a tree, and how many files are under each.
   const tree = useMemo(
@@ -176,22 +179,6 @@ export function FolderEditor({
       ),
     [files, rule.folder, rule.workspaceId],
   );
-
-  const addTags = () => {
-    const have = new Set(rule.tags.map((tag) => tag.toLowerCase()));
-    const tags = [...rule.tags];
-    for (const raw of tagDraft.split(/[,、]/)) {
-      const cleaned = cleanTagName(raw);
-      const key = cleaned.toLowerCase();
-      if (!isUsableTagName(cleaned) || have.has(key)) continue;
-      if (tags.length >= MAX_AUTO_TAG_FOLDER_TAGS) break;
-      have.add(key);
-      // The spelling already in use, so the rule joins that tag.
-      tags.push(existing.get(key) ?? cleaned);
-    }
-    if (tags.length !== rule.tags.length) onChange({ tags });
-    setTagDraft("");
-  };
 
   const listed = inScope
     ? workspaces
@@ -296,45 +283,22 @@ export function FolderEditor({
         </ScrollArea>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted">{t("autoTag.folder.tags")}</span>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {rule.tags.map((tag) => (
-            <Chip key={tag} className="flex items-center gap-1 pr-1">
-              {tag}
-              <button
-                type="button"
-                aria-label={t("autoTag.folder.removeTag", { tag })}
-                onClick={() =>
-                  onChange({ tags: rule.tags.filter((x) => x !== tag) })
-                }
-                className="px-1 text-[13px] text-muted hover:text-bright-fg"
-              >
-                ×
-              </button>
-            </Chip>
-          ))}
-          {rule.tags.length < MAX_AUTO_TAG_FOLDER_TAGS && (
-            <input
-              className="h-6 w-44 rounded-md border border-dashed border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
-              value={tagDraft}
-              maxLength={MAX_TAG_NAME * 4}
-              placeholder={t("autoTag.folder.addTag")}
-              aria-label={t("autoTag.folder.addTag")}
-              onChange={(e) => setTagDraft(e.target.value)}
-              onKeyDown={(e) => {
-                // Not while an IME is composing: that Enter only confirms the text.
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) addTags();
-              }}
-            />
-          )}
-        </div>
-        {rule.tags.length === 0 && (
-          <span className="text-xs text-warn">
-            {t("autoTag.folder.noTags")}
-          </span>
-        )}
-      </div>
+      <ChipListField
+        kind="tag"
+        label={t("autoTag.folder.tags")}
+        items={rule.tags}
+        max={MAX_AUTO_TAG_FOLDER_TAGS}
+        addLabel={t("autoTag.folder.addTag")}
+        removeLabel={(tag) => t("autoTag.folder.removeTag", { tag })}
+        empty={t("autoTag.folder.noTags")}
+        onAdd={(raw) => {
+          const tags = addFolderTags(rule.tags, raw, existing);
+          if (tags.length !== rule.tags.length) onChange({ tags });
+        }}
+        onRemove={(tag) =>
+          onChange({ tags: rule.tags.filter((x) => x !== tag) })
+        }
+      />
 
       <div className="flex justify-end">
         <SmallButton

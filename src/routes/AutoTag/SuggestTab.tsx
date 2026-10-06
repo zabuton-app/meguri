@@ -185,7 +185,7 @@ export function SuggestTab({
       }
       if (dict && canRegister(cand)) {
         // newKeyword is the one judge of whether an entry can be added.
-        const entry = newKeyword(keywords, cand.name, []);
+        const entry = newKeyword(keywords, [cand.name], existing);
         if (entry) {
           keywords = [...keywords, entry];
           entries.push(entry);
@@ -200,7 +200,9 @@ export function SuggestTab({
         let merged = c.keywords;
         for (const entry of entries) {
           // Still by newKeyword's rules, against what is there by now.
-          if (newKeyword(merged, entry.tag, [])) merged = [...merged, entry];
+          if (newKeyword(merged, entry.terms, existing)) {
+            merged = [...merged, entry];
+          }
         }
         return { ...c, keywords: merged };
       });

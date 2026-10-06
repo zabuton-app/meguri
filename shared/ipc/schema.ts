@@ -8,7 +8,8 @@ import { MAX_TAG_NAME, MAX_TAG_REF_NAME } from "../tags.js";
 import {
   CASE_MODES,
   KEYWORD_MODES,
-  MAX_AUTO_TAG_ALIASES,
+  MAX_AUTO_TAG_KEYWORD_TAGS,
+  MAX_AUTO_TAG_KEYWORD_TERMS,
   MAX_AUTO_TAG_EXCLUDE,
   MAX_AUTO_TAG_FOLDER_RULES,
   MAX_AUTO_TAG_FOLDER_TAGS,
@@ -283,8 +284,8 @@ const autoTagTerm = z.string().min(1).max(MAX_TAG_NAME);
 
 export const AutoTagKeywordSchema = z.object({
   id: z.string().min(1).max(64),
-  tag: autoTagTerm,
-  aliases: z.array(autoTagTerm).max(MAX_AUTO_TAG_ALIASES),
+  terms: z.array(autoTagTerm).max(MAX_AUTO_TAG_KEYWORD_TERMS),
+  tags: z.array(autoTagTerm).max(MAX_AUTO_TAG_KEYWORD_TAGS),
   mode: z.enum(KEYWORD_MODES),
 }) satisfies z.ZodType<KeywordEntry>;
 

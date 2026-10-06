@@ -2,7 +2,9 @@
 import type { TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import {
-  MAX_AUTO_TAG_ALIASES,
+  MAX_AUTO_TAG_FOLDER_TAGS,
+  MAX_AUTO_TAG_KEYWORD_TAGS,
+  MAX_AUTO_TAG_KEYWORD_TERMS,
   MAX_AUTO_TAG_KEYWORDS,
   cleanTagName,
   compileKeyword,
@@ -43,42 +45,83 @@ export const FIELD =
 /** Rows drawn per list at a time: a page of it, or all a preview shows. */
 export const MAX_ROWS = 200;
 
-/** A new dictionary entry, or null when the tag name is unusable or taken. */
+/**
+ * A new dictionary entry, or null when the first term cannot name a tag, the
+ * keywords are full, or one of the terms is already an entry's.
+ */
 export function newKeyword(
   keywords: readonly KeywordEntry[],
-  rawTag: string,
-  aliases: readonly string[],
+  rawTerms: readonly string[],
+  existing: ReadonlyMap<string, string>,
 ): KeywordEntry | null {
-  const tag = cleanTagName(rawTag);
-  if (!isUsableTagName(tag)) return null;
+  const terms = cleanTerms(rawTerms);
+  const first = terms[0];
+  if (!first || !isUsableTagName(first)) return null;
   if (keywords.length >= MAX_AUTO_TAG_KEYWORDS) return null;
-  if (keywords.some((k) => k.tag.toLowerCase() === tag.toLowerCase())) {
+  // One entry per term: a second one for the same word would only repeat it.
+  const keys = new Set(terms.map((term) => term.toLowerCase()));
+  if (keywords.some((k) => k.terms.some((t) => keys.has(t.toLowerCase())))) {
     return null;
   }
   return {
     id: crypto.randomUUID(),
-    tag,
-    aliases: cleanAliases(aliases, tag),
+    terms,
+    // The first term names the tag to begin with.
+    tags: addKeywordTags([], [first], existing),
     mode: "word",
   };
 }
 
-/** Aliases as stored: trimmed, without repeats or the tag itself. */
-export function cleanAliases(
-  aliases: readonly string[],
-  tag: string,
-): string[] {
-  const seen = new Set([tag.toLowerCase()]);
+/** Terms as stored: trimmed, without repeats. */
+export function cleanTerms(terms: readonly string[]): string[] {
+  const seen = new Set<string>();
   const out: string[] = [];
-  for (const raw of aliases) {
-    const alias = cleanTagName(raw);
-    const key = alias.toLowerCase();
-    if (!alias || seen.has(key)) continue;
+  for (const raw of terms) {
+    const term = cleanTagName(raw);
+    const key = term.toLowerCase();
+    if (!term || seen.has(key)) continue;
     seen.add(key);
-    out.push(alias);
+    out.push(term);
   }
-  return out.slice(0, MAX_AUTO_TAG_ALIASES);
+  return out.slice(0, MAX_AUTO_TAG_KEYWORD_TERMS);
 }
+
+/**
+ * Tags as stored, with more added: trimmed, usable, without repeats, in the
+ * spelling already in use for one the library has.
+ */
+export function mergeTags(
+  have: readonly string[],
+  raw: readonly string[],
+  existing: ReadonlyMap<string, string>,
+  max: number,
+): string[] {
+  const keys = new Set(have.map((tag) => tag.toLowerCase()));
+  const out = [...have];
+  for (const text of raw) {
+    const tag = cleanTagName(text);
+    const key = tag.toLowerCase();
+    if (!isUsableTagName(tag) || keys.has(key)) continue;
+    if (out.length >= max) break;
+    keys.add(key);
+    out.push(existing.get(key) ?? tag);
+  }
+  return out;
+}
+
+/** {@link mergeTags} for a keyword entry. */
+export const addKeywordTags = (
+  have: readonly string[],
+  raw: readonly string[],
+  existing: ReadonlyMap<string, string>,
+): string[] => mergeTags(have, raw, existing, MAX_AUTO_TAG_KEYWORD_TAGS);
+
+/** {@link mergeTags} for a folder rule. */
+export const addFolderTags = (
+  have: readonly string[],
+  raw: readonly string[],
+  existing: ReadonlyMap<string, string>,
+): string[] => mergeTags(have, raw, existing, MAX_AUTO_TAG_FOLDER_TAGS);
 
 /**
  * Where a suggestion stands: whether the files carry the word as a tag, and
@@ -188,19 +231,17 @@ export function keywordMatches(
   if (cached?.names === names) return cached.rows;
   const rows: KeywordMatches = [];
   const compiled = compileKeyword(entry);
-  if (compiled) {
-    // A plain substring test first: nearly every name fails it, and it costs a
-    // fraction of running the expression. The expression then decides (word
-    // boundaries, the extension), so the test may only ever let too much in.
-    const needles = [entry.tag, ...entry.aliases]
-      .map((term) => term.normalize("NFC").trim().toLowerCase())
-      .filter(Boolean);
-    for (const name of names) {
-      const lower = name.toLowerCase();
-      if (!needles.some((needle) => lower.includes(needle))) continue;
-      const hits = runKeyword(compiled, name);
-      if (hits.length > 0) rows.push({ name, hits });
-    }
+  // A plain substring test first: nearly every name fails it, and it costs a
+  // fraction of running the expression. The expression then decides (word
+  // boundaries, the extension), so the test may only ever let too much in.
+  const needles = entry.terms
+    .map((term) => term.normalize("NFC").trim().toLowerCase())
+    .filter(Boolean);
+  for (const name of names) {
+    const lower = name.toLowerCase();
+    if (!needles.some((needle) => lower.includes(needle))) continue;
+    const hits = runKeyword(compiled, name);
+    if (hits.length > 0) rows.push({ name, hits });
   }
   keywordMatchCache.set(entry, { names, rows });
   return rows;

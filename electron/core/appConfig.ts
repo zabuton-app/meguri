@@ -11,6 +11,7 @@ import {
   type LogoId,
 } from "../../shared/ipc/schema.js";
 import {
+  MAX_AUTO_TAG_KEYWORD_TERMS,
   MAX_AUTO_TAG_KEYWORDS,
   MAX_AUTO_TAG_FOLDER_RULES,
   MAX_AUTO_TAG_RULES,
@@ -154,7 +155,7 @@ function parseAutoTag(value: unknown): AutoTagConfig {
     keywords: list(
       c.keywords,
       MAX_AUTO_TAG_KEYWORDS,
-      (item) => AutoTagKeywordSchema.safeParse(item).data,
+      (item) => AutoTagKeywordSchema.safeParse(keywordFromLegacy(item)).data,
     ),
     // Absent from a configuration written before folder rules existed.
     folders: list(
@@ -165,6 +166,26 @@ function parseAutoTag(value: unknown): AutoTagConfig {
     applyOnScan: c.applyOnScan === true,
     ignored: list(c.ignored, MAX_AUTO_TAG_TERMS, term),
     excludedTerms: list(c.excludedTerms, MAX_AUTO_TAG_TERMS, term),
+  };
+}
+
+/**
+ * A keyword entry written before an entry had tags of its own, brought to
+ * the current shape: its one tag was also the first of its terms, the aliases
+ * the rest — one more than the terms may hold, so the last alias goes.
+ */
+function keywordFromLegacy(item: unknown): unknown {
+  if (!item || typeof item !== "object" || "terms" in item) return item;
+  const { tag, aliases, ...rest } = item as Record<string, unknown>;
+  if (typeof tag !== "string") return item;
+  const terms = [
+    tag,
+    ...(Array.isArray(aliases) ? (aliases as unknown[]) : []),
+  ];
+  return {
+    ...rest,
+    terms: terms.slice(0, MAX_AUTO_TAG_KEYWORD_TERMS),
+    tags: [tag],
   };
 }
 

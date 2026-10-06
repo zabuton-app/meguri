@@ -600,11 +600,10 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.rule.new": "새 규칙",
   "autoTag.rule.untitled": "이름 없는 규칙",
   "autoTag.keywords": "키워드",
-  "autoTag.keywordsHint": "이름에 포함되면 태그를 붙임",
+  "autoTag.keywordsHint": "이름에 단어가 포함되면 태그를 붙임",
   "autoTag.filterKeywords": "키워드 필터",
-  "autoTag.addKeywordInline": "+ 키워드 추가(태그, 별칭, … 후 Enter)",
+  "autoTag.addKeywordInline": "+ 키워드 추가(단어, 단어, … 후 Enter)",
   "autoTag.noKeywordsMatch": "필터와 일치하는 키워드가 없습니다.",
-  "autoTag.noAliases": "별칭 없음",
   "autoTag.noKeywords": "아직 키워드가 없습니다.",
   "autoTag.folders": "폴더",
   "autoTag.foldersHint": "폴더 아래의 파일에 태그를 붙입니다",
@@ -632,13 +631,19 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.folder.noFiles": "이 폴더 아래에 파일이 없습니다.",
   "autoTag.folder.outOfScope":
     "이 워크스페이스는 더 이상 라이브러리에 없습니다.",
-  "autoTag.joinsExisting":
-    '기존 태그 "{tag}"와 이름이 같아 그 태그에 추가됩니다',
-  "autoTag.createsNew": "새 태그로 만들어집니다",
   "autoTag.deleteKeyword": "삭제",
-  "autoTag.aliases": "별칭·표기 차이",
-  "autoTag.removeAlias": '별칭 "{alias}" 삭제',
-  "autoTag.addAlias": "+ 별칭 추가",
+  "autoTag.keyword.terms": "찾을 단어",
+  "autoTag.keyword.addTerm": "+ 단어 추가(Enter)",
+  "autoTag.keyword.removeTerm": "단어 “{term}” 삭제",
+  "autoTag.keyword.noTerms":
+    "아직 단어가 없습니다. 이 항목은 아무것도 찾지 않습니다.",
+  "autoTag.keyword.noTermsShort": "단어 없음",
+  "autoTag.keyword.tags": "붙일 태그",
+  "autoTag.keyword.addTag": "+ 태그 추가(Enter)",
+  "autoTag.keyword.removeTag": "태그 “{tag}” 삭제",
+  "autoTag.keyword.noTags":
+    "아직 태그가 없습니다. 이 항목은 아무것도 붙이지 않습니다.",
+  "autoTag.keyword.noTagsShort": "태그 없음",
   "autoTag.matchMode": "일치 방식",
   "autoTag.mode.word": "단어 단위",
   "autoTag.mode.contains": "부분 일치",
@@ -648,7 +653,7 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.matchingFiles": "일치하는 파일",
   "autoTag.searchInLibrary": "라이브러리에서 검색",
   "autoTag.searchInLibraryHint":
-    "태그 이름이나 별칭 중 하나를 포함한 파일을 라이브러리 검색으로 표시합니다",
+    "단어 중 하나를 포함한 파일을 라이브러리 검색으로 표시합니다",
   "autoTag.noMatchingFiles": "일치하는 파일이 없습니다.",
   "autoTag.analyzing": "파일 이름 분석 중…",
   "autoTag.analyzed":

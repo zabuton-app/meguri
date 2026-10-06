@@ -1,9 +1,11 @@
 // Small pieces shared by the auto-tagging tabs.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Segment } from "@shared/autoTagAnalysis";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { MAX_TAG_NAME } from "@shared/tags";
+import { MONO } from "./helpers";
 import type { Paging } from "./paging";
 
 /** A proposed tag, in the tint the design gives proposals. */
@@ -156,7 +158,13 @@ export function SplitPane({
     // the element it measures.
     <div className="@container flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col @[760px]:flex-row">
-        <ScrollArea className="h-2/5 shrink-0 border-b border-border @[760px]:h-auto @[760px]:w-[360px] @[760px]:border-b-0 @[760px]:border-r">
+        <ScrollArea
+          className="h-2/5 shrink-0 border-b border-border @[760px]:h-auto @[760px]:w-[360px] @[760px]:border-b-0 @[760px]:border-r"
+          // Radix lays the content out as a table, which is as wide as its
+          // longest line: a block instead, so a line too long is cut short
+          // rather than scrolled to.
+          viewportClassName="[&>div]:!block"
+        >
           {aside}
         </ScrollArea>
         <ScrollArea className="min-h-0 min-w-0 flex-1" fillViewport>
@@ -265,5 +273,97 @@ export function Pager({ t, paging }: { t: TFunc; paging: Paging }) {
         {t("autoTag.page.next")}
       </SmallButton>
     </nav>
+  );
+}
+
+/**
+ * A list of values as chips, each with its ×, and a field to add more —
+ * several at once, "a, b" — up to `max`. `onAdd` gets the raw pieces: what
+ * they become (cleaned, deduplicated, capped) is the caller's.
+ */
+export function ChipListField({
+  label,
+  items,
+  max,
+  kind,
+  addLabel,
+  removeLabel,
+  empty,
+  heading,
+  onAdd,
+  onRemove,
+}: {
+  label: string;
+  items: readonly string[];
+  max: number;
+  /** Tags are chips; terms are plain outlined, in the name font. */
+  kind: "tag" | "term";
+  addLabel: string;
+  removeLabel: (item: string) => string;
+  /** Said, as a warning, while there is nothing in the list. */
+  empty: string;
+  /** Sits at the right of the label. */
+  heading?: ReactNode;
+  onAdd: (raw: string[]) => void;
+  onRemove: (item: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    onAdd(draft.split(/[,、]/));
+    setDraft("");
+  };
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted">{label}</span>
+        {heading}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {items.map((item) => {
+          const remove = (
+            <button
+              type="button"
+              aria-label={removeLabel(item)}
+              onClick={() => onRemove(item)}
+              className="px-1 text-[13px] text-muted hover:text-bright-fg"
+            >
+              ×
+            </button>
+          );
+          return kind === "tag" ? (
+            <Chip key={item} className="flex items-center gap-1 pr-1">
+              {item}
+              {remove}
+            </Chip>
+          ) : (
+            <span
+              key={item}
+              className={cn(
+                MONO,
+                "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border pl-2 pr-1 text-xs text-fg",
+              )}
+            >
+              {item}
+              {remove}
+            </span>
+          );
+        })}
+        {items.length < max && (
+          <input
+            className="h-6 w-44 rounded-md border border-dashed border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
+            value={draft}
+            maxLength={MAX_TAG_NAME * 4}
+            placeholder={addLabel}
+            aria-label={addLabel}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // Not while an IME is composing: that Enter only confirms the text.
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) add();
+            }}
+          />
+        )}
+      </div>
+      {items.length === 0 && <span className="text-xs text-warn">{empty}</span>}
+    </div>
   );
 }

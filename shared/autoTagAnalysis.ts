@@ -100,9 +100,7 @@ export function suggestCandidates(
 ): Candidate[] {
   const dictionary = new Set<string>();
   for (const { entry } of engine.keywords) {
-    for (const term of [entry.tag, ...entry.aliases]) {
-      dictionary.add(term.toLowerCase());
-    }
+    for (const term of entry.terms) dictionary.add(term.toLowerCase());
   }
   const frequent = new Map<
     string,

@@ -96,7 +96,7 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
             <span className="text-xs tabular-nums text-muted">
               {config.folders.length}
             </span>
-            <span className="truncate text-xs text-muted">
+            <span className="min-w-0 truncate text-xs text-muted">
               {t("autoTag.foldersHint")}
             </span>
           </div>

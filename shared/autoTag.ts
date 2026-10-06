@@ -3,7 +3,7 @@
  *
  * Two things read a file's name and propose tags: pattern rules (a regular
  * expression whose matches name tags through a template) and a keyword
- * dictionary (a tag plus its aliases). A third goes by where the file is:
+ * dictionary (terms to find, and the tags they give). A third goes by where the file is:
  * folder rules, which tag everything under a folder of a workspace. The tags
  * are the user's own — plain names, no namespace — so applying them is the
  * same act as tagging by hand.
@@ -18,7 +18,8 @@ import { MAX_TAG_NAME, isReservedTagName } from "./tags.js";
 
 export const MAX_AUTO_TAG_RULES = 64;
 export const MAX_AUTO_TAG_KEYWORDS = 500;
-export const MAX_AUTO_TAG_ALIASES = 32;
+export const MAX_AUTO_TAG_KEYWORD_TERMS = 32;
+export const MAX_AUTO_TAG_KEYWORD_TAGS = 16;
 export const MAX_AUTO_TAG_PATTERN = 256;
 export const MAX_AUTO_TAG_TEMPLATE = 64;
 /**
@@ -67,9 +68,9 @@ export interface TagRule {
 
 export interface KeywordEntry {
   id: string;
-  /** The tag applied when the tag itself or any alias is found. */
-  tag: string;
-  aliases: string[];
+  /** What to find in a name: any of them found gives the file the tags. */
+  terms: string[];
+  tags: string[];
   /** `word`: ASCII terms must stand alone between non-alphanumerics. */
   mode: KeywordMode;
 }
@@ -377,16 +378,21 @@ const ASCII_ONLY = /^[\x00-\x7f]+$/;
 
 export interface CompiledKeyword {
   entry: KeywordEntry;
-  tag: string;
+  /** The usable ones among the entry's tags. */
+  tags: string[];
   /** Every term of the entry as one alternation, or null when it has none. */
   regex: RegExp | null;
 }
 
-export function compileKeyword(entry: KeywordEntry): CompiledKeyword | null {
-  const tag = cleanTagName(entry.tag);
-  if (!isUsableTagName(tag)) return null;
+/**
+ * An entry with no usable tag still compiles: it finds its terms (so the
+ * screen can show where, and a suggestion does not repeat them) and gives
+ * nothing.
+ */
+export function compileKeyword(entry: KeywordEntry): CompiledKeyword {
+  const tags = entry.tags.map(cleanTagName).filter(isUsableTagName);
   const sources: string[] = [];
-  for (const raw of [entry.tag, ...entry.aliases]) {
+  for (const raw of entry.terms) {
     const term = raw.normalize("NFC").trim();
     if (!term) continue;
     // Word mode only means something for ASCII: Japanese has no word breaks to
@@ -403,7 +409,7 @@ export function compileKeyword(entry: KeywordEntry): CompiledKeyword | null {
   sources.sort((a, b) => b.length - a.length);
   return {
     entry,
-    tag,
+    tags,
     regex: sources.length > 0 ? new RegExp(sources.join("|"), "gi") : null,
   };
 }
@@ -550,12 +556,11 @@ export function compileEngine(config: {
     const compiled = compileRule(rule);
     if (compiled) rules.push(compiled);
   }
-  const keywords: CompiledKeyword[] = [];
-  for (const entry of config.keywords) {
-    const compiled = compileKeyword(entry);
-    if (compiled) keywords.push(compiled);
-  }
-  return { rules, keywords, folders: compileFolders(config.folders ?? []) };
+  return {
+    rules,
+    keywords: config.keywords.map(compileKeyword),
+    folders: compileFolders(config.folders ?? []),
+  };
 }
 
 export type ProposalSource =
@@ -596,8 +601,10 @@ export function proposalsFor(engine: CompiledEngine, name: string): Proposal[] {
   }
   for (const compiled of engine.keywords) {
     if (runKeyword(compiled, input).length === 0) continue;
-    if (!add(compiled.tag, { kind: "keyword", keywordId: compiled.entry.id })) {
-      return out;
+    for (const tag of compiled.tags) {
+      if (!add(tag, { kind: "keyword", keywordId: compiled.entry.id })) {
+        return out;
+      }
     }
   }
   return out;

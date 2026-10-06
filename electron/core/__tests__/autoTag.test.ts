@@ -69,8 +69,8 @@ const rule = (over: Partial<TagRule> = {}): TagRule => ({
 });
 const keyword = (over: Partial<KeywordEntry> = {}): KeywordEntry => ({
   id: "k",
-  tag: "Yoga",
-  aliases: ["ヨガ"],
+  terms: ["Yoga", "ヨガ"],
+  tags: ["Yoga"],
   mode: "word",
   ...over,
 });
@@ -204,9 +204,9 @@ describe("rules", () => {
 
 describe("keywords", () => {
   const hits = (k: KeywordEntry, name: string) =>
-    runKeyword(compileKeyword(k)!, name).map((h) => h.text);
+    runKeyword(compileKeyword(k), name).map((h) => h.text);
 
-  it("finds the tag or any alias, whatever the case", () => {
+  it("finds any of the terms, whatever the case", () => {
     expect(hits(keyword(), NAMES[0])).toEqual(["yoga"]);
     expect(hits(keyword(), NAMES[8])).toEqual(["ヨガ"]);
     expect(tagsForName(engineOf([], [keyword()]), NAMES[8])).toEqual(["Yoga"]);
@@ -221,16 +221,22 @@ describe("keywords", () => {
   });
 
   it("never reads the extension, like the rules", () => {
-    const movie = keyword({ tag: "Movie", aliases: ["mov"] });
+    const movie = keyword({ terms: ["Movie", "mov"], tags: ["Movie"] });
     expect(hits(movie, "holiday.mov")).toEqual([]);
     expect(hits(movie, "mov night.mp4")).toEqual(["mov"]);
     expect(
-      hits(keyword({ tag: "AV", aliases: [], mode: "contains" }), "clip.avi"),
+      hits(
+        keyword({ terms: ["AV"], tags: ["AV"], mode: "contains" }),
+        "clip.avi",
+      ),
     ).toEqual([]);
   });
 
   it("matches a decomposed (macOS) name against a keyword typed normally", () => {
-    const engine = engineOf([], [keyword({ tag: "ガール", aliases: [] })]);
+    const engine = engineOf(
+      [],
+      [keyword({ terms: ["ガール"], tags: ["ガール"] })],
+    );
     expect(tagsForName(engine, `${"ガール".normalize("NFD")} 01.mp4`)).toEqual([
       "ガール",
     ]);
@@ -240,13 +246,28 @@ describe("keywords", () => {
 describe("proposals", () => {
   it("lists rules first, then the dictionary, one spelling per tag", () => {
     const engine = engineOf(activeRules(), [
-      keyword({ id: "trip", tag: "trip", aliases: [] }),
+      keyword({ id: "trip", terms: ["trip"], tags: ["trip"] }),
       keyword(),
     ]);
     expect(proposalsFor(engine, "[Trip] yoga camp.mp4")).toEqual([
       { tag: "Trip", key: "trip", source: { kind: "rule", ruleId: "square" } },
       { tag: "Yoga", key: "yoga", source: { kind: "keyword", keywordId: "k" } },
     ]);
+  });
+
+  it("gives every tag of a keyword entry, and nothing for one with none", () => {
+    const code = keyword({
+      id: "code",
+      terms: ["ABCD-123"],
+      tags: ["ABCD", "Series"],
+      mode: "contains",
+    });
+    expect(tagsForName(engineOf([], [code]), "ABCD-123 intro.mp4")).toEqual([
+      "ABCD",
+      "Series",
+    ]);
+    const bare = keyword({ tags: [] });
+    expect(tagsForName(engineOf([], [bare]), NAMES[0])).toEqual([]);
   });
 });
 

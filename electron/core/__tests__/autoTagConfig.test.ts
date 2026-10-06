@@ -48,6 +48,58 @@ describe("the stored auto-tagging configuration", () => {
     expect(loadConfig().autoTag).toEqual(stored);
   });
 
+  it("reads a keyword written as one tag with aliases as terms adding that tag", () => {
+    write({
+      autoTag: {
+        ...defaultAutoTagConfig(),
+        keywords: [
+          { id: "k1", tag: "Yoga", aliases: ["ヨガ", "stretch"], mode: "word" },
+          {
+            id: "k2",
+            terms: ["Trip"],
+            tags: ["Trip", "Journey"],
+            mode: "word",
+          },
+        ],
+      },
+    });
+    expect(loadConfig().autoTag.keywords).toEqual([
+      {
+        id: "k1",
+        terms: ["Yoga", "ヨガ", "stretch"],
+        tags: ["Yoga"],
+        mode: "word",
+      },
+      { id: "k2", terms: ["Trip"], tags: ["Trip", "Journey"], mode: "word" },
+    ]);
+  });
+
+  it("keeps an old entry with as many aliases as were allowed, short of its last", () => {
+    // The old shape held a tag plus 32 aliases: one more term than there is
+    // room for. The aliases that are not an array, or a tag that is not a
+    // string, are no entry at all.
+    const aliases = Array.from({ length: 32 }, (_, i) => `alias${i}`);
+    write({
+      autoTag: {
+        ...defaultAutoTagConfig(),
+        keywords: [
+          { id: "k1", tag: "Yoga", aliases, mode: "word" },
+          { id: "k2", tag: "Trip", aliases: "trip", mode: "word" },
+          { id: "k3", tag: 7, aliases: [], mode: "word" },
+        ],
+      },
+    });
+    expect(loadConfig().autoTag.keywords).toEqual([
+      {
+        id: "k1",
+        terms: ["Yoga", ...aliases.slice(0, 31)],
+        tags: ["Yoga"],
+        mode: "word",
+      },
+      { id: "k2", terms: ["Trip"], tags: ["Trip"], mode: "word" },
+    ]);
+  });
+
   it("reads a configuration written before folder rules as having none", () => {
     const before: Record<string, unknown> = { ...defaultAutoTagConfig() };
     delete before.folders;

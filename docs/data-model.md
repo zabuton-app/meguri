@@ -128,7 +128,7 @@ never sent to `LIKE` because a short one sits beside it, since `LIKE` is slower
 and folds case for ASCII only.
 
 The auto-tagging screen uses this to search the library for a dictionary
-entry's tag and aliases (`searchLibrary()` in `src/lib/ui-events.ts`, which
+entry's terms (`searchLibrary()` in `src/lib/ui-events.ts`, which
 replaces the text query rather than adding to it) — by the search box's rules,
 a substring of the path or of the tags, not by the entry's own word matching.
 
@@ -240,9 +240,11 @@ previews with the code a scan runs:
   what the worker returned for the names. `withFolderTags()` is the one place
   the two are put together, and the screen's analysis lists a folder rule's
   tags for exactly the files it would give them to.
-- A **keyword** is a tag with aliases. Finding any of them in the name (again
-  without its extension) proposes the tag; in `word` mode an ASCII term must
-  stand between non-alphanumerics.
+- A **keyword** is some terms to find and the tags to add: finding any of the
+  terms in the name (again without its extension) proposes every one of the
+  tags; in `word` mode an ASCII term must stand between non-alphanumerics. An
+  entry written before it had tags of its own (one `tag` plus `aliases`) is
+  read as those terms, adding that tag.
 
 Unlike [derived tags](#derived-tags), what the engine proposes is attached as
 the user's **own** tags: no namespace, `source = 'manual'`, indexed in FTS,

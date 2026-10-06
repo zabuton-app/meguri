@@ -622,12 +622,12 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.rule.new": "Nouvelle règle",
   "autoTag.rule.untitled": "Règle sans nom",
   "autoTag.keywords": "Mots-clés",
-  "autoTag.keywordsHint": "étiquettent le fichier dont le nom les contient",
+  "autoTag.keywordsHint":
+    "étiquettent le fichier dont le nom contient l’un de leurs termes",
   "autoTag.filterKeywords": "Filtrer les mots-clés",
   "autoTag.addKeywordInline":
-    "+ Ajouter un mot-clé (étiquette, alias, … puis Entrée)",
+    "+ Ajouter un mot-clé (terme, terme, … puis Entrée)",
   "autoTag.noKeywordsMatch": "Aucun mot-clé ne correspond au filtre.",
-  "autoTag.noAliases": "Aucun alias",
   "autoTag.noKeywords": "Aucun mot-clé pour l’instant.",
   "autoTag.folders": "Dossiers",
   "autoTag.foldersHint": "tague tout ce qui se trouve sous un dossier",
@@ -654,13 +654,18 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.folder.noFiles": "Aucun fichier sous ce dossier.",
   "autoTag.folder.outOfScope":
     "Cet espace de travail n'est plus dans la bibliothèque.",
-  "autoTag.joinsExisting":
-    "Même nom que l’étiquette existante « {tag} » ; les fichiers la rejoignent",
-  "autoTag.createsNew": "Crée une nouvelle étiquette",
   "autoTag.deleteKeyword": "Supprimer",
-  "autoTag.aliases": "Alias et variantes",
-  "autoTag.removeAlias": "Retirer l’alias « {alias} »",
-  "autoTag.addAlias": "+ Ajouter un alias",
+  "autoTag.keyword.terms": "Termes à chercher",
+  "autoTag.keyword.addTerm": "+ Ajouter un terme (Entrée)",
+  "autoTag.keyword.removeTerm": "Retirer le terme « {term} »",
+  "autoTag.keyword.noTerms":
+    "Pas encore de termes : cette entrée ne trouve rien.",
+  "autoTag.keyword.noTermsShort": "aucun terme",
+  "autoTag.keyword.tags": "Tags à ajouter",
+  "autoTag.keyword.addTag": "+ Ajouter un tag (Entrée)",
+  "autoTag.keyword.removeTag": "Retirer le tag « {tag} »",
+  "autoTag.keyword.noTags": "Pas encore de tags : cette entrée n'ajoute rien.",
+  "autoTag.keyword.noTagsShort": "aucun tag",
   "autoTag.matchMode": "Correspondance",
   "autoTag.mode.word": "Mot entier",
   "autoTag.mode.contains": "Contient",
@@ -670,7 +675,7 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.matchingFiles": "Fichiers correspondants",
   "autoTag.searchInLibrary": "Rechercher dans la bibliothèque",
   "autoTag.searchInLibraryHint":
-    "Affiche les fichiers contenant l’étiquette ou un alias avec la recherche de la bibliothèque",
+    "Affiche les fichiers contenant l’un des termes avec la recherche de la bibliothèque",
   "autoTag.noMatchingFiles": "Aucun fichier correspondant.",
   "autoTag.analyzing": "Analyse des noms de fichiers…",
   "autoTag.analyzed":

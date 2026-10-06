@@ -19,7 +19,7 @@ test.describe("Auto tagging", () => {
     const add = dialog.getByLabel(/Add a keyword/);
     await add.fill("Test");
     await add.press("Enter");
-    await expect(dialog.getByText("Creates a new tag")).toBeVisible();
+    await expect(dialog.getByText("Terms to find")).toBeVisible();
     await expect(dialog.getByText("Matching files")).toBeVisible();
 
     // A keyword is not a suggestion: it is applied over the library as a
@@ -46,7 +46,7 @@ test.describe("Auto tagging", () => {
     const dialog = ready.getByRole("dialog");
     await dialog.getByRole("tab", { name: "Keywords" }).click();
     const add = dialog.getByLabel(/Add a keyword/);
-    // The alias matches the fixture ("test.png"); the tag itself does not.
+    // The second term matches the fixture ("test.png"); the first does not.
     await add.fill("Sample, test");
     await add.press("Enter");
     await dialog.getByRole("button", { name: "Search the library" }).click();
