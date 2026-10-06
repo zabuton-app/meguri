@@ -273,10 +273,11 @@ evaluated on the main thread in its place. Either way the scan logs it and
 carries on without auto-tagging; the files stay owed.
 
 `shared/autoTagAnalysis.ts` builds the screen's views on top of the engine —
-suggestions (including frequent words nothing claims yet), a file name cut into
-tokens, and the library's vocabulary by kind. Those run in the renderer over the
-names loaded by `auto_tag_files` (capped at `MAX_AUTO_TAG_FILES`); every write
-goes through `auto_tag_apply`, which only says which files get which tags.
+suggestions (frequent words of the names that no rule or keyword produces
+yet), a file name cut into tokens, and the library's vocabulary by kind. Those
+run in the renderer over the names loaded by `auto_tag_files` (capped at
+`MAX_AUTO_TAG_FILES`); every write goes through `auto_tag_apply`, which only
+says which files get which tags.
 
 The renderer runs those analyses on its own thread, so a rule that hangs would
 hang the screen. Two things keep that from being permanent. The configuration

@@ -1,5 +1,5 @@
-// Suggestions tab: every tag the engine would give the library's files, plus
-// frequent words it does not pick up yet — to apply, register or dismiss.
+// Suggestions tab: frequent words of the file names that no rule or keyword
+// produces yet — to apply, register as keywords, or dismiss.
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -9,17 +9,11 @@ import { searchLibrary } from "@/lib/ui-events";
 import { cn } from "@/lib/utils";
 import { MAX_AUTO_TAG_KEYWORDS, type KeywordEntry } from "@shared/autoTag";
 import { anyOfSearchToken } from "@shared/tags";
-import {
-  candidateGroup,
-  segments,
-  type Candidate,
-  type CandidateOrigin,
-} from "@shared/autoTagAnalysis";
+import { segments, type Candidate } from "@shared/autoTagAnalysis";
 import { isAutoMetaValue } from "./autoMeta";
 import { MONO, newKeyword, type CandidateState } from "./helpers";
 import { usePaging } from "./paging";
 import {
-  Badge,
   Chip,
   Highlighted,
   MoreRows,
@@ -33,26 +27,13 @@ import {
 import type { AutoTagState } from "./useAutoTag";
 import { useViewState } from "./viewState";
 
-const ORIGIN_LABELS: Record<CandidateOrigin, TranslationKey> = {
-  prefix: "autoTag.kind.prefix",
-  bracket: "autoTag.kind.bracket",
-  regex: "autoTag.kind.regex",
-  folder: "autoTag.kind.folder",
-  keyword: "autoTag.origin.keyword",
-  frequent: "autoTag.origin.frequent",
-};
-
-// Rules and the keywords are one group here, as they are one tab: both are
-// what the Conditions tab already produces, as opposed to the frequent words
-// nothing produces yet. The dismissed ones are a list of their own: out of the
-// way everywhere else, and here to be brought back.
-type Filter = "all" | "conditions" | "frequent" | "ignored";
-const FILTERS = ["all", "conditions", "frequent", "ignored"] as const;
+// The dismissed ones are a list of their own: out of the way everywhere else,
+// and here to be brought back.
+type Filter = "all" | "ignored";
+const FILTERS = ["all", "ignored"] as const;
 
 const FILTER_LABELS: Record<Filter, TranslationKey> = {
   all: "autoTag.filter.all",
-  conditions: "autoTag.tab.conditions",
-  frequent: "autoTag.filter.frequent",
   ignored: "autoTag.status.ignored",
 };
 
@@ -66,13 +47,9 @@ const APPLIED_LABELS: Record<AppliedFilter, TranslationKey> = {
   applied: "autoTag.filter.appliedOnly",
 };
 
-const groupOf = (c: Candidate): "conditions" | "frequent" =>
-  candidateGroup(c) === "frequent" ? "frequent" : "conditions";
-
 /** For a candidate the screen has no state for; none is expected. */
 const NOT_PENDING: CandidateState = {
   ignored: false,
-  inKeywords: false,
   canRegister: false,
   missing: 0,
   tagged: 0,
@@ -125,22 +102,12 @@ export function SuggestTab({
 
   // Dismissing a candidate takes it out of the lists: what is left in them is
   // what has not been decided yet.
-  const filterOf = (c: Candidate): Exclude<Filter, "all"> =>
-    stateOf(c).ignored ? "ignored" : groupOf(c);
-  const counts: Record<Filter, number> = {
-    all: 0,
-    conditions: 0,
-    frequent: 0,
-    ignored: 0,
-  };
-  for (const c of candidates) counts[filterOf(c)]++;
-  counts.all = counts.conditions + counts.frequent;
-  // Applying once leaves a frequent word listed (the keywords still do not
-  // hold it), so the ones with files left to tag can be asked for on their
-  // own.
+  const counts: Record<Filter, number> = { all: 0, ignored: 0 };
+  for (const c of candidates) counts[stateOf(c).ignored ? "ignored" : "all"]++;
+  // Applying once leaves a word listed (the keywords still do not hold it),
+  // so the ones with files left to tag can be asked for on their own.
   const shown = candidates.filter((c) => {
-    const at = filterOf(c);
-    if (filter === "all" ? at === "ignored" : at !== filter) return false;
+    if (stateOf(c).ignored !== (filter === "ignored")) return false;
     if (applied === "unapplied") return stateOf(c).missing > 0;
     if (applied === "applied") return stateOf(c).tagged > 0;
     return true;
@@ -381,7 +348,7 @@ export function SuggestTab({
         {/* One grid for the heading and every row (each a subgrid of it), so
             a column is as wide in one row as in the next: each action has a
             column of its own, left empty where a row does not offer it. */}
-        <div className="grid grid-cols-[28px_minmax(160px,1fr)_auto_auto_auto_auto_auto_auto_auto_auto] gap-x-2">
+        <div className="grid grid-cols-[28px_minmax(160px,1fr)_auto_auto_auto_auto_auto_auto_auto] gap-x-2">
           <div
             className={cn(
               ROW,
@@ -402,7 +369,6 @@ export function SuggestTab({
               }
             />
             <span>{t("autoTag.col.candidate")}</span>
-            <span>{t("autoTag.col.origin")}</span>
             <span className="text-right">{t("autoTag.col.files")}</span>
             <span className="col-span-6" />
           </div>
@@ -464,43 +430,24 @@ export function SuggestTab({
                       </span>
                     )}
                   </button>
-                  <span className="flex gap-1">
-                    {c.origins.map((origin) => (
-                      <Badge key={origin}>{t(ORIGIN_LABELS[origin])}</Badge>
-                    ))}
-                  </span>
                   <span className="text-right text-xs tabular-nums text-fg">
                     {c.count}
                   </span>
                   {/* Whatever was done with it: looking at the files is how
                     one decides, and how one checks afterwards. */}
-                  {/* By the spellings found in the names; a folder rule's
-                      tag has none, and a search for the tag itself would
-                      list other files than the ones counted here. */}
-                  {c.variants.length > 0 ? (
-                    <SmallButton
-                      variant="ghost"
-                      className="h-[26px] px-2"
-                      onClick={() => searchInLibrary(c)}
-                      title={t("autoTag.searchCandidateHint")}
-                    >
-                      {t("autoTag.viewFiles")}
-                    </SmallButton>
-                  ) : (
-                    <span />
-                  )}
-                  {/* The two facts side by side, each as what it is now: in the
-                    keywords or not, on the files or not — the latter as the
-                    way to take it off them again. */}
-                  <span
-                    className={cn(
-                      "whitespace-nowrap text-xs",
-                      at.ignored ? "text-muted" : "text-primary",
-                    )}
+                  {/* By the spellings found in the names: a search for the
+                      tag itself would list other files than the ones counted
+                      here. */}
+                  <SmallButton
+                    variant="ghost"
+                    className="h-[26px] px-2"
+                    onClick={() => searchInLibrary(c)}
+                    title={t("autoTag.searchCandidateHint")}
                   >
-                    {at.ignored
-                      ? t("autoTag.status.ignored")
-                      : at.inKeywords && t("autoTag.status.registered")}
+                    {t("autoTag.viewFiles")}
+                  </SmallButton>
+                  <span className="whitespace-nowrap text-xs text-muted">
+                    {at.ignored && t("autoTag.status.ignored")}
                   </span>
                   {at.ignored ? (
                     <button
@@ -523,11 +470,9 @@ export function SuggestTab({
                   ) : (
                     <span />
                   )}
-                  {/* Registering is the main action where it applies: the tag
-                    then keeps being applied by the Conditions tab's keywords
-                    instead of this once — and it is offered for as long as
-                    they do not have it, whether or not the files are tagged
-                    already. */}
+                  {/* Registering is the main action: the tag then keeps being
+                    applied by the Keywords tab's entries instead of this once
+                    — offered whether or not the files are tagged already. */}
                   {!at.ignored && at.canRegister ? (
                     <SmallButton
                       variant="primary"
@@ -542,9 +487,8 @@ export function SuggestTab({
                   ) : (
                     <span />
                   )}
-                  {/* In the keywords does not mean on the files: those already
-                    in the library only get the tag from a scan, a re-apply —
-                    or here. */}
+                  {/* The one-off apply; the main action only once the keywords
+                    are full and registering is off the table. */}
                   {!at.ignored && at.missing > 0 ? (
                     <SmallButton
                       variant={at.canRegister ? "outline" : "primary"}

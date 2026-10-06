@@ -47,7 +47,6 @@ import {
   type TagRule,
 } from "../../../shared/autoTag.js";
 import {
-  candidateGroup,
   segments,
   suggestCandidates,
   nameTagParts,
@@ -267,7 +266,7 @@ describe("analysis", () => {
     ]);
   });
 
-  it("suggests what the engine yields plus frequent words it misses", () => {
+  it("suggests the frequent words the engine misses, and nothing it gives", () => {
     const cands = suggestCandidates(
       engineOf(activeRules(), [keyword()]),
       NAMES,
@@ -277,14 +276,13 @@ describe("analysis", () => {
       },
     );
     const by = new Map(cands.map((c) => [c.key, c]));
-    expect(by.get("abcd")).toMatchObject({ count: 2, origins: ["prefix"] });
-    expect(by.get("trip")).toMatchObject({ count: 2, origins: ["bracket"] });
-    expect(by.get("yoga")).toMatchObject({ count: 3, origins: ["keyword"] });
-    expect(by.get("yoga")!.variants.sort()).toEqual(["yoga", "ヨガ"]);
     // "Harbor" is in three names and nothing claims it.
     expect(by.get("harbor")).toMatchObject({ name: "Harbor", count: 3 });
-    expect(candidateGroup(by.get("harbor")!)).toBe("frequent");
-    // Once, or a stop word, or already a tag: not offered as a frequent word.
+    // What a rule or a keyword produces is theirs, not a suggestion.
+    expect(by.has("abcd")).toBe(false);
+    expect(by.has("trip")).toBe(false);
+    expect(by.has("yoga")).toBe(false);
+    // Once, or a stop word, or already a tag: not offered either.
     expect(by.has("picnic")).toBe(false);
     expect(by.has("routine")).toBe(false);
     expect(cands[0].count).toBeGreaterThanOrEqual(cands[1].count);
@@ -306,7 +304,20 @@ describe("analysis", () => {
     expect(tokenInfo("harbor")).toEqual({ type: "word", value: "harbor" });
   });
 
-  it("suggests a folder rule's tags for the files under it, beside what the names give", () => {
+  it("hides a word only in the names a rule gives it to as a tag", () => {
+    // The bracket rule tags the first file "Trip"; the other two hold the word
+    // plain, and nothing gives it to them.
+    const names = ["[Trip] Kyoto.mp4", "Trip to Nara.mp4", "Trip day.mp4"];
+    const found = suggestCandidates(engineOf(activeRules()), names, {
+      minFreq: 2,
+      stop: new Set(),
+    });
+    const trip = found.find((c) => c.key === "trip");
+    expect(trip).toMatchObject({ name: "Trip", count: 2 });
+    expect([...(trip?.files.keys() ?? [])]).toEqual([1, 2]);
+  });
+
+  it("does not let a folder rule's tag hide the word in other files' names", () => {
     const engine = compileEngine({
       rules: [],
       keywords: [],
@@ -320,36 +331,16 @@ describe("analysis", () => {
         },
       ],
     });
-    // Two files under the folder (one of them named after the tag), and two
-    // outside it whose names hold the same word.
-    const names = [
-      "a.mp4",
-      "harbor walk.mp4",
-      "harbor pier.mp4",
-      "harbor fog.mp4",
-    ];
-    const places = ["Trips", "Trips/2024", "", "Other"].map((folder) => ({
-      workspaceId: "ws",
-      folder,
-    }));
+    // The folder rule says nothing about the names: the word is still a
+    // suggestion for the files whose names hold it.
+    const names = ["a.mp4", "harbor walk.mp4", "harbor pier.mp4"];
     const found = suggestCandidates(engine, names, {
-      minFreq: 2,
-      stop: new Set(),
-      places,
-    });
-    // One candidate for the tag: the folder's files and the word's, which
-    // the folder rule must not hide — it says nothing about the names.
-    const harbor = found.find((c) => c.key === "harbor");
-    expect(harbor?.origins.sort()).toEqual(["folder", "frequent"]);
-    expect([...(harbor?.files.keys() ?? [])].sort()).toEqual([0, 1, 2, 3]);
-    // Without places a folder rule proposes nothing.
-    const bare = suggestCandidates(engine, names, {
       minFreq: 2,
       stop: new Set(),
     });
     expect([
-      ...(bare.find((c) => c.key === "harbor")?.files.keys() ?? []),
-    ]).toEqual([1, 2, 3]);
+      ...(found.find((c) => c.key === "harbor")?.files.keys() ?? []),
+    ]).toEqual([1, 2]);
   });
 
   it("offers a name's words, code prefix and bracket entries as tags", () => {

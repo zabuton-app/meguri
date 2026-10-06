@@ -41,7 +41,7 @@ export function RuleEditor({
 }) {
   const { t } = useI18n();
   const [onlyMatches, setOnlyMatches] = useViewState(
-    "conditions.onlyMatches",
+    "regex.onlyMatches",
     false,
   );
 

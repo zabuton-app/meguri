@@ -2,8 +2,8 @@
  * Analysis on top of the auto-tagging engine: what the screen's suggestions
  * are computed from, and the file name cut into taggable parts that
  * the detail view shows. Pure; the library-wide parts are indexed by position
- * in the list of names the caller passes (and of places, for the folder rules)
- * — the caller knows which file each position is.
+ * in the list of names the caller passes — the caller knows which file each
+ * position is.
  *
  * Names are expected in NFC (the screen normalizes them once on load), so the
  * ranges reported here index straight into the string that is displayed.
@@ -11,17 +11,11 @@
 import {
   SPLIT_PATTERN,
   cleanTagName,
-  folderMatcher,
   isUsableTagName,
-  runKeyword,
-  runRule,
   stripExt,
   tagsForName,
-  withFolderTags,
   type CompiledEngine,
-  type FilePlace,
   type Range,
-  type RuleKind,
 } from "./autoTag.js";
 
 /** Words that say nothing about a file. The user's excluded terms add to these. */
@@ -75,123 +69,35 @@ export function segments(
 }
 
 // ---------------------------------------------------------------------------
-// Suggestions: every tag the engine would give, plus frequent words it misses.
+// Suggestions: frequent words of the names that no condition picks up yet.
 // ---------------------------------------------------------------------------
-
-export type CandidateOrigin = RuleKind | "keyword" | "folder" | "frequent";
 
 export interface Candidate {
   /** Lowercased tag name. */
   key: string;
   name: string;
-  origins: CandidateOrigin[];
-  /** File position → where in the name the tag comes from. */
+  /** File position → where in the name the word is. */
   files: Map<number, Range[]>;
   /** Spellings found in the names. */
   variants: string[];
   count: number;
 }
 
-export type CandidateGroup = "rule" | "keyword" | "frequent";
-
-export function candidateGroup(c: Candidate): CandidateGroup {
-  if (c.origins.includes("frequent")) return "frequent";
-  return c.origins.includes("keyword") ? "keyword" : "rule";
-}
-
-const NO_RANGES: Range[] = [];
-const NO_TEXTS: string[] = [];
-
-interface CandidateDraft {
-  key: string;
-  name: string;
-  origins: Set<CandidateOrigin>;
-  files: Map<number, Range[]>;
-  variants: Set<string>;
-}
-
+/**
+ * Plain ASCII words in the names that nothing produces as a tag — not a rule,
+ * not a keyword — in at least `minFreq` files. What the conditions do produce
+ * is theirs to apply (a scan, or a pass over the library), not a suggestion.
+ * A folder rule's tag is no such thing: it says nothing of the name, and the
+ * word may well be in other files' names.
+ */
 export function suggestCandidates(
   engine: CompiledEngine,
   names: readonly string[],
   opts: {
     minFreq: number;
     stop: ReadonlySet<string>;
-    /**
-     * Where each file is, by position, for the engine's folder rules. Without
-     * it they propose nothing: a name alone does not say where its file is.
-     */
-    places?: readonly FilePlace[];
   },
 ): Candidate[] {
-  const map = new Map<string, CandidateDraft>();
-  const reaching = folderMatcher(engine.folders);
-  /** Tags the names give, through a rule or a keyword. */
-  const named = new Set<string>();
-  const add = (
-    name: string,
-    origin: CandidateOrigin,
-    file: number,
-    ranges: Range[],
-    texts: Iterable<string>,
-  ): void => {
-    const key = name.toLowerCase();
-    let c = map.get(key);
-    if (!c) {
-      c = {
-        key,
-        name,
-        origins: new Set(),
-        files: new Map(),
-        variants: new Set(),
-      };
-      map.set(key, c);
-    }
-    c.origins.add(origin);
-    if (origin !== "folder" && origin !== "frequent") named.add(key);
-    for (const text of texts) c.variants.add(text);
-    const have = c.files.get(file);
-    if (have) have.push(...ranges);
-    // Nothing to copy for a tag that points at no part of the name: one
-    // shared list serves every such file.
-    else c.files.set(file, ranges.length > 0 ? [...ranges] : NO_RANGES);
-  };
-
-  names.forEach((name, i) => {
-    for (const compiled of engine.rules) {
-      for (const hit of runRule(compiled, name)) {
-        for (const tag of hit.tags) {
-          add(tag, compiled.rule.kind, i, [hit], [tag]);
-        }
-      }
-    }
-    for (const compiled of engine.keywords) {
-      const hits = runKeyword(compiled, name);
-      if (hits.length === 0) continue;
-      add(
-        compiled.tag,
-        "keyword",
-        i,
-        hits,
-        hits.map((h) => h.text),
-      );
-    }
-    // What the folder rules reaching the file give it — exactly what a scan
-    // would add after the name's own tags (withFolderTags), so a tag the name
-    // already gave is not listed again as the folder's. A folder rule points
-    // at no part of the name: no range, no spelling.
-    const place = opts.places?.[i];
-    if (place) {
-      const folders = reaching(place);
-      if (folders.length > 0) {
-        const named = tagsForName(engine, name);
-        for (const tag of withFolderTags(named, folders).slice(named.length)) {
-          add(tag, "folder", i, NO_RANGES, NO_TEXTS);
-        }
-      }
-    }
-  });
-
-  // Frequent words: plain ASCII words nothing above picked up.
   const dictionary = new Set<string>();
   for (const { entry } of engine.keywords) {
     for (const term of [entry.tag, ...entry.aliases]) {
@@ -203,13 +109,14 @@ export function suggestCandidates(
     { texts: Map<string, number>; files: Map<number, Range[]> }
   >();
   names.forEach((name, i) => {
+    /** What a rule or a keyword gives this name; found once it is needed. */
+    let named: Set<string> | null = null;
     for (const match of stripExt(name).matchAll(/[A-Za-z]{3,}/g)) {
       const word = match[0];
       const key = word.toLowerCase();
-      // What a rule or a keyword already produces is not a word nothing
-      // picks up. A folder rule's tag is no such thing: it says nothing of
-      // the name, and the word may well be in other files' names.
-      if (opts.stop.has(key) || dictionary.has(key) || named.has(key)) continue;
+      if (opts.stop.has(key) || dictionary.has(key)) continue;
+      named ??= new Set(tagsForName(engine, name).map((t) => t.toLowerCase()));
+      if (named.has(key)) continue;
       let entry = frequent.get(key);
       if (!entry) {
         entry = { texts: new Map(), files: new Map() };
@@ -222,25 +129,20 @@ export function suggestCandidates(
       else entry.files.set(i, [range]);
     }
   });
-  for (const entry of frequent.values()) {
+  const out: Candidate[] = [];
+  for (const [key, entry] of frequent) {
     if (entry.files.size < opts.minFreq) continue;
     const texts = mostCommonFirst(entry.texts);
     if (!isUsableTagName(cleanTagName(texts[0]))) continue;
-    for (const [file, ranges] of entry.files) {
-      add(texts[0], "frequent", file, ranges, texts);
-    }
+    out.push({
+      key,
+      name: texts[0],
+      files: entry.files,
+      variants: texts,
+      count: entry.files.size,
+    });
   }
-
-  return [...map.values()]
-    .map((c) => ({
-      key: c.key,
-      name: c.name,
-      origins: [...c.origins],
-      files: c.files,
-      variants: [...c.variants],
-      count: c.files.size,
-    }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return out.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 function mostCommonFirst(counts: Map<string, number>): string[] {

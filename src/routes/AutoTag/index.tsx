@@ -1,6 +1,7 @@
-// Auto-tagging. /auto-tag. Rules and keywords that tag files from
-// their names, and suggestions that bring an existing library in line with
-// them.
+// Auto-tagging. /auto-tag. The conditions that tag files — regular
+// expressions and keywords over their names, folder rules over where they are
+// — a tab each, and suggestions: frequent words of the names that no rule or
+// keyword produces yet.
 // Overlays the library as a modal, like /tags and /history.
 import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
@@ -11,22 +12,38 @@ import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { suggestCandidates } from "@shared/autoTagAnalysis";
-import { ConditionsTab } from "./ConditionsTab";
+import type { ComponentType } from "react";
+import { ApplyToolbar } from "./ApplyToolbar";
+import { FoldersTab } from "./FoldersTab";
+import { KeywordsTab } from "./KeywordsTab";
+import { RegexTab } from "./RegexTab";
 import {
   candidateContext,
   candidateState,
   type CandidateState,
 } from "./helpers";
 import { SuggestTab } from "./SuggestTab";
-import { useAutoTag } from "./useAutoTag";
+import { useAutoTag, type AutoTagState } from "./useAutoTag";
 import { useViewState } from "./viewState";
 
-const TABS = ["conditions", "suggest"] as const;
+const TABS = ["regex", "keywords", "folders", "suggest"] as const;
 type TabId = (typeof TABS)[number];
 
 const TAB_LABELS: Record<TabId, TranslationKey> = {
-  conditions: "autoTag.tab.conditions",
+  regex: "autoTag.tab.regex",
+  keywords: "autoTag.tab.keywords",
+  folders: "autoTag.tab.folders",
   suggest: "autoTag.tab.suggest",
+};
+
+// The condition tabs: each edits one kind of condition, and all of them sit
+// under the one bar that applies every kind at once.
+const CONDITION_TABS: Partial<
+  Record<TabId, ComponentType<{ state: AutoTagState }>>
+> = {
+  regex: RegexTab,
+  keywords: KeywordsTab,
+  folders: FoldersTab,
 };
 
 // Per screen, like the Tags and History modals' own.
@@ -52,7 +69,8 @@ export default function AutoTag() {
   const toggleLabel = isSmall
     ? t("media.modalMaximize")
     : t("media.modalMinimize");
-  const [tab, setTab] = useViewState<TabId>("tab", "conditions");
+  const [tab, setTab] = useViewState<TabId>("tab", "regex");
+  const ConditionTab = CONDITION_TABS[tab];
   const state = useAutoTag();
 
   useEffect(() => {
@@ -71,17 +89,12 @@ export default function AutoTag() {
   const engine = state?.engine;
   const names = state?.names;
   const stop = state?.stop;
-  const places = state?.places;
   const candidates = useMemo(
     () =>
       engine && names && stop
-        ? suggestCandidates(engine, names, {
-            minFreq: MIN_FREQUENCY,
-            stop,
-            places,
-          })
+        ? suggestCandidates(engine, names, { minFreq: MIN_FREQUENCY, stop })
         : [],
-    [engine, names, stop, places],
+    [engine, names, stop],
   );
   // Where each candidate stands, worked out once for the badge and the tab
   // alike, and only again when what it is read from changes: the keywords,
@@ -225,15 +238,21 @@ export default function AutoTag() {
             <p className="p-8 text-center text-[13px] text-muted">
               {t("autoTag.loading")}
             </p>
-          ) : tab === "conditions" ? (
-            <ConditionsTab state={state} />
-          ) : (
+          ) : !ConditionTab ? (
             <SuggestTab
               state={state}
               candidates={candidates}
               states={states}
               pending={pending}
             />
+          ) : (
+            // The bar stays at the same place in the tree across the
+            // condition tabs, so what it holds — a pass under way, its
+            // result — survives moving between them.
+            <>
+              <ApplyToolbar state={state} />
+              <ConditionTab state={state} />
+            </>
           )}
         </div>
       </div>

@@ -17,7 +17,7 @@ import {
   type AutoTagFile,
   type TagRule,
 } from "@shared/autoTag";
-import { candidateGroup, type Candidate } from "@shared/autoTagAnalysis";
+import type { Candidate } from "@shared/autoTagAnalysis";
 import { ROOT_FOLDER, parentOf } from "@shared/folderPath";
 
 const BUILTIN_RULE_NAMES: Record<BuiltinRuleId, TranslationKey> = {
@@ -81,22 +81,16 @@ export function cleanAliases(
 }
 
 /**
- * Where a suggestion stands. Two facts that do not follow from each other —
- * whether the keywords hold the tag, and whether the files carry it — plus the
- * user having dismissed it. Each is read from where it is kept (the
+ * Where a suggestion stands: whether the files carry the word as a tag, and
+ * whether the user dismissed it. Each is read from where it is kept (the
  * configuration, the files' tags) every time; nothing is remembered, not even
- * what the screen itself applied, so a row cannot say something the Conditions
- * tab or the library does not.
+ * what the screen itself applied, so a row cannot say something the condition
+ * tabs or the library do not. A word the keywords hold is no suggestion at
+ * all (suggestCandidates leaves it out), so there is no state for that.
  */
 export interface CandidateState {
   ignored: boolean;
-  /** The keywords have an entry for the tag. */
-  inKeywords: boolean;
-  /**
-   * An entry can be added: nothing on the Conditions tab produces the tag yet
-   * (a rule's or a keyword's candidate is already managed there), and the
-   * keywords have room.
-   */
+  /** An entry can be added: the keywords have room. */
   canRegister: boolean;
   /** Files it names that do not carry the tag yet. */
   missing: number;
@@ -104,9 +98,7 @@ export interface CandidateState {
   tagged: number;
   /**
    * Something is still to be decided: files to tag, or an entry to add. Never
-   * for a tag the keywords hold — that was decided on the Conditions tab, and
-   * the row only reports it (and can still tag the files that lack it) — and
-   * never for a dismissed one: `ignored` comes before everything else here.
+   * for a dismissed one: `ignored` comes before everything else here.
    */
   pending: boolean;
 }
@@ -114,8 +106,6 @@ export interface CandidateState {
 /** What `candidateState` reads; built once per render for the whole list. */
 export interface CandidateContext {
   ignored: ReadonlySet<string>;
-  /** Lowercased tags of the keyword entries. */
-  keywordTags: ReadonlySet<string>;
   keywordsFull: boolean;
   fileTags: readonly Set<string>[];
 }
@@ -126,7 +116,6 @@ export function candidateContext(
 ): CandidateContext {
   return {
     ignored: new Set(config.ignored),
-    keywordTags: new Set(config.keywords.map((k) => k.tag.toLowerCase())),
     keywordsFull: config.keywords.length >= MAX_AUTO_TAG_KEYWORDS,
     fileTags,
   };
@@ -137,25 +126,22 @@ export function candidateState(
   ctx: CandidateContext,
 ): CandidateState {
   const ignored = ctx.ignored.has(c.key);
-  const inKeywords = ctx.keywordTags.has(c.key);
-  // The candidates come from the configuration as last analyzed, the context
-  // from the one being edited: a word can still read as "frequent" for a
-  // moment after its entry was added, hence the second test.
-  const unmanaged = candidateGroup(c) === "frequent" && !inKeywords;
-  const canRegister = unmanaged && !ctx.keywordsFull;
+  // The candidates come from the configuration as last analyzed: a word is
+  // still listed for a moment after its entry was added, and goes once the
+  // analysis has caught up. (newKeyword refuses the entry twice meanwhile.)
+  const canRegister = !ctx.keywordsFull;
   let missing = 0;
   for (const index of c.files.keys()) {
     if (!ctx.fileTags[index].has(c.key)) missing++;
   }
   return {
     ignored,
-    inKeywords,
     canRegister,
     missing,
     tagged: c.files.size - missing,
     // What could be done about it: with the keywords full and the files
     // tagged there is nothing, and a row with no action is not waiting.
-    pending: !ignored && !inKeywords && (missing > 0 || canRegister),
+    pending: !ignored && (missing > 0 || canRegister),
   };
 }
 

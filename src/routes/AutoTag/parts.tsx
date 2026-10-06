@@ -26,7 +26,7 @@ export function Chip({
   );
 }
 
-/** A small outlined label: a rule kind, an origin. */
+/** A small outlined label: a rule kind. */
 export function Badge({ children }: { children: ReactNode }) {
   return (
     <span className="w-max shrink-0 whitespace-nowrap rounded-md border border-border px-1.5 text-[10px] leading-4 text-muted">

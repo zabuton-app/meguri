@@ -15,17 +15,23 @@ test.describe("Auto tagging", () => {
     const dialog = ready.getByRole("dialog");
 
     // The fixture is "test.png": register its name as a keyword.
+    await dialog.getByRole("tab", { name: "Keywords" }).click();
     const add = dialog.getByLabel(/Add a keyword/);
     await add.fill("Test");
     await add.press("Enter");
     await expect(dialog.getByText("Creates a new tag")).toBeVisible();
+    await expect(dialog.getByText("Matching files")).toBeVisible();
 
-    // It shows up as a suggestion; applying it tags the file for real.
-    await dialog.getByRole("tab", { name: /Keywords/ }).click();
-    await dialog.getByRole("button", { name: "Apply", exact: true }).click();
-    await expect(
-      dialog.getByRole("button", { name: "Remove from 1 files" }),
-    ).toBeVisible();
+    // A keyword is not a suggestion: it is applied over the library as a
+    // whole, after a question, and tags the file for real.
+    await dialog
+      .getByRole("button", { name: "Apply to existing files" })
+      .click();
+    await ready
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Apply to existing files" })
+      .click();
+    await expect(dialog.getByText("Added 1 tags to 1 files")).toBeVisible();
 
     // The tag is the user's own: the tag screen lists it like any other.
     await closeTopDialog(ready);
@@ -33,26 +39,12 @@ test.describe("Auto tagging", () => {
     await expect(
       ready.getByRole("dialog").getByText("Test", { exact: true }),
     ).toBeVisible();
-    await closeTopDialog(ready);
-
-    // Reopened, the row reads what the file carries — nothing was remembered
-    // to say so — and the tag can be taken off it again, after a question.
-    await ready.getByRole("link", { name: "Auto tagging" }).click();
-    await dialog.getByRole("tab", { name: /Keywords/ }).click();
-    await dialog.getByRole("button", { name: "Remove from 1 files" }).click();
-    await ready.getByRole("button", { name: "Remove", exact: true }).click();
-
-    // Taken off, the entry still reads as registered — it is in the keywords,
-    // so it is not offered as a suggestion — with the file left to apply it to.
-    await expect(dialog.getByText("In keywords")).toBeVisible();
-    await expect(
-      dialog.getByRole("button", { name: "Apply", exact: true }),
-    ).toBeVisible();
   });
 
   test("searches the library for a keyword's terms", async ({ ready }) => {
     await ready.getByRole("link", { name: "Auto tagging" }).click();
     const dialog = ready.getByRole("dialog");
+    await dialog.getByRole("tab", { name: "Keywords" }).click();
     const add = dialog.getByLabel(/Add a keyword/);
     // The alias matches the fixture ("test.png"); the tag itself does not.
     await add.fill("Sample, test");
