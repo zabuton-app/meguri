@@ -71,12 +71,17 @@ export default function AutoTag() {
   const engine = state?.engine;
   const names = state?.names;
   const stop = state?.stop;
+  const places = state?.places;
   const candidates = useMemo(
     () =>
       engine && names && stop
-        ? suggestCandidates(engine, names, { minFreq: MIN_FREQUENCY, stop })
+        ? suggestCandidates(engine, names, {
+            minFreq: MIN_FREQUENCY,
+            stop,
+            places,
+          })
         : [],
-    [engine, names, stop],
+    [engine, names, stop, places],
   );
   // Where each candidate stands, worked out once for the badge and the tab
   // alike, and only again when what it is read from changes: the keywords,
@@ -126,6 +131,7 @@ export default function AutoTag() {
               {t("autoTag.summary", {
                 rules: state.config.rules.filter((r) => r.enabled).length,
                 keywords: state.config.keywords.length,
+                folders: state.config.folders.filter((r) => r.enabled).length,
                 files: state.total,
               })}
               {state.total > state.files.length &&

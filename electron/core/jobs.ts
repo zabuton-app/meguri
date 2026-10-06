@@ -87,6 +87,8 @@ export async function runScan(
     signal?: AbortSignal;
     /** Auto-tagging configuration (app config); nothing is tagged when omitted. */
     autoTag?: AutoTagConfig;
+    /** The workspace being scanned, for the configuration's folder rules. */
+    workspaceId?: string;
     /** Evaluates the engine; on the calling thread when omitted. */
     deriveAutoTags?: DeriveAutoTags;
   } = {},
@@ -130,11 +132,13 @@ export async function runScan(
 
   // Tag what this scan added or changed (ftsTargets is exactly that set). Ahead
   // of the FTS sync and the thumbnail pool: the engine reads nothing but file
-  // names, so its tags need not wait for the slowest phase of the scan.
+  // names and where the files are, so its tags need not wait for the slowest
+  // phase of the scan.
   if (opts.autoTag?.applyOnScan) {
     try {
       await applyAutoTagsOnScan(db, {
         engine: opts.autoTag,
+        workspaceId: opts.workspaceId,
         derive: opts.deriveAutoTags,
         changedIds: ftsTargets,
         signal,

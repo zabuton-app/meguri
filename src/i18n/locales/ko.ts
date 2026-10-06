@@ -529,7 +529,8 @@ export const ko: Record<TranslationKey, string> = {
   // 태그 관리 화면
   // auto tagging
   "autoTag.title": "자동 태그",
-  "autoTag.summary": "활성 규칙 {rules} · 키워드 {keywords} · 파일 {files}",
+  "autoTag.summary":
+    "활성 규칙 {rules} · 키워드 {keywords} · 폴더 규칙 {folders} · 파일 {files}",
   "autoTag.sampled": "(앞의 {count}개 분석)",
   "autoTag.safeMode":
     "지난 분석이 끝나지 않아 규칙 실행을 멈췄습니다. 원인이 된 규칙을 고치거나 끈 다음 다시 시작하세요.",
@@ -602,6 +603,33 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.noKeywordsMatch": "필터와 일치하는 키워드가 없습니다.",
   "autoTag.noAliases": "별칭 없음",
   "autoTag.noKeywords": "아직 키워드가 없습니다.",
+  "autoTag.folders": "폴더",
+  "autoTag.foldersHint": "폴더 아래의 파일에 태그를 붙입니다",
+  "autoTag.addFolder": "+ 폴더 규칙 추가",
+  "autoTag.noFolders": "아직 폴더 규칙이 없습니다.",
+  "autoTag.folderEnabled": "폴더 규칙 사용",
+  "autoTag.kind.folder": "폴더",
+  "autoTag.folder.workspace": "워크스페이스",
+  "autoTag.folder.path": "폴더",
+  "autoTag.folder.root": "(워크스페이스 전체)",
+  "autoTag.folder.pathHint": "하위 폴더의 파일도 포함됩니다.",
+  "autoTag.folder.pick": "폴더 선택",
+  "autoTag.folder.search": "폴더 찾기",
+  "autoTag.folder.noFolders":
+    "이 워크스페이스에는 파일이 있는 폴더가 없습니다.",
+  "autoTag.folder.noMatch": "일치하는 폴더가 없습니다.",
+  "autoTag.folder.expand": "펼치기",
+  "autoTag.folder.collapse": "접기",
+  "autoTag.folder.tags": "붙일 태그",
+  "autoTag.folder.addTag": "+ 태그 추가(Enter)",
+  "autoTag.folder.removeTag": "태그 “{tag}” 삭제",
+  "autoTag.folder.noTags":
+    "아직 태그가 없습니다. 이 규칙은 아무것도 붙이지 않습니다.",
+  "autoTag.folder.noTagsShort": "태그 없음",
+  "autoTag.folder.files": "아래에 있는 파일",
+  "autoTag.folder.noFiles": "이 폴더 아래에 파일이 없습니다.",
+  "autoTag.folder.outOfScope":
+    "이 워크스페이스는 더 이상 라이브러리에 없습니다.",
   "autoTag.joinsExisting":
     '기존 태그 "{tag}"와 이름이 같아 그 태그에 추가됩니다',
   "autoTag.createsNew": "새 태그로 만들어집니다",

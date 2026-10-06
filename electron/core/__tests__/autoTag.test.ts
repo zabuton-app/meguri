@@ -32,12 +32,17 @@ import {
   builtinRulesAsShipped,
   defaultRules,
   excludeValues,
+  folderMatcher,
+  folderOf,
   formatExclude,
+  isUnderFolder,
   proposalsFor,
   resetBuiltinRules,
   runKeyword,
   runRule,
   tagsForName,
+  withFolderTags,
+  type FolderRule,
   type KeywordEntry,
   type TagRule,
 } from "../../../shared/autoTag.js";
@@ -301,6 +306,52 @@ describe("analysis", () => {
     expect(tokenInfo("harbor")).toEqual({ type: "word", value: "harbor" });
   });
 
+  it("suggests a folder rule's tags for the files under it, beside what the names give", () => {
+    const engine = compileEngine({
+      rules: [],
+      keywords: [],
+      folders: [
+        {
+          id: "f1",
+          workspaceId: "ws",
+          folder: "Trips",
+          tags: ["Harbor"],
+          enabled: true,
+        },
+      ],
+    });
+    // Two files under the folder (one of them named after the tag), and two
+    // outside it whose names hold the same word.
+    const names = [
+      "a.mp4",
+      "harbor walk.mp4",
+      "harbor pier.mp4",
+      "harbor fog.mp4",
+    ];
+    const places = ["Trips", "Trips/2024", "", "Other"].map((folder) => ({
+      workspaceId: "ws",
+      folder,
+    }));
+    const found = suggestCandidates(engine, names, {
+      minFreq: 2,
+      stop: new Set(),
+      places,
+    });
+    // One candidate for the tag: the folder's files and the word's, which
+    // the folder rule must not hide — it says nothing about the names.
+    const harbor = found.find((c) => c.key === "harbor");
+    expect(harbor?.origins.sort()).toEqual(["folder", "frequent"]);
+    expect([...(harbor?.files.keys() ?? [])].sort()).toEqual([0, 1, 2, 3]);
+    // Without places a folder rule proposes nothing.
+    const bare = suggestCandidates(engine, names, {
+      minFreq: 2,
+      stop: new Set(),
+    });
+    expect([
+      ...(bare.find((c) => c.key === "harbor")?.files.keys() ?? []),
+    ]).toEqual([1, 2, 3]);
+  });
+
   it("offers a name's words, code prefix and bracket entries as tags", () => {
     const name = "ABCD-123 [Trip, Family]_harbor.mp4";
     const parts = nameTagParts(name);
@@ -412,6 +463,26 @@ describe("configuration", () => {
     expect(builtinRulesAsShipped(reset)).toBe(true);
   });
 
+  it("stores folder rules, and refuses a folder path that is not a folder's", () => {
+    const rule = {
+      id: "f1",
+      workspaceId: "ws",
+      folder: "Trips/2024",
+      tags: ["Trip"],
+      enabled: true,
+    };
+    const config = { ...defaultAutoTagConfig(), folders: [rule] };
+    expect(AutoTagConfigSchema.safeParse(config).success).toBe(true);
+    for (const folder of ["../etc", "a//b", "/abs", "a/"]) {
+      expect(
+        AutoTagConfigSchema.safeParse({
+          ...config,
+          folders: [{ ...rule, folder }],
+        }).success,
+      ).toBe(false);
+    }
+  });
+
   it("stores a rule whose pattern is still being typed", () => {
     const config = {
       ...defaultAutoTagConfig(),
@@ -508,6 +579,108 @@ describe("attaching tags", () => {
     expect((await applyAutoTags(db, { engine })).added).toBe(0);
   });
 
+  it("tags the files under a folder of this workspace, subfolders included", async () => {
+    const at = (relPath: string) => insertFile(db, rootId, { relPath });
+    const inFolder = at("Trips/2024/harbor.mp4");
+    // Written with the other separator, as Windows stores it.
+    const deeper = at("Trips\\2024\\day1\\walk.mp4");
+    const sibling = at("Trips/2024b/pier.mp4");
+    const elsewhere = at("Work/plan.mp4");
+    const folders: FolderRule[] = [
+      {
+        id: "f1",
+        workspaceId: "ws",
+        folder: "Trips/2024",
+        tags: ["Trip", "2024"],
+        enabled: true,
+      },
+      // The same path in another workspace is another folder.
+      {
+        id: "f2",
+        workspaceId: "other",
+        folder: "",
+        tags: ["Other"],
+        enabled: true,
+      },
+      {
+        id: "f3",
+        workspaceId: "ws",
+        folder: "Work",
+        tags: ["Job"],
+        enabled: false,
+      },
+    ];
+    const engine = { rules: [], keywords: [], folders };
+
+    // Without being told which workspace this is, no folder rule applies.
+    expect((await applyAutoTags(db, { engine })).added).toBe(0);
+
+    const result = await applyAutoTags(db, { engine, workspaceId: "ws" });
+    expect(result).toEqual({ files: 2, added: 4, completed: true });
+    expect(names(inFolder)).toEqual(["2024", "Trip"]);
+    expect(names(deeper)).toEqual(["2024", "Trip"]);
+    // A folder whose name merely starts the same is not under it.
+    expect(names(sibling)).toEqual([]);
+    expect(names(elsewhere)).toEqual([]);
+  });
+
+  it("adds a folder's tags after what the name gave, without repeats", () => {
+    const engine = compileEngine({
+      rules: activeRules(),
+      keywords: [],
+      folders: [
+        {
+          id: "f1",
+          workspaceId: "ws",
+          folder: "",
+          tags: ["abcd", " Clips ", "res:hd", "clips"],
+          enabled: true,
+        },
+      ],
+    });
+    const reaching = folderMatcher(engine.folders);
+    const place = { workspaceId: "ws", folder: "a/b" };
+    const tagsAt = (name: string, where = place) =>
+      withFolderTags(tagsForName(engine, name), reaching(where));
+    // "abcd" is the rule's ABCD already; a reserved name is no tag.
+    expect(tagsAt(NAMES[0])).toEqual(["ABCD", "Clips"]);
+    expect(tagsAt("plain.mp4")).toEqual(["abcd", "Clips"]);
+    // The same path in another workspace is not this folder.
+    expect(
+      tagsAt("plain.mp4", { workspaceId: "other", folder: "a/b" }),
+    ).toEqual([]);
+    // A name alone does not say where its file is.
+    expect(tagsForName(engine, "plain.mp4")).toEqual([]);
+    expect(isUnderFolder("a/b", "a")).toBe(true);
+    expect(isUnderFolder("ab", "a")).toBe(false);
+    expect(folderOf("a\\b\\c.mp4")).toBe("a/b");
+    expect(folderOf("c.mp4")).toBe("");
+  });
+
+  it("matches a folder written decomposed, and a rule for the whole workspace", async () => {
+    // macOS hands names over decomposed (NFD); the rule was written from the
+    // screen, which shows them composed (NFC).
+    const nfd = "Cafe\u0301";
+    const inFolder = insertFile(db, rootId, { relPath: `${nfd}/menu.mp4` });
+    const atRoot = insertFile(db, rootId, { relPath: "top.mp4" });
+    const folders: FolderRule[] = [
+      {
+        id: "f1",
+        workspaceId: "ws",
+        folder: "Caf\u00e9",
+        tags: ["Cafe"],
+        enabled: true,
+      },
+      { id: "f2", workspaceId: "ws", folder: "", tags: ["All"], enabled: true },
+    ];
+    await applyAutoTags(db, {
+      engine: { rules: [], keywords: [], folders },
+      workspaceId: "ws",
+    });
+    expect(names(inFolder)).toEqual(["All", "Cafe"]);
+    expect(names(atRoot)).toEqual(["All"]);
+  });
+
   it("keeps owing the files of a scan that was cut short", async () => {
     const id = insertFile(db, rootId, { relPath: NAMES[0] });
     const engine = { rules: activeRules(), keywords: [] };
@@ -539,6 +712,7 @@ describe("attaching tags", () => {
           workspaceId: "ws",
           id: a,
           name: NAMES[0],
+          folder: "dir",
           metaKey: `p:${rootId}:dir/${NAMES[0]}`,
           tags: ["Yoga"],
         },

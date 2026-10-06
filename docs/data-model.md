@@ -222,7 +222,8 @@ screen sorts unknown namespaces after the known ones rather than dropping them.
 
 ## Auto tagging
 
-Rules and a keyword dictionary propose tags from a file's **name**. The engine
+Rules and a keyword dictionary propose tags from a file's **name**, and folder
+rules from where the file is. The engine
 is `shared/autoTag.ts`, shared by both processes so the auto-tagging screen
 previews with the code a scan runs:
 
@@ -231,6 +232,14 @@ previews with the code a scan runs:
   on `, 、 / ／ ・`, case-folded, and dropped when it is in the rule's exclude
   list. The built-in rules cover a leading code prefix and bracketed text;
   they ship switched off, and the screen can reset them to that state.
+- A **folder rule** goes by where a file is rather than by its name: every
+  file under a folder of one workspace — subfolders included — gets the rule's
+  tags. The folder is kept as the workspace id plus the path inside it, in the
+  normalized form of `shared/folderPath.ts` (`""` is the whole workspace).
+  Comparing paths cannot hang, so a scan adds these in the main process to
+  what the worker returned for the names. `withFolderTags()` is the one place
+  the two are put together, and the screen's analysis lists a folder rule's
+  tags for exactly the files it would give them to.
 - A **keyword** is a tag with aliases. Finding any of them in the name (again
   without its extension) proposes the tag; in `word` mode an ASCII term must
   stand between non-alphanumerics.
@@ -247,14 +256,15 @@ what rolls back an apply that failed partway (kept in memory in the main
 process, not persisted). The screen keeps no record of what it applied: taking
 a tag off again goes by what the files carry, through `files_bulk_tag`.
 
-The configuration (`rules`, `keywords`, `applyOnScan`, dismissed suggestions and
+The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed suggestions and
 excluded terms) is app-wide, in `config.json` under `autoTag`. With `applyOnScan`
 on, `runScan()` runs the engine over the files the scan inserted, updated or
 moved, ahead of the FTS sync and the thumbnail pool. The ids still owed are kept
 in `settings` under `auto_tag_pending` until the pass completes, because a scan
 aborted in between reports those files as unchanged the next time round.
 
-In the main process the engine is evaluated in a worker thread
+In the main process the part of the engine that reads names is evaluated in a
+worker thread
 (`electron/autoTagWorker.ts`, driven by `AutoTagWorkerClient`): a rule is an
 arbitrary regular expression, and one that backtracks without end cannot be
 interrupted on the thread running it. A chunk that exceeds its time budget gets

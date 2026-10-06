@@ -14,9 +14,11 @@ import {
   type KeywordEntry,
   type KeywordHit,
   type AutoTagConfig,
+  type AutoTagFile,
   type TagRule,
 } from "@shared/autoTag";
 import { candidateGroup, type Candidate } from "@shared/autoTagAnalysis";
+import { ROOT_FOLDER, parentOf } from "@shared/folderPath";
 
 const BUILTIN_RULE_NAMES: Record<BuiltinRuleId, TranslationKey> = {
   prefix: "autoTag.rule.prefix",
@@ -217,3 +219,35 @@ export function keywordMatches(
   keywordMatchCache.set(entry, { names, rows });
   return rows;
 }
+
+/**
+ * How many files are under each folder of each workspace, subfolders counted
+ * in: one pass over the files instead of one per folder rule. The key is
+ * {@link folderCountKey}; a workspace's root ("") counts all of it.
+ */
+export function folderCounts(
+  files: readonly AutoTagFile[],
+): ReadonlyMap<string, number> {
+  const own = new Map<string, number>();
+  for (const file of files) {
+    const key = folderCountKey(file.workspaceId, file.folder);
+    own.set(key, (own.get(key) ?? 0) + 1);
+  }
+  // Each folder's own files count for every folder above it too.
+  const all = new Map<string, number>();
+  for (const [key, count] of own) {
+    const at = key.indexOf("\0");
+    const workspaceId = key.slice(0, at);
+    let folder = key.slice(at + 1);
+    for (;;) {
+      const up = folderCountKey(workspaceId, folder);
+      all.set(up, (all.get(up) ?? 0) + count);
+      if (folder === ROOT_FOLDER) break;
+      folder = parentOf(folder);
+    }
+  }
+  return all;
+}
+
+export const folderCountKey = (workspaceId: string, folder: string): string =>
+  `${workspaceId}\0${folder}`;

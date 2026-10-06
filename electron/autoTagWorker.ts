@@ -2,6 +2,9 @@
 // process: a rule is an arbitrary regular expression, and one that backtracks
 // catastrophically on some file name cannot be interrupted where it runs — only
 // the thread running it can be killed. Spawned by AutoTagWorkerClient.
+//
+// Only what reads a name is evaluated here: the rules and the keywords. Folder
+// rules compare paths, which cannot hang, and are added by the caller.
 import { parentPort } from "node:worker_threads";
 import {
   compileEngine,

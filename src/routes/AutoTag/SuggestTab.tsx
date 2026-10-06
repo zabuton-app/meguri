@@ -1,4 +1,4 @@
-// Suggestions tab: every tag the engine would give the files in scope, plus
+// Suggestions tab: every tag the engine would give the library's files, plus
 // frequent words it does not pick up yet — to apply, register or dismiss.
 import { useState } from "react";
 import { useNavigate } from "react-router";
@@ -37,6 +37,7 @@ const ORIGIN_LABELS: Record<CandidateOrigin, TranslationKey> = {
   prefix: "autoTag.kind.prefix",
   bracket: "autoTag.kind.bracket",
   regex: "autoTag.kind.regex",
+  folder: "autoTag.kind.folder",
   keyword: "autoTag.origin.keyword",
   frequent: "autoTag.origin.frequent",
 };
@@ -473,14 +474,21 @@ export function SuggestTab({
                   </span>
                   {/* Whatever was done with it: looking at the files is how
                     one decides, and how one checks afterwards. */}
-                  <SmallButton
-                    variant="ghost"
-                    className="h-[26px] px-2"
-                    onClick={() => searchInLibrary(c)}
-                    title={t("autoTag.searchCandidateHint")}
-                  >
-                    {t("autoTag.viewFiles")}
-                  </SmallButton>
+                  {/* By the spellings found in the names; a folder rule's
+                      tag has none, and a search for the tag itself would
+                      list other files than the ones counted here. */}
+                  {c.variants.length > 0 ? (
+                    <SmallButton
+                      variant="ghost"
+                      className="h-[26px] px-2"
+                      onClick={() => searchInLibrary(c)}
+                      title={t("autoTag.searchCandidateHint")}
+                    >
+                      {t("autoTag.viewFiles")}
+                    </SmallButton>
+                  ) : (
+                    <span />
+                  )}
                   {/* The two facts side by side, each as what it is now: in the
                     keywords or not, on the files or not — the latter as the
                     way to take it off them again. */}

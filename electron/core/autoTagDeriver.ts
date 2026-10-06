@@ -10,6 +10,7 @@ import { scopedLog } from "./logger.js";
 import {
   compileEngine,
   tagsForName,
+  type FolderRule,
   type KeywordEntry,
   type TagRule,
 } from "../../shared/autoTag.js";
@@ -19,6 +20,11 @@ const log = scopedLog("autoTag");
 export interface AutoTagEngine {
   rules: readonly TagRule[];
   keywords: readonly KeywordEntry[];
+  /**
+   * Not for the worker: a folder rule compares paths, which cannot hang, so
+   * the caller adds its tags itself (see applyAutoTags).
+   */
+  folders?: readonly FolderRule[];
 }
 
 /** Tags for each file name, in the same order. */

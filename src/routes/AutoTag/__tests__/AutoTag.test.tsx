@@ -42,6 +42,18 @@ vi.mock("@/ipc/client", () => ({
     autoTagApply: (a: AutoTagAssignment[]) => mocks.autoTagApply(a),
     autoTagUndo: (ids: string[]) => mocks.autoTagUndo(ids),
     autoTagReapply: () => mocks.autoTagReapply(),
+    // The names folder rules show their workspaces by.
+    workspacesList: () =>
+      Promise.resolve({
+        workspaces: [
+          // The virtual entry the list leads with: not a place for a rule.
+          { id: "__all__", path: "", label: "All", active: false },
+          { id: "ws", path: "/media/ws", label: "Media", active: true },
+          { id: "other", path: "/media/other", label: "Other", active: false },
+        ],
+        collections: [],
+        activeId: "ws",
+      }),
     filesBulkTag: (
       targets: { workspaceId: string; fileIds: number[] }[],
       add: string[],
@@ -80,6 +92,7 @@ function library(): AutoTagLibrary {
       workspaceId: "ws",
       id: i + 1,
       name,
+      folder: "",
       metaKey: `k${i}`,
       tags: i === 2 ? ["trip"] : [],
     })),
@@ -133,9 +146,12 @@ describe("AutoTag", () => {
   it("lists the rules with how many files each would tag and tests the selected one", async () => {
     await renderScreen();
     expect(
-      screen.getByText("4 active rules · 0 keywords · 5 files", {
-        exact: false,
-      }),
+      screen.getByText(
+        "4 active rules · 0 keywords · 0 folder rules · 5 files",
+        {
+          exact: false,
+        },
+      ),
     ).toBeTruthy();
     // The code-prefix rule tags the two ABCD files; IMG is excluded.
     expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
@@ -149,9 +165,12 @@ describe("AutoTag", () => {
     mocks.autoTagGet.mockResolvedValue(defaultAutoTagConfig());
     await renderScreen();
     expect(
-      screen.getByText("0 active rules · 0 keywords · 5 files", {
-        exact: false,
-      }),
+      screen.getByText(
+        "0 active rules · 0 keywords · 0 folder rules · 5 files",
+        {
+          exact: false,
+        },
+      ),
     ).toBeTruthy();
     // As shipped already: there is nothing to reset.
     expect(screen.getByRole("button", { name: "Reset" })).toHaveProperty(
@@ -374,6 +393,157 @@ describe("AutoTag", () => {
     expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
   });
 
+  it("adds a folder rule, and suggests its tags for the files under the folder", async () => {
+    // Two files in Trips/2024, one in a folder beside it, the rest at the root.
+    const placed = library();
+    placed.files[0].folder = "Trips/2024";
+    placed.files[1].folder = "Trips/2024/day1";
+    placed.files[4].folder = "Trips/2024b";
+    mocks.autoTagFiles.mockResolvedValue(placed);
+    await renderScreen();
+    expect(screen.getByText("No folder rules yet.")).toBeTruthy();
+    // Once the workspaces are known: a rule has to be for one of them.
+    const add = screen.getByRole("button", { name: "+ Add a folder rule" });
+    await waitFor(() => expect(add).toHaveProperty("disabled", false));
+    fireEvent.click(add);
+
+    // It starts as the whole of the workspace the files are in, named as the
+    // app names it, with nothing to add yet.
+    expect(screen.getByLabelText("Workspace").textContent).toBe("Media");
+    expect(
+      screen.getByText("No tags yet: this rule adds nothing."),
+    ).toBeTruthy();
+    const pane = screen.getByText("Files under it").closest("div")!;
+    expect(within(pane).getByText("5 files")).toBeTruthy();
+
+    // The folders that hold files, as a tree: the root open, the rest shut.
+    const tree = within(screen.getByRole("tree", { name: "Pick a folder" }));
+    const shown = () =>
+      tree
+        .getAllByRole("treeitem")
+        .map((row) => row.getAttribute("aria-label"));
+    expect(shown()).toEqual(["(the whole workspace)", "Trips"]);
+    expect(
+      tree.getByRole("treeitem", { name: "(the whole workspace)" }),
+    ).toHaveProperty("ariaSelected", "true");
+    // Opened, a folder shows what is under it, with how many files each holds.
+    fireEvent.click(
+      within(tree.getByRole("treeitem", { name: "Trips" })).getByRole(
+        "button",
+        {
+          name: "Expand",
+        },
+      ),
+    );
+    expect(shown()).toEqual([
+      "(the whole workspace)",
+      "Trips",
+      "Trips/2024",
+      "Trips/2024b",
+    ]);
+    expect(
+      tree.getByRole("treeitem", { name: "Trips/2024" }).textContent,
+    ).toContain("2 files");
+    // A search finds a folder wherever it is, and shows the way to it.
+    fireEvent.change(screen.getByLabelText("Find a folder"), {
+      target: { value: "day" },
+    });
+    expect(shown()).toEqual([
+      "(the whole workspace)",
+      "Trips",
+      "Trips/2024",
+      "Trips/2024/day1",
+    ]);
+    fireEvent.click(
+      within(tree.getByRole("treeitem", { name: "Trips/2024/day1" })).getByText(
+        "day1",
+      ),
+    );
+    expect(within(pane).getByText("1 files")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Find a folder"), {
+      target: { value: "" },
+    });
+    // Picked while searching, it stays in view once the search is cleared.
+    expect(
+      tree.getByRole("treeitem", { name: "Trips/2024/day1" }),
+    ).toHaveProperty("ariaSelected", "true");
+    fireEvent.click(
+      within(tree.getByRole("treeitem", { name: "Trips/2024" })).getByText(
+        "2024",
+      ),
+    );
+    expect(within(pane).getByText("2 files")).toBeTruthy();
+
+    const tags = screen.getByLabelText("+ Add tag (Enter)");
+    fireEvent.change(tags, { target: { value: "Journey, 2024, journey" } });
+    fireEvent.keyDown(tags, { key: "Enter" });
+    expect((await lastSaved()).folders).toEqual([
+      {
+        id: expect.any(String) as string,
+        workspaceId: "ws",
+        folder: "Trips/2024",
+        tags: ["Journey", "2024"],
+        enabled: true,
+      },
+    ]);
+    expect(screen.getByText("Media / Trips/2024")).toBeTruthy();
+
+    // Its tags are suggestions like a rule's, for the two files under it.
+    fireEvent.click(screen.getByRole("tab", { name: /Keywords/ }));
+    const row = (
+      await screen.findByRole("checkbox", { name: "Journey" })
+    ).closest("div")!;
+    expect(within(row).getByText("Folder")).toBeTruthy();
+    expect(
+      within(row).queryByRole("button", { name: "Add to keywords" }),
+    ).toBeNull();
+    fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
+    expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
+      { workspaceId: "ws", fileIds: [1, 2], tags: ["Journey"] },
+    ]);
+  });
+
+  it("takes a folder rule for any workspace, whichever has files on screen", async () => {
+    // Every file here is in "ws"; the rule is for another workspace of the
+    // library, and for one that is no longer in it.
+    mocks.autoTagGet.mockResolvedValue({
+      ...sampleConfig(),
+      folders: [
+        {
+          id: "f1",
+          workspaceId: "other",
+          folder: "Scans",
+          tags: ["Scan"],
+          enabled: true,
+        },
+        {
+          id: "f2",
+          workspaceId: "gone",
+          folder: "",
+          tags: ["Old"],
+          enabled: true,
+        },
+      ],
+    });
+    await renderScreen();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Other \/ Scans/ }),
+    );
+    // Named as the app names it, and nothing says it is out of reach.
+    expect(screen.getByLabelText("Workspace").textContent).toBe("Other");
+    expect(screen.getByText("No file is under this folder.")).toBeTruthy();
+    expect(
+      screen.getByText("No folder of this workspace holds a file."),
+    ).toBeTruthy();
+
+    // A workspace that was removed is said to be gone, not merely empty.
+    fireEvent.click(screen.getByRole("button", { name: /^gone/ }));
+    expect(
+      screen.getByText("This workspace is not in the library any more."),
+    ).toBeTruthy();
+  });
+
   it("deletes keywords with the Delete key, one press each", async () => {
     mocks.autoTagGet.mockResolvedValue({
       ...sampleConfig(),
@@ -462,6 +632,7 @@ describe("AutoTag", () => {
       workspaceId: "other",
       id: 9,
       name: "backup_001.mp4",
+      folder: "",
       metaKey: copies.files[2].metaKey,
       tags: ["trip"],
     });
@@ -860,6 +1031,7 @@ describe("AutoTag", () => {
       workspaceId: "ws",
       id: i + 1,
       name: `${wordAt(Math.floor(i / 2))} clip.mp4`,
+      folder: "",
       metaKey: `k${i}`,
       tags: [],
     }));

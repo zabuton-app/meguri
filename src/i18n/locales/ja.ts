@@ -533,7 +533,7 @@ export const ja = {
   // auto tagging
   "autoTag.title": "自動タグ付け",
   "autoTag.summary":
-    "有効なルール {rules} · キーワード {keywords} · {files} ファイル",
+    "有効なルール {rules} · キーワード {keywords} · フォルダルール {folders} · {files} ファイル",
   "autoTag.sampled": "（先頭の{count}件を解析）",
   "autoTag.safeMode":
     "前回の解析が完了しなかったため、ルールの実行を止めています。原因のルールを修正または無効にしてから再開してください。",
@@ -552,7 +552,7 @@ export const ja = {
   "autoTag.tab.suggest": "キーワード",
   "autoTag.applyOnScan": "スキャン時に自動適用",
   "autoTag.applyOnScanHint":
-    "新規・変更されたファイルの取り込み時に、有効なルールとキーワードを実行します。",
+    "新規・変更されたファイルの取り込み時に、有効なルール・キーワード・フォルダルールを実行します。",
   "autoTag.reapply": "既存ファイルに再適用",
   "autoTag.reapplying": "適用中…",
   "autoTag.reapplyConfirm":
@@ -606,6 +606,32 @@ export const ja = {
   "autoTag.noKeywordsMatch": "絞り込みに一致するキーワードはありません。",
   "autoTag.noAliases": "別名なし",
   "autoTag.noKeywords": "キーワードはまだありません。",
+  "autoTag.folders": "フォルダ",
+  "autoTag.foldersHint": "フォルダ配下のファイルにタグを付ける",
+  "autoTag.addFolder": "+ フォルダルールを追加",
+  "autoTag.noFolders": "フォルダルールはまだありません。",
+  "autoTag.folderEnabled": "フォルダルールを有効にする",
+  "autoTag.kind.folder": "フォルダ",
+  "autoTag.folder.workspace": "ワークスペース",
+  "autoTag.folder.path": "フォルダ",
+  "autoTag.folder.root": "（ワークスペース全体）",
+  "autoTag.folder.pathHint": "サブフォルダ内のファイルも含みます。",
+  "autoTag.folder.pick": "フォルダを選択",
+  "autoTag.folder.search": "フォルダを検索",
+  "autoTag.folder.noFolders":
+    "このワークスペースにファイルのあるフォルダはありません。",
+  "autoTag.folder.noMatch": "一致するフォルダはありません。",
+  "autoTag.folder.expand": "開く",
+  "autoTag.folder.collapse": "閉じる",
+  "autoTag.folder.tags": "付けるタグ",
+  "autoTag.folder.addTag": "+ タグを追加（Enter）",
+  "autoTag.folder.removeTag": "タグ「{tag}」を削除",
+  "autoTag.folder.noTags": "タグがまだありません。このルールは何も付けません。",
+  "autoTag.folder.noTagsShort": "タグなし",
+  "autoTag.folder.files": "配下のファイル",
+  "autoTag.folder.noFiles": "このフォルダ配下にファイルはありません。",
+  "autoTag.folder.outOfScope":
+    "このワークスペースは、もうライブラリにありません。",
   "autoTag.joinsExisting":
     "既存タグ「{tag}」と同じ名前のため、そのタグに追加されます",
   "autoTag.createsNew": "新しいタグとして作成されます",

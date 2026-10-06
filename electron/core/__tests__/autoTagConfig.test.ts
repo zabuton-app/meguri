@@ -47,4 +47,26 @@ describe("the stored auto-tagging configuration", () => {
     write({ autoTag: stored });
     expect(loadConfig().autoTag).toEqual(stored);
   });
+
+  it("reads a configuration written before folder rules as having none", () => {
+    const before: Record<string, unknown> = { ...defaultAutoTagConfig() };
+    delete before.folders;
+    write({ autoTag: before });
+    expect(loadConfig().autoTag.folders).toEqual([]);
+    // And one rule that no longer validates does not take the others with it.
+    const good = {
+      id: "f1",
+      workspaceId: "ws",
+      folder: "Trips",
+      tags: ["Trip"],
+      enabled: true,
+    };
+    write({
+      autoTag: {
+        ...before,
+        folders: [good, { ...good, id: "f2", folder: "../x" }],
+      },
+    });
+    expect(loadConfig().autoTag.folders).toEqual([good]);
+  });
 });

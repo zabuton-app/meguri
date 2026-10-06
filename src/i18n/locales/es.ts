@@ -547,7 +547,7 @@ export const es: Record<TranslationKey, string> = {
   // auto tagging
   "autoTag.title": "Etiquetado automático",
   "autoTag.summary":
-    "{rules} reglas activas · {keywords} palabras clave · {files} archivos",
+    "{rules} reglas activas · {keywords} palabras clave · {folders} reglas de carpeta · {files} archivos",
   "autoTag.sampled": "(se analizan los primeros {count})",
   "autoTag.safeMode":
     "El último análisis no terminó, así que las reglas no se están ejecutando. Corrige o desactiva la regla causante y reanuda.",
@@ -624,6 +624,32 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.noKeywordsMatch": "Ninguna palabra clave coincide con el filtro.",
   "autoTag.noAliases": "Sin alias",
   "autoTag.noKeywords": "Aún no hay palabras clave.",
+  "autoTag.folders": "Carpetas",
+  "autoTag.foldersHint": "etiqueta todo lo que hay bajo una carpeta",
+  "autoTag.addFolder": "+ Añadir regla de carpeta",
+  "autoTag.noFolders": "Aún no hay reglas de carpeta.",
+  "autoTag.folderEnabled": "Activar regla de carpeta",
+  "autoTag.kind.folder": "Carpeta",
+  "autoTag.folder.workspace": "Espacio de trabajo",
+  "autoTag.folder.path": "Carpeta",
+  "autoTag.folder.root": "(todo el espacio de trabajo)",
+  "autoTag.folder.pathHint": "Incluye los archivos de sus subcarpetas.",
+  "autoTag.folder.pick": "Elige una carpeta",
+  "autoTag.folder.search": "Buscar una carpeta",
+  "autoTag.folder.noFolders":
+    "Ninguna carpeta de este espacio de trabajo contiene archivos.",
+  "autoTag.folder.noMatch": "Ninguna carpeta coincide.",
+  "autoTag.folder.expand": "Expandir",
+  "autoTag.folder.collapse": "Contraer",
+  "autoTag.folder.tags": "Etiquetas que añadir",
+  "autoTag.folder.addTag": "+ Añadir etiqueta (Intro)",
+  "autoTag.folder.removeTag": "Quitar la etiqueta «{tag}»",
+  "autoTag.folder.noTags": "Aún sin etiquetas: esta regla no añade nada.",
+  "autoTag.folder.noTagsShort": "sin etiquetas",
+  "autoTag.folder.files": "Archivos que contiene",
+  "autoTag.folder.noFiles": "No hay archivos bajo esta carpeta.",
+  "autoTag.folder.outOfScope":
+    "Este espacio de trabajo ya no está en la biblioteca.",
   "autoTag.joinsExisting":
     "Mismo nombre que la etiqueta existente «{tag}»; los archivos se añaden a ella",
   "autoTag.createsNew": "Crea una etiqueta nueva",

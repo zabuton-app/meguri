@@ -4,6 +4,7 @@ import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  AutoTagFolderSchema,
   AutoTagKeywordSchema,
   AutoTagRuleSchema,
   LogoIdSchema,
@@ -11,6 +12,7 @@ import {
 } from "../../shared/ipc/schema.js";
 import {
   MAX_AUTO_TAG_KEYWORDS,
+  MAX_AUTO_TAG_FOLDER_RULES,
   MAX_AUTO_TAG_RULES,
   MAX_AUTO_TAG_TERMS,
   defaultAutoTagConfig,
@@ -153,6 +155,12 @@ function parseAutoTag(value: unknown): AutoTagConfig {
       c.keywords,
       MAX_AUTO_TAG_KEYWORDS,
       (item) => AutoTagKeywordSchema.safeParse(item).data,
+    ),
+    // Absent from a configuration written before folder rules existed.
+    folders: list(
+      c.folders,
+      MAX_AUTO_TAG_FOLDER_RULES,
+      (item) => AutoTagFolderSchema.safeParse(item).data,
     ),
     applyOnScan: c.applyOnScan === true,
     ignored: list(c.ignored, MAX_AUTO_TAG_TERMS, term),

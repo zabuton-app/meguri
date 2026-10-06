@@ -112,6 +112,7 @@ export class ScanManager {
             rebuild: opts.rebuild,
             signal: controller.signal,
             autoTag: this.deps.autoTag(),
+            workspaceId: wsId ?? undefined,
             deriveAutoTags: this.deps.deriveAutoTags,
           },
         );

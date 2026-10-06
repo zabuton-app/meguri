@@ -1,31 +1,40 @@
-// Conditions tab: everything that decides which tags a file name gets. Pattern
+// Conditions tab: everything that decides which tags a file gets. Pattern
 // rules and dictionary entries sit in one list — both are conditions of the
-// form "found in the name, so tag it" — and the pane beside it edits whichever
-// is selected.
-import { useEffect, useRef, useState } from "react";
+// form "found in the name, so tag it" — with the folder rules, which go by
+// where the file is, under them; the pane beside it edits whichever is
+// selected.
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nProvider";
+import { api } from "@/ipc/client";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import {
+  MAX_AUTO_TAG_FOLDER_RULES,
   MAX_AUTO_TAG_RULES,
   builtinRulesAsShipped,
   resetBuiltinRules,
+  type FolderRule,
   type KeywordEntry,
   type RuleKind,
   type TagRule,
 } from "@shared/autoTag";
 import { MAX_TAG_NAME } from "@shared/tags";
+import { ALL_ID } from "@shared/workspaceIds";
 import {
   MAX_ROWS,
   MONO,
+  folderCountKey,
+  folderCounts,
   keywordMatches,
   newKeyword,
   ruleDisplayName,
   ruleMatchCount,
 } from "./helpers";
+import { FolderEditor, type FolderWorkspace } from "./FolderEditor";
 import { KeywordEditor } from "./KeywordEditor";
 import {
   Badge,
@@ -51,7 +60,7 @@ const NO_NAMES: readonly string[] = [];
 /** Entries past which the dictionary gets a filter box. */
 const FILTER_FROM = 8;
 
-type Selection = { kind: "rule" | "keyword"; id: string };
+type Selection = { kind: "rule" | "keyword" | "folder"; id: string };
 
 export function ConditionsTab({ state }: { state: AutoTagState }) {
   const { t } = useI18n();
@@ -83,12 +92,85 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
     selection?.kind === "keyword"
       ? config.keywords.find((entry) => entry.id === selection.id)
       : undefined;
+  const selectedFolder =
+    selection?.kind === "folder"
+      ? config.folders.find((rule) => rule.id === selection.id)
+      : undefined;
   const shownRule =
-    selectedRule ?? (selectedKeyword ? undefined : config.rules[0]);
+    selectedRule ??
+    (selectedKeyword || selectedFolder ? undefined : config.rules[0]);
   const shownKeyword =
-    selectedKeyword ?? (shownRule ? undefined : config.keywords[0]);
+    selectedKeyword ??
+    (shownRule || selectedFolder ? undefined : config.keywords[0]);
+  const shownFolder =
+    selectedFolder ??
+    (shownRule || shownKeyword ? undefined : config.folders[0]);
   const isSelected = (kind: Selection["kind"], id: string): boolean =>
-    kind === "rule" ? shownRule?.id === id : shownKeyword?.id === id;
+    kind === "rule"
+      ? shownRule?.id === id
+      : kind === "keyword"
+        ? shownKeyword?.id === id
+        : shownFolder?.id === id;
+
+  // The workspaces a folder rule can be for: all of them, whichever one the
+  // library is showing — named as the rest of the app names them.
+  const workspacesList = useQuery({
+    queryKey: ["workspaces_list"],
+    queryFn: api.workspacesList,
+    staleTime: 30_000,
+  });
+  const workspaceLabels = useMemo(
+    () =>
+      new Map(
+        (workspacesList.data?.workspaces ?? []).map((w) => [w.id, w.label]),
+      ),
+    [workspacesList.data],
+  );
+  // A rule may be for a workspace that is not open here: named all the same.
+  const workspaceLabel = (id: string): string => workspaceLabels.get(id) ?? id;
+  const folderWorkspaces = useMemo(
+    (): FolderWorkspace[] =>
+      // The real ones: "All" is a view over them, not a place files are in.
+      (workspacesList.data?.workspaces ?? [])
+        .filter((w) => w.id !== ALL_ID)
+        .map((w) => ({ id: w.id, label: w.label })),
+    [workspacesList.data],
+  );
+  // Files under each folder, counted once for the whole list of rules.
+  const underFolder = useMemo(() => folderCounts(state.files), [state.files]);
+  const folderFileCount = (rule: FolderRule): number =>
+    underFolder.get(folderCountKey(rule.workspaceId, rule.folder)) ?? 0;
+  const patchFolder = (id: string, change: Partial<FolderRule>) => {
+    setResult(null);
+    update((c) => ({
+      ...c,
+      folders: c.folders.map((rule) =>
+        rule.id === id ? { ...rule, ...change } : rule,
+      ),
+    }));
+  };
+  const addFolder = () => {
+    const workspaceId = folderWorkspaces[0]?.id;
+    if (!workspaceId) return;
+    const id = crypto.randomUUID();
+    setResult(null);
+    update((c) => ({
+      ...c,
+      folders: [
+        ...c.folders,
+        { id, workspaceId, folder: "", tags: [], enabled: true },
+      ],
+    }));
+    select("folder", id);
+  };
+  const deleteFolder = (id: string) => {
+    setResult(null);
+    update((c) => ({
+      ...c,
+      folders: c.folders.filter((rule) => rule.id !== id),
+    }));
+    setSelection(null);
+  };
   const select = (kind: Selection["kind"], id: string) =>
     setSelection({ kind, id });
 
@@ -432,6 +514,79 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
                 />
               </>
             )}
+
+            <div className="mt-4 flex items-baseline gap-2 px-1 pb-2">
+              <span className="text-xs font-semibold text-fg">
+                {t("autoTag.folders")}
+              </span>
+              <span className="text-xs tabular-nums text-muted">
+                {config.folders.length}
+              </span>
+              <span className="truncate text-xs text-muted">
+                {t("autoTag.foldersHint")}
+              </span>
+            </div>
+            {config.folders.slice(0, MAX_ROWS).map((rule) => (
+              <div
+                key={rule.id}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg p-2",
+                  isSelected("folder", rule.id)
+                    ? "bg-overlay"
+                    : "hover:bg-surface",
+                )}
+              >
+                <Switch
+                  checked={rule.enabled}
+                  onCheckedChange={(enabled) =>
+                    patchFolder(rule.id, { enabled })
+                  }
+                  aria-label={t("autoTag.folderEnabled")}
+                />
+                <button
+                  type="button"
+                  onClick={() => select("folder", rule.id)}
+                  aria-current={isSelected("folder", rule.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span
+                      className={cn(
+                        MONO,
+                        "truncate text-[13px]",
+                        rule.enabled ? "text-bright-fg" : "text-muted",
+                      )}
+                    >
+                      {workspaceLabel(rule.workspaceId)}
+                      {rule.folder && ` / ${rule.folder}`}
+                    </span>
+                    <span className="truncate text-[11px] text-muted">
+                      {rule.tags.join(", ") || t("autoTag.folder.noTagsShort")}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted">
+                    {t("autoTag.fileCount", { count: folderFileCount(rule) })}
+                  </span>
+                </button>
+              </div>
+            ))}
+            <MoreRows t={t} hidden={config.folders.length - MAX_ROWS} />
+            {config.folders.length === 0 && (
+              <p className="px-1 pb-1 text-xs text-muted">
+                {t("autoTag.noFolders")}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={addFolder}
+              disabled={
+                folderWorkspaces.length === 0 ||
+                config.folders.length >= MAX_AUTO_TAG_FOLDER_RULES
+              }
+              className="mt-2 h-8 rounded-lg border border-dashed border-border-strong text-xs text-muted transition hover:text-bright-fg disabled:opacity-40"
+            >
+              {t("autoTag.addFolder")}
+            </button>
           </div>
         }
       >
@@ -457,6 +612,18 @@ export function ConditionsTab({ state }: { state: AutoTagState }) {
             existing={existing}
             onChange={(change) => patchKeyword(shownKeyword.id, change)}
             onDelete={() => deleteKeyword(shownKeyword.id)}
+          />
+        ) : shownFolder ? (
+          <FolderEditor
+            // Per rule: the path and the tag being typed belong to this one.
+            key={shownFolder.id}
+            rule={shownFolder}
+            workspaces={folderWorkspaces}
+            files={state.files}
+            existing={existing}
+            workspaceLabel={workspaceLabel(shownFolder.workspaceId)}
+            onChange={(change) => patchFolder(shownFolder.id, change)}
+            onDelete={() => deleteFolder(shownFolder.id)}
           />
         ) : null}
       </SplitPane>

@@ -16,8 +16,12 @@ import { upsertTag } from "./tags.js";
 import {
   MAX_AUTO_TAG_FILES,
   cleanTagName,
+  compileFolders,
+  folderMatcher,
   fileNameOf,
+  folderOf,
   isUsableTagName,
+  withFolderTags,
   type AutoTagFile,
 } from "../../shared/autoTag.js";
 
@@ -148,14 +152,29 @@ export async function applyAutoTags(
   db: DB,
   opts: {
     engine: AutoTagEngine;
+    /**
+     * The workspace this database is: what the engine's folder rules are
+     * matched against. Without it none of them applies — a caller that has
+     * folder rules to run must say which workspace it is running them in.
+     */
+    workspaceId?: string;
     derive?: DeriveAutoTags;
     fileIds?: readonly number[];
     signal?: AbortSignal;
     onProgress?: (done: number, total: number) => void;
   },
 ): Promise<{ files: number; added: number; completed: boolean }> {
-  const { engine, fileIds, signal, onProgress } = opts;
+  const { engine, fileIds, signal, onProgress, workspaceId } = opts;
   const derive = opts.derive ?? deriveAutoTagsInProcess;
+  // Only the rules of this workspace can reach a file of it. Looked up per
+  // folder, not per file (see folderMatcher).
+  const reaching = folderMatcher(
+    workspaceId
+      ? compileFolders(engine.folders ?? []).filter(
+          ({ rule }) => rule.workspaceId === workspaceId,
+        )
+      : [],
+  );
   const byIds = db.prepare(
     `SELECT id, rel_path FROM files
       WHERE deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))`,
@@ -189,12 +208,27 @@ export async function applyAutoTags(
       lastId = rows[rows.length - 1].id;
       done += rows.length;
     }
-    const tags = await derive(
+    const named = await derive(
       engine,
       rows.map((row) => fileNameOf(row.rel_path)),
     );
     // The await let the caller cancel; nothing of this chunk is written yet.
     if (signal?.aborted) return { files, added, completed: false };
+    // What the names gave, then what the folders give: path comparisons, done
+    // here rather than in the worker, and put together by withFolderTags as
+    // the screen's own analysis expects.
+    const tags = workspaceId
+      ? named.map((list, i) =>
+          withFolderTags(
+            list,
+            reaching({
+              workspaceId,
+              // NFC, as the screen that wrote the rule saw the folder.
+              folder: folderOf(rows[i].rel_path).normalize("NFC"),
+            }),
+          ),
+        )
+      : named;
     const result = attachAutoTags(
       db,
       rows
@@ -234,6 +268,7 @@ export async function applyAutoTagsOnScan(
   db: DB,
   opts: {
     engine: AutoTagEngine;
+    workspaceId?: string;
     derive?: DeriveAutoTags;
     changedIds: readonly number[];
     signal?: AbortSignal;
@@ -289,6 +324,7 @@ export function autoTagFiles(
       workspaceId,
       id: row.id,
       name: fileNameOf(row.rel_path).normalize("NFC"),
+      folder: folderOf(row.rel_path).normalize("NFC"),
       metaKey: row.meta_key,
       tags: [...new Set(JSON.parse(row.tags) as string[])],
     })),

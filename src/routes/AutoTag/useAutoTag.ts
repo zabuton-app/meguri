@@ -1,5 +1,5 @@
 // State behind the auto-tagging screen: the configuration (saved as it is
-// edited), the files of the current scope, and applying / removing tags.
+// edited), the files of every workspace, and applying / removing tags.
 //
 // Analysis runs here in the renderer, on the same engine the scan uses
 // (shared/autoTag.ts), over the names loaded once per visit. Writes go through
@@ -27,6 +27,7 @@ import {
   type AutoTagFile,
   type AutoTagLibrary,
   type CompiledEngine,
+  type FilePlace,
 } from "@shared/autoTag";
 import { STOP_WORDS } from "@shared/autoTagAnalysis";
 import type { BulkTargets } from "@shared/ipc/channels";
@@ -53,9 +54,11 @@ export interface AutoTagState {
   files: AutoTagFile[];
   /** `files[i].name`, as its own array: every analysis takes just the names. */
   names: string[];
-  /** Alive files in scope; more than `files.length` when only a sample loaded. */
+  /** Where each file is, by position: what folder rules go by. */
+  places: FilePlace[];
+  /** Alive files of every workspace; more than `files.length` when only a sample loaded. */
   total: number;
-  /** The user's tags in scope: lowercase → the spelling in use. */
+  /** The user's tags, of every workspace: lowercase → the spelling in use. */
   existing: Map<string, string>;
   /** Lowercased tags of each file. */
   fileTags: Set<string>[];
@@ -241,11 +244,12 @@ export function useAutoTag(): AutoTagState | null {
       compileEngine({
         rules: safeMode ? [] : (deferred?.rules ?? []),
         keywords: deferred?.keywords ?? [],
+        folders: deferred?.folders ?? [],
       }),
-    // Rules and keywords only: dismissing a suggestion or renaming a rule
+    // What the engine runs only: dismissing a suggestion or renaming a rule
     // changes the configuration, not what the engine does, and every analysis
     // downstream is keyed on this object.
-    [deferred?.rules, deferred?.keywords, safeMode],
+    [deferred?.rules, deferred?.keywords, deferred?.folders, safeMode],
   );
   const stop = useMemo(
     () => new Set([...STOP_WORDS, ...(deferred?.excludedTerms ?? [])]),
@@ -257,6 +261,16 @@ export function useAutoTag(): AutoTagState | null {
   // but never their names, and a new array here would rerun every analysis.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const names = useMemo(() => (files ?? []).map((f) => f.name), [loadedAt]);
+  // Where each file is, for the folder rules. Keyed on the load like `names`.
+  const places = useMemo(
+    () =>
+      (files ?? []).map((f) => ({
+        workspaceId: f.workspaceId,
+        folder: f.folder,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadedAt],
+  );
   const fileTags = useMemo(
     () => (files ?? []).map((f) => new Set(f.tags.map((x) => x.toLowerCase()))),
     [files],
@@ -484,6 +498,7 @@ export function useAutoTag(): AutoTagState | null {
     update,
     files: library.files,
     names,
+    places,
     total: library.total,
     existing,
     fileTags,

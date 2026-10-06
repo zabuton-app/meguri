@@ -90,7 +90,10 @@ export function ExcludeList({
           {t("autoTag.excludeFull")}
         </span>
       )}
-      <ScrollArea className="max-h-[188px] rounded-md border border-border">
+      <ScrollArea
+        className="max-h-[188px] rounded-md border border-border"
+        viewportClassName="max-h-[188px]"
+      >
         <ul className="flex flex-col">
           {shown.slice(0, MAX_ROWS).map((value) => (
             <li

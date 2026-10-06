@@ -10,7 +10,7 @@ import {
 import { handle } from "../core/ipcHandler.js";
 import { MAX_AUTO_TAG_FILES, type AutoTagFile } from "../../shared/autoTag.js";
 import type { IpcContext } from "./context.js";
-import { coreById, scopedCores } from "./helpers.js";
+import { coreById } from "./helpers.js";
 
 /** Rollback handles kept at a time; the oldest go first. */
 const MAX_UNDO_ENTRIES = 256;
@@ -50,10 +50,12 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
     const files: AutoTagFile[] = [];
     const existing = new Set<string>();
     let total = 0;
-    const cores = scopedCores(ws);
+    // Every workspace, whichever one is being looked at: the rules are the
+    // app's, not a workspace's, and a folder rule may be for any of them.
+    const cores = ws.allCores();
     cores.forEach(({ id, core }, i) => {
-      // An even share of what is left, so the last workspaces of the "All"
-      // view are sampled too instead of the first one taking the whole cap.
+      // An even share of what is left, so the last workspaces are sampled
+      // too instead of the first one taking the whole cap.
       const share = Math.ceil(
         (MAX_AUTO_TAG_FILES - files.length) / (cores.length - i),
       );
@@ -133,9 +135,11 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
       const engine = loadConfig().autoTag;
       let files = 0;
       let added = 0;
-      for (const { core } of scopedCores(ws)) {
+      // As the screen that asked: every workspace (see auto_tag_files).
+      for (const { id, core } of ws.allCores()) {
         const result = await applyAutoTags(core.db, {
           engine,
+          workspaceId: id,
           derive: ctx.deriveAutoTags,
         });
         files += result.files;

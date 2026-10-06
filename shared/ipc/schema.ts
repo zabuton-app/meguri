@@ -10,6 +10,8 @@ import {
   KEYWORD_MODES,
   MAX_AUTO_TAG_ALIASES,
   MAX_AUTO_TAG_EXCLUDE,
+  MAX_AUTO_TAG_FOLDER_RULES,
+  MAX_AUTO_TAG_FOLDER_TAGS,
   MAX_AUTO_TAG_KEYWORDS,
   MAX_AUTO_TAG_PATTERN,
   MAX_AUTO_TAG_RULES,
@@ -18,6 +20,7 @@ import {
   MAX_AUTO_TAG_TERMS,
   RULE_KINDS,
   type AutoTagConfig,
+  type FolderRule,
   type KeywordEntry,
   type TagRule,
 } from "../autoTag.js";
@@ -285,9 +288,18 @@ export const AutoTagKeywordSchema = z.object({
   mode: z.enum(KEYWORD_MODES),
 }) satisfies z.ZodType<KeywordEntry>;
 
+export const AutoTagFolderSchema = z.object({
+  id: z.string().min(1).max(64),
+  workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  folder: z.string().max(MAX_FOLDER_PATH).refine(isNormalizedFolderPath),
+  tags: z.array(autoTagTerm).max(MAX_AUTO_TAG_FOLDER_TAGS),
+  enabled: z.boolean(),
+}) satisfies z.ZodType<FolderRule>;
+
 export const AutoTagConfigSchema = z.object({
   rules: z.array(AutoTagRuleSchema).max(MAX_AUTO_TAG_RULES),
   keywords: z.array(AutoTagKeywordSchema).max(MAX_AUTO_TAG_KEYWORDS),
+  folders: z.array(AutoTagFolderSchema).max(MAX_AUTO_TAG_FOLDER_RULES),
   applyOnScan: z.boolean(),
   ignored: z.array(autoTagTerm).max(MAX_AUTO_TAG_TERMS),
   excludedTerms: z.array(autoTagTerm).max(MAX_AUTO_TAG_TERMS),

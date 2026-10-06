@@ -3,12 +3,16 @@
  *
  * Two things read a file's name and propose tags: pattern rules (a regular
  * expression whose matches name tags through a template) and a keyword
- * dictionary (a tag plus its aliases). The tags are the user's own — plain
- * names, no namespace — so applying them is the same act as tagging by hand.
+ * dictionary (a tag plus its aliases). A third goes by where the file is:
+ * folder rules, which tag everything under a folder of a workspace. The tags
+ * are the user's own — plain names, no namespace — so applying them is the
+ * same act as tagging by hand.
  *
- * Everything here is pure. The scan runs it in a worker thread, and the
- * auto-tagging screen runs the very same code to preview and suggest,
- * so what the screen shows is what a scan writes.
+ * Everything here is pure, and the auto-tagging screen runs the very same code
+ * to preview and suggest, so what the screen shows is what a scan writes. The
+ * scan evaluates the part that reads names in a worker thread — a rule is an
+ * arbitrary regular expression — and adds the folder rules' tags itself:
+ * comparing paths cannot hang.
  */
 import { MAX_TAG_NAME, isReservedTagName } from "./tags.js";
 
@@ -23,6 +27,9 @@ export const MAX_AUTO_TAG_TEMPLATE = 64;
  */
 export const MAX_AUTO_TAG_EXCLUDE = 32_768;
 export const MAX_AUTO_TAG_RULE_NAME = 64;
+export const MAX_AUTO_TAG_FOLDER_RULES = 500;
+/** Tags one folder rule may name. */
+export const MAX_AUTO_TAG_FOLDER_TAGS = 16;
 export const MAX_AUTO_TAG_TERMS = 5000;
 /** Matches one rule may take from one name; a pattern that matches everywhere stops here. */
 export const MAX_RULE_MATCHES = 50;
@@ -67,9 +74,24 @@ export interface KeywordEntry {
   mode: KeywordMode;
 }
 
+/** Everything under one folder of one workspace gets these tags. */
+export interface FolderRule {
+  id: string;
+  /** The workspace the folder is in: the same path elsewhere is another folder. */
+  workspaceId: string;
+  /**
+   * The folder inside the workspace, in the normalized form of
+   * shared/folderPath.ts ("/"-separated; "" is the workspace root).
+   */
+  folder: string;
+  tags: string[];
+  enabled: boolean;
+}
+
 export interface AutoTagConfig {
   rules: TagRule[];
   keywords: KeywordEntry[];
+  folders: FolderRule[];
   /** Run the engine on files a scan adds or changes. */
   applyOnScan: boolean;
   /** Suggestions the user dismissed (lowercase), so they are not offered again. */
@@ -173,6 +195,7 @@ export function defaultAutoTagConfig(): AutoTagConfig {
   return {
     rules: defaultRules(),
     keywords: [],
+    folders: [],
     applyOnScan: false,
     ignored: [],
     excludedTerms: ["dsc", "img", "mvi", "公式"],
@@ -184,6 +207,20 @@ export function fileNameOf(relPath: string): string {
   return relPath.slice(
     Math.max(relPath.lastIndexOf("/"), relPath.lastIndexOf("\\")) + 1,
   );
+}
+
+/**
+ * The folder a file is in, as folder rules name folders: "/"-separated
+ * whatever the OS wrote the path with, and "" at the workspace root.
+ */
+export function folderOf(relPath: string): string {
+  const at = Math.max(relPath.lastIndexOf("/"), relPath.lastIndexOf("\\"));
+  return at < 0
+    ? ""
+    : relPath
+        .slice(0, at)
+        .split(/[\\/]+/)
+        .join("/");
 }
 
 /** A file name without its extension. Positions in it are positions in the name. */
@@ -394,15 +431,118 @@ export function runKeyword(
   return hits;
 }
 
+/** Where a file is: what a folder rule goes by. */
+export interface FilePlace {
+  workspaceId: string;
+  /** The file's folder inside the workspace, "/"-separated; "" at the root. */
+  folder: string;
+}
+
+export interface CompiledFolder {
+  rule: FolderRule;
+  /** The rule's tags that can be tags, cleaned, without repeats. */
+  tags: string[];
+}
+
+/** Whether `folder` is `base` or somewhere under it. */
+export function isUnderFolder(folder: string, base: string): boolean {
+  return base === "" || folder === base || folder.startsWith(`${base}/`);
+}
+
+/** The folder rules that actually run: enabled, with at least one usable tag. */
+export function compileFolders(
+  folders: readonly FolderRule[],
+): CompiledFolder[] {
+  const out: CompiledFolder[] = [];
+  for (const rule of folders) {
+    if (!rule.enabled) continue;
+    const seen = new Set<string>();
+    const tags: string[] = [];
+    for (const raw of rule.tags) {
+      const tag = cleanTagName(raw);
+      const key = tag.toLowerCase();
+      if (!isUsableTagName(tag) || seen.has(key)) continue;
+      seen.add(key);
+      tags.push(tag);
+    }
+    if (tags.length > 0) out.push({ rule, tags });
+  }
+  return out;
+}
+
+/** The folder rules that reach a file at `place`, in their own order. */
+export function foldersFor(
+  folders: readonly CompiledFolder[],
+  place: FilePlace,
+): CompiledFolder[] {
+  return folders.filter(
+    ({ rule }) =>
+      rule.workspaceId === place.workspaceId &&
+      isUnderFolder(place.folder, rule.folder),
+  );
+}
+
+/**
+ * {@link foldersFor} for many files: the answer is the same for every file of
+ * one folder, so it is worked out once per folder rather than once per file —
+ * a library has far fewer folders than files, and there may be hundreds of
+ * rules.
+ */
+export function folderMatcher(
+  folders: readonly CompiledFolder[],
+): (place: FilePlace) => readonly CompiledFolder[] {
+  if (folders.length === 0) return () => NO_FOLDERS;
+  const cache = new Map<string, readonly CompiledFolder[]>();
+  return (place) => {
+    const key = `${place.workspaceId}\0${place.folder}`;
+    let found = cache.get(key);
+    if (!found) {
+      found = foldersFor(folders, place);
+      cache.set(key, found);
+    }
+    return found;
+  };
+}
+
+const NO_FOLDERS: readonly CompiledFolder[] = [];
+
+/**
+ * `tags` (what the name gave) with the tags of the folder rules reaching the
+ * file after them. The one place the two are put together: the scan adds
+ * folder tags to what its worker returned with this, and the screen's
+ * analysis lists a folder rule's tags for the files this would give them to.
+ * Compared without regard to case; the first spelling wins.
+ */
+export function withFolderTags(
+  tags: readonly string[],
+  reaching: readonly CompiledFolder[],
+): string[] {
+  const out = tags.slice(0, MAX_AUTO_TAGS_PER_FILE);
+  if (reaching.length === 0) return out;
+  const seen = new Set(out.map((tag) => tag.toLowerCase()));
+  for (const { tags: more } of reaching) {
+    for (const tag of more) {
+      if (out.length >= MAX_AUTO_TAGS_PER_FILE) return out;
+      const key = tag.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(tag);
+    }
+  }
+  return out;
+}
+
 export interface CompiledEngine {
   rules: CompiledRule[];
   keywords: CompiledKeyword[];
+  folders: CompiledFolder[];
 }
 
-/** The rules and keywords that actually run: enabled, and valid. */
+/** What actually runs: the rules, keywords and folder rules enabled and valid. */
 export function compileEngine(config: {
   rules: readonly TagRule[];
   keywords: readonly KeywordEntry[];
+  folders?: readonly FolderRule[];
 }): CompiledEngine {
   const rules: CompiledRule[] = [];
   for (const rule of config.rules) {
@@ -415,7 +555,7 @@ export function compileEngine(config: {
     const compiled = compileKeyword(entry);
     if (compiled) keywords.push(compiled);
   }
-  return { rules, keywords };
+  return { rules, keywords, folders: compileFolders(config.folders ?? []) };
 }
 
 export type ProposalSource =
@@ -429,9 +569,11 @@ export interface Proposal {
 }
 
 /**
- * The tags the engine gives one file, rules first, then the dictionary. Tag
- * names are compared case-insensitively and the first spelling wins. The input
- * is normalized (NFC) so a decomposed name from macOS matches a typed keyword.
+ * The tags a file's name gives it: rules first, then the dictionary. What the
+ * folder rules add goes by where the file is, not by its name, and is put
+ * after these by {@link withFolderTags}. Tag names are compared
+ * case-insensitively and the first spelling wins. The input is normalized
+ * (NFC) so a decomposed name from macOS matches a typed keyword.
  */
 export function proposalsFor(engine: CompiledEngine, name: string): Proposal[] {
   const input = name.normalize("NFC");
@@ -484,6 +626,8 @@ export interface AutoTagFile {
   id: number;
   /** File name (no folders), NFC-normalized. */
   name: string;
+  /** The folder it is in, inside its workspace ("/"-separated; "" at the root). */
+  folder: string;
   /**
    * Metadata identity. Copies of a file share it — and with it their tags, so
    * tagging one copy tags them all.
@@ -495,9 +639,9 @@ export interface AutoTagFile {
 
 export interface AutoTagLibrary {
   files: AutoTagFile[];
-  /** Alive files in scope; larger than `files.length` when the sample was cut. */
+  /** Alive files of every workspace; larger than `files.length` when the sample was cut. */
   total: number;
-  /** Names of the user's own tags in scope. */
+  /** Names of the user's own tags, of every workspace. */
   existingTags: string[];
 }
 

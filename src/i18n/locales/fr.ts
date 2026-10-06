@@ -549,7 +549,7 @@ export const fr: Record<TranslationKey, string> = {
   // auto tagging
   "autoTag.title": "Étiquetage automatique",
   "autoTag.summary":
-    "{rules} règles actives · {keywords} mots-clés · {files} fichiers",
+    "{rules} règles actives · {keywords} mots-clés · {folders} règles de dossier · {files} fichiers",
   "autoTag.sampled": "(analyse des {count} premiers)",
   "autoTag.safeMode":
     "La dernière analyse ne s’est pas terminée ; les règles ne sont donc pas exécutées. Corrigez ou désactivez la règle en cause, puis reprenez.",
@@ -626,6 +626,32 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.noKeywordsMatch": "Aucun mot-clé ne correspond au filtre.",
   "autoTag.noAliases": "Aucun alias",
   "autoTag.noKeywords": "Aucun mot-clé pour l’instant.",
+  "autoTag.folders": "Dossiers",
+  "autoTag.foldersHint": "tague tout ce qui se trouve sous un dossier",
+  "autoTag.addFolder": "+ Ajouter une règle de dossier",
+  "autoTag.noFolders": "Aucune règle de dossier pour l'instant.",
+  "autoTag.folderEnabled": "Activer la règle de dossier",
+  "autoTag.kind.folder": "Dossier",
+  "autoTag.folder.workspace": "Espace de travail",
+  "autoTag.folder.path": "Dossier",
+  "autoTag.folder.root": "(tout l'espace de travail)",
+  "autoTag.folder.pathHint": "Les fichiers des sous-dossiers sont inclus.",
+  "autoTag.folder.pick": "Choisir un dossier",
+  "autoTag.folder.search": "Chercher un dossier",
+  "autoTag.folder.noFolders":
+    "Aucun dossier de cet espace de travail ne contient de fichier.",
+  "autoTag.folder.noMatch": "Aucun dossier ne correspond.",
+  "autoTag.folder.expand": "Déplier",
+  "autoTag.folder.collapse": "Replier",
+  "autoTag.folder.tags": "Tags à ajouter",
+  "autoTag.folder.addTag": "+ Ajouter un tag (Entrée)",
+  "autoTag.folder.removeTag": "Retirer le tag « {tag} »",
+  "autoTag.folder.noTags": "Pas encore de tags : cette règle n'ajoute rien.",
+  "autoTag.folder.noTagsShort": "aucun tag",
+  "autoTag.folder.files": "Fichiers qu'il contient",
+  "autoTag.folder.noFiles": "Aucun fichier sous ce dossier.",
+  "autoTag.folder.outOfScope":
+    "Cet espace de travail n'est plus dans la bibliothèque.",
   "autoTag.joinsExisting":
     "Même nom que l’étiquette existante « {tag} » ; les fichiers la rejoignent",
   "autoTag.createsNew": "Crée une nouvelle étiquette",

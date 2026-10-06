@@ -531,7 +531,7 @@ export const en: Record<TranslationKey, string> = {
   // auto tagging
   "autoTag.title": "Auto tagging",
   "autoTag.summary":
-    "{rules} active rules · {keywords} keywords · {files} files",
+    "{rules} active rules · {keywords} keywords · {folders} folder rules · {files} files",
   "autoTag.sampled": "(analyzing the first {count})",
   "autoTag.safeMode":
     "The last analysis did not finish, so rules are not being run. Fix or disable the rule at fault, then resume.",
@@ -550,7 +550,7 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.tab.suggest": "Keywords",
   "autoTag.applyOnScan": "Apply when scanning",
   "autoTag.applyOnScanHint":
-    "Runs the active rules and the keywords on files a scan adds or changes.",
+    "Runs the active rules, the keywords and the folder rules on files a scan adds or changes.",
   "autoTag.reapply": "Apply to existing files",
   "autoTag.reapplying": "Applying…",
   "autoTag.reapplyConfirm":
@@ -605,6 +605,30 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.noKeywordsMatch": "No keyword matches the filter.",
   "autoTag.noAliases": "No aliases",
   "autoTag.noKeywords": "No keywords yet.",
+  "autoTag.folders": "Folders",
+  "autoTag.foldersHint": "tag everything under a folder",
+  "autoTag.addFolder": "+ Add a folder rule",
+  "autoTag.noFolders": "No folder rules yet.",
+  "autoTag.folderEnabled": "Enable folder rule",
+  "autoTag.kind.folder": "Folder",
+  "autoTag.folder.workspace": "Workspace",
+  "autoTag.folder.path": "Folder",
+  "autoTag.folder.root": "(the whole workspace)",
+  "autoTag.folder.pathHint": "Files in its subfolders are included.",
+  "autoTag.folder.pick": "Pick a folder",
+  "autoTag.folder.search": "Find a folder",
+  "autoTag.folder.noFolders": "No folder of this workspace holds a file.",
+  "autoTag.folder.noMatch": "No folder matches.",
+  "autoTag.folder.expand": "Expand",
+  "autoTag.folder.collapse": "Collapse",
+  "autoTag.folder.tags": "Tags to add",
+  "autoTag.folder.addTag": "+ Add tag (Enter)",
+  "autoTag.folder.removeTag": "Remove tag “{tag}”",
+  "autoTag.folder.noTags": "No tags yet: this rule adds nothing.",
+  "autoTag.folder.noTagsShort": "no tags yet",
+  "autoTag.folder.files": "Files under it",
+  "autoTag.folder.noFiles": "No file is under this folder.",
+  "autoTag.folder.outOfScope": "This workspace is not in the library any more.",
   "autoTag.joinsExisting":
     "Same name as the existing tag “{tag}”, so files join that tag",
   "autoTag.createsNew": "Creates a new tag",

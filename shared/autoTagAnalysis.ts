@@ -2,8 +2,8 @@
  * Analysis on top of the auto-tagging engine: what the screen's suggestions
  * are computed from, and the file name cut into taggable parts that
  * the detail view shows. Pure; the library-wide parts are indexed by position
- * in the list of names the caller passes — the caller knows which file each
- * position is.
+ * in the list of names the caller passes (and of places, for the folder rules)
+ * — the caller knows which file each position is.
  *
  * Names are expected in NFC (the screen normalizes them once on load), so the
  * ranges reported here index straight into the string that is displayed.
@@ -11,11 +11,15 @@
 import {
   SPLIT_PATTERN,
   cleanTagName,
+  folderMatcher,
   isUsableTagName,
   runKeyword,
   runRule,
   stripExt,
+  tagsForName,
+  withFolderTags,
   type CompiledEngine,
+  type FilePlace,
   type Range,
   type RuleKind,
 } from "./autoTag.js";
@@ -74,7 +78,7 @@ export function segments(
 // Suggestions: every tag the engine would give, plus frequent words it misses.
 // ---------------------------------------------------------------------------
 
-export type CandidateOrigin = RuleKind | "keyword" | "frequent";
+export type CandidateOrigin = RuleKind | "keyword" | "folder" | "frequent";
 
 export interface Candidate {
   /** Lowercased tag name. */
@@ -95,6 +99,9 @@ export function candidateGroup(c: Candidate): CandidateGroup {
   return c.origins.includes("keyword") ? "keyword" : "rule";
 }
 
+const NO_RANGES: Range[] = [];
+const NO_TEXTS: string[] = [];
+
 interface CandidateDraft {
   key: string;
   name: string;
@@ -106,9 +113,20 @@ interface CandidateDraft {
 export function suggestCandidates(
   engine: CompiledEngine,
   names: readonly string[],
-  opts: { minFreq: number; stop: ReadonlySet<string> },
+  opts: {
+    minFreq: number;
+    stop: ReadonlySet<string>;
+    /**
+     * Where each file is, by position, for the engine's folder rules. Without
+     * it they propose nothing: a name alone does not say where its file is.
+     */
+    places?: readonly FilePlace[];
+  },
 ): Candidate[] {
   const map = new Map<string, CandidateDraft>();
+  const reaching = folderMatcher(engine.folders);
+  /** Tags the names give, through a rule or a keyword. */
+  const named = new Set<string>();
   const add = (
     name: string,
     origin: CandidateOrigin,
@@ -129,10 +147,13 @@ export function suggestCandidates(
       map.set(key, c);
     }
     c.origins.add(origin);
+    if (origin !== "folder" && origin !== "frequent") named.add(key);
     for (const text of texts) c.variants.add(text);
     const have = c.files.get(file);
     if (have) have.push(...ranges);
-    else c.files.set(file, [...ranges]);
+    // Nothing to copy for a tag that points at no part of the name: one
+    // shared list serves every such file.
+    else c.files.set(file, ranges.length > 0 ? [...ranges] : NO_RANGES);
   };
 
   names.forEach((name, i) => {
@@ -154,6 +175,20 @@ export function suggestCandidates(
         hits.map((h) => h.text),
       );
     }
+    // What the folder rules reaching the file give it — exactly what a scan
+    // would add after the name's own tags (withFolderTags), so a tag the name
+    // already gave is not listed again as the folder's. A folder rule points
+    // at no part of the name: no range, no spelling.
+    const place = opts.places?.[i];
+    if (place) {
+      const folders = reaching(place);
+      if (folders.length > 0) {
+        const named = tagsForName(engine, name);
+        for (const tag of withFolderTags(named, folders).slice(named.length)) {
+          add(tag, "folder", i, NO_RANGES, NO_TEXTS);
+        }
+      }
+    }
   });
 
   // Frequent words: plain ASCII words nothing above picked up.
@@ -171,7 +206,10 @@ export function suggestCandidates(
     for (const match of stripExt(name).matchAll(/[A-Za-z]{3,}/g)) {
       const word = match[0];
       const key = word.toLowerCase();
-      if (opts.stop.has(key) || dictionary.has(key) || map.has(key)) continue;
+      // What a rule or a keyword already produces is not a word nothing
+      // picks up. A folder rule's tag is no such thing: it says nothing of
+      // the name, and the word may well be in other files' names.
+      if (opts.stop.has(key) || dictionary.has(key) || named.has(key)) continue;
       let entry = frequent.get(key);
       if (!entry) {
         entry = { texts: new Map(), files: new Map() };
