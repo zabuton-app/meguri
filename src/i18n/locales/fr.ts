@@ -415,6 +415,21 @@ export const fr: Record<TranslationKey, string> = {
   "heatmap.clearDay": "Effacer les jours sélectionnés",
   "heatmap.error": "Impossible de charger les décomptes",
 
+  // Vue chronologique
+  "view.timeline": "Vue chronologique",
+  "view.folderUnavailableTimeline":
+    "L’affichage par dossier n’est pas disponible dans la vue chronologique",
+  "timeline.axis.label": "Date",
+  "timeline.axis.captured": "Prise de vue",
+  "timeline.axis.btime": "Création",
+  "timeline.undated": "Sans date",
+  "timeline.count": "{count} fichiers",
+  "timeline.scrubber": "Aller à un mois",
+  "timeline.month": "{month} : {count} fichiers",
+  "timeline.sortLocked":
+    "La vue chronologique classe les fichiers par date, du plus récent au plus ancien",
+  "timeline.error": "Impossible de charger la chronologie",
+
   // graph view
   "view.graph": "Vue graphe",
   "view.folderUnavailableGraph":

@@ -9,7 +9,10 @@ export function parseDay(day: string): Date | null {
   const m = DAY_RE.exec(day);
   if (!m) return null;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const date = new Date(y, mo - 1, d);
+  // Not the Date constructor, which reads a year below 100 as 19xx.
+  const date = new Date(0);
+  date.setFullYear(y, mo - 1, d);
+  date.setHours(0, 0, 0, 0);
   // Date rolls an impossible day over (02-31 → 03-03) instead of refusing it.
   return date.getFullYear() === y &&
     date.getMonth() === mo - 1 &&

@@ -5,9 +5,26 @@ import type { SearchCursor } from "@/ipc/types";
 export const FILES_SEARCH_PAGE_SIZE = 100;
 export const FILES_SEARCH_MAX_PAGES = 5;
 
+/**
+ * A backward page shorter than a full one: the rows from the top of the list
+ * down to a window that does not start on a page boundary (one opened at a
+ * cursor of its own, see useFilesSearch's `anchor`).
+ */
+export interface FilesSearchHeadPage {
+  offset: 0;
+  size: number;
+}
+
 /** Page params are cursors: keyset objects from the main process, plain
  *  offsets for backward pages, undefined for the very first page. */
-export type FilesSearchPageParam = number | SearchCursor | undefined;
+export type FilesSearchPageParam =
+  number | SearchCursor | FilesSearchHeadPage | undefined;
+
+export function isHeadPage(
+  param: FilesSearchPageParam,
+): param is FilesSearchHeadPage {
+  return typeof param === "object" && param !== null && "size" in param;
+}
 
 /** Offset carried by a cursor (keyset cursors piggyback it for the UI). */
 function offsetOf(cursor: FilesSearchPageParam): number {
@@ -23,9 +40,12 @@ function offsetOf(cursor: FilesSearchPageParam): number {
  */
 export function filesSearchPreviousCursor(
   firstPageParam: FilesSearchPageParam,
-): number | undefined {
+): number | FilesSearchHeadPage | undefined {
   const offset = offsetOf(firstPageParam);
   if (offset <= 0) return undefined;
+  // Less than a page left above the window: a full page from the top would
+  // run into the rows already loaded.
+  if (offset < FILES_SEARCH_PAGE_SIZE) return { offset: 0, size: offset };
   return offset - FILES_SEARCH_PAGE_SIZE;
 }
 

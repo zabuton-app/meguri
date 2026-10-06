@@ -14,8 +14,9 @@ import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
 
 /**
  * The SearchQuery part of a ["files_search", wsId, filter] query key. The
- * graph ("graph_build") and the heatmap ("activity_days") keep the
- * scope and the filter in the same two places.
+ * graph ("graph_build"), the heatmap ("activity_days") and the timeline's
+ * day counts ("timeline_counts") keep the scope and the filter in the same two
+ * places.
  */
 function searchFilterOf(queryKey: readonly unknown[]): SearchQuery | undefined {
   return queryKey[2] as SearchQuery | undefined;
@@ -113,6 +114,7 @@ export function forgetDeletedFile(
   void qc.invalidateQueries({ queryKey: ["duplicates_list"] });
   void qc.invalidateQueries({ queryKey: ["graph_build"] });
   void qc.invalidateQueries({ queryKey: ["activity_days"] });
+  void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
 }
 
 /** Patch the detail cache when the modal is open for the same file. */
@@ -180,6 +182,13 @@ export function invalidatePlayedSearches(qc: QueryClient): void {
       activityMetricOf(q.queryKey) === "played" ||
       filtersOnPlays(searchFilterOf(q.queryKey)),
   });
+  // The timeline's day counts of the same lists (its axes are not plays).
+  void qc.invalidateQueries({
+    queryKey: ["timeline_counts"],
+    predicate: (q) =>
+      q.queryKey[1] === watchLater ||
+      filtersOnPlays(searchFilterOf(q.queryKey)),
+  });
 }
 
 /**
@@ -202,6 +211,10 @@ export function invalidateInProgressSearches(qc: QueryClient): void {
     queryKey: ["activity_days"],
     predicate: inProgress,
   });
+  void qc.invalidateQueries({
+    queryKey: ["timeline_counts"],
+    predicate: inProgress,
+  });
 }
 
 /**
@@ -218,6 +231,10 @@ export function invalidateTagSearches(qc: QueryClient): void {
   };
   void qc.invalidateQueries({ queryKey: ["files_search"], predicate: byTags });
   void qc.invalidateQueries({ queryKey: ["activity_days"], predicate: byTags });
+  void qc.invalidateQueries({
+    queryKey: ["timeline_counts"],
+    predicate: byTags,
+  });
 }
 
 /**
@@ -248,6 +265,7 @@ export function invalidateTagCatalog(qc: QueryClient): void {
 export function invalidateFileCaches(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["graph_build"] });
   void qc.invalidateQueries({ queryKey: ["activity_days"] });
+  void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
   void qc.invalidateQueries({ queryKey: ["files_search"] });
   void qc.invalidateQueries({ queryKey: ["files_random"] });
   void qc.invalidateQueries({ queryKey: ["file_get"] });
@@ -279,6 +297,10 @@ export function invalidateCollectionSearches(qc: QueryClient): void {
   });
   void qc.invalidateQueries({
     queryKey: ["activity_days"],
+    predicate: inCollection,
+  });
+  void qc.invalidateQueries({
+    queryKey: ["timeline_counts"],
     predicate: inCollection,
   });
 }

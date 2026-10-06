@@ -9,6 +9,7 @@ import { MAX_FOLDER_PATH, isNormalizedFolderPath } from "../folderPath.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
 import { GRAPH_NODE_KEY_MAX } from "./graph.js";
 import { ACTIVITY_METRICS } from "./activity.js";
+import { TIMELINE_AXES } from "./timeline.js";
 import { parseDay } from "../day.js";
 
 export const KindSchema = z.enum(["video", "image", "audio"]);
@@ -133,6 +134,8 @@ export const FolderScopeSchema = z.object({
 export type FolderScope = z.infer<typeof FolderScopeSchema>;
 
 export const ActivityMetricSchema = z.enum(ACTIVITY_METRICS);
+
+export const TimelineAxisSchema = z.enum(TIMELINE_AXES);
 
 /** A calendar day, "YYYY-MM-DD", read in the main process's local time. */
 export const DaySchema = z

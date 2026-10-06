@@ -288,6 +288,34 @@ applied, within the folder shown under the folder view — per calendar day.
   deliberately not used: it does not agree with `Date` for every year or on
   every platform, and a file would land in a cell whose list leaves it out.
 
+### Timeline
+
+The timeline is the list cut into calendar days. The files come from
+`files_search` sorted by the axis (`captured` or `btime`, newest first; NULLs
+last make the "No date" tail); only the counts are its own.
+
+- **One query per database.** `timeline_counts` runs on the query worker
+  (`electron/core/timelineCounts.ts`) with files_search's target resolution
+  and sums the per-database counts (`queries/timeline.ts`, which reuses
+  `appendSearchConditions`). A request names an axis; back come the days
+  holding at least one file, newest first, as `YYYY-MM-DD`, and the number
+  of files with no date on the axis. The counts and `undated` add up to the length of the list the same
+  query gives, which `timelineCounts.test.ts` pins.
+- **The axis's own range stays.** Unlike the heatmap's counts, the axis's
+  date range in the query narrows the days: the timeline is the list that
+  range gives, cut up. Paging and the sort are ignored.
+- **Local days, one calendar.** Days cross IPC as `YYYY-MM-DD` strings
+  (`shared/day.ts`) in the main process's time zone. As for the heatmap, the
+  SQL only selects timestamps and they are put into days in JavaScript
+  against local midnights worked out by `Date`, not SQLite's `'localtime'`,
+  so a file is on the day whose date range lists it.
+- **Jumping to a day.** The renderer reads the list from a day's head with
+  an ordinary keyed cursor: the day's last second as the sort value,
+  and the empty string as the workspace id, which sorts before every real one
+  so the seek keeps every file on that second (`tie: "all"`). The tail of
+  undated files is reached with a null value. Nothing in the search changed
+  for this; the test above checks the cursor over one and several workspaces.
+
 ## Collections
 
 Two unrelated mechanisms group files. They differ in where they persist and who

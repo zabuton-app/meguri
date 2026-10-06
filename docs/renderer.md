@@ -105,10 +105,10 @@ shows one frame per state.
 
 Data fetching uses `@tanstack/react-query`. The file list is an
 `useInfiniteQuery` combined with `@tanstack/react-virtual` for infinite scroll
-plus virtualization (`src/components/MediaGrid.tsx`). Three view modes — grid,
-list and graph — are switchable.
+plus virtualization (`src/components/MediaGrid.tsx`). Four view modes — grid,
+list, timeline and graph — are switchable.
 
-Both views have a "show by folder" option (`BY_FOLDER_KEY`, remembered apart
+The grid and the list have a "show by folder" option (`BY_FOLDER_KEY`, remembered apart
 from the view mode) that browses one workspace like a file manager: the current
 folder's child folders first, then its direct files, with a header above naming
 the folder and what it holds (`FolderHeader`). A folder is drawn as a folder —
@@ -160,6 +160,45 @@ rows through `files_by_ids` and the picked folders through `folder_files`. A
 file that does not come back is gone and leaves the selection. The selection
 can be larger than one call may name, so the rows are read in runs of
 `MAX_BULK_FILES` (`readInBulkBatches`), all of which must succeed.
+
+The timeline (`src/timeline/`) is the list ordered by a date, newest first, cut
+into a section per calendar day under a header that stays at the top while
+its files are shown, with a rail down the right edge (`TimelineScrubber`), a minimap of the list:
+the whole list at the height of the view, the years written along it and a
+bar per month as long and as dark as the month is full, with a window over
+the part on screen — dragging it, or pressing the track, scrolls the list so
+the point pressed is mid-view (`scrollToOffset`), a label naming the month
+under the pointer; as a slider, the arrow keys step a month at a time. The date is an axis — the capture date or the
+filesystem's birth time — switched in the pinned header and remembered in
+`TIMELINE_AXIS_KEY`; its values are the search's sort keys, so the list under
+the sections is the same windowed `files_search` every other view reads, with
+`sort`/`sortDir` put on the query sent (`timelineQuery`) and the filter's own
+sort left as it was for the other views (the sort control is shown switched
+off meanwhile). Files with no date on the axis sort last and make a "No date"
+section at the end. The rail runs by month: the days of a month are gathered under one mark. The
+rows are laid out from the day counts alone
+(`timeline_counts`; see docs/architecture.md, "Timeline") by `layout.ts`: each
+section is a header row and its files packed `cols` to a row, with the cards,
+column count and row height of the grid (`MediaCard`, `useCardGridMetrics`),
+so the whole height is known before any file is read and the rail can scroll
+to any month. Rows the loaded window does not cover are drawn as placeholders.
+The window follows the view: near its edges a page is added as in the grid;
+away from it — a drag on the rail or the scrollbar — the list is read
+again from where the view is (`anchor.ts`), which is a cursor passed to
+`useFilesSearch` as a fourth key element and its `initialPageParam`. Near the
+head of a section the cursor is keyed (the section's last second, with an
+empty workspace id so no file on that second is skipped) and the main process
+seeks straight to it; deeper in it is a page-aligned offset. A window opened
+that way pages backwards to the top with a last, shorter page
+(`FilesSearchHeadPage`). A jump is kept and realigned as the rows settle (the
+estimate can move once fonts load), until the header is where it was sent or
+the user scrolls. Keyboard focus is an index into the whole list and moves by
+the layout (`useGridKeyboardNav`'s `layout` option: up and down keep the
+column across sections), so it can reach a file the window has not, and the
+window follows. The day counts and the list are two reads; a file found under
+another day's header has the counts read again. The timeline has no
+folder form (`hasFolderForm`), shows a collection in date order rather than
+its manual order, and keeps the heatmap panel over it like any view.
 
 The heatmap (`src/heatmap/`, "Contribution graph" in the UI) is not a view but
 a panel under the filter bar, over whichever view is shown, toggled from the

@@ -118,6 +118,8 @@ export const api = {
   /** Per-day file counts of the active target for a query (contribution graph). */
   activityDays: (input: ChannelInput<"activity_days">) =>
     invoke("activity_days", input),
+  timelineCounts: (input: ChannelInput<"timeline_counts">) =>
+    invoke("timeline_counts", input),
   graphLayoutGet: (scope: string, dims: GraphDims = 2) =>
     invoke("graph_layout_get", { scope, dims }),
   graphLayoutSet: (

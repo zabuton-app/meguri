@@ -28,6 +28,7 @@ import {
 import { RECENT_SEARCHES_KEY } from "@/lib/recentSearches";
 import {
   BY_FOLDER_KEY,
+  TIMELINE_AXIS_KEY,
   HEATMAP_METRIC_KEY,
   HEATMAP_OPEN_KEY,
   VIEW_KEY,
@@ -39,6 +40,7 @@ const mocks = vi.hoisted(() => ({
   workspacesList: vi.fn(),
   filesSearch: vi.fn(),
   activityDays: vi.fn<(input: unknown) => Promise<unknown>>(),
+  timelineCounts: vi.fn<(input: unknown) => Promise<unknown>>(),
   fileGet: vi.fn(),
   fileSetFavorite: vi.fn(),
   fileSetRating: vi.fn(),
@@ -70,6 +72,7 @@ vi.mock("@/ipc/client", () => ({
     workspacesList: () => mocks.workspacesList(),
     filesSearch: (query: unknown) => mocks.filesSearch(query),
     activityDays: (input: unknown) => mocks.activityDays(input),
+    timelineCounts: (input: unknown) => mocks.timelineCounts(input),
     fileGet: (id: number, ws: string) => mocks.fileGet(id, ws),
     fileSetFavorite: (...args: unknown[]) => mocks.fileSetFavorite(...args),
     fileSetRating: (...args: unknown[]) => mocks.fileSetRating(...args),
@@ -1519,6 +1522,154 @@ describe("Home graph view", () => {
         .getByRole("button", { name: "Show by folder" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
+  });
+});
+
+describe("Home timeline view", () => {
+  afterEach(() => {
+    localStorage.removeItem(VIEW_KEY);
+    localStorage.removeItem(BY_FOLDER_KEY);
+    localStorage.removeItem(TIMELINE_AXIS_KEY);
+  });
+
+  beforeEach(() => {
+    localStorage.setItem(VIEW_KEY, "grid");
+    mocks.appStatus.mockResolvedValue(defaultAppStatus);
+    mocks.workspacesList.mockResolvedValue(defaultWorkspacesList);
+    mocks.filesSearch.mockReset();
+    mocks.filesSearch.mockResolvedValue({
+      items: [sampleFileRow],
+      nextCursor: null,
+    });
+    mocks.timelineCounts.mockReset();
+    mocks.timelineCounts.mockResolvedValue({
+      days: [{ day: "2026-10-15", count: 1 }],
+      undated: 0,
+    });
+    mocks.foldersList.mockResolvedValue({
+      path: "",
+      folders: [],
+      fileCount: 1,
+    });
+    mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
+  });
+
+  it("reads the list by the axis, newest first, without touching the filter's sort", async () => {
+    renderWithProviders(<AppRoutes />);
+    await screen.findByText("sample.mp4");
+    fireEvent.click(screen.getByRole("button", { name: "Timeline view" }));
+    await screen.findAllByText("October 15, 2026");
+    expect(localStorage.getItem(VIEW_KEY)).toBe("timeline");
+    await waitFor(() =>
+      expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).toMatchObject({
+        sort: "captured",
+        sortDir: "desc",
+      }),
+    );
+    expect(mocks.timelineCounts.mock.calls.at(-1)?.[0]).toMatchObject({
+      axis: "captured",
+    });
+    // The months are counted without the paging and the sort.
+    expect(
+      (mocks.timelineCounts.mock.calls.at(-1)?.[0] as { query: unknown }).query,
+    ).not.toHaveProperty("sort");
+    expect(screen.getByRole("radio", { name: "Captured" })).toBeTruthy();
+
+    // Back on the grid the list is read in the filter's own order again.
+    fireEvent.click(screen.getByRole("button", { name: "Grid view" }));
+    await waitFor(() =>
+      expect(screen.queryByText("October 15, 2026")).toBeNull(),
+    );
+    await waitFor(() =>
+      expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+        "sort",
+      ),
+    );
+  });
+
+  it("remembers the axis and reads the list by it", async () => {
+    localStorage.setItem(VIEW_KEY, "timeline");
+    localStorage.setItem(TIMELINE_AXIS_KEY, "btime");
+    renderWithProviders(<AppRoutes />);
+    await screen.findAllByText("October 15, 2026");
+    expect(
+      screen
+        .getByRole("radio", { name: "Created" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    await waitFor(() =>
+      expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).toMatchObject({
+        sort: "btime",
+        sortDir: "desc",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "Captured" }));
+    expect(localStorage.getItem(TIMELINE_AXIS_KEY)).toBe("captured");
+    await waitFor(() =>
+      expect(mocks.timelineCounts.mock.calls.at(-1)?.[0]).toMatchObject({
+        axis: "captured",
+      }),
+    );
+  });
+
+  it("has no folder form, and keeps the stored option for the grid", async () => {
+    localStorage.setItem(BY_FOLDER_KEY, "true");
+    renderWithProviders(<AppRoutes />);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Show by folder" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Timeline view" }));
+    await screen.findAllByText("October 15, 2026");
+    const disabled = screen.getByRole("button", { name: "Show by folder" });
+    expect((disabled as HTMLButtonElement).disabled).toBe(true);
+    expect(disabled.getAttribute("title")).toBe(
+      "The folder view is not available in the timeline view",
+    );
+    // The list is the whole workspace, not a folder.
+    expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      "folder",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Grid view" }));
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Show by folder" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true"),
+    );
+    expect(localStorage.getItem(BY_FOLDER_KEY)).toBe("true");
+  });
+
+  it("gathers the files without a date at the end", async () => {
+    localStorage.setItem(VIEW_KEY, "timeline");
+    mocks.timelineCounts.mockResolvedValue({
+      days: [{ day: "2026-10-15", count: 1 }],
+      undated: 2,
+    });
+    mocks.filesSearch.mockResolvedValue({
+      items: [
+        { ...sampleFileRow, capturedAt: 1_790_000_000 },
+        { ...sampleFileRow, id: 2, relPath: "b.mp4" },
+        { ...sampleFileRow, id: 3, relPath: "c.mp4" },
+      ],
+      nextCursor: null,
+    });
+    renderWithProviders(<AppRoutes />);
+    await screen.findAllByText("October 15, 2026");
+    const headers = document.querySelectorAll('[data-slot="timeline-header"]');
+    expect([...headers].map((h) => h.textContent)).toEqual([
+      "October 15, 20261 files",
+      "No date2 files",
+    ]);
+    // The rail names the tail like a year.
+    expect(
+      [...document.querySelectorAll("[data-year]")].map((e) => e.textContent),
+    ).toEqual(["2026", "No date"]);
   });
 });
 

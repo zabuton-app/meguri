@@ -404,6 +404,20 @@ export const ko: Record<TranslationKey, string> = {
   "heatmap.clearDay": "선택한 날짜 해제",
   "heatmap.error": "집계를 불러오지 못했습니다",
 
+  // 타임라인 보기
+  "view.timeline": "타임라인 보기",
+  "view.folderUnavailableTimeline":
+    "타임라인 보기에서는 폴더별 보기를 사용할 수 없습니다",
+  "timeline.axis.label": "기준 날짜",
+  "timeline.axis.captured": "촬영일",
+  "timeline.axis.btime": "생성일",
+  "timeline.undated": "날짜 없음",
+  "timeline.count": "{count}개",
+  "timeline.scrubber": "연월로 이동",
+  "timeline.month": "{month}: {count}개",
+  "timeline.sortLocked": "타임라인 보기에서는 날짜가 최신인 순서로 정렬됩니다",
+  "timeline.error": "타임라인을 불러오지 못했습니다",
+
   // graph view
   "view.graph": "그래프 보기",
   "view.folderUnavailableGraph":

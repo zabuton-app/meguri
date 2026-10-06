@@ -1,4 +1,5 @@
 import {
+  CalendarRange,
   ChevronDown,
   CopyCheck,
   DatabaseBackup,
@@ -176,6 +177,12 @@ export function HomeHeader({
                 rounded: "",
               },
               {
+                mode: "timeline",
+                label: t("view.timeline"),
+                Icon: CalendarRange,
+                rounded: "",
+              },
+              {
                 mode: "graph",
                 label: t("view.graph"),
                 Icon: Waypoints,
@@ -214,9 +221,11 @@ export function HomeHeader({
           title={
             view === "graph"
               ? t("view.folderUnavailableGraph")
-              : folderAvailable
-                ? t("view.folder")
-                : t("view.folderUnavailable")
+              : view === "timeline"
+                ? t("view.folderUnavailableTimeline")
+                : folderAvailable
+                  ? t("view.folder")
+                  : t("view.folderUnavailable")
           }
           className={cn(
             "flex size-7 items-center justify-center rounded-md border border-border transition disabled:cursor-not-allowed disabled:opacity-40",

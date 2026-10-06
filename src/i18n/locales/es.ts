@@ -414,6 +414,21 @@ export const es: Record<TranslationKey, string> = {
   "heatmap.clearDay": "Quitar los días seleccionados",
   "heatmap.error": "No se pudieron cargar los recuentos",
 
+  // Vista de cronología
+  "view.timeline": "Vista de cronología",
+  "view.folderUnavailableTimeline":
+    "La vista por carpetas no está disponible en la vista de cronología",
+  "timeline.axis.label": "Fecha",
+  "timeline.axis.captured": "Captura",
+  "timeline.axis.btime": "Creación",
+  "timeline.undated": "Sin fecha",
+  "timeline.count": "{count} archivos",
+  "timeline.scrubber": "Ir a un mes",
+  "timeline.month": "{month}: {count} archivos",
+  "timeline.sortLocked":
+    "La vista de cronología ordena los archivos por fecha, del más reciente al más antiguo",
+  "timeline.error": "No se pudo cargar la cronología",
+
   // graph view
   "view.graph": "Vista de grafo",
   "view.folderUnavailableGraph":
