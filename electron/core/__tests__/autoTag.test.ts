@@ -427,9 +427,9 @@ describe("analysis", () => {
 });
 
 describe("configuration", () => {
-  it("ships rules but does not tag on scan until asked to", () => {
+  it("ships rules switched off, and a scan that applies what is on", () => {
     const config = defaultAutoTagConfig();
-    expect(config.applyOnScan).toBe(false);
+    expect(config.applyOnScan).toBe(true);
     expect(config.rules.map((r) => r.id)).toEqual([
       "prefix",
       "square",

@@ -290,12 +290,12 @@ describe("AutoTag", () => {
     expect((await lastSaved()).rules[0].pattern).toBe("(");
   });
 
-  it("turns scanning on only when asked", async () => {
+  it("applies on scan from the start, until turned off", async () => {
     await renderScreen();
-    fireEvent.click(
-      screen.getByRole("switch", { name: "Apply when scanning" }),
-    );
-    expect((await lastSaved()).applyOnScan).toBe(true);
+    const scan = screen.getByRole("switch", { name: "Apply when scanning" });
+    expect(scan.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(scan);
+    expect((await lastSaved()).applyOnScan).toBe(false);
   });
 
   it("registers a keyword and shows the files it finds", async () => {

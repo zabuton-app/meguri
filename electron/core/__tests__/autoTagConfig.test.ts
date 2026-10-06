@@ -30,6 +30,18 @@ describe("the stored auto-tagging configuration", () => {
     const { autoTag } = loadConfig();
     expect(autoTag).toEqual(defaultAutoTagConfig());
     expect(autoTag.rules.some((rule) => rule.enabled)).toBe(false);
+    expect(autoTag.applyOnScan).toBe(true);
+  });
+
+  it("keeps the scan switched off only when the user turned it off", () => {
+    const stored = { ...defaultAutoTagConfig(), applyOnScan: false };
+    write({ autoTag: stored });
+    expect(loadConfig().autoTag.applyOnScan).toBe(false);
+    // Absent — never saved by this version — is not "off".
+    const without: Record<string, unknown> = { ...defaultAutoTagConfig() };
+    delete without.applyOnScan;
+    write({ autoTag: without });
+    expect(loadConfig().autoTag.applyOnScan).toBe(true);
   });
 
   it("keeps the rules a user has as they are: switched on, edited, in their order", () => {

@@ -188,16 +188,18 @@ export function builtinRulesAsShipped(rules: readonly TagRule[]): boolean {
 }
 
 /**
- * The starting configuration. Nothing is tagged until the user turns it on —
- * neither a rule nor the scan: the built-in rules are a starting point to look
- * at, not something to run over a library unasked.
+ * The starting configuration. A scan applies the conditions from the start,
+ * so a keyword or a folder rule works as soon as it is added — but no rule is
+ * on: the built-in rules are a starting point to look at, not something to
+ * run over a library unasked. Nothing is tagged until one of them is turned
+ * on or something is added.
  */
 export function defaultAutoTagConfig(): AutoTagConfig {
   return {
     rules: defaultRules(),
     keywords: [],
     folders: [],
-    applyOnScan: false,
+    applyOnScan: true,
     ignored: [],
     excludedTerms: ["dsc", "img", "mvi", "公式"],
   };

@@ -163,7 +163,8 @@ function parseAutoTag(value: unknown): AutoTagConfig {
       MAX_AUTO_TAG_FOLDER_RULES,
       (item) => AutoTagFolderSchema.safeParse(item).data,
     ),
-    applyOnScan: c.applyOnScan === true,
+    // Off only when the user turned it off.
+    applyOnScan: c.applyOnScan !== false,
     ignored: list(c.ignored, MAX_AUTO_TAG_TERMS, term),
     excludedTerms: list(c.excludedTerms, MAX_AUTO_TAG_TERMS, term),
   };
