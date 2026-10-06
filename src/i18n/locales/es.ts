@@ -172,6 +172,7 @@ export const es: Record<TranslationKey, string> = {
     'Busca en los nombres de archivo y en las etiquetas. Usa tag:playa o tag:4k para coincidir de forma exacta, tanto con las tuyas como con las automáticas. Entrecomilla los valores con espacios: tag:"casa de playa".',
   "filter.searchPlaceholder": "Buscar nombre de archivo o etiquetas",
   "filter.tagSuggestions": "Sugerencias de etiquetas",
+  "filter.tagElsewhere": "solo en otros espacios de trabajo",
   "filter.all": "Todo",
   "filter.played": "Reproducido",
   "filter.unplayed": "No reproducido",

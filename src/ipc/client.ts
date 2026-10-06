@@ -155,8 +155,12 @@ export const api = {
     invoke("files_by_ids", { targets }),
   tagsList: (workspaceId: string, prefix: string, limit?: number) =>
     invoke("tags_list", { workspaceId, prefix, limit }),
-  /** Whole tag catalog for the tag management screen (scope follows the active view). */
-  tagsListAll: () => invoke("tags_list_all"),
+  /**
+   * Whole tag catalog for the tag management screen (scope follows the active
+   * view), or of every workspace when asked.
+   */
+  tagsListAll: (opts?: { allWorkspaces: boolean }) =>
+    invoke("tags_list_all", opts),
   tagRename: (from: TagRef, to: string) => invoke("tag_rename", { from, to }),
   tagMerge: (from: TagRef[], into: TagRef) =>
     invoke("tag_merge", { from, into }),

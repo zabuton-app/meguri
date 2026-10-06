@@ -405,7 +405,9 @@ export const ChannelInputs = {
   // The tag-catalog channels take no workspaceId: scope comes from the active
   // view (like duplicates_list), and tags are addressed by name because ids are
   // per-database and meaningless across the "All" view.
-  tags_list_all: z.void(),
+  // The whole library on request: the search box completes a tag from every
+  // workspace, so a tag held elsewhere can be found and said to be elsewhere.
+  tags_list_all: z.object({ allWorkspaces: z.boolean() }).optional(),
   tag_rename: z.object({
     from: TagRefSchema,
     /** New plain name; the namespace is always "" since only manual tags are editable. */

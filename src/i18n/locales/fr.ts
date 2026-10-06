@@ -173,6 +173,7 @@ export const fr: Record<TranslationKey, string> = {
     'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage ou tag:4k pour une correspondance exacte, sur vos tags comme sur ceux du scan. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage".',
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
   "filter.tagSuggestions": "Suggestions de tags",
+  "filter.tagElsewhere": "autres espaces de travail seulement",
   "filter.all": "Tout",
   "filter.played": "Lu",
   "filter.unplayed": "Non lu",

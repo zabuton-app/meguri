@@ -162,6 +162,7 @@ export const zhCN: Record<TranslationKey, string> = {
     '搜索文件名和标签。用 tag:旅行 或 tag:4k 精确匹配标签，手动标签与自动标签通用。含空格的值请加引号：tag:"夏日 旅行"。',
   "filter.searchPlaceholder": "搜索文件名或标签",
   "filter.tagSuggestions": "标签建议",
+  "filter.tagElsewhere": "仅在其他工作区",
   "filter.all": "全部",
   "filter.played": "已播放",
   "filter.unplayed": "未播放",
