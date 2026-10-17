@@ -55,6 +55,9 @@ const positions = new PositionWriter((e) =>
 );
 let mediaPort = 0;
 const mediaToken = randomBytes(32).toString("base64url");
+// Separate from mediaToken: control.json is read by a shell handler, so a leak
+// of this token should raise the window at most, never open the media server.
+const controlToken = randomBytes(32).toString("base64url");
 const MEDIA_TOKEN_HEADER = "X-Api-Token";
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -137,8 +140,9 @@ app.on("open-url", (e, url) => {
 // argv. Instead, a tiny local HTTP server accepts "show" requests so a shell
 // handler (see scripts/install-local.mjs) can raise the window in ~10ms.
 // Port and token are published to <userData>/control.json (0600); the token
-// is per-launch random, and the file is removed on quit so a handler hitting
-// a stale file just falls back to launching the app.
+// is per-launch random and only good for this endpoint, and the file is
+// removed on quit so a handler hitting a stale file just falls back to
+// launching the app.
 function controlFilePath(): string {
   return path.join(app.getPath("userData"), "control.json");
 }
@@ -148,7 +152,7 @@ function startControlServer(): Promise<http.Server | null> {
     const server = http.createServer((req, res) => {
       const header = req.headers[MEDIA_TOKEN_HEADER.toLowerCase()];
       const token = Array.isArray(header) ? header[0] : header;
-      if (token !== mediaToken) {
+      if (token !== controlToken) {
         res.statusCode = 403;
         res.end();
         return;
@@ -176,7 +180,7 @@ function startControlServer(): Promise<http.Server | null> {
         fs.rmSync(controlFilePath(), { force: true });
         fs.writeFileSync(
           controlFilePath(),
-          JSON.stringify({ port, token: mediaToken }),
+          JSON.stringify({ port, token: controlToken }),
           { mode: 0o600 },
         );
         log.info(`[control] listening on http://127.0.0.1:${port}`);
