@@ -6,6 +6,7 @@ import { MAX_TAG_LIST } from "@shared/tags";
 import type { TagSummary } from "@/ipc/types";
 import { tagHumanLabel } from "@/lib/tagLabel";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   CLOUD_MAX_TAGS,
@@ -180,7 +181,11 @@ export function TagCloud({
           {limited && t("tags.cloudLimited", { max: CLOUD_MAX_TAGS })}
         </p>
       )}
-      <div ref={viewportRef} className="flex min-h-0 flex-1 overflow-auto p-4">
+      <ScrollArea
+        className="fill-scroll min-h-0 flex-1"
+        viewportClassName="p-4"
+        viewportRef={viewportRef}
+      >
         {shown.length === 0 ? (
           <div className="m-auto flex flex-col items-center gap-2 text-center text-muted">
             <Cloud className="size-10 opacity-50" />
@@ -240,7 +245,7 @@ export function TagCloud({
             </ul>
           )
         )}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

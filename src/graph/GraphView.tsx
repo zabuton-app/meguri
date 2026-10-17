@@ -35,6 +35,7 @@ import type { SearchQuery } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import { fileHref } from "@/lib/fileHref";
 import log from "@/lib/logger";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { buildGraphology, emptyGraph } from "./model/buildGraphology";
 import { placeNodes, type Point } from "./model/placement";
 import type { MediaGraph } from "./model/types";
@@ -611,15 +612,24 @@ function GraphScene({
           <GraphLegend showAutoTags={options.showAutoTags} />
         </div>
 
+        {/* Unlike HeatmapView's plain scroller, this ScrollArea sits under
+            #list-main: the graph replaces the list, so there is no list
+            viewport for scrollListByPage to miss, and paging the open panel
+            instead is fine. */}
         {panelOpen && (
-          <div className="absolute right-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] overflow-y-auto">
-            <GraphSettingsPanel
-              dims={dims}
-              settings={settings}
-              visibleFiles={visibleFiles}
-              onChange={setSettings}
-              onClose={closePanel}
-            />
+          <div className="absolute right-[4.25rem] top-3 flex max-h-[calc(100%-1.5rem)] flex-col">
+            <ScrollArea
+              className="flex min-h-0 flex-1 flex-col"
+              viewportClassName="min-h-0 flex-1"
+            >
+              <GraphSettingsPanel
+                dims={dims}
+                settings={settings}
+                visibleFiles={visibleFiles}
+                onChange={setSettings}
+                onClose={closePanel}
+              />
+            </ScrollArea>
           </div>
         )}
 

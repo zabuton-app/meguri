@@ -26,6 +26,7 @@ import {
 import { api } from "@/ipc/client";
 import type { TagSummary } from "@/ipc/types";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { searchTokenLabel, tagHumanLabel } from "@/lib/tagLabel";
@@ -369,43 +370,56 @@ export function SearchTokenInput({
         className="h-6 min-w-24 flex-1 bg-transparent outline-none placeholder:text-muted"
       />
       {open && (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label={t("filter.tagSuggestions")}
+        // Capped by max-height, not sized: the scroll area is a flex column so
+        // its viewport can shrink as a flex item (see ShortcutsOverlay).
+        <div
           // Keep the field focused: a blur here would close the list before the
-          // click landed on an option.
+          // click landed on an option (or while its scrollbar is dragged).
           onMouseDown={(e) => e.preventDefault()}
-          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-surface py-1 shadow-lg"
+          className="absolute left-0 right-0 top-full z-20 mt-1 flex max-h-72 flex-col rounded-md border border-border bg-surface shadow-lg"
         >
-          {suggestions.map((tag, i) => (
-            <li
-              key={tag.qualified}
-              id={`${listId}-${i}`}
-              role="option"
-              aria-selected={i === activeIndex}
-              onMouseEnter={() => setActive(i)}
-              onClick={() => accept(tag)}
-              className={cn(
-                "flex cursor-pointer items-center gap-2 px-2 py-1 text-sm",
-                i === activeIndex && "bg-fg/10",
-              )}
+          {/* type="auto": an always-on scrollbar track would sit over the
+              options' edges and take their clicks even when nothing overflows. */}
+          <ScrollArea
+            type="auto"
+            className="page-scroll flex min-h-0 flex-1 flex-col"
+            viewportClassName="min-h-0 flex-1 py-1"
+          >
+            <ul
+              id={listId}
+              role="listbox"
+              aria-label={t("filter.tagSuggestions")}
             >
-              <span className="truncate">
-                <span className="text-muted">{TAG_SEARCH_PREFIX}:</span>
-                {tag.name}
-              </span>
-              {tag.namespace && (
-                <span className="truncate text-xs text-muted">
-                  {tagHumanLabel(t, tag.namespace, tag.name)}
-                </span>
-              )}
-              <span className="ml-auto shrink-0 text-xs tabular-nums text-muted">
-                {tag.fileCount}
-              </span>
-            </li>
-          ))}
-        </ul>
+              {suggestions.map((tag, i) => (
+                <li
+                  key={tag.qualified}
+                  id={`${listId}-${i}`}
+                  role="option"
+                  aria-selected={i === activeIndex}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => accept(tag)}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 px-2 py-1 text-sm",
+                    i === activeIndex && "bg-fg/10",
+                  )}
+                >
+                  <span className="truncate">
+                    <span className="text-muted">{TAG_SEARCH_PREFIX}:</span>
+                    {tag.name}
+                  </span>
+                  {tag.namespace && (
+                    <span className="truncate text-xs text-muted">
+                      {tagHumanLabel(t, tag.namespace, tag.name)}
+                    </span>
+                  )}
+                  <span className="ml-auto shrink-0 text-xs tabular-nums text-muted">
+                    {tag.fileCount}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </ScrollArea>
+        </div>
       )}
     </div>
   );
