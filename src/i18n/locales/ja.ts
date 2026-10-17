@@ -444,6 +444,11 @@ export const ja = {
   "graph.settings.textFade": "テキストフェードのしきい値",
   "graph.settings.nodeSize": "ノードの大きさ",
   "graph.settings.lineSize": "リンクの太さ",
+  "graph.settings.thumbnails": "サムネイル表示",
+  "graph.settings.thumbnailLimit": "サムネイル表示の上限",
+  "graph.settings.thumbnailsOverLimit":
+    "現在{count}件（上限を超えているため表示していません）",
+  "graph.settings.thumbnails2dOnly": "2Dのみ",
   "graph.settings.forces": "力",
   "graph.settings.center": "中心力",
   "graph.settings.repel": "反発力",

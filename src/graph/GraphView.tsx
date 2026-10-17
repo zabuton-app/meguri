@@ -39,6 +39,7 @@ import { buildGraphology, emptyGraph } from "./model/buildGraphology";
 import { placeNodes, type Point } from "./model/placement";
 import type { MediaGraph } from "./model/types";
 import { visibleSet } from "./model/visibility";
+import { thumbnailsActive, visibleFileCount } from "./model/thumbnails";
 import {
   GraphCanvas,
   type GraphCanvasHandle,
@@ -518,12 +519,21 @@ function GraphScene({
   }, []);
 
   const empty = !!payload && visibility.nodes.size === 0;
+  const visibleFiles = useMemo(
+    () => visibleFileCount(graph, visibility),
+    [graph, visibility],
+  );
   const canvasProps: GraphCanvasProps = {
     graph,
     colors,
     visibility,
     focus,
     display: settings.display,
+    thumbnails: thumbnailsActive({
+      display: settings.display,
+      visibleFiles,
+      dims,
+    }),
     onHover: setHovered,
     onClickNode: open,
     onClickStage: clearPick,
@@ -606,6 +616,7 @@ function GraphScene({
             <GraphSettingsPanel
               dims={dims}
               settings={settings}
+              visibleFiles={visibleFiles}
               onChange={setSettings}
               onClose={closePanel}
             />

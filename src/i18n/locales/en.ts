@@ -443,6 +443,11 @@ export const en: Record<TranslationKey, string> = {
   "graph.settings.textFade": "Text fade threshold",
   "graph.settings.nodeSize": "Node size",
   "graph.settings.lineSize": "Link thickness",
+  "graph.settings.thumbnails": "Thumbnails",
+  "graph.settings.thumbnailLimit": "Thumbnail limit",
+  "graph.settings.thumbnailsOverLimit":
+    "{count} files shown (over the limit, so no thumbnails)",
+  "graph.settings.thumbnails2dOnly": "2D only",
   "graph.settings.forces": "Forces",
   "graph.settings.center": "Center force",
   "graph.settings.repel": "Repel force",

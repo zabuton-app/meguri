@@ -18,6 +18,10 @@ export interface DisplaySettings {
   textFade: number;
   nodeSize: number;
   lineSize: number;
+  /** Draw file nodes as their thumbnails when few are shown (2D only). */
+  thumbnails: boolean;
+  /** The most visible files that are still drawn as thumbnails. */
+  thumbnailLimit: number;
 }
 
 export interface ForceSettings {
@@ -36,14 +40,22 @@ export interface GraphSettings {
   forces: ForceSettings;
 }
 
-/** The display settings that are sliders. */
-export type DisplayScale = Exclude<keyof DisplaySettings, "sizeBy">;
+/** The display settings listed as plain sliders. */
+export type DisplayScale = Exclude<
+  keyof DisplaySettings,
+  "sizeBy" | "thumbnails" | "thumbnailLimit"
+>;
 
-/** Slider ranges: [min, max, step]. */
-export const DISPLAY_RANGE: Record<DisplayScale, [number, number, number]> = {
+/** Slider ranges: [min, max, step]. The thumbnail limit has a slider of its
+ *  own, next to its switch. */
+export const DISPLAY_RANGE: Record<
+  DisplayScale | "thumbnailLimit",
+  [number, number, number]
+> = {
   textFade: [-3, 3, 0.1],
   nodeSize: [0.1, 5, 0.01],
   lineSize: [0.1, 5, 0.01],
+  thumbnailLimit: [0, 1000, 10],
 };
 export const FORCE_RANGE: Record<
   keyof ForceSettings,
@@ -69,7 +81,14 @@ export function uneased(strength: number): number {
 
 export function defaultGraphSettings(): GraphSettings {
   return {
-    display: { sizeBy: "links", textFade: 0, nodeSize: 1, lineSize: 1 },
+    display: {
+      sizeBy: "links",
+      textFade: 0,
+      nodeSize: 1,
+      lineSize: 1,
+      thumbnails: true,
+      thumbnailLimit: 150,
+    },
     forces: {
       center: uneased(0.1),
       repel: 10,
@@ -124,8 +143,11 @@ export function parseGraphSettings(raw: string | null): GraphSettings {
   try {
     const v = JSON.parse(raw) as Record<string, unknown> | null;
     const display = section(v?.display, DISPLAY_RANGE, fallback.display);
-    const sizeBy = (v?.display as Record<string, unknown> | undefined)?.sizeBy;
-    if (SIZE_BY.includes(sizeBy as SizeBy)) display.sizeBy = sizeBy as SizeBy;
+    const stored = v?.display as Record<string, unknown> | undefined;
+    if (SIZE_BY.includes(stored?.sizeBy as SizeBy))
+      display.sizeBy = stored?.sizeBy as SizeBy;
+    if (typeof stored?.thumbnails === "boolean")
+      display.thumbnails = stored.thumbnails;
     return {
       display,
       forces: section(v?.forces, FORCE_RANGE, fallback.forces),

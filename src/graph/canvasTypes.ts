@@ -21,6 +21,9 @@ export interface GraphCanvasProps {
   /** The node whose neighbourhood is highlighted (the rest fades). */
   focus: string | null;
   display: DisplaySettings;
+  /** File nodes are drawn as their thumbnails (2D only; the 3D canvas
+   *  ignores it). Decided by the view from the visible file count. */
+  thumbnails: boolean;
   onHover: (key: string | null) => void;
   onClickNode: (key: string) => void;
   onClickStage: () => void;
