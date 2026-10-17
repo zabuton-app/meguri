@@ -15,22 +15,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
-import { groupBulkTargets } from "@/lib/bulkEdit";
 import { invalidateTagCatalog } from "@/lib/queryCache";
 import {
   MAX_AUTO_TAGS_PER_FILE,
+  MAX_AUTO_TAG_PLACE_CHARS,
   MAX_AUTO_TAG_PAIRS,
   MAX_AUTO_TAG_TERMS,
   compileEngine,
   type AutoTagAssignment,
   type AutoTagConfig,
+  type AutoTagEditTarget,
   type AutoTagFile,
   type AutoTagLibrary,
   type CompiledEngine,
   type TagRule,
+  placeOf,
 } from "@shared/autoTag";
 import { STOP_WORDS } from "@shared/autoTagAnalysis";
-import type { BulkTargets } from "@shared/ipc/channels";
 import { MAX_BULK_FILES, MAX_BULK_TAG_NAMES } from "@shared/tags";
 import { useRuleResults, type RuleView } from "./useRuleResults";
 
@@ -141,6 +142,26 @@ class ConfigSaver {
     this.saved = config;
     if (this.waiting === config) this.waiting = null;
   }
+}
+
+/** Files grouped by workspace, each with where this screen read it. */
+function placedTargets(files: readonly AutoTagFile[]): AutoTagEditTarget[] {
+  const groups = new Map<string, AutoTagEditTarget>();
+  for (const file of files) {
+    const place = placeOf(file.folder, file.name);
+    const group = groups.get(file.workspaceId);
+    if (group) {
+      group.fileIds.push(file.id);
+      group.places.push(place);
+    } else {
+      groups.set(file.workspaceId, {
+        workspaceId: file.workspaceId,
+        fileIds: [file.id],
+        places: [place],
+      });
+    }
+  }
+  return [...groups.values()];
 }
 
 /** Keep the newest entries of a list that the schema caps. */
@@ -298,51 +319,66 @@ export function useAutoTag(): AutoTagState | null {
         fresh.length = Math.min(fresh.length, MAX_AUTO_TAGS_PER_FILE);
         sent.set(index, fresh);
         const groupKey = `${file.workspaceId}\0${fresh.join("\0")}`;
+        const place = placeOf(file.folder, file.name);
         const group = groups.get(groupKey);
-        if (group) group.fileIds.push(file.id);
-        else {
+        if (group) {
+          group.fileIds.push(file.id);
+          group.places.push(place);
+        } else {
           groups.set(groupKey, {
             workspaceId: file.workspaceId,
             fileIds: [file.id],
+            places: [place],
             tags: fresh,
           });
         }
       }
       if (sent.size === 0) return { ok: true, files: 0, added: 0 };
 
-      // One call carries at most MAX_BULK_FILES ids and MAX_AUTO_TAG_PAIRS
-      // (file, tag) pairs, however the files are grouped.
+      // One call carries at most MAX_BULK_FILES ids, MAX_AUTO_TAG_PAIRS
+      // (file, tag) pairs and MAX_AUTO_TAG_PLACE_CHARS of places, however the
+      // files are grouped.
       const calls: AutoTagAssignment[][] = [[]];
       let fileRoom = MAX_BULK_FILES;
       let pairRoom = MAX_AUTO_TAG_PAIRS;
+      let charRoom = MAX_AUTO_TAG_PLACE_CHARS;
       for (const group of groups.values()) {
-        for (let at = 0; at < group.fileIds.length;) {
-          let take = Math.min(
-            fileRoom,
-            Math.floor(pairRoom / group.tags.length),
-          );
-          if (take === 0) {
+        let part: AutoTagAssignment | null = null;
+        group.fileIds.forEach((fileId, i) => {
+          const place = group.places[i];
+          if (
+            fileRoom === 0 ||
+            pairRoom < group.tags.length ||
+            charRoom < place.length
+          ) {
             calls.push([]);
             fileRoom = MAX_BULK_FILES;
             pairRoom = MAX_AUTO_TAG_PAIRS;
-            take = Math.min(fileRoom, Math.floor(pairRoom / group.tags.length));
+            charRoom = MAX_AUTO_TAG_PLACE_CHARS;
+            part = null;
           }
-          const fileIds = group.fileIds.slice(at, at + take);
-          calls[calls.length - 1].push({ ...group, fileIds });
-          at += fileIds.length;
-          fileRoom -= fileIds.length;
-          pairRoom -= fileIds.length * group.tags.length;
-        }
+          if (!part) {
+            part = { ...group, fileIds: [], places: [] };
+            calls[calls.length - 1].push(part);
+          }
+          part.fileIds.push(fileId);
+          part.places.push(place);
+          fileRoom -= 1;
+          pairRoom -= group.tags.length;
+          charRoom -= place.length;
+        });
       }
 
       const undoIds: string[] = [];
       let filesChanged = 0;
       let pairs = 0;
+      let moved = 0;
       try {
         for (const assignments of calls) {
           const result = await api.autoTagApply(assignments);
           filesChanged += result.files;
           pairs += result.added;
+          moved += result.moved;
           if (result.undoId) undoIds.push(result.undoId);
         }
       } catch (error) {
@@ -384,6 +420,9 @@ export function useAutoTag(): AutoTagState | null {
         return { ...prev, files: nextFiles, existingTags: [...nextExisting] };
       });
       invalidateTagCatalog(qc);
+      // Some files were no longer where this screen read them: what it shows
+      // of them is out of date, so read the files again.
+      if (moved > 0) load();
       return { ok: true, files: filesChanged, added: pairs };
     },
     [existing, fileTags, library, load, qc, siblings, t],
@@ -403,13 +442,13 @@ export function useAutoTag(): AutoTagState | null {
       // The tag as the files spell it: `trip` and `Trip` are two rows of the
       // tag table, and both are what this candidate reads as "tagged".
       const spellings = new Set<string>();
-      const holders: { workspaceId: string; fileId: number }[] = [];
+      const holders: AutoTagFile[] = [];
       for (const index of indexes) {
         const file = library.files[index];
         const mine = file.tags.filter((tag) => tag.toLowerCase() === key);
         if (mine.length === 0) continue;
         for (const tag of mine) spellings.add(tag);
-        holders.push({ workspaceId: file.workspaceId, fileId: file.id });
+        holders.push(file);
       }
       // What one call can name; more spellings of one tag than that is not a
       // case worth a second pass, and what is not sent is not dropped below.
@@ -417,15 +456,29 @@ export function useAutoTag(): AutoTagState | null {
       if (names.length === 0) return { ok: true, files: 0 };
       const gone = new Set(names);
 
-      // One call carries at most MAX_BULK_FILES ids, however they are grouped.
-      const calls: BulkTargets[] = [];
-      for (let at = 0; at < holders.length; at += MAX_BULK_FILES) {
-        calls.push(groupBulkTargets(holders.slice(at, at + MAX_BULK_FILES)));
+      // One call carries at most MAX_BULK_FILES ids and
+      // MAX_AUTO_TAG_PLACE_CHARS of places, however they are grouped.
+      const parts: AutoTagFile[][] = [];
+      let charRoom = 0;
+      for (const file of holders) {
+        const chars = placeOf(file.folder, file.name).length;
+        const last = parts.at(-1);
+        if (!last || last.length === MAX_BULK_FILES || charRoom < chars) {
+          parts.push([file]);
+          charRoom = MAX_AUTO_TAG_PLACE_CHARS - chars;
+        } else {
+          last.push(file);
+          charRoom -= chars;
+        }
       }
+      const calls = parts.map(placedTargets);
       let filesChanged = 0;
+      let moved = 0;
       try {
         for (const targets of calls) {
-          filesChanged += (await api.filesBulkTag(targets, put, names)).files;
+          const result = await api.autoTagEdit(targets, put, names);
+          filesChanged += result.files;
+          moved += result.moved;
         }
       } catch (error) {
         toast.error(
@@ -466,6 +519,8 @@ export function useAutoTag(): AutoTagState | null {
         };
       });
       invalidateTagCatalog(qc);
+      // As in apply: some files had moved on; show what they really carry.
+      if (moved > 0) load();
       return { ok: true, files: filesChanged };
     },
     [existing, library, load, qc, siblings, t],

@@ -14,7 +14,8 @@
  * arbitrary regular expression — and adds the folder rules' tags itself:
  * comparing paths cannot hang.
  */
-import { MAX_TAG_NAME, isReservedTagName } from "./tags.js";
+import { MAX_FOLDER_PATH } from "./folderPath.js";
+import { MAX_BULK_FILES, MAX_TAG_NAME, isReservedTagName } from "./tags.js";
 
 export const MAX_AUTO_TAG_RULES = 64;
 export const MAX_AUTO_TAG_KEYWORDS = 500;
@@ -706,11 +707,39 @@ export interface AutoTagLibrary {
   existingTags: string[];
 }
 
+/**
+ * Where a file is, as the screen has it — its folder and name, NFC, "/"
+ * joined. A write from the screen sends it beside each file id, and a file no
+ * longer there (a rebuild gave the id to another file, a move another name)
+ * is left alone: the screen worked out what to write from where it was.
+ */
+export const placeOf = (folder: string, name: string): string =>
+  folder ? `${folder}/${name}` : name;
+
+/** Cap on one place: the longest folder, a slash and a long file name. */
+export const MAX_AUTO_TAG_PLACE = MAX_FOLDER_PATH + 1 + 1024;
+
+/**
+ * What the places of one write may add up to: a few hundred characters a file
+ * is generous for real paths. The screen splits its writes by this as well as
+ * by the file count.
+ */
+export const MAX_AUTO_TAG_PLACE_CHARS = MAX_BULK_FILES * 512;
+
 /** Files (by workspace) that should receive the same tags. */
 export interface AutoTagAssignment {
   workspaceId: string;
   fileIds: number[];
+  /** Where each of `fileIds` was when the screen read it (placeOf). */
+  places: string[];
   tags: string[];
+}
+
+/** Files (by workspace) for a tag edit from the screen, with their places. */
+export interface AutoTagEditTarget {
+  workspaceId: string;
+  fileIds: number[];
+  places: string[];
 }
 
 export interface AutoTagApplyResult {
@@ -718,6 +747,8 @@ export interface AutoTagApplyResult {
   files: number;
   /** (file, tag) pairs attached. */
   added: number;
+  /** Files left alone: no longer where the screen read them. */
+  moved: number;
   /**
    * Handle for taking exactly these pairs back — used to roll an apply back
    * when a later call of it fails. Null when nothing was added.

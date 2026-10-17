@@ -10,10 +10,13 @@ import {
   type AutoTagApplyResult,
   type AutoTagAssignment,
   type AutoTagConfig,
+  type AutoTagEditTarget,
   type AutoTagLibrary,
 } from "@shared/autoTag";
 
 const mocks = vi.hoisted(() => ({
+  /** What one write's places may add up to; lowered by the case splitting by it. */
+  placeChars: null as number | null,
   autoTagGet: vi.fn<() => Promise<AutoTagConfig>>(),
   autoTagSet: vi.fn<(config: AutoTagConfig) => Promise<void>>(),
   autoTagFiles: vi.fn<() => Promise<AutoTagLibrary>>(),
@@ -21,14 +24,15 @@ const mocks = vi.hoisted(() => ({
     vi.fn<(a: AutoTagAssignment[]) => Promise<AutoTagApplyResult>>(),
   autoTagUndo: vi.fn<(ids: string[]) => Promise<number>>(),
   autoTagReapply: vi.fn<() => Promise<{ files: number; added: number }>>(),
-  filesBulkTag: vi.fn<
+  autoTagEdit: vi.fn<
     (
-      targets: { workspaceId: string; fileIds: number[] }[],
+      targets: AutoTagEditTarget[],
       add: string[],
       remove: string[],
     ) => Promise<{
       files: number;
       skipped: number;
+      moved: number;
       added: number;
       removed: number;
     }>
@@ -36,10 +40,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 // A short deadline for the rule worker, for the case that waits on it.
-vi.mock("@shared/autoTag", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@shared/autoTag")>()),
-  AUTO_TAG_CHUNK_TIMEOUT_MS: 100,
-}));
+vi.mock("@shared/autoTag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/autoTag")>();
+  return {
+    ...actual,
+    AUTO_TAG_CHUNK_TIMEOUT_MS: 100,
+    get MAX_AUTO_TAG_PLACE_CHARS() {
+      return mocks.placeChars ?? actual.MAX_AUTO_TAG_PLACE_CHARS;
+    },
+  };
+});
 
 vi.mock("@/ipc/client", () => ({
   api: {
@@ -61,11 +71,11 @@ vi.mock("@/ipc/client", () => ({
         collections: [],
         activeId: "ws",
       }),
-    filesBulkTag: (
-      targets: { workspaceId: string; fileIds: number[] }[],
+    autoTagEdit: (
+      targets: AutoTagEditTarget[],
       add: string[],
       remove: string[],
-    ) => mocks.filesBulkTag(targets, add, remove),
+    ) => mocks.autoTagEdit(targets, add, remove),
   },
 }));
 
@@ -147,13 +157,20 @@ describe("AutoTag", () => {
     mocks.autoTagFiles.mockResolvedValue(library());
     mocks.autoTagSet.mockResolvedValue();
     mocks.autoTagUndo.mockResolvedValue(1);
-    mocks.filesBulkTag.mockImplementation((targets) => {
+    mocks.autoTagEdit.mockImplementation((targets) => {
       const files = targets.reduce((n, g) => n + g.fileIds.length, 0);
-      return Promise.resolve({ files, skipped: 0, added: 0, removed: files });
+      return Promise.resolve({
+        files,
+        skipped: 0,
+        moved: 0,
+        added: 0,
+        removed: files,
+      });
     });
     mocks.autoTagApply.mockImplementation((assignments) =>
       Promise.resolve({
         files: assignments.reduce((n, a) => n + a.fileIds.length, 0),
+        moved: 0,
         added: assignments.reduce(
           (n, a) => n + a.fileIds.length * a.tags.length,
           0,
@@ -446,20 +463,20 @@ describe("AutoTag", () => {
       // Only the file that carries the old tag is asked about.
       const dialog = await screen.findByRole("alertdialog");
       expect(within(dialog).getByText("Move files to “Port”?")).toBeTruthy();
-      expect(mocks.filesBulkTag).not.toHaveBeenCalled();
+      expect(mocks.autoTagEdit).not.toHaveBeenCalled();
       fireEvent.click(
         within(dialog).getByRole("button", { name: "Replace on 1 files" }),
       );
       // One edit: the new tag on, the old one — as the file spells it — off,
       // so no file is left with neither.
       await waitFor(() =>
-        expect(mocks.filesBulkTag).toHaveBeenCalledWith(
-          [{ workspaceId: "ws", fileIds: [3] }],
+        expect(mocks.autoTagEdit).toHaveBeenCalledWith(
+          [{ workspaceId: "ws", fileIds: [3], places: [NAMES[2]] }],
           ["Port"],
           ["harbor"],
         ),
       );
-      expect(mocks.filesBulkTag).toHaveBeenCalledTimes(1);
+      expect(mocks.autoTagEdit).toHaveBeenCalledTimes(1);
       expect(mocks.autoTagApply).not.toHaveBeenCalled();
 
       // The screen reads the file as carrying the new tag: renamed back, it
@@ -474,7 +491,7 @@ describe("AutoTag", () => {
 
     it("shows what the files carry when the edit failed", async () => {
       withKeyword();
-      mocks.filesBulkTag.mockRejectedValue(new Error("locked"));
+      mocks.autoTagEdit.mockRejectedValue(new Error("locked"));
       await renderScreen("Keywords");
       rename("Harbor", "Port");
       fireEvent.click(
@@ -493,7 +510,7 @@ describe("AutoTag", () => {
         await screen.findByRole("button", { name: "Setting only" }),
       );
       expect((await lastSaved()).keywords).toMatchObject([{ tags: ["Port"] }]);
-      expect(mocks.filesBulkTag).not.toHaveBeenCalled();
+      expect(mocks.autoTagEdit).not.toHaveBeenCalled();
     });
 
     it("asks nothing for another spelling of the same tag", async () => {
@@ -557,8 +574,14 @@ describe("AutoTag", () => {
         await screen.findByRole("button", { name: "Replace on 1 files" }),
       );
       await waitFor(() =>
-        expect(mocks.filesBulkTag).toHaveBeenCalledWith(
-          [{ workspaceId: "ws", fileIds: [3] }],
+        expect(mocks.autoTagEdit).toHaveBeenCalledWith(
+          [
+            {
+              workspaceId: "ws",
+              fileIds: [3],
+              places: [`Trips/2024/${NAMES[2]}`],
+            },
+          ],
           ["Port"],
           ["harbor"],
         ),
@@ -837,7 +860,7 @@ describe("AutoTag", () => {
     await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
     // File 3 already carries "harbor"; only file 4 is sent, with the existing spelling.
     expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
-      { workspaceId: "ws", fileIds: [4], tags: ["harbor"] },
+      { workspaceId: "ws", fileIds: [4], places: [NAMES[3]], tags: ["harbor"] },
     ]);
     // Nothing left to apply; what there is to do is take it off both.
     const remove = await within(row).findByRole("button", {
@@ -848,11 +871,11 @@ describe("AutoTag", () => {
     // It goes by what the files carry, not by what was applied here: the file
     // tagged before the screen was opened loses the tag too, so it asks.
     fireEvent.click(remove);
-    expect(mocks.filesBulkTag).not.toHaveBeenCalled();
+    expect(mocks.autoTagEdit).not.toHaveBeenCalled();
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     await waitFor(() =>
-      expect(mocks.filesBulkTag).toHaveBeenCalledWith(
-        [{ workspaceId: "ws", fileIds: [3, 4] }],
+      expect(mocks.autoTagEdit).toHaveBeenCalledWith(
+        [{ workspaceId: "ws", fileIds: [3, 4], places: [NAMES[2], NAMES[3]] }],
         [],
         ["harbor"],
       ),
@@ -893,8 +916,8 @@ describe("AutoTag", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     // Only the file the candidate names is sent; main detaches by content.
     await waitFor(() =>
-      expect(mocks.filesBulkTag).toHaveBeenCalledWith(
-        [{ workspaceId: "ws", fileIds: [3] }],
+      expect(mocks.autoTagEdit).toHaveBeenCalledWith(
+        [{ workspaceId: "ws", fileIds: [3], places: [NAMES[2]] }],
         [],
         ["harbor"],
       ),
@@ -905,12 +928,17 @@ describe("AutoTag", () => {
     fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
     await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
     expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
-      { workspaceId: "ws", fileIds: [3, 4], tags: ["harbor"] },
+      {
+        workspaceId: "ws",
+        fileIds: [3, 4],
+        places: [NAMES[2], NAMES[3]],
+        tags: ["harbor"],
+      },
     ]);
   });
 
   it("shows what the files carry when taking a tag off failed", async () => {
-    mocks.filesBulkTag.mockRejectedValue(new Error("locked"));
+    mocks.autoTagEdit.mockRejectedValue(new Error("locked"));
     mocks.autoTagFiles.mockResolvedValue(harborOnOne());
     await renderScreen("Suggestions");
     const row = () =>
@@ -954,7 +982,7 @@ describe("AutoTag", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull(),
     );
-    expect(mocks.filesBulkTag).not.toHaveBeenCalled();
+    expect(mocks.autoTagEdit).not.toHaveBeenCalled();
   });
 
   it("does not call a suggestion applied when applying failed", async () => {
@@ -975,6 +1003,70 @@ describe("AutoTag", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("reads the files again when some were no longer where they were read", async () => {
+    // Main leaves out a file whose id now names another file, or that moved.
+    mocks.autoTagApply.mockResolvedValue({
+      files: 0,
+      moved: 1,
+      added: 0,
+      undoId: null,
+    });
+    mocks.autoTagEdit.mockResolvedValue({
+      files: 0,
+      skipped: 1,
+      moved: 1,
+      added: 0,
+      removed: 0,
+    });
+    mocks.autoTagFiles.mockResolvedValue(harborOnOne());
+    await renderScreen("Suggestions");
+    const row = () =>
+      screen.getByRole("checkbox", { name: "Harbor" }).closest("div")!;
+    fireEvent.click(within(row()).getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(
+      await within(row()).findByRole("button", { name: /Remove from/ }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(mocks.autoTagEdit).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(3));
+  });
+
+  it("splits a write by how long its places run together", async () => {
+    // Room for one of the two Harbor files' places a call, not both.
+    mocks.placeChars = Math.max(NAMES[2].length, NAMES[3].length);
+    try {
+      await renderScreen("Suggestions");
+      fireEvent.click(
+        within(
+          screen.getByRole("checkbox", { name: "Harbor" }).closest("div")!,
+        ).getByRole("button", { name: "Add to keywords" }),
+      );
+      await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(2));
+      expect(mocks.autoTagApply.mock.calls.map(([a]) => a)).toEqual([
+        [
+          {
+            workspaceId: "ws",
+            fileIds: [3],
+            places: [NAMES[2]],
+            tags: ["Harbor"],
+          },
+        ],
+        [
+          {
+            workspaceId: "ws",
+            fileIds: [4],
+            places: [NAMES[3]],
+            tags: ["Harbor"],
+          },
+        ],
+      ]);
+    } finally {
+      mocks.placeChars = null;
+    }
+  });
+
   it("leads with the dictionary for a word nothing produces yet", async () => {
     await renderScreen("Suggestions");
     // A frequent word: registering it is offered, ahead of a one-off apply.
@@ -993,7 +1085,12 @@ describe("AutoTag", () => {
     );
     await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalledTimes(1));
     expect(mocks.autoTagApply.mock.calls[0][0]).toEqual([
-      { workspaceId: "ws", fileIds: [3, 4], tags: ["Harbor"] },
+      {
+        workspaceId: "ws",
+        fileIds: [3, 4],
+        places: [NAMES[2], NAMES[3]],
+        tags: ["Harbor"],
+      },
     ]);
     expect((await lastSaved()).keywords).toMatchObject([
       { terms: ["Harbor"], tags: ["Harbor"] },
@@ -1191,16 +1288,16 @@ describe("AutoTag", () => {
     // Asked about once for all of them, with what it comes to.
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByText("Remove 2 tags?")).toBeTruthy();
-    expect(mocks.filesBulkTag).not.toHaveBeenCalled();
+    expect(mocks.autoTagEdit).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
-    await waitFor(() => expect(mocks.filesBulkTag).toHaveBeenCalledTimes(2));
-    expect(mocks.filesBulkTag).toHaveBeenCalledWith(
-      [{ workspaceId: "ws", fileIds: [3, 4] }],
+    await waitFor(() => expect(mocks.autoTagEdit).toHaveBeenCalledTimes(2));
+    expect(mocks.autoTagEdit).toHaveBeenCalledWith(
+      [{ workspaceId: "ws", fileIds: [3, 4], places: [NAMES[2], NAMES[3]] }],
       [],
       ["Harbor"],
     );
-    expect(mocks.filesBulkTag).toHaveBeenCalledWith(
-      [{ workspaceId: "ws", fileIds: [1] }],
+    expect(mocks.autoTagEdit).toHaveBeenCalledWith(
+      [{ workspaceId: "ws", fileIds: [1], places: [NAMES[0]] }],
       [],
       ["yoga"],
     );

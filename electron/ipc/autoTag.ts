@@ -5,8 +5,10 @@ import {
   attachAutoTags,
   autoTagFiles,
   detachTagPairs,
+  keepStillAt,
   type TagPair,
 } from "../core/autoTag.js";
+import { bulkEditManualTags } from "../core/tags.js";
 import { handle } from "../core/ipcHandler.js";
 import { MAX_AUTO_TAG_FILES, type AutoTagFile } from "../../shared/autoTag.js";
 import type { IpcContext } from "./context.js";
@@ -70,15 +72,21 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
   handle("auto_tag_apply", async ({ assignments }) => {
     // Every Core is resolved before the first write, so an unknown workspace
     // fails the call rather than leaving the ones ahead of it already tagged.
+    // Only the files still where the screen read them (see keepStillAt):
+    // checked here, with nothing awaited before the writes below.
+    let moved = 0;
     const byWorkspace = new Map<
       string,
       { fileIds: number[]; tags: string[] }[]
     >();
-    for (const { workspaceId, fileIds, tags } of assignments) {
-      coreById(ws, workspaceId);
+    for (const { workspaceId, fileIds, places, tags } of assignments) {
+      const still = keepStillAt(coreById(ws, workspaceId).db, fileIds, places);
+      moved += still.moved;
+      const { kept } = still;
+      if (kept.length === 0) continue;
       const list = byWorkspace.get(workspaceId);
-      if (list) list.push({ fileIds, tags });
-      else byWorkspace.set(workspaceId, [{ fileIds, tags }]);
+      if (list) list.push({ fileIds: kept, tags });
+      else byWorkspace.set(workspaceId, [{ fileIds: kept, tags }]);
     }
     let files = 0;
     let added = 0;
@@ -100,7 +108,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
       }
       throw err;
     }
-    if (added === 0) return { files, added, undoId: null };
+    if (added === 0) return { files, added, moved, undoId: null };
     const undoId = randomUUID();
     undo.set(undoId, entry);
     undoPairs += added;
@@ -111,7 +119,41 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
       forget(undo.keys().next().value as string);
     }
     await queryClient.invalidateCaches();
-    return { files, added, undoId };
+    return { files, added, moved, undoId };
+  });
+
+  handle("auto_tag_edit", ({ targets, add, remove }) => {
+    // Every Core is resolved, and every file checked (see keepStillAt), before
+    // the first write, with nothing awaited in between; then one edit a
+    // workspace, as files_bulk_tag makes.
+    const total = { files: 0, skipped: 0, moved: 0, added: 0, removed: 0 };
+    const byWorkspace = new Map<string, number[]>();
+    for (const { workspaceId, fileIds, places } of targets) {
+      const { kept, moved } = keepStillAt(
+        coreById(ws, workspaceId).db,
+        fileIds,
+        places,
+      );
+      total.moved += moved;
+      total.skipped += moved;
+      const ids = byWorkspace.get(workspaceId);
+      if (ids) ids.push(...kept);
+      else byWorkspace.set(workspaceId, kept);
+    }
+    for (const [workspaceId, ids] of byWorkspace) {
+      if (ids.length === 0) continue;
+      const r = bulkEditManualTags(
+        coreById(ws, workspaceId).db,
+        ids,
+        add,
+        remove,
+      );
+      total.files += r.files;
+      total.skipped += r.skipped;
+      total.added += r.added;
+      total.removed += r.removed;
+    }
+    return total;
   });
 
   handle("auto_tag_undo", async ({ undoIds }) => {

@@ -6,6 +6,10 @@ import { describe, expect, it } from "vitest";
 import { ChannelInputs } from "../../../shared/ipc/channels.js";
 import { MAX_WORKSPACE_ID } from "../../../shared/workspaceIds.js";
 import {
+  MAX_AUTO_TAG_PLACE,
+  MAX_AUTO_TAG_PLACE_CHARS,
+} from "../../../shared/autoTag.js";
+import {
   MAX_BULK_FILES,
   MAX_BULK_TAG_NAMES,
   MAX_TAG_LIST,
@@ -157,6 +161,55 @@ describe("files_bulk_tag payloads", () => {
       parse({ targets: [group([])], add: ["x"], remove: [] }).success,
     ).toBe(false);
     expect(parse({ targets: [], add: ["x"], remove: [] }).success).toBe(false);
+  });
+});
+
+describe("auto-tag write payloads", () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+  const group = (fileIds: number[], places: string[]) => ({
+    workspaceId: "ws",
+    fileIds,
+    places,
+  });
+  const edit = (targets: unknown) =>
+    ChannelInputs.auto_tag_edit.safeParse({ targets, add: ["x"], remove: [] })
+      .success;
+  const apply = (groups: { fileIds: number[]; places: string[] }[]) =>
+    ChannelInputs.auto_tag_apply.safeParse({
+      assignments: groups.map((g) => ({
+        ...g,
+        workspaceId: "ws",
+        tags: ["x"],
+      })),
+    }).success;
+
+  it("takes one place a file", () => {
+    expect(edit([group([1, 2], ["a.mp4", "b/c.mp4"])])).toBe(true);
+    expect(apply([group([1, 2], ["a.mp4", "b/c.mp4"])])).toBe(true);
+    expect(edit([group([1, 2], ["a.mp4"])])).toBe(false);
+    expect(apply([group([1], ["a.mp4", "b.mp4"])])).toBe(false);
+    expect(edit([{ workspaceId: "ws", fileIds: [1] }])).toBe(false);
+  });
+
+  it("caps one place, and the places of a call together", () => {
+    expect(edit([group([1], ["p".repeat(MAX_AUTO_TAG_PLACE)])])).toBe(true);
+    expect(edit([group([1], ["p".repeat(MAX_AUTO_TAG_PLACE + 1)])])).toBe(
+      false,
+    );
+    const n = Math.ceil(MAX_AUTO_TAG_PLACE_CHARS / MAX_AUTO_TAG_PLACE) + 1;
+    const long = Array.from({ length: n }, () =>
+      "p".repeat(MAX_AUTO_TAG_PLACE),
+    );
+    expect(edit([group(ids(n), long)])).toBe(false);
+    expect(apply([group(ids(n), long)])).toBe(false);
+  });
+
+  it("refuses millions of places without validating them", () => {
+    // Empty places cost no characters; their number is what the gate reads.
+    const places = Array.from({ length: 2_000_000 }, () => "");
+    const started = performance.now();
+    expect(edit([group([1], places)])).toBe(false);
+    expect(performance.now() - started).toBeLessThan(500);
   });
 });
 

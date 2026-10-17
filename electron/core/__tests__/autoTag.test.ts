@@ -12,6 +12,8 @@ import {
   attachAutoTags,
   autoTagFiles,
   detachTagPairs,
+  filesStillAt,
+  keepStillAt,
 } from "../autoTag.js";
 import {
   AutoTagTimeoutError,
@@ -539,6 +541,56 @@ describe("configuration", () => {
     };
     expect(AutoTagConfigSchema.safeParse(config).success).toBe(true);
     expect(compileEngine(config).rules).toEqual([]);
+  });
+});
+
+describe("files still where they were read", () => {
+  let db: DB;
+  let rootId: number;
+  beforeEach(() => {
+    ({ db, rootId } = newDb());
+  });
+
+  it("keeps a file at the place the screen named, and no other", () => {
+    const kept = insertFile(db, rootId, { relPath: "Trips/a.mp4" });
+    const moved = insertFile(db, rootId, { relPath: "b.mp4" });
+    const gone = insertFile(db, rootId, { relPath: "c.mp4" });
+    db.prepare("UPDATE files SET rel_path = ? WHERE id = ?").run(
+      "Trips/b.mp4",
+      moved,
+    );
+    db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(gone);
+    const still = filesStillAt(
+      db,
+      new Map([
+        [kept, "Trips/a.mp4"],
+        [moved, "b.mp4"],
+        [gone, "c.mp4"],
+        // An id the index no longer has.
+        [9999, "d.mp4"],
+      ]),
+    );
+    expect([...still]).toEqual([kept]);
+  });
+
+  it("judges each id sent by the place sent beside it", () => {
+    const a = insertFile(db, rootId, { relPath: "a.mp4" });
+    const b = insertFile(db, rootId, { relPath: "b.mp4" });
+    // The same id twice, once where it is: only that one is kept.
+    expect(keepStillAt(db, [a, a, b], ["x.mp4", "a.mp4", "a.mp4"])).toEqual({
+      kept: [a],
+      moved: 2,
+    });
+  });
+
+  it("names a path the way the screen does, composed", () => {
+    // Stored decomposed, as a macOS volume may hand it over.
+    const id = insertFile(db, rootId, {
+      relPath: "Cafe\u0301/Cafe\u0301.mp4",
+    });
+    expect([
+      ...filesStillAt(db, new Map([[id, "Caf\u00e9/Caf\u00e9.mp4"]])),
+    ]).toEqual([id]);
   });
 });
 
