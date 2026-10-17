@@ -239,6 +239,48 @@ describe("extractMeta", () => {
     expect(meta.duration).toBeGreaterThan(0);
   });
 
+  // A phone's portrait video is stored as landscape frames plus a rotation, and
+  // ffprobe reports the stored size. The recorded size must be the displayed one.
+  it("records a quarter-turned video at its displayed size", async () => {
+    for (const rotation of ["90", "-90"]) {
+      const rotated = path.join(dir, `rot${rotation}.mp4`);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-y",
+        "-display_rotation",
+        rotation,
+        "-i",
+        video,
+        "-c",
+        "copy",
+        rotated,
+      ]);
+      const meta = await extractMeta(rotated, "video");
+      expect(meta.width).toBe(48);
+      expect(meta.height).toBe(64);
+    }
+  });
+
+  it("keeps the size of a half-turned video", async () => {
+    const flipped = path.join(dir, "rot180.mp4");
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-y",
+      "-display_rotation",
+      "180",
+      "-i",
+      video,
+      "-c",
+      "copy",
+      flipped,
+    ]);
+    const meta = await extractMeta(flipped, "video");
+    expect(meta.width).toBe(64);
+    expect(meta.height).toBe(48);
+  });
+
   it("reports no frame rate for a still image", async () => {
     const image = path.join(dir, "still.png");
     execFileSync(FFMPEG, [

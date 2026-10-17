@@ -293,6 +293,87 @@ describe("VideoPlayer", () => {
     });
   });
 
+  describe("box shape", () => {
+    const boxOf = (video: HTMLVideoElement) =>
+      (video.closest(".group") as HTMLElement).style.aspectRatio;
+    const loadSized = (
+      video: HTMLVideoElement,
+      width: number,
+      height: number,
+    ) => {
+      Object.defineProperty(video, "videoWidth", {
+        configurable: true,
+        value: width,
+      });
+      Object.defineProperty(video, "videoHeight", {
+        configurable: true,
+        value: height,
+      });
+      loadVideo(video);
+    };
+
+    it("starts from the recorded size", () => {
+      const { video } = renderPlayer();
+      expect(boxOf(video)).toBe("1920 / 1080");
+    });
+
+    // A portrait phone video recorded at its stored, pre-rotation size: the
+    // element reports it as displayed, and the box must follow.
+    it("follows the size the element reports once it has metadata", () => {
+      const { video } = renderPlayer();
+      loadSized(video, 1080, 1920);
+      expect(boxOf(video)).toBe("1080 / 1920");
+    });
+
+    it("shapes a file with no recorded size once it has metadata", () => {
+      const { video } = renderPlayer({ width: null, height: null });
+      expect(boxOf(video)).toBe("16 / 9");
+      loadSized(video, 720, 1280);
+      expect(boxOf(video)).toBe("720 / 1280");
+    });
+
+    // The playlist hands its element over already loaded: no loadedmetadata
+    // follows, so the size is read off the element when it is adopted.
+    it("takes the size of an element handed over already loaded", () => {
+      const first = renderPlayer();
+      loadSized(first.video, 1080, 1920);
+      Object.defineProperty(first.video, "readyState", {
+        configurable: true,
+        value: 1,
+      });
+      announceVideoHandOff("http://127.0.0.1:17345/ws/ws1/media/1");
+      cleanup();
+
+      const second = renderPlayer();
+      expect(second.video).toBe(first.video);
+      expect(boxOf(second.video)).toBe("1080 / 1920");
+    });
+
+    it("drops the reported size when the source changes", () => {
+      const { video, view } = renderPlayer();
+      loadSized(video, 1080, 1920);
+      view.rerender(
+        <Providers>
+          <VideoPlayer
+            id={2}
+            src="http://127.0.0.1:17345/ws/ws1/media/2"
+            duration={60}
+            width={1280}
+            height={720}
+            mediaBase="http://127.0.0.1:17345"
+            wsId="ws1"
+            startAt={0}
+            navKeys={NAV_BINDINGS.normal}
+            onNativeDuration={vi.fn()}
+            onPlayed={vi.fn()}
+            t={(key: string) => key}
+          />
+        </Providers>,
+      );
+      expect(boxOf(document.querySelector("video")!)).toBe("1280 / 720");
+    });
+  });
+
   it("persists volume changes to localStorage", async () => {
     const { video } = renderPlayer();
     loadVideo(video);

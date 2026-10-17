@@ -31,7 +31,8 @@ interface FfprobeStream {
   avg_frame_rate?: string;
   nb_frames?: string;
   disposition?: { attached_pic?: number; default?: number };
-  tags?: { creation_time?: string };
+  tags?: { creation_time?: string; rotate?: string };
+  side_data_list?: { side_data_type?: string; rotation?: number }[];
 }
 
 interface FfprobeFormat {
@@ -70,6 +71,43 @@ function frameRate(kind: Kind, v: FfprobeStream | undefined): number | null {
   const animated = Number(v?.nb_frames) > 1 || v?.codec_name === "apng";
   if (kind === "image" && animated) return parseRational(v?.avg_frame_rate);
   return null;
+}
+
+/** Whether a video stream is shown turned a quarter turn from how it is stored.
+ *  Phones record portrait video as landscape frames plus a rotation, and ffprobe
+ *  reports `width` / `height` before that rotation is applied. ffprobe 5 and later
+ *  carry it as the Display Matrix side data; older output had a `rotate` tag. A
+ *  rotation off the right angles is taken at its nearest quarter turn, as players
+ *  do not render those either. */
+function isQuarterTurned(v: FfprobeStream): boolean {
+  const matrix = v.side_data_list?.find(
+    (d) => typeof d.rotation === "number",
+  )?.rotation;
+  const deg = matrix ?? Number(v.tags?.rotate ?? 0);
+  if (!Number.isFinite(deg)) return false;
+  return Math.round(Math.abs(deg) / 90) % 2 === 1;
+}
+
+/** A video stream's size as it is displayed: `width` / `height` swapped when the
+ *  stream is turned a quarter, else as reported. Null when ffprobe gave no size. */
+function displaySize(
+  v: FfprobeStream | undefined,
+): { width: number; height: number } | null {
+  if (!v?.width || !v.height) return null;
+  return isQuarterTurned(v)
+    ? { width: v.height, height: v.width }
+    : { width: v.width, height: v.height };
+}
+
+/** The display size a video's stored ffprobe output describes, for correcting
+ *  rows recorded before extractMeta applied the rotation. Picks the stream
+ *  extractMeta reads (the first video stream); null for anything unreadable. */
+export function storedVideoDisplaySize(
+  raw: unknown,
+): { width: number; height: number } | null {
+  const streams = (raw as FfprobeOutput | null)?.streams;
+  if (!Array.isArray(streams)) return null;
+  return displaySize(streams.find((s) => s.codec_type === "video"));
 }
 
 /** Get metadata via ffprobe (video, image, and audio). Returns empty meta on failure.
@@ -121,10 +159,13 @@ export async function extractMeta(
     // cover art, whose size describes the artwork and not the track. A tiled
     // image's streams each describe one tile (see isTiledImage).
     const sized = !wantAudio && !tiled;
+    // Videos are recorded as displayed (see isQuarterTurned). Images are not:
+    // ffprobe exposes no rotation for EXIF-oriented stills.
+    const size = kind === "video" ? displaySize(v) : null;
     return {
       // `|| null`: ffprobe 6.1 reports a tiled AVIF as one 0x0 stream.
-      width: sized ? v?.width || null : null,
-      height: sized ? v?.height || null : null,
+      width: sized ? (size?.width ?? (v?.width || null)) : null,
+      height: sized ? (size?.height ?? (v?.height || null)) : null,
       duration: fmt.duration
         ? Number(fmt.duration)
         : v?.duration

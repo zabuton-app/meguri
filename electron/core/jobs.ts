@@ -12,6 +12,10 @@ import {
   backfillAutoMetaTags,
   needsAutoMetaBackfill,
 } from "./autoMetaTags.js";
+import {
+  fixVideoDisplaySizes,
+  needsVideoDisplaySizeFix,
+} from "./videoDisplaySize.js";
 import { pool } from "./concurrency.js";
 import {
   LARGE_IMAGE_PIXELS,
@@ -361,6 +365,12 @@ export async function runScan(
   // leaves their thumb_status alone), so an existing library only gains derived
   // tags through this pass. It reads the ffprobe columns already on `files`, so
   // no media file is touched.
+  //
+  // Rotated videos recorded before extractMeta applied the rotation are
+  // corrected first, so the backfill classifies them by their displayed shape.
+  if (!signal?.aborted && needsVideoDisplaySizeFix(db)) {
+    await fixVideoDisplaySizes(db, signal);
+  }
   if (!signal?.aborted && needsAutoMetaBackfill(db)) {
     await backfillAutoMetaTags(db, {
       signal,

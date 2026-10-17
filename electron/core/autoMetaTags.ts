@@ -12,11 +12,16 @@ import { AUTO_META_SOURCE } from "../../shared/tags.js";
 export { AUTO_META_SOURCE };
 
 /**
- * Bump whenever a threshold moves, an alias is added, or the vocabulary changes.
+ * Bump whenever a threshold moves, an alias is added, or the vocabulary changes,
+ * and whenever a pass corrects the columns the rules read (width, height, ...)
+ * for files already in the library.
  * The next scan of each workspace re-derives every file; classifications that
  * did not move diff out and cost one indexed read each.
+ *
+ * 2: rotated videos' width / height corrected (videoDisplaySize.ts),
+ * so their `orient` tag has to be derived again.
  */
-export const AUTO_META_RULESET_VERSION = 1;
+export const AUTO_META_RULESET_VERSION = 2;
 export const AUTO_META_VERSION_KEY = "auto_meta_ruleset_version";
 
 export interface DerivedTag {

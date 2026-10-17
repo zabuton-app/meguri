@@ -221,6 +221,12 @@ export const VideoPlayer = forwardRef<
   const { volume, muted } = useVolume();
   // Total duration obtained natively (only when finite).
   const [nativeDur, setNativeDur] = useState<number | null>(null);
+  // Displayed size reported by the element once it has metadata. Preferred over
+  // the recorded size, which may predate a rescan or be missing altogether.
+  const [nativeSize, setNativeSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   // Hover position on the seek bar {ratio: 0..1, t: seconds}. Positioning uses % to be invariant to CSS zoom.
   const [hover, setHover] = useState<{ ratio: number; t: number } | null>(null);
   // Temporary display position while dragging (seconds).
@@ -340,6 +346,7 @@ export const VideoPlayer = forwardRef<
     setPlaying(false);
     setLoaded(false);
     setNativeDur(null);
+    setNativeSize(null);
     setHover(null);
     setScrub(null);
     cancelQueuedSeek();
@@ -466,6 +473,7 @@ export const VideoPlayer = forwardRef<
       setNativeDur(v.duration);
       onNativeDuration(v.duration);
     }
+    setNativeSize(nativeSizeOf(v));
     if (v.ended) {
       setPlaying(false);
       if (firstTime) onEnded?.();
@@ -885,8 +893,9 @@ export const VideoPlayer = forwardRef<
 
   const pct = total ? `${Math.min(100, (displayPos / total) * 100)}%` : "0%";
   const controlsVisible = !chromeless && loaded && (!playing || hover != null);
-  const aspectRatio =
-    width && height && width > 0 && height > 0
+  const aspectRatio = nativeSize
+    ? `${nativeSize.width} / ${nativeSize.height}`
+    : width && height && width > 0 && height > 0
       ? `${width} / ${height}`
       : "16 / 9";
 
@@ -993,6 +1002,7 @@ export const VideoPlayer = forwardRef<
             setNativeDur(v.duration);
             onNativeDuration(v.duration);
           }
+          setNativeSize(nativeSizeOf(v));
           // Apply the initial seek (e.g. from a Discovery scene click) once.
           if (startAt > 0 && !appliedStartRef.current) {
             appliedStartRef.current = true;
@@ -1219,6 +1229,17 @@ function CtrlButton({
       {children}
     </button>
   );
+}
+
+/** The element's displayed size, or null before it knows one. Chromium reports
+ *  it with the stream's rotation applied, so a portrait phone video stored as
+ *  rotated landscape frames comes back portrait. */
+function nativeSizeOf(
+  v: HTMLVideoElement,
+): { width: number; height: number } | null {
+  return v.videoWidth > 0 && v.videoHeight > 0
+    ? { width: v.videoWidth, height: v.videoHeight }
+    : null;
 }
 
 // Round the ratio with about 80px (layout) of margin so the preview doesn't overflow the bar edges too much.
