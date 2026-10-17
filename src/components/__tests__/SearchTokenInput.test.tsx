@@ -32,11 +32,18 @@ const CATALOG = [
   tag("4k", 9, "res"),
 ];
 
-const mocks = vi.hoisted(() => ({ tagsListAll: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  tagsListAll: vi.fn(),
+  workspaceId: "ws-test",
+}));
 vi.mock("@/ipc/client", () => ({
   api: {
     appStatus: () =>
-      Promise.resolve({ ready: true, workspaceId: "ws-test", root: "/m" }),
+      Promise.resolve({
+        ready: true,
+        workspaceId: mocks.workspaceId,
+        root: "/m",
+      }),
     tagsListAll: (): Promise<unknown> =>
       mocks.tagsListAll() as Promise<unknown>,
   },
@@ -49,6 +56,7 @@ const { I18nProvider } = await import("@/i18n/I18nProvider");
 
 /** Render the box the way FilterBar does: controlled, with the query lifted out. */
 function setup(initial = "", catalog = CATALOG) {
+  mocks.workspaceId = "ws-test";
   mocks.tagsListAll.mockResolvedValue({ tags: catalog, truncated: false });
   const seen = vi.fn();
   const qc = new QueryClient({
@@ -77,7 +85,12 @@ function setup(initial = "", catalog = CATALOG) {
   const input = document.getElementById(
     "list-search-input",
   ) as HTMLInputElement;
-  return { input, seen, last: () => seen.mock.calls.at(-1)?.[0] as string };
+  return {
+    input,
+    qc,
+    seen,
+    last: () => seen.mock.calls.at(-1)?.[0] as string,
+  };
 }
 
 /** Type into the field with it focused, the way completion requires. */
@@ -363,6 +376,29 @@ describe("SearchTokenInput chip selection", () => {
     ]);
     fireEvent.click(options()[1]);
     expect(chips().map((c) => c.textContent)).toEqual(["tag:hotel"]);
+  });
+
+  it("asks for the catalog again when the view changes", async () => {
+    // Past the cap the main process keeps the view's own tags first, so the
+    // catalog fetched for one workspace is not the one for another.
+    const { input, qc } = setup();
+    type(input, "tag:ho");
+    await waitFor(() => expect(options()).toHaveLength(1));
+    const before = mocks.tagsListAll.mock.calls.length;
+
+    mocks.workspaceId = "ws-other";
+    mocks.tagsListAll.mockResolvedValue({
+      tags: [{ ...tag("hotel", 2), workspaceIds: ["ws-other"] }],
+      truncated: false,
+    });
+    await qc.refetchQueries({ queryKey: ["app_status"] });
+
+    await waitFor(() =>
+      expect(mocks.tagsListAll.mock.calls.length).toBeGreaterThan(before),
+    );
+    await waitFor(() =>
+      expect(options().map((o) => o.textContent)).toEqual(["tag:hotel2"]),
+    );
   });
 
   it("does not chip a condition the box already carries", () => {
