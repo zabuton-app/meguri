@@ -117,7 +117,10 @@ function buildUrlHandlerScript() {
     '  port=$(sed -n \'s/.*"port":\\([0-9]*\\).*/\\1/p\' "$ctl")',
     '  token=$(sed -n \'s/.*"token":"\\([^"]*\\)".*/\\1/p\' "$ctl")',
     '  if [ -n "$port" ] && [ -n "$token" ] &&',
-    '    curl -fsS -m 2 -H "X-Api-Token: $token" \\',
+    // The header goes in on stdin (printf is a builtin), not on curl's
+    // argv, where other local users could read the token from /proc.
+    "    printf 'X-Api-Token: %s\\n' \"$token\" |",
+    "    curl -fsS -m 2 -H @- \\",
     '      "http://127.0.0.1:$port/show" >/dev/null 2>&1; then',
     "    exit 0",
     "  fi",
