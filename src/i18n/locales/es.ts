@@ -550,9 +550,6 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.summary":
     "{rules} reglas activas · {keywords} palabras clave · {folders} reglas de carpeta · {files} archivos",
   "autoTag.sampled": "(se analizan los primeros {count})",
-  "autoTag.safeMode":
-    "El último análisis no terminó, así que las reglas no se están ejecutando. Corrige o desactiva la regla causante y reanuda.",
-  "autoTag.safeModeResume": "Reanudar análisis",
   "autoTag.loading": "Cargando…",
   "autoTag.loadFailed":
     "No se pudieron cargar los datos de etiquetado automático.",

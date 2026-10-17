@@ -66,12 +66,7 @@ export interface AutoTagState {
    * No rule: the screen runs those in a worker (ruleView).
    */
   engine: CompiledEngine;
-  /**
-   * The names the rules are run over: none in safe mode, where one of them
-   * hung the screen once and has to stay editable until it is found.
-   */
-  testedNames: readonly string[];
-  /** Where a regex rule stands against them (see useRuleResults). */
+  /** Where a regex rule stands against the names (see useRuleResults). */
   ruleView: (rule: TagRule) => RuleView;
   /**
    * The suggestable words the enabled rules give each name, by position —
@@ -84,13 +79,6 @@ export interface AutoTagState {
   reload: () => void;
   /** Attach tags (file position → names). Tags a file already has are skipped. */
   apply: (perFile: Map<number, string[]>) => Promise<ApplyOutcome>;
-  /**
-   * The previous visit never finished analyzing — a rule hung the screen. Rules
-   * are left out of every analysis until the user says to try again, so the
-   * rule at fault can be found and fixed.
-   */
-  safeMode: boolean;
-  leaveSafeMode: () => void;
   /**
    * Take a tag off files (by position), whoever put it there: nothing records
    * which tags the screen applied, so this goes by what the files carry — the
@@ -155,31 +143,6 @@ class ConfigSaver {
   }
 }
 
-/**
- * Set before an analysis starts and cleared once it has been drawn. Finding it
- * set on arrival means the last analysis never came back.
- */
-const ANALYZING_KEY = "meguri.autoTag.analyzing";
-
-function markAnalyzing(on: boolean): void {
-  try {
-    if (on) localStorage.setItem(ANALYZING_KEY, "1");
-    else localStorage.removeItem(ANALYZING_KEY);
-  } catch {
-    // Storage unavailable: the screen works, only without the safety net.
-  }
-}
-
-function wasAnalyzing(): boolean {
-  try {
-    return localStorage.getItem(ANALYZING_KEY) !== null;
-  } catch {
-    return false;
-  }
-}
-
-const NO_NAMES: readonly string[] = [];
-
 /** Keep the newest entries of a list that the schema caps. */
 function capped(list: string[]): string[] {
   return list.length > MAX_AUTO_TAG_TERMS
@@ -201,7 +164,6 @@ export function useAutoTag(): AutoTagState | null {
       api
         .autoTagFiles()
         .then((loaded) => {
-          markAnalyzing(true);
           setLibrary(loaded);
           setLoadedAt((n) => n + 1);
         })
@@ -222,7 +184,6 @@ export function useAutoTag(): AutoTagState | null {
       .then((loaded) => {
         if (!active) return;
         saver.loaded(loaded);
-        markAnalyzing(true);
         setConfig(loaded);
       })
       .catch(() => toast.error(t("autoTag.loadFailed")));
@@ -232,9 +193,7 @@ export function useAutoTag(): AutoTagState | null {
     };
   }, [fetchLibrary, saver, t]);
 
-  // Saved as it is edited — there is no save button. This runs after the
-  // render that analyzed the configuration, so a pattern that hangs the engine
-  // hangs here, before it is stored, instead of on every later visit.
+  // Saved as it is edited — there is no save button.
   useEffect(() => {
     if (!config) return;
     saver.schedule(config, (error) =>
@@ -244,13 +203,7 @@ export function useAutoTag(): AutoTagState | null {
   // Closing the screen inside the delay must not drop the last edit.
   useEffect(() => () => void saver.flush().catch(() => {}), [saver]);
 
-  // Read once, before this visit's first analysis can overwrite it.
-  const [safeMode, setSafeMode] = useState(wasAnalyzing);
-  // Every commit means the analysis behind it came back.
-  useEffect(() => markAnalyzing(false));
-
   const update = useCallback((fn: (config: AutoTagConfig) => AutoTagConfig) => {
-    markAnalyzing(true);
     setConfig((prev) => {
       if (!prev) return prev;
       const next = fn(prev);
@@ -298,11 +251,7 @@ export function useAutoTag(): AutoTagState | null {
     [files],
   );
 
-  const testedNames = safeMode ? NO_NAMES : names;
-  const { view: ruleView, ruleWords } = useRuleResults(
-    deferred?.rules,
-    testedNames,
-  );
+  const { view: ruleView, ruleWords } = useRuleResults(deferred?.rules, names);
   const existing = useMemo(() => {
     const map = new Map<string, string>();
     for (const name of library?.existingTags ?? []) {
@@ -551,13 +500,10 @@ export function useAutoTag(): AutoTagState | null {
     existing,
     fileTags,
     engine,
-    testedNames,
     ruleView,
     ruleWords,
     stop,
     loading,
-    safeMode,
-    leaveSafeMode: () => setSafeMode(false),
     reload: load,
     apply,
     remove,

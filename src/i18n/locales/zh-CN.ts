@@ -518,9 +518,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "autoTag.summary":
     "启用规则 {rules} · 关键词 {keywords} · {folders} 条文件夹规则 · {files} 个文件",
   "autoTag.sampled": "（分析前 {count} 个）",
-  "autoTag.safeMode":
-    "上次分析未完成，因此已停止运行规则。请修正或停用有问题的规则后再继续。",
-  "autoTag.safeModeResume": "继续分析",
   "autoTag.loading": "加载中…",
   "autoTag.loadFailed": "无法加载自动标签数据。",
   "autoTag.saveFailed": "无法保存设置。",

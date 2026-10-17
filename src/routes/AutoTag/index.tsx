@@ -219,22 +219,6 @@ export default function AutoTag() {
           </div>
         </div>
 
-        {state?.safeMode && (
-          <div
-            role="alert"
-            className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-warn/10 px-3 py-2 text-xs text-warn"
-          >
-            <span>{t("autoTag.safeMode")}</span>
-            <button
-              type="button"
-              onClick={state.leaveSafeMode}
-              className="rounded-md border border-warn/50 px-2 py-0.5 text-bright-fg hover:bg-warn/20"
-            >
-              {t("autoTag.safeModeResume")}
-            </button>
-          </div>
-        )}
-
         <div
           role="tabpanel"
           id="auto-tag-panel"

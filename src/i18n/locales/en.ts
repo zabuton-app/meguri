@@ -534,9 +534,6 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.summary":
     "{rules} active rules · {keywords} keywords · {folders} folder rules · {files} files",
   "autoTag.sampled": "(analyzing the first {count})",
-  "autoTag.safeMode":
-    "The last analysis did not finish, so rules are not being run. Fix or disable the rule at fault, then resume.",
-  "autoTag.safeModeResume": "Resume analysis",
   "autoTag.loading": "Loading…",
   "autoTag.loadFailed": "Could not load auto-tagging data.",
   "autoTag.saveFailed": "Could not save the settings.",

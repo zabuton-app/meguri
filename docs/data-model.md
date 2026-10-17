@@ -295,10 +295,7 @@ suggestions until its pattern is changed. What a rule finds comes back in a
 size that does not grow with how much it matches: a count, the positions it
 matches, the matches for the rows the editor draws, and the words a
 suggestion has to know about. Where no worker can start the rules are not
-run at all. The keywords, escaped literals, are run in place. As a further
-net, a marker in `localStorage` is set before each analysis and cleared once
-it has been drawn: finding it still set on arrival opens the screen in a safe
-mode that runs no rules until the user resumes.
+run at all. The keywords, escaped literals, are run in place.
 
 "Apply to existing files" writes chunk by chunk; when a later chunk fails, the
 ones before it stay, and the caches and the screen are read again so that they

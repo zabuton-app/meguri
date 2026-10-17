@@ -533,9 +533,6 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.summary":
     "활성 규칙 {rules} · 키워드 {keywords} · 폴더 규칙 {folders} · 파일 {files}",
   "autoTag.sampled": "(앞의 {count}개 분석)",
-  "autoTag.safeMode":
-    "지난 분석이 끝나지 않아 규칙 실행을 멈췄습니다. 원인이 된 규칙을 고치거나 끈 다음 다시 시작하세요.",
-  "autoTag.safeModeResume": "분석 다시 시작",
   "autoTag.loading": "불러오는 중…",
   "autoTag.loadFailed": "자동 태그 정보를 불러오지 못했습니다.",
   "autoTag.saveFailed": "설정을 저장하지 못했습니다.",

@@ -60,7 +60,11 @@ export function useRuleResults(
     typeof Worker === "undefined" ? null : new RuleRunner(),
   );
   useEffect(() => () => runner?.dispose(), [runner]);
-  /** What was last sent to the runner, so the same is not sent again. */
+  /**
+   * What is with the runner and not all back yet, so the same is not sent
+   * again meanwhile. Once it is all back, nothing is: a rule removed and
+   * added again is a rule to run again.
+   */
   const asked = useRef<{ names: readonly string[]; keys: string } | null>(null);
 
   useEffect(() => {
@@ -69,6 +73,13 @@ export function useRuleResults(
       cache.set(ruleKey(rule), { names, outcome, seq: ++seq.current });
       if (outcome.status === "done") {
         lastById.current.set(rule.id, { names, result: outcome.result });
+      }
+      const sent = asked.current;
+      if (
+        sent?.names === names &&
+        sent.keys.split("\n").every((key) => cache.get(key)?.names === names)
+      ) {
+        asked.current = null;
       }
       bump();
     };

@@ -187,7 +187,7 @@ export function RegexTab({ state }: { state: AutoTagState }) {
       {shown && (
         <RuleEditor
           rule={shown}
-          names={state.testedNames}
+          names={state.names}
           view={state.ruleView(shown)}
           onChange={(change) => patchRule(shown.id, change)}
           onDelete={() => {

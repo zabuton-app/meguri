@@ -34,7 +34,7 @@ export function RuleEditor({
   onDelete,
 }: {
   rule: TagRule;
-  /** The names the rule is tested against (none in safe mode). */
+  /** The names the rule is tested against. */
   names: readonly string[];
   /** What the rule found in them, worked out off this thread. */
   view: RuleView;

@@ -229,6 +229,17 @@ const keywordMatchCache = new WeakMap<
   { names: readonly string[]; rows: KeywordMatches }
 >();
 
+/** The names lowercased, once per list rather than once per entry. */
+const loweredCache = new WeakMap<readonly string[], string[]>();
+function lowerNames(names: readonly string[]): string[] {
+  let lowered = loweredCache.get(names);
+  if (!lowered) {
+    lowered = names.map((name) => name.toLowerCase());
+    loweredCache.set(names, lowered);
+  }
+  return lowered;
+}
+
 /** The files a dictionary entry finds, and where in each name. */
 export function keywordMatches(
   entry: KeywordEntry,
@@ -244,8 +255,9 @@ export function keywordMatches(
   const needles = entry.terms
     .map((term) => term.normalize("NFC").trim().toLowerCase())
     .filter(Boolean);
+  const lowered = lowerNames(names);
   names.forEach((name, index) => {
-    const lower = name.toLowerCase();
+    const lower = lowered[index];
     if (!needles.some((needle) => lower.includes(needle))) return;
     const hits = runKeyword(compiled, name);
     if (hits.length > 0) rows.push({ index, name, hits });

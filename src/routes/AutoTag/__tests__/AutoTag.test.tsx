@@ -1289,19 +1289,20 @@ describe("AutoTag", () => {
     expect(screen.getByText(/^1–200 of \d+$/)).toBeTruthy();
   });
 
-  it("leaves rules out of the analysis after a visit that never finished", async () => {
-    localStorage.setItem("meguri.autoTag.analyzing", "1");
+  it("runs a rule removed and added again", async () => {
     await renderScreen();
-    expect(screen.getByRole("alert").textContent).toContain(
-      "The last analysis did not finish",
-    );
-    // Nothing is run against the library, but the rules can still be edited.
-    expect(screen.getByText("0 of 0 would be tagged")).toBeTruthy();
-    expect(screen.getByDisplayValue("^([A-Z]{2,6})-\\d{2,5}")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Resume analysis" }));
-    expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
-    expect(localStorage.getItem("meguri.autoTag.analyzing")).toBeNull();
+    const add = () =>
+      fireEvent.click(
+        screen.getByRole("button", { name: "+ Add a regex rule" }),
+      );
+    // A new rule is run; removed, and added again the same, it is run again
+    // rather than left waiting on a run that already came back.
+    add();
+    expect(screen.getByText("0 of 5 would be tagged")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete rule" }));
+    add();
+    expect(screen.getByText("0 of 5 would be tagged")).toBeTruthy();
+    expect(screen.queryByText("testing…")).toBeNull();
   });
 
   describe("with a rule that hangs", () => {

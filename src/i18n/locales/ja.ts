@@ -536,9 +536,6 @@ export const ja = {
   "autoTag.summary":
     "有効なルール {rules} · キーワード {keywords} · フォルダルール {folders} · {files} ファイル",
   "autoTag.sampled": "（先頭の{count}件を解析）",
-  "autoTag.safeMode":
-    "前回の解析が完了しなかったため、ルールの実行を止めています。原因のルールを修正または無効にしてから再開してください。",
-  "autoTag.safeModeResume": "解析を再開",
   "autoTag.loading": "読み込み中…",
   "autoTag.loadFailed": "自動タグ付けの情報を読み込めませんでした。",
   "autoTag.saveFailed": "設定を保存できませんでした。",
