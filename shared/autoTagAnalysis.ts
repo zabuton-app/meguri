@@ -17,6 +17,7 @@ import {
   type CompiledEngine,
   type Range,
 } from "./autoTag.js";
+import { MAX_TAG_NAME } from "./tags.js";
 
 /** Words that say nothing about a file. The user's excluded terms add to these. */
 export const STOP_WORDS: readonly string[] = [
@@ -132,6 +133,11 @@ export function suggestCandidates(
     let named: Set<string> | null = null;
     for (const match of stripExt(name).matchAll(WORD)) {
       const word = match[0];
+      // Longer than a tag name can be: it could only be offered cut short,
+      // and its key could not be stored as it is — neither applied (the IPC
+      // caps a name at MAX_TAG_NAME) nor dismissed (config.ignored is read
+      // back under the same cap).
+      if (word.length > MAX_TAG_NAME) continue;
       const key = word.toLowerCase();
       if (opts.stop.has(key) || dictionary.has(key)) continue;
       named ??= new Set([

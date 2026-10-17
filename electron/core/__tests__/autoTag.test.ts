@@ -17,6 +17,8 @@ import {
   AutoTagTimeoutError,
   AutoTagUnavailableError,
   AutoTagWorkerClient,
+  deriveAutoTagsInProcess,
+  type DeriveAutoTags,
 } from "../autoTagDeriver.js";
 import { getSetting, searchFiles } from "../queries.js";
 import { addManualTag, fileTags } from "../tags.js";
@@ -347,6 +349,18 @@ describe("analysis", () => {
     ).toThrow();
   });
 
+  it("does not offer a word longer than a tag name can be", () => {
+    const long = "a".repeat(64);
+    const longer = "b".repeat(65);
+    const names = [`${long} ${longer} x.mp4`, `${long} ${longer} y.mp4`];
+    const keys = suggestCandidates(engineOf([]), names, {
+      minFreq: 2,
+      stop: new Set(),
+    }).map((c) => c.key);
+    // Up to the limit it is a word like any other; past it, not offered.
+    expect(keys).toEqual([long]);
+  });
+
   it("hides a word only in the names a rule gives it to as a tag", () => {
     // The bracket rule tags the first file "Trip"; the other two hold the word
     // plain, and nothing gives it to them.
@@ -611,6 +625,38 @@ describe("attaching tags", () => {
     expect(names(ids[8])).toEqual(["Yoga"]);
     // Nothing left to add the second time.
     expect((await applyAutoTags(db, { engine })).added).toBe(0);
+  });
+
+  it("writes nothing to a file that took another's id while the names were read", async () => {
+    const first = insertFile(db, rootId, { relPath: "ABCD-123 intro.mp4" });
+    // A folder rule for the whole workspace reaches every file: the check
+    // has to hold for what the folders give as well as the names.
+    const folders: FolderRule[] = [
+      {
+        id: "f",
+        workspaceId: "ws",
+        folder: "",
+        tags: ["Everything"],
+        enabled: true,
+      },
+    ];
+    const engine = { rules: activeRules(), keywords: [], folders };
+    let other = 0;
+    // A rebuild runs while the engine works: the index is cleared and filled
+    // again, and the id goes to another file.
+    const derive: DeriveAutoTags = (e, list) => {
+      db.prepare("DELETE FROM files").run();
+      other = insertFile(db, rootId, { relPath: "unrelated.mp4" });
+      return deriveAutoTagsInProcess(e, list);
+    };
+    const result = await applyAutoTags(db, {
+      engine,
+      derive,
+      workspaceId: "ws",
+    });
+    expect(other).toBe(first);
+    expect(result.added).toBe(0);
+    expect(names(other)).toEqual([]);
   });
 
   it("tags the files under a folder of this workspace, subfolders included", async () => {

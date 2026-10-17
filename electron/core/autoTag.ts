@@ -215,6 +215,19 @@ export async function applyAutoTags(
     );
     // The await let the caller cancel; nothing of this chunk is written yet.
     if (signal?.aborted) return { files, added, completed: false };
+    // It also let the index change: an id may now name another file (a
+    // rebuild clears the index and fills it again) or this file under
+    // another name (a move). Either way the tags were worked out from a name
+    // it no longer has, so only a file still at the path its name was read
+    // from is written to — checked here, with nothing awaited between this
+    // and the write. (The screen's own apply, which sends ids it loaded
+    // earlier, does not check this.)
+    const readFrom = new Map(rows.map((row) => [row.id, row.rel_path]));
+    const unchanged = new Set(
+      (byIds.all(JSON.stringify([...readFrom.keys()])) as NameRow[])
+        .filter((now) => now.rel_path === readFrom.get(now.id))
+        .map((now) => now.id),
+    );
     // What the names gave, then what the folders give: path comparisons, done
     // here rather than in the worker, and put together by withFolderTags as
     // the screen's own analysis expects.
@@ -234,7 +247,7 @@ export async function applyAutoTags(
       db,
       rows
         .map((row, i) => ({ fileIds: [row.id], tags: tags[i] }))
-        .filter((a) => a.tags.length > 0),
+        .filter((a) => unchanged.has(a.fileIds[0]) && a.tags.length > 0),
     );
     files += result.files;
     added += result.pairs.length;
