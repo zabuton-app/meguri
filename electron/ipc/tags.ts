@@ -75,12 +75,18 @@ export function registerTagHandlers(ctx: IpcContext): void {
   };
 
   handle("tags_list_all", (input) =>
-    queryClient.run<TagList>({
-      kind: "tagsList",
-      targets: queryTargets(
-        input?.allWorkspaces ? ws.allCores() : scopedCores(ws),
-      ),
-    }),
+    queryClient.run<TagList>(
+      input?.allWorkspaces
+        ? {
+            kind: "tagsList",
+            targets: queryTargets(ws.allCores()),
+            // Past the cap, the view's own tags are the ones not to lose. Only
+            // a single workspace's view is narrower than every workspace;
+            // for All and collections this is all of them.
+            prefer: scopedCores(ws).map(({ id }) => id),
+          }
+        : { kind: "tagsList", targets: queryTargets(scopedCores(ws)) },
+    ),
   );
   // Mutations are addressed by name, so fanning them across every database in
   // scope converges on the same end state even when one of them has a collision

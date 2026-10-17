@@ -582,6 +582,62 @@ describe("listTagsWorkspaces", () => {
     a.close();
     b.close();
   });
+
+  it("keeps every tag of the workspaces in view when the catalog is over the cap", () => {
+    // The other workspace's tags sort first ("o…" ahead of "t…"), so a cap
+    // taken over the whole catalog would cut the view's own.
+    const { db: elsewhere, rootId } = newDb();
+    const file = insertFile(elsewhere, rootId, { relPath: "b.mp4" });
+    for (let i = 0; i < MAX_TAG_LIST; i++) {
+      addManualTag(elsewhere, file, `o${String(i).padStart(5, "0")}`);
+    }
+    const here = seedTags(10, [["res", "4k"]]);
+    const cores = [coreTarget("w1", elsewhere), coreTarget("w2", here)];
+
+    const unpreferred = listTagsWorkspaces(cores);
+    expect(unpreferred.tags.map((tag) => tag.qualified)).not.toContain(
+      "t00009",
+    );
+
+    const res = listTagsWorkspaces(cores, ["w2"]);
+    expect(res.truncated).toBe(true);
+    expect(res.tags).toHaveLength(MAX_TAG_LIST);
+    const names = res.tags.map((tag) => tag.qualified);
+    for (let i = 0; i < 10; i++) {
+      expect(names).toContain(`t${String(i).padStart(5, "0")}`);
+    }
+    expect(names).toContain("res:4k");
+    // The rest of the room goes to the other workspace, and the catalog keeps
+    // its order: the view's tags are not moved to the front.
+    expect(names.filter((name) => name.startsWith("o"))).toHaveLength(
+      MAX_TAG_LIST - 11,
+    );
+    expect(names[0]).toBe("o00000");
+    elsewhere.close();
+    here.close();
+  });
+
+  it("caps the view's own tags when they alone are over the cap", () => {
+    // Names no tag in view shares ("a…" sorts first), so they stay the other
+    // workspace's alone and would be kept by a cap that ignored the view.
+    const { db: elsewhere, rootId } = newDb();
+    const file = insertFile(elsewhere, rootId, { relPath: "b.mp4" });
+    for (let i = 0; i < 5; i++) addManualTag(elsewhere, file, `a${i}`);
+    const here = seedTags(MAX_TAG_LIST + 5, [["res", "4k"]]);
+    const res = listTagsWorkspaces(
+      [coreTarget("w1", elsewhere), coreTarget("w2", here)],
+      ["w2"],
+    );
+
+    expect(res.tags).toHaveLength(MAX_TAG_LIST);
+    // No room is left for the other workspace; every one kept is held in
+    // view, the generated one among them.
+    expect(res.tags.some((tag) => tag.qualified.startsWith("a"))).toBe(false);
+    expect(res.tags.every((tag) => tag.workspaceIds.includes("w2"))).toBe(true);
+    expect(res.tags.map((tag) => tag.qualified)).toContain("res:4k");
+    elsewhere.close();
+    here.close();
+  });
 });
 
 describe("filesByIdsWorkspaces", () => {

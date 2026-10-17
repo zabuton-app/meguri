@@ -106,15 +106,16 @@ export function SearchTokenInput({
   // key, so every tag mutation invalidates it as it does that screen's;
   // `enabled` keeps it unfetched until a directive is actually being typed.
   // Filtering client-side beats a round trip per keystroke — the catalog is
-  // capped at MAX_TAG_LIST.
+  // capped at MAX_TAG_LIST. Past the cap the view's own tags are kept first,
+  // so the key carries the view and a switch fetches the catalog again.
+  const viewId = status.data?.workspaceId ?? null;
   const catalog = useQuery({
-    queryKey: ["tags_list_all", "library"],
+    queryKey: ["tags_list_all", "library", viewId],
     queryFn: () => api.tagsListAll({ allWorkspaces: true }),
     enabled: (status.data?.ready ?? false) && pending !== null,
   });
   // Whether a tag is on view: in the workspace shown, or anywhere when all of
   // them (or a collection, which spans them) is.
-  const viewId = status.data?.workspaceId ?? null;
   const held = useCallback(
     (tag: TagSummary) =>
       viewId === null ||
