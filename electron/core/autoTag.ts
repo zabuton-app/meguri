@@ -193,35 +193,15 @@ export async function applyAutoTags(
 
   let files = 0;
   let added = 0;
-  let done = 0;
-  let lastId = 0;
-  for (;;) {
-    if (signal?.aborted) return { files, added, completed: false };
-    let rows: NameRow[];
-    if (fileIds) {
-      if (done >= fileIds.length) break;
-      const ids = fileIds.slice(done, done + CHUNK);
-      rows = byIds.all(JSON.stringify(ids)) as NameRow[];
-      done += ids.length;
-    } else {
-      rows = byPage.all(lastId, CHUNK) as NameRow[];
-      if (rows.length === 0) break;
-      lastId = rows[rows.length - 1].id;
-      done += rows.length;
-    }
-    const named = await derive(
-      engine,
-      rows.map((row) => fileNameOf(row.rel_path)),
-    );
-    // The await let the caller cancel; nothing of this chunk is written yet.
-    if (signal?.aborted) return { files, added, completed: false };
-    // It also let the index change: an id may now name another file (a
-    // rebuild clears the index and fills it again) or this file under
-    // another name (a move). Either way the tags were worked out from a name
-    // it no longer has, so only a file still at the path its name was read
-    // from is written to — checked here, with nothing awaited between this
-    // and the write. (The screen's own apply, which sends ids it loaded
-    // earlier, does not check this.)
+  /** Writes what the names gave each row, with what its folder gives. */
+  const write = (rows: NameRow[], named: readonly string[][]): void => {
+    // The engine was awaited before this, and the index may have changed
+    // meanwhile: an id may now name another file (a rebuild clears the index
+    // and fills it again) or this file under another name (a move). Either
+    // way the tags were worked out from a name it no longer has, so only a
+    // file still at the path its name was read from is written to — checked
+    // here, with nothing awaited between this and the write. (The screen's
+    // own apply, which sends ids it loaded earlier, does not check this.)
     const readFrom = new Map(rows.map((row) => [row.id, row.rel_path]));
     const unchanged = new Set(
       (byIds.all(JSON.stringify([...readFrom.keys()])) as NameRow[])
@@ -251,9 +231,47 @@ export async function applyAutoTags(
     );
     files += result.files;
     added += result.pairs.length;
+  };
+
+  let done = 0;
+  let lastId = 0;
+  let failure: Error | null = null;
+  for (;;) {
+    if (signal?.aborted) return { files, added, completed: false };
+    let rows: NameRow[];
+    if (fileIds) {
+      if (done >= fileIds.length) break;
+      const ids = fileIds.slice(done, done + CHUNK);
+      rows = byIds.all(JSON.stringify(ids)) as NameRow[];
+      done += ids.length;
+    } else {
+      rows = byPage.all(lastId, CHUNK) as NameRow[];
+      if (rows.length === 0) break;
+      lastId = rows[rows.length - 1].id;
+      done += rows.length;
+    }
+    // Once the names could not be read, the rest of the pass goes on without
+    // them: where the files are still can be read, and a folder rule's tags
+    // do not wait on the names. The failure is reported at the end, so the
+    // files stay owed for what their names give.
+    let named: string[][] = rows.map(() => []);
+    if (failure === null) {
+      try {
+        named = await derive(
+          engine,
+          rows.map((row) => fileNameOf(row.rel_path)),
+        );
+      } catch (err) {
+        failure = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    // The await let the caller cancel; nothing of this chunk is written yet.
+    if (signal?.aborted) return { files, added, completed: false };
+    write(rows, named);
     onProgress?.(Math.min(done, total), total);
     await new Promise((r) => setImmediate(r));
   }
+  if (failure !== null) throw failure;
   return { files, added, completed: true };
 }
 

@@ -20,6 +20,7 @@ import {
   deriveAutoTagsInProcess,
   type DeriveAutoTags,
 } from "../autoTagDeriver.js";
+import { deriveChunk } from "../autoTagChunk.js";
 import { getSetting, searchFiles } from "../queries.js";
 import { addManualTag, fileTags } from "../tags.js";
 import {
@@ -627,6 +628,40 @@ describe("attaching tags", () => {
     expect((await applyAutoTags(db, { engine })).added).toBe(0);
   });
 
+  it("adds the folder rules' tags even when the names could not be read", async () => {
+    const file = insertFile(db, rootId, { relPath: "Trips/ABCD-123.mp4" });
+    // More than one chunk of them: every one gets the folder's tags.
+    const more = Array.from({ length: 600 }, (_, i) =>
+      insertFile(db, rootId, { relPath: `Trips/clip${i}.mp4` }),
+    );
+    const folders: FolderRule[] = [
+      {
+        id: "f",
+        workspaceId: "ws",
+        folder: "Trips",
+        tags: ["Trip"],
+        enabled: true,
+      },
+    ];
+    const engine = { rules: activeRules(), keywords: [], folders };
+    const failing: DeriveAutoTags = () =>
+      Promise.reject(new AutoTagUnavailableError("down"));
+    await expect(
+      applyAutoTagsOnScan(db, {
+        engine,
+        workspaceId: "ws",
+        derive: failing,
+        changedIds: [file, ...more],
+      }),
+    ).rejects.toBeInstanceOf(AutoTagUnavailableError);
+    expect(names(file)).toEqual(["Trip"]);
+    expect(names(more[599])).toEqual(["Trip"]);
+    // Still owed for what their names give.
+    expect(
+      JSON.parse(getSetting(db, AUTO_TAG_PENDING_KEY) ?? "[]"),
+    ).toHaveLength(601);
+  });
+
   it("writes nothing to a file that took another's id while the names were read", async () => {
     const first = insertFile(db, rootId, { relPath: "ABCD-123 intro.mp4" });
     // A folder rule for the whole workspace reaches every file: the check
@@ -803,6 +838,51 @@ describe("attaching tags", () => {
   });
 });
 
+describe("deriveChunk", () => {
+  it("gives a name nothing from a rule that throws on it, and goes on", () => {
+    const engine = compileEngine({ rules: activeRules(), keywords: [] });
+    const [first, ...rest] = engine.rules;
+    // As an expression that overflows the stack on some name would.
+    const throwing = {
+      ...first,
+      regex: {
+        [Symbol.matchAll]() {
+          throw new RangeError("Maximum call stack size exceeded");
+        },
+      } as unknown as RegExp,
+    };
+    const tags = deriveChunk({ ...engine, rules: [throwing, ...rest] }, [
+      "[Trip] ABCD-123.mp4",
+    ]);
+    expect(tags).toEqual([["Trip"]]);
+  });
+
+  it("gives each name what tagsForName gives it, naming each rule as it starts", () => {
+    const rules = [
+      ...activeRules(),
+      { ...activeRules()[0], id: "off", enabled: false },
+    ];
+    const keywords = [
+      keyword(),
+      keyword({ id: "k2", terms: ["trip"], tags: ["Trip", "Journey"] }),
+    ];
+    const engine = compileEngine({ rules, keywords });
+    const started: (string | null)[] = [];
+    const tags = deriveChunk(engine, NAMES, (at) =>
+      started.push(at === null ? null : engine.rules[at].rule.id),
+    );
+    expect(tags).toEqual(NAMES.map((name) => tagsForName(engine, name)));
+    // The rules that run, in order; a rule switched off is not among them.
+    expect(started).toEqual([
+      ...activeRules()
+        .filter((r) => r.enabled)
+        .map((r) => r.id),
+      // Then the keywords.
+      null,
+    ]);
+  });
+});
+
 describe("AutoTagWorkerClient", () => {
   let dir: string;
   beforeEach(() => {
@@ -820,6 +900,92 @@ describe("AutoTagWorkerClient", () => {
     return file;
   }
 
+  // Names each rule as it starts, then the keywords, as the real worker
+  // does; hangs on a rule whose pattern is "HANG", and in the keywords when
+  // one of them is "HANG". Tags each name with the ids of the rules sent.
+  const naming = `parentPort.on("message", (m) => {
+    m.rules.forEach((r, at) => {
+      parentPort.postMessage({ type: "start", id: m.id, at });
+      if (r.pattern === "HANG") for (;;) {}
+    });
+    parentPort.postMessage({ type: "start", id: m.id, at: null });
+    if (m.keywords.some((k) => k.terms.includes("HANG"))) for (;;) {}
+    parentPort.postMessage({
+      type: "done", id: m.id, tags: m.names.map(() => m.rules.map((r) => r.id)),
+    });
+  });`;
+  const slow = {
+    ...activeRules()[0],
+    id: "slow",
+    name: "Slow",
+    pattern: "HANG",
+  };
+
+  it("leaves out the rule that does not finish, and carries on without it", async () => {
+    const client = new AutoTagWorkerClient(workerFile(naming), 500);
+    const withSlow = { rules: [slow, ...activeRules()], keywords: [] };
+    const ids = activeRules().map((r) => r.id);
+    // The request, and one waiting behind it, are run again without the
+    // rule, on a new worker.
+    const [first, second] = await Promise.all([
+      client.derive(withSlow, ["a.mp4"]),
+      client.derive(withSlow, ["b.mp4"]),
+    ]);
+    expect(first).toEqual([ids]);
+    expect(second).toEqual([ids]);
+    expect(client.droppedRules()).toEqual(["Slow"]);
+    // Left out from then on: no further wait on it.
+    const started = Date.now();
+    expect(await client.derive(withSlow, ["c.mp4"])).toEqual([ids]);
+    expect(Date.now() - started).toBeLessThan(500);
+    // Changed, it gets another chance (and hangs again here).
+    const edited = { ...slow, ci: !slow.ci };
+    expect(
+      await client.derive({ rules: [edited], keywords: [] }, ["d.mp4"]),
+    ).toEqual([[]]);
+    expect(client.droppedRules()).toEqual(["Slow", "Slow"]);
+    client.dispose();
+  });
+
+  it("blames no rule for time spent on the keywords", async () => {
+    const client = new AutoTagWorkerClient(workerFile(naming), 500);
+    const stuckInKeywords = {
+      rules: activeRules(),
+      keywords: [keyword({ terms: ["HANG"] })],
+    };
+    await expect(
+      client.derive(stuckInKeywords, ["a.mp4"]),
+    ).rejects.toBeInstanceOf(AutoTagTimeoutError);
+    expect(client.droppedRules()).toEqual([]);
+    client.dispose();
+  });
+
+  it("does not count time waiting behind other requests", async () => {
+    // Each rule takes 300 ms; the budget is 500 ms. Two requests of two rules
+    // each take 1.2 s in all, yet the worker is never silent for 500 ms.
+    const client = new AutoTagWorkerClient(
+      workerFile(`parentPort.on("message", (m) => {
+        m.rules.forEach((r, at) => {
+          parentPort.postMessage({ type: "start", id: m.id, at });
+          const until = Date.now() + 300;
+          while (Date.now() < until) {}
+        });
+        parentPort.postMessage({ type: "start", id: m.id, at: null });
+        parentPort.postMessage({ type: "done", id: m.id, tags: m.names.map(() => []) });
+      });`),
+      500,
+    );
+    const engine2 = { rules: activeRules().slice(0, 2), keywords: [] };
+    await expect(
+      Promise.all([
+        client.derive(engine2, ["a.mp4"]),
+        client.derive(engine2, ["b.mp4"]),
+      ]),
+    ).resolves.toEqual([[[]], [[]]]);
+    expect(client.droppedRules()).toEqual([]);
+    client.dispose();
+  });
+
   it("kills a worker that does not answer and reports a timeout", async () => {
     const client = new AutoTagWorkerClient(
       workerFile(`parentPort.on("message", () => { for (;;) {} });`),
@@ -835,7 +1001,7 @@ describe("AutoTagWorkerClient", () => {
     const client = new AutoTagWorkerClient(
       workerFile(
         `parentPort.on("message", (m) => parentPort.postMessage({
-           id: m.id, ok: true, tags: m.names.map((n) => [n]),
+           type: "done", id: m.id, tags: m.names.map((n) => [n]),
          }));`,
       ),
     );
