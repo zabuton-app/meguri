@@ -147,6 +147,11 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
       }
       if (added > 0) await queryClient.invalidateCaches();
       return { files, added };
+    } catch (error) {
+      // Each chunk is written as it is done: the ones before the failure
+      // stay, and every view of the files has to see them.
+      await queryClient.invalidateCaches().catch(() => {});
+      throw error;
     } finally {
       reapplying = false;
     }

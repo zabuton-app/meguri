@@ -10,14 +10,13 @@ import {
   MAX_AUTO_TAG_RULE_NAME,
   MAX_AUTO_TAG_TEMPLATE,
   compilePattern,
-  compileRule,
-  runRule,
   type CaseMode,
   type TagRule,
 } from "@shared/autoTag";
 import { segments } from "@shared/autoTagAnalysis";
 import { ExcludeList } from "./ExcludeList";
 import { FIELD, MAX_ROWS, MONO, ruleDisplayName } from "./helpers";
+import type { RuleView } from "./useRuleResults";
 import { useViewState } from "./viewState";
 import { Chip, Highlighted, MoreRows, Segmented, SmallButton } from "./parts";
 
@@ -30,12 +29,15 @@ const CASE_LABELS: Record<CaseMode, TranslationKey> = {
 export function RuleEditor({
   rule,
   names,
+  view,
   onChange,
   onDelete,
 }: {
   rule: TagRule;
   /** The names the rule is tested against (none in safe mode). */
   names: readonly string[];
+  /** What the rule found in them, worked out off this thread. */
+  view: RuleView;
   onChange: (change: Partial<TagRule>) => void;
   onDelete: () => void;
 }) {
@@ -48,20 +50,30 @@ export function RuleEditor({
   const pattern = compilePattern(rule.pattern, rule.ci);
   const patternError = rule.pattern && "error" in pattern ? pattern.error : "";
 
+  // What the rule found — or, while it is still being run, what its previous
+  // version found, so the list does not blank out while a pattern is typed.
+  const found =
+    view.status === "done"
+      ? view.result
+      : view.status === "pending"
+        ? view.last
+        : undefined;
+  // The rows drawn: the first of the library's names, or of the matched ones
+  // — the ones the worker sent the matches of.
   const test = useMemo(() => {
-    const compiled = compileRule(rule);
-    let tagged = 0;
-    const rows = names.map((name) => {
-      const hits = compiled ? runRule(compiled, name) : [];
+    const detail = new Map(found?.detail);
+    const matched = found?.matched ?? new Int32Array(0);
+    const total = onlyMatches ? matched.length : names.length;
+    const indexes = onlyMatches
+      ? Array.from(matched.subarray(0, MAX_ROWS))
+      : names.slice(0, MAX_ROWS).map((_, index) => index);
+    const rows = indexes.map((index) => {
+      const hits = detail.get(index) ?? [];
       const tags = [...new Set(hits.flatMap((hit) => hit.tags))];
-      if (tags.length > 0) tagged++;
-      return { name, hits, tags };
+      return { name: names[index], hits, tags };
     });
-    return { tagged, rows };
-  }, [names, rule]);
-  const shown = onlyMatches
-    ? test.rows.filter((row) => row.hits.length > 0)
-    : test.rows;
+    return { rows, total };
+  }, [found, names, onlyMatches]);
 
   return (
     <section className="flex min-w-0 flex-1 flex-col gap-4 px-5 py-4">
@@ -163,10 +175,14 @@ export function RuleEditor({
             {t("autoTag.liveTest")}
           </span>
           <span className="text-xs tabular-nums text-muted">
-            {t("autoTag.liveTestSummary", {
-              tagged: test.tagged,
-              total: names.length,
-            })}
+            {found
+              ? t("autoTag.liveTestSummary", {
+                  tagged: found.tagged,
+                  total: names.length,
+                })
+              : view.status === "pending"
+                ? t("autoTag.ruleTesting")
+                : null}
           </span>
           <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-fg">
             <input
@@ -178,8 +194,20 @@ export function RuleEditor({
             {t("autoTag.onlyMatches")}
           </label>
         </div>
+        {(view.status === "timedOut" || view.status === "failed") && (
+          <p
+            role="alert"
+            className="border-b border-border px-3 py-2 text-xs text-warn"
+          >
+            {t(
+              view.status === "timedOut"
+                ? "autoTag.ruleTimedOutDetail"
+                : "autoTag.ruleFailedDetail",
+            )}
+          </p>
+        )}
         <ul className="flex flex-col">
-          {shown.slice(0, MAX_ROWS).map((row, i) => (
+          {test.rows.map((row, i) => (
             <li
               key={i}
               className={cn(
@@ -219,7 +247,7 @@ export function RuleEditor({
             </li>
           ))}
         </ul>
-        <MoreRows t={t} hidden={shown.length - MAX_ROWS} />
+        <MoreRows t={t} hidden={test.total - test.rows.length} />
       </div>
     </section>
   );

@@ -299,7 +299,7 @@ export function SuggestTab({
     <>
       <Toolbar>
         <span className="min-w-[220px] flex-[1_1_260px] text-xs text-fg">
-          {state.loading
+          {state.loading || !state.ruleWords
             ? t("autoTag.analyzing")
             : t("autoTag.analyzed", {
                 files: names.length,
@@ -545,7 +545,9 @@ export function SuggestTab({
         </div>
         {shown.length === 0 && (
           <p className="p-8 text-center text-[13px] text-muted">
-            {state.loading ? t("autoTag.analyzing") : t("autoTag.noCandidates")}
+            {state.loading || !state.ruleWords
+              ? t("autoTag.analyzing")
+              : t("autoTag.noCandidates")}
           </p>
         )}
       </TabScroll>

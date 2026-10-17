@@ -36,6 +36,16 @@ export const MAX_AUTO_TAG_TERMS = 5000;
 export const MAX_RULE_MATCHES = 50;
 /** Tags the engine may put on one file. */
 export const MAX_AUTO_TAGS_PER_FILE = 64;
+/**
+ * Names the engine is run over at a time — on a scan and on the screen alike
+ * — and how long a chunk may take before it is given up on. A chunk is a few
+ * hundred short strings, so a healthy rule answers in milliseconds; only
+ * runaway backtracking gets near this. A scan measures the whole engine over
+ * a chunk, the screen one rule over a chunk: a rule the screen gives up on is
+ * one a scan stalls on too.
+ */
+export const AUTO_TAG_CHUNK = 512;
+export const AUTO_TAG_CHUNK_TIMEOUT_MS = 5_000;
 
 export const RULE_KINDS = ["prefix", "bracket", "regex"] as const;
 export type RuleKind = (typeof RULE_KINDS)[number];

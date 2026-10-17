@@ -2,7 +2,7 @@
 // them editing whichever is selected.
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Switch } from "@/components/ui/switch";
-import { useI18n } from "@/i18n/I18nProvider";
+import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { cn } from "@/lib/utils";
 import {
@@ -12,10 +12,11 @@ import {
   type RuleKind,
   type TagRule,
 } from "@shared/autoTag";
-import { MONO, ruleDisplayName, ruleMatchCount } from "./helpers";
+import { MONO, ruleDisplayName } from "./helpers";
 import { Badge, SplitPane } from "./parts";
 import { RuleEditor } from "./RuleEditor";
 import type { AutoTagState } from "./useAutoTag";
+import type { RuleView } from "./useRuleResults";
 import { useViewState } from "./viewState";
 
 const KIND_LABELS: Record<RuleKind, TranslationKey> = {
@@ -24,20 +25,29 @@ const KIND_LABELS: Record<RuleKind, TranslationKey> = {
   regex: "autoTag.kind.regex",
 };
 
-const NO_NAMES: readonly string[] = [];
+/** A rule's line in the list: how many files it would tag, or why not known. */
+function countLabel(t: TFunc, view: RuleView): string {
+  if (view.status === "done") {
+    return t("autoTag.fileCount", { count: view.result.tagged });
+  }
+  if (view.status === "pending") {
+    return view.last
+      ? t("autoTag.fileCount", { count: view.last.tagged })
+      : t("autoTag.ruleTesting");
+  }
+  return t(
+    view.status === "timedOut" ? "autoTag.ruleTimedOut" : "autoTag.ruleFailed",
+  );
+}
 
 export function RegexTab({ state }: { state: AutoTagState }) {
   const { t } = useI18n();
   const confirm = useConfirm();
-  const { config, update, names } = state;
+  const { config, update } = state;
   const [selection, setSelection] = useViewState<string | null>(
     "regex.selection",
     null,
   );
-
-  // In safe mode no rule is run against the library: one of them hung the
-  // screen, and it has to stay editable until it is found.
-  const tested = state.safeMode ? NO_NAMES : names;
 
   // What is selected, falling back to the first rule when nothing is, or when
   // the selected one was deleted.
@@ -109,49 +119,60 @@ export function RegexTab({ state }: { state: AutoTagState }) {
               {t("autoTag.resetRules")}
             </button>
           </div>
-          {config.rules.map((rule) => (
-            <div
-              key={rule.id}
-              className={cn(
-                "flex items-center gap-2.5 rounded-lg p-2",
-                shown?.id === rule.id ? "bg-overlay" : "hover:bg-surface",
-              )}
-            >
-              <Switch
-                checked={rule.enabled}
-                onCheckedChange={(enabled) => patchRule(rule.id, { enabled })}
-                aria-label={t("autoTag.ruleEnabled")}
-              />
-              <button
-                type="button"
-                onClick={() => setSelection(rule.id)}
-                aria-current={shown?.id === rule.id}
-                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          {config.rules.map((rule) => {
+            const view = state.ruleView(rule);
+            return (
+              <div
+                key={rule.id}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg p-2",
+                  shown?.id === rule.id ? "bg-overlay" : "hover:bg-surface",
+                )}
               >
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "truncate text-[13px]",
-                        rule.enabled ? "text-bright-fg" : "text-muted",
-                      )}
-                    >
-                      {ruleDisplayName(t, rule)}
+                <Switch
+                  checked={rule.enabled}
+                  onCheckedChange={(enabled) => patchRule(rule.id, { enabled })}
+                  aria-label={t("autoTag.ruleEnabled")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelection(rule.id)}
+                  aria-current={shown?.id === rule.id}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "truncate text-[13px]",
+                          rule.enabled ? "text-bright-fg" : "text-muted",
+                        )}
+                      >
+                        {ruleDisplayName(t, rule)}
+                      </span>
+                      <Badge>{t(KIND_LABELS[rule.kind])}</Badge>
                     </span>
-                    <Badge>{t(KIND_LABELS[rule.kind])}</Badge>
+                    <span
+                      className={cn(MONO, "truncate text-[11px] text-muted")}
+                    >
+                      {rule.pattern}
+                    </span>
                   </span>
-                  <span className={cn(MONO, "truncate text-[11px] text-muted")}>
-                    {rule.pattern}
+                  <span
+                    className={cn(
+                      "shrink-0 text-xs tabular-nums",
+                      view.status === "timedOut" || view.status === "failed"
+                        ? "text-warn"
+                        : "text-muted",
+                    )}
+                  >
+                    {countLabel(t, view)}
                   </span>
-                </span>
-                <span className="shrink-0 text-xs tabular-nums text-muted">
-                  {t("autoTag.fileCount", {
-                    count: ruleMatchCount(rule, tested),
-                  })}
-                </span>
-              </button>
-            </div>
-          ))}
+                </button>
+              </div>
+            );
+          })}
+
           <button
             type="button"
             onClick={addRule}
@@ -166,7 +187,8 @@ export function RegexTab({ state }: { state: AutoTagState }) {
       {shown && (
         <RuleEditor
           rule={shown}
-          names={tested}
+          names={state.testedNames}
+          view={state.ruleView(shown)}
           onChange={(change) => patchRule(shown.id, change)}
           onDelete={() => {
             update((c) => ({

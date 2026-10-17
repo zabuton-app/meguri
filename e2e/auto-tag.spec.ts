@@ -6,6 +6,9 @@ test.describe("Auto tagging", () => {
     await ready.getByRole("link", { name: "Auto tagging" }).click();
     const dialog = ready.getByRole("dialog");
     await expect(dialog.getByText("Pattern rules")).toBeVisible();
+    // The rules are run in a worker: a count coming back is that worker
+    // having started and answered in the built app.
+    await expect(dialog.getByText(/^\d+ files$/).first()).toBeVisible();
     await closeTopDialog(ready);
     await expect(ready).toHaveURL(/#\/$/);
   });

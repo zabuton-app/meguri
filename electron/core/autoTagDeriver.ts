@@ -8,6 +8,7 @@ import type {
 } from "../autoTagWorker.js";
 import { scopedLog } from "./logger.js";
 import {
+  AUTO_TAG_CHUNK_TIMEOUT_MS,
   compileEngine,
   tagsForName,
   type FolderRule,
@@ -55,11 +56,8 @@ export const deriveAutoTagsInProcess: DeriveAutoTags = (engine, names) => {
   return Promise.resolve(names.map((name) => tagsForName(compiled, name)));
 };
 
-/**
- * Budget for one chunk. A chunk is a few hundred short strings, so a healthy
- * engine answers in milliseconds; only runaway backtracking gets near this.
- */
-export const AUTO_TAG_CHUNK_TIMEOUT_MS = 5_000;
+// Budget for one chunk (shared with the screen's own rule worker).
+export { AUTO_TAG_CHUNK_TIMEOUT_MS };
 
 interface Pending {
   resolve: (tags: string[][]) => void;

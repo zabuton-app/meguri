@@ -591,6 +591,12 @@ export const ja = {
   "autoTag.split": "「,」「、」「/」「・」で複数タグに分割",
   "autoTag.liveTest": "ライブラリのファイル名でテスト",
   "autoTag.liveTestSummary": "{tagged} / {total} 件がタグ付け対象",
+  "autoTag.ruleTesting": "テスト中…",
+  "autoTag.ruleTimedOut": "時間超過",
+  "autoTag.ruleFailed": "未テスト",
+  "autoTag.ruleTimedOutDetail":
+    "このパターンはライブラリのファイル名に対して時間がかかりすぎたため、プレビューと候補から外しています。スキャンでも同じように止まります。パターンを変更すると再テストします。",
+  "autoTag.ruleFailedDetail": "このパターンはテストできませんでした。",
   "autoTag.onlyMatches": "一致のみ表示",
   "autoTag.kind.prefix": "プレフィックス",
   "autoTag.kind.bracket": "カッコ",

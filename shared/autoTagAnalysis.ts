@@ -90,14 +90,35 @@ export interface Candidate {
  * A folder rule's tag is no such thing: it says nothing of the name, and the
  * word may well be in other files' names.
  */
+/** A word that can be suggested on its own: plain ASCII letters, three or more. */
+const WORD = /[A-Za-z]{3,}/g;
+
+/**
+ * Whether a tag is a word a suggestion could be (see WORD): only those of
+ * what the rules give a name can stop one being suggested.
+ */
+export const isSuggestableWord = (tag: string): boolean =>
+  /^[A-Za-z]{3,}$/.test(tag);
+
 export function suggestCandidates(
   engine: CompiledEngine,
   names: readonly string[],
   opts: {
     minFreq: number;
     stop: ReadonlySet<string>;
+    /**
+     * The suggestable words (lowercased) the rules give each name, by
+     * position, worked out elsewhere — the screen runs the rules in a worker.
+     * Given this, the engine must hold no rule of its own. Unlike a scan, no
+     * cap applies to them: it only matters past MAX_AUTO_TAGS_PER_FILE tags
+     * on one name.
+     */
+    ruleWords?: (index: number) => ReadonlySet<string> | undefined;
   },
 ): Candidate[] {
+  if (opts.ruleWords && engine.rules.length > 0) {
+    throw new Error("suggestCandidates: rules given twice");
+  }
   const dictionary = new Set<string>();
   for (const { entry } of engine.keywords) {
     for (const term of entry.terms) dictionary.add(term.toLowerCase());
@@ -109,11 +130,14 @@ export function suggestCandidates(
   names.forEach((name, i) => {
     /** What a rule or a keyword gives this name; found once it is needed. */
     let named: Set<string> | null = null;
-    for (const match of stripExt(name).matchAll(/[A-Za-z]{3,}/g)) {
+    for (const match of stripExt(name).matchAll(WORD)) {
       const word = match[0];
       const key = word.toLowerCase();
       if (opts.stop.has(key) || dictionary.has(key)) continue;
-      named ??= new Set(tagsForName(engine, name).map((t) => t.toLowerCase()));
+      named ??= new Set([
+        ...(opts.ruleWords?.(i) ?? []),
+        ...tagsForName(engine, name).map((tag) => tag.toLowerCase()),
+      ]);
       if (named.has(key)) continue;
       let entry = frequent.get(key);
       if (!entry) {

@@ -27,10 +27,12 @@ import {
   type AutoTagFile,
   type AutoTagLibrary,
   type CompiledEngine,
+  type TagRule,
 } from "@shared/autoTag";
 import { STOP_WORDS } from "@shared/autoTagAnalysis";
 import type { BulkTargets } from "@shared/ipc/channels";
 import { MAX_BULK_FILES, MAX_BULK_TAG_NAMES } from "@shared/tags";
+import { useRuleResults, type RuleView } from "./useRuleResults";
 
 /**
  * `ok: false` is a failure (already reported to the user). Nothing new to add
@@ -59,8 +61,23 @@ export interface AutoTagState {
   existing: Map<string, string>;
   /** Lowercased tags of each file. */
   fileTags: Set<string>[];
-  /** Compiled from the configuration, a beat behind fast typing. */
+  /**
+   * The keywords, compiled from the configuration a beat behind fast typing.
+   * No rule: the screen runs those in a worker (ruleView).
+   */
   engine: CompiledEngine;
+  /**
+   * The names the rules are run over: none in safe mode, where one of them
+   * hung the screen once and has to stay editable until it is found.
+   */
+  testedNames: readonly string[];
+  /** Where a regex rule stands against them (see useRuleResults). */
+  ruleView: (rule: TagRule) => RuleView;
+  /**
+   * The suggestable words the enabled rules give each name, by position —
+   * null while one of them is still running.
+   */
+  ruleWords: ReadonlyMap<number, ReadonlySet<string>> | null;
   /** Words never offered as tags. */
   stop: Set<string>;
   loading: boolean;
@@ -161,6 +178,8 @@ function wasAnalyzing(): boolean {
   }
 }
 
+const NO_NAMES: readonly string[] = [];
+
 /** Keep the newest entries of a list that the schema caps. */
 function capped(list: string[]): string[] {
   return list.length > MAX_AUTO_TAG_TERMS
@@ -249,7 +268,10 @@ export function useAutoTag(): AutoTagState | null {
   const engine = useMemo(
     () =>
       compileEngine({
-        rules: safeMode ? [] : (deferred?.rules ?? []),
+        // A user's regular expression never runs on this thread: one that
+        // backtracks without end would hang the screen. The rules run in a
+        // worker instead (below).
+        rules: [],
         keywords: deferred?.keywords ?? [],
         // The screen's analyses read names only: the Folders tab goes by the
         // files' places itself, and editing a folder rule must not rerun the
@@ -259,7 +281,7 @@ export function useAutoTag(): AutoTagState | null {
     // What the engine runs only: dismissing a suggestion or renaming a rule
     // changes the configuration, not what the engine does, and every analysis
     // downstream is keyed on this object.
-    [deferred?.rules, deferred?.keywords, safeMode],
+    [deferred?.keywords],
   );
   const stop = useMemo(
     () => new Set([...STOP_WORDS, ...(deferred?.excludedTerms ?? [])]),
@@ -274,6 +296,12 @@ export function useAutoTag(): AutoTagState | null {
   const fileTags = useMemo(
     () => (files ?? []).map((f) => new Set(f.tags.map((x) => x.toLowerCase()))),
     [files],
+  );
+
+  const testedNames = safeMode ? NO_NAMES : names;
+  const { view: ruleView, ruleWords } = useRuleResults(
+    deferred?.rules,
+    testedNames,
   );
   const existing = useMemo(() => {
     const map = new Map<string, string>();
@@ -505,6 +533,10 @@ export function useAutoTag(): AutoTagState | null {
       return result;
     } catch (error) {
       toast.error(t("autoTag.applyFailed"), { description: String(error) });
+      // The chunks before the one that failed were written: show what the
+      // files really carry, here and in every other view of them.
+      invalidateTagCatalog(qc);
+      load();
       return null;
     }
   }, [load, qc, saver, t]);
@@ -519,6 +551,9 @@ export function useAutoTag(): AutoTagState | null {
     existing,
     fileTags,
     engine,
+    testedNames,
+    ruleView,
+    ruleWords,
     stop,
     loading,
     safeMode,

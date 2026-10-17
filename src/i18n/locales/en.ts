@@ -590,6 +590,12 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.split": "Split on , 、 / ・ into several tags",
   "autoTag.liveTest": "Test against the library’s file names",
   "autoTag.liveTestSummary": "{tagged} of {total} would be tagged",
+  "autoTag.ruleTesting": "testing…",
+  "autoTag.ruleTimedOut": "too slow",
+  "autoTag.ruleFailed": "not tested",
+  "autoTag.ruleTimedOutDetail":
+    "This pattern took too long on the library’s file names, so it is left out of this preview and of the suggestions — a scan would stall on it too. Change the pattern to test it again.",
+  "autoTag.ruleFailedDetail": "This pattern could not be tested.",
   "autoTag.onlyMatches": "Matches only",
   "autoTag.kind.prefix": "Prefix",
   "autoTag.kind.bracket": "Brackets",

@@ -572,6 +572,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "autoTag.split": "按 , 、 / ・ 拆分为多个标签",
   "autoTag.liveTest": "用媒体库的文件名测试",
   "autoTag.liveTestSummary": "{total} 个中有 {tagged} 个会被标记",
+  "autoTag.ruleTesting": "测试中…",
+  "autoTag.ruleTimedOut": "超时",
+  "autoTag.ruleFailed": "未测试",
+  "autoTag.ruleTimedOutDetail":
+    "此模式在媒体库的文件名上耗时过长，已从预览和建议中排除；扫描也会在此卡住。修改模式后会重新测试。",
+  "autoTag.ruleFailedDetail": "无法测试此模式。",
   "autoTag.onlyMatches": "仅显示匹配项",
   "autoTag.kind.prefix": "前缀",
   "autoTag.kind.bracket": "括号",

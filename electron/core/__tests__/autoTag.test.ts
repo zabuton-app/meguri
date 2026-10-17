@@ -325,6 +325,28 @@ describe("analysis", () => {
     expect(tokenInfo("harbor")).toEqual({ type: "word", value: "harbor" });
   });
 
+  it("takes what the rules give from outside, and only then", () => {
+    const names = ["[Trip] Kyoto.mp4", "Trip to Nara.mp4", "Trip day.mp4"];
+    // The rules run elsewhere: what they give is passed in, by position.
+    const given = new Map([[0, new Set(["trip"])]]);
+    const found = suggestCandidates(engineOf([]), names, {
+      minFreq: 2,
+      stop: new Set(),
+      ruleWords: (index) => given.get(index),
+    });
+    expect([
+      ...(found.find((c) => c.key === "trip")?.files.keys() ?? []),
+    ]).toEqual([1, 2]);
+    // Rules given both ways would be counted twice.
+    expect(() =>
+      suggestCandidates(engineOf(activeRules()), names, {
+        minFreq: 2,
+        stop: new Set(),
+        ruleWords: () => undefined,
+      }),
+    ).toThrow();
+  });
+
   it("hides a word only in the names a rule gives it to as a tag", () => {
     // The bracket rule tags the first file "Trip"; the other two hold the word
     // plain, and nothing gives it to them.

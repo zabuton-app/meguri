@@ -8,11 +8,9 @@ import {
   MAX_AUTO_TAG_KEYWORDS,
   cleanTagName,
   compileKeyword,
-  compileRule,
   isUnderFolder,
   isUsableTagName,
   runKeyword,
-  runRule,
   type BuiltinRuleId,
   type KeywordEntry,
   type KeywordHit,
@@ -216,33 +214,9 @@ export function candidateState(
   };
 }
 
-// The two memos below are keyed per rule / entry object and per names array, so
-// editing one leaves the results of the others alone. They rely on the
-// configuration being updated immutably, and live outside React on purpose:
-// they are pure.
-const ruleCountCache = new WeakMap<
-  TagRule,
-  { names: readonly string[]; count: number }
->();
-
-/** Files a rule would tag. */
-export function ruleMatchCount(
-  rule: TagRule,
-  names: readonly string[],
-): number {
-  const cached = ruleCountCache.get(rule);
-  if (cached?.names === names) return cached.count;
-  let count = 0;
-  const compiled = compileRule(rule);
-  if (compiled) {
-    for (const name of names) {
-      if (runRule(compiled, name).some((hit) => hit.tags.length > 0)) count++;
-    }
-  }
-  ruleCountCache.set(rule, { names, count });
-  return count;
-}
-
+// The memo below is keyed per entry object and per names array, so editing
+// one leaves the results of the others alone. It relies on the configuration
+// being updated immutably, and lives outside React on purpose: it is pure.
 export type KeywordMatches = {
   /** The file's position in the names. */
   index: number;

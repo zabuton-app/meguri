@@ -610,6 +610,12 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.split": "Diviser sur , 、 / ・ en plusieurs étiquettes",
   "autoTag.liveTest": "Tester sur les noms de fichiers de la bibliothèque",
   "autoTag.liveTestSummary": "{tagged} sur {total} seraient étiquetés",
+  "autoTag.ruleTesting": "test…",
+  "autoTag.ruleTimedOut": "trop lente",
+  "autoTag.ruleFailed": "non testée",
+  "autoTag.ruleTimedOutDetail":
+    "Ce motif a pris trop de temps sur les noms de fichiers de la bibliothèque : il est écarté de cet aperçu et des suggestions, et un scan s’y bloquerait aussi. Modifiez le motif pour le tester à nouveau.",
+  "autoTag.ruleFailedDetail": "Ce motif n’a pas pu être testé.",
   "autoTag.onlyMatches": "Correspondances uniquement",
   "autoTag.kind.prefix": "Préfixe",
   "autoTag.kind.bracket": "Crochets",

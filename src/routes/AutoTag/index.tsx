@@ -89,12 +89,19 @@ export default function AutoTag() {
   const engine = state?.engine;
   const names = state?.names;
   const stop = state?.stop;
+  // Null while a rule is still running: what it gives a name is not offered
+  // as a word nothing produces, so nothing is offered until it is known.
+  const ruleWords = state?.ruleWords;
   const candidates = useMemo(
     () =>
-      engine && names && stop
-        ? suggestCandidates(engine, names, { minFreq: MIN_FREQUENCY, stop })
+      engine && names && stop && ruleWords
+        ? suggestCandidates(engine, names, {
+            minFreq: MIN_FREQUENCY,
+            stop,
+            ruleWords: (index) => ruleWords.get(index),
+          })
         : [],
-    [engine, names, stop],
+    [engine, names, stop, ruleWords],
   );
   // Where each candidate stands, worked out once for the badge and the tab
   // alike, and only again when what it is read from changes: the keywords,

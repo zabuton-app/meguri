@@ -14,6 +14,7 @@ import {
 } from "./autoTagDeriver.js";
 import { upsertTag } from "./tags.js";
 import {
+  AUTO_TAG_CHUNK,
   MAX_AUTO_TAG_FILES,
   cleanTagName,
   compileFolders,
@@ -136,7 +137,7 @@ export function detachTagPairs(db: DB, pairs: readonly TagPair[]): number {
   })();
 }
 
-const CHUNK = 512;
+const CHUNK = AUTO_TAG_CHUNK;
 
 interface NameRow {
   id: number;

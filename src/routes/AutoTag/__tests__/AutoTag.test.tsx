@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { onSearchLibrary } from "@/lib/ui-events";
 import AutoTag from "@/routes/AutoTag";
 import { resetViewState } from "@/routes/AutoTag/viewState";
 import { renderWithProviders } from "@/test/renderWithProviders";
+import { fakeRuleWorker } from "./fakeRuleWorker";
 import {
   defaultAutoTagConfig,
   type AutoTagApplyResult,
@@ -32,6 +33,12 @@ const mocks = vi.hoisted(() => ({
       removed: number;
     }>
   >(),
+}));
+
+// A short deadline for the rule worker, for the case that waits on it.
+vi.mock("@shared/autoTag", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@shared/autoTag")>()),
+  AUTO_TAG_CHUNK_TIMEOUT_MS: 100,
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -114,6 +121,8 @@ async function renderScreen(tab?: string) {
   // ("#/") would otherwise pass without anything having navigated.
   renderWithProviders(<AutoTag />, { route: "/auto-tag" });
   await screen.findByText("Pattern rules");
+  // The rules' results, from the worker, a render after the rules arrive.
+  await waitFor(() => expect(screen.queryByText("testing…")).toBeNull());
   if (tab) fireEvent.click(screen.getByRole("tab", { name: new RegExp(tab) }));
 }
 
@@ -126,8 +135,11 @@ async function lastSaved(): Promise<AutoTagConfig> {
 }
 
 describe("AutoTag", () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
     vi.clearAllMocks();
+    // The rules run in a worker, answering at once here.
+    vi.stubGlobal("Worker", fakeRuleWorker());
     resetViewState();
     localStorage.clear();
     localStorage.setItem("meguri.lang", "en");
@@ -288,6 +300,22 @@ describe("AutoTag", () => {
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(screen.getByText("0 of 5 would be tagged")).toBeTruthy();
     expect((await lastSaved()).rules[0].pattern).toBe("(");
+  });
+
+  it("shows what the files carry when a pass over the library failed partway", async () => {
+    mocks.autoTagReapply.mockRejectedValue(new Error("timed out"));
+    await renderScreen();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply to existing files" }),
+    );
+    fireEvent.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Apply to existing files",
+      }),
+    );
+    // What was written before the failure is read back rather than lost.
+    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/^Added /)).toBeNull();
   });
 
   it("applies on scan from the start, until turned off", async () => {
@@ -905,9 +933,12 @@ describe("AutoTag", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Re-analyze all files" }),
     );
-    const row = () =>
-      screen.getByRole("checkbox", { name: "Harbor" }).closest("div")!;
-    await within(row()).findByRole("button", { name: "Remove from 2 files" });
+    // The list is drawn again once the rules have run over the new names.
+    await waitFor(() =>
+      within(
+        screen.getByRole("checkbox", { name: "Harbor" }).closest("div")!,
+      ).getByRole("button", { name: "Remove from 2 files" }),
+    );
   });
 
   it("removes nothing when the question is declined", async () => {
@@ -1271,6 +1302,49 @@ describe("AutoTag", () => {
     fireEvent.click(screen.getByRole("button", { name: "Resume analysis" }));
     expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
     expect(localStorage.getItem("meguri.autoTag.analyzing")).toBeNull();
+  });
+
+  describe("with a rule that hangs", () => {
+    const HANGS = "(a+)+$";
+    beforeEach(() =>
+      vi.stubGlobal(
+        "Worker",
+        fakeRuleWorker((rule) => rule.pattern === HANGS),
+      ),
+    );
+
+    it("gives up on a rule that hangs, and keeps the screen and the others going", async () => {
+      const config = sampleConfig();
+      mocks.autoTagGet.mockResolvedValue({
+        ...config,
+        // In the middle of the list: the rules after it run all the same.
+        rules: [
+          config.rules[0],
+          {
+            ...config.rules[0],
+            id: "slow",
+            name: "Slow",
+            kind: "regex",
+            pattern: HANGS,
+          },
+          ...config.rules.slice(1),
+        ],
+      });
+      await renderScreen();
+      const slow = await screen.findByRole("button", { name: /Slow/ });
+      await within(slow).findByText("too slow", undefined, { timeout: 2000 });
+      // The rules before it and after it were run.
+      expect(screen.getByText("2 of 5 would be tagged")).toBeTruthy();
+      const square = screen.getByRole("button", { name: /Square brackets/ });
+      expect(within(square).getByText("2 files")).toBeTruthy();
+      fireEvent.click(slow);
+      expect(screen.getByRole("alert").textContent).toContain("took too long");
+      // And the suggestions do not wait on it.
+      fireEvent.click(screen.getByRole("tab", { name: /Suggestions/ }));
+      expect(
+        await screen.findByRole("checkbox", { name: "Harbor" }),
+      ).toBeTruthy();
+    });
   });
 
   describe("coming back to the screen", () => {

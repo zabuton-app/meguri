@@ -608,6 +608,12 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.split": "Dividir por , 、 / ・ en varias etiquetas",
   "autoTag.liveTest": "Probar con los nombres de archivo de la biblioteca",
   "autoTag.liveTestSummary": "{tagged} de {total} se etiquetarían",
+  "autoTag.ruleTesting": "probando…",
+  "autoTag.ruleTimedOut": "demasiado lenta",
+  "autoTag.ruleFailed": "sin probar",
+  "autoTag.ruleTimedOutDetail":
+    "Este patrón tardó demasiado con los nombres de archivo de la biblioteca, así que queda fuera de esta vista previa y de las sugerencias; un escaneo también se atascaría en él. Cambia el patrón para volver a probarlo.",
+  "autoTag.ruleFailedDetail": "No se pudo probar este patrón.",
   "autoTag.onlyMatches": "Solo coincidencias",
   "autoTag.kind.prefix": "Prefijo",
   "autoTag.kind.bracket": "Corchetes",

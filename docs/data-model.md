@@ -261,12 +261,13 @@ a tag of a keyword or folder rule on the screen offers to move the files the
 condition reaches from the old tag to the new one, by the same reading; a
 rename on the tag screen does not reach the conditions.
 
-The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed suggestions and
-excluded terms) is app-wide, in `config.json` under `autoTag`. With `applyOnScan`
-on, `runScan()` runs the engine over the files the scan inserted, updated or
-moved, ahead of the FTS sync and the thumbnail pool. The ids still owed are kept
-in `settings` under `auto_tag_pending` until the pass completes, because a scan
-aborted in between reports those files as unchanged the next time round.
+The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed
+suggestions and excluded terms) is app-wide, in `config.json` under `autoTag`.
+With `applyOnScan` on, `runScan()` runs the engine over the files the scan
+inserted, updated or moved, ahead of the FTS sync and the thumbnail pool. The
+ids still owed are kept in `settings` under `auto_tag_pending` until the pass
+completes, because a scan aborted in between reports those files as unchanged
+the next time round.
 
 In the main process the part of the engine that reads names is evaluated in a
 worker thread
@@ -284,13 +285,24 @@ run in the renderer over the names loaded by `auto_tag_files` (capped at
 `MAX_AUTO_TAG_FILES`); every write goes through `auto_tag_apply`, which only
 says which files get which tags.
 
-The renderer runs those analyses on its own thread, so a rule that hangs would
-hang the screen. Two things keep that from being permanent. The configuration
-is saved a moment after an edit, which a screen frozen by that edit never
-reaches. And a marker in `localStorage` is set before each analysis and cleared
-once it has been drawn: finding it still set on arrival opens the screen in a
-safe mode that runs no rules until the user resumes, leaving the rule at fault
-editable.
+A user's regular expression never runs on the renderer's own thread: one that
+backtracks without end would hang the screen. The screen runs the rules in a
+worker (`src/routes/AutoTag/rules.worker.ts`), rule by rule over the names,
+each chunk of names under the same deadline a scan's worker has. A rule that
+misses it is given up on — the worker is ended and a new one carries on with
+the rules after it — and shown as too slow, left out of the preview and the
+suggestions until its pattern is changed. What a rule finds comes back in a
+size that does not grow with how much it matches: a count, the positions it
+matches, the matches for the rows the editor draws, and the words a
+suggestion has to know about. Where no worker can start the rules are not
+run at all. The keywords, escaped literals, are run in place. As a further
+net, a marker in `localStorage` is set before each analysis and cleared once
+it has been drawn: finding it still set on arrival opens the screen in a safe
+mode that runs no rules until the user resumes.
+
+"Apply to existing files" writes chunk by chunk; when a later chunk fails, the
+ones before it stay, and the caches and the screen are read again so that they
+show it.
 
 `config.ignored` holds suggestions dismissed on the suggestions tab.
 `config.excludedTerms` holds words that are never suggested (no screen edits

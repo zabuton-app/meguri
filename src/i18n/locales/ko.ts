@@ -588,6 +588,12 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.split": ", 、 / ・ 로 여러 태그로 분할",
   "autoTag.liveTest": "라이브러리 파일 이름으로 테스트",
   "autoTag.liveTestSummary": "{total}개 중 {tagged}개가 태그 대상",
+  "autoTag.ruleTesting": "테스트 중…",
+  "autoTag.ruleTimedOut": "시간 초과",
+  "autoTag.ruleFailed": "테스트 안 됨",
+  "autoTag.ruleTimedOutDetail":
+    "이 패턴은 라이브러리의 파일 이름에 너무 오래 걸려 미리 보기와 추천에서 제외했습니다. 스캔도 이 패턴에서 멈춥니다. 패턴을 바꾸면 다시 테스트합니다.",
+  "autoTag.ruleFailedDetail": "이 패턴을 테스트할 수 없었습니다.",
   "autoTag.onlyMatches": "일치만 표시",
   "autoTag.kind.prefix": "접두어",
   "autoTag.kind.bracket": "괄호",
