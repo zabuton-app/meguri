@@ -53,4 +53,29 @@ describe("graph settings", () => {
     ).toBe("links");
     expect(got.forces).toEqual({ ...d.forces, repel: 0, distance: 100 });
   });
+
+  it("show thumbnails up to 150 files by default, and read back the limit", () => {
+    const d = defaultGraphSettings().display;
+    expect(d.thumbnails).toBe(true);
+    expect(d.thumbnailLimit).toBe(150);
+    // Stored before the thumbnail settings existed.
+    const old = parseGraphSettings(
+      JSON.stringify({ display: { sizeBy: "plays", nodeSize: 2 } }),
+    ).display;
+    expect(old.thumbnails).toBe(true);
+    expect(old.thumbnailLimit).toBe(150);
+    const read = (display: unknown) =>
+      parseGraphSettings(JSON.stringify({ display })).display;
+    expect(read({ thumbnails: false, thumbnailLimit: 80 })).toMatchObject({
+      thumbnails: false,
+      thumbnailLimit: 80,
+    });
+    expect(read({ thumbnails: "no", thumbnailLimit: "x" })).toMatchObject({
+      thumbnails: true,
+      thumbnailLimit: 150,
+    });
+    expect(read({ thumbnailLimit: -1 }).thumbnailLimit).toBe(0);
+    expect(read({ thumbnailLimit: 999 }).thumbnailLimit).toBe(999);
+    expect(read({ thumbnailLimit: 1500 }).thumbnailLimit).toBe(1000);
+  });
 });
