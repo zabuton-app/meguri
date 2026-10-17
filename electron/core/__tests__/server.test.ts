@@ -2,7 +2,7 @@
 // path-confinement guards, and the ffmpeg remux path (status-code behaviour only).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { FFMPEG } from "../ffmpeg-paths.js";
+import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -29,6 +29,7 @@ let outsideMediaId: number;
 let symlinkMediaId: number;
 let remuxId: number;
 let brokenRemuxId: number;
+let anamorphicId: number;
 let fifoSrc: string;
 /** One row per supported audio extension, so contentType() is covered for all of them. */
 let audioIds: Record<string, number>;
@@ -92,6 +93,23 @@ beforeAll(async () => {
     "yuv420p",
     remuxFile,
   ]);
+  // 64x48 frames with pixels twice as wide as tall, shown 128x48.
+  const anamorphicFile = path.join(root, "anamorphic.mp4");
+  execFileSync(FFMPEG, [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "testsrc=size=64x48:rate=10:duration=0.3",
+    "-vf",
+    "setsar=2/1",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    anamorphicFile,
+  ]);
   const brokenFile = path.join(root, "broken.mkv");
   fs.writeFileSync(brokenFile, "NOT A REAL MKV");
 
@@ -127,6 +145,7 @@ beforeAll(async () => {
   symlinkMediaId = insert("symlink.mp4", symlinkMedia, null, "pending");
   remuxId = insert("real.mkv", remuxFile, null, "pending");
   brokenRemuxId = insert("broken.mkv", brokenFile, null, "pending");
+  anamorphicId = insert("anamorphic.mp4", anamorphicFile, null, "pending");
 
   // Audio rows carry no thumbnail by design (thumb_status 'done', thumb_path NULL).
   // The bytes are placeholder text, not real audio: these tests exercise routing,
@@ -379,6 +398,31 @@ describe("frame serving (ffmpeg path)", () => {
     await expectJpeg(
       await fetch(`${base}/ws/${WS}/frame/${remuxId}`, authHeaders()),
     );
+  });
+});
+
+describe("frame serving (pixel shape)", () => {
+  // Scaled by its stored pixel grid, the 240px preview would be 240x180.
+  it("draws an anamorphic video's frame at its displayed shape", async () => {
+    const res = await fetch(
+      `${base}/ws/${WS}/frame/${anamorphicId}?t=0&q=low`,
+      authHeaders(),
+    );
+    expect(res.status).toBe(200);
+    const file = path.join(dataDir, "anamorphic-frame.jpg");
+    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    const size = execFileSync(FFPROBE, [
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=width,height",
+      "-of",
+      "csv=p=0",
+      file,
+    ])
+      .toString()
+      .trim();
+    expect(size).toBe("240,90");
   });
 });
 

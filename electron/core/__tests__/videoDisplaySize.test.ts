@@ -1,8 +1,9 @@
-// Correction of rotated videos recorded with their stored (pre-rotation) size,
-// read back from the raw ffprobe output kept in files.meta.
+// Correction of rotated and anamorphic videos recorded at the size ffprobe
+// reports for their frames, read back from the raw ffprobe output kept in
+// files.meta.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DB } from "../db.js";
-import { storedVideoDisplaySize } from "../media.js";
+import { probedVideoSize } from "../media.js";
 import { getSetting } from "../queries.js";
 import {
   VIDEO_DISPLAY_SIZE_VERSION,
@@ -16,7 +17,7 @@ import { insertFile, newDb } from "./helpers.js";
 function probe(
   width: number,
   height: number,
-  rotation?: { matrix?: number; tag?: string },
+  rotation?: { matrix?: number; tag?: string; sar?: string },
 ): unknown {
   return {
     streams: [
@@ -27,6 +28,7 @@ function probe(
         codec_name: "h264",
         width,
         height,
+        ...(rotation?.sar != null ? { sample_aspect_ratio: rotation.sar } : {}),
         ...(rotation?.tag != null ? { tags: { rotate: rotation.tag } } : {}),
         ...(rotation?.matrix != null
           ? {
@@ -44,7 +46,12 @@ function probe(
   };
 }
 
-describe("storedVideoDisplaySize", () => {
+/** The display size the stored output describes. */
+function storedVideoDisplaySize(raw: unknown) {
+  return probedVideoSize(raw)?.display ?? null;
+}
+
+describe("probedVideoSize", () => {
   it("swaps the size for a quarter turn either way", () => {
     for (const matrix of [90, -90, 270, -270]) {
       expect(storedVideoDisplaySize(probe(1920, 1080, { matrix }))).toEqual({
@@ -79,6 +86,31 @@ describe("storedVideoDisplaySize", () => {
       width: 1080,
       height: 1920,
     });
+  });
+
+  // 720x1280 frames whose pixels are 256:81 wide: shown 16:9, not portrait.
+  it("widens an anamorphic video by its sample aspect ratio", () => {
+    expect(probedVideoSize(probe(720, 1280, { sar: "256:81" }))).toEqual({
+      frame: { width: 720, height: 1280 },
+      display: { width: 2276, height: 1280 },
+      anamorphic: true,
+    });
+  });
+
+  it("applies the pixel shape to the stored frame, before the turn", () => {
+    expect(
+      storedVideoDisplaySize(probe(720, 1280, { sar: "256:81", matrix: 90 })),
+    ).toEqual({ width: 1280, height: 2276 });
+  });
+
+  it("takes square or unknown pixels as square", () => {
+    for (const sar of ["1:1", "0:1", "N/A"]) {
+      expect(probedVideoSize(probe(1920, 1080, { sar }))).toEqual({
+        frame: { width: 1920, height: 1080 },
+        display: { width: 1920, height: 1080 },
+        anamorphic: false,
+      });
+    }
   });
 
   it("returns null for output with no sized video stream", () => {
@@ -137,6 +169,60 @@ describe("fixVideoDisplaySizes", () => {
     expect(needsVideoDisplaySizeFix(db)).toBe(false);
   });
 
+  function thumbStatusOf(id: number): string {
+    return db
+      .prepare("SELECT thumb_status FROM files WHERE id = ?")
+      .pluck()
+      .get(id) as string;
+  }
+
+  function setThumbStatus(id: number, status: string): void {
+    db.prepare("UPDATE files SET thumb_status = ? WHERE id = ?").run(
+      status,
+      id,
+    );
+  }
+
+  it("widens an anamorphic video and sends its thumbnail back to be made", async () => {
+    const id = seed(
+      "anamorphic.mp4",
+      720,
+      1280,
+      probe(720, 1280, { sar: "256:81" }),
+    );
+    setThumbStatus(id, "done");
+    expect(await fixVideoDisplaySizes(db)).toBe(1);
+    expect(sizeOf(id)).toEqual({ width: 2276, height: 1280 });
+    // Scaled by its stored pixel grid, the old thumbnail is squeezed.
+    expect(thumbStatusOf(id)).toBe("pending");
+  });
+
+  it("keeps the thumbnail of a video that was only turned", async () => {
+    const id = seed(
+      "portrait.mp4",
+      1920,
+      1080,
+      probe(1920, 1080, { matrix: 90 }),
+    );
+    setThumbStatus(id, "done");
+    await fixVideoDisplaySizes(db);
+    // ffmpeg already turned it upright when making the thumbnail.
+    expect(thumbStatusOf(id)).toBe("done");
+  });
+
+  it("leaves an anamorphic video whose thumbnail failed in error", async () => {
+    const id = seed(
+      "anamorphic.mp4",
+      720,
+      1280,
+      probe(720, 1280, { sar: "256:81" }),
+    );
+    setThumbStatus(id, "error");
+    await fixVideoDisplaySizes(db);
+    expect(sizeOf(id)).toEqual({ width: 2276, height: 1280 });
+    expect(thumbStatusOf(id)).toBe("error");
+  });
+
   it("is a no-op on a second run", async () => {
     const id = seed(
       "portrait.mp4",
@@ -157,6 +243,12 @@ describe("fixVideoDisplaySizes", () => {
       1080,
       probe(1920, 1080, { matrix: 180 }),
     );
+    const anamorphicFixed = seed(
+      "anamorphic-fixed.mp4",
+      2276,
+      1280,
+      probe(720, 1280, { sar: "256:81" }),
+    );
     const fixed = seed(
       "fixed.mp4",
       1080,
@@ -175,6 +267,7 @@ describe("fixVideoDisplaySizes", () => {
     expect(sizeOf(plain)).toEqual({ width: 1920, height: 1080 });
     expect(sizeOf(upsideDown)).toEqual({ width: 1920, height: 1080 });
     expect(sizeOf(fixed)).toEqual({ width: 1080, height: 1920 });
+    expect(sizeOf(anamorphicFixed)).toEqual({ width: 2276, height: 1280 });
     expect(sizeOf(image)).toEqual({ width: 1920, height: 1080 });
     expect(sizeOf(unreadable)).toEqual({ width: 1920, height: 1080 });
   });

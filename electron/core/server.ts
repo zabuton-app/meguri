@@ -630,7 +630,18 @@ function serveFrame(
   // pipeline, and per-process memory is what those slots are meant to cap.
   const args = ["-v", "error", "-threads", String(DECODE_FFMPEG_THREADS)];
   if (t > 0) args.push("-ss", t.toFixed(3));
-  args.push("-i", file, "-frames:v", "1", "-vf", `scale=${width}:-2`);
+  // Height from the display aspect ratio, not the stored pixel grid, so an
+  // anamorphic video's preview is not squeezed (setsar=1 marks it square), as
+  // media.ts squares its thumbnails. Capped at 4x the width: a crafted pixel
+  // shape could otherwise ask for a frame of any height.
+  args.push(
+    "-i",
+    file,
+    "-frames:v",
+    "1",
+    "-vf",
+    `scale=${width}:'min(round(ow/dar/2)*2,${width * 4})',setsar=1`,
+  );
   if (qv !== null) args.push("-q:v", String(qv));
   args.push("-f", "mjpeg", "pipe:1");
   serveBufferedFfmpeg(res, args, "image/jpeg");

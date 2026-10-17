@@ -33,6 +33,7 @@ interface FfprobeStream {
   disposition?: { attached_pic?: number; default?: number };
   tags?: { creation_time?: string; rotate?: string };
   side_data_list?: { side_data_type?: string; rotation?: number }[];
+  sample_aspect_ratio?: string;
 }
 
 interface FfprobeFormat {
@@ -88,26 +89,54 @@ function isQuarterTurned(v: FfprobeStream): boolean {
   return Math.round(Math.abs(deg) / 90) % 2 === 1;
 }
 
-/** A video stream's size as it is displayed: `width` / `height` swapped when the
- *  stream is turned a quarter, else as reported. Null when ffprobe gave no size. */
-function displaySize(
-  v: FfprobeStream | undefined,
-): { width: number; height: number } | null {
-  if (!v?.width || !v.height) return null;
-  return isQuarterTurned(v)
-    ? { width: v.height, height: v.width }
-    : { width: v.width, height: v.height };
+/** Width of one pixel relative to its height. Anamorphic video stores fewer
+ *  (or more) columns than it shows, e.g. 720x1280 frames at 256:81 shown 16:9,
+ *  and ffprobe reports the stored columns. Unknown (`0:1`, `N/A`) counts as
+ *  square, as ffmpeg's filters do. */
+function sampleAspect(v: FfprobeStream): number {
+  const [n, d] = (v.sample_aspect_ratio ?? "").split(":").map(Number);
+  return n > 0 && d > 0 ? n / d : 1;
 }
 
-/** The display size a video's stored ffprobe output describes, for correcting
- *  rows recorded before extractMeta applied the rotation. Picks the stream
- *  extractMeta reads (the first video stream); null for anything unreadable. */
-export function storedVideoDisplaySize(
+type Size = { width: number; height: number };
+
+// The ffmpeg filters that draw a video (thumbnails and frame export here, seek
+// previews in server.ts serveFrame) square its pixels the same way, from the
+// `sar` / `dar` of the decoded (already turned) frame, so what they draw has
+// the shape displaySize records.
+
+/** A video stream's size as it is displayed: its width scaled by the sample
+ *  aspect ratio (rounded as Chromium rounds `videoWidth`), then width and
+ *  height swapped when the stream is turned a quarter. The pixel shape applies
+ *  to the stored frame, so it comes before the turn. Null when ffprobe gave no
+ *  size. */
+function displaySize(v: FfprobeStream | undefined): Size | null {
+  if (!v?.width || !v.height) return null;
+  const width = Math.round(v.width * sampleAspect(v));
+  return isQuarterTurned(v)
+    ? { width: v.height, height: width }
+    : { width, height: v.height };
+}
+
+/** What a video's stored ffprobe output says about its size, for correcting
+ *  rows recorded before extractMeta applied the pixel shape and rotation:
+ *  `frame` is the size ffprobe reports (what such rows hold), `display` the
+ *  size shown, and `anamorphic` whether its pixels are not square (its old
+ *  thumbnail is then squeezed). Picks the stream extractMeta reads (the first
+ *  video stream); null for anything unreadable. */
+export function probedVideoSize(
   raw: unknown,
-): { width: number; height: number } | null {
+): { frame: Size; display: Size; anamorphic: boolean } | null {
   const streams = (raw as FfprobeOutput | null)?.streams;
   if (!Array.isArray(streams)) return null;
-  return displaySize(streams.find((s) => s.codec_type === "video"));
+  const v = streams.find((s) => s.codec_type === "video");
+  const display = displaySize(v);
+  if (!v?.width || !v.height || !display) return null;
+  return {
+    frame: { width: v.width, height: v.height },
+    display,
+    anamorphic: sampleAspect(v) !== 1,
+  };
 }
 
 /** Get metadata via ffprobe (video, image, and audio). Returns empty meta on failure.
@@ -159,8 +188,9 @@ export async function extractMeta(
     // cover art, whose size describes the artwork and not the track. A tiled
     // image's streams each describe one tile (see isTiledImage).
     const sized = !wantAudio && !tiled;
-    // Videos are recorded as displayed (see isQuarterTurned). Images are not:
-    // ffprobe exposes no rotation for EXIF-oriented stills.
+    // Videos are recorded as displayed (see displaySize). Images are not:
+    // ffprobe exposes no rotation for EXIF-oriented stills, and browsers
+    // ignore the pixel shape a JPEG's density may imply.
     const size = kind === "video" ? displaySize(v) : null;
     return {
       // `|| null`: ffprobe 6.1 reports a tiled AVIF as one 0x0 stream.
@@ -307,8 +337,9 @@ export type FrameFormat = "png" | "jpeg";
 /** Extract one full-resolution frame at `offsetSec` and write it to `dest`.
  *  Uses the same hybrid seek strategy as generateThumb (coarse pre-input -ss +
  *  fine post-input -ss), falling back to a pure pre-input (keyframe-only) seek
- *  for containers where post-input seek yields zero frames. No scaling — the
- *  frame keeps the source resolution. */
+ *  for containers where post-input seek yields zero frames. The frame keeps the
+ *  source resolution, with an anamorphic video's pixels squared by stretching
+ *  the short side of the pixel, never shrinking the long one. */
 export async function exportFrame(
   src: string,
   dest: string,
@@ -351,7 +382,18 @@ async function runFfmpegFrameExport(
     args.push("-ss", fastSeek.toFixed(3), "-i", src);
     if (fineSeek > 0.01) args.push("-ss", fineSeek.toFixed(3));
   }
-  args.push("-frames:v", "1");
+  // Square an anamorphic video's pixels, so the still looks as the frame did
+  // in the player; viewers mostly ignore a pixel shape stored in the file.
+  // Stretch, never shrink: a turned video reaches the filter transposed, with
+  // its pixel shape inverted (sar < 1), and widening by sar would then throw
+  // away two thirds of a 256:81 frame. A no-op for square pixels. The shape
+  // matches displaySize; the size may be larger.
+  args.push(
+    "-frames:v",
+    "1",
+    "-vf",
+    "scale='if(gte(sar,1),round(iw*sar),iw)':'if(gte(sar,1),ih,round(ih/sar))',setsar=1",
+  );
   if (format === "jpeg") args.push("-c:v", "mjpeg", "-q:v", "2");
   else args.push("-c:v", "png");
   args.push(dest);
@@ -397,10 +439,14 @@ async function runFfmpegThumb(
   // window (default 100 frames) in memory, so at full 4K that is ~1.2 GB per
   // process versus ~140 MB once the frames are already 480px. Its histogram
   // scoring picks the same frame either way.
-  const vf =
-    kind === "video" && !useOffset
-      ? `scale='min(${THUMB_MAX},iw)':-2,thumbnail`
+  // A video's pixels are squared on the way down (see displaySize): scaling
+  // by stored columns would squeeze an anamorphic one. Not for stills or
+  // cover art, whose pixel shape browsers ignore.
+  const scale =
+    kind === "video"
+      ? `scale='min(${THUMB_MAX},round(iw*sar))':'round(ow/dar/2)*2',setsar=1`
       : `scale='min(${THUMB_MAX},iw)':-2`;
+  const vf = kind === "video" && !useOffset ? `${scale},thumbnail` : scale;
   const args: string[] = [
     "-v",
     "error",

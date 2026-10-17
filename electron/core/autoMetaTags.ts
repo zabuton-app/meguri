@@ -18,8 +18,8 @@ export { AUTO_META_SOURCE };
  * The next scan of each workspace re-derives every file; classifications that
  * did not move diff out and cost one indexed read each.
  *
- * 2: rotated videos' width / height corrected (videoDisplaySize.ts),
- * so their `orient` tag has to be derived again.
+ * 2: rotated and anamorphic videos' width / height corrected
+ * (videoDisplaySize.ts), so their `orient` tag has to be derived again.
  */
 export const AUTO_META_RULESET_VERSION = 2;
 export const AUTO_META_VERSION_KEY = "auto_meta_ruleset_version";

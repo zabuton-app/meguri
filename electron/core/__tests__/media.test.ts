@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FFMPEG } from "../ffmpeg-paths.js";
+import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
 import {
   coverArtStreamIndex,
   exportFrame,
@@ -16,6 +16,7 @@ import {
 
 let dir: string;
 let video: string;
+let anamorphic: string;
 let broken: string;
 let audio: string;
 let audioWithArt: string;
@@ -36,6 +37,23 @@ beforeAll(() => {
     "-pix_fmt",
     "yuv420p",
     video,
+  ]);
+  // The same 64x48 frames with pixels twice as wide as tall: shown 128x48.
+  anamorphic = path.join(dir, "anamorphic.mp4");
+  execFileSync(FFMPEG, [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "testsrc=size=64x48:rate=10:duration=1",
+    "-vf",
+    "setsar=2/1",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    anamorphic,
   ]);
   broken = path.join(dir, "broken.mp4");
   fs.writeFileSync(broken, "NOT A REAL MP4");
@@ -178,6 +196,37 @@ describe("exportFrame", () => {
     expect(buf.readUInt32BE(20)).toBe(48);
   });
 
+  it("squares an anamorphic video's pixels", async () => {
+    const dest = path.join(dir, "anamorphic.png");
+    await expect(exportFrame(anamorphic, dest, 0.2, "png")).resolves.toBe(true);
+    const buf = fs.readFileSync(dest);
+    expect(buf.readUInt32BE(16)).toBe(128);
+    expect(buf.readUInt32BE(20)).toBe(48);
+  });
+
+  // Turned, the frame reaches the filter transposed with its pixels 1:2:
+  // squaring must stretch its height rather than halve its width.
+  it("keeps the resolution of a turned anamorphic video", async () => {
+    const turned = path.join(dir, "anamorphic-rot90.mp4");
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-y",
+      "-display_rotation",
+      "90",
+      "-i",
+      anamorphic,
+      "-c",
+      "copy",
+      turned,
+    ]);
+    const dest = path.join(dir, "anamorphic-rot90.png");
+    await expect(exportFrame(turned, dest, 0.2, "png")).resolves.toBe(true);
+    const buf = fs.readFileSync(dest);
+    expect(buf.readUInt32BE(16)).toBe(48);
+    expect(buf.readUInt32BE(20)).toBe(128);
+  });
+
   it("refuses non-finite or negative offsets without invoking ffmpeg", async () => {
     const dest = path.join(dir, "invalid-offset.png");
     await expect(exportFrame(video, dest, NaN, "png")).resolves.toBe(false);
@@ -260,6 +309,12 @@ describe("extractMeta", () => {
       expect(meta.width).toBe(48);
       expect(meta.height).toBe(64);
     }
+  });
+
+  it("records an anamorphic video at its displayed size", async () => {
+    const meta = await extractMeta(anamorphic, "video");
+    expect(meta.width).toBe(128);
+    expect(meta.height).toBe(48);
   });
 
   it("keeps the size of a half-turned video", async () => {
@@ -437,5 +492,37 @@ describe("generateThumb (audio cover art)", () => {
     const dest = path.join(dir, "no-cover.webp");
     await expect(generateThumb(audio, "audio", dest)).resolves.toBe(false);
     expect(fs.existsSync(dest)).toBe(false);
+  });
+});
+
+describe("generateThumb (video pixel shape)", () => {
+  /** Width and height of an image as ffprobe reads it. */
+  function sizeOf(file: string): number[] {
+    return execFileSync(FFPROBE, [
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=width,height",
+      "-of",
+      "csv=p=0",
+      file,
+    ])
+      .toString()
+      .trim()
+      .split(",")
+      .map(Number);
+  }
+
+  it("keeps a square-pixel video's shape", async () => {
+    const dest = path.join(dir, "square.webp");
+    await expect(generateThumb(video, "video", dest)).resolves.toBe(true);
+    expect(sizeOf(dest)).toEqual([64, 48]);
+  });
+
+  // Scaled by its stored pixel grid, the thumbnail would be squeezed to 64x48.
+  it("draws an anamorphic video at its displayed shape", async () => {
+    const dest = path.join(dir, "anamorphic.webp");
+    await expect(generateThumb(anamorphic, "video", dest)).resolves.toBe(true);
+    expect(sizeOf(dest)).toEqual([128, 48]);
   });
 });
