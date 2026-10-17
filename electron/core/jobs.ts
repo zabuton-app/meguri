@@ -152,11 +152,13 @@ export async function runScan(
           }),
       });
     } catch (err) {
-      // A rule that does not terminate, or a worker that will not run, must not
-      // cost the scan its thumbnails. The files stay owed, so they are tagged
-      // by the next scan after the cause is fixed.
+      // A worker that will not run, or that got stuck with no rule to blame
+      // (a rule that does not finish is left out by the worker's client, and
+      // the rest carry on), must not cost the scan its thumbnails. The folder
+      // rules' tags were added; the files stay owed for what their names give,
+      // so the next scan tags them once the cause is gone.
       if (err instanceof AutoTagTimeoutError) {
-        log.warn("auto-tagging skipped: a rule did not finish on a file name");
+        log.warn("auto-tagging skipped: the worker got stuck");
       } else if (err instanceof AutoTagUnavailableError) {
         log.warn("auto-tagging skipped: the worker is unavailable");
       } else {

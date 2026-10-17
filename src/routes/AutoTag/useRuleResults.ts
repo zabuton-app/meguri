@@ -3,7 +3,7 @@
 // worker the rules are not run at all: a user's regular expression never runs
 // on the screen's own thread.
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import type { TagRule } from "@shared/autoTag";
+import { ruleBehaviorKey, type TagRule } from "@shared/autoTag";
 import type { RuleResult } from "./ruleEval";
 import { RuleRunner, type RuleOutcome } from "./ruleRunner";
 
@@ -15,19 +15,7 @@ export type RuleView =
    */
   | { status: "pending"; last?: RuleResult };
 
-/**
- * What decides what a rule finds: its name, whether it is on, its place in
- * the list do not, and changing them runs nothing again.
- */
-const ruleKey = (rule: TagRule): string =>
-  JSON.stringify([
-    rule.pattern,
-    rule.ci,
-    rule.template,
-    rule.split,
-    rule.caseMode,
-    rule.exclude,
-  ]);
+const ruleKey = ruleBehaviorKey;
 
 interface Settled {
   names: readonly string[];

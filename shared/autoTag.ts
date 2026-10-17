@@ -38,11 +38,11 @@ export const MAX_RULE_MATCHES = 50;
 export const MAX_AUTO_TAGS_PER_FILE = 64;
 /**
  * Names the engine is run over at a time — on a scan and on the screen alike
- * — and how long a chunk may take before it is given up on. A chunk is a few
- * hundred short strings, so a healthy rule answers in milliseconds; only
- * runaway backtracking gets near this. A scan measures the whole engine over
- * a chunk, the screen one rule over a chunk: a rule the screen gives up on is
- * one a scan stalls on too.
+ * — and how long a worker may go without a sign of life before the rule it is
+ * on is given up on. Both run one rule at a time over a chunk and say which,
+ * so the budget is one rule over one chunk: a few hundred short strings, which
+ * a healthy rule answers in milliseconds; only runaway backtracking gets near
+ * this. A rule the screen gives up on is one a scan gives up on too.
  */
 export const AUTO_TAG_CHUNK = 512;
 export const AUTO_TAG_CHUNK_TIMEOUT_MS = 5_000;
@@ -548,6 +548,49 @@ export function withFolderTags(
   }
   return out;
 }
+
+/**
+ * Tags as one list puts them together: the first spelling of each (compared
+ * without regard to case), up to what one file may be given — as proposalsFor
+ * does as it goes.
+ */
+export function firstSpellings(tags: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const tag of tags) {
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+    if (out.length >= MAX_AUTO_TAGS_PER_FILE) break;
+  }
+  return out;
+}
+
+/** What the keywords give a name (NFC), in their order; repeats left in. */
+export function keywordTags(engine: CompiledEngine, input: string): string[] {
+  const out: string[] = [];
+  for (const compiled of engine.keywords) {
+    if (runKeyword(compiled, input).length > 0) out.push(...compiled.tags);
+  }
+  return out;
+}
+
+/**
+ * What decides what a rule does: its name, whether it is on, its place in the
+ * list and its kind (which only picks a default) do not. A rule given up on is
+ * known by this, so an edit that changes it gets another chance, and renaming
+ * it does not; a result is kept by it, so renaming runs nothing again.
+ */
+export const ruleBehaviorKey = (rule: TagRule): string =>
+  JSON.stringify([
+    rule.pattern,
+    rule.ci,
+    rule.template,
+    rule.split,
+    rule.caseMode,
+    rule.exclude,
+  ]);
 
 export interface CompiledEngine {
   rules: CompiledRule[];

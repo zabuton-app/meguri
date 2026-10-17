@@ -270,13 +270,19 @@ completes, because a scan aborted in between reports those files as unchanged
 the next time round.
 
 In the main process the part of the engine that reads names is evaluated in a
-worker thread
-(`electron/autoTagWorker.ts`, driven by `AutoTagWorkerClient`): a rule is an
-arbitrary regular expression, and one that backtracks without end cannot be
-interrupted on the thread running it. A chunk that exceeds its time budget gets
-the worker terminated, and a worker that cannot run fails closed — nothing is
-evaluated on the main thread in its place. Either way the scan logs it and
-carries on without auto-tagging; the files stay owed.
+worker thread (`electron/autoTagWorker.ts`, driven by `AutoTagWorkerClient`): a
+rule is an arbitrary regular expression, and one that backtracks without end
+cannot be interrupted on the thread running it. The worker runs a chunk's rules
+one at a time (`deriveChunk`) and names each as it starts, then the keywords
+(which are blamed on no rule); the client watches
+the worker rather than each request, so time spent queued behind another pass
+does not count. A worker silent for the whole budget is stuck in the rule it
+last named: that rule is left out from then on (known by what it does, so an
+edit gives it another chance), the worker is terminated, and everything waiting
+is sent again to a new one. A rule that hangs therefore costs its own tags and
+nothing else. A worker that cannot run fails closed — nothing is evaluated on
+the main thread in its place; the scan logs it and carries on with the folder
+rules' tags only, and the files stay owed for what their names give.
 
 `shared/autoTagAnalysis.ts` builds the screen's views on top of the engine —
 suggestions (frequent words of the names that no rule or keyword produces
