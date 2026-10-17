@@ -22,7 +22,12 @@ import {
   deriveAutoTagsInProcess,
   type DeriveAutoTags,
 } from "../autoTagDeriver.js";
-import { deriveChunk } from "../autoTagChunk.js";
+import {
+  AUTO_TAG_ENGINES_HELD,
+  deriveChunk,
+  handleRequests,
+  type AutoTagWorkerReply,
+} from "../autoTagChunk.js";
 import { getSetting, searchFiles } from "../queries.js";
 import { addManualTag, fileTags } from "../tags.js";
 import {
@@ -935,6 +940,65 @@ describe("deriveChunk", () => {
   });
 });
 
+describe("the worker's protocol", () => {
+  const run = () => {
+    const replies: AutoTagWorkerReply[] = [];
+    return { replies, handle: handleRequests((r) => replies.push(r)) };
+  };
+  const done = (replies: AutoTagWorkerReply[]) =>
+    replies.filter((r) => r.type !== "start");
+
+  it("derives a chunk with the engine its version names", () => {
+    const { replies, handle } = run();
+    const [first, second] = activeRules();
+    // Switched off: left out of the compiled engine, so `at` maps back.
+    handle({
+      type: "engine",
+      version: 1,
+      rules: [{ ...first, enabled: false }, second],
+      keywords: [keyword({ terms: ["Harbor"], tags: ["port"] })],
+    });
+    handle({ type: "engine", version: 2, rules: [], keywords: [] });
+    handle({ type: "derive", id: 7, version: 1, names: [NAMES[2]] });
+    handle({ type: "derive", id: 8, version: 2, names: [NAMES[2]] });
+    expect(replies.filter((r) => r.type === "start" && r.id === 7)).toEqual([
+      { type: "start", id: 7, at: 1 },
+      { type: "start", id: 7, at: null },
+    ]);
+    const [seven, eight] = done(replies);
+    expect(seven).toMatchObject({ type: "done", id: 7 });
+    expect(seven.type === "done" && seven.tags[0]).toContain("port");
+    expect(eight).toEqual({ type: "done", id: 8, tags: [[]] });
+  });
+
+  it("holds the latest engines only, and says when it lacks one", () => {
+    const { replies, handle } = run();
+    for (let v = 1; v <= AUTO_TAG_ENGINES_HELD + 1; v++) {
+      handle({ type: "engine", version: v, rules: [], keywords: [] });
+    }
+    handle({ type: "derive", id: 1, version: 1, names: ["a.mp4"] });
+    handle({ type: "derive", id: 2, version: 2, names: ["a.mp4"] });
+    handle({ type: "derive", id: 3, version: 99, names: ["a.mp4"] });
+    expect(done(replies)).toEqual([
+      { type: "unknownEngine", id: 1 },
+      { type: "done", id: 2, tags: [[]] },
+      { type: "unknownEngine", id: 3 },
+    ]);
+  });
+
+  it("fails each chunk of an engine that does not compile", () => {
+    const { replies, handle } = run();
+    handle({
+      type: "engine",
+      version: 1,
+      rules: null as unknown as TagRule[],
+      keywords: [],
+    });
+    handle({ type: "derive", id: 1, version: 1, names: ["a.mp4"] });
+    expect(done(replies)).toMatchObject([{ type: "failed", id: 1 }]);
+  });
+});
+
 describe("AutoTagWorkerClient", () => {
   let dir: string;
   beforeEach(() => {
@@ -943,11 +1007,34 @@ describe("AutoTagWorkerClient", () => {
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   const engine = { rules: activeRules(), keywords: [] };
+  // A fake worker speaks the real one's protocol (handleRequests): it holds
+  // the last AUTO_TAG_ENGINES_HELD engines sent and answers a chunk for
+  // another version with "unknownEngine". `onChunk(handler)` hands the body
+  // each chunk with its engine's rules and keywords; `engines` counts the
+  // engines received, `unknowns` the chunks it had none for.
   function workerFile(body: string): string {
     const file = path.join(dir, "worker.cjs");
     fs.writeFileSync(
       file,
-      `const { parentPort } = require("node:worker_threads");\n${body}`,
+      `const { parentPort } = require("node:worker_threads");
+const held = new Map();
+let engines = 0;
+let unknowns = 0;
+const onChunk = (handler) =>
+  parentPort.on("message", (m) => {
+    if (m.type === "engine") {
+      held.set(m.version, m);
+      if (held.size > ${AUTO_TAG_ENGINES_HELD}) held.delete(held.keys().next().value);
+      engines += 1;
+    } else if (!held.has(m.version)) {
+      unknowns += 1;
+      parentPort.postMessage({ type: "unknownEngine", id: m.id });
+    } else {
+      const e = held.get(m.version);
+      handler({ ...m, rules: e.rules, keywords: e.keywords });
+    }
+  });
+${body}`,
     );
     return file;
   }
@@ -955,7 +1042,7 @@ describe("AutoTagWorkerClient", () => {
   // Names each rule as it starts, then the keywords, as the real worker
   // does; hangs on a rule whose pattern is "HANG", and in the keywords when
   // one of them is "HANG". Tags each name with the ids of the rules sent.
-  const naming = `parentPort.on("message", (m) => {
+  const naming = `onChunk((m) => {
     m.rules.forEach((r, at) => {
       parentPort.postMessage({ type: "start", id: m.id, at });
       if (r.pattern === "HANG") for (;;) {}
@@ -1016,7 +1103,7 @@ describe("AutoTagWorkerClient", () => {
     // Each rule takes 300 ms; the budget is 500 ms. Two requests of two rules
     // each take 1.2 s in all, yet the worker is never silent for 500 ms.
     const client = new AutoTagWorkerClient(
-      workerFile(`parentPort.on("message", (m) => {
+      workerFile(`onChunk((m) => {
         m.rules.forEach((r, at) => {
           parentPort.postMessage({ type: "start", id: m.id, at });
           const until = Date.now() + 300;
@@ -1038,6 +1125,114 @@ describe("AutoTagWorkerClient", () => {
     client.dispose();
   });
 
+  // Tags each name with how many engines the worker has received, and how
+  // many chunks it had none for; hangs on a rule whose pattern is "HANG".
+  const counting = `onChunk((m) => {
+    m.rules.forEach((r, at) => {
+      parentPort.postMessage({ type: "start", id: m.id, at });
+      if (r.pattern === "HANG") for (;;) {}
+    });
+    parentPort.postMessage({
+      type: "done", id: m.id, tags: m.names.map(() => [engines, unknowns].map(String)),
+    });
+  });`;
+
+  it("sends the engine once for the chunks that share it", async () => {
+    const client = new AutoTagWorkerClient(workerFile(counting));
+    const pass = { rules: activeRules(), keywords: [] };
+    expect(await client.derive(pass, ["a.mp4"])).toEqual([["1", "0"]]);
+    expect(
+      await Promise.all([
+        client.derive(pass, ["b.mp4"]),
+        client.derive(pass, ["c.mp4"]),
+      ]),
+    ).toEqual([[["1", "0"]], [["1", "0"]]]);
+    // A configuration changed meanwhile is another engine, sent once again.
+    const changed = { rules: activeRules().slice(1), keywords: [] };
+    expect(await client.derive(changed, ["d.mp4"])).toEqual([["2", "0"]]);
+    expect(await client.derive(changed, ["e.mp4"])).toEqual([["2", "0"]]);
+    client.dispose();
+  });
+
+  it("evaluates each chunk with the engine it was sent for", async () => {
+    // Two passes with different rules, their chunks interleaved.
+    const client = new AutoTagWorkerClient(workerFile(naming));
+    const one = { rules: activeRules().slice(0, 1), keywords: [] };
+    const two = { rules: activeRules().slice(1, 3), keywords: [] };
+    const ids = (e: typeof one) => e.rules.map((r) => r.id);
+    expect(
+      await Promise.all([
+        client.derive(one, ["a.mp4"]),
+        client.derive(two, ["b.mp4"]),
+        client.derive(one, ["c.mp4"]),
+      ]),
+    ).toEqual([[ids(one)], [ids(two)], [ids(one)]]);
+    client.dispose();
+  });
+
+  it("keeps passes that run side by side from sending their engines again", async () => {
+    // As every workspace scanned at once: one engine object each, chunks
+    // taking turns.
+    const client = new AutoTagWorkerClient(workerFile(counting));
+    const passes = Array.from({ length: AUTO_TAG_ENGINES_HELD }, () => ({
+      rules: activeRules(),
+      keywords: [],
+    }));
+    for (let round = 0; round < 3; round++) {
+      for (const pass of passes) await client.derive(pass, ["a.mp4"]);
+    }
+    expect(await client.derive(passes[0], ["a.mp4"])).toEqual([
+      [String(AUTO_TAG_ENGINES_HELD), "0"],
+    ]);
+    // One more than the worker holds pushes the oldest out; it is sent again
+    // when next needed, ahead of its chunk.
+    await client.derive({ rules: activeRules(), keywords: [] }, ["b.mp4"]);
+    expect(await client.derive(passes[0], ["c.mp4"])).toEqual([
+      [String(AUTO_TAG_ENGINES_HELD + 2), "0"],
+    ]);
+    client.dispose();
+  });
+
+  it("sends a new worker its engine ahead of the first chunk", async () => {
+    // The worker ends after its first answer; the next one holds nothing, so
+    // the same engine is sent to it before the chunk, not after asking.
+    const client = new AutoTagWorkerClient(
+      workerFile(`${counting}
+parentPort.on("message", (m) => {
+  if (m.type === "derive") setTimeout(() => process.exit(0), 10);
+});`),
+    );
+    expect(await client.derive(engine, ["a.mp4"])).toEqual([["1", "0"]]);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await client.derive(engine, ["b.mp4"])).toEqual([["1", "0"]]);
+    client.dispose();
+  });
+
+  it("sends the engine again when the worker does not hold it", async () => {
+    // Loses the first engine it is sent.
+    const client = new AutoTagWorkerClient(
+      workerFile(`${counting}
+let lost = false;
+parentPort.on("message", (m) => {
+  if (m.type === "engine" && !lost) { lost = true; held.delete(m.version); }
+});`),
+    );
+    expect(await client.derive(engine, ["a.mp4"])).toEqual([["2", "1"]]);
+    client.dispose();
+  });
+
+  it("gives up on a worker that never holds the engine sent", async () => {
+    const client = new AutoTagWorkerClient(
+      workerFile(`parentPort.on("message", (m) => {
+  if (m.type === "derive") parentPort.postMessage({ type: "unknownEngine", id: m.id });
+});`),
+    );
+    await expect(client.derive(engine, ["a.mp4"])).rejects.toBeInstanceOf(
+      AutoTagUnavailableError,
+    );
+    client.dispose();
+  });
+
   it("kills a worker that does not answer and reports a timeout", async () => {
     const client = new AutoTagWorkerClient(
       workerFile(`parentPort.on("message", () => { for (;;) {} });`),
@@ -1052,7 +1247,7 @@ describe("AutoTagWorkerClient", () => {
   it("returns what the worker derived", async () => {
     const client = new AutoTagWorkerClient(
       workerFile(
-        `parentPort.on("message", (m) => parentPort.postMessage({
+        `onChunk((m) => parentPort.postMessage({
            type: "done", id: m.id, tags: m.names.map((n) => [n]),
          }));`,
       ),
