@@ -171,6 +171,54 @@ describe("RuleRunner", () => {
     expect(next.at(-1)).toEqual([list[2].id, "timedOut"]);
   });
 
+  it("does not take an earlier run's result over other names", () => {
+    const runner = make();
+    const list = rules();
+    start(runner, list);
+    const worker = FakeWorker.all[0];
+    const earlier = worker.run.batch;
+    worker.start(0, earlier);
+    // The files are read again while the first rule is going: same rule
+    // objects, other names.
+    const heard: [string, RuleOutcome["status"]][] = [];
+    runner.run(["c.mp4"], list, (rule, outcome) =>
+      heard.push([rule.id, outcome.status]),
+    );
+    expect(worker.sent.map((m) => m.type)).toEqual([
+      "names",
+      "run",
+      "names",
+      "run",
+    ]);
+    worker.finish(0, earlier);
+    expect(heard).toEqual([]);
+    // Its own result, over the new names, is.
+    worker.start(0);
+    worker.finish(0);
+    expect(heard).toEqual([[list[0].id, "done"]]);
+  });
+
+  it("does not blame a rule for sticking over names it is no longer run on", () => {
+    const runner = make();
+    const list = rules();
+    start(runner, list);
+    const first = FakeWorker.all[0];
+    first.start(0);
+    const heard: [string, RuleOutcome["status"]][] = [];
+    runner.run(["c.mp4"], list, (rule, outcome) =>
+      heard.push([rule.id, outcome.status]),
+    );
+    // Stuck in the rule over the old names: given up on, but not said to be
+    // too slow for the new ones — it is run over them in a new worker.
+    vi.advanceTimersByTime(1000);
+    expect(heard).toEqual([]);
+    const second = FakeWorker.all[1];
+    expect(second.sent[0]).toEqual({ type: "names", names: ["c.mp4"] });
+    expect(second.run.rules.map((r: TagRule) => r.id)).toEqual(
+      list.map((r) => r.id),
+    );
+  });
+
   it("says the rules failed when there is no worker to run them", () => {
     const runner = make(() => {
       throw new Error("no worker");

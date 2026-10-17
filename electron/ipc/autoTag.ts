@@ -135,16 +135,22 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
       const engine = loadConfig().autoTag;
       let files = 0;
       let added = 0;
-      // As the screen that asked: every workspace (see auto_tag_files).
-      for (const { id, core } of ws.allCores()) {
-        const result = await applyAutoTags(core.db, {
-          engine,
-          workspaceId: id,
-          derive: ctx.deriveAutoTags,
-        });
-        files += result.files;
-        added += result.added;
-      }
+      // As the screen that asked: every workspace (see auto_tag_files). One
+      // removed meanwhile is stopped (its database is about to close) or
+      // skipped, and the others are still done.
+      await ctx.passes.forEachWorkspace(
+        () => ws.allCores(),
+        async ({ id, core }, signal) => {
+          const result = await applyAutoTags(core.db, {
+            engine,
+            workspaceId: id,
+            derive: ctx.deriveAutoTags,
+            signal,
+          });
+          files += result.files;
+          added += result.added;
+        },
+      );
       if (added > 0) await queryClient.invalidateCaches();
       return { files, added };
     } catch (error) {

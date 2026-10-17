@@ -34,11 +34,14 @@ export class RuleRunner {
   /** The names the current worker holds. */
   private sent: readonly string[] | null = null;
   private job: Job | null = null;
-  /** The rules of each run sent to the current worker, by batch. */
-  private batches = new Map<number, readonly TagRule[]>();
+  /** Each run sent to the current worker, by batch: its names and rules. */
+  private batches = new Map<
+    number,
+    { names: readonly string[]; rules: readonly TagRule[] }
+  >();
   private lastBatch = 0;
-  /** The rule the worker said it is running. */
-  private running: TagRule | null = null;
+  /** The rule the worker said it is running, and over which names. */
+  private running: { rule: TagRule; names: readonly string[] } | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -81,7 +84,7 @@ export class RuleRunner {
       return;
     }
     const batch = ++this.lastBatch;
-    this.batches.set(batch, rest);
+    this.batches.set(batch, { names: job.names, rules: rest });
     // The deadline runs from the worker's last sign of life: a worker busy
     // with an earlier run (maybe stuck in it) gets no fresh time for this one.
     if (this.timer === null) this.arm();
@@ -111,13 +114,21 @@ export class RuleRunner {
     // A worker given up on may still have had messages on their way.
     if (worker !== this.worker) return;
     const job = this.job;
+    const batch = this.batches.get(msg.batch);
     if (msg.type === "start") {
-      this.running = this.batches.get(msg.batch)?.[msg.at] ?? null;
+      const rule = batch?.rules[msg.at];
+      this.running = batch && rule ? { rule, names: batch.names } : null;
     } else if (msg.type === "rule") {
-      const rule = this.batches.get(msg.batch)?.[msg.at];
+      const rule = batch?.rules[msg.at];
       this.running = null;
-      // An earlier run's rule counts when this run asked for it too.
-      if (job && rule && job.rules.includes(rule)) {
+      // An earlier run's rule counts when this run asked for it too — over
+      // the same names: positions into another list are not this one's.
+      if (
+        job &&
+        rule &&
+        batch.names === job.names &&
+        job.rules.includes(rule)
+      ) {
         this.hear(job, rule, { status: "done", result: msg.result });
       }
     }
@@ -136,11 +147,15 @@ export class RuleRunner {
     this.drop();
     const job = this.job;
     if (!job) return;
-    // Stuck in a rule of an earlier run that this one no longer asks for:
-    // nothing to say about it. Not started yet: the first one waiting is the
-    // one that did not get going.
-    const culprit =
-      stuck ?? job.rules.find((rule) => !job.heard.has(rule)) ?? null;
+    // Stuck in a rule of an earlier run — one this run no longer asks for,
+    // or over other names — nothing to say about it: this run runs it again
+    // over its own names. Not started yet: the first one waiting is the one
+    // that did not get going.
+    const culprit = stuck
+      ? stuck.names === job.names
+        ? stuck.rule
+        : null
+      : (job.rules.find((rule) => !job.heard.has(rule)) ?? null);
     if (culprit && job.rules.includes(culprit)) {
       this.hear(job, culprit, outcome);
     }

@@ -7,6 +7,7 @@ import type { BrowserWindow } from "electron";
 import type { DeriveAutoTags } from "../core/autoTagDeriver.js";
 import type { PositionWriter } from "../core/positionWriter.js";
 import type { QueryWorkerClient } from "../core/queryWorkerClient.js";
+import type { WorkspacePasses } from "../core/workspacePasses.js";
 import type { Workspaces } from "../core/workspaces.js";
 import type { ScanManager } from "../scanManager.js";
 import type { LogoId } from "../../shared/ipc/schema.js";
@@ -30,4 +31,10 @@ export interface IpcContext {
   applyLogo: (logo: LogoId) => void;
   /** Evaluates the auto-tagging engine off the main thread. */
   deriveAutoTags: DeriveAutoTags;
+  /**
+   * Where passes over every workspace outside a scan run ("Apply to existing
+   * files", and any new one of that kind), so that a workspace's removal and
+   * quitting can stop them and wait.
+   */
+  passes: WorkspacePasses;
 }

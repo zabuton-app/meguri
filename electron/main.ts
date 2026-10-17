@@ -36,6 +36,7 @@ import { PositionWriter } from "./core/positionWriter.js";
 import { registerIpc } from "./ipc/index.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
+import { WorkspacePasses } from "./core/workspacePasses.js";
 import type { LogoId } from "../shared/ipc/schema.js";
 
 // Set up logging before anything else so early failures land in the log file.
@@ -340,6 +341,7 @@ function emit(channel: string, payload: unknown): void {
 const autoTagWorker = new AutoTagWorkerClient(
   path.join(__dirname, "autoTagWorker.js"),
 );
+const passes = new WorkspacePasses();
 const scans = new ScanManager({
   ws,
   queryClient,
@@ -572,6 +574,7 @@ void app.whenReady().then(async () => {
     scans,
     applyLogo,
     deriveAutoTags: autoTagWorker.derive,
+    passes,
   });
   createTray();
   // Dock icon override on macOS (BrowserWindow icons are ignored there).
@@ -596,21 +599,23 @@ void app.whenReady().then(async () => {
 // Async teardown before quit: leave no live better-sqlite3 handle behind
 // (worker read-only handles, the main-thread fallback, and the per-workspace
 // writers), since unloading the native addon over open connections is a
-// crash risk on exit. Order: abort scans and let them drain (their in-flight
-// ffmpeg runs are killed by the signal, so this is short — and bounded, since
-// a stuck scan must not stall quit), then dispose the query worker. The
+// crash risk on exit. Order: abort scans and workspace passes and let them
+// drain (a scan's in-flight ffmpeg runs are killed by the signal, so this is
+// short — and bounded, since a stuck one must not stall quit), then dispose
+// the query worker. The
 // writers are closed by the quit gate's finally below, so that step runs even
 // when the budget cuts this short.
 // Teardown is three steps, in this order, on every quit path:
 //   1. stopIntake()   — sync: hide the window, stop the local servers, abort
 //                       scans. Nothing new gets in after this.
-//   2. drain          — async (shutdown() only): wait, bounded, for scans to
-//                       settle and for the query worker to close its handles.
+//   2. drain          — async (shutdown() only): wait, bounded, for scans and
+//                       workspace passes to settle and for the query worker
+//                       to close its handles.
 //   3. finalizeQuit() — sync: close the writers, refuse reopening, remove the
 //                       control file. Always runs, even when 2 was cut short.
 // The async gate (before-quit below) runs 1→2→3; the synchronous paths
 // (teardownSync) run 1→3 with the worker torn down fire-and-forget.
-const SHUTDOWN_SCAN_WAIT_MS = 1_000;
+const SHUTDOWN_DRAIN_WAIT_MS = 1_000;
 
 function stopIntake(): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
@@ -620,7 +625,10 @@ function stopIntake(): void {
 
 async function shutdown(): Promise<void> {
   stopIntake();
-  await withTimeout(scans.abortAll(), SHUTDOWN_SCAN_WAIT_MS);
+  await withTimeout(
+    Promise.all([scans.abortAll(), passes.abortAll()]),
+    SHUTDOWN_DRAIN_WAIT_MS,
+  );
   autoTagWorker.dispose();
   await queryClient.dispose();
 }
@@ -661,6 +669,7 @@ function teardownSync(): void {
   quitPhase = "disposing";
   stopIntake();
   void scans.abortAll();
+  void passes.abortAll();
   autoTagWorker.dispose();
   queryClient.terminateNow();
   finalizeQuit();
@@ -672,7 +681,7 @@ function teardownSync(): void {
 // The budget here is a backstop over shutdown()'s own bounds (scan drain +
 // worker dispose), derived from them so it always stays above their sum and
 // the normal path completes before it fires.
-const QUIT_BUDGET_MS = SHUTDOWN_SCAN_WAIT_MS + DISPOSE_TIMEOUT_MS + 2_000;
+const QUIT_BUDGET_MS = SHUTDOWN_DRAIN_WAIT_MS + DISPOSE_TIMEOUT_MS + 2_000;
 app.on("before-quit", (e) => {
   globalShortcut.unregisterAll();
   if (quitPhase === "done") return;
