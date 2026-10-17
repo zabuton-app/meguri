@@ -19,7 +19,11 @@ import type {
   UpdateInfo,
 } from "@shared/ipc/schema";
 import type { GraphDims } from "@shared/ipc/graph";
-import type { AutoTagAssignment, AutoTagConfig } from "@shared/autoTag";
+import type {
+  AutoTagAssignment,
+  AutoTagConfig,
+  AutoTagEditTarget,
+} from "@shared/autoTag";
 
 interface Bridge {
   invoke<T = unknown>(channel: string, args?: unknown): Promise<T>;
@@ -223,6 +227,12 @@ export const api = {
   autoTagFiles: () => invoke("auto_tag_files"),
   autoTagApply: (assignments: AutoTagAssignment[]) =>
     invoke("auto_tag_apply", { assignments }),
+  /** files_bulk_tag for the screen: only files still where it read them. */
+  autoTagEdit: (
+    targets: AutoTagEditTarget[],
+    add: string[],
+    remove: string[],
+  ) => invoke("auto_tag_edit", { targets, add, remove }),
   autoTagUndo: (undoIds: string[]) => invoke("auto_tag_undo", { undoIds }),
   autoTagReapply: () => invoke("auto_tag_reapply"),
   /** App logo variant (window + tray icon), persisted in main's config.json. */

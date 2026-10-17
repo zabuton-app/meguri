@@ -56,6 +56,7 @@ export const INVOKE_CHANNELS = [
   "auto_tag_set",
   "auto_tag_files",
   "auto_tag_apply",
+  "auto_tag_edit",
   "auto_tag_undo",
   "auto_tag_reapply",
   "bookmark_add",

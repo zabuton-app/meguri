@@ -256,10 +256,18 @@ Attaching only ever adds — changing a rule does not take back what it already
 tagged — and `attachAutoTags()` reports exactly the pairs it added, which is
 what rolls back an apply that failed partway (kept in memory in the main
 process, not persisted). The screen keeps no record of what it applied: taking
-a tag off again goes by what the files carry, through `files_bulk_tag`. Renaming
+a tag off again goes by what the files carry, through `auto_tag_edit`. Renaming
 a tag of a keyword or folder rule on the screen offers to move the files the
 condition reaches from the old tag to the new one, by the same reading; a
 rename on the tag screen does not reach the conditions.
+
+The screen sends ids it loaded earlier, and a rebuild hands ids to other files
+while a move gives a file another name. So `auto_tag_apply` and `auto_tag_edit`
+take, with each id, the place the screen read it at, and write only to the
+files still there (`keepStillAt`, the same check a scan's pass makes before
+its writes); the rest come back as `moved`, and the screen reads the files
+again. Each call is split to fit the file count, the (file, tag) pairs and the
+places' total length (`MAX_AUTO_TAG_PLACE_CHARS`).
 
 The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed
 suggestions and excluded terms) is app-wide, in `config.json` under `autoTag`.
@@ -288,8 +296,8 @@ rules' tags only, and the files stay owed for what their names give.
 suggestions (frequent words of the names that no rule or keyword produces
 yet) and a file name cut into taggable parts for the detail view. Those
 run in the renderer over the names loaded by `auto_tag_files` (capped at
-`MAX_AUTO_TAG_FILES`); every write goes through `auto_tag_apply`, which only
-says which files get which tags.
+`MAX_AUTO_TAG_FILES`); every write goes through `auto_tag_apply` or
+`auto_tag_edit`, which only say which files get which tags.
 
 A user's regular expression never runs on the renderer's own thread: one that
 backtracks without end would hang the screen. The screen runs the rules in a

@@ -22,6 +22,7 @@ import {
   fileNameOf,
   folderOf,
   isUsableTagName,
+  placeOf,
   withFolderTags,
   type AutoTagFile,
 } from "../../shared/autoTag.js";
@@ -139,6 +140,59 @@ export function detachTagPairs(db: DB, pairs: readonly TagPair[]): number {
 
 const CHUNK = AUTO_TAG_CHUNK;
 
+/** The place (placeOf) a stored path is at, as the screen names it. */
+export function placeOfPath(relPath: string): string {
+  return placeOf(
+    folderOf(relPath).normalize("NFC"),
+    fileNameOf(relPath).normalize("NFC"),
+  );
+}
+
+/** Where each of these alive files is now (placeOfPath), by id. */
+function placesNow(db: DB, ids: readonly number[]): Map<number, string> {
+  if (ids.length === 0) return new Map();
+  const rows = db
+    .prepare(
+      `SELECT id, rel_path FROM files
+        WHERE deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))`,
+    )
+    .all(JSON.stringify(ids)) as NameRow[];
+  return new Map(rows.map((row) => [row.id, placeOfPath(row.rel_path)]));
+}
+
+/**
+ * Of these files (id → where its name was read, placeOf), the ones still
+ * there. A rebuild clears the index and fills it again, handing the ids to
+ * other files; a move gives a file another name. Either way what was worked
+ * out from the old name is not the file's any more. Synchronous: checked
+ * with nothing awaited between this and the write it guards.
+ */
+export function filesStillAt(
+  db: DB,
+  readAt: ReadonlyMap<number, string>,
+): Set<number> {
+  const now = placesNow(db, [...readAt.keys()]);
+  return new Set(
+    [...readAt]
+      .filter(([id, place]) => now.get(id) === place)
+      .map(([id]) => id),
+  );
+}
+
+/**
+ * filesStillAt for ids sent beside the places they were read at, as the
+ * screen sends them: the ids still there, and how many were not.
+ */
+export function keepStillAt(
+  db: DB,
+  fileIds: readonly number[],
+  places: readonly string[],
+): { kept: number[]; moved: number } {
+  const now = placesNow(db, fileIds);
+  const kept = fileIds.filter((id, i) => now.get(id) === places[i]);
+  return { kept, moved: fileIds.length - kept.length };
+}
+
 interface NameRow {
   id: number;
   rel_path: string;
@@ -196,17 +250,11 @@ export async function applyAutoTags(
   /** Writes what the names gave each row, with what its folder gives. */
   const write = (rows: NameRow[], named: readonly string[][]): void => {
     // The engine was awaited before this, and the index may have changed
-    // meanwhile: an id may now name another file (a rebuild clears the index
-    // and fills it again) or this file under another name (a move). Either
-    // way the tags were worked out from a name it no longer has, so only a
-    // file still at the path its name was read from is written to — checked
-    // here, with nothing awaited between this and the write. (The screen's
-    // own apply, which sends ids it loaded earlier, does not check this.)
-    const readFrom = new Map(rows.map((row) => [row.id, row.rel_path]));
-    const unchanged = new Set(
-      (byIds.all(JSON.stringify([...readFrom.keys()])) as NameRow[])
-        .filter((now) => now.rel_path === readFrom.get(now.id))
-        .map((now) => now.id),
+    // meanwhile (see filesStillAt): only a file still where its name was read
+    // is written to. The screen's own writes are checked the same way.
+    const unchanged = filesStillAt(
+      db,
+      new Map(rows.map((row) => [row.id, placeOfPath(row.rel_path)])),
     );
     // What the names gave, then what the folders give: path comparisons, done
     // here rather than in the worker, and put together by withFolderTags as
