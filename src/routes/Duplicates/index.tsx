@@ -16,6 +16,7 @@ import { fileHref } from "@/lib/fileHref";
 import { formatSize } from "@/lib/format";
 import type { DuplicateGroup } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -119,80 +120,82 @@ export default function Duplicates() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex flex-col gap-2 p-4">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-14 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
-            <CopyCheck className="size-10 opacity-50" />
-            <p>{t("duplicates.empty")}</p>
-            <p className="text-xs">{t("duplicates.emptyHint")}</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 p-3">
-            {duplicates.data?.truncated && (
-              <p className="px-1 text-xs text-muted">
-                {t("duplicates.truncated", { max: MAX_DUPLICATE_GROUPS })}
-              </p>
-            )}
-            {groups.map((g) => (
-              <section key={`${g.contentHash}:${g.size}`}>
-                <h3 className="sticky top-0 z-10 flex items-baseline gap-2 bg-bg px-1 py-1.5 text-xs font-semibold text-muted">
-                  <span className="tabular-nums text-fg">
-                    {formatSize(g.size, "0 B")}
-                  </span>
-                  <span>
-                    {t("duplicates.fileCount", { count: g.files.length })}
-                  </span>
-                  <span className="font-mono font-normal opacity-60">
-                    {g.contentHash.slice(0, 8)}
-                  </span>
-                </h3>
-                <ul className="flex flex-col gap-1">
-                  {g.files.map((file) => (
-                    <li key={`${file.workspaceId}:${file.id}`}>
-                      <Link
-                        to={fileHref(file.id, file.workspaceId, {
-                          autoplay: false,
-                        })}
-                        className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
-                      >
-                        <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
-                          <MediaThumbnail
-                            file={file}
-                            mediaBase={mediaBase}
-                            version={0}
-                            fallbackIconSize="size-5"
-                            playOverlaySize="size-7"
-                            playIconSize="size-3.5"
-                          />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className="block truncate text-sm text-fg"
-                            title={file.relPath}
-                          >
-                            {file.relPath}
+      {!loading && groups.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
+          <CopyCheck className="size-10 opacity-50" />
+          <p>{t("duplicates.empty")}</p>
+          <p className="text-xs">{t("duplicates.emptyHint")}</p>
+        </div>
+      ) : (
+        <ScrollArea className="page-scroll min-h-0 flex-1">
+          {loading ? (
+            <div className="flex flex-col gap-2 p-4">
+              {Array.from({ length: 6 }, (_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 p-3">
+              {duplicates.data?.truncated && (
+                <p className="px-1 text-xs text-muted">
+                  {t("duplicates.truncated", { max: MAX_DUPLICATE_GROUPS })}
+                </p>
+              )}
+              {groups.map((g) => (
+                <section key={`${g.contentHash}:${g.size}`}>
+                  <h3 className="sticky top-0 z-10 flex items-baseline gap-2 bg-bg px-1 py-1.5 text-xs font-semibold text-muted">
+                    <span className="tabular-nums text-fg">
+                      {formatSize(g.size, "0 B")}
+                    </span>
+                    <span>
+                      {t("duplicates.fileCount", { count: g.files.length })}
+                    </span>
+                    <span className="font-mono font-normal opacity-60">
+                      {g.contentHash.slice(0, 8)}
+                    </span>
+                  </h3>
+                  <ul className="flex flex-col gap-1">
+                    {g.files.map((file) => (
+                      <li key={`${file.workspaceId}:${file.id}`}>
+                        <Link
+                          to={fileHref(file.id, file.workspaceId, {
+                            autoplay: false,
+                          })}
+                          className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
+                        >
+                          <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
+                            <MediaThumbnail
+                              file={file}
+                              mediaBase={mediaBase}
+                              version={0}
+                              fallbackIconSize="size-5"
+                              playOverlaySize="size-7"
+                              playIconSize="size-3.5"
+                            />
                           </span>
-                          {showWsLabel && wsLabels.get(file.workspaceId) && (
-                            <span className="mt-0.5 block truncate text-xs text-muted">
-                              {wsLabels.get(file.workspaceId)}
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className="block truncate text-sm text-fg"
+                              title={file.relPath}
+                            >
+                              {file.relPath}
                             </span>
-                          )}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        )}
-      </div>
+                            {showWsLabel && wsLabels.get(file.workspaceId) && (
+                              <span className="mt-0.5 block truncate text-xs text-muted">
+                                {wsLabels.get(file.workspaceId)}
+                              </span>
+                            )}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      )}
     </HistoryModal>
   );
 }

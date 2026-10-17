@@ -24,6 +24,7 @@ import { tallySelectionTags } from "@/lib/bulkTags";
 import { bulkTargets } from "@/lib/bulkEdit";
 import { useTagSuggestions } from "@/hooks/useTagSuggestions";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FileRow } from "@/ipc/types";
 import {
   MAX_BULK_FILES,
@@ -256,70 +257,78 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
             {tally.length === 0 ? (
               <span className="text-xs text-muted">{t("tag.none")}</span>
             ) : (
-              <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto">
-                {tally.map(({ name, count }) => {
-                  const staged = removing.includes(name);
-                  const all = count === total;
-                  const raised = adding.includes(name);
-                  return (
-                    <span
-                      key={name}
-                      className={cn(
-                        "inline-flex h-[26px] items-center gap-1.5 rounded-md border pl-2 pr-1 text-xs",
-                        staged
-                          ? "border-error/60 bg-bg text-muted line-through"
-                          : all || raised
-                            ? "border-overlay bg-overlay text-fg"
-                            : "border-dashed border-primary bg-bg text-fg",
-                      )}
-                    >
-                      {/* Only a partial tag can be raised; one every file
-                          already carries has nothing to level up to. */}
-                      {!all && !staged && !raised ? (
+              // type="auto": an always-on scrollbar track sits over the chips'
+              // edges and takes their clicks even when nothing overflows.
+              <ScrollArea
+                type="auto"
+                className="page-scroll flex max-h-44 flex-col"
+                viewportClassName="min-h-0 flex-1 pr-2.5"
+              >
+                <div className="flex flex-wrap gap-1.5">
+                  {tally.map(({ name, count }) => {
+                    const staged = removing.includes(name);
+                    const all = count === total;
+                    const raised = adding.includes(name);
+                    return (
+                      <span
+                        key={name}
+                        className={cn(
+                          "inline-flex h-[26px] items-center gap-1.5 rounded-md border pl-2 pr-1 text-xs",
+                          staged
+                            ? "border-error/60 bg-bg text-muted line-through"
+                            : all || raised
+                              ? "border-overlay bg-overlay text-fg"
+                              : "border-dashed border-primary bg-bg text-fg",
+                        )}
+                      >
+                        {/* Only a partial tag can be raised; one every file
+                            already carries has nothing to level up to. */}
+                        {!all && !staged && !raised ? (
+                          <button
+                            type="button"
+                            onClick={() => stageAdd(name)}
+                            title={t("select.bulkTagRaise", { name })}
+                            className="transition hover:opacity-80"
+                          >
+                            {name}
+                          </button>
+                        ) : (
+                          name
+                        )}
+                        <span
+                          className={cn(
+                            "text-[10px] font-bold tabular-nums",
+                            all || raised ? "text-muted" : "text-primary",
+                          )}
+                        >
+                          {raised ? total : count}/{total}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => stageAdd(name)}
-                          title={t("select.bulkTagRaise", { name })}
-                          className="transition hover:opacity-80"
+                          onClick={() => toggleRemove(name)}
+                          aria-label={
+                            staged
+                              ? t("select.bulkTagKeep", { name })
+                              : t("select.bulkTagRemove", { name })
+                          }
+                          title={
+                            staged
+                              ? t("select.bulkTagKeep", { name })
+                              : t("select.bulkTagRemove", { name })
+                          }
+                          className="rounded p-0.5 text-muted transition hover:text-fg"
                         >
-                          {name}
+                          {staged ? (
+                            <Undo2 className="size-3" strokeWidth={2.5} />
+                          ) : (
+                            <X className="size-3" strokeWidth={3} />
+                          )}
                         </button>
-                      ) : (
-                        name
-                      )}
-                      <span
-                        className={cn(
-                          "text-[10px] font-bold tabular-nums",
-                          all || raised ? "text-muted" : "text-primary",
-                        )}
-                      >
-                        {raised ? total : count}/{total}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => toggleRemove(name)}
-                        aria-label={
-                          staged
-                            ? t("select.bulkTagKeep", { name })
-                            : t("select.bulkTagRemove", { name })
-                        }
-                        title={
-                          staged
-                            ? t("select.bulkTagKeep", { name })
-                            : t("select.bulkTagRemove", { name })
-                        }
-                        className="rounded p-0.5 text-muted transition hover:text-fg"
-                      >
-                        {staged ? (
-                          <Undo2 className="size-3" strokeWidth={2.5} />
-                        ) : (
-                          <X className="size-3" strokeWidth={3} />
-                        )}
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
             )}
             <p className="text-[11px] leading-relaxed text-muted">
               {t("select.bulkTagHint")}
