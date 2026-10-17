@@ -321,11 +321,10 @@ run at all. The keywords, escaped literals, are run in place.
 ones before it stay, and the caches and the screen are read again so that they
 show it.
 
-`config.ignored` holds suggestions dismissed on the suggestions tab.
-`config.excludedTerms` holds words that are never suggested (no screen edits
-it any more; what is stored is still read); they also stop
-being offered as frequent words. Neither changes what the rules or the
-dictionary themselves produce.
+`config.ignored` holds suggestions dismissed on the suggestions tab. Common
+words (`STOP_WORDS` in `shared/autoTagAnalysis.ts`) are never suggested.
+Neither changes what the rules or the dictionary themselves produce. An
+`excludedTerms` list an earlier version stored is no longer read.
 
 ## Query layer
 

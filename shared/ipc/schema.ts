@@ -308,7 +308,6 @@ export const AutoTagConfigSchema = z.object({
   folders: z.array(AutoTagFolderSchema).max(MAX_AUTO_TAG_FOLDER_RULES),
   applyOnScan: z.boolean(),
   ignored: z.array(autoTagTerm).max(MAX_AUTO_TAG_TERMS),
-  excludedTerms: z.array(autoTagTerm).max(MAX_AUTO_TAG_TERMS),
 }) satisfies z.ZodType<AutoTagConfig>;
 
 export const TagSourceCountSchema = z.object({

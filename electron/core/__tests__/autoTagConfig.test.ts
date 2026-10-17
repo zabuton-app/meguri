@@ -44,6 +44,14 @@ describe("the stored auto-tagging configuration", () => {
     expect(loadConfig().autoTag.applyOnScan).toBe(true);
   });
 
+  it("drops the excluded terms an earlier version stored", () => {
+    write({
+      autoTag: { ...defaultAutoTagConfig(), excludedTerms: ["dsc", "公式"] },
+    });
+    // Nothing edits them and nothing reads them; the rest loads as stored.
+    expect(loadConfig().autoTag).toEqual(defaultAutoTagConfig());
+  });
+
   it("keeps the rules a user has as they are: switched on, edited, in their order", () => {
     // As a config written while the built-in rules still shipped switched on.
     const [prefix, square, ...rest] = defaultRules();

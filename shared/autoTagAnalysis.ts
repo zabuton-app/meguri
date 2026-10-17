@@ -19,7 +19,7 @@ import {
 } from "./autoTag.js";
 import { MAX_TAG_NAME } from "./tags.js";
 
-/** Words that say nothing about a file. The user's excluded terms add to these. */
+/** Words that say nothing about a file: never suggested. */
 export const STOP_WORDS: readonly string[] = [
   "the",
   "and",

@@ -108,12 +108,6 @@ export interface AutoTagConfig {
   applyOnScan: boolean;
   /** Suggestions the user dismissed (lowercase), so they are not offered again. */
   ignored: string[];
-  /**
-   * Terms that are never offered as tags (lowercase). Nothing on the screen
-   * edits this list at present — the tab that did was removed — but what is
-   * stored is still read, as stop words for the suggestions.
-   */
-  excludedTerms: string[];
 }
 
 /** Ids of the built-in rules; the UI has a localized name for each. */
@@ -212,7 +206,6 @@ export function defaultAutoTagConfig(): AutoTagConfig {
     folders: [],
     applyOnScan: true,
     ignored: [],
-    excludedTerms: ["dsc", "img", "mvi", "公式"],
   };
 }
 
@@ -552,7 +545,7 @@ export function withFolderTags(
 
 /**
  * Tags as one list puts them together: the first spelling of each (compared
- * without regard to case), up to what one file may be given — as proposalsFor
+ * without regard to case), up to what one file may be given — as tagsForName
  * does as it goes.
  */
 export function firstSpellings(tags: readonly string[]): string[] {
@@ -618,16 +611,6 @@ export function compileEngine(config: {
   };
 }
 
-export type ProposalSource =
-  { kind: "rule"; ruleId: string } | { kind: "keyword"; keywordId: string };
-
-export interface Proposal {
-  tag: string;
-  /** Lowercased tag: what makes two proposals the same tag. */
-  key: string;
-  source: ProposalSource;
-}
-
 /**
  * The tags a file's name gives it: rules first, then the dictionary. What the
  * folder rules add goes by where the file is, not by its name, and is put
@@ -635,39 +618,32 @@ export interface Proposal {
  * case-insensitively and the first spelling wins. The input is normalized
  * (NFC) so a decomposed name from macOS matches a typed keyword.
  */
-export function proposalsFor(engine: CompiledEngine, name: string): Proposal[] {
+export function tagsForName(engine: CompiledEngine, name: string): string[] {
   const input = name.normalize("NFC");
-  const out: Proposal[] = [];
+  const out: string[] = [];
   const seen = new Set<string>();
-  const add = (tag: string, source: ProposalSource): boolean => {
+  const add = (tag: string): boolean => {
     const key = tag.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
-      out.push({ tag, key, source });
+      out.push(tag);
     }
     return out.length < MAX_AUTO_TAGS_PER_FILE;
   };
   for (const compiled of engine.rules) {
     for (const hit of runRule(compiled, input)) {
       for (const tag of hit.tags) {
-        if (!add(tag, { kind: "rule", ruleId: compiled.rule.id })) return out;
+        if (!add(tag)) return out;
       }
     }
   }
   for (const compiled of engine.keywords) {
     if (runKeyword(compiled, input).length === 0) continue;
     for (const tag of compiled.tags) {
-      if (!add(tag, { kind: "keyword", keywordId: compiled.entry.id })) {
-        return out;
-      }
+      if (!add(tag)) return out;
     }
   }
   return out;
-}
-
-/** {@link proposalsFor}, names only. */
-export function tagsForName(engine: CompiledEngine, name: string): string[] {
-  return proposalsFor(engine, name).map((p) => p.tag);
 }
 
 // ---------------------------------------------------------------------------

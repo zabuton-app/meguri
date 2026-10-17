@@ -46,7 +46,6 @@ import {
   folderOf,
   formatExclude,
   isUnderFolder,
-  proposalsFor,
   resetBuiltinRules,
   runKeyword,
   runRule,
@@ -253,15 +252,15 @@ describe("keywords", () => {
   });
 });
 
-describe("proposals", () => {
+describe("tags for a name", () => {
   it("lists rules first, then the dictionary, one spelling per tag", () => {
     const engine = engineOf(activeRules(), [
       keyword({ id: "trip", terms: ["trip"], tags: ["trip"] }),
       keyword(),
     ]);
-    expect(proposalsFor(engine, "[Trip] yoga camp.mp4")).toEqual([
-      { tag: "Trip", key: "trip", source: { kind: "rule", ruleId: "square" } },
-      { tag: "Yoga", key: "yoga", source: { kind: "keyword", keywordId: "k" } },
+    expect(tagsForName(engine, "[Trip] yoga camp.mp4")).toEqual([
+      "Trip",
+      "Yoga",
     ]);
   });
 
@@ -672,17 +671,27 @@ describe("attaching tags", () => {
     );
     const engine = { rules: activeRules(), keywords: [keyword()] };
 
-    const some = await applyAutoTags(db, { engine, fileIds: [ids[0], ids[7]] });
+    const some = await applyAutoTags(db, {
+      engine,
+      derive: deriveAutoTagsInProcess,
+      fileIds: [ids[0], ids[7]],
+    });
     expect(some).toEqual({ files: 1, added: 2, completed: true });
     expect(names(ids[0])).toEqual(["ABCD", "Yoga"]);
     expect(names(ids[3])).toEqual([]);
 
-    const all = await applyAutoTags(db, { engine });
+    const all = await applyAutoTags(db, {
+      engine,
+      derive: deriveAutoTagsInProcess,
+    });
     expect(all.completed).toBe(true);
     expect(names(ids[3])).toEqual(["Kyoto", "Trip"]);
     expect(names(ids[8])).toEqual(["Yoga"]);
     // Nothing left to add the second time.
-    expect((await applyAutoTags(db, { engine })).added).toBe(0);
+    expect(
+      (await applyAutoTags(db, { engine, derive: deriveAutoTagsInProcess }))
+        .added,
+    ).toBe(0);
   });
 
   it("adds the folder rules' tags even when the names could not be read", async () => {
@@ -785,9 +794,16 @@ describe("attaching tags", () => {
     const engine = { rules: [], keywords: [], folders };
 
     // Without being told which workspace this is, no folder rule applies.
-    expect((await applyAutoTags(db, { engine })).added).toBe(0);
+    expect(
+      (await applyAutoTags(db, { engine, derive: deriveAutoTagsInProcess }))
+        .added,
+    ).toBe(0);
 
-    const result = await applyAutoTags(db, { engine, workspaceId: "ws" });
+    const result = await applyAutoTags(db, {
+      engine,
+      derive: deriveAutoTagsInProcess,
+      workspaceId: "ws",
+    });
     expect(result).toEqual({ files: 2, added: 4, completed: true });
     expect(names(inFolder)).toEqual(["2024", "Trip"]);
     expect(names(deeper)).toEqual(["2024", "Trip"]);
@@ -846,6 +862,7 @@ describe("attaching tags", () => {
       { id: "f2", workspaceId: "ws", folder: "", tags: ["All"], enabled: true },
     ];
     await applyAutoTags(db, {
+      derive: deriveAutoTagsInProcess,
       engine: { rules: [], keywords: [], folders },
       workspaceId: "ws",
     });
@@ -859,6 +876,7 @@ describe("attaching tags", () => {
     const controller = new AbortController();
     controller.abort();
     await applyAutoTagsOnScan(db, {
+      derive: deriveAutoTagsInProcess,
       engine,
       changedIds: [id],
       signal: controller.signal,
@@ -867,7 +885,11 @@ describe("attaching tags", () => {
     expect(getSetting(db, AUTO_TAG_PENDING_KEY)).toBe(JSON.stringify([id]));
 
     // The next scan sees the file as unchanged, and tags it anyway.
-    await applyAutoTagsOnScan(db, { engine, changedIds: [] });
+    await applyAutoTagsOnScan(db, {
+      engine,
+      derive: deriveAutoTagsInProcess,
+      changedIds: [],
+    });
     expect(names(id)).toEqual(["ABCD"]);
     expect(getSetting(db, AUTO_TAG_PENDING_KEY)).toBe("[]");
   });

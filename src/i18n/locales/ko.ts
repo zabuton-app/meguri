@@ -729,6 +729,8 @@ export const ko: Record<TranslationKey, string> = {
   "autoTag.removedMany": "태그 {tags}개를 {files}개 파일에서 제거했습니다.",
   "autoTag.removeFailed": "태그를 제거하지 못했습니다.",
   "autoTag.viewFiles": "파일 보기",
+  "autoTag.viewFilesInAllFailed":
+    "‘전체’로 전환하지 못해 현재 보기에서 검색합니다",
   "autoTag.searchCandidateHint":
     "이 후보의 단어를 포함한 파일을 라이브러리 검색으로 표시합니다",
   "autoTag.noCandidates": "이 조건의 후보가 없습니다.",

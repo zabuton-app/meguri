@@ -703,6 +703,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "autoTag.removedMany": "已从 {files} 个文件移除 {tags} 个标签。",
   "autoTag.removeFailed": "无法移除标签。",
   "autoTag.viewFiles": "查看文件",
+  "autoTag.viewFilesInAllFailed": "无法切换到“全部”，将在当前视图中搜索",
   "autoTag.searchCandidateHint": "用媒体库的搜索显示包含此候选词语的文件",
   "autoTag.noCandidates": "此条件下没有候选。",
   "autoTag.selection": "已选 {count} 项 · 共标记 {files} 个文件",
