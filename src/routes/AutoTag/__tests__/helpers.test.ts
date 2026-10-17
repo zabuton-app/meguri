@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { folderFileIndexes, renameTag } from "@/routes/AutoTag/helpers";
-import type { AutoTagFile } from "@shared/autoTag";
+import {
+  folderFileIndexes,
+  keywordMatches,
+  renameTag,
+} from "@/routes/AutoTag/helpers";
+import {
+  compileKeyword,
+  runKeyword,
+  type AutoTagFile,
+  type KeywordEntry,
+} from "@shared/autoTag";
 
 describe("renameTag", () => {
   const none = new Map<string, string>();
@@ -63,5 +72,40 @@ describe("folderFileIndexes", () => {
     expect(folderFileIndexes(files, { workspaceId: "ws", folder: "" })).toEqual(
       [0, 1, 2, 4],
     );
+  });
+});
+
+describe("keywordMatches", () => {
+  const entry = (terms: string[]): KeywordEntry => ({
+    id: "k",
+    terms,
+    tags: ["T"],
+    mode: "contains",
+  });
+
+  it("finds every name the keyword's expression matches, whatever the case", () => {
+    // The final sigma lowers to itself but uppers to Σ, as σ does; ß uppers
+    // to two letters; the dotted İ lowers to two characters.
+    const cases: [string, string][] = [
+      ["Σ", "ς.mp4"],
+      ["σ", "ΟΔΟΣ.mp4"],
+      ["ς", "σ.mp4"],
+      ["straße", "STRASSE straße.mp4"],
+      ["i", "İstanbul.mp4"],
+      ["Yoga", "yoga.mp4"],
+      // Half of a pair, as only a broken setting could hold.
+      ["\uDC28", "\uD801\uDC28.mp4"],
+    ];
+    for (const [term, name] of cases) {
+      const expression = runKeyword(compileKeyword(entry([term])), name);
+      const found = keywordMatches(entry([term]), [name]);
+      // Whatever the expression matches, the list shows.
+      expect(found.length > 0).toBe(expression.length > 0);
+    }
+    expect(keywordMatches(entry(["Σ"]), ["ς.mp4"])).toHaveLength(1);
+    // Whole words too, where the lookarounds only narrow the expression.
+    expect(
+      keywordMatches({ ...entry(["Yoga"]), mode: "word" }, ["YOGA class.mp4"]),
+    ).toHaveLength(1);
   });
 });

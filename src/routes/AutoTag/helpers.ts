@@ -229,16 +229,29 @@ const keywordMatchCache = new WeakMap<
   { names: readonly string[]; rows: KeywordMatches }
 >();
 
-/** The names lowercased, once per list rather than once per entry. */
-const loweredCache = new WeakMap<readonly string[], string[]>();
-function lowerNames(names: readonly string[]): string[] {
-  let lowered = loweredCache.get(names);
-  if (!lowered) {
-    lowered = names.map((name) => name.toLowerCase());
-    loweredCache.set(names, lowered);
+/**
+ * The names case-folded for the substring test below, once per list rather
+ * than once per entry. Folded the way the expression folds: a keyword's
+ * expression ignores case by upper-casing each character (the `i` flag
+ * without `u`), and so does `toUpperCase`, with no rule that looks at the
+ * letters around one. Lower-casing does not agree with it — the final sigma
+ * `ς` lowers to itself but uppers to `Σ`, as `σ` does — and would let the
+ * test turn away a name the expression matches. Where upper-casing makes a
+ * letter longer (`ß` becomes `SS`) it does so in the name and the term alike:
+ * the test may let a name through, never turn one away.
+ */
+const foldedCache = new WeakMap<readonly string[], string[]>();
+function foldNames(names: readonly string[]): string[] {
+  let folded = foldedCache.get(names);
+  if (!folded) {
+    folded = names.map((name) => name.toUpperCase());
+    foldedCache.set(names, folded);
   }
-  return lowered;
+  return folded;
 }
+
+const LONE_SURROGATE =
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
 /** The files a dictionary entry finds, and where in each name. */
 export function keywordMatches(
@@ -253,12 +266,16 @@ export function keywordMatches(
   // fraction of running the expression. The expression then decides (word
   // boundaries, the extension), so the test may only ever let too much in.
   const needles = entry.terms
-    .map((term) => term.normalize("NFC").trim().toLowerCase())
+    .map((term) => term.normalize("NFC").trim().toUpperCase())
     .filter(Boolean);
-  const lowered = lowerNames(names);
+  // A term holding half a surrogate pair (a broken setting: it cannot be
+  // typed) matches half of a character, which upper-casing the whole name
+  // can change: no test for it, the expression alone decides.
+  const testable = !needles.some((needle) => LONE_SURROGATE.test(needle));
+  const folded = foldNames(names);
   names.forEach((name, index) => {
-    const lower = lowered[index];
-    if (!needles.some((needle) => lower.includes(needle))) return;
+    const upper = folded[index];
+    if (testable && !needles.some((needle) => upper.includes(needle))) return;
     const hits = runKeyword(compiled, name);
     if (hits.length > 0) rows.push({ index, name, hits });
   });
