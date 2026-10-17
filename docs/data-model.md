@@ -280,7 +280,13 @@ the next time round.
 In the main process the part of the engine that reads names is evaluated in a
 worker thread (`electron/autoTagWorker.ts`, driven by `AutoTagWorkerClient`): a
 rule is an arbitrary regular expression, and one that backtracks without end
-cannot be interrupted on the thread running it. The worker runs a chunk's rules
+cannot be interrupted on the thread running it. The engine crosses to the
+worker once, under a version, and each chunk then carries only the names and
+the version it is for. The worker holds the last few engines sent
+(`AUTO_TAG_ENGINES_HELD`), so passes running side by side do not resend theirs
+at every chunk; the client counts them the same way and sends an engine ahead
+of a chunk the worker would not hold it for, a new worker's first included.
+The worker runs a chunk's rules
 one at a time (`deriveChunk`) and names each as it starts, then the keywords
 (which are blamed on no rule); the client watches
 the worker rather than each request, so time spent queued behind another pass

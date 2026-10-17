@@ -2,10 +2,11 @@
 // only knows the DeriveAutoTags shape; the app hands it the worker-backed one,
 // so a rule that never finishes costs a killed thread instead of a frozen app.
 import { Worker } from "node:worker_threads";
-import type {
-  AutoTagWorkerReply,
-  AutoTagWorkerRequest,
-} from "../autoTagWorker.js";
+import {
+  AUTO_TAG_ENGINES_HELD,
+  type AutoTagWorkerReply,
+  type AutoTagWorkerRequest,
+} from "./autoTagChunk.js";
 import { scopedLog } from "./logger.js";
 import {
   AUTO_TAG_CHUNK_TIMEOUT_MS,
@@ -71,6 +72,20 @@ interface Pending {
   reject: (err: Error) => void;
   /** The rules sent with it — what the worker names, by position, as it goes. */
   sent: readonly TagRule[];
+  /** Sent again once on "unknownEngine"; a second is a fault, not a race. */
+  resent: boolean;
+}
+
+/**
+ * The version an engine object goes by, with this many rules left out.
+ * Engines are not changed in place — a new configuration is a new object — so
+ * a pass's chunks, which share one, share a version; and since `dropped` only
+ * grows, its size tells whether the rules sent are still the ones to send.
+ */
+interface EngineVersion {
+  dropped: number;
+  version: number;
+  rules: readonly TagRule[];
 }
 
 export class AutoTagWorkerClient {
@@ -96,6 +111,14 @@ export class AutoTagWorkerClient {
    * hangs costs the budget once, not every chunk of every scan.
    */
   private readonly dropped = new Map<string, string>();
+  private engineSeq = 0;
+  private readonly engineVersions = new WeakMap<AutoTagEngine, EngineVersion>();
+  /**
+   * The versions the current worker holds, oldest first — counted as the
+   * worker counts them (AUTO_TAG_ENGINES_HELD), so an engine is sent exactly
+   * when the worker would not have it. A new worker holds none.
+   */
+  private workerHolds: number[] = [];
 
   constructor(
     private readonly workerPath: string,
@@ -143,6 +166,7 @@ export class AutoTagWorkerClient {
         resolve,
         reject,
         sent: [],
+        resent: false,
       });
       this.send(id);
     });
@@ -160,31 +184,76 @@ export class AutoTagWorkerClient {
       p.reject(err instanceof Error ? err : new Error(String(err)));
       return;
     }
-    const rules =
-      this.dropped.size === 0
-        ? p.engine.rules
-        : p.engine.rules.filter(
-            (rule) => !this.dropped.has(ruleBehaviorKey(rule)),
-          );
+    const { version, rules } = this.versionOf(p.engine);
     p.sent = rules;
     if (!this.watchdog) this.arm();
+    // Posts arrive in order, so the engine is held by the time its chunk is
+    // read.
+    if (!this.workerHolds.includes(version)) {
+      worker.postMessage({
+        type: "engine",
+        version,
+        rules: [...rules],
+        keywords: [...p.engine.keywords],
+      } satisfies AutoTagWorkerRequest);
+      this.workerHolds.push(version);
+      if (this.workerHolds.length > AUTO_TAG_ENGINES_HELD) {
+        this.workerHolds.shift();
+      }
+    }
     worker.postMessage({
+      type: "derive",
       id,
-      rules: [...rules],
-      keywords: [...p.engine.keywords],
+      version,
       names: [...p.names],
     } satisfies AutoTagWorkerRequest);
+  }
+
+  /** The version `engine` goes by now, without the rules given up on. */
+  private versionOf(engine: AutoTagEngine): EngineVersion {
+    const known = this.engineVersions.get(engine);
+    if (known?.dropped === this.dropped.size) return known;
+    const rules =
+      this.dropped.size === 0
+        ? engine.rules
+        : engine.rules.filter(
+            (rule) => !this.dropped.has(ruleBehaviorKey(rule)),
+          );
+    const version = {
+      dropped: this.dropped.size,
+      version: ++this.engineSeq,
+      rules,
+    };
+    this.engineVersions.set(engine, version);
+    return version;
   }
 
   private ensureWorker(): Worker {
     if (this.worker) return this.worker;
     const worker = new Worker(this.workerPath);
     worker.unref(); // never keep the app alive on its own
+    this.workerHolds = [];
     worker.on("message", (reply: AutoTagWorkerReply) => {
       if (worker !== this.worker) return;
       if (reply.type === "start") {
         this.running = { id: reply.id, at: reply.at };
         this.arm();
+        return;
+      }
+      if (reply.type === "unknownEngine") {
+        // The two sides counted differently (see the reply): forget what the
+        // worker was thought to hold and send again, engine first — once.
+        const p = this.pending.get(reply.id);
+        if (!p) return;
+        this.workerHolds = [];
+        if (!p.resent) {
+          p.resent = true;
+          this.send(reply.id);
+          return;
+        }
+        this.pending.delete(reply.id);
+        if (this.pending.size === 0) this.stopWatchdog();
+        p.reject(new Error("auto-tag worker does not hold the engine sent"));
         return;
       }
       const p = this.pending.get(reply.id);
