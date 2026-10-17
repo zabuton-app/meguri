@@ -4,7 +4,27 @@
 // values can be used at runtime (e.g. for .parse() validation in main); the
 // inferred types satisfy the prior hand-written interfaces.
 import { z } from "zod";
-import { MAX_TAG_REF_NAME } from "../tags.js";
+import { MAX_TAG_NAME, MAX_TAG_REF_NAME } from "../tags.js";
+import {
+  CASE_MODES,
+  KEYWORD_MODES,
+  MAX_AUTO_TAG_KEYWORD_TAGS,
+  MAX_AUTO_TAG_KEYWORD_TERMS,
+  MAX_AUTO_TAG_EXCLUDE,
+  MAX_AUTO_TAG_FOLDER_RULES,
+  MAX_AUTO_TAG_FOLDER_TAGS,
+  MAX_AUTO_TAG_KEYWORDS,
+  MAX_AUTO_TAG_PATTERN,
+  MAX_AUTO_TAG_RULES,
+  MAX_AUTO_TAG_RULE_NAME,
+  MAX_AUTO_TAG_TEMPLATE,
+  MAX_AUTO_TAG_TERMS,
+  RULE_KINDS,
+  type AutoTagConfig,
+  type FolderRule,
+  type KeywordEntry,
+  type TagRule,
+} from "../autoTag.js";
 import { MAX_FOLDER_PATH, isNormalizedFolderPath } from "../folderPath.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
 import { GRAPH_NODE_KEY_MAX } from "./graph.js";
@@ -246,6 +266,50 @@ export const TagRefSchema = z.object({
   name: z.string().min(1).max(MAX_TAG_REF_NAME),
 });
 export type TagRef = z.infer<typeof TagRefSchema>;
+
+/**
+ * Auto-tagging configuration (shared/autoTag.ts). Shape and size only: a rule
+ * whose pattern does not compile is stored as typed — the screen shows the
+ * error next to it and the engine skips it — so half-finished edits survive.
+ */
+export const AutoTagRuleSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().max(MAX_AUTO_TAG_RULE_NAME),
+  kind: z.enum(RULE_KINDS),
+  pattern: z.string().max(MAX_AUTO_TAG_PATTERN),
+  template: z.string().max(MAX_AUTO_TAG_TEMPLATE),
+  exclude: z.string().max(MAX_AUTO_TAG_EXCLUDE),
+  ci: z.boolean(),
+  split: z.boolean(),
+  caseMode: z.enum(CASE_MODES),
+  enabled: z.boolean(),
+}) satisfies z.ZodType<TagRule>;
+
+const autoTagTerm = z.string().min(1).max(MAX_TAG_NAME);
+
+export const AutoTagKeywordSchema = z.object({
+  id: z.string().min(1).max(64),
+  terms: z.array(autoTagTerm).max(MAX_AUTO_TAG_KEYWORD_TERMS),
+  tags: z.array(autoTagTerm).max(MAX_AUTO_TAG_KEYWORD_TAGS),
+  mode: z.enum(KEYWORD_MODES),
+}) satisfies z.ZodType<KeywordEntry>;
+
+export const AutoTagFolderSchema = z.object({
+  id: z.string().min(1).max(64),
+  workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  folder: z.string().max(MAX_FOLDER_PATH).refine(isNormalizedFolderPath),
+  tags: z.array(autoTagTerm).max(MAX_AUTO_TAG_FOLDER_TAGS),
+  enabled: z.boolean(),
+}) satisfies z.ZodType<FolderRule>;
+
+export const AutoTagConfigSchema = z.object({
+  rules: z.array(AutoTagRuleSchema).max(MAX_AUTO_TAG_RULES),
+  keywords: z.array(AutoTagKeywordSchema).max(MAX_AUTO_TAG_KEYWORDS),
+  folders: z.array(AutoTagFolderSchema).max(MAX_AUTO_TAG_FOLDER_RULES),
+  applyOnScan: z.boolean(),
+  ignored: z.array(autoTagTerm).max(MAX_AUTO_TAG_TERMS),
+  excludedTerms: z.array(autoTagTerm).max(MAX_AUTO_TAG_TERMS),
+}) satisfies z.ZodType<AutoTagConfig>;
 
 export const TagSourceCountSchema = z.object({
   source: z.string(),

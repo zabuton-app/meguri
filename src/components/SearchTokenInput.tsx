@@ -33,6 +33,7 @@ import {
   pendingDirective,
   splitQueryChips,
   tagSuggestions,
+  viewIsOneWorkspace,
 } from "@/lib/searchTokens";
 import { onHighlightSearchToken } from "@/lib/ui-events";
 
@@ -100,18 +101,33 @@ export function SearchTokenInput({
 
   const pending = focused && picked === null ? pendingDirective(draft) : null;
   const status = useAppStatus();
-  // Same key and fetcher as the tag management screen, so the two share one
-  // cached catalog; `enabled` keeps it unfetched until a directive is actually
-  // being typed. Filtering client-side beats a round trip per keystroke — the
-  // catalog is capped at MAX_TAG_LIST and is invalidated by every tag mutation.
+  // The catalog of the whole library, not of the view: a tag held in another
+  // workspace is still a tag to look for. Under the tag management screen's
+  // key, so every tag mutation invalidates it as it does that screen's;
+  // `enabled` keeps it unfetched until a directive is actually being typed.
+  // Filtering client-side beats a round trip per keystroke — the catalog is
+  // capped at MAX_TAG_LIST.
   const catalog = useQuery({
-    queryKey: ["tags_list_all", status.data?.workspaceId ?? ""],
-    queryFn: api.tagsListAll,
+    queryKey: ["tags_list_all", "library"],
+    queryFn: () => api.tagsListAll({ allWorkspaces: true }),
     enabled: (status.data?.ready ?? false) && pending !== null,
   });
+  // Whether a tag is on view: in the workspace shown, or anywhere when all of
+  // them (or a collection, which spans them) is.
+  const viewId = status.data?.workspaceId ?? null;
+  const held = useCallback(
+    (tag: TagSummary) =>
+      viewId === null ||
+      !viewIsOneWorkspace(viewId) ||
+      tag.workspaceIds.includes(viewId),
+    [viewId],
+  );
   const suggestions = useMemo(
-    () => (pending ? tagSuggestions(catalog.data?.tags ?? [], pending) : []),
-    [catalog.data, pending],
+    () =>
+      pending
+        ? tagSuggestions(catalog.data?.tags ?? [], pending, undefined, held)
+        : [],
+    [catalog.data, pending, held],
   );
   const open = !dismissed && suggestions.length > 0;
   const activeIndex = Math.min(active, suggestions.length - 1);
@@ -389,6 +405,8 @@ export function SearchTokenInput({
               className={cn(
                 "flex cursor-pointer items-center gap-2 px-2 py-1 text-sm",
                 i === activeIndex && "bg-fg/10",
+                // Offered, but with a word of warning: nothing here carries it.
+                !held(tag) && "text-muted",
               )}
             >
               <span className="truncate">
@@ -398,6 +416,11 @@ export function SearchTokenInput({
               {tag.namespace && (
                 <span className="truncate text-xs text-muted">
                   {tagHumanLabel(t, tag.namespace, tag.name)}
+                </span>
+              )}
+              {!held(tag) && (
+                <span className="truncate text-xs text-muted">
+                  {t("filter.tagElsewhere")}
                 </span>
               )}
               <span className="ml-auto shrink-0 text-xs tabular-nums text-muted">

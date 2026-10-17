@@ -1,3 +1,4 @@
+import { defaultAutoTagConfig } from "../../shared/autoTag.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runScan = vi.hoisted(() => vi.fn());
@@ -60,6 +61,8 @@ function makeDeps(
     queryClient: { invalidateCaches } as unknown as Deps["queryClient"],
     emit: vi.fn(),
     isQuitting: () => false,
+    autoTag: () => defaultAutoTagConfig(),
+    deriveAutoTags: () => Promise.resolve([]),
     ...overrides,
   };
 }

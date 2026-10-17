@@ -347,6 +347,24 @@ describe("SearchTokenInput chip selection", () => {
     expect(options()).toHaveLength(0);
   });
 
+  it("offers a tag held only in another workspace, saying so, after the ones here", async () => {
+    const { input } = setup("", [
+      ...CATALOG,
+      { ...tag("hotel", 20), workspaceIds: ["ws-other"] },
+    ]);
+    type(input, "tag:ho");
+    await waitFor(() => expect(options()).toHaveLength(2));
+    // The whole library was asked for, not the view.
+    expect(mocks.tagsListAll).toHaveBeenCalled();
+    // "hotel" is the better match and the more used, but it is not here.
+    expect(options().map((o) => o.textContent)).toEqual([
+      "tag:hoge7",
+      "tag:hotelother workspaces only20",
+    ]);
+    fireEvent.click(options()[1]);
+    expect(chips().map((c) => c.textContent)).toEqual(["tag:hotel"]);
+  });
+
   it("does not chip a condition the box already carries", () => {
     const { input, last } = setup("tag:4k");
     // Same rule the click path follows: a condition already on stays on once.

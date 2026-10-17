@@ -102,7 +102,7 @@ export default function Tags() {
 
   const catalog = useQuery({
     queryKey: ["tags_list_all", wsId],
-    queryFn: api.tagsListAll,
+    queryFn: () => api.tagsListAll(),
     enabled: ready,
   });
   const all = useMemo(() => catalog.data?.tags ?? [], [catalog.data]);

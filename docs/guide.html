@@ -248,7 +248,11 @@
   <p>The search bar at the top filters your whole library. You can combine:</p>
   <ul>
     <li><strong>Text search</strong> — matches file names, paths, and tags
-    (full-text search, so partial words work).</li>
+    (full-text search, so partial words work). Words separated by spaces must
+    all match; write alternatives with <code>|</code> between them, as in
+    <code>yoga|stretch</code>, to match any of them. An alternative with a space in it needs quotes around the whole
+    group: <code>"morning yoga|harbor walk"</code>. To search for a
+    <code>|</code> that is part of a file name, write <code>\|</code>.</li>
     <li><strong>Kind</strong> — only videos, only images, or only audio.</li>
     <li><strong>Tags</strong> — one or more tags.</li>
     <li><strong>Rating</strong> — minimum ★ rating.</li>
