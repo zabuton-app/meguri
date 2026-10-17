@@ -725,6 +725,8 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.removedMany": "Removed {tags} tags from {files} files.",
   "autoTag.removeFailed": "Could not remove the tag.",
   "autoTag.viewFiles": "View Files",
+  "autoTag.viewFilesInAllFailed":
+    "Could not switch to All; searching in the view shown",
   "autoTag.searchCandidateHint":
     "Shows files containing this candidate’s words, using the library’s search",
   "autoTag.noCandidates": "No candidates for this filter.",

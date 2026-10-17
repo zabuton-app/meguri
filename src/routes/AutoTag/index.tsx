@@ -103,8 +103,8 @@ export default function AutoTag() {
         : [],
     [engine, names, stop, ruleWords],
   );
-  // Where each candidate stands, worked out once for the badge and the tab
-  // alike, and only again when what it is read from changes: the keywords,
+  // Where each candidate stands, worked out once for the tab and its count,
+  // and only again when what it is read from changes: the keywords,
   // the dismissed words, the files' tags.
   const ignored = state?.config.ignored;
   const keywords = state?.config.keywords;
@@ -208,11 +208,6 @@ export default function AutoTag() {
                   )}
                 >
                   {t(TAB_LABELS[id])}
-                  {id === "suggest" && pending > 0 && (
-                    <span className="rounded-full bg-overlay px-[5px] text-[10px] leading-[14px] tabular-nums text-bright-fg">
-                      {pending}
-                    </span>
-                  )}
                 </button>
               );
             })}

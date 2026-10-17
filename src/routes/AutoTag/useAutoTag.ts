@@ -228,13 +228,9 @@ export function useAutoTag(): AutoTagState | null {
     setConfig((prev) => {
       if (!prev) return prev;
       const next = fn(prev);
-      // The schema caps these lists; past the cap every later save would be
+      // The schema caps this list; past the cap every later save would be
       // refused, so the oldest entries make room instead.
-      return {
-        ...next,
-        ignored: capped(next.ignored),
-        excludedTerms: capped(next.excludedTerms),
-      };
+      return { ...next, ignored: capped(next.ignored) };
     });
   }, []);
 
@@ -257,10 +253,7 @@ export function useAutoTag(): AutoTagState | null {
     // downstream is keyed on this object.
     [deferred?.keywords],
   );
-  const stop = useMemo(
-    () => new Set([...STOP_WORDS, ...(deferred?.excludedTerms ?? [])]),
-    [deferred?.excludedTerms],
-  );
+  const stop = useMemo(() => new Set(STOP_WORDS), []);
 
   const files = library?.files;
   // Keyed on the load, not on `files`: applying tags replaces the file objects

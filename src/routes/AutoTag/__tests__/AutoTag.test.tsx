@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import type { QueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { onSearchLibrary } from "@/lib/ui-events";
 import AutoTag from "@/routes/AutoTag";
 import { resetViewState } from "@/routes/AutoTag/viewState";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from "@/test/renderWithProviders";
 import { fakeRuleWorker } from "./fakeRuleWorker";
 import {
   defaultAutoTagConfig,
@@ -37,6 +42,7 @@ const mocks = vi.hoisted(() => ({
       removed: number;
     }>
   >(),
+  workspaceSwitch: vi.fn<(id: string) => Promise<void>>(),
 }));
 
 // A short deadline for the rule worker, for the case that waits on it.
@@ -76,6 +82,7 @@ vi.mock("@/ipc/client", () => ({
       add: string[],
       remove: string[],
     ) => mocks.autoTagEdit(targets, add, remove),
+    workspaceSwitch: (id: string) => mocks.workspaceSwitch(id),
   },
 }));
 
@@ -126,10 +133,10 @@ function harborOnOne(): AutoTagLibrary {
   return lib;
 }
 
-async function renderScreen(tab?: string) {
+async function renderScreen(tab?: string, queryClient?: QueryClient) {
   // At the screen's own route: a test that expects to land on the library
   // ("#/") would otherwise pass without anything having navigated.
-  renderWithProviders(<AutoTag />, { route: "/auto-tag" });
+  renderWithProviders(<AutoTag />, { route: "/auto-tag", queryClient });
   await screen.findByText("Pattern rules");
   // The rules' results, from the worker, a render after the rules arrive.
   await waitFor(() => expect(screen.queryByText("testing…")).toBeNull());
@@ -157,6 +164,7 @@ describe("AutoTag", () => {
     mocks.autoTagFiles.mockResolvedValue(library());
     mocks.autoTagSet.mockResolvedValue();
     mocks.autoTagUndo.mockResolvedValue(1);
+    mocks.workspaceSwitch.mockResolvedValue();
     mocks.autoTagEdit.mockImplementation((targets) => {
       const files = targets.reduce((n, g) => n + g.fileIds.length, 0);
       return Promise.resolve({
@@ -1168,17 +1176,62 @@ describe("AutoTag", () => {
 
   it("searches the library for a candidate's word", async () => {
     const asked: string[][] = [];
+    // The view each search was asked in: All, as the files were counted
+    // across every workspace.
+    const switchedFirst: unknown[][][] = [];
+    const off = onSearchLibrary((tokens) => {
+      switchedFirst.push([...mocks.workspaceSwitch.mock.calls]);
+      asked.push(tokens);
+    });
+    await renderScreen("Suggestions");
+    const row = screen
+      .getByRole("checkbox", { name: "Harbor" })
+      .closest("div")!;
+    fireEvent.click(within(row).getByRole("button", { name: "View Files" }));
+    await waitFor(() => expect(window.location.hash).toBe("#/"));
+    off();
+
+    // The word as found in the names, by the search box's own rules.
+    expect(asked).toEqual([["Harbor"]]);
+    expect(switchedFirst).toEqual([[["__all__"]]]);
+  });
+
+  it("still searches, saying so, when the view cannot be switched to All", async () => {
+    const failed = vi.spyOn(toast, "error").mockImplementation(() => 0);
+    mocks.workspaceSwitch.mockRejectedValue(new Error("gone"));
+    const asked: string[][] = [];
     const off = onSearchLibrary((tokens) => asked.push(tokens));
     await renderScreen("Suggestions");
     const row = screen
       .getByRole("checkbox", { name: "Harbor" })
       .closest("div")!;
     fireEvent.click(within(row).getByRole("button", { name: "View Files" }));
+    await waitFor(() => expect(window.location.hash).toBe("#/"));
     off();
 
-    // The word as found in the names, by the search box's own rules.
     expect(asked).toEqual([["Harbor"]]);
-    expect(window.location.hash).toBe("#/");
+    expect(failed).toHaveBeenCalledWith(
+      "Could not switch to All; searching in the view shown",
+      { description: "gone" },
+    );
+    failed.mockRestore();
+  });
+
+  it("searches in the view shown when it is All already", async () => {
+    const asked: string[][] = [];
+    const off = onSearchLibrary((tokens) => asked.push(tokens));
+    const qc = createTestQueryClient();
+    qc.setQueryData(["app_status"], { ready: true, workspaceId: "__all__" });
+    await renderScreen("Suggestions", qc);
+    const row = screen
+      .getByRole("checkbox", { name: "Harbor" })
+      .closest("div")!;
+    fireEvent.click(within(row).getByRole("button", { name: "View Files" }));
+    await waitFor(() => expect(window.location.hash).toBe("#/"));
+    off();
+
+    expect(asked).toEqual([["Harbor"]]);
+    expect(mocks.workspaceSwitch).not.toHaveBeenCalled();
   });
 
   it("offers only what no condition produces", async () => {
@@ -1197,9 +1250,12 @@ describe("AutoTag", () => {
     expect(
       filters.getAllByRole("radio").map((radio) => radio.textContent),
     ).toEqual(["All1", "Ignored0"]);
-    expect(
-      within(screen.getByRole("tab", { name: /Suggestions/ })).getByText("1"),
-    ).toBeTruthy();
+    // The count is in the toolbar, not on the tab: a badge there read as a
+    // total rather than as what needs a decision.
+    expect(screen.getByRole("tab", { name: /Suggestions/ }).textContent).toBe(
+      "Suggestions",
+    );
+    expect(screen.getByText(/candidates \(1 open\)/)).toBeTruthy();
   });
 
   it("offers frequent words and remembers the ones dismissed", async () => {

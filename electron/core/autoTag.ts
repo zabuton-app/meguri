@@ -7,11 +7,7 @@
 // index has to follow every change.
 import { resyncFtsForKeys, type DB } from "./db.js";
 import { getSetting, setSetting } from "./queries/settings.js";
-import {
-  deriveAutoTagsInProcess,
-  type AutoTagEngine,
-  type DeriveAutoTags,
-} from "./autoTagDeriver.js";
+import type { AutoTagEngine, DeriveAutoTags } from "./autoTagDeriver.js";
 import { upsertTag } from "./tags.js";
 import {
   AUTO_TAG_CHUNK,
@@ -201,7 +197,9 @@ interface NameRow {
 /**
  * Run the engine over files and attach what it proposes — every alive file, or
  * just `fileIds`. Chunked and yielding, so a large library does not park the
- * main process; `derive` is where the engine runs (the worker, in the app).
+ * main process; `derive` is where the engine runs — the worker, so a rule that
+ * never finishes cannot hold the main process. Required for that reason:
+ * deriveAutoTagsInProcess is for tests.
  */
 export async function applyAutoTags(
   db: DB,
@@ -213,14 +211,13 @@ export async function applyAutoTags(
      * folder rules to run must say which workspace it is running them in.
      */
     workspaceId?: string;
-    derive?: DeriveAutoTags;
+    derive: DeriveAutoTags;
     fileIds?: readonly number[];
     signal?: AbortSignal;
     onProgress?: (done: number, total: number) => void;
   },
 ): Promise<{ files: number; added: number; completed: boolean }> {
-  const { engine, fileIds, signal, onProgress, workspaceId } = opts;
-  const derive = opts.derive ?? deriveAutoTagsInProcess;
+  const { engine, derive, fileIds, signal, onProgress, workspaceId } = opts;
   // Only the rules of this workspace can reach a file of it. Looked up per
   // folder, not per file (see folderMatcher).
   const reaching = folderMatcher(
@@ -349,7 +346,7 @@ export async function applyAutoTagsOnScan(
   opts: {
     engine: AutoTagEngine;
     workspaceId?: string;
-    derive?: DeriveAutoTags;
+    derive: DeriveAutoTags;
     changedIds: readonly number[];
     signal?: AbortSignal;
     onProgress?: (done: number, total: number) => void;

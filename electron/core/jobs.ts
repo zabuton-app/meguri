@@ -85,13 +85,17 @@ export async function runScan(
   opts: {
     rebuild?: boolean;
     signal?: AbortSignal;
-    /** Auto-tagging configuration (app config); nothing is tagged when omitted. */
-    autoTag?: AutoTagConfig;
     /** The workspace being scanned, for the configuration's folder rules. */
     workspaceId?: string;
-    /** Evaluates the engine; on the calling thread when omitted. */
-    deriveAutoTags?: DeriveAutoTags;
-  } = {},
+  } & (
+    | { autoTag?: undefined; deriveAutoTags?: undefined }
+    | {
+        /** Auto-tagging configuration (app config); nothing is tagged when omitted. */
+        autoTag: AutoTagConfig;
+        /** Evaluates the engine: the worker, so a rule cannot stall the scan. */
+        deriveAutoTags: DeriveAutoTags;
+      }
+  ) = {},
 ): Promise<ScanStats> {
   const { signal } = opts;
   const { db } = core;

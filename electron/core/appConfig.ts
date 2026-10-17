@@ -166,7 +166,9 @@ function parseAutoTag(value: unknown): AutoTagConfig {
     // Off only when the user turned it off.
     applyOnScan: c.applyOnScan !== false,
     ignored: list(c.ignored, MAX_AUTO_TAG_TERMS, term),
-    excludedTerms: list(c.excludedTerms, MAX_AUTO_TAG_TERMS, term),
+    // excludedTerms, which an earlier configuration may hold, is no longer
+    // read: nothing edited it, and of its defaults STOP_WORDS holds the ones
+    // a suggestion could be (公式 never was: suggestions are ASCII words).
   };
 }
 

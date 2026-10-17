@@ -730,6 +730,8 @@ export const ja = {
   "autoTag.removedMany": "{tags}個のタグを{files}ファイルから外しました。",
   "autoTag.removeFailed": "タグを外せませんでした。",
   "autoTag.viewFiles": "ファイルを表示",
+  "autoTag.viewFilesInAllFailed":
+    "「すべて」に切り替えられなかったため、表示中のビューで検索します",
   "autoTag.searchCandidateHint":
     "この候補の語を含むファイルを、ライブラリの検索で表示します",
   "autoTag.noCandidates": "この条件の候補はありません。",

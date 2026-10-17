@@ -2,13 +2,19 @@
 // produces yet — to apply, register as keywords, or dismiss.
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
+import { api } from "@/ipc/client";
+import type { AppStatus } from "@/ipc/types";
 import { searchLibrary } from "@/lib/ui-events";
 import { cn } from "@/lib/utils";
+import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import { MAX_AUTO_TAG_KEYWORDS, type KeywordEntry } from "@shared/autoTag";
 import { anyOfSearchToken } from "@shared/tags";
+import { ALL_ID } from "@shared/workspaceIds";
 import { segments, type Candidate } from "@shared/autoTagAnalysis";
 import { isAutoMetaValue } from "./autoMeta";
 import { MONO, newKeyword, type CandidateState } from "./helpers";
@@ -77,6 +83,7 @@ export function SuggestTab({
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { config, update, fileTags, existing, names } = state;
   const [filter, setFilter] = useViewState<Filter>("suggest.filter", "all");
   // Whether the files carry the tag, as something to narrow by: the ones with
@@ -155,8 +162,21 @@ export function SuggestTab({
   // The library's own search for the spellings this candidate was found
   // under, in place of whatever was being searched for. By the search box's
   // rules — a substring of the path or of the tags — so it can list more than
-  // the files counted here.
-  const searchInLibrary = (c: Candidate) => {
+  // the files counted here. In All: the files were counted across every
+  // workspace, and one workspace shown could hold none of them.
+  const searchInLibrary = async (c: Candidate) => {
+    if (qc.getQueryData<AppStatus>(["app_status"])?.workspaceId !== ALL_ID) {
+      try {
+        await api.workspaceSwitch(ALL_ID);
+        await invalidateWorkspaceScoped(qc);
+      } catch (e) {
+        // The search still runs, in the view shown — said so, as it may find
+        // fewer files than were counted.
+        toast.error(t("autoTag.viewFilesInAllFailed"), {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
     searchLibrary([anyOfSearchToken([c.name, ...c.variants])]);
     void navigate("/");
   };
@@ -443,7 +463,7 @@ export function SuggestTab({
                   <SmallButton
                     variant="ghost"
                     className="h-[26px] px-2"
-                    onClick={() => searchInLibrary(c)}
+                    onClick={() => void searchInLibrary(c)}
                     title={t("autoTag.searchCandidateHint")}
                   >
                     {t("autoTag.viewFiles")}
