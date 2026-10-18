@@ -1,10 +1,9 @@
-import { loadConfig, updateConfig } from "../core/appConfig.js";
+import { loadConfig, saveAutoTag } from "../core/appConfig.js";
 import { handle } from "../core/ipcHandler.js";
 import log from "../core/logger.js";
 import * as tagAdmin from "../core/tagAdmin.js";
 import * as tags from "../core/tags.js";
 import type { TagList } from "../core/types.js";
-import type { AutoTagConfig } from "../../shared/autoTag.js";
 import { retagConditions } from "../../shared/autoTagConditions.js";
 import { AutoTagConfigSchema, type TagRef } from "../../shared/ipc/schema.js";
 import type { IpcContext } from "./context.js";
@@ -154,12 +153,4 @@ export function registerTagHandlers(ctx: IpcContext): void {
       return { removedTags, affectedFiles };
     }),
   );
-}
-
-/** As auto_tag_set: saveConfig logs a failed write, so it is read back. */
-function saveAutoTag(config: AutoTagConfig): void {
-  updateConfig((c) => ({ ...c, autoTag: config }));
-  if (JSON.stringify(loadConfig().autoTag) !== JSON.stringify(config)) {
-    throw new Error("auto-tagging settings could not be saved");
-  }
 }

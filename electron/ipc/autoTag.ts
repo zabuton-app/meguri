@@ -1,51 +1,29 @@
 import { randomUUID } from "node:crypto";
-import { loadConfig, updateConfig } from "../core/appConfig.js";
+import { loadAutoTag, loadConfig, saveAutoTag } from "../core/appConfig.js";
 import {
   applyAutoTags,
   attachAutoTags,
+  autoTagSettingsVersion,
   autoTagFiles,
   detachTagPairs,
   keepStillAt,
-  type TagPair,
 } from "../core/autoTag.js";
 import { bulkEditManualTags } from "../core/tags.js";
 import { handle } from "../core/ipcHandler.js";
 import { MAX_AUTO_TAG_FILES, type AutoTagFile } from "../../shared/autoTag.js";
 import type { IpcContext } from "./context.js";
+import { UndoLog, type UndoEntry } from "./undoLog.js";
 import { coreById } from "./helpers.js";
-
-/** Rollback handles kept at a time; the oldest go first. */
-const MAX_UNDO_ENTRIES = 256;
-/** Pairs those handles may hold together, so a long session stays bounded. */
-const MAX_UNDO_PAIRS = 500_000;
 
 export function registerAutoTagHandlers(ctx: IpcContext): void {
   const { ws, queryClient } = ctx;
-  // What each apply attached, so it can be taken back exactly — nothing the
-  // files already had. The screen sends one apply as several calls when it is
-  // large, and when a later one fails it takes the earlier ones back with
-  // these, rather than leave the files half tagged. That is their only use:
-  // in memory on purpose, a rollback, not a history.
-  const undo = new Map<string, { workspaceId: string; pairs: TagPair[] }[]>();
-  let undoPairs = 0;
-  const forget = (undoId: string) => {
-    const entry = undo.get(undoId);
-    if (!entry) return undefined;
-    undo.delete(undoId);
-    for (const { pairs } of entry) undoPairs -= pairs.length;
-    return entry;
-  };
+  const undo = new UndoLog();
   let reapplying = false;
 
   // App-wide, not per workspace: the same rules tag every library.
   handle("auto_tag_get", () => loadConfig().autoTag);
   handle("auto_tag_set", ({ config }) => {
-    updateConfig((c) => ({ ...c, autoTag: config }));
-    // saveConfig logs a failed write instead of throwing; read back so a full
-    // disk is not reported as a successful save.
-    if (JSON.stringify(loadConfig().autoTag) !== JSON.stringify(config)) {
-      throw new Error("auto-tagging settings could not be saved");
-    }
+    saveAutoTag(config);
   });
 
   handle("auto_tag_files", () => {
@@ -69,7 +47,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
     return { files, total, existingTags: [...existing] };
   });
 
-  handle("auto_tag_apply", async ({ assignments }) => {
+  handle("auto_tag_apply", async ({ assignments, keep }) => {
     // Every Core is resolved before the first write, so an unknown workspace
     // fails the call rather than leaving the ones ahead of it already tagged.
     // Only the files still where the screen read them (see keepStillAt):
@@ -90,7 +68,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
     }
     let files = 0;
     let added = 0;
-    const entry: { workspaceId: string; pairs: TagPair[] }[] = [];
+    const entry: UndoEntry = [];
     try {
       for (const [workspaceId, list] of byWorkspace) {
         const result = attachAutoTags(coreById(ws, workspaceId).db, list);
@@ -110,14 +88,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
     }
     if (added === 0) return { files, added, moved, undoId: null };
     const undoId = randomUUID();
-    undo.set(undoId, entry);
-    undoPairs += added;
-    while (
-      undo.size > 1 &&
-      (undo.size > MAX_UNDO_ENTRIES || undoPairs > MAX_UNDO_PAIRS)
-    ) {
-      forget(undo.keys().next().value as string);
-    }
+    undo.add(undoId, entry, keep);
     await queryClient.invalidateCaches();
     return { files, added, moved, undoId };
   });
@@ -159,7 +130,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
   handle("auto_tag_undo", async ({ undoIds }) => {
     let removed = 0;
     for (const undoId of undoIds) {
-      const entry = forget(undoId);
+      const entry = undo.forget(undoId);
       if (!entry) continue;
       for (const { workspaceId, pairs } of entry) {
         const core = ws.byId(workspaceId);
@@ -174,7 +145,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
     if (reapplying) throw new Error("auto-tagging is already running");
     reapplying = true;
     try {
-      const engine = loadConfig().autoTag;
+      const { config: engine, version: settingsVersion } = loadAutoTag();
       let files = 0;
       let added = 0;
       // As the screen that asked: every workspace (see auto_tag_files). One
@@ -188,11 +159,19 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
             workspaceId: id,
             derive: ctx.deriveAutoTags,
             signal,
+            settingsVersion,
           });
           files += result.files;
           added += result.added;
         },
       );
+      // Stopped by a change to the settings (applyAutoTags): what was added
+      // stays, and the caches are invalidated below, as for any failure.
+      if (autoTagSettingsVersion() !== settingsVersion) {
+        throw new Error(
+          "the auto-tagging settings changed while applying; apply again",
+        );
+      }
       if (added > 0) await queryClient.invalidateCaches();
       return { files, added };
     } catch (error) {

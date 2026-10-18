@@ -26,8 +26,8 @@ export interface ScanManagerDeps {
   emit: (channel: string, payload: unknown) => void;
   /** Once the app is quitting no new scan may start. */
   isQuitting: () => boolean;
-  /** The auto-tagging configuration, read when a scan starts. */
-  autoTag: () => AutoTagConfig;
+  /** The auto-tagging configuration and its version (loadAutoTag), read when a scan starts. */
+  autoTag: () => { config: AutoTagConfig; version: number };
   /** Evaluates it off the main thread (AutoTagWorkerClient). */
   deriveAutoTags: DeriveAutoTags;
 }
@@ -88,6 +88,9 @@ export class ScanManager {
     const promise = (async () => {
       try {
         if (opts.includeExcluded) q.clearExcludedFiles(core.db, core.rootId);
+        // With its version: settings saved after this stop the scan's
+        // tagging, and leave its files to the next scan (see applyAutoTags).
+        const autoTag = this.deps.autoTag();
         await runScan(
           core,
           jobId,
@@ -111,7 +114,8 @@ export class ScanManager {
           {
             rebuild: opts.rebuild,
             signal: controller.signal,
-            autoTag: this.deps.autoTag(),
+            autoTag: autoTag.config,
+            autoTagSettingsVersion: autoTag.version,
             workspaceId: wsId ?? undefined,
             deriveAutoTags: this.deps.deriveAutoTags,
           },

@@ -372,7 +372,9 @@ export function useAutoTag(): AutoTagState | null {
       let moved = 0;
       try {
         for (const assignments of calls) {
-          const result = await api.autoTagApply(assignments);
+          // The calls before this one are what a failure takes back: they
+          // must not be the ones the main process lets go of to make room.
+          const result = await api.autoTagApply(assignments, [...undoIds]);
           filesChanged += result.files;
           pairs += result.added;
           moved += result.moved;
