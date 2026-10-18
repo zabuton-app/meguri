@@ -87,6 +87,7 @@
     <li><a href="#audio">Listening to audio</a></li>
     <li><a href="#search">Search and filters</a></li>
     <li><a href="#tags">Tags, ratings, and favorites</a></li>
+    <li><a href="#auto-tag">Auto tagging</a></li>
     <li><a href="#bulk-edit">Editing several files at once</a></li>
     <li><a href="#timeline">Timeline view</a></li>
     <li><a href="#graph">Graph view</a></li>
@@ -280,6 +281,39 @@
   you later rename a file or move it to another folder inside the same
   workspace, your tags, rating, favorite mark, and history follow it
   automatically after the next scan.</p>
+
+  <h2 id="auto-tag">Auto tagging</h2>
+  <img class="shot" src="./assets/auto-tag.png" alt="The auto-tagging screen with the code-prefix rule open, listing the files it would tag">
+  <p>File names often already say what a file is. The <strong>Auto
+  tagging</strong> button (the sparkles in the header) opens a screen of
+  conditions that turn names and folders into tags. The conditions are shared
+  by every workspace; a folder rule belongs to the workspace its folder is
+  in. Each tab edits one kind of condition:</p>
+  <ul>
+    <li><strong>Regex</strong> — pattern rules run on the file name. Built-in
+    ones take a code's prefix (<code>ABCD</code> from
+    <code>ABCD-123</code>) or what sits inside brackets; they ship turned off.
+    Add your own with a regular expression, where <code>$1</code> is the
+    first capture. Each rule lists values to leave out, sets the letter case,
+    and tests itself against your file names as you type.</li>
+    <li><strong>Keywords</strong> — terms to find in a name, and the tags a
+    file holding one of them gets. A term matches as a whole word or anywhere
+    in the name.</li>
+    <li><strong>Folders</strong> — tags for everything under a folder,
+    subfolders included.</li>
+    <li><strong>Suggestions</strong> — words that come up again and again in
+    your file names and that no condition covers yet. Apply one to its files
+    now, add it to the keywords so later scans apply it too, or ignore
+    it.</li>
+  </ul>
+  <p>With <strong>Apply when scanning</strong> on, the conditions run on the
+  files each scan adds or changes. <strong>Apply to existing files</strong>
+  runs them over the whole library once; that cannot be undone. Either way
+  they only add ordinary tags, never take one away. Renaming, merging or
+  deleting a tag in the Tags screen updates the keywords and folder rules
+  that name it.</p>
+  <p>To tag a single file from its name, open it: under its tags, the detail
+  view cuts the name into parts, and clicking one adds it as a tag.</p>
 
   <h2 id="bulk-edit">Editing several files at once</h2>
   <img class="shot" src="./assets/bulk-edit.gif" alt="Four files selected, then rated, favorited and tagged from the selection bar">
