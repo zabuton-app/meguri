@@ -8,7 +8,7 @@ import {
   detachTagPairs,
   keepStillAt,
 } from "../core/autoTag.js";
-import { bulkEditManualTags } from "../core/tags.js";
+import { bulkEditManualTags, manualSpellings } from "../core/tags.js";
 import { handle } from "../core/ipcHandler.js";
 import { MAX_AUTO_TAG_FILES, type AutoTagFile } from "../../shared/autoTag.js";
 import type { IpcContext } from "./context.js";
@@ -96,7 +96,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
   handle("auto_tag_edit", ({ targets, add, remove }) => {
     // Every Core is resolved, and every file checked (see keepStillAt), before
     // the first write, with nothing awaited in between; then one edit a
-    // workspace, as files_bulk_tag makes.
+    // workspace, as files_bulk_tag makes, its removals by what they mean.
     const total = { files: 0, skipped: 0, moved: 0, added: 0, removed: 0 };
     const byWorkspace = new Map<string, number[]>();
     for (const { workspaceId, fileIds, places } of targets) {
@@ -113,12 +113,11 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
     }
     for (const [workspaceId, ids] of byWorkspace) {
       if (ids.length === 0) continue;
-      const r = bulkEditManualTags(
-        coreById(ws, workspaceId).db,
-        ids,
-        add,
-        remove,
-      );
+      const db = coreById(ws, workspaceId).db;
+      // Taken off by what the names mean, not as the screen spells them: its
+      // spelling is the first workspace's, and this one may spell the tag
+      // otherwise (see manualSpellings).
+      const r = bulkEditManualTags(db, ids, add, manualSpellings(db, remove));
       total.files += r.files;
       total.skipped += r.skipped;
       total.added += r.added;

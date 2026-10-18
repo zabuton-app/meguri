@@ -13,6 +13,7 @@ import {
   bulkEditManualTags,
   fileTags,
   findManualTag,
+  manualSpellings,
   syncFts,
   upsertTag,
 } from "../tags.js";
@@ -148,6 +149,27 @@ describe("tag identity", () => {
       expect(fileTags(db, a).map((t) => t.id)).toEqual([Trip]);
       expect(fileTags(db, b).map((t) => t.id)).toEqual([Trip]);
       expect(trip).not.toBe(Trip);
+    });
+
+    it("takes a tag off by what the screen calls it, as this library spells it", () => {
+      // The auto-tagging screen spells a tag as the first workspace does;
+      // this one has `kids`, and both spellings side by side elsewhere.
+      addManualTag(db, a, "kids");
+      const Kids = upsertTag(db, "", "Kids");
+      db.prepare(
+        "INSERT INTO meta_tags (meta_key, tag_id, source) SELECT meta_key, ?, 'manual' FROM files WHERE id = ?",
+      ).run(Kids, b);
+      expect(manualSpellings(db, ["KIDS"])).toEqual(["kids", "Kids"]);
+      const r = bulkEditManualTags(
+        db,
+        [a, b],
+        [],
+        manualSpellings(db, ["Kids"]),
+      );
+      expect(r.removed).toBe(2);
+      expect(namesOf(a)).toEqual([]);
+      expect(namesOf(b)).toEqual([]);
+      expect(manualSpellings(db, [])).toEqual([]);
     });
 
     it("keeps a tag both lists name under different spellings", () => {
