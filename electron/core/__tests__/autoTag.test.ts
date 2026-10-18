@@ -334,6 +334,15 @@ describe("analysis", () => {
     expect(tokenInfo("harbor")).toEqual({ type: "word", value: "harbor" });
   });
 
+  it("keeps a code whole however long its number runs", () => {
+    const tokens = tokenizeName("ABCD-123456 intro.mp4");
+    expect(tokens.filter((t) => !t.sep).map((t) => t.text)).toEqual([
+      "ABCD-123456",
+      "intro",
+    ]);
+    expect(tokenInfo("ABCD-123456")).toEqual({ type: "code", value: "ABCD" });
+  });
+
   it("takes what the rules give from outside, and only then", () => {
     const names = ["[Trip] Kyoto.mp4", "Trip to Nara.mp4", "Trip day.mp4"];
     // The rules run elsewhere: what they give is passed in, by position.
@@ -661,7 +670,7 @@ describe("attaching tags", () => {
     const result = attachAutoTags(db, [
       { fileIds: [a, 9999], tags: ["res:4k", "  "] },
     ]);
-    expect(result).toEqual({ files: 0, pairs: [] });
+    expect(result).toEqual({ files: 0, tagged: [], pairs: [] });
     expect(names(a)).toEqual([]);
   });
 
@@ -676,7 +685,12 @@ describe("attaching tags", () => {
       derive: deriveAutoTagsInProcess,
       fileIds: [ids[0], ids[7]],
     });
-    expect(some).toEqual({ files: 1, added: 2, completed: true });
+    expect(some).toEqual({
+      files: 1,
+      added: 2,
+      completed: true,
+      tagged: new Set([ids[0]]),
+    });
     expect(names(ids[0])).toEqual(["ABCD", "Yoga"]);
     expect(names(ids[3])).toEqual([]);
 
@@ -804,7 +818,12 @@ describe("attaching tags", () => {
       derive: deriveAutoTagsInProcess,
       workspaceId: "ws",
     });
-    expect(result).toEqual({ files: 2, added: 4, completed: true });
+    expect(result).toEqual({
+      files: 2,
+      added: 4,
+      completed: true,
+      tagged: new Set([inFolder, deeper]),
+    });
     expect(names(inFolder)).toEqual(["2024", "Trip"]);
     expect(names(deeper)).toEqual(["2024", "Trip"]);
     // A folder whose name merely starts the same is not under it.
@@ -892,6 +911,25 @@ describe("attaching tags", () => {
     });
     expect(names(id)).toEqual(["ABCD"]);
     expect(getSetting(db, AUTO_TAG_PENDING_KEY)).toBe("[]");
+  });
+
+  it("reports the files it tagged on a scan, their FTS rows already current", async () => {
+    const tagged = insertFile(db, rootId, { relPath: NAMES[0] });
+    const plain = insertFile(db, rootId, { relPath: "plain.mp4" });
+    const result = await applyAutoTagsOnScan(db, {
+      engine: { rules: activeRules(), keywords: [] },
+      derive: deriveAutoTagsInProcess,
+      changedIds: [tagged, plain],
+    });
+    // The scan syncs only what is left: the tagged file's row already holds
+    // its tag.
+    expect([...result]).toEqual([tagged]);
+    expect(
+      db
+        .prepare("SELECT tags_text FROM files_fts WHERE rowid = ?")
+        .pluck()
+        .get(tagged),
+    ).toBe("ABCD");
   });
 
   it("loads names, own tags and the tag catalog for the screen", () => {

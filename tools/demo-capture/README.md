@@ -30,6 +30,7 @@ node tools/demo-capture/shoot-history.mjs    # history.png — play-history view
 node tools/demo-capture/shoot-peek.mjs       # side-peek.png — side peek
 node tools/demo-capture/shoot-audio.mjs      # audio.png — player bar
 node tools/demo-capture/shoot-spectrum.mjs   # spectrum*.png — audio spectrum
+node tools/demo-capture/shoot-auto-tag.mjs   # auto-tag.png — auto-tagging screen
 ```
 
 `record-graph.mjs`, `record-folders.mjs`, `record-bulk-edit.mjs` and
@@ -37,9 +38,13 @@ node tools/demo-capture/shoot-spectrum.mjs   # spectrum*.png — audio spectrum
 name), so the cards carry tag chips and the graph has hubs to draw. The first
 three also cut their stills from the same run, at the frame worth keeping.
 
+`shoot-auto-tag.mjs` needs no sample library: it generates a dozen images
+under names with codes and brackets in a temporary directory, and shoots
+those.
+
 To use your own media instead of the sample library (not for the graph,
 folder and bulk-edit captures, which act on the sample's folders, file names
-and tags):
+and tags, nor for the auto-tagging one, which makes its own):
 
 ```bash
 MEGURI_DEMO_MEDIA=/path/to/media node tools/demo-capture/record-demo.mjs

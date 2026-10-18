@@ -191,7 +191,7 @@ export interface NameToken {
 }
 
 const TOKEN_PATTERN =
-  /\[[^\]]+\]|【[^】]+】|「[^」]+」|[A-Za-z]{2,6}-\d{2,5}|[^\s_[\]【】「」]+/g;
+  /\[[^\]]+\]|【[^】]+】|「[^」]+」|[A-Za-z]{2,6}-\d{2,}|[^\s_[\]【】「」]+/g;
 
 export function tokenizeName(name: string): NameToken[] {
   const base = stripExt(name);

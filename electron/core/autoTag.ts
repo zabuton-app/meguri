@@ -30,6 +30,8 @@ export type TagPair = [metaKey: string, tagId: number];
 export interface AttachResult {
   /** Of the files named, how many gained at least one tag. */
   files: number;
+  /** Those files, whose FTS rows this call re-synced. */
+  tagged: number[];
   /** Exactly the pairs this call attached — what an undo may remove. */
   pairs: TagPair[];
 }
@@ -42,6 +44,8 @@ export interface AttachResult {
  * The fold is tagIdentityKey, as everywhere else, and of two spellings it picks
  * as findManualTag does: the exact one, else the older. The catalog of own tags is small,
  * so it is read once per call rather than queried per name.
+ * Not kept across calls: applyAutoTags awaits between chunks, and a tag
+ * deleted meanwhile would leave a cached id that no longer exists.
  */
 function tagIdResolver(db: DB): (name: string) => number | null {
   const known = new Map<string, number | null>();
@@ -112,7 +116,7 @@ export function attachAutoTags(
       }
     }
     resyncFtsForKeys(db, [...changed]);
-    return { files: touched.size, pairs };
+    return { files: touched.size, tagged: [...touched], pairs };
   });
   return run();
 }
@@ -218,7 +222,13 @@ export async function applyAutoTags(
     signal?: AbortSignal;
     onProgress?: (done: number, total: number) => void;
   },
-): Promise<{ files: number; added: number; completed: boolean }> {
+): Promise<{
+  files: number;
+  added: number;
+  completed: boolean;
+  /** The files that gained a tag, their FTS rows already re-synced. */
+  tagged: Set<number>;
+}> {
   const { engine, derive, fileIds, signal, onProgress, workspaceId } = opts;
   // Only the rules of this workspace can reach a file of it. Looked up per
   // folder, not per file (see folderMatcher).
@@ -244,8 +254,8 @@ export async function applyAutoTags(
           .get() as { n: number }
       ).n;
 
-  let files = 0;
   let added = 0;
+  const tagged = new Set<number>();
   /** Writes what the names gave each row, with what its folder gives. */
   const write = (rows: NameRow[], named: readonly string[][]): void => {
     // The engine was awaited before this, and the index may have changed
@@ -276,15 +286,15 @@ export async function applyAutoTags(
         .map((row, i) => ({ fileIds: [row.id], tags: tags[i] }))
         .filter((a) => unchanged.has(a.fileIds[0]) && a.tags.length > 0),
     );
-    files += result.files;
     added += result.pairs.length;
+    for (const id of result.tagged) tagged.add(id);
   };
 
   let done = 0;
   let lastId = 0;
   let failure: Error | null = null;
   for (;;) {
-    if (signal?.aborted) return { files, added, completed: false };
+    if (signal?.aborted) return { files: tagged.size, added, completed: false, tagged };
     let rows: NameRow[];
     if (fileIds) {
       if (done >= fileIds.length) break;
@@ -313,13 +323,13 @@ export async function applyAutoTags(
       }
     }
     // The await let the caller cancel; nothing of this chunk is written yet.
-    if (signal?.aborted) return { files, added, completed: false };
+    if (signal?.aborted) return { files: tagged.size, added, completed: false, tagged };
     write(rows, named);
     onProgress?.(Math.min(done, total), total);
     await new Promise((r) => setImmediate(r));
   }
   if (failure !== null) throw failure;
-  return { files, added, completed: true };
+  return { files: tagged.size, added, completed: true, tagged };
 }
 
 /**
@@ -342,7 +352,11 @@ function readPending(db: DB): number[] {
   }
 }
 
-/** The scan hook: tag what this scan added or changed, plus anything still owed. */
+/**
+ * The scan hook: tag what this scan added or changed, plus anything still owed.
+ * Returns the files that gained a tag, whose FTS rows are already re-synced, so
+ * the scan need not sync them again.
+ */
 export async function applyAutoTagsOnScan(
   db: DB,
   opts: {
@@ -353,13 +367,14 @@ export async function applyAutoTagsOnScan(
     signal?: AbortSignal;
     onProgress?: (done: number, total: number) => void;
   },
-): Promise<void> {
+): Promise<Set<number>> {
   const owed = readPending(db);
-  if (owed.length === 0 && opts.changedIds.length === 0) return;
+  if (owed.length === 0 && opts.changedIds.length === 0) return new Set();
   const fileIds = [...new Set([...owed, ...opts.changedIds])];
   setSetting(db, AUTO_TAG_PENDING_KEY, JSON.stringify(fileIds));
-  const { completed } = await applyAutoTags(db, { ...opts, fileIds });
+  const { completed, tagged } = await applyAutoTags(db, { ...opts, fileIds });
   if (completed) setSetting(db, AUTO_TAG_PENDING_KEY, "[]");
+  return tagged;
 }
 
 /** Forget what is owed — the feature was turned off, so nothing is. */

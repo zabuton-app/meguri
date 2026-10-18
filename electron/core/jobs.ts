@@ -138,9 +138,10 @@ export async function runScan(
   // of the FTS sync and the thumbnail pool: the engine reads nothing but file
   // names and where the files are, so its tags need not wait for the slowest
   // phase of the scan.
+  let tagged: ReadonlySet<number> = new Set();
   if (opts.autoTag?.applyOnScan) {
     try {
-      await applyAutoTagsOnScan(db, {
+      tagged = await applyAutoTagsOnScan(db, {
         engine: opts.autoTag,
         workspaceId: opts.workspaceId,
         derive: opts.deriveAutoTags,
@@ -173,10 +174,12 @@ export async function runScan(
     clearAutoTagPending(db);
   }
 
-  // Sync FTS only for new/moved/updated entries (unchanged ones need no re-sync).
-  const ftsTotal = ftsTargets.length;
+  // Sync FTS only for new/moved/updated entries (unchanged ones need no re-sync),
+  // less those auto tagging re-synced as it tagged them.
+  const ftsIds = ftsTargets.filter((id) => !tagged.has(id));
+  const ftsTotal = ftsIds.length;
   let done = 0;
-  for (const id of ftsTargets) {
+  for (const id of ftsIds) {
     if (signal?.aborted) break;
     syncFts(db, id);
     done++;
