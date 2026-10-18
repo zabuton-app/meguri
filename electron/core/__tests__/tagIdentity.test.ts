@@ -7,7 +7,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDb, openDbReadonly, type DB } from "../db.js";
 import { attachAutoTags } from "../autoTag.js";
-import { renameTag } from "../tagAdmin.js";
+import { deleteTags, mergeTags, renameTag } from "../tagAdmin.js";
 import {
   addManualTag,
   bulkEditManualTags,
@@ -199,6 +199,28 @@ describe("tag identity", () => {
       expect(res.merged).toBe(true);
       expect(ownTags()).toEqual(["Trip"]);
       expect(namesOf(b)).toEqual(["Trip"]);
+    });
+  });
+
+  describe("the tag screen's references", () => {
+    it("name the tag another spelling means", () => {
+      // The view showed `Trip`; this workspace spells it `trip`.
+      addManualTag(db, a, "trip");
+      addManualTag(db, b, "été");
+      renameTag(db, manual("Trip"), "travel");
+      expect(namesOf(a)).toEqual(["travel"]);
+      mergeTags(db, [manual("ÉTÉ")], manual("TRAVEL"));
+      expect(namesOf(b)).toEqual(["travel"]);
+      deleteTags(db, [manual("Travel")]);
+      expect(ownTags()).toEqual([]);
+    });
+
+    it("name the exact spelling first where a library holds two", () => {
+      upsertTag(db, "", "trip");
+      const Trip = upsertTag(db, "", "Trip");
+      deleteTags(db, [manual("Trip")]);
+      expect(ownTags()).toEqual(["trip"]);
+      expect(findManualTag(db, "Trip")).not.toBe(Trip);
     });
   });
 

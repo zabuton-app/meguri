@@ -268,8 +268,19 @@ what rolls back an apply that failed partway (kept in memory in the main
 process, not persisted). The screen keeps no record of what it applied: taking
 a tag off again goes by what the files carry, through `auto_tag_edit`. Renaming
 a tag of a keyword or folder rule on the screen offers to move the files the
-condition reaches from the old tag to the new one, by the same reading; a
-rename on the tag screen does not reach the conditions.
+condition reaches from the old tag to the new one, by the same reading.
+
+The tag screen's rename, merge and delete reach the conditions too, so the
+next scan does not put the old name back. The conditions are the app's, not a
+workspace's: when a keyword entry or folder rule names one of the tags, the
+operation runs in every workspace, whichever one is in view, and those
+conditions are rewritten with it (`retagConditions()` in
+`shared/autoTagConditions.ts`). A delete drops the tag from them; one left with
+no tags stays. The operation's tags resolve by `tagIdentityKey()` in each
+database, as the conditions are matched. The conditions are written after the
+databases, so a refused operation changes neither, and one that fails partway
+is finished by doing it again. Regex rules name their tags through a template
+and are left alone.
 
 The screen sends ids it loaded earlier, and a rebuild hands ids to other files
 while a move gives a file another name. So `auto_tag_apply` and `auto_tag_edit`
