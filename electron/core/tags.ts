@@ -7,6 +7,7 @@ import {
   RESERVED_TAG_ERROR,
   isReservedTagName,
   tagIdentityKey,
+  tidyTagName,
 } from "../../shared/tags.js";
 
 /** Resolve a file id to its stable meta_key (null if the file row is gone). */
@@ -79,6 +80,9 @@ export function manualTagId(db: DB, name: string): number {
  * renders identically to a generated one.
  */
 export function addManualTag(db: DB, fileId: number, name: string): number {
+  // Nothing left once tidied (only invisible characters): every such name
+  // would be one tag (see tagIdentityKey).
+  if (!tidyTagName(name)) throw new Error("empty tag name");
   if (isReservedTagName(name)) {
     throw new Error(`${RESERVED_TAG_ERROR}: ${name}`);
   }
@@ -145,7 +149,9 @@ export function bulkEditManualTags(
   add: string[],
   remove: string[],
 ): BulkTagEdit {
-  const addNames = [...new Set(add.map((n) => n.trim()).filter(Boolean))];
+  const addNames = [
+    ...new Set(add.map((n) => n.trim()).filter((n) => tidyTagName(n))),
+  ];
   const removeNames = [...new Set(remove.map((n) => n.trim()).filter(Boolean))];
   for (const name of addNames) {
     if (isReservedTagName(name)) {

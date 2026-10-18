@@ -52,6 +52,8 @@ describe("tag identity", () => {
       ["ASCII", "trip", "Trip"],
       ["beyond ASCII", "été", "ÉTÉ"],
       ["mixed", "Été trip", "éTÉ TRIP"],
+      ["spacing", "New  Name", " new name "],
+      ["composition", "caf\u00e9", "cafe\u0301"],
     ])("reuses the tag already there (%s)", (_, have, typed) => {
       const id = addManualTag(db, a, have);
       expect(addManualTag(db, b, typed)).toBe(id);
@@ -88,6 +90,18 @@ describe("tag identity", () => {
           findManualTag(db, name),
         ]);
       });
+    });
+
+    it("refuses a name that is a reserved one once tidied, or nothing", () => {
+      // `res\u200b:4k` would match `res:4k` in a `tag:` search.
+      expect(() => addManualTag(db, a, "res\u200b:4k")).toThrow();
+      expect(() => bulkEditManualTags(db, [a], ["\u200bres:4k"], [])).toThrow();
+      // Only invisible characters: every such name would be one tag.
+      expect(() => addManualTag(db, a, "\u200b")).toThrow();
+      expect(bulkEditManualTags(db, [a], ["\u200c"], []).added).toBe(0);
+      addManualTag(db, a, "trip");
+      expect(() => renameTag(db, manual("trip"), "\u200d")).toThrow();
+      expect(ownTags()).toEqual(["trip"]);
     });
 
     it("never resolves to a generated tag", () => {
@@ -200,6 +214,16 @@ describe("tag identity", () => {
       expect(ownTags()).toEqual(["Trip"]);
       expect(namesOf(b)).toEqual(["Trip"]);
     });
+  });
+
+  it("lands auto tagging on a tag renamed to a name it would tidy", () => {
+    // Renamed by hand to two spaces; auto tagging tidies the name the
+    // conditions hold to one, and must still find the tag.
+    addManualTag(db, a, "beach");
+    renameTag(db, manual("beach"), "New  Name");
+    attachAutoTags(db, [{ fileIds: [b], tags: ["New  Name"] }]);
+    expect(ownTags()).toEqual(["New  Name"]);
+    expect(namesOf(b)).toEqual(["New  Name"]);
   });
 
   describe("the tag screen's references", () => {

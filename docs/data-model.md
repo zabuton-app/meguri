@@ -43,7 +43,11 @@ The main tables:
   pipeline (see [Derived tags](#derived-tags)). The constraint tells
   spellings apart, but the code does not: two names are one tag when their
   `tagIdentityKey()` (`shared/tags.ts`) is the same — case aside, over all of
-  Unicode, so `Trip` and `trip` are one tag and so are `Été` and `été`. Adding a
+  Unicode, so `Trip` and `trip` are one tag and so are `Été` and `été`.
+  Spacing, composition and invisible characters aside too (`tidyTagName()`):
+  auto tagging stores names composed (NFC), with each run of whitespace as one
+  space and control and format characters dropped, while a name typed by hand
+  is kept as typed, so `New  Name` and `New Name` are one tag. Adding a
   tag by hand, the bulk editor, rename, auto tagging, the detail view's name
   parts and the `tag:` search all compare by it; SQL reaches it as the
   `tag_key()` function each connection registers, since SQLite's own `lower()`

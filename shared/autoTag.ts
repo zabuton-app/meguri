@@ -20,6 +20,7 @@ import {
   MAX_TAG_NAME,
   isReservedTagName,
   tagIdentityKey,
+  tidyTagName,
 } from "./tags.js";
 
 export const MAX_AUTO_TAG_RULES = 64;
@@ -241,20 +242,11 @@ export function stripExt(name: string): string {
 }
 
 /**
- * A tag name as it is stored. Control and format characters go — a file name
- * can carry zero-width or bidi marks, which would make tags that look identical
- * and are not — and the cut is by code point, never through a surrogate pair.
+ * A tag name as auto tagging stores it: tidied (tidyTagName), and cut by code
+ * point, never through a surrogate pair.
  */
 export function cleanTagName(raw: string): string {
-  let name = raw
-    .normalize("NFC")
-    // Whitespace first: a tab or a newline is a control character too, and
-    // must become a space rather than vanish. Collapsed again afterwards, since
-    // removing a zero-width character can leave two spaces side by side.
-    .replace(/\s+/g, " ")
-    .replace(/[\p{Cc}\p{Cf}]/gu, "")
-    .replace(/ {2,}/g, " ")
-    .trim();
+  let name = tidyTagName(raw);
   if (name.length <= MAX_TAG_NAME) return name;
   // MAX_TAG_NAME counts UTF-16 units everywhere else (the IPC schemas, the
   // inputs), so cut to that — but by code point, never through a pair.
