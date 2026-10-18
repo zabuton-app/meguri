@@ -12,7 +12,66 @@ import {
   tagIdentityKey,
   tagSearchKey,
   tagSearchToken,
+  tidyTagName,
 } from "@shared/tags";
+
+describe("tidyTagName", () => {
+  // The rule written out the long way: the shortcuts must give exactly this.
+  const reference = (raw: string) =>
+    raw
+      .normalize("NFC")
+      .replace(/\s+/g, " ")
+      .replace(/[\p{Cc}\p{Cf}]/gu, "")
+      .replace(/ {2,}/g, " ")
+      .trim();
+
+  it("tidies spacing, composition and invisible characters", () => {
+    expect(tidyTagName("  New \t Name ")).toBe("New Name");
+    expect(tidyTagName("cafe\u0301")).toBe("caf\u00e9");
+    expect(tidyTagName("tr\u200bip")).toBe("trip");
+    expect(tidyTagName("a \u200b b")).toBe("a b");
+    expect(tidyTagName("旅行\u3000タグ")).toBe("旅行 タグ");
+  });
+
+  it("gives what the long way gives, tidy names and untidy alike", () => {
+    // Deterministic, so a failure can be run again.
+    let seed = 1;
+    const next = () => (seed = (seed * 48271) % 2147483647);
+    const alphabet = [
+      "a",
+      "Z",
+      "~",
+      "!",
+      " ",
+      " ",
+      "\t",
+      "\n",
+      "\u00a0",
+      "\u3000",
+      "\u2028",
+      "\u200b",
+      "\u200e",
+      "\u0000",
+      "\u007f",
+      "\u0301",
+      "\u3099",
+      "e",
+      "か",
+      "旅",
+      "é",
+      "\u212b",
+      "\ud83d\ude00",
+    ];
+    for (let i = 0; i < 20_000; i++) {
+      const length = next() % 8;
+      let raw = "";
+      for (let j = 0; j < length; j++) {
+        raw += alphabet[next() % alphabet.length];
+      }
+      expect(tidyTagName(raw), JSON.stringify(raw)).toBe(reference(raw));
+    }
+  });
+});
 
 describe("qualifiedTagName", () => {
   it("returns the bare name for a manual tag", () => {

@@ -17,7 +17,7 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import { DEFAULT_LOGO, loadConfig } from "./core/appConfig.js";
+import { DEFAULT_LOGO, loadAutoTag, loadConfig } from "./core/appConfig.js";
 import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import log, { setupLogger } from "./core/logger.js";
 import { withTimeout } from "./core/concurrency.js";
@@ -351,7 +351,7 @@ const scans = new ScanManager({
   queryClient,
   emit,
   isQuitting,
-  autoTag: () => loadConfig().autoTag,
+  autoTag: loadAutoTag,
   deriveAutoTags: autoTagWorker.derive,
 });
 

@@ -10,6 +10,8 @@ import {
   applyAutoTags,
   applyAutoTagsOnScan,
   attachAutoTags,
+  autoTagSettingsChanged,
+  autoTagSettingsVersion,
   autoTagFiles,
   detachTagPairs,
   filesStillAt,
@@ -31,6 +33,7 @@ import {
 import { getSetting, searchFiles } from "../queries.js";
 import { addManualTag, fileTags } from "../tags.js";
 import {
+  AUTO_TAG_CHUNK,
   MAX_AUTO_TAG_EXCLUDE,
   MAX_AUTO_TAG_RULES,
   MAX_RULE_MATCHES,
@@ -43,6 +46,7 @@ import {
   defaultRules,
   excludeValues,
   folderMatcher,
+  fileNameOf,
   folderOf,
   formatExclude,
   isUnderFolder,
@@ -777,8 +781,9 @@ describe("attaching tags", () => {
   it("tags the files under a folder of this workspace, subfolders included", async () => {
     const at = (relPath: string) => insertFile(db, rootId, { relPath });
     const inFolder = at("Trips/2024/harbor.mp4");
-    // Written with the other separator, as Windows stores it.
-    const deeper = at("Trips\\2024\\day1\\walk.mp4");
+    // "/"-separated, as the rest of these paths: Windows's "\\" is covered
+    // where folderOf is given it.
+    const deeper = at("Trips/2024/day1/walk.mp4");
     const sibling = at("Trips/2024b/pier.mp4");
     const elsewhere = at("Work/plan.mp4");
     const folders: FolderRule[] = [
@@ -860,8 +865,14 @@ describe("attaching tags", () => {
     expect(tagsForName(engine, "plain.mp4")).toEqual([]);
     expect(isUnderFolder("a/b", "a")).toBe(true);
     expect(isUnderFolder("ab", "a")).toBe(false);
-    expect(folderOf("a\\b\\c.mp4")).toBe("a/b");
-    expect(folderOf("c.mp4")).toBe("");
+    // Split on the separator the path was written with: Windows writes
+    // "\\"; elsewhere a "\\" is part of a name.
+    expect(folderOf("a\\b\\c.mp4", "\\")).toBe("a/b");
+    expect(fileNameOf("a\\b\\c.mp4", "\\")).toBe("c.mp4");
+    expect(folderOf("a/b\\c.mp4", "/")).toBe("a");
+    expect(fileNameOf("旅行\\海.mp4", "/")).toBe("旅行\\海.mp4");
+    expect(folderOf("旅行\\海.mp4", "/")).toBe("");
+    expect(folderOf("c.mp4", "/")).toBe("");
   });
 
   it("matches a folder written decomposed, and a rule for the whole workspace", async () => {
@@ -887,6 +898,56 @@ describe("attaching tags", () => {
     });
     expect(names(inFolder)).toEqual(["All", "Cafe"]);
     expect(names(atRoot)).toEqual(["All"]);
+  });
+
+  it("stops writing once the settings it was read with change", async () => {
+    // The Tags screen renames a tag the engine adds while a scan is reading
+    // the names: the scan must not put the old name back.
+    const id = insertFile(db, rootId, { relPath: NAMES[0] });
+    const derive: DeriveAutoTags = (e, list) => {
+      autoTagSettingsChanged();
+      return deriveAutoTagsInProcess(e, list);
+    };
+    await applyAutoTagsOnScan(db, {
+      engine: { rules: activeRules(), keywords: [] },
+      derive,
+      settingsVersion: autoTagSettingsVersion(),
+      changedIds: [id],
+    });
+    expect(names(id)).toEqual([]);
+    // Owed, for the next scan to tag with the settings as they are then.
+    expect(getSetting(db, AUTO_TAG_PENDING_KEY)).toBe(JSON.stringify([id]));
+  });
+
+  it("stops between chunks once the settings change, and not after the last", async () => {
+    // More than one chunk: the change lands in the pause between them.
+    const ids = Array.from({ length: AUTO_TAG_CHUNK + 1 }, (_, i) =>
+      insertFile(db, rootId, { relPath: `ABCD-${100 + i} clip.mp4` }),
+    );
+    const engine = { rules: activeRules(), keywords: [] };
+    const settingsVersion = autoTagSettingsVersion();
+    const stopped = await applyAutoTags(db, {
+      engine,
+      derive: deriveAutoTagsInProcess,
+      settingsVersion,
+      onProgress: (done) => {
+        if (done === AUTO_TAG_CHUNK) autoTagSettingsChanged();
+      },
+    });
+    expect(stopped.completed).toBe(false);
+    expect(names(ids[0])).toEqual(["ABCD"]);
+    expect(names(ids[AUTO_TAG_CHUNK])).toEqual([]);
+
+    // Saved once the last chunk is written: the pass did all it had to.
+    const done = await applyAutoTags(db, {
+      engine,
+      derive: deriveAutoTagsInProcess,
+      settingsVersion: autoTagSettingsVersion(),
+      fileIds: [ids[AUTO_TAG_CHUNK]],
+      onProgress: () => autoTagSettingsChanged(),
+    });
+    expect(done.completed).toBe(true);
+    expect(names(ids[AUTO_TAG_CHUNK])).toEqual(["ABCD"]);
   });
 
   it("keeps owing the files of a scan that was cut short", async () => {

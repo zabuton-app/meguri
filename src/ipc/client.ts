@@ -225,9 +225,12 @@ export const api = {
   autoTagGet: () => invoke("auto_tag_get"),
   autoTagSet: (config: AutoTagConfig) => invoke("auto_tag_set", { config }),
   autoTagFiles: () => invoke("auto_tag_files"),
-  autoTagApply: (assignments: AutoTagAssignment[]) =>
-    invoke("auto_tag_apply", { assignments }),
-  /** files_bulk_tag for the screen: only files still where it read them. */
+  autoTagApply: (assignments: AutoTagAssignment[], keep?: string[]) =>
+    invoke("auto_tag_apply", { assignments, keep }),
+  /**
+   * files_bulk_tag for the screen: only files still where it read them, and a
+   * removal takes every spelling of the tag.
+   */
   autoTagEdit: (
     targets: AutoTagEditTarget[],
     add: string[],

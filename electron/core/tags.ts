@@ -7,6 +7,7 @@ import {
   RESERVED_TAG_ERROR,
   isReservedTagName,
   tagIdentityKey,
+  tidyTagName,
 } from "../../shared/tags.js";
 
 /** Resolve a file id to its stable meta_key (null if the file row is gone). */
@@ -65,6 +66,21 @@ export function findManualTag(
 }
 
 /**
+ * Every spelling of the user's tags that these names mean (tagIdentityKey):
+ * what "this tag" is in this database, where a library may spell it otherwise
+ * than another one, or hold two spellings side by side.
+ */
+export function manualSpellings(db: DB, names: readonly string[]): string[] {
+  if (names.length === 0) return [];
+  return db
+    .prepare(
+      "SELECT name FROM tags WHERE namespace = '' AND tag_key(name) IN (SELECT value FROM json_each(?)) ORDER BY id",
+    )
+    .pluck()
+    .all(JSON.stringify([...new Set(names.map(tagIdentityKey))])) as string[];
+}
+
+/**
  * The user's tag for a name, created in that spelling when there is none. An
  * existing one keeps its own: typing `Trip` beside a `trip` reuses `trip`.
  */
@@ -79,6 +95,9 @@ export function manualTagId(db: DB, name: string): number {
  * renders identically to a generated one.
  */
 export function addManualTag(db: DB, fileId: number, name: string): number {
+  // Nothing left once tidied (only invisible characters): every such name
+  // would be one tag (see tagIdentityKey).
+  if (!tidyTagName(name)) throw new Error("empty tag name");
   if (isReservedTagName(name)) {
     throw new Error(`${RESERVED_TAG_ERROR}: ${name}`);
   }
@@ -124,7 +143,8 @@ export interface BulkTagEdit {
  * manualTagId), so `Trip` lands on the `trip` a workspace already has. Names
  * to remove stay exact: they come from tags the selection showed, each a row
  * of its own, and a library from before that rule may hold `Trip` and `trip`
- * both — removing one must not take the other.
+ * both — removing one must not take the other. A caller that means the tag
+ * under any spelling passes them all (see manualSpellings).
  *
  * The edit is expressed as a final state, not as a sequence: a tag both lists
  * name is treated as an addition and dropped from the removals, so the same
@@ -145,7 +165,9 @@ export function bulkEditManualTags(
   add: string[],
   remove: string[],
 ): BulkTagEdit {
-  const addNames = [...new Set(add.map((n) => n.trim()).filter(Boolean))];
+  const addNames = [
+    ...new Set(add.map((n) => n.trim()).filter((n) => tidyTagName(n))),
+  ];
   const removeNames = [...new Set(remove.map((n) => n.trim()).filter(Boolean))];
   for (const name of addNames) {
     if (isReservedTagName(name)) {

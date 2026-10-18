@@ -32,11 +32,7 @@ import {
   placeOf,
 } from "@shared/autoTag";
 import { STOP_WORDS } from "@shared/autoTagAnalysis";
-import {
-  MAX_BULK_FILES,
-  MAX_BULK_TAG_NAMES,
-  tagIdentityKey,
-} from "@shared/tags";
+import { MAX_BULK_FILES, tagIdentityKey } from "@shared/tags";
 import { useRuleResults, type RuleView } from "./useRuleResults";
 
 /**
@@ -372,7 +368,9 @@ export function useAutoTag(): AutoTagState | null {
       let moved = 0;
       try {
         for (const assignments of calls) {
-          const result = await api.autoTagApply(assignments);
+          // The calls before this one are what a failure takes back: they
+          // must not be the ones the main process lets go of to make room.
+          const result = await api.autoTagApply(assignments, [...undoIds]);
           filesChanged += result.files;
           pairs += result.added;
           moved += result.moved;
@@ -436,22 +434,20 @@ export function useAutoTag(): AutoTagState | null {
       // use, which is the tag files_bulk_tag would resolve it to anyway.
       const put =
         to === undefined ? [] : [existing.get(tagIdentityKey(to)) ?? to];
-      // The tag as the files spell it: `trip` and `Trip` are two rows of the
-      // tag table, and both are what this candidate reads as "tagged".
-      const spellings = new Set<string>();
+      // The tag as one of the files spells it. One spelling is enough: each
+      // workspace takes off every spelling it has of the tag (`trip` and
+      // `Trip` may be two rows), see manualSpellings.
+      let name: string | undefined;
       const holders: AutoTagFile[] = [];
       for (const index of indexes) {
         const file = library.files[index];
-        const mine = file.tags.filter((tag) => tagIdentityKey(tag) === key);
-        if (mine.length === 0) continue;
-        for (const tag of mine) spellings.add(tag);
+        const mine = file.tags.find((tag) => tagIdentityKey(tag) === key);
+        if (mine === undefined) continue;
+        name ??= mine;
         holders.push(file);
       }
-      // What one call can name; more spellings of one tag than that is not a
-      // case worth a second pass, and what is not sent is not dropped below.
-      const names = [...spellings].slice(0, MAX_BULK_TAG_NAMES - put.length);
-      if (names.length === 0) return { ok: true, files: 0 };
-      const gone = new Set(names);
+      if (name === undefined) return { ok: true, files: 0 };
+      const names = [name];
 
       // One call carries at most MAX_BULK_FILES ids and
       // MAX_AUTO_TAG_PLACE_CHARS of places, however they are grouped.
@@ -501,8 +497,8 @@ export function useAutoTag(): AutoTagState | null {
         const nextFiles = [...prev.files];
         for (const index of touched) {
           const file = nextFiles[index];
-          if (!file.tags.some((tag) => gone.has(tag))) continue;
-          const tags = file.tags.filter((tag) => !gone.has(tag));
+          const tags = file.tags.filter((tag) => tagIdentityKey(tag) !== key);
+          if (tags.length === file.tags.length) continue;
           for (const tag of put) {
             const putKey = tagIdentityKey(tag);
             if (!tags.some((x) => tagIdentityKey(x) === putKey)) tags.push(tag);

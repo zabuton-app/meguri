@@ -61,7 +61,7 @@ function makeDeps(
     queryClient: { invalidateCaches } as unknown as Deps["queryClient"],
     emit: vi.fn(),
     isQuitting: () => false,
-    autoTag: () => defaultAutoTagConfig(),
+    autoTag: () => ({ config: defaultAutoTagConfig(), version: 0 }),
     deriveAutoTags: () => Promise.resolve([]),
     ...overrides,
   };

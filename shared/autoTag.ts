@@ -20,6 +20,7 @@ import {
   MAX_TAG_NAME,
   isReservedTagName,
   tagIdentityKey,
+  tidyTagName,
 } from "./tags.js";
 
 export const MAX_AUTO_TAG_RULES = 64;
@@ -214,25 +215,25 @@ export function defaultAutoTagConfig(): AutoTagConfig {
   };
 }
 
-/** The part of a path the engine reads: the file name. */
-export function fileNameOf(relPath: string): string {
-  return relPath.slice(
-    Math.max(relPath.lastIndexOf("/"), relPath.lastIndexOf("\\")) + 1,
-  );
+/**
+ * The part of a path the engine reads: the file name. `sep` is the separator
+ * the path was written with — the OS's, for a stored rel_path (path.sep):
+ * on Linux and macOS a "\\" is part of a name, not a separator. Required, as
+ * shared/ cannot default it to path.sep. Not src/lib/relPath.ts's fileNameOf,
+ * which splits on both for display.
+ */
+export function fileNameOf(relPath: string, sep: string): string {
+  return relPath.slice(relPath.lastIndexOf(sep) + 1);
 }
 
 /**
  * The folder a file is in, as folder rules name folders: "/"-separated
- * whatever the OS wrote the path with, and "" at the workspace root.
+ * whatever the OS wrote the path with (`sep`, as for fileNameOf), and "" at
+ * the workspace root.
  */
-export function folderOf(relPath: string): string {
-  const at = Math.max(relPath.lastIndexOf("/"), relPath.lastIndexOf("\\"));
-  return at < 0
-    ? ""
-    : relPath
-        .slice(0, at)
-        .split(/[\\/]+/)
-        .join("/");
+export function folderOf(relPath: string, sep: string): string {
+  const at = relPath.lastIndexOf(sep);
+  return at < 0 ? "" : relPath.slice(0, at).split(sep).join("/");
 }
 
 /** A file name without its extension. Positions in it are positions in the name. */
@@ -241,20 +242,11 @@ export function stripExt(name: string): string {
 }
 
 /**
- * A tag name as it is stored. Control and format characters go — a file name
- * can carry zero-width or bidi marks, which would make tags that look identical
- * and are not — and the cut is by code point, never through a surrogate pair.
+ * A tag name as auto tagging stores it: tidied (tidyTagName), and cut by code
+ * point, never through a surrogate pair.
  */
 export function cleanTagName(raw: string): string {
-  let name = raw
-    .normalize("NFC")
-    // Whitespace first: a tab or a newline is a control character too, and
-    // must become a space rather than vanish. Collapsed again afterwards, since
-    // removing a zero-width character can leave two spaces side by side.
-    .replace(/\s+/g, " ")
-    .replace(/[\p{Cc}\p{Cf}]/gu, "")
-    .replace(/ {2,}/g, " ")
-    .trim();
+  let name = tidyTagName(raw);
   if (name.length <= MAX_TAG_NAME) return name;
   // MAX_TAG_NAME counts UTF-16 units everywhere else (the IPC schemas, the
   // inputs), so cut to that — but by code point, never through a pair.

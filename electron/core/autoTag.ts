@@ -5,6 +5,7 @@
 // The tags are the user's own — source `manual`, no namespace — so everything
 // the app can do with a hand-applied tag works on these too, and the full-text
 // index has to follow every change.
+import path from "node:path";
 import { resyncFtsForKeys, type DB } from "./db.js";
 import { getSetting, setSetting } from "./queries/settings.js";
 import type { AutoTagEngine, DeriveAutoTags } from "./autoTagDeriver.js";
@@ -145,8 +146,8 @@ const CHUNK = AUTO_TAG_CHUNK;
 /** The place (placeOf) a stored path is at, as the screen names it. */
 export function placeOfPath(relPath: string): string {
   return placeOf(
-    folderOf(relPath).normalize("NFC"),
-    fileNameOf(relPath).normalize("NFC"),
+    folderOf(relPath, path.sep).normalize("NFC"),
+    fileNameOf(relPath, path.sep).normalize("NFC"),
   );
 }
 
@@ -200,6 +201,22 @@ interface NameRow {
   rel_path: string;
 }
 
+// Bumped each time the auto-tagging settings are saved. A pass reads the
+// settings once, when it starts: one that goes on after they changed would
+// apply what they no longer say (a tag the Tags screen just renamed, under its
+// old name), so it stops instead (see applyAutoTags' `settingsVersion`).
+let settingsVersion = 0;
+
+/** The version of the auto-tagging settings: read it with the settings. */
+export function autoTagSettingsVersion(): number {
+  return settingsVersion;
+}
+
+/** Call after saving the auto-tagging settings. */
+export function autoTagSettingsChanged(): void {
+  settingsVersion++;
+}
+
 /**
  * Run the engine over files and attach what it proposes — every alive file, or
  * just `fileIds`. Chunked and yielding, so a large library does not park the
@@ -220,6 +237,12 @@ export async function applyAutoTags(
     derive: DeriveAutoTags;
     fileIds?: readonly number[];
     signal?: AbortSignal;
+    /**
+     * The settings version (autoTagSettingsVersion) the engine was read at.
+     * Once the settings change, nothing more is written and the pass reports
+     * itself not completed.
+     */
+    settingsVersion?: number;
     onProgress?: (done: number, total: number) => void;
   },
 ): Promise<{
@@ -230,6 +253,10 @@ export async function applyAutoTags(
   tagged: Set<number>;
 }> {
   const { engine, derive, fileIds, signal, onProgress, workspaceId } = opts;
+  const stopped = () =>
+    signal?.aborted === true ||
+    (opts.settingsVersion !== undefined &&
+      opts.settingsVersion !== settingsVersion);
   // Only the rules of this workspace can reach a file of it. Looked up per
   // folder, not per file (see folderMatcher).
   const reaching = folderMatcher(
@@ -275,7 +302,7 @@ export async function applyAutoTags(
             reaching({
               workspaceId,
               // NFC, as the screen that wrote the rule saw the folder.
-              folder: folderOf(rows[i].rel_path).normalize("NFC"),
+              folder: folderOf(rows[i].rel_path, path.sep).normalize("NFC"),
             }),
           ),
         )
@@ -294,7 +321,9 @@ export async function applyAutoTags(
   let lastId = 0;
   let failure: Error | null = null;
   for (;;) {
-    if (signal?.aborted) return { files: tagged.size, added, completed: false, tagged };
+    if (signal?.aborted) {
+      return { files: tagged.size, added, completed: false, tagged };
+    }
     let rows: NameRow[];
     if (fileIds) {
       if (done >= fileIds.length) break;
@@ -307,6 +336,11 @@ export async function applyAutoTags(
       lastId = rows[rows.length - 1].id;
       done += rows.length;
     }
+    // After the end is known: settings saved just after the last chunk was
+    // written leave the pass completed, as it is.
+    if (stopped()) {
+      return { files: tagged.size, added, completed: false, tagged };
+    }
     // Once the names could not be read, the rest of the pass goes on without
     // them: where the files are still can be read, and a folder rule's tags
     // do not wait on the names. The failure is reported at the end, so the
@@ -316,14 +350,17 @@ export async function applyAutoTags(
       try {
         named = await derive(
           engine,
-          rows.map((row) => fileNameOf(row.rel_path)),
+          rows.map((row) => fileNameOf(row.rel_path, path.sep)),
         );
       } catch (err) {
         failure = err instanceof Error ? err : new Error(String(err));
       }
     }
-    // The await let the caller cancel; nothing of this chunk is written yet.
-    if (signal?.aborted) return { files: tagged.size, added, completed: false, tagged };
+    // The await let the caller cancel, or the settings change; nothing of
+    // this chunk is written yet.
+    if (stopped()) {
+      return { files: tagged.size, added, completed: false, tagged };
+    }
     write(rows, named);
     onProgress?.(Math.min(done, total), total);
     await new Promise((r) => setImmediate(r));
@@ -365,6 +402,7 @@ export async function applyAutoTagsOnScan(
     derive: DeriveAutoTags;
     changedIds: readonly number[];
     signal?: AbortSignal;
+    settingsVersion?: number;
     onProgress?: (done: number, total: number) => void;
   },
 ): Promise<Set<number>> {
@@ -419,8 +457,8 @@ export function autoTagFiles(
     files: rows.map((row) => ({
       workspaceId,
       id: row.id,
-      name: fileNameOf(row.rel_path).normalize("NFC"),
-      folder: folderOf(row.rel_path).normalize("NFC"),
+      name: fileNameOf(row.rel_path, path.sep).normalize("NFC"),
+      folder: folderOf(row.rel_path, path.sep).normalize("NFC"),
       metaKey: row.meta_key,
       tags: [...new Set(JSON.parse(row.tags) as string[])],
     })),

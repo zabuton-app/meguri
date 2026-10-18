@@ -516,9 +516,14 @@ export const ChannelInputs = {
   auto_tag_get: z.void(),
   auto_tag_set: z.object({ config: AutoTagConfigSchema }),
   auto_tag_files: z.void(),
-  auto_tag_apply: z.object({ assignments: AutoTagAssignments }),
-  // files_bulk_tag for the auto-tagging screen: the same edit, on the files
-  // still where the screen read them (see placeOf).
+  auto_tag_apply: z.object({
+    assignments: AutoTagAssignments,
+    // The undoIds of the earlier calls of the same apply: kept until it ends.
+    keep: z.array(z.string().max(64)).max(256).optional(),
+  }),
+  // files_bulk_tag for the auto-tagging screen, on the files still where the
+  // screen read them (see placeOf). One difference: a name to remove takes
+  // off every spelling of that tag in each workspace (see manualSpellings).
   auto_tag_edit: z
     .object({
       targets: placedGate(

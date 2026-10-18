@@ -94,6 +94,8 @@ export async function runScan(
         autoTag: AutoTagConfig;
         /** Evaluates the engine: the worker, so a rule cannot stall the scan. */
         deriveAutoTags: DeriveAutoTags;
+        /** autoTagSettingsVersion when `autoTag` was read. */
+        autoTagSettingsVersion?: number;
       }
   ) = {},
 ): Promise<ScanStats> {
@@ -145,6 +147,7 @@ export async function runScan(
         engine: opts.autoTag,
         workspaceId: opts.workspaceId,
         derive: opts.deriveAutoTags,
+        settingsVersion: opts.autoTagSettingsVersion,
         changedIds: ftsTargets,
         signal,
         onProgress: (d, t) =>

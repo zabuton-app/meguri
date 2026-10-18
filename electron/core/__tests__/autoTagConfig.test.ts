@@ -9,7 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let userData = "";
 vi.mock("electron", () => ({ app: { getPath: () => userData } }));
 
-const { loadConfig } = await import("../appConfig.js");
+const { loadAutoTag, loadConfig, saveAutoTag } =
+  await import("../appConfig.js");
 const { defaultAutoTagConfig, defaultRules } =
   await import("../../../shared/autoTag.js");
 
@@ -42,6 +43,16 @@ describe("the stored auto-tagging configuration", () => {
     delete without.applyOnScan;
     write({ autoTag: without });
     expect(loadConfig().autoTag.applyOnScan).toBe(true);
+  });
+
+  it("moves the version on with every save, so a pass under way stops", () => {
+    write({});
+    const before = loadAutoTag();
+    const next = { ...before.config, applyOnScan: false };
+    saveAutoTag(next);
+    const after = loadAutoTag();
+    expect(after.config).toEqual(next);
+    expect(after.version).not.toBe(before.version);
   });
 
   it("drops the excluded terms an earlier version stored", () => {

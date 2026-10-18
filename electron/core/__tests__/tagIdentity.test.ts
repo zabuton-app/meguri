@@ -13,6 +13,7 @@ import {
   bulkEditManualTags,
   fileTags,
   findManualTag,
+  manualSpellings,
   syncFts,
   upsertTag,
 } from "../tags.js";
@@ -52,6 +53,8 @@ describe("tag identity", () => {
       ["ASCII", "trip", "Trip"],
       ["beyond ASCII", "été", "ÉTÉ"],
       ["mixed", "Été trip", "éTÉ TRIP"],
+      ["spacing", "New  Name", " new name "],
+      ["composition", "caf\u00e9", "cafe\u0301"],
     ])("reuses the tag already there (%s)", (_, have, typed) => {
       const id = addManualTag(db, a, have);
       expect(addManualTag(db, b, typed)).toBe(id);
@@ -88,6 +91,18 @@ describe("tag identity", () => {
           findManualTag(db, name),
         ]);
       });
+    });
+
+    it("refuses a name that is a reserved one once tidied, or nothing", () => {
+      // `res\u200b:4k` would match `res:4k` in a `tag:` search.
+      expect(() => addManualTag(db, a, "res\u200b:4k")).toThrow();
+      expect(() => bulkEditManualTags(db, [a], ["\u200bres:4k"], [])).toThrow();
+      // Only invisible characters: every such name would be one tag.
+      expect(() => addManualTag(db, a, "\u200b")).toThrow();
+      expect(bulkEditManualTags(db, [a], ["\u200c"], []).added).toBe(0);
+      addManualTag(db, a, "trip");
+      expect(() => renameTag(db, manual("trip"), "\u200d")).toThrow();
+      expect(ownTags()).toEqual(["trip"]);
     });
 
     it("never resolves to a generated tag", () => {
@@ -134,6 +149,27 @@ describe("tag identity", () => {
       expect(fileTags(db, a).map((t) => t.id)).toEqual([Trip]);
       expect(fileTags(db, b).map((t) => t.id)).toEqual([Trip]);
       expect(trip).not.toBe(Trip);
+    });
+
+    it("takes a tag off by what the screen calls it, as this library spells it", () => {
+      // The auto-tagging screen spells a tag as the first workspace does;
+      // this one has `kids`, and both spellings side by side elsewhere.
+      addManualTag(db, a, "kids");
+      const Kids = upsertTag(db, "", "Kids");
+      db.prepare(
+        "INSERT INTO meta_tags (meta_key, tag_id, source) SELECT meta_key, ?, 'manual' FROM files WHERE id = ?",
+      ).run(Kids, b);
+      expect(manualSpellings(db, ["KIDS"])).toEqual(["kids", "Kids"]);
+      const r = bulkEditManualTags(
+        db,
+        [a, b],
+        [],
+        manualSpellings(db, ["Kids"]),
+      );
+      expect(r.removed).toBe(2);
+      expect(namesOf(a)).toEqual([]);
+      expect(namesOf(b)).toEqual([]);
+      expect(manualSpellings(db, [])).toEqual([]);
     });
 
     it("keeps a tag both lists name under different spellings", () => {
@@ -200,6 +236,16 @@ describe("tag identity", () => {
       expect(ownTags()).toEqual(["Trip"]);
       expect(namesOf(b)).toEqual(["Trip"]);
     });
+  });
+
+  it("lands auto tagging on a tag renamed to a name it would tidy", () => {
+    // Renamed by hand to two spaces; auto tagging tidies the name the
+    // conditions hold to one, and must still find the tag.
+    addManualTag(db, a, "beach");
+    renameTag(db, manual("beach"), "New  Name");
+    attachAutoTags(db, [{ fileIds: [b], tags: ["New  Name"] }]);
+    expect(ownTags()).toEqual(["New  Name"]);
+    expect(namesOf(b)).toEqual(["New  Name"]);
   });
 
   describe("the tag screen's references", () => {

@@ -20,6 +20,7 @@ import {
   type AutoTagConfig,
 } from "../../shared/autoTag.js";
 import { MAX_TAG_NAME } from "../../shared/tags.js";
+import { autoTagSettingsChanged, autoTagSettingsVersion } from "./autoTag.js";
 import log from "./logger.js";
 
 export interface AppConfig {
@@ -258,6 +259,27 @@ export function saveConfig(c: AppConfig): void {
  */
 export function updateConfig(mutator: (c: AppConfig) => AppConfig): void {
   saveConfig(mutator(loadConfig()));
+}
+
+/**
+ * The auto-tagging settings, and the version they are at: read together, so
+ * a pass run with them stops once they change (see applyAutoTags).
+ */
+export function loadAutoTag(): { config: AutoTagConfig; version: number } {
+  return { version: autoTagSettingsVersion(), config: loadConfig().autoTag };
+}
+
+/**
+ * The one way the auto-tagging settings are saved: a pass under way with the
+ * old ones stops. saveConfig logs a failed write instead of throwing, so it is
+ * read back, and a full disk is not reported as a successful save.
+ */
+export function saveAutoTag(config: AutoTagConfig): void {
+  updateConfig((c) => ({ ...c, autoTag: config }));
+  autoTagSettingsChanged();
+  if (JSON.stringify(loadConfig().autoTag) !== JSON.stringify(config)) {
+    throw new Error("auto-tagging settings could not be saved");
+  }
 }
 
 /** Normalize a path (realpath, falling back to resolve on failure). */

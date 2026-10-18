@@ -141,12 +141,50 @@ export function parseQualifiedTagName(raw: string): {
     : { namespace: "", name: raw };
 }
 
+const TIDY_ASCII = /^[!-~](?:[ -~]*[!-~])?$/;
+/** What tidyTagName would change, composition aside. */
+const UNTIDY = /[^\S ]|[\p{Cc}\p{Cf}]|^ | $| {2}/u;
+
+/**
+ * The form tag names are compared in (tagIdentityKey), and the one auto
+ * tagging stores them in (cleanTagName, which also cuts to length): composed
+ * (NFC), each run of whitespace one space, control and format characters gone
+ * — a file name can carry zero-width or bidi marks, which would make tags
+ * that look identical and are not — and trimmed.
+ */
+export function tidyTagName(raw: string): string {
+  // Most names are tidy already, and tag_key runs this over every row a tag
+  // query reads: those skip the replaces. Printable ASCII with single inner
+  // spaces is left as it is (NFC does not change ASCII); any other name with
+  // no whitespace but single spaces, no control or format character and no
+  // space at either end only needs composing.
+  if (TIDY_ASCII.test(raw) && !raw.includes("  ")) return raw;
+  if (!UNTIDY.test(raw)) return raw.normalize("NFC");
+  return (
+    raw
+      .normalize("NFC")
+      // Whitespace first: a tab or a newline is a control character too, and
+      // must become a space rather than vanish. Collapsed again afterwards,
+      // since removing a zero-width character can leave two spaces side by
+      // side.
+      .replace(/\s+/g, " ")
+      .replace(/[\p{Cc}\p{Cf}]/gu, "")
+      .replace(/ {2,}/g, " ")
+      .trim()
+  );
+}
+
 /**
  * The key two tag names are compared on to decide whether they are one tag:
- * case aside, over all of Unicode — `Trip` and `trip` are one tag, and so are
- * `Été` and `été`. Every path that matches a name to a tag already there goes
- * through this, so none of them can call one tag two; SQL reaches it as
- * `tag_key` (see db.ts). The paths are listed in docs/data-model.md.
+ * the name tidied (tidyTagName) and case aside, over all of Unicode — `Trip`
+ * and `trip` are one tag, and so are `Été` and `été`, `New  Name` and
+ * `New Name`, an `é` written as one character or as `e` and its accent, and a
+ * name with or without an invisible control or format character. Auto tagging
+ * stores names tidied while a name typed by hand is kept as typed, so without
+ * the tidying the two would make one name two tags. Every path that matches a
+ * name to a tag already there goes through this, so none of them can call one
+ * tag two; SQL reaches it as `tag_key` (see db.ts). The paths are listed in
+ * docs/data-model.md.
  *
  * The `tags` table itself still tells spellings apart: a library from before
  * this rule may hold `Trip` and `trip` side by side. They stay as they are; a
@@ -154,7 +192,7 @@ export function parseQualifiedTagName(raw: string): {
  * (see findManualTag), and the tag screen can merge them.
  */
 export function tagIdentityKey(name: string): string {
-  return name.toLowerCase();
+  return tidyTagName(name).toLowerCase();
 }
 
 /** Rename / merge / delete are allowed on user-owned tags only. */
@@ -398,9 +436,12 @@ export function reservedTagPrefix(
   name: string,
   reserved: readonly string[] = RESERVED_TAG_PREFIXES,
 ): string | null {
-  const i = name.indexOf(":");
-  if (i <= 0 || i === name.length - 1) return null;
-  const prefix = name.slice(0, i).toLowerCase();
+  // Tidied, as the name is compared (tagIdentityKey): `res\u200b:4k` would
+  // otherwise pass here and still match `res:4k` in a `tag:` search.
+  const tidy = tidyTagName(name);
+  const i = tidy.indexOf(":");
+  if (i <= 0 || i === tidy.length - 1) return null;
+  const prefix = tidy.slice(0, i).toLowerCase();
   return reserved.includes(prefix) ? prefix : null;
 }
 

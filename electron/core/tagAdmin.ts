@@ -10,6 +10,7 @@ import {
   RESERVED_TAG_ERROR,
   isEditableTag,
   isReservedTagName,
+  tidyTagName,
 } from "../../shared/tags.js";
 import type { TagRef } from "./types.js";
 
@@ -120,7 +121,7 @@ export function renameTag(
 ): { merged: boolean; affectedFiles: number } {
   assertEditable(from);
   const next = to.trim();
-  if (!next) throw new Error("empty tag name");
+  if (!tidyTagName(next)) throw new Error("empty tag name");
   if (isReservedTagName(next)) {
     throw new Error(`${RESERVED_TAG_ERROR}: ${next}`);
   }
