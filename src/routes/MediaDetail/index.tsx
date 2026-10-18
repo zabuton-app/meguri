@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyTagFilter, showFolderInLibrary } from "@/lib/ui-events";
-import { folderPathOf } from "@/lib/relPath";
+import { fileNameOf, folderPathOf } from "@/lib/relPath";
 import { isNormalizedFolderPath } from "@shared/folderPath";
 import { api, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
@@ -517,6 +517,9 @@ export default function MediaDetail() {
           {/* Rating + tags */}
           <RatingTagsCard
             detail={d}
+            // Whichever separator the path was stored with: a folder must
+            // never be offered as part of the name.
+            basename={fileNameOf(d.relPath)}
             fileId={fileId}
             wsId={wsId}
             watchLater={watchLater}

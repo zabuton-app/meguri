@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { addSearchTokens, isFolderView } from "@/routes/Home/utils";
+import {
+  addSearchTokens,
+  isFolderView,
+  replaceSearchTokens,
+} from "@/routes/Home/utils";
 
 describe("addSearchTokens", () => {
   it("puts the token into the query when there is none", () => {
@@ -41,10 +45,11 @@ describe("addSearchTokens", () => {
     expect(addSearchTokens(before, ["tag:4k"])).toBe(before);
   });
 
-  it("keeps two tags that differ beyond ASCII apart", () => {
-    // SQLite's NOCASE collation only folds ASCII, so these really are two tags.
-    const after = addSearchTokens({ q: "tag:été" }, ["tag:ÉTÉ"]);
-    expect(after.q).toBe("tag:été tag:ÉTÉ");
+  it("recognises a condition in another case beyond ASCII too", () => {
+    // The SQL resolves the tag by tagIdentityKey, which folds all of Unicode,
+    // so `tag:ÉTÉ` is the condition `tag:été` already is.
+    const before = { q: "tag:été" };
+    expect(addSearchTokens(before, ["tag:ÉTÉ"])).toBe(before);
   });
 
   it("still compares free text exactly", () => {
@@ -82,5 +87,28 @@ describe("isFolderView in the graph", () => {
     expect(
       isFolderView({ byFolder: true, folderAvailable: true, view: "grid" }),
     ).toBe(true);
+  });
+});
+
+describe("replaceSearchTokens", () => {
+  it("makes the tokens the whole text query and keeps the other filters", () => {
+    expect(
+      replaceSearchTokens({ q: "beach tag:4k", kind: "video" }, ["yoga|ヨガ"]),
+    ).toEqual({ q: "yoga|ヨガ", kind: "video" });
+  });
+
+  it("does not AND a second search onto the first", () => {
+    const first = replaceSearchTokens({}, ["yoga|ヨガ"]);
+    expect(replaceSearchTokens(first, ["harbor|港"])).toEqual({
+      q: "harbor|港",
+    });
+  });
+
+  it("keeps a token with a space in one piece, and the object when unchanged", () => {
+    const filter = replaceSearchTokens({}, ['"yoga|morning stretch"']);
+    expect(filter).toEqual({ q: '"yoga|morning stretch"' });
+    expect(replaceSearchTokens(filter, ['"yoga|morning stretch"'])).toBe(
+      filter,
+    );
   });
 });

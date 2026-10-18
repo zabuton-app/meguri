@@ -19,6 +19,11 @@ import type {
   UpdateInfo,
 } from "@shared/ipc/schema";
 import type { GraphDims } from "@shared/ipc/graph";
+import type {
+  AutoTagAssignment,
+  AutoTagConfig,
+  AutoTagEditTarget,
+} from "@shared/autoTag";
 
 interface Bridge {
   invoke<T = unknown>(channel: string, args?: unknown): Promise<T>;
@@ -156,8 +161,12 @@ export const api = {
     invoke("files_by_ids", { targets }),
   tagsList: (workspaceId: string, prefix: string, limit?: number) =>
     invoke("tags_list", { workspaceId, prefix, limit }),
-  /** Whole tag catalog for the tag management screen (scope follows the active view). */
-  tagsListAll: () => invoke("tags_list_all"),
+  /**
+   * Whole tag catalog for the tag management screen (scope follows the active
+   * view), or of every workspace when asked.
+   */
+  tagsListAll: (opts?: { allWorkspaces: boolean }) =>
+    invoke("tags_list_all", opts),
   tagRename: (from: TagRef, to: string) => invoke("tag_rename", { from, to }),
   tagMerge: (from: TagRef[], into: TagRef) =>
     invoke("tag_merge", { from, into }),
@@ -212,6 +221,23 @@ export const api = {
   updateSetAutoCheck: (enabled: boolean) =>
     invoke("update_set_auto_check", { enabled }),
   updateIgnore: (version: string) => invoke("update_ignore", { version }),
+  /** Auto-tagging (rules, dictionary, applying), configured app-wide. */
+  autoTagGet: () => invoke("auto_tag_get"),
+  autoTagSet: (config: AutoTagConfig) => invoke("auto_tag_set", { config }),
+  autoTagFiles: () => invoke("auto_tag_files"),
+  autoTagApply: (assignments: AutoTagAssignment[], keep?: string[]) =>
+    invoke("auto_tag_apply", { assignments, keep }),
+  /**
+   * files_bulk_tag for the screen: only files still where it read them, and a
+   * removal takes every spelling of the tag.
+   */
+  autoTagEdit: (
+    targets: AutoTagEditTarget[],
+    add: string[],
+    remove: string[],
+  ) => invoke("auto_tag_edit", { targets, add, remove }),
+  autoTagUndo: (undoIds: string[]) => invoke("auto_tag_undo", { undoIds }),
+  autoTagReapply: () => invoke("auto_tag_reapply"),
   /** App logo variant (window + tray icon), persisted in main's config.json. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),

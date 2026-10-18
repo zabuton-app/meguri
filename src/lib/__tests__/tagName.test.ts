@@ -9,9 +9,69 @@ import {
   reservedTagPrefix,
   qualifiedTagName,
   splitSearchTokens,
+  tagIdentityKey,
   tagSearchKey,
   tagSearchToken,
+  tidyTagName,
 } from "@shared/tags";
+
+describe("tidyTagName", () => {
+  // The rule written out the long way: the shortcuts must give exactly this.
+  const reference = (raw: string) =>
+    raw
+      .normalize("NFC")
+      .replace(/\s+/g, " ")
+      .replace(/[\p{Cc}\p{Cf}]/gu, "")
+      .replace(/ {2,}/g, " ")
+      .trim();
+
+  it("tidies spacing, composition and invisible characters", () => {
+    expect(tidyTagName("  New \t Name ")).toBe("New Name");
+    expect(tidyTagName("cafe\u0301")).toBe("caf\u00e9");
+    expect(tidyTagName("tr\u200bip")).toBe("trip");
+    expect(tidyTagName("a \u200b b")).toBe("a b");
+    expect(tidyTagName("旅行\u3000タグ")).toBe("旅行 タグ");
+  });
+
+  it("gives what the long way gives, tidy names and untidy alike", () => {
+    // Deterministic, so a failure can be run again.
+    let seed = 1;
+    const next = () => (seed = (seed * 48271) % 2147483647);
+    const alphabet = [
+      "a",
+      "Z",
+      "~",
+      "!",
+      " ",
+      " ",
+      "\t",
+      "\n",
+      "\u00a0",
+      "\u3000",
+      "\u2028",
+      "\u200b",
+      "\u200e",
+      "\u0000",
+      "\u007f",
+      "\u0301",
+      "\u3099",
+      "e",
+      "か",
+      "旅",
+      "é",
+      "\u212b",
+      "\ud83d\ude00",
+    ];
+    for (let i = 0; i < 20_000; i++) {
+      const length = next() % 8;
+      let raw = "";
+      for (let j = 0; j < length; j++) {
+        raw += alphabet[next() % alphabet.length];
+      }
+      expect(tidyTagName(raw), JSON.stringify(raw)).toBe(reference(raw));
+    }
+  });
+});
 
 describe("qualifiedTagName", () => {
   it("returns the bare name for a manual tag", () => {
@@ -200,6 +260,19 @@ describe("parseTagSearchToken", () => {
   });
 });
 
+describe("tagIdentityKey", () => {
+  it("is the same for spellings that differ only by case", () => {
+    expect(tagIdentityKey("Trip")).toBe(tagIdentityKey("trip"));
+    expect(tagIdentityKey("ÉTÉ")).toBe(tagIdentityKey("été"));
+    expect(tagIdentityKey("Été TRIP")).toBe(tagIdentityKey("éTÉ trip"));
+  });
+
+  it("tells different names apart", () => {
+    expect(tagIdentityKey("été")).not.toBe(tagIdentityKey("ete"));
+    expect(tagIdentityKey("旅行")).not.toBe(tagIdentityKey("旅"));
+  });
+});
+
 describe("tagSearchKey", () => {
   it("folds the difference two spellings of one condition can have", () => {
     expect(tagSearchKey("tag:4K")).toBe("4k");
@@ -210,10 +283,9 @@ describe("tagSearchKey", () => {
     );
   });
 
-  it("leaves non-ASCII case alone, as the SQL that resolves the tag does", () => {
-    // SQLite's NOCASE collation folds ASCII only, so these are two tags there;
-    // folding them here would drop one of the two conditions without a trace.
-    expect(tagSearchKey("tag:ÉTÉ")).not.toBe(tagSearchKey("tag:été"));
+  it("folds non-ASCII case too, as the SQL that resolves the tag does", () => {
+    // Both resolve by tagIdentityKey: one tag there, so one condition here.
+    expect(tagSearchKey("tag:ÉTÉ")).toBe(tagSearchKey("tag:été"));
   });
 
   it("returns null for anything that is not a directive", () => {

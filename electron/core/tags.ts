@@ -3,7 +3,12 @@
 // so they survive rebuilding the files table.
 import { resyncFtsForKeys, type DB } from "./db.js";
 import type { TagInfo } from "./types.js";
-import { RESERVED_TAG_ERROR, isReservedTagName } from "../../shared/tags.js";
+import {
+  RESERVED_TAG_ERROR,
+  isReservedTagName,
+  tagIdentityKey,
+  tidyTagName,
+} from "../../shared/tags.js";
 
 /** Resolve a file id to its stable meta_key (null if the file row is gone). */
 export function metaKeyOf(db: DB, fileId: number): string | null {
@@ -38,15 +43,65 @@ export function addFileTag(
 }
 
 /**
- * Attach a user-created tag. Names that would impersonate a pipeline-owned
+ * The user's tag a name means: the one whose name has the same tagIdentityKey,
+ * or null when there is none. Where a library holds two such spellings from
+ * before that rule (`Trip` and `trip`), the one spelled exactly as asked, and
+ * otherwise the older one — as auto tagging picks (see tagIdResolver in
+ * autoTag.ts). Exact first, so a chip the user picked is the tag they get.
+ * `except` leaves one tag out, for a rename asking what else the new name
+ * would mean.
+ */
+export function findManualTag(
+  db: DB,
+  name: string,
+  except?: number,
+): number | null {
+  const id = db
+    .prepare(
+      "SELECT id FROM tags WHERE namespace = '' AND tag_key(name) = ? AND id IS NOT ? ORDER BY name = ? DESC, id LIMIT 1",
+    )
+    .pluck()
+    .get(tagIdentityKey(name), except ?? null, name) as number | undefined;
+  return id ?? null;
+}
+
+/**
+ * Every spelling of the user's tags that these names mean (tagIdentityKey):
+ * what "this tag" is in this database, where a library may spell it otherwise
+ * than another one, or hold two spellings side by side.
+ */
+export function manualSpellings(db: DB, names: readonly string[]): string[] {
+  if (names.length === 0) return [];
+  return db
+    .prepare(
+      "SELECT name FROM tags WHERE namespace = '' AND tag_key(name) IN (SELECT value FROM json_each(?)) ORDER BY id",
+    )
+    .pluck()
+    .all(JSON.stringify([...new Set(names.map(tagIdentityKey))])) as string[];
+}
+
+/**
+ * The user's tag for a name, created in that spelling when there is none. An
+ * existing one keeps its own: typing `Trip` beside a `trip` reuses `trip`.
+ */
+export function manualTagId(db: DB, name: string): number {
+  return findManualTag(db, name) ?? upsertTag(db, "", name);
+}
+
+/**
+ * Attach a user-created tag — the one already there under another spelling,
+ * if any (see manualTagId). Names that would impersonate a pipeline-owned
  * namespace are rejected here rather than silently creating a manual tag that
  * renders identically to a generated one.
  */
 export function addManualTag(db: DB, fileId: number, name: string): number {
+  // Nothing left once tidied (only invisible characters): every such name
+  // would be one tag (see tagIdentityKey).
+  if (!tidyTagName(name)) throw new Error("empty tag name");
   if (isReservedTagName(name)) {
     throw new Error(`${RESERVED_TAG_ERROR}: ${name}`);
   }
-  const tagId = upsertTag(db, "", name);
+  const tagId = manualTagId(db, name);
   addFileTag(db, fileId, tagId, "manual", null);
   return tagId;
 }
@@ -84,8 +139,15 @@ export interface BulkTagEdit {
  * row matches are simply no-ops — the caller aggregated them from a selection
  * that may span several workspaces, so a name missing here is expected.
  *
- * The edit is expressed as a final state, not as a sequence: a name in both
- * lists is treated as an addition and dropped from the removals, so the same
+ * Names to add resolve to the tag they mean under any spelling (see
+ * manualTagId), so `Trip` lands on the `trip` a workspace already has. Names
+ * to remove stay exact: they come from tags the selection showed, each a row
+ * of its own, and a library from before that rule may hold `Trip` and `trip`
+ * both — removing one must not take the other. A caller that means the tag
+ * under any spelling passes them all (see manualSpellings).
+ *
+ * The edit is expressed as a final state, not as a sequence: a tag both lists
+ * name is treated as an addition and dropped from the removals, so the same
  * request always converges on the same tags and reports no churn for a file
  * that already had them.
  *
@@ -103,10 +165,10 @@ export function bulkEditManualTags(
   add: string[],
   remove: string[],
 ): BulkTagEdit {
-  const addNames = [...new Set(add.map((n) => n.trim()).filter(Boolean))];
-  const removeNames = [
-    ...new Set(remove.map((n) => n.trim()).filter(Boolean)),
-  ].filter((name) => !addNames.includes(name));
+  const addNames = [
+    ...new Set(add.map((n) => n.trim()).filter((n) => tidyTagName(n))),
+  ];
+  const removeNames = [...new Set(remove.map((n) => n.trim()).filter(Boolean))];
   for (const name of addNames) {
     if (isReservedTagName(name)) {
       throw new Error(`${RESERVED_TAG_ERROR}: ${name}`);
@@ -132,10 +194,10 @@ export function bulkEditManualTags(
     // Names resolve to ids once, not once per file. Additions create the tag
     // here so the id exists before the first attach; removals only look, since
     // creating a tag in order to detach it would leave an unused row behind.
-    const addIds = addNames.map((name) => upsertTag(db, "", name));
+    const addIds = [...new Set(addNames.map((name) => manualTagId(db, name)))];
     const removeIds = removeNames
       .map((name) => (selectId.get(name) as { id: number } | undefined)?.id)
-      .filter((id): id is number => id != null);
+      .filter((id): id is number => id != null && !addIds.includes(id));
 
     const keyOf = new Map<number, string>();
     for (const fileId of ids) {
