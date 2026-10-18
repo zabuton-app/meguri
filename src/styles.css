@@ -162,11 +162,25 @@ textarea,
  * Radix ScrollArea wraps the direct child of the Viewport with display:table; min-width:100%.
  * In a table context, the child's width:100% creates a circular reference to the content-based
  * table width, so <video>/<img> keep their natural width as a lower bound and stop shrinking.
- * Only for vertically scrolling pages (.page-scroll), make it block so the width correctly
- * follows the viewport. Not applied to horizontally scrolling ScrollAreas (scenes) (limited via the direct-child selector).
+ * The same table wrapper also widens to its content, which defeats truncate and flex-wrap.
+ * For vertically scrolling areas (.page-scroll: pages, option lists, wrapping chips), make it
+ * block so the width correctly follows the viewport. Not applied to horizontally scrolling
+ * ScrollAreas (scenes) (limited via the direct-child selector).
  */
 .page-scroll > [data-slot="scroll-area-viewport"] > div {
   display: block !important;
+}
+
+/*
+ * For a ScrollArea whose content is centred in the viewport with auto margins
+ * (the tag cloud): make the wrapper a flex box at least as tall as the viewport,
+ * so m-auto centres a small child and falls back to the top-left corner when the
+ * child outgrows the area. Use instead of .page-scroll, not with it: both set the
+ * wrapper's display.
+ */
+.fill-scroll > [data-slot="scroll-area-viewport"] > div {
+  display: flex !important;
+  min-height: 100%;
 }
 
 /* Sonner uses its own light/dark palette by default. Bridge it to Meguri themes. */

@@ -59,6 +59,7 @@ const canvas = vi.hoisted(() => ({
     graph: MediaGraph;
     visibility: Visibility;
     focus: string | null;
+    thumbnails: boolean;
   },
   fit: vi.fn(),
   focus: vi.fn(),
@@ -70,6 +71,7 @@ vi.mock("../GraphCanvas", async () => {
       graph: MediaGraph;
       visibility: Visibility;
       focus: string | null;
+      thumbnails: boolean;
       onHover: (key: string | null) => void;
       onClickNode: (key: string) => void;
       onClickStage: () => void;
@@ -559,6 +561,82 @@ describe("GraphView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Graph settings" }));
     expect(screen.queryByRole("slider", { name: "Link thickness" })).toBeNull();
     expect(screen.getByRole("slider", { name: "Node size" })).toBeTruthy();
+  });
+
+  it("draws thumbnails while the visible files are within the limit", async () => {
+    render();
+    await ready();
+    // a, b and c are shown (the orphan is not), under the default 150.
+    expect(canvas.props?.thumbnails).toBe(true);
+    cleanup();
+    localStorage.setItem(
+      GRAPH_SETTINGS_KEY,
+      JSON.stringify({ display: { thumbnailLimit: 2 } }),
+    );
+    render();
+    await ready();
+    expect(canvas.props?.thumbnails).toBe(false);
+  });
+
+  it("switches thumbnails and their limit from the settings panel", async () => {
+    render();
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Graph settings" }));
+    const toggle = screen.getByRole("switch", { name: "Thumbnails" });
+    const limit = screen.getByRole("slider", { name: "Thumbnail limit" });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect((limit as HTMLInputElement).value).toBe("150");
+    expect(screen.getByRole("status").textContent).toBe("");
+
+    // Under the three files on show: dots, and the panel says why.
+    fireEvent.change(limit, { target: { value: "2" } });
+    await waitFor(() => expect(canvas.props?.thumbnails).toBe(false));
+    expect(screen.getByRole("status").textContent).toBe(
+      "3 files shown (over the limit, so no thumbnails)",
+    );
+    fireEvent.change(limit, { target: { value: "10" } });
+    await waitFor(() => expect(canvas.props?.thumbnails).toBe(true));
+    expect(screen.getByRole("status").textContent).toBe("");
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(canvas.props?.thumbnails).toBe(false));
+    expect((limit as HTMLInputElement).disabled).toBe(true);
+    expect(
+      JSON.parse(localStorage.getItem(GRAPH_SETTINGS_KEY) ?? "{}"),
+    ).toMatchObject({ display: { thumbnails: false, thumbnailLimit: 10 } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore defaults" }));
+    await waitFor(() => expect(canvas.props?.thumbnails).toBe(true));
+    expect(
+      screen
+        .getByRole("switch", { name: "Thumbnails" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      screen.getByRole<HTMLInputElement>("slider", { name: "Thumbnail limit" })
+        .value,
+    ).toBe("150");
+  });
+
+  it("leaves thumbnails to the flat graph", async () => {
+    localStorage.setItem(GRAPH_DIMS_KEY, "3");
+    localStorage.setItem(
+      GRAPH_SETTINGS_KEY,
+      JSON.stringify({ display: { thumbnailLimit: 2 } }),
+    );
+    render();
+    await ready();
+    expect(canvas.props?.thumbnails).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Graph settings" }));
+    const toggle = screen.getByRole("switch", { name: "Thumbnails" });
+    expect((toggle as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      screen.getByRole<HTMLInputElement>("slider", { name: "Thumbnail limit" })
+        .disabled,
+    ).toBe(true);
+    expect(screen.getByText("2D only")).toBeTruthy();
+    // Over the limit, but in 3D the limit does not apply: no hint.
+    expect(screen.getByRole("status").textContent).toBe("");
   });
 
   it("applies and remembers the forces from the settings panel", async () => {

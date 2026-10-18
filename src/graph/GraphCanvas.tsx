@@ -8,7 +8,9 @@
 // Nodes are circles of radius clamp(3·√(links + 1), 8, 30) graph units drawn
 // at √scale (they shrink slower than the graph when zooming out), links are a
 // constant number of pixels wide, and labels sit under their node and fade in
-// as the view zooms past a threshold.
+// as the view zooms past a threshold. When few files are shown, file nodes
+// are drawn as their thumbnails (NodeThumbProgram), once each picture is in;
+// until then, and for tags, as discs.
 import {
   useEffect,
   useImperativeHandle,
@@ -35,9 +37,17 @@ import {
   nodeFill,
   nodeRadius,
   nodeWeights,
+  rgbOf,
   textAlpha,
 } from "./model/appearance";
-import type { EdgeAttrs, NodeAttrs } from "./model/types";
+import { THUMB_MIN_RADIUS } from "./model/thumbnails";
+import type { EdgeAttrs, FileNodeAttrs, NodeAttrs } from "./model/types";
+import {
+  createNodeThumbProgram,
+  type ThumbDisplayData,
+} from "./render/NodeThumbProgram";
+import { ThumbAtlas, type ThumbRequest } from "./render/thumbAtlas";
+import { useThumbVersions } from "./useThumbVersions";
 import type { GraphCanvasHandle, GraphCanvasProps } from "./canvasTypes";
 import type { GraphColors } from "./useGraphColors";
 
@@ -80,6 +90,19 @@ interface View {
   display: DisplaySettings;
   /** Faded versions of the colours, by colour (reset with the colours). */
   faded: Map<string, string>;
+  /** The background as 0..1 RGB, which faded thumbnails are mixed towards. */
+  background: readonly [number, number, number];
+}
+
+/** The background as the thumbnail program takes it. */
+function backgroundOf(colors: GraphColors): readonly [number, number, number] {
+  const rgb = rgbOf(colors.bg);
+  return rgb ? [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255] : [0, 0, 0];
+}
+
+/** A file's cell in the thumbnail atlas. */
+function thumbKey(a: Pick<FileNodeAttrs, "workspaceId" | "fileId">): string {
+  return `${a.workspaceId}:${a.fileId}`;
 }
 
 function fadedColor(view: View, color: string): string {
@@ -142,6 +165,7 @@ export function GraphCanvas({
   visibility,
   focus,
   display,
+  thumbnails,
   onHover,
   onClickNode,
   onClickStage,
@@ -155,6 +179,9 @@ export function GraphCanvas({
   const sigmaRef = useRef<Sigma<NodeAttrs, EdgeAttrs> | null>(null);
   const [contextLost, setContextLost] = useState(false);
   if (contextLost) throw new Error("WebGL context lost");
+  const { thumbOf } = useThumbVersions();
+  // Made with sigma: the pictures its thumbnail program draws.
+  const atlasRef = useRef<ThumbAtlas | null>(null);
 
   // What the reducers and drawers read. Updated on every render, applied by
   // the effect below; the reducers themselves are installed once.
@@ -167,6 +194,7 @@ export function GraphCanvas({
     weights: visibility.degree,
     // Null so the first effect counts them for the current setting.
     weightsBy: null as DisplaySettings["sizeBy"] | null,
+    thumbnails,
   });
   const view = useRef<View>({
     s1: 1,
@@ -175,6 +203,7 @@ export function GraphCanvas({
     colors,
     display,
     faded: new Map(),
+    background: backgroundOf(colors),
   });
   const handlers = useRef({
     onHover,
@@ -206,10 +235,17 @@ export function GraphCanvas({
     if (!el) return;
     const s = state.current;
     const v = view.current;
+    // A picture that came in is drawn on the next frame.
+    const atlas = new ThumbAtlas(() => sigmaRef.current?.scheduleRefresh());
+    atlasRef.current = atlas;
     const sigma = new Sigma<NodeAttrs, EdgeAttrs>(s.graph, el, {
       allowInvalidContainer: true,
       defaultNodeType: "file",
-      nodeProgramClasses: { file: NodeCircleProgram, tag: NodeCircleProgram },
+      nodeProgramClasses: {
+        file: NodeCircleProgram,
+        tag: NodeCircleProgram,
+        thumb: createNodeThumbProgram(atlas, () => v.background),
+      },
       stagePadding: 0,
       itemSizesReference: "screen",
       // Node radius on screen = size / this = size · √scale.
@@ -230,11 +266,25 @@ export function GraphCanvas({
         if (!vis.nodes.has(key)) return { ...data, hidden: true };
 
         const fill = nodeFill(data, c);
-        const out: Partial<NodeDisplayData> & Record<string, unknown> = {
+        const weight = state.current.weights.get(key) ?? 0;
+        const out: Partial<NodeDisplayData> &
+          Partial<ThumbDisplayData> &
+          Record<string, unknown> = {
           ...data,
-          size: nodeRadius(state.current.weights.get(key) ?? 0, d.nodeSize),
+          size: nodeRadius(weight, d.nodeSize),
           color: fill,
         };
+        if (state.current.thumbnails && data.type === "file") {
+          // Raised whether or not the picture is in yet, so the node does
+          // not jump in size when it arrives.
+          out.size = nodeRadius(weight, d.nodeSize, THUMB_MIN_RADIUS);
+          const cell = atlasRef.current?.readyCell(thumbKey(data)) ?? -1;
+          if (cell >= 0) {
+            out.type = "thumb";
+            out.thumbCell = cell;
+            out.thumbOpacity = 1;
+          }
+        }
         if (!f) return out;
         if (key === f) {
           out.color = c.highlight;
@@ -249,6 +299,7 @@ export function GraphCanvas({
           out.color = fadedColor(view.current, fill);
           out.faded = true;
           out.zIndex = 0;
+          if (out.type === "thumb") out.thumbOpacity = FADED;
         }
         return out;
       },
@@ -491,6 +542,8 @@ export function GraphCanvas({
       canvas?.removeEventListener("webglcontextlost", onLost);
       sigma.kill();
       sigmaRef.current = null;
+      atlas.dispose();
+      atlasRef.current = null;
     };
   }, []);
 
@@ -521,10 +574,14 @@ export function GraphCanvas({
       neighbours,
       weights,
       weightsBy: display.sizeBy,
+      thumbnails,
     };
     const colorsChanged = v.colors !== colors;
     v.colors = colors;
-    if (colorsChanged) v.faded = new Map();
+    if (colorsChanged) {
+      v.faded = new Map();
+      v.background = backgroundOf(colors);
+    }
     v.display = display;
     if (!sigma) return;
     if (colorsChanged) sigma.setSetting("labelFont", colors.font);
@@ -538,7 +595,26 @@ export function GraphCanvas({
     // with the simulation's.
     if (sigma.getGraph() !== graph) sigma.setGraph(graph);
     else sigma.scheduleRefresh();
-  }, [graph, colors, visibility, focus, display]);
+  }, [graph, colors, visibility, focus, display, thumbnails]);
+
+  // The pictures to have in the atlas: every visible file with a thumbnail,
+  // at its current version, while thumbnails are drawn. Asked again when
+  // that set changes or a thumbnail was (re)generated; a cell already
+  // holding the version wanted costs nothing. Kept when thumbnails are
+  // switched off, so switching back draws them without loading again.
+  useEffect(() => {
+    const atlas = atlasRef.current;
+    if (!atlas || !thumbnails) return;
+    const wanted: ThumbRequest[] = [];
+    for (const key of visibility.nodes) {
+      if (!graph.hasNode(key)) continue;
+      const a = graph.getNodeAttributes(key);
+      if (a.type !== "file") continue;
+      const thumb = thumbOf(a);
+      if (thumb) wanted.push({ key: thumbKey(a), ...thumb });
+    }
+    atlas.request(wanted);
+  }, [graph, visibility, thumbnails, thumbOf]);
 
   useImperativeHandle(ref, () => {
     /** The camera that frames the visible nodes, from their graph positions

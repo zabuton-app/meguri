@@ -6,6 +6,7 @@ import { useId, useMemo, useState, type KeyboardEvent, type Ref } from "react";
 import { Search } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { searchNodes } from "./model/search";
 import type { MediaGraph } from "./model/types";
 import type { Visibility } from "./model/visibility";
@@ -112,42 +113,55 @@ export function GraphSearch({
         />
       </label>
       {showList && (
-        <ul
-          id={listId}
-          role="listbox"
-          className="absolute left-0 top-9 z-20 max-h-80 w-80 overflow-y-auto rounded-md border border-border bg-surface p-1 shadow-lg"
+        // Capped by max-height, not sized: the scroll area is a flex column so
+        // its viewport can shrink as a flex item (see ShortcutsOverlay). The
+        // mousedown guard keeps the input focused while the scrollbar is
+        // dragged; its blur would close the list.
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          className="absolute left-0 top-9 z-20 flex max-h-80 w-80 flex-col rounded-md border border-border bg-surface shadow-lg"
         >
-          {hits.length === 0 ? (
-            <li className="px-2.5 py-2 text-sm text-muted">
-              {t("graph.search.noMatch")}
-            </li>
-          ) : (
-            hits.map((hit, i) => {
-              const attrs = graph.getNodeAttributes(hit.key);
-              return (
-                <li
-                  key={hit.key}
-                  id={`${listId}-${i}`}
-                  role="option"
-                  aria-selected={i === active}
-                  // mousedown, not click: the input's blur would close the list first.
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    pick(hit.key);
-                  }}
-                  onMouseEnter={() => setActive(i)}
-                  className={cn(
-                    "flex min-h-9 cursor-pointer items-center gap-2 rounded px-2.5 text-sm text-fg",
-                    i === active && "bg-fg/10",
-                  )}
-                >
-                  <NodeDot node={attrs} />
-                  <span className="truncate">{hit.label}</span>
+          {/* type="auto": an always-on scrollbar track would sit over the
+              options' edges and take their clicks even when nothing overflows. */}
+          <ScrollArea
+            type="auto"
+            className="page-scroll flex min-h-0 flex-1 flex-col"
+            viewportClassName="min-h-0 flex-1 p-1"
+          >
+            <ul id={listId} role="listbox">
+              {hits.length === 0 ? (
+                <li className="px-2.5 py-2 text-sm text-muted">
+                  {t("graph.search.noMatch")}
                 </li>
-              );
-            })
-          )}
-        </ul>
+              ) : (
+                hits.map((hit, i) => {
+                  const attrs = graph.getNodeAttributes(hit.key);
+                  return (
+                    <li
+                      key={hit.key}
+                      id={`${listId}-${i}`}
+                      role="option"
+                      aria-selected={i === active}
+                      // mousedown, not click: the input's blur would close the list first.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        pick(hit.key);
+                      }}
+                      onMouseEnter={() => setActive(i)}
+                      className={cn(
+                        "flex min-h-9 cursor-pointer items-center gap-2 rounded px-2.5 text-sm text-fg",
+                        i === active && "bg-fg/10",
+                      )}
+                    >
+                      <NodeDot node={attrs} />
+                      <span className="truncate">{hit.label}</span>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </ScrollArea>
+        </div>
       )}
     </div>
   );

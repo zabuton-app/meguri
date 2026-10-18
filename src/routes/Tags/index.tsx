@@ -26,6 +26,7 @@ import { HistoryModal } from "@/routes/History/HistoryModal";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { invalidateTagCatalog } from "@/lib/queryCache";
@@ -387,13 +388,13 @@ export default function Tags() {
 
       {/* Loading and "no tags at all" belong to the catalog, not to a view. */}
       {loading ? (
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <ScrollArea className="page-scroll min-h-0 flex-1">
           <div className="flex flex-col gap-2 p-4">
             {Array.from({ length: 8 }, (_, i) => (
               <Skeleton key={i} className="h-7 w-full rounded-lg" />
             ))}
           </div>
-        </div>
+        </ScrollArea>
       ) : all.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
           <TagsIcon className="size-10 opacity-50" />
@@ -407,75 +408,73 @@ export default function Tags() {
           truncated={catalog.data?.truncated ?? false}
           onFilter={onFilterByTag}
         />
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {groups.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-center text-muted">
-              <p>{t("tags.noMatch")}</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 p-3">
-              {catalog.data?.truncated && (
-                <p className="px-1 text-xs text-muted">
-                  {t("tags.truncated", { max: MAX_TAG_LIST })}
-                </p>
-              )}
-              {groups.map((group) => {
-                const isCollapsed = collapsed.has(group.namespace);
-                const pipelineOwned = group.namespace !== "";
-                return (
-                  <section key={group.namespace || "manual"}>
-                    <h3 className="sticky top-0 z-10 flex items-baseline gap-2 bg-bg px-1 py-1.5 text-xs font-semibold text-muted">
-                      <button
-                        type="button"
-                        className="flex items-center gap-1 text-fg"
-                        onClick={() => toggleGroup(group.namespace)}
-                        aria-expanded={!isCollapsed}
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="size-3" />
-                        ) : (
-                          <ChevronDown className="size-3" />
-                        )}
-                        {pipelineOwned && <Lock className="size-3" />}
-                        {pipelineOwned
-                          ? tagNamespaceLabel(t, group.namespace)
-                          : t("tags.groupManual")}
-                      </button>
-                      <span className="tabular-nums">{group.tags.length}</span>
-                      {pipelineOwned && (
-                        <span className="font-normal opacity-70">
-                          {t("tags.readOnly")}
-                        </span>
-                      )}
-                    </h3>
-                    {pipelineOwned && !isCollapsed && (
-                      <p className="px-1 pb-1 text-xs text-muted">
-                        {t("tags.readOnlyHint")}
-                      </p>
-                    )}
-                    {!isCollapsed && (
-                      <ul className="flex flex-col">
-                        {group.tags.map((tag) => (
-                          <TagRow
-                            key={tag.qualified}
-                            tag={tag}
-                            selected={selected.has(tag.qualified)}
-                            busy={mutating}
-                            onToggleSelect={toggleSelect}
-                            onFilter={onFilterByTag}
-                            onRename={setRenameTarget}
-                            onDelete={(target) => void onDeleteOne(target)}
-                          />
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-                );
-              })}
-            </div>
-          )}
+      ) : groups.length === 0 ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center text-center text-muted">
+          <p>{t("tags.noMatch")}</p>
         </div>
+      ) : (
+        <ScrollArea className="page-scroll min-h-0 flex-1">
+          <div className="flex flex-col gap-2 p-3">
+            {catalog.data?.truncated && (
+              <p className="px-1 text-xs text-muted">
+                {t("tags.truncated", { max: MAX_TAG_LIST })}
+              </p>
+            )}
+            {groups.map((group) => {
+              const isCollapsed = collapsed.has(group.namespace);
+              const pipelineOwned = group.namespace !== "";
+              return (
+                <section key={group.namespace || "manual"}>
+                  <h3 className="sticky top-0 z-10 flex items-baseline gap-2 bg-bg px-1 py-1.5 text-xs font-semibold text-muted">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-fg"
+                      onClick={() => toggleGroup(group.namespace)}
+                      aria-expanded={!isCollapsed}
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight className="size-3" />
+                      ) : (
+                        <ChevronDown className="size-3" />
+                      )}
+                      {pipelineOwned && <Lock className="size-3" />}
+                      {pipelineOwned
+                        ? tagNamespaceLabel(t, group.namespace)
+                        : t("tags.groupManual")}
+                    </button>
+                    <span className="tabular-nums">{group.tags.length}</span>
+                    {pipelineOwned && (
+                      <span className="font-normal opacity-70">
+                        {t("tags.readOnly")}
+                      </span>
+                    )}
+                  </h3>
+                  {pipelineOwned && !isCollapsed && (
+                    <p className="px-1 pb-1 text-xs text-muted">
+                      {t("tags.readOnlyHint")}
+                    </p>
+                  )}
+                  {!isCollapsed && (
+                    <ul className="flex flex-col">
+                      {group.tags.map((tag) => (
+                        <TagRow
+                          key={tag.qualified}
+                          tag={tag}
+                          selected={selected.has(tag.qualified)}
+                          busy={mutating}
+                          onToggleSelect={toggleSelect}
+                          onFilter={onFilterByTag}
+                          onRename={setRenameTarget}
+                          onDelete={(target) => void onDeleteOne(target)}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </ScrollArea>
       )}
 
       <TagRenameDialog

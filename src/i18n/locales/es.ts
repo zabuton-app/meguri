@@ -458,6 +458,11 @@ export const es: Record<TranslationKey, string> = {
   "graph.settings.textFade": "Umbral de desvanecimiento del texto",
   "graph.settings.nodeSize": "Tamaño de nodo",
   "graph.settings.lineSize": "Grosor de enlace",
+  "graph.settings.thumbnails": "Miniaturas",
+  "graph.settings.thumbnailLimit": "Límite de miniaturas",
+  "graph.settings.thumbnailsOverLimit":
+    "{count} archivos visibles (supera el límite, sin miniaturas)",
+  "graph.settings.thumbnails2dOnly": "Solo 2D",
   "graph.settings.forces": "Fuerzas",
   "graph.settings.center": "Fuerza central",
   "graph.settings.repel": "Fuerza de repulsión",

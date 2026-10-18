@@ -10,6 +10,13 @@ describe("nodeRadius", () => {
     expect(nodeRadius(10_000)).toBe(30);
     expect(nodeRadius(15, 2)).toBe(24);
   });
+
+  it("keeps a raised floor, which the multiplier scales too", () => {
+    expect(nodeRadius(0, 1, 14)).toBe(14);
+    expect(nodeRadius(15, 1, 14)).toBe(14);
+    expect(nodeRadius(99, 1, 14)).toBe(30);
+    expect(nodeRadius(0, 2, 14)).toBe(28);
+  });
 });
 
 describe("nodeWeights", () => {

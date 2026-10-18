@@ -278,6 +278,29 @@ never pay for it) draws the same list as a network of files and tags, from one
   under a cache buster of its own, and it follows `thumb:done` itself, so a
   regenerated thumbnail is never read back from the HTTP cache, and one
   made after the payload was built shows without a refetch.
+- **Thumbnail nodes.** When thumbnails are on and the visible files number
+  no more than the limit (`display.thumbnails` / `display.thumbnailLimit`,
+  150 by default; decided in `GraphView` by `model/thumbnails.ts`, from the
+  visibility rather than the camera, so zooming never flips it), the flat
+  canvas draws file nodes as their thumbnails, at a radius of at least 14.
+  The node reducer switches a file node's `type` to `thumb` once its picture
+  is in, so a file without one (or still loading, or failed) stays a disc.
+  `render/thumbAtlas.ts` loads the pictures (`crossOrigin`, which the media
+  server allows), crops each to a square and draws it into a 128 px cell of
+  one canvas (decoded and scaled by `createImageBitmap`, off the main
+  thread). Cells are keyed by file, so a regenerated thumbnail is drawn over
+  its old cell, the old picture showing until the new one is in; a file new
+  to the atlas takes the cell of one no longer on show before an empty one,
+  so the canvas, which grows by doubling its height, stays about as large as
+  the files shown need. Pictures with transparency show the background
+  through. `render/NodeThumbProgram.ts`, a sigma
+  node program built like `NodeCircleProgram`, keeps a texture per WebGL
+  context (sigma draws the hovered node in a context of its own), uploads
+  the cells written since it last looked, draws the picture inside a ring of
+  the node's kind colour (so the legend still holds), and mixes faded nodes
+  into the background as `fade()` does for the discs. The cache busters come from
+  `useThumbVersions`, shared with the hover card. The 3D canvas does not draw
+  thumbnails, and the settings panel says so.
 - **A graph per payload.** Each payload builds a new graphology graph that
   takes over the previous one's positions by key (`model/buildGraphology.ts`),
   and the one sigma instance (`GraphView` is keyed by scope in Home) switches

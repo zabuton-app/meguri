@@ -15,3 +15,14 @@ Example of generating each format from a single PNG:
 ```bash
 npx electron-icon-builder --input=icon-source.png --output=build
 ```
+
+## appx (Microsoft Store)
+
+`appx/` holds the MSIX/AppX visual assets, generated from
+`logo/appicon-1024.png` with no padding.
+
+- `appx.backgroundColor` is set to `transparent` in `package.json`.
+  electron-builder's default `#464646` shows as a gray frame around the icon.
+- The `Square44x44Logo.targetsize-*_altform-unplated` /
+  `_altform-lightunplated` variants keep Windows from drawing a backplate
+  behind the taskbar / Start icon.

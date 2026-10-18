@@ -94,13 +94,14 @@ export function textAlpha(scale: number, textFade: number): number {
   return Math.min(1, Math.max(0, Math.log2(scale) + 1 - textFade));
 }
 
-/** The node radius in graph units for a node with `links` visible links. */
-export function nodeRadius(links: number, multiplier = 1): number {
-  return multiplier * Math.min(30, Math.max(8, 3 * Math.sqrt(links + 1)));
+/** The node radius in graph units for a node with `links` visible links,
+ *  never under `min` (raised for a node drawn as its thumbnail). */
+export function nodeRadius(links: number, multiplier = 1, min = 8): number {
+  return multiplier * Math.min(30, Math.max(min, 3 * Math.sqrt(links + 1)));
 }
 
 /** [r, g, b] (0-255) of a hex or rgb() colour, or null. */
-function rgbOf(color: string): [number, number, number] | null {
+export function rgbOf(color: string): [number, number, number] | null {
   const c = color.trim();
   const hex = /^#([0-9a-f]{3,8})$/i.exec(c);
   if (hex && [3, 4, 6, 8].includes(hex[1].length)) {

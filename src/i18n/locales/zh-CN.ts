@@ -436,6 +436,11 @@ export const zhCN: Record<TranslationKey, string> = {
   "graph.settings.textFade": "文字淡出阈值",
   "graph.settings.nodeSize": "节点大小",
   "graph.settings.lineSize": "连线粗细",
+  "graph.settings.thumbnails": "显示缩略图",
+  "graph.settings.thumbnailLimit": "缩略图显示上限",
+  "graph.settings.thumbnailsOverLimit":
+    "当前 {count} 个（超过上限，不显示缩略图）",
+  "graph.settings.thumbnails2dOnly": "仅限 2D",
   "graph.settings.forces": "力",
   "graph.settings.center": "中心力",
   "graph.settings.repel": "排斥力",

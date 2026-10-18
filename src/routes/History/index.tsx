@@ -27,6 +27,7 @@ import { fileNameOf } from "@/lib/relPath";
 import type { HistoryEntryRow } from "@/ipc/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -208,90 +209,92 @@ export default function History() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex flex-col gap-2 p-4">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-14 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
-            <HistoryIcon className="size-10 opacity-50" />
-            <p>{t("history.empty")}</p>
-            <p className="text-xs">{t("history.emptyHint")}</p>
-          </div>
-        ) : (
-          <div className="flex flex-col p-3">
-            {groups.map((g) => (
-              <section key={g.label}>
-                <h3 className="sticky top-0 z-10 bg-bg px-1 py-1.5 text-xs font-semibold uppercase text-muted">
-                  {g.label}
-                </h3>
-                <ul className="flex flex-col gap-1">
-                  {g.rows.map((row) => (
-                    <li key={`${row.workspaceId}:${row.historyId}`}>
-                      <Link
-                        to={fileHref(row.id, row.workspaceId, {
-                          autoplay: false,
-                        })}
-                        className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
-                      >
-                        <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
-                          <MediaThumbnail
-                            file={row}
-                            mediaBase={mediaBase}
-                            version={0}
-                            fallbackIconSize="size-5"
-                            playOverlaySize="size-7"
-                            playIconSize="size-3.5"
-                          />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className="block truncate text-sm text-fg"
-                            title={row.relPath}
-                          >
-                            {fileNameOf(row.relPath)}
+      {!loading && items.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
+          <HistoryIcon className="size-10 opacity-50" />
+          <p>{t("history.empty")}</p>
+          <p className="text-xs">{t("history.emptyHint")}</p>
+        </div>
+      ) : (
+        <ScrollArea className="page-scroll min-h-0 flex-1">
+          {loading ? (
+            <div className="flex flex-col gap-2 p-4">
+              {Array.from({ length: 6 }, (_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col p-3">
+              {groups.map((g) => (
+                <section key={g.label}>
+                  <h3 className="sticky top-0 z-10 bg-bg px-1 py-1.5 text-xs font-semibold uppercase text-muted">
+                    {g.label}
+                  </h3>
+                  <ul className="flex flex-col gap-1">
+                    {g.rows.map((row) => (
+                      <li key={`${row.workspaceId}:${row.historyId}`}>
+                        <Link
+                          to={fileHref(row.id, row.workspaceId, {
+                            autoplay: false,
+                          })}
+                          className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
+                        >
+                          <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
+                            <MediaThumbnail
+                              file={row}
+                              mediaBase={mediaBase}
+                              version={0}
+                              fallbackIconSize="size-5"
+                              playOverlaySize="size-7"
+                              playIconSize="size-3.5"
+                            />
                           </span>
-                          <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
-                            <span className="tabular-nums">
-                              {new Date(row.playedAt * 1000).toLocaleString()}
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className="block truncate text-sm text-fg"
+                              title={row.relPath}
+                            >
+                              {fileNameOf(row.relPath)}
                             </span>
-                            <Badge variant="outline" className="font-normal">
-                              {row.via === "external"
-                                ? t("history.viaExternal")
-                                : t("history.viaBrowser")}
-                            </Badge>
-                            {row.playCount > 1 && (
-                              <span>
-                                {t("history.playCount", {
-                                  count: row.playCount,
-                                })}
+                            <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
+                              <span className="tabular-nums">
+                                {new Date(row.playedAt * 1000).toLocaleString()}
                               </span>
-                            )}
-                            {showWsLabel && wsLabels.get(row.workspaceId) && (
-                              <span className="truncate">
-                                {wsLabels.get(row.workspaceId)}
-                              </span>
-                            )}
+                              <Badge variant="outline" className="font-normal">
+                                {row.via === "external"
+                                  ? t("history.viaExternal")
+                                  : t("history.viaBrowser")}
+                              </Badge>
+                              {row.playCount > 1 && (
+                                <span>
+                                  {t("history.playCount", {
+                                    count: row.playCount,
+                                  })}
+                                </span>
+                              )}
+                              {showWsLabel && wsLabels.get(row.workspaceId) && (
+                                <span className="truncate">
+                                  {wsLabels.get(row.workspaceId)}
+                                </span>
+                              )}
+                            </span>
                           </span>
-                        </span>
-                        {row.duration ? (
-                          <span className="shrink-0 text-xs tabular-nums text-muted">
-                            {formatDuration(row.duration)}
-                          </span>
-                        ) : null}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-            {hasNextPage && <div ref={sentinelRef} className="h-8" />}
-          </div>
-        )}
-      </div>
+                          {row.duration ? (
+                            <span className="shrink-0 text-xs tabular-nums text-muted">
+                              {formatDuration(row.duration)}
+                            </span>
+                          ) : null}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+              {hasNextPage && <div ref={sentinelRef} className="h-8" />}
+            </div>
+          )}
+        </ScrollArea>
+      )}
     </HistoryModal>
   );
 }

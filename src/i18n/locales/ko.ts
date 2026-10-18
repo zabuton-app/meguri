@@ -446,6 +446,11 @@ export const ko: Record<TranslationKey, string> = {
   "graph.settings.textFade": "텍스트 페이드 임계값",
   "graph.settings.nodeSize": "노드 크기",
   "graph.settings.lineSize": "링크 두께",
+  "graph.settings.thumbnails": "썸네일 표시",
+  "graph.settings.thumbnailLimit": "썸네일 표시 한도",
+  "graph.settings.thumbnailsOverLimit":
+    "현재 {count}개 (한도를 넘어 표시하지 않음)",
+  "graph.settings.thumbnails2dOnly": "2D 전용",
   "graph.settings.forces": "힘",
   "graph.settings.center": "중심력",
   "graph.settings.repel": "반발력",
