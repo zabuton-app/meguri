@@ -76,7 +76,14 @@ function assertEditable(ref: TagRef): void {
   }
 }
 
+/**
+ * The tag a reference names. The user's own resolve by tagIdentityKey, as
+ * names do everywhere (see findManualTag): `Trip` from a view that shows it
+ * names the `trip` another workspace holds, as the auto-tagging conditions
+ * rewritten with the operation do.
+ */
 function tagIdOf(db: DB, ref: TagRef): number | null {
+  if (ref.namespace === "") return findManualTag(db, ref.name);
   const row = db
     .prepare("SELECT id FROM tags WHERE namespace = ? AND name = ?")
     .get(ref.namespace, ref.name) as { id: number } | undefined;
