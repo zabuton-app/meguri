@@ -1,7 +1,21 @@
 // SQLite (better-sqlite3). Schema definition and connection.
 import Database from "better-sqlite3";
+import { tagIdentityKey } from "../../shared/tags.js";
 
 export type DB = Database.Database;
+
+/**
+ * Make tagIdentityKey callable from SQL as `tag_key(name)`, so a query matches
+ * tag names by the same rule as the code around it. SQLite's own `lower()` and
+ * NOCASE stop at ASCII. Connection-local: every handle that runs those queries
+ * registers it, and nothing in the schema depends on it, so the file still
+ * opens anywhere else.
+ */
+function registerFunctions(db: DB): void {
+  db.function("tag_key", { deterministic: true }, (name: unknown) =>
+    typeof name === "string" ? tagIdentityKey(name) : name,
+  );
+}
 
 // Trigram tokenizer enables substring matching (mid-word and CJK), which the default
 // unicode61 tokenizer cannot do. Shared between CORE_DDL and the rebuild in
@@ -160,6 +174,7 @@ ${FTS_DDL};
  *  here so existing on-disk DBs gain them without a separate migration step. */
 export function openDb(file: string): DB {
   const db = new Database(file);
+  registerFunctions(db);
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");
   db.pragma("foreign_keys = ON");
@@ -343,6 +358,7 @@ function migrateFtsToTrigram(db: DB): void {
  */
 export function openDbReadonly(file: string): DB {
   const db = new Database(file, { readonly: true, fileMustExist: true });
+  registerFunctions(db);
   // Connection-local (never written to the file): even in WAL mode a reader
   // can hit SQLITE_BUSY around writer checkpoints; retry briefly instead of
   // surfacing an exception to the renderer.

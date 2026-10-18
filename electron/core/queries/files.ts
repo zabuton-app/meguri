@@ -14,6 +14,7 @@ import {
   parseTagSearchToken,
   searchTokenTerms,
   splitSearchTokens,
+  tagIdentityKey,
 } from "../../../shared/tags.js";
 import type {
   FileDetail,
@@ -146,20 +147,22 @@ function resolveTagIds(db: DB, token: string): number[] {
  * and the condition matches either. That is the reading a person means by
  * "tag:4k"; the qualified form is there when only the generated one is wanted.
  *
- * Matched case-insensitively: this value is typed into the search box, where the
- * FTS half is case-insensitive too — `tag:4K` failing while `4K` works would be
- * an arbitrary split. Structured `tags[]` tokens stay exact; those come from a
- * saved search, never from typing.
+ * Matched case-insensitively, by tagIdentityKey (`tag_key` in SQL): this value
+ * is typed into the search box, where the FTS half is case-insensitive too —
+ * `tag:4K` failing while `4K` works would be an arbitrary split — and every
+ * other path calls `Été` and `été` one tag. Structured `tags[]` tokens stay
+ * exact; those come from a saved search, never from typing.
  */
 function resolveSearchTagIds(db: DB, value: string): number[] {
+  const key = tagIdentityKey(value);
   return db
     .prepare(
       `SELECT id FROM tags
-        WHERE name = ? COLLATE NOCASE
-           OR (namespace <> '' AND namespace || ':' || name = ? COLLATE NOCASE)`,
+        WHERE tag_key(name) = ?
+           OR (namespace <> '' AND tag_key(namespace || ':' || name) = ?)`,
     )
     .pluck()
-    .all(value, value) as number[];
+    .all(key, key) as number[];
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   withFolderTags,
   type AutoTagFile,
 } from "../../shared/autoTag.js";
+import { tagIdentityKey } from "../../shared/tags.js";
 
 /** A tag attached to a file's metadata identity. */
 export type TagPair = [metaKey: string, tagId: number];
@@ -38,24 +39,25 @@ export interface AttachResult {
  * existing tag that differs only by case is reused, so `kids` from a file name
  * lands on the `Kids` the user already has instead of beside it.
  *
- * The fold is JavaScript's, the same one the engine and the screen compare tags
- * with — SQLite's NOCASE stops at ASCII, and would call `Été` and `été` two
- * tags after the screen had promised one. The catalog of own tags is small, so
- * it is read once per call rather than queried per name.
+ * The fold is tagIdentityKey, as everywhere else, and of two spellings it picks
+ * as findManualTag does: the exact one, else the older. The catalog of own tags is small,
+ * so it is read once per call rather than queried per name.
  */
 function tagIdResolver(db: DB): (name: string) => number | null {
   const known = new Map<string, number | null>();
+  const exact = new Map<string, number>();
   const rows = db
     .prepare("SELECT id, name FROM tags WHERE namespace = '' ORDER BY id")
     .all() as { id: number; name: string }[];
   for (const row of rows) {
-    const key = row.name.toLowerCase();
+    const key = tagIdentityKey(row.name);
     if (!known.has(key)) known.set(key, row.id);
+    exact.set(row.name, row.id);
   }
   return (raw) => {
     const name = cleanTagName(raw);
-    const key = name.toLowerCase();
-    let id = known.get(key);
+    const key = tagIdentityKey(name);
+    let id = exact.get(name) ?? known.get(key);
     if (id === undefined) {
       id = isUsableTagName(name) ? upsertTag(db, "", name) : null;
       known.set(key, id);
@@ -393,7 +395,9 @@ export function autoTagFiles(
       .get() as { n: number }
   ).n;
   const existingTags = db
-    .prepare("SELECT name FROM tags WHERE namespace = ''")
+    // Oldest first, so the screen's first spelling of a name is the one
+    // findManualTag would pick for it.
+    .prepare("SELECT name FROM tags WHERE namespace = '' ORDER BY id")
     .pluck()
     .all() as string[];
   return {

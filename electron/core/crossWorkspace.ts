@@ -654,6 +654,9 @@ function dupKey(hash: string, size: number): string {
  * Tags live in per-workspace databases with per-database ids, so the union is
  * built on the name — the same identifier the mutation channels use. Counts and
  * per-source breakdowns are summed; a workspace is listed once per tag it holds.
+ * Keyed by the exact spelling, not tagIdentityKey: `Trip` in one workspace and
+ * `trip` in another are listed apart, as a library holding both lists them —
+ * each is a row the screen can rename or merge, which a folded entry is not.
  *
  * Ordering puts user-owned tags first, then namespaces alphabetically, then
  * names case-insensitively. The known auto-meta namespaces get no special
