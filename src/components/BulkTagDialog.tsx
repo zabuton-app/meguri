@@ -31,6 +31,7 @@ import {
   MAX_TAG_NAME,
   RESERVED_TAG_ERROR,
   reservedTagPrefix,
+  tagIdentityKey,
 } from "@shared/tags";
 
 // Mounted only while it is open (see SelectionLayer), so the staged edit starts
@@ -93,7 +94,16 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
    * in the field alone.
    */
   const stageAdd = (name: string, clearInput = false) => {
-    const value = name.trim();
+    const typed = name.trim();
+    // In the spelling the selection already has, if any: main resolves `Trip`
+    // to the `trip` there anyway (see tagIdentityKey), and staging it as typed
+    // would show a new tag beside that chip instead of raising it. An exact
+    // match first, so a chip raises itself even beside another spelling.
+    const key = tagIdentityKey(typed);
+    const value = tally.some((entry) => entry.name === typed)
+      ? typed
+      : (tally.find((entry) => tagIdentityKey(entry.name) === key)?.name ??
+        typed);
     if (!value || value.length > MAX_TAG_NAME) return;
     if (!adding.includes(value) && atNameLimit) return;
     setAdding((prev) => (prev.includes(value) ? prev : [...prev, value]));

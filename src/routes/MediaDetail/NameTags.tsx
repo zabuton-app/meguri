@@ -4,15 +4,7 @@ import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import { nameTagParts } from "@shared/autoTagAnalysis";
-import { isEditableTag } from "@shared/tags";
-
-/**
- * How a part is matched against the tags the file has: ASCII case aside, as a
- * tag search matches (see tagSearchKey) — `trip` on the file answers for
- * `Trip` in its name, while `Été` and `été` stay two tags, as they are stored.
- */
-const foldCase = (name: string): string =>
-  name.replace(/[A-Z]/g, (c) => c.toLowerCase());
+import { isEditableTag, tagIdentityKey } from "@shared/tags";
 
 /**
  * The file's name, cut into the parts that could be tags: each word, a code's
@@ -32,12 +24,14 @@ export function NameTags({
   t: TFunc;
 }) {
   const parts = useMemo(() => nameTagParts(basename), [basename]);
+  // Case aside, as adding one resolves it (see tagIdentityKey): `trip` on the
+  // file answers for `Trip` in its name, since clicking it would land there.
   const have = useMemo(
     () =>
       new Set(
         tags
           .filter((tag) => isEditableTag(tag.namespace))
-          .map((tag) => foldCase(tag.name)),
+          .map((tag) => tagIdentityKey(tag.name)),
       ),
     [tags],
   );
@@ -55,7 +49,7 @@ export function NameTags({
               </span>
             );
           }
-          const tagged = have.has(foldCase(tag));
+          const tagged = have.has(tagIdentityKey(tag));
           const label = t(
             tagged ? "media.nameTags.tagged" : "media.nameTags.add",
             { tag },

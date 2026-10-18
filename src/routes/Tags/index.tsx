@@ -248,14 +248,11 @@ export default function Tags() {
         message: t("tags.renameConflict", { name: targetName }),
         confirmText: t("tags.mergeAction"),
       });
-      if (ok) {
-        mergeTags.mutate({
-          from: [refOf(tag)],
-          into: { namespace: "", name: targetName },
-        });
-      }
+      // As a rename, not a merge into `targetName`: main resolves the name in
+      // each workspace, where the tag it means may be spelled otherwise.
+      if (ok) renameTag.mutate({ from: refOf(tag), to: targetName });
     },
-    [confirm, mergeTags, t],
+    [confirm, renameTag, t],
   );
 
   const mutating =

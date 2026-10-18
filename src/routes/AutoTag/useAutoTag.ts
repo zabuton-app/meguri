@@ -32,7 +32,11 @@ import {
   placeOf,
 } from "@shared/autoTag";
 import { STOP_WORDS } from "@shared/autoTagAnalysis";
-import { MAX_BULK_FILES, MAX_BULK_TAG_NAMES } from "@shared/tags";
+import {
+  MAX_BULK_FILES,
+  MAX_BULK_TAG_NAMES,
+  tagIdentityKey,
+} from "@shared/tags";
 import { useRuleResults, type RuleView } from "./useRuleResults";
 
 /**
@@ -261,7 +265,7 @@ export function useAutoTag(): AutoTagState | null {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const names = useMemo(() => (files ?? []).map((f) => f.name), [loadedAt]);
   const fileTags = useMemo(
-    () => (files ?? []).map((f) => new Set(f.tags.map((x) => x.toLowerCase()))),
+    () => (files ?? []).map((f) => new Set(f.tags.map(tagIdentityKey))),
     [files],
   );
 
@@ -269,7 +273,7 @@ export function useAutoTag(): AutoTagState | null {
   const existing = useMemo(() => {
     const map = new Map<string, string>();
     for (const name of library?.existingTags ?? []) {
-      const key = name.toLowerCase();
+      const key = tagIdentityKey(name);
       if (!map.has(key)) map.set(key, name);
     }
     return map;
@@ -303,7 +307,7 @@ export function useAutoTag(): AutoTagState | null {
         const seen = new Set<string>();
         const fresh: string[] = [];
         for (const tag of tags) {
-          const key = tag.toLowerCase();
+          const key = tagIdentityKey(tag);
           if (have.has(key) || seen.has(key)) continue;
           seen.add(key);
           fresh.push(existing.get(key) ?? tag);
@@ -391,9 +395,9 @@ export function useAutoTag(): AutoTagState | null {
           []) {
           const have = new Set([
             ...fileTags[twin],
-            ...(added.get(twin) ?? []).map((x) => x.toLowerCase()),
+            ...(added.get(twin) ?? []).map(tagIdentityKey),
           ]);
-          const fresh = tags.filter((tag) => !have.has(tag.toLowerCase()));
+          const fresh = tags.filter((tag) => !have.has(tagIdentityKey(tag)));
           if (fresh.length > 0) {
             added.set(twin, [...(added.get(twin) ?? []), ...fresh]);
           }
@@ -429,16 +433,16 @@ export function useAutoTag(): AutoTagState | null {
     ): Promise<RemoveOutcome> => {
       if (!library) return { ok: false };
       // What goes on in its place, if anything: in the spelling already in
-      // use, since files_bulk_tag matches a name exactly.
+      // use, which is the tag files_bulk_tag would resolve it to anyway.
       const put =
-        to === undefined ? [] : [existing.get(to.toLowerCase()) ?? to];
+        to === undefined ? [] : [existing.get(tagIdentityKey(to)) ?? to];
       // The tag as the files spell it: `trip` and `Trip` are two rows of the
       // tag table, and both are what this candidate reads as "tagged".
       const spellings = new Set<string>();
       const holders: AutoTagFile[] = [];
       for (const index of indexes) {
         const file = library.files[index];
-        const mine = file.tags.filter((tag) => tag.toLowerCase() === key);
+        const mine = file.tags.filter((tag) => tagIdentityKey(tag) === key);
         if (mine.length === 0) continue;
         for (const tag of mine) spellings.add(tag);
         holders.push(file);
@@ -500,8 +504,8 @@ export function useAutoTag(): AutoTagState | null {
           if (!file.tags.some((tag) => gone.has(tag))) continue;
           const tags = file.tags.filter((tag) => !gone.has(tag));
           for (const tag of put) {
-            const putKey = tag.toLowerCase();
-            if (!tags.some((x) => x.toLowerCase() === putKey)) tags.push(tag);
+            const putKey = tagIdentityKey(tag);
+            if (!tags.some((x) => tagIdentityKey(x) === putKey)) tags.push(tag);
           }
           nextFiles[index] = { ...file, tags };
         }

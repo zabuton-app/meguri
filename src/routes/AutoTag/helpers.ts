@@ -20,6 +20,7 @@ import {
 } from "@shared/autoTag";
 import type { Candidate } from "@shared/autoTagAnalysis";
 import { ROOT_FOLDER, parentOf } from "@shared/folderPath";
+import { tagIdentityKey } from "@shared/tags";
 
 const BUILTIN_RULE_NAMES: Record<BuiltinRuleId, TranslationKey> = {
   prefix: "autoTag.rule.prefix",
@@ -95,11 +96,11 @@ export function mergeTags(
   existing: ReadonlyMap<string, string>,
   max: number,
 ): string[] {
-  const keys = new Set(have.map((tag) => tag.toLowerCase()));
+  const keys = new Set(have.map(tagIdentityKey));
   const out = [...have];
   for (const text of raw) {
     const tag = cleanTagName(text);
-    const key = tag.toLowerCase();
+    const key = tagIdentityKey(tag);
     if (!isUsableTagName(tag) || keys.has(key)) continue;
     if (out.length >= max) break;
     keys.add(key);
@@ -122,9 +123,9 @@ export function renameTag(
 ): { tags: string[]; to: string } | null {
   const cleaned = cleanTagName(raw);
   if (!isUsableTagName(cleaned)) return null;
-  const key = cleaned.toLowerCase();
+  const key = tagIdentityKey(cleaned);
   // The list's own spelling of the name, when it holds it already.
-  const held = tags.find((tag) => tag !== from && tag.toLowerCase() === key);
+  const held = tags.find((tag) => tag !== from && tagIdentityKey(tag) === key);
   const to = held ?? existing.get(key) ?? cleaned;
   if (to === from || !tags.includes(from)) return null;
   const out: string[] = [];

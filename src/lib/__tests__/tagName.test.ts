@@ -9,6 +9,7 @@ import {
   reservedTagPrefix,
   qualifiedTagName,
   splitSearchTokens,
+  tagIdentityKey,
   tagSearchKey,
   tagSearchToken,
 } from "@shared/tags";
@@ -200,6 +201,19 @@ describe("parseTagSearchToken", () => {
   });
 });
 
+describe("tagIdentityKey", () => {
+  it("is the same for spellings that differ only by case", () => {
+    expect(tagIdentityKey("Trip")).toBe(tagIdentityKey("trip"));
+    expect(tagIdentityKey("ÉTÉ")).toBe(tagIdentityKey("été"));
+    expect(tagIdentityKey("Été TRIP")).toBe(tagIdentityKey("éTÉ trip"));
+  });
+
+  it("tells different names apart", () => {
+    expect(tagIdentityKey("été")).not.toBe(tagIdentityKey("ete"));
+    expect(tagIdentityKey("旅行")).not.toBe(tagIdentityKey("旅"));
+  });
+});
+
 describe("tagSearchKey", () => {
   it("folds the difference two spellings of one condition can have", () => {
     expect(tagSearchKey("tag:4K")).toBe("4k");
@@ -210,10 +224,9 @@ describe("tagSearchKey", () => {
     );
   });
 
-  it("leaves non-ASCII case alone, as the SQL that resolves the tag does", () => {
-    // SQLite's NOCASE collation folds ASCII only, so these are two tags there;
-    // folding them here would drop one of the two conditions without a trace.
-    expect(tagSearchKey("tag:ÉTÉ")).not.toBe(tagSearchKey("tag:été"));
+  it("folds non-ASCII case too, as the SQL that resolves the tag does", () => {
+    // Both resolve by tagIdentityKey: one tag there, so one condition here.
+    expect(tagSearchKey("tag:ÉTÉ")).toBe(tagSearchKey("tag:été"));
   });
 
   it("returns null for anything that is not a directive", () => {

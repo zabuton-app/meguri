@@ -7,6 +7,7 @@ import { useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useI18n } from "@/i18n/I18nProvider";
+import { tagIdentityKey } from "@shared/tags";
 import type { AutoTagState } from "./useAutoTag";
 
 /**
@@ -23,9 +24,9 @@ export function useTagMigration(state: AutoTagState) {
   const running = useRef(false);
   return useCallback(
     async (indexes: readonly number[], from: string, to: string) => {
-      const fromKey = from.toLowerCase();
+      const fromKey = tagIdentityKey(from);
       // Another spelling of the same tag: the files' tag is that one already.
-      if (fromKey === to.toLowerCase() || running.current) return;
+      if (fromKey === tagIdentityKey(to) || running.current) return;
       const holders = indexes.filter((index) => fileTags[index].has(fromKey));
       if (holders.length === 0) return;
       running.current = true;

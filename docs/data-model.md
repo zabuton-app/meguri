@@ -40,7 +40,18 @@ The main tables:
   never the full image. Its stored `meta` keeps only the first tile's stream.
 - `tags` — the tag master, unique on `(namespace, name)`. An empty namespace
   means the tag is the user's own; a non-empty one means it is owned by a
-  pipeline (see [Derived tags](#derived-tags)).
+  pipeline (see [Derived tags](#derived-tags)). The constraint tells
+  spellings apart, but the code does not: two names are one tag when their
+  `tagIdentityKey()` (`shared/tags.ts`) is the same — case aside, over all of
+  Unicode, so `Trip` and `trip` are one tag and so are `Été` and `été`. Adding a
+  tag by hand, the bulk editor, rename, auto tagging, the detail view's name
+  parts and the `tag:` search all compare by it; SQL reaches it as the
+  `tag_key()` function each connection registers, since SQLite's own `lower()`
+  and `NOCASE` stop at ASCII. A name another spelling already has lands on
+  that tag in its existing spelling. A library from before this rule may hold
+  two such rows; they stay, a name that means both resolves to the one spelled
+  exactly so, else the older (`findManualTag()`), and renaming one to the
+  other merges them. The `All` view's catalog lists spellings apart.
 - `file_meta` — durable user metadata (see below).
 - `meta_tags` — tag associations.
 - `play_history` — playback history.
@@ -249,9 +260,8 @@ previews with the code a scan runs:
 Unlike [derived tags](#derived-tags), what the engine proposes is attached as
 the user's **own** tags: no namespace, `source = 'manual'`, indexed in FTS,
 removable per file. A name that differs from an existing tag only by case
-reuses that tag — compared with JavaScript's case folding, the same one the
-engine and the screen use, not SQLite's ASCII-only `NOCASE`. This folding is
-particular to auto-tagging: tagging by hand still matches names exactly.
+reuses that tag, by the same rule as every other path (see `tags` under
+[Schema](#schema)).
 Attaching only ever adds — changing a rule does not take back what it already
 tagged — and `attachAutoTags()` reports exactly the pairs it added, which is
 what rolls back an apply that failed partway (kept in memory in the main

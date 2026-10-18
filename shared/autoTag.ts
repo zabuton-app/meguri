@@ -15,7 +15,12 @@
  * comparing paths cannot hang.
  */
 import { MAX_FOLDER_PATH } from "./folderPath.js";
-import { MAX_BULK_FILES, MAX_TAG_NAME, isReservedTagName } from "./tags.js";
+import {
+  MAX_BULK_FILES,
+  MAX_TAG_NAME,
+  isReservedTagName,
+  tagIdentityKey,
+} from "./tags.js";
 
 export const MAX_AUTO_TAG_RULES = 64;
 export const MAX_AUTO_TAG_KEYWORDS = 500;
@@ -472,7 +477,7 @@ export function compileFolders(
     const tags: string[] = [];
     for (const raw of rule.tags) {
       const tag = cleanTagName(raw);
-      const key = tag.toLowerCase();
+      const key = tagIdentityKey(tag);
       if (!isUsableTagName(tag) || seen.has(key)) continue;
       seen.add(key);
       tags.push(tag);
@@ -530,11 +535,11 @@ export function withFolderTags(
 ): string[] {
   const out = tags.slice(0, MAX_AUTO_TAGS_PER_FILE);
   if (reaching.length === 0) return out;
-  const seen = new Set(out.map((tag) => tag.toLowerCase()));
+  const seen = new Set(out.map(tagIdentityKey));
   for (const { tags: more } of reaching) {
     for (const tag of more) {
       if (out.length >= MAX_AUTO_TAGS_PER_FILE) return out;
-      const key = tag.toLowerCase();
+      const key = tagIdentityKey(tag);
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(tag);
@@ -552,7 +557,7 @@ export function firstSpellings(tags: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const tag of tags) {
-    const key = tag.toLowerCase();
+    const key = tagIdentityKey(tag);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(tag);
@@ -623,7 +628,7 @@ export function tagsForName(engine: CompiledEngine, name: string): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   const add = (tag: string): boolean => {
-    const key = tag.toLowerCase();
+    const key = tagIdentityKey(tag);
     if (!seen.has(key)) {
       seen.add(key);
       out.push(tag);

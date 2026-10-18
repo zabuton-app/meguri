@@ -40,7 +40,7 @@ describe("NameTags", () => {
     expect(screen.queryByRole("button", { name: /mp4/ })).toBeNull();
   });
 
-  it("shows a part the file is already tagged with as done, ASCII case aside", () => {
+  it("shows a part the file is already tagged with as done, case aside", () => {
     const onAdd = vi.fn();
     render(
       <NameTags
@@ -62,14 +62,14 @@ describe("NameTags", () => {
     ).toHaveProperty("disabled", false);
   });
 
-  it("tells two tags apart where the tag table does", () => {
-    // Above ASCII a difference of case is a different tag, and can be added.
+  it("folds case beyond ASCII too, as adding the tag resolves it", () => {
+    // Clicking `Été` would land on the `été` the file has (see tagIdentityKey).
     render(
       <NameTags basename="Été.mp4" tags={[tag("été")]} onAdd={vi.fn()} t={t} />,
     );
     expect(
-      screen.getByRole("button", { name: "media.nameTags.add:Été" }),
-    ).toHaveProperty("disabled", false);
+      screen.getByRole("button", { name: "media.nameTags.tagged:Été" }),
+    ).toHaveProperty("disabled", true);
   });
 
   it("is not there for a name with nothing to tag by", () => {

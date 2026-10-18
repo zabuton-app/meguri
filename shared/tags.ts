@@ -141,6 +141,22 @@ export function parseQualifiedTagName(raw: string): {
     : { namespace: "", name: raw };
 }
 
+/**
+ * The key two tag names are compared on to decide whether they are one tag:
+ * case aside, over all of Unicode — `Trip` and `trip` are one tag, and so are
+ * `Été` and `été`. Every path that matches a name to a tag already there goes
+ * through this, so none of them can call one tag two; SQL reaches it as
+ * `tag_key` (see db.ts). The paths are listed in docs/data-model.md.
+ *
+ * The `tags` table itself still tells spellings apart: a library from before
+ * this rule may hold `Trip` and `trip` side by side. They stay as they are; a
+ * name that means both resolves to the one spelled exactly so, else the older
+ * (see findManualTag), and the tag screen can merge them.
+ */
+export function tagIdentityKey(name: string): string {
+  return name.toLowerCase();
+}
+
 /** Rename / merge / delete are allowed on user-owned tags only. */
 export function isEditableTag(namespace: string): boolean {
   return namespace === "";
@@ -191,17 +207,13 @@ export function isTagDirective(token: string): boolean {
  * condition — null for ordinary free text.
  *
  * Both routes into the query (typing one, clicking a tag) go through here, so
- * neither can append a condition the other would have called a repeat. The fold
- * is ASCII-only on purpose: it has to agree with the SQL that finally resolves
- * the tag, and SQLite's NOCASE collation leaves everything above ASCII alone —
- * `Été` and `été` really are two tags there, and calling them one here would
- * silently drop a condition the user typed.
+ * neither can append a condition the other would have called a repeat. The
+ * fold is tagIdentityKey, the one the SQL that finally resolves the tag uses:
+ * a looser one here would silently drop a condition the user typed.
  */
 export function tagSearchKey(token: string): string | null {
   const value = parseTagSearchToken(token);
-  return value === null
-    ? null
-    : value.replace(/[A-Z]/g, (c) => c.toLowerCase());
+  return value === null ? null : tagIdentityKey(value);
 }
 
 function needsQuoting(value: string): boolean {
