@@ -5,6 +5,7 @@
 // The tags are the user's own — source `manual`, no namespace — so everything
 // the app can do with a hand-applied tag works on these too, and the full-text
 // index has to follow every change.
+import path from "node:path";
 import { resyncFtsForKeys, type DB } from "./db.js";
 import { getSetting, setSetting } from "./queries/settings.js";
 import type { AutoTagEngine, DeriveAutoTags } from "./autoTagDeriver.js";
@@ -145,8 +146,8 @@ const CHUNK = AUTO_TAG_CHUNK;
 /** The place (placeOf) a stored path is at, as the screen names it. */
 export function placeOfPath(relPath: string): string {
   return placeOf(
-    folderOf(relPath).normalize("NFC"),
-    fileNameOf(relPath).normalize("NFC"),
+    folderOf(relPath, path.sep).normalize("NFC"),
+    fileNameOf(relPath, path.sep).normalize("NFC"),
   );
 }
 
@@ -301,7 +302,7 @@ export async function applyAutoTags(
             reaching({
               workspaceId,
               // NFC, as the screen that wrote the rule saw the folder.
-              folder: folderOf(rows[i].rel_path).normalize("NFC"),
+              folder: folderOf(rows[i].rel_path, path.sep).normalize("NFC"),
             }),
           ),
         )
@@ -349,7 +350,7 @@ export async function applyAutoTags(
       try {
         named = await derive(
           engine,
-          rows.map((row) => fileNameOf(row.rel_path)),
+          rows.map((row) => fileNameOf(row.rel_path, path.sep)),
         );
       } catch (err) {
         failure = err instanceof Error ? err : new Error(String(err));
@@ -456,8 +457,8 @@ export function autoTagFiles(
     files: rows.map((row) => ({
       workspaceId,
       id: row.id,
-      name: fileNameOf(row.rel_path).normalize("NFC"),
-      folder: folderOf(row.rel_path).normalize("NFC"),
+      name: fileNameOf(row.rel_path, path.sep).normalize("NFC"),
+      folder: folderOf(row.rel_path, path.sep).normalize("NFC"),
       metaKey: row.meta_key,
       tags: [...new Set(JSON.parse(row.tags) as string[])],
     })),

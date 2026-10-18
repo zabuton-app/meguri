@@ -46,6 +46,7 @@ import {
   defaultRules,
   excludeValues,
   folderMatcher,
+  fileNameOf,
   folderOf,
   formatExclude,
   isUnderFolder,
@@ -780,8 +781,9 @@ describe("attaching tags", () => {
   it("tags the files under a folder of this workspace, subfolders included", async () => {
     const at = (relPath: string) => insertFile(db, rootId, { relPath });
     const inFolder = at("Trips/2024/harbor.mp4");
-    // Written with the other separator, as Windows stores it.
-    const deeper = at("Trips\\2024\\day1\\walk.mp4");
+    // "/"-separated, as the rest of these paths: Windows's "\\" is covered
+    // where folderOf is given it.
+    const deeper = at("Trips/2024/day1/walk.mp4");
     const sibling = at("Trips/2024b/pier.mp4");
     const elsewhere = at("Work/plan.mp4");
     const folders: FolderRule[] = [
@@ -863,8 +865,14 @@ describe("attaching tags", () => {
     expect(tagsForName(engine, "plain.mp4")).toEqual([]);
     expect(isUnderFolder("a/b", "a")).toBe(true);
     expect(isUnderFolder("ab", "a")).toBe(false);
-    expect(folderOf("a\\b\\c.mp4")).toBe("a/b");
-    expect(folderOf("c.mp4")).toBe("");
+    // Split on the separator the path was written with: Windows writes
+    // "\\"; elsewhere a "\\" is part of a name.
+    expect(folderOf("a\\b\\c.mp4", "\\")).toBe("a/b");
+    expect(fileNameOf("a\\b\\c.mp4", "\\")).toBe("c.mp4");
+    expect(folderOf("a/b\\c.mp4", "/")).toBe("a");
+    expect(fileNameOf("旅行\\海.mp4", "/")).toBe("旅行\\海.mp4");
+    expect(folderOf("旅行\\海.mp4", "/")).toBe("");
+    expect(folderOf("c.mp4", "/")).toBe("");
   });
 
   it("matches a folder written decomposed, and a rule for the whole workspace", async () => {

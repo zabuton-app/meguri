@@ -215,25 +215,25 @@ export function defaultAutoTagConfig(): AutoTagConfig {
   };
 }
 
-/** The part of a path the engine reads: the file name. */
-export function fileNameOf(relPath: string): string {
-  return relPath.slice(
-    Math.max(relPath.lastIndexOf("/"), relPath.lastIndexOf("\\")) + 1,
-  );
+/**
+ * The part of a path the engine reads: the file name. `sep` is the separator
+ * the path was written with — the OS's, for a stored rel_path (path.sep):
+ * on Linux and macOS a "\\" is part of a name, not a separator. Required, as
+ * shared/ cannot default it to path.sep. Not src/lib/relPath.ts's fileNameOf,
+ * which splits on both for display.
+ */
+export function fileNameOf(relPath: string, sep: string): string {
+  return relPath.slice(relPath.lastIndexOf(sep) + 1);
 }
 
 /**
  * The folder a file is in, as folder rules name folders: "/"-separated
- * whatever the OS wrote the path with, and "" at the workspace root.
+ * whatever the OS wrote the path with (`sep`, as for fileNameOf), and "" at
+ * the workspace root.
  */
-export function folderOf(relPath: string): string {
-  const at = Math.max(relPath.lastIndexOf("/"), relPath.lastIndexOf("\\"));
-  return at < 0
-    ? ""
-    : relPath
-        .slice(0, at)
-        .split(/[\\/]+/)
-        .join("/");
+export function folderOf(relPath: string, sep: string): string {
+  const at = relPath.lastIndexOf(sep);
+  return at < 0 ? "" : relPath.slice(0, at).split(sep).join("/");
 }
 
 /** A file name without its extension. Positions in it are positions in the name. */
