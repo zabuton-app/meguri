@@ -5,10 +5,12 @@
 // Tags are addressed by (namespace, name), never by tags.id — ids are
 // database-local and meaningless in the cross-workspace "All" view.
 import { resyncFtsForKeys, type DB } from "./db.js";
+import { findManualTag } from "./tags.js";
 import {
   RESERVED_TAG_ERROR,
   isEditableTag,
   isReservedTagName,
+  tidyTagName,
 } from "../../shared/tags.js";
 import type { TagRef } from "./types.js";
 
@@ -75,7 +77,14 @@ function assertEditable(ref: TagRef): void {
   }
 }
 
+/**
+ * The tag a reference names. The user's own resolve by tagIdentityKey, as
+ * names do everywhere (see findManualTag): `Trip` from a view that shows it
+ * names the `trip` another workspace holds, as the auto-tagging conditions
+ * rewritten with the operation do.
+ */
 function tagIdOf(db: DB, ref: TagRef): number | null {
+  if (ref.namespace === "") return findManualTag(db, ref.name);
   const row = db
     .prepare("SELECT id FROM tags WHERE namespace = ? AND name = ?")
     .get(ref.namespace, ref.name) as { id: number } | undefined;
@@ -95,8 +104,15 @@ function keysForTagIds(db: DB, ids: number[]): string[] {
 }
 
 /**
- * Rename a manual tag. When the target name is already taken this escalates to a
- * merge, which is what the user is asked to confirm in the UI.
+ * Rename a manual tag. When the target name is already taken — by another tag
+ * under any spelling (see findManualTag) — this escalates to a merge into that
+ * tag, which is what the user is asked to confirm in the UI. Only a change of
+ * case on the tag itself stays a plain rename.
+ *
+ * Either way the result is spelled as asked. The screen asks in the spelling
+ * it showed, so a visible tag keeps its own; one it could not show (another
+ * workspace's spelling, a tag no live file carries) is respelled rather than
+ * turning a rename into a different name than the one typed.
  */
 export function renameTag(
   db: DB,
@@ -105,18 +121,29 @@ export function renameTag(
 ): { merged: boolean; affectedFiles: number } {
   assertEditable(from);
   const next = to.trim();
-  if (!next) throw new Error("empty tag name");
+  if (!tidyTagName(next)) throw new Error("empty tag name");
   if (isReservedTagName(next)) {
     throw new Error(`${RESERVED_TAG_ERROR}: ${next}`);
   }
 
   const fromId = tagIdOf(db, from);
   if (fromId == null) return { merged: false, affectedFiles: 0 };
-  const target: TagRef = { namespace: "", name: next };
-  const targetId = tagIdOf(db, target);
-  if (targetId === fromId) return { merged: false, affectedFiles: 0 };
+  if (next === from.name) return { merged: false, affectedFiles: 0 };
+  const targetId = findManualTag(db, next, fromId);
   if (targetId != null) {
-    return { merged: true, ...mergeTags(db, [from], target) };
+    return db.transaction(() => {
+      const name = db
+        .prepare("SELECT name FROM tags WHERE id = ?")
+        .pluck()
+        .get(targetId) as string;
+      const merged = mergeTags(db, [from], { namespace: "", name });
+      if (name !== next) {
+        // No row is spelled `next` (findManualTag puts that one first).
+        db.prepare("UPDATE tags SET name = ? WHERE id = ?").run(next, targetId);
+        resyncFtsForKeys(db, keysForTagIds(db, [targetId]));
+      }
+      return { merged: true, ...merged };
+    })();
   }
 
   return db.transaction(() => {

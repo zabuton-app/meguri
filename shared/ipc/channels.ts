@@ -32,8 +32,18 @@ import {
   HistoryQuerySchema,
   LogoIdSchema,
   SearchQuerySchema,
+  AutoTagConfigSchema,
   TagRefSchema,
 } from "./schema.js";
+import {
+  MAX_AUTO_TAGS_PER_FILE,
+  MAX_AUTO_TAG_PAIRS,
+  MAX_AUTO_TAG_PLACE,
+  MAX_AUTO_TAG_PLACE_CHARS,
+  type AutoTagApplyResult,
+  type AutoTagConfig,
+  type AutoTagLibrary,
+} from "../autoTag.js";
 import {
   EVENT_CHANNELS,
   INVOKE_CHANNELS,
@@ -141,6 +151,96 @@ const BulkTargets = z
 
 /** The parsed shape, so both processes and the renderer name one type. */
 export type BulkTargets = z.infer<typeof BulkTargets>;
+
+/**
+ * Whether the places beside the ids (placeOf) of a raw value fit: one a file,
+ * and no more characters than MAX_AUTO_TAG_PLACE_CHARS in all. Read on the
+ * raw value with the rest of the gate, so neither 5,000 four-kilobyte places
+ * nor millions of empty ones are parsed before being refused.
+ */
+function placesFit(raw: unknown[]): boolean {
+  let chars = 0;
+  for (const group of raw) {
+    const { fileIds, places } = (group ?? {}) as {
+      fileIds?: unknown;
+      places?: unknown;
+    };
+    if (!Array.isArray(places)) continue;
+    if (!Array.isArray(fileIds) || places.length !== fileIds.length) {
+      return false;
+    }
+    for (const place of places) {
+      if (typeof place === "string") chars += place.length;
+      if (chars > MAX_AUTO_TAG_PLACE_CHARS) return false;
+    }
+  }
+  return true;
+}
+
+/** Files of one workspace, each with where the screen read it. */
+const PlacedGroupShape = z.object({
+  workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  fileIds: z.array(z.number().int().positive()).min(1).max(MAX_BULK_FILES),
+  places: z.array(z.string().max(MAX_AUTO_TAG_PLACE)).max(MAX_BULK_FILES),
+});
+const onePlacePerFile = [
+  (g: { fileIds: number[]; places: string[] }) =>
+    g.places.length === g.fileIds.length,
+  { message: "one place per file" },
+] as const;
+
+/**
+ * Gated on the raw value as BulkTargets is, places included; the file count
+ * is checked first, so the places a gate reads are bounded by it.
+ */
+const placedGate = <T extends z.ZodType>(target: T) =>
+  z
+    .unknown()
+    .superRefine((raw, ctx) => {
+      if (!Array.isArray(raw)) return;
+      if (
+        raw.length > MAX_BULK_FILES ||
+        bulkTargetFileCount(raw) > MAX_BULK_FILES ||
+        hasOversizedWorkspaceId(raw)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: `too many files (max ${MAX_BULK_FILES})`,
+        });
+      } else if (!placesFit(raw)) {
+        ctx.addIssue({
+          code: "custom",
+          message: `one place a file, at most ${MAX_AUTO_TAG_PLACE_CHARS} characters in all`,
+        });
+      }
+    })
+    .pipe(target);
+
+/**
+ * BulkTargets whose groups each carry the tags their files receive, and where
+ * the screen read each file. Gated on the raw value the same way, for the
+ * same reason.
+ */
+const AutoTagAssignments = placedGate(
+  z
+    .array(
+      PlacedGroupShape.extend({
+        tags: z
+          .array(z.string().min(1).max(MAX_TAG_NAME))
+          .min(1)
+          .max(MAX_AUTO_TAGS_PER_FILE),
+      }).refine(...onePlacePerFile),
+    )
+    .min(1)
+    // The cross product is what costs, and the file gate above does not
+    // bound it: 5,000 files with 64 tags each is 320,000 statements.
+    .refine(
+      (groups) =>
+        groups.reduce((n, g) => n + g.fileIds.length * g.tags.length, 0) <=
+        MAX_AUTO_TAG_PAIRS,
+      { message: `too many tags to attach (max ${MAX_AUTO_TAG_PAIRS})` },
+    ),
+);
 
 /**
  * An array of at most `max` items whose length is checked on the raw value
@@ -365,7 +465,9 @@ export const ChannelInputs = {
   // The tag-catalog channels take no workspaceId: scope comes from the active
   // view (like duplicates_list), and tags are addressed by name because ids are
   // per-database and meaningless across the "All" view.
-  tags_list_all: z.void(),
+  // The whole library on request: the search box completes a tag from every
+  // workspace, so a tag held elsewhere can be found and said to be elsewhere.
+  tags_list_all: z.object({ allWorkspaces: z.boolean() }).optional(),
   tag_rename: z.object({
     from: TagRefSchema,
     /** New plain name; the namespace is always "" since only manual tags are editable. */
@@ -411,6 +513,32 @@ export const ChannelInputs = {
   update_get_settings: z.void(),
   update_set_auto_check: z.object({ enabled: z.boolean() }),
   update_ignore: z.object({ version: z.string() }),
+  auto_tag_get: z.void(),
+  auto_tag_set: z.object({ config: AutoTagConfigSchema }),
+  auto_tag_files: z.void(),
+  auto_tag_apply: z.object({
+    assignments: AutoTagAssignments,
+    // The undoIds of the earlier calls of the same apply: kept until it ends.
+    keep: z.array(z.string().max(64)).max(256).optional(),
+  }),
+  // files_bulk_tag for the auto-tagging screen, on the files still where the
+  // screen read them (see placeOf). One difference: a name to remove takes
+  // off every spelling of that tag in each workspace (see manualSpellings).
+  auto_tag_edit: z
+    .object({
+      targets: placedGate(
+        z.array(PlacedGroupShape.refine(...onePlacePerFile)).min(1),
+      ),
+      add: z.array(z.string().min(1).max(MAX_TAG_NAME)).max(MAX_BULK_TAG_NAMES),
+      remove: z
+        .array(z.string().min(1).max(MAX_TAG_NAME))
+        .max(MAX_BULK_TAG_NAMES),
+    })
+    .refine((v) => v.add.length + v.remove.length <= MAX_BULK_TAG_NAMES, {
+      message: `too many tag names (max ${MAX_BULK_TAG_NAMES})`,
+    }),
+  auto_tag_undo: z.object({ undoIds: z.array(z.string().max(64)).max(256) }),
+  auto_tag_reapply: z.void(),
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
 } as const satisfies Record<InvokeChannel, z.ZodTypeAny>;
@@ -550,6 +678,25 @@ export interface ChannelOutputs {
   update_get_settings: UpdateSettings;
   update_set_auto_check: void;
   update_ignore: void;
+  auto_tag_get: AutoTagConfig;
+  auto_tag_set: void;
+  // Files of every workspace (a sample when there are more than the cap).
+  auto_tag_files: AutoTagLibrary;
+  auto_tag_apply: AutoTagApplyResult;
+  // As files_bulk_tag; `skipped` also counts the files no longer where the
+  // screen read them, which `moved` counts alone.
+  auto_tag_edit: {
+    files: number;
+    skipped: number;
+    moved: number;
+    added: number;
+    removed: number;
+  };
+  // Pairs removed. Handles the session no longer holds are no-ops.
+  auto_tag_undo: number;
+  // Runs the conditions over every file of every workspace and attaches
+  // what they give.
+  auto_tag_reapply: { files: number; added: number };
   logo_get: LogoId;
   // Echoes the applied variant so the renderer can settle on main's value.
   logo_set: LogoId;

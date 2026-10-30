@@ -1,8 +1,9 @@
-// Rename a user-owned tag. A rename into a name that is already taken is a
-// merge in disguise, so the collision is detected here (against the catalog the
-// screen already loaded) and confirmed before it is carried out.
-import { useEffect, useState } from "react";
-import { MAX_TAG_NAME, reservedTagPrefix } from "@shared/tags";
+// Rename a user-owned tag. A rename into a name that is already taken — under
+// any spelling, see tagIdentityKey — is a merge in disguise, so the collision is
+// detected here (against the catalog the screen already loaded) and confirmed
+// before it is carried out.
+import { useEffect, useMemo, useState } from "react";
+import { MAX_TAG_NAME, reservedTagPrefix, tagIdentityKey } from "@shared/tags";
 import type { TagSummary } from "@/ipc/types";
 import {
   Dialog,
@@ -30,7 +31,10 @@ export function TagRenameDialog({
   /** Editable tag names already in the catalog, for collision detection. */
   existingNames: ReadonlySet<string>;
   onRename: (tag: TagSummary, newName: string) => void;
-  /** Called instead of onRename when the target name is already taken. */
+  /**
+   * Called instead of onRename when the target name is already taken, with
+   * the taken tag's own spelling.
+   */
   onMerge: (tag: TagSummary, targetName: string) => void;
 }) {
   const { t } = useI18n();
@@ -44,9 +48,30 @@ export function TagRenameDialog({
     setName(tag?.name ?? "");
   }, [open, tag]);
 
+  const byKey = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const existing of existingNames) {
+      const key = tagIdentityKey(existing);
+      const list = map.get(key);
+      if (list) list.push(existing);
+      else map.set(key, [existing]);
+    }
+    return map;
+  }, [existingNames]);
+
   const trimmed = name.trim();
   const reserved = reservedTagPrefix(trimmed);
-  const collides = trimmed !== tag?.name && existingNames.has(trimmed);
+  // Another tag the new name means, spelled exactly as typed if there is one
+  // (main resolves it the same way). The tag itself is not one: `Trip` to
+  // `TRIP` only respells it, and an unchanged name collides with nothing.
+  const others =
+    trimmed === tag?.name
+      ? undefined
+      : byKey
+          .get(tagIdentityKey(trimmed))
+          ?.filter((existing) => existing !== tag?.name);
+  const taken = others?.includes(trimmed) ? trimmed : others?.[0];
+  const collides = taken !== undefined;
   // maxLength on the field stops this being reachable by typing; the check is
   // here so a name that gets in another way (an IME commit, a paste the browser
   // does not clip) is refused in the form rather than by the IPC layer, whose
@@ -58,7 +83,7 @@ export function TagRenameDialog({
     if (!tag || !canSubmit) return;
     onOpenChange(false);
     if (trimmed === tag.name) return;
-    if (collides) onMerge(tag, trimmed);
+    if (taken !== undefined) onMerge(tag, taken);
     else onRename(tag, trimmed);
   };
 
@@ -95,7 +120,7 @@ export function TagRenameDialog({
             )}
             {collides && reserved === null && !tooLong && (
               <p className="text-xs text-muted">
-                {t("tags.renameConflict", { name: trimmed })}
+                {t("tags.renameConflict", { name: taken })}
               </p>
             )}
           </div>

@@ -3,6 +3,7 @@ import {
   MAX_TAG_SUGGESTIONS,
   pendingDirective,
   tagSuggestions,
+  viewIsOneWorkspace,
 } from "@/lib/searchTokens";
 import type { TagSummary } from "@/ipc/types";
 
@@ -66,6 +67,30 @@ describe("tagSuggestions", () => {
       value: "",
     });
     expect(out.map((t) => t.qualified)).toEqual(["res:4k", "beach"]);
+  });
+
+  it("puts the tags on view before the ones held only elsewhere", () => {
+    // "beach" is the best match by use and prefix, but the view does not
+    // carry it: a search for it there would find nothing.
+    const elsewhere = { ...tag("beach", 9), workspaceIds: ["other"] };
+    const out = tagSuggestions(
+      [elsewhere, tag("beachfront", 2), tag("sea beach", 1)],
+      { value: "bea" },
+      MAX_TAG_SUGGESTIONS,
+      (t) => t.workspaceIds.includes("ws"),
+    );
+    expect(out.map((t) => t.name)).toEqual([
+      "beachfront",
+      "sea beach",
+      "beach",
+    ]);
+  });
+
+  it("knows which views are of one workspace", () => {
+    expect(viewIsOneWorkspace("ws")).toBe(true);
+    expect(viewIsOneWorkspace("__all__")).toBe(false);
+    expect(viewIsOneWorkspace("collection:c1")).toBe(false);
+    expect(viewIsOneWorkspace(null)).toBe(false);
   });
 
   it("honours an explicit limit", () => {

@@ -1,5 +1,7 @@
 /**
- * Tag naming contract, shared by both processes.
+ * Tag naming contract, shared by both processes — and, further down, the
+ * grammar of the search box (tokens, quoting, the `tag:` directive, and
+ * alternatives), since the two meet in `tag:` tokens.
  *
  * A tag is `(namespace, name)`. An empty namespace means the tag is the user's
  * own — created by hand, freely renamed, merged and deleted. A non-empty
@@ -139,6 +141,60 @@ export function parseQualifiedTagName(raw: string): {
     : { namespace: "", name: raw };
 }
 
+const TIDY_ASCII = /^[!-~](?:[ -~]*[!-~])?$/;
+/** What tidyTagName would change, composition aside. */
+const UNTIDY = /[^\S ]|[\p{Cc}\p{Cf}]|^ | $| {2}/u;
+
+/**
+ * The form tag names are compared in (tagIdentityKey), and the one auto
+ * tagging stores them in (cleanTagName, which also cuts to length): composed
+ * (NFC), each run of whitespace one space, control and format characters gone
+ * — a file name can carry zero-width or bidi marks, which would make tags
+ * that look identical and are not — and trimmed.
+ */
+export function tidyTagName(raw: string): string {
+  // Most names are tidy already, and tag_key runs this over every row a tag
+  // query reads: those skip the replaces. Printable ASCII with single inner
+  // spaces is left as it is (NFC does not change ASCII); any other name with
+  // no whitespace but single spaces, no control or format character and no
+  // space at either end only needs composing.
+  if (TIDY_ASCII.test(raw) && !raw.includes("  ")) return raw;
+  if (!UNTIDY.test(raw)) return raw.normalize("NFC");
+  return (
+    raw
+      .normalize("NFC")
+      // Whitespace first: a tab or a newline is a control character too, and
+      // must become a space rather than vanish. Collapsed again afterwards,
+      // since removing a zero-width character can leave two spaces side by
+      // side.
+      .replace(/\s+/g, " ")
+      .replace(/[\p{Cc}\p{Cf}]/gu, "")
+      .replace(/ {2,}/g, " ")
+      .trim()
+  );
+}
+
+/**
+ * The key two tag names are compared on to decide whether they are one tag:
+ * the name tidied (tidyTagName) and case aside, over all of Unicode — `Trip`
+ * and `trip` are one tag, and so are `Été` and `été`, `New  Name` and
+ * `New Name`, an `é` written as one character or as `e` and its accent, and a
+ * name with or without an invisible control or format character. Auto tagging
+ * stores names tidied while a name typed by hand is kept as typed, so without
+ * the tidying the two would make one name two tags. Every path that matches a
+ * name to a tag already there goes through this, so none of them can call one
+ * tag two; SQL reaches it as `tag_key` (see db.ts). The paths are listed in
+ * docs/data-model.md.
+ *
+ * The `tags` table itself still tells spellings apart: a library from before
+ * this rule may hold `Trip` and `trip` side by side. They stay as they are; a
+ * name that means both resolves to the one spelled exactly so, else the older
+ * (see findManualTag), and the tag screen can merge them.
+ */
+export function tagIdentityKey(name: string): string {
+  return tidyTagName(name).toLowerCase();
+}
+
 /** Rename / merge / delete are allowed on user-owned tags only. */
 export function isEditableTag(namespace: string): boolean {
   return namespace === "";
@@ -189,17 +245,13 @@ export function isTagDirective(token: string): boolean {
  * condition — null for ordinary free text.
  *
  * Both routes into the query (typing one, clicking a tag) go through here, so
- * neither can append a condition the other would have called a repeat. The fold
- * is ASCII-only on purpose: it has to agree with the SQL that finally resolves
- * the tag, and SQLite's NOCASE collation leaves everything above ASCII alone —
- * `Été` and `été` really are two tags there, and calling them one here would
- * silently drop a condition the user typed.
+ * neither can append a condition the other would have called a repeat. The
+ * fold is tagIdentityKey, the one the SQL that finally resolves the tag uses:
+ * a looser one here would silently drop a condition the user typed.
  */
 export function tagSearchKey(token: string): string | null {
   const value = parseTagSearchToken(token);
-  return value === null
-    ? null
-    : value.replace(/[A-Z]/g, (c) => c.toLowerCase());
+  return value === null ? null : tagIdentityKey(value);
 }
 
 function needsQuoting(value: string): boolean {
@@ -313,6 +365,64 @@ export function joinSearchTokens(tokens: string[]): string {
 }
 
 /**
+ * Separates alternatives inside one free-text token: `yoga|ヨガ` matches a file
+ * that contains either. It lives inside the token — rather than as an `OR`
+ * between tokens — so the rule stays one sentence: tokens are ANDed, the
+ * alternatives of a token are ORed, and a token is still one condition.
+ *
+ * A file name can contain the character itself, so `\|` is a literal one:
+ * `a\|b` searches for the text "a|b".
+ */
+const SEARCH_OR = "|";
+const ESCAPED_OR = `\\${SEARCH_OR}`;
+/** Splits on separators that are not escaped. */
+const UNESCAPED_OR = /(?<!\\)\|/;
+
+/** Alternatives one token may carry; the rest are dropped. */
+export const MAX_SEARCH_ALTERNATIVES = 64;
+
+/**
+ * What a free-text token (not a `tag:` directive) searches for: its
+ * alternatives when it has several, otherwise the one text — with `\|` turned
+ * back into `|` either way. A separator with nothing on one side is not a
+ * separator: `yoga|` is searched as typed.
+ *
+ * The one place that reads this syntax; the query layer only ever sees terms.
+ */
+export function searchTokenTerms(token: string): string[] {
+  const literal = (text: string) => text.split(ESCAPED_OR).join(SEARCH_OR);
+  if (!token.includes(SEARCH_OR)) return [token];
+  const parts = token
+    .split(UNESCAPED_OR)
+    .map((part) => literal(part).trim())
+    .filter(Boolean);
+  return parts.length >= 2
+    ? parts.slice(0, MAX_SEARCH_ALTERNATIVES)
+    : [literal(token)];
+}
+
+/**
+ * The search-box token that matches any of `terms`, quoted where it needs to
+ * be. Terms are deduplicated without regard to case, as the search itself is.
+ */
+export function anyOfSearchToken(terms: readonly string[]): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const raw of terms) {
+    // A trailing backslash would escape the separator that follows the term.
+    const term = raw.replace(/\s+/g, " ").trim().replace(/\\+$/, "");
+    const key = term.toLowerCase();
+    if (!term || seen.has(key)) continue;
+    seen.add(key);
+    // A separator inside a term is part of the term, not another alternative.
+    parts.push(term.split(SEARCH_OR).join(ESCAPED_OR));
+  }
+  return joinSearchTokens([
+    parts.slice(0, MAX_SEARCH_ALTERNATIVES).join(SEARCH_OR),
+  ]);
+}
+
+/**
  * The reserved prefix a would-be manual tag name impersonates, or null when it
  * claims none. Returned rather than just tested so the rejection message can
  * name the prefix without re-deriving it — `parseQualifiedTagName()` cannot,
@@ -326,9 +436,12 @@ export function reservedTagPrefix(
   name: string,
   reserved: readonly string[] = RESERVED_TAG_PREFIXES,
 ): string | null {
-  const i = name.indexOf(":");
-  if (i <= 0 || i === name.length - 1) return null;
-  const prefix = name.slice(0, i).toLowerCase();
+  // Tidied, as the name is compared (tagIdentityKey): `res\u200b:4k` would
+  // otherwise pass here and still match `res:4k` in a `tag:` search.
+  const tidy = tidyTagName(name);
+  const i = tidy.indexOf(":");
+  if (i <= 0 || i === tidy.length - 1) return null;
+  const prefix = tidy.slice(0, i).toLowerCase();
   return reserved.includes(prefix) ? prefix : null;
 }
 

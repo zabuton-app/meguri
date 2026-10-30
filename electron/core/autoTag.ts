@@ -1,0 +1,468 @@
+// Database side of auto-tagging: attaching the tags the engine (shared/
+// autoTag.ts) proposes, taking them back, and running the engine over files a
+// scan brought in.
+//
+// The tags are the user's own — source `manual`, no namespace — so everything
+// the app can do with a hand-applied tag works on these too, and the full-text
+// index has to follow every change.
+import path from "node:path";
+import { resyncFtsForKeys, type DB } from "./db.js";
+import { getSetting, setSetting } from "./queries/settings.js";
+import type { AutoTagEngine, DeriveAutoTags } from "./autoTagDeriver.js";
+import { upsertTag } from "./tags.js";
+import {
+  AUTO_TAG_CHUNK,
+  MAX_AUTO_TAG_FILES,
+  cleanTagName,
+  compileFolders,
+  folderMatcher,
+  fileNameOf,
+  folderOf,
+  isUsableTagName,
+  placeOf,
+  withFolderTags,
+  type AutoTagFile,
+} from "../../shared/autoTag.js";
+import { tagIdentityKey } from "../../shared/tags.js";
+
+/** A tag attached to a file's metadata identity. */
+export type TagPair = [metaKey: string, tagId: number];
+
+export interface AttachResult {
+  /** Of the files named, how many gained at least one tag. */
+  files: number;
+  /** Those files, whose FTS rows this call re-synced. */
+  tagged: number[];
+  /** Exactly the pairs this call attached — what an undo may remove. */
+  pairs: TagPair[];
+}
+
+/**
+ * Resolve a tag name to the user's tag it means, creating it when new. An
+ * existing tag that differs only by case is reused, so `kids` from a file name
+ * lands on the `Kids` the user already has instead of beside it.
+ *
+ * The fold is tagIdentityKey, as everywhere else, and of two spellings it picks
+ * as findManualTag does: the exact one, else the older. The catalog of own tags is small,
+ * so it is read once per call rather than queried per name.
+ * Not kept across calls: applyAutoTags awaits between chunks, and a tag
+ * deleted meanwhile would leave a cached id that no longer exists.
+ */
+function tagIdResolver(db: DB): (name: string) => number | null {
+  const known = new Map<string, number | null>();
+  const exact = new Map<string, number>();
+  const rows = db
+    .prepare("SELECT id, name FROM tags WHERE namespace = '' ORDER BY id")
+    .all() as { id: number; name: string }[];
+  for (const row of rows) {
+    const key = tagIdentityKey(row.name);
+    if (!known.has(key)) known.set(key, row.id);
+    exact.set(row.name, row.id);
+  }
+  return (raw) => {
+    const name = cleanTagName(raw);
+    const key = tagIdentityKey(name);
+    let id = exact.get(name) ?? known.get(key);
+    if (id === undefined) {
+      id = isUsableTagName(name) ? upsertTag(db, "", name) : null;
+      known.set(key, id);
+    }
+    return id;
+  };
+}
+
+/**
+ * Attach tags to files. Only adds: a tag the file already has is left alone and
+ * is not reported, so undoing this call never removes something it did not put
+ * there. Work is per meta_key (copies of a file share their tags), and the FTS
+ * rows of every key that changed are re-synced.
+ */
+export function attachAutoTags(
+  db: DB,
+  assignments: readonly {
+    fileIds: readonly number[];
+    tags: readonly string[];
+  }[],
+): AttachResult {
+  const metaKeyOf = db.prepare(
+    "SELECT meta_key FROM files WHERE id = ? AND deleted_at IS NULL",
+  );
+  const attach = db.prepare(
+    "INSERT INTO meta_tags (meta_key, tag_id, source, score) VALUES (?, ?, 'manual', NULL) ON CONFLICT(meta_key, tag_id, source) DO NOTHING",
+  );
+  const run = db.transaction((): AttachResult => {
+    const tagIdOf = tagIdResolver(db);
+    const pairs: TagPair[] = [];
+    const changed = new Set<string>();
+    // Counted per file named, as bulkEditManualTags does: two selected copies
+    // of one file are two files to the user, though one metadata identity.
+    const touched = new Set<number>();
+    for (const { fileIds, tags } of assignments) {
+      const tagIds = [
+        ...new Set(tags.map(tagIdOf).filter((id): id is number => id != null)),
+      ];
+      if (tagIds.length === 0) continue;
+      for (const fileId of fileIds) {
+        const row = metaKeyOf.get(fileId) as { meta_key: string } | undefined;
+        if (!row) continue;
+        let gained = changed.has(row.meta_key);
+        for (const tagId of tagIds) {
+          if (attach.run(row.meta_key, tagId).changes > 0) {
+            pairs.push([row.meta_key, tagId]);
+            changed.add(row.meta_key);
+            gained = true;
+          }
+        }
+        if (gained) touched.add(fileId);
+      }
+    }
+    resyncFtsForKeys(db, [...changed]);
+    return { files: touched.size, tagged: [...touched], pairs };
+  });
+  return run();
+}
+
+/** Remove pairs a previous {@link attachAutoTags} reported. Returns how many went. */
+export function detachTagPairs(db: DB, pairs: readonly TagPair[]): number {
+  const detach = db.prepare(
+    "DELETE FROM meta_tags WHERE meta_key = ? AND tag_id = ? AND source = 'manual'",
+  );
+  return db.transaction(() => {
+    let removed = 0;
+    const changed = new Set<string>();
+    for (const [metaKey, tagId] of pairs) {
+      if (detach.run(metaKey, tagId).changes > 0) {
+        removed++;
+        changed.add(metaKey);
+      }
+    }
+    resyncFtsForKeys(db, [...changed]);
+    return removed;
+  })();
+}
+
+const CHUNK = AUTO_TAG_CHUNK;
+
+/** The place (placeOf) a stored path is at, as the screen names it. */
+export function placeOfPath(relPath: string): string {
+  return placeOf(
+    folderOf(relPath, path.sep).normalize("NFC"),
+    fileNameOf(relPath, path.sep).normalize("NFC"),
+  );
+}
+
+/** Where each of these alive files is now (placeOfPath), by id. */
+function placesNow(db: DB, ids: readonly number[]): Map<number, string> {
+  if (ids.length === 0) return new Map();
+  const rows = db
+    .prepare(
+      `SELECT id, rel_path FROM files
+        WHERE deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))`,
+    )
+    .all(JSON.stringify(ids)) as NameRow[];
+  return new Map(rows.map((row) => [row.id, placeOfPath(row.rel_path)]));
+}
+
+/**
+ * Of these files (id → where its name was read, placeOf), the ones still
+ * there. A rebuild clears the index and fills it again, handing the ids to
+ * other files; a move gives a file another name. Either way what was worked
+ * out from the old name is not the file's any more. Synchronous: checked
+ * with nothing awaited between this and the write it guards.
+ */
+export function filesStillAt(
+  db: DB,
+  readAt: ReadonlyMap<number, string>,
+): Set<number> {
+  const now = placesNow(db, [...readAt.keys()]);
+  return new Set(
+    [...readAt]
+      .filter(([id, place]) => now.get(id) === place)
+      .map(([id]) => id),
+  );
+}
+
+/**
+ * filesStillAt for ids sent beside the places they were read at, as the
+ * screen sends them: the ids still there, and how many were not.
+ */
+export function keepStillAt(
+  db: DB,
+  fileIds: readonly number[],
+  places: readonly string[],
+): { kept: number[]; moved: number } {
+  const now = placesNow(db, fileIds);
+  const kept = fileIds.filter((id, i) => now.get(id) === places[i]);
+  return { kept, moved: fileIds.length - kept.length };
+}
+
+interface NameRow {
+  id: number;
+  rel_path: string;
+}
+
+// Bumped each time the auto-tagging settings are saved. A pass reads the
+// settings once, when it starts: one that goes on after they changed would
+// apply what they no longer say (a tag the Tags screen just renamed, under its
+// old name), so it stops instead (see applyAutoTags' `settingsVersion`).
+let settingsVersion = 0;
+
+/** The version of the auto-tagging settings: read it with the settings. */
+export function autoTagSettingsVersion(): number {
+  return settingsVersion;
+}
+
+/** Call after saving the auto-tagging settings. */
+export function autoTagSettingsChanged(): void {
+  settingsVersion++;
+}
+
+/**
+ * Run the engine over files and attach what it proposes — every alive file, or
+ * just `fileIds`. Chunked and yielding, so a large library does not park the
+ * main process; `derive` is where the engine runs — the worker, so a rule that
+ * never finishes cannot hold the main process. Required for that reason:
+ * deriveAutoTagsInProcess is for tests.
+ */
+export async function applyAutoTags(
+  db: DB,
+  opts: {
+    engine: AutoTagEngine;
+    /**
+     * The workspace this database is: what the engine's folder rules are
+     * matched against. Without it none of them applies — a caller that has
+     * folder rules to run must say which workspace it is running them in.
+     */
+    workspaceId?: string;
+    derive: DeriveAutoTags;
+    fileIds?: readonly number[];
+    signal?: AbortSignal;
+    /**
+     * The settings version (autoTagSettingsVersion) the engine was read at.
+     * Once the settings change, nothing more is written and the pass reports
+     * itself not completed.
+     */
+    settingsVersion?: number;
+    onProgress?: (done: number, total: number) => void;
+  },
+): Promise<{
+  files: number;
+  added: number;
+  completed: boolean;
+  /** The files that gained a tag, their FTS rows already re-synced. */
+  tagged: Set<number>;
+}> {
+  const { engine, derive, fileIds, signal, onProgress, workspaceId } = opts;
+  const stopped = () =>
+    signal?.aborted === true ||
+    (opts.settingsVersion !== undefined &&
+      opts.settingsVersion !== settingsVersion);
+  // Only the rules of this workspace can reach a file of it. Looked up per
+  // folder, not per file (see folderMatcher).
+  const reaching = folderMatcher(
+    workspaceId
+      ? compileFolders(engine.folders ?? []).filter(
+          ({ rule }) => rule.workspaceId === workspaceId,
+        )
+      : [],
+  );
+  const byIds = db.prepare(
+    `SELECT id, rel_path FROM files
+      WHERE deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))`,
+  );
+  const byPage = db.prepare(
+    "SELECT id, rel_path FROM files WHERE deleted_at IS NULL AND id > ? ORDER BY id LIMIT ?",
+  );
+  const total = fileIds
+    ? fileIds.length
+    : (
+        db
+          .prepare("SELECT COUNT(*) AS n FROM files WHERE deleted_at IS NULL")
+          .get() as { n: number }
+      ).n;
+
+  let added = 0;
+  const tagged = new Set<number>();
+  /** Writes what the names gave each row, with what its folder gives. */
+  const write = (rows: NameRow[], named: readonly string[][]): void => {
+    // The engine was awaited before this, and the index may have changed
+    // meanwhile (see filesStillAt): only a file still where its name was read
+    // is written to. The screen's own writes are checked the same way.
+    const unchanged = filesStillAt(
+      db,
+      new Map(rows.map((row) => [row.id, placeOfPath(row.rel_path)])),
+    );
+    // What the names gave, then what the folders give: path comparisons, done
+    // here rather than in the worker, and put together by withFolderTags as
+    // the screen's own analysis expects.
+    const tags = workspaceId
+      ? named.map((list, i) =>
+          withFolderTags(
+            list,
+            reaching({
+              workspaceId,
+              // NFC, as the screen that wrote the rule saw the folder.
+              folder: folderOf(rows[i].rel_path, path.sep).normalize("NFC"),
+            }),
+          ),
+        )
+      : named;
+    const result = attachAutoTags(
+      db,
+      rows
+        .map((row, i) => ({ fileIds: [row.id], tags: tags[i] }))
+        .filter((a) => unchanged.has(a.fileIds[0]) && a.tags.length > 0),
+    );
+    added += result.pairs.length;
+    for (const id of result.tagged) tagged.add(id);
+  };
+
+  let done = 0;
+  let lastId = 0;
+  let failure: Error | null = null;
+  for (;;) {
+    if (signal?.aborted) {
+      return { files: tagged.size, added, completed: false, tagged };
+    }
+    let rows: NameRow[];
+    if (fileIds) {
+      if (done >= fileIds.length) break;
+      const ids = fileIds.slice(done, done + CHUNK);
+      rows = byIds.all(JSON.stringify(ids)) as NameRow[];
+      done += ids.length;
+    } else {
+      rows = byPage.all(lastId, CHUNK) as NameRow[];
+      if (rows.length === 0) break;
+      lastId = rows[rows.length - 1].id;
+      done += rows.length;
+    }
+    // After the end is known: settings saved just after the last chunk was
+    // written leave the pass completed, as it is.
+    if (stopped()) {
+      return { files: tagged.size, added, completed: false, tagged };
+    }
+    // Once the names could not be read, the rest of the pass goes on without
+    // them: where the files are still can be read, and a folder rule's tags
+    // do not wait on the names. The failure is reported at the end, so the
+    // files stay owed for what their names give.
+    let named: string[][] = rows.map(() => []);
+    if (failure === null) {
+      try {
+        named = await derive(
+          engine,
+          rows.map((row) => fileNameOf(row.rel_path, path.sep)),
+        );
+      } catch (err) {
+        failure = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    // The await let the caller cancel, or the settings change; nothing of
+    // this chunk is written yet.
+    if (stopped()) {
+      return { files: tagged.size, added, completed: false, tagged };
+    }
+    write(rows, named);
+    onProgress?.(Math.min(done, total), total);
+    await new Promise((r) => setImmediate(r));
+  }
+  if (failure !== null) throw failure;
+  return { files: tagged.size, added, completed: true, tagged };
+}
+
+/**
+ * Files a scan brought in that the engine has not seen yet. Persisted, because
+ * a scan aborted between indexing and tagging reports those files as unchanged
+ * the next time round, and they would otherwise never be tagged.
+ */
+export const AUTO_TAG_PENDING_KEY = "auto_tag_pending";
+
+function readPending(db: DB): number[] {
+  try {
+    const value: unknown = JSON.parse(
+      getSetting(db, AUTO_TAG_PENDING_KEY) ?? "[]",
+    );
+    return Array.isArray(value)
+      ? value.filter((v): v is number => Number.isInteger(v))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The scan hook: tag what this scan added or changed, plus anything still owed.
+ * Returns the files that gained a tag, whose FTS rows are already re-synced, so
+ * the scan need not sync them again.
+ */
+export async function applyAutoTagsOnScan(
+  db: DB,
+  opts: {
+    engine: AutoTagEngine;
+    workspaceId?: string;
+    derive: DeriveAutoTags;
+    changedIds: readonly number[];
+    signal?: AbortSignal;
+    settingsVersion?: number;
+    onProgress?: (done: number, total: number) => void;
+  },
+): Promise<Set<number>> {
+  const owed = readPending(db);
+  if (owed.length === 0 && opts.changedIds.length === 0) return new Set();
+  const fileIds = [...new Set([...owed, ...opts.changedIds])];
+  setSetting(db, AUTO_TAG_PENDING_KEY, JSON.stringify(fileIds));
+  const { completed, tagged } = await applyAutoTags(db, { ...opts, fileIds });
+  if (completed) setSetting(db, AUTO_TAG_PENDING_KEY, "[]");
+  return tagged;
+}
+
+/** Forget what is owed — the feature was turned off, so nothing is. */
+export function clearAutoTagPending(db: DB): void {
+  if (getSetting(db, AUTO_TAG_PENDING_KEY) !== null) {
+    setSetting(db, AUTO_TAG_PENDING_KEY, "[]");
+  }
+}
+
+/** What the auto-tagging screen loads from one workspace. */
+export function autoTagFiles(
+  db: DB,
+  workspaceId: string,
+  limit: number = MAX_AUTO_TAG_FILES,
+): { files: AutoTagFile[]; total: number; existingTags: string[] } {
+  const rows = db
+    .prepare(
+      `SELECT f.id, f.rel_path, f.meta_key,
+              (SELECT json_group_array(t.name)
+                 FROM meta_tags mt JOIN tags t ON t.id = mt.tag_id
+                WHERE mt.meta_key = f.meta_key AND t.namespace = '') AS tags
+         FROM files f WHERE f.deleted_at IS NULL ORDER BY f.id LIMIT ?`,
+    )
+    .all(limit) as {
+    id: number;
+    rel_path: string;
+    meta_key: string;
+    tags: string;
+  }[];
+  const total = (
+    db
+      .prepare("SELECT COUNT(*) AS n FROM files WHERE deleted_at IS NULL")
+      .get() as { n: number }
+  ).n;
+  const existingTags = db
+    // Oldest first, so the screen's first spelling of a name is the one
+    // findManualTag would pick for it.
+    .prepare("SELECT name FROM tags WHERE namespace = '' ORDER BY id")
+    .pluck()
+    .all() as string[];
+  return {
+    files: rows.map((row) => ({
+      workspaceId,
+      id: row.id,
+      name: fileNameOf(row.rel_path, path.sep).normalize("NFC"),
+      folder: folderOf(row.rel_path, path.sep).normalize("NFC"),
+      metaKey: row.meta_key,
+      tags: [...new Set(JSON.parse(row.tags) as string[])],
+    })),
+    total,
+    existingTags,
+  };
+}

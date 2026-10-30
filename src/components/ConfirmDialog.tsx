@@ -101,7 +101,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         close(false);
       } else if (e.key === "Enter") {
         e.preventDefault();
-        close(true);
+        // Not a key still held from whatever opened the dialog: its repeats
+        // would answer the question before it was read.
+        if (!e.repeat) close(true);
       }
     };
     // Capture phase, matching Radix's dismissable layer: this dialog is on top,

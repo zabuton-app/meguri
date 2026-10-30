@@ -61,13 +61,15 @@ export class Workspaces {
 
   /**
    * Persist our snapshot, refreshing the fields this class never owns first.
-   * `update` is written independently via `updateConfig()` (the update checker
-   * runs across awaits), so spreading our startup snapshot back wholesale would
-   * silently revert the user's update preferences. Every write below goes
+   * `update` and `autoTag` are written independently via `updateConfig()`, so
+   * spreading our startup snapshot back wholesale would silently revert the
+   * user's update preferences and their auto-tagging rules. Every write below goes
    * through here rather than calling saveConfig directly.
    */
   private persist(): void {
-    this.config.update = loadConfig().update;
+    const { update, autoTag } = loadConfig();
+    this.config.update = update;
+    this.config.autoTag = autoTag;
     saveConfig(this.config);
   }
 
