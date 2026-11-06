@@ -1,11 +1,13 @@
-import { clipboard, shell } from "electron";
+import { clipboard, nativeImage, shell } from "electron";
 import { spawn } from "node:child_process";
+import { statSync } from "node:fs";
 import { handle } from "../core/ipcHandler.js";
 import log from "../core/logger.js";
+import { TRAY_ICON_BASE64 } from "../core/logoAssets.js";
 import { folderDirInsideRoot, folderPathUnderRoot } from "../core/paths.js";
 import * as q from "../core/queries.js";
 import type { IpcContext } from "./context.js";
-import { coreById, ensureFileInsideRoot } from "./helpers.js";
+import { bulkTargetCores, coreById, ensureFileInsideRoot } from "./helpers.js";
 
 // Launch an external file/URL in a fully detached child process.
 // shell.openPath leaves the spawned process attached to Electron's process
@@ -41,6 +43,22 @@ export function registerShellHandlers(ctx: IpcContext): void {
   handle("open_folder", ({ id, workspaceId }) => {
     const abs = ensureFileInsideRoot(coreById(ws, workspaceId), id);
     shell.showItemInFolder(abs);
+  });
+
+  handle("drag_files", (targets, event) => {
+    const files = bulkTargetCores(ws, targets).flatMap(({ core, fileIds }) =>
+      fileIds.map((id) => {
+        const file = ensureFileInsideRoot(core, id);
+        if (!statSync(file).isFile()) throw new Error("file not found");
+        return file;
+      }),
+    );
+    // Resolve the entire selection before starting the OS drag. A stale or
+    // out-of-root entry must not silently turn this into a partial drag.
+    const icon = nativeImage.createFromBuffer(
+      Buffer.from(TRAY_ICON_BASE64.dark, "base64"),
+    );
+    event.sender.startDrag({ file: files[0], files: [...new Set(files)], icon });
   });
 
   // A folder of the folder view, in the default file manager. Opened detached

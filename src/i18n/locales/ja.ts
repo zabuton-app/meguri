@@ -643,6 +643,9 @@ export const ja = {
   "drop.alreadyOneInCollection": "すでに「{name}」に追加済みです",
   "drop.addToCollectionFailed": "コレクションに追加できませんでした",
   "drag.fileCount": "{count}件",
+  "drag.external": "別のアプリにドラッグ",
+  "drag.externalFailed":
+    "ドラッグを開始できませんでした。ファイルが利用可能か確認してください。",
   "drag.selectionPending":
     "選択したフォルダを読み込み中です。少し待ってからもう一度ドラッグしてください",
 

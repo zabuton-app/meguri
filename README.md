@@ -341,6 +341,10 @@ already run Electron apps locally.
 | Theme      | Switch from Theme at the top-right of the header                                                                   |
 | Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset                                                                          |
 
+To drag a file to another app, hover over it in grid or list view and drag
+the arrow beside its selection checkbox. Drag from a selected file's arrow
+to carry the whole selection.
+
 ## Where Data Is Stored
 
 Scan root paths are hashed for identification and managed centrally under

@@ -638,6 +638,9 @@ export const ko: Record<TranslationKey, string> = {
   "drop.alreadyOneInCollection": "이미 「{name}」에 있습니다",
   "drop.addToCollectionFailed": "컬렉션에 추가하지 못했습니다",
   "drag.fileCount": "{count}개 파일",
+  "drag.external": "다른 앱으로 드래그",
+  "drag.externalFailed":
+    "드래그를 시작할 수 없습니다. 파일을 아직 사용할 수 있는지 확인하세요.",
   "drag.selectionPending":
     "선택한 폴더를 불러오는 중입니다. 잠시 후 다시 드래그해 주세요.",
 

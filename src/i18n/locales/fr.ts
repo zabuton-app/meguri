@@ -660,6 +660,9 @@ export const fr: Record<TranslationKey, string> = {
   "drop.alreadyOneInCollection": "Déjà dans « {name} »",
   "drop.addToCollectionFailed": "Impossible d’ajouter à la collection",
   "drag.fileCount": "{count} fichiers",
+  "drag.external": "Glisser vers une autre application",
+  "drag.externalFailed":
+    "Impossible de démarrer le glissement. Vérifiez que les fichiers sont toujours disponibles.",
   "drag.selectionPending":
     "Les dossiers sélectionnés sont encore en cours de chargement. Réessayez dans un instant.",
 

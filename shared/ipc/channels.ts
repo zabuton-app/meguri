@@ -391,6 +391,7 @@ export const ChannelInputs = {
   frame_export: FileTarget.extend({ sec: z.number().finite().min(0) }),
   open_external: FileTarget,
   open_folder: FileTarget,
+  drag_files: BulkTargets,
   // A folder of the folder view, opened in the OS file manager.
   folder_open_in_file_manager: z.object({
     workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
@@ -539,6 +540,7 @@ export interface ChannelOutputs {
   frame_export: { saved: boolean; path: string | null };
   open_external: void;
   open_folder: void;
+  drag_files: void;
   folder_open_in_file_manager: void;
   folder_copy_path: void;
   copy_file_path: void;

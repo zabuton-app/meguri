@@ -616,6 +616,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "drop.alreadyOneInCollection": "已在“{name}”中",
   "drop.addToCollectionFailed": "无法添加到收藏夹",
   "drag.fileCount": "{count} 个文件",
+  "drag.external": "拖到其他应用",
+  "drag.externalFailed": "无法开始拖动。请检查文件是否仍然可用。",
   "drag.selectionPending": "所选文件夹仍在加载，请稍后再拖动。",
 
   // user collections
