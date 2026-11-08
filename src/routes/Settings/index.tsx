@@ -47,6 +47,7 @@ import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
+import { CssThemeSection } from "./CssThemeSection";
 import { CustomCssSection } from "./CustomCssSection";
 import { useTour } from "@/tour/TourProvider";
 import {
@@ -361,7 +362,8 @@ export default function Settings() {
                 </div>
               </section>
 
-              {/* User stylesheet (custom.css) layered over the theme */}
+              {/* CSS theme file, then the user stylesheet (custom.css) on top */}
+              <CssThemeSection />
               <CustomCssSection />
 
               {/* Emoji glyph style (applies to all emoji in the UI) */}

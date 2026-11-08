@@ -68,6 +68,12 @@ export const ko: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.cssTheme": "CSS 테마",
+  "settings.cssThemeDesc":
+    "테마 폴더의 .css 파일을 테마 위에 덧씌워 적용합니다. 사용자 정의 CSS는 그 위에 적용됩니다.",
+  "settings.cssThemeNone": "없음",
+  "settings.cssThemeOpenFolder": "테마 폴더 열기",
+  "settings.cssThemeOpenError": "테마 폴더를 열 수 없습니다.",
   "settings.customCss": "사용자 정의 CSS",
   "settings.customCssDesc":
     "custom.css를 테마 위에 덧씌워 적용합니다. 파일을 저장하면 바로 반영됩니다.",

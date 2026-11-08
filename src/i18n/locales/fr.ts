@@ -70,6 +70,12 @@ export const fr: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.cssTheme": "Thème CSS",
+  "settings.cssThemeDesc":
+    "Applique un fichier .css du dossier des thèmes par-dessus le thème. Le CSS personnalisé s'applique au-dessus.",
+  "settings.cssThemeNone": "Aucun",
+  "settings.cssThemeOpenFolder": "Ouvrir le dossier des thèmes",
+  "settings.cssThemeOpenError": "Impossible d'ouvrir le dossier des thèmes.",
   "settings.customCss": "CSS personnalisé",
   "settings.customCssDesc":
     "Applique custom.css par-dessus le thème. Les modifications prennent effet dès l'enregistrement du fichier.",

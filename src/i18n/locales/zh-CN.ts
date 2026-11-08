@@ -65,6 +65,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.cssTheme": "CSS 主题",
+  "settings.cssThemeDesc":
+    "在主题之上应用主题文件夹中的 .css 文件。自定义 CSS 叠加在其上。",
+  "settings.cssThemeNone": "无",
+  "settings.cssThemeOpenFolder": "打开主题文件夹",
+  "settings.cssThemeOpenError": "无法打开主题文件夹。",
   "settings.customCss": "自定义 CSS",
   "settings.customCssDesc": "在主题之上应用 custom.css。保存文件后立即生效。",
   "settings.customCssOpen": "打开文件",

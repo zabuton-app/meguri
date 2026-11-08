@@ -109,4 +109,54 @@ test.describe("Custom CSS", () => {
     await expect(root).toHaveAttribute("data-appearance", "light");
     await expect.poll(bg).toBe("#f5f2ff");
   });
+
+  test("applies a picked theme file under custom.css", async ({
+    app,
+    ready,
+  }) => {
+    const userData = await app.evaluate(({ app }) => app.getPath("userData"));
+    const themes = path.join(userData, "themes");
+    fs.mkdirSync(themes, { recursive: true });
+    fs.copyFileSync(
+      path.join(process.cwd(), "docs/themes/cyberpunk.css"),
+      path.join(themes, "cyberpunk.css"),
+    );
+    const bg = () =>
+      ready.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--c-bg")
+          .trim(),
+      );
+    const themeBg = await bg();
+
+    const dialog = await openSettings(ready);
+    const picker = dialog
+      .locator("section", { hasText: "CSS theme" })
+      .getByRole("combobox");
+    // The file was added after launch: it reaches the list through the watch.
+    await expect(async () => {
+      await picker.click();
+      await ready.getByRole("option", { name: "Cyberpunk" }).click();
+    }).toPass({ timeout: 5000 });
+    await expect.poll(bg).toBe("#0a0a14");
+
+    // custom.css sits on top of the theme at equal specificity.
+    fs.writeFileSync(
+      path.join(userData, "custom.css"),
+      'html[data-appearance="dark"] { --c-bg: #123456; }',
+    );
+    await dialog
+      .locator("section", { hasText: "Custom CSS" })
+      .getByRole("switch")
+      .click();
+    await expect.poll(bg).toBe("#123456");
+
+    await dialog
+      .locator("section", { hasText: "Custom CSS" })
+      .getByRole("switch")
+      .click();
+    await picker.click();
+    await ready.getByRole("option", { name: "None" }).click();
+    await expect.poll(bg).toBe(themeBg);
+  });
 });

@@ -1,13 +1,16 @@
 /*
- * Cyberpunk — a sample Meguri CSS theme
+ * @name Cyberpunk
+ *
+ * A sample Meguri CSS theme.
  *
  * Neon magenta, cyan and yellow on indigo. Has a dark and a light variant,
  * picked by the app's light / dark switch through html[data-appearance].
  * Uses only the public API described in docs/theming.md, so it keeps working
  * across updates.
  *
- * To use it, copy this file's contents into custom.css
- * (Settings > General > Custom CSS > Open file).
+ * To use it, put this file in the themes folder and pick "Cyberpunk" under
+ * Settings > General > CSS theme ("Open themes folder" shows where it is).
+ * Pasting it into custom.css works too.
  */
 
 /* ---- Palette: dark ------------------------------------------------------ */

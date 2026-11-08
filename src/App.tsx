@@ -16,6 +16,7 @@ import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { StatusBar } from "@/components/StatusBar";
 import { useAppearanceAttribute } from "@/hooks/useAppearanceAttribute";
 import { useContentZoom } from "@/hooks/useContentZoom";
+import { useCssThemeStyle } from "@/hooks/useCssThemes";
 import { useCustomCssStyle } from "@/hooks/useCustomCss";
 import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
@@ -49,6 +50,7 @@ export default function App() {
   useSelectAllGuard();
   useUpdateNotifier();
   useAppearanceAttribute();
+  useCssThemeStyle();
   useCustomCssStyle();
   return (
     <div className="flex h-full">

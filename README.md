@@ -376,6 +376,10 @@ the side rail. See [Theming Meguri with CSS](docs/theming.md) for every
 variable and slot, what is safe to rely on across updates, contrast guidance,
 and a [sample theme](docs/themes/cyberpunk.css).
 
+To switch between several themes, put their `.css` files in
+`<userData>/themes/` (**Settings → General → CSS theme → Open themes folder**)
+and pick one under **CSS theme**. `custom.css` still applies on top.
+
 External resources (`@import` or `url()` pointing at the network) are blocked by
 the app's Content Security Policy, so a stylesheet cannot make Meguri go
 online. If a stylesheet makes the UI unusable, delete or rename `custom.css`
@@ -390,6 +394,7 @@ Electron's userData.
 <userData>/                 # e.g. ~/.config/Meguri
 ├─ config.json              # registered workspaces and the active root
 ├─ custom.css               # optional user stylesheet (see "Custom CSS")
+├─ themes/                  # optional CSS theme files (see "Custom CSS")
 └─ roots/<hash of root>/
    ├─ db.sqlite             # metadata (WAL)
    └─ thumbs/               # generated thumbnails (webp)

@@ -545,6 +545,18 @@ export const ChannelInputs = {
   custom_css_get: z.void(),
   custom_css_set_enabled: z.object({ enabled: z.boolean() }),
   custom_css_open: z.void(),
+  css_themes_get: z.void(),
+  // A plain file name inside the themes directory, or null for none. Main
+  // also checks that it is one of the listed files before reading it.
+  css_theme_select: z.object({
+    file: z
+      .string()
+      .max(255)
+      .regex(/^[^/\\]+\.css$/)
+      .refine((f) => f !== "." && f !== "..")
+      .nullable(),
+  }),
+  css_themes_open_folder: z.void(),
 } as const satisfies Record<InvokeChannel, z.ZodTypeAny>;
 
 type ChannelInputKeys = keyof typeof ChannelInputs;
@@ -711,6 +723,11 @@ export interface ChannelOutputs {
   custom_css_set_enabled: CustomCssState;
   // Creates the file from a template when it does not exist, then opens it.
   custom_css_open: void;
+  css_themes_get: CssThemesState;
+  // Returns the state after the switch, so the renderer applies it at once.
+  css_theme_select: CssThemesState;
+  // Creates the folder when it does not exist, then opens it.
+  css_themes_open_folder: void;
 }
 
 type ChannelOutputKeys = keyof ChannelOutputs;
@@ -751,6 +768,26 @@ export interface CustomCssState {
   path: string;
   /** File contents; null while disabled or when the file does not exist. */
   css: string | null;
+}
+
+/** One file in <userData>/themes. */
+export interface CssThemeEntry {
+  /** File name inside the themes directory, e.g. "cyberpunk.css". */
+  file: string;
+  /** From a leading `@name` comment, else the file name without .css. */
+  name: string;
+}
+
+/** CSS theme files the user can pick, and the picked one's contents. */
+export interface CssThemesState {
+  /** Sorted by display name. */
+  themes: CssThemeEntry[];
+  /** The picked file, or null for none (also while the file is missing). */
+  selected: string | null;
+  /** Contents of the picked file; null when none is picked. */
+  css: string | null;
+  /** Absolute path of the themes folder. */
+  dir: string;
 }
 
 /** Payload of the custom-css:changed event. */

@@ -66,17 +66,24 @@ describe("watchCustomCss", () => {
     const onChange = vi.fn();
     const stop = watchCustomCss(file, onChange);
     try {
+      // Cleared before each step, so a late event from the previous one
+      // cannot stand in for the step under test.
+      const settle = () => new Promise((r) => setTimeout(r, 300));
       fs.writeFileSync(file, "b{}");
       await waitForCall(onChange, 1);
+      await settle();
+      onChange.mockClear();
 
       const tmp = path.join(userData, "custom.css.tmp");
       fs.writeFileSync(tmp, "c{}");
       fs.renameSync(tmp, file);
-      await waitForCall(onChange, 2);
+      await waitForCall(onChange, 1);
       expect(readCustomCss(file)).toBe("c{}");
+      await settle();
+      onChange.mockClear();
 
       fs.rmSync(file);
-      await waitForCall(onChange, 3);
+      await waitForCall(onChange, 1);
     } finally {
       stop();
     }

@@ -68,6 +68,12 @@ export const ja = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.cssTheme": "CSSテーマ",
+  "settings.cssThemeDesc":
+    "テーマフォルダの.cssファイルをテーマの上に重ねて適用します。カスタムCSSはさらにその上に重なります。",
+  "settings.cssThemeNone": "なし",
+  "settings.cssThemeOpenFolder": "テーマフォルダを開く",
+  "settings.cssThemeOpenError": "テーマフォルダを開けませんでした。",
   "settings.customCss": "カスタムCSS",
   "settings.customCssDesc":
     "custom.cssをテーマの上に重ねて適用します。保存するとすぐに反映されます。",

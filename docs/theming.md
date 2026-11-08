@@ -1,22 +1,54 @@
 # Theming Meguri with CSS
 
-Meguri applies a user stylesheet, `custom.css`, on top of its built-in themes.
-This page is the reference for writing one, whether for yourself or to share
-as a theme.
+Meguri can layer stylesheets over its built-in themes: a **CSS theme**
+picked from a folder of theme files, and your own **`custom.css`** on top of
+that. This page is the reference for writing either, whether for yourself or
+to share.
 
-## Using a stylesheet
+The layers, from bottom to top:
+
+1. The built-in theme picked under **Settings → General → Theme**
+2. The CSS theme picked under **Settings → General → CSS theme**
+3. `custom.css`, when **Settings → General → Custom CSS** is on
+
+At equal specificity a higher layer wins, so `custom.css` can adjust a CSS
+theme.
+
+`<userData>` below is, for example, `~/.config/meguri` on Linux.
+
+## Installing a CSS theme
+
+1. Open **Settings → General → CSS theme** and press **Open themes folder**.
+   This opens `<userData>/themes/`.
+2. Put the theme's `.css` file there (the extension in lower case). It appears
+   in the picker right away.
+3. Pick it. Saving the file applies the change right away.
+
+The picker shows the name from an `@name` line in the comment at the very top
+of the file, or the file name if there is none:
+
+```css
+/*
+ * @name Cyberpunk
+ */
+```
+
+## Using custom.css
 
 1. Open **Settings → General → Custom CSS** and turn the switch on.
 2. Press **Open file**. Meguri creates `<userData>/custom.css` from a commented
    template (an existing file is never overwritten) and opens it in your
-   default app. `<userData>` is, for example, `~/.config/meguri` on Linux.
+   default app.
 3. Save the file. Every save applies right away.
 
-To try a shared theme, paste its contents into `custom.css`. A stylesheet can
-change or hide anything shown in the window, including the labels of buttons,
-so read a shared theme before applying it and use themes from sources you
-trust. If a stylesheet
-makes the window unusable, delete or rename `custom.css` and the app returns
+## Trust and recovery
+
+A stylesheet can change or hide anything shown in the window, including the
+labels of buttons. Read a shared theme before applying it, and use themes
+from sources you trust.
+
+If a stylesheet makes the window unusable, move the theme file out of
+`<userData>/themes/`, or delete or rename `custom.css`, and the app returns
 to normal.
 
 ## Public API
@@ -188,10 +220,11 @@ html[data-theme] body {
 ## Sample theme
 
 [themes/cyberpunk.css](themes/cyberpunk.css) uses only the public API, has a
-dark and a light variant, and meets the contrast minimums above. Copy it as a
-starting point.
+dark and a light variant, and meets the contrast minimums above. Install it as
+a CSS theme to try it, or copy it as a starting point.
 
 ## Sharing a theme
 
-A theme is a single `.css` file. Share it any way you like, for example as a
-gist or in a repository. Meguri does not download themes by itself.
+A theme is a single `.css` file, named by its `@name` line. Share it any way
+you like, for example as a gist or in a repository. Meguri does not download
+themes by itself.

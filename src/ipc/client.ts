@@ -8,6 +8,7 @@ import type {
   ChannelInput,
   ChannelName,
   ChannelOutput,
+  CssThemesState,
   CustomCssChanged,
   CustomCssState,
 } from "@shared/ipc/channels";
@@ -250,6 +251,10 @@ export const api = {
   customCssSetEnabled: (enabled: boolean) =>
     invoke("custom_css_set_enabled", { enabled }),
   customCssOpen: () => invoke("custom_css_open"),
+  /** CSS theme files in <userData>/themes; the pick is persisted in main's config.json. */
+  cssThemesGet: () => invoke("css_themes_get"),
+  cssThemeSelect: (file: string | null) => invoke("css_theme_select", { file }),
+  cssThemesOpenFolder: () => invoke("css_themes_open_folder"),
 };
 
 export {
@@ -262,6 +267,7 @@ export {
 // Re-exported for compatibility with components that imported these from this module.
 export type {
   AboutInfo,
+  CssThemesState,
   CustomCssState,
   LogoId,
   ScanDone,
@@ -289,6 +295,10 @@ export const events = {
     ),
   onUpdateAvailable: (cb: (info: UpdateInfo) => void): Promise<Unlisten> =>
     Promise.resolve(bridge.on("update:available", (p) => cb(p as UpdateInfo))),
+  onCssThemesChanged: (cb: (s: CssThemesState) => void): Promise<Unlisten> =>
+    Promise.resolve(
+      bridge.on("css-themes:changed", (p) => cb(p as CssThemesState)),
+    ),
   onCustomCssChanged: (cb: (e: CustomCssChanged) => void): Promise<Unlisten> =>
     Promise.resolve(
       bridge.on("custom-css:changed", (p) => cb(p as CustomCssChanged)),
