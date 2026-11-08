@@ -235,7 +235,7 @@ function mergeIntoLibrary(db: DB): void {
   // One at a time, so a bookmark is checked against the ones just added too:
   // the same window addBookmark applies to a new one.
   const near = db.prepare(
-    "SELECT 1 FROM lib.scene_bookmarks WHERE meta_key = ? AND ABS(sec - ?) <= ? LIMIT 1",
+    "SELECT 1 FROM lib.scene_bookmarks WHERE meta_key = ? AND sec BETWEEN ? AND ? LIMIT 1",
   );
   const insert = db.prepare(
     "INSERT INTO lib.scene_bookmarks (meta_key, sec, created_at) VALUES (?, ?, ?)",
@@ -246,7 +246,12 @@ function mergeIntoLibrary(db: DB): void {
     )
     .all() as { meta_key: string; sec: number; created_at: number }[];
   for (const b of rows) {
-    if (near.get(b.meta_key, b.sec, BOOKMARK_NEAR_EPS)) continue;
+    const taken = near.get(
+      b.meta_key,
+      b.sec - BOOKMARK_NEAR_EPS,
+      b.sec + BOOKMARK_NEAR_EPS,
+    );
+    if (taken) continue;
     insert.run(b.meta_key, b.sec, b.created_at);
   }
 }
@@ -340,10 +345,14 @@ export function catchUpTagIndex(db: DB): void {
       )
       .pluck()
       .all(seen) as string[];
+    // Counted only as far as the decision needs: past keys / limit files,
+    // re-syncing wins whatever the rest is.
     const files = db
-      .prepare("SELECT COUNT(*) FROM files WHERE deleted_at IS NULL")
+      .prepare(
+        "SELECT COUNT(*) FROM (SELECT 1 FROM files WHERE deleted_at IS NULL LIMIT ?)",
+      )
       .pluck()
-      .get() as number;
+      .get(Math.floor(keys.length / RESYNC_SHARE_LIMIT) + 1) as number;
     if (keys.length > files * RESYNC_SHARE_LIMIT) {
       rebuildTagIndex(db);
       return;
@@ -351,6 +360,37 @@ export function catchUpTagIndex(db: DB): void {
     resyncFtsForKeys(db, keys);
     setSetting(db, FTS_TAG_SEQ_KEY, String(latest));
   })();
+}
+
+/**
+ * Re-index the files behind `metaKeys` after a tag write that changed them,
+ * and record the index as current when those keys are all the log holds past
+ * it: the write's own changes, so catchUpTagIndex (syncTagIndexes after every
+ * write) does not apply them a second time, which for a large write would
+ * mean rebuilding the whole index. Caller supplies the transaction, the one
+ * the write ran in.
+ */
+export function resyncTagIndexForKeys(
+  db: DB,
+  metaKeys: readonly string[],
+): void {
+  resyncFtsForKeys(db, [...metaKeys]);
+  if (usesOwnMetadata(db)) return;
+  const seen = tagIndexSeq(db);
+  const latest = latestTagChange(db);
+  if (seen === null || seen >= latest) return;
+  const { oldest } = db
+    .prepare("SELECT MIN(seq) AS oldest FROM lib.tag_changes")
+    .get() as { oldest: number | null };
+  // Rows the index has not applied are gone from the log: only a rebuild knows.
+  if (oldest === null || oldest > seen + 1) return;
+  const other = db
+    .prepare(
+      `SELECT 1 FROM lib.tag_changes WHERE seq > ?
+         AND meta_key NOT IN (SELECT value FROM json_each(?)) LIMIT 1`,
+    )
+    .get(seen, JSON.stringify(metaKeys));
+  if (!other) setSetting(db, FTS_TAG_SEQ_KEY, String(latest));
 }
 
 /**
