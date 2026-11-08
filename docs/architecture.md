@@ -338,34 +338,29 @@ is what the `manual` sort reads. The UI lives in
 
 ### Smart collections
 
-The Smart bins sidebar and saved-filter menu share the same renderer store.
-New bins save an explicit scope: every scanned workspace, or one workspace
-(optionally with a subfolder). Opening a global bin switches to `All` before
-applying its conditions and sort. Older saved searches without an explicit
-scope retain their existing current-view behavior. The sidebar editor can
-create, rename and change the rules of a bin, and the bins survive restarts.
+The Smart bins sidebar and saved-filter menu share the renderer's saved-rule
+store. Modern bins are reusable rule objects: the Global/Local sidebar control
+supplies the current search location independently of their stored criteria.
+Global searches all scanned roots; Local searches the chosen root/subfolder and
+remembers its last location across Global browsing and restarts. Folder switches
+keep the selected bin. The rail identifies the active location, while the bin
+list identifies either one bin or All media. Legacy searches without explicit
+bin scope retain their original folder/workspace opening behaviour.
 
-Saved searches: a named `SearchQuery`. These never touch the main process —
-they persist in the renderer's `localStorage` (`SMART_COLLECTIONS_KEY`). The
-schema and normalization live in `src/lib/smartCollections.ts`, the hook in
-`src/hooks/useSmartCollections.ts`, and the UI in
-`src/components/SmartCollectionsMenu.tsx`. A query is passed through
-`cleanSearchQuery()` to drop empty fields before it is stored. A folder below
-the root is kept as `folder: { path, recursive: true }` and saved together with
-the collection's `workspaceId`, since a folder path means nothing outside its
-own workspace; a folder with no workspace to place it in is dropped. Opening
-such a search switches to that workspace and browses the folder by folder.
+Saved queries persist in `localStorage` under `SMART_COLLECTIONS_KEY`, validated
+and normalized in `src/lib/smartCollections.ts`. `useLibraryFilters` keeps saved
+membership criteria, incoming browsing filters, and this visit's applied/inactive
+subsets separate. Flat AND clauses preserve both sets of rules. Bin edits can
+turn newly conflicting filters off but cannot revive excluded ones; remembered
+filters show as unavailable or compatible-but-off until explicitly enabled.
+See the [renderer guide](renderer.md#smart-bin-visits-and-persistent-filters) for
+session storage, location navigation, inactive snapshots, and request-order guards.
 
-One saved search can be marked as the default (the star in the menu; its id is
-stored under `DEFAULT_SMART_COLLECTION_KEY`, apart from the collections). Its
-conditions and sort become Home's initial filter at launch
-(`loadInitialFilter()`), and "Clear all" returns to them — or empties the
-filter once it already shows exactly them (`clearAllTarget()` in
-`src/lib/searchConditions.ts`); removing the sort chip restores its sort. The
-conditions apply in every workspace, so its folder and a manual sort, both
-bound to one place, are left out (`defaultQueryOf()`). A default with an explicit
-scope also restores that scope at launch. `useSmartCollections()` uses one shared
-snapshot for the sidebar, the menu and "Clear all".
+A saved bin can be marked as the launch default. A selected visit takes precedence
+on restart; otherwise its rules open in the remembered Global/Local location.
+Clear all in a modern bin clears visitor and inactive filters, not membership.
+Legacy default saved searches retain their replacement/clear behaviour through
+`loadInitialFilter()`, `defaultQueryOf()` and `clearAllTarget()`.
 
 Resolution presets live in `shared/resolutions.ts`. `SearchQuery.resolution`
 stores the preset and either an exact dimension match or an at-least class.
@@ -401,7 +396,7 @@ logic in `shared/recentFiles.ts` resolves the window for every query, so saved
 Today/This week bins keep moving. Days use local time; weeks start on Monday.
 The New files control works within the current workspace or All and saves
 relative rules in Smart bins. Its last active view and date preference persist
-across restarts; a default Smart bin takes precedence. Active recent views
+across restarts as part of the visitor session. Active recent views
 refresh indexed results every 30 seconds while visible; this does not scan files.
 An ordinary rebuild preserves discovery dates for existing relative paths.
 

@@ -19,6 +19,55 @@ and stays fully usable along with the toolbar and the bottom player bar
 choice, the modal size and the peek width are all remembered in
 `localStorage`.
 
+File detail starts compact and centered, at about 55% of the window width up to
+960 CSS pixels. The earlier width-driven layout let the video fill most of the
+window and pushed scene selection below the fold. The frame now reserves room for
+the scene strip and gives metadata its own scroll area. Drag any edge or corner
+to resize around the opposite side, or drag the title to move the panel inside
+the app. Handles use resize cursors and focus outlines without colored hover
+fills, which previously looked like scrollbars. Focused handles accept arrow keys;
+the focused title accepts arrows to move the frame.
+
+`useModalResize.ts` clamps the frame to the current viewport, including after a
+window resize or content zoom, and remembers width, height and position on
+release. Existing width/height-only records remain valid and start centered.
+Enlarging and shrinking from the header preserves the compact bounds. Detail uses
+`meguri.media.detail.modalSize.v2` and `meguri.media.detail.dimensions.v1`. The
+new mode key starts existing users compact once. Discovery keeps its own size
+preference.
+
+The **Open in separate window** action invokes the validated `media_popout`
+channel with a file/workspace ID, playback second and play state, never a URL or
+path. Main resolves the actual file and loads the bundled `/detached/:id` route
+in a sandboxed, isolated `BrowserWindow` independent of the library. It reuses one
+preview window; native borders handle movement/resizing outside the app. That
+route mounts `MediaDetail` without Home, the workspace rail or status/audio bars;
+its frame fills the native client area and Escape/Close closes only the preview.
+The source view pauses before opening, closes after successful load, and resumes
+on failure. Main emits catalogue events to all app windows. The
+`useCatalogueWindowSync` broadcast channel invalidates the other window’s active
+queries after successful mutations, without broadcasting query refreshes or
+changing the existing local invalidation paths.
+
+For video, the player and `Scenes` live in one bounded flex area outside the
+metadata scroll region. The video uses `fitToParent` and `object-contain`
+so it yields space to the rail even for portrait footage. Container-height
+units scale the scene thumbnails with the review area, not just the window.
+Scenes scroll horizontally; their full height, seek targets, and main-thumbnail
+stars stay visible while tags, history, and other details scroll independently.
+This also holds in the side peek and detail fullscreen. Resizing or changing
+presentation keeps the same video element and its current playback position.
+
+Scene and bookmark strips use native horizontal overflow. The custom scrollbar
+could keep its drag state after lost capture or cancellation, moving the strip
+when the pointer returned to it. Native scrollbars handle release and cancellation
+without any extra pointer bookkeeping. The metadata area still scrolls separately.
+
+The detail header and filename row share `MediaFileName` with the cards and show
+`FileExtensionBadge` beside the stem. The extension stays visible without taking
+space inside a long name. Tooltips, accessibility, copying a path, search and
+file actions retain the original filename.
+
 Each route is a directory: `index.tsx` is the entry point and composes the
 route, sitting alongside its companion components and hooks — for example
 `src/routes/MediaDetail/MediaModal.tsx`,
@@ -431,7 +480,86 @@ endpoint (`src/hooks/useHoverFramePreview.ts`, shared by `MediaThumbnail` and
 the Discover main media); the `hoverPreview` preference in
 `PreferencesProvider` toggles it.
 
+Grid and list thumbnails wrap their image and sibling controls in a
+`data-scrub-surface`. `useThumbnailScrub` listens on that complete surface, so
+entering over a selection checkbox or drag handle still starts scrubbing. It
+registers modifier-key and dismissal listeners only while that thumbnail is
+hovered. Option/Alt hides thumbnail overlays through a scoped CSS rule;
+Command/Ctrl plus Option/Alt also portals an icon-free, pointer-transparent frame
+into the document body, outside the virtualized rows' clipping containers.
+`scrubPreviewBounds` selects an adjacent viewport region with a 12px gap,
+preferring above/below before the sides, fitting at most 2× in each dimension.
+The portal and thumbnail reuse one sequential frame loader and the configured
+frame source. Ordinary scrubbing uses the configured preview quality; enlarged
+scrubbing raises it as described under [frame quality](#enlarged-hover-frame-quality).
+File/workspace changes, blur, scrolling, resize, Escape, and unmount dispose of
+preview state and pending work.
+
+`MediaFileName` visually separates only the final suffix from grid/list names;
+the suffix remains screen-reader text, while metadata shows the uppercase
+extension beside resolution/duration. Original paths, search, sorting, navigation,
+and external drags retain the unchanged filename. This reduces truncation of
+descriptive names without losing the file's identity. See the
+[library guide](library-guide.md#scrub-and-review-footage) for the user-facing
+behaviour and rationale; update it alongside changes to these interactions.
+
 Styling is Tailwind CSS v4 (`@tailwindcss/vite`). `@/*` is an alias for `src/*`.
+
+## Smart-bin visits and persistent filters
+
+`useLibraryFilters` owns a validated `meguri.libraryFilters.v1` session: incoming
+browsing filters, a selected bin ID and workspace scope, and the accepted and
+excluded filters for that visit. The sidebar highlights the selected ID instead
+of comparing the entire current query to a preset. `SmartBinContext` displays the
+saved rules separately from the editable visitor controls.
+
+Entering a different bin runs `compatibleBinFilters` against the full incoming
+filters, including conditions omitted by the previous bin. It checks media-type
+applicability. Valid values remain in the query even if their intersection is
+empty. Bin edits revalidate only the current active subset: newly incompatible
+conditions move into remembered inactive filters, and previously excluded values
+are never automatically enabled.
+`heldFilterEntries` derives unavailable versus compatible-but-off switches from
+the live bin rules. Explicit activation merges that individual condition into
+the controls. Restart restores the accepted/inactive snapshot. Any remaining
+inactive condition sets the derived `matchNone` query guard. The central SQL
+condition builder emits `AND 0`, keeping list, random, graph, timeline and activity
+counts consistently empty rather than broadening the results. The guard is not a
+saved visitor condition. `filterFeedback` counts visitor conditions (excluding
+sort/location/bin rules), selects single/combination empty copy, and names paused
+filters. Removing a remembered condition clears its incoming and visit values;
+newly compatible off conditions still require explicit activation.
+
+Inactive snapshots use the untransformed `SearchFilterFieldsSchema`, so audio
+and visual choices can coexist without query normalization silently deleting one
+on reload. Executable queries still use the normalized `SearchQuerySchema`.
+Explicit edits patch incoming fields individually, including audio properties.
+
+The library location and bin identity are independent. Global/Local follows the
+actual active workspace (`All` versus a scanned root); collections remain their
+own named locations. `useLibraryLocation` stores the last root and subfolder under
+`meguri.library.lastLocal.v1`, and `useFolderNav` seeds that path on restart.
+`useFolderFilter.onOpenLocation` serializes location switches with the existing
+stale-request guards. Location changes retain bin identity and its visit snapshot.
+The rail marks the actual location with `aria-current=location`, while the Smart
+bins sidebar always marks either the selected bin or the All media entry.
+
+`queryWithinBin` preserves bin and visitor conditions as independent flat `allOf`
+clauses; the shared IPC schema validates and bounds these to 32. SQL appends every
+clause with AND, preserving text alternatives and tag constraints without a lossy
+field overwrite. List, random/discovery, graph, timeline, heatmap, and cross-root
+queries use the same conditions. Duplicate restrictions also inspect bin clauses.
+Folder joins are selected for nested saved-folder constraints where needed.
+
+`useFolderFilter` commits bin entry only after a successful scope switch, retaining
+its request-order guards. The current Global/Local location overrides the old
+per-bin opening location; modern editors expose rules and refer location choice
+to the sidebar. Legacy searches without explicit bin scope keep their existing
+replacement behaviour. Workspace-rail events carry their target and preserve the
+bin for scanned folders or All, while opening a collection leaves the bin.
+Clear all clears visitor/inactive filters but retains bin identity and location.
+Update the [library guide](library-guide.md#understand-empty-results-and-paused-filters)
+when changing these semantics.
 
 ## Internationalization
 
@@ -476,3 +604,12 @@ the UI fails there instead of shipping.
 Zoom uses `webFrame.setZoomFactor` rather than CSS zoom, so coordinate math is
 not affected. It is driven via `preload` through
 `src/hooks/useContentZoom.ts`.
+
+### Enlarged hover frame quality
+
+The ordinary hover respects the Low/Standard/High preview preference. Enlargement
+selects the internal `enlarged` media-server preset (720 px, qv 3), leaving an
+existing High request at 960 px. The frame loader compares the full source URL,
+so changing quality at a stationary timestamp fetches the sharper frame. It keeps
+one request in flight and chains a pending quality/time change after it. Popup
+geometry stays the same, and the original card and popup share the loaded frame.

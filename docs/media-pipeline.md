@@ -91,8 +91,12 @@ Containers Chromium cannot demux — `REMUX_CONTAINERS` = `mkv` / `avi` / `wmv` 
 
 ### Frame previews
 
-A `frame` request returns a single JPEG frame at `?t=<seconds>`, used for seek
-previews.
+A `frame` request returns one JPEG frame at `?t=<seconds>`. Optional `q` values
+are bounded presets: Low (240 px), Standard (480 px), High (960 px), and the
+internal `enlarged` preset (720 px, JPEG qv 3). The cache keys include quality as
+well as file identity and time. The enlarged scrub uses that preset while keeping
+its existing screen bounds; High stays at 960 px. The [renderer guide](renderer.md#enlarged-hover-frame-quality)
+explains how it switches the source without concurrent frame requests.
 
 ### Authorization
 
