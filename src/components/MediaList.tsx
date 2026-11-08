@@ -378,6 +378,7 @@ const MediaRow = memo(function MediaRow({
   return (
     <div
       {...dragProps}
+      data-slot="media-row"
       aria-current={focused ? "true" : undefined}
       className={cn(
         "group @container relative flex items-center gap-4 rounded-lg p-2 pr-4 transition-colors hover:bg-overlay/50",

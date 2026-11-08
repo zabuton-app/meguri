@@ -84,6 +84,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
       aria-modal="true"
     >
       <div
+        data-slot="modal-panel"
         className="relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >

@@ -306,7 +306,10 @@ export function WorkspaceRail() {
 
   return (
     <>
-      <nav className="flex h-full w-16 shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-3">
+      <nav
+        data-slot="workspace-rail"
+        className="flex h-full w-16 shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-3"
+      >
         <img
           src={LOGO_SRC[logo]}
           alt="Meguri"

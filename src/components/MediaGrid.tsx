@@ -468,6 +468,7 @@ export const MediaCard = memo(function MediaCard({
     <div
       {...dragProps}
       data-testid="media-card"
+      data-slot="media-card"
       aria-current={focused ? "true" : undefined}
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-primary",

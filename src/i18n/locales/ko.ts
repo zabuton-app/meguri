@@ -68,6 +68,11 @@ export const ko: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.customCss": "사용자 정의 CSS",
+  "settings.customCssDesc":
+    "custom.css를 테마 위에 덧씌워 적용합니다. 파일을 저장하면 바로 반영됩니다.",
+  "settings.customCssOpen": "파일 열기",
+  "settings.customCssOpenError": "custom.css를 열 수 없습니다.",
   "settings.logo": "앱 로고",
   "settings.logoDesc": "창, 트레이, 앱 내 아이콘에 적용됩니다.",
   "logo.dark": "진한 색",

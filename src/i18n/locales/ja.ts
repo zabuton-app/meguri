@@ -68,6 +68,11 @@ export const ja = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.customCss": "カスタムCSS",
+  "settings.customCssDesc":
+    "custom.cssをテーマの上に重ねて適用します。保存するとすぐに反映されます。",
+  "settings.customCssOpen": "ファイルを開く",
+  "settings.customCssOpenError": "custom.cssを開けませんでした。",
   "settings.logo": "アプリのロゴ",
   "settings.logoDesc": "ウィンドウ・トレイ・画面内のアイコンに反映されます。",
   "logo.dark": "濃色",

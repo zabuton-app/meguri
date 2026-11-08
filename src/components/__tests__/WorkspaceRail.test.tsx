@@ -69,6 +69,14 @@ describe("WorkspaceRail", () => {
     });
   });
 
+  // A hook user stylesheets (custom.css) target; renaming it breaks theirs.
+  it("marks the rail with data-slot for custom CSS", () => {
+    const { container } = renderWithProviders(<WorkspaceRail />);
+    expect(
+      container.querySelector('nav[data-slot="workspace-rail"]'),
+    ).toBeTruthy();
+  });
+
   it("switches workspace when an inactive entry is clicked", async () => {
     renderWithProviders(<WorkspaceRail />);
 

@@ -16,7 +16,7 @@ import { bulkTargetCores, coreById, ensureFileInsideRoot } from "./helpers.js";
 // Windows uses shell.openPath directly: ShellExecuteExW doesn't reproduce the
 // child-process attachment issue, and routing through cmd.exe /c start would
 // open a command-injection surface for filenames containing &/|/^/( etc.
-function openDetached(target: string): void {
+export function openDetached(target: string): void {
   if (process.platform === "win32") {
     void shell.openPath(target);
     return;

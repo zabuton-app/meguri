@@ -70,6 +70,11 @@ export const es: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.customCss": "CSS personalizado",
+  "settings.customCssDesc":
+    "Aplica custom.css sobre el tema. Los cambios se aplican en cuanto guardas el archivo.",
+  "settings.customCssOpen": "Abrir archivo",
+  "settings.customCssOpenError": "No se pudo abrir custom.css.",
   "settings.logo": "Logotipo de la aplicación",
   "settings.logoDesc":
     "Se aplica a los iconos de la ventana, de la bandeja y de la aplicación.",

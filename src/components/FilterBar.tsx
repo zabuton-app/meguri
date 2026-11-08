@@ -68,7 +68,10 @@ export function FilterBar({
   const collapsedCount = collapsedConditionCount(descriptors);
 
   return (
-    <div className="flex flex-col gap-2 border-b border-border bg-bg px-4 py-2">
+    <div
+      data-slot="filter-bar"
+      className="flex flex-col gap-2 border-b border-border bg-bg px-4 py-2"
+    >
       <div className="flex flex-wrap items-center gap-3">
         {/* grow + a non-zero basis (flex-1 would zero it): with a 0 basis this box
           never counts toward a row's width, so the wrapping bar never breaks a

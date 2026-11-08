@@ -8,6 +8,8 @@ import type {
   ChannelInput,
   ChannelName,
   ChannelOutput,
+  CustomCssChanged,
+  CustomCssState,
 } from "@shared/ipc/channels";
 import type { PreloadInvokeChannel } from "@shared/ipc/channelNames";
 import type {
@@ -243,6 +245,11 @@ export const api = {
   /** App logo variant (window + tray icon), persisted in main's config.json. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
+  /** User stylesheet (<userData>/custom.css); the switch is persisted in main's config.json. */
+  customCssGet: () => invoke("custom_css_get"),
+  customCssSetEnabled: (enabled: boolean) =>
+    invoke("custom_css_set_enabled", { enabled }),
+  customCssOpen: () => invoke("custom_css_open"),
 };
 
 export {
@@ -255,6 +262,7 @@ export {
 // Re-exported for compatibility with components that imported these from this module.
 export type {
   AboutInfo,
+  CustomCssState,
   LogoId,
   ScanDone,
   ScanProgress,
@@ -281,4 +289,8 @@ export const events = {
     ),
   onUpdateAvailable: (cb: (info: UpdateInfo) => void): Promise<Unlisten> =>
     Promise.resolve(bridge.on("update:available", (p) => cb(p as UpdateInfo))),
+  onCustomCssChanged: (cb: (e: CustomCssChanged) => void): Promise<Unlisten> =>
+    Promise.resolve(
+      bridge.on("custom-css:changed", (p) => cb(p as CustomCssChanged)),
+    ),
 };
