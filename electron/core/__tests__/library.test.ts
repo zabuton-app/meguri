@@ -536,6 +536,25 @@ describe("the library shared by two workspaces", () => {
     expect(matches(b, "beach")).toEqual([inB]);
   });
 
+  it("does not rebuild for changes to files only other workspaces hold", () => {
+    const { inA } = sameFileInBoth();
+    markerInB();
+    // Many files of A's own, each tagged: far more keys than B has files.
+    for (let i = 0; i < 20; i++) {
+      const id = insertFile(a.db, a.rootId, {
+        relPath: `onlyA${i}.mp4`,
+        root: a.root,
+        contentHash: `onlyA${i}`,
+      });
+      addManualTag(a.db, id, "beach");
+    }
+    addManualTag(a.db, inA, "sea");
+    catchUpTagIndex(b.db);
+    // Re-synced the one key B holds, not rebuilt.
+    expect(matches(b, "sea")).toHaveLength(1);
+    expect(matches(b, "untouched")).toEqual([]);
+  });
+
   it("rebuilds rather than re-syncing most of the files key by key", () => {
     const { inA, inB } = sameFileInBoth();
     // B holds two files; one changed key is half of them.

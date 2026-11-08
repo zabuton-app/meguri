@@ -254,6 +254,18 @@ CREATE TABLE IF NOT EXISTS lib.migrated_workspaces (
  *  empty library. */
 export function openDb(file: string, libraryFile: string): DB {
   const db = new Database(file);
+  try {
+    prepareDb(db, libraryFile);
+  } catch (e) {
+    // Not left open: the caller retries on the next access, and an open handle
+    // keeps Windows from deleting the directory on removal.
+    db.close();
+    throw e;
+  }
+  return db;
+}
+
+function prepareDb(db: DB, libraryFile: string): void {
   registerFunctions(db);
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");
@@ -275,7 +287,6 @@ export function openDb(file: string, libraryFile: string): DB {
   migrateFilesTable(db);
   backfillColumns(db);
   migrateFtsToTrigram(db);
-  return db;
 }
 
 function attachLibrary(db: DB, libraryFile: string): void {

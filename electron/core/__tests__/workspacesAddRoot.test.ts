@@ -13,7 +13,9 @@ vi.mock("electron", () => ({ app: { getPath: () => userData } }));
 const { Workspaces } = await import("../workspaces.js");
 const { fileDetail, setFavorite, setRating } = await import("../queries.js");
 const { addManualTag } = await import("../tags.js");
-const { insertFile } = await import("./helpers.js");
+const { insertFile, LEGACY_METADATA_DDL } = await import("./helpers.js");
+const { openDb } = await import("../db.js");
+const paths = await import("../paths.js");
 const { Core } = await import("../index.js");
 
 let root = "";
@@ -106,5 +108,40 @@ describe("Workspaces.metadataCores", () => {
     } finally {
       fs.rmSync(other, { recursive: true, force: true });
     }
+  });
+});
+
+describe("removing a workspace that has not been merged yet", () => {
+  it("merges it first, so its metadata stays", () => {
+    const first = new Workspaces();
+    const { path: p } = first.addRoot(root);
+    first.closeAll();
+    // Its database as the version before the library left it, never opened
+    // since: a favorite under the hash of a file it held.
+    const dataDir = paths.dataDirForRoot(Core.resolveRoot(p));
+    fs.mkdirSync(dataDir, { recursive: true });
+    const legacy = openDb(
+      paths.dbPathForDataDir(dataDir),
+      paths.libraryDbPath(),
+    );
+    legacy.exec(LEGACY_METADATA_DDL);
+    legacy.exec(
+      "INSERT INTO file_meta (meta_key, rating, favorite, updated_at) VALUES ('h', 3, 1, 1)",
+    );
+    legacy.close();
+
+    const ws = new Workspaces();
+    ws.remove(p);
+    expect(fs.existsSync(dataDir)).toBe(false);
+
+    ws.addRoot(root);
+    const core = ws.byId(Workspaces.idFor(p))!;
+    const id = insertFile(core.db, core.rootId, {
+      relPath: "clip.mp4",
+      root: p,
+      contentHash: "h",
+    });
+    expect(fileDetail(core.db, id)).toMatchObject({ favorite: 1, rating: 3 });
+    ws.closeAll();
   });
 });

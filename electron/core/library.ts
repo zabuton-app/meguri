@@ -40,11 +40,11 @@ const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
  * 2. Not recorded in `lib.migrated_workspaces`: copy the whole database to
  *    `backupPath` (VACUUM INTO), then merge and record it in one transaction.
  *    If the copy cannot be written, stop here and keep the own tables.
+ *    When the workspace was recorded already, its own tables are merged again
+ *    (no backup, no new record): they may be the ones an older version of the
+ *    app recreated and wrote to after the merge.
  * 3. Drop the own tables and rebuild files_fts from the library's tags, in one
- *    transaction, recording the index as current (FTS_TAG_SEQ_KEY). When step 2
- *    was skipped because the workspace was recorded already, the own tables are
- *    merged again first: they may be the ones an older version of the app
- *    recreated and wrote to after the merge.
+ *    transaction, recording the index as current (FTS_TAG_SEQ_KEY).
  *
  * The two transactions write different files, so a crash can fall between
  * them; the record makes the next open skip the backup. The merge rules leave
@@ -76,18 +76,21 @@ export function migrateWorkspaceMetadata(
       .prepare("SELECT 1 FROM lib.migrated_workspaces WHERE workspace_id = ?")
       .get(workspaceId) !== undefined;
   try {
-    if (!recorded) {
-      if (!writeBackup(db, backupPath)) return false;
-      db.transaction(() => {
-        mergeIntoLibrary(db);
+    if (!recorded && !writeBackup(db, backupPath)) return false;
+    // Library side and workspace side in transactions of their own: in WAL
+    // mode a transaction over attached databases is not atomic across the
+    // files, so one that wrote both could leave the drop committed and the
+    // merge not.
+    db.transaction(() => {
+      mergeIntoLibrary(db);
+      if (!recorded) {
         db.prepare(
           "INSERT INTO lib.migrated_workspaces (workspace_id, migrated_at) VALUES (?, ?)",
         ).run(workspaceId, nowUnix());
-      })();
-    }
+      }
+    })();
 
     db.transaction(() => {
-      if (recorded) mergeIntoLibrary(db);
       for (const table of OWN_METADATA_TABLES) {
         db.exec(`DROP TABLE IF EXISTS main.${table}`);
       }
@@ -262,8 +265,15 @@ export function catchUpTagIndex(db: DB): void {
       rebuildTagIndex(db);
       return;
     }
+    // Only the keys of files this workspace holds: most of a large change
+    // may be other workspaces' files, which this index has nothing to do with.
     const keys = db
-      .prepare("SELECT DISTINCT meta_key FROM lib.tag_changes WHERE seq > ?")
+      .prepare(
+        `SELECT DISTINCT c.meta_key FROM lib.tag_changes c
+          WHERE c.seq > ? AND EXISTS (
+            SELECT 1 FROM main.files f INDEXED BY idx_files_meta_key
+             WHERE f.meta_key = c.meta_key)`,
+      )
       .pluck()
       .all(seen) as string[];
     const files = db

@@ -353,7 +353,15 @@ export class Workspaces {
    */
   remove(p: string): void {
     const id = Workspaces.idFor(p);
-    const core = this.cores.get(id);
+    // Opened first if it is not, so a workspace whose metadata has not been
+    // merged into the library yet is merged before its database goes: the
+    // removal keeps the metadata, as its confirmation says.
+    const core = this.coreForPath(p) ?? undefined;
+    if (core && usesOwnMetadata(core.db)) {
+      log.warn(
+        `removing workspace ${id} whose metadata could not be merged into the library; it goes with its database`,
+      );
+    }
     this.cores.delete(id);
     this.errors.delete(id);
     this.config.roots = this.config.roots.filter((r) => r !== p);
