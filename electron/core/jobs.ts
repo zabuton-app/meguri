@@ -90,12 +90,15 @@ export async function runScan(
   } & (
     | { autoTag?: undefined; deriveAutoTags?: undefined }
     | {
-        /** Auto-tagging configuration (app config); nothing is tagged when omitted. */
-        autoTag: AutoTagConfig;
+        /**
+         * Reads the auto-tagging configuration (app config) and its version
+         * (autoTagSettingsVersion); nothing is tagged when omitted. Read when
+         * the tagging starts, not with the scan: settings saved while the
+         * files are walked and hashed are the ones the scan tags them with.
+         */
+        autoTag: () => { config: AutoTagConfig; version: number };
         /** Evaluates the engine: the worker, so a rule cannot stall the scan. */
         deriveAutoTags: DeriveAutoTags;
-        /** autoTagSettingsVersion when `autoTag` was read. */
-        autoTagSettingsVersion?: number;
       }
   ) = {},
 ): Promise<ScanStats> {
@@ -141,13 +144,19 @@ export async function runScan(
   // names and where the files are, so its tags need not wait for the slowest
   // phase of the scan.
   let tagged: ReadonlySet<number> = new Set();
-  if (opts.autoTag?.applyOnScan) {
+  // `derive` read with it: checking opts.autoTag is what tells the type
+  // that deriveAutoTags is there.
+  const autoTag = opts.autoTag && {
+    ...opts.autoTag(),
+    derive: opts.deriveAutoTags,
+  };
+  if (autoTag?.config.applyOnScan) {
     try {
       tagged = await applyAutoTagsOnScan(db, {
-        engine: opts.autoTag,
+        engine: autoTag.config,
         workspaceId: opts.workspaceId,
-        derive: opts.deriveAutoTags,
-        settingsVersion: opts.autoTagSettingsVersion,
+        derive: autoTag.derive,
+        settingsVersion: autoTag.version,
         changedIds: ftsTargets,
         signal,
         onProgress: (d, t) =>
@@ -173,7 +182,7 @@ export async function runScan(
         throw err;
       }
     }
-  } else if (opts.autoTag) {
+  } else if (autoTag) {
     clearAutoTagPending(db);
   }
 

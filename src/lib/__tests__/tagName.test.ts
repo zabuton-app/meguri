@@ -19,9 +19,10 @@ describe("tidyTagName", () => {
   // The rule written out the long way: the shortcuts must give exactly this.
   const reference = (raw: string) =>
     raw
-      .normalize("NFC")
+      .replace(/\p{Cf}/gu, "")
       .replace(/\s+/g, " ")
-      .replace(/[\p{Cc}\p{Cf}]/gu, "")
+      .replace(/\p{Cc}/gu, "")
+      .normalize("NFC")
       .replace(/ {2,}/g, " ")
       .trim();
 
@@ -31,6 +32,18 @@ describe("tidyTagName", () => {
     expect(tidyTagName("tr\u200bip")).toBe("trip");
     expect(tidyTagName("a \u200b b")).toBe("a b");
     expect(tidyTagName("旅行\u3000タグ")).toBe("旅行 タグ");
+    // U+FEFF is whitespace to JS, and a format character all the same.
+    expect(tidyTagName("tr\ufeffip")).toBe("trip");
+    // Composed once the invisible character between is gone.
+    expect(tidyTagName("e\u200b\u0301")).toBe("\u00e9");
+    expect(tidyTagName("e\u0000\u0301")).toBe("\u00e9");
+  });
+
+  it("is a fixed point: a tidy name tidies to itself", () => {
+    for (const raw of ["e\u200b\u0301", "a\ufeff \u0301b", " \u0301\t"]) {
+      const once = tidyTagName(raw);
+      expect(tidyTagName(once), JSON.stringify(raw)).toBe(once);
+    }
   });
 
   it("gives what the long way gives, tidy names and untidy alike", () => {
@@ -51,6 +64,7 @@ describe("tidyTagName", () => {
       "\u2028",
       "\u200b",
       "\u200e",
+      "\ufeff",
       "\u0000",
       "\u007f",
       "\u0301",

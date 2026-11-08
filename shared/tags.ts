@@ -162,13 +162,17 @@ export function tidyTagName(raw: string): string {
   if (!UNTIDY.test(raw)) return raw.normalize("NFC");
   return (
     raw
-      .normalize("NFC")
-      // Whitespace first: a tab or a newline is a control character too, and
-      // must become a space rather than vanish. Collapsed again afterwards,
-      // since removing a zero-width character can leave two spaces side by
-      // side.
+      // Format characters first: JS counts U+FEFF as whitespace, and it must
+      // vanish rather than become a space. Then whitespace, ahead of the
+      // control characters: a tab or a newline is one too, and must become a
+      // space rather than vanish.
+      .replace(/\p{Cf}/gu, "")
       .replace(/\s+/g, " ")
-      .replace(/[\p{Cc}\p{Cf}]/gu, "")
+      .replace(/\p{Cc}/gu, "")
+      // Composed once nothing is left between a letter and its marks:
+      // `e\u200b\u0301` is `é`. Collapsed again afterwards, since removing a
+      // character can leave two spaces side by side.
+      .normalize("NFC")
       .replace(/ {2,}/g, " ")
       .trim()
   );

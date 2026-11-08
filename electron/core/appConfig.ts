@@ -21,6 +21,7 @@ import {
 } from "../../shared/autoTag.js";
 import { MAX_TAG_NAME } from "../../shared/tags.js";
 import { autoTagSettingsChanged, autoTagSettingsVersion } from "./autoTag.js";
+import type { AutoTagEngine } from "./autoTagDeriver.js";
 import log from "./logger.js";
 
 export interface AppConfig {
@@ -271,15 +272,25 @@ export function loadAutoTag(): { config: AutoTagConfig; version: number } {
 
 /**
  * The one way the auto-tagging settings are saved: a pass under way with the
- * old ones stops. saveConfig logs a failed write instead of throwing, so it is
- * read back, and a full disk is not reported as a successful save.
+ * old ones stops — when what the engine runs on changed. Dismissing a
+ * suggestion or switching the scan's tagging is no reason to start over.
+ * saveConfig logs a failed write instead of throwing, so it is read back, and
+ * a full disk is not reported as a successful save.
  */
 export function saveAutoTag(config: AutoTagConfig): void {
+  const before = engineOf(loadConfig().autoTag);
   updateConfig((c) => ({ ...c, autoTag: config }));
-  autoTagSettingsChanged();
+  if (engineOf(config) !== before) autoTagSettingsChanged();
   if (JSON.stringify(loadConfig().autoTag) !== JSON.stringify(config)) {
     throw new Error("auto-tagging settings could not be saved");
   }
+}
+
+/** The settings a pass applies, as one comparable value. */
+function engineOf({ rules, keywords, folders }: AutoTagConfig): string {
+  // Typed as the engine, so a field it gains has to be named here too.
+  const engine: Required<AutoTagEngine> = { rules, keywords, folders };
+  return JSON.stringify(engine);
 }
 
 /** Normalize a path (realpath, falling back to resolve on failure). */

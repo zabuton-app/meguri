@@ -201,7 +201,8 @@ interface NameRow {
   rel_path: string;
 }
 
-// Bumped each time the auto-tagging settings are saved. A pass reads the
+// Bumped each time a save changes what the engine runs on (saveAutoTag
+// decides: a dismissed suggestion is not such a change). A pass reads the
 // settings once, when it starts: one that goes on after they changed would
 // apply what they no longer say (a tag the Tags screen just renamed, under its
 // old name), so it stops instead (see applyAutoTags' `settingsVersion`).
@@ -212,7 +213,7 @@ export function autoTagSettingsVersion(): number {
   return settingsVersion;
 }
 
-/** Call after saving the auto-tagging settings. */
+/** Call once a save changed what the engine runs on (see saveAutoTag). */
 export function autoTagSettingsChanged(): void {
   settingsVersion++;
 }
