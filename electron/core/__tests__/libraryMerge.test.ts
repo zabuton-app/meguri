@@ -351,6 +351,12 @@ describe("merging workspaces into the library at startup", () => {
     for (const suffix of ["", "-wal", "-shm"]) {
       fs.rmSync(paths.libraryDbPath() + suffix, { force: true });
     }
+    const beforeRemerge = Date.now() - 1000;
+    fs.utimesSync(
+      backupOf(a),
+      beforeRemerge / 1000 - 60,
+      beforeRemerge / 1000 - 60,
+    );
 
     const ws = new Workspaces();
     ws.bootstrap(null);
@@ -361,7 +367,10 @@ describe("merging workspaces into the library at startup", () => {
     expect(
       core.db.prepare("SELECT favorite FROM lib.file_meta").pluck().get(),
     ).toBe(1);
-    // Kept until a copy of the library holds it again.
+    // Kept until a copy of the library holds it again: a copy taken before
+    // this merge does not.
+    expect(fs.existsSync(backupOf(a))).toBe(true);
+    ws.dropCoveredBackups(beforeRemerge);
     expect(fs.existsSync(backupOf(a))).toBe(true);
     ws.closeAll();
 

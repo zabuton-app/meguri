@@ -180,9 +180,15 @@ function mergeFromBackup(
       markComplete(db, workspaceId);
       return { merged: false };
     }
+    // Merged and recorded in one transaction on the library: recorded, the
+    // copy is never merged a second time over what the user changed since.
     db.transaction(() => {
       mergeIntoLibrary(db, "kept");
-      rebuildTagIndex(db);
+      db.prepare(
+        `INSERT INTO lib.migrated_workspaces (workspace_id, migrated_at, complete)
+         VALUES (?, ?, 1)
+         ON CONFLICT (workspace_id) DO UPDATE SET complete = 1`,
+      ).run(workspaceId, nowUnix());
     })();
   } catch (e) {
     log.warn(
@@ -193,7 +199,22 @@ function mergeFromBackup(
   } finally {
     db.exec("DETACH DATABASE kept");
   }
-  markComplete(db, workspaceId);
+  // Dated now: only a copy of the library taken after this merge holds what
+  // the copy does, and only such a copy lets it go (dropCoveredBackups).
+  try {
+    const now = new Date();
+    fs.utimesSync(backupPath, now, now);
+  } catch (e) {
+    log.warn(`could not date the backup ${backupPath}:`, e);
+  }
+  // The workspace's own index, in a transaction of its own (WAL is not atomic
+  // across the attached files). A failure leaves it to the next catch-up,
+  // which finds it behind and rebuilds it.
+  try {
+    db.transaction(() => rebuildTagIndex(db))();
+  } catch (e) {
+    log.warn("could not rebuild the tag index after the merge:", e);
+  }
   log.warn(
     `the library had no record of workspace ${workspaceId}: merged its metadata again from ${backupPath}`,
   );
