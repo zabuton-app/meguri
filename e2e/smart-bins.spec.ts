@@ -5,7 +5,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import ffmpeg from "ffmpeg-static";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
-import { fileCard, waitForIdle } from "./fixtures/helpers";
+import { fileCard, skipFirstLaunchTour, waitForIdle } from "./fixtures/helpers";
 
 test("global smart bins retain scope, resolution, type and ratings after restart", async () => {
   const temporary = fs.mkdtempSync(
@@ -51,6 +51,8 @@ test("global smart bins retain scope, resolution, type and ratings after restart
   let app = await launch();
   try {
     let page: Page = await app.firstWindow();
+    await page.waitForLoadState("domcontentloaded");
+    await skipFirstLaunchTour(page);
     await expect(page.getByText("clip-hd.mp4", { exact: true })).toBeVisible();
     await waitForIdle(page);
     for (const name of ["clip-hd.mp4", "photo-4k.png"]) {
