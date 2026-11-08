@@ -188,9 +188,9 @@ and its copy, as they were until the next open.
 
 At startup, `Workspaces.bootstrap()` lists the registered workspaces that
 have a database but no record in the library, reading `migrated_workspaces`
-without opening any workspace, and leaves them unopened: until they have merged, nothing else
-opens them. Once the window has loaded, `Workspaces.mergePending()` opens them
-one at a time, so each one merges. The
+without opening any workspace, and leaves them unopened: until they have
+merged, nothing else opens them. Once the window has loaded,
+`Workspaces.mergePending()` opens them one at a time, so each one merges. The
 window shows a modal with how many are done (`app_status.libraryMerge` and
 the `library:merge` event, `LibraryMergeModal`). When it closes, a notice
 names any workspace that could not be merged and why, with a "Try again"
