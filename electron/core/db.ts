@@ -193,7 +193,11 @@ CREATE TABLE IF NOT EXISTS lib.scene_bookmarks (
   sec REAL NOT NULL CHECK (sec >= 0),
   created_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS lib.idx_scene_bookmarks_meta ON scene_bookmarks(meta_key);
+-- (meta_key, sec): the dedupe window above is a range on sec within one file, so
+-- both columns are searched, not only meta_key (a file with many bookmarks
+-- would otherwise be read through for each one checked).
+DROP INDEX IF EXISTS lib.idx_scene_bookmarks_meta;
+CREATE INDEX IF NOT EXISTS lib.idx_scene_bookmarks_meta_sec ON scene_bookmarks(meta_key, sec);
 
 -- Workspaces whose own metadata tables have been merged into this database
 -- (library.ts). Written in the same transaction as the merge. workspace_id is

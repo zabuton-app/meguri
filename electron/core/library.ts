@@ -151,7 +151,7 @@ function mergeIntoLibrary(db: DB): void {
   // One at a time, so a bookmark is checked against the ones just added too:
   // the same window addBookmark applies to a new one.
   const near = db.prepare(
-    "SELECT 1 FROM lib.scene_bookmarks WHERE meta_key = ? AND ABS(sec - ?) <= ? LIMIT 1",
+    "SELECT 1 FROM lib.scene_bookmarks WHERE meta_key = ? AND sec BETWEEN ? AND ? LIMIT 1",
   );
   const insert = db.prepare(
     "INSERT INTO lib.scene_bookmarks (meta_key, sec, created_at) VALUES (?, ?, ?)",
@@ -162,7 +162,12 @@ function mergeIntoLibrary(db: DB): void {
     )
     .all() as { meta_key: string; sec: number; created_at: number }[];
   for (const b of rows) {
-    if (near.get(b.meta_key, b.sec, BOOKMARK_NEAR_EPS)) continue;
+    const taken = near.get(
+      b.meta_key,
+      b.sec - BOOKMARK_NEAR_EPS,
+      b.sec + BOOKMARK_NEAR_EPS,
+    );
+    if (taken) continue;
     insert.run(b.meta_key, b.sec, b.created_at);
   }
 }
