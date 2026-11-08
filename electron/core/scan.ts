@@ -341,7 +341,8 @@ export async function syncFiles(
         size: number;
         mtime: number;
         content_hash: string | null;
-        abs_path: string;
+        /** The key its metadata is stored under (META_KEY_EXPR). */
+        meta_key: string;
       }
     | undefined;
 
@@ -353,12 +354,12 @@ export async function syncFiles(
     (
       db
         .prepare(
-          "SELECT id, rel_path, abs_path, size, mtime, content_hash FROM files WHERE root_id = ?",
+          "SELECT id, rel_path, meta_key, size, mtime, content_hash FROM files WHERE root_id = ?",
         )
         .all(rootId) as {
         id: number;
         rel_path: string;
-        abs_path: string;
+        meta_key: string;
         size: number;
         mtime: number;
         content_hash: string | null;
@@ -370,7 +371,7 @@ export async function syncFiles(
         size: r.size,
         mtime: r.mtime,
         content_hash: r.content_hash,
-        abs_path: r.abs_path,
+        meta_key: r.meta_key,
       },
     ]),
   );
@@ -418,17 +419,22 @@ export async function syncFiles(
       const d = scannable[i];
       const existing = existingOf[i];
       if (existing) {
+        // A row without a hash keys its metadata by its path (the path
+        // fallback). The update below can change that key: a hash appears, or
+        // the path written differs from the stored one. Its metadata follows,
+        // from the key the row derived before.
+        const carryMeta = (newKey: string) => {
+          if (existing.content_hash == null && existing.meta_key !== newKey) {
+            migrateMetaKey(db, existing.meta_key, newKey);
+          }
+        };
         if (existing.size === d.size && existing.mtime === d.mtime) {
+          carryMeta(pathMetaKey(d.absPath));
           touchUnchanged.run(d.absPath, d.inode, d.btime, existing.id);
           stats.unchanged++;
         } else {
           const newHash = hashOf.get(i) ?? null;
-          // If the file had no hash before (meta was keyed by the path fallback) and
-          // now gains one, carry its metadata over to the hash-based meta_key. The
-          // old key is the one the row derived, from the path stored on it.
-          if (newHash && existing.content_hash == null) {
-            migrateMetaKey(db, pathMetaKey(existing.abs_path), newHash);
-          }
+          carryMeta(newHash ?? pathMetaKey(d.absPath));
           updateChanged.run(
             d.size,
             d.mtime,
@@ -449,7 +455,7 @@ export async function syncFiles(
       // before this apply ran). Fall back to null — never bind undefined (which
       // better-sqlite3 rejects, rolling back the whole chunk tx) — and skip move
       // detection in that case (a null hash can't be matched to a candidate anyway;
-      // the row inserts with content_hash NULL and uses the rel_path meta_key).
+      // the row inserts with content_hash NULL and uses the path fallback key).
       const hash = hashOf.get(i) ?? null;
       const cands =
         hash != null
