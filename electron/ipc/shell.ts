@@ -58,7 +58,11 @@ export function registerShellHandlers(ctx: IpcContext): void {
     const icon = nativeImage.createFromBuffer(
       Buffer.from(TRAY_ICON_BASE64.dark, "base64"),
     );
-    event.sender.startDrag({ file: files[0], files: [...new Set(files)], icon });
+    event.sender.startDrag({
+      file: files[0],
+      files: [...new Set(files)],
+      icon,
+    });
   });
 
   // A folder of the folder view, in the default file manager. Opened detached

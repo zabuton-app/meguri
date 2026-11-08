@@ -28,11 +28,12 @@ for (const view of ["Grid view", "List view"]) {
 
     await expect
       .poll(() =>
-        app.evaluate(({ BrowserWindow }) =>
-          Reflect.get(
-            BrowserWindow.getAllWindows()[0].webContents,
-            "testNativeDrag",
-          ) as unknown,
+        app.evaluate(
+          ({ BrowserWindow }) =>
+            Reflect.get(
+              BrowserWindow.getAllWindows()[0].webContents,
+              "testNativeDrag",
+            ) as unknown,
         ),
       )
       .toEqual({
