@@ -42,13 +42,23 @@ export class Core {
     this.mergedOnOpen = mergedOnOpen;
   }
 
-  static init(rawRoot: string, libraryPath: string): Core {
-    let root: string;
+  /** The root as Core.init resolves it: symlinks followed where it exists. */
+  static resolveRoot(rawRoot: string): string {
     try {
-      root = fs.realpathSync(rawRoot);
+      return fs.realpathSync(rawRoot);
     } catch {
-      root = path.resolve(rawRoot);
+      return path.resolve(rawRoot);
     }
+  }
+
+  /** The id `lib.migrated_workspaces` records a workspace under, which also
+   *  names its data directory. */
+  static dataIdFor(rawRoot: string): string {
+    return pathHash(Core.resolveRoot(rawRoot));
+  }
+
+  static init(rawRoot: string, libraryPath: string): Core {
+    const root = Core.resolveRoot(rawRoot);
     const dataDir = dataDirForRoot(root);
     fs.mkdirSync(path.join(dataDir, "thumbs"), { recursive: true });
 

@@ -549,7 +549,7 @@ export const fr: Record<TranslationKey, string> = {
   "history.clear": "Effacer l'historique",
   "history.clearAction": "Effacer",
   "history.clearConfirm":
-    "Supprimer tout l'historique de lecture ? Cette action est irréversible.",
+    "Supprimer l'historique de lecture et les points de reprise de tous les espaces de travail ? Cette action est irréversible.",
   "history.playCount": "{count} lectures",
   "history.viaBrowser": "Dans l'application",
   "history.viaExternal": "Lecteur externe",
@@ -807,7 +807,7 @@ export const fr: Record<TranslationKey, string> = {
   "tags.merge": "Fusionner",
   "tags.mergeTitle": "Fusionner les tags",
   "tags.mergeDescription":
-    "Les {count} tags sélectionnés sont regroupés dans la cible. Les autres sont supprimés.",
+    "Les {count} tags sélectionnés sont regroupés dans la cible dans tous les espaces de travail. Les autres sont supprimés.",
   "tags.mergeTarget": "Fusionner dans",
   "tags.mergeAction": "Fusionner",
   "tags.merged": "{count} tags fusionnés",
@@ -815,9 +815,9 @@ export const fr: Record<TranslationKey, string> = {
   "tags.delete": "Supprimer",
   "tags.deleteAction": "Supprimer",
   "tags.deleteConfirm":
-    "Le tag « {name} » sera retiré de {count} fichiers. Continuer ?",
+    "Le tag « {name} » sera retiré de {count} fichiers dans tous les espaces de travail. Continuer ?",
   "tags.deleteConfirmMany":
-    "Les {count} tags sélectionnés seront supprimés. Continuer ?",
+    "Les {count} tags sélectionnés seront supprimés de tous les espaces de travail. Continuer ?",
   "tags.deleted": "Tag supprimé",
   "tags.deleteFailed": "Impossible de supprimer le tag",
   "tags.addFailedReserved":
@@ -844,7 +844,7 @@ export const fr: Record<TranslationKey, string> = {
   "workspace.removeFromSidebar": "Supprimer l'espace de travail",
   "workspace.removeTitle": "Supprimer l'espace de travail",
   "workspace.removeConfirm":
-    "Supprimer « {label} » ?\nSa base de données et ses miniatures seront aussi supprimées (les fichiers multimédias eux-mêmes sont conservés).",
+    "Supprimer « {label} » ?\nSa liste de fichiers et ses miniatures seront supprimées (les fichiers multimédias eux-mêmes sont conservés). Les favoris, notes, tags, signets et l'historique de lecture sont conservés et reviennent si vous ajoutez à nouveau le même dossier.",
   "workspace.removeAction": "Supprimer",
   "workspace.addedToast": "Espace de travail ajouté",
   "workspace.removedToast": "Espace de travail supprimé",

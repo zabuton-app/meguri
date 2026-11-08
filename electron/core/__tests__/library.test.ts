@@ -224,11 +224,13 @@ describe("migrateWorkspaceMetadata", () => {
     fs.mkdirSync(path.join(dir, "fresh"));
     const fresh = openAndMigrate("fresh");
     expect(fs.existsSync(backupFile("fresh"))).toBe(false);
+    // Nothing to merge, but recorded as on the library, so a write to every
+    // workspace knows it need not open this one (Workspaces.metadataCores).
     expect(
       fresh
         .prepare("SELECT 1 FROM lib.migrated_workspaces WHERE workspace_id = ?")
         .get("fresh"),
-    ).toBeUndefined();
+    ).toBeDefined();
     fresh.close();
   });
 
@@ -586,6 +588,25 @@ describe("the library shared by two workspaces", () => {
     addManualTag(a.db, inA, "beach");
     catchUpTagIndex(b.db);
     expect(matches(b, "beach")).toEqual([inB]);
+  });
+
+  it("does not rebuild for changes to files only other workspaces hold", () => {
+    const { inA } = sameFileInBoth();
+    markerInB();
+    // Many files of A's own, each tagged: far more keys than B has files.
+    for (let i = 0; i < 20; i++) {
+      const id = insertFile(a.db, a.rootId, {
+        relPath: `onlyA${i}.mp4`,
+        root: a.root,
+        contentHash: `onlyA${i}`,
+      });
+      addManualTag(a.db, id, "beach");
+    }
+    addManualTag(a.db, inA, "sea");
+    catchUpTagIndex(b.db);
+    // Re-synced the one key B holds, not rebuilt.
+    expect(matches(b, "sea")).toHaveLength(1);
+    expect(matches(b, "untouched")).toEqual([]);
   });
 
   it("rebuilds rather than re-syncing most of the files key by key", () => {

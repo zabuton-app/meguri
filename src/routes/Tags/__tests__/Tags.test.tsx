@@ -16,7 +16,7 @@ import type {
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn<() => Promise<AppStatus>>(),
   workspacesList: vi.fn<() => Promise<WorkspacesList>>(),
-  tagsListAll: vi.fn<() => Promise<TagList>>(),
+  tagsListAll: vi.fn<(opts?: { allWorkspaces: boolean }) => Promise<TagList>>(),
   tagRename:
     vi.fn<
       (
@@ -40,7 +40,7 @@ vi.mock("@/ipc/client", () => ({
   api: {
     appStatus: () => mocks.appStatus(),
     workspacesList: () => mocks.workspacesList(),
-    tagsListAll: () => mocks.tagsListAll(),
+    tagsListAll: (opts?: { allWorkspaces: boolean }) => mocks.tagsListAll(opts),
     tagRename: (from: TagRef, to: string) => mocks.tagRename(from, to),
     tagMerge: (from: TagRef[], into: TagRef) => mocks.tagMerge(from, into),
     tagDelete: (tags: TagRef[]) => mocks.tagDelete(tags),
@@ -187,6 +187,29 @@ describe("Tags screen", () => {
     expect(mocks.tagMerge).not.toHaveBeenCalled();
   });
 
+  it("asks before a rename into a name only another workspace holds", async () => {
+    mocks.tagsListAll.mockImplementation((opts) =>
+      Promise.resolve(
+        opts?.allWorkspaces
+          ? {
+              tags: [...CATALOG.tags, tag("", "shore", 2)],
+              truncated: false,
+            }
+          : CATALOG,
+      ),
+    );
+    render();
+    await screen.findByText("Manual tags");
+    fireEvent.click(screen.getAllByLabelText("Rename")[0]);
+
+    const input = await screen.findByLabelText("New tag name");
+    fireEvent.change(input, { target: { value: "shore" } });
+    // The rename would merge into the other workspace's tag: the merge wording.
+    expect(
+      await screen.findByText("Merge", { selector: "button" }),
+    ).toBeTruthy();
+  });
+
   it("treats a name in another case as the tag it means", async () => {
     render();
     await screen.findByText("Manual tags");
@@ -301,6 +324,24 @@ describe("Tags screen", () => {
         { namespace: "", name: "beach" },
       ]),
     );
+  });
+
+  it("asks about the files of every workspace, which the delete reaches", async () => {
+    mocks.tagsListAll.mockImplementation((opts) =>
+      Promise.resolve(
+        opts?.allWorkspaces
+          ? { tags: [tag("", "beach", 30)], truncated: false }
+          : CATALOG,
+      ),
+    );
+    render();
+    await screen.findByText("Manual tags");
+    fireEvent.click(screen.getAllByLabelText("Delete")[0]);
+    expect(
+      await screen.findByText(
+        'Remove the tag "beach" from 30 files across all workspaces. Continue?',
+      ),
+    ).toBeTruthy();
   });
 
   it("merges the selected tags into the chosen target", async () => {

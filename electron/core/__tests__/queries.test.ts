@@ -746,6 +746,29 @@ describe("scene bookmarks", () => {
     expect(listBookmarks(db, b).map((r) => r.id)).toEqual([bBm.id]);
   });
 
+  it("migrateMetaKey drops a bookmark near one the target key holds", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "m.mp4", contentHash: null });
+    addBookmark(db, id, 11);
+    addBookmark(db, id, 60);
+    // Another workspace's copy of the same content, bookmarked at 10s.
+    db.prepare(
+      "INSERT INTO scene_bookmarks (meta_key, sec, created_at) VALUES ('h', 10, 0)",
+    ).run();
+
+    migrateMetaKey(db, "p:/fake/root/m.mp4", "h");
+
+    expect(
+      db
+        .prepare("SELECT meta_key, sec FROM scene_bookmarks ORDER BY sec")
+        .all(),
+    ).toEqual([
+      { meta_key: "h", sec: 10 },
+      { meta_key: "h", sec: 60 },
+    ]);
+    db.close();
+  });
+
   it("migrateMetaKey carries bookmarks along when a content_hash first appears", () => {
     const id = insertFile(db, rootId, { relPath: "m.mp4", contentHash: null });
     addBookmark(db, id, 42);

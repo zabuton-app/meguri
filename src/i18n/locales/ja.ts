@@ -533,7 +533,7 @@ export const ja = {
   "history.clear": "履歴をクリア",
   "history.clearAction": "クリア",
   "history.clearConfirm":
-    "再生履歴をすべて削除しますか？この操作は取り消せません。",
+    "すべてのワークスペースの再生履歴と再開位置を削除しますか？この操作は取り消せません。",
   "history.playCount": "{count} 回再生",
   "history.viaBrowser": "アプリ内",
   "history.viaExternal": "外部プレーヤー",
@@ -783,7 +783,7 @@ export const ja = {
   "tags.merge": "統合",
   "tags.mergeTitle": "タグを統合",
   "tags.mergeDescription":
-    "選択した {count} 個のタグを統合先にまとめます。統合元のタグは削除されます。",
+    "選択した {count} 個のタグを、すべてのワークスペースで統合先にまとめます。統合元のタグは削除されます。",
   "tags.mergeTarget": "統合先",
   "tags.mergeAction": "統合する",
   "tags.merged": "{count} 個のタグを統合しました",
@@ -791,9 +791,9 @@ export const ja = {
   "tags.delete": "削除",
   "tags.deleteAction": "削除",
   "tags.deleteConfirm":
-    "タグ「{name}」を {count} ファイルから削除します。よろしいですか?",
+    "タグ「{name}」を、すべてのワークスペースの {count} ファイルから削除します。よろしいですか?",
   "tags.deleteConfirmMany":
-    "選択した {count} 個のタグを削除します。よろしいですか?",
+    "選択した {count} 個のタグを、すべてのワークスペースから削除します。よろしいですか?",
   "tags.deleted": "タグを削除しました",
   "tags.deleteFailed": "タグの削除に失敗しました",
   "tags.addFailedReserved":
@@ -820,7 +820,7 @@ export const ja = {
   "workspace.removeFromSidebar": "ワークスペースを削除",
   "workspace.removeTitle": "ワークスペースを削除",
   "workspace.removeConfirm":
-    "「{label}」を削除しますか？\nデータベースとサムネイルも削除されます（メディアファイル自体は削除されません）",
+    "「{label}」を削除しますか？\nファイルの一覧とサムネイルは削除されます（メディアファイル自体は削除されません）。お気に入り・評価・タグ・ブックマーク・再生履歴は残り、同じフォルダを追加し直すと元に戻ります。",
   "workspace.removeAction": "削除",
   "workspace.addedToast": "ワークスペースを追加しました",
   "workspace.removedToast": "ワークスペースを削除しました",

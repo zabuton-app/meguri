@@ -10,6 +10,7 @@ import {
 } from "../queries.js";
 import {
   filesByIdsWorkspaces,
+  listHistoryWorkspaces,
   listTagsWorkspaces,
   searchCollection,
   searchWorkspaces,
@@ -24,7 +25,7 @@ import type {
   SearchQuery,
   SearchResult,
 } from "../types.js";
-import { insertFile, newDb } from "./helpers.js";
+import { insertFile, newDb, newSharedDbs } from "./helpers.js";
 
 function coreTarget(id: string, db: DB): CoreTarget {
   return { id, core: { db } as Core };
@@ -703,5 +704,49 @@ describe("filesByIdsWorkspaces", () => {
       ),
     ).toThrow(/not readable/);
     db.close();
+  });
+});
+
+describe("listHistoryWorkspaces over a shared library", () => {
+  it("lists a play of content both workspaces hold once, across pages", () => {
+    const { dbs, cleanup } = newSharedDbs(2);
+    try {
+      const [a, b] = dbs;
+      const file = (ws: (typeof dbs)[number], rel: string, hash: string) =>
+        insertFile(ws.db, ws.rootId, {
+          relPath: rel,
+          root: ws.root,
+          contentHash: hash,
+        });
+      file(a, "same.mp4", "h");
+      file(b, "same.mp4", "h");
+      file(a, "onlyA.mp4", "x");
+      file(b, "onlyB.mp4", "y");
+      // Newest first: h, x, y, h, x, y, h — no file twice in a row in either
+      // workspace, so neither collapses a run.
+      const play = a.db.prepare(
+        "INSERT INTO play_history (meta_key, played_at, via) VALUES (?, ?, 'browser')",
+      );
+      ["h", "y", "x", "h", "y", "x", "h"].forEach((key, i) =>
+        play.run(key, i + 1),
+      );
+      const targets = [coreTarget("a", a.db), coreTarget("b", b.db)];
+
+      const all = listHistoryWorkspaces(targets, { limit: 100 });
+      expect(all.items.map((e) => e.playedAt)).toEqual([7, 6, 5, 4, 3, 2, 1]);
+      // The copy in "a" stands for a play both hold.
+      expect(all.items[0].workspaceId).toBe("a");
+
+      const paged: number[] = [];
+      let cursor: number | undefined = 0;
+      while (cursor !== undefined) {
+        const page = listHistoryWorkspaces(targets, { limit: 2, cursor });
+        paged.push(...page.items.map((e) => e.historyId));
+        cursor = page.nextCursor ?? undefined;
+      }
+      expect(paged).toEqual(all.items.map((e) => e.historyId));
+    } finally {
+      cleanup();
+    }
   });
 });

@@ -159,7 +159,8 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
 }
 
 /**
- * Delete every play event in this workspace, and the resume points with them:
+ * Delete every play event `db` reaches — through the shared library, every
+ * workspace's — and the resume points with them:
  * a progress bar or the "In progress" filter would otherwise still say what was
  * watched after the user asked for that record to go.
  */

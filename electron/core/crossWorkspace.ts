@@ -4,6 +4,7 @@
 import { MAX_DUPLICATE_GROUPS } from "../../shared/duplicates.js";
 import { MAX_TAG_LIST, qualifiedTagName } from "../../shared/tags.js";
 import { resolveSortDir } from "../../shared/sortDir.js";
+import { usesOwnMetadata } from "./db.js";
 import type { Core } from "./index.js";
 import {
   attachTags,
@@ -455,13 +456,21 @@ function mergeSearchPages(
   };
 }
 
-/** k-way merge with per-workspace batched fetches — memory stays O(N × batch), not O(N × offset). */
+/**
+ * k-way merge with per-workspace batched fetches — memory stays O(N × batch), not O(N × offset).
+ *
+ * `same`, when given, names rows that several workspaces return for one thing.
+ * `cmp` must order such rows next to each other; each one after the first is
+ * dropped before it counts toward `offset` or `limit`, so pages neither repeat
+ * nor skip it.
+ */
 function mergePages<T>(
   targets: CoreTarget[],
   fetchBatch: FetchBatch<T>,
   cmp: (a: T, b: T) => number,
   limit: number,
   offset: number,
+  same?: (a: T, b: T) => boolean,
 ): { items: T[]; nextCursor: number | null } {
   const batchSize = limit + 1;
 
@@ -486,6 +495,8 @@ function mergePages<T>(
   let skipped = 0;
   const collected: T[] = [];
   const want = limit + 1;
+  let last: T | undefined;
+  let any = false;
 
   while (!heap.isEmpty() && (skipped < offset || collected.length < want)) {
     const si = heap.pop();
@@ -493,7 +504,12 @@ function mergePages<T>(
     const item = stream.buffer[stream.bufIdx];
     stream.bufIdx++;
 
-    if (skipped < offset) {
+    const repeat = same !== undefined && any && same(last as T, item);
+    last = item;
+    any = true;
+    if (repeat) {
+      // Counted neither way: the row it repeats already was.
+    } else if (skipped < offset) {
       skipped++;
     } else {
       collected.push(item);
@@ -613,9 +629,12 @@ class StreamHeap<T> {
 
 /**
  * Cross-workspace play-history timeline. Mirrors history.ts' ORDER BY
- * (played_at DESC, id DESC) with (workspaceId, historyId) as the cross-workspace
- * tiebreak. Runs collapsed per-workspace are not re-collapsed across workspaces:
- * a file exists in one workspace's DB, so cross-ws duplicates can't occur.
+ * (played_at DESC, id DESC), then workspaceId. The play history lives in the
+ * library every workspace shares, so a play of content two workspaces hold
+ * comes back from both under one historyId: the order puts those rows next to
+ * each other and the merge keeps the first (the lower workspaceId). A
+ * workspace still on its own tables is never deduplicated against. Runs
+ * collapsed per workspace are not re-collapsed across workspaces.
  */
 export function listHistoryWorkspaces(
   cores: CoreTarget[],
@@ -627,10 +646,19 @@ export function listHistoryWorkspaces(
     const res = listPlayHistory(core.db, query);
     return { items: inject(res.items, id), nextCursor: res.nextCursor };
   }
+  // A workspace whose merge into the library has not run numbers its own
+  // events, so only rows read through the library can be the same event.
+  const own = new Set(
+    cores.filter(({ core }) => usesOwnMetadata(core.db)).map(({ id }) => id),
+  );
+  const shared = (r: HistoryEntryRow) => !own.has(r.workspaceId);
+  // Rows read through the library sort before the others on a tie, so the
+  // copies of one event stay next to each other.
   const cmp = (a: HistoryEntryRow, b: HistoryEntryRow): number =>
     b.playedAt - a.playedAt ||
-    cmpStr(a.workspaceId, b.workspaceId) ||
-    b.historyId - a.historyId;
+    b.historyId - a.historyId ||
+    Number(shared(b)) - Number(shared(a)) ||
+    cmpStr(a.workspaceId, b.workspaceId);
   return mergePages<HistoryEntryRow>(
     cores,
     (core, wsId, cursor, limit) => {
@@ -640,6 +668,11 @@ export function listHistoryWorkspaces(
     cmp,
     Math.max(1, query.limit ?? DEFAULT_LIMIT),
     Math.max(0, query.cursor ?? 0),
+    (a, b) =>
+      shared(a) &&
+      shared(b) &&
+      a.historyId === b.historyId &&
+      a.playedAt === b.playedAt,
   );
 }
 

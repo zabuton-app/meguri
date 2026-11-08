@@ -2,6 +2,7 @@
 // extracted ffprobe meta, and meta_key migration / orphan cleanup.
 import type { DB } from "../db.js";
 import { nowUnix } from "../db.js";
+import { BOOKMARK_NEAR_EPS } from "./bookmarks.js";
 import { metaKeyOf } from "../tags.js";
 import type { ExtractedMeta } from "../media.js";
 import { resumePointOf } from "../../../shared/resume.js";
@@ -248,8 +249,9 @@ export const FILE_META_MERGE_SET = `
  * Carry durable metadata from one meta_key to another (used when a file's content_hash
  * first appears and its meta_key shifts from the path fallback to the hash). The target
  * may already hold metadata, typically another workspace's copy of the same content in
- * the shared library: file_meta is merged into it (FILE_META_MERGE_SET), and a tag the
- * target already carries keeps the target's row.
+ * the shared library: file_meta is merged into it (FILE_META_MERGE_SET), a tag the
+ * target already carries keeps the target's row, and a bookmark near one the target
+ * has is dropped.
  */
 export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
   if (fromKey === toKey) return;
@@ -270,6 +272,16 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
       toKey,
       fromKey,
     );
+    // As the library merge does (BOOKMARK_NEAR_EPS): a bookmark close to one
+    // the target holds already is not carried over a second time. A range on
+    // sec, searched in (meta_key, sec).
+    db.prepare(
+      `DELETE FROM scene_bookmarks
+        WHERE meta_key = ? AND EXISTS (
+          SELECT 1 FROM scene_bookmarks t
+           WHERE t.meta_key = ?
+             AND t.sec BETWEEN scene_bookmarks.sec - ? AND scene_bookmarks.sec + ?)`,
+    ).run(fromKey, toKey, BOOKMARK_NEAR_EPS, BOOKMARK_NEAR_EPS);
     db.prepare(
       "UPDATE scene_bookmarks SET meta_key = ? WHERE meta_key = ?",
     ).run(toKey, fromKey);

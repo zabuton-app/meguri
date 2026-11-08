@@ -353,10 +353,15 @@ Electron's userData.
 ```text
 <userData>/                 # e.g. ~/.config/Meguri
 ├─ config.json              # registered workspaces and the active root
+├─ library.sqlite           # favorites, ratings, tags, bookmarks, history (WAL)
 └─ roots/<hash of root>/
-   ├─ db.sqlite             # metadata (WAL)
+   ├─ db.sqlite             # the file index (WAL)
    └─ thumbs/               # generated thumbnails (webp)
 ```
+
+Removing a workspace deletes its `roots/<hash>/` directory. The library keeps
+the metadata of its files, which comes back when the same files are added
+again.
 
 > [!WARNING]
 > Data stored here (tags, ratings, playback history, and other metadata) may
