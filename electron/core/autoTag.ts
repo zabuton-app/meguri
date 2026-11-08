@@ -6,7 +6,8 @@
 // the app can do with a hand-applied tag works on these too, and the full-text
 // index has to follow every change.
 import path from "node:path";
-import { resyncFtsForKeys, type DB } from "./db.js";
+import type { DB } from "./db.js";
+import { resyncTagIndexForKeys } from "./library.js";
 import { getSetting, setSetting } from "./queries/settings.js";
 import type { AutoTagEngine, DeriveAutoTags } from "./autoTagDeriver.js";
 import { upsertTag } from "./tags.js";
@@ -116,7 +117,7 @@ export function attachAutoTags(
         if (gained) touched.add(fileId);
       }
     }
-    resyncFtsForKeys(db, [...changed]);
+    resyncTagIndexForKeys(db, [...changed]);
     return { files: touched.size, tagged: [...touched], pairs };
   });
   return run();
@@ -136,7 +137,7 @@ export function detachTagPairs(db: DB, pairs: readonly TagPair[]): number {
         changed.add(metaKey);
       }
     }
-    resyncFtsForKeys(db, [...changed]);
+    resyncTagIndexForKeys(db, [...changed]);
     return removed;
   })();
 }

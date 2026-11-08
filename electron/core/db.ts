@@ -181,7 +181,11 @@ CREATE TABLE IF NOT EXISTS lib.play_history (
   id INTEGER PRIMARY KEY, meta_key TEXT NOT NULL,
   played_at INTEGER NOT NULL, position REAL, via TEXT NOT NULL CHECK (via IN ('browser','external'))
 );
-CREATE INDEX IF NOT EXISTS lib.idx_play_history_meta ON play_history(meta_key);
+-- (meta_key, played_at, id): a file's events in timeline order, which also lets
+-- a workspace collect its own events without streaming every workspace's
+-- (listPlayHistory).
+DROP INDEX IF EXISTS lib.idx_play_history_meta;
+CREATE INDEX IF NOT EXISTS lib.idx_play_history_meta_played ON play_history(meta_key, played_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS lib.idx_play_history_played ON play_history(played_at DESC, id DESC);
 
 -- User-curated scene bookmarks (specific times in a video, distinct from the auto-generated
@@ -195,7 +199,11 @@ CREATE TABLE IF NOT EXISTS lib.scene_bookmarks (
   sec REAL NOT NULL CHECK (sec >= 0),
   created_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS lib.idx_scene_bookmarks_meta ON scene_bookmarks(meta_key);
+-- (meta_key, sec): the dedupe window above is a range on sec within one file, so
+-- both columns are searched, not only meta_key (a file with many bookmarks
+-- would otherwise be read through for each one checked).
+DROP INDEX IF EXISTS lib.idx_scene_bookmarks_meta;
+CREATE INDEX IF NOT EXISTS lib.idx_scene_bookmarks_meta_sec ON scene_bookmarks(meta_key, sec);
 
 -- The meta_keys whose user tags (namespace = '') changed, logged by the
 -- triggers below: every workspace keeps its own files_fts.tags_text, and
@@ -221,8 +229,11 @@ WHEN NOT EXISTS (SELECT 1 FROM tags WHERE id = OLD.tag_id AND namespace <> '')
 BEGIN
   INSERT INTO tag_changes (meta_key) VALUES (OLD.meta_key);
 END;
+-- Only a change of file or tag: an upsert that rewrites the score of a tag
+-- already on the file (addFileTag) changes nothing the index holds.
 CREATE TRIGGER IF NOT EXISTS lib.trg_meta_tags_au AFTER UPDATE ON meta_tags
-WHEN EXISTS (SELECT 1 FROM tags WHERE id IN (OLD.tag_id, NEW.tag_id) AND namespace = '')
+WHEN (OLD.meta_key IS NOT NEW.meta_key OR OLD.tag_id IS NOT NEW.tag_id)
+  AND EXISTS (SELECT 1 FROM tags WHERE id IN (OLD.tag_id, NEW.tag_id) AND namespace = '')
 BEGIN
   INSERT INTO tag_changes (meta_key) VALUES (OLD.meta_key);
   INSERT INTO tag_changes (meta_key) SELECT NEW.meta_key WHERE NEW.meta_key <> OLD.meta_key;
