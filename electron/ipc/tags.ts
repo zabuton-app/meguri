@@ -1,8 +1,11 @@
+import { loadConfig, saveAutoTag } from "../core/appConfig.js";
 import { handle } from "../core/ipcHandler.js";
 import log from "../core/logger.js";
 import * as tagAdmin from "../core/tagAdmin.js";
 import * as tags from "../core/tags.js";
 import type { TagList } from "../core/types.js";
+import { retagConditions } from "../../shared/autoTagConditions.js";
+import { AutoTagConfigSchema, type TagRef } from "../../shared/ipc/schema.js";
 import type { IpcContext } from "./context.js";
 import {
   bulkTargetCores,
@@ -57,15 +60,19 @@ export function registerTagHandlers(ctx: IpcContext): void {
 
   // The catalog channels take no workspaceId: coreById(ALL_ID) throws by design,
   // and a tag id means nothing across databases. Scope follows the active view
-  // (see scopedCores).
+  // (see scopedCores), except a mutation the auto-tagging conditions reach
+  // (see withAutoTagConditions).
 
-  /** Cores for a catalog mutation. allCores() silently skips workspaces whose DB
-   *  could not be opened, which for a rename means that workspace keeps the old
-   *  name while the others move on — worth a line in the log when it happens. */
-  const tagMutationCores = () => {
-    const cores = scopedCores(ws);
+  /** Cores for a catalog mutation: the view's, or every workspace's. allCores()
+   *  silently skips workspaces whose DB could not be opened, which for a rename
+   *  means that workspace keeps the old name while the others move on — worth a
+   *  line in the log when it happens. */
+  const tagMutationCores = (everyWorkspace: boolean) => {
+    const cores = everyWorkspace ? ws.allCores() : scopedCores(ws);
     const expected =
-      ws.isCollection() || ws.isAll() ? ws.rootCount() : cores.length;
+      everyWorkspace || ws.isCollection() || ws.isAll()
+        ? ws.rootCount()
+        : cores.length;
     if (cores.length < expected) {
       log.warn(
         `tag mutation covers ${cores.length}/${expected} workspaces; the rest could not be opened`,
@@ -74,40 +81,76 @@ export function registerTagHandlers(ctx: IpcContext): void {
     return cores;
   };
 
-  handle("tags_list_all", () =>
-    queryClient.run<TagList>({
-      kind: "tagsList",
-      targets: queryTargets(scopedCores(ws)),
-    }),
+  handle("tags_list_all", (input) =>
+    queryClient.run<TagList>(
+      input?.allWorkspaces
+        ? {
+            kind: "tagsList",
+            targets: queryTargets(ws.allCores()),
+            // Past the cap, the view's own tags are the ones not to lose. Only
+            // a single workspace's view is narrower than every workspace;
+            // for All and collections this is all of them.
+            prefer: scopedCores(ws).map(({ id }) => id),
+          }
+        : { kind: "tagsList", targets: queryTargets(scopedCores(ws)) },
+    ),
   );
   // Mutations are addressed by name, so fanning them across every database in
   // scope converges on the same end state even when one of them has a collision
   // (rename there escalates to a merge) and another does not.
-  handle("tag_rename", ({ from, to }) => {
-    let merged = false;
-    let affectedFiles = 0;
-    for (const { core } of tagMutationCores()) {
-      const r = tagAdmin.renameTag(core.db, from, to);
-      merged ||= r.merged;
-      affectedFiles += r.affectedFiles;
-    }
-    return { merged, affectedFiles };
-  });
-  handle("tag_merge", ({ from, into }) => {
-    let affectedFiles = 0;
-    for (const { core } of tagMutationCores()) {
-      affectedFiles += tagAdmin.mergeTags(core.db, from, into).affectedFiles;
-    }
-    return { affectedFiles };
-  });
-  handle("tag_delete", ({ tags: refs }) => {
-    let removedTags = 0;
-    let affectedFiles = 0;
-    for (const { core } of tagMutationCores()) {
-      const r = tagAdmin.deleteTags(core.db, refs);
-      removedTags += r.removedTags;
-      affectedFiles += r.affectedFiles;
-    }
-    return { removedTags, affectedFiles };
-  });
+  //
+  // A tag an auto-tagging condition names is the app's, not a workspace's: the
+  // operation then runs in every workspace, whichever is in view, and the
+  // conditions are rewritten after it so the next scan does not put the old
+  // name back (see retagConditions). A name the conditions cannot hold stops
+  // the operation before anything changes. A failure partway leaves the
+  // conditions as they were; doing it again finishes both.
+  const withAutoTagConditions = <T>(
+    from: readonly TagRef[],
+    to: string | null,
+    run: (cores: ReturnType<typeof tagMutationCores>) => T,
+  ): T => {
+    const before = loadConfig().autoTag;
+    const names = from.filter((ref) => ref.namespace === "").map((r) => r.name);
+    const after = retagConditions(before, names, to);
+    if (after === before) return run(tagMutationCores(false));
+    AutoTagConfigSchema.parse(after);
+    const result = run(tagMutationCores(true));
+    saveAutoTag(after);
+    return result;
+  };
+  handle("tag_rename", ({ from, to }) =>
+    // Trimmed as renameTag trims it, so both get the same name.
+    withAutoTagConditions([from], to.trim(), (cores) => {
+      let merged = false;
+      let affectedFiles = 0;
+      for (const { core } of cores) {
+        const r = tagAdmin.renameTag(core.db, from, to);
+        merged ||= r.merged;
+        affectedFiles += r.affectedFiles;
+      }
+      return { merged, affectedFiles };
+    }),
+  );
+  handle("tag_merge", ({ from, into }) =>
+    withAutoTagConditions(from, into.name, (cores) => {
+      let affectedFiles = 0;
+      for (const { core } of cores) {
+        affectedFiles += tagAdmin.mergeTags(core.db, from, into).affectedFiles;
+      }
+      return { affectedFiles };
+    }),
+  );
+  handle("tag_delete", ({ tags: refs }) =>
+    withAutoTagConditions(refs, null, (cores) => {
+      let removedTags = 0;
+      let affectedFiles = 0;
+      for (const { core } of cores) {
+        const r = tagAdmin.deleteTags(core.db, refs);
+        removedTags += r.removedTags;
+        affectedFiles += r.affectedFiles;
+      }
+      return { removedTags, affectedFiles };
+    }),
+  );
 }

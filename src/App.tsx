@@ -8,6 +8,7 @@ import Player from "@/routes/Player";
 import History from "@/routes/History";
 import Duplicates from "@/routes/Duplicates";
 import Tags from "@/routes/Tags";
+import AutoTag from "@/routes/AutoTag";
 import Settings from "@/routes/Settings";
 import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
@@ -32,6 +33,7 @@ const router = createHashRouter([
       { path: "history", element: <History /> },
       { path: "duplicates", element: <Duplicates /> },
       { path: "tags", element: <Tags /> },
+      { path: "auto-tag", element: <AutoTag /> },
       { path: "settings", element: <Settings /> },
     ],
   },

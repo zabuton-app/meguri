@@ -157,6 +157,33 @@ describe("BulkTagDialog", () => {
     expect(screen.getByText("1 to add / 0 to remove")).toBeTruthy();
   });
 
+  it("stages a name in another case as the tag the selection has", async () => {
+    open();
+    const input = screen.getByLabelText("Add a tag");
+    fireEvent.change(input, { target: { value: "TRIP" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    // Raised on the chip there, not a second chip beside it.
+    expect(within(chip("trip")).getByText("3/3")).toBeTruthy();
+    expect(screen.queryByText("TRIP")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply to 3" }));
+    await waitFor(() => expect(mocks.filesBulkTag).toHaveBeenCalled());
+    expect(mocks.filesBulkTag.mock.calls[0][1]).toEqual(["trip"]);
+  });
+
+  it("raises the chip clicked, beside another spelling of it", async () => {
+    // `trip` covers more of the selection, so it comes first in the tally.
+    open([
+      row(1, [manual(11, "trip")]),
+      row(2, [manual(11, "trip")]),
+      row(3, [manual(12, "Trip")], "ws-b"),
+    ]);
+    fireEvent.click(screen.getByTitle("Put “Trip” on every selected file"));
+    fireEvent.click(screen.getByRole("button", { name: "Apply to 3" }));
+    await waitFor(() => expect(mocks.filesBulkTag).toHaveBeenCalled());
+    expect(mocks.filesBulkTag.mock.calls[0][1]).toEqual(["Trip"]);
+  });
+
   it("an addition cancels a pending removal of the same name", () => {
     open();
     fireEvent.click(

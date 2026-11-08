@@ -69,16 +69,22 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
   const removeWorkspace = async (id: string): Promise<void> => {
     const p = ws.pathOf(id);
     if (p) {
-      await ctx.scans.abort(id);
-      // A graph layout save must not write into the data dir as it is
-      // deleted, nor bring it back after.
-      await removeWorkspaceWithLayouts(dataDirForRoot(p), async () => {
-        // The worker holds a read-only handle on this workspace's DB; close
-        // it before ws.remove() deletes the data dir (open handles block
-        // removal on Windows), with nothing awaited in between that would
-        // let a query open it again.
-        await queryClient.closeWorkspace(id);
-        ws.remove(p);
+      // Nothing may write into its database as it is closed: neither a scan
+      // nor a pass such as "Apply to existing files". Both are stopped and
+      // waited for at once.
+      const scanStopped = ctx.scans.abort(id);
+      await ctx.passes.holding(id, async () => {
+        await scanStopped;
+        // A graph layout save must not write into the data dir as it is
+        // deleted, nor bring it back after.
+        await removeWorkspaceWithLayouts(dataDirForRoot(p), async () => {
+          // The worker holds a read-only handle on this workspace's DB; close
+          // it before ws.remove() deletes the data dir (open handles block
+          // removal on Windows), with nothing awaited in between that would
+          // let a query open it again.
+          await queryClient.closeWorkspace(id);
+          ws.remove(p);
+        });
       });
     }
     if (ws.active()) ctx.scans.start();

@@ -53,7 +53,8 @@ export type QueryRequest =
     }
   | { kind: "history"; targets: QueryTarget[]; query: HistoryQuery }
   | { kind: "duplicates"; targets: QueryTarget[] }
-  | { kind: "tagsList"; targets: QueryTarget[] }
+  // prefer: the workspaces in view, whose tags are kept first at the cap.
+  | { kind: "tagsList"; targets: QueryTarget[]; prefer?: string[] }
   | { kind: "stats"; targets: QueryTarget[] }
   // Folder view: one real workspace only (the view is off for All and
   // collections), so these take the first target and ignore the rest.
@@ -279,7 +280,7 @@ export class QueryExecutor {
       case "duplicates":
         return cw.listDuplicatesWorkspaces(cores);
       case "tagsList":
-        return cw.listTagsWorkspaces(cores);
+        return cw.listTagsWorkspaces(cores, req.prefer);
       case "stats": {
         let fileCount = 0;
         let scanAt: number | null = null;

@@ -1,7 +1,21 @@
 // SQLite (better-sqlite3). Schema definition and connection.
 import Database from "better-sqlite3";
+import { tagIdentityKey } from "../../shared/tags.js";
 
 export type DB = Database.Database;
+
+/**
+ * Make tagIdentityKey callable from SQL as `tag_key(name)`, so a query matches
+ * tag names by the same rule as the code around it. SQLite's own `lower()` and
+ * NOCASE stop at ASCII. Connection-local: every handle that runs those queries
+ * registers it, and nothing in the schema depends on it, so the file still
+ * opens anywhere else.
+ */
+function registerFunctions(db: DB): void {
+  db.function("tag_key", { deterministic: true }, (name: unknown) =>
+    typeof name === "string" ? tagIdentityKey(name) : name,
+  );
+}
 
 // Trigram tokenizer enables substring matching (mid-word and CJK), which the default
 // unicode61 tokenizer cannot do. Shared between CORE_DDL and the rebuild in
@@ -24,15 +38,22 @@ const FTS_DDL =
  * SearchQuery.tags[] filter, neither of which goes through FTS.
  *
  * Callers append their own scope to the trailing WHERE clause.
+ *
+ * The join order in the subquery is pinned (CROSS JOIN), and callers may pin
+ * the index on `files` through `from`. Workspace databases are never ANALYZEd,
+ * and without statistics the planner starts the subquery from `tags` — every
+ * one of the user's tags, for every file — which went unnoticed while a library
+ * had a few dozen of them and takes seconds once it has thousands.
  */
-const FTS_ROW_SELECT = `
+const ftsRowSelect = (from = "files f"): string => `
   SELECT f.id, f.rel_path,
          COALESCE((SELECT group_concat(name, ' ') FROM
            (SELECT DISTINCT t.name AS name
-            FROM meta_tags mt JOIN tags t ON t.id = mt.tag_id
+            FROM meta_tags mt CROSS JOIN tags t ON t.id = mt.tag_id
             WHERE mt.meta_key = f.meta_key AND t.namespace = ''
             ORDER BY name)), '')
-  FROM files f WHERE f.deleted_at IS NULL`;
+  FROM ${from} WHERE f.deleted_at IS NULL`;
+const FTS_ROW_SELECT = ftsRowSelect();
 
 /** Chunk size for meta_key batches passed to resyncFtsForKeys as one JSON array. */
 const FTS_RESYNC_CHUNK = 5000;
@@ -153,6 +174,7 @@ ${FTS_DDL};
  *  here so existing on-disk DBs gain them without a separate migration step. */
 export function openDb(file: string): DB {
   const db = new Database(file);
+  registerFunctions(db);
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");
   db.pragma("foreign_keys = ON");
@@ -297,7 +319,8 @@ export function resyncFtsForKeys(db: DB, metaKeys: string[]): void {
   );
   const ins = db.prepare(
     `INSERT INTO files_fts (rowid, rel_path, tags_text)
-     ${FTS_ROW_SELECT} AND f.meta_key IN (SELECT value FROM json_each(?))`,
+     ${ftsRowSelect("files f INDEXED BY idx_files_meta_key")}
+       AND f.meta_key IN (SELECT value FROM json_each(?))`,
   );
   for (let i = 0; i < metaKeys.length; i += FTS_RESYNC_CHUNK) {
     const chunk = JSON.stringify(metaKeys.slice(i, i + FTS_RESYNC_CHUNK));
@@ -335,6 +358,7 @@ function migrateFtsToTrigram(db: DB): void {
  */
 export function openDbReadonly(file: string): DB {
   const db = new Database(file, { readonly: true, fileMustExist: true });
+  registerFunctions(db);
   // Connection-local (never written to the file): even in WAL mode a reader
   // can hit SQLITE_BUSY around writer checkpoints; retry briefly instead of
   // surfacing an exception to the renderer.

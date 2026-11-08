@@ -177,13 +177,67 @@ describe("Tags screen", () => {
     fireEvent.click(screen.getByText("Merge", { selector: "button" }));
     fireEvent.click(await screen.findByText("Merge", { selector: "button" }));
 
+    // As a rename into the taken name: main merges it in each workspace.
     await waitFor(() =>
-      expect(mocks.tagMerge).toHaveBeenCalledWith(
-        [{ namespace: "", name: "beach" }],
-        { namespace: "", name: "holiday" },
+      expect(mocks.tagRename).toHaveBeenCalledWith(
+        { namespace: "", name: "beach" },
+        "holiday",
       ),
     );
-    expect(mocks.tagRename).not.toHaveBeenCalled();
+    expect(mocks.tagMerge).not.toHaveBeenCalled();
+  });
+
+  it("treats a name in another case as the tag it means", async () => {
+    render();
+    await screen.findByText("Manual tags");
+    fireEvent.click(screen.getAllByLabelText("Rename")[0]);
+
+    const input = await screen.findByLabelText("New tag name");
+    fireEvent.change(input, { target: { value: "HOLIDAY" } });
+    fireEvent.click(screen.getByText("Merge", { selector: "button" }));
+    fireEvent.click(await screen.findByText("Merge", { selector: "button" }));
+
+    // Into the tag as it is spelled, not as typed.
+    // As a rename into the taken name: main merges it in each workspace.
+    await waitFor(() =>
+      expect(mocks.tagRename).toHaveBeenCalledWith(
+        { namespace: "", name: "beach" },
+        "holiday",
+      ),
+    );
+    expect(mocks.tagMerge).not.toHaveBeenCalled();
+  });
+
+  it("only respells a tag renamed to itself in another case", async () => {
+    render();
+    await screen.findByText("Manual tags");
+    fireEvent.click(screen.getAllByLabelText("Rename")[0]);
+
+    const input = await screen.findByLabelText("New tag name");
+    fireEvent.change(input, { target: { value: "Beach" } });
+    fireEvent.click(screen.getByText("Rename", { selector: "button" }));
+
+    await waitFor(() =>
+      expect(mocks.tagRename).toHaveBeenCalledWith(
+        { namespace: "", name: "beach" },
+        "Beach",
+      ),
+    );
+    expect(mocks.tagMerge).not.toHaveBeenCalled();
+  });
+
+  it("offers no merge for an unchanged name beside another spelling", async () => {
+    // A library from before the rule holds both; neither collides with itself.
+    mocks.tagsListAll.mockResolvedValue({
+      tags: [tag("", "Trip", 2), tag("", "trip", 1)],
+      truncated: false,
+    });
+    render();
+    await screen.findByText("Manual tags");
+    fireEvent.click(screen.getAllByLabelText("Rename")[0]);
+    await screen.findByLabelText("New tag name");
+    expect(screen.queryByText("Merge", { selector: "button" })).toBeNull();
+    expect(screen.getByText("Rename", { selector: "button" })).toBeTruthy();
   });
 
   it("refuses an over-long name in the form instead of at the IPC layer", async () => {

@@ -1,3 +1,4 @@
+import { defaultAutoTagConfig } from "../../shared/autoTag.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runScan = vi.hoisted(() => vi.fn());
@@ -60,6 +61,8 @@ function makeDeps(
     queryClient: { invalidateCaches } as unknown as Deps["queryClient"],
     emit: vi.fn(),
     isQuitting: () => false,
+    autoTag: () => ({ config: defaultAutoTagConfig(), version: 0 }),
+    deriveAutoTags: () => Promise.resolve([]),
     ...overrides,
   };
 }
@@ -80,6 +83,28 @@ describe("ScanManager", () => {
     // Settled: the same workspace can be scanned again.
     pendingScan();
     expect(scans.start()).not.toBe("");
+  });
+
+  it("leaves the auto-tagging settings to be read when the tagging starts", async () => {
+    // A save while the files are walked and hashed is no reason to skip
+    // tagging them: the scan reads the settings only once it tags.
+    const finish = pendingScan();
+    const autoTag = vi.fn(() => ({
+      config: defaultAutoTagConfig(),
+      version: 0,
+    }));
+    const scans = new ScanManager(makeDeps({ autoTag }));
+    scans.start();
+    const [, , , opts] = runScan.mock.calls[0] as [
+      unknown,
+      string,
+      unknown,
+      { autoTag: unknown },
+    ];
+    expect(opts.autoTag).toBe(autoTag);
+    expect(autoTag).not.toHaveBeenCalled();
+    finish();
+    await scans.abort("a");
   });
 
   it("starts nothing once the app is quitting", () => {

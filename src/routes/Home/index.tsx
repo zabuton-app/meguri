@@ -52,6 +52,7 @@ import {
   onApplyTagFilter,
   onOpenCommandMenu,
   onOpenShortcuts,
+  onSearchLibrary,
 } from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -81,6 +82,7 @@ import {
   VIEW_KEY,
   type ViewMode,
   addSearchTokens,
+  replaceSearchTokens,
   discoverPath,
   BY_FOLDER_KEY,
   LIST_MAIN_ID,
@@ -748,10 +750,14 @@ export default function Home() {
     const unApplyTags = onApplyTagFilter((tokens) =>
       setFilter((f) => addSearchTokens(f, tokens)),
     );
+    const unSearch = onSearchLibrary((tokens) =>
+      setFilter((f) => replaceSearchTokens(f, tokens)),
+    );
     return () => {
       unCommand();
       unShortcuts();
       unApplyTags();
+      unSearch();
     };
   }, []);
 

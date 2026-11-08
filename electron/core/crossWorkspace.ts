@@ -654,13 +654,19 @@ function dupKey(hash: string, size: number): string {
  * Tags live in per-workspace databases with per-database ids, so the union is
  * built on the name — the same identifier the mutation channels use. Counts and
  * per-source breakdowns are summed; a workspace is listed once per tag it holds.
+ * Keyed by the exact spelling, not tagIdentityKey: `Trip` in one workspace and
+ * `trip` in another are listed apart, as a library holding both lists them —
+ * each is a row the screen can rename or merge, which a folded entry is not.
  *
  * Ordering puts user-owned tags first, then namespaces alphabetically, then
  * names case-insensitively. The known auto-meta namespaces get no special
  * treatment here: the set is open, and the renderer applies its own grouping
- * order on top.
+ * order on top. `prefer`: see capTagList.
  */
-export function listTagsWorkspaces(cores: CoreTarget[]): TagList {
+export function listTagsWorkspaces(
+  cores: CoreTarget[],
+  prefer?: readonly string[],
+): TagList {
   const merged = new Map<string, TagSummary>();
   for (const { id, core } of cores) {
     for (const row of listTags(core.db)) {
@@ -696,11 +702,40 @@ export function listTagsWorkspaces(cores: CoreTarget[]): TagList {
   for (const tag of tags) {
     tag.bySource.sort((a, b) => a.source.localeCompare(b.source));
   }
-  return capTagList(tags);
+  return capTagList(tags, prefer);
 }
 
 /**
- * Cut an over-long catalog down to MAX_TAG_LIST without losing a whole class of
+ * Cut the catalog down to MAX_TAG_LIST.
+ *
+ * `prefer` names the workspaces being looked at when the catalog spans more
+ * than them (the search box completes from every workspace). Their tags are
+ * kept first and the others fill what room is left, so a library with more
+ * tags than the cap never stops offering the view's own.
+ */
+function capTagList(
+  tags: TagSummary[],
+  prefer: readonly string[] | undefined,
+): TagList {
+  if (tags.length <= MAX_TAG_LIST) return { tags, truncated: false };
+  if (!prefer) return { tags: capTags(tags, MAX_TAG_LIST), truncated: true };
+  const inView = new Set(prefer);
+  const near: TagSummary[] = [];
+  const far: TagSummary[] = [];
+  for (const tag of tags) {
+    (tag.workspaceIds.some((id) => inView.has(id)) ? near : far).push(tag);
+  }
+  const keptNear = capTags(near, MAX_TAG_LIST);
+  const kept = new Set([
+    ...keptNear,
+    ...capTags(far, MAX_TAG_LIST - keptNear.length),
+  ]);
+  // Filtering the catalog keeps its order; the split only decides membership.
+  return { tags: tags.filter((tag) => kept.has(tag)), truncated: true };
+}
+
+/**
+ * Cut an over-long catalog down to `limit` without losing a whole class of
  * tags.
  *
  * The ordering puts user-owned tags first, so a plain slice() would drop every
@@ -714,30 +749,27 @@ export function listTagsWorkspaces(cores: CoreTarget[]): TagList {
  * floor only bites where both classes are over a thousand, and there being cut
  * to half a catalog nobody can read through anyway is the point.
  */
-function capTagList(tags: TagSummary[]): TagList {
-  if (tags.length <= MAX_TAG_LIST) return { tags, truncated: false };
+function capTags(tags: TagSummary[], limit: number): TagSummary[] {
+  if (tags.length <= limit) return tags;
   const manual = tags.filter((tag) => !tag.pipelineOwned);
   const pipeline = tags.filter((tag) => tag.pipelineOwned);
   const keepPipeline = Math.min(
     pipeline.length,
-    Math.max(Math.floor(MAX_TAG_LIST / 2), MAX_TAG_LIST - manual.length),
+    Math.max(Math.floor(limit / 2), limit - manual.length),
   );
-  return {
-    // Concatenating in this order preserves the sort: manual tags have an empty
-    // namespace, which sorts ahead of every generated one.
-    tags: [
-      ...manual.slice(0, MAX_TAG_LIST - keepPipeline),
-      ...takeAcrossNamespaces(pipeline, keepPipeline),
-    ],
-    truncated: true,
-  };
+  // Concatenating in this order preserves the sort: manual tags have an empty
+  // namespace, which sorts ahead of every generated one.
+  return [
+    ...manual.slice(0, limit - keepPipeline),
+    ...takeAcrossNamespaces(pipeline, keepPipeline),
+  ];
 }
 
 /**
  * Take `limit` tags, one namespace at a time, so no namespace can crowd out
  * another.
  *
- * The same failure as the one capTagList exists to prevent, a level down: the
+ * The same failure as the one capTags exists to prevent, a level down: the
  * catalog is sorted by namespace, so slicing the generated tags would empty the
  * ones late in the alphabet first. `codec` is the namespace this actually
  * threatens — its values come from ffprobe and are an open set, unlike the

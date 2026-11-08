@@ -8,10 +8,23 @@ function ScrollArea({
   children,
   viewportClassName,
   viewportRef,
+  fillViewport = false,
   type,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   viewportClassName?: string;
+  /**
+   * Make the content at least as tall as the viewport, so a child given
+   * `flex-1` fills it while the content is short (a pane border that runs to
+   * the bottom, a footer pinned there).
+   *
+   * Radix wraps the content in a `display: table` box that is only as tall as
+   * the content; this turns that box into a flex column of the viewport's
+   * height. A percentage `min-height` on the child would not do — the box has
+   * no height of its own to take a percentage of. Knowledge of that box stays
+   * in this file.
+   */
+  fillViewport?: boolean;
   /** Ref to the Viewport (the actual scroll element). Used by virtualization's getScrollElement, etc. */
   viewportRef?: React.Ref<HTMLDivElement>;
 }) {
@@ -27,6 +40,7 @@ function ScrollArea({
         data-slot="scroll-area-viewport"
         className={cn(
           "size-full rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          fillViewport && "[&>div]:!flex [&>div]:min-h-full [&>div]:flex-col",
           viewportClassName,
         )}
       >

@@ -11,6 +11,7 @@ import {
   Waypoints,
   Pencil,
   RefreshCw,
+  Sparkles,
   Tags as TagsIcon,
 } from "lucide-react";
 import { Link } from "react-router";
@@ -160,6 +161,14 @@ export function HomeHeader({
           className="flex size-7 items-center justify-center rounded-md border border-border text-muted transition hover:bg-fg/10 hover:text-fg"
         >
           <TagsIcon className="size-4" />
+        </Link>
+        <Link
+          to="/auto-tag"
+          title={t("autoTag.title")}
+          aria-label={t("autoTag.title")}
+          className="flex size-7 items-center justify-center rounded-md border border-border text-muted transition hover:bg-fg/10 hover:text-fg"
+        >
+          <Sparkles className="size-4" />
         </Link>
         <div className="flex items-center rounded-md border border-border">
           {(

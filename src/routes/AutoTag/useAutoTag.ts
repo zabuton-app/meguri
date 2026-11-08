@@ -1,0 +1,561 @@
+// State behind the auto-tagging screen: the configuration (saved as it is
+// edited), the files of every workspace, and applying / removing tags.
+//
+// Analysis runs here in the renderer, on the same engine the scan uses
+// (shared/autoTag.ts), over the names loaded once per visit. Writes go through
+// main: the screen only ever says which files get which tags.
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { api } from "@/ipc/client";
+import { useI18n } from "@/i18n/I18nProvider";
+import { invalidateTagCatalog } from "@/lib/queryCache";
+import {
+  MAX_AUTO_TAGS_PER_FILE,
+  MAX_AUTO_TAG_PLACE_CHARS,
+  MAX_AUTO_TAG_PAIRS,
+  MAX_AUTO_TAG_TERMS,
+  compileEngine,
+  type AutoTagAssignment,
+  type AutoTagConfig,
+  type AutoTagEditTarget,
+  type AutoTagFile,
+  type AutoTagLibrary,
+  type CompiledEngine,
+  type TagRule,
+  placeOf,
+} from "@shared/autoTag";
+import { STOP_WORDS } from "@shared/autoTagAnalysis";
+import { MAX_BULK_FILES, tagIdentityKey } from "@shared/tags";
+import { useRuleResults, type RuleView } from "./useRuleResults";
+
+/**
+ * `ok: false` is a failure (already reported to the user). Nothing new to add
+ * is a success with zero counts — callers must be able to tell the two apart
+ * before they report anything as done.
+ */
+export type ApplyOutcome =
+  { ok: true; files: number; added: number } | { ok: false };
+
+/** Which files share one set of tags: the copies of a file in its workspace. */
+const siblingKey = (file: AutoTagFile): string =>
+  `${file.workspaceId}\0${file.metaKey}`;
+
+/** As ApplyOutcome, for taking a tag off: `files` is how many lost it. */
+export type RemoveOutcome = { ok: true; files: number } | { ok: false };
+
+export interface AutoTagState {
+  config: AutoTagConfig;
+  update: (fn: (config: AutoTagConfig) => AutoTagConfig) => void;
+  files: AutoTagFile[];
+  /** `files[i].name`, as its own array: every analysis takes just the names. */
+  names: string[];
+  /** Alive files of every workspace; more than `files.length` when only a sample loaded. */
+  total: number;
+  /** The user's tags, of every workspace: lowercase → the spelling in use. */
+  existing: Map<string, string>;
+  /** Lowercased tags of each file. */
+  fileTags: Set<string>[];
+  /**
+   * The keywords, compiled from the configuration a beat behind fast typing.
+   * No rule: the screen runs those in a worker (ruleView).
+   */
+  engine: CompiledEngine;
+  /** Where a regex rule stands against the names (see useRuleResults). */
+  ruleView: (rule: TagRule) => RuleView;
+  /**
+   * The suggestable words the enabled rules give each name, by position —
+   * null while one of them is still running.
+   */
+  ruleWords: ReadonlyMap<number, ReadonlySet<string>> | null;
+  /** Words never offered as tags. */
+  stop: Set<string>;
+  loading: boolean;
+  reload: () => void;
+  /** Attach tags (file position → names). Tags a file already has are skipped. */
+  apply: (perFile: Map<number, string[]>) => Promise<ApplyOutcome>;
+  /**
+   * Take a tag off files (by position), whoever put it there: nothing records
+   * which tags the screen applied, so this goes by what the files carry — the
+   * user's own tags, which is all the screen reads and all files_bulk_tag
+   * detaches. `key` is the tag lowercased; every spelling of it goes, and the
+   * files' copies lose it with them.
+   */
+  remove: (indexes: readonly number[], key: string) => Promise<RemoveOutcome>;
+  /**
+   * {@link remove}, with `to` put on the same files in the tag's place — one
+   * edit per file, so a file ends up with the one tag or the other, never
+   * with neither. `files` is how many changed.
+   */
+  retag: (
+    indexes: readonly number[],
+    key: string,
+    to: string,
+  ) => Promise<RemoveOutcome>;
+  reapply: () => Promise<{ files: number; added: number } | null>;
+}
+
+const SAVE_DELAY_MS = 400;
+
+/** Debounced writer for the configuration; `flush` sends what is waiting. */
+class ConfigSaver {
+  private saved: AutoTagConfig | null = null;
+  private waiting: AutoTagConfig | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private onError: (error: unknown) => void = () => {};
+
+  /** What main already has: not something to write back. */
+  loaded(config: AutoTagConfig): void {
+    this.saved = config;
+  }
+
+  schedule(config: AutoTagConfig, onError: (error: unknown) => void): void {
+    if (config === this.saved) return;
+    this.waiting = config;
+    this.onError = onError;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(
+      () => void this.flush().catch(() => {}),
+      SAVE_DELAY_MS,
+    );
+  }
+
+  /** Sends what is waiting. Rejects when the write fails, and keeps it waiting. */
+  async flush(): Promise<void> {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    const config = this.waiting;
+    if (!config || config === this.saved) return;
+    try {
+      await api.autoTagSet(config);
+    } catch (error) {
+      this.onError(error);
+      throw error;
+    }
+    // Only now: a failed write is still waiting, and the next flush retries it.
+    this.saved = config;
+    if (this.waiting === config) this.waiting = null;
+  }
+}
+
+/** Files grouped by workspace, each with where this screen read it. */
+function placedTargets(files: readonly AutoTagFile[]): AutoTagEditTarget[] {
+  const groups = new Map<string, AutoTagEditTarget>();
+  for (const file of files) {
+    const place = placeOf(file.folder, file.name);
+    const group = groups.get(file.workspaceId);
+    if (group) {
+      group.fileIds.push(file.id);
+      group.places.push(place);
+    } else {
+      groups.set(file.workspaceId, {
+        workspaceId: file.workspaceId,
+        fileIds: [file.id],
+        places: [place],
+      });
+    }
+  }
+  return [...groups.values()];
+}
+
+/** Keep the newest entries of a list that the schema caps. */
+function capped(list: string[]): string[] {
+  return list.length > MAX_AUTO_TAG_TERMS
+    ? list.slice(list.length - MAX_AUTO_TAG_TERMS)
+    : list;
+}
+
+export function useAutoTag(): AutoTagState | null {
+  const { t } = useI18n();
+  const qc = useQueryClient();
+  const [config, setConfig] = useState<AutoTagConfig | null>(null);
+  const [library, setLibrary] = useState<AutoTagLibrary | null>(null);
+  const [loading, setLoading] = useState(true);
+  /** Counts completed loads of the file list. */
+  const [loadedAt, setLoadedAt] = useState(0);
+
+  const fetchLibrary = useCallback(
+    () =>
+      api
+        .autoTagFiles()
+        .then((loaded) => {
+          setLibrary(loaded);
+          setLoadedAt((n) => n + 1);
+        })
+        .catch(() => toast.error(t("autoTag.loadFailed")))
+        .finally(() => setLoading(false)),
+    [t],
+  );
+  const load = useCallback(() => {
+    setLoading(true);
+    void fetchLibrary();
+  }, [fetchLibrary]);
+
+  const [saver] = useState(() => new ConfigSaver());
+  useEffect(() => {
+    let active = true;
+    api
+      .autoTagGet()
+      .then((loaded) => {
+        if (!active) return;
+        saver.loaded(loaded);
+        setConfig(loaded);
+      })
+      .catch(() => toast.error(t("autoTag.loadFailed")));
+    void fetchLibrary();
+    return () => {
+      active = false;
+    };
+  }, [fetchLibrary, saver, t]);
+
+  // Saved as it is edited — there is no save button.
+  useEffect(() => {
+    if (!config) return;
+    saver.schedule(config, (error) =>
+      toast.error(t("autoTag.saveFailed"), { description: String(error) }),
+    );
+  }, [config, saver, t]);
+  // Closing the screen inside the delay must not drop the last edit.
+  useEffect(() => () => void saver.flush().catch(() => {}), [saver]);
+
+  const update = useCallback((fn: (config: AutoTagConfig) => AutoTagConfig) => {
+    setConfig((prev) => {
+      if (!prev) return prev;
+      const next = fn(prev);
+      // The schema caps this list; past the cap every later save would be
+      // refused, so the oldest entries make room instead.
+      return { ...next, ignored: capped(next.ignored) };
+    });
+  }, []);
+
+  const deferred = useDeferredValue(config);
+  const engine = useMemo(
+    () =>
+      compileEngine({
+        // A user's regular expression never runs on this thread: one that
+        // backtracks without end would hang the screen. The rules run in a
+        // worker instead (below).
+        rules: [],
+        keywords: deferred?.keywords ?? [],
+        // The screen's analyses read names only: the Folders tab goes by the
+        // files' places itself, and editing a folder rule must not rerun the
+        // analysis of every name.
+        folders: [],
+      }),
+    // What the engine runs only: dismissing a suggestion or renaming a rule
+    // changes the configuration, not what the engine does, and every analysis
+    // downstream is keyed on this object.
+    [deferred?.keywords],
+  );
+  const stop = useMemo(() => new Set(STOP_WORDS), []);
+
+  const files = library?.files;
+  // Keyed on the load, not on `files`: applying tags replaces the file objects
+  // but never their names, and a new array here would rerun every analysis.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const names = useMemo(() => (files ?? []).map((f) => f.name), [loadedAt]);
+  const fileTags = useMemo(
+    () => (files ?? []).map((f) => new Set(f.tags.map(tagIdentityKey))),
+    [files],
+  );
+
+  const { view: ruleView, ruleWords } = useRuleResults(deferred?.rules, names);
+  const existing = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const name of library?.existingTags ?? []) {
+      const key = tagIdentityKey(name);
+      if (!map.has(key)) map.set(key, name);
+    }
+    return map;
+  }, [library?.existingTags]);
+
+  // Copies of a file share their tags, so what one of them gains they all do
+  // — within a workspace: each has a database of its own, and the same
+  // content in two of them is tagged twice over.
+  const siblings = useMemo(() => {
+    const byKey = new Map<string, number[]>();
+    (files ?? []).forEach((file, index) => {
+      const key = siblingKey(file);
+      const list = byKey.get(key);
+      if (list) list.push(index);
+      else byKey.set(key, [index]);
+    });
+    return byKey;
+  }, [files]);
+
+  const apply = useCallback(
+    async (perFile: Map<number, string[]>): Promise<ApplyOutcome> => {
+      if (!library) return { ok: false };
+      // Only what is new to each file is sent, so the counts reported are of
+      // what really changed — and so is what a rollback takes back, should a
+      // later call of this apply fail.
+      const sent = new Map<number, string[]>();
+      const groups = new Map<string, AutoTagAssignment>();
+      for (const [index, tags] of perFile) {
+        const file = library.files[index];
+        const have = fileTags[index];
+        const seen = new Set<string>();
+        const fresh: string[] = [];
+        for (const tag of tags) {
+          const key = tagIdentityKey(tag);
+          if (have.has(key) || seen.has(key)) continue;
+          seen.add(key);
+          fresh.push(existing.get(key) ?? tag);
+        }
+        if (fresh.length === 0) continue;
+        fresh.length = Math.min(fresh.length, MAX_AUTO_TAGS_PER_FILE);
+        sent.set(index, fresh);
+        const groupKey = `${file.workspaceId}\0${fresh.join("\0")}`;
+        const place = placeOf(file.folder, file.name);
+        const group = groups.get(groupKey);
+        if (group) {
+          group.fileIds.push(file.id);
+          group.places.push(place);
+        } else {
+          groups.set(groupKey, {
+            workspaceId: file.workspaceId,
+            fileIds: [file.id],
+            places: [place],
+            tags: fresh,
+          });
+        }
+      }
+      if (sent.size === 0) return { ok: true, files: 0, added: 0 };
+
+      // One call carries at most MAX_BULK_FILES ids, MAX_AUTO_TAG_PAIRS
+      // (file, tag) pairs and MAX_AUTO_TAG_PLACE_CHARS of places, however the
+      // files are grouped.
+      const calls: AutoTagAssignment[][] = [[]];
+      let fileRoom = MAX_BULK_FILES;
+      let pairRoom = MAX_AUTO_TAG_PAIRS;
+      let charRoom = MAX_AUTO_TAG_PLACE_CHARS;
+      for (const group of groups.values()) {
+        let part: AutoTagAssignment | null = null;
+        group.fileIds.forEach((fileId, i) => {
+          const place = group.places[i];
+          if (
+            fileRoom === 0 ||
+            pairRoom < group.tags.length ||
+            charRoom < place.length
+          ) {
+            calls.push([]);
+            fileRoom = MAX_BULK_FILES;
+            pairRoom = MAX_AUTO_TAG_PAIRS;
+            charRoom = MAX_AUTO_TAG_PLACE_CHARS;
+            part = null;
+          }
+          if (!part) {
+            part = { ...group, fileIds: [], places: [] };
+            calls[calls.length - 1].push(part);
+          }
+          part.fileIds.push(fileId);
+          part.places.push(place);
+          fileRoom -= 1;
+          pairRoom -= group.tags.length;
+          charRoom -= place.length;
+        });
+      }
+
+      const undoIds: string[] = [];
+      let filesChanged = 0;
+      let pairs = 0;
+      let moved = 0;
+      try {
+        for (const assignments of calls) {
+          // The calls before this one are what a failure takes back: they
+          // must not be the ones the main process lets go of to make room.
+          const result = await api.autoTagApply(assignments, [...undoIds]);
+          filesChanged += result.files;
+          pairs += result.added;
+          moved += result.moved;
+          if (result.undoId) undoIds.push(result.undoId);
+        }
+      } catch (error) {
+        toast.error(t("autoTag.applyFailed"), { description: String(error) });
+        // Earlier calls landed. Take them back rather than leave the files
+        // half tagged with nothing on screen to undo it, then show what the
+        // files really carry.
+        if (undoIds.length > 0) await api.autoTagUndo(undoIds).catch(() => {});
+        load();
+        return { ok: false };
+      }
+
+      // What changed here, copies included.
+      const added = new Map<number, string[]>();
+      for (const [index, tags] of sent) {
+        for (const twin of siblings.get(siblingKey(library.files[index])) ??
+          []) {
+          const have = new Set([
+            ...fileTags[twin],
+            ...(added.get(twin) ?? []).map(tagIdentityKey),
+          ]);
+          const fresh = tags.filter((tag) => !have.has(tagIdentityKey(tag)));
+          if (fresh.length > 0) {
+            added.set(twin, [...(added.get(twin) ?? []), ...fresh]);
+          }
+        }
+      }
+      setLibrary((prev) => {
+        if (!prev) return prev;
+        const nextFiles = [...prev.files];
+        const nextExisting = new Set(prev.existingTags);
+        for (const [index, tags] of added) {
+          nextFiles[index] = {
+            ...nextFiles[index],
+            tags: [...nextFiles[index].tags, ...tags],
+          };
+          for (const tag of tags) nextExisting.add(tag);
+        }
+        return { ...prev, files: nextFiles, existingTags: [...nextExisting] };
+      });
+      invalidateTagCatalog(qc);
+      // Some files were no longer where this screen read them: what it shows
+      // of them is out of date, so read the files again.
+      if (moved > 0) load();
+      return { ok: true, files: filesChanged, added: pairs };
+    },
+    [existing, fileTags, library, load, qc, siblings, t],
+  );
+
+  const remove = useCallback(
+    async (
+      indexes: readonly number[],
+      key: string,
+      to?: string,
+    ): Promise<RemoveOutcome> => {
+      if (!library) return { ok: false };
+      // What goes on in its place, if anything: in the spelling already in
+      // use, which is the tag files_bulk_tag would resolve it to anyway.
+      const put =
+        to === undefined ? [] : [existing.get(tagIdentityKey(to)) ?? to];
+      // The tag as one of the files spells it. One spelling is enough: each
+      // workspace takes off every spelling it has of the tag (`trip` and
+      // `Trip` may be two rows), see manualSpellings.
+      let name: string | undefined;
+      const holders: AutoTagFile[] = [];
+      for (const index of indexes) {
+        const file = library.files[index];
+        const mine = file.tags.find((tag) => tagIdentityKey(tag) === key);
+        if (mine === undefined) continue;
+        name ??= mine;
+        holders.push(file);
+      }
+      if (name === undefined) return { ok: true, files: 0 };
+      const names = [name];
+
+      // One call carries at most MAX_BULK_FILES ids and
+      // MAX_AUTO_TAG_PLACE_CHARS of places, however they are grouped.
+      const parts: AutoTagFile[][] = [];
+      let charRoom = 0;
+      for (const file of holders) {
+        const chars = placeOf(file.folder, file.name).length;
+        const last = parts.at(-1);
+        if (!last || last.length === MAX_BULK_FILES || charRoom < chars) {
+          parts.push([file]);
+          charRoom = MAX_AUTO_TAG_PLACE_CHARS - chars;
+        } else {
+          last.push(file);
+          charRoom -= chars;
+        }
+      }
+      const calls = parts.map(placedTargets);
+      let filesChanged = 0;
+      let moved = 0;
+      try {
+        for (const targets of calls) {
+          const result = await api.autoTagEdit(targets, put, names);
+          filesChanged += result.files;
+          moved += result.moved;
+        }
+      } catch (error) {
+        toast.error(
+          t(put.length > 0 ? "autoTag.applyFailed" : "autoTag.removeFailed"),
+          { description: String(error) },
+        );
+        // Some calls may have landed: show what the files really carry, here
+        // and in every other view of them.
+        load();
+        invalidateTagCatalog(qc);
+        return { ok: false };
+      }
+      // Copies of a file share their tags, so they lost it as well.
+      const touched = new Set<number>();
+      for (const index of indexes) {
+        for (const twin of siblings.get(siblingKey(library.files[index])) ??
+          []) {
+          touched.add(twin);
+        }
+      }
+      setLibrary((prev) => {
+        if (!prev) return prev;
+        const nextFiles = [...prev.files];
+        for (const index of touched) {
+          const file = nextFiles[index];
+          const tags = file.tags.filter((tag) => tagIdentityKey(tag) !== key);
+          if (tags.length === file.tags.length) continue;
+          for (const tag of put) {
+            const putKey = tagIdentityKey(tag);
+            if (!tags.some((x) => tagIdentityKey(x) === putKey)) tags.push(tag);
+          }
+          nextFiles[index] = { ...file, tags };
+        }
+        return {
+          ...prev,
+          files: nextFiles,
+          existingTags: [...new Set([...prev.existingTags, ...put])],
+        };
+      });
+      invalidateTagCatalog(qc);
+      // As in apply: some files had moved on; show what they really carry.
+      if (moved > 0) load();
+      return { ok: true, files: filesChanged };
+    },
+    [existing, library, load, qc, siblings, t],
+  );
+
+  const reapply = useCallback(async () => {
+    try {
+      // The scan-side pass reads the stored configuration, so store it first —
+      // and do not run at all on rules other than the ones on screen.
+      await saver.flush();
+      const result = await api.autoTagReapply();
+      invalidateTagCatalog(qc);
+      load();
+      return result;
+    } catch (error) {
+      toast.error(t("autoTag.applyFailed"), { description: String(error) });
+      // The chunks before the one that failed were written: show what the
+      // files really carry, here and in every other view of them.
+      invalidateTagCatalog(qc);
+      load();
+      return null;
+    }
+  }, [load, qc, saver, t]);
+
+  if (!config || !library) return null;
+  return {
+    config,
+    update,
+    files: library.files,
+    names,
+    total: library.total,
+    existing,
+    fileTags,
+    engine,
+    ruleView,
+    ruleWords,
+    stop,
+    loading,
+    reload: load,
+    apply,
+    remove,
+    retag: remove,
+    reapply,
+  };
+}

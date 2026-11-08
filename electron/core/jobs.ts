@@ -12,6 +12,12 @@ import {
   backfillAutoMetaTags,
   needsAutoMetaBackfill,
 } from "./autoMetaTags.js";
+import { applyAutoTagsOnScan, clearAutoTagPending } from "./autoTag.js";
+import {
+  AutoTagTimeoutError,
+  AutoTagUnavailableError,
+  type DeriveAutoTags,
+} from "./autoTagDeriver.js";
 import { pool } from "./concurrency.js";
 import {
   LARGE_IMAGE_PIXELS,
@@ -20,6 +26,7 @@ import {
 } from "./mediaConcurrency.js";
 import { scopedLog } from "./logger.js";
 import type { Kind } from "./types.js";
+import type { AutoTagConfig } from "../../shared/autoTag.js";
 
 const log = scopedLog("scan");
 
@@ -75,7 +82,25 @@ export async function runScan(
   core: Core,
   jobId: string,
   onEvent: (e: JobEvent) => void,
-  opts: { rebuild?: boolean; signal?: AbortSignal } = {},
+  opts: {
+    rebuild?: boolean;
+    signal?: AbortSignal;
+    /** The workspace being scanned, for the configuration's folder rules. */
+    workspaceId?: string;
+  } & (
+    | { autoTag?: undefined; deriveAutoTags?: undefined }
+    | {
+        /**
+         * Reads the auto-tagging configuration (app config) and its version
+         * (autoTagSettingsVersion); nothing is tagged when omitted. Read when
+         * the tagging starts, not with the scan: settings saved while the
+         * files are walked and hashed are the ones the scan tags them with.
+         */
+        autoTag: () => { config: AutoTagConfig; version: number };
+        /** Evaluates the engine: the worker, so a rule cannot stall the scan. */
+        deriveAutoTags: DeriveAutoTags;
+      }
+  ) = {},
 ): Promise<ScanStats> {
   const { signal } = opts;
   const { db } = core;
@@ -114,10 +139,59 @@ export async function runScan(
   );
   q.touchScanRoot(db, core.rootId);
 
-  // Sync FTS only for new/moved/updated entries (unchanged ones need no re-sync).
-  const ftsTotal = ftsTargets.length;
+  // Tag what this scan added or changed (ftsTargets is exactly that set). Ahead
+  // of the FTS sync and the thumbnail pool: the engine reads nothing but file
+  // names and where the files are, so its tags need not wait for the slowest
+  // phase of the scan.
+  let tagged: ReadonlySet<number> = new Set();
+  // `derive` read with it: checking opts.autoTag is what tells the type
+  // that deriveAutoTags is there.
+  const autoTag = opts.autoTag && {
+    ...opts.autoTag(),
+    derive: opts.deriveAutoTags,
+  };
+  if (autoTag?.config.applyOnScan) {
+    try {
+      tagged = await applyAutoTagsOnScan(db, {
+        engine: autoTag.config,
+        workspaceId: opts.workspaceId,
+        derive: autoTag.derive,
+        settingsVersion: autoTag.version,
+        changedIds: ftsTargets,
+        signal,
+        onProgress: (d, t) =>
+          onEvent({
+            type: "progress",
+            jobId,
+            phase: "tags",
+            done: d,
+            total: t,
+          }),
+      });
+    } catch (err) {
+      // A worker that will not run, or that got stuck with no rule to blame
+      // (a rule that does not finish is left out by the worker's client, and
+      // the rest carry on), must not cost the scan its thumbnails. The folder
+      // rules' tags were added; the files stay owed for what their names give,
+      // so the next scan tags them once the cause is gone.
+      if (err instanceof AutoTagTimeoutError) {
+        log.warn("auto-tagging skipped: the worker got stuck");
+      } else if (err instanceof AutoTagUnavailableError) {
+        log.warn("auto-tagging skipped: the worker is unavailable");
+      } else {
+        throw err;
+      }
+    }
+  } else if (autoTag) {
+    clearAutoTagPending(db);
+  }
+
+  // Sync FTS only for new/moved/updated entries (unchanged ones need no re-sync),
+  // less those auto tagging re-synced as it tagged them.
+  const ftsIds = ftsTargets.filter((id) => !tagged.has(id));
+  const ftsTotal = ftsIds.length;
   let done = 0;
-  for (const id of ftsTargets) {
+  for (const id of ftsIds) {
     if (signal?.aborted) break;
     syncFts(db, id);
     done++;
