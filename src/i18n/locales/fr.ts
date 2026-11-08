@@ -21,6 +21,32 @@ export const fr: Record<TranslationKey, string> = {
   "audio.between": "Entre",
   "audio.durationOrderError":
     "La durée minimale ne doit pas dépasser la durée maximale.",
+  "recent.title": "Nouveaux fichiers",
+  "recent.window": "Période",
+  "recent.basis": "Définir les nouveaux fichiers selon",
+  "recent.today": "Aujourd’hui",
+  "recent.thisWeek": "Cette semaine",
+  "recent.lastHour": "Dernière heure",
+  "recent.last24Hours": "Dernières 24 heures",
+  "recent.last7Days": "7 derniers jours",
+  "recent.added": "Première détection par Meguri",
+  "recent.created": "Date de création du fichier",
+  "recent.addedHint":
+    "Utilise la première entrée dans ce catalogue, indépendamment des dates intégrées au média.",
+  "recent.createdHint":
+    "Utilise la date de création du système de fichiers. Les fichiers sans cette date ne correspondent pas.",
+  "recent.calendarHint":
+    "Aujourd’hui et cette semaine suivent votre fuseau horaire local. La semaine commence le lundi.",
+  "watch.title": "Surveiller les dossiers",
+  "watch.off": "Désactivé",
+  "watch.enable": "Surveiller automatiquement les dossiers analysés",
+  "watch.hint":
+    "Met à jour pendant l’exécution de Meguri. Utilise les notifications du système et attend la stabilisation des téléchargements.",
+  "watch.count": "Surveillance de {count} dossiers analysés.",
+  "watch.unavailable":
+    "Surveillance indisponible pour {count} dossiers. Utilisez Analyser pour les actualiser.",
+  "watch.error":
+    "Impossible de lire ou de modifier les paramètres de surveillance.",
   "audio.filters": "Propriétés audio",
   "audio.any": "Tous",
   "audio.sampleRate": "Fréquence d’échantillonnage",

@@ -322,6 +322,8 @@ export const ChannelInputs = {
     })
     .default({}),
   scan_cancel: z.object({ wsId: z.string().optional() }).default({}),
+  watch_get: z.void(),
+  watch_set: z.object({ enabled: z.boolean() }),
   files_search: z.object({ query: SearchQuerySchema }),
   files_random: z.object({ query: SearchQuerySchema.optional() }).default({}),
   folders_list: z.object({
@@ -610,6 +612,8 @@ export interface ChannelOutputs {
   collection_set_membership: { changed: number };
   scan_start: string;
   scan_cancel: void;
+  watch_get: { enabled: boolean; watched: number; unavailable: string[] };
+  watch_set: { enabled: boolean; watched: number; unavailable: string[] };
   files_search: SearchResult;
   files_random: FileRow[];
   folders_list: FolderListing;

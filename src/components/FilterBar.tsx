@@ -21,6 +21,7 @@ import { useSmartCollections } from "@/hooks/useSmartCollections";
 import type { SmartCollection } from "@/lib/smartCollections";
 import { ResolutionFilter } from "./ResolutionFilter";
 import { AudioFilters } from "./AudioFilters";
+import { RecentFilesFilter } from "./RecentFilesFilter";
 
 interface Props {
   value: SearchQuery;
@@ -153,6 +154,25 @@ export function FilterBar({
             size={14}
           />
         </div>
+        <RecentFilesFilter
+          value={value.recent}
+          rememberView={showSaved}
+          onChange={(recent) =>
+            patch({
+              recent,
+              ...(recent
+                ? {
+                    addedFrom: undefined,
+                    addedTo: undefined,
+                    btimeFrom: undefined,
+                    btimeTo: undefined,
+                    sort: recent.basis === "added" ? "added" : "btime",
+                    sortDir: "desc",
+                  }
+                : {}),
+            })
+          }
+        />
 
         <button
           type="button"

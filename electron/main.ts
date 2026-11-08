@@ -17,7 +17,12 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import { DEFAULT_LOGO, loadAutoTag, loadConfig } from "./core/appConfig.js";
+import {
+  DEFAULT_LOGO,
+  loadAutoTag,
+  loadConfig,
+  normalizeDir,
+} from "./core/appConfig.js";
 import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import log, { setupLogger } from "./core/logger.js";
 import { withTimeout } from "./core/concurrency.js";
@@ -336,6 +341,7 @@ function resolveCliRoot(): string | null {
 }
 
 function emit(channel: string, payload: unknown): void {
+  if (channel === "workspace:changed") scans.syncWatchers();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send(channel, payload);
 }
@@ -347,6 +353,10 @@ const autoTagWorker = new AutoTagWorkerClient(
 );
 const passes = new WorkspacePasses();
 const scans = new ScanManager({
+  ignoredRoots: [
+    app.getPath("userData"),
+    normalizeDir(app.getPath("userData")),
+  ],
   ws,
   queryClient,
   emit,
@@ -594,7 +604,10 @@ void app.whenReady().then(async () => {
       mainWindow?.webContents.openDevTools({ mode: "right" });
     });
   }
-  scans.start();
+  scans.setWatching(loadConfig().watchFolders !== false);
+  if (loadConfig().watchFolders !== false) void scans.catchUp();
+  else scans.start();
+  mainWindow?.on("focus", () => scans.syncWatchers());
   scheduleStartupUpdateCheck();
 
   app.on("activate", () => showWindow());
@@ -622,6 +635,7 @@ void app.whenReady().then(async () => {
 const SHUTDOWN_DRAIN_WAIT_MS = 1_000;
 
 function stopIntake(): void {
+  scans.stopWatching();
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
   mediaServer?.close();
   controlServer?.close();

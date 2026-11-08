@@ -29,6 +29,7 @@ import { sortLabel } from "@/lib/sortLabel";
 import { resolutionLabel } from "@shared/resolutions";
 import { tagHumanLabel } from "@/lib/tagLabel";
 import { describeAudioFilters } from "./audioFilters";
+import { describeRecentFiles } from "./recentFiles";
 
 /** Which surface owns the control that sets a condition. */
 export type ConditionGroup = "primary" | "collapsed";
@@ -202,6 +203,14 @@ export function describeConditions(
       group: "primary",
       chip: true,
       clear: (q) => without(q, "favorite"),
+    });
+  if (query.recent)
+    out.push({
+      key: "recent",
+      label: describeRecentFiles(t, query.recent),
+      group: "primary",
+      chip: true,
+      clear: (q) => without(q, "recent"),
     });
 
   if (query.played != null)

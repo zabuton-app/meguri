@@ -392,3 +392,34 @@ ignoring cover artwork. Bit depth comes from `bits_per_raw_sample` or
 source bit depth. The same reader feeds the detail badges, scan-time metadata
 writes, and a one-time, batched database backfill for existing audio rows. This
 adds searchable columns without accessing media files or changing ratings/tags.
+
+### Recent files and folder watching
+
+`SearchQuery.recent` stores a relative period and date basis (`added`, the
+default discovery date, or `created`, filesystem birthtime). Shared calendar
+logic in `shared/recentFiles.ts` resolves the window for every query, so saved
+Today/This week bins keep moving. Days use local time; weeks start on Monday.
+The New files control works within the current workspace or All and saves
+relative rules in Smart bins. Its last active view and date preference persist
+across restarts; a default Smart bin takes precedence. Active recent views
+refresh indexed results every 30 seconds while visible; this does not scan files.
+An ordinary rebuild preserves discovery dates for existing relative paths.
+
+`electron/folderWatcher.ts` uses native recursive `fs.watch` notifications,
+with no idle stat polling or periodic rescans. Per-path quiet times and two
+stability samples batch downloads without one busy file holding back settled
+ones. Known temporary downloads, hidden paths, and the application's own data
+are excluded. Normal batches enumerate only notified files/subtrees and reconcile
+only that scope; unknown filenames or queue overflow request a full reconciliation.
+Copies cannot take an unrelated original's identity; notified moves retain it.
+Metadata/thumbnail processing is restricted to the changed files and uses the
+existing process-wide concurrency limits.
+
+ScanManager serializes each workspace's work and coalesces notifications that
+arrive during a scan. Startup catches up scanned roots one at a time. Watch
+settings persist in app config independently of workspace writes; disabling
+watching closes subscriptions and cancels automatic work. Watchers close before
+workspace removal and application shutdown. A disconnected root is not reconciled
+as an empty directory. Actual watch failures appear in the Watch folders control,
+and synchronization on window focus retries unavailable roots. Native notification
+support remains filesystem-dependent ([Node documentation](https://nodejs.org/api/fs.html#fswatchfilename-options-listener)); manual Scan stays available.

@@ -18,6 +18,31 @@ export const ko: Record<TranslationKey, string> = {
   "audio.atMost": "이하",
   "audio.between": "범위",
   "audio.durationOrderError": "최소 길이는 최대 길이를 초과할 수 없습니다.",
+  "recent.title": "새 파일",
+  "recent.window": "기간",
+  "recent.basis": "새 파일 기준",
+  "recent.today": "오늘",
+  "recent.thisWeek": "이번 주",
+  "recent.lastHour": "최근 1시간",
+  "recent.last24Hours": "최근 24시간",
+  "recent.last7Days": "최근 7일",
+  "recent.added": "Meguri가 처음 발견한 날짜",
+  "recent.created": "파일 생성 날짜",
+  "recent.addedHint":
+    "미디어에 기록된 날짜와 관계없이 이 카탈로그에 처음 추가된 날짜를 사용합니다.",
+  "recent.createdHint":
+    "파일 시스템의 생성 날짜를 사용합니다. 이 날짜가 없는 파일은 일치하지 않습니다.",
+  "recent.calendarHint":
+    "오늘과 이번 주는 로컬 시간대를 사용합니다. 주는 월요일에 시작합니다.",
+  "watch.title": "폴더 감시",
+  "watch.off": "꺼짐",
+  "watch.enable": "스캔한 폴더 자동 감시",
+  "watch.hint":
+    "Meguri 실행 중에 업데이트합니다. 파일 시스템 알림을 사용하며 다운로드가 안정될 때까지 기다립니다.",
+  "watch.count": "스캔한 폴더 {count}개 감시 중.",
+  "watch.unavailable":
+    "폴더 {count}개를 감시할 수 없습니다. 스캔으로 업데이트하세요.",
+  "watch.error": "폴더 감시 설정을 읽거나 업데이트하지 못했습니다.",
   "audio.filters": "오디오 속성",
   "audio.any": "모두",
   "audio.sampleRate": "샘플 레이트",

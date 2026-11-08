@@ -1,6 +1,7 @@
 // File search, listing and detail queries. Dynamic SQL is built safely with placeholders.
 import type { DB } from "../db.js";
 import { RESOLUTIONS } from "../../../shared/resolutions.js";
+import { recentFilesRange } from "../../../shared/recentFiles.js";
 import { fileTags } from "../tags.js";
 import { listBookmarksByMetaKey } from "./bookmarks.js";
 import { thumbOffsetByKey } from "./meta.js";
@@ -305,6 +306,12 @@ export function appendSearchConditions(
     // SQLite's SQLITE_MAX_VARIABLE_NUMBER limit and throw "too many SQL variables".
     sql += " AND f.id IN (SELECT value FROM json_each(?))";
     args.push(JSON.stringify(query.fileIds));
+  }
+  if (query.recent) {
+    const [from, to] = recentFilesRange(query.recent.period);
+    const column = query.recent.basis === "created" ? "btime" : "created_at";
+    sql += ` AND f.${column} >= ? AND f.${column} <= ?`;
+    args.push(from, to);
   }
   if (query.ratingMin != null) {
     sql += " AND COALESCE(m.rating, 0) >= ?";

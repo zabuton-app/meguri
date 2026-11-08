@@ -20,6 +20,31 @@ export const es: Record<TranslationKey, string> = {
   "audio.atMost": "Como máximo",
   "audio.between": "Entre",
   "audio.durationOrderError": "La duración mínima no puede superar la máxima.",
+  "recent.title": "Archivos nuevos",
+  "recent.window": "Periodo",
+  "recent.basis": "Definir nuevos según",
+  "recent.today": "Hoy",
+  "recent.thisWeek": "Esta semana",
+  "recent.lastHour": "Última hora",
+  "recent.last24Hours": "Últimas 24 horas",
+  "recent.last7Days": "Últimos 7 días",
+  "recent.added": "Primera detección por Meguri",
+  "recent.created": "Fecha de creación del archivo",
+  "recent.addedHint":
+    "Usa la primera incorporación al catálogo, independientemente de las fechas internas del medio.",
+  "recent.createdHint":
+    "Usa la fecha de creación del sistema de archivos. Los archivos sin esa fecha no coinciden.",
+  "recent.calendarHint":
+    "Hoy y esta semana usan tu zona horaria local. La semana empieza el lunes.",
+  "watch.title": "Vigilar carpetas",
+  "watch.off": "Desactivado",
+  "watch.enable": "Vigilar automáticamente las carpetas escaneadas",
+  "watch.hint":
+    "Actualiza mientras Meguri está abierto. Usa notificaciones del sistema y espera a que se estabilicen las descargas.",
+  "watch.count": "Vigilando {count} carpetas escaneadas.",
+  "watch.unavailable":
+    "No se pueden vigilar {count} carpetas. Usa Escanear para actualizarlas.",
+  "watch.error": "No se pudo leer o actualizar la configuración de vigilancia.",
   "audio.filters": "Propiedades de audio",
   "audio.any": "Cualquiera",
   "audio.sampleRate": "Frecuencia de muestreo",

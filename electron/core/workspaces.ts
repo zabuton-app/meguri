@@ -67,9 +67,10 @@ export class Workspaces {
    * through here rather than calling saveConfig directly.
    */
   private persist(): void {
-    const { update, autoTag } = loadConfig();
+    const { update, autoTag, watchFolders } = loadConfig();
     this.config.update = update;
     this.config.autoTag = autoTag;
+    this.config.watchFolders = watchFolders;
     saveConfig(this.config);
   }
 

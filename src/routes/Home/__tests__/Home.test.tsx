@@ -68,6 +68,12 @@ vi.mock("sonner", () => ({
 
 vi.mock("@/ipc/client", () => ({
   api: {
+    watchGet: vi
+      .fn()
+      .mockResolvedValue({ enabled: true, watched: 1, unavailable: [] }),
+    watchSet: vi
+      .fn()
+      .mockResolvedValue({ enabled: false, watched: 0, unavailable: [] }),
     appStatus: () => mocks.appStatus(),
     workspacesList: () => mocks.workspacesList(),
     filesSearch: (query: unknown) => mocks.filesSearch(query),
@@ -100,6 +106,7 @@ vi.mock("@/ipc/client", () => ({
     collectionRemoveFile: vi.fn().mockResolvedValue(undefined),
   },
   events: {
+    onWatchChanged: vi.fn().mockResolvedValue(() => {}),
     onThumbDone: vi.fn().mockResolvedValue(() => {}),
     onScanDone: vi.fn().mockResolvedValue(() => {}),
     onScanProgress: vi.fn().mockResolvedValue(() => {}),

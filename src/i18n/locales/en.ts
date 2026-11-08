@@ -21,6 +21,31 @@ export const en: Record<TranslationKey, string> = {
   "audio.between": "Between",
   "audio.durationOrderError":
     "The minimum duration must not exceed the maximum.",
+  "recent.title": "New files",
+  "recent.window": "Time window",
+  "recent.basis": "Define new using",
+  "recent.today": "Today",
+  "recent.thisWeek": "This week",
+  "recent.lastHour": "Last hour",
+  "recent.last24Hours": "Last 24 hours",
+  "recent.last7Days": "Last 7 days",
+  "recent.added": "First discovered by Meguri",
+  "recent.created": "File creation date",
+  "recent.addedHint":
+    "Uses when Meguri first adds a file to this catalogue, independently of dates embedded in the media.",
+  "recent.createdHint":
+    "Uses the filesystem creation date. Files without this date do not match.",
+  "recent.calendarHint":
+    "Today and this week use your local time zone. Weeks start on Monday.",
+  "watch.title": "Watch folders",
+  "watch.off": "Off",
+  "watch.enable": "Automatically watch scanned folders",
+  "watch.hint":
+    "Updates while Meguri is running. Uses filesystem notifications and waits for downloads to settle.",
+  "watch.count": "Watching {count} scanned folders.",
+  "watch.unavailable":
+    "Watching is unavailable for {count} folders. Use Scan to update them.",
+  "watch.error": "Could not read or update watch-folder settings.",
   "audio.filters": "Audio properties",
   "audio.any": "Any",
   "audio.sampleRate": "Sample rate",

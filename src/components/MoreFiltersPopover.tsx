@@ -239,7 +239,15 @@ export function MoreFiltersPopover({
             to={value[to]}
             fromLabel={t("filter.dateFrom")}
             toLabel={t("filter.dateTo")}
-            onChange={(range) => patch({ [from]: range.from, [to]: range.to })}
+            onChange={(range) =>
+              patch({
+                [from]: range.from,
+                [to]: range.to,
+                ...(from === "addedFrom" || from === "btimeFrom"
+                  ? { recent: undefined }
+                  : {}),
+              })
+            }
           />
         ))}
 

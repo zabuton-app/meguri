@@ -105,6 +105,8 @@ export const api = {
   scanStart: (includeExcluded?: boolean, rebuild?: boolean) =>
     invoke("scan_start", { includeExcluded, rebuild }),
   scanCancel: (wsId?: string) => invoke("scan_cancel", { wsId }),
+  watchGet: () => invoke("watch_get"),
+  watchSet: (enabled: boolean) => invoke("watch_set", { enabled }),
   filesSearch: (query: ChannelInput<"files_search">["query"]) =>
     invoke("files_search", { query }),
   filesRandom: (query?: ChannelInput<"files_random">["query"]) =>
@@ -265,6 +267,12 @@ export type {
 // Returns a Promise so existing components can receive the unlisten function via `.then(unlisten => ...)`.
 type Unlisten = () => void;
 export const events = {
+  onWatchChanged: (
+    cb: (status: ChannelOutput<"watch_get">) => void,
+  ): Promise<Unlisten> =>
+    Promise.resolve(
+      bridge.on("watch:changed", (p) => cb(p as ChannelOutput<"watch_get">)),
+    ),
   onScanProgress: (cb: (p: ScanProgress) => void): Promise<Unlisten> =>
     Promise.resolve(bridge.on("scan:progress", (p) => cb(p as ScanProgress))),
   onThumbDone: (cb: (event: ThumbDone) => void): Promise<Unlisten> =>

@@ -72,6 +72,7 @@ import { walksPlaybackOrder } from "@/lib/playbackOrder";
 import { readInBulkBatches } from "@/lib/bulkEdit";
 import { FolderHeader } from "@/components/FolderHeader";
 import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
+import { useRecentFilesRefresh } from "@/hooks/useRecentFilesRefresh";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
 import { useHeatmapFilter } from "./useHeatmapFilter";
@@ -122,6 +123,7 @@ export default function Home() {
   const [commandOpen, setCommandOpen] = useState(false);
   // Opens on the default saved search, if one is set (see loadInitialFilter).
   const [filter, setFilter] = useState<SearchQuery>(loadInitialFilter);
+  useRecentFilesRefresh(filter.recent);
   const smart = useSmartCollections();
   const [launchBin] = useState(() =>
     smart.collections.find((bin) => bin.id === smart.defaultId && bin.scope),

@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { RESOLUTION_IDS } from "../resolutions.js";
 import { AUDIO_CODECS } from "../audioMetadata.js";
+import { RECENT_BASES, RECENT_PERIODS } from "../recentFiles.js";
 import { MAX_TAG_NAME, MAX_TAG_REF_NAME } from "../tags.js";
 import {
   CASE_MODES,
@@ -180,6 +181,9 @@ export const SearchQuerySchema = z
     tagSource: z.string().optional(),
     kind: z.string().optional(),
     ratingMin: z.number().optional(),
+    recent: z
+      .object({ period: z.enum(RECENT_PERIODS), basis: z.enum(RECENT_BASES) })
+      .optional(),
     audio: z
       .object({
         sampleRate: z.number().int().positive().optional(),

@@ -17,6 +17,31 @@ export const ja = {
   "audio.atMost": "以下",
   "audio.between": "範囲",
   "audio.durationOrderError": "最短時間は最長時間以下にしてください。",
+  "recent.title": "新しいファイル",
+  "recent.window": "期間",
+  "recent.basis": "新しさの基準",
+  "recent.today": "今日",
+  "recent.thisWeek": "今週",
+  "recent.lastHour": "過去1時間",
+  "recent.last24Hours": "過去24時間",
+  "recent.last7Days": "過去7日間",
+  "recent.added": "Meguriで初めて検出した日時",
+  "recent.created": "ファイルの作成日時",
+  "recent.addedHint":
+    "メディア内の日付ではなく、このカタログに初めて追加された日時を使います。",
+  "recent.createdHint":
+    "ファイルシステムの作成日時を使います。日時が不明なファイルは一致しません。",
+  "recent.calendarHint":
+    "今日と今週はローカル時間に基づきます。週は月曜日から始まります。",
+  "watch.title": "フォルダー監視",
+  "watch.off": "オフ",
+  "watch.enable": "スキャン済みフォルダーを自動監視",
+  "watch.hint":
+    "Meguriの実行中に更新します。ファイルシステム通知を利用し、ダウンロードが落ち着いてから処理します。",
+  "watch.count": "{count}個のフォルダーを監視中。",
+  "watch.unavailable":
+    "{count}個のフォルダーを監視できません。スキャンで更新してください。",
+  "watch.error": "フォルダー監視設定を読み込みまたは更新できませんでした。",
   "audio.filters": "オーディオの詳細",
   "audio.any": "指定なし",
   "audio.sampleRate": "サンプルレート",
