@@ -1039,4 +1039,46 @@ export const fr: Record<TranslationKey, string> = {
   "settings.petSizeSmall": "Petite (×2)",
   "settings.petSizeMedium": "Moyenne (×3)",
   "settings.petSizeLarge": "Grande (×4)",
+
+  // Guided tours
+  "tour.languageTitle": "Choisis ta langue",
+  "tour.languageBody":
+    "Choisis la langue à utiliser. La suite de la visite l'utilisera, et tu pourras la changer plus tard dans les paramètres.",
+  "tour.welcomeTitle": "Bienvenue dans Meguri",
+  "tour.welcomeBody":
+    "Je te fais faire le tour. Appuie sur Échap pour passer à tout moment.",
+  "tour.addWorkspaceTitle": "Ajouter un dossier",
+  "tour.addWorkspaceBody":
+    "Commence par ajouter un dossier contenant tes vidéos et images. Je l'analyse et crée les miniatures. Tu peux en ajouter autant que tu veux.",
+  "tour.collectionsTitle": "Collections",
+  "tour.collectionsBody":
+    "Regroupe des fichiers de n'importe quel dossier dans une collection. Glisse des fichiers ici pour les ajouter.",
+  "tour.searchTitle": "Rechercher et filtrer",
+  "tour.searchBody":
+    "Recherche par nom de fichier ou par tag. Appuie sur / dans la liste pour venir ici.",
+  "tour.viewTitle": "Changer de vue",
+  "tour.viewBody":
+    "Affiche tes fichiers en grille, en liste, en chronologie ou en graphe.",
+  "tour.discoverTitle": "Découvrir",
+  "tour.discoverBody":
+    "Tu ne sais pas quoi regarder ? Découvrir choisit quelque chose au hasard. Le bouton au-dessus lit toute la liste.",
+  "tour.petTitle": "Ton compagnon",
+  "tour.petBody":
+    "Fais un clic droit sur moi pour ouvrir un menu. Dépose des fichiers sur moi et je les garde dans À regarder plus tard.",
+  "tour.commandTitle": "Menu des commandes",
+  "tour.commandBody":
+    "Appuie sur Ctrl+K pour lancer n'importe quelle action par son nom. Appuie sur ? pour voir tous les raccourcis.",
+  "tour.settingsTitle": "Paramètres",
+  "tour.settingsBody":
+    "Change ici le thème, la langue et plus encore. Tu peux revoir cette visite depuis l'onglet Application.",
+  "tour.doneTitle": "C'est prêt",
+  "tour.doneBody": "La visite est terminée. Amuse-toi bien !",
+  "tour.progress": "{current} / {total}",
+  "tour.skip": "Passer",
+  "tour.prev": "Retour",
+  "tour.next": "Suivant",
+  "tour.done": "Terminé",
+  "settings.tour": "Tutoriel",
+  "settings.tourDesc": "Affiche à nouveau la visite du premier lancement",
+  "settings.tourReplay": "Revoir",
 };

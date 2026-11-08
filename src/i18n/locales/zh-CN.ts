@@ -965,4 +965,41 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.petSizeSmall": "小（×2）",
   "settings.petSizeMedium": "中（×3）",
   "settings.petSizeLarge": "大（×4）",
+
+  // Guided tours
+  "tour.languageTitle": "选择语言",
+  "tour.languageBody":
+    "选择要使用的语言。接下来的教程也会使用该语言，之后也可以在设置中更改",
+  "tour.welcomeTitle": "欢迎使用 Meguri",
+  "tour.welcomeBody": "我来带你快速了解一下。随时按 Esc 可以跳过",
+  "tour.addWorkspaceTitle": "添加文件夹",
+  "tour.addWorkspaceBody":
+    "先添加一个存放视频和图片的文件夹吧。我会扫描并生成缩略图。可以添加任意多个",
+  "tour.collectionsTitle": "收藏集",
+  "tour.collectionsBody":
+    "把不同文件夹里的文件汇集到一个收藏集中。把文件拖到这里即可添加",
+  "tour.searchTitle": "搜索与筛选",
+  "tour.searchBody": "按文件名或标签搜索。在列表中按 / 可以跳到这里",
+  "tour.viewTitle": "切换视图",
+  "tour.viewBody": "以网格、列表、时间线或关系图显示文件",
+  "tour.discoverTitle": "发现",
+  "tour.discoverBody":
+    "不知道看什么？发现会随机挑选一些。上面的按钮会播放整个列表",
+  "tour.petTitle": "宠物",
+  "tour.petBody": "右键点我会出现菜单。把文件拖到我身上，我就帮你放进稍后观看",
+  "tour.commandTitle": "命令菜单",
+  "tour.commandBody": "按 Ctrl+K 可以按名称执行任何操作。按 ? 查看所有快捷键",
+  "tour.settingsTitle": "设置",
+  "tour.settingsBody":
+    "可以在这里更改主题、语言等。也可以在“应用”标签页重新查看本教程",
+  "tour.doneTitle": "准备就绪",
+  "tour.doneBody": "介绍到此结束。祝你使用愉快！",
+  "tour.progress": "{current} / {total}",
+  "tour.skip": "跳过",
+  "tour.prev": "上一步",
+  "tour.next": "下一步",
+  "tour.done": "完成",
+  "settings.tour": "教程",
+  "settings.tourDesc": "再次显示首次启动时的使用教程",
+  "settings.tourReplay": "再看一次",
 };

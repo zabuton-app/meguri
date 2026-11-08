@@ -7,7 +7,7 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { waitForIndexedMedia } from "./helpers";
+import { skipFirstLaunchTour, waitForIndexedMedia } from "./helpers";
 import {
   electronLaunchOptions,
   mainScript,
@@ -17,6 +17,9 @@ const mediaRoot = path.join(process.cwd(), "e2e/fixtures/media");
 
 export interface MeguriFixtures {
   app: ElectronApplication;
+  /** The window as a brand-new user sees it, first-launch tour included. */
+  firstLaunchWindow: Page;
+  /** The window with the first-launch tour already seen. */
   window: Page;
   /** Same window after the fixture media appears in the list. */
   ready: Page;
@@ -48,9 +51,15 @@ export const test = base.extend<MeguriFixtures>({
       }
     }
   },
+  firstLaunchWindow: async ({ app }, use) => {
+    const window = await app.firstWindow();
+    await window.waitForLoadState("domcontentloaded");
+    await use(window);
+  },
   window: async ({ app }, use) => {
     const window = await app.firstWindow();
     await window.waitForLoadState("domcontentloaded");
+    await skipFirstLaunchTour(window);
     await use(window);
   },
   ready: async ({ window }, use) => {

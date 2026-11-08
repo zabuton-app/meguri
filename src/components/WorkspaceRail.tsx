@@ -390,6 +390,7 @@ export function WorkspaceRail() {
               <button
                 type="button"
                 onClick={openCreateDialog}
+                data-tour="collections"
                 title={t("collection.create")}
                 aria-label={t("collection.create")}
                 className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-border text-muted transition hover:rounded-xl hover:border-primary hover:text-primary"
@@ -431,6 +432,7 @@ export function WorkspaceRail() {
             <button
               type="button"
               onClick={() => addViaPicker.mutate()}
+              data-tour="add-workspace"
               title={t("workspace.addDirectory")}
               className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-dashed border-border text-muted transition hover:rounded-xl hover:border-primary hover:text-primary"
             >
@@ -446,6 +448,7 @@ export function WorkspaceRail() {
         <button
           type="button"
           onClick={openCommandMenu}
+          data-tour="command-menu"
           title={`${t("command.title")} (Ctrl+K)`}
           aria-label={t("command.title")}
           className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted transition hover:rounded-xl hover:bg-overlay hover:text-fg"
@@ -466,6 +469,7 @@ export function WorkspaceRail() {
           onClick={() => {
             window.location.hash = "/settings";
           }}
+          data-tour="settings"
           title={t("workspace.settings")}
           className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted transition hover:rounded-xl hover:bg-overlay hover:text-fg"
         >
