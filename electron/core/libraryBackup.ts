@@ -24,6 +24,11 @@ const log = scopedLog("library-backup");
 
 export const BACKUP_EVERY_MS = 24 * 60 * 60 * 1000;
 export const BACKUPS_KEPT = 5;
+/** How far ahead of the clock a copy may be dated before it counts as taken
+ *  by a clock that jumped: a copy just written is a moment ahead of a `now`
+ *  read before it, and mtimes carry fractions of a millisecond. */
+const CLOCK_SLACK_MS = 60_000;
+const isAhead = (time: number, now: number) => time > now + CLOCK_SLACK_MS;
 const PREFIX = "library-";
 const SUFFIX = ".sqlite";
 
@@ -71,8 +76,8 @@ function listBackups(
       return { file, time: fs.statSync(file).mtimeMs };
     })
     .sort((a, b) => {
-      const aheadA = a.time > now;
-      const aheadB = b.time > now;
+      const aheadA = isAhead(a.time, now);
+      const aheadB = isAhead(b.time, now);
       if (aheadA !== aheadB) return aheadA ? 1 : -1;
       return b.time - a.time;
     });
@@ -106,7 +111,10 @@ function takeBackup(file: string, dir: string, now: number): number | null {
   } finally {
     db?.close();
   }
-  for (const old of listBackups(dir, now).slice(BACKUPS_KEPT)) {
+  // The copy just taken is kept whatever its mtime says: written after `now`,
+  // it can be dated a moment ahead of it, which listBackups orders last.
+  const others = listBackups(dir, now).filter((b) => b.file !== target);
+  for (const old of others.slice(BACKUPS_KEPT - 1)) {
     fs.rmSync(old.file, { force: true });
   }
   return fs.statSync(target).mtimeMs;
@@ -119,7 +127,7 @@ export function newestBackupTime(
   now: number = Date.now(),
 ): number | null {
   const newest = listBackups(dir, now)[0];
-  return newest && newest.time <= now ? newest.time : null;
+  return newest && !isAhead(newest.time, now) ? newest.time : null;
 }
 
 /**
@@ -239,7 +247,11 @@ export function maintainLibrary(
     if (health === "damaged") return restoreNewest(file, backups, now, true);
     const newest = backups[0];
     // A copy dated ahead of now (a clock that jumped) does not count as fresh.
-    if (!newest || newest.time > now || now - newest.time >= BACKUP_EVERY_MS) {
+    if (
+      !newest ||
+      isAhead(newest.time, now) ||
+      now - newest.time >= BACKUP_EVERY_MS
+    ) {
       takeBackup(file, dir, now);
     }
     return null;

@@ -392,4 +392,28 @@ describe("merging workspaces into the library at startup", () => {
     expect(ws.mergedInLastRun()).toBe(0);
     ws.closeAll();
   });
+
+  it("reports a failed merge from the backup, and keeps the data on removal", async () => {
+    const a = legacyWorkspace();
+    const b = legacyWorkspace();
+    register([a, b]);
+    const first = new Workspaces();
+    first.bootstrap(null);
+    await first.mergePending(() => {});
+    first.closeAll();
+    for (const suffix of ["", "-wal", "-shm"]) {
+      fs.rmSync(paths.libraryDbPath() + suffix, { force: true });
+    }
+    // a's backup cannot be read.
+    fs.writeFileSync(backupOf(a), "not a database ".repeat(500));
+
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    const failed = await ws.mergePending(() => {});
+    expect(failed).toEqual([{ label: path.basename(a), reason: "merge" }]);
+
+    ws.remove(a);
+    expect(fs.existsSync(backupOf(a))).toBe(true);
+    ws.closeAll();
+  });
 });

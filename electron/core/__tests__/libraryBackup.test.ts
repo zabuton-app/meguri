@@ -190,6 +190,20 @@ describe("maintainLibrary", () => {
     expect(newest!).toBeLessThanOrEqual(at(BACKUPS_KEPT));
   });
 
+  it("keeps the copy just taken when its mtime is a moment past now", () => {
+    writeLibrary(1);
+    const base = Date.now();
+    for (let i = 0; i < BACKUPS_KEPT; i++) {
+      backupLibraryNow(library, backups, base - 60_000 + i);
+    }
+    dateCopies(base - 60_000);
+    // Taken "now" by a clock read before the copy was written.
+    const taken = backupLibraryNow(library, backups, base - 1000);
+    expect(taken).not.toBeNull();
+    expect(copies()).toHaveLength(BACKUPS_KEPT);
+    expect(newestBackupTime(backups)).toBe(taken);
+  });
+
   it("copies right away after a merge, however fresh the newest copy is", () => {
     writeLibrary(1);
     maintainLibrary(library, backups, T0);

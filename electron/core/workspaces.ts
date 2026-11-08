@@ -420,7 +420,9 @@ export class Workspaces {
     const core = merged
       ? (this.cores.get(id) ?? undefined)
       : (this.coreForPath(p, { merging: true }) ?? undefined);
-    const keepData = !merged && (!core || usesOwnMetadata(core.db));
+    const keepData =
+      !merged &&
+      (!core || !!core.mergeFailureReason || usesOwnMetadata(core.db));
     if (keepData) {
       log.warn(
         `removing workspace ${id} whose metadata could not be merged into the library; its data directory is kept`,
@@ -914,7 +916,9 @@ export class Workspaces {
         const core = this.coreForPath(p, { merging: true });
         if (core?.mergedOnOpen) this.mergedLast++;
         if (!core) failed.push({ path: p, reason: "open" });
-        else if (usesOwnMetadata(core.db)) {
+        // Still on its own tables, or merged from its backup without success
+        // (it has no own tables then, and its backup is all that is left).
+        else if (core.mergeFailureReason || usesOwnMetadata(core.db)) {
           failed.push({ path: p, reason: core.mergeFailureReason ?? "merge" });
         }
         merge.done++;
