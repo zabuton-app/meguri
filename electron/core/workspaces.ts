@@ -17,6 +17,7 @@ import {
 import { dataDirForRoot, libraryDbPath, pathHash } from "./paths.js";
 import log from "./logger.js";
 import { nowUnix } from "./db.js";
+import { syncTagIndexes as syncTagIndexesOf } from "./library.js";
 
 export interface WorkspaceInfo {
   id: string;
@@ -191,6 +192,16 @@ export class Workspaces {
     for (const core of this.cores.values()) core.close();
     this.cores.clear();
     this.errors.clear();
+  }
+
+  /**
+   * Bring every open workspace's keyword index up to date with tag changes
+   * made through any workspace (library.ts). Call after anything that writes
+   * user tags; never throws. A workspace opened later catches up as it opens
+   * (Core.init).
+   */
+  syncTagIndexes(): void {
+    syncTagIndexesOf([...this.cores.values()].map((core) => core.db));
   }
 
   /** All registered workspaces resolved to Cores, skipping any that fail to initialize. */
@@ -713,6 +724,10 @@ export class Workspaces {
       const core = Core.init(p, libraryDbPath());
       this.cores.set(id, core);
       this.errors.delete(id);
+      // Core.init has caught this workspace's own index up. Merging its
+      // metadata into the library (on its first open after the upgrade) may
+      // have changed tags the other open workspaces index.
+      if (core.mergedOnOpen) this.syncTagIndexes();
       return core;
     } catch (e) {
       const message = String(e);

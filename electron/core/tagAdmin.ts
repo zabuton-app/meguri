@@ -4,7 +4,8 @@
 //
 // Tags are addressed by (namespace, name), never by tags.id — ids are
 // database-local and meaningless in the cross-workspace "All" view.
-import { resyncFtsForKeys, type DB } from "./db.js";
+import type { DB } from "./db.js";
+import { resyncTagIndexForKeys } from "./library.js";
 import { findManualTag } from "./tags.js";
 import {
   RESERVED_TAG_ERROR,
@@ -140,7 +141,7 @@ export function renameTag(
       if (name !== next) {
         // No row is spelled `next` (findManualTag puts that one first).
         db.prepare("UPDATE tags SET name = ? WHERE id = ?").run(next, targetId);
-        resyncFtsForKeys(db, keysForTagIds(db, [targetId]));
+        resyncTagIndexForKeys(db, keysForTagIds(db, [targetId]));
       }
       return { merged: true, ...merged };
     })();
@@ -150,7 +151,7 @@ export function renameTag(
     // Assignments are untouched by a plain rename — only tags_text changes.
     const keys = keysForTagIds(db, [fromId]);
     db.prepare("UPDATE tags SET name = ? WHERE id = ?").run(next, fromId);
-    resyncFtsForKeys(db, keys);
+    resyncTagIndexForKeys(db, keys);
     return { merged: false, affectedFiles: keys.length };
   })();
 }
@@ -204,7 +205,7 @@ export function mergeTags(
     db.prepare(
       "DELETE FROM tags WHERE id IN (SELECT value FROM json_each(?))",
     ).run(idsJson);
-    resyncFtsForKeys(db, keys);
+    resyncTagIndexForKeys(db, keys);
     return { affectedFiles: keys.length };
   })();
 }
@@ -225,7 +226,7 @@ export function deleteTags(
     db.prepare(
       "DELETE FROM tags WHERE id IN (SELECT value FROM json_each(?))",
     ).run(JSON.stringify(ids));
-    resyncFtsForKeys(db, keys);
+    resyncTagIndexForKeys(db, keys);
     return { removedTags: ids.length, affectedFiles: keys.length };
   })();
 }

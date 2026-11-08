@@ -1,7 +1,8 @@
 // Operations on tags and meta_tags. Used for manual tags, plugin tags, and FTS sync.
 // Tags are keyed by the stable meta_key (resolved from a file id) rather than files.id,
 // so they survive rebuilding the files table.
-import { resyncFtsForKeys, type DB } from "./db.js";
+import type { DB } from "./db.js";
+import { resyncTagIndexForKeys } from "./library.js";
 import type { TagInfo } from "./types.js";
 import {
   RESERVED_TAG_ERROR,
@@ -230,7 +231,7 @@ export function bulkEditManualTags(
     // One set-based pass instead of a delete+insert per file: it also covers
     // files behind a changed key that were never in the selection, whose tags
     // moved all the same.
-    resyncFtsForKeys(db, [...changed]);
+    resyncTagIndexForKeys(db, [...changed]);
   });
   run();
   return result;

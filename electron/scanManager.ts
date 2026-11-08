@@ -126,6 +126,10 @@ export class ScanManager {
           this.controllers.delete(wsId);
           this.promises.delete(wsId);
         }
+        // The scan's auto-tagging and its first hashes (migrateMetaKey) change
+        // tags in the library every workspace shares: the others' keyword
+        // indexes follow here, once a scan.
+        this.deps.ws.syncTagIndexes();
         // Scans can change duplicate group membership; clear derived query caches.
         // Runs after the bookkeeping above so a failure here can never leave the
         // workspace stuck in the "scanning" state.

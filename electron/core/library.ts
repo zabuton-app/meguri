@@ -1,5 +1,7 @@
 // The library shared by every workspace (`<userData>/library.sqlite`, attached
-// as `lib`; schema in LIB_DDL, db.ts): moving a workspace's own metadata into it.
+// as `lib`; schema in LIB_DDL, db.ts): moving a workspace's own metadata into
+// it, and keeping every workspace's keyword index (files_fts.tags_text) in step
+// with the tags it holds (catchUpTagIndex, syncTagIndexes).
 //
 // Before the library existed every workspace database held its own file_meta,
 // tags, meta_tags, scene_bookmarks and play_history. The merge below runs when
@@ -13,12 +15,14 @@ import {
   META_KEYED_TABLES,
   nowUnix,
   rebuildFtsAll,
+  resyncFtsForKeys,
   usesOwnMetadata,
   type DB,
 } from "./db.js";
 import { scopedLog } from "./logger.js";
 import { BOOKMARK_NEAR_EPS } from "./queries/bookmarks.js";
 import { FILE_META_MERGE_SET } from "./queries/meta.js";
+import { getSetting, setSetting } from "./queries/settings.js";
 
 const log = scopedLog("library");
 
@@ -36,9 +40,10 @@ const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
  *    `backupPath` (VACUUM INTO), then merge and record it in one transaction.
  *    If the copy cannot be written, stop here and keep the own tables.
  * 3. Drop the own tables and rebuild files_fts from the library's tags, in one
- *    transaction. When step 2 was skipped because the workspace was recorded
- *    already, the own tables are merged again first: they may be the ones an
- *    older version of the app recreated and wrote to after the merge.
+ *    transaction, recording the index as current (FTS_TAG_SEQ_KEY). When step 2
+ *    was skipped because the workspace was recorded already, the own tables are
+ *    merged again first: they may be the ones an older version of the app
+ *    recreated and wrote to after the merge.
  *
  * The two transactions write different files, so a crash can fall between
  * them; the record makes the next open skip the backup. The merge rules leave
@@ -46,13 +51,16 @@ const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
  *
  * A failure in either transaction is logged and leaves the workspace on its
  * own tables, as a failed backup does; the next open tries again.
+ *
+ * Returns whether the merge ran to the end, which changes tags the other
+ * workspaces may index.
  */
 export function migrateWorkspaceMetadata(
   db: DB,
   workspaceId: string,
   backupPath: string,
-): void {
-  if (!usesOwnMetadata(db)) return;
+): boolean {
+  if (!usesOwnMetadata(db)) return false;
 
   const recorded =
     db
@@ -60,7 +68,7 @@ export function migrateWorkspaceMetadata(
       .get(workspaceId) !== undefined;
   try {
     if (!recorded) {
-      if (!writeBackup(db, backupPath)) return;
+      if (!writeBackup(db, backupPath)) return false;
       db.transaction(() => {
         mergeIntoLibrary(db);
         db.prepare(
@@ -76,16 +84,17 @@ export function migrateWorkspaceMetadata(
       }
       // tags_text now comes from the library, which may carry tags other
       // workspaces gave the same content.
-      rebuildFtsAll(db);
+      rebuildTagIndex(db);
     })();
   } catch (e) {
     log.warn(
       `could not merge the metadata of workspace ${workspaceId}; keeping its own tables for now:`,
       e,
     );
-    return;
+    return false;
   }
   log.info(`merged the metadata of workspace ${workspaceId} into the library`);
+  return true;
 }
 
 /**
@@ -169,5 +178,168 @@ function mergeIntoLibrary(db: DB): void {
     );
     if (taken) continue;
     insert.run(b.meta_key, b.sec, b.created_at);
+  }
+}
+
+/**
+ * Workspace setting: the last `lib.tag_changes` seq this workspace's
+ * files_fts.tags_text reflects. Unset until the index is first built from the
+ * library.
+ */
+export const FTS_TAG_SEQ_KEY = "fts_tag_seq";
+
+/** The last seq `lib.tag_changes` handed out, rows trimmed or not; 0 before the first. */
+function latestTagChange(db: DB): number {
+  const row = db
+    .prepare("SELECT seq FROM lib.sqlite_sequence WHERE name = 'tag_changes'")
+    .get() as { seq: number } | undefined;
+  return row?.seq ?? 0;
+}
+
+/** The FTS_TAG_SEQ_KEY this workspace has recorded, or null if none (or unreadable). */
+function tagIndexSeq(db: DB): number | null {
+  const stored = getSetting(db, FTS_TAG_SEQ_KEY);
+  const seq = stored === null ? NaN : Number(stored);
+  return Number.isSafeInteger(seq) ? seq : null;
+}
+
+/** Rebuild files_fts and record it as reflecting every tag change so far. Caller supplies the transaction. */
+function rebuildTagIndex(db: DB): void {
+  rebuildFtsAll(db);
+  setSetting(db, FTS_TAG_SEQ_KEY, String(latestTagChange(db)));
+}
+
+/**
+ * How many of the latest `lib.tag_changes` rows are kept for workspaces that
+ * are not open, so one opened later catches up on the keys it missed rather
+ * than rebuilding its whole index. A row is a few dozen bytes. A workspace
+ * further behind than this rebuilds.
+ */
+export const TAG_CHANGES_KEPT = 50_000;
+
+/**
+ * Past this share of the workspace's files, re-syncing key by key costs more
+ * than rebuilding the index (about twice as much once every file has changed).
+ */
+const RESYNC_SHARE_LIMIT = 0.3;
+
+/**
+ * Bring this workspace's files_fts.tags_text up to date with tag changes made
+ * through any workspace (research.md, R4), in one transaction:
+ *
+ * - Already at the latest change: nothing to do.
+ * - Never built from the library, ahead of it (the library file was replaced
+ *   with one that has handed out fewer seqs), behind the oldest change still
+ *   logged (trimmed meanwhile), or behind by more keys than RESYNC_SHARE_LIMIT
+ *   of its files: rebuild the whole index.
+ * - Otherwise: re-sync only the keys logged since.
+ *
+ * A library replaced with one that has handed out as many seqs or more is not
+ * detected; the app never does that itself.
+ *
+ * A workspace still on its own metadata tables (its merge has not run) indexes
+ * those and is left alone.
+ */
+export function catchUpTagIndex(db: DB): void {
+  if (usesOwnMetadata(db)) return;
+  db.transaction(() => {
+    const latest = latestTagChange(db);
+    const seen = tagIndexSeq(db);
+    if (seen === latest) return;
+    const { oldest } = db
+      .prepare("SELECT MIN(seq) AS oldest FROM lib.tag_changes")
+      .get() as { oldest: number | null };
+    if (
+      seen === null ||
+      seen > latest ||
+      oldest === null ||
+      oldest > seen + 1
+    ) {
+      rebuildTagIndex(db);
+      return;
+    }
+    const keys = db
+      .prepare("SELECT DISTINCT meta_key FROM lib.tag_changes WHERE seq > ?")
+      .pluck()
+      .all(seen) as string[];
+    // Counted only as far as the decision needs: past keys / limit files,
+    // re-syncing wins whatever the rest is.
+    const files = db
+      .prepare(
+        "SELECT COUNT(*) FROM (SELECT 1 FROM files WHERE deleted_at IS NULL LIMIT ?)",
+      )
+      .pluck()
+      .get(Math.floor(keys.length / RESYNC_SHARE_LIMIT) + 1) as number;
+    if (keys.length > files * RESYNC_SHARE_LIMIT) {
+      rebuildTagIndex(db);
+      return;
+    }
+    resyncFtsForKeys(db, keys);
+    setSetting(db, FTS_TAG_SEQ_KEY, String(latest));
+  })();
+}
+
+/**
+ * Re-index the files behind `metaKeys` after a tag write that changed them,
+ * and record the index as current when those keys are all the log holds past
+ * it: the write's own changes, so catchUpTagIndex (syncTagIndexes after every
+ * write) does not apply them a second time, which for a large write would
+ * mean rebuilding the whole index. Caller supplies the transaction, the one
+ * the write ran in.
+ */
+export function resyncTagIndexForKeys(
+  db: DB,
+  metaKeys: readonly string[],
+): void {
+  resyncFtsForKeys(db, [...metaKeys]);
+  if (usesOwnMetadata(db)) return;
+  const seen = tagIndexSeq(db);
+  const latest = latestTagChange(db);
+  if (seen === null || seen >= latest) return;
+  const { oldest } = db
+    .prepare("SELECT MIN(seq) AS oldest FROM lib.tag_changes")
+    .get() as { oldest: number | null };
+  // Rows the index has not applied are gone from the log: only a rebuild knows.
+  if (oldest === null || oldest > seen + 1) return;
+  const other = db
+    .prepare(
+      `SELECT 1 FROM lib.tag_changes WHERE seq > ?
+         AND meta_key NOT IN (SELECT value FROM json_each(?)) LIMIT 1`,
+    )
+    .get(seen, JSON.stringify(metaKeys));
+  if (!other) setSetting(db, FTS_TAG_SEQ_KEY, String(latest));
+}
+
+/**
+ * Catch every given workspace up (catchUpTagIndex), then trim the log: a row
+ * goes once each of them has applied it and `kept` newer rows have been logged
+ * after it, so a workspace opened later finds what it missed. A failure is
+ * logged and does not stop the others; nothing is trimmed then.
+ */
+export function syncTagIndexes(
+  dbs: readonly DB[],
+  kept: number = TAG_CHANGES_KEPT,
+): void {
+  let floor = Infinity;
+  let any: DB | undefined;
+  for (const db of dbs) {
+    try {
+      if (usesOwnMetadata(db)) continue;
+      catchUpTagIndex(db);
+      floor = Math.min(floor, tagIndexSeq(db) ?? 0);
+      any = db;
+    } catch (e) {
+      log.warn("could not bring a workspace's tag index up to date:", e);
+      floor = 0;
+    }
+  }
+  if (!any) return;
+  try {
+    const upTo = Math.min(floor, latestTagChange(any) - kept);
+    if (upTo > 0) {
+      any.prepare("DELETE FROM lib.tag_changes WHERE seq <= ?").run(upTo);
+    }
+  } catch (e) {
+    log.warn("could not trim the tag change log:", e);
   }
 }

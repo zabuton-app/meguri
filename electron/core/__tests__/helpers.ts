@@ -1,9 +1,14 @@
 // Shared helpers for core DB tests. Not a test file itself (no ".test" suffix).
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { openDb, nowUnix, type DB } from "../db.js";
 import { upsertScanRoot } from "../queries.js";
 
 export interface FileSeed {
   relPath: string;
+  /** The workspace root abs_path is built under; "/fake/root" (newDb's) by default. */
+  root?: string;
   kind?: "video" | "image" | "audio";
   ext?: string;
   size?: number;
@@ -62,6 +67,40 @@ export function newDb(): { db: DB; rootId: number } {
   return { db, rootId };
 }
 
+/** A workspace in newSharedDbs: its connection, scan root id and root path. */
+export interface SharedWorkspace {
+  db: DB;
+  rootId: number;
+  root: string;
+}
+
+/**
+ * `count` workspace databases on disk that share one library, as the app opens
+ * them (openDb), with roots `/ws0`, `/ws1`, … Call `cleanup` to close them and
+ * remove the directory.
+ */
+export function newSharedDbs(count: number): {
+  dbs: SharedWorkspace[];
+  libraryPath: string;
+  cleanup: () => void;
+} {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-shared-"));
+  const libraryPath = path.join(dir, "library.sqlite");
+  const dbs = Array.from({ length: count }, (_, i) => {
+    const db = openDb(path.join(dir, `ws${i}.sqlite`), libraryPath);
+    const root = `/ws${i}`;
+    return { db, rootId: upsertScanRoot(db, root, `ws${i}`), root };
+  });
+  return {
+    dbs,
+    libraryPath,
+    cleanup: () => {
+      for (const { db } of dbs) db.close();
+      fs.rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
+
 /** Insert a file row directly (bypassing the filesystem-backed scan) and return its id. */
 export function insertFile(db: DB, rootId: number, seed: FileSeed): number {
   const ext = seed.ext ?? seed.relPath.split(".").pop() ?? "mp4";
@@ -75,7 +114,7 @@ export function insertFile(db: DB, rootId: number, seed: FileSeed): number {
     .run(
       rootId,
       seed.relPath,
-      `/fake/root/${seed.relPath}`,
+      `${seed.root ?? "/fake/root"}/${seed.relPath}`,
       seed.kind ?? "video",
       ext,
       seed.size ?? 1000,

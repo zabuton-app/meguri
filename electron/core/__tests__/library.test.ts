@@ -4,9 +4,35 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hasMainTable, openDb, type DB } from "../db.js";
-import { migrateWorkspaceMetadata } from "../library.js";
-import { setFavorite } from "../queries.js";
-import { LEGACY_METADATA_DDL } from "./helpers.js";
+import {
+  FTS_TAG_SEQ_KEY,
+  catchUpTagIndex,
+  migrateWorkspaceMetadata,
+  syncTagIndexes,
+} from "../library.js";
+import {
+  addBookmark,
+  fileDetail,
+  getSetting,
+  migrateMetaKey,
+  searchFiles,
+  setFavorite,
+  setRating,
+} from "../queries.js";
+import { deleteTags, renameTag } from "../tagAdmin.js";
+import {
+  addFileTag,
+  addManualTag,
+  bulkEditManualTags,
+  removeManualTag,
+  syncFts,
+} from "../tags.js";
+import {
+  LEGACY_METADATA_DDL,
+  insertFile,
+  newSharedDbs,
+  type SharedWorkspace,
+} from "./helpers.js";
 
 let dir: string;
 let libraryPath: string;
@@ -305,6 +331,309 @@ describe("migrateWorkspaceMetadata", () => {
         .prepare("SELECT favorite FROM main.file_meta WHERE meta_key = 'h2'")
         .get(),
     ).toEqual({ favorite: 1 });
+    db.close();
+  });
+});
+
+describe("the library shared by two workspaces", () => {
+  let a: SharedWorkspace;
+  let b: SharedWorkspace;
+  let cleanup: () => void;
+  beforeEach(() => {
+    const shared = newSharedDbs(2);
+    [a, b] = shared.dbs;
+    cleanup = shared.cleanup;
+  });
+  afterEach(() => cleanup());
+
+  /** The same content in both workspaces, indexed as a scan leaves it. */
+  function sameFileInBoth(): { inA: number; inB: number } {
+    const inA = insertFile(a.db, a.rootId, {
+      relPath: "trip.mp4",
+      root: a.root,
+      contentHash: "h",
+    });
+    const inB = insertFile(b.db, b.rootId, {
+      relPath: "clip.mp4",
+      root: b.root,
+      contentHash: "h",
+    });
+    syncFts(a.db, inA);
+    syncFts(b.db, inB);
+    return { inA, inB };
+  }
+  /**
+   * Give B a file only it has, plus a few more so one changed key stays a small
+   * share of its files, catch B up, then drop that file's index row: a rebuild
+   * puts the row back, a catch-up of the changed keys leaves it out.
+   */
+  function markerInB(): number {
+    const marker = insertFile(b.db, b.rootId, {
+      relPath: "untouched.mp4",
+      root: b.root,
+      contentHash: "other",
+    });
+    for (let i = 0; i < 4; i++) {
+      insertFile(b.db, b.rootId, {
+        relPath: `filler${i}.mp4`,
+        root: b.root,
+        contentHash: `filler${i}`,
+      });
+    }
+    catchUpTagIndex(b.db);
+    b.db.prepare("DELETE FROM files_fts WHERE rowid = ?").run(marker);
+    return marker;
+  }
+  const matches = (ws: SharedWorkspace, q: string) =>
+    searchFiles(ws.db, { q }).items.map((f) => f.id);
+  const loggedChanges = () =>
+    (
+      a.db.prepare("SELECT COUNT(*) AS n FROM lib.tag_changes").get() as {
+        n: number;
+      }
+    ).n;
+
+  it("shows what one workspace curated in the other", () => {
+    const { inA, inB } = sameFileInBoth();
+    setFavorite(a.db, inA, true);
+    setRating(a.db, inA, 4);
+    addManualTag(a.db, inA, "beach");
+    addBookmark(a.db, inA, 12);
+
+    const detail = fileDetail(b.db, inB);
+    expect(detail).toMatchObject({ favorite: 1, rating: 4 });
+    expect(detail?.tags.map((t) => t.name)).toEqual(["beach"]);
+    expect(detail?.bookmarks.map((m) => m.sec)).toEqual([12]);
+    expect(
+      searchFiles(b.db, { favorite: true }).items.map((f) => f.id),
+    ).toEqual([inB]);
+    expect(
+      searchFiles(b.db, { tags: ["beach"] }).items.map((f) => f.id),
+    ).toEqual([inB]);
+  });
+
+  it("brings the other workspace's keyword index up to the tags changed in one", () => {
+    const { inA, inB } = sameFileInBoth();
+    markerInB();
+
+    const tagId = addManualTag(a.db, inA, "beach");
+    syncFts(a.db, inA);
+    expect(matches(b, "beach")).toEqual([]);
+    catchUpTagIndex(b.db);
+    expect(matches(b, "beach")).toEqual([inB]);
+    expect(matches(b, "untouched")).toEqual([]);
+
+    removeManualTag(a.db, inA, tagId);
+    catchUpTagIndex(b.db);
+    expect(matches(b, "beach")).toEqual([]);
+  });
+
+  it("does not log derived tags, which the keyword index never holds", () => {
+    sameFileInBoth();
+    const before = loggedChanges();
+    a.db.exec(`
+      INSERT INTO tags (name, namespace) VALUES ('long', 'dur');
+      INSERT INTO meta_tags (meta_key, tag_id, source)
+        SELECT 'h', id, 'auto-meta' FROM tags WHERE namespace = 'dur';
+      DELETE FROM meta_tags WHERE source = 'auto-meta';
+    `);
+    expect(loggedChanges()).toBe(before);
+  });
+
+  it("rebuilds the index of a workspace that fell behind the trimmed log", () => {
+    const { inA, inB } = sameFileInBoth();
+    const untouched = markerInB();
+
+    addManualTag(a.db, inA, "beach");
+    // Trimmed while B was closed, then another change.
+    a.db.exec("DELETE FROM lib.tag_changes");
+    addManualTag(a.db, inA, "sea");
+    catchUpTagIndex(b.db);
+
+    expect(matches(b, "beach")).toEqual([inB]);
+    expect(matches(b, "untouched")).toEqual([untouched]);
+  });
+
+  it("builds the index from the library the first time, when nothing is recorded", () => {
+    const { inA, inB } = sameFileInBoth();
+    addManualTag(a.db, inA, "beach");
+    expect(getSetting(b.db, FTS_TAG_SEQ_KEY)).toBeNull();
+    catchUpTagIndex(b.db);
+    expect(matches(b, "beach")).toEqual([inB]);
+    expect(getSetting(b.db, FTS_TAG_SEQ_KEY)).not.toBeNull();
+  });
+
+  it("leaves the writer's index current after a bulk write, so catching up applies nothing again", () => {
+    const ids = Array.from({ length: 5 }, (_, i) =>
+      insertFile(a.db, a.rootId, {
+        relPath: `f${i}.mp4`,
+        root: a.root,
+        contentHash: `k${i}`,
+      }),
+    );
+    catchUpTagIndex(a.db);
+    // Most of A's files: catching up on these keys would rebuild the index.
+    bulkEditManualTags(a.db, ids.slice(0, 4), ["beach"], []);
+    const latest = a.db
+      .prepare("SELECT MAX(seq) FROM lib.tag_changes")
+      .pluck()
+      .get();
+    expect(getSetting(a.db, FTS_TAG_SEQ_KEY)).toBe(String(latest));
+    expect(matches(a, "beach")).toHaveLength(4);
+  });
+
+  it("does not mark the writer's index current when another change is pending", () => {
+    const { inA, inB } = sameFileInBoth();
+    const own = insertFile(a.db, a.rootId, {
+      relPath: "own.mp4",
+      root: a.root,
+      contentHash: "own",
+    });
+    catchUpTagIndex(a.db);
+    // B changes the shared file while A's index is not looking.
+    addManualTag(b.db, inB, "sea");
+    bulkEditManualTags(a.db, [own], ["beach"], []);
+    expect(Number(getSetting(a.db, FTS_TAG_SEQ_KEY))).toBeLessThan(
+      a.db
+        .prepare("SELECT MAX(seq) FROM lib.tag_changes")
+        .pluck()
+        .get() as number,
+    );
+    catchUpTagIndex(a.db);
+    expect(matches(a, "sea")).toEqual([inA]);
+  });
+
+  it("does not log a tag put again on a file that has it", () => {
+    const { inA } = sameFileInBoth();
+    const tagId = addManualTag(a.db, inA, "beach");
+    const before = loggedChanges();
+    addFileTag(a.db, inA, tagId, "manual", null);
+    expect(loggedChanges()).toBe(before);
+  });
+
+  it("syncTagIndexes catches every workspace up and trims what all have applied", () => {
+    const { inA, inB } = sameFileInBoth();
+    addManualTag(a.db, inA, "beach");
+    expect(loggedChanges()).toBeGreaterThan(0);
+
+    syncTagIndexes([a.db, b.db], 0);
+
+    expect(matches(a, "beach")).toEqual([inA]);
+    expect(matches(b, "beach")).toEqual([inB]);
+    expect(loggedChanges()).toBe(0);
+  });
+
+  it("keeps the latest changes for a workspace that is not open", () => {
+    const { inA, inB } = sameFileInBoth();
+    addManualTag(a.db, inA, "old");
+    markerInB();
+    addManualTag(a.db, inA, "beach");
+    addManualTag(a.db, inA, "sea");
+
+    // Only A is open, and it has applied all three: the trim keeps the last
+    // two, which are the ones B missed.
+    syncTagIndexes([a.db], 2);
+    expect(loggedChanges()).toBe(2);
+    catchUpTagIndex(b.db);
+    expect(matches(b, "sea")).toEqual([inB]);
+    // Caught up from the log, not rebuilt.
+    expect(matches(b, "untouched")).toEqual([]);
+  });
+
+  it("does not trim when a workspace could not be caught up", () => {
+    const { inA } = sameFileInBoth();
+    addManualTag(a.db, inA, "beach");
+    const broken = {
+      prepare: () => {
+        throw new Error("closed");
+      },
+    } as unknown as DB;
+    syncTagIndexes([a.db, broken], 0);
+    expect(loggedChanges()).toBeGreaterThan(0);
+  });
+
+  it("follows a rename, a delete and a key move made through the other workspace", () => {
+    const { inA, inB } = sameFileInBoth();
+    addManualTag(a.db, inA, "beach");
+    catchUpTagIndex(b.db);
+    expect(matches(b, "beach")).toEqual([inB]);
+
+    renameTag(a.db, { namespace: "", name: "beach" }, "shore");
+    catchUpTagIndex(b.db);
+    expect(matches(b, "beach")).toEqual([]);
+    expect(matches(b, "shore")).toEqual([inB]);
+
+    deleteTags(a.db, [{ namespace: "", name: "shore" }]);
+    catchUpTagIndex(b.db);
+    expect(matches(b, "shore")).toEqual([]);
+
+    // A file of A's gains the hash B's copy has: its tags move to that key.
+    const pending = insertFile(a.db, a.rootId, {
+      relPath: "pending.mp4",
+      root: a.root,
+      contentHash: null,
+    });
+    addManualTag(a.db, pending, "dune");
+    migrateMetaKey(a.db, `p:${a.root}/pending.mp4`, "h");
+    catchUpTagIndex(b.db);
+    expect(matches(b, "dune")).toEqual([inB]);
+  });
+
+  it("rebuilds when the library has handed out fewer changes than recorded", () => {
+    const { inA, inB } = sameFileInBoth();
+    catchUpTagIndex(b.db);
+    b.db.exec("UPDATE settings SET value = '999999' WHERE key = 'fts_tag_seq'");
+    addManualTag(a.db, inA, "beach");
+    catchUpTagIndex(b.db);
+    expect(matches(b, "beach")).toEqual([inB]);
+  });
+
+  it("rebuilds rather than re-syncing most of the files key by key", () => {
+    const { inA, inB } = sameFileInBoth();
+    // B holds two files; one changed key is half of them.
+    const marker = insertFile(b.db, b.rootId, {
+      relPath: "untouched.mp4",
+      root: b.root,
+      contentHash: "other",
+    });
+    catchUpTagIndex(b.db);
+    b.db.prepare("DELETE FROM files_fts WHERE rowid = ?").run(marker);
+    addManualTag(a.db, inA, "beach");
+    catchUpTagIndex(b.db);
+    expect(matches(b, "beach")).toEqual([inB]);
+    expect(matches(b, "untouched")).toEqual([marker]);
+  });
+
+  it("keeps a hash-less file's metadata to its own workspace", () => {
+    // Same relative path in both, no hash yet: the keys are the absolute paths.
+    const inA = insertFile(a.db, a.rootId, {
+      relPath: "same.mp4",
+      root: a.root,
+      contentHash: null,
+    });
+    const inB = insertFile(b.db, b.rootId, {
+      relPath: "same.mp4",
+      root: b.root,
+      contentHash: null,
+    });
+    setRating(a.db, inA, 5);
+    expect(fileDetail(b.db, inB)?.rating).toBe(0);
+  });
+});
+
+describe("the tag index after the merge", () => {
+  it("records the rebuilt index as current", () => {
+    makeLegacyWorkspace("a", ["h1", "h2"], SEED_A);
+    const db = openAndMigrate("a");
+    const latest = (
+      db
+        .prepare(
+          "SELECT seq FROM lib.sqlite_sequence WHERE name = 'tag_changes'",
+        )
+        .get() as { seq: number }
+    ).seq;
+    expect(latest).toBeGreaterThan(0);
+    expect(getSetting(db, FTS_TAG_SEQ_KEY)).toBe(String(latest));
     db.close();
   });
 });
