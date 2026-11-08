@@ -85,6 +85,8 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
         detachTagPairs(coreById(ws, workspaceId).db, pairs);
       }
       throw err;
+    } finally {
+      ws.syncTagIndexes();
     }
     if (added === 0) return { files, added, moved, undoId: null };
     const undoId = randomUUID();
@@ -111,30 +113,38 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
       if (ids) ids.push(...kept);
       else byWorkspace.set(workspaceId, kept);
     }
-    for (const [workspaceId, ids] of byWorkspace) {
-      if (ids.length === 0) continue;
-      const db = coreById(ws, workspaceId).db;
-      // Taken off by what the names mean, not as the screen spells them: its
-      // spelling is the first workspace's, and this one may spell the tag
-      // otherwise (see manualSpellings).
-      const r = bulkEditManualTags(db, ids, add, manualSpellings(db, remove));
-      total.files += r.files;
-      total.skipped += r.skipped;
-      total.added += r.added;
-      total.removed += r.removed;
+    try {
+      for (const [workspaceId, ids] of byWorkspace) {
+        if (ids.length === 0) continue;
+        const db = coreById(ws, workspaceId).db;
+        // Taken off by what the names mean, not as the screen spells them: its
+        // spelling is the first workspace's, and this one may spell the tag
+        // otherwise (see manualSpellings).
+        const r = bulkEditManualTags(db, ids, add, manualSpellings(db, remove));
+        total.files += r.files;
+        total.skipped += r.skipped;
+        total.added += r.added;
+        total.removed += r.removed;
+      }
+    } finally {
+      ws.syncTagIndexes();
     }
     return total;
   });
 
   handle("auto_tag_undo", async ({ undoIds }) => {
     let removed = 0;
-    for (const undoId of undoIds) {
-      const entry = undo.forget(undoId);
-      if (!entry) continue;
-      for (const { workspaceId, pairs } of entry) {
-        const core = ws.byId(workspaceId);
-        if (core) removed += detachTagPairs(core.db, pairs);
+    try {
+      for (const undoId of undoIds) {
+        const entry = undo.forget(undoId);
+        if (!entry) continue;
+        for (const { workspaceId, pairs } of entry) {
+          const core = ws.byId(workspaceId);
+          if (core) removed += detachTagPairs(core.db, pairs);
+        }
       }
+    } finally {
+      ws.syncTagIndexes();
     }
     if (removed > 0) await queryClient.invalidateCaches();
     return removed;
@@ -183,6 +193,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
       throw error;
     } finally {
       reapplying = false;
+      ws.syncTagIndexes();
     }
   });
 }

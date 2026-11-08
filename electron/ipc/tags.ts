@@ -14,19 +14,31 @@ import {
   scopedCores,
 } from "./helpers.js";
 
+// Every handler that writes tags calls ws.syncTagIndexes() in a finally, so
+// the other workspaces' keyword indexes follow even a write that failed
+// partway. Its own syncFts and the like stay: they keep this workspace's index
+// right within the same call (research.md, R4).
 export function registerTagHandlers(ctx: IpcContext): void {
   const { ws, queryClient } = ctx;
 
   handle("file_add_tag", ({ id, workspaceId, name }) => {
     const db = coreById(ws, workspaceId).db;
-    const tagId = tags.addManualTag(db, id, name.trim());
-    tags.syncFts(db, id);
-    return tagId;
+    try {
+      const tagId = tags.addManualTag(db, id, name.trim());
+      tags.syncFts(db, id);
+      return tagId;
+    } finally {
+      ws.syncTagIndexes();
+    }
   });
   handle("file_remove_tag", ({ id, workspaceId, tagId }) => {
     const db = coreById(ws, workspaceId).db;
-    tags.removeManualTag(db, id, tagId);
-    tags.syncFts(db, id);
+    try {
+      tags.removeManualTag(db, id, tagId);
+      tags.syncFts(db, id);
+    } finally {
+      ws.syncTagIndexes();
+    }
   });
   // One edit over a multi-workspace selection.
   //
@@ -45,12 +57,16 @@ export function registerTagHandlers(ctx: IpcContext): void {
   handle("files_bulk_tag", ({ targets, add, remove }) => {
     const groups = bulkTargetCores(ws, targets);
     const total = { files: 0, skipped: 0, added: 0, removed: 0 };
-    for (const { core, fileIds } of groups) {
-      const r = tags.bulkEditManualTags(core.db, fileIds, add, remove);
-      total.files += r.files;
-      total.skipped += r.skipped;
-      total.added += r.added;
-      total.removed += r.removed;
+    try {
+      for (const { core, fileIds } of groups) {
+        const r = tags.bulkEditManualTags(core.db, fileIds, add, remove);
+        total.files += r.files;
+        total.skipped += r.skipped;
+        total.added += r.added;
+        total.removed += r.removed;
+      }
+    } finally {
+      ws.syncTagIndexes();
     }
     return total;
   });
@@ -113,11 +129,17 @@ export function registerTagHandlers(ctx: IpcContext): void {
     const before = loadConfig().autoTag;
     const names = from.filter((ref) => ref.namespace === "").map((r) => r.name);
     const after = retagConditions(before, names, to);
-    if (after === before) return run(tagMutationCores(false));
-    AutoTagConfigSchema.parse(after);
-    const result = run(tagMutationCores(true));
-    saveAutoTag(after);
-    return result;
+    try {
+      if (after === before) return run(tagMutationCores(false));
+      AutoTagConfigSchema.parse(after);
+      const result = run(tagMutationCores(true));
+      saveAutoTag(after);
+      return result;
+    } finally {
+      // The tags live in the library every workspace shares: the others'
+      // keyword indexes have to follow, whichever ran it.
+      ws.syncTagIndexes();
+    }
   };
   handle("tag_rename", ({ from, to }) =>
     // Trimmed as renameTag trims it, so both get the same name.

@@ -57,6 +57,7 @@ function makeDeps(
       allCores: () => [a],
       active: () => a.core,
       activeId: "a",
+      syncTagIndexes: vi.fn(),
     } as unknown as Deps["ws"],
     queryClient: { invalidateCaches } as unknown as Deps["queryClient"],
     emit: vi.fn(),
@@ -134,6 +135,7 @@ describe("ScanManager", () => {
         allCores: () => [fakeCore("a"), fakeCore("b")],
         active: () => null,
         activeId: "all",
+        syncTagIndexes: vi.fn(),
       } as unknown as Deps["ws"],
     });
     const scans = new ScanManager(deps);
@@ -145,6 +147,8 @@ describe("ScanManager", () => {
   it("reports a failed scan as scan:done with an error flag and frees the workspace", async () => {
     runScan.mockRejectedValue(new Error("boom"));
     const deps = makeDeps();
+    const syncTagIndexes = vi.fn();
+    Object.assign(deps.ws, { syncTagIndexes });
     const scans = new ScanManager(deps);
     scans.start();
     await scans.abort("a");
@@ -152,6 +156,8 @@ describe("ScanManager", () => {
       "scan:done",
       expect.objectContaining({ error: true }),
     );
+    // Even a failed scan may have tagged some files before it stopped.
+    expect(syncTagIndexes).toHaveBeenCalledTimes(1);
     pendingScan();
     expect(scans.start()).not.toBe("");
   });

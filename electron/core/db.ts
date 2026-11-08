@@ -30,7 +30,9 @@ const FTS_DDL =
  * indexes trigrams, not positions). DISTINCT collapses the same tag attached
  * via multiple sources; duplicates carry no extra search signal.
  *
- * Only user-owned tags (namespace = '') are indexed. The tokenizer is trigram,
+ * Only user-owned tags (namespace = '') are indexed — the rule the tag_changes
+ * triggers in LIB_DDL repeat in their WHEN clauses, so change both together.
+ * The tokenizer is trigram,
  * so indexing a generated tag like `dur:long` would make a plain search for
  * "long" return every long video — and likewise for "short", "square",
  * "h264"… Generated tags stay reachable through the explicit `tag:` directive
@@ -194,6 +196,42 @@ CREATE TABLE IF NOT EXISTS lib.scene_bookmarks (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS lib.idx_scene_bookmarks_meta ON scene_bookmarks(meta_key);
+
+-- The meta_keys whose user tags (namespace = '') changed, logged by the
+-- triggers below: every workspace keeps its own files_fts.tags_text, and
+-- catchUpTagIndex (library.ts) brings it up to date from here, whichever
+-- workspace made the change. AUTOINCREMENT so a seq is never handed out again
+-- after syncTagIndexes trims old rows.
+-- Derived tags are namespaced and never in tags_text (ftsRowSelect, which
+-- holds the same namespace = '' rule as the WHEN clauses below), so they are
+-- not logged.
+CREATE TABLE IF NOT EXISTS lib.tag_changes (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  meta_key TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS lib.trg_meta_tags_ai AFTER INSERT ON meta_tags
+WHEN EXISTS (SELECT 1 FROM tags WHERE id = NEW.tag_id AND namespace = '')
+BEGIN
+  INSERT INTO tag_changes (meta_key) VALUES (NEW.meta_key);
+END;
+-- A row removed by ON DELETE CASCADE fires after its tag is gone, so a tag
+-- that no longer exists counts as a user tag here.
+CREATE TRIGGER IF NOT EXISTS lib.trg_meta_tags_ad AFTER DELETE ON meta_tags
+WHEN NOT EXISTS (SELECT 1 FROM tags WHERE id = OLD.tag_id AND namespace <> '')
+BEGIN
+  INSERT INTO tag_changes (meta_key) VALUES (OLD.meta_key);
+END;
+CREATE TRIGGER IF NOT EXISTS lib.trg_meta_tags_au AFTER UPDATE ON meta_tags
+WHEN EXISTS (SELECT 1 FROM tags WHERE id IN (OLD.tag_id, NEW.tag_id) AND namespace = '')
+BEGIN
+  INSERT INTO tag_changes (meta_key) VALUES (OLD.meta_key);
+  INSERT INTO tag_changes (meta_key) SELECT NEW.meta_key WHERE NEW.meta_key <> OLD.meta_key;
+END;
+CREATE TRIGGER IF NOT EXISTS lib.trg_tags_au_name AFTER UPDATE OF name ON tags
+WHEN NEW.namespace = ''
+BEGIN
+  INSERT INTO tag_changes (meta_key) SELECT DISTINCT meta_key FROM meta_tags WHERE tag_id = NEW.id;
+END;
 
 -- Workspaces whose own metadata tables have been merged into this database
 -- (library.ts). Written in the same transaction as the merge. workspace_id is

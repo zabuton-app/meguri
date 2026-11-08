@@ -2,7 +2,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { openDb, type DB } from "./db.js";
-import { migrateWorkspaceMetadata } from "./library.js";
+import { catchUpTagIndex, migrateWorkspaceMetadata } from "./library.js";
+import log from "./logger.js";
 import {
   backupDbPathForDataDir,
   dataDirForRoot,
@@ -20,6 +21,9 @@ export class Core {
   readonly dbPath: string;
   /** The library shared by every workspace, attached to `db` as `lib`. */
   readonly libraryPath: string;
+  /** Whether opening this workspace merged its own metadata into the library,
+   *  changing tags the other workspaces may index. */
+  readonly mergedOnOpen: boolean;
 
   private constructor(
     db: DB,
@@ -27,6 +31,7 @@ export class Core {
     rootId: number,
     dataDir: string,
     libraryPath: string,
+    mergedOnOpen: boolean,
   ) {
     this.db = db;
     this.root = root;
@@ -34,6 +39,7 @@ export class Core {
     this.dataDir = dataDir;
     this.dbPath = dbPathForDataDir(dataDir);
     this.libraryPath = libraryPath;
+    this.mergedOnOpen = mergedOnOpen;
   }
 
   static init(rawRoot: string, libraryPath: string): Core {
@@ -50,13 +56,21 @@ export class Core {
     try {
       // The id the data directory is named after, so it means the same database
       // however the root path was spelled when the workspace was added.
-      migrateWorkspaceMetadata(
+      const merged = migrateWorkspaceMetadata(
         db,
         pathHash(root),
         backupDbPathForDataDir(dataDir),
       );
+      // Tags may have changed through other workspaces while this one was
+      // closed. A failure leaves the index as it was: searching still works,
+      // and the next catch-up tries again.
+      try {
+        catchUpTagIndex(db);
+      } catch (e) {
+        log.warn("could not bring the tag index up to date on open:", e);
+      }
       const rootId = upsertScanRoot(db, root, pathHash(root));
-      return new Core(db, root, rootId, dataDir, libraryPath);
+      return new Core(db, root, rootId, dataDir, libraryPath, merged);
     } catch (e) {
       // Not left open: the caller retries on the next access, and an open
       // handle keeps Windows from deleting the directory on removal.
