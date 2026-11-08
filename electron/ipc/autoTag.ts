@@ -147,6 +147,7 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
       const { config: engine, version: settingsVersion } = loadAutoTag();
       let files = 0;
       let added = 0;
+      let stopped = false;
       // As the screen that asked: every workspace (see auto_tag_files). One
       // removed meanwhile is stopped (its database is about to close) or
       // skipped, and the others are still done.
@@ -162,11 +163,13 @@ export function registerAutoTagHandlers(ctx: IpcContext): void {
           });
           files += result.files;
           added += result.added;
+          if (!result.completed) stopped = true;
         },
       );
       // Stopped by a change to the settings (applyAutoTags): what was added
-      // stays, and the caches are invalidated below, as for any failure.
-      if (autoTagSettingsVersion() !== settingsVersion) {
+      // stays, and the caches are invalidated below, as for any failure. A
+      // change saved after every pass was done stopped none of them.
+      if (stopped && autoTagSettingsVersion() !== settingsVersion) {
         throw new Error(
           "the auto-tagging settings changed while applying; apply again",
         );

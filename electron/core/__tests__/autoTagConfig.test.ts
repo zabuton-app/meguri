@@ -45,14 +45,30 @@ describe("the stored auto-tagging configuration", () => {
     expect(loadConfig().autoTag.applyOnScan).toBe(true);
   });
 
-  it("moves the version on with every save, so a pass under way stops", () => {
+  it("moves the version on when the engine's settings change, so a pass under way stops", () => {
     write({});
     const before = loadAutoTag();
-    const next = { ...before.config, applyOnScan: false };
+    const next = {
+      ...before.config,
+      keywords: [
+        { id: "k1", terms: ["trip"], tags: ["Trip"], mode: "word" as const },
+      ],
+    };
     saveAutoTag(next);
     const after = loadAutoTag();
     expect(after.config).toEqual(next);
     expect(after.version).not.toBe(before.version);
+  });
+
+  it("keeps the version when only what the engine does not read changes", () => {
+    write({});
+    const before = loadAutoTag();
+    saveAutoTag({ ...before.config, ignored: ["dsc"] });
+    saveAutoTag({ ...loadAutoTag().config, applyOnScan: false });
+    const after = loadAutoTag();
+    expect(after.config.ignored).toEqual(["dsc"]);
+    expect(after.config.applyOnScan).toBe(false);
+    expect(after.version).toBe(before.version);
   });
 
   it("drops the excluded terms an earlier version stored", () => {
