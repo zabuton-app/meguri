@@ -89,6 +89,12 @@ export function migrateWorkspaceMetadata(
     )
     .get(workspaceId) as { complete: number } | undefined;
   if (!usesOwnMetadata(db)) {
+    // Merged before into a library that no longer has it (one put back from
+    // a copy older than the merge, or made anew): its own tables are gone,
+    // and its copy is what is left of them. Merged again from there.
+    if (record === undefined && fs.existsSync(backupPath)) {
+      return mergeFromBackup(db, workspaceId, backupPath);
+    }
     // Created after the library, or merged before: on the library already.
     // Recorded complete so a write to every workspace knows it need not be
     // opened to be reached (Workspaces.metadataCores). Written only when it
@@ -142,6 +148,55 @@ export function migrateWorkspaceMetadata(
   log.info(`merged the metadata of workspace ${workspaceId} into the library`);
   // The copy stays until a copy of the library holds what it guards
   // (Workspaces.dropCoveredBackups).
+  return { merged: true };
+}
+
+/**
+ * Merge the own tables kept in a workspace's copy (writeBackup) into a library
+ * that has no record of it, then record it complete. The copy stays: what it
+ * holds is in the library again only once a copy of the library is taken
+ * (Workspaces.dropCoveredBackups). A failure leaves nothing recorded, so the
+ * next open tries again.
+ */
+function mergeFromBackup(
+  db: DB,
+  workspaceId: string,
+  backupPath: string,
+): MergeOutcome {
+  try {
+    db.prepare("ATTACH DATABASE ? AS kept").run(backupPath);
+  } catch (e) {
+    log.warn(`could not read the backup ${backupPath}:`, e);
+    return { merged: false, failure: "merge" };
+  }
+  try {
+    const holds =
+      db
+        .prepare(
+          "SELECT 1 FROM kept.sqlite_master WHERE type = 'table' AND name = 'file_meta'",
+        )
+        .get() !== undefined;
+    if (!holds) {
+      markComplete(db, workspaceId);
+      return { merged: false };
+    }
+    db.transaction(() => {
+      mergeIntoLibrary(db, "kept");
+      rebuildTagIndex(db);
+    })();
+  } catch (e) {
+    log.warn(
+      `could not merge the metadata of workspace ${workspaceId} from its backup:`,
+      e,
+    );
+    return { merged: false, failure: isDiskFull(e) ? "diskFull" : "merge" };
+  } finally {
+    db.exec("DETACH DATABASE kept");
+  }
+  markComplete(db, workspaceId);
+  log.warn(
+    `the library had no record of workspace ${workspaceId}: merged its metadata again from ${backupPath}`,
+  );
   return { merged: true };
 }
 
@@ -223,12 +278,12 @@ function writeBackup(db: DB, backupPath: string): unknown {
  * same result when the same rows are merged again. Caller supplies the
  * transaction.
  */
-function mergeIntoLibrary(db: DB): void {
+function mergeIntoLibrary(db: DB, from: "main" | "kept" = "main"): void {
   db.exec(`
     INSERT INTO lib.file_meta
       (meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at)
     SELECT meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at
-    FROM main.file_meta WHERE true
+    FROM ${from}.file_meta WHERE true
     ON CONFLICT (meta_key) DO UPDATE SET ${FILE_META_MERGE_SET};
   `);
 
@@ -237,13 +292,13 @@ function mergeIntoLibrary(db: DB): void {
   // and auto tagging already treat them as one (tagIdentityKey).
   db.exec(`
     INSERT INTO lib.tags (name, namespace)
-    SELECT name, namespace FROM main.tags WHERE true
+    SELECT name, namespace FROM ${from}.tags WHERE true
     ON CONFLICT (namespace, name) DO NOTHING;
 
     INSERT OR IGNORE INTO lib.meta_tags (meta_key, tag_id, source, score)
     SELECT mt.meta_key, lt.id, mt.source, mt.score
-    FROM main.meta_tags mt
-    JOIN main.tags t ON t.id = mt.tag_id
+    FROM ${from}.meta_tags mt
+    JOIN ${from}.tags t ON t.id = mt.tag_id
     JOIN lib.tags lt ON lt.namespace = t.namespace AND lt.name = t.name;
   `);
 
@@ -251,7 +306,7 @@ function mergeIntoLibrary(db: DB): void {
   db.exec(`
     INSERT INTO lib.play_history (meta_key, played_at, position, via)
     SELECT DISTINCT p.meta_key, p.played_at, p.position, p.via
-    FROM main.play_history p
+    FROM ${from}.play_history p
     WHERE NOT EXISTS (
       SELECT 1 FROM lib.play_history x
       WHERE x.meta_key = p.meta_key AND x.played_at = p.played_at
@@ -269,7 +324,7 @@ function mergeIntoLibrary(db: DB): void {
   );
   const rows = db
     .prepare(
-      "SELECT meta_key, sec, created_at FROM main.scene_bookmarks ORDER BY meta_key, sec, id",
+      `SELECT meta_key, sec, created_at FROM ${from}.scene_bookmarks ORDER BY meta_key, sec, id`,
     )
     .all() as { meta_key: string; sec: number; created_at: number }[];
   for (const b of rows) {

@@ -622,20 +622,19 @@ async function runLibraryMerge(
     onProgress: (progress: LibraryMergeProgress) => void,
   ) => Promise<LibraryMergeFailure[] | null>,
 ): Promise<void> {
-  let total = 0;
-  const failed = await run((progress) => {
-    total = progress.total;
-    emit("library:merge", { state: "running", ...progress });
-  });
+  const failed = await run((progress) =>
+    emit("library:merge", { state: "running", ...progress }),
+  );
   if (failed === null || isQuitting()) return;
   // The workspaces that merged have dropped their own tables: the library is
   // the one copy of their metadata, so it is copied now rather than at the
-  // next launch, and only then do their own copies go. Nothing merged
-  // (every one failed, a full disk) leaves the library as it was: no copy.
-  if (failed.length < total) {
-    ws.dropCoveredBackups(
-      backupLibraryNow(libraryDbPath(), libraryBackupDir()),
-    );
+  // next launch, and only then do their own copies go (not in a session
+  // that put the library back from a copy: theirs may hold what it lost).
+  // Nothing merged (every one failed, or was on the library already) leaves
+  // the library as it was: no copy.
+  if (ws.mergedInLastRun() > 0) {
+    const copiedAt = backupLibraryNow(libraryDbPath(), libraryBackupDir());
+    if (libraryRestoredFrom === null) ws.dropCoveredBackups(copiedAt);
   }
   if (failed.length > 0) {
     log.warn(
@@ -657,8 +656,11 @@ void app.whenReady().then(async () => {
   libraryRestoredFrom = maintainLibrary(libraryDbPath(), libraryBackupDir());
   ws.bootstrap(resolveCliRoot());
   // Workspaces that merged outside the startup merge (a tag rename reaching
-  // every workspace, a removal) kept their own copies until now.
-  ws.dropCoveredBackups(newestBackupTime(libraryBackupDir()));
+  // every workspace, a removal) kept their own copies until now. Not when the
+  // library was just put back from a copy: theirs may hold what it lost.
+  if (libraryRestoredFrom === null) {
+    ws.dropCoveredBackups(newestBackupTime(libraryBackupDir()));
+  }
 
   // The media server resolves the DB by workspace ID to serve (independent of the active one).
   ({ port: mediaPort, server: mediaServer } = await startServer(

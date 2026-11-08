@@ -88,6 +88,8 @@ export class Workspaces {
    */
   private merge: { pending: string[]; done: number; total: number } | null =
     null;
+  /** How many workspaces the last mergePending moved into the library. */
+  private mergedLast = 0;
   /** Above zero while metadataCores opens workspaces, which catches the
    *  others' keyword indexes up once at the end rather than after each. */
   private holdingTagSync = 0;
@@ -413,13 +415,8 @@ export class Workspaces {
     // when it cannot run (a full disk, a database that does not open), the
     // workspace is unregistered but its data directory stays, metadata and
     // all, and comes back when the folder is added again.
-    const library = this.cores.has(id)
-      ? null
-      : openLibraryReadonly(libraryDbPath());
-    const merged = library
-      ? recordedWorkspaceIds(library).has(Core.dataIdFor(p))
-      : false;
-    library?.close();
+    const merged =
+      !this.cores.has(id) && completeWorkspaceIds().has(Core.dataIdFor(p));
     const core = merged
       ? (this.cores.get(id) ?? undefined)
       : (this.coreForPath(p, { merging: true }) ?? undefined);
@@ -833,9 +830,7 @@ export class Workspaces {
     // The workspaces the library has no record of may still hold their own
     // metadata (the first launch after the upgrade). Their merge is left to
     // mergePending, which runs once the window can show it.
-    const library = openLibraryReadonly(libraryDbPath());
-    const recorded = library ? recordedWorkspaceIds(library) : new Set();
-    library?.close();
+    const recorded = completeWorkspaceIds();
     // One with no database yet has nothing to merge: it starts on the library.
     const pending = this.config.roots.filter(
       (p) =>
@@ -865,10 +860,7 @@ export class Workspaces {
    */
   dropCoveredBackups(copiedAt: number | null): void {
     if (copiedAt === null) return;
-    const library = openLibraryReadonly(libraryDbPath());
-    if (!library) return;
-    const recorded = recordedWorkspaceIds(library);
-    library.close();
+    const recorded = completeWorkspaceIds();
     for (const p of this.config.roots) {
       if (!recorded.has(Core.dataIdFor(p))) continue;
       const backup = backupDbPathForDataDir(
@@ -908,6 +900,7 @@ export class Workspaces {
     const merge = this.merge;
     if (!merge) return [];
     const failed: PendingFailure[] = [];
+    this.mergedLast = 0;
     try {
       for (const p of merge.pending) {
         await new Promise<void>((resolve) => setImmediate(resolve));
@@ -919,6 +912,7 @@ export class Workspaces {
           continue;
         }
         const core = this.coreForPath(p, { merging: true });
+        if (core?.mergedOnOpen) this.mergedLast++;
         if (!core) failed.push({ path: p, reason: "open" });
         else if (usesOwnMetadata(core.db)) {
           failed.push({ path: p, reason: core.mergeFailureReason ?? "merge" });
@@ -942,6 +936,12 @@ export class Workspaces {
     this.syncTagIndexes();
     this.mergeFailed = failed;
     return this.mergeFailures();
+  }
+
+  /** How many workspaces the last merge moved into the library: none (all
+   *  failed, or were on it already) leaves it as it was. */
+  mergedInLastRun(): number {
+    return this.mergedLast;
   }
 
   /** The workspaces the last merge could not merge (still registered), and why. */
@@ -1033,6 +1033,18 @@ export class Workspaces {
       });
       return null;
     }
+  }
+}
+
+/** The workspaces the library records as merged and complete, read without
+ *  opening any workspace. Empty when the library cannot be read. */
+function completeWorkspaceIds(): Set<string> {
+  const library = openLibraryReadonly(libraryDbPath());
+  if (!library) return new Set();
+  try {
+    return recordedWorkspaceIds(library);
+  } finally {
+    library.close();
   }
 }
 

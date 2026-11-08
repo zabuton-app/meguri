@@ -338,4 +338,58 @@ describe("merging workspaces into the library at startup", () => {
     );
     ws.closeAll();
   });
+
+  it("merges a workspace again from its backup when the library lost it", async () => {
+    const a = legacyWorkspace();
+    register([a]);
+    const first = new Workspaces();
+    first.bootstrap(null);
+    await first.mergePending(() => {});
+    expect(first.mergedInLastRun()).toBe(1);
+    first.closeAll();
+    // Put back from a copy older than the merge: no record, no metadata.
+    for (const suffix of ["", "-wal", "-shm"]) {
+      fs.rmSync(paths.libraryDbPath() + suffix, { force: true });
+    }
+
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    expect(ws.mergeProgress()).toEqual({ done: 0, total: 1 });
+    expect(await ws.mergePending(() => {})).toEqual([]);
+    expect(ws.mergedInLastRun()).toBe(1);
+    const core = ws.byId(Workspaces.idFor(a))!;
+    expect(
+      core.db.prepare("SELECT favorite FROM lib.file_meta").pluck().get(),
+    ).toBe(1);
+    // Kept until a copy of the library holds it again.
+    expect(fs.existsSync(backupOf(a))).toBe(true);
+    ws.closeAll();
+
+    const next = new Workspaces();
+    next.bootstrap(null);
+    expect(next.mergeProgress()).toBeNull();
+    next.closeAll();
+  });
+
+  it("counts no merge for workspaces already on the library", async () => {
+    const a = legacyWorkspace();
+    register([a]);
+    const first = new Workspaces();
+    first.bootstrap(null);
+    await first.mergePending(() => {});
+    first.closeAll();
+    // A record from before `complete`: opened once more, nothing to move.
+    const db = openDb(
+      paths.dbPathForDataDir(paths.dataDirForRoot(Core.resolveRoot(a))),
+      paths.libraryDbPath(),
+    );
+    db.exec("UPDATE lib.migrated_workspaces SET complete = 0");
+    db.close();
+
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    await ws.mergePending(() => {});
+    expect(ws.mergedInLastRun()).toBe(0);
+    ws.closeAll();
+  });
 });

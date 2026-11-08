@@ -8,6 +8,7 @@ import {
   BACKUPS_KEPT,
   backupLibraryNow,
   maintainLibrary,
+  newestBackupTime,
 } from "../libraryBackup.js";
 
 let dir: string;
@@ -168,6 +169,25 @@ describe("maintainLibrary", () => {
     dateCopies(T0 + 10 * DAY);
     maintainLibrary(library, backups, T0 + DAY);
     expect(copies()).toHaveLength(2);
+  });
+
+  it("takes a copy dated ahead of now for the stalest, not the newest", () => {
+    // On the real clock: the copies taken below carry its mtime.
+    const base = Date.now();
+    writeLibrary(1);
+    maintainLibrary(library, backups, base);
+    // A clock that jumped ahead when that copy was taken.
+    dateCopies(base + 10 * DAY);
+    expect(newestBackupTime(backups, base + 1000)).toBeNull();
+    const at = (i: number) => base + 1000 + i;
+    for (let i = 1; i <= BACKUPS_KEPT; i++) {
+      backupLibraryNow(library, backups, at(i));
+    }
+    // The copies taken since stay; the one dated ahead goes first.
+    expect(copies()).toHaveLength(BACKUPS_KEPT);
+    const newest = newestBackupTime(backups, at(BACKUPS_KEPT));
+    expect(newest).not.toBeNull();
+    expect(newest!).toBeLessThanOrEqual(at(BACKUPS_KEPT));
   });
 
   it("copies right away after a merge, however fresh the newest copy is", () => {

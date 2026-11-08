@@ -52,8 +52,12 @@ function checkLibrary(file: string): Health {
   }
 }
 
-/** The copies in `dir`, newest first. */
-function listBackups(dir: string): { file: string; time: number }[] {
+/** The copies in `dir`, newest first; one dated ahead of `now` (a clock that
+ *  jumped when it was taken) comes after every other, as the stalest. */
+function listBackups(
+  dir: string,
+  now: number = Date.now(),
+): { file: string; time: number }[] {
   let names: string[];
   try {
     names = fs.readdirSync(dir);
@@ -66,7 +70,12 @@ function listBackups(dir: string): { file: string; time: number }[] {
       const file = path.join(dir, n);
       return { file, time: fs.statSync(file).mtimeMs };
     })
-    .sort((a, b) => b.time - a.time);
+    .sort((a, b) => {
+      const aheadA = a.time > now;
+      const aheadB = b.time > now;
+      if (aheadA !== aheadB) return aheadA ? 1 : -1;
+      return b.time - a.time;
+    });
 }
 
 /** `library-20261108T123456789.sqlite`, in UTC, to the millisecond. */
@@ -97,15 +106,20 @@ function takeBackup(file: string, dir: string, now: number): number | null {
   } finally {
     db?.close();
   }
-  for (const old of listBackups(dir).slice(BACKUPS_KEPT)) {
+  for (const old of listBackups(dir, now).slice(BACKUPS_KEPT)) {
     fs.rmSync(old.file, { force: true });
   }
   return fs.statSync(target).mtimeMs;
 }
 
-/** When the newest copy in `dir` was taken (ms), or null with none. */
-export function newestBackupTime(dir: string): number | null {
-  return listBackups(dir)[0]?.time ?? null;
+/** When the newest copy in `dir` was taken (ms), or null with none: one
+ *  dated ahead of now does not count. */
+export function newestBackupTime(
+  dir: string,
+  now: number = Date.now(),
+): number | null {
+  const newest = listBackups(dir, now)[0];
+  return newest && newest.time <= now ? newest.time : null;
 }
 
 /**
@@ -214,7 +228,7 @@ export function maintainLibrary(
   now: number = Date.now(),
 ): number | null {
   try {
-    const backups = listBackups(dir);
+    const backups = listBackups(dir, now);
     if (!fs.existsSync(file)) {
       return backups.length > 0
         ? restoreNewest(file, backups, now, false)

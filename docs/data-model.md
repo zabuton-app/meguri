@@ -220,7 +220,13 @@ A copy is also taken right after workspaces merge into the library, since
 their own tables are gone by then, unless none of them merged. The
 workspaces' own copies are deleted after it. A workspace merged some other
 way (a tag rename reaching every workspace, a removal) keeps its copy until a
-later startup finds a library copy newer than it.
+later startup finds a library copy newer than it. No workspace copy is deleted
+in a session that put the library back from a copy.
+
+A library put back from a copy older than a workspace's merge has no record of
+that workspace, whose own tables are gone. Its own copy still holds them:
+opening it merges them into the library again from there. A copy dated ahead
+of the clock counts as the stalest, never as the newest.
 
 Rows for the same `meta_key` are merged so that nothing the user set is lost:
 
