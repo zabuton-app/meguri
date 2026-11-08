@@ -26,12 +26,14 @@ export function ActiveFilterChips({
 
           A plain overflow container rather than ScrollArea: this is a single
           row, the same shape the grid cards and list rows already scroll their tag
-          rows with. Unlike those, the scrollbar stays visible (thin) — a row
+          rows with. Unlike those, the scrollbar stays visible — a row
           that silently hides conditions off its right edge is exactly the
-          failure this feature exists to avoid. */}
+          failure this feature exists to avoid. It is drawn by the app-wide
+          ::-webkit-scrollbar rules in styles.css; setting scrollbar-width here
+          would make Chromium ignore them and fall back to its native bar. */}
       <div
         data-slot="filter-chip-track"
-        className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]"
+        className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto overflow-y-hidden pb-1"
       >
         {chips.map((chip) => (
           <Badge

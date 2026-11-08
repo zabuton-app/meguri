@@ -58,6 +58,8 @@ function ScrollBar({
   orientation = "vertical",
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
+  // The native bars ScrollArea cannot wrap copy this look by hand: the
+  // ::-webkit-scrollbar rules in styles.css and SHADOW_CSS in EmojiPicker.tsx.
   return (
     <ScrollAreaPrimitive.ScrollAreaScrollbar
       data-slot="scroll-area-scrollbar"
