@@ -40,28 +40,29 @@ const SHADOW_STYLE_ID = "meguri-emoji-style";
 // thumb to match ScrollArea's (the theme's --c-* variables also inherit across
 // the shadow boundary). The bar keeps emoji-mart's width: the picker reserves
 // --sidebar-width for it when sizing the grid, so the wider transparent border
-// narrows the visible thumb instead. emoji-mart sets the hover colour with
-// !important, hence the !important here.
+// narrows the visible thumb instead. The rules carry emoji-mart's own `.scroll`
+// selectors and !important: its hover colour is !important too, and this style
+// is appended after emoji-mart's, so at equal specificity it wins.
 const SHADOW_CSS = `.emoji-mart-emoji span {
   font-family: var(--font-family) !important;
 }
-::-webkit-scrollbar-track,
-::-webkit-scrollbar-corner {
+.scroll::-webkit-scrollbar-track,
+.scroll::-webkit-scrollbar-corner {
   background: transparent !important;
 }
-::-webkit-scrollbar-thumb {
+.scroll::-webkit-scrollbar-thumb {
   min-height: 24px !important;
   border: 5px solid transparent !important;
   border-radius: 9999px !important;
   background-color: var(--c-overlay) !important;
   background-clip: padding-box !important;
 }
-::-webkit-scrollbar-thumb:hover {
+.scroll::-webkit-scrollbar-thumb:hover {
   background-color: var(--c-muted) !important;
 }`;
 
 /** Inject the font and scrollbar overrides into the picker's shadow root (idempotent). */
-function injectShadowFont(host: Element): boolean {
+function injectShadowCss(host: Element): boolean {
   const root = host.shadowRoot;
   if (!root) return false;
   if (!root.getElementById(SHADOW_STYLE_ID)) {
@@ -110,7 +111,7 @@ export function EmojiPicker({
     let raf = 0;
     const tryInject = () => {
       const host = node.querySelector("em-emoji-picker");
-      if ((host && injectShadowFont(host)) || tries++ > 60) return;
+      if ((host && injectShadowCss(host)) || tries++ > 60) return;
       raf = requestAnimationFrame(tryInject);
     };
     tryInject();
