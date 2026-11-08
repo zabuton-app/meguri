@@ -223,7 +223,7 @@ export function updateExtractedMeta(
 
 /**
  * Carry durable metadata from one meta_key to another (used when a file's content_hash
- * first appears and its meta_key shifts from the rel_path fallback to the hash). Rows that
+ * first appears and its meta_key shifts from the path fallback to the hash). Rows that
  * would collide with an existing target are dropped (the target already holds metadata).
  */
 export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {

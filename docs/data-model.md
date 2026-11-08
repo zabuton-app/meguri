@@ -95,14 +95,18 @@ User-edited metadata is split into `file_meta`, whose primary key is **not**
 `files.id` but `meta_key`:
 
 ```text
-meta_key = COALESCE(content_hash, 'p:<root_id>:<rel_path>')
+meta_key = COALESCE(content_hash, 'p:<abs_path>')
 ```
 
 `files.meta_key` is a `VIRTUAL` generated column computing the same expression.
-It prefers `content_hash` and falls back to a root-scoped `rel_path` when no
-hash is available. Because metadata is keyed this way, it **survives file moves,
-renames, and rebuilds of the `files` / `files_fts` tables** — anything that
-would change or regenerate `files.id`.
+It prefers `content_hash` and falls back to the file's absolute path when no
+hash is available. The fallback is the absolute path rather than a root-scoped
+`rel_path` so that it cannot collide with a file of another workspace; DBs from
+before this change are rebuilt once on open and the metadata under their old
+`p:<root_id>:<rel_path>` keys is moved to the new ones. Because metadata is
+keyed this way, it **survives file moves, renames, and rebuilds of the
+`files` / `files_fts` tables** — anything that would change or regenerate
+`files.id`.
 
 `file_meta` holds `favorite`, `rating` (0–5), `last_accessed_at`, and
 `thumb_offset_sec` (the user-chosen thumbnail frame offset, `NULL` meaning the

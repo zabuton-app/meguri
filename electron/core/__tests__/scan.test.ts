@@ -193,6 +193,87 @@ describe("syncFiles lifecycle", () => {
     ).c;
   }
 
+  it("carries metadata from the path key to the hash key when a hash first appears", async () => {
+    const file = path.join(root, "late.mp4");
+    await fsp.writeFile(file, "BBBBBBBBBB");
+    await rescan();
+    const row = db
+      .prepare("SELECT id, abs_path FROM files WHERE rel_path = 'late.mp4'")
+      .get() as { id: number; abs_path: string };
+    // Emulate a scan that stored the row before hashing it: the metadata then
+    // lives under the absolute-path key.
+    db.prepare("UPDATE files SET content_hash = NULL WHERE id = ?").run(row.id);
+    const pathKey = `p:${row.abs_path}`;
+    db.prepare(
+      "INSERT INTO file_meta (meta_key, favorite, rating, updated_at) VALUES (?, 1, 4, 0)",
+    ).run(pathKey);
+
+    await fsp.writeFile(file, "CCCCCCCCCCCC");
+    await fsp.utimes(file, new Date(), new Date(Date.now() + 60_000));
+    await rescan();
+
+    const after = db
+      .prepare(
+        "SELECT f.content_hash AS hash, m.favorite, m.rating FROM files f JOIN file_meta m ON m.meta_key = f.meta_key WHERE f.id = ?",
+      )
+      .get(row.id) as { hash: string | null; favorite: number; rating: number };
+    expect(after.hash).not.toBeNull();
+    expect(after).toMatchObject({ favorite: 1, rating: 4 });
+    expect(
+      db.prepare("SELECT 1 FROM file_meta WHERE meta_key = ?").get(pathKey),
+    ).toBeUndefined();
+  });
+
+  it("carries metadata from the key the row derived, not from the path found now", async () => {
+    const file = path.join(root, "late.mp4");
+    await fsp.writeFile(file, "BBBBBBBBBB");
+    await rescan();
+    // A row stored without a hash, under a path spelled differently from the
+    // one this scan finds: its metadata is under the key that path derives.
+    const storedKey = "p:/elsewhere/late.mp4";
+    db.prepare(
+      "UPDATE files SET content_hash = NULL, abs_path = '/elsewhere/late.mp4' WHERE rel_path = 'late.mp4'",
+    ).run();
+    db.prepare(
+      "INSERT INTO file_meta (meta_key, favorite, rating, updated_at) VALUES (?, 1, 4, 0)",
+    ).run(storedKey);
+
+    await fsp.writeFile(file, "CCCCCCCCCCCC");
+    await fsp.utimes(file, new Date(), new Date(Date.now() + 60_000));
+    await rescan();
+
+    const after = db
+      .prepare(
+        "SELECT f.content_hash AS hash, m.favorite FROM files f JOIN file_meta m ON m.meta_key = f.meta_key WHERE f.rel_path = 'late.mp4'",
+      )
+      .get() as { hash: string | null; favorite: number } | undefined;
+    expect(after?.hash).not.toBeNull();
+    expect(after?.favorite).toBe(1);
+  });
+
+  it("keeps the metadata of an unchanged row without a hash when its path is written anew", async () => {
+    const file = path.join(root, "same.mp4");
+    await fsp.writeFile(file, "BBBBBBBBBB");
+    await rescan();
+    db.prepare(
+      "UPDATE files SET content_hash = NULL, abs_path = '/elsewhere/same.mp4' WHERE rel_path = 'same.mp4'",
+    ).run();
+    db.prepare(
+      "INSERT INTO file_meta (meta_key, favorite, rating, updated_at) VALUES ('p:/elsewhere/same.mp4', 1, 4, 0)",
+    ).run();
+
+    // Size and mtime unchanged: the row is touched, its abs_path rewritten.
+    await rescan();
+
+    const after = db
+      .prepare(
+        "SELECT f.meta_key AS key, m.favorite FROM files f JOIN file_meta m ON m.meta_key = f.meta_key WHERE f.rel_path = 'same.mp4'",
+      )
+      .get() as { key: string; favorite: number } | undefined;
+    expect(after?.key).toBe(`p:${file}`);
+    expect(after?.favorite).toBe(1);
+  });
+
   it("re-derives kind/ext when a move changes the extension", async () => {
     // The same bytes are video as .mp4 and audio as .m4a. Move detection is
     // content-hash based, so this is seen as a move rather than insert+delete —

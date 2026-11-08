@@ -605,11 +605,11 @@ describe("deleteFromIndex", () => {
 describe("durable metadata keyed by meta_key", () => {
   it("survives a content_hash appearing: migrateMetaKey carries favorite/rating over", () => {
     const { db, rootId } = newDb();
-    // File with no hash yet -> meta_key falls back to "p:<rootId>:<relPath>".
+    // File with no hash yet -> meta_key falls back to "p:<absPath>".
     const id = insertFile(db, rootId, { relPath: "m.mp4", contentHash: null });
     setFavorite(db, id, true);
     setRating(db, id, 5);
-    const fromKey = `p:${rootId}:m.mp4`;
+    const fromKey = `p:/fake/root/m.mp4`;
     const toKey = "abc123hash";
 
     migrateMetaKey(db, fromKey, toKey);
@@ -693,7 +693,7 @@ describe("scene bookmarks", () => {
   it("migrateMetaKey carries bookmarks along when a content_hash first appears", () => {
     const id = insertFile(db, rootId, { relPath: "m.mp4", contentHash: null });
     addBookmark(db, id, 42);
-    migrateMetaKey(db, `p:${rootId}:m.mp4`, "hashed");
+    migrateMetaKey(db, `p:/fake/root/m.mp4`, "hashed");
     db.prepare("UPDATE files SET content_hash = ? WHERE id = ?").run(
       "hashed",
       id,
