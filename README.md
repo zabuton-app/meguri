@@ -356,7 +356,8 @@ away.
 
 Theme colors are the `--c-*` CSS variables. The themes declare them on
 `html[data-theme="<id>"]`, so a plain `:root` rule loses to them; target
-`html[data-theme]` instead, or a single theme id:
+`html[data-theme]` instead, or `html[data-appearance="dark"]` /
+`html[data-appearance="light"]` for one appearance:
 
 ```css
 /* Every theme */
@@ -364,34 +365,16 @@ html[data-theme] {
   --c-primary: #e06c75;
 }
 
-/* Only gruvbox dark */
-html[data-theme="gruvbox-dark"] {
-  --c-bg: #1d2021;
+/* Dark themes only */
+html[data-appearance="dark"] {
+  --c-bg: #101014;
 }
 ```
 
-Some parts of the UI carry a `data-slot` attribute to target:
-
-| `data-slot`        | Part                                                                     |
-| ------------------ | ------------------------------------------------------------------------ |
-| `workspace-rail`   | Side rail                                                                |
-| `home-header`      | Workspace info header                                                    |
-| `filter-bar`       | Search and filters                                                       |
-| `status-bar`       | Footer                                                                   |
-| `audio-player-bar` | Audio player at the bottom                                               |
-| `media-card`       | A file in the grid                                                       |
-| `media-row`        | A file in the list                                                       |
-| `folder-card`      | A folder in the grid                                                     |
-| `folder-row`       | A folder in the list                                                     |
-| `modal-panel`      | The panel of a full-size window (settings, file details, discovery, ...) |
-
-The focused item has `aria-current="true"`. For example:
-
-```css
-[data-slot="workspace-rail"] {
-  background-color: var(--c-surface);
-}
-```
+Parts of the UI carry a `data-slot` attribute, such as `workspace-rail` for
+the side rail. See [Theming Meguri with CSS](docs/theming.md) for every
+variable and slot, what is safe to rely on across updates, contrast guidance,
+and a [sample theme](docs/themes/cyberpunk.css).
 
 External resources (`@import` or `url()` pointing at the network) are blocked by
 the app's Content Security Policy, so a stylesheet cannot make Meguri go

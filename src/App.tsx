@@ -14,6 +14,7 @@ import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { StatusBar } from "@/components/StatusBar";
+import { useAppearanceAttribute } from "@/hooks/useAppearanceAttribute";
 import { useContentZoom } from "@/hooks/useContentZoom";
 import { useCustomCssStyle } from "@/hooks/useCustomCss";
 import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
@@ -47,6 +48,7 @@ export default function App() {
   useContentZoom();
   useSelectAllGuard();
   useUpdateNotifier();
+  useAppearanceAttribute();
   useCustomCssStyle();
   return (
     <div className="flex h-full">

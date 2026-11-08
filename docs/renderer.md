@@ -471,6 +471,14 @@ touched. `src/themes/__tests__/derive.test.ts` runs every scheme through the
 floors and the hierarchy invariants, so a palette that would break somewhere in
 the UI fails there instead of shipping.
 
+On top of the schemes, a user stylesheet (`custom.css`) can override the
+`--c-*` variables; see the Custom CSS section of
+[Architecture](architecture.md#custom-css) for the mechanism and
+[Theming Meguri with CSS](theming.md) for the public API it may rely on.
+`src/hooks/useAppearanceAttribute.ts` mirrors the current appearance onto
+`<html data-appearance>` for those stylesheets; it lives outside the
+series-shared `ThemeProvider.tsx` on purpose.
+
 ## Content zoom
 
 Zoom uses `webFrame.setZoomFactor` rather than CSS zoom, so coordinate math is

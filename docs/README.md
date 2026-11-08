@@ -22,6 +22,12 @@ For what the app is, how to install it, and how to use it, see the top-level
 - [Build and CI](build-and-ci.md) — npm scripts, the electron-vite build, the
   two-project test setup, packaging, CI, and Docker-based development.
 
+For people writing stylesheets rather than code:
+
+- [Theming Meguri with CSS](theming.md) — the public API for `custom.css`
+  (color variables, `data-slot`, `data-appearance`), contrast guidance, and a
+  sample theme.
+
 ## Where to start
 
 Read in this order for a top-down picture:

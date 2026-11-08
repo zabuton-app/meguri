@@ -386,5 +386,8 @@ injects what it is given.
   react-query cache with the Settings section.
 - The themes declare `--c-*` on `html[data-theme="<id>"]`, so overrides must
   match at least that specificity; the template documents this.
+- `useAppearanceAttribute()` sets `<html data-appearance="light|dark">` so a
+  stylesheet can write light and dark variants. What a stylesheet may rely on
+  is listed in [Theming Meguri with CSS](theming.md#public-api).
 - The CSS is loaded asynchronously, so on startup the plain theme can show for
   a moment before the stylesheet applies.
