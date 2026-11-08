@@ -232,4 +232,51 @@ describe("listPlayHistory over the shared library", () => {
       b.close();
     }
   });
+
+  it("collects a workspace's few events without reading the library's", () => {
+    const library = path.join(dir, "library.sqlite");
+    const a = openDb(path.join(dir, "a.sqlite"), library);
+    const b = openDb(path.join(dir, "b.sqlite"), library);
+    try {
+      const ra = upsertScanRoot(a, "/a", "a");
+      const rb = upsertScanRoot(b, "/b", "b");
+      const busy = insertFile(a, ra, {
+        relPath: "busy.mp4",
+        contentHash: "hb",
+      });
+      const x = insertFile(b, rb, { relPath: "x.mp4", contentHash: "hx" });
+      const y = insertFile(b, rb, { relPath: "y.mp4", contentHash: "hy" });
+      // Far more events in A than OWN_SORT_MAX, interleaved with B's few.
+      a.transaction(() => {
+        for (let t = 0; t < 30_000; t++) insertPlay(a, busy, t * 2);
+      })();
+      for (const [file, at] of [
+        [x, 101],
+        [y, 303],
+        [x, 505],
+        [x, 507],
+        [y, 909],
+      ] as const) {
+        insertPlay(b, file, at, at === 303 ? "external" : "browser");
+      }
+
+      const page = listPlayHistory(b, { limit: 2 });
+      expect(page.items.map((r) => [r.relPath, r.playedAt])).toEqual([
+        ["y.mp4", 909],
+        ["x.mp4", 507],
+      ]);
+      expect(page.items.map((r) => r.playCount)).toEqual([2, 3]);
+      const rest = listPlayHistory(b, { limit: 2, cursor: page.nextCursor! });
+      expect(rest.items.map((r) => r.playedAt)).toEqual([303, 101]);
+      expect(rest.nextCursor).toBeNull();
+      expect(
+        listPlayHistory(b, { via: "external" }).items.map((r) => r.playedAt),
+      ).toEqual([303]);
+      // A's own events are most of the library: still streamed, same order.
+      expect(listPlayHistory(a, { limit: 1 }).items[0].playedAt).toBe(59_998);
+    } finally {
+      a.close();
+      b.close();
+    }
+  });
 });

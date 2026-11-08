@@ -179,7 +179,11 @@ CREATE TABLE IF NOT EXISTS lib.play_history (
   id INTEGER PRIMARY KEY, meta_key TEXT NOT NULL,
   played_at INTEGER NOT NULL, position REAL, via TEXT NOT NULL CHECK (via IN ('browser','external'))
 );
-CREATE INDEX IF NOT EXISTS lib.idx_play_history_meta ON play_history(meta_key);
+-- (meta_key, played_at, id): a file's events in timeline order, which also lets
+-- a workspace collect its own events without streaming every workspace's
+-- (listPlayHistory).
+DROP INDEX IF EXISTS lib.idx_play_history_meta;
+CREATE INDEX IF NOT EXISTS lib.idx_play_history_meta_played ON play_history(meta_key, played_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS lib.idx_play_history_played ON play_history(played_at DESC, id DESC);
 
 -- User-curated scene bookmarks (specific times in a video, distinct from the auto-generated
