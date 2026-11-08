@@ -16,7 +16,7 @@ import {
 } from "./appConfig.js";
 import { dataDirForRoot, libraryDbPath, pathHash } from "./paths.js";
 import log from "./logger.js";
-import { nowUnix } from "./db.js";
+import { nowUnix, usesOwnMetadata } from "./db.js";
 import { syncTagIndexes as syncTagIndexesOf } from "./library.js";
 
 export interface WorkspaceInfo {
@@ -202,6 +202,55 @@ export class Workspaces {
    */
   syncTagIndexes(): void {
     syncTagIndexesOf([...this.cores.values()].map((core) => core.db));
+  }
+
+  /**
+   * The Cores a write meant for every workspace's metadata runs on (tag
+   * rename, merge and delete; clearing the play history). One that uses the
+   * shared library reaches every workspace on it at once, so a Core already
+   * open is used. A workspace still on its own metadata tables (its merge has
+   * not run) is reached only through its own, and would bring old names back
+   * when merged later: every registered workspace the library has no record
+   * of is opened, which merges it or finds it on the library already. One
+   * whose DB cannot be opened misses the write, worth a line in the log.
+   */
+  metadataCores(): { id: string; core: Core }[] {
+    const open = (p: string) => {
+      const core = this.coreForPath(p);
+      return core ? { id: Workspaces.idFor(p), core } : null;
+    };
+    const opened = () =>
+      this.config.roots.flatMap((p) => {
+        const core = this.cores.get(Workspaces.idFor(p));
+        return core ? [{ id: Workspaces.idFor(p), core }] : [];
+      });
+    // Any Core reads the library's record; open one if none is.
+    if (opened().length === 0) {
+      for (const p of this.config.roots) if (open(p)) break;
+    }
+    const reader = opened()[0];
+    if (!reader) return [];
+    const recorded = new Set(
+      reader.core.db
+        .prepare("SELECT workspace_id FROM lib.migrated_workspaces")
+        .pluck()
+        .all() as string[],
+    );
+    let missed = 0;
+    for (const p of this.config.roots) {
+      if (this.cores.has(Workspaces.idFor(p))) continue;
+      if (recorded.has(Core.dataIdFor(p))) continue;
+      if (!open(p)) missed++;
+    }
+    if (missed > 0) {
+      log.warn(
+        `a write to every workspace missed ${missed} that could not be opened`,
+      );
+    }
+    const cores = opened();
+    const own = cores.filter(({ core }) => usesOwnMetadata(core.db));
+    const shared = cores.find(({ core }) => !usesOwnMetadata(core.db));
+    return shared ? [shared, ...own] : own;
   }
 
   /** All registered workspaces resolved to Cores, skipping any that fail to initialize. */

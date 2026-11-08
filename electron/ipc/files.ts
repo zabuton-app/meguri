@@ -142,12 +142,14 @@ export function registerFileHandlers(ctx: IpcContext): void {
       targets: queryTargets(scopedCores(ws)),
     }),
   );
-  // Clear scope matches what history_list shows: the active workspace only, or
-  // every workspace when All / a collection is active.
+  // Clears every workspace's history, whichever view asked: the play history
+  // lives in the library they all share.
   handle("history_clear", () => {
     // Positions still held would otherwise land after the clear and bring
     // back the resume points it is meant to remove.
     positions.flush();
-    for (const { core } of scopedCores(ws)) q.clearPlayHistory(core.db);
+    for (const { core } of ws.metadataCores()) {
+      q.clearPlayHistory(core.db);
+    }
   });
 }

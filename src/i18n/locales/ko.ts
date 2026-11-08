@@ -531,7 +531,7 @@ export const ko: Record<TranslationKey, string> = {
   "history.clear": "기록 지우기",
   "history.clearAction": "지우기",
   "history.clearConfirm":
-    "재생 기록을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "모든 워크스페이스의 재생 기록과 이어서 재생할 위치를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
   "history.playCount": "{count}회 재생",
   "history.viaBrowser": "앱 내",
   "history.viaExternal": "외부 플레이어",
@@ -782,7 +782,7 @@ export const ko: Record<TranslationKey, string> = {
   "tags.merge": "통합",
   "tags.mergeTitle": "태그 통합",
   "tags.mergeDescription":
-    "선택한 {count}개 태그를 대상 태그로 합칩니다. 나머지 태그는 삭제됩니다.",
+    "선택한 {count}개 태그를 모든 워크스페이스에서 대상 태그로 합칩니다. 나머지 태그는 삭제됩니다.",
   "tags.mergeTarget": "통합 대상",
   "tags.mergeAction": "통합",
   "tags.merged": "{count}개 태그를 통합했습니다",
@@ -790,8 +790,9 @@ export const ko: Record<TranslationKey, string> = {
   "tags.delete": "삭제",
   "tags.deleteAction": "삭제",
   "tags.deleteConfirm":
-    "태그 「{name}」을(를) {count}개 파일에서 삭제합니다. 계속할까요?",
-  "tags.deleteConfirmMany": "선택한 {count}개 태그를 삭제합니다. 계속할까요?",
+    "태그 「{name}」을(를) 모든 워크스페이스의 {count}개 파일에서 삭제합니다. 계속할까요?",
+  "tags.deleteConfirmMany":
+    "선택한 {count}개 태그를 모든 워크스페이스에서 삭제합니다. 계속할까요?",
   "tags.deleted": "태그를 삭제했습니다",
   "tags.deleteFailed": "태그를 삭제하지 못했습니다",
   "tags.addFailedReserved":
@@ -818,7 +819,7 @@ export const ko: Record<TranslationKey, string> = {
   "workspace.removeFromSidebar": "워크스페이스 삭제",
   "workspace.removeTitle": "워크스페이스 삭제",
   "workspace.removeConfirm":
-    "「{label}」을(를) 삭제하시겠습니까?\n데이터베이스와 썸네일도 삭제됩니다 (미디어 파일 자체는 삭제되지 않습니다).",
+    "「{label}」을(를) 삭제하시겠습니까?\n파일 목록과 썸네일이 삭제됩니다 (미디어 파일 자체는 삭제되지 않습니다). 즐겨찾기, 평점, 태그, 북마크, 재생 기록은 남으며, 같은 폴더를 다시 추가하면 복원됩니다.",
   "workspace.removeAction": "삭제",
   "workspace.addedToast": "워크스페이스를 추가했습니다",
   "workspace.removedToast": "워크스페이스를 삭제했습니다",

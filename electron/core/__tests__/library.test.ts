@@ -218,11 +218,13 @@ describe("migrateWorkspaceMetadata", () => {
     fs.mkdirSync(path.join(dir, "fresh"));
     const fresh = openAndMigrate("fresh");
     expect(fs.existsSync(backupFile("fresh"))).toBe(false);
+    // Nothing to merge, but recorded as on the library, so a write to every
+    // workspace knows it need not open this one (Workspaces.metadataCores).
     expect(
       fresh
         .prepare("SELECT 1 FROM lib.migrated_workspaces WHERE workspace_id = ?")
         .get("fresh"),
-    ).toBeUndefined();
+    ).toBeDefined();
     fresh.close();
   });
 

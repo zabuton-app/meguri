@@ -547,7 +547,7 @@ export const es: Record<TranslationKey, string> = {
   "history.clear": "Borrar historial",
   "history.clearAction": "Borrar",
   "history.clearConfirm":
-    "¿Eliminar todo el historial de reproducción? Esta acción no se puede deshacer.",
+    "¿Eliminar el historial de reproducción y los puntos de reanudación de todos los espacios de trabajo? Esta acción no se puede deshacer.",
   "history.playCount": "{count} reproducciones",
   "history.viaBrowser": "En la aplicación",
   "history.viaExternal": "Reproductor externo",
@@ -803,7 +803,7 @@ export const es: Record<TranslationKey, string> = {
   "tags.merge": "Combinar",
   "tags.mergeTitle": "Combinar etiquetas",
   "tags.mergeDescription":
-    "Las {count} etiquetas seleccionadas se combinan en la de destino. Las demás se eliminan.",
+    "Las {count} etiquetas seleccionadas se combinan en la de destino en todos los espacios de trabajo. Las demás se eliminan.",
   "tags.mergeTarget": "Combinar en",
   "tags.mergeAction": "Combinar",
   "tags.merged": "Se combinaron {count} etiquetas",
@@ -811,9 +811,9 @@ export const es: Record<TranslationKey, string> = {
   "tags.delete": "Eliminar",
   "tags.deleteAction": "Eliminar",
   "tags.deleteConfirm":
-    "Se quitará la etiqueta «{name}» de {count} archivos. ¿Continuar?",
+    "Se quitará la etiqueta «{name}» de {count} archivos en todos los espacios de trabajo. ¿Continuar?",
   "tags.deleteConfirmMany":
-    "Se eliminarán las {count} etiquetas seleccionadas. ¿Continuar?",
+    "Se eliminarán las {count} etiquetas seleccionadas de todos los espacios de trabajo. ¿Continuar?",
   "tags.deleted": "Etiqueta eliminada",
   "tags.deleteFailed": "No se pudo eliminar la etiqueta",
   "tags.addFailedReserved":
@@ -841,7 +841,7 @@ export const es: Record<TranslationKey, string> = {
   "workspace.removeFromSidebar": "Eliminar espacio de trabajo",
   "workspace.removeTitle": "Eliminar espacio de trabajo",
   "workspace.removeConfirm":
-    "¿Eliminar «{label}»?\nTambién se eliminarán su base de datos y sus miniaturas (los archivos multimedia se conservan).",
+    "¿Eliminar «{label}»?\nSe eliminarán su lista de archivos y sus miniaturas (los archivos multimedia se conservan). Los favoritos, las valoraciones, las etiquetas, los marcadores y el historial de reproducción se mantienen y vuelven si añades de nuevo la misma carpeta.",
   "workspace.removeAction": "Eliminar",
   "workspace.addedToast": "Espacio de trabajo añadido",
   "workspace.removedToast": "Espacio de trabajo eliminado",

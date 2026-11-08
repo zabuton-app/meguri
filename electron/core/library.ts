@@ -34,8 +34,9 @@ const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
  * Merge this workspace's own metadata into the library and drop its tables.
  * Versionless and safe to run on every open (Principle III):
  *
- * 1. No own `file_meta`: nothing to do (merged before, or created after the
- *    library existed).
+ * 1. No own `file_meta`: nothing to merge (merged before, or created after the
+ *    library existed). It is recorded in `lib.migrated_workspaces` if it is not
+ *    yet.
  * 2. Not recorded in `lib.migrated_workspaces`: copy the whole database to
  *    `backupPath` (VACUUM INTO), then merge and record it in one transaction.
  *    If the copy cannot be written, stop here and keep the own tables.
@@ -60,7 +61,15 @@ export function migrateWorkspaceMetadata(
   workspaceId: string,
   backupPath: string,
 ): boolean {
-  if (!usesOwnMetadata(db)) return false;
+  if (!usesOwnMetadata(db)) {
+    // Created after the library, or merged before: on the library already.
+    // Recorded so a write to every workspace knows it need not be opened to
+    // be reached (Workspaces.metadataCores).
+    db.prepare(
+      "INSERT OR IGNORE INTO lib.migrated_workspaces (workspace_id, migrated_at) VALUES (?, ?)",
+    ).run(workspaceId, nowUnix());
+    return false;
+  }
 
   const recorded =
     db

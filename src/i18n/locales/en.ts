@@ -532,7 +532,8 @@ export const en: Record<TranslationKey, string> = {
   "history.emptyHint": "Play videos or images and they will show up here.",
   "history.clear": "Clear history",
   "history.clearAction": "Clear",
-  "history.clearConfirm": "Delete all play history? This cannot be undone.",
+  "history.clearConfirm":
+    "Delete the play history and resume points of every workspace? This cannot be undone.",
   "history.playCount": "{count} plays",
   "history.viaBrowser": "In-app",
   "history.viaExternal": "External player",
@@ -779,15 +780,17 @@ export const en: Record<TranslationKey, string> = {
   "tags.merge": "Merge",
   "tags.mergeTitle": "Merge tags",
   "tags.mergeDescription":
-    "The {count} selected tags are combined into the target. The others are removed.",
+    "The {count} selected tags are combined into the target in every workspace. The others are removed.",
   "tags.mergeTarget": "Merge into",
   "tags.mergeAction": "Merge",
   "tags.merged": "Merged {count} tags",
   "tags.mergeFailed": "Could not merge the tags",
   "tags.delete": "Delete",
   "tags.deleteAction": "Delete",
-  "tags.deleteConfirm": 'Remove the tag "{name}" from {count} files. Continue?',
-  "tags.deleteConfirmMany": "Delete the {count} selected tags. Continue?",
+  "tags.deleteConfirm":
+    'Remove the tag "{name}" from {count} files across all workspaces. Continue?',
+  "tags.deleteConfirmMany":
+    "Delete the {count} selected tags from all workspaces. Continue?",
   "tags.deleted": "Tag deleted",
   "tags.deleteFailed": "Could not delete the tag",
   "tags.addFailedReserved":
@@ -814,7 +817,7 @@ export const en: Record<TranslationKey, string> = {
   "workspace.removeFromSidebar": "Delete workspace",
   "workspace.removeTitle": "Delete workspace",
   "workspace.removeConfirm":
-    'Delete "{label}"?\nIts database and thumbnails will also be deleted (the media files themselves are kept).',
+    'Delete "{label}"?\nIts file list and thumbnails will be deleted (the media files themselves are kept). Favorites, ratings, tags, bookmarks and play history stay, and come back if you add the same folder again.',
   "workspace.removeAction": "Delete",
   "workspace.addedToast": "Workspace added",
   "workspace.removedToast": "Workspace deleted",
