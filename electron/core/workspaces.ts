@@ -22,6 +22,7 @@ import {
 import {
   backupDbPathForDataDir,
   dataDirForRoot,
+  dbPathForDataDir,
   libraryDbPath,
   pathHash,
 } from "./paths.js";
@@ -800,8 +801,11 @@ export class Workspaces {
     const library = openLibraryReadonly(libraryDbPath());
     const recorded = library ? recordedWorkspaceIds(library) : new Set();
     library?.close();
+    // One with no database yet has nothing to merge: it starts on the library.
     const pending = this.config.roots.filter(
-      (p) => !recorded.has(Core.dataIdFor(p)),
+      (p) =>
+        !recorded.has(Core.dataIdFor(p)) &&
+        fs.existsSync(dbPathForDataDir(dataDirForRoot(Core.resolveRoot(p)))),
     );
     if (pending.length > 0) {
       this.merge = { pending, done: 0, total: pending.length };

@@ -115,6 +115,29 @@ describe("merging workspaces into the library at startup", () => {
     ws.closeAll();
   });
 
+  it("has nothing to merge for a workspace with no database yet", () => {
+    const root = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), "meguri-merge-root-")),
+    );
+    roots.push(root);
+    const first = new Workspaces();
+    first.add(root);
+    // Registered, never opened: no database, no library either.
+    first.closeAll();
+    fs.rmSync(paths.dataDirForRoot(Core.resolveRoot(root)), {
+      recursive: true,
+      force: true,
+    });
+    for (const suffix of ["", "-wal", "-shm"]) {
+      fs.rmSync(paths.libraryDbPath() + suffix, { force: true });
+    }
+
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    expect(ws.mergeProgress()).toBeNull();
+    ws.closeAll();
+  });
+
   it("has nothing to do on the next launch", async () => {
     const a = legacyWorkspace();
     register([a]);
