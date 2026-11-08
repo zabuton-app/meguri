@@ -379,6 +379,12 @@ bit depth, mono/stereo/multichannel, codec, minimum stream bitrate and duration
 bounds in seconds. These persist in `SearchQuery.audio`; switching away from audio
 clears them. The query schema also removes stale audio/resolution combinations
 from older saved bins. Unknown properties never satisfy a filter on that property.
+Sample rate and bit depth each support exact or at-least matching; omitted modes
+retain exact matching for compatibility. Duration supports exact, at-least,
+at-most, or between matching, backed by second-based minimum/maximum bounds.
+Its editor remembers seconds, decimal minutes or `MM:SS` display separately from
+the query, shows an explicit input example, and preserves the stored value when
+changing formats. Invalid text and reversed ranges prevent saving a Smart bin.
 
 `shared/audioMetadata.ts` reads the first audio stream in the stored ffprobe JSON,
 ignoring cover artwork. Bit depth comes from `bits_per_raw_sample` or

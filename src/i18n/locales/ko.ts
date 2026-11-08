@@ -3,6 +3,21 @@ import type { TranslationKey } from "./ja";
 
 export const ko: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.sampleRateMatch": "샘플 레이트 일치 조건",
+  "audio.bitDepthMatch": "비트 깊이 일치 조건",
+  "audio.durationMatch": "길이 일치 조건",
+  "audio.durationFormat": "길이 입력 형식",
+  "audio.seconds": "초",
+  "audio.minutes": "분",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "분:초 (MM:SS)",
+  "audio.durationTimeHint":
+    "MM:SS 형식으로 입력하세요. 예: 02:30 = 2분 30초. 초는 00–59입니다.",
+  "audio.durationMinutesHint": "분 단위로 입력하세요. 예: 2.5 = 2분 30초.",
+  "audio.durationSecondsHint": "초 단위로 입력하세요. 예: 150 = 2분 30초.",
+  "audio.atMost": "이하",
+  "audio.between": "범위",
+  "audio.durationOrderError": "최소 길이는 최대 길이를 초과할 수 없습니다.",
   "audio.filters": "오디오 속성",
   "audio.any": "모두",
   "audio.sampleRate": "샘플 레이트",

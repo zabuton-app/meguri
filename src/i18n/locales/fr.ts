@@ -3,6 +3,24 @@ import type { TranslationKey } from "./ja";
 
 export const fr: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.sampleRateMatch": "Comparaison de fréquence d’échantillonnage",
+  "audio.bitDepthMatch": "Comparaison de profondeur de bits",
+  "audio.durationMatch": "Comparaison de durée",
+  "audio.durationFormat": "Format de durée",
+  "audio.seconds": "Secondes",
+  "audio.minutes": "Minutes",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "Minutes:secondes (MM:SS)",
+  "audio.durationTimeHint":
+    "Saisissez MM:SS, par ex. 02:30 = 2 minutes et 30 secondes. Les secondes vont de 00 à 59.",
+  "audio.durationMinutesHint":
+    "Saisissez des minutes, par ex. 2.5 = 2 minutes et 30 secondes.",
+  "audio.durationSecondsHint":
+    "Saisissez des secondes, par ex. 150 = 2 minutes et 30 secondes.",
+  "audio.atMost": "Au plus",
+  "audio.between": "Entre",
+  "audio.durationOrderError":
+    "La durée minimale ne doit pas dépasser la durée maximale.",
   "audio.filters": "Propriétés audio",
   "audio.any": "Tous",
   "audio.sampleRate": "Fréquence d’échantillonnage",

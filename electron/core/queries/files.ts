@@ -267,12 +267,12 @@ export function appendSearchConditions(
   }
   if (query.kind === "audio" && query.audio) {
     const audio = query.audio;
-    for (const [column, value] of [
-      ["sample_rate", audio.sampleRate],
-      ["bit_depth", audio.bitDepth],
+    for (const [column, value, match] of [
+      ["sample_rate", audio.sampleRate, audio.sampleRateMatch],
+      ["bit_depth", audio.bitDepth, audio.bitDepthMatch],
     ] as const) {
       if (value != null) {
-        sql += ` AND f.${column} = ?`;
+        sql += ` AND f.${column} ${match === "atLeast" ? ">=" : "="} ?`;
         args.push(value);
       }
     }

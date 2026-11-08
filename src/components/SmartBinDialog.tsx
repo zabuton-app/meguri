@@ -42,6 +42,7 @@ export function SmartBinDialog({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const [filtersValid, setFiltersValid] = useState(true);
   const [name, setName] = useState(collection?.name ?? "");
   const [scope, setScope] = useState(
     collection
@@ -58,7 +59,7 @@ export function SmartBinDialog({
     scope === "current" ||
     workspaces.some((workspace) => workspace.id === scope);
   const save = () => {
-    if (!name.trim() || !scopeExists) return;
+    if (!name.trim() || !scopeExists || !filtersValid) return;
     const target =
       scope === ALL_ID ? "all" : scope === "current" ? undefined : "workspace";
     const next = makeSmartCollection(
@@ -142,6 +143,7 @@ export function SmartBinDialog({
           <FilterBar
             value={draft}
             onChange={setDraft}
+            onValidityChange={setFiltersValid}
             showSaved={false}
             searchInputId="smart-bin-search-input"
           />
@@ -150,7 +152,10 @@ export function SmartBinDialog({
             <Button type="button" variant="outline" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={!name.trim() || !scopeExists}>
+            <Button
+              type="submit"
+              disabled={!name.trim() || !scopeExists || !filtersValid}
+            >
               {t("smartCollection.save")}
             </Button>
           </DialogFooter>

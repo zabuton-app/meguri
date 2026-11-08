@@ -52,6 +52,10 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
     const audio = Object.fromEntries(
       Object.entries(query.audio).filter(([, value]) => value != null),
     );
+    if (audio.sampleRate == null) delete audio.sampleRateMatch;
+    if (audio.bitDepth == null) delete audio.bitDepthMatch;
+    if (audio.durationMin == null && audio.durationMax == null)
+      delete audio.durationMatch;
     if (Object.keys(audio).length) next.audio = audio;
   }
   if (query.ratingMin != null && query.ratingMin > 0)

@@ -3,6 +3,21 @@ import type { TranslationKey } from "./ja";
 
 export const zhCN: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.sampleRateMatch": "采样率匹配方式",
+  "audio.bitDepthMatch": "位深匹配方式",
+  "audio.durationMatch": "时长匹配方式",
+  "audio.durationFormat": "时长输入格式",
+  "audio.seconds": "秒",
+  "audio.minutes": "分钟",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "分:秒 (MM:SS)",
+  "audio.durationTimeHint":
+    "请输入 MM:SS，例如 02:30 表示 2 分 30 秒。秒数必须为 00–59。",
+  "audio.durationMinutesHint": "请输入分钟数，例如 2.5 表示 2 分 30 秒。",
+  "audio.durationSecondsHint": "请输入秒数，例如 150 表示 2 分 30 秒。",
+  "audio.atMost": "最多",
+  "audio.between": "范围",
+  "audio.durationOrderError": "最短时长不能超过最长时长。",
   "audio.filters": "音频属性",
   "audio.any": "不限",
   "audio.sampleRate": "采样率",

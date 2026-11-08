@@ -2,6 +2,21 @@
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
   // アプリ名（表示名の漢字1文字。ガイドライン00）
+  "audio.sampleRateMatch": "サンプルレートの一致条件",
+  "audio.bitDepthMatch": "ビット深度の一致条件",
+  "audio.durationMatch": "時間の一致条件",
+  "audio.durationFormat": "時間の入力形式",
+  "audio.seconds": "秒",
+  "audio.minutes": "分",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "分:秒 (MM:SS)",
+  "audio.durationTimeHint":
+    "MM:SS形式で入力してください。例：02:30は2分30秒。秒は00〜59です。",
+  "audio.durationMinutesHint": "分で入力してください。例：2.5は2分30秒です。",
+  "audio.durationSecondsHint": "秒で入力してください。例：150は2分30秒です。",
+  "audio.atMost": "以下",
+  "audio.between": "範囲",
+  "audio.durationOrderError": "最短時間は最長時間以下にしてください。",
   "audio.filters": "オーディオの詳細",
   "audio.any": "指定なし",
   "audio.sampleRate": "サンプルレート",

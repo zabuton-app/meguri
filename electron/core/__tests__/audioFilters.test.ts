@@ -120,6 +120,29 @@ describe("audio catalogue filtering", () => {
       .sort();
   }
 
+  it("matches sample rate and bit depth independently as exact values or lower bounds", () => {
+    add(db, rootId, "base.wav", 96000, 24, 2);
+    add(db, rootId, "higher.wav", 192000, 32, 2);
+    add(db, rootId, "rate.wav", 192000, 24, 2);
+    add(db, rootId, "bits.wav", 96000, 32, 2);
+    add(db, rootId, "low.wav", 48000, 16, 2);
+    expect(names({ sampleRate: 96000, bitDepth: 24 })).toEqual(["base.wav"]);
+    expect(
+      names({
+        sampleRate: 96000,
+        sampleRateMatch: "atLeast",
+        bitDepth: 24,
+        bitDepthMatch: "atLeast",
+      }),
+    ).toEqual(["base.wav", "bits.wav", "higher.wav", "rate.wav"]);
+    expect(
+      names({ sampleRate: 96000, sampleRateMatch: "atLeast", bitDepth: 24 }),
+    ).toEqual(["base.wav", "rate.wav"]);
+    expect(
+      names({ sampleRate: 96000, bitDepth: 24, bitDepthMatch: "atLeast" }),
+    ).toEqual(["base.wav", "bits.wav"]);
+  });
+
   it("combines sample rate, precision, mono/stereo, codec, bitrate and duration", () => {
     add(db, rootId, "stereo.wav", 96000, 24, 2);
     add(db, rootId, "mono.wav", 48000, 16, 1);

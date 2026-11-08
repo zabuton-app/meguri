@@ -14,12 +14,12 @@ export function describeAudioFilters(
   if (audio.sampleRate != null)
     out.push({
       key: "sampleRate",
-      label: `${t("audio.sampleRate")}: ${sampleRateLabel(audio.sampleRate)}`,
+      label: `${t("audio.sampleRate")}: ${audio.sampleRateMatch === "atLeast" ? "≥ " : ""}${sampleRateLabel(audio.sampleRate)}`,
     });
   if (audio.bitDepth != null)
     out.push({
       key: "bitDepth",
-      label: t("audio.bits", { count: audio.bitDepth }),
+      label: `${audio.bitDepthMatch === "atLeast" ? "≥ " : ""}${t("audio.bits", { count: audio.bitDepth })}`,
     });
   if (audio.channels)
     out.push({ key: "channels", label: t(`audio.${audio.channels}`) });
@@ -33,12 +33,19 @@ export function describeAudioFilters(
       key: "bitRateMin",
       label: `${t("audio.bitRate")}: ≥ ${audio.bitRateMin / 1000} kbps`,
     });
-  if (audio.durationMin != null)
+  const exactDuration =
+    audio.durationMin != null && audio.durationMin === audio.durationMax;
+  if (exactDuration)
+    out.push({
+      key: "durationMin",
+      label: `${t("media.metaDuration")}: ${t("resolution.exact")} ${audio.durationMin} s`,
+    });
+  if (audio.durationMin != null && !exactDuration)
     out.push({
       key: "durationMin",
       label: `${t("media.metaDuration")}: ≥ ${audio.durationMin} s`,
     });
-  if (audio.durationMax != null)
+  if (audio.durationMax != null && !exactDuration)
     out.push({
       key: "durationMax",
       label: `${t("media.metaDuration")}: ≤ ${audio.durationMax} s`,

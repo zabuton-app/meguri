@@ -108,7 +108,11 @@ describe("kind segments", () => {
   it("shows audio conditions as removable chips and clears them when leaving audio", () => {
     const { latest } = setup({
       kind: "audio",
-      audio: { sampleRate: 96000, channels: "stereo" },
+      audio: {
+        sampleRate: 96000,
+        sampleRateMatch: "atLeast",
+        channels: "stereo",
+      },
     });
     expect(chips()).toHaveLength(3);
     const rate = chips().find((chip) => chip.textContent?.includes("96 kHz"));

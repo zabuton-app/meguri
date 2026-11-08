@@ -165,7 +165,21 @@ export function describeConditions(
         chip: true,
         clear: (q) => {
           const audio = { ...q.audio };
+          const exactDuration =
+            audio.durationMin != null &&
+            audio.durationMin === audio.durationMax;
           delete audio[key];
+          if (key === "sampleRate") delete audio.sampleRateMatch;
+          if (key === "bitDepth") delete audio.bitDepthMatch;
+          if (
+            (key === "durationMin" || key === "durationMax") &&
+            exactDuration
+          ) {
+            delete audio.durationMin;
+            delete audio.durationMax;
+          }
+          if (audio.durationMin == null && audio.durationMax == null)
+            delete audio.durationMatch;
           return Object.values(audio).some((v) => v != null)
             ? { ...q, audio }
             : without(q, "audio");

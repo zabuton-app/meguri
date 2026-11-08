@@ -183,12 +183,17 @@ export const SearchQuerySchema = z
     audio: z
       .object({
         sampleRate: z.number().int().positive().optional(),
+        sampleRateMatch: z.enum(["exact", "atLeast"]).optional(),
         bitDepth: z.number().int().positive().optional(),
+        bitDepthMatch: z.enum(["exact", "atLeast"]).optional(),
         channels: z.enum(["mono", "stereo", "multichannel"]).optional(),
         codec: z.enum(AUDIO_CODECS).optional(),
         bitRateMin: z.number().nonnegative().optional(),
         durationMin: z.number().nonnegative().optional(),
         durationMax: z.number().nonnegative().optional(),
+        durationMatch: z
+          .enum(["exact", "atLeast", "atMost", "between"])
+          .optional(),
       })
       .optional(),
     resolution: z
@@ -231,6 +236,23 @@ export const SearchQuerySchema = z
     // A saved search from an older build may contain an audio/resolution pair.
     if (query.kind === "audio") delete query.resolution;
     else delete query.audio;
+    if (query.audio?.sampleRate == null && query.audio)
+      delete query.audio.sampleRateMatch;
+    if (query.audio?.bitDepth == null && query.audio)
+      delete query.audio.bitDepthMatch;
+    if (query.audio) {
+      if (query.audio.durationMatch === "atLeast")
+        delete query.audio.durationMax;
+      if (query.audio.durationMatch === "atMost")
+        delete query.audio.durationMin;
+      if (query.audio.durationMatch === "exact") {
+        const duration = query.audio.durationMin ?? query.audio.durationMax;
+        query.audio.durationMin = duration;
+        query.audio.durationMax = duration;
+      }
+      if (query.audio.durationMin == null && query.audio.durationMax == null)
+        delete query.audio.durationMatch;
+    }
     if (query.audio && !Object.values(query.audio).some((v) => v != null))
       delete query.audio;
     return query;
