@@ -181,7 +181,11 @@ CREATE TABLE IF NOT EXISTS lib.play_history (
   id INTEGER PRIMARY KEY, meta_key TEXT NOT NULL,
   played_at INTEGER NOT NULL, position REAL, via TEXT NOT NULL CHECK (via IN ('browser','external'))
 );
-CREATE INDEX IF NOT EXISTS lib.idx_play_history_meta ON play_history(meta_key);
+-- (meta_key, played_at, id): a file's events in timeline order, which also lets
+-- a workspace collect its own events without streaming every workspace's
+-- (listPlayHistory).
+DROP INDEX IF EXISTS lib.idx_play_history_meta;
+CREATE INDEX IF NOT EXISTS lib.idx_play_history_meta_played ON play_history(meta_key, played_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS lib.idx_play_history_played ON play_history(played_at DESC, id DESC);
 
 -- User-curated scene bookmarks (specific times in a video, distinct from the auto-generated
@@ -195,7 +199,11 @@ CREATE TABLE IF NOT EXISTS lib.scene_bookmarks (
   sec REAL NOT NULL CHECK (sec >= 0),
   created_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS lib.idx_scene_bookmarks_meta ON scene_bookmarks(meta_key);
+-- (meta_key, sec): the dedupe window above is a range on sec within one file, so
+-- both columns are searched, not only meta_key (a file with many bookmarks
+-- would otherwise be read through for each one checked).
+DROP INDEX IF EXISTS lib.idx_scene_bookmarks_meta;
+CREATE INDEX IF NOT EXISTS lib.idx_scene_bookmarks_meta_sec ON scene_bookmarks(meta_key, sec);
 
 -- The meta_keys whose user tags (namespace = '') changed, logged by the
 -- triggers below: every workspace keeps its own files_fts.tags_text, and
