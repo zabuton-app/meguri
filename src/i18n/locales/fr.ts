@@ -96,6 +96,26 @@ export const fr: Record<TranslationKey, string> = {
   "update.checkFailed":
     "Impossible de vérifier (vous êtes peut-être hors ligne).",
   "update.upToDate": "Vous êtes à jour ({version}).",
+  "libraryMerge.title": "Migration de votre bibliothèque",
+  "libraryMerge.description":
+    "Les favoris, notes, tags, signets et l'historique de lecture sont déplacés vers une bibliothèque partagée par tous les espaces de travail. Veuillez patienter jusqu'à la fin.",
+  "libraryMerge.progress": "{done} / {total} espaces de travail",
+  "libraryMerge.failed": "Certains espaces de travail n'ont pas pu être migrés",
+  "libraryMerge.failedDesc":
+    "{list}\nIls fonctionnent comme avant. Meguri réessaiera au prochain lancement.",
+  "libraryMerge.failedItem": "{name} : {reason}",
+  "libraryMerge.reason.diskFull":
+    "Le disque est plein. Libérez de l'espace, puis réessayez.",
+  "libraryMerge.reason.backup":
+    "Sa copie de sauvegarde n'a pas pu être écrite.",
+  "libraryMerge.reason.merge":
+    "Une erreur a interrompu la migration (rien n'a été modifié).",
+  "libraryMerge.reason.open": "Sa base de données n'a pas pu être ouverte.",
+  "libraryMerge.retry": "Réessayer",
+  "library.restored":
+    "Votre bibliothèque était endommagée : Meguri a restauré la copie du {date}",
+  "library.restoredDesc":
+    "Les favoris, notes, tags et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
   "settings.about": "À propos",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} est publié sous licence MIT.",

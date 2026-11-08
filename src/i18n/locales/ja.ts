@@ -93,6 +93,25 @@ export const ja = {
   "update.checkFailed":
     "確認できませんでした（オフラインの可能性があります）。",
   "update.upToDate": "最新です（{version}）。",
+  "libraryMerge.title": "ライブラリを移行しています",
+  "libraryMerge.description":
+    "お気に入り・評価・タグ・ブックマーク・再生履歴を、すべてのワークスペースで共有するライブラリへ移しています。終わるまでそのままお待ちください。",
+  "libraryMerge.progress": "{done} / {total} ワークスペース",
+  "libraryMerge.failed": "一部のワークスペースを移行できませんでした",
+  "libraryMerge.failedDesc":
+    "{list}\nこれらのワークスペースはこれまでどおり使えます。次回の起動時にも、もう一度移行します。",
+  "libraryMerge.failedItem": "{name}: {reason}",
+  "libraryMerge.reason.diskFull":
+    "ディスクの空きが足りません。空きを作ってから、もう一度移行してください",
+  "libraryMerge.reason.backup": "移行前の退避ファイルを書き込めませんでした",
+  "libraryMerge.reason.merge":
+    "移行の途中でエラーが起きました（変更は元に戻してあります）",
+  "libraryMerge.reason.open": "ワークスペースのデータベースを開けませんでした",
+  "libraryMerge.retry": "もう一度移行",
+  "library.restored":
+    "ライブラリが壊れていたため、{date}時点の写しから戻しました",
+  "library.restoredDesc":
+    "それより後に付けたお気に入り・評価・タグなどは失われています。壊れたファイルは、ライブラリと同じフォルダに残してあります。",
   "settings.about": "このアプリについて",
   "about.version": "{name} バージョン {version}",
   "about.appLicense": "{name}は MIT License の下で公開されています。",

@@ -266,6 +266,7 @@ const FileTarget = z.object({
 
 export const ChannelInputs = {
   app_status: z.void(),
+  library_merge_retry: z.void(),
   about_info: z.void(),
   workspace_stats: z.void(),
   workspaces_list: z.void(),
@@ -589,6 +590,7 @@ export interface WorkspaceAddResult {
 // signature and the renderer client wrapper to match.
 export interface ChannelOutputs {
   app_status: AppStatus;
+  library_merge_retry: void;
   about_info: AboutInfo;
   workspace_stats: WorkspaceStats;
   workspaces_list: WorkspacesList;

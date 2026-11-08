@@ -5,6 +5,7 @@
 /** Renderer → main invoke channels (ipcMain.handle). */
 export const INVOKE_CHANNELS = [
   "app_status",
+  "library_merge_retry",
   "about_info",
   "workspace_stats",
   "workspaces_list",
@@ -96,6 +97,7 @@ export const EVENT_CHANNELS = [
   "scan:done",
   "workspace:changed",
   "update:available",
+  "library:merge",
 ] as const;
 
 export type PreloadInvokeChannel = (typeof PRELOAD_INVOKE_CHANNELS)[number];

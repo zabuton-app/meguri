@@ -14,16 +14,18 @@ files live in a directory named after the workspace's path hash:
 ```text
 <userData>/
 ├─ library.sqlite      # metadata every workspace shares (WAL mode)
+├─ library-backups/    # dated copies of it (see The shared library)
 └─ roots/<hash>/
    ├─ db.sqlite        # this workspace's database (WAL mode)
    ├─ db.pre-shared-metadata.sqlite
-   │                   # its copy from before the metadata moved
+   │                   # its copy until a library copy holds the move
    └─ thumbs/          # generated thumbnails (WebP)
 ```
 
 Removing a workspace deletes its `roots/<hash>/` directory. The library is
 never deleted, so the metadata of a removed workspace's files stays and comes
-back when the same files are added again.
+back when the same files are added again. A workspace whose metadata could not
+be merged into the library yet keeps its directory instead, metadata and all.
 
 `electron/core/paths.ts` resolves these paths. The top-level
 [README](../README.md#where-data-is-stored) is the canonical description of the
@@ -90,7 +92,8 @@ In the library (`LIB_DDL`):
 - `tag_changes` — the `meta_key`s whose user tags changed (see
   [Full-text search](#full-text-search)).
 - `migrated_workspaces` — the workspaces found on the library: merged into it,
-  or created after it (see [The shared library](#the-shared-library)).
+  or created after it, and whether their own tables are gone yet (`complete`;
+  see [The shared library](#the-shared-library)).
 
 ## Versionless migrations
 
@@ -175,12 +178,55 @@ open after the upgrade:
    again.
 2. Merge its tables into the library and record it in `migrated_workspaces`,
    in one transaction.
-3. Drop its own tables and rebuild `files_fts`, in another.
+3. Drop its own tables and rebuild `files_fts`, in another. Then mark the
+   record `complete`. A workspace recorded but not complete still has its own
+   tables, and is treated as not merged until it is.
+4. Keep the copy. Once the move is complete, the library is the only place
+   that metadata lives, so `Workspaces.dropCoveredBackups()` deletes the copy
+   only when a copy of the library taken after it exists.
 
 A workspace recorded already but still holding its own tables — an older
 version recreated them after a downgrade — is merged again before they are
-dropped. A failure in either transaction is logged and leaves the workspace on
-its own tables until the next open.
+dropped. A failure in either transaction is logged and leaves the workspace,
+and its copy, as they were until the next open.
+
+At startup, `Workspaces.bootstrap()` lists the registered workspaces that
+have a database but no record in the library, reading `migrated_workspaces`
+without opening any workspace, and leaves them unopened: until they have
+merged, nothing else opens them. Once the window has loaded,
+`Workspaces.mergePending()` opens them one at a time, so each one merges. The
+window shows a modal with how many are done (`app_status.libraryMerge` and
+the `library:merge` event, `LibraryMergeModal`). When it closes, a notice
+names any workspace that could not be merged and why, with a "Try again"
+button. Trying again (`Workspaces.beginRetry()`, then `retryMerge()`) makes
+those workspaces pending again at once, so the modal comes back while their
+scans and passes stop, then merges them the same way. Scans start after it.
+
+The library is the one copy of every migrated workspace's metadata. Before
+any workspace opens it, `maintainLibrary()` (`electron/core/libraryBackup.ts`)
+runs `PRAGMA quick_check` on it:
+
+- A sound library gets a copy in `library-backups/` when the newest copy is a
+  day old or more. The five newest copies are kept.
+- A damaged library is renamed to `library.damaged-<ms>.sqlite`, and the
+  newest sound copy is put in its place, as it is for a library that has gone
+  while copies of it exist. The window says so, and from when the copy is:
+  anything changed after it is lost. The copy's change log is emptied and its
+  sequence moved far ahead, so every workspace rebuilds its keyword index.
+- A damaged library with no copy, or one that cannot be read, is left as it
+  is.
+
+A copy is also taken right after workspaces merge into the library, since
+their own tables are gone by then, unless none of them merged. The
+workspaces' own copies are deleted after it. A workspace merged some other
+way (a tag rename reaching every workspace, a removal) keeps its copy until a
+later startup finds a library copy newer than it. No workspace copy is deleted
+in a session that put the library back from a copy.
+
+A library put back from a copy older than a workspace's merge has no record of
+that workspace, whose own tables are gone. Its own copy still holds them:
+opening it merges them into the library again from there. A copy dated ahead
+of the clock counts as the stalest, never as the newest.
 
 Rows for the same `meta_key` are merged so that nothing the user set is lost:
 
@@ -204,7 +250,9 @@ the play history, apply to every workspace whichever one is in view. They run
 once, on a connection that uses the library, plus once on each workspace still
 on its own tables. A workspace the library has no record of is opened first,
 so its merge runs; `migrated_workspaces` records every workspace found on the
-library, so the others are not opened for it. The history views show only
+library as complete, so the others are not opened for it. When every open
+workspace is still on its own tables, one the library records is opened so the
+write reaches the library too. The history views show only
 events for files alive in the workspaces they list, and the `All` view lists
 an event two workspaces share once.
 

@@ -245,13 +245,18 @@ BEGIN
 END;
 
 -- Workspaces whose own metadata tables have been merged into this database
--- (library.ts). Written in the same transaction as the merge. workspace_id is
+-- (library.ts). Written in the same transaction as the merge. complete is set
+-- once the workspace's own tables are gone too, in a later transaction: a
+-- workspace recorded but not complete still has them, and is opened before any
+-- write meant for every workspace, which would otherwise miss them and see
+-- them merged back later (Workspaces.metadataCores). workspace_id is
 -- pathHash of the resolved root, the name of the workspace's data directory —
 -- not Workspaces.idFor, which hashes the path as configured and differs from it
 -- when the root was added through a symlink.
 CREATE TABLE IF NOT EXISTS lib.migrated_workspaces (
   workspace_id TEXT PRIMARY KEY,
-  migrated_at INTEGER NOT NULL
+  migrated_at INTEGER NOT NULL,
+  complete INTEGER NOT NULL DEFAULT 0
 );
 `;
 
@@ -288,6 +293,7 @@ function prepareDb(db: DB, libraryFile: string): void {
   db.pragma("lib.journal_mode = WAL");
   db.pragma("lib.synchronous = NORMAL");
   db.exec(LIB_DDL);
+  backfillLibraryColumns(db);
   db.exec(CORE_DDL);
   // Before backfillColumns: on a DB that pre-dates `btime`, the backfill would add
   // the column and build its two indexes only for the table rebuild here to drop
@@ -298,6 +304,22 @@ function prepareDb(db: DB, libraryFile: string): void {
   migrateFilesTable(db);
   backfillColumns(db);
   migrateFtsToTrigram(db);
+}
+
+/** Columns LIB_DDL gained after a library was first created. */
+function backfillLibraryColumns(db: DB): void {
+  const cols = (
+    db.prepare("PRAGMA lib.table_info(migrated_workspaces)").all() as {
+      name: string;
+    }[]
+  ).map((c) => c.name);
+  if (!cols.includes("complete")) {
+    // Rows from before it are taken as not complete: each workspace is opened
+    // once more, finds its own tables gone, and is marked complete.
+    db.exec(
+      "ALTER TABLE lib.migrated_workspaces ADD COLUMN complete INTEGER NOT NULL DEFAULT 0",
+    );
+  }
 }
 
 function attachLibrary(db: DB, libraryFile: string): void {
@@ -567,6 +589,59 @@ export function openDbReadonly(file: string, libraryFile: string): DB {
   // surfacing an exception to the renderer.
   db.pragma("busy_timeout = 5000");
   return db;
+}
+
+/**
+ * The shared library on its own, read-only: what the app reads before any
+ * workspace is open (which workspaces it has a record of, whether it is
+ * sound). Throws when it cannot be opened.
+ */
+export function openLibraryReadonlyOrThrow(libraryFile: string): DB {
+  const db = new Database(libraryFile, { readonly: true, fileMustExist: true });
+  db.pragma("busy_timeout = 5000");
+  return db;
+}
+
+/** The shared library on its own, writable: for repairing a copy before it
+ *  is put back (libraryBackup.ts). Throws when it cannot be opened. */
+export function openLibraryForRepair(libraryFile: string): DB {
+  const db = new Database(libraryFile, { fileMustExist: true });
+  db.pragma("busy_timeout = 5000");
+  return db;
+}
+
+/** openLibraryReadonlyOrThrow, or null when the file does not exist yet or
+ *  cannot be opened. */
+export function openLibraryReadonly(libraryFile: string): DB | null {
+  try {
+    return openLibraryReadonlyOrThrow(libraryFile);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether the workspace database at `dbFile` still holds its own metadata
+ * tables, read without attaching or preparing anything. Null when it cannot
+ * be opened: nobody can tell.
+ */
+export function fileUsesOwnMetadata(dbFile: string): boolean | null {
+  let db: DB | undefined;
+  try {
+    db = new Database(dbFile, { readonly: true, fileMustExist: true });
+    db.pragma("busy_timeout = 5000");
+    return usesOwnMetadata(db);
+  } catch {
+    return null;
+  } finally {
+    db?.close();
+  }
+}
+
+/** The `code` an error from SQLite or the file system carries, if any. */
+export function errorCode(e: unknown): string | undefined {
+  const code = (e as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : undefined;
 }
 
 export function nowUnix(): number {

@@ -15,6 +15,7 @@ import {
   META_KEYED_TABLES,
   nowUnix,
   rebuildFtsAll,
+  errorCode,
   resyncFtsForKeys,
   usesOwnMetadata,
   type DB,
@@ -23,6 +24,7 @@ import { scopedLog } from "./logger.js";
 import { BOOKMARK_NEAR_EPS } from "./queries/bookmarks.js";
 import { FILE_META_MERGE_SET } from "./queries/meta.js";
 import { getSetting, setSetting } from "./queries/settings.js";
+import type { LibraryMergeFailureReason } from "../../shared/ipc/schema.js";
 
 const log = scopedLog("library");
 
@@ -30,13 +32,26 @@ const log = scopedLog("library");
  *  meta_tags rows that reference it. */
 const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
 
+export interface MergeOutcome {
+  /** The merge ran to the end, which changes tags the others may index. */
+  merged: boolean;
+  /** Set when the workspace still holds its own tables. */
+  failure?: LibraryMergeFailureReason;
+}
+
+/** A full disk, as SQLite and the file system report it. */
+function isDiskFull(e: unknown): boolean {
+  const code = errorCode(e);
+  return code === "SQLITE_FULL" || code === "ENOSPC";
+}
+
 /**
  * Merge this workspace's own metadata into the library and drop its tables.
  * Versionless and safe to run on every open (Principle III):
  *
  * 1. No own `file_meta`: nothing to merge (merged before, or created after the
- *    library existed). It is recorded in `lib.migrated_workspaces` if it is not
- *    yet.
+ *    library existed). It is recorded in `lib.migrated_workspaces` as complete
+ *    if it is not yet.
  * 2. Not recorded in `lib.migrated_workspaces`: copy the whole database to
  *    `backupPath` (VACUUM INTO), then merge and record it in one transaction.
  *    If the copy cannot be written, stop here and keep the own tables.
@@ -44,39 +59,61 @@ const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
  *    (no backup, no new record): they may be the ones an older version of the
  *    app recreated and wrote to after the merge.
  * 3. Drop the own tables and rebuild files_fts from the library's tags, in one
- *    transaction, recording the index as current (FTS_TAG_SEQ_KEY).
+ *    transaction, recording the index as current (FTS_TAG_SEQ_KEY). Then mark
+ *    the record complete.
+ * 4. Keep the copy: once the move is complete, the library is the one place
+ *    its metadata lives, so the copy goes only when a copy of the library
+ *    taken afterwards holds it (Workspaces.dropCoveredBackups).
  *
  * The two transactions write different files, so a crash can fall between
- * them; the record makes the next open skip the backup. The merge rules leave
+ * them; the record makes the next open skip the backup, and, not complete,
+ * keeps the workspace in reach of writes meant for every workspace until the
+ * drop has run. The merge rules leave
  * the library unchanged when the same rows are merged again.
  *
  * A failure in either transaction is logged and leaves the workspace on its
  * own tables, as a failed backup does; the next open tries again.
  *
- * Returns whether the merge ran to the end, which changes tags the other
- * workspaces may index.
+ * Returns a MergeOutcome: `merged` when the merge ran to the end (which
+ * changes tags the other workspaces may index), `failure` with the reason when
+ * the workspace is still on its own tables.
  */
 export function migrateWorkspaceMetadata(
   db: DB,
   workspaceId: string,
   backupPath: string,
-): boolean {
+): MergeOutcome {
+  const record = db
+    .prepare(
+      "SELECT complete FROM lib.migrated_workspaces WHERE workspace_id = ?",
+    )
+    .get(workspaceId) as { complete: number } | undefined;
   if (!usesOwnMetadata(db)) {
+    // Merged before into a library that no longer has it (one put back from
+    // a copy older than the merge, or made anew): its own tables are gone,
+    // and its copy is what is left of them. Merged again from there.
+    if (record === undefined && fs.existsSync(backupPath)) {
+      return mergeFromBackup(db, workspaceId, backupPath);
+    }
     // Created after the library, or merged before: on the library already.
-    // Recorded so a write to every workspace knows it need not be opened to
-    // be reached (Workspaces.metadataCores).
-    db.prepare(
-      "INSERT OR IGNORE INTO lib.migrated_workspaces (workspace_id, migrated_at) VALUES (?, ?)",
-    ).run(workspaceId, nowUnix());
-    return false;
+    // Recorded complete so a write to every workspace knows it need not be
+    // opened to be reached (Workspaces.metadataCores). Written only when it
+    // is not yet, so an ordinary open takes no lock on the library.
+    if (record?.complete !== 1) markComplete(db, workspaceId);
+    return { merged: false };
   }
 
-  const recorded =
-    db
-      .prepare("SELECT 1 FROM lib.migrated_workspaces WHERE workspace_id = ?")
-      .get(workspaceId) !== undefined;
+  const recorded = record !== undefined;
   try {
-    if (!recorded && !writeBackup(db, backupPath)) return false;
+    if (!recorded) {
+      const error = writeBackup(db, backupPath);
+      if (error !== null) {
+        return {
+          merged: false,
+          failure: isDiskFull(error) ? "diskFull" : "backup",
+        };
+      }
+    }
     // Library side and workspace side in transactions of their own: in WAL
     // mode a transaction over attached databases is not atomic across the
     // files, so one that wrote both could leave the drop committed and the
@@ -98,33 +135,159 @@ export function migrateWorkspaceMetadata(
       // workspaces gave the same content.
       rebuildTagIndex(db);
     })();
+    // Only once the drop has committed: complete with the tables still there
+    // would let a write to every workspace skip them.
+    markComplete(db, workspaceId);
   } catch (e) {
     log.warn(
       `could not merge the metadata of workspace ${workspaceId}; keeping its own tables for now:`,
       e,
     );
-    return false;
+    return { merged: false, failure: isDiskFull(e) ? "diskFull" : "merge" };
   }
   log.info(`merged the metadata of workspace ${workspaceId} into the library`);
-  return true;
+  // The copy stays until a copy of the library holds what it guards
+  // (Workspaces.dropCoveredBackups).
+  return { merged: true };
 }
 
 /**
- * Copy the workspace database to `backupPath`. A copy left by an attempt that
+ * Merge the own tables kept in a workspace's copy (writeBackup) into a library
+ * that has no record of it, then record it complete. The copy stays: what it
+ * holds is in the library again only once a copy of the library is taken
+ * (Workspaces.dropCoveredBackups). A failure leaves nothing recorded, so the
+ * next open tries again.
+ */
+function mergeFromBackup(
+  db: DB,
+  workspaceId: string,
+  backupPath: string,
+): MergeOutcome {
+  try {
+    db.prepare("ATTACH DATABASE ? AS kept").run(backupPath);
+  } catch (e) {
+    log.warn(`could not read the backup ${backupPath}:`, e);
+    return { merged: false, failure: "merge" };
+  }
+  try {
+    const holds =
+      db
+        .prepare(
+          "SELECT 1 FROM kept.sqlite_master WHERE type = 'table' AND name = 'file_meta'",
+        )
+        .get() !== undefined;
+    if (!holds) {
+      markComplete(db, workspaceId);
+      return { merged: false };
+    }
+    // Dated now, before anything is recorded: only a copy of the library
+    // taken after this merge holds what the copy does, and only such a copy
+    // lets it go (dropCoveredBackups). Not merged when it cannot be dated.
+    const now = new Date();
+    fs.utimesSync(backupPath, now, now);
+    // Merged and recorded in one transaction on the library: recorded, the
+    // copy is never merged a second time over what the user changed since.
+    db.transaction(() => {
+      mergeIntoLibrary(db, "kept");
+      db.prepare(
+        `INSERT INTO lib.migrated_workspaces (workspace_id, migrated_at, complete)
+         VALUES (?, ?, 1)
+         ON CONFLICT (workspace_id) DO UPDATE SET complete = 1`,
+      ).run(workspaceId, nowUnix());
+    })();
+  } catch (e) {
+    log.warn(
+      `could not merge the metadata of workspace ${workspaceId} from its backup:`,
+      e,
+    );
+    return { merged: false, failure: isDiskFull(e) ? "diskFull" : "merge" };
+  } finally {
+    db.exec("DETACH DATABASE kept");
+  }
+  // The workspace's own index, in a transaction of its own (WAL is not atomic
+  // across the attached files). A failure leaves it to the next catch-up,
+  // which finds it behind and rebuilds it.
+  try {
+    db.transaction(() => rebuildTagIndex(db))();
+  } catch (e) {
+    log.warn("could not rebuild the tag index after the merge:", e);
+  }
+  log.warn(
+    `the library had no record of workspace ${workspaceId}: merged its metadata again from ${backupPath}`,
+  );
+  return { merged: true };
+}
+
+/**
+ * Record the workspace as merged with its own tables gone. A failure is
+ * logged: the record only spares opening it for a write to every workspace,
+ * and the next open writes it again.
+ */
+function markComplete(db: DB, workspaceId: string): void {
+  try {
+    db.prepare(
+      `INSERT INTO lib.migrated_workspaces (workspace_id, migrated_at, complete)
+       VALUES (?, ?, 1)
+       ON CONFLICT (workspace_id) DO UPDATE SET complete = 1`,
+    ).run(workspaceId, nowUnix());
+  } catch (e) {
+    log.warn(`could not record workspace ${workspaceId} as merged:`, e);
+  }
+}
+
+/** Delete a partial copy writeBackup left. A failure is logged: the copy
+ *  only costs disk space. */
+function removeBackup(backupPath: string): void {
+  try {
+    fs.rmSync(backupPath, { force: true });
+  } catch (e) {
+    log.warn(`could not delete the backup ${backupPath}:`, e);
+  }
+}
+
+/**
+ * The workspace ids `migrated_workspaces` records as complete: merged, with
+ * their own tables gone. `db` is a library opened on
+ * its own (openLibraryReadonly), or `lib` when `schema` says so. Empty when
+ * the table cannot be read: then every workspace is opened to find out.
+ */
+export function recordedWorkspaceIds(
+  db: DB,
+  schema: "main" | "lib" = "main",
+): Set<string> {
+  try {
+    return new Set(
+      db
+        .prepare(
+          `SELECT workspace_id FROM ${schema}.migrated_workspaces WHERE complete = 1`,
+        )
+        .pluck()
+        .all() as string[],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Copy the workspace database to `backupPath`, returning the error when it
+ * cannot (null when it could). A copy left by an attempt that
  * stopped before the merge was recorded is replaced: the merge had not
  * happened, so the database is still in the state it describes.
  */
-function writeBackup(db: DB, backupPath: string): boolean {
+function writeBackup(db: DB, backupPath: string): unknown {
   try {
     fs.rmSync(backupPath, { force: true });
     db.prepare("VACUUM main INTO ?").run(backupPath);
-    return true;
+    return null;
   } catch (e) {
     log.warn(
       `could not back up ${backupPath}; keeping this workspace's own metadata for now:`,
       e,
     );
-    return false;
+    // A partial copy only takes the space the merge needs.
+    removeBackup(backupPath);
+    return e;
   }
 }
 
@@ -133,12 +296,12 @@ function writeBackup(db: DB, backupPath: string): boolean {
  * same result when the same rows are merged again. Caller supplies the
  * transaction.
  */
-function mergeIntoLibrary(db: DB): void {
+function mergeIntoLibrary(db: DB, from: "main" | "kept" = "main"): void {
   db.exec(`
     INSERT INTO lib.file_meta
       (meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at)
     SELECT meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at
-    FROM main.file_meta WHERE true
+    FROM ${from}.file_meta WHERE true
     ON CONFLICT (meta_key) DO UPDATE SET ${FILE_META_MERGE_SET};
   `);
 
@@ -147,13 +310,13 @@ function mergeIntoLibrary(db: DB): void {
   // and auto tagging already treat them as one (tagIdentityKey).
   db.exec(`
     INSERT INTO lib.tags (name, namespace)
-    SELECT name, namespace FROM main.tags WHERE true
+    SELECT name, namespace FROM ${from}.tags WHERE true
     ON CONFLICT (namespace, name) DO NOTHING;
 
     INSERT OR IGNORE INTO lib.meta_tags (meta_key, tag_id, source, score)
     SELECT mt.meta_key, lt.id, mt.source, mt.score
-    FROM main.meta_tags mt
-    JOIN main.tags t ON t.id = mt.tag_id
+    FROM ${from}.meta_tags mt
+    JOIN ${from}.tags t ON t.id = mt.tag_id
     JOIN lib.tags lt ON lt.namespace = t.namespace AND lt.name = t.name;
   `);
 
@@ -161,7 +324,7 @@ function mergeIntoLibrary(db: DB): void {
   db.exec(`
     INSERT INTO lib.play_history (meta_key, played_at, position, via)
     SELECT DISTINCT p.meta_key, p.played_at, p.position, p.via
-    FROM main.play_history p
+    FROM ${from}.play_history p
     WHERE NOT EXISTS (
       SELECT 1 FROM lib.play_history x
       WHERE x.meta_key = p.meta_key AND x.played_at = p.played_at
@@ -179,7 +342,7 @@ function mergeIntoLibrary(db: DB): void {
   );
   const rows = db
     .prepare(
-      "SELECT meta_key, sec, created_at FROM main.scene_bookmarks ORDER BY meta_key, sec, id",
+      `SELECT meta_key, sec, created_at FROM ${from}.scene_bookmarks ORDER BY meta_key, sec, id`,
     )
     .all() as { meta_key: string; sec: number; created_at: number }[];
   for (const b of rows) {
@@ -247,7 +410,8 @@ const RESYNC_SHARE_LIMIT = 0.3;
  * - Otherwise: re-sync only the keys logged since.
  *
  * A library replaced with one that has handed out as many seqs or more is not
- * detected; the app never does that itself.
+ * detected: the copy libraryBackup.ts puts back has its sequence moved far
+ * ahead, so it is never the case there.
  *
  * A workspace still on its own metadata tables (its merge has not run) indexes
  * those and is left alone.

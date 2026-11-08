@@ -1,5 +1,6 @@
 import { app } from "electron";
 import { handle } from "../core/ipcHandler.js";
+import log from "../core/logger.js";
 import type { WorkspaceStats } from "../core/types.js";
 import { ALL_ID } from "../core/workspaces.js";
 import type { IpcContext } from "./context.js";
@@ -18,6 +19,26 @@ export function registerStatusHandlers(ctx: IpcContext): void {
   );
 
   handle("app_status", () => {
+    // While workspaces are being merged into the library (the first launch
+    // after the upgrade), nothing is ready, and no view is selected, so the
+    // renderer asks for nothing that would wait on them (Workspaces.merge).
+    const libraryMerge = ws.mergeProgress();
+    if (libraryMerge) {
+      return {
+        root: null,
+        ready: false,
+        initError: null,
+        initErrorKind: null,
+        mediaBase: ctx.mediaBase(),
+        workspaceId: null,
+        devMode: ctx.isDevMode(),
+        libraryMerge,
+        libraryRestoredFrom: ctx.libraryRestoredFrom() ?? undefined,
+      };
+    }
+    const failed = ws.mergeFailures();
+    const libraryMergeFailed = failed.length > 0 ? failed : undefined;
+    const libraryRestoredFrom = ctx.libraryRestoredFrom() ?? undefined;
     if (ws.isAll()) {
       return {
         root: "All",
@@ -27,6 +48,8 @@ export function registerStatusHandlers(ctx: IpcContext): void {
         mediaBase: ctx.mediaBase(),
         workspaceId: ALL_ID,
         devMode: ctx.isDevMode(),
+        libraryMergeFailed,
+        libraryRestoredFrom,
       };
     }
     const activeCollection = ws.activeCollection();
@@ -39,6 +62,8 @@ export function registerStatusHandlers(ctx: IpcContext): void {
         mediaBase: ctx.mediaBase(),
         workspaceId: ws.activeId,
         devMode: ctx.isDevMode(),
+        libraryMergeFailed,
+        libraryRestoredFrom,
       };
     }
     const core = ws.active();
@@ -50,7 +75,17 @@ export function registerStatusHandlers(ctx: IpcContext): void {
       mediaBase: ctx.mediaBase(),
       workspaceId: ws.activeId,
       devMode: ctx.isDevMode(),
+      libraryMergeFailed,
+      libraryRestoredFrom,
     };
+  });
+
+  // The "Try again" of the merge failure notice. Not awaited: the progress
+  // and the outcome arrive as library:merge events, as at startup.
+  handle("library_merge_retry", () => {
+    ctx.retryLibraryMerge().catch((e: unknown) => {
+      log.error("library merge retry failed:", e);
+    });
   });
 
   // Static app/runtime versions for the Settings "About" section.

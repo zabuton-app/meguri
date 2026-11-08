@@ -14,9 +14,11 @@ import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { StatusBar } from "@/components/StatusBar";
+import { LibraryMergeModal } from "@/components/LibraryMergeModal";
 import { useContentZoom } from "@/hooks/useContentZoom";
 import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
+import { useLibraryRestoreNotifier } from "@/hooks/useLibraryRestoreNotifier";
 import { registerRouterNavigate } from "@/lib/routerBridge";
 
 // In a webview, a hash router is more stable than a file-path-style history.
@@ -46,6 +48,7 @@ export default function App() {
   useContentZoom();
   useSelectAllGuard();
   useUpdateNotifier();
+  useLibraryRestoreNotifier();
   return (
     <div className="flex h-full">
       <WorkspaceRail />
@@ -63,6 +66,7 @@ export default function App() {
           <StatusBar />
         </div>
       </AudioPlayerProvider>
+      <LibraryMergeModal />
     </div>
   );
 }

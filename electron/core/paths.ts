@@ -32,6 +32,11 @@ export function libraryDbPath(): string {
   return path.join(baseDataDir(), "library.sqlite");
 }
 
+/** Where libraryBackup.ts keeps its dated copies of the library. */
+export function libraryBackupDir(): string {
+  return path.join(baseDataDir(), "library-backups");
+}
+
 /** Where a workspace DB is copied before its metadata is merged into the library. */
 export function backupDbPathForDataDir(dataDir: string): string {
   return path.join(dataDir, "db.pre-shared-metadata.sqlite");
