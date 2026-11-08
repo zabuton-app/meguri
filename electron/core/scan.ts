@@ -4,7 +4,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type { DB } from "./db.js";
-import { nowUnix } from "./db.js";
+import { nowUnix, pathMetaKey } from "./db.js";
 import { migrateMetaKey } from "./queries.js";
 import { pool } from "./concurrency.js";
 import type { Kind } from "./types.js";
@@ -314,7 +314,7 @@ export async function syncFiles(
     "UPDATE files SET deleted_at = NULL, abs_path = ?, inode = ?, btime = ? WHERE id = ?",
   );
   // Recompute content_hash for changed files so meta_key stays anchored to the hash
-  // (rather than dropping to the rel_path fallback) and metadata keeps linking.
+  // (rather than dropping to the path fallback) and metadata keeps linking.
   const updateChanged = db.prepare(
     "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL WHERE id = ?",
   );
@@ -336,7 +336,13 @@ export async function syncFiles(
   );
 
   type Existing =
-    | { id: number; size: number; mtime: number; content_hash: string | null }
+    | {
+        id: number;
+        size: number;
+        mtime: number;
+        content_hash: string | null;
+        abs_path: string;
+      }
     | undefined;
 
   // --- 1. Classify (look up existing rows, keeping indices aligned with discovered) ---
@@ -347,18 +353,25 @@ export async function syncFiles(
     (
       db
         .prepare(
-          "SELECT id, rel_path, size, mtime, content_hash FROM files WHERE root_id = ?",
+          "SELECT id, rel_path, abs_path, size, mtime, content_hash FROM files WHERE root_id = ?",
         )
         .all(rootId) as {
         id: number;
         rel_path: string;
+        abs_path: string;
         size: number;
         mtime: number;
         content_hash: string | null;
       }[]
     ).map((r) => [
       r.rel_path,
-      { id: r.id, size: r.size, mtime: r.mtime, content_hash: r.content_hash },
+      {
+        id: r.id,
+        size: r.size,
+        mtime: r.mtime,
+        content_hash: r.content_hash,
+        abs_path: r.abs_path,
+      },
     ]),
   );
   // hashIdx holds new files (move detection) plus changed files (content_hash refresh).
@@ -410,10 +423,11 @@ export async function syncFiles(
           stats.unchanged++;
         } else {
           const newHash = hashOf.get(i) ?? null;
-          // If the file had no hash before (meta was keyed by the rel_path fallback) and
-          // now gains one, carry its metadata over to the hash-based meta_key.
+          // If the file had no hash before (meta was keyed by the path fallback) and
+          // now gains one, carry its metadata over to the hash-based meta_key. The
+          // old key is the one the row derived, from the path stored on it.
           if (newHash && existing.content_hash == null) {
-            migrateMetaKey(db, `p:${rootId}:${d.relPath}`, newHash);
+            migrateMetaKey(db, pathMetaKey(existing.abs_path), newHash);
           }
           updateChanged.run(
             d.size,

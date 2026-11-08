@@ -58,7 +58,15 @@ const FTS_ROW_SELECT = ftsRowSelect();
 /** Chunk size for meta_key batches passed to resyncFtsForKeys as one JSON array. */
 const FTS_RESYNC_CHUNK = 5000;
 
-// Shared between CORE_DDL and the rebuild in migrateKindCheck so the two can never
+/** The meta_key expression. migrateFilesTable looks for it in the stored DDL. */
+const META_KEY_EXPR = "COALESCE(content_hash, 'p:' || abs_path)";
+
+/** The meta_key of a file without a hash, as built in TypeScript (see META_KEY_EXPR). */
+export function pathMetaKey(absPath: string): string {
+  return `p:${absPath}`;
+}
+
+// Shared between CORE_DDL and the rebuild in migrateFilesTable so the two can never
 // drift apart (same rationale as FTS_DDL above).
 const FILES_DDL = `
 CREATE TABLE IF NOT EXISTS files (
@@ -72,9 +80,12 @@ CREATE TABLE IF NOT EXISTS files (
     CHECK (thumb_status IN ('pending','done','error')),
   deleted_at INTEGER, excluded_at INTEGER, created_at INTEGER NOT NULL, meta TEXT,
   -- Stable identity for metadata, independent of the autoincrement id: content_hash
-  -- when available (survives move/rename), else a root-scoped rel_path fallback.
+  -- when available (survives move/rename), else the absolute path. The fallback
+  -- has to be unique across workspaces, not just within this database, and a
+  -- generated column can only read its own row — so no workspace id, but the
+  -- absolute path, which two workspaces share only for the same file.
   meta_key TEXT GENERATED ALWAYS AS
-    (COALESCE(content_hash, 'p:' || root_id || ':' || rel_path)) VIRTUAL,
+    (${META_KEY_EXPR}) VIRTUAL,
   UNIQUE (root_id, rel_path)
 )`;
 
@@ -185,7 +196,7 @@ export function openDb(file: string): DB {
   // backfill pass then only adds the indexes). Before migrateFtsToTrigram: that
   // migration reads `files`, so it has to see the final table rather than one
   // about to be rebuilt underneath it.
-  migrateKindCheck(db);
+  migrateFilesTable(db);
   backfillColumns(db);
   migrateFtsToTrigram(db);
   return db;
@@ -239,9 +250,14 @@ function backfillColumns(db: DB): void {
   );
 }
 
-/** Versionless idempotent migration: DBs created before audio support carry a
- *  `CHECK (kind IN ('video','image'))` on files, which rejects every audio INSERT.
- *  SQLite cannot ALTER a CHECK constraint, so the table is rebuilt once.
+/** Versionless idempotent migration: rebuild `files` once when its stored DDL is
+ *  older than FILES_DDL in either of two ways SQLite cannot ALTER:
+ *  - DBs created before audio support carry a `CHECK (kind IN ('video','image'))`,
+ *    which rejects every audio INSERT.
+ *  - DBs created before metadata moved out of the workspace derive the no-hash
+ *    meta_key from `root_id || ':' || rel_path`, which is unique only within one
+ *    database. Metadata stored under those keys is moved to the new ones
+ *    (rewritePathMetaKeys) in the same transaction.
  *
  *  Detected from the stored DDL rather than a version number (Principle III), so it is
  *  safe to run from any prior state and safe to re-run. Unlike files_fts this table is
@@ -253,17 +269,26 @@ function backfillColumns(db: DB): void {
  *    (added by backfillColumns, which runs after this) copies only the columns it
  *    actually has; the rebuilt table gets `btime` from FILES_DDL, NULL throughout.
  *  - `meta_key` is a VIRTUAL generated column and must be excluded from the INSERT;
- *    it re-derives itself from content_hash / root_id / rel_path.
+ *    it re-derives itself from content_hash / abs_path.
  *  - DROP TABLE takes the indexes with it, so CORE_DDL and backfillColumns are re-run
  *    afterwards to restore them.
- *  User-curated metadata is keyed by meta_key in separate tables and is untouched. */
-function migrateKindCheck(db: DB): void {
+ *  User-curated metadata is keyed by meta_key in separate tables; only the rows
+ *  under an old-style no-hash key are rewritten. */
+function migrateFilesTable(db: DB): void {
   const row = db
     .prepare(
       "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'files'",
     )
     .get() as { sql: string } | undefined;
-  if (!row || row.sql.includes("'audio'")) return;
+  if (!row) return;
+  const hasAudio = row.sql.includes("'audio'");
+  const hasCurrentMetaKey = row.sql.includes(META_KEY_EXPR);
+  if (hasAudio && hasCurrentMetaKey) return;
+  // The key rewrite knows one older expression only, so it is gated on that
+  // expression being present rather than on the current one being absent.
+  const hasRootScopedKey = row.sql.includes(
+    "'p:' || root_id || ':' || rel_path",
+  );
   // Real (non-generated) columns of the existing table. PRAGMA table_info omits
   // VIRTUAL generated columns, which is exactly the meta_key exclusion we need.
   const cols = (
@@ -273,8 +298,10 @@ function migrateKindCheck(db: DB): void {
     .filter((n) => n !== "meta_key");
   const colList = cols.map((c) => `"${c}"`).join(", ");
   db.transaction(() => {
+    // Read the old keys off the table before it is replaced.
+    if (hasRootScopedKey) rewritePathMetaKeys(db);
     db.exec("ALTER TABLE files RENAME TO files_old");
-    // Recreate `files` (and only it) with the widened CHECK; CORE_DDL below restores
+    // Recreate `files` (and only it) from FILES_DDL; CORE_DDL below restores
     // the indexes that RENAME carried over to files_old.
     db.exec(FILES_DDL);
     db.exec(`INSERT INTO files (${colList}) SELECT ${colList} FROM files_old`);
@@ -288,6 +315,53 @@ function migrateKindCheck(db: DB): void {
   // the WAL, and nothing shrinks a WAL file on its own — without this it would
   // sit next to the database at that high-water mark for good.
   db.pragma("wal_checkpoint(TRUNCATE)");
+}
+
+/** The tables that hold user-curated metadata under a meta_key. migrateMetaKey and
+ *  pruneOrphanMeta (queries/meta.ts) list the same tables; keep the three in step. */
+const META_KEYED_TABLES = [
+  "file_meta",
+  "meta_tags",
+  "play_history",
+  "scene_bookmarks",
+] as const;
+
+/**
+ * Move metadata stored under an old-style no-hash key (`p:<root_id>:<rel_path>`)
+ * to the absolute-path key the rebuilt `files` table derives for the same file.
+ * Collisions are resolved as in migrateMetaKey: a row that would clash with one
+ * already under the new key is dropped. Keys that no file row maps to are left
+ * as they are. Reads the files table as it is before the rebuild; the caller
+ * supplies the transaction.
+ *
+ * Names are qualified with `main.` and missing tables skipped because these
+ * tables are to move to a database shared by every workspace: what is rewritten
+ * here is always this workspace's own copy, when it still has one.
+ */
+function rewritePathMetaKeys(db: DB): void {
+  db.exec(`
+    DROP TABLE IF EXISTS temp.path_key_map;
+    CREATE TEMP TABLE path_key_map (old_key TEXT PRIMARY KEY, new_key TEXT NOT NULL);
+    INSERT OR IGNORE INTO temp.path_key_map (old_key, new_key)
+      SELECT 'p:' || root_id || ':' || rel_path, 'p:' || abs_path
+      FROM main.files WHERE content_hash IS NULL;
+  `);
+  for (const table of META_KEYED_TABLES) {
+    const exists = db
+      .prepare(
+        "SELECT 1 FROM main.sqlite_master WHERE type = 'table' AND name = ?",
+      )
+      .get(table);
+    if (!exists) continue;
+    db.exec(`
+      UPDATE OR IGNORE main.${table}
+        SET meta_key = (SELECT new_key FROM temp.path_key_map WHERE old_key = meta_key)
+        WHERE meta_key IN (SELECT old_key FROM temp.path_key_map);
+      DELETE FROM main.${table}
+        WHERE meta_key IN (SELECT old_key FROM temp.path_key_map);
+    `);
+  }
+  db.exec("DROP TABLE temp.path_key_map");
 }
 
 /**

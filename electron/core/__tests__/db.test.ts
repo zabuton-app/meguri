@@ -65,7 +65,7 @@ describe("openDb / backfillColumns", () => {
   });
 });
 
-describe("migrateKindCheck", () => {
+describe("migrateFilesTable", () => {
   let dir: string;
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-kind-"));
@@ -126,6 +126,9 @@ describe("migrateKindCheck", () => {
       INSERT INTO tags (id, name) VALUES (10, 'sunset');
       INSERT INTO meta_tags (meta_key, tag_id, source) VALUES ('hash-a', 10, 'manual');
       INSERT INTO play_history (meta_key, played_at, via) VALUES ('hash-a', 123, 'browser');
+      -- Under the old root-scoped no-hash key: moved by the same rebuild.
+      INSERT INTO file_meta (meta_key, rating, favorite, updated_at)
+        VALUES ('p:1:b.jpg', 2, 0, 0);
     `);
     db.close();
   }
@@ -156,7 +159,7 @@ describe("migrateKindCheck", () => {
       .all();
     expect(rows).toEqual([
       { id: 7, rel_path: "a.mp4", kind: "video", meta_key: "hash-a" },
-      { id: 9, rel_path: "b.jpg", kind: "image", meta_key: "p:1:b.jpg" },
+      { id: 9, rel_path: "b.jpg", kind: "image", meta_key: "p:/r/b.jpg" },
     ]);
     db.close();
   });
@@ -210,6 +213,13 @@ describe("migrateKindCheck", () => {
       )
       .get();
     expect(play).toEqual({ played_at: 123 });
+    // The no-hash file's metadata follows it to the absolute-path key.
+    const noHash = db
+      .prepare(
+        "SELECT f.meta_key, m.rating FROM files f JOIN file_meta m ON m.meta_key = f.meta_key WHERE f.id = 9",
+      )
+      .get();
+    expect(noHash).toEqual({ meta_key: "p:/r/b.jpg", rating: 2 });
     db.close();
   });
 
@@ -239,6 +249,94 @@ describe("migrateKindCheck", () => {
   it("leaves a fresh DB alone (already has the widened CHECK)", () => {
     const db = openDb(":memory:");
     expect(filesDdl(db)).toContain("'audio'");
+    db.close();
+  });
+
+  /** A DB that already accepts audio but derives the no-hash meta_key from
+   *  root_id and rel_path, with metadata stored under those keys. */
+  function makePathKeyLegacyDb(file: string): void {
+    const db = openDb(file);
+    const oldDdl = filesDdl(db).replace(
+      "'p:' || abs_path",
+      "'p:' || root_id || ':' || rel_path",
+    );
+    db.exec(`
+      DROP TABLE files;
+      ${oldDdl};
+      INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
+      INSERT INTO files (id, root_id, rel_path, abs_path, kind, content_hash, created_at)
+        VALUES (3, 1, 'x.mp4', '/r/x.mp4', 'video', NULL, 0),
+               (4, 1, 'y.mp4', '/r/y.mp4', 'video', 'hash-y', 0);
+      INSERT INTO file_meta (meta_key, rating, favorite, updated_at)
+        VALUES ('p:1:x.mp4', 5, 1, 0), ('hash-y', 2, 0, 0),
+               -- No file maps to this key: it stays as it is.
+               ('p:1:gone.mp4', 1, 0, 0);
+      INSERT INTO tags (id, name) VALUES (20, 'trip');
+      INSERT INTO meta_tags (meta_key, tag_id, source) VALUES ('p:1:x.mp4', 20, 'manual');
+      INSERT INTO play_history (meta_key, played_at, via) VALUES ('p:1:x.mp4', 50, 'browser');
+      INSERT INTO scene_bookmarks (meta_key, sec, created_at) VALUES ('p:1:x.mp4', 12, 0);
+    `);
+    db.close();
+  }
+
+  it("moves metadata under an old no-hash key to the absolute-path key", () => {
+    const file = path.join(dir, "pathkey.sqlite");
+    makePathKeyLegacyDb(file);
+    const db = openDb(file);
+    expect(filesDdl(db)).toContain("'p:' || abs_path");
+    const keyOf = (id: number) =>
+      (
+        db.prepare("SELECT meta_key FROM files WHERE id = ?").get(id) as {
+          meta_key: string;
+        }
+      ).meta_key;
+    expect(keyOf(3)).toBe("p:/r/x.mp4");
+    expect(keyOf(4)).toBe("hash-y");
+    const keys = (table: string) =>
+      (
+        db.prepare(`SELECT meta_key FROM ${table} ORDER BY meta_key`).all() as {
+          meta_key: string;
+        }[]
+      ).map((r) => r.meta_key);
+    expect(keys("file_meta")).toEqual(["hash-y", "p:/r/x.mp4", "p:1:gone.mp4"]);
+    expect(keys("meta_tags")).toEqual(["p:/r/x.mp4"]);
+    expect(keys("play_history")).toEqual(["p:/r/x.mp4"]);
+    expect(keys("scene_bookmarks")).toEqual(["p:/r/x.mp4"]);
+    db.close();
+  });
+
+  it("does not rewrite the keys again on a second open", () => {
+    const file = path.join(dir, "pathkey-again.sqlite");
+    makePathKeyLegacyDb(file);
+    openDb(file).close();
+    const db = openDb(file);
+    const rows = db
+      .prepare("SELECT meta_key, rating FROM file_meta ORDER BY meta_key")
+      .all();
+    expect(rows).toEqual([
+      { meta_key: "hash-y", rating: 2 },
+      { meta_key: "p:/r/x.mp4", rating: 5 },
+      { meta_key: "p:1:gone.mp4", rating: 1 },
+    ]);
+    db.close();
+  });
+
+  it("drops an old-key row that collides with one already under the new key", () => {
+    const file = path.join(dir, "pathkey-collide.sqlite");
+    makePathKeyLegacyDb(file);
+    const legacy = new Database(file);
+    legacy.exec(
+      "INSERT INTO file_meta (meta_key, rating, favorite, updated_at) VALUES ('p:/r/x.mp4', 3, 0, 0)",
+    );
+    legacy.close();
+    const db = openDb(file);
+    expect(
+      db
+        .prepare(
+          "SELECT meta_key, rating FROM file_meta WHERE meta_key LIKE 'p:%x.mp4'",
+        )
+        .all(),
+    ).toEqual([{ meta_key: "p:/r/x.mp4", rating: 3 }]);
     db.close();
   });
 });
@@ -277,7 +375,7 @@ describe("migrateFtsToTrigram", () => {
       INSERT INTO tags (id, name) VALUES (10, 'sunset');
       -- Same tag attached via two sources: the rebuild must emit the name once.
       INSERT INTO meta_tags (meta_key, tag_id, source)
-        VALUES ('p:1:alive.mp4', 10, 'manual'), ('p:1:alive.mp4', 10, 'plugin');
+        VALUES ('p:/r/alive.mp4', 10, 'manual'), ('p:/r/alive.mp4', 10, 'plugin');
       DROP TABLE files_fts;
       CREATE VIRTUAL TABLE files_fts USING fts5(rel_path, tags_text);
       INSERT INTO files_fts (rowid, rel_path, tags_text)
@@ -334,7 +432,7 @@ describe("migrateFtsToTrigram", () => {
     seed.exec(`
       INSERT INTO tags (id, name, namespace) VALUES (11, '4k', 'res');
       INSERT INTO meta_tags (meta_key, tag_id, source)
-        VALUES ('p:1:alive.mp4', 11, 'auto-meta');
+        VALUES ('p:/r/alive.mp4', 11, 'auto-meta');
     `);
     seed.close();
     const db = openDb(file);
@@ -358,7 +456,7 @@ describe("resyncFtsForKeys", () => {
                (2, 1, 'b.mp4', '/r/b.mp4', 'video', 0);
       INSERT INTO tags (id, name, namespace) VALUES (10, 'beach', ''), (11, '4k', 'res');
       INSERT INTO meta_tags (meta_key, tag_id, source)
-        VALUES ('p:1:a.mp4', 10, 'manual'), ('p:1:b.mp4', 11, 'auto-meta');
+        VALUES ('p:/r/a.mp4', 10, 'manual'), ('p:/r/b.mp4', 11, 'auto-meta');
       INSERT INTO files_fts (rowid, rel_path, tags_text)
         VALUES (1, 'a.mp4', 'stale'), (2, 'b.mp4', 'stale');
     `);
@@ -374,7 +472,7 @@ describe("resyncFtsForKeys", () => {
   }
 
   it("re-indexes only the files behind the given meta_keys", () => {
-    resyncFtsForKeys(db, ["p:1:a.mp4"]);
+    resyncFtsForKeys(db, ["p:/r/a.mp4"]);
     expect(textOf(1)).toBe("beach");
     expect(textOf(2)).toBe("stale");
   });
@@ -382,14 +480,14 @@ describe("resyncFtsForKeys", () => {
   it("is a no-op for an empty key list, and clears generated-only rows", () => {
     resyncFtsForKeys(db, []);
     expect(textOf(2)).toBe("stale");
-    resyncFtsForKeys(db, ["p:1:a.mp4", "p:1:b.mp4"]);
+    resyncFtsForKeys(db, ["p:/r/a.mp4", "p:/r/b.mp4"]);
     // b.mp4 carries only a namespaced tag, which is not indexed.
     expect(textOf(2)).toBe("");
   });
 
   it("does not re-add a soft-deleted file", () => {
     db.exec("UPDATE files SET deleted_at = 100 WHERE id = 1");
-    resyncFtsForKeys(db, ["p:1:a.mp4"]);
+    resyncFtsForKeys(db, ["p:/r/a.mp4"]);
     const n = (
       db
         .prepare("SELECT count(*) AS n FROM files_fts WHERE rowid = 1")
