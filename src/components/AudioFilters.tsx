@@ -125,6 +125,7 @@ export function AudioFilters({
         </button>
       </PopoverTrigger>
       <PopoverContent
+        align="start"
         aria-label={t("audio.filters")}
         className="grid w-[min(28rem,calc(100vw-2rem))] grid-cols-2 gap-3"
         onEscapeKeyDown={(event) => {
