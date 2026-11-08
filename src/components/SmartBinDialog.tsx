@@ -139,7 +139,12 @@ export function SmartBinDialog({
               </p>
             )}
           </div>
-          <FilterBar value={draft} onChange={setDraft} showSaved={false} />
+          <FilterBar
+            value={draft}
+            onChange={setDraft}
+            showSaved={false}
+            searchInputId="smart-bin-search-input"
+          />
           <p className="px-5 py-3 text-xs text-muted">{t("smartBin.live")}</p>
           <DialogFooter className="border-t border-border p-4">
             <Button type="button" variant="outline" onClick={onClose}>

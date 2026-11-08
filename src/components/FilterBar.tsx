@@ -44,6 +44,7 @@ interface Props {
   heatmapOpen?: boolean;
   /** The smart-bin editor reuses these controls without nesting saved searches. */
   showSaved?: boolean;
+  searchInputId?: string;
 }
 
 export function FilterBar({
@@ -56,6 +57,7 @@ export function FilterBar({
   onToggleHeatmap,
   heatmapOpen = false,
   showSaved = true,
+  searchInputId = "list-search-input",
 }: Props) {
   const { t } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
@@ -81,7 +83,7 @@ export function FilterBar({
           all we get. */}
         <div className="flex min-w-0 grow basis-48 items-center">
           <SearchTokenInput
-            id="list-search-input"
+            id={searchInputId}
             value={value.q ?? ""}
             onChange={(q) => patch({ q: q || undefined })}
             placeholder={t("filter.searchPlaceholder")}
