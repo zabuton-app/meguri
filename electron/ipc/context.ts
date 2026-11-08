@@ -37,4 +37,10 @@ export interface IpcContext {
    * quitting can stop them and wait.
    */
   passes: WorkspacePasses;
+  /** Merge the workspaces the last merge into the library could not, again,
+   *  with the progress shown as at startup. */
+  retryLibraryMerge: () => Promise<void>;
+  /** When the library copy put back at startup was taken (Unix seconds), or
+   *  null when the library was sound. */
+  libraryRestoredFrom: () => number | null;
 }

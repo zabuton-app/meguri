@@ -96,6 +96,25 @@ export const es: Record<TranslationKey, string> = {
   "update.checking": "Comprobando…",
   "update.checkFailed": "No se pudo comprobar (puede que estés sin conexión).",
   "update.upToDate": "Estás al día ({version}).",
+  "libraryMerge.title": "Trasladando tu biblioteca",
+  "libraryMerge.description":
+    "Los favoritos, las valoraciones, las etiquetas, los marcadores y el historial de reproducción se trasladan a una biblioteca que comparten todos los espacios de trabajo. Espera a que termine.",
+  "libraryMerge.progress": "{done} / {total} espacios de trabajo",
+  "libraryMerge.failed": "No se pudieron trasladar algunos espacios de trabajo",
+  "libraryMerge.failedDesc":
+    "{list}\nSiguen funcionando como antes. Meguri lo intentará de nuevo en el próximo inicio.",
+  "libraryMerge.failedItem": "{name}: {reason}",
+  "libraryMerge.reason.diskFull":
+    "El disco está lleno. Libera espacio y vuelve a intentarlo.",
+  "libraryMerge.reason.backup": "No se pudo escribir su copia de seguridad.",
+  "libraryMerge.reason.merge":
+    "Un error detuvo el traslado (no se cambió nada).",
+  "libraryMerge.reason.open": "No se pudo abrir su base de datos.",
+  "libraryMerge.retry": "Reintentar",
+  "library.restored":
+    "Tu biblioteca estaba dañada, así que Meguri restauró la copia del {date}",
+  "library.restoredDesc":
+    "Se han perdido los favoritos, las valoraciones, las etiquetas y demás cambios posteriores. El archivo dañado se conserva en la misma carpeta que la biblioteca.",
   "settings.about": "Acerca de",
   "about.version": "{name} versión {version}",
   "about.appLicense": "{name} se publica bajo la licencia MIT.",

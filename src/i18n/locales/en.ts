@@ -94,6 +94,25 @@ export const en: Record<TranslationKey, string> = {
   "update.checking": "Checking…",
   "update.checkFailed": "Couldn't check (you may be offline).",
   "update.upToDate": "You're up to date ({version}).",
+  "libraryMerge.title": "Moving your library",
+  "libraryMerge.description":
+    "Favorites, ratings, tags, bookmarks and play history are moving into one library that every workspace shares. Please wait until it finishes.",
+  "libraryMerge.progress": "{done} / {total} workspaces",
+  "libraryMerge.failed": "Some workspaces could not be moved",
+  "libraryMerge.failedDesc":
+    "{list}\nThey keep working as before. Meguri tries again at the next launch.",
+  "libraryMerge.failedItem": "{name}: {reason}",
+  "libraryMerge.reason.diskFull":
+    "The disk is full. Free some space, then try again.",
+  "libraryMerge.reason.backup": "Its backup copy could not be written.",
+  "libraryMerge.reason.merge":
+    "An error stopped the move (nothing was changed).",
+  "libraryMerge.reason.open": "Its database could not be opened.",
+  "libraryMerge.retry": "Try again",
+  "library.restored":
+    "Your library was damaged, so Meguri restored the copy from {date}",
+  "library.restoredDesc":
+    "Favorites, ratings, tags and other changes made after that are lost. The damaged file is kept in the same folder as the library.",
   "settings.about": "About",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} is released under the MIT License.",

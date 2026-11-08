@@ -354,6 +354,7 @@ Electron's userData.
 <userData>/                 # e.g. ~/.config/Meguri
 ├─ config.json              # registered workspaces and the active root
 ├─ library.sqlite           # favorites, ratings, tags, bookmarks, history (WAL)
+├─ library-backups/         # daily copies of library.sqlite (the 5 newest)
 └─ roots/<hash of root>/
    ├─ db.sqlite             # the file index (WAL)
    └─ thumbs/               # generated thumbnails (webp)

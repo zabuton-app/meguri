@@ -163,6 +163,8 @@ holding the workspace's generated files.
   (with the library attached), `root`, and `dataDir`. `Core.init` moves a
   workspace's own metadata into the library on the first open after the
   upgrade, and catches its keyword index up with tag changes made elsewhere.
+  On the first launch after the upgrade, `main.ts` opens every workspace that
+  still has to move before scans start, while a modal shows the progress.
 - `electron/core/paths.ts` resolves the storage layout; see
   [Data Model](data-model.md#storage-layout).
 

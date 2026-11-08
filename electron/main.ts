@@ -32,12 +32,22 @@ import {
   updateDownloadUrl,
 } from "./core/updater.js";
 import { Workspaces } from "./core/workspaces.js";
+import {
+  backupLibraryNow,
+  maintainLibrary,
+  newestBackupTime,
+} from "./core/libraryBackup.js";
+import { libraryBackupDir, libraryDbPath } from "./core/paths.js";
 import { PositionWriter } from "./core/positionWriter.js";
 import { registerIpc } from "./ipc/index.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
-import type { LogoId } from "../shared/ipc/schema.js";
+import type {
+  LibraryMergeFailure,
+  LibraryMergeProgress,
+  LogoId,
+} from "../shared/ipc/schema.js";
 
 // Set up logging before anything else so early failures land in the log file.
 setupLogger();
@@ -544,11 +554,111 @@ async function installReactDevTools(): Promise<void> {
   }
 }
 
+/**
+ * The first launch after the upgrade: merge every workspace's own metadata
+ * into the shared library while the window shows how far it has got
+ * (library:merge, LibraryMergeModal). Waits for the window to load first, so
+ * the progress is on screen before the work starts. Scans start after it.
+ */
+async function mergeWorkspacesIntoLibrary(): Promise<void> {
+  if (!ws.mergeProgress()) return;
+  const contents = mainWindow?.webContents;
+  if (contents?.isLoading()) {
+    await new Promise<void>((resolve) => {
+      contents.once("did-finish-load", () => resolve());
+      contents.once("did-fail-load", () => resolve());
+    });
+  }
+  await runLibraryMerge((onProgress) => ws.mergePending(onProgress));
+}
+
+/** When the library copy put back at startup was taken (libraryBackup.ts). */
+let libraryRestoredFrom: number | null = null;
+
+/**
+ * The "Try again" of the merge failure notice (library_merge_retry). Each
+ * workspace is closed and opened again to merge, so, as for its removal,
+ * nothing may be writing into it meanwhile: its scan and passes are stopped
+ * and waited for, and the query worker's read-only handle on it is closed.
+ * Scanning resumes after.
+ */
+async function retryLibraryMerge(): Promise<void> {
+  // Pending again from here (Workspaces.beginRetry): the window shows the
+  // merge while the scans stop, and nothing else reopens these workspaces.
+  const ids = ws.beginRetry();
+  if (!ids) return;
+  const hold = async ([id, ...rest]: string[]): Promise<void> => {
+    if (id === undefined) {
+      await runLibraryMerge((onProgress) => ws.retryMerge(onProgress));
+      return;
+    }
+    const scanStopped = scans.abort(id);
+    await passes.holding(id, async () => {
+      await scanStopped;
+      await queryClient.closeWorkspace(id);
+      await hold(rest);
+    });
+  };
+  try {
+    await hold(ids);
+  } catch (e) {
+    // The merge did not run, or stopped: the failures stand, and the window
+    // is told so rather than left on the modal.
+    log.error("could not try the library merge again:", e);
+    ws.cancelRetry();
+    emit("library:merge", { state: "done", failed: ws.mergeFailures() });
+  } finally {
+    // At startup nothing has been read before the merge; here the query
+    // worker may hold results from before these workspaces merged.
+    await queryClient.invalidateCaches();
+    // Every scan the hold stopped, in "All" as in a single workspace.
+    if (!isQuitting()) scans.start();
+  }
+}
+
+/** Run a merge, telling the window how far it has got and how it ended. */
+async function runLibraryMerge(
+  run: (
+    onProgress: (progress: LibraryMergeProgress) => void,
+  ) => Promise<LibraryMergeFailure[] | null>,
+): Promise<void> {
+  let total = 0;
+  const failed = await run((progress) => {
+    total = progress.total;
+    emit("library:merge", { state: "running", ...progress });
+  });
+  if (failed === null || isQuitting()) return;
+  // The workspaces that merged have dropped their own tables: the library is
+  // the one copy of their metadata, so it is copied now rather than at the
+  // next launch, and only then do their own copies go. Nothing merged
+  // (every one failed, a full disk) leaves the library as it was: no copy.
+  if (failed.length < total) {
+    ws.dropCoveredBackups(
+      backupLibraryNow(libraryDbPath(), libraryBackupDir()),
+    );
+  }
+  if (failed.length > 0) {
+    log.warn(
+      `metadata of ${failed.length} workspace(s) could not be merged: ${failed.map((f) => f.reason).join(", ")}`,
+    );
+  }
+  // The window may have read app_status mid-merge and still be subscribing:
+  // app_status reports the outcome too (libraryMergeFailed), so the modal
+  // closes even when this event goes unheard.
+  emit("library:merge", { state: "done", failed });
+}
+
 void app.whenReady().then(async () => {
   // Completely remove the native app menu (File/Edit/View…).
   Menu.setApplicationMenu(null);
 
+  // Before any workspace opens the library: put a copy back if it is damaged,
+  // and keep the copies current otherwise.
+  libraryRestoredFrom = maintainLibrary(libraryDbPath(), libraryBackupDir());
   ws.bootstrap(resolveCliRoot());
+  // Workspaces that merged outside the startup merge (a tag rename reaching
+  // every workspace, a removal) kept their own copies until now.
+  ws.dropCoveredBackups(newestBackupTime(libraryBackupDir()));
 
   // The media server resolves the DB by workspace ID to serve (independent of the active one).
   ({ port: mediaPort, server: mediaServer } = await startServer(
@@ -579,6 +689,8 @@ void app.whenReady().then(async () => {
     applyLogo,
     deriveAutoTags: autoTagWorker.derive,
     passes,
+    retryLibraryMerge,
+    libraryRestoredFrom: () => libraryRestoredFrom,
   });
   createTray();
   // Dock icon override on macOS (BrowserWindow icons are ignored there).
@@ -594,10 +706,12 @@ void app.whenReady().then(async () => {
       mainWindow?.webContents.openDevTools({ mode: "right" });
     });
   }
+  app.on("activate", () => showWindow());
+  await mergeWorkspacesIntoLibrary();
+  // Quit while merging: the teardown has run, so nothing more starts.
+  if (isQuitting()) return;
   scans.start();
   scheduleStartupUpdateCheck();
-
-  app.on("activate", () => showWindow());
 });
 
 // Async teardown before quit: leave no live better-sqlite3 handle behind

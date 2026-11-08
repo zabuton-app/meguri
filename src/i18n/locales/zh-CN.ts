@@ -88,6 +88,22 @@ export const zhCN: Record<TranslationKey, string> = {
   "update.checking": "正在检查…",
   "update.checkFailed": "无法检查（可能处于离线状态）。",
   "update.upToDate": "已是最新版本（{version}）。",
+  "libraryMerge.title": "正在迁移资料库",
+  "libraryMerge.description":
+    "正在将收藏、评分、标签、书签和播放历史迁移到所有工作区共享的资料库中，请等待完成。",
+  "libraryMerge.progress": "{done} / {total} 个工作区",
+  "libraryMerge.failed": "部分工作区未能迁移",
+  "libraryMerge.failedDesc":
+    "{list}\n这些工作区仍可照常使用，下次启动时会再次尝试迁移。",
+  "libraryMerge.failedItem": "{name}：{reason}",
+  "libraryMerge.reason.diskFull": "磁盘空间不足。请腾出空间后重试。",
+  "libraryMerge.reason.backup": "无法写入其备份副本。",
+  "libraryMerge.reason.merge": "迁移因错误中断（未做任何更改）。",
+  "libraryMerge.reason.open": "无法打开其数据库。",
+  "libraryMerge.retry": "重试",
+  "library.restored": "资料库已损坏，已从 {date} 的副本恢复",
+  "library.restoredDesc":
+    "此后对收藏、评分、标签等所做的更改已丢失。损坏的文件保留在资料库所在的文件夹中。",
   "settings.about": "关于",
   "about.version": "{name} 版本 {version}",
   "about.appLicense": "{name} 基于 MIT License 发布。",

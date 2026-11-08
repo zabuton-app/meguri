@@ -15,6 +15,7 @@ import {
   META_KEYED_TABLES,
   nowUnix,
   rebuildFtsAll,
+  errorCode,
   resyncFtsForKeys,
   usesOwnMetadata,
   type DB,
@@ -23,12 +24,26 @@ import { scopedLog } from "./logger.js";
 import { BOOKMARK_NEAR_EPS } from "./queries/bookmarks.js";
 import { FILE_META_MERGE_SET } from "./queries/meta.js";
 import { getSetting, setSetting } from "./queries/settings.js";
+import type { LibraryMergeFailureReason } from "../../shared/ipc/schema.js";
 
 const log = scopedLog("library");
 
 /** A workspace's own metadata tables, in drop order: tags last, after the
  *  meta_tags rows that reference it. */
 const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
+
+export interface MergeOutcome {
+  /** The merge ran to the end, which changes tags the others may index. */
+  merged: boolean;
+  /** Set when the workspace still holds its own tables. */
+  failure?: LibraryMergeFailureReason;
+}
+
+/** A full disk, as SQLite and the file system report it. */
+function isDiskFull(e: unknown): boolean {
+  const code = errorCode(e);
+  return code === "SQLITE_FULL" || code === "ENOSPC";
+}
 
 /**
  * Merge this workspace's own metadata into the library and drop its tables.
@@ -45,6 +60,9 @@ const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
  *    app recreated and wrote to after the merge.
  * 3. Drop the own tables and rebuild files_fts from the library's tags, in one
  *    transaction, recording the index as current (FTS_TAG_SEQ_KEY).
+ * 4. Keep the copy: once the move is complete, the library is the one place
+ *    its metadata lives, so the copy goes only when a copy of the library
+ *    taken afterwards holds it (Workspaces.dropCoveredBackups).
  *
  * The two transactions write different files, so a crash can fall between
  * them; the record makes the next open skip the backup. The merge rules leave
@@ -53,14 +71,15 @@ const OWN_METADATA_TABLES = [...META_KEYED_TABLES, "tags"] as const;
  * A failure in either transaction is logged and leaves the workspace on its
  * own tables, as a failed backup does; the next open tries again.
  *
- * Returns whether the merge ran to the end, which changes tags the other
- * workspaces may index.
+ * Returns a MergeOutcome: `merged` when the merge ran to the end (which
+ * changes tags the other workspaces may index), `failure` with the reason when
+ * the workspace is still on its own tables.
  */
 export function migrateWorkspaceMetadata(
   db: DB,
   workspaceId: string,
   backupPath: string,
-): boolean {
+): MergeOutcome {
   if (!usesOwnMetadata(db)) {
     // Created after the library, or merged before: on the library already.
     // Recorded so a write to every workspace knows it need not be opened to
@@ -68,7 +87,7 @@ export function migrateWorkspaceMetadata(
     db.prepare(
       "INSERT OR IGNORE INTO lib.migrated_workspaces (workspace_id, migrated_at) VALUES (?, ?)",
     ).run(workspaceId, nowUnix());
-    return false;
+    return { merged: false };
   }
 
   const recorded =
@@ -76,7 +95,15 @@ export function migrateWorkspaceMetadata(
       .prepare("SELECT 1 FROM lib.migrated_workspaces WHERE workspace_id = ?")
       .get(workspaceId) !== undefined;
   try {
-    if (!recorded && !writeBackup(db, backupPath)) return false;
+    if (!recorded) {
+      const error = writeBackup(db, backupPath);
+      if (error !== null) {
+        return {
+          merged: false,
+          failure: isDiskFull(error) ? "diskFull" : "backup",
+        };
+      }
+    }
     // Library side and workspace side in transactions of their own: in WAL
     // mode a transaction over attached databases is not atomic across the
     // files, so one that wrote both could leave the drop committed and the
@@ -103,28 +130,64 @@ export function migrateWorkspaceMetadata(
       `could not merge the metadata of workspace ${workspaceId}; keeping its own tables for now:`,
       e,
     );
-    return false;
+    return { merged: false, failure: isDiskFull(e) ? "diskFull" : "merge" };
   }
   log.info(`merged the metadata of workspace ${workspaceId} into the library`);
-  return true;
+  // The copy stays until a copy of the library holds what it guards
+  // (Workspaces.dropCoveredBackups).
+  return { merged: true };
+}
+
+/** Delete a partial copy writeBackup left. A failure is logged: the copy
+ *  only costs disk space. */
+function removeBackup(backupPath: string): void {
+  try {
+    fs.rmSync(backupPath, { force: true });
+  } catch (e) {
+    log.warn(`could not delete the backup ${backupPath}:`, e);
+  }
 }
 
 /**
- * Copy the workspace database to `backupPath`. A copy left by an attempt that
+ * The workspace ids `migrated_workspaces` records. `db` is a library opened on
+ * its own (openLibraryReadonly), or `lib` when `schema` says so. Empty when
+ * the table cannot be read: then every workspace is opened to find out.
+ */
+export function recordedWorkspaceIds(
+  db: DB,
+  schema: "main" | "lib" = "main",
+): Set<string> {
+  try {
+    return new Set(
+      db
+        .prepare(`SELECT workspace_id FROM ${schema}.migrated_workspaces`)
+        .pluck()
+        .all() as string[],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Copy the workspace database to `backupPath`, returning the error when it
+ * cannot (null when it could). A copy left by an attempt that
  * stopped before the merge was recorded is replaced: the merge had not
  * happened, so the database is still in the state it describes.
  */
-function writeBackup(db: DB, backupPath: string): boolean {
+function writeBackup(db: DB, backupPath: string): unknown {
   try {
     fs.rmSync(backupPath, { force: true });
     db.prepare("VACUUM main INTO ?").run(backupPath);
-    return true;
+    return null;
   } catch (e) {
     log.warn(
       `could not back up ${backupPath}; keeping this workspace's own metadata for now:`,
       e,
     );
-    return false;
+    // A partial copy only takes the space the merge needs.
+    removeBackup(backupPath);
+    return e;
   }
 }
 
@@ -242,7 +305,8 @@ const RESYNC_SHARE_LIMIT = 0.3;
  * - Otherwise: re-sync only the keys logged since.
  *
  * A library replaced with one that has handed out as many seqs or more is not
- * detected; the app never does that itself.
+ * detected: the copy libraryBackup.ts puts back has its sequence moved far
+ * ahead, so it is never the case there.
  *
  * A workspace still on its own metadata tables (its merge has not run) indexes
  * those and is left alone.

@@ -558,6 +558,41 @@ export function openDbReadonly(file: string, libraryFile: string): DB {
   return db;
 }
 
+/**
+ * The shared library on its own, read-only: what the app reads before any
+ * workspace is open (which workspaces it has a record of, whether it is
+ * sound). Throws when it cannot be opened.
+ */
+export function openLibraryReadonlyOrThrow(libraryFile: string): DB {
+  const db = new Database(libraryFile, { readonly: true, fileMustExist: true });
+  db.pragma("busy_timeout = 5000");
+  return db;
+}
+
+/** The shared library on its own, writable: for repairing a copy before it
+ *  is put back (libraryBackup.ts). Throws when it cannot be opened. */
+export function openLibraryForRepair(libraryFile: string): DB {
+  const db = new Database(libraryFile, { fileMustExist: true });
+  db.pragma("busy_timeout = 5000");
+  return db;
+}
+
+/** openLibraryReadonlyOrThrow, or null when the file does not exist yet or
+ *  cannot be opened. */
+export function openLibraryReadonly(libraryFile: string): DB | null {
+  try {
+    return openLibraryReadonlyOrThrow(libraryFile);
+  } catch {
+    return null;
+  }
+}
+
+/** The `code` an error from SQLite or the file system carries, if any. */
+export function errorCode(e: unknown): string | undefined {
+  const code = (e as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : undefined;
+}
+
 export function nowUnix(): number {
   return Math.floor(Date.now() / 1000);
 }

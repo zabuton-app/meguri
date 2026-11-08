@@ -2,7 +2,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { openDb, type DB } from "./db.js";
-import { catchUpTagIndex, migrateWorkspaceMetadata } from "./library.js";
+import {
+  catchUpTagIndex,
+  migrateWorkspaceMetadata,
+  type MergeOutcome,
+} from "./library.js";
 import log from "./logger.js";
 import {
   backupDbPathForDataDir,
@@ -11,6 +15,7 @@ import {
   pathHash,
 } from "./paths.js";
 import { upsertScanRoot } from "./queries.js";
+import type { LibraryMergeFailureReason } from "../../shared/ipc/schema.js";
 
 export class Core {
   readonly db: DB;
@@ -24,6 +29,8 @@ export class Core {
   /** Whether opening this workspace merged its own metadata into the library,
    *  changing tags the other workspaces may index. */
   readonly mergedOnOpen: boolean;
+  /** Why its metadata is still on its own tables, when it is. */
+  readonly mergeFailureReason: LibraryMergeFailureReason | undefined;
 
   private constructor(
     db: DB,
@@ -31,7 +38,7 @@ export class Core {
     rootId: number,
     dataDir: string,
     libraryPath: string,
-    mergedOnOpen: boolean,
+    { merged, failure }: MergeOutcome,
   ) {
     this.db = db;
     this.root = root;
@@ -39,7 +46,8 @@ export class Core {
     this.dataDir = dataDir;
     this.dbPath = dbPathForDataDir(dataDir);
     this.libraryPath = libraryPath;
-    this.mergedOnOpen = mergedOnOpen;
+    this.mergedOnOpen = merged;
+    this.mergeFailureReason = failure;
   }
 
   /** The root as Core.init resolves it: symlinks followed where it exists. */
@@ -66,7 +74,7 @@ export class Core {
     try {
       // The id the data directory is named after, so it means the same database
       // however the root path was spelled when the workspace was added.
-      const merged = migrateWorkspaceMetadata(
+      const outcome = migrateWorkspaceMetadata(
         db,
         pathHash(root),
         backupDbPathForDataDir(dataDir),
@@ -80,7 +88,7 @@ export class Core {
         log.warn("could not bring the tag index up to date on open:", e);
       }
       const rootId = upsertScanRoot(db, root, pathHash(root));
-      return new Core(db, root, rootId, dataDir, libraryPath, merged);
+      return new Core(db, root, rootId, dataDir, libraryPath, outcome);
     } catch (e) {
       // Not left open: the caller retries on the next access, and an open
       // handle keeps Windows from deleting the directory on removal.

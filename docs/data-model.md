@@ -14,10 +14,11 @@ files live in a directory named after the workspace's path hash:
 ```text
 <userData>/
 ├─ library.sqlite      # metadata every workspace shares (WAL mode)
+├─ library-backups/    # dated copies of it (see The shared library)
 └─ roots/<hash>/
    ├─ db.sqlite        # this workspace's database (WAL mode)
    ├─ db.pre-shared-metadata.sqlite
-   │                   # its copy from before the metadata moved
+   │                   # its copy until a library copy holds the move
    └─ thumbs/          # generated thumbnails (WebP)
 ```
 
@@ -176,11 +177,46 @@ open after the upgrade:
 2. Merge its tables into the library and record it in `migrated_workspaces`,
    in one transaction.
 3. Drop its own tables and rebuild `files_fts`, in another.
+4. Keep the copy. Once the move is complete, the library is the only place
+   that metadata lives, so `Workspaces.dropCoveredBackups()` deletes the copy
+   only when a copy of the library taken after it exists.
 
 A workspace recorded already but still holding its own tables — an older
 version recreated them after a downgrade — is merged again before they are
-dropped. A failure in either transaction is logged and leaves the workspace on
-its own tables until the next open.
+dropped. A failure in either transaction is logged and leaves the workspace,
+and its copy, as they were until the next open.
+
+At startup, `Workspaces.bootstrap()` lists the registered workspaces the
+library has no record of, reading `migrated_workspaces` without opening any
+workspace, and leaves them unopened: until they have merged, nothing else
+opens them. Once the window has loaded, `Workspaces.mergePending()` opens them
+one at a time, so each one merges. The
+window shows a modal with how many are done (`app_status.libraryMerge` and
+the `library:merge` event, `LibraryMergeModal`). When it closes, a notice
+names any workspace that could not be merged and why, with a "Try again"
+button. Trying again (`Workspaces.beginRetry()`, then `retryMerge()`) makes
+those workspaces pending again at once, so the modal comes back while their
+scans and passes stop, then merges them the same way. Scans start after it.
+
+The library is the one copy of every migrated workspace's metadata. Before
+any workspace opens it, `maintainLibrary()` (`electron/core/libraryBackup.ts`)
+runs `PRAGMA quick_check` on it:
+
+- A sound library gets a copy in `library-backups/` when the newest copy is a
+  day old or more. The five newest copies are kept.
+- A damaged library is renamed to `library.damaged-<ms>.sqlite`, and the
+  newest sound copy is put in its place, as it is for a library that has gone
+  while copies of it exist. The window says so, and from when the copy is:
+  anything changed after it is lost. The copy's change log is emptied and its
+  sequence moved far ahead, so every workspace rebuilds its keyword index.
+- A damaged library with no copy, or one that cannot be read, is left as it
+  is.
+
+A copy is also taken right after workspaces merge into the library, since
+their own tables are gone by then, unless none of them merged. The
+workspaces' own copies are deleted after it. A workspace merged some other
+way (a tag rename reaching every workspace, a removal) keeps its copy until a
+later startup finds a library copy newer than it.
 
 Rows for the same `meta_key` are merged so that nothing the user set is lost:
 

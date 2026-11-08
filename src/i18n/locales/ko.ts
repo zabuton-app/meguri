@@ -91,6 +91,25 @@ export const ko: Record<TranslationKey, string> = {
   "update.checking": "확인 중…",
   "update.checkFailed": "확인할 수 없습니다(오프라인일 수 있습니다).",
   "update.upToDate": "최신 버전입니다 ({version}).",
+  "libraryMerge.title": "라이브러리를 옮기는 중",
+  "libraryMerge.description":
+    "즐겨찾기, 평점, 태그, 북마크, 재생 기록을 모든 워크스페이스가 함께 쓰는 라이브러리로 옮기고 있습니다. 끝날 때까지 기다려 주세요.",
+  "libraryMerge.progress": "{done} / {total} 워크스페이스",
+  "libraryMerge.failed": "일부 워크스페이스를 옮기지 못했습니다",
+  "libraryMerge.failedDesc":
+    "{list}\n해당 워크스페이스는 이전처럼 사용할 수 있습니다. 다음 실행 때 다시 시도합니다.",
+  "libraryMerge.failedItem": "{name}: {reason}",
+  "libraryMerge.reason.diskFull":
+    "디스크 공간이 부족합니다. 공간을 확보한 뒤 다시 시도해 주세요.",
+  "libraryMerge.reason.backup": "백업 사본을 쓰지 못했습니다.",
+  "libraryMerge.reason.merge":
+    "오류로 옮기기가 중단되었습니다(변경된 내용은 없습니다).",
+  "libraryMerge.reason.open": "데이터베이스를 열지 못했습니다.",
+  "libraryMerge.retry": "다시 시도",
+  "library.restored":
+    "라이브러리가 손상되어 {date} 시점의 사본으로 복원했습니다",
+  "library.restoredDesc":
+    "그 이후에 바꾼 즐겨찾기, 평점, 태그 등은 사라졌습니다. 손상된 파일은 라이브러리와 같은 폴더에 남겨 두었습니다.",
   "settings.about": "정보",
   "about.version": "{name} 버전 {version}",
   "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
