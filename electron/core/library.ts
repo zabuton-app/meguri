@@ -262,10 +262,14 @@ export function catchUpTagIndex(db: DB): void {
       .prepare("SELECT DISTINCT meta_key FROM lib.tag_changes WHERE seq > ?")
       .pluck()
       .all(seen) as string[];
+    // Counted only as far as the decision needs: past keys / limit files,
+    // re-syncing wins whatever the rest is.
     const files = db
-      .prepare("SELECT COUNT(*) FROM files WHERE deleted_at IS NULL")
+      .prepare(
+        "SELECT COUNT(*) FROM (SELECT 1 FROM files WHERE deleted_at IS NULL LIMIT ?)",
+      )
       .pluck()
-      .get() as number;
+      .get(Math.floor(keys.length / RESYNC_SHARE_LIMIT) + 1) as number;
     if (keys.length > files * RESYNC_SHARE_LIMIT) {
       rebuildTagIndex(db);
       return;
@@ -273,6 +277,37 @@ export function catchUpTagIndex(db: DB): void {
     resyncFtsForKeys(db, keys);
     setSetting(db, FTS_TAG_SEQ_KEY, String(latest));
   })();
+}
+
+/**
+ * Re-index the files behind `metaKeys` after a tag write that changed them,
+ * and record the index as current when those keys are all the log holds past
+ * it: the write's own changes, so catchUpTagIndex (syncTagIndexes after every
+ * write) does not apply them a second time, which for a large write would
+ * mean rebuilding the whole index. Caller supplies the transaction, the one
+ * the write ran in.
+ */
+export function resyncTagIndexForKeys(
+  db: DB,
+  metaKeys: readonly string[],
+): void {
+  resyncFtsForKeys(db, [...metaKeys]);
+  if (usesOwnMetadata(db)) return;
+  const seen = tagIndexSeq(db);
+  const latest = latestTagChange(db);
+  if (seen === null || seen >= latest) return;
+  const { oldest } = db
+    .prepare("SELECT MIN(seq) AS oldest FROM lib.tag_changes")
+    .get() as { oldest: number | null };
+  // Rows the index has not applied are gone from the log: only a rebuild knows.
+  if (oldest === null || oldest > seen + 1) return;
+  const other = db
+    .prepare(
+      `SELECT 1 FROM lib.tag_changes WHERE seq > ?
+         AND meta_key NOT IN (SELECT value FROM json_each(?)) LIMIT 1`,
+    )
+    .get(seen, JSON.stringify(metaKeys));
+  if (!other) setSetting(db, FTS_TAG_SEQ_KEY, String(latest));
 }
 
 /**

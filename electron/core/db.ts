@@ -229,8 +229,11 @@ WHEN NOT EXISTS (SELECT 1 FROM tags WHERE id = OLD.tag_id AND namespace <> '')
 BEGIN
   INSERT INTO tag_changes (meta_key) VALUES (OLD.meta_key);
 END;
+-- Only a change of file or tag: an upsert that rewrites the score of a tag
+-- already on the file (addFileTag) changes nothing the index holds.
 CREATE TRIGGER IF NOT EXISTS lib.trg_meta_tags_au AFTER UPDATE ON meta_tags
-WHEN EXISTS (SELECT 1 FROM tags WHERE id IN (OLD.tag_id, NEW.tag_id) AND namespace = '')
+WHEN (OLD.meta_key IS NOT NEW.meta_key OR OLD.tag_id IS NOT NEW.tag_id)
+  AND EXISTS (SELECT 1 FROM tags WHERE id IN (OLD.tag_id, NEW.tag_id) AND namespace = '')
 BEGIN
   INSERT INTO tag_changes (meta_key) VALUES (OLD.meta_key);
   INSERT INTO tag_changes (meta_key) SELECT NEW.meta_key WHERE NEW.meta_key <> OLD.meta_key;

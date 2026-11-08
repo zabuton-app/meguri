@@ -20,7 +20,13 @@ import {
   setRating,
 } from "../queries.js";
 import { deleteTags, renameTag } from "../tagAdmin.js";
-import { addManualTag, removeManualTag, syncFts } from "../tags.js";
+import {
+  addFileTag,
+  addManualTag,
+  bulkEditManualTags,
+  removeManualTag,
+  syncFts,
+} from "../tags.js";
 import {
   LEGACY_METADATA_DDL,
   insertFile,
@@ -455,6 +461,54 @@ describe("the library shared by two workspaces", () => {
     catchUpTagIndex(b.db);
     expect(matches(b, "beach")).toEqual([inB]);
     expect(getSetting(b.db, FTS_TAG_SEQ_KEY)).not.toBeNull();
+  });
+
+  it("leaves the writer's index current after a bulk write, so catching up applies nothing again", () => {
+    const ids = Array.from({ length: 5 }, (_, i) =>
+      insertFile(a.db, a.rootId, {
+        relPath: `f${i}.mp4`,
+        root: a.root,
+        contentHash: `k${i}`,
+      }),
+    );
+    catchUpTagIndex(a.db);
+    // Most of A's files: catching up on these keys would rebuild the index.
+    bulkEditManualTags(a.db, ids.slice(0, 4), ["beach"], []);
+    const latest = a.db
+      .prepare("SELECT MAX(seq) FROM lib.tag_changes")
+      .pluck()
+      .get();
+    expect(getSetting(a.db, FTS_TAG_SEQ_KEY)).toBe(String(latest));
+    expect(matches(a, "beach")).toHaveLength(4);
+  });
+
+  it("does not mark the writer's index current when another change is pending", () => {
+    const { inA, inB } = sameFileInBoth();
+    const own = insertFile(a.db, a.rootId, {
+      relPath: "own.mp4",
+      root: a.root,
+      contentHash: "own",
+    });
+    catchUpTagIndex(a.db);
+    // B changes the shared file while A's index is not looking.
+    addManualTag(b.db, inB, "sea");
+    bulkEditManualTags(a.db, [own], ["beach"], []);
+    expect(Number(getSetting(a.db, FTS_TAG_SEQ_KEY))).toBeLessThan(
+      a.db
+        .prepare("SELECT MAX(seq) FROM lib.tag_changes")
+        .pluck()
+        .get() as number,
+    );
+    catchUpTagIndex(a.db);
+    expect(matches(a, "sea")).toEqual([inA]);
+  });
+
+  it("does not log a tag put again on a file that has it", () => {
+    const { inA } = sameFileInBoth();
+    const tagId = addManualTag(a.db, inA, "beach");
+    const before = loggedChanges();
+    addFileTag(a.db, inA, tagId, "manual", null);
+    expect(loggedChanges()).toBe(before);
   });
 
   it("syncTagIndexes catches every workspace up and trims what all have applied", () => {
