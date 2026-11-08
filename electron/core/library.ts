@@ -50,8 +50,8 @@ function isDiskFull(e: unknown): boolean {
  * Versionless and safe to run on every open (Principle III):
  *
  * 1. No own `file_meta`: nothing to merge (merged before, or created after the
- *    library existed). It is recorded in `lib.migrated_workspaces` if it is not
- *    yet.
+ *    library existed). It is recorded in `lib.migrated_workspaces` as complete
+ *    if it is not yet.
  * 2. Not recorded in `lib.migrated_workspaces`: copy the whole database to
  *    `backupPath` (VACUUM INTO), then merge and record it in one transaction.
  *    If the copy cannot be written, stop here and keep the own tables.
@@ -59,13 +59,16 @@ function isDiskFull(e: unknown): boolean {
  *    (no backup, no new record): they may be the ones an older version of the
  *    app recreated and wrote to after the merge.
  * 3. Drop the own tables and rebuild files_fts from the library's tags, in one
- *    transaction, recording the index as current (FTS_TAG_SEQ_KEY).
+ *    transaction, recording the index as current (FTS_TAG_SEQ_KEY). Then mark
+ *    the record complete.
  * 4. Keep the copy: once the move is complete, the library is the one place
  *    its metadata lives, so the copy goes only when a copy of the library
  *    taken afterwards holds it (Workspaces.dropCoveredBackups).
  *
  * The two transactions write different files, so a crash can fall between
- * them; the record makes the next open skip the backup. The merge rules leave
+ * them; the record makes the next open skip the backup, and, not complete,
+ * keeps the workspace in reach of writes meant for every workspace until the
+ * drop has run. The merge rules leave
  * the library unchanged when the same rows are merged again.
  *
  * A failure in either transaction is logged and leaves the workspace on its
@@ -80,20 +83,21 @@ export function migrateWorkspaceMetadata(
   workspaceId: string,
   backupPath: string,
 ): MergeOutcome {
+  const record = db
+    .prepare(
+      "SELECT complete FROM lib.migrated_workspaces WHERE workspace_id = ?",
+    )
+    .get(workspaceId) as { complete: number } | undefined;
   if (!usesOwnMetadata(db)) {
     // Created after the library, or merged before: on the library already.
-    // Recorded so a write to every workspace knows it need not be opened to
-    // be reached (Workspaces.metadataCores).
-    db.prepare(
-      "INSERT OR IGNORE INTO lib.migrated_workspaces (workspace_id, migrated_at) VALUES (?, ?)",
-    ).run(workspaceId, nowUnix());
+    // Recorded complete so a write to every workspace knows it need not be
+    // opened to be reached (Workspaces.metadataCores). Written only when it
+    // is not yet, so an ordinary open takes no lock on the library.
+    if (record?.complete !== 1) markComplete(db, workspaceId);
     return { merged: false };
   }
 
-  const recorded =
-    db
-      .prepare("SELECT 1 FROM lib.migrated_workspaces WHERE workspace_id = ?")
-      .get(workspaceId) !== undefined;
+  const recorded = record !== undefined;
   try {
     if (!recorded) {
       const error = writeBackup(db, backupPath);
@@ -125,6 +129,9 @@ export function migrateWorkspaceMetadata(
       // workspaces gave the same content.
       rebuildTagIndex(db);
     })();
+    // Only once the drop has committed: complete with the tables still there
+    // would let a write to every workspace skip them.
+    markComplete(db, workspaceId);
   } catch (e) {
     log.warn(
       `could not merge the metadata of workspace ${workspaceId}; keeping its own tables for now:`,
@@ -138,6 +145,23 @@ export function migrateWorkspaceMetadata(
   return { merged: true };
 }
 
+/**
+ * Record the workspace as merged with its own tables gone. A failure is
+ * logged: the record only spares opening it for a write to every workspace,
+ * and the next open writes it again.
+ */
+function markComplete(db: DB, workspaceId: string): void {
+  try {
+    db.prepare(
+      `INSERT INTO lib.migrated_workspaces (workspace_id, migrated_at, complete)
+       VALUES (?, ?, 1)
+       ON CONFLICT (workspace_id) DO UPDATE SET complete = 1`,
+    ).run(workspaceId, nowUnix());
+  } catch (e) {
+    log.warn(`could not record workspace ${workspaceId} as merged:`, e);
+  }
+}
+
 /** Delete a partial copy writeBackup left. A failure is logged: the copy
  *  only costs disk space. */
 function removeBackup(backupPath: string): void {
@@ -149,7 +173,8 @@ function removeBackup(backupPath: string): void {
 }
 
 /**
- * The workspace ids `migrated_workspaces` records. `db` is a library opened on
+ * The workspace ids `migrated_workspaces` records as complete: merged, with
+ * their own tables gone. `db` is a library opened on
  * its own (openLibraryReadonly), or `lib` when `schema` says so. Empty when
  * the table cannot be read: then every workspace is opened to find out.
  */
@@ -160,7 +185,9 @@ export function recordedWorkspaceIds(
   try {
     return new Set(
       db
-        .prepare(`SELECT workspace_id FROM ${schema}.migrated_workspaces`)
+        .prepare(
+          `SELECT workspace_id FROM ${schema}.migrated_workspaces WHERE complete = 1`,
+        )
         .pluck()
         .all() as string[],
     );

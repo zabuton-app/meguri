@@ -251,4 +251,91 @@ describe("merging workspaces into the library at startup", () => {
     expect(next.mergeProgress()).toEqual({ done: 0, total: 1 });
     next.closeAll();
   });
+
+  it("reaches a workspace recorded but still on its own tables for a write to every workspace", async () => {
+    const a = legacyWorkspace();
+    const b = legacyWorkspace();
+    register([a, b]);
+    const first = new Workspaces();
+    first.bootstrap(null);
+    await first.mergePending(() => {});
+    first.closeAll();
+    // a's merge committed, its drop did not: own tables back, not complete.
+    const db = openDb(
+      paths.dbPathForDataDir(paths.dataDirForRoot(Core.resolveRoot(a))),
+      paths.libraryDbPath(),
+    );
+    db.exec(LEGACY_METADATA_DDL);
+    db.prepare(
+      "UPDATE lib.migrated_workspaces SET complete = 0 WHERE workspace_id = ?",
+    ).run(Core.dataIdFor(a));
+    db.close();
+
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    // Not taken as merged: due for the merge again.
+    expect(ws.mergeProgress()).toEqual({ done: 0, total: 1 });
+    const ids = ws.metadataCores().map((c) => c.id);
+    expect(ids).toContain(Workspaces.idFor(a));
+    expect(usesOwnMetadata(ws.byId(Workspaces.idFor(a))!.db)).toBe(false);
+    ws.closeAll();
+  });
+
+  it("reaches the library when every open workspace is still on its own tables", async () => {
+    const a = legacyWorkspace();
+    const b = legacyWorkspace();
+    register([a, b]);
+    // a cannot merge; b can.
+    fs.mkdirSync(path.join(backupOf(a), "taken"), { recursive: true });
+    const first = new Workspaces();
+    first.bootstrap(null);
+    await first.mergePending(() => {});
+    first.closeAll();
+
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    await ws.mergePending(() => {});
+    // Only a, on its own tables, is open; b is on the library, unopened.
+    const cores = ws.metadataCores();
+    expect(cores.some(({ core }) => !usesOwnMetadata(core.db))).toBe(true);
+    expect(cores.some(({ core }) => usesOwnMetadata(core.db))).toBe(true);
+    ws.closeAll();
+  });
+
+  it("keeps the data of a workspace removed before its metadata could be merged", async () => {
+    const a = legacyWorkspace();
+    register([a]);
+    fs.mkdirSync(path.join(backupOf(a), "taken"), { recursive: true });
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    await ws.mergePending(() => {});
+
+    ws.remove(a);
+
+    expect(ws.list().map((w) => w.path)).not.toContain(a);
+    const dataDir = paths.dataDirForRoot(Core.resolveRoot(a));
+    expect(fs.existsSync(paths.dbPathForDataDir(dataDir))).toBe(true);
+    ws.closeAll();
+  });
+
+  it("removes a merged workspace without opening it", async () => {
+    const a = legacyWorkspace();
+    const b = legacyWorkspace();
+    register([a, b]);
+    const first = new Workspaces();
+    first.bootstrap(null);
+    await first.mergePending(() => {});
+    first.closeAll();
+
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    const init = vi.spyOn(Core, "init");
+    ws.remove(b);
+    expect(init).not.toHaveBeenCalled();
+    init.mockRestore();
+    expect(fs.existsSync(paths.dataDirForRoot(Core.resolveRoot(b)))).toBe(
+      false,
+    );
+    ws.closeAll();
+  });
 });

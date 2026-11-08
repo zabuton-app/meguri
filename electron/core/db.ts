@@ -245,13 +245,18 @@ BEGIN
 END;
 
 -- Workspaces whose own metadata tables have been merged into this database
--- (library.ts). Written in the same transaction as the merge. workspace_id is
+-- (library.ts). Written in the same transaction as the merge. complete is set
+-- once the workspace's own tables are gone too, in a later transaction: a
+-- workspace recorded but not complete still has them, and is opened before any
+-- write meant for every workspace, which would otherwise miss them and see
+-- them merged back later (Workspaces.metadataCores). workspace_id is
 -- pathHash of the resolved root, the name of the workspace's data directory —
 -- not Workspaces.idFor, which hashes the path as configured and differs from it
 -- when the root was added through a symlink.
 CREATE TABLE IF NOT EXISTS lib.migrated_workspaces (
   workspace_id TEXT PRIMARY KEY,
-  migrated_at INTEGER NOT NULL
+  migrated_at INTEGER NOT NULL,
+  complete INTEGER NOT NULL DEFAULT 0
 );
 `;
 
@@ -288,6 +293,7 @@ function prepareDb(db: DB, libraryFile: string): void {
   db.pragma("lib.journal_mode = WAL");
   db.pragma("lib.synchronous = NORMAL");
   db.exec(LIB_DDL);
+  backfillLibraryColumns(db);
   db.exec(CORE_DDL);
   // Before backfillColumns: on a DB that pre-dates `btime`, the backfill would add
   // the column and build its two indexes only for the table rebuild here to drop
@@ -298,6 +304,22 @@ function prepareDb(db: DB, libraryFile: string): void {
   migrateFilesTable(db);
   backfillColumns(db);
   migrateFtsToTrigram(db);
+}
+
+/** Columns LIB_DDL gained after a library was first created. */
+function backfillLibraryColumns(db: DB): void {
+  const cols = (
+    db.prepare("PRAGMA lib.table_info(migrated_workspaces)").all() as {
+      name: string;
+    }[]
+  ).map((c) => c.name);
+  if (!cols.includes("complete")) {
+    // Rows from before it are taken as not complete: each workspace is opened
+    // once more, finds its own tables gone, and is marked complete.
+    db.exec(
+      "ALTER TABLE lib.migrated_workspaces ADD COLUMN complete INTEGER NOT NULL DEFAULT 0",
+    );
+  }
 }
 
 function attachLibrary(db: DB, libraryFile: string): void {

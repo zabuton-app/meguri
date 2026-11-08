@@ -24,7 +24,8 @@ files live in a directory named after the workspace's path hash:
 
 Removing a workspace deletes its `roots/<hash>/` directory. The library is
 never deleted, so the metadata of a removed workspace's files stays and comes
-back when the same files are added again.
+back when the same files are added again. A workspace whose metadata could not
+be merged into the library yet keeps its directory instead, metadata and all.
 
 `electron/core/paths.ts` resolves these paths. The top-level
 [README](../README.md#where-data-is-stored) is the canonical description of the
@@ -91,7 +92,8 @@ In the library (`LIB_DDL`):
 - `tag_changes` — the `meta_key`s whose user tags changed (see
   [Full-text search](#full-text-search)).
 - `migrated_workspaces` — the workspaces found on the library: merged into it,
-  or created after it (see [The shared library](#the-shared-library)).
+  or created after it, and whether their own tables are gone yet (`complete`;
+  see [The shared library](#the-shared-library)).
 
 ## Versionless migrations
 
@@ -176,7 +178,9 @@ open after the upgrade:
    again.
 2. Merge its tables into the library and record it in `migrated_workspaces`,
    in one transaction.
-3. Drop its own tables and rebuild `files_fts`, in another.
+3. Drop its own tables and rebuild `files_fts`, in another. Then mark the
+   record `complete`. A workspace recorded but not complete still has its own
+   tables, and is treated as not merged until it is.
 4. Keep the copy. Once the move is complete, the library is the only place
    that metadata lives, so `Workspaces.dropCoveredBackups()` deletes the copy
    only when a copy of the library taken after it exists.
@@ -240,7 +244,9 @@ the play history, apply to every workspace whichever one is in view. They run
 once, on a connection that uses the library, plus once on each workspace still
 on its own tables. A workspace the library has no record of is opened first,
 so its merge runs; `migrated_workspaces` records every workspace found on the
-library, so the others are not opened for it. The history views show only
+library as complete, so the others are not opened for it. When every open
+workspace is still on its own tables, one the library records is opened so the
+write reaches the library too. The history views show only
 events for files alive in the workspaces they list, and the `All` view lists
 an event two workspaces share once.
 

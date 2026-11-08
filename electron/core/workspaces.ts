@@ -88,6 +88,9 @@ export class Workspaces {
    */
   private merge: { pending: string[]; done: number; total: number } | null =
     null;
+  /** Above zero while metadataCores opens workspaces, which catches the
+   *  others' keyword indexes up once at the end rather than after each. */
+  private holdingTagSync = 0;
   /** The workspaces the last mergePending could not merge, and why. */
   private mergeFailed: PendingFailure[] = [];
 
@@ -251,11 +254,19 @@ export class Workspaces {
    * whose DB cannot be opened misses the write, worth a line in the log.
    */
   metadataCores(): { id: string; core: Core }[] {
+    let merged = false;
     const open = (p: string) => {
       // Not left for mergePending: a workspace skipped here would bring the
-      // old names back when it merges.
-      const core = this.coreForPath(p, { merging: true });
-      return core ? { id: Workspaces.idFor(p), core } : null;
+      // old names back when it merges. Its merge may change tags the others
+      // index: they are caught up once, below, rather than after each open.
+      this.holdingTagSync++;
+      try {
+        const core = this.coreForPath(p, { merging: true });
+        if (core?.mergedOnOpen) merged = true;
+        return core ? { id: Workspaces.idFor(p), core } : null;
+      } finally {
+        this.holdingTagSync--;
+      }
     };
     const opened = () =>
       this.config.roots.flatMap((p) => {
@@ -275,11 +286,21 @@ export class Workspaces {
       if (recorded.has(Core.dataIdFor(p))) continue;
       if (!open(p)) missed++;
     }
+    // Every open one still on its own tables: the library itself is reached
+    // through one that uses it, opened among those it records.
+    if (!opened().some(({ core }) => !usesOwnMetadata(core.db))) {
+      for (const p of this.config.roots) {
+        if (this.cores.has(Workspaces.idFor(p))) continue;
+        const o = open(p);
+        if (o && !usesOwnMetadata(o.core.db)) break;
+      }
+    }
     if (missed > 0) {
       log.warn(
         `a write to every workspace missed ${missed} that could not be opened`,
       );
     }
+    if (merged) this.syncTagIndexes();
     const cores = opened();
     const own = cores.filter(({ core }) => usesOwnMetadata(core.db));
     const shared = cores.find(({ core }) => !usesOwnMetadata(core.db));
@@ -386,13 +407,26 @@ export class Workspaces {
    */
   remove(p: string): void {
     const id = Workspaces.idFor(p);
-    // Opened first if it is not, so a workspace whose metadata has not been
-    // merged into the library yet is merged before its database goes: the
-    // removal keeps the metadata, as its confirmation says.
-    const core = this.coreForPath(p, { merging: true }) ?? undefined;
-    if (core && usesOwnMetadata(core.db)) {
+    // The removal keeps the metadata, as its confirmation says. One the
+    // library records complete has it there already, and its database can go
+    // without being opened. Any other is opened first, so its merge runs;
+    // when it cannot run (a full disk, a database that does not open), the
+    // workspace is unregistered but its data directory stays, metadata and
+    // all, and comes back when the folder is added again.
+    const library = this.cores.has(id)
+      ? null
+      : openLibraryReadonly(libraryDbPath());
+    const merged = library
+      ? recordedWorkspaceIds(library).has(Core.dataIdFor(p))
+      : false;
+    library?.close();
+    const core = merged
+      ? (this.cores.get(id) ?? undefined)
+      : (this.coreForPath(p, { merging: true }) ?? undefined);
+    const keepData = !merged && (!core || usesOwnMetadata(core.db));
+    if (keepData) {
       log.warn(
-        `removing workspace ${id} whose metadata could not be merged into the library; it goes with its database`,
+        `removing workspace ${id} whose metadata could not be merged into the library; its data directory is kept`,
       );
     }
     this.cores.delete(id);
@@ -416,8 +450,9 @@ export class Workspaces {
     this.persist();
 
     // Close the DB handle first so the files can be removed (Windows locks open files).
-    const dir = core?.dataDir ?? dataDirForRoot(p);
+    const dir = core?.dataDir ?? dataDirForRoot(Core.resolveRoot(p));
     core?.close();
+    if (keepData) return;
     try {
       fs.rmSync(dir, { recursive: true, force: true });
     } catch (e) {
@@ -986,7 +1021,9 @@ export class Workspaces {
       // have changed tags the other open workspaces index. A running
       // mergePending does that once, after the last one, rather than after
       // each.
-      if (core.mergedOnOpen && !this.merge) this.syncTagIndexes();
+      if (core.mergedOnOpen && !this.merge && this.holdingTagSync === 0) {
+        this.syncTagIndexes();
+      }
       return core;
     } catch (e) {
       const message = String(e);
