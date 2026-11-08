@@ -9,6 +9,7 @@ import { kindLabelKey } from "@/lib/mediaKind";
 import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
 import { resolutionLabel } from "@shared/resolutions";
+import { describeAudioFilters } from "./audioFilters";
 
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
 
@@ -45,7 +46,14 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.tags?.length) next.tags = query.tags.filter(Boolean);
   if (query.tagSource) next.tagSource = query.tagSource;
   if (query.kind) next.kind = query.kind;
-  if (query.resolution) next.resolution = query.resolution;
+  if (query.resolution && query.kind !== "audio")
+    next.resolution = query.resolution;
+  if (query.kind === "audio" && query.audio) {
+    const audio = Object.fromEntries(
+      Object.entries(query.audio).filter(([, value]) => value != null),
+    );
+    if (Object.keys(audio).length) next.audio = audio;
+  }
   if (query.ratingMin != null && query.ratingMin > 0)
     next.ratingMin = query.ratingMin;
   if (query.favorite) next.favorite = true;
@@ -234,7 +242,9 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     parts.push(key ? t(key) : query.kind);
   }
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
-  if (query.resolution)
+  if (query.kind === "audio")
+    parts.push(...describeAudioFilters(t, query.audio).map((d) => d.label));
+  if (query.resolution && query.kind !== "audio")
     parts.push(
       `${t(query.resolution.match === "exact" ? "resolution.exact" : "resolution.atLeast")} ${resolutionLabel(query.resolution.preset)}`,
     );

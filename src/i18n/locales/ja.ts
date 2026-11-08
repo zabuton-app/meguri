@@ -2,6 +2,22 @@
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
   // アプリ名（表示名の漢字1文字。ガイドライン00）
+  "audio.filters": "オーディオの詳細",
+  "audio.any": "指定なし",
+  "audio.sampleRate": "サンプルレート",
+  "audio.bitDepth": "ビット深度",
+  "audio.bits": "{count}ビット",
+  "audio.channels": "チャンネル",
+  "audio.mono": "モノラル",
+  "audio.stereo": "ステレオ",
+  "audio.multichannel": "マルチチャンネル",
+  "audio.channelCount": "{count}チャンネル",
+  "audio.bitRate": "ビットレート",
+  "audio.bitRateMin": "最小ビットレート (kbps)",
+  "audio.durationMin": "最短時間（秒）",
+  "audio.durationMax": "最長時間（秒）",
+  "audio.unknownHint":
+    "値が不明なファイルは、その項目のフィルターに一致しません。",
   "kind.visual": "動画＋画像",
   "resolution.title": "解像度",
   "resolution.any": "すべての解像度",

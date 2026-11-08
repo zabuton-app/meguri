@@ -3,6 +3,21 @@ import type { TranslationKey } from "./ja";
 
 export const zhCN: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.filters": "音频属性",
+  "audio.any": "不限",
+  "audio.sampleRate": "采样率",
+  "audio.bitDepth": "位深",
+  "audio.bits": "{count} 位",
+  "audio.channels": "声道",
+  "audio.mono": "单声道",
+  "audio.stereo": "立体声",
+  "audio.multichannel": "多声道",
+  "audio.channelCount": "{count} 声道",
+  "audio.bitRate": "比特率",
+  "audio.bitRateMin": "最低比特率 (kbps)",
+  "audio.durationMin": "最短时长（秒）",
+  "audio.durationMax": "最长时长（秒）",
+  "audio.unknownHint": "属性值未知的文件不会匹配该属性的筛选条件。",
   "kind.visual": "视频＋图像",
   "resolution.title": "分辨率",
   "resolution.any": "任意分辨率",

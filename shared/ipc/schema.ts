@@ -5,6 +5,7 @@
 // inferred types satisfy the prior hand-written interfaces.
 import { z } from "zod";
 import { RESOLUTION_IDS } from "../resolutions.js";
+import { AUDIO_CODECS } from "../audioMetadata.js";
 import { MAX_TAG_NAME, MAX_TAG_REF_NAME } from "../tags.js";
 import {
   CASE_MODES,
@@ -172,48 +173,68 @@ export const SearchCursorSchema = z.object({
 });
 export type SearchCursor = z.infer<typeof SearchCursorSchema>;
 
-export const SearchQuerySchema = z.object({
-  q: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  tagSource: z.string().optional(),
-  kind: z.string().optional(),
-  ratingMin: z.number().optional(),
-  resolution: z
-    .object({
-      preset: z.enum(RESOLUTION_IDS),
-      match: z.enum(["exact", "atLeast"]),
-    })
-    .optional(),
-  favorite: z.boolean().optional(),
-  /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
-  duplicates: z.boolean().optional(),
-  played: z.boolean().optional(),
-  /** Only files left part-way through (a resume point is stored). */
-  inProgress: z.boolean().optional(),
-  playedVia: z.string().optional(),
-  capturedFrom: z.number().optional(),
-  capturedTo: z.number().optional(),
-  /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
-  btimeFrom: z.number().optional(),
-  btimeTo: z.number().optional(),
-  /** Range of the time the file entered the index (created_at), Unix seconds. */
-  addedFrom: z.number().optional(),
-  addedTo: z.number().optional(),
-  /** Played-at range, Unix seconds: files with a play history row inside it. */
-  playedFrom: z.number().optional(),
-  playedTo: z.number().optional(),
-  sort: z.string().optional(),
-  sortDir: z.enum(["asc", "desc"]).optional(),
-  /** Folder view: only files under this folder (see FolderScopeSchema). */
-  folder: FolderScopeSchema.optional(),
-  fileIds: z.array(z.number()).optional(),
-  // Number = plain offset (legacy / backward paging); object = keyset cursor.
-  cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
-  // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
-  // absurd values at the IPC boundary and double-guards the multi-core cross-
-  // workspace path, where the per-core clamp doesn't bound the merged slice.
-  limit: z.number().int().min(1).max(500).optional(),
-});
+export const SearchQuerySchema = z
+  .object({
+    q: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    tagSource: z.string().optional(),
+    kind: z.string().optional(),
+    ratingMin: z.number().optional(),
+    audio: z
+      .object({
+        sampleRate: z.number().int().positive().optional(),
+        bitDepth: z.number().int().positive().optional(),
+        channels: z.enum(["mono", "stereo", "multichannel"]).optional(),
+        codec: z.enum(AUDIO_CODECS).optional(),
+        bitRateMin: z.number().nonnegative().optional(),
+        durationMin: z.number().nonnegative().optional(),
+        durationMax: z.number().nonnegative().optional(),
+      })
+      .optional(),
+    resolution: z
+      .object({
+        preset: z.enum(RESOLUTION_IDS),
+        match: z.enum(["exact", "atLeast"]),
+      })
+      .optional(),
+    favorite: z.boolean().optional(),
+    /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
+    duplicates: z.boolean().optional(),
+    played: z.boolean().optional(),
+    /** Only files left part-way through (a resume point is stored). */
+    inProgress: z.boolean().optional(),
+    playedVia: z.string().optional(),
+    capturedFrom: z.number().optional(),
+    capturedTo: z.number().optional(),
+    /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
+    btimeFrom: z.number().optional(),
+    btimeTo: z.number().optional(),
+    /** Range of the time the file entered the index (created_at), Unix seconds. */
+    addedFrom: z.number().optional(),
+    addedTo: z.number().optional(),
+    /** Played-at range, Unix seconds: files with a play history row inside it. */
+    playedFrom: z.number().optional(),
+    playedTo: z.number().optional(),
+    sort: z.string().optional(),
+    sortDir: z.enum(["asc", "desc"]).optional(),
+    /** Folder view: only files under this folder (see FolderScopeSchema). */
+    folder: FolderScopeSchema.optional(),
+    fileIds: z.array(z.number()).optional(),
+    // Number = plain offset (legacy / backward paging); object = keyset cursor.
+    cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
+    // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
+    // absurd values at the IPC boundary and double-guards the multi-core cross-
+    // workspace path, where the per-core clamp doesn't bound the merged slice.
+    limit: z.number().int().min(1).max(500).optional(),
+  })
+  .transform((query) => {
+    // A saved search from an older build may contain an audio/resolution pair.
+    if (query.kind === "audio") delete query.resolution;
+    else delete query.audio;
+    if (query.audio && !Object.values(query.audio).some((v) => v != null))
+      delete query.audio;
+    return query;
+  });
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 
 export const HistoryQuerySchema = z.object({

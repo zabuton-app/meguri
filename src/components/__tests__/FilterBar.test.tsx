@@ -89,6 +89,35 @@ describe("collapsed-condition badge", () => {
 });
 
 describe("kind segments", () => {
+  it("replaces resolution with audio properties and clears incompatible filters", () => {
+    const { latest } = setup({
+      kind: "video",
+      resolution: { preset: "qhd", match: "exact" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Audio" }));
+    expect(latest()?.resolution).toBeUndefined();
+    expect(screen.queryByRole("combobox", { name: "Resolution" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Audio properties" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "Video" }));
+    expect(screen.getByRole("combobox", { name: "Resolution" })).toBeTruthy();
+    expect(latest()?.audio).toBeUndefined();
+  });
+
+  it("shows audio conditions as removable chips and clears them when leaving audio", () => {
+    const { latest } = setup({
+      kind: "audio",
+      audio: { sampleRate: 96000, channels: "stereo" },
+    });
+    expect(chips()).toHaveLength(3);
+    const rate = chips().find((chip) => chip.textContent?.includes("96 kHz"));
+    fireEvent.click(within(rate!).getByRole("button"));
+    expect(latest()?.audio).toEqual({ channels: "stereo" });
+    fireEvent.click(screen.getByRole("radio", { name: "Image" }));
+    expect(latest()?.audio).toBeUndefined();
+    expect(chips()).toHaveLength(1);
+  });
   it("exposes exactly one checked radio", () => {
     setup({ kind: "video" });
     const radios = screen.getAllByRole("radio");

@@ -255,7 +255,7 @@ export function appendSearchConditions(
     sql += " AND f.kind = ?";
     args.push(query.kind);
   }
-  if (query.resolution) {
+  if (query.resolution && query.kind !== "audio") {
     const { width, height } = RESOLUTIONS[query.resolution.preset];
     // Match the resolution badges, including portrait and cropped cinema clips.
     // Exact matching checks both dimensions.
@@ -264,6 +264,40 @@ export function appendSearchConditions(
         ? " AND MAX(f.width, f.height) = ? AND MIN(f.width, f.height) = ?"
         : " AND f.width > 0 AND f.height > 0 AND (MAX(f.width, f.height) >= ? OR MIN(f.width, f.height) >= ?)";
     args.push(width, height);
+  }
+  if (query.kind === "audio" && query.audio) {
+    const audio = query.audio;
+    for (const [column, value] of [
+      ["sample_rate", audio.sampleRate],
+      ["bit_depth", audio.bitDepth],
+    ] as const) {
+      if (value != null) {
+        sql += ` AND f.${column} = ?`;
+        args.push(value);
+      }
+    }
+    if (audio.channels) {
+      sql +=
+        audio.channels === "multichannel"
+          ? " AND f.audio_channels > 2"
+          : " AND f.audio_channels = ?";
+      if (audio.channels !== "multichannel")
+        args.push(audio.channels === "mono" ? 1 : 2);
+    }
+    if (audio.codec) {
+      sql += audio.codec === "pcm" ? " AND f.codec GLOB ?" : " AND f.codec = ?";
+      args.push(audio.codec === "pcm" ? "pcm_*" : audio.codec);
+    }
+    for (const [column, operator, value] of [
+      ["audio_bit_rate", ">=", audio.bitRateMin],
+      ["duration", ">=", audio.durationMin],
+      ["duration", "<=", audio.durationMax],
+    ] as const) {
+      if (value != null) {
+        sql += ` AND f.${column} ${operator} ?`;
+        args.push(value);
+      }
+    }
   }
   if (query.fileIds?.length) {
     // Pass the IDs as a single JSON array bound to one placeholder rather than

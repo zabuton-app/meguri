@@ -4,6 +4,7 @@ import type { DB } from "../db.js";
 import { nowUnix } from "../db.js";
 import { metaKeyOf } from "../tags.js";
 import type { ExtractedMeta } from "../media.js";
+import { readAudioMetadata } from "../../../shared/audioMetadata.js";
 import { resumePointOf } from "../../../shared/resume.js";
 
 /**
@@ -207,8 +208,9 @@ export function updateExtractedMeta(
   fileId: number,
   m: ExtractedMeta,
 ): void {
+  const audio = readAudioMetadata(m.raw);
   db.prepare(
-    "UPDATE files SET width = ?, height = ?, duration = ?, codec = ?, fps = ?, captured_at = COALESCE(?, captured_at), meta = COALESCE(?, meta) WHERE id = ?",
+    "UPDATE files SET width = ?, height = ?, duration = ?, codec = ?, fps = ?, captured_at = COALESCE(?, captured_at), meta = COALESCE(?, meta), sample_rate = CASE WHEN ? THEN ? ELSE sample_rate END, bit_depth = CASE WHEN ? THEN ? ELSE bit_depth END, audio_channels = CASE WHEN ? THEN ? ELSE audio_channels END, audio_bit_rate = CASE WHEN ? THEN ? ELSE audio_bit_rate END WHERE id = ?",
   ).run(
     m.width,
     m.height,
@@ -217,6 +219,14 @@ export function updateExtractedMeta(
     m.fps,
     m.capturedAt,
     m.raw == null ? null : JSON.stringify(m.raw),
+    m.raw != null ? 1 : 0,
+    audio.sampleRate,
+    m.raw != null ? 1 : 0,
+    audio.bitDepth,
+    m.raw != null ? 1 : 0,
+    audio.channels,
+    m.raw != null ? 1 : 0,
+    audio.bitRate,
     fileId,
   );
 }

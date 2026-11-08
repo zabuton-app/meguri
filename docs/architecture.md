@@ -373,3 +373,16 @@ The latter follows the resolution badges' edge thresholds, including portrait
 and cropped cinema footage. `kind: "visual"` selects videos and images together.
 Both conditions use `appendSearchConditions()`, so ordinary listings, cross-workspace
 search, graphs and saved searches apply the same SQL conditions.
+
+Audio-only searches replace resolution with `AudioFilters`: sample rate, source
+bit depth, mono/stereo/multichannel, codec, minimum stream bitrate and duration
+bounds in seconds. These persist in `SearchQuery.audio`; switching away from audio
+clears them. The query schema also removes stale audio/resolution combinations
+from older saved bins. Unknown properties never satisfy a filter on that property.
+
+`shared/audioMetadata.ts` reads the first audio stream in the stored ffprobe JSON,
+ignoring cover artwork. Bit depth comes from `bits_per_raw_sample` or
+`bits_per_sample`, never the decoder's `sample_fmt`; lossy audio can have no known
+source bit depth. The same reader feeds the detail badges, scan-time metadata
+writes, and a one-time, batched database backfill for existing audio rows. This
+adds searchable columns without accessing media files or changing ratings/tags.

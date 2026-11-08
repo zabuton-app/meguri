@@ -20,6 +20,7 @@ import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
 import type { SmartCollection } from "@/lib/smartCollections";
 import { ResolutionFilter } from "./ResolutionFilter";
+import { AudioFilters } from "./AudioFilters";
 
 interface Props {
   value: SearchQuery;
@@ -105,13 +106,26 @@ export function FilterBar({
             { value: "visual", label: t("kind.visual") },
             { value: "audio", label: t("kind.audio") },
           ]}
-          onChange={(kind) => patch({ kind })}
+          onChange={(kind) =>
+            patch({
+              kind,
+              resolution: kind === "audio" ? undefined : value.resolution,
+              audio: kind === "audio" ? value.audio : undefined,
+            })
+          }
         />
 
-        <ResolutionFilter
-          value={value.resolution}
-          onChange={(resolution) => patch({ resolution })}
-        />
+        {value.kind === "audio" ? (
+          <AudioFilters
+            value={value.audio}
+            onChange={(audio) => patch({ audio })}
+          />
+        ) : (
+          <ResolutionFilter
+            value={value.resolution}
+            onChange={(resolution) => patch({ resolution })}
+          />
+        )}
 
         <div
           className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2"

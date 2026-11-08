@@ -3,6 +3,22 @@ import type { TranslationKey } from "./ja";
 
 export const es: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.filters": "Propiedades de audio",
+  "audio.any": "Cualquiera",
+  "audio.sampleRate": "Frecuencia de muestreo",
+  "audio.bitDepth": "Profundidad de bits",
+  "audio.bits": "{count} bits",
+  "audio.channels": "Canales",
+  "audio.mono": "Mono",
+  "audio.stereo": "Estéreo",
+  "audio.multichannel": "Multicanal",
+  "audio.channelCount": "{count} canales",
+  "audio.bitRate": "Tasa de bits",
+  "audio.bitRateMin": "Tasa mínima (kbps)",
+  "audio.durationMin": "Duración mínima (segundos)",
+  "audio.durationMax": "Duración máxima (segundos)",
+  "audio.unknownHint":
+    "Los archivos con valores desconocidos no coinciden con un filtro de esa propiedad.",
   "kind.visual": "Vídeo + Imagen",
   "resolution.title": "Resolución",
   "resolution.any": "Cualquier resolución",

@@ -28,6 +28,7 @@ import {
 import { sortLabel } from "@/lib/sortLabel";
 import { resolutionLabel } from "@shared/resolutions";
 import { tagHumanLabel } from "@/lib/tagLabel";
+import { describeAudioFilters } from "./audioFilters";
 
 /** Which surface owns the control that sets a condition. */
 export type ConditionGroup = "primary" | "collapsed";
@@ -143,7 +144,7 @@ export function describeConditions(
       label: kindLabel(t, query.kind),
       group: "primary",
       chip: true,
-      clear: (q) => without(q, "kind"),
+      clear: (q) => without(q, "kind", "audio"),
     });
 
   if (query.ratingMin)
@@ -155,7 +156,23 @@ export function describeConditions(
       clear: (q) => without(q, "ratingMin"),
     });
 
-  if (query.resolution)
+  if (query.kind === "audio") {
+    for (const { key, label } of describeAudioFilters(t, query.audio))
+      out.push({
+        key: `audio.${key}`,
+        label,
+        group: "primary",
+        chip: true,
+        clear: (q) => {
+          const audio = { ...q.audio };
+          delete audio[key];
+          return Object.values(audio).some((v) => v != null)
+            ? { ...q, audio }
+            : without(q, "audio");
+        },
+      });
+  }
+  if (query.resolution && query.kind !== "audio")
     out.push({
       key: "resolution",
       label: `${t(query.resolution.match === "exact" ? "resolution.exact" : "resolution.atLeast")} ${resolutionLabel(query.resolution.preset)}`,

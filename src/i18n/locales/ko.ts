@@ -3,6 +3,22 @@ import type { TranslationKey } from "./ja";
 
 export const ko: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.filters": "오디오 속성",
+  "audio.any": "모두",
+  "audio.sampleRate": "샘플 레이트",
+  "audio.bitDepth": "비트 깊이",
+  "audio.bits": "{count}비트",
+  "audio.channels": "채널",
+  "audio.mono": "모노",
+  "audio.stereo": "스테레오",
+  "audio.multichannel": "멀티채널",
+  "audio.channelCount": "{count}채널",
+  "audio.bitRate": "비트레이트",
+  "audio.bitRateMin": "최소 비트레이트 (kbps)",
+  "audio.durationMin": "최소 길이 (초)",
+  "audio.durationMax": "최대 길이 (초)",
+  "audio.unknownHint":
+    "값을 알 수 없는 파일은 해당 속성의 필터와 일치하지 않습니다.",
   "kind.visual": "동영상 + 이미지",
   "resolution.title": "해상도",
   "resolution.any": "모든 해상도",
