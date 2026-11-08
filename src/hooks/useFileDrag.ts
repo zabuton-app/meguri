@@ -10,7 +10,9 @@ import {
 import { toast } from "sonner";
 import { useReadSelection } from "@/components/SelectionContext";
 import { useI18n } from "@/i18n/I18nProvider";
+import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
+import { groupBulkTargets } from "@/lib/bulkEdit";
 import { dragPayload, encodeFileDrag, FILE_DRAG_MIME } from "@/lib/fileDrag";
 import { setFileDragImage } from "@/lib/fileDragImage";
 import { fileNameOf } from "@/lib/relPath";
@@ -29,11 +31,14 @@ export function useFileDrag(
    * and a native drag starting underneath it would fight it.
    */
   enabled: boolean,
-): DragProps {
+): {
+  dragProps: DragProps;
+  onExternalDragStart?: DragProps["onDragStart"];
+} {
   const readSelection = useReadSelection();
   const { t } = useI18n();
   const onDragStart = useCallback(
-    (e: ReactDragEvent<HTMLElement>) => {
+    (e: ReactDragEvent<HTMLElement>, external: boolean) => {
       const files = dragPayload(file, readSelection(), selected);
       if (typeof files === "string") {
         // A partial drop would report success for less than was selected.
@@ -43,6 +48,14 @@ export function useFileDrag(
             ? t("drag.selectionPending")
             : t("select.bulkFileLimit", { max: MAX_BULK_FILES }),
         );
+        return;
+      }
+      if (external) {
+        // Cancel Chromium's drag before Electron starts the OS file drag.
+        e.preventDefault();
+        void api.dragFiles(groupBulkTargets(files)).catch(() => {
+          toast.error(t("drag.externalFailed"));
+        });
         return;
       }
       const dt = e.dataTransfer;
@@ -66,8 +79,17 @@ export function useFileDrag(
     },
     [file, readSelection, selected, t],
   );
-  if (!enabled) return NONE;
-  return { draggable: true, onDragStart };
+  if (!enabled) return { dragProps: NONE };
+  return {
+    dragProps: {
+      draggable: true,
+      onDragStart: (e) => onDragStart(e, false),
+    },
+    onExternalDragStart: (e) => {
+      e.stopPropagation();
+      onDragStart(e, true);
+    },
+  };
 }
 
 /**

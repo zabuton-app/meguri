@@ -31,6 +31,7 @@ import {
   type FolderViewEntry,
 } from "@/hooks/useFolderEntries";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { ExternalFileDragHandle } from "@/components/ExternalFileDragHandle";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
@@ -448,7 +449,7 @@ export const MediaCard = memo(function MediaCard({
   watchLater: WatchLaterMembership;
   /** Set only on the focused card, so the "W" shortcut can drive this toggle. */
   watchLaterRef?: Ref<HTMLButtonElement>;
-  /** Can be dragged onto a collection in the rail (off while reordering). */
+  /** Can be dragged within Meguri or to another app (off while reordering). */
   fileDraggable: boolean;
 }) {
   // The card is split into two click regions so the click target controls
@@ -458,14 +459,18 @@ export const MediaCard = memo(function MediaCard({
   // metadata region opens the detail view without starting playback.
   const { onThumbnailClick } = useActivateFile();
   const { selected, onSelectableClick } = useSelectableClick(file, index);
-  const dragProps = useFileDrag(file, selected, fileDraggable);
+  const { dragProps, onExternalDragStart } = useFileDrag(
+    file,
+    selected,
+    fileDraggable,
+  );
   return (
     <div
       {...dragProps}
       data-testid="media-card"
       aria-current={focused ? "true" : undefined}
       className={cn(
-        "group flex flex-col overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-primary",
+        "group relative flex flex-col overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-primary",
         focused && "border-primary ring-2 ring-primary",
         selected && "border-primary ring-1 ring-primary",
       )}
@@ -513,6 +518,10 @@ export const MediaCard = memo(function MediaCard({
           className="absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
         />
       </Link>
+      <ExternalFileDragHandle
+        onDragStart={onExternalDragStart}
+        className="left-7 top-1"
+      />
       {/* Metadata. Fixed height so the card height doesn't change with tag
           count — and independent of the card width (single-line truncation,
           no wrapping): the grid's row-height estimate measures this block

@@ -639,6 +639,9 @@ export const en: Record<TranslationKey, string> = {
   "drop.alreadyOneInCollection": 'Already in "{name}"',
   "drop.addToCollectionFailed": "Could not add to the collection",
   "drag.fileCount": "{count} files",
+  "drag.external": "Drag to another app",
+  "drag.externalFailed":
+    "Could not start dragging. Check that the files are still available.",
   "drag.selectionPending":
     "The selected folders are still loading. Drag again in a moment.",
 

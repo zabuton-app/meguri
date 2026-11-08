@@ -58,6 +58,7 @@ export const INVOKE_CHANNELS = [
   "frame_export",
   "open_external",
   "open_folder",
+  "drag_files",
   "folder_open_in_file_manager",
   "folder_copy_path",
   "copy_file_path",

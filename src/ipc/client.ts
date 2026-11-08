@@ -194,6 +194,8 @@ export const api = {
     invoke("open_external", { id, workspaceId }),
   openFolder: (id: number, workspaceId: string) =>
     invoke("open_folder", { id, workspaceId }),
+  dragFiles: (targets: ChannelInput<"drag_files">) =>
+    invoke("drag_files", targets),
   /** Open a folder of the folder view in the OS file manager. */
   folderOpenInFileManager: (workspaceId: string, path: string) =>
     invoke("folder_open_in_file_manager", { workspaceId, path }),

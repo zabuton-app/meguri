@@ -27,6 +27,7 @@ import type { FileRow, FolderEntry } from "@/ipc/types";
 import { FolderRow } from "@/components/FolderRow";
 import { useFolderEntries } from "@/hooks/useFolderEntries";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { ExternalFileDragHandle } from "@/components/ExternalFileDragHandle";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import {
   useWatchLater,
@@ -341,7 +342,7 @@ const MediaRow = memo(function MediaRow({
   watchLater: WatchLaterMembership;
   /** Set only on the focused row, so the "W" shortcut can drive this toggle. */
   watchLaterRef?: Ref<HTMLButtonElement>;
-  /** Can be dragged onto a collection in the rail (off while reordering). */
+  /** Can be dragged within Meguri or to another app (off while reordering). */
   fileDraggable: boolean;
 }) {
   // The row has two click regions so the click target controls whether the
@@ -356,7 +357,11 @@ const MediaRow = memo(function MediaRow({
   const { t } = useI18n();
   const { onThumbnailClick } = useActivateFile();
   const { selected, onSelectableClick } = useSelectableClick(file, index);
-  const dragProps = useFileDrag(file, selected, fileDraggable);
+  const { dragProps, onExternalDragStart } = useFileDrag(
+    file,
+    selected,
+    fileDraggable,
+  );
   const dir = dirOf(file.relPath);
   const dims =
     file.width && file.height ? `${file.width}×${file.height}` : null;
@@ -405,6 +410,10 @@ const MediaRow = memo(function MediaRow({
           file={file}
           index={index}
           className="absolute left-1.5 top-1.5 z-10"
+        />
+        <ExternalFileDragHandle
+          onDragStart={onExternalDragStart}
+          className="left-8 top-1.5"
         />
       </div>
 

@@ -658,6 +658,9 @@ export const es: Record<TranslationKey, string> = {
   "drop.alreadyOneInCollection": "Ya está en «{name}»",
   "drop.addToCollectionFailed": "No se pudo añadir a la colección",
   "drag.fileCount": "{count} archivos",
+  "drag.external": "Arrastrar a otra aplicación",
+  "drag.externalFailed":
+    "No se pudo iniciar el arrastre. Comprueba que los archivos sigan disponibles.",
   "drag.selectionPending":
     "Las carpetas seleccionadas aún se están cargando. Vuelve a arrastrar en un momento.",
 
