@@ -35,18 +35,39 @@ import { useI18n, type Lang } from "@/i18n/I18nProvider";
 // emoji-augmented UI stack that emoji-fonts.css sets on the host element
 // (custom properties inherit across the shadow boundary).
 const SHADOW_STYLE_ID = "meguri-emoji-style";
-const SHADOW_FONT_CSS = `.emoji-mart-emoji span {
+// The grid's scrollbar is drawn by emoji-mart in its own palette, out of reach
+// of the document-level ::-webkit-scrollbar rules in styles.css. Restyle its
+// thumb to match ScrollArea's (the theme's --c-* variables also inherit across
+// the shadow boundary). The bar keeps emoji-mart's width: the picker reserves
+// --sidebar-width for it when sizing the grid, so the wider transparent border
+// narrows the visible thumb instead. emoji-mart sets the hover colour with
+// !important, hence the !important here.
+const SHADOW_CSS = `.emoji-mart-emoji span {
   font-family: var(--font-family) !important;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+::-webkit-scrollbar-thumb {
+  min-height: 24px !important;
+  border: 5px solid transparent !important;
+  border-radius: 9999px !important;
+  background-color: var(--c-overlay) !important;
+  background-clip: padding-box !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--c-muted) !important;
 }`;
 
-/** Inject the font override into the picker's shadow root (idempotent). */
+/** Inject the font and scrollbar overrides into the picker's shadow root (idempotent). */
 function injectShadowFont(host: Element): boolean {
   const root = host.shadowRoot;
   if (!root) return false;
   if (!root.getElementById(SHADOW_STYLE_ID)) {
     const style = document.createElement("style");
     style.id = SHADOW_STYLE_ID;
-    style.textContent = SHADOW_FONT_CSS;
+    style.textContent = SHADOW_CSS;
     root.appendChild(style);
   }
   return true;
