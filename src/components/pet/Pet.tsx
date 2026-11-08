@@ -53,6 +53,8 @@ import { parseQueueKey, queueKey } from "@/lib/playbackQueue";
 import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import { LIST_MAIN_ID } from "@/routes/Home/utils";
 import { peekPass } from "@/routes/Player/detour";
+import { TourBubble } from "@/tour/TourBubble";
+import { useTour } from "@/tour/TourProvider";
 import { BUBBLE_REACH, PetBubble } from "./PetBubble";
 import { PetSprite } from "./PetSprite";
 import { bringSomething, type BringCategory } from "./petBring";
@@ -182,6 +184,10 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [parkedKey, setParkedKey] = useState<string | null>(null);
   const [bubble, setBubble] = useState<Bubble | null>(null);
+  // During a tour the pet is the one explaining: it stays put above the
+  // overlay and says each step (TourBubble) instead of its own lines.
+  const tourStep = useTour().step?.index ?? null;
+  const touring = tourStep != null;
 
   const lastTouch = useRef(0);
   const touch = () => {
@@ -355,7 +361,8 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
 
   // Standing around, the pet wanders off after a while — or dozes off once
   // nobody has touched it for long enough.
-  const quiet = active && display === "idle" && !menuOpen && bubble == null;
+  const quiet =
+    active && display === "idle" && !menuOpen && bubble == null && !touring;
   useEffect(() => {
     if (!quiet) return;
     let timer = 0;
@@ -380,6 +387,17 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
     schedule();
     return () => clearTimeout(timer);
   }, [quiet, reducedMotion, width]);
+
+  // Each step of a tour gets a hop, which also wakes it and stops a walk.
+  useEffect(() => {
+    if (tourStep != null) dispatch({ type: "react", reactions: ["hop"] });
+  }, [tourStep]);
+  // A line it was saying when the tour began is dropped, not held back to
+  // come out (and keep it from wandering) once the tour is over.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the tour takes over the bubble
+    if (touring) setBubble(null);
+  }, [touring]);
 
   const walking = active && display === "walk";
   useEffect(() => {
@@ -684,13 +702,18 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
       ref={rootRef}
       data-pet=""
       inert={!foreground}
-      className="fixed left-0 top-0 z-20 will-change-transform"
+      // Above driver.js's overlay (z-index 10000) while a tour runs.
+      className={`fixed left-0 top-0 will-change-transform ${touring ? "z-[10001]" : "z-20"}`}
       style={{ width, height }}
     >
       <ContextMenu onOpenChange={onMenuOpenChange}>
         <ContextMenuTrigger asChild>
           <button
             type="button"
+            // The tour's target is the character, not this root: driver.js
+            // makes its target and everything in it unclickable, and the
+            // tour's bubble is drawn in here too.
+            data-tour="pet"
             aria-label={t("pet.label")}
             title={t("pet.hint")}
             // No ring around the character: keyboard focus is marked by the
@@ -774,7 +797,9 @@ function VisiblePet({ active: foreground, hasPool, onDiscover }: PetProps) {
           className="pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-primary"
         />
       )}
-      {bubble && (
+      {/* With the pet put away, TourProvider draws the bubble instead. */}
+      {touring && <TourBubble placement="pet" />}
+      {bubble && !touring && (
         <PetBubble
           key={bubble.id}
           paused={!active}

@@ -170,7 +170,10 @@ export function HomeHeader({
         >
           <Sparkles className="size-4" />
         </Link>
-        <div className="flex items-center rounded-md border border-border">
+        <div
+          data-tour="view-mode"
+          className="flex items-center rounded-md border border-border"
+        >
           {(
             [
               {

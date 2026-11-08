@@ -332,3 +332,11 @@ textarea,
     display: none;
   }
 }
+
+/* driver.js turns pointer events off for everything while a tour runs (only its
+   own popover, which we do not use, is exempt). The tour's bubble is ours, so
+   give it its clicks back. */
+.driver-active [data-tour-bubble],
+.driver-active [data-tour-bubble] * {
+  pointer-events: auto;
+}

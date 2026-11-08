@@ -75,7 +75,10 @@ export function FilterBar({
           line and the fixed-width controls squeeze the input down to nothing.
           min-w-0 stays so it can still shrink below the basis when one row is
           all we get. */}
-        <div className="flex min-w-0 grow basis-48 items-center">
+        <div
+          data-tour="search"
+          className="flex min-w-0 grow basis-48 items-center"
+        >
           <SearchTokenInput
             id="list-search-input"
             value={value.q ?? ""}

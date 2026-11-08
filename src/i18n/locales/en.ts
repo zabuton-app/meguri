@@ -983,4 +983,44 @@ export const en: Record<TranslationKey, string> = {
   "settings.petSizeSmall": "Small (×2)",
   "settings.petSizeMedium": "Medium (×3)",
   "settings.petSizeLarge": "Large (×4)",
+
+  // Guided tours
+  "tour.languageTitle": "Choose your language",
+  "tour.languageBody":
+    "Pick the language to use. The rest of this tour follows it, and you can change it later in Settings.",
+  "tour.welcomeTitle": "Welcome to Meguri",
+  "tour.welcomeBody": "Let me show you around. Press Esc to skip at any time.",
+  "tour.addWorkspaceTitle": "Add a folder",
+  "tour.addWorkspaceBody":
+    "Start by adding a folder with your videos and images. I'll scan it and make thumbnails. Add as many as you like.",
+  "tour.collectionsTitle": "Collections",
+  "tour.collectionsBody":
+    "Gather files from any folder into a collection. Drag files here to add them.",
+  "tour.searchTitle": "Search and filter",
+  "tour.searchBody":
+    "Search by file name or tag. Press / in the list to jump here.",
+  "tour.viewTitle": "Switch views",
+  "tour.viewBody": "Show your files as a grid, a list, a timeline or a graph.",
+  "tour.discoverTitle": "Discover",
+  "tour.discoverBody":
+    "Can't decide what to watch? Discover picks something at random. The button above plays the whole list.",
+  "tour.petTitle": "Your pet",
+  "tour.petBody":
+    "Right-click me for a menu. Drop files on me and I'll keep them in Watch Later.",
+  "tour.commandTitle": "Command menu",
+  "tour.commandBody":
+    "Press Ctrl+K to run any action by name. Press ? to see every shortcut.",
+  "tour.settingsTitle": "Settings",
+  "tour.settingsBody":
+    "Change the theme, the language and more here. You can replay this tour from the App tab.",
+  "tour.doneTitle": "You're all set",
+  "tour.doneBody": "That's the tour. Enjoy!",
+  "tour.progress": "{current} / {total}",
+  "tour.skip": "Skip",
+  "tour.prev": "Back",
+  "tour.next": "Next",
+  "tour.done": "Done",
+  "settings.tour": "Tutorial",
+  "settings.tourDesc": "Show the first-launch tour again",
+  "settings.tourReplay": "Replay",
 };

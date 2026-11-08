@@ -988,6 +988,47 @@ export const ja = {
   "settings.petSizeSmall": "小（×2）",
   "settings.petSizeMedium": "中（×3）",
   "settings.petSizeLarge": "大（×4）",
+
+  // ガイドツアー
+  "tour.languageTitle": "言語を選んでね",
+  "tour.languageBody":
+    "使う言語を選んでね。この案内もこの言語で進むよ。あとから設定でも変えられるよ",
+  "tour.welcomeTitle": "Meguriへようこそ",
+  "tour.welcomeBody": "使い方をざっと案内するね。Escでいつでも飛ばせるよ",
+  "tour.addWorkspaceTitle": "フォルダを追加",
+  "tour.addWorkspaceBody":
+    "まずは動画や画像が入ったフォルダを追加してね。中身を読み込んでサムネイルを作るよ。いくつでも追加できるよ",
+  "tour.collectionsTitle": "コレクション",
+  "tour.collectionsBody":
+    "フォルダをまたいで好きなファイルをまとめられるよ。ファイルをここにドラッグすると追加できるよ",
+  "tour.searchTitle": "検索と絞り込み",
+  "tour.searchBody":
+    "ファイル名やタグで検索できるよ。一覧で / を押すとここに飛べるよ",
+  "tour.viewTitle": "表示の切り替え",
+  "tour.viewBody":
+    "グリッド・リスト・タイムライン・グラフで表示を切り替えられるよ",
+  "tour.discoverTitle": "ディスカバリー",
+  "tour.discoverBody":
+    "何を見るか迷ったら、ここからランダムにおすすめを出すよ。上のボタンは一覧をまとめて再生するよ",
+  "tour.petTitle": "ペット",
+  "tour.petBody":
+    "ぼくを右クリックするとメニューが出るよ。ファイルをぼくにドロップすると「あとで見る」に入れておくね",
+  "tour.commandTitle": "コマンドメニュー",
+  "tour.commandBody":
+    "Ctrl+Kで、どの操作も名前で呼び出せるよ。?キーでショートカットの一覧も見られるよ",
+  "tour.settingsTitle": "設定",
+  "tour.settingsBody":
+    "テーマや言語はここで変えられるよ。この案内も「アプリ」タブからもう一度見られるよ",
+  "tour.doneTitle": "準備完了",
+  "tour.doneBody": "案内はこれでおしまい。楽しんでね！",
+  "tour.progress": "{current} / {total}",
+  "tour.skip": "スキップ",
+  "tour.prev": "戻る",
+  "tour.next": "次へ",
+  "tour.done": "完了",
+  "settings.tour": "チュートリアル",
+  "settings.tourDesc": "初回起動時の使い方案内をもう一度表示します",
+  "settings.tourReplay": "もう一度見る",
 } as const;
 
 export type TranslationKey = keyof typeof ja;

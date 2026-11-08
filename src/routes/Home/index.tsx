@@ -76,6 +76,7 @@ import { useHeatmapFilter } from "./useHeatmapFilter";
 import { setListCounts, type ListCounts } from "@/hooks/useListCounts";
 import { useFolderNavKeys } from "./useFolderNavKeys";
 import { useFolderPlaylist } from "./useFolderPlaylist";
+import { useTour } from "@/tour/TourProvider";
 import { HomeHeader } from "./HomeHeader";
 import { SelectionLayer } from "./SelectionLayer";
 import {
@@ -689,6 +690,14 @@ export default function Home() {
   // fight the player's.)
   const peekDocked = usePeekDocked();
   const listShortcutsActive = location.pathname === "/" || peekDocked;
+
+  // Tours run on the bare list only: no routed modal, overlay or menu on top
+  // (the same condition as the views' keyboard navigation, navActive).
+  const { setHostReady: setTourHostReady } = useTour();
+  useEffect(() => {
+    setTourHostReady(navActive);
+    return () => setTourHostReady(false);
+  }, [navActive, setTourHostReady]);
   useEffect(() => {
     if (!listShortcutsActive) return;
     const onKey = (e: KeyboardEvent) => {
@@ -1146,6 +1155,7 @@ export default function Home() {
 
         <Link
           to={discoverPath(subtreeFilter)}
+          data-tour="discover"
           title={t("discover.title")}
           aria-label={t("discover.title")}
           aria-disabled={!hasPool}
