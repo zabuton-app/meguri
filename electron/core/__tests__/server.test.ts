@@ -118,7 +118,7 @@ beforeAll(async () => {
     ]);
   }
 
-  db = openDb(":memory:");
+  db = openDb(":memory:", ":memory:");
   upsertScanRoot(db, root, "h");
   mediaId = insert("a.mp4", mediaFile, thumbFile, "done");
   thumbId = mediaId;

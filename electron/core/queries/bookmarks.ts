@@ -8,7 +8,7 @@ import type { SceneBookmark } from "../types.js";
 // Treat two bookmarks within this many seconds as the same instant. Used to dedupe
 // "Add bookmark" presses near an existing mark. Mirrors BOOKMARK_NEAR_EPS in
 // src/lib/bookmarks.ts (the UI uses the same value to highlight the active mark) — keep in sync.
-const BOOKMARK_NEAR_EPS = 2;
+export const BOOKMARK_NEAR_EPS = 2;
 
 export function listBookmarksByMetaKey(
   db: DB,

@@ -115,22 +115,37 @@ CREATE INDEX IF NOT EXISTS idx_files_alive_rel_path ON files(rel_path, id) WHERE
 -- direction still filesorts (a reversed scan would put NULLs first).
 CREATE INDEX IF NOT EXISTS idx_files_alive_captured ON files((captured_at IS NULL), captured_at DESC, id) WHERE deleted_at IS NULL;
 
-CREATE TABLE IF NOT EXISTS tags (
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+
+${FTS_DDL};
+`;
+
+/**
+ * The database shared by every workspace (`<userData>/library.sqlite`), attached
+ * to each workspace connection as `lib`: user-curated metadata, keyed by
+ * meta_key. Every name carries `lib.`, because an unqualified CREATE lands in
+ * `main`. Queries elsewhere leave the schema out: SQLite resolves an unqualified
+ * table in `main` first, so a workspace that still holds its own copies (one not
+ * migrated yet, see library.ts) keeps using them, and one that does not reaches
+ * these.
+ */
+const LIB_DDL = `
+CREATE TABLE IF NOT EXISTS lib.tags (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, namespace TEXT NOT NULL DEFAULT '',
   UNIQUE (namespace, name)
 );
 -- Tag-name autocomplete uses a prefix LIKE; LIKE is case-insensitive by
 -- default, so the range-search optimization needs a NOCASE-collated index.
-CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS lib.idx_tags_name ON tags(name COLLATE NOCASE);
 -- Manual-tag autocomplete only offers user-owned tags, so listTagNames filters on
 -- namespace = ''. A partial index over the same expression keeps that prefix range
 -- search covering, which the plain index above cannot do once the predicate is added.
-CREATE INDEX IF NOT EXISTS idx_tags_manual_name ON tags(name COLLATE NOCASE) WHERE namespace = '';
+CREATE INDEX IF NOT EXISTS lib.idx_tags_manual_name ON tags(name COLLATE NOCASE) WHERE namespace = '';
 
 -- Durable, manually-curated metadata keyed by the stable meta_key (not files.id),
--- so it survives rebuilding the files/files_fts tables. Removed only when the whole
--- workspace is deleted (its data directory is wiped).
-CREATE TABLE IF NOT EXISTS file_meta (
+-- so it survives rebuilding the files/files_fts tables, moving a file to another
+-- workspace, and removing a workspace and adding it again.
+CREATE TABLE IF NOT EXISTS lib.file_meta (
   meta_key TEXT PRIMARY KEY,
   rating INTEGER NOT NULL DEFAULT 0 CHECK (rating BETWEEN 0 AND 5),
   favorite INTEGER NOT NULL DEFAULT 0 CHECK (favorite IN (0, 1)),
@@ -145,50 +160,73 @@ CREATE TABLE IF NOT EXISTS file_meta (
   resume_position REAL,
   updated_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_file_meta_favorite ON file_meta(favorite);
-CREATE INDEX IF NOT EXISTS idx_file_meta_accessed ON file_meta(last_accessed_at);
+CREATE INDEX IF NOT EXISTS lib.idx_file_meta_favorite ON file_meta(favorite);
+CREATE INDEX IF NOT EXISTS lib.idx_file_meta_accessed ON file_meta(last_accessed_at);
+-- Drives the "In progress" filter (see appendSearchConditions): only a
+-- handful of files are ever part-way through, so the filter starts from
+-- them rather than scanning every file for a meta row that has one.
+CREATE INDEX IF NOT EXISTS lib.idx_file_meta_resume ON file_meta(meta_key) WHERE resume_position IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS meta_tags (
+CREATE TABLE IF NOT EXISTS lib.meta_tags (
   meta_key TEXT NOT NULL,
   tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
   source TEXT NOT NULL, score REAL,
   PRIMARY KEY (meta_key, tag_id, source)
 );
-CREATE INDEX IF NOT EXISTS idx_meta_tags_tag ON meta_tags(tag_id);
+CREATE INDEX IF NOT EXISTS lib.idx_meta_tags_tag ON meta_tags(tag_id);
 
-CREATE TABLE IF NOT EXISTS play_history (
+CREATE TABLE IF NOT EXISTS lib.play_history (
   id INTEGER PRIMARY KEY, meta_key TEXT NOT NULL,
   played_at INTEGER NOT NULL, position REAL, via TEXT NOT NULL CHECK (via IN ('browser','external'))
 );
-CREATE INDEX IF NOT EXISTS idx_play_history_meta ON play_history(meta_key);
-CREATE INDEX IF NOT EXISTS idx_play_history_played ON play_history(played_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS lib.idx_play_history_meta ON play_history(meta_key);
+CREATE INDEX IF NOT EXISTS lib.idx_play_history_played ON play_history(played_at DESC, id DESC);
 
 -- User-curated scene bookmarks (specific times in a video, distinct from the auto-generated
 -- evenly-spaced scenes shown in the player). Keyed by meta_key like file_meta so bookmarks
 -- survive file moves/renames once a content_hash is established.
 -- No UNIQUE on (meta_key, sec): "no two bookmarks at the same time" is a policy enforced
 -- in addBookmark() with a ±BOOKMARK_NEAR_EPS window, which doesn't map to a column constraint.
-CREATE TABLE IF NOT EXISTS scene_bookmarks (
+CREATE TABLE IF NOT EXISTS lib.scene_bookmarks (
   id INTEGER PRIMARY KEY,
   meta_key TEXT NOT NULL,
   sec REAL NOT NULL CHECK (sec >= 0),
   created_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_scene_bookmarks_meta ON scene_bookmarks(meta_key);
+CREATE INDEX IF NOT EXISTS lib.idx_scene_bookmarks_meta ON scene_bookmarks(meta_key);
 
-CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
-
-${FTS_DDL};
+-- Workspaces whose own metadata tables have been merged into this database
+-- (library.ts). Written in the same transaction as the merge. workspace_id is
+-- pathHash of the resolved root, the name of the workspace's data directory —
+-- not Workspaces.idFor, which hashes the path as configured and differs from it
+-- when the root was added through a symlink.
+CREATE TABLE IF NOT EXISTS lib.migrated_workspaces (
+  workspace_id TEXT PRIMARY KEY,
+  migrated_at INTEGER NOT NULL
+);
 `;
 
-/** Open the DB and apply PRAGMAs. New tables/columns added after release are reconciled
- *  here so existing on-disk DBs gain them without a separate migration step. */
-export function openDb(file: string): DB {
+/** Open a workspace DB with the shared library attached as `lib`, and apply PRAGMAs.
+ *  New tables/columns added after release are reconciled here so existing on-disk
+ *  DBs gain them without a separate migration step. Moving a workspace's own
+ *  metadata into the library is a separate step (migrateWorkspaceMetadata in
+ *  library.ts), since it needs the workspace's id and data directory.
+ *
+ *  `libraryFile` may be ":memory:" (tests): each connection then gets a private,
+ *  empty library. */
+export function openDb(file: string, libraryFile: string): DB {
   const db = new Database(file);
   registerFunctions(db);
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");
   db.pragma("foreign_keys = ON");
+  // Every workspace connection writes the library, and a checkpoint or another
+  // connection's write can hold its lock for a moment: wait instead of failing.
+  db.pragma("busy_timeout = 5000");
+  attachLibrary(db, libraryFile);
+  db.pragma("lib.journal_mode = WAL");
+  db.pragma("lib.synchronous = NORMAL");
+  db.exec(LIB_DDL);
   db.exec(CORE_DDL);
   // Before backfillColumns: on a DB that pre-dates `btime`, the backfill would add
   // the column and build its two indexes only for the table rebuild here to drop
@@ -200,6 +238,32 @@ export function openDb(file: string): DB {
   backfillColumns(db);
   migrateFtsToTrigram(db);
   return db;
+}
+
+function attachLibrary(db: DB, libraryFile: string): void {
+  db.prepare("ATTACH DATABASE ? AS lib").run(libraryFile);
+}
+
+/**
+ * Whether this workspace still holds its own metadata tables, which shadow the
+ * library's for every unqualified name on this connection: true until
+ * migrateWorkspaceMetadata (library.ts) has merged them, and for good when the
+ * backup before that merge cannot be written. An operation meant to reach the
+ * library must not rely on unqualified names over such a connection.
+ */
+export function usesOwnMetadata(db: DB): boolean {
+  return hasMainTable(db, "file_meta");
+}
+
+/** Whether `main` itself holds `table` (an unqualified name may resolve to `lib`). */
+export function hasMainTable(db: DB, table: string): boolean {
+  return (
+    db
+      .prepare(
+        "SELECT 1 FROM main.sqlite_master WHERE type = 'table' AND name = ?",
+      )
+      .get(table) !== undefined
+  );
 }
 
 function hasColumn(db: DB, table: string, column: string): boolean {
@@ -219,18 +283,21 @@ function hasColumn(db: DB, table: string, column: string): boolean {
  *  IF NOT EXISTS leaves existing tables alone, so columns added after first release must
  *  be added explicitly with ALTER. Each step must be safe to run repeatedly. */
 function backfillColumns(db: DB): void {
-  if (!hasColumn(db, "file_meta", "thumb_offset_sec")) {
-    db.exec("ALTER TABLE file_meta ADD COLUMN thumb_offset_sec REAL");
+  // A workspace's own file_meta exists only until its metadata is merged into
+  // the library (whose LIB_DDL already has these columns and the index). Until
+  // then it is what this connection reads, so it still needs them.
+  if (usesOwnMetadata(db)) {
+    if (!hasColumn(db, "file_meta", "thumb_offset_sec")) {
+      db.exec("ALTER TABLE main.file_meta ADD COLUMN thumb_offset_sec REAL");
+    }
+    if (!hasColumn(db, "file_meta", "resume_position")) {
+      db.exec("ALTER TABLE main.file_meta ADD COLUMN resume_position REAL");
+    }
+    // Drives the "In progress" filter (see appendSearchConditions).
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS main.idx_file_meta_resume ON file_meta(meta_key) WHERE resume_position IS NOT NULL",
+    );
   }
-  if (!hasColumn(db, "file_meta", "resume_position")) {
-    db.exec("ALTER TABLE file_meta ADD COLUMN resume_position REAL");
-  }
-  // Drives the "In progress" filter (see appendSearchConditions): only a
-  // handful of files are ever part-way through, so the filter starts from
-  // them rather than scanning every file for a meta row that has one.
-  db.exec(
-    "CREATE INDEX IF NOT EXISTS idx_file_meta_resume ON file_meta(meta_key) WHERE resume_position IS NOT NULL",
-  );
   // Filesystem creation time (birthtime), NULL where the filesystem doesn't
   // provide it. The index lives here (not in CORE_DDL) because on pre-existing
   // DBs the column only exists after this ALTER runs.
@@ -314,12 +381,14 @@ function migrateFilesTable(db: DB): void {
   // The copy plus the index rebuilds write roughly 1.5x the database size into
   // the WAL, and nothing shrinks a WAL file on its own — without this it would
   // sit next to the database at that high-water mark for good.
-  db.pragma("wal_checkpoint(TRUNCATE)");
+  // `main.`: unqualified, it would checkpoint the attached library too and wait
+  // out any reader of it.
+  db.pragma("main.wal_checkpoint(TRUNCATE)");
 }
 
-/** The tables that hold user-curated metadata under a meta_key. migrateMetaKey and
- *  pruneOrphanMeta (queries/meta.ts) list the same tables; keep the three in step. */
-const META_KEYED_TABLES = [
+/** The tables that hold user-curated metadata under a meta_key. migrateMetaKey
+ *  (queries/meta.ts) lists the same tables; keep the two in step. */
+export const META_KEYED_TABLES = [
   "file_meta",
   "meta_tags",
   "play_history",
@@ -329,9 +398,9 @@ const META_KEYED_TABLES = [
 /**
  * Move metadata stored under an old-style no-hash key (`p:<root_id>:<rel_path>`)
  * to the absolute-path key the rebuilt `files` table derives for the same file.
- * Collisions are resolved as in migrateMetaKey: a row that would clash with one
- * already under the new key is dropped. Keys that no file row maps to are left
- * as they are. Reads the files table as it is before the rebuild; the caller
+ * A row that would clash with one already under the new key is dropped: both
+ * describe this workspace's own copies, before any merge into the library.
+ * Keys that no file row maps to are left as they are. Reads the files table as it is before the rebuild; the caller
  * supplies the transaction.
  *
  * Names are qualified with `main.` and missing tables skipped because these
@@ -347,12 +416,7 @@ function rewritePathMetaKeys(db: DB): void {
       FROM main.files WHERE content_hash IS NULL;
   `);
   for (const table of META_KEYED_TABLES) {
-    const exists = db
-      .prepare(
-        "SELECT 1 FROM main.sqlite_master WHERE type = 'table' AND name = ?",
-      )
-      .get(table);
-    if (!exists) continue;
+    if (!hasMainTable(db, table)) continue;
     db.exec(`
       UPDATE OR IGNORE main.${table}
         SET meta_key = (SELECT new_key FROM temp.path_key_map WHERE old_key = meta_key)
@@ -426,13 +490,18 @@ function migrateFtsToTrigram(db: DB): void {
  * Open an existing workspace DB read-only (no DDL, no PRAGMA writes). Used by
  * the query worker: WAL mode allows any number of readers alongside the main
  * process's single writer, and a read-only handle can never take the write
- * lock or mutate schema. Throws if the file does not exist. Schema migrations
- * (backfillColumns / migrateFtsToTrigram) are assumed to have already run via
- * the main process's openDb before any read-only handle is opened.
+ * lock or mutate schema. Throws if either file does not exist. The schema of
+ * both databases (openDb) and the merge of the workspace's own metadata into the
+ * library (migrateWorkspaceMetadata) are assumed to have already run in the main
+ * process before any read-only handle is opened. A handle opened earlier still
+ * reads correctly afterwards: the merge drops the workspace's own tables, and
+ * SQLite re-resolves the unqualified names to `lib` on the next statement.
  */
-export function openDbReadonly(file: string): DB {
+export function openDbReadonly(file: string, libraryFile: string): DB {
   const db = new Database(file, { readonly: true, fileMustExist: true });
   registerFunctions(db);
+  // Opened read-only along with the connection it is attached to.
+  attachLibrary(db, libraryFile);
   // Connection-local (never written to the file): even in WAL mode a reader
   // can hit SQLITE_BUSY around writer checkpoints; retry briefly instead of
   // surfacing an exception to the renderer.

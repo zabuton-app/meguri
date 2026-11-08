@@ -15,12 +15,14 @@ import type { WorkspaceStats } from "../types.js";
 let dir: string;
 let db: DB;
 let dbPath: string;
+let libraryPath: string;
 let client: QueryWorkerClient;
 
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), "meguri-queryclient-"));
   dbPath = path.join(dir, "db.sqlite");
-  db = openDb(dbPath);
+  libraryPath = path.join(dir, "library.sqlite");
+  db = openDb(dbPath, libraryPath);
   const rootId = upsertScanRoot(db, "/fake/root", "deadbeef");
   for (let i = 0; i < 4; i++) insertFile(db, rootId, { relPath: `v${i}.mp4` });
   client = new QueryWorkerClient(path.join(dir, "no-such-worker.js"));
@@ -34,7 +36,7 @@ afterEach(async () => {
 
 const statsReq = () => ({
   kind: "stats" as const,
-  targets: [{ id: "ws1", dbPath }],
+  targets: [{ id: "ws1", dbPath, libraryPath }],
 });
 
 describe("QueryWorkerClient", () => {
@@ -55,7 +57,10 @@ describe("QueryWorkerClient", () => {
     }
     // Now on the fallback path. An invalid request makes the executor throw
     // synchronously; the client must still return a rejected promise.
-    const bad = { kind: "search" as const, targets: [{ id: "ws1", dbPath }] };
+    const bad = {
+      kind: "search" as const,
+      targets: [{ id: "ws1", dbPath, libraryPath }],
+    };
     const p = client.run(bad as never); // missing `query` → sync TypeError
     expect(p).toBeInstanceOf(Promise);
     await expect(p).rejects.toThrow();

@@ -1,7 +1,10 @@
 // Regression tests for the cross-file play-history timeline (history.ts) and its
 // cross-workspace merge (listHistoryWorkspaces).
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { DB } from "../db.js";
+import { openDb, type DB } from "../db.js";
 import type { Core } from "../index.js";
 import {
   clearPlayHistory,
@@ -10,6 +13,7 @@ import {
 } from "../queries.js";
 import { listHistoryWorkspaces, type CoreTarget } from "../crossWorkspace.js";
 import { insertFile, newDb } from "./helpers.js";
+import { upsertScanRoot } from "../queries.js";
 
 /** Insert a play event with an explicit timestamp (recordPlay always uses "now"). */
 function insertPlay(
@@ -196,5 +200,36 @@ describe("listHistoryWorkspaces", () => {
       items: [],
       nextCursor: null,
     });
+  });
+});
+
+describe("listPlayHistory over the shared library", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-history-lib-"));
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it("lists only events for files alive in this workspace", () => {
+    const library = path.join(dir, "library.sqlite");
+    const a = openDb(path.join(dir, "a.sqlite"), library);
+    const b = openDb(path.join(dir, "b.sqlite"), library);
+    try {
+      const ra = upsertScanRoot(a, "/a", "a");
+      const rb = upsertScanRoot(b, "/b", "b");
+      const onlyA = insertFile(a, ra, { relPath: "x.mp4", contentHash: "hx" });
+      const shared = insertFile(a, ra, { relPath: "s.mp4", contentHash: "hs" });
+      insertFile(b, rb, { relPath: "s.mp4", contentHash: "hs" });
+      // Many newer events of A's own file ahead of the shared one.
+      for (let t = 1000; t < 1600; t++) insertPlay(a, onlyA, t);
+      insertPlay(a, shared, 10);
+
+      const page = listPlayHistory(b, {});
+      expect(page.items.map((r) => r.playedAt)).toEqual([10]);
+      expect(listPlayHistory(a, { limit: 1 }).items[0].playedAt).toBe(1599);
+    } finally {
+      a.close();
+      b.close();
+    }
   });
 });

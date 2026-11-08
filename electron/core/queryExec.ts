@@ -32,10 +32,12 @@ import type {
   WorkspaceStats,
 } from "./types.js";
 
-/** One workspace to query: its stable ID plus the on-disk DB file. */
+/** One workspace to query: its stable ID plus the on-disk DB file, and the
+ *  shared library the handle attaches. */
 export interface QueryTarget {
   id: string;
   dbPath: string;
+  libraryPath: string;
 }
 
 export type QueryRequest =
@@ -159,7 +161,7 @@ export class QueryExecutor {
       let db = this.dbs.get(t.id);
       if (!db) {
         try {
-          db = openDbReadonly(t.dbPath);
+          db = openDbReadonly(t.dbPath, t.libraryPath);
         } catch (e) {
           if (!this.warned.has(t.id)) {
             this.warned.add(t.id);

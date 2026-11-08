@@ -35,13 +35,18 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
   const offset = Math.max(0, query.cursor ?? 0);
 
   const viaSql = query.via ? "via = ? AND " : "";
+  // play_history is shared by every workspace: only events for a file alive in
+  // this one, filtered in SQL so the stream does not hand JS every other
+  // workspace's events to drop one lookup at a time.
+  const aliveHere = `EXISTS (SELECT 1 FROM main.files f
+     WHERE f.meta_key = play_history.meta_key AND f.deleted_at IS NULL)`;
   const firstBatch = db.prepare(
     `SELECT id, meta_key, played_at, via, position FROM play_history
-     WHERE ${viaSql}1 ORDER BY played_at DESC, id DESC LIMIT ?`,
+     WHERE ${viaSql}${aliveHere} ORDER BY played_at DESC, id DESC LIMIT ?`,
   );
   const nextBatch = db.prepare(
     `SELECT id, meta_key, played_at, via, position FROM play_history
-     WHERE ${viaSql}(played_at < ? OR (played_at = ? AND id < ?))
+     WHERE ${viaSql}(played_at < ? OR (played_at = ? AND id < ?)) AND ${aliveHere}
      ORDER BY played_at DESC, id DESC LIMIT ?`,
   );
   // Representative alive file for a run's meta_key (MIN(id) mirrors the old

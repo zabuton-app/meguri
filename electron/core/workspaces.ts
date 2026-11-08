@@ -14,7 +14,7 @@ import {
   type UserCollectionConfig,
   type UserCollectionItemConfig,
 } from "./appConfig.js";
-import { dataDirForRoot, pathHash } from "./paths.js";
+import { dataDirForRoot, libraryDbPath, pathHash } from "./paths.js";
 import log from "./logger.js";
 import { nowUnix } from "./db.js";
 
@@ -710,7 +710,7 @@ export class Workspaces {
     if (cached) return cached;
     if (this.closed) return null;
     try {
-      const core = Core.init(p);
+      const core = Core.init(p, libraryDbPath());
       this.cores.set(id, core);
       this.errors.delete(id);
       return core;
