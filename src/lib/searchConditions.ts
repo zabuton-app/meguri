@@ -26,6 +26,7 @@ import {
   scopedFolderPath,
 } from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
+import { resolutionLabel } from "@shared/resolutions";
 import { tagHumanLabel } from "@/lib/tagLabel";
 
 /** Which surface owns the control that sets a condition. */
@@ -152,6 +153,15 @@ export function describeConditions(
       group: "primary",
       chip: true,
       clear: (q) => without(q, "ratingMin"),
+    });
+
+  if (query.resolution)
+    out.push({
+      key: "resolution",
+      label: `${t(query.resolution.match === "exact" ? "resolution.exact" : "resolution.atLeast")} ${resolutionLabel(query.resolution.preset)}`,
+      group: "primary",
+      chip: true,
+      clear: (q) => without(q, "resolution"),
     });
 
   if (query.favorite)

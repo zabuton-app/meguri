@@ -42,6 +42,7 @@ import { usePreferences } from "@/settings/PreferencesProvider";
 import { NAV_BINDINGS, isHelpKey, matchAny } from "@/settings/keybindings";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "@/components/FilterBar";
+import { SmartBinsSidebar } from "@/components/SmartBinsSidebar";
 import { ScanProgress } from "@/components/ScanProgress";
 import { CommandMenu } from "@/components/CommandMenu";
 import { Pet } from "@/components/pet/Pet";
@@ -56,6 +57,7 @@ import {
 } from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useSmartCollections } from "@/hooks/useSmartCollections";
 import { recordRecentSearch } from "@/hooks/useRecentSearches";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
@@ -119,6 +121,11 @@ export default function Home() {
   const [commandOpen, setCommandOpen] = useState(false);
   // Opens on the default saved search, if one is set (see loadInitialFilter).
   const [filter, setFilter] = useState<SearchQuery>(loadInitialFilter);
+  const smart = useSmartCollections();
+  const [launchBin] = useState(() =>
+    smart.collections.find((bin) => bin.id === smart.defaultId && bin.scope),
+  );
+  const restoredLaunchBin = useRef(false);
   // Compared by identity below: every later filter is a new object.
   const openedWith = useRef(filter);
   const [thumbVersion, setThumbVersion] = useState<Record<string, number>>({});
@@ -222,6 +229,11 @@ export default function Home() {
       setFilter,
       setByFolder: showByFolder,
     });
+  useEffect(() => {
+    if (!launchBin || !status.data?.ready || restoredLaunchBin.current) return;
+    restoredLaunchBin.current = true;
+    onApplySaved(launchBin);
+  }, [launchBin, status.data?.ready, onApplySaved]);
   const heatmap = useHeatmapFilter({ filterValue, onFilterChange });
   // What the heatmap counts over: the filter, within the folder shown and
   // everything below it — what the list becomes once a day narrows it (a
@@ -829,7 +841,13 @@ export default function Home() {
   useEffect(() => dropPass, [listScope]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col sm:pl-52">
+      <SmartBinsSidebar
+        query={filterValue}
+        workspaceId={workspaceId}
+        workspaces={workspaces.data?.workspaces ?? []}
+        onApply={onApplySaved}
+      />
       <HomeHeader
         root={status.data?.root}
         rootFetched={status.isFetched}

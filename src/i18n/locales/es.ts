@@ -3,6 +3,27 @@ import type { TranslationKey } from "./ja";
 
 export const es: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "kind.visual": "Vídeo + Imagen",
+  "resolution.title": "Resolución",
+  "resolution.any": "Cualquier resolución",
+  "resolution.match": "Coincidencia de resolución",
+  "resolution.atLeast": "Como mínimo",
+  "resolution.exact": "Exactamente",
+  "smartBin.title": "Bins inteligentes",
+  "smartBin.create": "Crear bin inteligente",
+  "smartBin.edit": "Editar bin inteligente",
+  "smartBin.delete": "Eliminar bin inteligente",
+  "smartBin.deleteConfirm": "¿Eliminar el bin inteligente «{name}»?",
+  "smartBin.name": "Nombre",
+  "smartBin.scope": "Buscar en",
+  "smartBin.all": "Todas las carpetas escaneadas",
+  "smartBin.selected": "Carpeta escaneada seleccionada",
+  "smartBin.current": "Vista actual",
+  "smartBin.live":
+    "Los resultados se actualizan al escanear archivos o cambiar sus valoraciones y etiquetas.",
+  "smartBin.empty":
+    "Guarda una búsqueda para encontrar medios que coincidan en todo tu catálogo.",
+
   "app.name": "巡",
 
   // common

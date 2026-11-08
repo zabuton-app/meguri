@@ -3,6 +3,25 @@ import type { TranslationKey } from "./ja";
 
 export const zhCN: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "kind.visual": "视频＋图像",
+  "resolution.title": "分辨率",
+  "resolution.any": "任意分辨率",
+  "resolution.match": "分辨率匹配方式",
+  "resolution.atLeast": "至少",
+  "resolution.exact": "精确匹配",
+  "smartBin.title": "智能媒体夹",
+  "smartBin.create": "创建智能媒体夹",
+  "smartBin.edit": "编辑智能媒体夹",
+  "smartBin.delete": "删除智能媒体夹",
+  "smartBin.deleteConfirm": "删除智能媒体夹“{name}”？",
+  "smartBin.name": "名称",
+  "smartBin.scope": "搜索范围",
+  "smartBin.all": "所有已扫描文件夹",
+  "smartBin.selected": "所选已扫描文件夹",
+  "smartBin.current": "当前视图",
+  "smartBin.live": "扫描文件或更改评分和标签后，匹配结果会随之更新。",
+  "smartBin.empty": "保存搜索，即可在整个媒体目录中查找符合条件的媒体。",
+
   "app.name": "巡",
 
   // common

@@ -338,6 +338,13 @@ is what the `manual` sort reads. The UI lives in
 
 ### Smart collections
 
+The Smart bins sidebar and saved-filter menu share the same renderer store.
+New bins save an explicit scope: every scanned workspace, or one workspace
+(optionally with a subfolder). Opening a global bin switches to `All` before
+applying its conditions and sort. Older saved searches without an explicit
+scope retain their existing current-view behavior. The sidebar editor can
+create, rename and change the rules of a bin, and the bins survive restarts.
+
 Saved searches: a named `SearchQuery`. These never touch the main process —
 they persist in the renderer's `localStorage` (`SMART_COLLECTIONS_KEY`). The
 schema and normalization live in `src/lib/smartCollections.ts`, the hook in
@@ -355,7 +362,14 @@ conditions and sort become Home's initial filter at launch
 (`loadInitialFilter()`), and "Clear all" returns to them — or empties the
 filter once it already shows exactly them (`clearAllTarget()` in
 `src/lib/searchConditions.ts`); removing the sort chip restores its sort. The
-default applies in every workspace, so its folder and a manual sort, both
-bound to one place, are left out (`defaultQueryOf()`). The hook is owned by
-`FilterBar`, which passes it to the menu, so the menu and "Clear all" read the
-same state.
+conditions apply in every workspace, so its folder and a manual sort, both
+bound to one place, are left out (`defaultQueryOf()`). A default with an explicit
+scope also restores that scope at launch. `useSmartCollections()` uses one shared
+snapshot for the sidebar, the menu and "Clear all".
+
+Resolution presets live in `shared/resolutions.ts`. `SearchQuery.resolution`
+stores the preset and either an exact dimension match or an at-least class.
+The latter follows the resolution badges' edge thresholds, including portrait
+and cropped cinema footage. `kind: "visual"` selects videos and images together.
+Both conditions use `appendSearchConditions()`, so ordinary listings, cross-workspace
+search, graphs and saved searches apply the same SQL conditions.

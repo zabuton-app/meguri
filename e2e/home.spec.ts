@@ -82,10 +82,10 @@ test.describe("Home", () => {
     // fixture reports ready and its completion re-renders the bar out from
     // under the control being clicked.
     await waitForIdle(ready);
-    await ready.getByRole("radio", { name: "Image" }).click();
+    await ready.getByRole("radio", { name: "Image", exact: true }).click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
 
-    await ready.getByRole("radio", { name: "Video" }).click();
+    await ready.getByRole("radio", { name: "Video", exact: true }).click();
     await expect(ready.getByText("No media to display.")).toBeVisible();
 
     await ready.getByRole("radio", { name: "All" }).click();

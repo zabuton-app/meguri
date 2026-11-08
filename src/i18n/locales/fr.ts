@@ -3,6 +3,27 @@ import type { TranslationKey } from "./ja";
 
 export const fr: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "kind.visual": "Vidéo + Image",
+  "resolution.title": "Résolution",
+  "resolution.any": "Toutes les résolutions",
+  "resolution.match": "Correspondance de résolution",
+  "resolution.atLeast": "Au moins",
+  "resolution.exact": "Exactement",
+  "smartBin.title": "Chutiers intelligents",
+  "smartBin.create": "Créer un chutier intelligent",
+  "smartBin.edit": "Modifier le chutier intelligent",
+  "smartBin.delete": "Supprimer le chutier intelligent",
+  "smartBin.deleteConfirm": "Supprimer le chutier intelligent « {name} » ?",
+  "smartBin.name": "Nom",
+  "smartBin.scope": "Rechercher dans",
+  "smartBin.all": "Tous les dossiers analysés",
+  "smartBin.selected": "Dossier analysé sélectionné",
+  "smartBin.current": "Vue actuelle",
+  "smartBin.live":
+    "Les résultats évoluent avec les analyses et les modifications des notes et des tags.",
+  "smartBin.empty":
+    "Enregistrez une recherche pour retrouver les médias correspondants dans tout votre catalogue.",
+
   "app.name": "巡",
 
   // common

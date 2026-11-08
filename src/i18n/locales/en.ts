@@ -3,6 +3,27 @@ import type { TranslationKey } from "./ja";
 
 export const en: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "kind.visual": "Video + Image",
+  "resolution.title": "Resolution",
+  "resolution.any": "Any resolution",
+  "resolution.match": "Resolution match",
+  "resolution.atLeast": "At least",
+  "resolution.exact": "Exactly",
+  "smartBin.title": "Smart bins",
+  "smartBin.create": "Create smart bin",
+  "smartBin.edit": "Edit smart bin",
+  "smartBin.delete": "Delete smart bin",
+  "smartBin.deleteConfirm": 'Delete smart bin "{name}"?',
+  "smartBin.name": "Name",
+  "smartBin.scope": "Search in",
+  "smartBin.all": "All scanned folders",
+  "smartBin.selected": "Selected scanned folder",
+  "smartBin.current": "Current view",
+  "smartBin.live":
+    "Matches update as files are scanned or their ratings and tags change.",
+  "smartBin.empty":
+    "Save a search here to find matching media across your catalogue.",
+
   "app.name": "巡",
 
   // common

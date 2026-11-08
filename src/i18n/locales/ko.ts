@@ -3,6 +3,27 @@ import type { TranslationKey } from "./ja";
 
 export const ko: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "kind.visual": "동영상 + 이미지",
+  "resolution.title": "해상도",
+  "resolution.any": "모든 해상도",
+  "resolution.match": "해상도 일치 방식",
+  "resolution.atLeast": "이상",
+  "resolution.exact": "정확히",
+  "smartBin.title": "스마트 빈",
+  "smartBin.create": "스마트 빈 만들기",
+  "smartBin.edit": "스마트 빈 편집",
+  "smartBin.delete": "스마트 빈 삭제",
+  "smartBin.deleteConfirm": '스마트 빈 "{name}"을 삭제할까요?',
+  "smartBin.name": "이름",
+  "smartBin.scope": "검색 범위",
+  "smartBin.all": "스캔한 모든 폴더",
+  "smartBin.selected": "선택한 스캔 폴더",
+  "smartBin.current": "현재 보기",
+  "smartBin.live":
+    "파일 스캔이나 평점 및 태그 변경에 따라 일치하는 결과가 갱신됩니다.",
+  "smartBin.empty":
+    "검색을 저장하여 전체 카탈로그에서 조건에 맞는 미디어를 찾으세요.",
+
   "app.name": "巡",
 
   // common

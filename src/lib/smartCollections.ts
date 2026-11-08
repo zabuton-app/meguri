@@ -8,6 +8,7 @@ import type { TFunc } from "@/i18n/I18nProvider";
 import { kindLabelKey } from "@/lib/mediaKind";
 import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
+import { resolutionLabel } from "@shared/resolutions";
 
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
 
@@ -16,10 +17,12 @@ export const SmartCollectionSchema = z.object({
   name: z.string(),
   query: SearchQuerySchema,
   /**
-   * The workspace `query.folder` lies in. A folder path means nothing outside
-   * its own workspace, so it is saved only together with one.
+   * The workspace for a scoped bin or a legacy folder search. A folder path
+   * means nothing outside its own workspace.
    */
   workspaceId: z.string().optional(),
+  /** Absent on older saved searches, which continue to use the current view. */
+  scope: z.enum(["all", "workspace"]).optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -42,6 +45,7 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.tags?.length) next.tags = query.tags.filter(Boolean);
   if (query.tagSource) next.tagSource = query.tagSource;
   if (query.kind) next.kind = query.kind;
+  if (query.resolution) next.resolution = query.resolution;
   if (query.ratingMin != null && query.ratingMin > 0)
     next.ratingMin = query.ratingMin;
   if (query.favorite) next.favorite = true;
@@ -166,22 +170,30 @@ export function loadInitialFilter(): SearchQuery {
 }
 
 /**
- * `workspaceId` is the workspace the list shows; it is kept only when the
- * query has a folder, and a folder with no workspace to place it is dropped.
+ * Explicit bins keep their scope. Legacy saved searches keep a workspace only
+ * with a folder, preserving their current-view behavior.
  */
 export function makeSmartCollection(
   name: string,
   query: SearchQuery,
   workspaceId?: string | null,
+  scope?: SmartCollection["scope"],
 ): SmartCollection {
   const now = Math.floor(Date.now() / 1000);
   const cleaned = cleanSearchQuery(query);
-  if (cleaned.folder && !workspaceId) delete cleaned.folder;
+  if (scope === "all" || !workspaceId) delete cleaned.folder;
+  if (scope && cleaned.sort === MANUAL_SORT) {
+    delete cleaned.sort;
+    delete cleaned.sortDir;
+  }
   return {
     id: `${now}-${Math.random().toString(36).slice(2, 10)}`,
     name: name.trim(),
     query: cleaned,
-    ...(cleaned.folder && workspaceId ? { workspaceId } : {}),
+    ...((cleaned.folder || scope === "workspace") && workspaceId
+      ? { workspaceId }
+      : {}),
+    ...(scope ? { scope } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -222,6 +234,10 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     parts.push(key ? t(key) : query.kind);
   }
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
+  if (query.resolution)
+    parts.push(
+      `${t(query.resolution.match === "exact" ? "resolution.exact" : "resolution.atLeast")} ${resolutionLabel(query.resolution.preset)}`,
+    );
   if (query.favorite) parts.push(t("favorite.chip"));
   if (query.duplicates) parts.push(t("duplicates.chip"));
   if (query.played != null) {

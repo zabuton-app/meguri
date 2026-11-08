@@ -19,6 +19,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
 import type { SmartCollection } from "@/lib/smartCollections";
+import { ResolutionFilter } from "./ResolutionFilter";
 
 interface Props {
   value: SearchQuery;
@@ -41,6 +42,8 @@ interface Props {
    */
   onToggleHeatmap?: () => void;
   heatmapOpen?: boolean;
+  /** The smart-bin editor reuses these controls without nesting saved searches. */
+  showSaved?: boolean;
 }
 
 export function FilterBar({
@@ -52,6 +55,7 @@ export function FilterBar({
   onApplySaved,
   onToggleHeatmap,
   heatmapOpen = false,
+  showSaved = true,
 }: Props) {
   const { t } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
@@ -93,9 +97,15 @@ export function FilterBar({
             { value: undefined, label: t("filter.all") },
             { value: "video", label: t("kind.video") },
             { value: "image", label: t("kind.image") },
+            { value: "visual", label: t("kind.visual") },
             { value: "audio", label: t("kind.audio") },
           ]}
           onChange={(kind) => patch({ kind })}
+        />
+
+        <ResolutionFilter
+          value={value.resolution}
+          onChange={(resolution) => patch({ resolution })}
         />
 
         <div
@@ -155,14 +165,16 @@ export function FilterBar({
 
         {/* Pushed to the far end: saved searches are a way *into* a set of
             conditions, not one more condition to set. */}
-        <div className="ml-auto">
-          <SmartCollectionsMenu
-            value={value}
-            workspaceId={workspaceId}
-            onApply={onApplySaved ?? ((c) => onChange(c.query))}
-            smart={smart}
-          />
-        </div>
+        {showSaved && (
+          <div className="ml-auto">
+            <SmartCollectionsMenu
+              value={value}
+              workspaceId={workspaceId}
+              onApply={onApplySaved ?? ((c) => onChange(c.query))}
+              smart={smart}
+            />
+          </div>
+        )}
       </div>
 
       <ActiveFilterChips

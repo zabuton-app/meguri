@@ -26,6 +26,38 @@ const t = (key: keyof typeof en, params?: Record<string, string | number>) => {
 };
 
 describe("smartCollections", () => {
+  it("saves an explicit global bin without a folder restriction", () => {
+    const bin = makeSmartCollection(
+      "4K catalogue",
+      {
+        kind: "visual",
+        ratingMin: 4,
+        resolution: { preset: "uhd", match: "atLeast" },
+        folder: { path: "old/subfolder", recursive: true },
+        sort: "rating",
+        sortDir: "desc",
+      },
+      "ws1",
+      "all",
+    );
+    expect(bin.scope).toBe("all");
+    expect(bin.workspaceId).toBeUndefined();
+    expect(bin.query.folder).toBeUndefined();
+    expect(parseSmartCollections(JSON.stringify([bin]))[0]).toEqual(bin);
+    expect(bin.query.resolution).toEqual({ preset: "uhd", match: "atLeast" });
+    expect(bin.query.sort).toBe("rating");
+  });
+
+  it("remembers a scanned-folder scope even at its root", () => {
+    const bin = makeSmartCollection(
+      "My footage",
+      { ratingMin: 4 },
+      "ws1",
+      "workspace",
+    );
+    expect(bin.scope).toBe("workspace");
+    expect(bin.workspaceId).toBe("ws1");
+  });
   it("cleanSearchQuery drops empty fields and trims text", () => {
     expect(
       cleanSearchQuery({

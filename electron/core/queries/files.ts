@@ -1,5 +1,6 @@
 // File search, listing and detail queries. Dynamic SQL is built safely with placeholders.
 import type { DB } from "../db.js";
+import { RESOLUTIONS } from "../../../shared/resolutions.js";
 import { fileTags } from "../tags.js";
 import { listBookmarksByMetaKey } from "./bookmarks.js";
 import { thumbOffsetByKey } from "./meta.js";
@@ -248,9 +249,21 @@ export function appendSearchConditions(
       args.push(...cond.args);
     }
   }
-  if (query.kind) {
+  if (query.kind === "visual") {
+    sql += " AND f.kind IN ('video', 'image')";
+  } else if (query.kind) {
     sql += " AND f.kind = ?";
     args.push(query.kind);
+  }
+  if (query.resolution) {
+    const { width, height } = RESOLUTIONS[query.resolution.preset];
+    // Match the resolution badges, including portrait and cropped cinema clips.
+    // Exact matching checks both dimensions.
+    sql +=
+      query.resolution.match === "exact"
+        ? " AND MAX(f.width, f.height) = ? AND MIN(f.width, f.height) = ?"
+        : " AND f.width > 0 AND f.height > 0 AND (MAX(f.width, f.height) >= ? OR MIN(f.width, f.height) >= ?)";
+    args.push(width, height);
   }
   if (query.fileIds?.length) {
     // Pass the IDs as a single JSON array bound to one placeholder rather than

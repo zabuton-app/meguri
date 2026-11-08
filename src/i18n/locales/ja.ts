@@ -2,6 +2,27 @@
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
   // アプリ名（表示名の漢字1文字。ガイドライン00）
+  "kind.visual": "動画＋画像",
+  "resolution.title": "解像度",
+  "resolution.any": "すべての解像度",
+  "resolution.match": "解像度の条件",
+  "resolution.atLeast": "以上",
+  "resolution.exact": "完全一致",
+  "smartBin.title": "スマートビン",
+  "smartBin.create": "スマートビンを作成",
+  "smartBin.edit": "スマートビンを編集",
+  "smartBin.delete": "スマートビンを削除",
+  "smartBin.deleteConfirm": "スマートビン「{name}」を削除しますか？",
+  "smartBin.name": "名前",
+  "smartBin.scope": "検索範囲",
+  "smartBin.all": "すべてのスキャン済みフォルダー",
+  "smartBin.selected": "選択中のスキャン済みフォルダー",
+  "smartBin.current": "現在の表示",
+  "smartBin.live":
+    "スキャンや評価・タグの変更に応じて、条件に合うファイルが更新されます。",
+  "smartBin.empty":
+    "検索を保存して、カタログ全体から条件に合うメディアを見つけられます。",
+
   "app.name": "巡",
 
   // 共通

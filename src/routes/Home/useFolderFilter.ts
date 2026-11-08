@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/ipc/client";
+import { api, ALL_ID } from "@/ipc/client";
 import type { AppStatus, SearchQuery, WorkspacesList } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import { onShowFolderInLibrary } from "@/lib/ui-events";
@@ -179,6 +179,34 @@ export function useFolderFilter({
   const onApplySaved = useCallback(
     (collection: SmartCollection) => {
       const { folder, ...rest } = collection.query;
+      if (collection.scope === "workspace" && collection.workspaceId) {
+        void openFolder(
+          collection.workspaceId,
+          folder?.path ?? ROOT_FOLDER,
+          rest,
+        );
+        return;
+      }
+      if (collection.scope === "all") {
+        const request = ++latestOpen.current;
+        void (async () => {
+          while (switching.current) await switching.current.catch(() => {});
+          if (request !== latestOpen.current) return;
+          try {
+            if (activeWorkspace() !== ALL_ID) await switchWorkspace(ALL_ID);
+            if (request !== latestOpen.current || activeWorkspace() !== ALL_ID)
+              return;
+            setFilter(rest);
+          } catch (error) {
+            if (request !== latestOpen.current) return;
+            toast.error(t("folder.showFailed"), {
+              description:
+                error instanceof Error ? error.message : String(error),
+            });
+          }
+        })();
+        return;
+      }
       if (folder && collection.workspaceId) {
         void openFolder(collection.workspaceId, folder.path, rest);
         return;
@@ -187,7 +215,7 @@ export function useFolderFilter({
       if (path !== ROOT_FOLDER) goTo(ROOT_FOLDER);
       setFilter(rest);
     },
-    [openFolder, path, goTo, setFilter],
+    [openFolder, path, goTo, setFilter, activeWorkspace, switchWorkspace, t],
   );
 
   // A recent search replaces the conditions but not the place: it was saved

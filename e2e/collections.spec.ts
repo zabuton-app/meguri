@@ -9,14 +9,10 @@ import {
 
 test.describe("Collections", () => {
   test("creates a user collection from sidebar", async ({ ready }) => {
-    await ready
-      .getByRole("button", { name: "Create user collection" })
-      .click();
+    await ready.getByRole("button", { name: "Create user collection" }).click();
     const dialog = ready.getByRole("dialog");
     await expect(dialog.getByText("Create user collection")).toBeVisible();
-    await dialog
-      .getByPlaceholder("Collection name")
-      .fill("E2E Picks");
+    await dialog.getByPlaceholder("Collection name").fill("E2E Picks");
     await dialog.getByRole("button", { name: "Create" }).click();
     await expect(
       ready.getByRole("button", { name: "E2E Picks" }),
@@ -24,9 +20,7 @@ test.describe("Collections", () => {
   });
 
   test("adds file to user collection from detail", async ({ ready }) => {
-    await ready
-      .getByRole("button", { name: "Create user collection" })
-      .click();
+    await ready.getByRole("button", { name: "Create user collection" }).click();
     await ready.getByPlaceholder("Collection name").fill("Detail Collection");
     await ready.getByRole("button", { name: "Create" }).click();
 
@@ -38,9 +32,7 @@ test.describe("Collections", () => {
     await ready
       .getByRole("menuitem", { name: 'Add to "Detail Collection"' })
       .click();
-    await expect(
-      ready.getByText('Added to "Detail Collection"'),
-    ).toBeVisible();
+    await expect(ready.getByText('Added to "Detail Collection"')).toBeVisible();
 
     await detail.getByRole("button", { name: "Add to collection" }).click();
     await expect(
@@ -49,9 +41,7 @@ test.describe("Collections", () => {
   });
 
   test("switches to empty user collection", async ({ ready }) => {
-    await ready
-      .getByRole("button", { name: "Create user collection" })
-      .click();
+    await ready.getByRole("button", { name: "Create user collection" }).click();
     await ready.getByPlaceholder("Collection name").fill("Empty Collection");
     await ready.getByRole("button", { name: "Create" }).click();
     await ready.getByRole("button", { name: "Empty Collection" }).click();
@@ -70,7 +60,7 @@ test.describe("Collections", () => {
     await expect(ready.getByText("No media to display.")).toBeVisible();
 
     await ready.getByRole("button", { name: "Smart collections" }).click();
-    await ready.getByText("PNG search").click();
+    await ready.getByRole("menuitem", { name: /^PNG search/ }).click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
   });
 
@@ -90,7 +80,7 @@ test.describe("Collections", () => {
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
 
     await ready.getByRole("button", { name: "Smart collections" }).click();
-    await ready.getByText("E2E Favorites").click();
+    await ready.getByRole("menuitem", { name: /^E2E Favorites/ }).click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
     await expect(ready.getByText("♥ Favorites")).toBeVisible();
   });

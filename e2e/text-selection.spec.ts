@@ -51,12 +51,14 @@ test.describe("Text selection", () => {
     expect(await selectedText(ready)).toBe("");
   });
 
-  test("Ctrl+A still selects all inside the search field", async ({
+  test("Ctrl/Cmd+A still selects all inside the search field", async ({
     ready,
   }) => {
     const search = searchInput(ready);
     await search.fill("hello");
-    await search.press("Control+KeyA");
+    await search.press(
+      process.platform === "darwin" ? "Meta+KeyA" : "Control+KeyA",
+    );
     const [start, end] = await search.evaluate((el) => [
       (el as HTMLInputElement).selectionStart,
       (el as HTMLInputElement).selectionEnd,
