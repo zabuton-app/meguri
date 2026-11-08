@@ -69,23 +69,24 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
   // workspace's events to drop one lookup at a time. Either streamed in
   // idx_play_history_played order and checked against this workspace's files,
   // or, when they are a small share (collectsOwnEvents), collected per file
-  // and sorted: the unary + keeps the planner off idx_play_history_played,
-  // which would bring the stream back.
+  // and sorted: the unary + on played_at and id, in ORDER BY and in the
+  // keyset, keeps the planner off idx_play_history_played, which would bring
+  // the stream back (a range on played_at searched there reads every
+  // workspace's events in it).
   const own = collectsOwnEvents(db, query.via);
   const aliveHere = own
     ? "meta_key IN (SELECT meta_key FROM main.files WHERE deleted_at IS NULL)"
     : `EXISTS (SELECT 1 FROM main.files f
      WHERE f.meta_key = play_history.meta_key AND f.deleted_at IS NULL)`;
-  const order = own
-    ? "ORDER BY +played_at DESC, +id DESC"
-    : "ORDER BY played_at DESC, id DESC";
+  const [at, id] = own ? ["+played_at", "+id"] : ["played_at", "id"];
+  const order = `ORDER BY ${at} DESC, ${id} DESC`;
   const firstBatch = db.prepare(
     `SELECT id, meta_key, played_at, via, position FROM play_history
      WHERE ${viaSql}${aliveHere} ${order} LIMIT ?`,
   );
   const nextBatch = db.prepare(
     `SELECT id, meta_key, played_at, via, position FROM play_history
-     WHERE ${viaSql}(played_at < ? OR (played_at = ? AND id < ?)) AND ${aliveHere}
+     WHERE ${viaSql}(${at} < ? OR (${at} = ? AND ${id} < ?)) AND ${aliveHere}
      ${order} LIMIT ?`,
   );
   // Representative alive file for a run's meta_key (MIN(id) mirrors the old

@@ -272,6 +272,16 @@ describe("listPlayHistory over the shared library", () => {
       expect(
         listPlayHistory(b, { via: "external" }).items.map((r) => r.playedAt),
       ).toEqual([303]);
+      // Past the first batch of raw events: B's own, still in order.
+      b.transaction(() => {
+        for (let t = 0; t < 1200; t++) {
+          insertPlay(b, t % 2 === 0 ? x : y, 100_000 + t);
+        }
+      })();
+      const deep = listPlayHistory(b, { limit: 100, cursor: 1000 });
+      expect(deep.items.map((r) => r.playedAt)).toEqual(
+        Array.from({ length: 100 }, (_, i) => 100_000 + 199 - i),
+      );
       // A's own events are most of the library: still streamed, same order.
       expect(listPlayHistory(a, { limit: 1 }).items[0].playedAt).toBe(59_998);
     } finally {
