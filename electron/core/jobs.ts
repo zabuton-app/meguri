@@ -443,9 +443,8 @@ export async function runScan(
     });
   }
 
-  // Reclaim durable metadata whose file row no longer exists (mainly post-rebuild orphans).
-  // Skipped on abort to avoid purging metadata for files not yet re-indexed (especially after rebuild).
-  if (!signal?.aborted) q.pruneOrphanMeta(db);
+  // Tags left on no file (pruneUnusedTags keeps metadata itself: it is shared).
+  if (!signal?.aborted) q.pruneUnusedTags(db);
 
   // Every file failing points at the tooling, not the files. Reported
   // regardless of batch size: a tiny incremental scan may flag a merely

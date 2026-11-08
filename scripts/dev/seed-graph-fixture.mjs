@@ -5,8 +5,9 @@
 //     content hash), spread over 50 sub-folders.
 //
 //   ELECTRON_RUN_AS_NODE=1 npx electron scripts/dev/seed-graph-fixture.mjs tags <dir> [userDataDir]
-//     After the app has scanned <dir>: tags its files in the workspace DB with
-//     200 manual tags, 1-4 per file, skewed so a few tags become large hubs.
+//     After the app has scanned <dir>: tags its files with 200 manual tags,
+//     1-4 per file, skewed so a few tags become large hubs. Tags live in the
+//     library every workspace shares (library.sqlite), attached as `lib`.
 //     Runs under Electron because better-sqlite3 is built for Electron's ABI.
 //     userDataDir defaults to the platform's Meguri directory; pass the one
 //     the app ran with (--user-data-dir) to keep a throwaway profile.
@@ -83,7 +84,11 @@ function tagFiles(dir, userData) {
     throw new Error(`no workspace DB at ${dbPath}; scan ${root} first`);
   const require = createRequire(import.meta.url);
   const Database = require("better-sqlite3");
+  const libraryPath = path.join(userData, "library.sqlite");
+  if (!fs.existsSync(libraryPath))
+    throw new Error(`no library at ${libraryPath}; open the app first`);
   const db = new Database(dbPath);
+  db.prepare("ATTACH DATABASE ? AS lib").run(libraryPath);
 
   let seed = 7;
   const rnd = () => {
@@ -97,10 +102,10 @@ function tagFiles(dir, userData) {
   const now = Math.floor(Date.now() / 1000);
   db.transaction(() => {
     const upsert = db.prepare(
-      "INSERT INTO tags (namespace, name) VALUES ('', ?) ON CONFLICT(namespace, name) DO NOTHING",
+      "INSERT INTO lib.tags (namespace, name) VALUES ('', ?) ON CONFLICT(namespace, name) DO NOTHING",
     );
     const idOf = db
-      .prepare("SELECT id FROM tags WHERE namespace = '' AND name = ?")
+      .prepare("SELECT id FROM lib.tags WHERE namespace = '' AND name = ?")
       .pluck();
     const ids = [];
     for (let t = 0; t < TAGS; t++) {
@@ -108,7 +113,7 @@ function tagFiles(dir, userData) {
       ids.push(idOf.get(`topic${String(t).padStart(3, "0")}`));
     }
     const link = db.prepare(
-      "INSERT OR IGNORE INTO meta_tags (meta_key, tag_id, source, score) VALUES (?, ?, 'manual', NULL)",
+      "INSERT OR IGNORE INTO lib.meta_tags (meta_key, tag_id, source, score) VALUES (?, ?, 'manual', NULL)",
     );
     for (const key of keys) {
       const n = 1 + Math.floor(rnd() * 4);
@@ -122,7 +127,7 @@ function tagFiles(dir, userData) {
       SELECT f.id, f.rel_path,
              COALESCE((SELECT group_concat(name, ' ') FROM
                (SELECT DISTINCT t.name AS name
-                FROM meta_tags mt JOIN tags t ON t.id = mt.tag_id
+                FROM lib.meta_tags mt JOIN lib.tags t ON t.id = mt.tag_id
                 WHERE mt.meta_key = f.meta_key AND t.namespace = ''
                 ORDER BY name)), '')
       FROM files f WHERE f.deleted_at IS NULL`);

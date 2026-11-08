@@ -299,8 +299,9 @@ describe("tag_key on a read-only handle", () => {
   it("is registered there too, where the query worker searches", () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-tagkey-"));
     const file = path.join(dir, "core.db");
-    openDb(file).close();
-    const ro = openDbReadonly(file);
+    const library = path.join(dir, "library.sqlite");
+    openDb(file, library).close();
+    const ro = openDbReadonly(file, library);
     try {
       expect(ro.prepare("SELECT tag_key('ÉTÉ')").pluck().get()).toBe("été");
     } finally {

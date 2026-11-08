@@ -171,7 +171,7 @@ describe("syncFiles lifecycle", () => {
   let rootId: number;
 
   beforeEach(async () => {
-    db = openDb(":memory:");
+    db = openDb(":memory:", ":memory:");
     root = await fsp.mkdtemp(path.join(os.tmpdir(), "meguri-scan-"));
     rootId = upsertScanRoot(db, root, "deadbeef");
   });

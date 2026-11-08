@@ -1,7 +1,10 @@
 // Regression tests for the cross-file play-history timeline (history.ts) and its
 // cross-workspace merge (listHistoryWorkspaces).
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { DB } from "../db.js";
+import { openDb, type DB } from "../db.js";
 import type { Core } from "../index.js";
 import {
   clearPlayHistory,
@@ -10,6 +13,7 @@ import {
 } from "../queries.js";
 import { listHistoryWorkspaces, type CoreTarget } from "../crossWorkspace.js";
 import { insertFile, newDb } from "./helpers.js";
+import { upsertScanRoot } from "../queries.js";
 
 /** Insert a play event with an explicit timestamp (recordPlay always uses "now"). */
 function insertPlay(
@@ -196,5 +200,93 @@ describe("listHistoryWorkspaces", () => {
       items: [],
       nextCursor: null,
     });
+  });
+});
+
+describe("listPlayHistory over the shared library", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-history-lib-"));
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it("lists only events for files alive in this workspace", () => {
+    const library = path.join(dir, "library.sqlite");
+    const a = openDb(path.join(dir, "a.sqlite"), library);
+    const b = openDb(path.join(dir, "b.sqlite"), library);
+    try {
+      const ra = upsertScanRoot(a, "/a", "a");
+      const rb = upsertScanRoot(b, "/b", "b");
+      const onlyA = insertFile(a, ra, { relPath: "x.mp4", contentHash: "hx" });
+      const shared = insertFile(a, ra, { relPath: "s.mp4", contentHash: "hs" });
+      insertFile(b, rb, { relPath: "s.mp4", contentHash: "hs" });
+      // Many newer events of A's own file ahead of the shared one.
+      for (let t = 1000; t < 1600; t++) insertPlay(a, onlyA, t);
+      insertPlay(a, shared, 10);
+
+      const page = listPlayHistory(b, {});
+      expect(page.items.map((r) => r.playedAt)).toEqual([10]);
+      expect(listPlayHistory(a, { limit: 1 }).items[0].playedAt).toBe(1599);
+    } finally {
+      a.close();
+      b.close();
+    }
+  });
+
+  it("collects a workspace's few events without reading the library's", () => {
+    const library = path.join(dir, "library.sqlite");
+    const a = openDb(path.join(dir, "a.sqlite"), library);
+    const b = openDb(path.join(dir, "b.sqlite"), library);
+    try {
+      const ra = upsertScanRoot(a, "/a", "a");
+      const rb = upsertScanRoot(b, "/b", "b");
+      const busy = insertFile(a, ra, {
+        relPath: "busy.mp4",
+        contentHash: "hb",
+      });
+      const x = insertFile(b, rb, { relPath: "x.mp4", contentHash: "hx" });
+      const y = insertFile(b, rb, { relPath: "y.mp4", contentHash: "hy" });
+      // Far more events in A than OWN_SORT_MAX, interleaved with B's few.
+      a.transaction(() => {
+        for (let t = 0; t < 30_000; t++) insertPlay(a, busy, t * 2);
+      })();
+      for (const [file, at] of [
+        [x, 101],
+        [y, 303],
+        [x, 505],
+        [x, 507],
+        [y, 909],
+      ] as const) {
+        insertPlay(b, file, at, at === 303 ? "external" : "browser");
+      }
+
+      const page = listPlayHistory(b, { limit: 2 });
+      expect(page.items.map((r) => [r.relPath, r.playedAt])).toEqual([
+        ["y.mp4", 909],
+        ["x.mp4", 507],
+      ]);
+      expect(page.items.map((r) => r.playCount)).toEqual([2, 3]);
+      const rest = listPlayHistory(b, { limit: 2, cursor: page.nextCursor! });
+      expect(rest.items.map((r) => r.playedAt)).toEqual([303, 101]);
+      expect(rest.nextCursor).toBeNull();
+      expect(
+        listPlayHistory(b, { via: "external" }).items.map((r) => r.playedAt),
+      ).toEqual([303]);
+      // Past the first batch of raw events: B's own, still in order.
+      b.transaction(() => {
+        for (let t = 0; t < 1200; t++) {
+          insertPlay(b, t % 2 === 0 ? x : y, 100_000 + t);
+        }
+      })();
+      const deep = listPlayHistory(b, { limit: 100, cursor: 1000 });
+      expect(deep.items.map((r) => r.playedAt)).toEqual(
+        Array.from({ length: 100 }, (_, i) => 100_000 + 199 - i),
+      );
+      // A's own events are most of the library: still streamed, same order.
+      expect(listPlayHistory(a, { limit: 1 }).items[0].playedAt).toBe(59_998);
+    } finally {
+      a.close();
+      b.close();
+    }
   });
 });
