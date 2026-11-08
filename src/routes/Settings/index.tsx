@@ -47,6 +47,7 @@ import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
+import { useTour } from "@/tour/TourProvider";
 import {
   isSpectrumPattern,
   SPECTRUM_PATTERN_OPTIONS,
@@ -178,6 +179,7 @@ export default function Settings() {
     setPetSize,
   } = usePreferences();
   const navigate = useNavigate();
+  const { replay: replayTour } = useTour();
   // Not persisted: opening settings should always land on the first tab rather
   // than wherever the previous visit happened to stop.
   const [tab, setTab] = useState<TabId>("general");
@@ -768,6 +770,28 @@ export default function Settings() {
 
           {tab === "app" && (
             <>
+              {/* Replay the first-launch tour (it starts once the list is back) */}
+              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.tour")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.tourDesc")}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    replayTour();
+                    void navigate("/");
+                  }}
+                >
+                  {t("settings.tourReplay")}
+                </Button>
+              </section>
+
               {/* Update check */}
               <UpdateSection />
 

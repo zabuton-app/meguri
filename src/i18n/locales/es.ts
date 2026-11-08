@@ -1014,4 +1014,46 @@ export const es: Record<TranslationKey, string> = {
   "settings.petSizeSmall": "Pequeño (×2)",
   "settings.petSizeMedium": "Mediano (×3)",
   "settings.petSizeLarge": "Grande (×4)",
+
+  // Guided tours
+  "tour.languageTitle": "Elige tu idioma",
+  "tour.languageBody":
+    "Elige el idioma que quieres usar. El resto del recorrido lo seguirá, y puedes cambiarlo luego en Ajustes.",
+  "tour.welcomeTitle": "Te damos la bienvenida a Meguri",
+  "tour.welcomeBody":
+    "Te enseño cómo funciona. Pulsa Esc para saltarlo cuando quieras.",
+  "tour.addWorkspaceTitle": "Añadir una carpeta",
+  "tour.addWorkspaceBody":
+    "Empieza añadiendo una carpeta con tus vídeos e imágenes. La escanearé y crearé las miniaturas. Puedes añadir todas las que quieras.",
+  "tour.collectionsTitle": "Colecciones",
+  "tour.collectionsBody":
+    "Reúne archivos de cualquier carpeta en una colección. Arrastra archivos aquí para añadirlos.",
+  "tour.searchTitle": "Buscar y filtrar",
+  "tour.searchBody":
+    "Busca por nombre de archivo o etiqueta. Pulsa / en la lista para venir aquí.",
+  "tour.viewTitle": "Cambiar de vista",
+  "tour.viewBody":
+    "Muestra tus archivos en cuadrícula, lista, línea de tiempo o grafo.",
+  "tour.discoverTitle": "Descubrir",
+  "tour.discoverBody":
+    "¿No sabes qué ver? Descubrir elige algo al azar. El botón de arriba reproduce toda la lista.",
+  "tour.petTitle": "Tu mascota",
+  "tour.petBody":
+    "Haz clic derecho sobre mí para ver un menú. Suelta archivos sobre mí y los guardaré en Ver más tarde.",
+  "tour.commandTitle": "Menú de comandos",
+  "tour.commandBody":
+    "Pulsa Ctrl+K para ejecutar cualquier acción por su nombre. Pulsa ? para ver todos los atajos.",
+  "tour.settingsTitle": "Ajustes",
+  "tour.settingsBody":
+    "Aquí puedes cambiar el tema, el idioma y más. Puedes repetir este recorrido desde la pestaña Aplicación.",
+  "tour.doneTitle": "¡Todo listo!",
+  "tour.doneBody": "Eso es todo. ¡Disfruta!",
+  "tour.progress": "{current} / {total}",
+  "tour.skip": "Omitir",
+  "tour.prev": "Atrás",
+  "tour.next": "Siguiente",
+  "tour.done": "Hecho",
+  "settings.tour": "Tutorial",
+  "settings.tourDesc": "Vuelve a mostrar el recorrido del primer inicio",
+  "settings.tourReplay": "Repetir",
 };

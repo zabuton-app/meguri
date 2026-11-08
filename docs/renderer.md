@@ -101,6 +101,38 @@ Whether the pet is out and its size are preferences (`petVisible`,
 `petSize`). With reduced motion preferred it neither walks nor bounces and
 shows one frame per state.
 
+## Tours
+
+Guided tours (`src/tour/`) highlight an element and have the pet explain it.
+
+- **Definitions**: `tours.ts` holds each tour as data: an id and a list of
+  steps, each naming the `data-tour="<target>"` element to highlight and the
+  i18n keys for its title and body. A step without a target is shown in the
+  middle of the window; a step whose target is not on screen when the tour
+  starts (an empty library, the pet put away) is left out. A step can also
+  carry a `picker`: the first-launch tour opens with the language picker, so
+  the rest of it runs in the chosen language. The choice goes through
+  `setLang`, the same store as the setting.
+- **Running**: `TourProvider` uses driver.js only for the dimmed overlay and
+  the cut-out (`highlight()`, with no popover of its own) and keeps the step
+  itself. While a tour runs it takes the keyboard (Esc skips, the arrow keys
+  move, Tab stays on the bubble's buttons) so the list's shortcuts do not act
+  behind the overlay. Tours start only on the bare list, which Home reports
+  through `setHostReady`.
+- **Presenter**: with the pet out, `Pet.tsx` raises itself above the overlay,
+  stops wandering, hops at each step and draws `TourBubble` over its head.
+  With the pet put away, the provider draws the bubble at the bottom of the
+  window instead.
+- **Seen list**: `tourStore.ts` keeps the ids of finished or skipped tours in
+  `localStorage["meguri.tours"]`. When the key is missing, any other
+  `meguri.*` key means an upgrade from a version without tours, and the
+  first-launch tour counts as seen. Feature tours (`FEATURE_TOURS`) run once
+  each, only after the first-launch tour; ending the first-launch tour marks
+  them all as seen. Settings (App tab) can replay the first-launch tour.
+
+To add a feature tour, append it to `FEATURE_TOURS`, put `data-tour` on its
+targets and add its strings to every locale.
+
 ## Data fetching
 
 Data fetching uses `@tanstack/react-query`. The file list is an
