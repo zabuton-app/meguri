@@ -273,13 +273,15 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
       fromKey,
     );
     // As the library merge does (BOOKMARK_NEAR_EPS): a bookmark close to one
-    // the target holds already is not carried over a second time.
+    // the target holds already is not carried over a second time. A range on
+    // sec, searched in (meta_key, sec).
     db.prepare(
       `DELETE FROM scene_bookmarks
         WHERE meta_key = ? AND EXISTS (
           SELECT 1 FROM scene_bookmarks t
-           WHERE t.meta_key = ? AND ABS(t.sec - scene_bookmarks.sec) <= ?)`,
-    ).run(fromKey, toKey, BOOKMARK_NEAR_EPS);
+           WHERE t.meta_key = ?
+             AND t.sec BETWEEN scene_bookmarks.sec - ? AND scene_bookmarks.sec + ?)`,
+    ).run(fromKey, toKey, BOOKMARK_NEAR_EPS, BOOKMARK_NEAR_EPS);
     db.prepare(
       "UPDATE scene_bookmarks SET meta_key = ? WHERE meta_key = ?",
     ).run(toKey, fromKey);
