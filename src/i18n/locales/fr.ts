@@ -69,6 +69,28 @@ export const fr: Record<TranslationKey, string> = {
   "resolution.match": "Correspondance de résolution",
   "resolution.atLeast": "Au moins",
   "resolution.exact": "Exactement",
+  "smartBin.leave": "Quitter le chutier intelligent",
+  "smartBin.omitted":
+    "Écartés pour cette visite : {filters}. Ils seront vérifiés à votre retour.",
+  "smartBin.global": "Global",
+  "smartBin.local": "Local",
+  "smartBin.location": "Lieu de recherche",
+  "smartBin.locationPending": "Chargement de la bibliothèque…",
+  "smartBin.browse": "Parcourir sans chutier intelligent",
+  "smartBin.noLocal": "Ajoutez un dossier analysé pour utiliser le mode local.",
+  "smartBin.globalHint": "Rechercher dans tous les dossiers analysés.",
+  "smartBin.localHint":
+    "Revenir au dernier dossier consulté ; choisissez-en un autre dans la barre gauche.",
+  "smartBin.scopeManaged":
+    "Utilisez Global/Local à côté des chutiers intelligents pour choisir où chercher.",
+  "smartBin.inactiveFilters": "Filtres mémorisés — non appliqués",
+  "smartBin.enableFilter": "Activer le filtre : {filter}",
+  "smartBin.off": "Désactivé",
+  "smartBin.unavailable": "Indisponible",
+  "smartBin.offHint":
+    "Compatible maintenant. Cliquez pour l’activer ; modifier le chutier le laisse désactivé.",
+  "smartBin.unavailableHint":
+    "Ce filtre est incompatible avec les règles actuelles du chutier.",
   "smartBin.title": "Chutiers intelligents",
   "smartBin.create": "Créer un chutier intelligent",
   "smartBin.edit": "Modifier le chutier intelligent",
@@ -131,10 +153,10 @@ export const fr: Record<TranslationKey, string> = {
     "Nombre de miniatures de scène à générer sur l'écran de détail.",
   "settings.hoverPreview": "Aperçu au survol",
   "settings.hoverPreviewDesc":
-    "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
+    "Parcourez les scènes en déplaçant le curseur sur les miniatures vidéo. Maintenez Option/Alt pour masquer les icônes ; ajoutez Commande/Ctrl pour agrandir l'aperçu.",
   "settings.frameQuality": "Qualité des aperçus",
   "settings.frameQualityDesc":
-    "Qualité des aperçus au survol et de la rangée de scènes dans Découverte. Plus elle est élevée, plus la génération est lente.",
+    "Qualité des aperçus des miniatures et de Découverte, et de la rangée de scènes. Plus elle est élevée, plus la génération est lente.",
   "settings.frameQualityLow": "Basse (240px)",
   "settings.frameQualityStandard": "Standard (480px)",
   "settings.frameQualityHigh": "Haute (960px)",
@@ -303,6 +325,15 @@ export const fr: Record<TranslationKey, string> = {
   "media.openAsPeek": "Ouvrir en panneau latéral",
   "media.openAsModal": "Ouvrir en fenêtre",
   "media.peekResize": "Redimensionner le panneau latéral",
+  "media.moveWindow": "Glisser pour déplacer cette fenêtre",
+  "media.movePlayer":
+    "Déplacer le lecteur (glisser le titre ou utiliser les flèches)",
+  "media.popout": "Ouvrir dans une fenêtre séparée",
+  "media.popoutFailed": "Impossible d’ouvrir la fenêtre d’aperçu.",
+  "media.resizeWidth": "Redimensionner la largeur du lecteur",
+  "media.resizeHeight": "Redimensionner la hauteur du lecteur",
+  "media.resizePlayer":
+    "Redimensionner le lecteur (glisser le coin ou utiliser les flèches)",
   "media.playAsPlaylist": "Lire comme une liste à partir d’ici",
   "media.deleteFromIndex": "Supprimer de l'index",
   "media.deleteFromIndexConfirm":
@@ -472,6 +503,17 @@ export const fr: Record<TranslationKey, string> = {
   "select.tagsFailed": "Impossible d’appliquer les tags : {msg}",
 
   // media grid
+  "home.noCombinationMatches":
+    "La combinaison de filtres ne donne aucun résultat.",
+  "home.pausedFilterHint":
+    "Filtres en pause : {filters}. Activez-les, retirez-les ou choisissez une collection compatible. Aucun média ne s’affiche tant qu’ils sont en pause.",
+  "smartBin.removeHeld": "Retirer le filtre mémorisé : {filter}",
+  "smartBin.pausedResultsHint":
+    "Les résultats sont en pause tant que ces filtres sont désactivés. Activez-les ou retirez-les pour continuer.",
+  "home.noFilterMatches":
+    "Aucun fichier ne correspond à ces critères de filtre.",
+  "home.noFilterMatchesHint":
+    "Vérifiez les règles de la collection et les filtres ci-dessus, ou effacez les filtres pour élargir la recherche.",
   "grid.empty": "Aucun média à afficher.",
   "grid.emptyHint":
     "Lancez « Analyser » pour lister ici les vidéos et les images.",
@@ -916,6 +958,7 @@ export const fr: Record<TranslationKey, string> = {
   "tags.value.orientSquare": "Carré",
 
   // workspace rail
+  "workspace.navigation": "Navigation de la bibliothèque",
   "workspace.all": "Tout",
   "workspace.settings": "Paramètres",
   "workspace.edit": "Modifier l'espace de travail",

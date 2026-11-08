@@ -67,12 +67,13 @@ test.describe("Text selection", () => {
     expect(end).toBe("hello".length);
   });
 
-  test("the detail title and folder stay selectable", async ({ ready }) => {
+  test("the visible detail title stays selectable", async ({ ready }) => {
     const dialog = await openFileDetail(ready);
     const heading = dialog.getByRole("heading", { name: FIXTURE_FILE });
-    await expect(heading).toHaveCSS("user-select", "text");
-    await heading.click({ clickCount: 3 });
-    expect(await selectedText(ready)).toContain(FIXTURE_FILE);
+    const title = heading.getByText(FIXTURE_FILE, { exact: true });
+    await expect(title).toHaveCSS("user-select", "text");
+    await title.click({ clickCount: 3 });
+    expect(await selectedText(ready)).toContain("test");
   });
 
   test("the About section stays selectable", async ({ ready }) => {

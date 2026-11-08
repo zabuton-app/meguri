@@ -33,6 +33,7 @@ export function SmartBinDialog({
   workspaces,
   onSave,
   onClose,
+  portable = false,
 }: {
   collection: SmartCollection | null;
   query: SearchQuery;
@@ -40,6 +41,7 @@ export function SmartBinDialog({
   workspaces: WorkspaceInfo[];
   onSave: (collection: SmartCollection) => void;
   onClose: () => void;
+  portable?: boolean;
 }) {
   const { t } = useI18n();
   const [filtersValid, setFiltersValid] = useState(true);
@@ -52,20 +54,27 @@ export function SmartBinDialog({
       : ALL_ID,
   );
   const [draft, setDraft] = useState<SearchQuery>(
-    collection?.query ?? cleanConditions(query),
+    portable
+      ? cleanConditions(collection?.query ?? query)
+      : (collection?.query ?? cleanConditions(query)),
   );
   const scopeExists =
+    portable ||
     scope === ALL_ID ||
     scope === "current" ||
     workspaces.some((workspace) => workspace.id === scope);
   const save = () => {
     if (!name.trim() || !scopeExists || !filtersValid) return;
     const target =
-      scope === ALL_ID ? "all" : scope === "current" ? undefined : "workspace";
+      portable || scope === ALL_ID
+        ? "all"
+        : scope === "current"
+          ? undefined
+          : "workspace";
     const next = makeSmartCollection(
       name,
       draft,
-      scope === "current" ? workspaceId : scope,
+      portable ? undefined : scope === "current" ? workspaceId : scope,
       target,
     );
     onSave(
@@ -103,37 +112,42 @@ export function SmartBinDialog({
                 onChange={(event) => setName(event.target.value)}
               />
             </label>
-            <label className="block space-y-1 text-sm">
-              <span>{t("smartBin.scope")}</span>
-              <Select
-                value={scope}
-                onValueChange={(next) => {
-                  setScope(next);
-                  setDraft(cleanConditions(draft));
-                }}
-              >
-                <SelectTrigger aria-label={t("smartBin.scope")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_ID}>{t("smartBin.all")}</SelectItem>
-                  {collection &&
-                    !collection.scope &&
-                    !collection.workspaceId && (
-                      <SelectItem value="current">
-                        {t("smartBin.current")}
-                      </SelectItem>
-                    )}
-                  {workspaces
-                    .filter((workspace) => workspace.id !== ALL_ID)
-                    .map((workspace) => (
-                      <SelectItem key={workspace.id} value={workspace.id}>
-                        {workspace.label}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </label>
+            {!portable && (
+              <label className="block space-y-1 text-sm">
+                <span>{t("smartBin.scope")}</span>
+                <Select
+                  value={scope}
+                  onValueChange={(next) => {
+                    setScope(next);
+                    setDraft(cleanConditions(draft));
+                  }}
+                >
+                  <SelectTrigger aria-label={t("smartBin.scope")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_ID}>{t("smartBin.all")}</SelectItem>
+                    {collection &&
+                      !collection.scope &&
+                      !collection.workspaceId && (
+                        <SelectItem value="current">
+                          {t("smartBin.current")}
+                        </SelectItem>
+                      )}
+                    {workspaces
+                      .filter((workspace) => workspace.id !== ALL_ID)
+                      .map((workspace) => (
+                        <SelectItem key={workspace.id} value={workspace.id}>
+                          {workspace.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </label>
+            )}
+            {portable && (
+              <p className="text-xs text-muted">{t("smartBin.scopeManaged")}</p>
+            )}
             {!scopeExists && (
               <p role="alert" className="text-sm text-destructive">
                 {t("folder.workspaceGone")}

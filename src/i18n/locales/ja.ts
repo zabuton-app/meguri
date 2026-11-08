@@ -64,6 +64,28 @@ export const ja = {
   "resolution.match": "解像度の条件",
   "resolution.atLeast": "以上",
   "resolution.exact": "完全一致",
+  "smartBin.leave": "スマートビンから退出",
+  "smartBin.omitted":
+    "今回の表示では除外: {filters}。退出して戻ると再確認します。",
+  "smartBin.global": "全体",
+  "smartBin.local": "フォルダー",
+  "smartBin.location": "検索場所",
+  "smartBin.locationPending": "ライブラリを読み込み中…",
+  "smartBin.browse": "スマートビンなしで閲覧",
+  "smartBin.noLocal":
+    "フォルダーモードを使うにはスキャンフォルダーを追加してください。",
+  "smartBin.globalHint": "すべてのスキャンフォルダーを検索します。",
+  "smartBin.localHint":
+    "最後に閲覧したフォルダーに戻ります。左側で別のフォルダーも選べます。",
+  "smartBin.scopeManaged": "スマートビン横の切り替えで検索範囲を選びます。",
+  "smartBin.inactiveFilters": "記憶したフィルター — 未適用",
+  "smartBin.enableFilter": "フィルターを有効化: {filter}",
+  "smartBin.off": "オフ",
+  "smartBin.unavailable": "使用不可",
+  "smartBin.offHint":
+    "現在は使用可能です。クリックで有効化します。ビンの編集では自動的に有効になりません。",
+  "smartBin.unavailableHint":
+    "このフィルターは現在のビンの条件と一致しません。",
   "smartBin.title": "スマートビン",
   "smartBin.create": "スマートビンを作成",
   "smartBin.edit": "スマートビンを編集",
@@ -125,10 +147,10 @@ export const ja = {
   "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
   "settings.hoverPreview": "ホバープレビュー",
   "settings.hoverPreviewDesc":
-    "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
+    "動画サムネ上で左右に動かしてプレビュー。Option/Alt を押すとアイコンを非表示にし、Command/Ctrl も押すと拡大表示します。",
   "settings.frameQuality": "プレビュー画質",
   "settings.frameQualityDesc":
-    "ディスカバリーのホバープレビューとシーンレールの画質。高いほど生成が遅くなります。",
+    "サムネイルとディスカバリーのホバープレビュー、シーンレールの画質。高いほど生成が遅くなります。",
   "settings.frameQualityLow": "低 (240px)",
   "settings.frameQualityStandard": "標準 (480px)",
   "settings.frameQualityHigh": "高 (960px)",
@@ -293,6 +315,15 @@ export const ja = {
   "media.openAsPeek": "サイドピークで開く",
   "media.openAsModal": "モーダルで開く",
   "media.peekResize": "サイドピークの幅を変更",
+  "media.moveWindow": "ドラッグしてウィンドウを移動",
+  "media.movePlayer":
+    "プレーヤーを移動（タイトルバーをドラッグ、または矢印キー）",
+  "media.popout": "別のウィンドウで開く",
+  "media.popoutFailed": "プレビューウィンドウを開けませんでした。",
+  "media.resizeWidth": "プレーヤーの幅を変更",
+  "media.resizeHeight": "プレーヤーの高さを変更",
+  "media.resizePlayer":
+    "プレーヤーのサイズを変更（角をドラッグ、または矢印キー）",
   "media.playAsPlaylist": "ここからプレイリスト再生",
   "media.deleteFromIndex": "インデックスから削除",
   "media.deleteFromIndexConfirm":
@@ -459,6 +490,16 @@ export const ja = {
   "select.tagsFailed": "タグを適用できませんでした: {msg}",
 
   // メディアグリッド
+  "home.noCombinationMatches":
+    "フィルターの組み合わせに一致するファイルはありません。",
+  "home.pausedFilterHint":
+    "一時停止中のフィルター: {filters}。有効にするか削除するか、対応するビンを選んでください。一時停止中はメディアを表示しません。",
+  "smartBin.removeHeld": "記憶したフィルターを削除: {filter}",
+  "smartBin.pausedResultsHint":
+    "これらのフィルターがオフの間、結果は一時停止します。有効にするか削除して続行してください。",
+  "home.noFilterMatches": "このフィルター条件に一致するファイルはありません。",
+  "home.noFilterMatchesHint":
+    "上のスマートビンのルールとフィルターを確認するか、フィルターを解除して検索範囲を広げてください。",
   "grid.empty": "表示できるメディアがありません。",
   "grid.emptyHint":
     "「スキャン」を実行すると、配下の動画・画像がここに並びます。",
@@ -888,6 +929,7 @@ export const ja = {
   "tags.value.orientSquare": "正方形",
 
   // ワークスペースレール
+  "workspace.navigation": "ライブラリナビゲーション",
   "workspace.all": "すべて",
   "workspace.settings": "設定",
   "workspace.edit": "ワークスペースを編集",

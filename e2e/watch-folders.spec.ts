@@ -107,13 +107,15 @@ test("watches real downloads globally and per folder, and remembers new-file cho
       .first()
       .click();
     await expect(page.getByTestId("media-card")).toHaveCount(5);
+    // Selecting the bin retains the visitor window instead of replacing it
+    // with the bin's own Last hour / discovery rule.
     await openRecent();
     await expect(
       recentPanel().getByRole("combobox", { name: "Define new using" }),
-    ).toHaveText("First discovered by Meguri");
+    ).toHaveText("File creation date");
     await expect(
       recentPanel().getByRole("combobox", { name: "Time window" }),
-    ).toHaveText("Last hour");
+    ).toHaveText("This week");
     await page.keyboard.press("Escape");
 
     await page

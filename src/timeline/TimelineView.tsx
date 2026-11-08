@@ -10,7 +10,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaCard, useCardGridMetrics } from "@/components/MediaGrid";
-import { MediaEmptyState } from "@/components/MediaEmptyState";
+import {
+  MediaEmptyState,
+  type FilterFeedback,
+} from "@/components/MediaEmptyState";
+import { hasFilterConditions } from "@/lib/smartCollections";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivateFile } from "@/audio/useActivateFile";
@@ -82,6 +86,7 @@ interface Props {
   onAnchor: (anchor: FilesSearchPageParam) => void;
   navActive?: boolean;
   watchLater?: boolean;
+  filterFeedback?: FilterFeedback;
 }
 
 export const TimelineView = memo(function TimelineView({
@@ -105,6 +110,7 @@ export const TimelineView = memo(function TimelineView({
   onAnchor,
   navActive = false,
   watchLater = false,
+  filterFeedback,
 }: Props) {
   const { t, lang } = useI18n();
   const watchLaterMembership = useWatchLater();
@@ -431,7 +437,13 @@ export const TimelineView = memo(function TimelineView({
   }
 
   if (layout.total === 0) {
-    return <MediaEmptyState watchLater={watchLater} />;
+    return (
+      <MediaEmptyState
+        watchLater={watchLater}
+        filtered={hasFilterConditions(query)}
+        feedback={filterFeedback}
+      />
+    );
   }
 
   return (

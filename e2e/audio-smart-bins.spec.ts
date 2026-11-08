@@ -182,6 +182,10 @@ test("audio Smart bins replace resolution and preserve audio properties across f
     await expect(
       page.getByRole("combobox", { name: "Resolution", exact: true }),
     ).toHaveCount(0);
+    // A bin keeps its media rules; leave it before browsing a different kind.
+    await page
+      .getByRole("button", { name: "Leave smart bin", exact: true })
+      .click();
     await page.getByRole("radio", { name: "Video", exact: true }).click();
     await expect(
       page.getByRole("button", { name: /Audio properties/ }),

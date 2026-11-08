@@ -60,6 +60,12 @@ function invoke<C extends Exclude<ChannelName, PreloadInvokeChannel>>(
 }
 
 export const api = {
+  mediaPopout: (
+    id: number,
+    workspaceId: string,
+    sec: number,
+    autoplay: boolean,
+  ) => invoke("media_popout", { id, workspaceId, sec, autoplay }),
   appStatus: () => invoke("app_status"),
   /** App + runtime versions for the Settings "About" section. */
   aboutInfo: () => invoke("about_info"),

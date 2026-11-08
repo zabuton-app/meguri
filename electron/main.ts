@@ -67,6 +67,7 @@ const mediaToken = randomBytes(32).toString("base64url");
 const controlToken = randomBytes(32).toString("base64url");
 const MEDIA_TOKEN_HEADER = "X-Api-Token";
 let mainWindow: BrowserWindow | null = null;
+let mediaWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 // Quit lifecycle. "disposing" = async teardown in flight (see before-quit),
 // "done" = teardown finished (or skipped) and the quit may proceed. Any
@@ -270,7 +271,7 @@ app.on("render-process-gone", (_e, wc, details) => {
  */
 function reloadRenderer(win: BrowserWindow): void {
   if (isAppUrl(win.webContents.getURL())) win.webContents.reload();
-  else loadRenderer(win);
+  else void loadRenderer(win);
 }
 
 /** Crash-loop / integrity fallback: let the user choose instead of a blank window. */
@@ -342,8 +343,8 @@ function resolveCliRoot(): string | null {
 
 function emit(channel: string, payload: unknown): void {
   if (channel === "workspace:changed") scans.syncWatchers();
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.webContents.send(channel, payload);
+  for (const win of BrowserWindow.getAllWindows())
+    if (!win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
 // Scans are orchestrated by ScanManager (electron/scanManager.ts); main only
@@ -455,14 +456,61 @@ function createWindow(): void {
     teardownSync();
   });
 
-  loadRenderer(mainWindow);
+  void loadRenderer(mainWindow);
 }
 
 /** Load the app entry (dev server in development, bundled renderer otherwise). */
-function loadRenderer(win: BrowserWindow): void {
+function loadRenderer(win: BrowserWindow, hash = ""): Promise<void> {
   const devUrl = process.env["ELECTRON_RENDERER_URL"];
-  if (devUrl) void win.loadURL(devUrl);
-  else void win.loadFile(path.join(__dirname, "../renderer/index.html"));
+  if (devUrl) {
+    const url = new URL(devUrl);
+    url.hash = hash;
+    return win.loadURL(url.toString());
+  }
+  return win.loadFile(path.join(__dirname, "../renderer/index.html"), { hash });
+}
+
+async function openMediaWindow(input: {
+  id: number;
+  workspaceId: string;
+  sec: number;
+  autoplay: boolean;
+}): Promise<void> {
+  if (isQuitting()) return;
+  if (!mediaWindow || mediaWindow.isDestroyed()) {
+    const win = new BrowserWindow({
+      width: 1000,
+      height: 800,
+      minWidth: 480,
+      minHeight: 420,
+      title: "Meguri — Preview",
+      show: false,
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: path.join(__dirname, "../preload/preload.js"),
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        webSecurity: true,
+        devTools: isDevMode(),
+      },
+    });
+    mediaWindow = win;
+    win.on("closed", () => {
+      if (mediaWindow === win) mediaWindow = null;
+    });
+  }
+  const win = mediaWindow;
+  const params = new URLSearchParams({
+    ws: input.workspaceId,
+    t: String(input.sec),
+    autoplay: input.autoplay ? "1" : "0",
+  });
+  await loadRenderer(win, `/detached/${input.id}?${params.toString()}`);
+  if (!win.isDestroyed()) {
+    win.show();
+    win.focus();
+  }
 }
 
 /** Show and focus the main window, recreating it if it was destroyed. */
@@ -582,6 +630,7 @@ void app.whenReady().then(async () => {
     queryClient,
     positions,
     mainWindow: () => mainWindow,
+    openMediaWindow,
     mediaBase: () => (mediaPort ? `http://127.0.0.1:${mediaPort}` : null),
     isDevMode,
     emit,

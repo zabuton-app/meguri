@@ -68,6 +68,28 @@ export const en: Record<TranslationKey, string> = {
   "resolution.match": "Resolution match",
   "resolution.atLeast": "At least",
   "resolution.exact": "Exactly",
+  "smartBin.leave": "Leave smart bin",
+  "smartBin.omitted":
+    "Left out for this visit: {filters}. Filters are checked again when you leave and return.",
+  "smartBin.global": "Global",
+  "smartBin.local": "Local",
+  "smartBin.location": "Search location",
+  "smartBin.locationPending": "Loading library…",
+  "smartBin.browse": "Browse without a smart bin",
+  "smartBin.noLocal": "Add a scanned folder to use Local mode.",
+  "smartBin.globalHint": "Search all scanned folders.",
+  "smartBin.localHint":
+    "Return to the last visited folder; choose another in the left sidebar.",
+  "smartBin.scopeManaged":
+    "Use Global/Local beside Smart bins to choose where these rules search.",
+  "smartBin.inactiveFilters": "Remembered filters — not applied",
+  "smartBin.enableFilter": "Enable filter: {filter}",
+  "smartBin.off": "Off",
+  "smartBin.unavailable": "Unavailable",
+  "smartBin.offHint":
+    "Compatible now. Click to apply; bin edits leave this filter off.",
+  "smartBin.unavailableHint":
+    "This filter conflicts with the bin’s current rules.",
   "smartBin.title": "Smart bins",
   "smartBin.create": "Create smart bin",
   "smartBin.edit": "Edit smart bin",
@@ -130,10 +152,10 @@ export const en: Record<TranslationKey, string> = {
     "How many scene thumbnails to generate on the detail screen.",
   "settings.hoverPreview": "Hover preview",
   "settings.hoverPreviewDesc":
-    "Preview the scene under the cursor while hovering over a video thumbnail.",
+    "Hover to scrub video thumbnails. Hold Option/Alt for a clean view; add Command/Ctrl for an enlarged preview.",
   "settings.frameQuality": "Preview quality",
   "settings.frameQualityDesc":
-    "Quality of Discovery hover previews and scene rail frames. Higher is slower to generate.",
+    "Quality of thumbnail and Discovery hover previews and scene rail frames. Higher is slower to generate.",
   "settings.frameQualityLow": "Low (240px)",
   "settings.frameQualityStandard": "Standard (480px)",
   "settings.frameQualityHigh": "High (960px)",
@@ -297,6 +319,13 @@ export const en: Record<TranslationKey, string> = {
   "media.openAsPeek": "Open as side peek",
   "media.openAsModal": "Open as modal",
   "media.peekResize": "Resize side peek",
+  "media.moveWindow": "Drag to move this window",
+  "media.movePlayer": "Move player (drag title bar or use arrow keys)",
+  "media.popout": "Open in separate window",
+  "media.popoutFailed": "Could not open the preview window.",
+  "media.resizeWidth": "Resize player width",
+  "media.resizeHeight": "Resize player height",
+  "media.resizePlayer": "Resize player (drag corner or use arrow keys)",
   "media.playAsPlaylist": "Play as playlist from here",
   "media.deleteFromIndex": "Delete From Index",
   "media.deleteFromIndexConfirm":
@@ -462,6 +491,15 @@ export const en: Record<TranslationKey, string> = {
   "select.tagsFailed": "Could not apply the tags: {msg}",
 
   // media grid
+  "home.noCombinationMatches": "Filter combination has no matches.",
+  "home.pausedFilterHint":
+    "Paused filters: {filters}. Enable or remove these filters, or choose a compatible bin. No footage is shown while they are paused.",
+  "smartBin.removeHeld": "Remove remembered filter: {filter}",
+  "smartBin.pausedResultsHint":
+    "Results are paused while these filters are off. Enable or remove them to continue.",
+  "home.noFilterMatches": "No files match these filter criteria.",
+  "home.noFilterMatchesHint":
+    "Review the active bin rules and filters above, or clear filters to broaden your search.",
   "grid.empty": "No media to display.",
   "grid.emptyHint": 'Run "Scan" to list videos and images here.',
   "grid.searchByTag": 'Filter by "{name}"',
@@ -885,6 +923,7 @@ export const en: Record<TranslationKey, string> = {
   "tags.value.orientSquare": "Square",
 
   // workspace rail
+  "workspace.navigation": "Library navigation",
   "workspace.all": "All",
   "workspace.settings": "Settings",
   "workspace.edit": "Edit workspace",

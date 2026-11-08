@@ -80,7 +80,7 @@ describe("TimelineView", () => {
         dated(4, null),
       ]),
     );
-    await screen.findByText("f1.mp4");
+    await screen.findByTitle("f1.mp4");
     const headers = [
       ...document.querySelectorAll('[data-slot="timeline-header"]'),
     ].map((h) => h.textContent);
@@ -118,7 +118,7 @@ describe("TimelineView", () => {
         dated(3, at(2026, 8, 9)),
       ]),
     );
-    await screen.findByText("f1.mp4");
+    await screen.findByTitle("f1.mp4");
     const headers = [
       ...document.querySelectorAll('[data-slot="timeline-header"]'),
     ].map((h) => h.textContent);
@@ -144,7 +144,7 @@ describe("TimelineView", () => {
       undated: 0,
     });
     renderWithProviders(view([dated(1, at(2026, 10, 1))]));
-    await screen.findByText("f1.mp4");
+    await screen.findByTitle("f1.mp4");
     expect(screen.getAllByTestId("timeline-pending")).toHaveLength(4);
   });
 
@@ -162,7 +162,7 @@ describe("TimelineView", () => {
     });
     const onAxisChange = vi.fn();
     renderWithProviders(view([dated(1, at(2026, 10, 1))], { onAxisChange }));
-    await screen.findByText("f1.mp4");
+    await screen.findByTitle("f1.mp4");
     fireEvent.click(screen.getByRole("radio", { name: "Created" }));
     expect(onAxisChange).toHaveBeenCalledWith("btime");
   });
@@ -203,7 +203,7 @@ describe("TimelineView", () => {
         dated(4, at(2026, 8, 1)),
       ]),
     );
-    await screen.findByText("f1.mp4");
+    await screen.findByTitle("f1.mp4");
     // jsdom lays nothing out: give the viewport room to scroll.
     const viewport = document.querySelector(
       '[data-slot="timeline"] [data-slot="scroll-area-viewport"]',
@@ -235,7 +235,7 @@ describe("TimelineView", () => {
         navActive: true,
       }),
     );
-    await screen.findByText("f1.mp4");
+    await screen.findByTitle("f1.mp4");
     const slider = screen.getByRole("slider");
     slider.focus();
     fireEvent.keyDown(slider, { key: "ArrowDown", code: "ArrowDown" });
@@ -253,7 +253,7 @@ describe("TimelineView", () => {
     });
     const onAnchor = vi.fn();
     renderWithProviders(view([dated(1, at(2026, 8, 1))], { onAnchor }));
-    await screen.findByText("f1.mp4");
+    await screen.findByTitle("f1.mp4");
     // One recount for this window, and no more however often it answers.
     await waitFor(() => expect(mocks.timelineCounts.mock.calls.length).toBe(2));
     await new Promise((r) => setTimeout(r, 300));

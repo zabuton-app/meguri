@@ -13,7 +13,10 @@ import {
 import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Folder } from "lucide-react";
-import { MediaEmptyState } from "@/components/MediaEmptyState";
+import {
+  MediaEmptyState,
+  type FilterFeedback,
+} from "@/components/MediaEmptyState";
 import {
   MediaReorderProvider,
   SortableMedia,
@@ -35,6 +38,7 @@ import {
 } from "@/hooks/useWatchLater";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
+import { MediaFileName } from "@/components/MediaFileName";
 import { TagChips } from "@/components/TagChips";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -43,7 +47,7 @@ import { hasTimeline, kindIcon, kindLabel } from "@/lib/mediaKind";
 import { formatDuration, formatSize, resolutionBadge } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
 import { useActivateFile } from "@/audio/useActivateFile";
-import { dirOf, fileNameOf } from "@/lib/relPath";
+import { dirOf, fileNameParts } from "@/lib/relPath";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   usePreferences,
@@ -106,6 +110,9 @@ interface Props {
   resetKey?: string;
   /** The list is a search inside a folder: its empty state says so. */
   inFolder?: boolean;
+  /** An empty result was narrowed by search, filter, or smart-bin rules. */
+  filtered?: boolean;
+  filterFeedback?: FilterFeedback;
 }
 
 const noop = () => {};
@@ -133,6 +140,8 @@ export const MediaList = memo(function MediaList({
   onOpenFolder,
   resetKey,
   inFolder = false,
+  filtered = false,
+  filterFeedback,
 }: Props) {
   const watchLaterMembership = useWatchLater();
   const { listThumbSize } = usePreferences();
@@ -249,7 +258,14 @@ export const MediaList = memo(function MediaList({
   }
 
   if (entries.length === 0) {
-    return <MediaEmptyState watchLater={watchLater} inFolder={inFolder} />;
+    return (
+      <MediaEmptyState
+        watchLater={watchLater}
+        inFolder={inFolder}
+        filtered={filtered}
+        feedback={filterFeedback}
+      />
+    );
   }
 
   return (
@@ -363,6 +379,7 @@ const MediaRow = memo(function MediaRow({
     fileDraggable,
   );
   const dir = dirOf(file.relPath);
+  const format = fileNameParts(file.relPath).extension.slice(1).toUpperCase();
   const dims =
     file.width && file.height ? `${file.width}×${file.height}` : null;
   const duration = hasTimeline(file.kind) ? formatDuration(file.duration) : "";
@@ -386,6 +403,7 @@ const MediaRow = memo(function MediaRow({
       )}
     >
       <div
+        data-scrub-surface
         className={cn(
           "relative z-10 aspect-video shrink-0 overflow-hidden rounded-md bg-overlay text-muted",
           thumbWidth,
@@ -401,7 +419,10 @@ const MediaRow = memo(function MediaRow({
         >
           <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
           {duration && (
-            <span className="absolute bottom-1 right-1 rounded bg-bg/80 px-1 text-[11px] leading-4 tabular-nums text-bright-fg">
+            <span
+              data-thumbnail-overlay
+              className="absolute bottom-1 right-1 rounded bg-bg/80 px-1 text-[11px] leading-4 tabular-nums text-bright-fg"
+            >
               {duration}
             </span>
           )}
@@ -424,7 +445,7 @@ const MediaRow = memo(function MediaRow({
           title={file.relPath}
           className="h-6 truncate text-[15px] font-medium leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
         >
-          {fileNameOf(file.relPath)}
+          <MediaFileName relPath={file.relPath} />
         </Link>
         {/* Wide rows give the metadata its own columns and show the folder
             here; narrow ones (a docked side peek) fold the metadata into this
@@ -433,7 +454,7 @@ const MediaRow = memo(function MediaRow({
           <Folder className="hidden size-3 shrink-0 @3xl:block" />
           <span className="hidden truncate @3xl:inline">{dir || "/"}</span>
           <span className="truncate @3xl:hidden">
-            {[dims, duration, formatSize(file.size)]
+            {[dims, duration, format, formatSize(file.size)]
               .filter(Boolean)
               .join(" · ") || "—"}
           </span>
@@ -443,7 +464,7 @@ const MediaRow = memo(function MediaRow({
         </div>
       </div>
 
-      <div className="hidden shrink-0 grid-cols-[9.5rem_4rem_4.75rem] items-center gap-x-4 text-[13px] tabular-nums text-fg @3xl:grid">
+      <div className="hidden shrink-0 grid-cols-[9.5rem_6rem_4.75rem] items-center gap-x-4 text-[13px] tabular-nums text-fg @3xl:grid">
         <div className="flex min-w-0 items-center justify-end gap-2">
           {file.kind !== "video" && (
             <KindIcon
@@ -460,7 +481,13 @@ const MediaRow = memo(function MediaRow({
             {dims ?? "—"}
           </span>
         </div>
-        <div className={cn("text-right", !duration && "text-muted")}>
+        <div
+          className={cn(
+            "flex items-center justify-end gap-2",
+            !duration && "text-muted",
+          )}
+        >
+          <span className="text-[10px] text-muted">{format}</span>
           {duration || "—"}
         </div>
         <div className={cn("text-right", !file.size && "text-muted")}>

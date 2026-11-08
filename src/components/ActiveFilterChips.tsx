@@ -11,13 +11,15 @@ export function ActiveFilterChips({
   onRemove,
   onClearAll,
   t,
+  showClearAll = false,
 }: {
   chips: ConditionDescriptor[];
   onRemove: (chip: ConditionDescriptor) => void;
   onClearAll: () => void;
   t: TFunc;
+  showClearAll?: boolean;
 }) {
-  if (chips.length === 0) return null;
+  if (chips.length === 0 && !showClearAll) return null;
   return (
     <div className="flex items-center gap-2">
       {/* The chips scroll rather than wrap, so a long list never pushes the bar
@@ -39,8 +41,9 @@ export function ActiveFilterChips({
           <Badge
             key={chip.key}
             data-slot="filter-chip"
+            title={chip.label.length > 40 ? chip.label : undefined}
             variant="secondary"
-            className="max-w-72 pr-1"
+            className="max-w-72 border-border-strong bg-surface pr-1 text-sm font-semibold text-bright-fg"
           >
             <span className="truncate">{chip.label}</span>
             <button
@@ -57,7 +60,7 @@ export function ActiveFilterChips({
       <button
         type="button"
         onClick={onClearAll}
-        className="shrink-0 text-xs text-muted underline-offset-2 hover:text-fg hover:underline"
+        className="shrink-0 text-xs font-medium text-bright-fg underline-offset-2 hover:underline"
       >
         {t("home.clearAll")}
       </button>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useIsFullscreen } from "@/hooks/useIsFullscreen";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import {
-  MODAL_SIZE_KEY,
+  DETAIL_MODAL_SIZE_KEY,
   PRESENTATION_KEY,
   type ModalSize,
   type Presentation,
@@ -15,8 +15,7 @@ import {
  * Both the presentation and the modal size are remembered, so the view
  * reopens the way it was last left, and going peek → modal lands on the modal
  * size that was last chosen. The modal panel is the fullscreen target
- * (YouTube-style: video fills the screen, the rest of the detail content
- * scrolls below it).
+ * (the video and scene rail fit together, with details scrolling separately).
  */
 export function useDetailPresentation({
   kind,
@@ -25,14 +24,15 @@ export function useDetailPresentation({
   kind: string | undefined;
 }) {
   const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
-    MODAL_SIZE_KEY,
-    "large",
-    (raw) => (raw === "small" ? "small" : "large"),
+    DETAIL_MODAL_SIZE_KEY,
+    "small",
+    (raw) => (raw === "large" ? "large" : "small"),
   );
   const toggleModalSize = useCallback(
     () => setModalSize((prev) => (prev === "small" ? "large" : "small")),
     [setModalSize],
   );
+  const compactModal = useCallback(() => setModalSize("small"), [setModalSize]);
   const [presentation, setPresentation] = useLocalStorage<Presentation>(
     PRESENTATION_KEY,
     "modal",
@@ -59,6 +59,7 @@ export function useDetailPresentation({
   return {
     modalSize,
     toggleModalSize,
+    compactModal,
     presentation,
     setPresentation,
     isPeek: presentation === "peek",

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SceneBookmark } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
@@ -39,7 +38,14 @@ export function SceneBookmarks({
       <h3 className="mb-2 px-1 text-xs font-semibold uppercase text-muted">
         {t("media.bookmarks")}
       </h3>
-      <ScrollArea className="w-full" viewportClassName="pb-3">
+      {/* Native scrollbars end their drag on release/cancel. A custom rail can
+          retain pointer capture and chase the cursor on its way to a scene. */}
+      <div
+        data-slot="scene-scroll"
+        tabIndex={0}
+        aria-label={t("media.bookmarks")}
+        className="w-full overflow-x-auto overflow-y-hidden pb-1"
+      >
         <div className="flex gap-2">
           {bookmarks.map((b) => {
             const isMain = isSameThumbSource(thumbOffsetSec, b.sec);
@@ -61,7 +67,7 @@ export function SceneBookmarks({
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
     </section>
   );
 }

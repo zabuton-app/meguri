@@ -65,6 +65,27 @@ export const ko: Record<TranslationKey, string> = {
   "resolution.match": "해상도 일치 방식",
   "resolution.atLeast": "이상",
   "resolution.exact": "정확히",
+  "smartBin.leave": "스마트 빈 나가기",
+  "smartBin.omitted":
+    "이번 방문에서 제외: {filters}. 나갔다가 돌아오면 다시 확인합니다.",
+  "smartBin.global": "전체",
+  "smartBin.local": "폴더",
+  "smartBin.location": "검색 위치",
+  "smartBin.locationPending": "라이브러리 불러오는 중…",
+  "smartBin.browse": "스마트 빈 없이 탐색",
+  "smartBin.noLocal": "폴더 모드를 사용하려면 스캔 폴더를 추가하세요.",
+  "smartBin.globalHint": "스캔한 모든 폴더에서 검색합니다.",
+  "smartBin.localHint":
+    "마지막으로 방문한 폴더로 돌아갑니다. 왼쪽에서 다른 폴더를 선택할 수 있습니다.",
+  "smartBin.scopeManaged":
+    "스마트 빈 옆의 전체/폴더 전환으로 검색 위치를 선택하세요.",
+  "smartBin.inactiveFilters": "기억된 필터 — 적용되지 않음",
+  "smartBin.enableFilter": "필터 켜기: {filter}",
+  "smartBin.off": "꺼짐",
+  "smartBin.unavailable": "사용 불가",
+  "smartBin.offHint":
+    "이제 호환됩니다. 클릭하면 켜집니다. 빈을 편집해도 자동으로 켜지지 않습니다.",
+  "smartBin.unavailableHint": "이 필터는 현재 빈의 규칙과 호환되지 않습니다.",
   "smartBin.title": "스마트 빈",
   "smartBin.create": "스마트 빈 만들기",
   "smartBin.edit": "스마트 빈 편집",
@@ -125,10 +146,10 @@ export const ko: Record<TranslationKey, string> = {
   "settings.scenesDesc": "상세 화면에서 생성할 장면 썸네일 수입니다.",
   "settings.hoverPreview": "호버 미리보기",
   "settings.hoverPreviewDesc":
-    "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",
+    "동영상 썸네일 위에서 커서를 좌우로 움직여 장면을 탐색합니다. Option/Alt를 누르면 아이콘을 숨기고, Command/Ctrl도 누르면 미리보기를 확대합니다.",
   "settings.frameQuality": "미리보기 화질",
   "settings.frameQualityDesc":
-    "디스커버리의 호버 미리보기와 장면 레일의 화질. 높을수록 생성이 느려집니다.",
+    "썸네일과 디스커버리의 호버 미리보기 및 장면 레일의 화질. 높을수록 생성이 느려집니다.",
   "settings.frameQualityLow": "낮음 (240px)",
   "settings.frameQualityStandard": "표준 (480px)",
   "settings.frameQualityHigh": "높음 (960px)",
@@ -291,6 +312,13 @@ export const ko: Record<TranslationKey, string> = {
   "media.openAsPeek": "사이드 피크로 열기",
   "media.openAsModal": "모달로 열기",
   "media.peekResize": "사이드 피크 너비 조절",
+  "media.moveWindow": "드래그하여 이 창 이동",
+  "media.movePlayer": "플레이어 이동 (제목 표시줄 드래그 또는 방향키)",
+  "media.popout": "별도 창에서 열기",
+  "media.popoutFailed": "미리보기 창을 열 수 없습니다.",
+  "media.resizeWidth": "플레이어 너비 조절",
+  "media.resizeHeight": "플레이어 높이 조절",
+  "media.resizePlayer": "플레이어 크기 조절 (모서리 드래그 또는 방향키)",
   "media.playAsPlaylist": "여기부터 재생 목록으로 재생",
   "media.deleteFromIndex": "인덱스에서 삭제",
   "media.deleteFromIndexConfirm":
@@ -457,6 +485,15 @@ export const ko: Record<TranslationKey, string> = {
   "select.tagsFailed": "태그를 적용하지 못했습니다: {msg}",
 
   // media grid
+  "home.noCombinationMatches": "필터 조합에 맞는 파일이 없습니다.",
+  "home.pausedFilterHint":
+    "일시 중지된 필터: {filters}. 활성화하거나 제거하거나 호환되는 빈을 선택하세요. 일시 중지된 동안 미디어를 표시하지 않습니다.",
+  "smartBin.removeHeld": "기억된 필터 제거: {filter}",
+  "smartBin.pausedResultsHint":
+    "이 필터가 꺼져 있는 동안 결과가 일시 중지됩니다. 활성화하거나 제거하여 계속하세요.",
+  "home.noFilterMatches": "이 필터 조건에 맞는 파일이 없습니다.",
+  "home.noFilterMatchesHint":
+    "위의 스마트 빈 규칙과 필터를 확인하거나 필터를 지워 검색 범위를 넓히세요.",
   "grid.empty": "표시할 미디어가 없습니다.",
   "grid.emptyHint":
     "「스캔」을 실행하면 하위의 동영상·이미지가 여기에 표시됩니다.",
@@ -886,6 +923,7 @@ export const ko: Record<TranslationKey, string> = {
   "tags.value.orientSquare": "정사각형",
 
   // workspace rail
+  "workspace.navigation": "라이브러리 탐색",
   "workspace.all": "전체",
   "workspace.settings": "설정",
   "workspace.edit": "워크스페이스 편집",

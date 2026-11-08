@@ -5,6 +5,7 @@
 /** Renderer → main invoke channels (ipcMain.handle). */
 export const INVOKE_CHANNELS = [
   "app_status",
+  "media_popout",
   "about_info",
   "workspace_stats",
   "workspaces_list",

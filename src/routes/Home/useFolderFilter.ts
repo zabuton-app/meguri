@@ -25,12 +25,16 @@ export function useFolderFilter({
   filter,
   setFilter,
   setByFolder,
+  applySaved,
+  scopeForBin,
 }: {
   folderView: boolean;
   folderNav: FolderNav;
   filter: SearchQuery;
   setFilter: (next: SearchQuery) => void;
   setByFolder: (on: boolean) => void;
+  applySaved?: (collection: SmartCollection) => void;
+  scopeForBin?: () => { workspaceId: string; path: string };
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -106,7 +110,7 @@ export function useFolderFilter({
   // the user did in the workspace being left does not stop the request from
   // finishing the move it has started (and moves are kept per workspace).
   const openFolder = useCallback(
-    async (ws: string, folder: string, next?: SearchQuery) => {
+    async (ws: string, folder: string, next?: SearchQuery | (() => void)) => {
       const request = ++latestOpen.current;
       const overtaken = () => request !== latestOpen.current;
       while (switching.current) {
@@ -159,7 +163,8 @@ export function useFolderFilter({
         toast.info(t("folder.moved"), { id: "folder-moved" });
       visit(ws, target);
       setByFolder(true);
-      if (next) setFilter(next);
+      if (typeof next === "function") next();
+      else if (next) setFilter(next);
     },
     [
       qc,
@@ -173,49 +178,60 @@ export function useFolderFilter({
     ],
   );
 
-  // A saved search replaces every condition, the folder included: one saved
-  // without a folder opens at the root — even with the folder option off, so
-  // turning it on later does not bring back the folder left behind.
+  const openGlobal = useCallback(
+    async (commit?: () => void) => {
+      const request = ++latestOpen.current;
+      while (switching.current) await switching.current.catch(() => {});
+      if (request !== latestOpen.current) return;
+      try {
+        if (activeWorkspace() !== ALL_ID) await switchWorkspace(ALL_ID);
+        if (request === latestOpen.current && activeWorkspace() === ALL_ID)
+          commit?.();
+      } catch (error) {
+        if (request === latestOpen.current)
+          toast.error(t("folder.showFailed"), {
+            description: error instanceof Error ? error.message : String(error),
+          });
+      }
+    },
+    [activeWorkspace, switchWorkspace, t],
+  );
+
+  // Commit only after reaching the saved scope. The bin controller keeps
+  // membership separate from visitor filters; legacy searches replace them.
+  // A search without a folder opens at the root so an old folder cannot return.
   const onApplySaved = useCallback(
     (collection: SmartCollection) => {
       const { folder, ...rest } = collection.query;
+      const commit = () =>
+        applySaved ? applySaved(collection) : setFilter(rest);
+      if (collection.scope && scopeForBin) {
+        const target = scopeForBin();
+        if (target.workspaceId === ALL_ID) void openGlobal(commit);
+        else void openFolder(target.workspaceId, target.path, commit);
+        return;
+      }
       if (collection.scope === "workspace" && collection.workspaceId) {
         void openFolder(
           collection.workspaceId,
           folder?.path ?? ROOT_FOLDER,
-          rest,
+          commit,
         );
         return;
       }
       if (collection.scope === "all") {
-        const request = ++latestOpen.current;
-        void (async () => {
-          while (switching.current) await switching.current.catch(() => {});
-          if (request !== latestOpen.current) return;
-          try {
-            if (activeWorkspace() !== ALL_ID) await switchWorkspace(ALL_ID);
-            if (request !== latestOpen.current || activeWorkspace() !== ALL_ID)
-              return;
-            setFilter(rest);
-          } catch (error) {
-            if (request !== latestOpen.current) return;
-            toast.error(t("folder.showFailed"), {
-              description:
-                error instanceof Error ? error.message : String(error),
-            });
-          }
-        })();
+        void openGlobal(commit);
         return;
       }
       if (folder && collection.workspaceId) {
-        void openFolder(collection.workspaceId, folder.path, rest);
+        void openFolder(collection.workspaceId, folder.path, commit);
         return;
       }
       latestOpen.current++;
       if (path !== ROOT_FOLDER) goTo(ROOT_FOLDER);
-      setFilter(rest);
+      commit();
     },
-    [openFolder, path, goTo, setFilter, activeWorkspace, switchWorkspace, t],
+    [openFolder, path, goTo, setFilter, applySaved, scopeForBin, openGlobal],
   );
 
   // A recent search replaces the conditions but not the place: it was saved
@@ -237,5 +253,18 @@ export function useFolderFilter({
     [openFolder],
   );
 
-  return { filterValue, onFilterChange, onApplySaved, onApplyRecent };
+  const onOpenLocation = useCallback(
+    (workspaceId: string, folder = ROOT_FOLDER) => {
+      if (workspaceId === ALL_ID) void openGlobal();
+      else void openFolder(workspaceId, folder);
+    },
+    [openGlobal, openFolder],
+  );
+  return {
+    filterValue,
+    onFilterChange,
+    onApplySaved,
+    onApplyRecent,
+    onOpenLocation,
+  };
 }

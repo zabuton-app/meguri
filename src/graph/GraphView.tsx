@@ -36,6 +36,11 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { fileHref } from "@/lib/fileHref";
 import log from "@/lib/logger";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  MediaEmptyState,
+  type FilterFeedback,
+} from "@/components/MediaEmptyState";
+import { hasFilterConditions } from "@/lib/smartCollections";
 import { buildGraphology, emptyGraph } from "./model/buildGraphology";
 import { placeNodes, type Point } from "./model/placement";
 import type { MediaGraph } from "./model/types";
@@ -77,6 +82,7 @@ interface Props {
   /** Active target: workspace id, "__all__" or "collection:<id>". */
   scope: string;
   query: SearchQuery;
+  filterFeedback?: FilterFeedback;
   ready: boolean;
   /** Keyboard shortcuts apply (the list is in front, no overlay). */
   keysActive: boolean;
@@ -154,6 +160,7 @@ export function GraphView(props: Props) {
 function GraphScene({
   scope,
   query,
+  filterFeedback,
   ready,
   keysActive,
   onFilterToken,
@@ -584,6 +591,8 @@ function GraphScene({
               <p className="text-sm text-muted">{t("graph.loading")}</p>
             ) : isError ? (
               <p className="text-sm text-muted">{t("graph.loadFailed")}</p>
+            ) : payload?.totalFiles === 0 && hasFilterConditions(query) ? (
+              <MediaEmptyState filtered feedback={filterFeedback} />
             ) : (
               <>
                 <Share2 className="size-10 text-muted opacity-60" />

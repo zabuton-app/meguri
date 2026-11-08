@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { dirOf, fileNameOf, folderPathOf } from "@/lib/relPath";
+import { dirOf, fileNameOf, fileNameParts, folderPathOf } from "@/lib/relPath";
+
+describe("fileNameParts", () => {
+  it.each(["folder/Interview.final.v2.MOV", "folder\\Interview.final.v2.MOV"])(
+    "separates only the final extension of %s",
+    (path) => {
+      expect(fileNameParts(path)).toEqual({
+        name: "Interview.final.v2",
+        extension: ".MOV",
+      });
+    },
+  );
+  it.each(["README", ".hidden", "trailing."])(
+    "preserves %s without an extension",
+    (name) => {
+      expect(fileNameParts(name)).toEqual({ name, extension: "" });
+    },
+  );
+});
 
 describe("fileNameOf", () => {
   it("extracts the file name from a POSIX relative path", () => {

@@ -48,6 +48,11 @@ interface Props {
   showSaved?: boolean;
   searchInputId?: string;
   onValidityChange?: (valid: boolean) => void;
+  /** Within a bin, Clear all affects only visitor filters. */
+  onClearFilters?: () => void;
+  allowedKinds?: string[];
+  portableBins?: boolean;
+  showClearFilters?: boolean;
 }
 
 export function FilterBar({
@@ -62,11 +67,18 @@ export function FilterBar({
   showSaved = true,
   searchInputId = "list-search-input",
   onValidityChange,
+  onClearFilters,
+  allowedKinds,
+  portableBins = false,
+  showClearFilters = false,
 }: Props) {
   const { t } = useI18n();
   const [valid, setValid] = useState(true);
   const [audioReset, setAudioReset] = useState(0);
-  const filtersValid = value.kind !== "audio" || valid;
+  const audioMode =
+    value.kind === "audio" ||
+    (!value.kind && allowedKinds?.length === 1 && allowedKinds[0] === "audio");
+  const filtersValid = !audioMode || valid;
   useEffect(
     () => onValidityChange?.(filtersValid),
     [filtersValid, onValidityChange],
@@ -79,7 +91,8 @@ export function FilterBar({
   const clearAll = () => {
     setAudioReset((n) => n + 1);
     setValid(true);
-    onChange(clearAllTarget(value, defaultQuery));
+    if (onClearFilters) onClearFilters();
+    else onChange(showSaved ? clearAllTarget(value, defaultQuery) : {});
   };
 
   const descriptors = useMemo(
@@ -119,7 +132,16 @@ export function FilterBar({
             { value: "image", label: t("kind.image") },
             { value: "visual", label: t("kind.visual") },
             { value: "audio", label: t("kind.audio") },
-          ]}
+          ].filter(
+            (option) =>
+              !allowedKinds ||
+              !option.value ||
+              (option.value === "visual"
+                ? allowedKinds.some(
+                    (kind) => kind === "video" || kind === "image",
+                  )
+                : allowedKinds.includes(option.value)),
+          )}
           onChange={(kind) => {
             setValid(true);
             patch({
@@ -130,12 +152,12 @@ export function FilterBar({
           }}
         />
 
-        {value.kind === "audio" ? (
+        {audioMode ? (
           <AudioFilters
             key={audioReset}
             onValidityChange={setValid}
             value={value.audio}
-            onChange={(audio) => patch({ audio })}
+            onChange={(audio) => patch({ audio, kind: "audio" })}
           />
         ) : (
           <ResolutionFilter
@@ -227,6 +249,7 @@ export function FilterBar({
               workspaceId={workspaceId}
               onApply={onApplySaved ?? ((c) => onChange(c.query))}
               smart={smart}
+              portable={portableBins}
             />
           </fieldset>
         )}
@@ -237,6 +260,7 @@ export function FilterBar({
         onRemove={(chip) => onChange(chip.clear(value))}
         onClearAll={clearAll}
         t={t}
+        showClearAll={showClearFilters}
       />
     </div>
   );

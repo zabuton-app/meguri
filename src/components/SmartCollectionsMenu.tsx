@@ -43,6 +43,7 @@ interface Props {
    * the default picked here, so both have to read the same state.
    */
   smart: SmartCollectionsState;
+  portable?: boolean;
 }
 
 export function SmartCollectionsMenu({
@@ -50,6 +51,7 @@ export function SmartCollectionsMenu({
   workspaceId,
   onApply,
   smart,
+  portable = false,
 }: Props) {
   const { t } = useI18n();
   const {
@@ -81,7 +83,12 @@ export function SmartCollectionsMenu({
   const onSave = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    addCollection(trimmed, value, workspaceId, scope);
+    addCollection(
+      trimmed,
+      value,
+      portable ? undefined : workspaceId,
+      portable ? "all" : scope,
+    );
     setSaveOpen(false);
   };
 
@@ -222,22 +229,31 @@ export function SmartCollectionsMenu({
                 placeholder={t("smartCollection.namePlaceholder")}
               />
               <p className="select-text text-xs text-muted">{summary}</p>
-              <Select
-                value={scope}
-                onValueChange={(next) => setScope(next as "all" | "workspace")}
-              >
-                <SelectTrigger aria-label={t("smartBin.scope")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("smartBin.all")}</SelectItem>
-                  {workspaceId && (
-                    <SelectItem value="workspace">
-                      {t("smartBin.selected")}
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+              {!portable && (
+                <Select
+                  value={scope}
+                  onValueChange={(next) =>
+                    setScope(next as "all" | "workspace")
+                  }
+                >
+                  <SelectTrigger aria-label={t("smartBin.scope")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("smartBin.all")}</SelectItem>
+                    {workspaceId && (
+                      <SelectItem value="workspace">
+                        {t("smartBin.selected")}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+              {portable && (
+                <p className="text-xs text-muted">
+                  {t("smartBin.scopeManaged")}
+                </p>
+              )}
             </div>
             <DialogFooter className="border-t border-border p-4">
               <Button

@@ -67,6 +67,28 @@ export const es: Record<TranslationKey, string> = {
   "resolution.match": "Coincidencia de resolución",
   "resolution.atLeast": "Como mínimo",
   "resolution.exact": "Exactamente",
+  "smartBin.leave": "Salir del contenedor inteligente",
+  "smartBin.omitted":
+    "Excluidos durante esta visita: {filters}. Se revisarán al salir y volver.",
+  "smartBin.global": "Global",
+  "smartBin.local": "Local",
+  "smartBin.location": "Ubicación de búsqueda",
+  "smartBin.locationPending": "Cargando biblioteca…",
+  "smartBin.browse": "Explorar sin un contenedor inteligente",
+  "smartBin.noLocal": "Añade una carpeta escaneada para usar el modo local.",
+  "smartBin.globalHint": "Buscar en todas las carpetas escaneadas.",
+  "smartBin.localHint":
+    "Volver a la última carpeta visitada; elige otra en la barra izquierda.",
+  "smartBin.scopeManaged":
+    "Usa Global/Local junto a los contenedores inteligentes para elegir dónde buscar.",
+  "smartBin.inactiveFilters": "Filtros recordados — no aplicados",
+  "smartBin.enableFilter": "Activar filtro: {filter}",
+  "smartBin.off": "Desactivado",
+  "smartBin.unavailable": "No disponible",
+  "smartBin.offHint":
+    "Ahora es compatible. Haz clic para activarlo; editar el contenedor lo mantiene desactivado.",
+  "smartBin.unavailableHint":
+    "Este filtro entra en conflicto con las reglas actuales del contenedor.",
   "smartBin.title": "Bins inteligentes",
   "smartBin.create": "Crear bin inteligente",
   "smartBin.edit": "Editar bin inteligente",
@@ -129,10 +151,10 @@ export const es: Record<TranslationKey, string> = {
     "Cuántas miniaturas de escena generar en la pantalla de detalles.",
   "settings.hoverPreview": "Vista previa al pasar el cursor",
   "settings.hoverPreviewDesc":
-    "Muestra la escena bajo el cursor al pasar sobre la miniatura de un vídeo.",
+    "Mueve el cursor sobre las miniaturas de vídeo para explorar escenas. Mantén Opción/Alt para ocultar los iconos; añade Comando/Ctrl para ampliar la vista previa.",
   "settings.frameQuality": "Calidad de la vista previa",
   "settings.frameQualityDesc":
-    "Calidad de las vistas previas al pasar el cursor y de la fila de escenas en Descubrir. Cuanto más alta, más lenta la generación.",
+    "Calidad de las vistas previas de miniaturas y Descubrir, y de la fila de escenas. Cuanto más alta, más lenta la generación.",
   "settings.frameQualityLow": "Baja (240px)",
   "settings.frameQualityStandard": "Estándar (480px)",
   "settings.frameQualityHigh": "Alta (960px)",
@@ -300,6 +322,15 @@ export const es: Record<TranslationKey, string> = {
   "media.openAsPeek": "Abrir como panel lateral",
   "media.openAsModal": "Abrir como ventana",
   "media.peekResize": "Cambiar el ancho del panel lateral",
+  "media.moveWindow": "Arrastra para mover esta ventana",
+  "media.movePlayer":
+    "Mover reproductor (arrastrar la barra de título o usar las flechas)",
+  "media.popout": "Abrir en una ventana independiente",
+  "media.popoutFailed": "No se pudo abrir la ventana de vista previa.",
+  "media.resizeWidth": "Cambiar el ancho del reproductor",
+  "media.resizeHeight": "Cambiar la altura del reproductor",
+  "media.resizePlayer":
+    "Cambiar el tamaño del reproductor (arrastrar la esquina o usar las flechas)",
   "media.playAsPlaylist": "Reproducir como lista desde aquí",
   "media.deleteFromIndex": "Eliminar del índice",
   "media.deleteFromIndexConfirm":
@@ -469,6 +500,16 @@ export const es: Record<TranslationKey, string> = {
   "select.tagsFailed": "No se pudieron aplicar las etiquetas: {msg}",
 
   // media grid
+  "home.noCombinationMatches":
+    "La combinación de filtros no tiene coincidencias.",
+  "home.pausedFilterHint":
+    "Filtros en pausa: {filters}. Actívalos, elimínalos o elige una colección compatible. No se muestra contenido mientras estén en pausa.",
+  "smartBin.removeHeld": "Eliminar filtro recordado: {filter}",
+  "smartBin.pausedResultsHint":
+    "Los resultados están en pausa mientras estos filtros estén desactivados. Actívalos o elimínalos para continuar.",
+  "home.noFilterMatches": "Ningún archivo coincide con estos filtros.",
+  "home.noFilterMatchesHint":
+    "Revisa las reglas de la colección y los filtros de arriba, o borra los filtros para ampliar la búsqueda.",
   "grid.empty": "No hay medios que mostrar.",
   "grid.emptyHint":
     "Ejecuta «Escanear» para listar aquí los vídeos e imágenes.",
@@ -911,6 +952,7 @@ export const es: Record<TranslationKey, string> = {
   "tags.value.orientSquare": "Cuadrada",
 
   // workspace rail
+  "workspace.navigation": "Navegación de la biblioteca",
   "workspace.all": "Todo",
   "workspace.settings": "Ajustes",
   "workspace.edit": "Editar espacio de trabajo",

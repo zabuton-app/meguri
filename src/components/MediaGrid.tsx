@@ -12,7 +12,10 @@ import {
 } from "react";
 import { Link } from "react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { MediaEmptyState } from "@/components/MediaEmptyState";
+import {
+  MediaEmptyState,
+  type FilterFeedback,
+} from "@/components/MediaEmptyState";
 import {
   MediaReorderProvider,
   SortableMedia,
@@ -34,6 +37,7 @@ import { FavoriteButton } from "@/components/FavoriteButton";
 import { ExternalFileDragHandle } from "@/components/ExternalFileDragHandle";
 import { RatingButton } from "@/components/RatingButton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
+import { MediaFileName } from "@/components/MediaFileName";
 import { TagChips } from "@/components/TagChips";
 import { SelectionCheck } from "@/components/SelectionCheck";
 import { useSelectableClick } from "@/hooks/useSelectableClick";
@@ -44,8 +48,8 @@ import { cn } from "@/lib/utils";
 import { hasTimeline } from "@/lib/mediaKind";
 import { formatDuration } from "@/lib/format";
 import { fileHref } from "@/lib/fileHref";
+import { fileNameParts } from "@/lib/relPath";
 import { useActivateFile } from "@/audio/useActivateFile";
-import { fileNameOf } from "@/lib/relPath";
 import { useGridKeyboardNav, useScrollToRow } from "@/hooks/useGridKeyboardNav";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { usePublishFocusedFile } from "@/hooks/useFocusedFile";
@@ -102,6 +106,9 @@ interface Props {
   resetKey?: string;
   /** The list is a search inside a folder: its empty state says so. */
   inFolder?: boolean;
+  /** An empty result was narrowed by search, filter, or smart-bin rules. */
+  filtered?: boolean;
+  filterFeedback?: FilterFeedback;
 }
 
 const noop = () => {};
@@ -221,6 +228,8 @@ export const MediaGrid = memo(function MediaGrid({
   onOpenFolder,
   resetKey,
   inFolder = false,
+  filtered = false,
+  filterFeedback,
 }: Props) {
   const watchLaterMembership = useWatchLater();
 
@@ -343,7 +352,14 @@ export const MediaGrid = memo(function MediaGrid({
   }
 
   if (entries.length === 0) {
-    return <MediaEmptyState watchLater={watchLater} inFolder={inFolder} />;
+    return (
+      <MediaEmptyState
+        watchLater={watchLater}
+        inFolder={inFolder}
+        filtered={filtered}
+        feedback={filterFeedback}
+      />
+    );
   }
 
   // Keep the custom scrollbar (shadcn ScrollArea) while using its Viewport as the
@@ -475,53 +491,61 @@ export const MediaCard = memo(function MediaCard({
         selected && "border-primary ring-1 ring-primary",
       )}
     >
-      <Link
-        to={fileHref(file.id, file.workspaceId)}
-        onClick={(e) => {
-          if (onSelectableClick(e)) return;
-          onThumbnailClick(file)(e);
-        }}
-        data-thumb
-        className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
+      <div
+        data-scrub-surface
+        className="relative aspect-video overflow-hidden bg-overlay text-muted"
       >
-        <SelectionCheck
-          file={file}
-          index={index}
-          className="absolute left-1 top-1 z-10"
-        />
-        <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
-        {hasTimeline(file.kind) && file.duration && (
-          <span className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg">
-            {formatDuration(file.duration)}
-          </span>
-        )}
-        {/* Favorite toggle. Always visible when favorited; on hover otherwise. */}
-        <FavoriteButton
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          favorite={file.favorite}
-          size={16}
-          className={cn(
-            "absolute right-1 top-1 rounded bg-bg/70 p-1 backdrop-blur-[1px] transition-opacity",
-            file.favorite
-              ? "opacity-100"
-              : "opacity-0 focus:opacity-100 group-hover:opacity-100",
+        <Link
+          to={fileHref(file.id, file.workspaceId)}
+          onClick={(e) => {
+            if (onSelectableClick(e)) return;
+            onThumbnailClick(file)(e);
+          }}
+          data-thumb
+          className="group/thumb absolute inset-0 block"
+        >
+          <SelectionCheck
+            file={file}
+            index={index}
+            className="absolute left-1 top-1 z-10"
+          />
+          <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
+          {hasTimeline(file.kind) && file.duration && (
+            <span
+              data-thumbnail-overlay
+              className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg"
+            >
+              {formatDuration(file.duration)}
+            </span>
           )}
+          {/* Favorite toggle. Always visible when favorited; on hover otherwise. */}
+          <FavoriteButton
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            favorite={file.favorite}
+            size={16}
+            className={cn(
+              "absolute right-1 top-1 rounded bg-bg/70 p-1 backdrop-blur-[1px] transition-opacity",
+              file.favorite
+                ? "opacity-100"
+                : "opacity-0 focus:opacity-100 group-hover:opacity-100",
+            )}
+          />
+          {/* Watch Later toggle, mirroring the favorite affordance below it. */}
+          <WatchLaterButton
+            ref={watchLaterRef}
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            watchLater={watchLater}
+            size={16}
+            className="absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
+          />
+        </Link>
+        <ExternalFileDragHandle
+          onDragStart={onExternalDragStart}
+          className="left-7 top-1"
         />
-        {/* Watch Later toggle, mirroring the favorite affordance below it. */}
-        <WatchLaterButton
-          ref={watchLaterRef}
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          watchLater={watchLater}
-          size={16}
-          className="absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
-        />
-      </Link>
-      <ExternalFileDragHandle
-        onDragStart={onExternalDragStart}
-        className="left-7 top-1"
-      />
+      </div>
       {/* Metadata. Fixed height so the card height doesn't change with tag
           count — and independent of the card width (single-line truncation,
           no wrapping): the grid's row-height estimate measures this block
@@ -532,7 +556,7 @@ export const MediaCard = memo(function MediaCard({
         className="flex flex-col gap-1 border-t border-border px-2 py-1.5"
       >
         <div className="truncate text-xs text-fg" title={file.relPath}>
-          {fileNameOf(file.relPath)}
+          <MediaFileName relPath={file.relPath} />
         </div>
         <div className="truncate text-[10px] text-muted">{metaLine(file)}</div>
         {/* Editable rating. Stops click propagation so it doesn't open the detail. */}
@@ -559,5 +583,6 @@ function metaLine(file: FileRow): string {
     hasTimeline(file.kind) && file.duration
       ? formatDuration(file.duration)
       : null;
-  return [dims, dur].filter(Boolean).join(" · ") || "—";
+  const format = fileNameParts(file.relPath).extension.slice(1).toUpperCase();
+  return [dims, dur, format].filter(Boolean).join(" · ") || "—";
 }

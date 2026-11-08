@@ -23,6 +23,7 @@ import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
 import {
   cleanConditions,
   describeDateRange,
+  describeSearchQuery,
   scopedFolderPath,
 } from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
@@ -75,6 +76,14 @@ export function describeConditions(
   defaultQuery: SearchQuery | null = null,
 ): ConditionDescriptor[] {
   const out: ConditionDescriptor[] = [];
+  for (const [index, clause] of (query.allOf ?? []).entries())
+    out.push({
+      key: `allOf-${index}`,
+      label: describeSearchQuery(t, clause),
+      group: "primary",
+      chip: true,
+      clear: (q) => ({ ...q, allOf: q.allOf?.filter((_, at) => at !== index) }),
+    });
 
   // First: it is where the list is, and every other condition narrows within it.
   const folder = scopedFolderPath(query);

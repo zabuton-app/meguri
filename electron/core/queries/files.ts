@@ -173,7 +173,9 @@ function resolveSearchTagIds(db: DB, value: string): number[] {
  * The root has no range to walk. Exported for the index-plan tests.
  */
 export function fromFor(query: SearchQuery): string {
-  return query.folder?.path ? FOLDER_FILE_FROM : FILE_FROM;
+  return query.folder?.path || query.allOf?.some((part) => part.folder?.path)
+    ? FOLDER_FILE_FROM
+    : FILE_FROM;
 }
 
 /**
@@ -188,6 +190,9 @@ export function appendSearchConditions(
   /** rel_path's separator; see folderRange(). Injected only by tests. */
   sep?: string,
 ): string {
+  if (query.matchNone) return sql + " AND 0";
+  for (const clause of query.allOf ?? [])
+    sql = appendSearchConditions(db, sql, args, clause, sep);
   const terms = query.q
     ? buildSearchTerms(query.q)
     : { match: null, anyOf: [], tagTokens: [] };

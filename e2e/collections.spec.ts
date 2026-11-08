@@ -57,10 +57,21 @@ test.describe("Collections", () => {
     await saveDialog.getByRole("button", { name: "Save" }).click();
 
     await searchInput(ready).fill("nomatch");
-    await expect(ready.getByText("No media to display.")).toBeVisible();
+    await expect(
+      ready.getByText("No files match these filter criteria.", { exact: true }),
+    ).toBeVisible();
 
     await ready.getByRole("button", { name: "Smart collections" }).click();
     await ready.getByRole("menuitem", { name: /^PNG search/ }).click();
+    // A bin defines the starting set; the current visitor search still narrows it.
+    await expect(searchInput(ready)).toHaveValue("nomatch");
+    await expect(
+      ready.getByText("Filter combination has no matches.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      ready.locator('[data-slot="smart-bin-context"]'),
+    ).toContainText("PNG search");
+    await searchInput(ready).fill("");
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
   });
 
@@ -82,7 +93,14 @@ test.describe("Collections", () => {
     await ready.getByRole("button", { name: "Smart collections" }).click();
     await ready.getByRole("menuitem", { name: /^E2E Favorites/ }).click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
-    await expect(ready.getByText("♥ Favorites")).toBeVisible();
+    await expect(
+      ready
+        .locator('[data-slot="smart-bin-context"]')
+        .getByTitle("Favorites", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      ready.getByRole("button", { name: "Show favorites only" }),
+    ).toHaveAttribute("aria-pressed", "false");
   });
 
   test("drags a file card onto a user collection", async ({ ready }) => {

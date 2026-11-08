@@ -61,6 +61,23 @@ export const zhCN: Record<TranslationKey, string> = {
   "resolution.match": "分辨率匹配方式",
   "resolution.atLeast": "至少",
   "resolution.exact": "精确匹配",
+  "smartBin.leave": "离开智能媒体箱",
+  "smartBin.omitted": "本次访问已排除：{filters}。离开后再次进入时会重新检查。",
+  "smartBin.global": "全局",
+  "smartBin.local": "本地",
+  "smartBin.location": "搜索位置",
+  "smartBin.locationPending": "正在加载媒体库…",
+  "smartBin.browse": "不使用智能媒体箱浏览",
+  "smartBin.noLocal": "请先添加扫描文件夹以使用本地模式。",
+  "smartBin.globalHint": "搜索所有扫描的文件夹。",
+  "smartBin.localHint": "返回上次访问的文件夹，也可在左侧选择其他文件夹。",
+  "smartBin.scopeManaged": "使用智能媒体箱旁的全局/本地切换来选择搜索范围。",
+  "smartBin.inactiveFilters": "已记住的筛选条件 — 未应用",
+  "smartBin.enableFilter": "启用筛选条件：{filter}",
+  "smartBin.off": "关闭",
+  "smartBin.unavailable": "不可用",
+  "smartBin.offHint": "现在兼容。点击即可启用；编辑媒体箱不会自动启用此条件。",
+  "smartBin.unavailableHint": "此筛选条件与媒体箱当前的规则不兼容。",
   "smartBin.title": "智能媒体夹",
   "smartBin.create": "创建智能媒体夹",
   "smartBin.edit": "编辑智能媒体夹",
@@ -118,10 +135,11 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.scenes": "场景缩略图数量",
   "settings.scenesDesc": "在详情页生成多少张场景缩略图。",
   "settings.hoverPreview": "悬停预览",
-  "settings.hoverPreviewDesc": "预览视频缩略图上光标位置对应的场景。",
+  "settings.hoverPreviewDesc":
+    "在视频缩略图上左右移动光标以浏览场景。按住 Option/Alt 可隐藏图标，同时按住 Command/Ctrl 可放大预览。",
   "settings.frameQuality": "预览画质",
   "settings.frameQualityDesc":
-    "发现页悬停预览和场景栏帧图像的画质。越高生成越慢。",
+    "缩略图、发现页悬停预览和场景栏帧图像的画质。越高生成越慢。",
   "settings.frameQualityLow": "低 (240px)",
   "settings.frameQualityStandard": "标准 (480px)",
   "settings.frameQualityHigh": "高 (960px)",
@@ -282,6 +300,13 @@ export const zhCN: Record<TranslationKey, string> = {
   "media.openAsPeek": "以侧边面板打开",
   "media.openAsModal": "以窗口打开",
   "media.peekResize": "调整侧边面板宽度",
+  "media.moveWindow": "拖动以移动此窗口",
+  "media.movePlayer": "移动播放器（拖动标题栏或使用方向键）",
+  "media.popout": "在独立窗口中打开",
+  "media.popoutFailed": "无法打开预览窗口。",
+  "media.resizeWidth": "调整播放器宽度",
+  "media.resizeHeight": "调整播放器高度",
+  "media.resizePlayer": "调整播放器大小（拖动角落或使用方向键）",
   "media.playAsPlaylist": "从此处作为播放列表播放",
   "media.deleteFromIndex": "从索引中删除",
   "media.deleteFromIndexConfirm":
@@ -444,6 +469,15 @@ export const zhCN: Record<TranslationKey, string> = {
   "select.tagsFailed": "无法应用标签：{msg}",
 
   // media grid
+  "home.noCombinationMatches": "筛选条件组合没有匹配项。",
+  "home.pausedFilterHint":
+    "已暂停的筛选条件：{filters}。请启用、移除这些条件，或选择兼容的素材箱。暂停期间不显示素材。",
+  "smartBin.removeHeld": "移除已记住的筛选条件：{filter}",
+  "smartBin.pausedResultsHint":
+    "这些筛选条件关闭时，结果会暂停显示。请启用或移除它们以继续。",
+  "home.noFilterMatches": "没有文件符合这些筛选条件。",
+  "home.noFilterMatchesHint":
+    "请检查上方的智能素材箱规则和筛选条件，或清除筛选以扩大搜索范围。",
   "grid.empty": "没有可显示的媒体。",
   "grid.emptyHint": "执行“扫描”后，其下的视频和图片会显示在这里。",
   "grid.searchByTag": "按“{name}”筛选",
@@ -847,6 +881,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "tags.value.orientSquare": "方形",
 
   // workspace rail
+  "workspace.navigation": "媒体库导航",
   "workspace.all": "全部",
   "workspace.settings": "设置",
   "workspace.edit": "编辑工作区",

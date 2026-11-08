@@ -4,9 +4,10 @@
 // screens are child routes drawn over Home, which stays mounted underneath, so
 // state kept here survives opening and closing them untouched — while a
 // "?folder=" on "/" would be dropped by the first navigate to "/file/:id".
-// Nothing needs it across a restart (the view opens at the workspace root).
+// The last local path is restored after restart; back history stays session-local.
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ROOT_FOLDER, parentOf } from "@shared/folderPath";
+import { readLibraryLocation } from "@/hooks/useLibraryLocation";
 
 /** How many steps "back" remembers per workspace. */
 export const FOLDER_BACK_LIMIT = 100;
@@ -53,7 +54,10 @@ export interface FolderNav {
 export function useFolderNav(
   workspaceId: string | null | undefined,
 ): FolderNav {
-  const [byWorkspace, setByWorkspace] = useState<Record<string, Entry>>({});
+  const [byWorkspace, setByWorkspace] = useState<Record<string, Entry>>(() => {
+    const saved = readLibraryLocation();
+    return saved ? { [saved.workspaceId]: { path: saved.path, back: [] } } : {};
+  });
   const key = workspaceId ?? "";
   const entry = byWorkspace[key] ?? START;
   const moveCount = useRef(0);

@@ -47,6 +47,12 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.tags?.length) next.tags = query.tags.filter(Boolean);
   if (query.tagSource) next.tagSource = query.tagSource;
   if (query.kind) next.kind = query.kind;
+  if (query.allOf?.length) {
+    const clauses = query.allOf
+      .map(cleanSearchQuery)
+      .filter((part) => Object.keys(part).length > 0);
+    if (clauses.length) next.allOf = clauses;
+  }
   if (query.recent) next.recent = query.recent;
   if (query.resolution && query.kind !== "audio")
     next.resolution = query.resolution;
@@ -96,12 +102,15 @@ export function hasSearchConditions(query: SearchQuery): boolean {
  * its own contents; with a condition, it searches everything below it.
  */
 export function hasFilterConditions(query: SearchQuery): boolean {
+  if (query.matchNone) return true;
   const rest = cleanSearchQuery(query);
   delete rest.sort;
   delete rest.sortDir;
   // The folder is where the view is, not what narrows it.
   delete rest.folder;
-  return Object.keys(rest).length > 0;
+  const clauses = rest.allOf;
+  delete rest.allOf;
+  return Object.keys(rest).length > 0 || !!clauses?.some(hasFilterConditions);
 }
 
 export function parseSmartCollections(raw: string | null): SmartCollection[] {
@@ -248,6 +257,8 @@ export function describeDateRange(
 
 export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   const parts: string[] = [];
+  for (const clause of query.allOf ?? [])
+    parts.push(`(${describeSearchQuery(t, clause)})`);
   const folder = scopedFolderPath(query);
   if (folder != null) parts.push(`${t("folder.chip")}: ${folder}`);
   if (query.q) parts.push(`"${query.q}"`);

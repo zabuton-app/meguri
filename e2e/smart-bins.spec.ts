@@ -68,6 +68,10 @@ test("global smart bins retain scope, resolution, type and ratings after restart
       .click();
     await page.getByRole("button", { name: "Pexels A", exact: true }).click();
 
+    await page.getByRole("button", { name: "Global", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Global", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await page
       .getByRole("button", { name: "Create smart bin", exact: true })
       .click();
@@ -96,11 +100,14 @@ test("global smart bins retain scope, resolution, type and ratings after restart
     await expect(fileCard(page, "clip-4k.mp4")).toBeVisible();
 
     await page.getByRole("button", { name: "Pexels A", exact: true }).click();
+    // A folder change keeps the bin rules and narrows their search location.
     await expect(page.getByTestId("media-card")).toHaveCount(1);
     await sidebar
       .getByRole("button", { name: "4K picks", exact: false })
       .first()
       .click();
+    await expect(page.getByTestId("media-card")).toHaveCount(1);
+    await page.getByRole("button", { name: "Global", exact: true }).click();
     await expect(page.getByTestId("media-card")).toHaveCount(2);
 
     await sidebar
@@ -148,13 +155,20 @@ test("global smart bins retain scope, resolution, type and ratings after restart
     app = await launch();
     page = await app.firstWindow();
     const restored = page.getByRole("complementary", { name: "Smart bins" });
-    // The default restores its global scope even though a scanned folder was
-    // selected when the app closed.
-    await expect(fileCard(page, "clip-4k.mp4")).toBeVisible();
+    // The last selected bin and Local location take precedence over the launch default.
+    await expect(fileCard(page, "clip-hd.mp4")).toBeVisible();
+    await expect(
+      restored.getByRole("button", { name: /^720p picks/ }).first(),
+    ).toHaveAttribute("aria-current", "true");
+    await expect(
+      page.getByRole("button", { name: "Local", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await restored
       .getByRole("button", { name: "4K video", exact: false })
       .first()
       .click();
+    await expect(page.getByTestId("media-card")).toHaveCount(0);
+    await page.getByRole("button", { name: "Global", exact: true }).click();
     await expect(page.getByTestId("media-card")).toHaveCount(1);
     await expect(fileCard(page, "clip-4k.mp4")).toBeVisible();
     await expect(
