@@ -180,6 +180,11 @@ function mergeFromBackup(
       markComplete(db, workspaceId);
       return { merged: false };
     }
+    // Dated now, before anything is recorded: only a copy of the library
+    // taken after this merge holds what the copy does, and only such a copy
+    // lets it go (dropCoveredBackups). Not merged when it cannot be dated.
+    const now = new Date();
+    fs.utimesSync(backupPath, now, now);
     // Merged and recorded in one transaction on the library: recorded, the
     // copy is never merged a second time over what the user changed since.
     db.transaction(() => {
@@ -198,14 +203,6 @@ function mergeFromBackup(
     return { merged: false, failure: isDiskFull(e) ? "diskFull" : "merge" };
   } finally {
     db.exec("DETACH DATABASE kept");
-  }
-  // Dated now: only a copy of the library taken after this merge holds what
-  // the copy does, and only such a copy lets it go (dropCoveredBackups).
-  try {
-    const now = new Date();
-    fs.utimesSync(backupPath, now, now);
-  } catch (e) {
-    log.warn(`could not date the backup ${backupPath}:`, e);
   }
   // The workspace's own index, in a transaction of its own (WAL is not atomic
   // across the attached files). A failure leaves it to the next catch-up,
