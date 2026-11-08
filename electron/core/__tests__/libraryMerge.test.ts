@@ -416,4 +416,39 @@ describe("merging workspaces into the library at startup", () => {
     expect(fs.existsSync(backupOf(a))).toBe(true);
     ws.closeAll();
   });
+
+  it("merges what an older version wrote to tables it made again, though the record says complete", async () => {
+    const a = legacyWorkspace();
+    const b = legacyWorkspace();
+    register([a, b]);
+    const first = new Workspaces();
+    first.bootstrap(null);
+    await first.mergePending(() => {});
+    first.closeAll();
+    // An older version made b's own tables again and rated a file there.
+    const db = openDb(
+      paths.dbPathForDataDir(paths.dataDirForRoot(Core.resolveRoot(b))),
+      paths.libraryDbPath(),
+    );
+    db.exec(LEGACY_METADATA_DDL);
+    db.exec(
+      "INSERT INTO main.file_meta (meta_key, rating, updated_at) VALUES ('later', 5, 2)",
+    );
+    db.close();
+
+    const ws = new Workspaces();
+    ws.bootstrap(null);
+    // Due for the merge, not taken as on the library.
+    expect(ws.mergeProgress()).toEqual({ done: 0, total: 1 });
+    // Removed before that merge runs: merged first, then deleted.
+    ws.remove(b);
+    const core = ws.byId(Workspaces.idFor(a))!;
+    expect(
+      core.db
+        .prepare("SELECT rating FROM lib.file_meta WHERE meta_key = 'later'")
+        .pluck()
+        .get(),
+    ).toBe(5);
+    ws.closeAll();
+  });
 });

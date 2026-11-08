@@ -29,6 +29,7 @@ import {
 import log from "./logger.js";
 import {
   errorCode,
+  fileUsesOwnMetadata,
   nowUnix,
   openLibraryReadonly,
   usesOwnMetadata,
@@ -285,7 +286,7 @@ export class Workspaces {
     let missed = 0;
     for (const p of this.config.roots) {
       if (this.cores.has(Workspaces.idFor(p))) continue;
-      if (recorded.has(Core.dataIdFor(p))) continue;
+      if (onLibraryOnly(p, recorded)) continue;
       if (!open(p)) missed++;
     }
     // Every open one still on its own tables: the library itself is reached
@@ -416,7 +417,7 @@ export class Workspaces {
     // workspace is unregistered but its data directory stays, metadata and
     // all, and comes back when the folder is added again.
     const merged =
-      !this.cores.has(id) && completeWorkspaceIds().has(Core.dataIdFor(p));
+      !this.cores.has(id) && onLibraryOnly(p, completeWorkspaceIds());
     const core = merged
       ? (this.cores.get(id) ?? undefined)
       : (this.coreForPath(p, { merging: true }) ?? undefined);
@@ -836,7 +837,7 @@ export class Workspaces {
     // One with no database yet has nothing to merge: it starts on the library.
     const pending = this.config.roots.filter(
       (p) =>
-        !recorded.has(Core.dataIdFor(p)) &&
+        !onLibraryOnly(p, recorded) &&
         fs.existsSync(dbPathForDataDir(dataDirForRoot(Core.resolveRoot(p)))),
     );
     if (pending.length > 0) {
@@ -864,7 +865,7 @@ export class Workspaces {
     if (copiedAt === null) return;
     const recorded = completeWorkspaceIds();
     for (const p of this.config.roots) {
-      if (!recorded.has(Core.dataIdFor(p))) continue;
+      if (!onLibraryOnly(p, recorded)) continue;
       const backup = backupDbPathForDataDir(
         dataDirForRoot(Core.resolveRoot(p)),
       );
@@ -1050,6 +1051,19 @@ function completeWorkspaceIds(): Set<string> {
   } finally {
     library.close();
   }
+}
+
+/**
+ * Whether a workspace is on the library alone: recorded complete, and its own
+ * database without metadata tables of its own. An older version of the app
+ * may have made them again after the merge and written to them, which leaves
+ * the record as it was: such a workspace is opened, so its merge runs, before
+ * anything relies on the library holding all it has.
+ */
+function onLibraryOnly(p: string, complete: Set<string>): boolean {
+  if (!complete.has(Core.dataIdFor(p))) return false;
+  const dbFile = dbPathForDataDir(dataDirForRoot(Core.resolveRoot(p)));
+  return fileUsesOwnMetadata(dbFile) === false;
 }
 
 function activeCollectionId(activePath: string | null): string | null {

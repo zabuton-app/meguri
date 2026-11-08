@@ -620,6 +620,24 @@ export function openLibraryReadonly(libraryFile: string): DB | null {
   }
 }
 
+/**
+ * Whether the workspace database at `dbFile` still holds its own metadata
+ * tables, read without attaching or preparing anything. Null when it cannot
+ * be opened: nobody can tell.
+ */
+export function fileUsesOwnMetadata(dbFile: string): boolean | null {
+  let db: DB | undefined;
+  try {
+    db = new Database(dbFile, { readonly: true, fileMustExist: true });
+    db.pragma("busy_timeout = 5000");
+    return usesOwnMetadata(db);
+  } catch {
+    return null;
+  } finally {
+    db?.close();
+  }
+}
+
 /** The `code` an error from SQLite or the file system carries, if any. */
 export function errorCode(e: unknown): string | undefined {
   const code = (e as { code?: unknown } | null)?.code;
