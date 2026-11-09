@@ -1,0 +1,120 @@
+/*
+ * @name High Contrast
+ *
+ * A sample Meguri CSS theme.
+ *
+ * Maximum legibility: white on black with yellow and cyan accents, or black
+ * on white with deep blue. Text, accents and strong borders reach 7:1
+ * (WCAG AAA) rather than the 4.5:1 the other themes aim for, hairlines are
+ * solid and thicker, and the keyboard focus is a heavy outline. Picked by
+ * the app's light / dark switch through html[data-appearance]. Uses only the
+ * public API described in docs/theming.md, so it keeps working across
+ * updates.
+ *
+ * To use it, put this file in the themes folder and pick "High Contrast" in
+ * the Settings > General > Theme list ("Open themes folder" below it shows
+ * where the folder is). Pasting it into custom.css works too.
+ */
+
+/* ---- Palette: dark ------------------------------------------------------ */
+
+html[data-appearance="dark"] {
+  --c-bg: #000000;
+  --c-surface: #0a0a0a;
+  --c-overlay: #262626;
+  --c-hover: #333333;
+  --c-border: #8c8c8c;
+  --c-border-strong: #ffffff;
+
+  --c-muted: #d4d4d4;
+  --c-secondary-fg: #e8e8e8;
+  --c-fg: #ffffff;
+  --c-bright-fg: #ffffff;
+  --c-highlight: #ffff00;
+
+  --c-primary: #ffff00;
+  --c-info: #00ffff;
+  --c-accent2: #00ffff;
+  --c-success: #00ff66;
+  --c-warn: #ffb000;
+  --c-error: #ff6b6b;
+  --c-secondary-accent: #ff9cff;
+  --c-special: #00ffff;
+}
+
+/* ---- Palette: light ----------------------------------------------------- */
+
+html[data-appearance="light"] {
+  --c-bg: #ffffff;
+  --c-surface: #f7f7f7;
+  --c-overlay: #dddddd;
+  --c-hover: #c9c9c9;
+  --c-border: #6e6e6e;
+  --c-border-strong: #000000;
+
+  --c-muted: #2e2e2e;
+  --c-secondary-fg: #1a1a1a;
+  --c-fg: #000000;
+  --c-bright-fg: #000000;
+  --c-highlight: #0000c8;
+
+  --c-primary: #0000c8;
+  --c-info: #004c80;
+  --c-accent2: #004c80;
+  --c-success: #005a1e;
+  --c-warn: #6b3a00;
+  --c-error: #a30000;
+  --c-secondary-accent: #6a00a8;
+  --c-special: #004c80;
+}
+
+/* ---- Both variants ------------------------------------------------------ */
+
+::selection {
+  background-color: var(--c-primary);
+  color: var(--c-bg);
+}
+
+/* Keyboard focus: a heavy outline in the highlight color, on everything. */
+:focus-visible {
+  outline: 3px solid var(--c-highlight);
+  outline-offset: 2px;
+}
+
+/* Bars: flat, set apart by a solid line instead of a tint. */
+[data-slot="workspace-rail"],
+[data-slot="home-header"],
+[data-slot="filter-bar"],
+[data-slot="status-bar"],
+[data-slot="audio-player-bar"] {
+  background-color: var(--c-bg);
+}
+[data-slot="workspace-rail"] {
+  border-right: 2px solid var(--c-border-strong);
+}
+[data-slot="home-header"] {
+  border-bottom: 2px solid var(--c-border-strong);
+}
+[data-slot="status-bar"],
+[data-slot="audio-player-bar"] {
+  border-top: 2px solid var(--c-border-strong);
+  color: var(--c-fg);
+}
+
+/* Files and folders: a thicker frame. Only the width changes, so the card's
+   selected border color (--c-primary) and the selection rings (box-shadow)
+   still show. The focused file gets the heavy outline too. */
+[data-slot="media-card"],
+[data-slot="folder-card"] {
+  border-width: 2px;
+}
+[data-slot="media-card"][aria-current="true"],
+[data-slot="media-row"][aria-current="true"] {
+  outline: 3px solid var(--c-highlight);
+  outline-offset: 2px;
+}
+
+/* Windows: a solid frame instead of a soft shadow edge. */
+[data-slot="modal-panel"] {
+  border: 2px solid var(--c-border-strong);
+}

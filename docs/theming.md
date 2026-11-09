@@ -7,8 +7,9 @@ to share.
 
 The layers, from bottom to top:
 
-1. The built-in theme picked under **Settings → General → Theme**
-2. The CSS theme picked under **Settings → General → CSS theme**
+1. The built-in theme last picked under **Settings → General → Theme**
+2. The CSS theme picked in the same list, where theme files appear after the
+   built-in themes. Picking a built-in theme again turns the CSS theme off
 3. `custom.css`, when **Settings → General → Custom CSS** is on
 
 At equal specificity a higher layer wins, so `custom.css` can adjust a CSS
@@ -21,10 +22,10 @@ theme.
 1. Open **Settings → General → CSS theme** and press **Open themes folder**.
    This opens `<userData>/themes/`.
 2. Put the theme's `.css` file there (the extension in lower case). It appears
-   in the picker right away.
+   in the **Theme** list right away.
 3. Pick it. Saving the file applies the change right away.
 
-The picker shows the name from an `@name` line in the comment at the very top
+The list shows the name from an `@name` line in the comment at the very top
 of the file, or the file name if there is none:
 
 ```css
@@ -217,11 +218,20 @@ html[data-theme] body {
 }
 ```
 
-## Sample theme
+## Sample themes
 
-[themes/cyberpunk.css](themes/cyberpunk.css) uses only the public API, has a
-dark and a light variant, and meets the contrast minimums above. Install it as
-a CSS theme to try it, or copy it as a starting point.
+| File                                                 | Look                  |
+| ---------------------------------------------------- | --------------------- |
+| [themes/cyberpunk.css](themes/cyberpunk.css)         | Neon on black         |
+| [themes/oled.css](themes/oled.css)                   | True black            |
+| [themes/matrix.css](themes/matrix.css)               | Green terminal rain   |
+| [themes/sky.css](themes/sky.css)                     | Sky, clouds and trees |
+| [themes/high-contrast.css](themes/high-contrast.css) | 7:1 text, bold lines  |
+
+Each has a dark and a light variant and meets the contrast minimums above.
+They keep to the public API, except for a few rules in Cyberpunk and Sky
+whose comments say so. Install one as a CSS theme to try it, or copy it as a
+starting point.
 
 ## Sharing a theme
 

@@ -101,13 +101,13 @@ test.describe("Custom CSS", () => {
     const appearance = dialog.locator("section", { hasText: "Appearance" });
     await appearance.getByRole("button", { name: "Dark", exact: true }).click();
     await expect(root).toHaveAttribute("data-appearance", "dark");
-    await expect.poll(bg).toBe("#0a0a14");
+    await expect.poll(bg).toBe("#0b0c10");
 
     await appearance
       .getByRole("button", { name: "Light", exact: true })
       .click();
     await expect(root).toHaveAttribute("data-appearance", "light");
-    await expect.poll(bg).toBe("#f5f2ff");
+    await expect.poll(bg).toBe("#f3f6f9");
   });
 
   test("applies a picked theme file under custom.css", async ({
@@ -130,15 +130,12 @@ test.describe("Custom CSS", () => {
     const themeBg = await bg();
 
     const dialog = await openSettings(ready);
-    const picker = dialog
-      .locator("section", { hasText: "CSS theme" })
-      .getByRole("combobox");
-    // The file was added after launch: it reaches the list through the watch.
-    await expect(async () => {
-      await picker.click();
-      await ready.getByRole("option", { name: "Cyberpunk" }).click();
-    }).toPass({ timeout: 5000 });
-    await expect.poll(bg).toBe("#0a0a14");
+    // The file was added after launch: it reaches the theme grid through the
+    // watch, next to the built-in themes.
+    await dialog
+      .getByRole("button", { name: "Cyberpunk" })
+      .click({ timeout: 5000 });
+    await expect.poll(bg).toBe("#0b0c10");
 
     // custom.css sits on top of the theme at equal specificity.
     fs.writeFileSync(
@@ -155,8 +152,9 @@ test.describe("Custom CSS", () => {
       .locator("section", { hasText: "Custom CSS" })
       .getByRole("switch")
       .click();
-    await picker.click();
-    await ready.getByRole("option", { name: "None" }).click();
+    // Picking a built-in theme again drops the theme file. Gruvbox is the
+    // default (DEFAULT_THEME), so this is where the test started.
+    await dialog.getByRole("button", { name: "Gruvbox", exact: true }).click();
     await expect.poll(bg).toBe(themeBg);
   });
 });

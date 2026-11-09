@@ -67,8 +67,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "settings.emojiStyleOpenmoji": "OpenMoji",
   "settings.cssTheme": "CSS 主题",
   "settings.cssThemeDesc":
-    "在主题之上应用主题文件夹中的 .css 文件。自定义 CSS 叠加在其上。",
-  "settings.cssThemeNone": "无",
+    "主题文件夹中的 .css 文件会显示在上方的主题列表中。选中的文件叠加在内置主题之上，自定义 CSS 再叠加在其上。",
   "settings.cssThemeOpenFolder": "打开主题文件夹",
   "settings.cssThemeOpenError": "无法打开主题文件夹。",
   "settings.customCss": "自定义 CSS",

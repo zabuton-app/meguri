@@ -72,8 +72,7 @@ export const fr: Record<TranslationKey, string> = {
   "settings.emojiStyleOpenmoji": "OpenMoji",
   "settings.cssTheme": "Thème CSS",
   "settings.cssThemeDesc":
-    "Applique un fichier .css du dossier des thèmes par-dessus le thème. Le CSS personnalisé s'applique au-dessus.",
-  "settings.cssThemeNone": "Aucun",
+    "Les fichiers .css du dossier des thèmes apparaissent dans la liste des thèmes ci-dessus. Celui choisi s'applique par-dessus le thème intégré, et le CSS personnalisé s'applique au-dessus.",
   "settings.cssThemeOpenFolder": "Ouvrir le dossier des thèmes",
   "settings.cssThemeOpenError": "Impossible d'ouvrir le dossier des thèmes.",
   "settings.customCss": "CSS personnalisé",

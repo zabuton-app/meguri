@@ -26,7 +26,7 @@ For people writing stylesheets rather than code:
 
 - [Theming Meguri with CSS](theming.md) — installing CSS themes, the public
   API for theme files and `custom.css` (color variables, `data-slot`,
-  `data-appearance`), contrast guidance, and a sample theme.
+  `data-appearance`), contrast guidance, and sample themes.
 
 ## Where to start
 

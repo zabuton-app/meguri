@@ -3,75 +3,81 @@
  *
  * A sample Meguri CSS theme.
  *
- * Neon magenta, cyan and yellow on indigo. Has a dark and a light variant,
- * picked by the app's light / dark switch through html[data-appearance].
- * Uses only the public API described in docs/theming.md, so it keeps working
- * across updates.
+ * Neon cyan, pink and yellow on midnight black, with an electric-yellow
+ * side rail.
+ * Has a dark and a light variant, picked by the app's light / dark switch
+ * through html[data-appearance]. Built on the public API described in
+ * docs/theming.md; the two rules that reach past it (the rail's right-click
+ * menu and the Settings tabs) say so, and only lose their styling if the app
+ * changes underneath them.
  *
- * To use it, put this file in the themes folder and pick "Cyberpunk" under
- * Settings > General > CSS theme ("Open themes folder" shows where it is).
- * Pasting it into custom.css works too.
+ * To use it, put this file in the themes folder and pick "Cyberpunk" in the
+ * Settings > General > Theme list ("Open themes folder" below it shows where
+ * the folder is). Pasting it into custom.css works too.
  */
 
 /* ---- Palette: dark ------------------------------------------------------ */
 
+/* Midnight black, lit by neon cyan (the main accent), neon pink (signs and
+   warnings) and electric yellow (highlights). */
 html[data-appearance="dark"] {
-  --c-bg: #0a0a14;
-  --c-surface: #11111f;
-  --c-overlay: #22203d;
-  --c-hover: #2c294e;
-  --c-border: #332f5b;
-  --c-border-strong: #6553ad;
+  --c-bg: #0b0c10; /* midnight black */
+  --c-surface: #12141b;
+  --c-overlay: #222735;
+  --c-hover: #2a2f3f;
+  --c-border: #333a4d;
+  --c-border-strong: #5f6b8a;
 
-  --c-muted: #8b87b8;
-  --c-secondary-fg: #aaa6d6;
-  --c-fg: #dedaff;
+  --c-muted: #8d97ad;
+  --c-secondary-fg: #aeb7ca;
+  --c-fg: #dbe5f0;
   --c-bright-fg: #ffffff;
-  --c-highlight: #fcee0a;
+  --c-highlight: #ffe600;
 
-  --c-primary: #ff2bd6; /* magenta */
-  --c-info: #00f0ff; /* cyan */
-  --c-accent2: #fcee0a; /* yellow */
+  --c-primary: #00f0ff; /* neon cyan */
+  --c-info: #00f0ff;
+  --c-accent2: #ffe600; /* electric yellow */
   --c-success: #05ffa1;
-  --c-warn: #ff9e00;
-  --c-error: #ff2a6d;
-  --c-secondary-accent: #b431ff;
-  --c-special: #00f0ff;
+  --c-warn: #ffe600;
+  --c-error: #ff007f; /* neon pink */
+  --c-secondary-accent: #ff007f;
+  --c-special: #ff007f;
 
   --cp-glow-primary:
-    0 0 6px rgb(255 43 214 / 0.55), 0 0 18px rgb(255 43 214 / 0.25);
-  --cp-glow-info: 0 0 6px rgb(0 240 255 / 0.5), 0 0 18px rgb(0 240 255 / 0.2);
-  --cp-chrome: #07070f;
+    0 0 6px rgb(0 240 255 / 0.5), 0 0 18px rgb(0 240 255 / 0.2);
+  --cp-glow-accent:
+    0 0 6px rgb(255 0 127 / 0.55), 0 0 18px rgb(255 0 127 / 0.25);
+  --cp-chrome: #07080b;
 }
 
 /* ---- Palette: light ----------------------------------------------------- */
 
-/* Pale lavender paper with the same neon hues, darkened enough to read. */
+/* Cool white paper with the same neon hues, darkened enough to read. */
 html[data-appearance="light"] {
-  --c-bg: #f5f2ff;
-  --c-surface: #ece7ff;
-  --c-overlay: #ddd6f6;
-  --c-hover: #cdc5ee;
-  --c-border: #c3bbe8;
-  --c-border-strong: #8a7cc9;
+  --c-bg: #f3f6f9;
+  --c-surface: #e9eef3;
+  --c-overlay: #d6dee7;
+  --c-hover: #c3cedb;
+  --c-border: #b4c0cd;
+  --c-border-strong: #7a889b;
 
-  --c-muted: #5c5590;
-  --c-secondary-fg: #48427a;
-  --c-fg: #1a1630;
+  --c-muted: #4e5a6b;
+  --c-secondary-fg: #3a4555;
+  --c-fg: #0b0c10;
   --c-bright-fg: #000000;
-  --c-highlight: #7d6c00;
+  --c-highlight: #6e6200;
 
-  --c-primary: #c4008f;
-  --c-info: #00727f;
-  --c-accent2: #7d6c00;
-  --c-success: #007a55;
-  --c-warn: #a35200;
-  --c-error: #c8004a;
-  --c-secondary-accent: #7a1fd6;
-  --c-special: #00727f;
+  --c-primary: #006b75;
+  --c-info: #006b75;
+  --c-accent2: #6e6200;
+  --c-success: #00704c;
+  --c-warn: #6e6200;
+  --c-error: #c20060;
+  --c-secondary-accent: #c20060;
+  --c-special: #c20060;
 
-  --cp-glow-primary: 0 0 6px rgb(196 0 143 / 0.35);
-  --cp-glow-info: 0 0 6px rgb(0 114 127 / 0.3);
+  --cp-glow-primary: 0 0 6px rgb(0 107 117 / 0.35);
+  --cp-glow-accent: 0 0 6px rgb(194 0 96 / 0.3);
   --cp-chrome: #ffffff;
 }
 
@@ -87,21 +93,58 @@ html[data-appearance] {
   color: var(--c-bright-fg);
 }
 
-/* Side rail: neon edge */
+/* Side rail: a warning-yellow panel with black ink, in both variants. The
+   palette is redefined inside the rail, so its tiles, icons, hover states
+   and the active workspace (a black tile with a yellow glyph) follow
+   without touching each element. */
+[data-slot="workspace-rail"],
+body:has([data-slot="workspace-rail"] [data-state="open"])
+  [data-slot="context-menu-content"] {
+  --c-bg: #ffe600;
+  --c-surface: #ebd400; /* workspace and collection tiles */
+  --c-overlay: #d9c300;
+  --c-hover: #cbb700;
+  --c-border: #8f8100;
+  --c-border-strong: #5e5500;
+  --c-muted: #4d4500; /* idle icons */
+  --c-secondary-fg: #3a3400;
+  --c-fg: #0b0c10;
+  --c-bright-fg: #000000;
+  --c-primary: #0b0c10;
+  --c-error: #b0002e; /* the remove badge, with yellow text */
+}
 [data-slot="workspace-rail"] {
-  background-color: var(--c-surface);
-  border-right: 1px solid var(--c-info);
-  box-shadow: var(--cp-glow-info);
+  background-color: var(--c-bg);
+  border-right: 2px solid #0b0c10;
+  box-shadow: 0 0 10px rgb(255 230 0 / 0.45);
 }
 
-/* Workspace info header: primary → info gradient underline */
+/* The rail's right-click menu, in the rail's yellow. The menu is drawn
+   outside the rail, so it is picked out while its trigger in the rail is
+   open (data-state="open"). Not public API: neither the menu's data-slot
+   nor data-state is documented, so this may need updating when the app's
+   markup changes. Without it the menu just keeps the theme's colors. */
+body:has([data-slot="workspace-rail"] [data-state="open"])
+  [data-slot="context-menu-content"] {
+  background-color: var(--c-bg);
+  color: var(--c-fg);
+  border: 2px solid #0b0c10;
+  box-shadow: 0 0 10px rgb(255 230 0 / 0.45);
+}
+
+/* Workspace info header: cyan → pink gradient underline */
 [data-slot="home-header"] {
   background-color: var(--c-surface);
   border-bottom: 2px solid transparent;
-  border-image: linear-gradient(90deg, var(--c-primary), var(--c-info)) 1;
+  border-image: linear-gradient(
+      90deg,
+      var(--c-primary),
+      var(--c-secondary-accent)
+    )
+    1;
 }
 
-/* Search and filters: faint violet haze */
+/* Search and filters: faint pink haze */
 [data-slot="filter-bar"] {
   background: linear-gradient(
     180deg,
@@ -113,9 +156,9 @@ html[data-appearance] {
 /* Footer: terminal-style readout */
 [data-slot="status-bar"] {
   background-color: var(--cp-chrome);
-  border-top: 1px solid var(--c-primary);
-  box-shadow: var(--cp-glow-primary);
-  color: var(--c-info);
+  border-top: 1px solid var(--c-secondary-accent);
+  box-shadow: var(--cp-glow-accent);
+  color: var(--c-primary);
   font-family: var(--cp-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -146,11 +189,11 @@ html[data-appearance] {
   border-left: 2px solid transparent;
 }
 [data-slot="media-row"]:hover {
-  border-left-color: var(--c-info);
+  border-left-color: var(--c-secondary-accent);
 }
 [data-slot="media-card"][aria-current="true"],
 [data-slot="media-row"][aria-current="true"] {
-  outline: 1px solid var(--c-info);
+  outline: 1px solid var(--c-secondary-accent);
   outline-offset: 2px;
 }
 
@@ -173,4 +216,11 @@ html[data-appearance] {
   box-shadow:
     var(--cp-glow-primary),
     0 20px 60px rgb(0 0 0 / 0.5);
+}
+
+/* The selected Settings tab: neon text. Not public API: settings-tabs is not
+   a documented slot. */
+[data-slot="settings-tabs"] button[aria-selected="true"] {
+  color: var(--c-primary);
+  text-shadow: var(--cp-glow-primary);
 }

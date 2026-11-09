@@ -1,7 +1,7 @@
 // CSS theme files (<userData>/themes/*.css), shared app-wide through the
 // react-query cache like useCustomCss: main owns the folder, its watcher and
 // the pick. useCssThemeStyle (mounted once in App) applies the picked theme;
-// the settings section lists and picks through useCssThemes.
+// the Settings theme grid lists and picks through useCssThemes.
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, events, type CssThemesState } from "@/ipc/client";

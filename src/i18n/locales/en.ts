@@ -72,8 +72,7 @@ export const en: Record<TranslationKey, string> = {
   "settings.emojiStyleOpenmoji": "OpenMoji",
   "settings.cssTheme": "CSS theme",
   "settings.cssThemeDesc":
-    "Applies a .css file from the themes folder on top of the theme. Custom CSS goes on top of it.",
-  "settings.cssThemeNone": "None",
+    "The .css files in the themes folder appear in the theme list above. A picked one goes on top of the built-in theme, and custom CSS goes on top of it.",
   "settings.cssThemeOpenFolder": "Open themes folder",
   "settings.cssThemeOpenError": "Could not open the themes folder.",
   "settings.customCss": "Custom CSS",

@@ -1,0 +1,196 @@
+/*
+ * @name Matrix
+ *
+ * A sample Meguri CSS theme.
+ *
+ * Phosphor green on black, like an old terminal: monospace readouts, a faint
+ * glow and scanlines on the bars. The light variant is green ink on pale
+ * green-bar paper. Picked by the app's light / dark switch through
+ * html[data-appearance]. Uses only the public API described in
+ * docs/theming.md, so it keeps working across updates.
+ *
+ * To use it, put this file in the themes folder and pick "Matrix" in the
+ * Settings > General > Theme list ("Open themes folder" below it shows where
+ * the folder is). Pasting it into custom.css works too.
+ */
+
+/* ---- Palette: dark ------------------------------------------------------ */
+
+html[data-appearance="dark"] {
+  --c-bg: #000800;
+  --c-surface: #020f05;
+  --c-overlay: #0c2614;
+  --c-hover: #12341c;
+  --c-border: #143a20;
+  --c-border-strong: #1f8a40;
+
+  --c-muted: #3fae5f;
+  --c-secondary-fg: #6fd88a;
+  --c-fg: #a8f5b8;
+  --c-bright-fg: #e0ffe6;
+  --c-highlight: #00ff41;
+
+  --c-primary: #00ff41;
+  --c-info: #5cffb0;
+  --c-accent2: #c6ff3d;
+  --c-success: #00ff41;
+  --c-warn: #e8ff4d;
+  --c-error: #ff4d4d;
+  --c-secondary-accent: #00d4a0;
+  --c-special: #5cffb0;
+
+  --mx-glow: 0 0 6px rgb(0 255 65 / 0.45), 0 0 16px rgb(0 255 65 / 0.18);
+  --mx-text-glow: 0 0 4px rgb(0 255 65 / 0.6);
+  --mx-scan: rgb(0 255 65 / 0.04);
+  --mx-rain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='504' font-family='monospace' font-size='16' text-anchor='middle'%3E%3Ctext x='10' y='498' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BD%B4%3C/text%3E%3Ctext x='10' y='18' fill='%2300ff41' fill-opacity='0.08'%3E%EF%BD%B5%3C/text%3E%3Ctext x='10' y='42' fill='%2300ff41' fill-opacity='0.10'%3E7%3C/text%3E%3Ctext x='10' y='66' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BE%93%3C/text%3E%3Ctext x='10' y='90' fill='%2300ff41' fill-opacity='0.13'%3E%EF%BD%B7%3C/text%3E%3Ctext x='10' y='114' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%88%3C/text%3E%3Ctext x='10' y='138' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BE%96%3C/text%3E%3Ctext x='10' y='162' fill='%2300ff41' fill-opacity='0.19'%3E%EF%BD%B4%3C/text%3E%3Ctext x='10' y='186' fill='%2300ff41' fill-opacity='0.20'%3E%2A%3C/text%3E%3Ctext x='10' y='210' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%91%3C/text%3E%3Ctext x='70' y='426' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%8C%3C/text%3E%3Ctext x='70' y='450' fill='%2300ff41' fill-opacity='0.10'%3E%EF%BD%B4%3C/text%3E%3Ctext x='70' y='474' fill='%2300ff41' fill-opacity='0.13'%3E7%3C/text%3E%3Ctext x='70' y='498' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BE%95%3C/text%3E%3Ctext x='70' y='18' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BD%B8%3C/text%3E%3Ctext x='90' y='450' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%96%3C/text%3E%3Ctext x='90' y='474' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BE%8A%3C/text%3E%3Ctext x='90' y='498' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BD%B4%3C/text%3E%3Ctext x='90' y='18' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BD%BF%3C/text%3E%3Ctext x='90' y='426' fill='%2300ff41' fill-opacity='0.06'%3E9%3C/text%3E%3Ctext x='90' y='450' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BD%B9%3C/text%3E%3Ctext x='90' y='474' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%83%3C/text%3E%3Ctext x='90' y='498' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%8B%3C/text%3E%3Ctext x='150' y='90' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%96%3C/text%3E%3Ctext x='150' y='114' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%95%3C/text%3E%3Ctext x='150' y='138' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BE%99%3C/text%3E%3Ctext x='150' y='162' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BD%BD%3C/text%3E%3Ctext x='150' y='186' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BE%88%3C/text%3E%3Ctext x='150' y='210' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BD%B7%3C/text%3E%3Ctext x='150' y='66' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%95%3C/text%3E%3Ctext x='150' y='90' fill='%2300ff41' fill-opacity='0.08'%3E%EF%BD%B4%3C/text%3E%3Ctext x='150' y='114' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%98%3C/text%3E%3Ctext x='150' y='138' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BD%BE%3C/text%3E%3Ctext x='150' y='162' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BE%90%3C/text%3E%3Ctext x='150' y='186' fill='%2300ff41' fill-opacity='0.14'%3E%EF%BE%9C%3C/text%3E%3Ctext x='150' y='210' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%93%3C/text%3E%3Ctext x='150' y='234' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BE%8C%3C/text%3E%3Ctext x='150' y='258' fill='%2300ff41' fill-opacity='0.18'%3E4%3C/text%3E%3Ctext x='150' y='282' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BE%85%3C/text%3E%3Ctext x='150' y='306' fill='%2300ff41' fill-opacity='0.21'%3E%EF%BE%8E%3C/text%3E%3Ctext x='150' y='330' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%96%3C/text%3E%3Ctext x='170' y='186' fill='%2300ff41' fill-opacity='0.06'%3E5%3C/text%3E%3Ctext x='170' y='210' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BD%BC%3C/text%3E%3Ctext x='170' y='234' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BE%9D%3C/text%3E%3Ctext x='170' y='258' fill='%2300ff41' fill-opacity='0.13'%3E4%3C/text%3E%3Ctext x='170' y='282' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%80%3C/text%3E%3Ctext x='170' y='306' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BD%B6%3C/text%3E%3Ctext x='170' y='330' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BE%95%3C/text%3E%3Ctext x='170' y='354' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%84%3C/text%3E%3Ctext x='190' y='234' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%97%3C/text%3E%3Ctext x='190' y='258' fill='%2300ff41' fill-opacity='0.08'%3E%EF%BD%B5%3C/text%3E%3Ctext x='190' y='282' fill='%2300ff41' fill-opacity='0.10'%3E%EF%BD%B8%3C/text%3E%3Ctext x='190' y='306' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BE%91%3C/text%3E%3Ctext x='190' y='330' fill='%2300ff41' fill-opacity='0.13'%3E%EF%BE%8B%3C/text%3E%3Ctext x='190' y='354' fill='%2300ff41' fill-opacity='0.14'%3E%EF%BD%BB%3C/text%3E%3Ctext x='190' y='378' fill='%2300ff41' fill-opacity='0.16'%3E3%3C/text%3E%3Ctext x='190' y='402' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BE%86%3C/text%3E%3Ctext x='190' y='426' fill='%2300ff41' fill-opacity='0.19'%3E%EF%BD%BA%3C/text%3E%3Ctext x='190' y='450' fill='%2300ff41' fill-opacity='0.21'%3E%2B%3C/text%3E%3Ctext x='190' y='474' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%90%3C/text%3E%3Ctext x='210' y='426' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%95%3C/text%3E%3Ctext x='210' y='450' fill='%2300ff41' fill-opacity='0.10'%3E5%3C/text%3E%3Ctext x='210' y='474' fill='%2300ff41' fill-opacity='0.13'%3E:%3C/text%3E%3Ctext x='210' y='498' fill='%2300ff41' fill-opacity='0.17'%3E7%3C/text%3E%3Ctext x='210' y='18' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%85%3C/text%3E%3Ctext x='210' y='282' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%97%3C/text%3E%3Ctext x='210' y='306' fill='%2300ff41' fill-opacity='0.08'%3E%EF%BE%90%3C/text%3E%3Ctext x='210' y='330' fill='%2300ff41' fill-opacity='0.10'%3E%EF%BE%96%3C/text%3E%3Ctext x='210' y='354' fill='%2300ff41' fill-opacity='0.12'%3E6%3C/text%3E%3Ctext x='210' y='378' fill='%2300ff41' fill-opacity='0.14'%3E%EF%BE%8E%3C/text%3E%3Ctext x='210' y='402' fill='%2300ff41' fill-opacity='0.16'%3E%EF%BD%B5%3C/text%3E%3Ctext x='210' y='426' fill='%2300ff41' fill-opacity='0.18'%3E8%3C/text%3E%3Ctext x='210' y='450' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BD%B6%3C/text%3E%3Ctext x='210' y='474' fill='%23c8ffd4' fill-opacity='0.32'%3E%26lt%3B%3C/text%3E%3Ctext x='250' y='234' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%9A%3C/text%3E%3Ctext x='250' y='258' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BE%95%3C/text%3E%3Ctext x='250' y='282' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%9C%3C/text%3E%3Ctext x='250' y='306' fill='%23c8ffd4' fill-opacity='0.32'%3E7%3C/text%3E%3Ctext x='270' y='282' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BD%B2%3C/text%3E%3Ctext x='270' y='306' fill='%2300ff41' fill-opacity='0.08'%3E%26lt%3B%3C/text%3E%3Ctext x='270' y='330' fill='%2300ff41' fill-opacity='0.10'%3E%EF%BE%8E%3C/text%3E%3Ctext x='270' y='354' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BE%87%3C/text%3E%3Ctext x='270' y='378' fill='%2300ff41' fill-opacity='0.13'%3E%EF%BD%BB%3C/text%3E%3Ctext x='270' y='402' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%98%3C/text%3E%3Ctext x='270' y='426' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BD%B8%3C/text%3E%3Ctext x='270' y='450' fill='%2300ff41' fill-opacity='0.19'%3E%EF%BE%90%3C/text%3E%3Ctext x='270' y='474' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BD%B4%3C/text%3E%3Ctext x='270' y='498' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BD%BE%3C/text%3E%3Ctext x='270' y='114' fill='%2300ff41' fill-opacity='0.06'%3E2%3C/text%3E%3Ctext x='270' y='138' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%80%3C/text%3E%3Ctext x='270' y='162' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BE%8A%3C/text%3E%3Ctext x='270' y='186' fill='%2300ff41' fill-opacity='0.13'%3E%EF%BE%8A%3C/text%3E%3Ctext x='270' y='210' fill='%2300ff41' fill-opacity='0.15'%3E%2A%3C/text%3E%3Ctext x='270' y='234' fill='%2300ff41' fill-opacity='0.17'%3EZ%3C/text%3E%3Ctext x='270' y='258' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BE%90%3C/text%3E%3Ctext x='270' y='282' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BD%B6%3C/text%3E%3Ctext x='310' y='330' fill='%2300ff41' fill-opacity='0.06'%3EZ%3C/text%3E%3Ctext x='310' y='354' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%94%3C/text%3E%3Ctext x='310' y='378' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BE%82%3C/text%3E%3Ctext x='310' y='402' fill='%2300ff41' fill-opacity='0.15'%3E0%3C/text%3E%3Ctext x='310' y='426' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BE%8B%3C/text%3E%3Ctext x='310' y='450' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%87%3C/text%3E%3Ctext x='330' y='114' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BD%B6%3C/text%3E%3Ctext x='330' y='138' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BD%BC%3C/text%3E%3Ctext x='330' y='162' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BD%BA%3C/text%3E%3Ctext x='330' y='186' fill='%2300ff41' fill-opacity='0.14'%3E%EF%BD%BF%3C/text%3E%3Ctext x='330' y='210' fill='%2300ff41' fill-opacity='0.16'%3E%EF%BE%9B%3C/text%3E%3Ctext x='330' y='234' fill='%2300ff41' fill-opacity='0.19'%3E%EF%BD%BF%3C/text%3E%3Ctext x='330' y='258' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BD%B1%3C/text%3E%3Ctext x='350' y='210' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%83%3C/text%3E%3Ctext x='350' y='234' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BD%B1%3C/text%3E%3Ctext x='350' y='258' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BD%BA%3C/text%3E%3Ctext x='350' y='282' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%8B%3C/text%3E%3Ctext x='350' y='306' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BE%93%3C/text%3E%3Ctext x='350' y='330' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%88%3C/text%3E%3Ctext x='350' y='114' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%9D%3C/text%3E%3Ctext x='350' y='138' fill='%2300ff41' fill-opacity='0.08'%3E9%3C/text%3E%3Ctext x='350' y='162' fill='%2300ff41' fill-opacity='0.10'%3E%EF%BE%91%3C/text%3E%3Ctext x='350' y='186' fill='%2300ff41' fill-opacity='0.12'%3E%26lt%3B%3C/text%3E%3Ctext x='350' y='210' fill='%2300ff41' fill-opacity='0.14'%3E%EF%BE%98%3C/text%3E%3Ctext x='350' y='234' fill='%2300ff41' fill-opacity='0.16'%3E%EF%BE%9A%3C/text%3E%3Ctext x='350' y='258' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BE%9C%3C/text%3E%3Ctext x='350' y='282' fill='%2300ff41' fill-opacity='0.20'%3E2%3C/text%3E%3Ctext x='350' y='306' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BD%B4%3C/text%3E%3Ctext x='370' y='306' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%8A%3C/text%3E%3Ctext x='370' y='330' fill='%2300ff41' fill-opacity='0.08'%3E%EF%BE%8A%3C/text%3E%3Ctext x='370' y='354' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%8A%3C/text%3E%3Ctext x='370' y='378' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BD%B7%3C/text%3E%3Ctext x='370' y='402' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BE%8F%3C/text%3E%3Ctext x='370' y='426' fill='%2300ff41' fill-opacity='0.14'%3E%EF%BE%99%3C/text%3E%3Ctext x='370' y='450' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%8A%3C/text%3E%3Ctext x='370' y='474' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BD%B4%3C/text%3E%3Ctext x='370' y='498' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BD%BD%3C/text%3E%3Ctext x='370' y='18' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BD%B5%3C/text%3E%3Ctext x='370' y='42' fill='%2300ff41' fill-opacity='0.21'%3E%EF%BD%BE%3C/text%3E%3Ctext x='370' y='66' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%8D%3C/text%3E%3Ctext x='370' y='90' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%86%3C/text%3E%3Ctext x='370' y='114' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%97%3C/text%3E%3Ctext x='370' y='138' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BD%B4%3C/text%3E%3Ctext x='370' y='162' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BD%B7%3C/text%3E%3Ctext x='370' y='186' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BD%B1%3C/text%3E%3Ctext x='370' y='210' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%95%3C/text%3E%3Ctext x='430' y='162' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%98%3C/text%3E%3Ctext x='430' y='186' fill='%2300ff41' fill-opacity='0.10'%3E%EF%BE%89%3C/text%3E%3Ctext x='430' y='210' fill='%2300ff41' fill-opacity='0.13'%3E%EF%BD%BA%3C/text%3E%3Ctext x='430' y='234' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BE%99%3C/text%3E%3Ctext x='430' y='258' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%81%3C/text%3E%3Ctext x='450' y='378' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BD%B8%3C/text%3E%3Ctext x='450' y='402' fill='%2300ff41' fill-opacity='0.08'%3E%EF%BD%B8%3C/text%3E%3Ctext x='450' y='426' fill='%2300ff41' fill-opacity='0.10'%3E9%3C/text%3E%3Ctext x='450' y='450' fill='%2300ff41' fill-opacity='0.12'%3E%EF%BE%90%3C/text%3E%3Ctext x='450' y='474' fill='%2300ff41' fill-opacity='0.14'%3E%EF%BE%8E%3C/text%3E%3Ctext x='450' y='498' fill='%2300ff41' fill-opacity='0.16'%3E%EF%BE%8F%3C/text%3E%3Ctext x='450' y='18' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BE%8F%3C/text%3E%3Ctext x='450' y='42' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BE%84%3C/text%3E%3Ctext x='450' y='66' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BD%B6%3C/text%3E%3Ctext x='450' y='90' fill='%2300ff41' fill-opacity='0.06'%3E2%3C/text%3E%3Ctext x='450' y='114' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%86%3C/text%3E%3Ctext x='450' y='138' fill='%2300ff41' fill-opacity='0.12'%3E2%3C/text%3E%3Ctext x='450' y='162' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%81%3C/text%3E%3Ctext x='450' y='186' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BE%8F%3C/text%3E%3Ctext x='450' y='210' fill='%23c8ffd4' fill-opacity='0.32'%3E8%3C/text%3E%3Ctext x='470' y='162' fill='%2300ff41' fill-opacity='0.06'%3E%26lt%3B%3C/text%3E%3Ctext x='470' y='186' fill='%2300ff41' fill-opacity='0.11'%3E%26lt%3B%3C/text%3E%3Ctext x='470' y='210' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%92%3C/text%3E%3Ctext x='470' y='234' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%88%3C/text%3E%3Ctext x='470' y='426' fill='%2300ff41' fill-opacity='0.06'%3E%2A%3C/text%3E%3Ctext x='470' y='450' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BD%B2%3C/text%3E%3Ctext x='470' y='474' fill='%2300ff41' fill-opacity='0.12'%3E3%3C/text%3E%3Ctext x='470' y='498' fill='%2300ff41' fill-opacity='0.15'%3E%EF%BE%92%3C/text%3E%3Ctext x='470' y='18' fill='%2300ff41' fill-opacity='0.18'%3E%EF%BE%84%3C/text%3E%3Ctext x='470' y='42' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%9A%3C/text%3E%3Ctext x='490' y='402' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%88%3C/text%3E%3Ctext x='490' y='426' fill='%2300ff41' fill-opacity='0.09'%3E%2A%3C/text%3E%3Ctext x='490' y='450' fill='%2300ff41' fill-opacity='0.11'%3E%EF%BD%BB%3C/text%3E%3Ctext x='490' y='474' fill='%2300ff41' fill-opacity='0.13'%3E%EF%BE%87%3C/text%3E%3Ctext x='490' y='498' fill='%2300ff41' fill-opacity='0.15'%3E4%3C/text%3E%3Ctext x='490' y='18' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BD%BF%3C/text%3E%3Ctext x='490' y='42' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BE%93%3C/text%3E%3Ctext x='490' y='66' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%93%3C/text%3E%3Ctext x='490' y='258' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%99%3C/text%3E%3Ctext x='490' y='282' fill='%2300ff41' fill-opacity='0.08'%3E%EF%BD%BF%3C/text%3E%3Ctext x='490' y='306' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%98%3C/text%3E%3Ctext x='490' y='330' fill='%2300ff41' fill-opacity='0.11'%3E6%3C/text%3E%3Ctext x='490' y='354' fill='%2300ff41' fill-opacity='0.12'%3E5%3C/text%3E%3Ctext x='490' y='378' fill='%2300ff41' fill-opacity='0.14'%3E3%3C/text%3E%3Ctext x='490' y='402' fill='%2300ff41' fill-opacity='0.15'%3E9%3C/text%3E%3Ctext x='490' y='426' fill='%2300ff41' fill-opacity='0.17'%3E%EF%BD%BD%3C/text%3E%3Ctext x='490' y='450' fill='%2300ff41' fill-opacity='0.18'%3E6%3C/text%3E%3Ctext x='490' y='474' fill='%2300ff41' fill-opacity='0.20'%3E%EF%BE%80%3C/text%3E%3Ctext x='490' y='498' fill='%2300ff41' fill-opacity='0.21'%3E7%3C/text%3E%3Ctext x='490' y='18' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%8A%3C/text%3E%3Ctext x='510' y='402' fill='%2300ff41' fill-opacity='0.06'%3E%EF%BE%90%3C/text%3E%3Ctext x='510' y='426' fill='%2300ff41' fill-opacity='0.09'%3E%EF%BE%87%3C/text%3E%3Ctext x='510' y='450' fill='%2300ff41' fill-opacity='0.11'%3E1%3C/text%3E%3Ctext x='510' y='474' fill='%2300ff41' fill-opacity='0.14'%3E%EF%BD%B2%3C/text%3E%3Ctext x='510' y='498' fill='%2300ff41' fill-opacity='0.16'%3E%EF%BD%B2%3C/text%3E%3Ctext x='510' y='18' fill='%2300ff41' fill-opacity='0.19'%3E5%3C/text%3E%3Ctext x='510' y='42' fill='%23c8ffd4' fill-opacity='0.32'%3E%EF%BE%82%3C/text%3E%3C/svg%3E");
+}
+
+/* ---- Palette: light ----------------------------------------------------- */
+
+html[data-appearance="light"] {
+  --c-bg: #f2fbf3;
+  --c-surface: #e5f5e8;
+  --c-overlay: #c6e6cd;
+  --c-hover: #acd8b7;
+  --c-border: #a2cfad;
+  --c-border-strong: #4f9a63;
+
+  --c-muted: #2f6b40;
+  --c-secondary-fg: #1f5230;
+  --c-fg: #0b2a14;
+  --c-bright-fg: #00140a;
+  --c-highlight: #006b1f;
+
+  --c-primary: #006b1f;
+  --c-info: #00664a;
+  --c-accent2: #4f6a00;
+  --c-success: #006b1f;
+  --c-warn: #8a5a00;
+  --c-error: #b3261e;
+  --c-secondary-accent: #00695c;
+  --c-special: #00664a;
+
+  --mx-glow: 0 0 0 transparent;
+  --mx-text-glow: 0 0 0 transparent;
+  --mx-scan: rgb(0 107 31 / 0.04);
+  --mx-rain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='504' font-family='monospace' font-size='16' text-anchor='middle'%3E%3Ctext x='10' y='498' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BD%B4%3C/text%3E%3Ctext x='10' y='18' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BD%B5%3C/text%3E%3Ctext x='10' y='42' fill='%23006b1f' fill-opacity='0.07'%3E7%3C/text%3E%3Ctext x='10' y='66' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BE%93%3C/text%3E%3Ctext x='10' y='90' fill='%23006b1f' fill-opacity='0.09'%3E%EF%BD%B7%3C/text%3E%3Ctext x='10' y='114' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%88%3C/text%3E%3Ctext x='10' y='138' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%96%3C/text%3E%3Ctext x='10' y='162' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BD%B4%3C/text%3E%3Ctext x='10' y='186' fill='%23006b1f' fill-opacity='0.14'%3E%2A%3C/text%3E%3Ctext x='10' y='210' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%91%3C/text%3E%3Ctext x='70' y='426' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%8C%3C/text%3E%3Ctext x='70' y='450' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BD%B4%3C/text%3E%3Ctext x='70' y='474' fill='%23006b1f' fill-opacity='0.09'%3E7%3C/text%3E%3Ctext x='70' y='498' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%95%3C/text%3E%3Ctext x='70' y='18' fill='%2300400f' fill-opacity='0.22'%3E%EF%BD%B8%3C/text%3E%3Ctext x='90' y='450' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%96%3C/text%3E%3Ctext x='90' y='474' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BE%8A%3C/text%3E%3Ctext x='90' y='498' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BD%B4%3C/text%3E%3Ctext x='90' y='18' fill='%2300400f' fill-opacity='0.22'%3E%EF%BD%BF%3C/text%3E%3Ctext x='90' y='426' fill='%23006b1f' fill-opacity='0.04'%3E9%3C/text%3E%3Ctext x='90' y='450' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BD%B9%3C/text%3E%3Ctext x='90' y='474' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%83%3C/text%3E%3Ctext x='90' y='498' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%8B%3C/text%3E%3Ctext x='150' y='90' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%96%3C/text%3E%3Ctext x='150' y='114' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%95%3C/text%3E%3Ctext x='150' y='138' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BE%99%3C/text%3E%3Ctext x='150' y='162' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BD%BD%3C/text%3E%3Ctext x='150' y='186' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%88%3C/text%3E%3Ctext x='150' y='210' fill='%2300400f' fill-opacity='0.22'%3E%EF%BD%B7%3C/text%3E%3Ctext x='150' y='66' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%95%3C/text%3E%3Ctext x='150' y='90' fill='%23006b1f' fill-opacity='0.05'%3E%EF%BD%B4%3C/text%3E%3Ctext x='150' y='114' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%98%3C/text%3E%3Ctext x='150' y='138' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BD%BE%3C/text%3E%3Ctext x='150' y='162' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BE%90%3C/text%3E%3Ctext x='150' y='186' fill='%23006b1f' fill-opacity='0.09'%3E%EF%BE%9C%3C/text%3E%3Ctext x='150' y='210' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%93%3C/text%3E%3Ctext x='150' y='234' fill='%23006b1f' fill-opacity='0.11'%3E%EF%BE%8C%3C/text%3E%3Ctext x='150' y='258' fill='%23006b1f' fill-opacity='0.12'%3E4%3C/text%3E%3Ctext x='150' y='282' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BE%85%3C/text%3E%3Ctext x='150' y='306' fill='%23006b1f' fill-opacity='0.14'%3E%EF%BE%8E%3C/text%3E%3Ctext x='150' y='330' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%96%3C/text%3E%3Ctext x='170' y='186' fill='%23006b1f' fill-opacity='0.04'%3E5%3C/text%3E%3Ctext x='170' y='210' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BD%BC%3C/text%3E%3Ctext x='170' y='234' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BE%9D%3C/text%3E%3Ctext x='170' y='258' fill='%23006b1f' fill-opacity='0.09'%3E4%3C/text%3E%3Ctext x='170' y='282' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%80%3C/text%3E%3Ctext x='170' y='306' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BD%B6%3C/text%3E%3Ctext x='170' y='330' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BE%95%3C/text%3E%3Ctext x='170' y='354' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%84%3C/text%3E%3Ctext x='190' y='234' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%97%3C/text%3E%3Ctext x='190' y='258' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BD%B5%3C/text%3E%3Ctext x='190' y='282' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BD%B8%3C/text%3E%3Ctext x='190' y='306' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BE%91%3C/text%3E%3Ctext x='190' y='330' fill='%23006b1f' fill-opacity='0.09'%3E%EF%BE%8B%3C/text%3E%3Ctext x='190' y='354' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BD%BB%3C/text%3E%3Ctext x='190' y='378' fill='%23006b1f' fill-opacity='0.11'%3E3%3C/text%3E%3Ctext x='190' y='402' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%86%3C/text%3E%3Ctext x='190' y='426' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BD%BA%3C/text%3E%3Ctext x='190' y='450' fill='%23006b1f' fill-opacity='0.14'%3E%2B%3C/text%3E%3Ctext x='190' y='474' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%90%3C/text%3E%3Ctext x='210' y='426' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%95%3C/text%3E%3Ctext x='210' y='450' fill='%23006b1f' fill-opacity='0.07'%3E5%3C/text%3E%3Ctext x='210' y='474' fill='%23006b1f' fill-opacity='0.09'%3E:%3C/text%3E%3Ctext x='210' y='498' fill='%23006b1f' fill-opacity='0.12'%3E7%3C/text%3E%3Ctext x='210' y='18' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%85%3C/text%3E%3Ctext x='210' y='282' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%97%3C/text%3E%3Ctext x='210' y='306' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%90%3C/text%3E%3Ctext x='210' y='330' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BE%96%3C/text%3E%3Ctext x='210' y='354' fill='%23006b1f' fill-opacity='0.08'%3E6%3C/text%3E%3Ctext x='210' y='378' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%8E%3C/text%3E%3Ctext x='210' y='402' fill='%23006b1f' fill-opacity='0.11'%3E%EF%BD%B5%3C/text%3E%3Ctext x='210' y='426' fill='%23006b1f' fill-opacity='0.12'%3E8%3C/text%3E%3Ctext x='210' y='450' fill='%23006b1f' fill-opacity='0.14'%3E%EF%BD%B6%3C/text%3E%3Ctext x='210' y='474' fill='%2300400f' fill-opacity='0.22'%3E%26lt%3B%3C/text%3E%3Ctext x='250' y='234' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%9A%3C/text%3E%3Ctext x='250' y='258' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BE%95%3C/text%3E%3Ctext x='250' y='282' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%9C%3C/text%3E%3Ctext x='250' y='306' fill='%2300400f' fill-opacity='0.22'%3E7%3C/text%3E%3Ctext x='270' y='282' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BD%B2%3C/text%3E%3Ctext x='270' y='306' fill='%23006b1f' fill-opacity='0.06'%3E%26lt%3B%3C/text%3E%3Ctext x='270' y='330' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BE%8E%3C/text%3E%3Ctext x='270' y='354' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BE%87%3C/text%3E%3Ctext x='270' y='378' fill='%23006b1f' fill-opacity='0.09'%3E%EF%BD%BB%3C/text%3E%3Ctext x='270' y='402' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%98%3C/text%3E%3Ctext x='270' y='426' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BD%B8%3C/text%3E%3Ctext x='270' y='450' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BE%90%3C/text%3E%3Ctext x='270' y='474' fill='%23006b1f' fill-opacity='0.14'%3E%EF%BD%B4%3C/text%3E%3Ctext x='270' y='498' fill='%2300400f' fill-opacity='0.22'%3E%EF%BD%BE%3C/text%3E%3Ctext x='270' y='114' fill='%23006b1f' fill-opacity='0.04'%3E2%3C/text%3E%3Ctext x='270' y='138' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%80%3C/text%3E%3Ctext x='270' y='162' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BE%8A%3C/text%3E%3Ctext x='270' y='186' fill='%23006b1f' fill-opacity='0.09'%3E%EF%BE%8A%3C/text%3E%3Ctext x='270' y='210' fill='%23006b1f' fill-opacity='0.10'%3E%2A%3C/text%3E%3Ctext x='270' y='234' fill='%23006b1f' fill-opacity='0.12'%3EZ%3C/text%3E%3Ctext x='270' y='258' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BE%90%3C/text%3E%3Ctext x='270' y='282' fill='%2300400f' fill-opacity='0.22'%3E%EF%BD%B6%3C/text%3E%3Ctext x='310' y='330' fill='%23006b1f' fill-opacity='0.04'%3EZ%3C/text%3E%3Ctext x='310' y='354' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%94%3C/text%3E%3Ctext x='310' y='378' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BE%82%3C/text%3E%3Ctext x='310' y='402' fill='%23006b1f' fill-opacity='0.10'%3E0%3C/text%3E%3Ctext x='310' y='426' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%8B%3C/text%3E%3Ctext x='310' y='450' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%87%3C/text%3E%3Ctext x='330' y='114' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BD%B6%3C/text%3E%3Ctext x='330' y='138' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BD%BC%3C/text%3E%3Ctext x='330' y='162' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BD%BA%3C/text%3E%3Ctext x='330' y='186' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BD%BF%3C/text%3E%3Ctext x='330' y='210' fill='%23006b1f' fill-opacity='0.11'%3E%EF%BE%9B%3C/text%3E%3Ctext x='330' y='234' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BD%BF%3C/text%3E%3Ctext x='330' y='258' fill='%2300400f' fill-opacity='0.22'%3E%EF%BD%B1%3C/text%3E%3Ctext x='350' y='210' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%83%3C/text%3E%3Ctext x='350' y='234' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BD%B1%3C/text%3E%3Ctext x='350' y='258' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BD%BA%3C/text%3E%3Ctext x='350' y='282' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%8B%3C/text%3E%3Ctext x='350' y='306' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%93%3C/text%3E%3Ctext x='350' y='330' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%88%3C/text%3E%3Ctext x='350' y='114' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%9D%3C/text%3E%3Ctext x='350' y='138' fill='%23006b1f' fill-opacity='0.06'%3E9%3C/text%3E%3Ctext x='350' y='162' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BE%91%3C/text%3E%3Ctext x='350' y='186' fill='%23006b1f' fill-opacity='0.08'%3E%26lt%3B%3C/text%3E%3Ctext x='350' y='210' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%98%3C/text%3E%3Ctext x='350' y='234' fill='%23006b1f' fill-opacity='0.11'%3E%EF%BE%9A%3C/text%3E%3Ctext x='350' y='258' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%9C%3C/text%3E%3Ctext x='350' y='282' fill='%23006b1f' fill-opacity='0.14'%3E2%3C/text%3E%3Ctext x='350' y='306' fill='%2300400f' fill-opacity='0.22'%3E%EF%BD%B4%3C/text%3E%3Ctext x='370' y='306' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%8A%3C/text%3E%3Ctext x='370' y='330' fill='%23006b1f' fill-opacity='0.05'%3E%EF%BE%8A%3C/text%3E%3Ctext x='370' y='354' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%8A%3C/text%3E%3Ctext x='370' y='378' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BD%B7%3C/text%3E%3Ctext x='370' y='402' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BE%8F%3C/text%3E%3Ctext x='370' y='426' fill='%23006b1f' fill-opacity='0.09'%3E%EF%BE%99%3C/text%3E%3Ctext x='370' y='450' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%8A%3C/text%3E%3Ctext x='370' y='474' fill='%23006b1f' fill-opacity='0.11'%3E%EF%BD%B4%3C/text%3E%3Ctext x='370' y='498' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BD%BD%3C/text%3E%3Ctext x='370' y='18' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BD%B5%3C/text%3E%3Ctext x='370' y='42' fill='%23006b1f' fill-opacity='0.14'%3E%EF%BD%BE%3C/text%3E%3Ctext x='370' y='66' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%8D%3C/text%3E%3Ctext x='370' y='90' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%86%3C/text%3E%3Ctext x='370' y='114' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%97%3C/text%3E%3Ctext x='370' y='138' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BD%B4%3C/text%3E%3Ctext x='370' y='162' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BD%B7%3C/text%3E%3Ctext x='370' y='186' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BD%B1%3C/text%3E%3Ctext x='370' y='210' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%95%3C/text%3E%3Ctext x='430' y='162' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%98%3C/text%3E%3Ctext x='430' y='186' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BE%89%3C/text%3E%3Ctext x='430' y='210' fill='%23006b1f' fill-opacity='0.09'%3E%EF%BD%BA%3C/text%3E%3Ctext x='430' y='234' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%99%3C/text%3E%3Ctext x='430' y='258' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%81%3C/text%3E%3Ctext x='450' y='378' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BD%B8%3C/text%3E%3Ctext x='450' y='402' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BD%B8%3C/text%3E%3Ctext x='450' y='426' fill='%23006b1f' fill-opacity='0.07'%3E9%3C/text%3E%3Ctext x='450' y='450' fill='%23006b1f' fill-opacity='0.08'%3E%EF%BE%90%3C/text%3E%3Ctext x='450' y='474' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%8E%3C/text%3E%3Ctext x='450' y='498' fill='%23006b1f' fill-opacity='0.11'%3E%EF%BE%8F%3C/text%3E%3Ctext x='450' y='18' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%8F%3C/text%3E%3Ctext x='450' y='42' fill='%23006b1f' fill-opacity='0.14'%3E%EF%BE%84%3C/text%3E%3Ctext x='450' y='66' fill='%2300400f' fill-opacity='0.22'%3E%EF%BD%B6%3C/text%3E%3Ctext x='450' y='90' fill='%23006b1f' fill-opacity='0.04'%3E2%3C/text%3E%3Ctext x='450' y='114' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%86%3C/text%3E%3Ctext x='450' y='138' fill='%23006b1f' fill-opacity='0.08'%3E2%3C/text%3E%3Ctext x='450' y='162' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%81%3C/text%3E%3Ctext x='450' y='186' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%8F%3C/text%3E%3Ctext x='450' y='210' fill='%2300400f' fill-opacity='0.22'%3E8%3C/text%3E%3Ctext x='470' y='162' fill='%23006b1f' fill-opacity='0.04'%3E%26lt%3B%3C/text%3E%3Ctext x='470' y='186' fill='%23006b1f' fill-opacity='0.07'%3E%26lt%3B%3C/text%3E%3Ctext x='470' y='210' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%92%3C/text%3E%3Ctext x='470' y='234' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%88%3C/text%3E%3Ctext x='470' y='426' fill='%23006b1f' fill-opacity='0.04'%3E%2A%3C/text%3E%3Ctext x='470' y='450' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BD%B2%3C/text%3E%3Ctext x='470' y='474' fill='%23006b1f' fill-opacity='0.08'%3E3%3C/text%3E%3Ctext x='470' y='498' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BE%92%3C/text%3E%3Ctext x='470' y='18' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BE%84%3C/text%3E%3Ctext x='470' y='42' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%9A%3C/text%3E%3Ctext x='490' y='402' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%88%3C/text%3E%3Ctext x='490' y='426' fill='%23006b1f' fill-opacity='0.06'%3E%2A%3C/text%3E%3Ctext x='490' y='450' fill='%23006b1f' fill-opacity='0.07'%3E%EF%BD%BB%3C/text%3E%3Ctext x='490' y='474' fill='%23006b1f' fill-opacity='0.09'%3E%EF%BE%87%3C/text%3E%3Ctext x='490' y='498' fill='%23006b1f' fill-opacity='0.10'%3E4%3C/text%3E%3Ctext x='490' y='18' fill='%23006b1f' fill-opacity='0.12'%3E%EF%BD%BF%3C/text%3E%3Ctext x='490' y='42' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BE%93%3C/text%3E%3Ctext x='490' y='66' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%93%3C/text%3E%3Ctext x='490' y='258' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%99%3C/text%3E%3Ctext x='490' y='282' fill='%23006b1f' fill-opacity='0.05'%3E%EF%BD%BF%3C/text%3E%3Ctext x='490' y='306' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%98%3C/text%3E%3Ctext x='490' y='330' fill='%23006b1f' fill-opacity='0.07'%3E6%3C/text%3E%3Ctext x='490' y='354' fill='%23006b1f' fill-opacity='0.08'%3E5%3C/text%3E%3Ctext x='490' y='378' fill='%23006b1f' fill-opacity='0.09'%3E3%3C/text%3E%3Ctext x='490' y='402' fill='%23006b1f' fill-opacity='0.10'%3E9%3C/text%3E%3Ctext x='490' y='426' fill='%23006b1f' fill-opacity='0.11'%3E%EF%BD%BD%3C/text%3E%3Ctext x='490' y='450' fill='%23006b1f' fill-opacity='0.12'%3E6%3C/text%3E%3Ctext x='490' y='474' fill='%23006b1f' fill-opacity='0.13'%3E%EF%BE%80%3C/text%3E%3Ctext x='490' y='498' fill='%23006b1f' fill-opacity='0.14'%3E7%3C/text%3E%3Ctext x='490' y='18' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%8A%3C/text%3E%3Ctext x='510' y='402' fill='%23006b1f' fill-opacity='0.04'%3E%EF%BE%90%3C/text%3E%3Ctext x='510' y='426' fill='%23006b1f' fill-opacity='0.06'%3E%EF%BE%87%3C/text%3E%3Ctext x='510' y='450' fill='%23006b1f' fill-opacity='0.08'%3E1%3C/text%3E%3Ctext x='510' y='474' fill='%23006b1f' fill-opacity='0.10'%3E%EF%BD%B2%3C/text%3E%3Ctext x='510' y='498' fill='%23006b1f' fill-opacity='0.11'%3E%EF%BD%B2%3C/text%3E%3Ctext x='510' y='18' fill='%23006b1f' fill-opacity='0.13'%3E5%3C/text%3E%3Ctext x='510' y='42' fill='%2300400f' fill-opacity='0.22'%3E%EF%BE%82%3C/text%3E%3C/svg%3E");
+}
+
+/* ---- Both variants ------------------------------------------------------ */
+
+html[data-appearance] {
+  --mx-mono:
+    "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+
+/* The page: digital rain. Columns of faint katakana and digits, each
+   brightest at its leading glyph, falling slowly down the page. Faint enough
+   that text on the page still reads. The glyphs use the system's monospace
+   and Japanese fonts.
+
+   The rain is a fixed layer behind the app (body::before) that is one tile
+   (504px) taller than the window and slides down by one tile, then starts
+   over: the tile repeats, so the loop has no seam. It moves by transform,
+   which the compositor animates without repainting the page. body is made a
+   stacking context so the layer sits above body's own background but below
+   everything in it. */
+html[data-appearance] body {
+  position: relative;
+  z-index: 0;
+}
+html[data-appearance] body::before {
+  content: "";
+  position: fixed;
+  inset: -504px 0 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--mx-rain) repeat;
+  animation: mx-rain 40s linear infinite;
+  will-change: transform;
+}
+@keyframes mx-rain {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(504px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-appearance] body::before {
+    animation: none;
+  }
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--c-primary) 35%, transparent);
+  color: var(--c-bright-fg);
+}
+
+/* Bars: terminal scanlines */
+[data-slot="workspace-rail"],
+[data-slot="home-header"],
+[data-slot="status-bar"],
+[data-slot="audio-player-bar"] {
+  background-color: var(--c-bg);
+  background-image: repeating-linear-gradient(
+    0deg,
+    var(--mx-scan) 0,
+    var(--mx-scan) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+[data-slot="workspace-rail"] {
+  border-right: 1px solid var(--c-border-strong);
+  box-shadow: var(--mx-glow);
+}
+[data-slot="home-header"] {
+  border-bottom: 1px solid var(--c-border-strong);
+  font-family: var(--mx-mono);
+}
+
+/* Footer: a console readout */
+[data-slot="status-bar"] {
+  border-top: 1px solid var(--c-primary);
+  box-shadow: var(--mx-glow);
+  color: var(--c-primary);
+  font-family: var(--mx-mono);
+  text-shadow: var(--mx-text-glow);
+  letter-spacing: 0.04em;
+}
+[data-slot="audio-player-bar"] {
+  border-top: 1px solid var(--c-border-strong);
+  font-family: var(--mx-mono);
+}
+
+/* Files: square corners, glow on hover. The app's selection rings
+   (box-shadow), the card's selected border and the row's selected
+   background are left alone, so selection stays visible. */
+[data-slot="media-card"],
+[data-slot="folder-card"] {
+  border-radius: 0;
+}
+[data-slot="media-card"]:hover,
+[data-slot="folder-card"]:hover {
+  filter: drop-shadow(
+    0 0 6px color-mix(in srgb, var(--c-primary) 45%, transparent)
+  );
+}
+[data-slot="media-row"],
+[data-slot="folder-row"] {
+  font-family: var(--mx-mono);
+}
+[data-slot="media-card"][aria-current="true"],
+[data-slot="media-row"][aria-current="true"] {
+  outline: 1px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+[data-slot="modal-panel"] {
+  border: 1px solid var(--c-primary);
+  border-radius: 0;
+  box-shadow:
+    var(--mx-glow),
+    0 20px 60px rgb(0 0 0 / 0.5);
+}

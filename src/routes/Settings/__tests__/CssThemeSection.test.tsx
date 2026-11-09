@@ -49,10 +49,9 @@ beforeEach(() => {
 });
 
 describe("CssThemeSection", () => {
-  it("shows the folder and the picked theme by its name", async () => {
+  it("shows the folder", async () => {
     renderSection();
     await waitFor(() => expect(screen.getByText(DIR)).toBeTruthy());
-    expect(screen.getByRole("combobox").textContent).toContain("Neon");
   });
 
   it("opens the folder, and says so when main reports a failure", async () => {
