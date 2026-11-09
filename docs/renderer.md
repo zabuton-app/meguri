@@ -9,8 +9,10 @@ fetching, internationalization, theming, and content zoom.
 Routing uses `createHashRouter` (`src/App.tsx`); a hash router is the stable
 choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`),
-`play` (`src/routes/Player/`), `history` (`src/routes/History/`), and
-`settings` (`src/routes/Settings/`) are its **children**. Home renders an
+`play` (`src/routes/Player/`), `history` (`src/routes/History/`),
+`duplicates` (`src/routes/Duplicates/`), `tags` (`src/routes/Tags/`),
+`auto-tag` (`src/routes/AutoTag/`), and `settings` (`src/routes/Settings/`)
+are its **children**. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
 stays mounted underneath. The file detail can alternatively dock as a **side
 peek** — a sheet docked beside the list as a flex sibling, so the list narrows
@@ -32,7 +34,7 @@ mechanics in such hooks and components; `index.tsx` should stay a composition.
 The provider stack is set up in `src/main.tsx`:
 
 ```text
-QueryClientProvider → ThemeProvider → I18nProvider → PreferencesProvider → ConfirmProvider
+QueryClientProvider → ThemeProvider → I18nProvider → PreferencesProvider → TourProvider → ConfirmProvider
 ```
 
 ## Audio playback

@@ -66,8 +66,11 @@ export async function launchApp({ mediaRoot, width = 1280, height = 800 }) {
 
   // Selectors in the capture scripts assume the English locale, and the
   // screenshots should not depend on the host machine's saved preferences.
+  // The first-launch tour's overlay would cover every capture, so it counts
+  // as seen (as the e2e fixtures do).
   await page.evaluate(() => {
     localStorage.setItem("meguri.lang", "en");
+    localStorage.setItem("meguri.tours", JSON.stringify(["first-launch"]));
   });
   await page.reload();
   await page.waitForLoadState("domcontentloaded");

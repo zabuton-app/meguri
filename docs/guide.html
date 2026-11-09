@@ -127,6 +127,9 @@
     <li>That's it. The folder is remembered, and every later launch re-checks
     it automatically for new, changed, moved, or deleted files.</li>
   </ol>
+  <p>On first launch the pet also offers a short tour of the main screen,
+  starting with a choice of language. Skip it with <kbd>Esc</kbd>, or replay
+  it any time from <strong>Settings → App → Tutorial</strong>.</p>
   <div class="card tip">
     <strong>Your files are safe.</strong> Meguri only ever <em>reads</em> the
     folders you add. It never modifies, moves, or deletes your media files.
@@ -153,6 +156,13 @@
   </ul>
   <p>The grid and the list can also be shown <a href="#folders">by
   folder</a> instead of as one flat library.</p>
+  <p>The <strong>contribution graph</strong> button in the filter bar opens a
+  panel over any view with a year of days as a heatmap, shaded by how many
+  files you played, captured, created, or added on each. Click a day, or drag
+  across several, to narrow the list to them.</p>
+  <p>To hand files to another app — a chat, an editor, a file manager — hover
+  a file in the grid or the list and drag the arrow beside its checkbox. Drag
+  from a selected file's arrow to carry the whole selection.</p>
   <p>Scrolling is infinite — items load as you go, even in very large
   libraries. Use <kbd>Ctrl</kbd> + mouse wheel (or <kbd>Ctrl</kbd> +
   <kbd>+</kbd>/<kbd>-</kbd>) to make everything larger or smaller at any
@@ -272,7 +282,7 @@
   <h2 id="tags">Tags, ratings, and favorites</h2>
   <ul>
     <li><strong>Tags</strong> — add free-form tags in the detail view; the
-    input autocompletes from tags you've already used.</li>
+    input autocompletes from tags already used in that file's workspace.</li>
     <li><strong>Ratings</strong> — rate files from ★ to ★★★★★.</li>
     <li><strong>Favorites</strong> — a one-click heart for the files you come
     back to.</li>
@@ -281,6 +291,22 @@
   you later rename a file or move it to another folder inside the same
   workspace, your tags, rating, favorite mark, and history follow it
   automatically after the next scan.</p>
+  <p>Tags are shared across workspaces by name. Letter case, extra spaces and
+  invisible characters do not matter when you search or tag, so
+  <code>Trip</code> and <code>trip</code> are one tag. Typing
+  <code>tag:</code> in the search box suggests tags from every workspace, the
+  ones in the current view first.</p>
+  <p>The <strong>Tags</strong> screen (the tag button in the header) lists
+  every tag with how many files carry it. Rename, merge, or delete tags there.
+  The change applies to the workspaces in view — every workspace in the
+  <strong>All</strong> view and in collections, only the current one
+  otherwise. A tag that a keyword or folder rule of
+  <a href="#auto-tag">auto tagging</a> names is changed in every workspace,
+  wherever you are. Each spelling (<code>Trip</code>, <code>trip</code>) is
+  listed on its own row, and renaming or merging either changes both.
+  Switch to <strong>Cloud</strong> to see the tags sized by how many files
+  carry them, and click one to search for it.</p>
+  <img class="shot" src="./assets/tags-cloud.png" alt="The Tags screen as a cloud, each tag sized by how many files carry it">
 
   <h2 id="auto-tag">Auto tagging</h2>
   <img class="shot" src="./assets/auto-tag.png" alt="The auto-tagging screen with the code-prefix rule open, listing the files it would tag">
@@ -306,6 +332,8 @@
     now, add it to the keywords so later scans apply it too, or ignore
     it.</li>
   </ul>
+  <img class="shot" src="./assets/auto-tag-keywords.png" alt="The Keywords tab with a keyword open, listing the files whose names hold its term">
+  <img class="shot" src="./assets/auto-tag-suggest.png" alt="The Suggestions tab listing words from the file names that no condition covers yet">
   <p>With <strong>Apply when scanning</strong> on, the conditions run on the
   files each scan adds or changes. <strong>Apply to existing files</strong>
   runs them over the whole library once; that cannot be undone. Either way
@@ -545,6 +573,20 @@
     <li><strong>Themes</strong> — pick from base16 themes (gruvbox, solarized,
     nord, catppuccin, tokyo night, and more) in Settings. The entire UI
     follows the theme, in light and dark variants.</li>
+    <li><strong>CSS themes</strong> — put theme files (<code>.css</code>) in
+    the themes folder (<strong>Settings → General → CSS theme → Open themes
+    folder</strong>) and they appear in the theme list after the built-in
+    ones. A few <a href="https://github.com/zabuton-app/meguri/tree/main/docs/themes">sample
+    themes</a> are ready to try.</li>
+    <li><strong>Custom CSS</strong> — turn on <strong>Settings → General →
+    Custom CSS</strong> and press <strong>Open file</strong> to edit your own
+    <code>custom.css</code>, applied on top of whichever theme is picked.
+    Every save applies right away. If a stylesheet makes the window unusable,
+    move the theme file out of the themes folder or rename
+    <code>custom.css</code>. Stylesheets cannot load anything from the
+    network. See
+    <a href="https://github.com/zabuton-app/meguri/blob/main/docs/theming.md">Theming
+    Meguri with CSS</a> for what can be changed.</li>
     <li><strong>Language</strong> — the UI is available in English, 日本語,
     Español, Français, 한국어, and 简体中文. Switch in Settings.</li>
     <li><strong>Zoom</strong> — <kbd>Ctrl</kbd> + mouse wheel or
