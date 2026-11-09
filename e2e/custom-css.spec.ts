@@ -13,8 +13,9 @@ const primary = (page: Page) =>
       .trim(),
   );
 
-// The data-slot hooks documented for custom.css. User stylesheets target them,
-// so renaming or dropping one breaks theirs. folder-card / folder-row and
+// The data-slot hooks documented for custom.css (the list in docs/theming.md
+// is the source of truth). User stylesheets target them, so renaming or
+// dropping one breaks theirs. folder-card / folder-row and
 // audio-player-bar need a folder view or playback to appear and are not
 // covered here.
 const SHELL_SLOTS = [
@@ -71,5 +72,41 @@ test.describe("Custom CSS", () => {
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
     await expect.poll(() => primary(ready)).toBe(themePrimary);
+  });
+
+  test("the sample theme follows the light / dark switch", async ({
+    app,
+    ready,
+  }) => {
+    const userData = await app.evaluate(({ app }) => app.getPath("userData"));
+    fs.copyFileSync(
+      path.join(process.cwd(), "docs/themes/cyberpunk.css"),
+      path.join(userData, "custom.css"),
+    );
+    const bg = () =>
+      ready.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--c-bg")
+          .trim(),
+      );
+    const root = ready.locator("html");
+
+    const dialog = await openSettings(ready);
+    await dialog
+      .locator("section", { hasText: "Custom CSS" })
+      .getByRole("switch")
+      .click();
+
+    // Scoped: the logo picker has a "Dark" button too.
+    const appearance = dialog.locator("section", { hasText: "Appearance" });
+    await appearance.getByRole("button", { name: "Dark", exact: true }).click();
+    await expect(root).toHaveAttribute("data-appearance", "dark");
+    await expect.poll(bg).toBe("#0a0a14");
+
+    await appearance
+      .getByRole("button", { name: "Light", exact: true })
+      .click();
+    await expect(root).toHaveAttribute("data-appearance", "light");
+    await expect.poll(bg).toBe("#f5f2ff");
   });
 });

@@ -1,0 +1,173 @@
+/*
+ * Cyberpunk — a sample Meguri CSS theme
+ *
+ * Neon magenta, cyan and yellow on indigo. Has a dark and a light variant,
+ * picked by the app's light / dark switch through html[data-appearance].
+ * Uses only the public API described in docs/theming.md, so it keeps working
+ * across updates.
+ *
+ * To use it, copy this file's contents into custom.css
+ * (Settings > General > Custom CSS > Open file).
+ */
+
+/* ---- Palette: dark ------------------------------------------------------ */
+
+html[data-appearance="dark"] {
+  --c-bg: #0a0a14;
+  --c-surface: #11111f;
+  --c-overlay: #22203d;
+  --c-hover: #2c294e;
+  --c-border: #332f5b;
+  --c-border-strong: #6553ad;
+
+  --c-muted: #8b87b8;
+  --c-secondary-fg: #aaa6d6;
+  --c-fg: #dedaff;
+  --c-bright-fg: #ffffff;
+  --c-highlight: #fcee0a;
+
+  --c-primary: #ff2bd6; /* magenta */
+  --c-info: #00f0ff; /* cyan */
+  --c-accent2: #fcee0a; /* yellow */
+  --c-success: #05ffa1;
+  --c-warn: #ff9e00;
+  --c-error: #ff2a6d;
+  --c-secondary-accent: #b431ff;
+  --c-special: #00f0ff;
+
+  --cp-glow-primary:
+    0 0 6px rgb(255 43 214 / 0.55), 0 0 18px rgb(255 43 214 / 0.25);
+  --cp-glow-info: 0 0 6px rgb(0 240 255 / 0.5), 0 0 18px rgb(0 240 255 / 0.2);
+  --cp-chrome: #07070f;
+}
+
+/* ---- Palette: light ----------------------------------------------------- */
+
+/* Pale lavender paper with the same neon hues, darkened enough to read. */
+html[data-appearance="light"] {
+  --c-bg: #f5f2ff;
+  --c-surface: #ece7ff;
+  --c-overlay: #ddd6f6;
+  --c-hover: #cdc5ee;
+  --c-border: #c3bbe8;
+  --c-border-strong: #8a7cc9;
+
+  --c-muted: #5c5590;
+  --c-secondary-fg: #48427a;
+  --c-fg: #1a1630;
+  --c-bright-fg: #000000;
+  --c-highlight: #7d6c00;
+
+  --c-primary: #c4008f;
+  --c-info: #00727f;
+  --c-accent2: #7d6c00;
+  --c-success: #007a55;
+  --c-warn: #a35200;
+  --c-error: #c8004a;
+  --c-secondary-accent: #7a1fd6;
+  --c-special: #00727f;
+
+  --cp-glow-primary: 0 0 6px rgb(196 0 143 / 0.35);
+  --cp-glow-info: 0 0 6px rgb(0 114 127 / 0.3);
+  --cp-chrome: #ffffff;
+}
+
+/* ---- Both variants ------------------------------------------------------ */
+
+html[data-appearance] {
+  --cp-mono:
+    "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--c-primary) 45%, transparent);
+  color: var(--c-bright-fg);
+}
+
+/* Side rail: neon edge */
+[data-slot="workspace-rail"] {
+  background-color: var(--c-surface);
+  border-right: 1px solid var(--c-info);
+  box-shadow: var(--cp-glow-info);
+}
+
+/* Workspace info header: primary → info gradient underline */
+[data-slot="home-header"] {
+  background-color: var(--c-surface);
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(90deg, var(--c-primary), var(--c-info)) 1;
+}
+
+/* Search and filters: faint violet haze */
+[data-slot="filter-bar"] {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--c-secondary-accent) 10%, var(--c-bg)),
+    var(--c-bg)
+  );
+}
+
+/* Footer: terminal-style readout */
+[data-slot="status-bar"] {
+  background-color: var(--cp-chrome);
+  border-top: 1px solid var(--c-primary);
+  box-shadow: var(--cp-glow-primary);
+  color: var(--c-info);
+  font-family: var(--cp-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+[data-slot="audio-player-bar"] {
+  background-color: var(--cp-chrome);
+  border-top: 1px solid var(--c-accent2);
+}
+
+/* Files: sharp corners, glow on hover.
+   The app draws the selected / focused rings with box-shadow, the card's
+   selected state with its border color, and the row's with its background.
+   None of those is set here, so selection stays visible: the glow is a
+   drop-shadow filter and the focus marker an outline. */
+[data-slot="media-card"] {
+  border-radius: 2px;
+  transition: transform 120ms ease;
+}
+[data-slot="media-card"]:hover {
+  filter: drop-shadow(
+    0 0 6px color-mix(in srgb, var(--c-primary) 55%, transparent)
+  );
+  transform: translateY(-1px);
+}
+[data-slot="media-row"] {
+  border-radius: 2px;
+  border-left: 2px solid transparent;
+}
+[data-slot="media-row"]:hover {
+  border-left-color: var(--c-info);
+}
+[data-slot="media-card"][aria-current="true"],
+[data-slot="media-row"][aria-current="true"] {
+  outline: 1px solid var(--c-info);
+  outline-offset: 2px;
+}
+
+/* Folders: dashed, like warning tape. A folder card shows selection with a
+   ring only, so its border is free; a folder row shows it with its
+   background, so only the row's left edge is marked. */
+[data-slot="folder-card"] {
+  border-radius: 2px;
+  border-style: dashed;
+  border-color: var(--c-accent2);
+}
+[data-slot="folder-row"] {
+  border-left: 2px dashed var(--c-accent2);
+}
+
+/* Settings, file details, discovery, history, tags, ... */
+[data-slot="modal-panel"] {
+  border: 1px solid var(--c-primary);
+  border-radius: 4px;
+  box-shadow:
+    var(--cp-glow-primary),
+    0 20px 60px rgb(0 0 0 / 0.5);
+}
