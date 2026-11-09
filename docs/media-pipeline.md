@@ -44,6 +44,16 @@ a full index rebuild has the same effect.
 keys on, since `thumb_status` alone cannot distinguish a produced thumbnail from
 a deliberate absence.
 
+### Filtering by resolution
+
+Use **Video + Image** to browse visual media together. To find footage at a
+particular size, choose a **Resolution** preset, such as **4K UHD (3840 × 2160)**.
+**Exactly** matches both dimensions in either orientation. **At least** matches
+the preset's long or short edge, like Meguri's resolution badges, so it includes
+larger files and cropped clips such as 3840 × 1606. Resolution applies to videos
+and images with known dimensions. Use **Smart collections → Save current
+filters** to reuse the search, and select **All** to run it across scanned folders.
+
 ### Concurrency
 
 `electron/core/concurrency.ts` provides `pool()`, a bounded parallel worker that

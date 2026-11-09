@@ -13,6 +13,12 @@ export const ja = {
   "kind.video": "動画",
   "kind.image": "画像",
   "kind.audio": "音声",
+  "kind.visual": "動画＋画像",
+  "resolution.title": "解像度",
+  "resolution.any": "すべての解像度",
+  "resolution.match": "解像度の条件",
+  "resolution.atLeast": "以上",
+  "resolution.exact": "完全一致",
 
   // 並び順
   "sort.added": "追加順",

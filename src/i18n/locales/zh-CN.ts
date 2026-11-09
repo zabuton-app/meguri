@@ -14,6 +14,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "kind.video": "视频",
   "kind.image": "图片",
   "kind.audio": "音频",
+  "kind.visual": "视频＋图像",
+  "resolution.title": "分辨率",
+  "resolution.any": "任意分辨率",
+  "resolution.match": "分辨率匹配方式",
+  "resolution.atLeast": "至少",
+  "resolution.exact": "精确匹配",
 
   // sort
   "sort.added": "添加时间",

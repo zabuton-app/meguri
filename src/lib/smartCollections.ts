@@ -8,6 +8,7 @@ import type { TFunc } from "@/i18n/I18nProvider";
 import { kindLabelKey } from "@/lib/mediaKind";
 import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
+import { resolutionLabel } from "@shared/resolutions";
 
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
 
@@ -42,6 +43,8 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.tags?.length) next.tags = query.tags.filter(Boolean);
   if (query.tagSource) next.tagSource = query.tagSource;
   if (query.kind) next.kind = query.kind;
+  if (query.resolution && query.kind !== "audio")
+    next.resolution = query.resolution;
   if (query.ratingMin != null && query.ratingMin > 0)
     next.ratingMin = query.ratingMin;
   if (query.favorite) next.favorite = true;
@@ -222,6 +225,10 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     parts.push(key ? t(key) : query.kind);
   }
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
+  if (query.resolution && query.kind !== "audio")
+    parts.push(
+      `${t(query.resolution.match === "exact" ? "resolution.exact" : "resolution.atLeast")} ${resolutionLabel(query.resolution.preset)}`,
+    );
   if (query.favorite) parts.push(t("favorite.chip"));
   if (query.duplicates) parts.push(t("duplicates.chip"));
   if (query.played != null) {
