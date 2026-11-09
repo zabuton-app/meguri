@@ -75,10 +75,11 @@ test("global smart bins retain scope, resolution, type and ratings after restart
     await page
       .getByRole("button", { name: "Create smart bin", exact: true })
       .click();
+    const longBinName = "4KFootageForTheDocumentaryInterviewCollection";
     let dialog = page.getByRole("dialog");
     await dialog
       .getByRole("textbox", { name: "Name", exact: true })
-      .fill("4K picks");
+      .fill(longBinName);
     await dialog
       .getByRole("radio", { name: "Video + Image", exact: true })
       .click();
@@ -93,8 +94,18 @@ test("global smart bins retain scope, resolution, type and ratings after restart
 
     const sidebar = page.getByRole("complementary", { name: "Smart bins" });
     await expect(
-      sidebar.getByRole("button", { name: "4K picks", exact: false }).first(),
+      sidebar.getByRole("button", { name: longBinName, exact: false }).first(),
     ).toBeVisible();
+    const edit = sidebar.getByRole("button", {
+      name: `Edit smart bin: ${longBinName}`,
+      exact: true,
+    });
+    const remove = sidebar.getByRole("button", {
+      name: `Delete smart bin: ${longBinName}`,
+      exact: true,
+    });
+    await expect(edit).toBeInViewport({ ratio: 1, timeout: 3000 });
+    await expect(remove).toBeInViewport({ ratio: 1 });
     await expect(page.getByTestId("media-card")).toHaveCount(2);
     await expect(fileCard(page, "photo-4k.png")).toBeVisible();
     await expect(fileCard(page, "clip-4k.mp4")).toBeVisible();
@@ -103,22 +114,22 @@ test("global smart bins retain scope, resolution, type and ratings after restart
     // A folder change keeps the bin rules and narrows their search location.
     await expect(page.getByTestId("media-card")).toHaveCount(1);
     await sidebar
-      .getByRole("button", { name: "4K picks", exact: false })
+      .getByRole("button", { name: longBinName, exact: false })
       .first()
       .click();
     await expect(page.getByTestId("media-card")).toHaveCount(1);
-    await page.getByRole("button", { name: "Global", exact: true }).click();
-    await expect(page.getByTestId("media-card")).toHaveCount(2);
-
-    await sidebar
-      .getByRole("button", { name: "Edit smart bin: 4K picks", exact: true })
-      .click();
+    // A long summary must not push either action outside the sidebar in Local.
+    await expect(edit).toBeInViewport({ ratio: 1 });
+    await expect(remove).toBeInViewport({ ratio: 1 });
+    await edit.click();
     dialog = page.getByRole("dialog");
     await dialog
       .getByRole("textbox", { name: "Name", exact: true })
       .fill("4K video");
     await dialog.getByRole("radio", { name: "Video", exact: true }).click();
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByTestId("media-card")).toHaveCount(0);
+    await page.getByRole("button", { name: "Global", exact: true }).click();
     await expect(page.getByTestId("media-card")).toHaveCount(1);
     await expect(fileCard(page, "clip-4k.mp4")).toBeVisible();
 

@@ -113,7 +113,9 @@ export function SmartBinsSidebar({
           </span>
         </div>
       )}
-      <ScrollArea className="min-h-0 flex-1">
+      {/* Radix uses a table wrapper by default. A long rule can widen it past
+          this rail, pushing the edit and delete buttons into the clipped area. */}
+      <ScrollArea className="min-h-0 flex-1" viewportClassName="[&>div]:!block">
         <div className="space-y-1 p-2">
           {onBrowse && (
             <button
@@ -161,7 +163,7 @@ export function SmartBinsSidebar({
                   type="button"
                   onClick={() => onApply(collection)}
                   aria-current={active ? "true" : undefined}
-                  title={`${scope}\n${describeSearchQuery(t, collection.query)}`}
+                  title={`${collection.name}\n${scope}\n${describeSearchQuery(t, collection.query)}`}
                   className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-overlay"
                 >
                   <Bookmark
@@ -185,6 +187,7 @@ export function SmartBinsSidebar({
                   <button
                     type="button"
                     aria-label={`${t("smartBin.edit")}: ${collection.name}`}
+                    title={t("smartBin.edit")}
                     className="rounded p-1 text-muted hover:bg-overlay hover:text-fg"
                     onClick={() => setEditing(collection)}
                   >
@@ -193,6 +196,7 @@ export function SmartBinsSidebar({
                   <button
                     type="button"
                     aria-label={`${t("smartBin.delete")}: ${collection.name}`}
+                    title={t("smartBin.delete")}
                     className="rounded p-1 text-muted hover:bg-overlay hover:text-destructive"
                     onClick={() =>
                       void (async () => {
