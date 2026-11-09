@@ -32,6 +32,7 @@ node tools/demo-capture/shoot-audio.mjs      # audio.png — player bar
 node tools/demo-capture/shoot-spectrum.mjs   # spectrum*.png — audio spectrum
 node tools/demo-capture/shoot-auto-tag.mjs   # auto-tag*.png, tags-cloud.png — auto tagging and the tag cloud
 node tools/demo-capture/shoot-css-themes.mjs # css-theme-*.png — the sample CSS themes, dark and light
+node tools/demo-capture/shoot-tour.mjs        # tour.png — the first-launch tour
 ```
 
 `record-graph.mjs`, `record-folders.mjs`, `record-bulk-edit.mjs` and

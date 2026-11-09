@@ -15,6 +15,8 @@ The layers, from bottom to top:
 At equal specificity a higher layer wins, so `custom.css` can adjust a CSS
 theme.
 
+![The three layers: built-in theme, CSS theme, custom.css](assets/css-layers.png)
+
 `<userData>` below is, for example, `~/.config/meguri` on Linux.
 
 ## Installing a CSS theme
