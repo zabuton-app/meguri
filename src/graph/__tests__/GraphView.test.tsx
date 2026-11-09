@@ -554,8 +554,10 @@ describe("GraphView", () => {
   it("switches to 3D: its own layout cache, a 3D simulation, remembered", async () => {
     const load = vi.spyOn(SimClient.prototype, "load");
     render();
+    // The simulation is loaded by an effect that runs after the nodes are
+    // drawn, so ready() alone can come before it.
     await ready();
-    expect(load.mock.calls.at(-1)?.[0].dims).toBe(2);
+    await waitFor(() => expect(load.mock.calls.at(-1)?.[0].dims).toBe(2));
     fireEvent.click(screen.getByRole("radio", { name: "3D" }));
     await waitFor(() =>
       expect(api.graphLayoutGet).toHaveBeenCalledWith("w", 3),
