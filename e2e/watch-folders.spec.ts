@@ -11,9 +11,11 @@ test("watches real downloads globally and per folder, and remembers new-file cho
   const first = path.join(temporary, "Downloads A");
   const second = path.join(temporary, "Downloads B");
   for (const directory of [profile, first, second]) fs.mkdirSync(directory);
-  const fixture = path.resolve("e2e/fixtures/media/test.png");
-  fs.copyFileSync(fixture, path.join(first, "baseline-a.png"));
-  fs.copyFileSync(fixture, path.join(second, "baseline-b.png"));
+  // Write new files so the test sees fresh birthtimes on filesystems that
+  // preserve creation dates when copying a file.
+  const fixture = fs.readFileSync(path.resolve("e2e/fixtures/media/test.png"));
+  fs.writeFileSync(path.join(first, "baseline-a.png"), fixture);
+  fs.writeFileSync(path.join(second, "baseline-b.png"), fixture);
   fs.writeFileSync(
     path.join(profile, "config.json"),
     JSON.stringify({ roots: [first, second], activePath: "__all__" }),
@@ -45,10 +47,10 @@ test("watches real downloads globally and per folder, and remembers new-file cho
     await expect(page.getByTestId("media-card")).toHaveCount(2);
     await waitForIdle(page);
 
-    fs.copyFileSync(fixture, path.join(first, "download-a.png"));
-    fs.copyFileSync(fixture, path.join(second, "download-b.png"));
+    fs.writeFileSync(path.join(first, "download-a.png"), fixture);
+    fs.writeFileSync(path.join(second, "download-b.png"), fixture);
     fs.mkdirSync(path.join(first, "batch"));
-    fs.copyFileSync(fixture, path.join(first, "batch", "nested.png"));
+    fs.writeFileSync(path.join(first, "batch", "nested.png"), fixture);
     await expect(fileCard(page, "download-a.png")).toBeVisible({
       timeout: 15000,
     });
@@ -88,7 +90,7 @@ test("watches real downloads globally and per folder, and remembers new-file cho
 
     await openRecent();
     await choose("Define new using", "File creation date");
-    await choose("Time window", "This week");
+    await choose("Time window", "Last 24 hours");
     await page.keyboard.press("Escape");
     await app.close();
     app = await launch();
@@ -99,7 +101,7 @@ test("watches real downloads globally and per folder, and remembers new-file cho
     ).toHaveText("File creation date");
     await expect(
       recentPanel().getByRole("combobox", { name: "Time window" }),
-    ).toHaveText("This week");
+    ).toHaveText("Last 24 hours");
     await page.keyboard.press("Escape");
     await page
       .getByRole("complementary", { name: "Smart bins" })
@@ -115,7 +117,7 @@ test("watches real downloads globally and per folder, and remembers new-file cho
     ).toHaveText("File creation date");
     await expect(
       recentPanel().getByRole("combobox", { name: "Time window" }),
-    ).toHaveText("This week");
+    ).toHaveText("Last 24 hours");
     await page.keyboard.press("Escape");
 
     await page
@@ -143,7 +145,7 @@ test("watches real downloads globally and per folder, and remembers new-file cho
     await expect(watchPanel().getByRole("checkbox")).not.toBeChecked();
     await page.keyboard.press("Escape");
     await waitForIdle(page);
-    fs.copyFileSync(fixture, path.join(first, "manual.png"));
+    fs.writeFileSync(path.join(first, "manual.png"), fixture);
     await page
       .getByRole("button", { name: "Scan", exact: true })
       .first()

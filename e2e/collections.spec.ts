@@ -66,7 +66,7 @@ test.describe("Collections", () => {
     // A bin defines the starting set; the current visitor search still narrows it.
     await expect(searchInput(ready)).toHaveValue("nomatch");
     await expect(
-      ready.getByText("Filter combination has no matches.", { exact: true }),
+      ready.getByText("No files match these filter criteria.", { exact: true }),
     ).toBeVisible();
     await expect(
       ready.locator('[data-slot="smart-bin-context"]'),
