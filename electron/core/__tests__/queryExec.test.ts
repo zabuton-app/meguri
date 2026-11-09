@@ -20,13 +20,15 @@ import { insertFile } from "./helpers.js";
 let dir: string;
 let db: DB;
 let dbPath: string;
+let libraryPath: string;
 let exec: QueryExecutor;
 let fileIds: number[];
 
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), "meguri-queryexec-"));
   dbPath = path.join(dir, "db.sqlite");
-  db = openDb(dbPath);
+  libraryPath = path.join(dir, "library.sqlite");
+  db = openDb(dbPath, libraryPath);
   const rootId = upsertScanRoot(db, "/fake/root", "deadbeef");
   fileIds = [];
   for (let i = 0; i < 5; i++) {
@@ -42,7 +44,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-const target = () => [{ id: "ws1", dbPath }];
+const target = () => [{ id: "ws1", dbPath, libraryPath }];
 
 describe("QueryExecutor", () => {
   it("runs searches through its own read-only connection", () => {
@@ -91,6 +93,7 @@ describe("QueryExecutor", () => {
     const missing = {
       id: "ws2",
       dbPath: path.join(dir, "nowhere", "db.sqlite"),
+      libraryPath,
     };
     expect(() =>
       exec.run({
@@ -193,7 +196,7 @@ describe("QueryExecutor", () => {
     const warnings: string[] = [];
     const warnedExec = new QueryExecutor((m) => warnings.push(m));
     const missingTargets = [
-      { id: "nope", dbPath: path.join(dir, "missing.sqlite") },
+      { id: "nope", dbPath: path.join(dir, "missing.sqlite"), libraryPath },
     ];
     const missing = warnedExec.run({
       kind: "search",

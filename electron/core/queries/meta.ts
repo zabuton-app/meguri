@@ -2,6 +2,7 @@
 // extracted ffprobe meta, and meta_key migration / orphan cleanup.
 import type { DB } from "../db.js";
 import { nowUnix } from "../db.js";
+import { BOOKMARK_NEAR_EPS } from "./bookmarks.js";
 import { metaKeyOf } from "../tags.js";
 import type { ExtractedMeta } from "../media.js";
 import { resumePointOf } from "../../../shared/resume.js";
@@ -222,15 +223,45 @@ export function updateExtractedMeta(
 }
 
 /**
+ * How a file_meta row merges into one already held under the same meta_key
+ * (specs/015-shared-user-metadata/research.md, R5), as the SET list of an
+ * `ON CONFLICT (meta_key) DO UPDATE`: favorite is OR and rating the higher one;
+ * the thumbnail frame and the resume point come from whichever row was updated
+ * last, unless that row has none, since updated_at also moves when only the
+ * rating or favorite changed. SET expressions all read the row as it was
+ * before this update, and merging the same row again changes nothing.
+ */
+export const FILE_META_MERGE_SET = `
+  rating = MAX(rating, excluded.rating),
+  favorite = MAX(favorite, excluded.favorite),
+  last_accessed_at = MAX(
+    COALESCE(last_accessed_at, excluded.last_accessed_at),
+    COALESCE(excluded.last_accessed_at, last_accessed_at)),
+  thumb_offset_sec = CASE WHEN excluded.updated_at > updated_at
+    THEN COALESCE(excluded.thumb_offset_sec, thumb_offset_sec)
+    ELSE COALESCE(thumb_offset_sec, excluded.thumb_offset_sec) END,
+  resume_position = CASE WHEN excluded.updated_at > updated_at
+    THEN COALESCE(excluded.resume_position, resume_position)
+    ELSE COALESCE(resume_position, excluded.resume_position) END,
+  updated_at = MAX(updated_at, excluded.updated_at)`;
+
+/**
  * Carry durable metadata from one meta_key to another (used when a file's content_hash
- * first appears and its meta_key shifts from the rel_path fallback to the hash). Rows that
- * would collide with an existing target are dropped (the target already holds metadata).
+ * first appears and its meta_key shifts from the path fallback to the hash). The target
+ * may already hold metadata, typically another workspace's copy of the same content in
+ * the shared library: file_meta is merged into it (FILE_META_MERGE_SET), a tag the
+ * target already carries keeps the target's row, and a bookmark near one the target
+ * has is dropped.
  */
 export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
   if (fromKey === toKey) return;
   db.transaction(() => {
     db.prepare(
-      "UPDATE OR IGNORE file_meta SET meta_key = ? WHERE meta_key = ?",
+      `INSERT INTO file_meta
+         (meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at)
+       SELECT ?, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at
+       FROM file_meta WHERE meta_key = ?
+       ON CONFLICT (meta_key) DO UPDATE SET ${FILE_META_MERGE_SET}`,
     ).run(toKey, fromKey);
     db.prepare("DELETE FROM file_meta WHERE meta_key = ?").run(fromKey);
     db.prepare(
@@ -241,6 +272,16 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
       toKey,
       fromKey,
     );
+    // As the library merge does (BOOKMARK_NEAR_EPS): a bookmark close to one
+    // the target holds already is not carried over a second time. A range on
+    // sec, searched in (meta_key, sec).
+    db.prepare(
+      `DELETE FROM scene_bookmarks
+        WHERE meta_key = ? AND EXISTS (
+          SELECT 1 FROM scene_bookmarks t
+           WHERE t.meta_key = ?
+             AND t.sec BETWEEN scene_bookmarks.sec - ? AND scene_bookmarks.sec + ?)`,
+    ).run(fromKey, toKey, BOOKMARK_NEAR_EPS, BOOKMARK_NEAR_EPS);
     db.prepare(
       "UPDATE scene_bookmarks SET meta_key = ? WHERE meta_key = ?",
     ).run(toKey, fromKey);
@@ -248,26 +289,12 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
 }
 
 /**
- * Drop durable metadata that no longer maps to any file row. Soft-deleted files keep their
- * row (deleted_at set), so their meta_key still appears in `files` and is preserved — only
- * truly orphaned keys (e.g. left behind when a rebuild discards rows for files now gone from
- * disk) are removed. meta_key is a non-null generated column, so the NOT IN is safe.
+ * Drop tags no file carries any more, so tag completion does not keep offering
+ * them. Metadata itself is never dropped for lack of a file row: it lives in
+ * the library every workspace shares, where a key missing from this
+ * workspace's `files` may belong to another workspace, or to one removed and
+ * about to be added again.
  */
-export function pruneOrphanMeta(db: DB): void {
-  db.transaction(() => {
-    db.exec(
-      "DELETE FROM file_meta WHERE meta_key NOT IN (SELECT meta_key FROM files)",
-    );
-    db.exec(
-      "DELETE FROM meta_tags WHERE meta_key NOT IN (SELECT meta_key FROM files)",
-    );
-    db.exec(
-      "DELETE FROM play_history WHERE meta_key NOT IN (SELECT meta_key FROM files)",
-    );
-    db.exec(
-      "DELETE FROM scene_bookmarks WHERE meta_key NOT IN (SELECT meta_key FROM files)",
-    );
-    // Tags are referenced only via meta_tags; drop any left with no references.
-    db.exec("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM meta_tags)");
-  })();
+export function pruneUnusedTags(db: DB): void {
+  db.exec("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM meta_tags)");
 }

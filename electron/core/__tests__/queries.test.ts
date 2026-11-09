@@ -9,7 +9,7 @@ import {
   filesByIds,
   listBookmarks,
   migrateMetaKey,
-  pruneOrphanMeta,
+  pruneUnusedTags,
   randomFiles,
   removeBookmark,
   searchFiles,
@@ -605,11 +605,11 @@ describe("deleteFromIndex", () => {
 describe("durable metadata keyed by meta_key", () => {
   it("survives a content_hash appearing: migrateMetaKey carries favorite/rating over", () => {
     const { db, rootId } = newDb();
-    // File with no hash yet -> meta_key falls back to "p:<rootId>:<relPath>".
+    // File with no hash yet -> meta_key falls back to "p:<absPath>".
     const id = insertFile(db, rootId, { relPath: "m.mp4", contentHash: null });
     setFavorite(db, id, true);
     setRating(db, id, 5);
-    const fromKey = `p:${rootId}:m.mp4`;
+    const fromKey = `p:/fake/root/m.mp4`;
     const toKey = "abc123hash";
 
     migrateMetaKey(db, fromKey, toKey);
@@ -621,28 +621,84 @@ describe("durable metadata keyed by meta_key", () => {
     db.close();
   });
 
-  it("pruneOrphanMeta drops metadata with no file row but keeps soft-deleted files' metadata", () => {
+  it("migrateMetaKey merges into metadata the target key already holds", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "m.mp4", contentHash: null });
+    setFavorite(db, id, true);
+    setRating(db, id, 2);
+    const fromKey = `p:/fake/root/m.mp4`;
+    db.prepare("UPDATE file_meta SET updated_at = 10 WHERE meta_key = ?").run(
+      fromKey,
+    );
+    // Another workspace's copy of the same content, already under the hash.
+    db.prepare(
+      "INSERT INTO file_meta (meta_key, rating, favorite, thumb_offset_sec, updated_at) VALUES ('h', 4, 0, 7.5, 5)",
+    ).run();
+
+    migrateMetaKey(db, fromKey, "h");
+
+    expect(
+      db
+        .prepare(
+          "SELECT meta_key, rating, favorite, thumb_offset_sec, updated_at FROM file_meta",
+        )
+        .all(),
+    ).toEqual([
+      {
+        meta_key: "h",
+        rating: 4,
+        favorite: 1,
+        thumb_offset_sec: 7.5,
+        updated_at: 10,
+      },
+    ]);
+    db.close();
+  });
+
+  it("pruneUnusedTags keeps metadata with no file row: the library is shared", () => {
     const { db, rootId } = newDb();
     const kept = insertFile(db, rootId, {
       relPath: "kept.mp4",
       contentHash: "keephash",
     });
     setFavorite(db, kept, true);
-    deleteFromIndex(db, kept); // soft delete: row remains, so its meta_key is still referenced
-
-    // An orphan meta row whose key maps to no files row at all.
+    deleteFromIndex(db, kept);
+    // A key no file of this workspace maps to: another workspace's, or one
+    // removed and about to be added again.
     db.prepare(
-      "INSERT INTO file_meta (meta_key, favorite, updated_at) VALUES ('orphan', 1, 0)",
+      "INSERT INTO file_meta (meta_key, favorite, updated_at) VALUES ('elsewhere', 1, 0)",
     ).run();
 
-    pruneOrphanMeta(db);
+    pruneUnusedTags(db);
 
     expect(
-      db.prepare("SELECT 1 FROM file_meta WHERE meta_key = 'orphan'").get(),
-    ).toBeUndefined();
+      db.prepare("SELECT 1 FROM file_meta WHERE meta_key = 'elsewhere'").get(),
+    ).toBeDefined();
     expect(
       db.prepare("SELECT 1 FROM file_meta WHERE meta_key = 'keephash'").get(),
     ).toBeDefined();
+    db.close();
+  });
+
+  it("pruneUnusedTags drops tags no file carries, and keeps the rest", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "a.mp4", contentHash: "ha" });
+    addManualTag(db, id, "used");
+    upsertTag(db, "", "unused");
+    // Carried only by a key no file of this workspace maps to: still in use.
+    const elsewhere = upsertTag(db, "", "elsewhere");
+    db.prepare(
+      "INSERT INTO meta_tags (meta_key, tag_id, source) VALUES ('other-ws', ?, 'manual')",
+    ).run(elsewhere);
+
+    pruneUnusedTags(db);
+
+    const names = (
+      db.prepare("SELECT name FROM tags ORDER BY name").all() as {
+        name: string;
+      }[]
+    ).map((r) => r.name);
+    expect(names).toEqual(["elsewhere", "used"]);
     db.close();
   });
 });
@@ -690,10 +746,33 @@ describe("scene bookmarks", () => {
     expect(listBookmarks(db, b).map((r) => r.id)).toEqual([bBm.id]);
   });
 
+  it("migrateMetaKey drops a bookmark near one the target key holds", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "m.mp4", contentHash: null });
+    addBookmark(db, id, 11);
+    addBookmark(db, id, 60);
+    // Another workspace's copy of the same content, bookmarked at 10s.
+    db.prepare(
+      "INSERT INTO scene_bookmarks (meta_key, sec, created_at) VALUES ('h', 10, 0)",
+    ).run();
+
+    migrateMetaKey(db, "p:/fake/root/m.mp4", "h");
+
+    expect(
+      db
+        .prepare("SELECT meta_key, sec FROM scene_bookmarks ORDER BY sec")
+        .all(),
+    ).toEqual([
+      { meta_key: "h", sec: 10 },
+      { meta_key: "h", sec: 60 },
+    ]);
+    db.close();
+  });
+
   it("migrateMetaKey carries bookmarks along when a content_hash first appears", () => {
     const id = insertFile(db, rootId, { relPath: "m.mp4", contentHash: null });
     addBookmark(db, id, 42);
-    migrateMetaKey(db, `p:${rootId}:m.mp4`, "hashed");
+    migrateMetaKey(db, `p:/fake/root/m.mp4`, "hashed");
     db.prepare("UPDATE files SET content_hash = ? WHERE id = ?").run(
       "hashed",
       id,

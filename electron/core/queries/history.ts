@@ -19,6 +19,35 @@ interface RawEvent {
 // collapsing runs in JS.
 const RAW_BATCH = 500;
 
+// play_history is shared by every workspace. Streaming it newest-first reads
+// through every other workspace's events too, so a workspace that holds only
+// a small share of them collects its own instead (idx_play_history_meta_played)
+// and sorts those: at most OWN_SORT_MAX of them, and fewer than one in
+// OWN_SHARE of the library's.
+const OWN_SORT_MAX = 20_000;
+const OWN_SHARE = 4;
+
+/** Whether this workspace's events are few enough, next to the library's,
+ *  to be collected and sorted rather than found by streaming them all. */
+function collectsOwnEvents(db: DB, via: HistoryQuery["via"]): boolean {
+  // An upper bound on the number of events, read off the end of the rowid
+  // index rather than counted.
+  const total =
+    (db.prepare("SELECT max(id) FROM play_history").pluck().get() as
+      number | null) ?? 0;
+  if (total <= OWN_SORT_MAX) return false;
+  const viaSql = via ? "AND via = ? " : "";
+  const own = db
+    .prepare(
+      `SELECT count(*) FROM (SELECT 1 FROM play_history
+         WHERE meta_key IN (SELECT meta_key FROM main.files WHERE deleted_at IS NULL)
+         ${viaSql}LIMIT ?)`,
+    )
+    .pluck()
+    .get(...(via ? [via] : []), OWN_SORT_MAX + 1) as number;
+  return own <= OWN_SORT_MAX && own * OWN_SHARE < total;
+}
+
 /**
  * List play events newest-first, collapsing consecutive runs of the same file
  * into one row (re-plays while watching a video would otherwise flood the
@@ -35,14 +64,30 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
   const offset = Math.max(0, query.cursor ?? 0);
 
   const viaSql = query.via ? "via = ? AND " : "";
+  // play_history is shared by every workspace: only events for a file alive in
+  // this one, filtered in SQL so the stream does not hand JS every other
+  // workspace's events to drop one lookup at a time. Either streamed in
+  // idx_play_history_played order and checked against this workspace's files,
+  // or, when they are a small share (collectsOwnEvents), collected per file
+  // and sorted: the unary + on played_at and id, in ORDER BY and in the
+  // keyset, keeps the planner off idx_play_history_played, which would bring
+  // the stream back (a range on played_at searched there reads every
+  // workspace's events in it).
+  const own = collectsOwnEvents(db, query.via);
+  const aliveHere = own
+    ? "meta_key IN (SELECT meta_key FROM main.files WHERE deleted_at IS NULL)"
+    : `EXISTS (SELECT 1 FROM main.files f
+     WHERE f.meta_key = play_history.meta_key AND f.deleted_at IS NULL)`;
+  const [at, id] = own ? ["+played_at", "+id"] : ["played_at", "id"];
+  const order = `ORDER BY ${at} DESC, ${id} DESC`;
   const firstBatch = db.prepare(
     `SELECT id, meta_key, played_at, via, position FROM play_history
-     WHERE ${viaSql}1 ORDER BY played_at DESC, id DESC LIMIT ?`,
+     WHERE ${viaSql}${aliveHere} ${order} LIMIT ?`,
   );
   const nextBatch = db.prepare(
     `SELECT id, meta_key, played_at, via, position FROM play_history
-     WHERE ${viaSql}(played_at < ? OR (played_at = ? AND id < ?))
-     ORDER BY played_at DESC, id DESC LIMIT ?`,
+     WHERE ${viaSql}(${at} < ? OR (${at} = ? AND ${id} < ?)) AND ${aliveHere}
+     ${order} LIMIT ?`,
   );
   // Representative alive file for a run's meta_key (MIN(id) mirrors the old
   // SQL); a run whose file is soft-deleted/gone drops out, same as the old
@@ -94,7 +139,7 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
   const nextCursor = kept.length > limit ? offset + limit : null;
 
   // Total play counts for just the returned rows, in one grouped query
-  // (idx_play_history_meta) instead of a correlated COUNT per candidate row.
+  // (idx_play_history_meta_played) instead of a correlated COUNT per candidate row.
   if (items.length > 0) {
     const keys = [...new Set(keptKeys.slice(0, items.length))];
     const ph = keys.map(() => "?").join(",");
@@ -114,7 +159,8 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
 }
 
 /**
- * Delete every play event in this workspace, and the resume points with them:
+ * Delete every play event `db` reaches — through the shared library, every
+ * workspace's — and the resume points with them:
  * a progress bar or the "In progress" filter would otherwise still say what was
  * watched after the user asked for that record to go.
  */

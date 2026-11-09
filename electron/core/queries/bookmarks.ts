@@ -8,7 +8,7 @@ import type { SceneBookmark } from "../types.js";
 // Treat two bookmarks within this many seconds as the same instant. Used to dedupe
 // "Add bookmark" presses near an existing mark. Mirrors BOOKMARK_NEAR_EPS in
 // src/lib/bookmarks.ts (the UI uses the same value to highlight the active mark) — keep in sync.
-const BOOKMARK_NEAR_EPS = 2;
+export const BOOKMARK_NEAR_EPS = 2;
 
 export function listBookmarksByMetaKey(
   db: DB,
@@ -42,13 +42,15 @@ export function addBookmark(
   if (!metaKey) return null;
   const at = Math.max(0, sec);
   return db.transaction(() => {
-    // Any row within the dedupe window is good enough — we don't need the nearest,
-    // so we skip an ORDER BY that SQLite can't satisfy from the (meta_key) index.
+    // Any row within the dedupe window is good enough — we don't need the nearest.
+    // A range on sec, so (meta_key, sec) is searched rather than every
+    // bookmark of the file read.
     const existing = db
       .prepare(
-        "SELECT id, sec, created_at AS createdAt FROM scene_bookmarks WHERE meta_key = ? AND ABS(sec - ?) <= ? LIMIT 1",
+        "SELECT id, sec, created_at AS createdAt FROM scene_bookmarks WHERE meta_key = ? AND sec BETWEEN ? AND ? LIMIT 1",
       )
-      .get(metaKey, at, BOOKMARK_NEAR_EPS) as SceneBookmark | undefined;
+      .get(metaKey, at - BOOKMARK_NEAR_EPS, at + BOOKMARK_NEAR_EPS) as
+      SceneBookmark | undefined;
     if (existing) return existing;
     const createdAt = nowUnix();
     const info = db

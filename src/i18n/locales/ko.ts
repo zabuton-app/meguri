@@ -101,6 +101,25 @@ export const ko: Record<TranslationKey, string> = {
   "update.checking": "확인 중…",
   "update.checkFailed": "확인할 수 없습니다(오프라인일 수 있습니다).",
   "update.upToDate": "최신 버전입니다 ({version}).",
+  "libraryMerge.title": "라이브러리를 옮기는 중",
+  "libraryMerge.description":
+    "즐겨찾기, 평점, 태그, 북마크, 재생 기록을 모든 워크스페이스가 함께 쓰는 라이브러리로 옮기고 있습니다. 끝날 때까지 기다려 주세요.",
+  "libraryMerge.progress": "{done} / {total} 워크스페이스",
+  "libraryMerge.failed": "일부 워크스페이스를 옮기지 못했습니다",
+  "libraryMerge.failedDesc":
+    "{list}\n해당 워크스페이스는 이전처럼 사용할 수 있습니다. 다음 실행 때 다시 시도합니다.",
+  "libraryMerge.failedItem": "{name}: {reason}",
+  "libraryMerge.reason.diskFull":
+    "디스크 공간이 부족합니다. 공간을 확보한 뒤 다시 시도해 주세요.",
+  "libraryMerge.reason.backup": "백업 사본을 쓰지 못했습니다.",
+  "libraryMerge.reason.merge":
+    "오류로 옮기기가 중단되었습니다(변경된 내용은 없습니다).",
+  "libraryMerge.reason.open": "데이터베이스를 열지 못했습니다.",
+  "libraryMerge.retry": "다시 시도",
+  "library.restored":
+    "라이브러리가 손상되어 {date} 시점의 사본으로 복원했습니다",
+  "library.restoredDesc":
+    "그 이후에 바꾼 즐겨찾기, 평점, 태그 등은 사라졌습니다. 손상된 파일은 라이브러리와 같은 폴더에 남겨 두었습니다.",
   "settings.about": "정보",
   "about.version": "{name} 버전 {version}",
   "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
@@ -541,7 +560,7 @@ export const ko: Record<TranslationKey, string> = {
   "history.clear": "기록 지우기",
   "history.clearAction": "지우기",
   "history.clearConfirm":
-    "재생 기록을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "모든 워크스페이스의 재생 기록과 이어서 재생할 위치를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
   "history.playCount": "{count}회 재생",
   "history.viaBrowser": "앱 내",
   "history.viaExternal": "외부 플레이어",
@@ -792,7 +811,7 @@ export const ko: Record<TranslationKey, string> = {
   "tags.merge": "통합",
   "tags.mergeTitle": "태그 통합",
   "tags.mergeDescription":
-    "선택한 {count}개 태그를 대상 태그로 합칩니다. 나머지 태그는 삭제됩니다.",
+    "선택한 {count}개 태그를 모든 워크스페이스에서 대상 태그로 합칩니다. 나머지 태그는 삭제됩니다.",
   "tags.mergeTarget": "통합 대상",
   "tags.mergeAction": "통합",
   "tags.merged": "{count}개 태그를 통합했습니다",
@@ -800,8 +819,9 @@ export const ko: Record<TranslationKey, string> = {
   "tags.delete": "삭제",
   "tags.deleteAction": "삭제",
   "tags.deleteConfirm":
-    "태그 「{name}」을(를) {count}개 파일에서 삭제합니다. 계속할까요?",
-  "tags.deleteConfirmMany": "선택한 {count}개 태그를 삭제합니다. 계속할까요?",
+    "태그 「{name}」을(를) 모든 워크스페이스의 {count}개 파일에서 삭제합니다. 계속할까요?",
+  "tags.deleteConfirmMany":
+    "선택한 {count}개 태그를 모든 워크스페이스에서 삭제합니다. 계속할까요?",
   "tags.deleted": "태그를 삭제했습니다",
   "tags.deleteFailed": "태그를 삭제하지 못했습니다",
   "tags.addFailedReserved":
@@ -828,7 +848,7 @@ export const ko: Record<TranslationKey, string> = {
   "workspace.removeFromSidebar": "워크스페이스 삭제",
   "workspace.removeTitle": "워크스페이스 삭제",
   "workspace.removeConfirm":
-    "「{label}」을(를) 삭제하시겠습니까?\n데이터베이스와 썸네일도 삭제됩니다 (미디어 파일 자체는 삭제되지 않습니다).",
+    "「{label}」을(를) 삭제하시겠습니까?\n파일 목록과 썸네일이 삭제됩니다 (미디어 파일 자체는 삭제되지 않습니다). 즐겨찾기, 평점, 태그, 북마크, 재생 기록은 남으며, 같은 폴더를 다시 추가하면 복원됩니다.",
   "workspace.removeAction": "삭제",
   "workspace.addedToast": "워크스페이스를 추가했습니다",
   "workspace.removedToast": "워크스페이스를 삭제했습니다",

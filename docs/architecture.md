@@ -146,8 +146,13 @@ lifecycle behavior:
 
 ## Workspace model
 
-Each scan root is an independent workspace with its own database and thumbnails.
-The root path is hashed (SHA1, first 16 hex characters) into a stable ID via
+Each scan root is a workspace with its own database (the file index and its
+keyword index) and thumbnails. The metadata the user curates — favorites,
+ratings, tags, bookmarks, play history — lives in one library,
+`<userData>/library.sqlite`, that every workspace's connection attaches as
+`lib`, so the same content shows the same metadata in every workspace (see
+[Data Model](data-model.md#the-shared-library)). The root path is hashed
+(SHA1, first 16 hex characters) into a stable ID via
 `Workspaces.idFor()` / `pathHash()`; that ID is also the name of the directory
 holding the workspace's generated files.
 
@@ -162,8 +167,12 @@ holding the workspace's generated files.
   ID). Code that opens files should be deliberate about which it needs — the
   media server, for instance, resolves by ID so it does not depend on the active
   selection.
-- `electron/core/index.ts` defines `Core`, which holds one workspace's `db`,
-  `root`, and `dataDir`.
+- `electron/core/index.ts` defines `Core`, which holds one workspace's `db`
+  (with the library attached), `root`, and `dataDir`. `Core.init` moves a
+  workspace's own metadata into the library on the first open after the
+  upgrade, and catches its keyword index up with tag changes made elsewhere.
+  On the first launch after the upgrade, `main.ts` opens every workspace that
+  still has to move before scans start, while a modal shows the progress.
 - `electron/core/paths.ts` resolves the storage layout; see
   [Data Model](data-model.md#storage-layout).
 
@@ -173,7 +182,10 @@ holding the workspace's generated files.
 workspace. It has no database of its own;
 `electron/core/crossWorkspace.ts` merges, sorts, and paginates the per-database
 query results from each `Core` in memory (a single-workspace set takes a fast
-path that skips merging). Scanning never targets `All`.
+path that skips merging). Scanning never targets `All`. Each workspace's results
+come from its own file index, joined with the shared library. The play history
+is the one list where two workspaces return the same row (an event for content
+both hold); the merge keeps it once.
 
 ### Folders
 

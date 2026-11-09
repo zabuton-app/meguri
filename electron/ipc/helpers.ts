@@ -10,7 +10,11 @@ import type { Workspaces } from "../core/workspaces.js";
 export function queryTargets(
   cores: { id: string; core: Core }[],
 ): QueryTarget[] {
-  return cores.map(({ id, core }) => ({ id, dbPath: core.dbPath }));
+  return cores.map(({ id, core }) => ({
+    id,
+    dbPath: core.dbPath,
+    libraryPath: core.libraryPath,
+  }));
 }
 
 // File operations are addressed by (workspaceId, fileId) since file IDs are unique

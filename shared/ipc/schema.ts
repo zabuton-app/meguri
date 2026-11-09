@@ -385,6 +385,46 @@ export const FolderFilesResultSchema = z.array(
 );
 export type FolderFilesResult = z.infer<typeof FolderFilesResultSchema>;
 
+export const LibraryMergeProgressSchema = z.object({
+  done: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+export type LibraryMergeProgress = z.infer<typeof LibraryMergeProgressSchema>;
+
+/**
+ * Why a workspace's metadata could not be merged into the library:
+ * - diskFull: no room for its backup copy or the merge
+ * - backup: its backup copy could not be written for another reason
+ * - merge: the merge itself failed (rolled back)
+ * - open: its database could not be opened at all
+ */
+export const LibraryMergeFailureReasonSchema = z.enum([
+  "diskFull",
+  "backup",
+  "merge",
+  "open",
+]);
+export type LibraryMergeFailureReason = z.infer<
+  typeof LibraryMergeFailureReasonSchema
+>;
+
+export const LibraryMergeFailureSchema = z.object({
+  label: z.string(),
+  reason: LibraryMergeFailureReasonSchema,
+});
+export type LibraryMergeFailure = z.infer<typeof LibraryMergeFailureSchema>;
+
+/** The library:merge event: progress while it runs, then the outcome. */
+export const LibraryMergeEventSchema = z.discriminatedUnion("state", [
+  LibraryMergeProgressSchema.extend({ state: z.literal("running") }),
+  z.object({
+    state: z.literal("done"),
+    /** The workspaces whose metadata could not be merged. */
+    failed: z.array(LibraryMergeFailureSchema),
+  }),
+]);
+export type LibraryMergeEvent = z.infer<typeof LibraryMergeEventSchema>;
+
 export const AppStatusSchema = z.object({
   root: z.string().nullable(),
   ready: z.boolean(),
@@ -395,6 +435,14 @@ export const AppStatusSchema = z.object({
   workspaceId: z.string().nullable(),
   /** True while running unpackaged for local development. */
   devMode: z.boolean(),
+  /** Present while workspaces are being merged into the shared library (the
+   *  first launch after the upgrade): how many of them are done. */
+  libraryMerge: LibraryMergeProgressSchema.optional(),
+  /** After that merge: the workspaces it could not merge. */
+  libraryMergeFailed: z.array(LibraryMergeFailureSchema).optional(),
+  /** Set when the library was found damaged at startup and restored from
+   *  its backup copy: when that copy was taken (Unix seconds). */
+  libraryRestoredFrom: z.number().optional(),
 });
 export type AppStatus = z.infer<typeof AppStatusSchema>;
 

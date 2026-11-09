@@ -1,8 +1,8 @@
 import { loadConfig, saveAutoTag } from "../core/appConfig.js";
 import { handle } from "../core/ipcHandler.js";
-import log from "../core/logger.js";
 import * as tagAdmin from "../core/tagAdmin.js";
 import * as tags from "../core/tags.js";
+import type { Core } from "../core/index.js";
 import type { TagList } from "../core/types.js";
 import { retagConditions } from "../../shared/autoTagConditions.js";
 import { AutoTagConfigSchema, type TagRef } from "../../shared/ipc/schema.js";
@@ -14,19 +14,31 @@ import {
   scopedCores,
 } from "./helpers.js";
 
+// Every handler that writes tags calls ws.syncTagIndexes() in a finally, so
+// the other workspaces' keyword indexes follow even a write that failed
+// partway. Its own syncFts and the like stay: they keep this workspace's index
+// right within the same call (research.md, R4).
 export function registerTagHandlers(ctx: IpcContext): void {
   const { ws, queryClient } = ctx;
 
   handle("file_add_tag", ({ id, workspaceId, name }) => {
     const db = coreById(ws, workspaceId).db;
-    const tagId = tags.addManualTag(db, id, name.trim());
-    tags.syncFts(db, id);
-    return tagId;
+    try {
+      const tagId = tags.addManualTag(db, id, name.trim());
+      tags.syncFts(db, id);
+      return tagId;
+    } finally {
+      ws.syncTagIndexes();
+    }
   });
   handle("file_remove_tag", ({ id, workspaceId, tagId }) => {
     const db = coreById(ws, workspaceId).db;
-    tags.removeManualTag(db, id, tagId);
-    tags.syncFts(db, id);
+    try {
+      tags.removeManualTag(db, id, tagId);
+      tags.syncFts(db, id);
+    } finally {
+      ws.syncTagIndexes();
+    }
   });
   // One edit over a multi-workspace selection.
   //
@@ -45,12 +57,16 @@ export function registerTagHandlers(ctx: IpcContext): void {
   handle("files_bulk_tag", ({ targets, add, remove }) => {
     const groups = bulkTargetCores(ws, targets);
     const total = { files: 0, skipped: 0, added: 0, removed: 0 };
-    for (const { core, fileIds } of groups) {
-      const r = tags.bulkEditManualTags(core.db, fileIds, add, remove);
-      total.files += r.files;
-      total.skipped += r.skipped;
-      total.added += r.added;
-      total.removed += r.removed;
+    try {
+      for (const { core, fileIds } of groups) {
+        const r = tags.bulkEditManualTags(core.db, fileIds, add, remove);
+        total.files += r.files;
+        total.skipped += r.skipped;
+        total.added += r.added;
+        total.removed += r.removed;
+      }
+    } finally {
+      ws.syncTagIndexes();
     }
     return total;
   });
@@ -58,28 +74,9 @@ export function registerTagHandlers(ctx: IpcContext): void {
     tags.listTagNames(coreById(ws, workspaceId).db, prefix, limit ?? 20),
   );
 
-  // The catalog channels take no workspaceId: coreById(ALL_ID) throws by design,
-  // and a tag id means nothing across databases. Scope follows the active view
-  // (see scopedCores), except a mutation the auto-tagging conditions reach
-  // (see withAutoTagConditions).
-
-  /** Cores for a catalog mutation: the view's, or every workspace's. allCores()
-   *  silently skips workspaces whose DB could not be opened, which for a rename
-   *  means that workspace keeps the old name while the others move on — worth a
-   *  line in the log when it happens. */
-  const tagMutationCores = (everyWorkspace: boolean) => {
-    const cores = everyWorkspace ? ws.allCores() : scopedCores(ws);
-    const expected =
-      everyWorkspace || ws.isCollection() || ws.isAll()
-        ? ws.rootCount()
-        : cores.length;
-    if (cores.length < expected) {
-      log.warn(
-        `tag mutation covers ${cores.length}/${expected} workspaces; the rest could not be opened`,
-      );
-    }
-    return cores;
-  };
+  // The catalog channels take no workspaceId: coreById(ALL_ID) throws by design.
+  // The listing follows the active view (see scopedCores); a mutation applies
+  // to every workspace, since the tags live in the library they all share.
 
   handle("tags_list_all", (input) =>
     queryClient.run<TagList>(
@@ -95,29 +92,34 @@ export function registerTagHandlers(ctx: IpcContext): void {
         : { kind: "tagsList", targets: queryTargets(scopedCores(ws)) },
     ),
   );
-  // Mutations are addressed by name, so fanning them across every database in
-  // scope converges on the same end state even when one of them has a collision
-  // (rename there escalates to a merge) and another does not.
+  // Mutations are addressed by name, so running them on every Core that
+  // ws.metadataCores() returns converges on the same end state even when one
+  // of them has a collision (rename there escalates to a merge) and another
+  // does not.
   //
-  // A tag an auto-tagging condition names is the app's, not a workspace's: the
-  // operation then runs in every workspace, whichever is in view, and the
-  // conditions are rewritten after it so the next scan does not put the old
-  // name back (see retagConditions). A name the conditions cannot hold stops
-  // the operation before anything changes. A failure partway leaves the
-  // conditions as they were; doing it again finishes both.
+  // A tag an auto-tagging condition names is rewritten in the conditions after
+  // the operation, so the next scan does not put the old name back (see
+  // retagConditions). A name the conditions cannot hold stops the operation
+  // before anything changes. A failure partway leaves the conditions as they
+  // were; doing it again finishes both.
   const withAutoTagConditions = <T>(
     from: readonly TagRef[],
     to: string | null,
-    run: (cores: ReturnType<typeof tagMutationCores>) => T,
+    run: (cores: { id: string; core: Core }[]) => T,
   ): T => {
     const before = loadConfig().autoTag;
     const names = from.filter((ref) => ref.namespace === "").map((r) => r.name);
     const after = retagConditions(before, names, to);
-    if (after === before) return run(tagMutationCores(false));
-    AutoTagConfigSchema.parse(after);
-    const result = run(tagMutationCores(true));
-    saveAutoTag(after);
-    return result;
+    if (after !== before) AutoTagConfigSchema.parse(after);
+    try {
+      const result = run(ws.metadataCores());
+      if (after !== before) saveAutoTag(after);
+      return result;
+    } finally {
+      // Every workspace indexes the library's tags: their keyword indexes
+      // follow, whichever connection ran it.
+      ws.syncTagIndexes();
+    }
   };
   handle("tag_rename", ({ from, to }) =>
     // Trimmed as renameTag trims it, so both get the same name.

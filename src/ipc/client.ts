@@ -14,6 +14,7 @@ import type {
 } from "@shared/ipc/channels";
 import type { PreloadInvokeChannel } from "@shared/ipc/channelNames";
 import type {
+  LibraryMergeEvent,
   LogoId,
   ScanDone,
   ScanProgress,
@@ -64,6 +65,7 @@ function invoke<C extends Exclude<ChannelName, PreloadInvokeChannel>>(
 
 export const api = {
   appStatus: () => invoke("app_status"),
+  libraryMergeRetry: () => invoke("library_merge_retry"),
   /** App + runtime versions for the Settings "About" section. */
   aboutInfo: () => invoke("about_info"),
   workspaceStats: () => invoke("workspace_stats"),
@@ -295,6 +297,10 @@ export const events = {
     ),
   onUpdateAvailable: (cb: (info: UpdateInfo) => void): Promise<Unlisten> =>
     Promise.resolve(bridge.on("update:available", (p) => cb(p as UpdateInfo))),
+  onLibraryMerge: (cb: (e: LibraryMergeEvent) => void): Promise<Unlisten> =>
+    Promise.resolve(
+      bridge.on("library:merge", (p) => cb(p as LibraryMergeEvent)),
+    ),
   onCssThemesChanged: (cb: (s: CssThemesState) => void): Promise<Unlisten> =>
     Promise.resolve(
       bridge.on("css-themes:changed", (p) => cb(p as CssThemesState)),

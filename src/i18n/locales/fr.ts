@@ -106,6 +106,26 @@ export const fr: Record<TranslationKey, string> = {
   "update.checkFailed":
     "Impossible de vérifier (vous êtes peut-être hors ligne).",
   "update.upToDate": "Vous êtes à jour ({version}).",
+  "libraryMerge.title": "Migration de votre bibliothèque",
+  "libraryMerge.description":
+    "Les favoris, notes, tags, signets et l'historique de lecture sont déplacés vers une bibliothèque partagée par tous les espaces de travail. Veuillez patienter jusqu'à la fin.",
+  "libraryMerge.progress": "{done} / {total} espaces de travail",
+  "libraryMerge.failed": "Certains espaces de travail n'ont pas pu être migrés",
+  "libraryMerge.failedDesc":
+    "{list}\nIls fonctionnent comme avant. Meguri réessaiera au prochain lancement.",
+  "libraryMerge.failedItem": "{name} : {reason}",
+  "libraryMerge.reason.diskFull":
+    "Le disque est plein. Libérez de l'espace, puis réessayez.",
+  "libraryMerge.reason.backup":
+    "Sa copie de sauvegarde n'a pas pu être écrite.",
+  "libraryMerge.reason.merge":
+    "Une erreur a interrompu la migration (rien n'a été modifié).",
+  "libraryMerge.reason.open": "Sa base de données n'a pas pu être ouverte.",
+  "libraryMerge.retry": "Réessayer",
+  "library.restored":
+    "Votre bibliothèque était endommagée : Meguri a restauré la copie du {date}",
+  "library.restoredDesc":
+    "Les favoris, notes, tags et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
   "settings.about": "À propos",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} est publié sous licence MIT.",
@@ -559,7 +579,7 @@ export const fr: Record<TranslationKey, string> = {
   "history.clear": "Effacer l'historique",
   "history.clearAction": "Effacer",
   "history.clearConfirm":
-    "Supprimer tout l'historique de lecture ? Cette action est irréversible.",
+    "Supprimer l'historique de lecture et les points de reprise de tous les espaces de travail ? Cette action est irréversible.",
   "history.playCount": "{count} lectures",
   "history.viaBrowser": "Dans l'application",
   "history.viaExternal": "Lecteur externe",
@@ -817,7 +837,7 @@ export const fr: Record<TranslationKey, string> = {
   "tags.merge": "Fusionner",
   "tags.mergeTitle": "Fusionner les tags",
   "tags.mergeDescription":
-    "Les {count} tags sélectionnés sont regroupés dans la cible. Les autres sont supprimés.",
+    "Les {count} tags sélectionnés sont regroupés dans la cible dans tous les espaces de travail. Les autres sont supprimés.",
   "tags.mergeTarget": "Fusionner dans",
   "tags.mergeAction": "Fusionner",
   "tags.merged": "{count} tags fusionnés",
@@ -825,9 +845,9 @@ export const fr: Record<TranslationKey, string> = {
   "tags.delete": "Supprimer",
   "tags.deleteAction": "Supprimer",
   "tags.deleteConfirm":
-    "Le tag « {name} » sera retiré de {count} fichiers. Continuer ?",
+    "Le tag « {name} » sera retiré de {count} fichiers dans tous les espaces de travail. Continuer ?",
   "tags.deleteConfirmMany":
-    "Les {count} tags sélectionnés seront supprimés. Continuer ?",
+    "Les {count} tags sélectionnés seront supprimés de tous les espaces de travail. Continuer ?",
   "tags.deleted": "Tag supprimé",
   "tags.deleteFailed": "Impossible de supprimer le tag",
   "tags.addFailedReserved":
@@ -854,7 +874,7 @@ export const fr: Record<TranslationKey, string> = {
   "workspace.removeFromSidebar": "Supprimer l'espace de travail",
   "workspace.removeTitle": "Supprimer l'espace de travail",
   "workspace.removeConfirm":
-    "Supprimer « {label} » ?\nSa base de données et ses miniatures seront aussi supprimées (les fichiers multimédias eux-mêmes sont conservés).",
+    "Supprimer « {label} » ?\nSa liste de fichiers et ses miniatures seront supprimées (les fichiers multimédias eux-mêmes sont conservés). Les favoris, notes, tags, signets et l'historique de lecture sont conservés et reviennent si vous ajoutez à nouveau le même dossier.",
   "workspace.removeAction": "Supprimer",
   "workspace.addedToast": "Espace de travail ajouté",
   "workspace.removedToast": "Espace de travail supprimé",

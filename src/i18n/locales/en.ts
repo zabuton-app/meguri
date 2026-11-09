@@ -104,6 +104,25 @@ export const en: Record<TranslationKey, string> = {
   "update.checking": "Checking…",
   "update.checkFailed": "Couldn't check (you may be offline).",
   "update.upToDate": "You're up to date ({version}).",
+  "libraryMerge.title": "Moving your library",
+  "libraryMerge.description":
+    "Favorites, ratings, tags, bookmarks and play history are moving into one library that every workspace shares. Please wait until it finishes.",
+  "libraryMerge.progress": "{done} / {total} workspaces",
+  "libraryMerge.failed": "Some workspaces could not be moved",
+  "libraryMerge.failedDesc":
+    "{list}\nThey keep working as before. Meguri tries again at the next launch.",
+  "libraryMerge.failedItem": "{name}: {reason}",
+  "libraryMerge.reason.diskFull":
+    "The disk is full. Free some space, then try again.",
+  "libraryMerge.reason.backup": "Its backup copy could not be written.",
+  "libraryMerge.reason.merge":
+    "An error stopped the move (nothing was changed).",
+  "libraryMerge.reason.open": "Its database could not be opened.",
+  "libraryMerge.retry": "Try again",
+  "library.restored":
+    "Your library was damaged, so Meguri restored the copy from {date}",
+  "library.restoredDesc":
+    "Favorites, ratings, tags and other changes made after that are lost. The damaged file is kept in the same folder as the library.",
   "settings.about": "About",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} is released under the MIT License.",
@@ -542,7 +561,8 @@ export const en: Record<TranslationKey, string> = {
   "history.emptyHint": "Play videos or images and they will show up here.",
   "history.clear": "Clear history",
   "history.clearAction": "Clear",
-  "history.clearConfirm": "Delete all play history? This cannot be undone.",
+  "history.clearConfirm":
+    "Delete the play history and resume points of every workspace? This cannot be undone.",
   "history.playCount": "{count} plays",
   "history.viaBrowser": "In-app",
   "history.viaExternal": "External player",
@@ -789,15 +809,17 @@ export const en: Record<TranslationKey, string> = {
   "tags.merge": "Merge",
   "tags.mergeTitle": "Merge tags",
   "tags.mergeDescription":
-    "The {count} selected tags are combined into the target. The others are removed.",
+    "The {count} selected tags are combined into the target in every workspace. The others are removed.",
   "tags.mergeTarget": "Merge into",
   "tags.mergeAction": "Merge",
   "tags.merged": "Merged {count} tags",
   "tags.mergeFailed": "Could not merge the tags",
   "tags.delete": "Delete",
   "tags.deleteAction": "Delete",
-  "tags.deleteConfirm": 'Remove the tag "{name}" from {count} files. Continue?',
-  "tags.deleteConfirmMany": "Delete the {count} selected tags. Continue?",
+  "tags.deleteConfirm":
+    'Remove the tag "{name}" from {count} files across all workspaces. Continue?',
+  "tags.deleteConfirmMany":
+    "Delete the {count} selected tags from all workspaces. Continue?",
   "tags.deleted": "Tag deleted",
   "tags.deleteFailed": "Could not delete the tag",
   "tags.addFailedReserved":
@@ -824,7 +846,7 @@ export const en: Record<TranslationKey, string> = {
   "workspace.removeFromSidebar": "Delete workspace",
   "workspace.removeTitle": "Delete workspace",
   "workspace.removeConfirm":
-    'Delete "{label}"?\nIts database and thumbnails will also be deleted (the media files themselves are kept).',
+    'Delete "{label}"?\nIts file list and thumbnails will be deleted (the media files themselves are kept). Favorites, ratings, tags, bookmarks and play history stay, and come back if you add the same folder again.',
   "workspace.removeAction": "Delete",
   "workspace.addedToast": "Workspace added",
   "workspace.removedToast": "Workspace deleted",

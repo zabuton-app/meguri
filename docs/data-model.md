@@ -1,19 +1,31 @@
 # Data Model
 
-Each workspace has its own SQLite database. This document covers the storage
-layout, the schema, the versionless migration scheme, the `meta_key` design that
-keeps user-edited metadata durable, full-text search, and the query layer.
+Each workspace has its own SQLite database for its file index, and every
+workspace shares one library database for the metadata the user curates. This
+document covers the storage layout, the schema, the versionless migration
+scheme, the `meta_key` design that keeps user-edited metadata durable, the
+shared library, full-text search, and the query layer.
 
 ## Storage layout
 
-A workspace's generated files live under Electron's `userData`, in a directory
-named after the workspace's path hash:
+The library lives at the top of Electron's `userData`. A workspace's generated
+files live in a directory named after the workspace's path hash:
 
 ```text
-<userData>/roots/<hash>/
-├─ db.sqlite   # this workspace's database (WAL mode)
-└─ thumbs/     # generated thumbnails (WebP)
+<userData>/
+├─ library.sqlite      # metadata every workspace shares (WAL mode)
+├─ library-backups/    # dated copies of it (see The shared library)
+└─ roots/<hash>/
+   ├─ db.sqlite        # this workspace's database (WAL mode)
+   ├─ db.pre-shared-metadata.sqlite
+   │                   # its copy until a library copy holds the move
+   └─ thumbs/          # generated thumbnails (WebP)
 ```
+
+Removing a workspace deletes its `roots/<hash>/` directory. The library is
+never deleted, so the metadata of a removed workspace's files stays and comes
+back when the same files are added again. A workspace whose metadata could not
+be merged into the library yet keeps its directory instead, metadata and all.
 
 `electron/core/paths.ts` resolves these paths. The top-level
 [README](../README.md#where-data-is-stored) is the canonical description of the
@@ -21,10 +33,18 @@ full storage tree, including `config.json`.
 
 ## Schema
 
-All DDL lives in `electron/core/db.ts` (`CORE_DDL`). The database opens in WAL
-mode with `synchronous = NORMAL` and `foreign_keys = ON`.
+All DDL lives in `electron/core/db.ts`: `CORE_DDL` for the workspace database,
+`LIB_DDL` for the library. `openDb()` attaches the library to every workspace
+connection as `lib`, and the query worker's read-only handles attach it too.
+Both databases open in WAL mode with `synchronous = NORMAL`, and the connection
+has `foreign_keys = ON`.
 
-The main tables:
+An unqualified table name resolves in `main` first, then in `lib`, so queries
+name the metadata tables without a schema. Every name in `LIB_DDL` is written
+with `lib.`: an unqualified `CREATE INDEX` or `CREATE TRIGGER` would land in
+`main`.
+
+In the workspace database (`CORE_DDL`):
 
 - `scan_roots` — the registered root for this database.
 - `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image` |
@@ -38,7 +58,7 @@ The main tables:
   HEIF/AVIF (as phone cameras write) keeps `width` / `height` NULL: depending
   on the version, ffprobe reports one tile's size, 0x0, or no stream at all,
   never the full image. Its stored `meta` keeps only the first tile's stream.
-- `tags` — the tag master, unique on `(namespace, name)`. An empty namespace
+- `tags` (library) — the tag master, unique on `(namespace, name)`. An empty namespace
   means the tag is the user's own; a non-empty one means it is owned by a
   pipeline (see [Derived tags](#derived-tags)). The constraint tells
   spellings apart, but the code does not: two names are one tag when their
@@ -56,14 +76,24 @@ The main tables:
   two such rows; they stay, a name that means both resolves to the one spelled
   exactly so, else the older (`findManualTag()`), and renaming one to the
   other merges them. The `All` view's catalog lists spellings apart.
+- `settings` — a key/value store, holding the derived-tag ruleset version (see
+  [Derived tags](#derived-tags)), the files auto-tagging still owes (see
+  [Auto tagging](#auto-tagging)) and how far `files_fts` has followed the
+  library's tag changes (see [Full-text search](#full-text-search)).
+- `files_fts` — the FTS5 virtual table (see below).
+
+In the library (`LIB_DDL`):
+
+- `tags` — the tag master (described above).
 - `file_meta` — durable user metadata (see below).
 - `meta_tags` — tag associations.
 - `play_history` — playback history.
 - `scene_bookmarks` — user-created scene positions.
-- `settings` — a key/value store, holding the derived-tag ruleset version (see
-  [Derived tags](#derived-tags)) and the files auto-tagging still owes (see
-  [Auto tagging](#auto-tagging)).
-- `files_fts` — the FTS5 virtual table (see below).
+- `tag_changes` — the `meta_key`s whose user tags changed (see
+  [Full-text search](#full-text-search)).
+- `migrated_workspaces` — the workspaces found on the library: merged into it,
+  or created after it, and whether their own tables are gone yet (`complete`;
+  see [The shared library](#the-shared-library)).
 
 ## Versionless migrations
 
@@ -82,7 +112,14 @@ existing table, add the matching idempotent `ALTER` to `backfillColumns()`.
 
 Indexes go in `CORE_DDL` too — `openDb()` re-executes it on every open, so
 `CREATE INDEX IF NOT EXISTS` reaches existing databases without any entry in
-`backfillColumns()`.
+`backfillColumns()`. The same holds for `LIB_DDL`.
+
+Some changes cannot be made in place, and are detected from the stored state
+instead of a number: `migrateFilesTable()` rebuilds `files` when the DDL stored
+in `sqlite_master` shows an outdated `CHECK` or `meta_key` expression, and the
+move of a workspace's metadata into the library (see
+[The shared library](#the-shared-library)) runs while that workspace still has
+its own `file_meta` table. Each step changes nothing when run again.
 
 The `auto_meta_ruleset_version` row in `settings` is **not** an exception to this
 rule. It versions _derived data_, not schema: it gates nothing about DDL, and a
@@ -95,14 +132,23 @@ User-edited metadata is split into `file_meta`, whose primary key is **not**
 `files.id` but `meta_key`:
 
 ```text
-meta_key = COALESCE(content_hash, 'p:<root_id>:<rel_path>')
+meta_key = COALESCE(content_hash, 'p:<abs_path>')
 ```
 
 `files.meta_key` is a `VIRTUAL` generated column computing the same expression.
-It prefers `content_hash` and falls back to a root-scoped `rel_path` when no
-hash is available. Because metadata is keyed this way, it **survives file moves,
-renames, and rebuilds of the `files` / `files_fts` tables** — anything that
-would change or regenerate `files.id`.
+It prefers `content_hash` and falls back to the file's absolute path when no
+hash is available. The fallback is the absolute path rather than a root-scoped
+`rel_path` so that it cannot collide with a file of another workspace; DBs from
+before this change are rebuilt once on open and the metadata under their old
+`p:<root_id>:<rel_path>` keys is moved to the new ones. Because metadata is
+keyed this way, it **survives file moves, renames, and rebuilds of the
+`files` / `files_fts` tables** — anything that would change or regenerate
+`files.id`. It is also what makes the library shared: two workspaces holding
+the same content (the same `content_hash`) read and write the same rows.
+
+When a file gains its first hash, `migrateMetaKey()` moves its metadata from
+the path key to the hash. Another workspace's copy may already hold metadata
+under that hash; the two are merged by the rules below.
 
 `file_meta` holds `favorite`, `rating` (0–5), `last_accessed_at`, and
 `thumb_offset_sec` (the user-chosen thumbnail frame offset, `NULL` meaning the
@@ -119,6 +165,100 @@ These tables are keyed by `meta_key` for the same durability reason:
 - `play_history` — playback records (`played_at`, `position`, `via` =
   `browser` | `external`).
 
+## The shared library
+
+Before the library, every workspace database held its own `file_meta`, `tags`,
+`meta_tags`, `scene_bookmarks` and `play_history`. `migrateWorkspaceMetadata()`
+(`electron/core/library.ts`, called from `Core.init`) moves them on the first
+open after the upgrade:
+
+1. Copy the workspace database to `db.pre-shared-metadata.sqlite`
+   (`VACUUM INTO`). If the copy cannot be written, the workspace keeps working
+   on its own tables, which shadow the library's, and the next open tries
+   again.
+2. Merge its tables into the library and record it in `migrated_workspaces`,
+   in one transaction.
+3. Drop its own tables and rebuild `files_fts`, in another. Then mark the
+   record `complete`. A workspace recorded but not complete still has its own
+   tables, and is treated as not merged until it is.
+4. Keep the copy. Once the move is complete, the library is the only place
+   that metadata lives, so `Workspaces.dropCoveredBackups()` deletes the copy
+   only when a copy of the library taken after it exists.
+
+A workspace recorded already but still holding its own tables — an older
+version recreated them after a downgrade — is merged again before they are
+dropped. A failure in either transaction is logged and leaves the workspace,
+and its copy, as they were until the next open.
+
+At startup, `Workspaces.bootstrap()` lists the registered workspaces that
+have a database but no record in the library, reading `migrated_workspaces`
+without opening any workspace, and leaves them unopened: until they have
+merged, nothing else opens them. Once the window has loaded,
+`Workspaces.mergePending()` opens them one at a time, so each one merges. The
+window shows a modal with how many are done (`app_status.libraryMerge` and
+the `library:merge` event, `LibraryMergeModal`). When it closes, a notice
+names any workspace that could not be merged and why, with a "Try again"
+button. Trying again (`Workspaces.beginRetry()`, then `retryMerge()`) makes
+those workspaces pending again at once, so the modal comes back while their
+scans and passes stop, then merges them the same way. Scans start after it.
+
+The library is the one copy of every migrated workspace's metadata. Before
+any workspace opens it, `maintainLibrary()` (`electron/core/libraryBackup.ts`)
+runs `PRAGMA quick_check` on it:
+
+- A sound library gets a copy in `library-backups/` when the newest copy is a
+  day old or more. The five newest copies are kept.
+- A damaged library is renamed to `library.damaged-<ms>.sqlite`, and the
+  newest sound copy is put in its place, as it is for a library that has gone
+  while copies of it exist. The window says so, and from when the copy is:
+  anything changed after it is lost. The copy's change log is emptied and its
+  sequence moved far ahead, so every workspace rebuilds its keyword index.
+- A damaged library with no copy, or one that cannot be read, is left as it
+  is.
+
+A copy is also taken right after workspaces merge into the library, since
+their own tables are gone by then, unless none of them merged. The
+workspaces' own copies are deleted after it. A workspace merged some other
+way (a tag rename reaching every workspace, a removal) keeps its copy until a
+later startup finds a library copy newer than it. No workspace copy is deleted
+in a session that put the library back from a copy.
+
+A library put back from a copy older than a workspace's merge has no record of
+that workspace, whose own tables are gone. Its own copy still holds them:
+opening it merges them into the library again from there. A copy dated ahead
+of the clock counts as the stalest, never as the newest.
+
+Rows for the same `meta_key` are merged so that nothing the user set is lost:
+
+| What | Rule |
+| --- | --- |
+| `favorite` | either one set |
+| `rating`, `last_accessed_at` | the higher |
+| `thumb_offset_sec`, `resume_position` | the newer row's, unless it has none |
+| `tags` | matched on the exact `(namespace, name)` |
+| `meta_tags` | one row per `(meta_key, tag, source)` |
+| `scene_bookmarks` | one within `BOOKMARK_NEAR_EPS` of another is not added |
+| `play_history` | identical events are kept once |
+
+Merging the same rows again changes nothing. `FILE_META_MERGE_SET` in
+`queries/meta.ts` holds the `file_meta` rules for both this merge and
+`migrateMetaKey()`.
+
+Since every workspace reads the same rows, an edit made in one shows in every
+workspace holding the same content. Tag rename, merge and delete, and clearing
+the play history, apply to every workspace whichever one is in view. They run
+once, on a connection that uses the library, plus once on each workspace still
+on its own tables. A workspace the library has no record of is opened first,
+so its merge runs; `migrated_workspaces` records every workspace found on the
+library as complete, so the others are not opened for it. When every open
+workspace is still on its own tables, one the library records is opened so the
+write reaches the library too. The history views show only
+events for files alive in the workspaces they list, and the `All` view lists
+an event two workspaces share once.
+
+Metadata is never collected: the library keeps rows for files no workspace
+holds any more, so a removed workspace added again gets its metadata back.
+
 ## Full-text search
 
 `files_fts(rel_path, tags_text)` is an FTS5 virtual table whose `rowid` matches
@@ -132,6 +272,23 @@ files — a tag rename, a merge, the derived-tag backfill — use
 deduplicated across sources. Three places produce it — `syncFts()`,
 `resyncFtsForKeys()` and the trigram rebuild — and they must never drift, so the
 projection lives in a single `FTS_ROW_SELECT` constant in `db.ts`.
+
+Each workspace keeps its own `files_fts`, while the tags live in the library,
+so a tag changed through one workspace has to reach the others' indexes.
+Triggers on the library's `meta_tags` and `tags` log every `meta_key` whose
+user tags change in `tag_changes`. `catchUpTagIndex()` (`library.ts`) compares
+the workspace's `fts_tag_seq` setting with the log and either does nothing,
+re-syncs the logged keys, or rebuilds the index. It rebuilds when:
+
+- the index was never built from the library
+- the library was replaced
+- rows it needs were trimmed
+- the logged keys exceed 30% of the workspace's files
+
+`Workspaces.syncTagIndexes()` catches every open workspace up. It runs after
+every channel that writes tags and after each scan; a workspace catches itself
+up when it opens. The log keeps the latest 50,000 rows, so a workspace opened
+later re-syncs only what it missed.
 
 Free-text tokens are ANDed. A token may carry alternatives separated by `|`
 (`yoga|ヨガ`), any of which satisfies it; `\|` is a literal `|`, for the file
@@ -287,15 +444,14 @@ a tag of a keyword or folder rule on the screen offers to move the files the
 condition reaches from the old tag to the new one, by the same reading.
 
 The tag screen's rename, merge and delete reach the conditions too, so the
-next scan does not put the old name back. The conditions are the app's, not a
-workspace's: when a keyword entry or folder rule names one of the tags, the
-operation runs in every workspace, whichever one is in view, and those
-conditions are rewritten with it (`retagConditions()` in
+next scan does not put the old name back. Like the tags, the conditions are the
+app's, not a workspace's: when a keyword entry or folder rule names one of the
+tags, those conditions are rewritten with the operation (`retagConditions()` in
 `shared/autoTagConditions.ts`). A delete drops the tag from them; one left with
-no tags stays. The operation's tags resolve by `tagIdentityKey()` in each
-database, as the conditions are matched. The conditions are written after the
-databases, so a refused operation changes neither, and one that fails partway
-is finished by doing it again. Regex rules name their tags through a template
+no tags stays. The operation's tags resolve by `tagIdentityKey()`, as the
+conditions are matched. The conditions are written after the databases, so a
+refused operation changes neither, and one that fails partway is finished by
+doing it again. Regex rules name their tags through a template
 and are left alone.
 
 The screen sends ids it loaded earlier, and a rebuild hands ids to other files

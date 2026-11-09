@@ -97,6 +97,22 @@ export const zhCN: Record<TranslationKey, string> = {
   "update.checking": "正在检查…",
   "update.checkFailed": "无法检查（可能处于离线状态）。",
   "update.upToDate": "已是最新版本（{version}）。",
+  "libraryMerge.title": "正在迁移资料库",
+  "libraryMerge.description":
+    "正在将收藏、评分、标签、书签和播放历史迁移到所有工作区共享的资料库中，请等待完成。",
+  "libraryMerge.progress": "{done} / {total} 个工作区",
+  "libraryMerge.failed": "部分工作区未能迁移",
+  "libraryMerge.failedDesc":
+    "{list}\n这些工作区仍可照常使用，下次启动时会再次尝试迁移。",
+  "libraryMerge.failedItem": "{name}：{reason}",
+  "libraryMerge.reason.diskFull": "磁盘空间不足。请腾出空间后重试。",
+  "libraryMerge.reason.backup": "无法写入其备份副本。",
+  "libraryMerge.reason.merge": "迁移因错误中断（未做任何更改）。",
+  "libraryMerge.reason.open": "无法打开其数据库。",
+  "libraryMerge.retry": "重试",
+  "library.restored": "资料库已损坏，已从 {date} 的副本恢复",
+  "library.restoredDesc":
+    "此后对收藏、评分、标签等所做的更改已丢失。损坏的文件保留在资料库所在的文件夹中。",
   "settings.about": "关于",
   "about.version": "{name} 版本 {version}",
   "about.appLicense": "{name} 基于 MIT License 发布。",
@@ -525,7 +541,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "history.emptyHint": "播放视频或图片后，历史记录会显示在这里。",
   "history.clear": "清除历史",
   "history.clearAction": "清除",
-  "history.clearConfirm": "确定删除所有播放历史吗？此操作无法撤销。",
+  "history.clearConfirm":
+    "确定删除所有工作区的播放历史和上次播放位置吗？此操作无法撤销。",
   "history.playCount": "已播放 {count} 次",
   "history.viaBrowser": "应用内",
   "history.viaExternal": "外部播放器",
@@ -760,15 +777,17 @@ export const zhCN: Record<TranslationKey, string> = {
   "tags.merge": "合并",
   "tags.mergeTitle": "合并标签",
   "tags.mergeDescription":
-    "将所选的 {count} 个标签合并到目标标签，其余标签将被删除。",
+    "将所选的 {count} 个标签在所有工作区中合并到目标标签，其余标签将被删除。",
   "tags.mergeTarget": "合并到",
   "tags.mergeAction": "合并",
   "tags.merged": "已合并 {count} 个标签",
   "tags.mergeFailed": "合并标签失败",
   "tags.delete": "删除",
   "tags.deleteAction": "删除",
-  "tags.deleteConfirm": "将从 {count} 个文件中移除标签“{name}”。是否继续？",
-  "tags.deleteConfirmMany": "将删除所选的 {count} 个标签。是否继续？",
+  "tags.deleteConfirm":
+    "将从所有工作区的 {count} 个文件中移除标签“{name}”。是否继续？",
+  "tags.deleteConfirmMany":
+    "将从所有工作区中删除所选的 {count} 个标签。是否继续？",
   "tags.deleted": "已删除标签",
   "tags.deleteFailed": "删除标签失败",
   "tags.addFailedReserved": "“{prefix}:”是自动标签的保留前缀，请换一个名称。",
@@ -794,7 +813,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "workspace.removeFromSidebar": "删除工作区",
   "workspace.removeTitle": "删除工作区",
   "workspace.removeConfirm":
-    "要删除“{label}”吗？\n其数据库和缩略图也会被删除（媒体文件本身会保留）。",
+    "要删除“{label}”吗？\n其文件列表和缩略图会被删除（媒体文件本身会保留）。收藏、评分、标签、书签和播放历史会保留，重新添加同一文件夹即可恢复。",
   "workspace.removeAction": "删除",
   "workspace.addedToast": "已添加工作区",
   "workspace.removedToast": "已删除工作区",

@@ -1006,7 +1006,7 @@ describe("attaching tags", () => {
           id: a,
           name: NAMES[0],
           folder: "dir",
-          metaKey: `p:${rootId}:dir/${NAMES[0]}`,
+          metaKey: `p:/fake/root/dir/${NAMES[0]}`,
           tags: ["Yoga"],
         },
       ],

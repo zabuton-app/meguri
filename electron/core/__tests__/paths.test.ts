@@ -10,6 +10,8 @@ vi.mock("electron", () => ({ app: { getPath: () => "/base/userData" } }));
 const {
   pathHash,
   dataDirForRoot,
+  libraryDbPath,
+  backupDbPathForDataDir,
   isInsideRoot,
   folderDirInsideRoot,
   folderPathUnderRoot,
@@ -32,6 +34,20 @@ describe("dataDirForRoot", () => {
   it("places artifacts under <userData>/roots/<hash>", () => {
     expect(dataDirForRoot("/media/movies")).toBe(
       `/base/userData/roots/${pathHash("/media/movies")}`,
+    );
+  });
+});
+
+describe("libraryDbPath", () => {
+  it("places the shared library directly under <userData>", () => {
+    expect(libraryDbPath()).toBe("/base/userData/library.sqlite");
+  });
+});
+
+describe("backupDbPathForDataDir", () => {
+  it("places the pre-merge copy next to the workspace DB", () => {
+    expect(backupDbPathForDataDir("/base/userData/roots/abc")).toBe(
+      "/base/userData/roots/abc/db.pre-shared-metadata.sqlite",
     );
   });
 });

@@ -14,12 +14,14 @@ import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { StatusBar } from "@/components/StatusBar";
+import { LibraryMergeModal } from "@/components/LibraryMergeModal";
 import { useAppearanceAttribute } from "@/hooks/useAppearanceAttribute";
 import { useContentZoom } from "@/hooks/useContentZoom";
 import { useCssThemeStyle } from "@/hooks/useCssThemes";
 import { useCustomCssStyle } from "@/hooks/useCustomCss";
 import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
+import { useLibraryRestoreNotifier } from "@/hooks/useLibraryRestoreNotifier";
 import { registerRouterNavigate } from "@/lib/routerBridge";
 
 // In a webview, a hash router is more stable than a file-path-style history.
@@ -49,6 +51,7 @@ export default function App() {
   useContentZoom();
   useSelectAllGuard();
   useUpdateNotifier();
+  useLibraryRestoreNotifier();
   useAppearanceAttribute();
   useCssThemeStyle();
   useCustomCssStyle();
@@ -69,6 +72,7 @@ export default function App() {
           <StatusBar />
         </div>
       </AudioPlayerProvider>
+      <LibraryMergeModal />
     </div>
   );
 }

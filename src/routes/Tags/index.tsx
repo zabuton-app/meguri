@@ -107,6 +107,19 @@ export default function Tags() {
     enabled: ready,
   });
   const all = useMemo(() => catalog.data?.tags ?? [], [catalog.data]);
+  // Rename, merge and delete reach every workspace (the tags live in the
+  // library they all share), so what a new name collides with and how many
+  // files a delete touches are read from every workspace's catalog — the one
+  // the search box completes from, under the same key.
+  const libraryKey = useMemo(
+    () => ["tags_list_all", "library", status.data?.workspaceId ?? null],
+    [status.data?.workspaceId],
+  );
+  const libraryCatalog = useQuery({
+    queryKey: libraryKey,
+    queryFn: () => api.tagsListAll({ allWorkspaces: true }),
+    enabled: ready,
+  });
 
   const label = useCallback(
     (tag: TagSummary) => tagHumanLabel(t, tag.namespace, tag.name),
@@ -129,8 +142,12 @@ export default function Tags() {
   );
   const existingNames = useMemo(
     () =>
-      new Set(all.filter((tag) => !tag.pipelineOwned).map((tag) => tag.name)),
-    [all],
+      new Set(
+        [...all, ...(libraryCatalog.data?.tags ?? [])]
+          .filter((tag) => !tag.pipelineOwned)
+          .map((tag) => tag.name),
+      ),
+    [all, libraryCatalog.data],
   );
   const selectedTags = useMemo(
     () => all.filter((tag) => selected.has(tag.qualified)),
@@ -215,18 +232,29 @@ export default function Tags() {
   const deleteTagsMutate = deleteTags.mutate;
   const onDeleteOne = useCallback(
     async (tag: TagSummary) => {
+      // Every workspace's count (see libraryKey); this view's stands in if
+      // theirs cannot be read.
+      const everywhere = await qc
+        .ensureQueryData({
+          queryKey: libraryKey,
+          queryFn: () => api.tagsListAll({ allWorkspaces: true }),
+        })
+        .catch(() => null);
+      const count =
+        everywhere?.tags.find((x) => x.qualified === tag.qualified)
+          ?.fileCount ?? tag.fileCount;
       const ok = await confirm({
         title: t("tags.delete"),
         message: t("tags.deleteConfirm", {
           name: tag.qualified,
-          count: tag.fileCount,
+          count,
         }),
         confirmText: t("tags.deleteAction"),
         destructive: true,
       });
       if (ok) deleteTagsMutate([refOf(tag)]);
     },
-    [confirm, deleteTagsMutate, t],
+    [confirm, deleteTagsMutate, libraryKey, qc, t],
   );
   const onDeleteRow = useCallback(
     (tag: TagSummary) => void onDeleteOne(tag),

@@ -4,7 +4,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type { DB } from "./db.js";
-import { nowUnix } from "./db.js";
+import { nowUnix, pathMetaKey } from "./db.js";
 import { migrateMetaKey } from "./queries.js";
 import { pool } from "./concurrency.js";
 import type { Kind } from "./types.js";
@@ -314,7 +314,7 @@ export async function syncFiles(
     "UPDATE files SET deleted_at = NULL, abs_path = ?, inode = ?, btime = ? WHERE id = ?",
   );
   // Recompute content_hash for changed files so meta_key stays anchored to the hash
-  // (rather than dropping to the rel_path fallback) and metadata keeps linking.
+  // (rather than dropping to the path fallback) and metadata keeps linking.
   const updateChanged = db.prepare(
     "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL WHERE id = ?",
   );
@@ -336,7 +336,14 @@ export async function syncFiles(
   );
 
   type Existing =
-    | { id: number; size: number; mtime: number; content_hash: string | null }
+    | {
+        id: number;
+        size: number;
+        mtime: number;
+        content_hash: string | null;
+        /** The key its metadata is stored under (META_KEY_EXPR). */
+        meta_key: string;
+      }
     | undefined;
 
   // --- 1. Classify (look up existing rows, keeping indices aligned with discovered) ---
@@ -347,18 +354,25 @@ export async function syncFiles(
     (
       db
         .prepare(
-          "SELECT id, rel_path, size, mtime, content_hash FROM files WHERE root_id = ?",
+          "SELECT id, rel_path, meta_key, size, mtime, content_hash FROM files WHERE root_id = ?",
         )
         .all(rootId) as {
         id: number;
         rel_path: string;
+        meta_key: string;
         size: number;
         mtime: number;
         content_hash: string | null;
       }[]
     ).map((r) => [
       r.rel_path,
-      { id: r.id, size: r.size, mtime: r.mtime, content_hash: r.content_hash },
+      {
+        id: r.id,
+        size: r.size,
+        mtime: r.mtime,
+        content_hash: r.content_hash,
+        meta_key: r.meta_key,
+      },
     ]),
   );
   // hashIdx holds new files (move detection) plus changed files (content_hash refresh).
@@ -405,16 +419,22 @@ export async function syncFiles(
       const d = scannable[i];
       const existing = existingOf[i];
       if (existing) {
+        // A row without a hash keys its metadata by its path (the path
+        // fallback). The update below can change that key: a hash appears, or
+        // the path written differs from the stored one. Its metadata follows,
+        // from the key the row derived before.
+        const carryMeta = (newKey: string) => {
+          if (existing.content_hash == null && existing.meta_key !== newKey) {
+            migrateMetaKey(db, existing.meta_key, newKey);
+          }
+        };
         if (existing.size === d.size && existing.mtime === d.mtime) {
+          carryMeta(pathMetaKey(d.absPath));
           touchUnchanged.run(d.absPath, d.inode, d.btime, existing.id);
           stats.unchanged++;
         } else {
           const newHash = hashOf.get(i) ?? null;
-          // If the file had no hash before (meta was keyed by the rel_path fallback) and
-          // now gains one, carry its metadata over to the hash-based meta_key.
-          if (newHash && existing.content_hash == null) {
-            migrateMetaKey(db, `p:${rootId}:${d.relPath}`, newHash);
-          }
+          carryMeta(newHash ?? pathMetaKey(d.absPath));
           updateChanged.run(
             d.size,
             d.mtime,
@@ -435,7 +455,7 @@ export async function syncFiles(
       // before this apply ran). Fall back to null — never bind undefined (which
       // better-sqlite3 rejects, rolling back the whole chunk tx) — and skip move
       // detection in that case (a null hash can't be matched to a candidate anyway;
-      // the row inserts with content_hash NULL and uses the rel_path meta_key).
+      // the row inserts with content_hash NULL and uses the path fallback key).
       const hash = hashOf.get(i) ?? null;
       const cands =
         hash != null

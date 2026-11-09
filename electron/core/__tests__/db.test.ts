@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDb, resyncFtsForKeys } from "../db.js";
+import { LEGACY_METADATA_DDL } from "./helpers.js";
 
 function tableColumns(db: Database.Database, table: string): string[] {
   return (
@@ -23,7 +24,7 @@ describe("openDb / backfillColumns", () => {
   });
 
   it("creates thumb_offset_sec on a fresh DB", () => {
-    const db = openDb(":memory:");
+    const db = openDb(":memory:", ":memory:");
     expect(tableColumns(db, "file_meta")).toContain("thumb_offset_sec");
     db.close();
   });
@@ -48,24 +49,24 @@ describe("openDb / backfillColumns", () => {
       legacy.close();
     }
     // Re-open through openDb; backfillColumns should ALTER the missing column in.
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
     expect(tableColumns(db, "file_meta")).toContain("thumb_offset_sec");
     db.close();
   });
 
   it("is idempotent: opening the same DB twice does not throw on the second ALTER attempt", () => {
     const file = path.join(dir, "twice.sqlite");
-    const a = openDb(file);
+    const a = openDb(file, ":memory:");
     a.close();
     // Second open must notice the column already exists and skip the ALTER.
     expect(() => {
-      const b = openDb(file);
+      const b = openDb(file, ":memory:");
       b.close();
     }).not.toThrow();
   });
 });
 
-describe("migrateKindCheck", () => {
+describe("migrateFilesTable", () => {
   let dir: string;
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-kind-"));
@@ -97,7 +98,8 @@ describe("migrateKindCheck", () => {
   /** Build a DB with the current schema, then swap `files` back to the pre-audio
    *  shape (two-kind CHECK, no btime) and seed it, emulating a legacy on-disk DB. */
   function makeLegacyDb(file: string): void {
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
+    db.exec(LEGACY_METADATA_DDL);
     db.exec(`
       DROP TABLE files;
       CREATE TABLE files (
@@ -126,6 +128,9 @@ describe("migrateKindCheck", () => {
       INSERT INTO tags (id, name) VALUES (10, 'sunset');
       INSERT INTO meta_tags (meta_key, tag_id, source) VALUES ('hash-a', 10, 'manual');
       INSERT INTO play_history (meta_key, played_at, via) VALUES ('hash-a', 123, 'browser');
+      -- Under the old root-scoped no-hash key: moved by the same rebuild.
+      INSERT INTO file_meta (meta_key, rating, favorite, updated_at)
+        VALUES ('p:1:b.jpg', 2, 0, 0);
     `);
     db.close();
   }
@@ -137,7 +142,7 @@ describe("migrateKindCheck", () => {
     expect(filesDdl(legacy)).not.toContain("audio");
     legacy.close();
 
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
     expect(filesDdl(db)).toContain("'audio'");
     expect(() =>
       db.exec(
@@ -150,13 +155,13 @@ describe("migrateKindCheck", () => {
   it("preserves ids, row count, and meta_key values across the rebuild", () => {
     const file = path.join(dir, "preserve.sqlite");
     makeLegacyDb(file);
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
     const rows = db
       .prepare("SELECT id, rel_path, kind, meta_key FROM files ORDER BY id")
       .all();
     expect(rows).toEqual([
       { id: 7, rel_path: "a.mp4", kind: "video", meta_key: "hash-a" },
-      { id: 9, rel_path: "b.jpg", kind: "image", meta_key: "p:1:b.jpg" },
+      { id: 9, rel_path: "b.jpg", kind: "image", meta_key: "p:/r/b.jpg" },
     ]);
     db.close();
   });
@@ -164,7 +169,7 @@ describe("migrateKindCheck", () => {
   it("restores the indexes that DROP TABLE removed, including the backfilled btime ones", () => {
     const file = path.join(dir, "indexes.sqlite");
     makeLegacyDb(file);
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
     const names = indexNames(db);
     // The legacy table had no btime column at all; backfillColumns must re-add it
     // and its indexes after the rebuild.
@@ -191,7 +196,7 @@ describe("migrateKindCheck", () => {
   it("keeps meta_key-keyed user data attached across the rebuild", () => {
     const file = path.join(dir, "userdata.sqlite");
     makeLegacyDb(file);
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
     const meta = db
       .prepare(
         "SELECT m.rating, m.favorite FROM files f JOIN file_meta m ON m.meta_key = f.meta_key WHERE f.id = 7",
@@ -210,13 +215,20 @@ describe("migrateKindCheck", () => {
       )
       .get();
     expect(play).toEqual({ played_at: 123 });
+    // The no-hash file's metadata follows it to the absolute-path key.
+    const noHash = db
+      .prepare(
+        "SELECT f.meta_key, m.rating FROM files f JOIN file_meta m ON m.meta_key = f.meta_key WHERE f.id = 9",
+      )
+      .get();
+    expect(noHash).toEqual({ meta_key: "p:/r/b.jpg", rating: 2 });
     db.close();
   });
 
   it("is idempotent: a second open neither throws nor rebuilds again", () => {
     const file = path.join(dir, "again.sqlite");
     makeLegacyDb(file);
-    const a = openDb(file);
+    const a = openDb(file, ":memory:");
     a.exec(
       "INSERT INTO files (id, root_id, rel_path, abs_path, kind, created_at) VALUES (11, 1, 'c.mp3', '/r/c.mp3', 'audio', 0)",
     );
@@ -224,7 +236,7 @@ describe("migrateKindCheck", () => {
 
     let b!: Database.Database;
     expect(() => {
-      b = openDb(file);
+      b = openDb(file, ":memory:");
     }).not.toThrow();
     // The audio row inserted before the second open survives it: proof the rebuild
     // did not run a second time (a re-run would be harmless here, but a *repeated*
@@ -237,8 +249,97 @@ describe("migrateKindCheck", () => {
   });
 
   it("leaves a fresh DB alone (already has the widened CHECK)", () => {
-    const db = openDb(":memory:");
+    const db = openDb(":memory:", ":memory:");
     expect(filesDdl(db)).toContain("'audio'");
+    db.close();
+  });
+
+  /** A DB that already accepts audio but derives the no-hash meta_key from
+   *  root_id and rel_path, with metadata stored under those keys. */
+  function makePathKeyLegacyDb(file: string): void {
+    const db = openDb(file, ":memory:");
+    db.exec(LEGACY_METADATA_DDL);
+    const oldDdl = filesDdl(db).replace(
+      "'p:' || abs_path",
+      "'p:' || root_id || ':' || rel_path",
+    );
+    db.exec(`
+      DROP TABLE files;
+      ${oldDdl};
+      INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
+      INSERT INTO files (id, root_id, rel_path, abs_path, kind, content_hash, created_at)
+        VALUES (3, 1, 'x.mp4', '/r/x.mp4', 'video', NULL, 0),
+               (4, 1, 'y.mp4', '/r/y.mp4', 'video', 'hash-y', 0);
+      INSERT INTO file_meta (meta_key, rating, favorite, updated_at)
+        VALUES ('p:1:x.mp4', 5, 1, 0), ('hash-y', 2, 0, 0),
+               -- No file maps to this key: it stays as it is.
+               ('p:1:gone.mp4', 1, 0, 0);
+      INSERT INTO tags (id, name) VALUES (20, 'trip');
+      INSERT INTO meta_tags (meta_key, tag_id, source) VALUES ('p:1:x.mp4', 20, 'manual');
+      INSERT INTO play_history (meta_key, played_at, via) VALUES ('p:1:x.mp4', 50, 'browser');
+      INSERT INTO scene_bookmarks (meta_key, sec, created_at) VALUES ('p:1:x.mp4', 12, 0);
+    `);
+    db.close();
+  }
+
+  it("moves metadata under an old no-hash key to the absolute-path key", () => {
+    const file = path.join(dir, "pathkey.sqlite");
+    makePathKeyLegacyDb(file);
+    const db = openDb(file, ":memory:");
+    expect(filesDdl(db)).toContain("'p:' || abs_path");
+    const keyOf = (id: number) =>
+      (
+        db.prepare("SELECT meta_key FROM files WHERE id = ?").get(id) as {
+          meta_key: string;
+        }
+      ).meta_key;
+    expect(keyOf(3)).toBe("p:/r/x.mp4");
+    expect(keyOf(4)).toBe("hash-y");
+    const keys = (table: string) =>
+      (
+        db.prepare(`SELECT meta_key FROM ${table} ORDER BY meta_key`).all() as {
+          meta_key: string;
+        }[]
+      ).map((r) => r.meta_key);
+    expect(keys("file_meta")).toEqual(["hash-y", "p:/r/x.mp4", "p:1:gone.mp4"]);
+    expect(keys("meta_tags")).toEqual(["p:/r/x.mp4"]);
+    expect(keys("play_history")).toEqual(["p:/r/x.mp4"]);
+    expect(keys("scene_bookmarks")).toEqual(["p:/r/x.mp4"]);
+    db.close();
+  });
+
+  it("does not rewrite the keys again on a second open", () => {
+    const file = path.join(dir, "pathkey-again.sqlite");
+    makePathKeyLegacyDb(file);
+    openDb(file, ":memory:").close();
+    const db = openDb(file, ":memory:");
+    const rows = db
+      .prepare("SELECT meta_key, rating FROM file_meta ORDER BY meta_key")
+      .all();
+    expect(rows).toEqual([
+      { meta_key: "hash-y", rating: 2 },
+      { meta_key: "p:/r/x.mp4", rating: 5 },
+      { meta_key: "p:1:gone.mp4", rating: 1 },
+    ]);
+    db.close();
+  });
+
+  it("drops an old-key row that collides with one already under the new key", () => {
+    const file = path.join(dir, "pathkey-collide.sqlite");
+    makePathKeyLegacyDb(file);
+    const legacy = new Database(file);
+    legacy.exec(
+      "INSERT INTO file_meta (meta_key, rating, favorite, updated_at) VALUES ('p:/r/x.mp4', 3, 0, 0)",
+    );
+    legacy.close();
+    const db = openDb(file, ":memory:");
+    expect(
+      db
+        .prepare(
+          "SELECT meta_key, rating FROM file_meta WHERE meta_key LIKE 'p:%x.mp4'",
+        )
+        .all(),
+    ).toEqual([{ meta_key: "p:/r/x.mp4", rating: 3 }]);
     db.close();
   });
 });
@@ -265,7 +366,8 @@ describe("migrateFtsToTrigram", () => {
   /** Build a DB with the current schema, then swap files_fts back to the
    *  pre-trigram (unicode61) shape and seed it, emulating a legacy on-disk DB. */
   function makeLegacyDb(file: string): void {
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
+    db.exec(LEGACY_METADATA_DDL);
     db.exec(
       "INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0)",
     );
@@ -277,7 +379,7 @@ describe("migrateFtsToTrigram", () => {
       INSERT INTO tags (id, name) VALUES (10, 'sunset');
       -- Same tag attached via two sources: the rebuild must emit the name once.
       INSERT INTO meta_tags (meta_key, tag_id, source)
-        VALUES ('p:1:alive.mp4', 10, 'manual'), ('p:1:alive.mp4', 10, 'plugin');
+        VALUES ('p:/r/alive.mp4', 10, 'manual'), ('p:/r/alive.mp4', 10, 'plugin');
       DROP TABLE files_fts;
       CREATE VIRTUAL TABLE files_fts USING fts5(rel_path, tags_text);
       INSERT INTO files_fts (rowid, rel_path, tags_text)
@@ -289,7 +391,7 @@ describe("migrateFtsToTrigram", () => {
   it("rebuilds a legacy unicode61 files_fts as trigram and repopulates it", () => {
     const file = path.join(dir, "legacy.sqlite");
     makeLegacyDb(file);
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
     expect(ftsDdl(db)).toContain("trigram");
     const rows = db
       .prepare(
@@ -307,12 +409,12 @@ describe("migrateFtsToTrigram", () => {
   it("is idempotent: a second open leaves the rebuilt table untouched", () => {
     const file = path.join(dir, "again.sqlite");
     makeLegacyDb(file);
-    const a = openDb(file);
+    const a = openDb(file, ":memory:");
     const before = a.prepare("SELECT count(*) AS n FROM files_fts").get() as {
       n: number;
     };
     a.close();
-    const b = openDb(file);
+    const b = openDb(file, ":memory:");
     expect(ftsDdl(b)).toContain("trigram");
     const after = b.prepare("SELECT count(*) AS n FROM files_fts").get() as {
       n: number;
@@ -322,7 +424,7 @@ describe("migrateFtsToTrigram", () => {
   });
 
   it("creates a fresh DB with the trigram tokenizer directly", () => {
-    const db = openDb(":memory:");
+    const db = openDb(":memory:", ":memory:");
     expect(ftsDdl(db)).toContain("trigram");
     db.close();
   });
@@ -334,10 +436,10 @@ describe("migrateFtsToTrigram", () => {
     seed.exec(`
       INSERT INTO tags (id, name, namespace) VALUES (11, '4k', 'res');
       INSERT INTO meta_tags (meta_key, tag_id, source)
-        VALUES ('p:1:alive.mp4', 11, 'auto-meta');
+        VALUES ('p:/r/alive.mp4', 11, 'auto-meta');
     `);
     seed.close();
-    const db = openDb(file);
+    const db = openDb(file, ":memory:");
     const row = db
       .prepare("SELECT tags_text FROM files_fts WHERE rowid = 1")
       .get() as { tags_text: string };
@@ -350,7 +452,7 @@ describe("migrateFtsToTrigram", () => {
 describe("resyncFtsForKeys", () => {
   let db: ReturnType<typeof openDb>;
   beforeEach(() => {
-    db = openDb(":memory:");
+    db = openDb(":memory:", ":memory:");
     db.exec(`
       INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
       INSERT INTO files (id, root_id, rel_path, abs_path, kind, created_at)
@@ -358,7 +460,7 @@ describe("resyncFtsForKeys", () => {
                (2, 1, 'b.mp4', '/r/b.mp4', 'video', 0);
       INSERT INTO tags (id, name, namespace) VALUES (10, 'beach', ''), (11, '4k', 'res');
       INSERT INTO meta_tags (meta_key, tag_id, source)
-        VALUES ('p:1:a.mp4', 10, 'manual'), ('p:1:b.mp4', 11, 'auto-meta');
+        VALUES ('p:/r/a.mp4', 10, 'manual'), ('p:/r/b.mp4', 11, 'auto-meta');
       INSERT INTO files_fts (rowid, rel_path, tags_text)
         VALUES (1, 'a.mp4', 'stale'), (2, 'b.mp4', 'stale');
     `);
@@ -374,7 +476,7 @@ describe("resyncFtsForKeys", () => {
   }
 
   it("re-indexes only the files behind the given meta_keys", () => {
-    resyncFtsForKeys(db, ["p:1:a.mp4"]);
+    resyncFtsForKeys(db, ["p:/r/a.mp4"]);
     expect(textOf(1)).toBe("beach");
     expect(textOf(2)).toBe("stale");
   });
@@ -382,14 +484,14 @@ describe("resyncFtsForKeys", () => {
   it("is a no-op for an empty key list, and clears generated-only rows", () => {
     resyncFtsForKeys(db, []);
     expect(textOf(2)).toBe("stale");
-    resyncFtsForKeys(db, ["p:1:a.mp4", "p:1:b.mp4"]);
+    resyncFtsForKeys(db, ["p:/r/a.mp4", "p:/r/b.mp4"]);
     // b.mp4 carries only a namespaced tag, which is not indexed.
     expect(textOf(2)).toBe("");
   });
 
   it("does not re-add a soft-deleted file", () => {
     db.exec("UPDATE files SET deleted_at = 100 WHERE id = 1");
-    resyncFtsForKeys(db, ["p:1:a.mp4"]);
+    resyncFtsForKeys(db, ["p:/r/a.mp4"]);
     const n = (
       db
         .prepare("SELECT count(*) AS n FROM files_fts WHERE rowid = 1")
