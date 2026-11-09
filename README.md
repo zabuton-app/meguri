@@ -376,6 +376,10 @@ To drag a file to another app, hover over it in grid or list view and drag
 the arrow beside its selection checkbox. Drag from a selected file's arrow
 to carry the whole selection.
 
+ProRes clips play in Meguri through a local H.264 preview at up to
+1920 × 1080. The original clip is still used when you drag it into an editor
+or open it externally.
+
 ## Custom CSS
 
 Meguri's look can be changed with plain CSS in two ways, and both can be used
