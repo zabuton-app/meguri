@@ -75,6 +75,7 @@ import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
 import { useSettledFilter } from "./useSettledFilter";
 import { bumpThumbVersions } from "@/lib/thumbVersionStore";
+import { mediaSortId } from "@/lib/mediaSortId";
 import { useHeatmapFilter } from "./useHeatmapFilter";
 import { setListCounts, type ListCounts } from "@/hooks/useListCounts";
 import { useFolderNavKeys } from "./useFolderNavKeys";
@@ -250,7 +251,7 @@ export default function Home() {
     searchQuery,
     status.data?.ready ?? false,
     timeline.anchor,
-    true,
+    true, // keepWhileTyping: the fetch callbacks below hold paging meanwhile
   );
 
   const folderListing = useQuery({
@@ -481,7 +482,7 @@ export default function Home() {
   const onThumbDone = useCallback(
     (event: ThumbDone) => {
       const key = event.workspaceId
-        ? `${event.workspaceId}:${event.id}`
+        ? mediaSortId({ workspaceId: event.workspaceId, id: event.id })
         : String(event.id);
       const pending = pendingThumbs.current;
       pending.set(key, (pending.get(key) ?? 0) + 1);
@@ -689,10 +690,13 @@ export default function Home() {
       items,
       listOffset,
       fetchNextPage,
-      hasNextPage,
+      // Not while the previous search stands in: stepping past its end would
+      // wait on a page that is never fetched, then jump once the new results
+      // land.
+      hasNextPage: hasNextPage && !placeholder,
       isFetchingNextPage,
       fetchPreviousPage,
-      hasPreviousPage,
+      hasPreviousPage: hasPreviousPage && !placeholder,
       isFetchingPreviousPage,
       isLoading: searchLoading,
     }),
@@ -706,6 +710,7 @@ export default function Home() {
       hasPreviousPage,
       isFetchingPreviousPage,
       searchLoading,
+      placeholder,
     ],
   );
 
@@ -877,6 +882,10 @@ export default function Home() {
 
   // Changing it scrolls the list back to its top, as another folder does.
   const listResetKey = folderView ? `folder:${folderNav.path}` : undefined;
+  // The grid and the list keep the previous results on screen while only the
+  // search text changes (useFilesSearch's keepWhileTyping), so nothing
+  // remounts them: a new search has to send them back to the top itself.
+  const viewResetKey = `${listResetKey ?? ""}|${queryFilter.q ?? ""}`;
   // Names the list on screen: the workspace, how it is browsed and the filter.
   const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : view === "timeline" ? `timeline:${timeline.axis}` : (listResetKey ?? "flat")}|${JSON.stringify(queryFilter)}`;
   // A pass the playlist parked belongs to the list it was playing. Once the
@@ -1085,7 +1094,7 @@ export default function Home() {
                 reorder={reorder}
                 folders={folderEntries}
                 onOpenFolder={folderNav.enter}
-                resetKey={listResetKey}
+                resetKey={viewResetKey}
                 inFolder={folderSearching}
               />
             ) : (
@@ -1109,7 +1118,7 @@ export default function Home() {
                 reorder={reorder}
                 folders={folderEntries}
                 onOpenFolder={folderNav.enter}
-                resetKey={listResetKey}
+                resetKey={viewResetKey}
                 inFolder={folderSearching}
               />
             )}

@@ -377,6 +377,23 @@ describe("MediaGrid", () => {
       expect(mocks.collectionRemoveFile).not.toHaveBeenCalled();
     };
 
+    it("toggles the focused card without it being hovered", async () => {
+      // Keyboard focus alone keeps the card's toggle mounted for the shortcut.
+      renderGrid();
+      fireEvent.keyDown(window, { code: "ArrowDown" });
+      const btn = await screen.findByRole("button", { name: /Watch Later/ });
+      await waitFor(() => expect(btn.hasAttribute("disabled")).toBe(false));
+
+      fireEvent.keyDown(window, { code: "KeyW" });
+      await waitFor(() =>
+        expect(mocks.collectionAddFile).toHaveBeenCalledWith(
+          "watch-later",
+          sampleFileRow.id,
+          sampleFileRow.workspaceId,
+        ),
+      );
+    });
+
     it("toggles the focused card", async () => {
       renderGrid();
       await ready();

@@ -319,9 +319,11 @@ export const MediaGrid = memo(function MediaGrid({
   useInfiniteScrollTrigger({
     virtualRows,
     totalRows: rows.length,
-    // Two rows from the end, counted from the last row mounted: with the
-    // overscan at two rather than four, that is two more than it used to be.
-    threshold: 4,
+    // Counted from the rows mounted, which reach OVERSCAN_ROWS past the view:
+    // the next or previous page is asked for once the view is within six rows
+    // of either end, as it was with the overscan at four.
+    threshold: 6 - OVERSCAN_ROWS,
+    prevThreshold: 6 - OVERSCAN_ROWS,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
@@ -474,10 +476,16 @@ export const MediaCard = memo(function MediaCard({
   // toggle mounted: the "W" shortcut presses it through watchLaterRef.
   const { active: hot, handlers: hoverHandlers } = useHoverActivation();
   const { active: selecting } = useSelectionMode();
-  const showCheck = hot || selecting || selected;
+  // Each "always on" condition here matches the class that keeps the control
+  // opaque (boxClass's checked/active, `opacity-100` for a favorite,
+  // `aria-pressed:` for a queued file): one without the other would mount a
+  // control that stays invisible, or hide one that should show.
+  const pinnedCheck = selecting || selected;
+  const pinnedWatchLater =
+    !!focused || watchLater.has(file.workspaceId, file.id);
+  const showCheck = hot || pinnedCheck;
   const showFavorite = hot || file.favorite;
-  const showWatchLater =
-    hot || !!focused || watchLater.has(file.workspaceId, file.id);
+  const showWatchLater = hot || pinnedWatchLater;
   return (
     <div
       {...dragProps}
@@ -504,7 +512,12 @@ export const MediaCard = memo(function MediaCard({
           <SelectionCheck
             file={file}
             index={index}
-            className="card-control-in absolute left-1 top-1 z-10"
+            className={cn(
+              "absolute left-1 top-1 z-10",
+              // The fade is for a hover; a box out for the selection is
+              // simply there, as it was before.
+              !pinnedCheck && "card-control-in",
+            )}
           />
         )}
         <MediaThumbnail file={file} mediaBase={mediaBase} />
@@ -539,7 +552,10 @@ export const MediaCard = memo(function MediaCard({
             workspaceId={file.workspaceId}
             watchLater={watchLater}
             size={16}
-            className="card-control-in absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
+            className={cn(
+              "absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100",
+              !pinnedWatchLater && "card-control-in",
+            )}
           />
         )}
       </HashLink>

@@ -11,7 +11,8 @@ import {
 
 /**
  * The query key of a list: scope and filter, then the anchor when the window
- * is opened away from the top. Built here alone, so the cache helpers that
+ * is opened away from the top. (useFilesSearch's placeholderData reads it back
+ * in this order.) Built here alone, so the cache helpers that
  * reset a list find it where the hook keeps it.
  */
 export function filesSearchKey(
@@ -51,6 +52,8 @@ export function useFilesSearch(
    * list down to skeletons and mounts it again. Any other change (scope,
    * filter, sort, anchor) still starts from loading, so the view never shows
    * another list's rows under a different order or workspace.
+   * The caller must not page while `isPlaceholderData` is set: the pages on
+   * screen belong to the other query.
    */
   keepWhileTyping = false,
 ) {

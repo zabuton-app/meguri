@@ -7,7 +7,8 @@
 // and subscribes to the location, so every navigation (opening a file, which
 // leaves the list mounted underneath) re-rendered every link on screen too.
 // This one builds the hash href directly and reads the current location only
-// at the moment of a click.
+// at the moment of a click. (useNavigate still reads the route context, so a
+// navigation re-renders these too, but only as far as the <a> itself.)
 //
 // The app has no <base> element, so the href is the path behind a "#", as the
 // hash history would write it. The click handling follows <Link>'s: a plain

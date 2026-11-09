@@ -10,6 +10,11 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 
+/** How star `n` is drawn for a rating of `value`: lit up to the value. */
+function starClass(n: number, value: number): string {
+  return n <= value ? "fill-accent2 text-accent2" : "text-muted";
+}
+
 /** Per-star delay of the staggered pop when setting a rating. */
 const STAGGER_MS = 40;
 
@@ -83,9 +88,7 @@ export function RatingStars({
             >
               <Star
                 style={{ width: size, height: size }}
-                className={
-                  n <= value ? "fill-accent2 text-accent2" : "text-muted"
-                }
+                className={starClass(n, value)}
               />
             </span>
             {animated && fx.variant === "set" && n === fx.upTo && (
@@ -130,7 +133,7 @@ export function RatingStarsView({
             key={n}
             aria-hidden
             style={{ width: size, height: size }}
-            className={n <= value ? "fill-accent2 text-accent2" : "text-muted"}
+            className={starClass(n, value)}
           />
         ))}
       </div>

@@ -7,18 +7,25 @@
 // re-rendered Home, the list view under it and whatever detail or player was
 // open, only for a handful of cards to pick up a new number. Now a flush
 // notifies the thumbnails of the files it names and nothing else.
+//
+// Home is the one writer: it listens for thumb:done and flushes batches here.
+// A MediaThumbnail given no `version` reads this store; views outside Home
+// that track regenerations their own way (Discover, the detail view) pass
+// their version explicitly.
 import { useCallback, useSyncExternalStore } from "react";
+import { mediaSortId } from "@/lib/mediaSortId";
 
 const versions = new Map<string, number>();
 const listeners = new Map<string, Set<() => void>>();
 
 function keyOf(workspaceId: string, fileId: number): string {
-  return `${workspaceId}:${fileId}`;
+  return mediaSortId({ workspaceId, id: fileId });
 }
 
 /**
- * Add a batch of regenerations, keyed "<workspaceId>:<fileId>" with how many
- * times each happened, and notify the thumbnails showing those files.
+ * Add a batch of regenerations, keyed by mediaSortId ("<workspaceId>:<fileId>")
+ * with how many times each happened, and notify the thumbnails showing those
+ * files.
  */
 export function bumpThumbVersions(batch: ReadonlyMap<string, number>): void {
   const touched: (() => void)[] = [];

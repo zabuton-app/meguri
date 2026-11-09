@@ -37,10 +37,20 @@ describe("useSettledFilter", () => {
     expect(result.current.q).toBe("abc");
   });
 
-  it("passes the rest of the filter through at once", () => {
-    const { result, rerender } = render({ q: "a" });
+  it("takes the text at once when the rest of the filter changes with it", () => {
+    // A saved search applied: its text must not wait behind its conditions.
+    const { result, rerender } = render({ q: "dog" });
+    rerender({ filter: { q: "cat", ratingMin: 4 } });
+    expect(result.current).toEqual({ q: "cat", ratingMin: 4 });
+  });
+
+  it("keeps one object while only the text is being typed", () => {
+    const { result, rerender } = render({ q: "a", kind: "video" });
     rerender({ filter: { q: "ab", kind: "video" } });
-    expect(result.current).toEqual({ q: "a", kind: "video" });
+    const lagging = result.current;
+    rerender({ filter: { q: "abc", kind: "video" } });
+    expect(result.current).toBe(lagging);
+    expect(lagging).toEqual({ q: "a", kind: "video" });
   });
 
   it("returns the filter itself once the text has caught up", () => {
