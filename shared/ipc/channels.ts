@@ -4,6 +4,11 @@
 // Output is declared as TypeScript types rather than Zod schemas because the
 // renderer trusts data coming from main (no runtime check needed).
 import { z } from "zod";
+import {
+  MAX_SOURCE_URL,
+  parsePexelsVideoUrl,
+  type SourceReviewRow,
+} from "../pexelsSource.js";
 import type {
   AppStatus,
   DuplicatesResult,
@@ -264,6 +269,18 @@ const FileTarget = z.object({
   workspaceId: z.string(),
 });
 
+const PexelsSourceUrl = z
+  .string()
+  .max(MAX_SOURCE_URL)
+  .refine((url) => parsePexelsVideoUrl(url) !== null, {
+    message: "expected a Pexels video page URL",
+  });
+const PexelsEditTarget = z.object({
+  id: z.number().int().positive(),
+  workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  metaKey: z.string().min(1).max(32_768),
+});
+
 export const ChannelInputs = {
   app_status: z.void(),
   library_merge_retry: z.void(),
@@ -388,6 +405,23 @@ export const ChannelInputs = {
     axis: TimelineAxisSchema,
   }),
   file_get: FileTarget,
+  pexels_sources_preview: z.union([
+    z.object({ targets: BulkTargets }),
+    z.object({ globalQuery: SearchQuerySchema }),
+    z.object({
+      workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+      folder: FolderPathSchema,
+    }),
+  ]),
+  pexels_source_set: PexelsEditTarget.extend({
+    source: PexelsSourceUrl.nullable(),
+  }),
+  pexels_sources_save: z.object({
+    edits: boundedArray(
+      PexelsEditTarget.extend({ source: PexelsSourceUrl }),
+      MAX_BULK_FILES,
+    ),
+  }),
   file_set_rating: FileTarget.extend({ rating: z.number() }),
   file_set_favorite: FileTarget.extend({ favorite: z.boolean() }),
   file_delete_from_index: FileTarget,
@@ -638,6 +672,9 @@ export interface ChannelOutputs {
   activity_days: ActivityDays;
   timeline_counts: TimelineCounts;
   file_get: FileDetail | null;
+  pexels_sources_preview: { rows: SourceReviewRow[]; overLimit: boolean };
+  pexels_source_set: boolean;
+  pexels_sources_save: { saved: number; skipped: number };
   file_set_rating: void;
   file_set_favorite: void;
   file_delete_from_index: { id: number; relPath: string };

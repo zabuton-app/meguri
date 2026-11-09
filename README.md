@@ -376,6 +376,24 @@ To drag a file to another app, hover over it in grid or list view and drag
 the arrow beside its selection checkbox. Drag from a selected file's arrow
 to carry the whole selection.
 
+### Recover Pexels source links
+
+If you downloaded stock footage before you started cataloguing it, **Recover
+source links** lets you record the original Pexels video page in the library.
+Open it from a video’s details, use **Recover selected links** in the selection
+bar, or use **Recover folder links** to include a folder and its subfolders.
+From **All**, **Recover matching links** uses the current library filters.
+
+Meguri uses recognizable filenames to suggest a Pexels page. The review shows
+the local thumbnail, dimensions and container, so you can identify which copy
+you have. Choose **Open source** to check a suggestion in your browser, then
+tick **Save this link** and choose **Save links**. If you know the page URL, you
+can paste it yourself. Reopen the review to edit or remove a saved link.
+
+The links are library metadata. Saving a link leaves your media file where it
+is. Meguri reads the local index and thumbnails during review. **Open source**
+opens the website in your browser.
+
 ## Custom CSS
 
 Meguri's look can be changed with plain CSS in two ways, and both can be used

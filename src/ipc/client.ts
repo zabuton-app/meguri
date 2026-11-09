@@ -138,6 +138,12 @@ export const api = {
     xy: number[],
     dims: GraphDims = 2,
   ) => invoke("graph_layout_set", { scope, keys, xy, dims }),
+  previewPexelsSources: (input: ChannelInput<"pexels_sources_preview">) =>
+    invoke("pexels_sources_preview", input),
+  setPexelsSource: (input: ChannelInput<"pexels_source_set">) =>
+    invoke("pexels_source_set", input),
+  savePexelsSources: (edits: ChannelInput<"pexels_sources_save">["edits"]) =>
+    invoke("pexels_sources_save", { edits }),
   fileGet: (id: number, workspaceId: string) =>
     invoke("file_get", { id, workspaceId }),
   fileSetRating: (id: number, workspaceId: string, rating: number) =>

@@ -70,6 +70,7 @@ import { SelectionProvider } from "@/components/SelectionContext";
 import { walksPlaybackOrder } from "@/lib/playbackOrder";
 import { readInBulkBatches } from "@/lib/bulkEdit";
 import { FolderHeader } from "@/components/FolderHeader";
+import { PexelsReviewButton } from "@/components/PexelsSourceReview";
 import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
@@ -915,6 +916,16 @@ export default function Home() {
         onScan={() => void onScan()}
         onScanWithDeleted={() => void onScan(true)}
         onRebuild={() => void onRebuild()}
+        sourceAction={
+          workspaceId === ALL_ID &&
+          status.data?.ready &&
+          view !== "graph" && (
+            <PexelsReviewButton
+              scope={{ globalQuery: searchQuery }}
+              label="source.recoverMatching"
+            />
+          )
+        }
         t={t}
       />
 
@@ -961,6 +972,14 @@ export default function Home() {
           rootLabel={activeWorkspace?.label ?? t("folder.root")}
           path={folderNav.path}
           onNavigate={folderNav.goTo}
+          sourceAction={
+            workspaceId && (
+              <PexelsReviewButton
+                scope={{ workspaceId, folder: folderNav.path }}
+                label="source.recoverFolder"
+              />
+            )
+          }
           canGoBack={folderNav.canGoBack}
           onBack={folderNav.goBack}
           onUp={folderNav.goUp}

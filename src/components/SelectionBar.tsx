@@ -10,7 +10,7 @@
 // on click (see src/lib/bulkEdit.ts for those rules).
 import { useState } from "react";
 import { useLocation } from "react-router";
-import { Clock, Heart, StarOff, Tag, X } from "lucide-react";
+import { Clock, Heart, Link2, StarOff, Tag, X } from "lucide-react";
 import { useSelection } from "@/components/SelectionContext";
 import { BurstEffect } from "@/components/effects/BurstEffect";
 import { RatingStars } from "@/components/RatingStars";
@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 interface Props {
   /** Opens the bulk tag dialog. */
   onEditTags: () => void;
+  onRecoverSources?: () => void;
   /** Leaves selection mode. Owned by the caller, which also closes the dialog. */
   onExit: () => void;
 }
@@ -39,7 +40,7 @@ const ACTION_CLASS =
 const TOGGLE_CLASS =
   "relative flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-bg px-2.5 text-xs text-fg transition hover:bg-overlay disabled:cursor-default disabled:hover:bg-bg";
 
-export function SelectionBar({ onEditTags, onExit }: Props) {
+export function SelectionBar({ onEditTags, onRecoverSources, onExit }: Props) {
   const { t } = useI18n();
   const selection = useSelection();
   const watchLaterMembership = useWatchLater();
@@ -137,6 +138,22 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
       >
         {t("select.deselectAll")}
       </button>
+
+      {onRecoverSources && (
+        <button
+          type="button"
+          className={ACTION_CLASS}
+          onClick={onRecoverSources}
+          disabled={
+            selection.pending ||
+            tooMany ||
+            !rows.some((row) => row.kind === "video")
+          }
+        >
+          <Link2 className="size-3.5" />
+          {t("source.recoverSelected")}
+        </button>
+      )}
 
       <span className="h-6 w-px bg-border-strong" />
 

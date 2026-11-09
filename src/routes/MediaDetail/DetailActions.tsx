@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/ipc/client";
+import { PexelsReviewButton } from "@/components/PexelsSourceReview";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,12 @@ export function DetailActions({
           </p>
         )}
       </div>
+      {detail.kind === "video" && wsId && (
+        <PexelsReviewButton
+          scope={{ targets: [{ workspaceId: wsId, fileIds: [fileId] }] }}
+          label="source.recover"
+        />
+      )}
       <ButtonGroup className="shrink-0">
         {detail.kind === "image" && (
           <>
