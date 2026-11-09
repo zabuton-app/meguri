@@ -134,6 +134,7 @@ export default function AutoTag() {
       aria-labelledby="auto-tag-title"
     >
       <div
+        data-slot="modal-panel"
         className={cn(
           "relative flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl",
           isSmall &&

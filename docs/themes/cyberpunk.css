@@ -1,0 +1,226 @@
+/*
+ * @name Cyberpunk
+ *
+ * A sample Meguri CSS theme.
+ *
+ * Neon cyan, pink and yellow on midnight black, with an electric-yellow
+ * side rail.
+ * Has a dark and a light variant, picked by the app's light / dark switch
+ * through html[data-appearance]. Built on the public API described in
+ * docs/theming.md; the two rules that reach past it (the rail's right-click
+ * menu and the Settings tabs) say so, and only lose their styling if the app
+ * changes underneath them.
+ *
+ * To use it, put this file in the themes folder and pick "Cyberpunk" in the
+ * Settings > General > Theme list ("Open themes folder" below it shows where
+ * the folder is). Pasting it into custom.css works too.
+ */
+
+/* ---- Palette: dark ------------------------------------------------------ */
+
+/* Midnight black, lit by neon cyan (the main accent), neon pink (signs and
+   warnings) and electric yellow (highlights). */
+html[data-appearance="dark"] {
+  --c-bg: #0b0c10; /* midnight black */
+  --c-surface: #12141b;
+  --c-overlay: #222735;
+  --c-hover: #2a2f3f;
+  --c-border: #333a4d;
+  --c-border-strong: #5f6b8a;
+
+  --c-muted: #8d97ad;
+  --c-secondary-fg: #aeb7ca;
+  --c-fg: #dbe5f0;
+  --c-bright-fg: #ffffff;
+  --c-highlight: #ffe600;
+
+  --c-primary: #00f0ff; /* neon cyan */
+  --c-info: #00f0ff;
+  --c-accent2: #ffe600; /* electric yellow */
+  --c-success: #05ffa1;
+  --c-warn: #ffe600;
+  --c-error: #ff007f; /* neon pink */
+  --c-secondary-accent: #ff007f;
+  --c-special: #ff007f;
+
+  --cp-glow-primary:
+    0 0 6px rgb(0 240 255 / 0.5), 0 0 18px rgb(0 240 255 / 0.2);
+  --cp-glow-accent:
+    0 0 6px rgb(255 0 127 / 0.55), 0 0 18px rgb(255 0 127 / 0.25);
+  --cp-chrome: #07080b;
+}
+
+/* ---- Palette: light ----------------------------------------------------- */
+
+/* Cool white paper with the same neon hues, darkened enough to read. */
+html[data-appearance="light"] {
+  --c-bg: #f3f6f9;
+  --c-surface: #e9eef3;
+  --c-overlay: #d6dee7;
+  --c-hover: #c3cedb;
+  --c-border: #b4c0cd;
+  --c-border-strong: #7a889b;
+
+  --c-muted: #4e5a6b;
+  --c-secondary-fg: #3a4555;
+  --c-fg: #0b0c10;
+  --c-bright-fg: #000000;
+  --c-highlight: #6e6200;
+
+  --c-primary: #006b75;
+  --c-info: #006b75;
+  --c-accent2: #6e6200;
+  --c-success: #00704c;
+  --c-warn: #6e6200;
+  --c-error: #c20060;
+  --c-secondary-accent: #c20060;
+  --c-special: #c20060;
+
+  --cp-glow-primary: 0 0 6px rgb(0 107 117 / 0.35);
+  --cp-glow-accent: 0 0 6px rgb(194 0 96 / 0.3);
+  --cp-chrome: #ffffff;
+}
+
+/* ---- Both variants ------------------------------------------------------ */
+
+html[data-appearance] {
+  --cp-mono:
+    "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--c-primary) 45%, transparent);
+  color: var(--c-bright-fg);
+}
+
+/* Side rail: a warning-yellow panel with black ink, in both variants. The
+   palette is redefined inside the rail, so its tiles, icons, hover states
+   and the active workspace (a black tile with a yellow glyph) follow
+   without touching each element. */
+[data-slot="workspace-rail"],
+body:has([data-slot="workspace-rail"] [data-state="open"])
+  [data-slot="context-menu-content"] {
+  --c-bg: #ffe600;
+  --c-surface: #ebd400; /* workspace and collection tiles */
+  --c-overlay: #d9c300;
+  --c-hover: #cbb700;
+  --c-border: #8f8100;
+  --c-border-strong: #5e5500;
+  --c-muted: #4d4500; /* idle icons */
+  --c-secondary-fg: #3a3400;
+  --c-fg: #0b0c10;
+  --c-bright-fg: #000000;
+  --c-primary: #0b0c10;
+  --c-error: #b0002e; /* the remove badge, with yellow text */
+}
+[data-slot="workspace-rail"] {
+  background-color: var(--c-bg);
+  border-right: 2px solid #0b0c10;
+  box-shadow: 0 0 10px rgb(255 230 0 / 0.45);
+}
+
+/* The rail's right-click menu, in the rail's yellow. The menu is drawn
+   outside the rail, so it is picked out while its trigger in the rail is
+   open (data-state="open"). Not public API: neither the menu's data-slot
+   nor data-state is documented, so this may need updating when the app's
+   markup changes. Without it the menu just keeps the theme's colors. */
+body:has([data-slot="workspace-rail"] [data-state="open"])
+  [data-slot="context-menu-content"] {
+  background-color: var(--c-bg);
+  color: var(--c-fg);
+  border: 2px solid #0b0c10;
+  box-shadow: 0 0 10px rgb(255 230 0 / 0.45);
+}
+
+/* Workspace info header: cyan → pink gradient underline */
+[data-slot="home-header"] {
+  background-color: var(--c-surface);
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(
+      90deg,
+      var(--c-primary),
+      var(--c-secondary-accent)
+    )
+    1;
+}
+
+/* Search and filters: faint pink haze */
+[data-slot="filter-bar"] {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--c-secondary-accent) 10%, var(--c-bg)),
+    var(--c-bg)
+  );
+}
+
+/* Footer: terminal-style readout */
+[data-slot="status-bar"] {
+  background-color: var(--cp-chrome);
+  border-top: 1px solid var(--c-secondary-accent);
+  box-shadow: var(--cp-glow-accent);
+  color: var(--c-primary);
+  font-family: var(--cp-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+[data-slot="audio-player-bar"] {
+  background-color: var(--cp-chrome);
+  border-top: 1px solid var(--c-accent2);
+}
+
+/* Files: sharp corners, glow on hover.
+   The app draws the selected / focused rings with box-shadow, the card's
+   selected state with its border color, and the row's with its background.
+   None of those is set here, so selection stays visible: the glow is a
+   drop-shadow filter and the focus marker an outline. */
+[data-slot="media-card"] {
+  border-radius: 2px;
+  transition: transform 120ms ease;
+}
+[data-slot="media-card"]:hover {
+  filter: drop-shadow(
+    0 0 6px color-mix(in srgb, var(--c-primary) 55%, transparent)
+  );
+  transform: translateY(-1px);
+}
+[data-slot="media-row"] {
+  border-radius: 2px;
+  border-left: 2px solid transparent;
+}
+[data-slot="media-row"]:hover {
+  border-left-color: var(--c-secondary-accent);
+}
+[data-slot="media-card"][aria-current="true"],
+[data-slot="media-row"][aria-current="true"] {
+  outline: 1px solid var(--c-secondary-accent);
+  outline-offset: 2px;
+}
+
+/* Folders: dashed, like warning tape. A folder card shows selection with a
+   ring only, so its border is free; a folder row shows it with its
+   background, so only the row's left edge is marked. */
+[data-slot="folder-card"] {
+  border-radius: 2px;
+  border-style: dashed;
+  border-color: var(--c-accent2);
+}
+[data-slot="folder-row"] {
+  border-left: 2px dashed var(--c-accent2);
+}
+
+/* Settings, file details, discovery, history, tags, ... */
+[data-slot="modal-panel"] {
+  border: 1px solid var(--c-primary);
+  border-radius: 4px;
+  box-shadow:
+    var(--cp-glow-primary),
+    0 20px 60px rgb(0 0 0 / 0.5);
+}
+
+/* The selected Settings tab: neon text. Not public API: settings-tabs is not
+   a documented slot. */
+[data-slot="settings-tabs"] button[aria-selected="true"] {
+  color: var(--c-primary);
+  text-shadow: var(--cp-glow-primary);
+}

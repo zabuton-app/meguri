@@ -9,8 +9,10 @@ fetching, internationalization, theming, and content zoom.
 Routing uses `createHashRouter` (`src/App.tsx`); a hash router is the stable
 choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`),
-`play` (`src/routes/Player/`), `history` (`src/routes/History/`), and
-`settings` (`src/routes/Settings/`) are its **children**. Home renders an
+`play` (`src/routes/Player/`), `history` (`src/routes/History/`),
+`duplicates` (`src/routes/Duplicates/`), `tags` (`src/routes/Tags/`),
+`auto-tag` (`src/routes/AutoTag/`), and `settings` (`src/routes/Settings/`)
+are its **children**. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
 stays mounted underneath. The file detail can alternatively dock as a **side
 peek** — a sheet docked beside the list as a flex sibling, so the list narrows
@@ -32,7 +34,7 @@ mechanics in such hooks and components; `index.tsx` should stay a composition.
 The provider stack is set up in `src/main.tsx`:
 
 ```text
-QueryClientProvider → ThemeProvider → I18nProvider → PreferencesProvider → ConfirmProvider
+QueryClientProvider → ThemeProvider → I18nProvider → PreferencesProvider → TourProvider → ConfirmProvider
 ```
 
 ## Audio playback
@@ -100,6 +102,38 @@ order, so a modal's backdrop covers it; it rests (no timers, no frame loop,
 Whether the pet is out and its size are preferences (`petVisible`,
 `petSize`). With reduced motion preferred it neither walks nor bounces and
 shows one frame per state.
+
+## Tours
+
+Guided tours (`src/tour/`) highlight an element and have the pet explain it.
+
+- **Definitions**: `tours.ts` holds each tour as data: an id and a list of
+  steps, each naming the `data-tour="<target>"` element to highlight and the
+  i18n keys for its title and body. A step without a target is shown in the
+  middle of the window; a step whose target is not on screen when the tour
+  starts (an empty library, the pet put away) is left out. A step can also
+  carry a `picker`: the first-launch tour opens with the language picker, so
+  the rest of it runs in the chosen language. The choice goes through
+  `setLang`, the same store as the setting.
+- **Running**: `TourProvider` uses driver.js only for the dimmed overlay and
+  the cut-out (`highlight()`, with no popover of its own) and keeps the step
+  itself. While a tour runs it takes the keyboard (Esc skips, the arrow keys
+  move, Tab stays on the bubble's buttons) so the list's shortcuts do not act
+  behind the overlay. Tours start only on the bare list, which Home reports
+  through `setHostReady`.
+- **Presenter**: with the pet out, `Pet.tsx` raises itself above the overlay,
+  stops wandering, hops at each step and draws `TourBubble` over its head.
+  With the pet put away, the provider draws the bubble at the bottom of the
+  window instead.
+- **Seen list**: `tourStore.ts` keeps the ids of finished or skipped tours in
+  `localStorage["meguri.tours"]`. When the key is missing, any other
+  `meguri.*` key means an upgrade from a version without tours, and the
+  first-launch tour counts as seen. Feature tours (`FEATURE_TOURS`) run once
+  each, only after the first-launch tour; ending the first-launch tour marks
+  them all as seen. Settings (App tab) can replay the first-launch tour.
+
+To add a feature tour, append it to `FEATURE_TOURS`, put `data-tour` on its
+targets and add its strings to every locale.
 
 ## Data fetching
 
@@ -438,6 +472,14 @@ Adding a theme means adding its palette to `schemes.ts`; nothing else needs to b
 touched. `src/themes/__tests__/derive.test.ts` runs every scheme through the
 floors and the hierarchy invariants, so a palette that would break somewhere in
 the UI fails there instead of shipping.
+
+On top of the schemes, a user stylesheet (`custom.css`) can override the
+`--c-*` variables; see the Custom CSS section of
+[Architecture](architecture.md#custom-css) for the mechanism and
+[Theming Meguri with CSS](theming.md) for the public API it may rely on.
+`src/hooks/useAppearanceAttribute.ts` mirrors the current appearance onto
+`<html data-appearance>` for those stylesheets; it lives outside the
+series-shared `ThemeProvider.tsx` on purpose.
 
 ## Content zoom
 

@@ -27,7 +27,9 @@ launching, so Electron does not accidentally start in node mode.
 
 - Preload is emitted as **CommonJS** (`.js`); ESM `.mjs` preload can fail to
   load, and `electron/main.ts` resolves the preload, the renderer entry and
-  the query worker through `__dirname`, which assumes CJS output.
+  the worker threads (`queryWorker.js`, `autoTagWorker.js`) through
+  `__dirname`, which assumes CJS output. Each worker is its own main-build
+  entry in `electron.vite.config.ts`.
 - TypeScript uses separate tsconfigs for `src` and `electron`, both `strict` with
   `noUnusedLocals` / `noUnusedParameters`.
 

@@ -2,7 +2,7 @@
 // (as a modal) over the list.
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { Check, Coffee, Moon, Sun, X } from "lucide-react";
+import { Coffee, Moon, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/ipc/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTheme } from "@/themes/ThemeProvider";
-import { deriveTokens, type Token } from "@/themes/derive";
 import { LANGUAGES, useI18n, type Lang } from "@/i18n/I18nProvider";
 import { type TranslationKey } from "@/i18n/locales/ja";
 import {
@@ -47,6 +46,10 @@ import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
+import { CssThemeSection } from "./CssThemeSection";
+import { ThemeSection } from "./ThemeSection";
+import { CustomCssSection } from "./CustomCssSection";
+import { useTour } from "@/tour/TourProvider";
 import {
   isSpectrumPattern,
   SPECTRUM_PATTERN_OPTIONS,
@@ -54,18 +57,6 @@ import {
 } from "@/audio/spectrumPatterns";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/amgsk";
-
-// Swatches for the theme picker. Derived tokens, not raw palette slots, so what the swatch
-// shows is what the UI will actually use — and the chrome colors that used to be invisible in
-// some themes (hairlines, secondary text) can be judged before switching.
-const PREVIEW_TOKENS: Token[] = [
-  "bg",
-  "border",
-  "muted",
-  "primary",
-  "accent2",
-  "error",
-];
 
 const FRAME_QUALITY_LABELS: Record<FrameQuality, TranslationKey> = {
   low: "settings.frameQualityLow",
@@ -129,7 +120,7 @@ const LOGO_LABELS: Record<LogoId, TranslationKey> = {
 type TabId = "general" | "library" | "playback" | "audio" | "app";
 
 export default function Settings() {
-  const { mode, familyId, families, setMode, setFamily } = useTheme();
+  const { mode, setMode } = useTheme();
   const { lang, setLang, t } = useI18n();
   const tabs = useMemo<readonly SettingsTab<TabId>[]>(
     () => [
@@ -178,6 +169,7 @@ export default function Settings() {
     setPetSize,
   } = usePreferences();
   const navigate = useNavigate();
+  const { replay: replayTour } = useTour();
   // Not persisted: opening settings should always land on the first tab rather
   // than wherever the previous visit happened to stop.
   const [tab, setTab] = useState<TabId>("general");
@@ -315,48 +307,11 @@ export default function Settings() {
                 </div>
               </section>
 
-              {/* Theme (family) selection */}
-              <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-semibold text-bright-fg">
-                  {t("settings.theme")}
-                </h2>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {families.map((fam) => {
-                    // Preview the variant for the current appearance (or the paired variant if absent).
-                    const variant = fam[mode] ?? fam.dark ?? fam.light;
-                    if (!variant) return null;
-                    const active = fam.id === familyId;
-                    const swatch = deriveTokens(variant);
-                    return (
-                      <button
-                        key={fam.id}
-                        type="button"
-                        onClick={() => setFamily(fam.id)}
-                        className={
-                          "flex items-center justify-between gap-3 rounded-md border bg-surface px-3 py-2 text-left transition " +
-                          (active
-                            ? "border-primary ring-1 ring-primary"
-                            : "border-border hover:border-primary")
-                        }
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="flex overflow-hidden rounded-[3px] border border-border">
-                            {PREVIEW_TOKENS.map((token) => (
-                              <span
-                                key={token}
-                                className="h-4 w-4"
-                                style={{ backgroundColor: swatch[token] }}
-                              />
-                            ))}
-                          </span>
-                          <span className="text-sm text-fg">{fam.name}</span>
-                        </span>
-                        {active && <Check className="size-4 text-primary" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
+              <ThemeSection />
+
+              {/* CSS theme file, then the user stylesheet (custom.css) on top */}
+              <CssThemeSection />
+              <CustomCssSection />
 
               {/* Emoji glyph style (applies to all emoji in the UI) */}
               <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
@@ -768,6 +723,28 @@ export default function Settings() {
 
           {tab === "app" && (
             <>
+              {/* Replay the first-launch tour (it starts once the list is back) */}
+              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.tour")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.tourDesc")}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    replayTour();
+                    void navigate("/");
+                  }}
+                >
+                  {t("settings.tourReplay")}
+                </Button>
+              </section>
+
               {/* Update check */}
               <UpdateSection />
 

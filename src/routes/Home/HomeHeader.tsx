@@ -85,7 +85,10 @@ export function HomeHeader({
   t: TFunc;
 }) {
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-bg px-4 py-1.5">
+    <header
+      data-slot="home-header"
+      className="flex items-center gap-3 border-b border-border bg-bg px-4 py-1.5"
+    >
       {collection ? (
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-fg">
           {collection.emoji ? (
@@ -170,7 +173,10 @@ export function HomeHeader({
         >
           <Sparkles className="size-4" />
         </Link>
-        <div className="flex items-center rounded-md border border-border">
+        <div
+          data-tour="view-mode"
+          className="flex items-center rounded-md border border-border"
+        >
           {(
             [
               {

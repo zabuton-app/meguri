@@ -35,7 +35,6 @@ const commonProps = {
   mediaBase: "http://127.0.0.1:17345",
   workspaceId: WS_ID,
   loading: false,
-  thumbVersion: {},
   navActive: true,
 };
 

@@ -68,6 +68,16 @@ export const ko: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.cssTheme": "CSS 테마",
+  "settings.cssThemeDesc":
+    "테마 폴더의 .css 파일은 위 테마 목록에 표시됩니다. 선택한 파일은 기본 테마 위에 적용되며, 사용자 정의 CSS는 그 위에 적용됩니다.",
+  "settings.cssThemeOpenFolder": "테마 폴더 열기",
+  "settings.cssThemeOpenError": "테마 폴더를 열 수 없습니다.",
+  "settings.customCss": "사용자 정의 CSS",
+  "settings.customCssDesc":
+    "custom.css를 테마 위에 덧씌워 적용합니다. 파일을 저장하면 바로 반영됩니다.",
+  "settings.customCssOpen": "파일 열기",
+  "settings.customCssOpenError": "custom.css를 열 수 없습니다.",
   "settings.logo": "앱 로고",
   "settings.logoDesc": "창, 트레이, 앱 내 아이콘에 적용됩니다.",
   "logo.dark": "진한 색",
@@ -907,6 +917,7 @@ export const ko: Record<TranslationKey, string> = {
 
   // rating
   "rating.star": "별 {n}개",
+  "rating.value": "평점 {n}/5",
 
   // favorite
   "favorite.add": "즐겨찾기에 추가",
@@ -1008,4 +1019,45 @@ export const ko: Record<TranslationKey, string> = {
   "settings.petSizeSmall": "작게 (×2)",
   "settings.petSizeMedium": "보통 (×3)",
   "settings.petSizeLarge": "크게 (×4)",
+
+  // Guided tours
+  "tour.languageTitle": "언어를 골라 줘",
+  "tour.languageBody":
+    "사용할 언어를 골라 줘. 이 안내도 그 언어로 진행할게. 나중에 설정에서 바꿀 수도 있어",
+  "tour.welcomeTitle": "Meguri에 오신 걸 환영해",
+  "tour.welcomeBody":
+    "사용법을 간단히 안내할게. Esc를 누르면 언제든 건너뛸 수 있어",
+  "tour.addWorkspaceTitle": "폴더 추가",
+  "tour.addWorkspaceBody":
+    "먼저 동영상이나 이미지가 든 폴더를 추가해 줘. 내용을 읽어서 썸네일을 만들게. 몇 개든 추가할 수 있어",
+  "tour.collectionsTitle": "컬렉션",
+  "tour.collectionsBody":
+    "여러 폴더의 파일을 하나의 컬렉션으로 모을 수 있어. 파일을 여기로 끌어 오면 추가돼",
+  "tour.searchTitle": "검색과 필터",
+  "tour.searchBody":
+    "파일 이름이나 태그로 검색할 수 있어. 목록에서 / 를 누르면 여기로 와",
+  "tour.viewTitle": "보기 전환",
+  "tour.viewBody": "그리드, 목록, 타임라인, 그래프로 보기를 바꿀 수 있어",
+  "tour.discoverTitle": "디스커버리",
+  "tour.discoverBody":
+    "뭘 볼지 고민되면 여기서 무작위로 골라 줄게. 위 버튼은 목록 전체를 재생해",
+  "tour.petTitle": "펫",
+  "tour.petBody":
+    "나를 오른쪽 클릭하면 메뉴가 나와. 파일을 나한테 놓으면 나중에 보기에 넣어 둘게",
+  "tour.commandTitle": "명령 메뉴",
+  "tour.commandBody":
+    "Ctrl+K로 모든 동작을 이름으로 불러올 수 있어. ?키로 단축키 목록도 볼 수 있어",
+  "tour.settingsTitle": "설정",
+  "tour.settingsBody":
+    "테마나 언어는 여기서 바꿀 수 있어. 이 안내도 앱 탭에서 다시 볼 수 있어",
+  "tour.doneTitle": "준비 완료",
+  "tour.doneBody": "안내는 여기까지야. 즐겨 줘!",
+  "tour.progress": "{current} / {total}",
+  "tour.skip": "건너뛰기",
+  "tour.prev": "이전",
+  "tour.next": "다음",
+  "tour.done": "완료",
+  "settings.tour": "튜토리얼",
+  "settings.tourDesc": "처음 실행할 때 나오는 사용법 안내를 다시 표시합니다",
+  "settings.tourReplay": "다시 보기",
 };

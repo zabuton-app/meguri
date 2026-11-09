@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
+import { skipFirstLaunchTour } from "./fixtures/helpers";
 
 // Reordering needs two files to drag between, so this spec launches its own
 // instance over a temporary media root instead of the shared fixture (whose
@@ -25,6 +26,7 @@ test("dragging in manual order reorders without opening the detail view", async 
   try {
     const page: Page = await app.firstWindow();
     await page.waitForLoadState("domcontentloaded");
+    await skipFirstLaunchTour(page);
     for (const name of ["aaa.png", "bbb.png"]) {
       await expect(page.getByText(name).first()).toBeVisible({
         timeout: 60_000,
@@ -41,7 +43,9 @@ test("dragging in manual order reorders without opening the detail view", async 
       await card.hover();
       await card.getByRole("button", { name: "Add to Watch Later" }).click();
     }
-    await page.getByRole("button", { name: "Watch Later", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Watch Later", exact: true })
+      .click();
     await expect(page.getByTestId("media-card")).toHaveCount(2);
 
     await page.getByTitle("More conditions").click();

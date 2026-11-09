@@ -70,6 +70,16 @@ export const fr: Record<TranslationKey, string> = {
   "settings.emojiStyleTwemoji": "Twemoji",
   "settings.emojiStyleNoto": "Noto Emoji",
   "settings.emojiStyleOpenmoji": "OpenMoji",
+  "settings.cssTheme": "Thème CSS",
+  "settings.cssThemeDesc":
+    "Les fichiers .css du dossier des thèmes apparaissent dans la liste des thèmes ci-dessus. Celui choisi s'applique par-dessus le thème intégré, et le CSS personnalisé s'applique au-dessus.",
+  "settings.cssThemeOpenFolder": "Ouvrir le dossier des thèmes",
+  "settings.cssThemeOpenError": "Impossible d'ouvrir le dossier des thèmes.",
+  "settings.customCss": "CSS personnalisé",
+  "settings.customCssDesc":
+    "Applique custom.css par-dessus le thème. Les modifications prennent effet dès l'enregistrement du fichier.",
+  "settings.customCssOpen": "Ouvrir le fichier",
+  "settings.customCssOpenError": "Impossible d'ouvrir custom.css.",
   "settings.logo": "Logo de l'application",
   "settings.logoDesc":
     "S'applique aux icônes de la fenêtre, de la barre d'état et de l'application.",
@@ -934,6 +944,7 @@ export const fr: Record<TranslationKey, string> = {
 
   // rating
   "rating.star": "{n} étoiles",
+  "rating.value": "Note : {n} sur 5",
 
   // favorite
   "favorite.add": "Ajouter aux favoris",
@@ -1038,4 +1049,46 @@ export const fr: Record<TranslationKey, string> = {
   "settings.petSizeSmall": "Petite (×2)",
   "settings.petSizeMedium": "Moyenne (×3)",
   "settings.petSizeLarge": "Grande (×4)",
+
+  // Guided tours
+  "tour.languageTitle": "Choisis ta langue",
+  "tour.languageBody":
+    "Choisis la langue à utiliser. La suite de la visite l'utilisera, et tu pourras la changer plus tard dans les paramètres.",
+  "tour.welcomeTitle": "Bienvenue dans Meguri",
+  "tour.welcomeBody":
+    "Je te fais faire le tour. Appuie sur Échap pour passer à tout moment.",
+  "tour.addWorkspaceTitle": "Ajouter un dossier",
+  "tour.addWorkspaceBody":
+    "Commence par ajouter un dossier contenant tes vidéos et images. Je l'analyse et crée les miniatures. Tu peux en ajouter autant que tu veux.",
+  "tour.collectionsTitle": "Collections",
+  "tour.collectionsBody":
+    "Regroupe des fichiers de n'importe quel dossier dans une collection. Glisse des fichiers ici pour les ajouter.",
+  "tour.searchTitle": "Rechercher et filtrer",
+  "tour.searchBody":
+    "Recherche par nom de fichier ou par tag. Appuie sur / dans la liste pour venir ici.",
+  "tour.viewTitle": "Changer de vue",
+  "tour.viewBody":
+    "Affiche tes fichiers en grille, en liste, en chronologie ou en graphe.",
+  "tour.discoverTitle": "Découvrir",
+  "tour.discoverBody":
+    "Tu ne sais pas quoi regarder ? Découvrir choisit quelque chose au hasard. Le bouton au-dessus lit toute la liste.",
+  "tour.petTitle": "Ton compagnon",
+  "tour.petBody":
+    "Fais un clic droit sur moi pour ouvrir un menu. Dépose des fichiers sur moi et je les garde dans À regarder plus tard.",
+  "tour.commandTitle": "Menu des commandes",
+  "tour.commandBody":
+    "Appuie sur Ctrl+K pour lancer n'importe quelle action par son nom. Appuie sur ? pour voir tous les raccourcis.",
+  "tour.settingsTitle": "Paramètres",
+  "tour.settingsBody":
+    "Change ici le thème, la langue et plus encore. Tu peux revoir cette visite depuis l'onglet Application.",
+  "tour.doneTitle": "C'est prêt",
+  "tour.doneBody": "La visite est terminée. Amuse-toi bien !",
+  "tour.progress": "{current} / {total}",
+  "tour.skip": "Passer",
+  "tour.prev": "Retour",
+  "tour.next": "Suivant",
+  "tour.done": "Terminé",
+  "settings.tour": "Tutoriel",
+  "settings.tourDesc": "Affiche à nouveau la visite du premier lancement",
+  "settings.tourReplay": "Revoir",
 };

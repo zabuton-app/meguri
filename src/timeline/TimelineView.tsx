@@ -70,7 +70,6 @@ interface Props {
   /** The window's first page has not arrived. */
   loading: boolean;
   mediaBase: string;
-  thumbVersion: Record<string, number>;
   onTagClick?: (name: string) => void;
   hasNextPage?: boolean;
   fetchNextPage?: () => void;
@@ -94,7 +93,6 @@ export const TimelineView = memo(function TimelineView({
   listOffset,
   loading,
   mediaBase,
-  thumbVersion,
   onTagClick,
   hasNextPage,
   fetchNextPage,
@@ -498,9 +496,6 @@ export const TimelineView = memo(function TimelineView({
                           key={`${file.workspaceId}:${file.id}`}
                           file={file}
                           index={index - listOffset}
-                          version={
-                            thumbVersion[`${file.workspaceId}:${file.id}`] ?? 0
-                          }
                           mediaBase={mediaBase}
                           onTagClick={onTagClick}
                           focused={focused}

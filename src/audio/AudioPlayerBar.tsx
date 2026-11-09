@@ -155,6 +155,7 @@ export function AudioPlayerBar() {
   return (
     <div
       ref={setBarEl}
+      data-slot="audio-player-bar"
       role="region"
       aria-label={t("player.audio.region")}
       // Part of the shell, not an overlay: the route modals (settings, history,

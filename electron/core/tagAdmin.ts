@@ -11,6 +11,7 @@ import {
   RESERVED_TAG_ERROR,
   isEditableTag,
   isReservedTagName,
+  tagIdentityKey,
   tidyTagName,
 } from "../../shared/tags.js";
 import type { TagRef } from "./types.js";
@@ -90,6 +91,40 @@ function tagIdOf(db: DB, ref: TagRef): number | null {
     .prepare("SELECT id FROM tags WHERE namespace = ? AND name = ?")
     .get(ref.namespace, ref.name) as { id: number } | undefined;
   return row?.id ?? null;
+}
+
+/**
+ * tagIdOf for many references at once. The user's tags are read once and
+ * looked up in memory (exact spelling first, else the older of the same
+ * tagIdentityKey, as findManualTag picks), so a bulk delete or merge does not
+ * scan every tag through tag_key() once per reference.
+ */
+function tagIdsOf(db: DB, refs: TagRef[]): (number | null)[] {
+  let manual: {
+    exact: Map<string, number>;
+    byKey: Map<string, number>;
+  } | null = null;
+  return refs.map((ref) => {
+    if (ref.namespace !== "") return tagIdOf(db, ref);
+    if (!manual) {
+      const exact = new Map<string, number>();
+      const byKey = new Map<string, number>();
+      const rows = db
+        .prepare("SELECT id, name FROM tags WHERE namespace = '' ORDER BY id")
+        .all() as { id: number; name: string }[];
+      for (const row of rows) {
+        exact.set(row.name, row.id);
+        const key = tagIdentityKey(row.name);
+        if (!byKey.has(key)) byKey.set(key, row.id);
+      }
+      manual = { exact, byKey };
+    }
+    return (
+      manual.exact.get(ref.name) ??
+      manual.byKey.get(tagIdentityKey(ref.name)) ??
+      null
+    );
+  });
 }
 
 /** The meta_keys currently linked to any of these tag ids (the FTS resync scope). */
@@ -180,9 +215,9 @@ export function mergeTags(
 
   return db.transaction(() => {
     let intoId = tagIdOf(db, into);
-    const fromIds = from
-      .map((ref) => tagIdOf(db, ref))
-      .filter((id): id is number => id != null && id !== intoId);
+    const fromIds = tagIdsOf(db, from).filter(
+      (id): id is number => id != null && id !== intoId,
+    );
     if (fromIds.length === 0) return { affectedFiles: 0 };
     if (intoId == null) {
       db.prepare(
@@ -218,9 +253,7 @@ export function deleteTags(
   for (const ref of refs) assertEditable(ref);
 
   return db.transaction(() => {
-    const ids = refs
-      .map((ref) => tagIdOf(db, ref))
-      .filter((id): id is number => id != null);
+    const ids = tagIdsOf(db, refs).filter((id): id is number => id != null);
     if (ids.length === 0) return { removedTags: 0, affectedFiles: 0 };
     const keys = keysForTagIds(db, ids);
     db.prepare(

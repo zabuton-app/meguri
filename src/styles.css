@@ -149,13 +149,46 @@ textarea,
 /*
  * Scrollbars are unified via the shadcn/ui ScrollArea (src/components/ui/scroll-area.tsx).
  * Small incidental overflows that don't need a visible bar hide the native one
- * with .no-scrollbar. Visible scrollbars should use ScrollArea.
+ * with .no-scrollbar. Visible scrollbars should use ScrollArea; the native bars
+ * below are only for what it cannot wrap.
  */
 .no-scrollbar {
   scrollbar-width: none; /* Firefox */
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * Native scrollbars ScrollArea cannot wrap (the window itself once its content
+ * outgrows a small window, plain scrollers such as the heatmap's and the filter
+ * chips') are drawn to match its bar: 10px wide, no track or arrow buttons, a
+ * rounded thumb in --c-overlay that turns --c-muted on hover. The transparent
+ * border approximates ScrollArea's inset around the thumb. Elements that set
+ * the standard scrollbar-width/scrollbar-color (Radix viewports, .no-scrollbar)
+ * opt out of these pseudo-elements in Chromium. Shadow roots are out of reach:
+ * the emoji picker injects its own copy (EmojiPicker.tsx).
+ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-color: var(--c-overlay);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--c-muted);
 }
 
 /*
@@ -321,14 +354,39 @@ textarea,
   animation: none;
 }
 
+/*
+ * A media card's hover-only controls are mounted when the card is hovered
+ * (src/hooks/useHoverActivation.ts), already in their hovered state, so the
+ * opacity transition they carry has nothing to run from. This plays the same
+ * fade-in on mount instead; the fade-out still comes from the transition,
+ * which runs before they are unmounted.
+ */
+@keyframes card-control-in {
+  from {
+    opacity: 0;
+  }
+}
+.card-control-in {
+  animation: card-control-in 150ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fx-pop,
   .fx-settle,
   .fx-particle,
-  .fx-eq-bar {
+  .fx-eq-bar,
+  .card-control-in {
     animation: none;
   }
   .fx-overlay {
     display: none;
   }
+}
+
+/* driver.js turns pointer events off for everything while a tour runs (only its
+   own popover, which we do not use, is exempt). The tour's bubble is ours, so
+   give it its clicks back. */
+.driver-active [data-tour-bubble],
+.driver-active [data-tour-bubble] * {
+  pointer-events: auto;
 }

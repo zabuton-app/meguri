@@ -1,0 +1,100 @@
+/*
+ * @name OLED
+ *
+ * A sample Meguri CSS theme.
+ *
+ * True black with white text and quiet accents: easy on the eyes in a dark
+ * room and on OLED screens. The light variant turns it into black ink on
+ * white paper. Picked by the app's light / dark switch through
+ * html[data-appearance]. Uses only the public API described in
+ * docs/theming.md, so it keeps working across updates.
+ *
+ * To use it, put this file in the themes folder and pick "OLED" in the
+ * Settings > General > Theme list ("Open themes folder" below it shows where
+ * the folder is). Pasting it into custom.css works too.
+ */
+
+/* ---- Palette: dark ------------------------------------------------------ */
+
+html[data-appearance="dark"] {
+  --c-bg: #000000;
+  --c-surface: #0a0a0a;
+  --c-overlay: #202020;
+  --c-hover: #2a2a2a;
+  --c-border: #333333;
+  --c-border-strong: #6a6a6a;
+
+  --c-muted: #8f8f8f;
+  --c-secondary-fg: #b4b4b4;
+  --c-fg: #e8e8e8;
+  --c-bright-fg: #ffffff;
+  --c-highlight: #ffffff;
+
+  --c-primary: #ffffff;
+  --c-info: #7cc4ff;
+  --c-accent2: #ffd166;
+  --c-success: #7ee08a;
+  --c-warn: #ffb454;
+  --c-error: #ff6b6b;
+  --c-secondary-accent: #c3a6ff;
+  --c-special: #7cc4ff;
+}
+
+/* ---- Palette: light ----------------------------------------------------- */
+
+html[data-appearance="light"] {
+  --c-bg: #ffffff;
+  --c-surface: #f5f5f5;
+  --c-overlay: #e2e2e2;
+  --c-hover: #d4d4d4;
+  --c-border: #c4c4c4;
+  --c-border-strong: #8a8a8a;
+
+  --c-muted: #5e5e5e;
+  --c-secondary-fg: #3d3d3d;
+  --c-fg: #111111;
+  --c-bright-fg: #000000;
+  --c-highlight: #000000;
+
+  --c-primary: #000000;
+  --c-info: #0057b8;
+  --c-accent2: #805b00;
+  --c-success: #1b7a2e;
+  --c-warn: #a14d00;
+  --c-error: #c62828;
+  --c-secondary-accent: #6a3fc2;
+  --c-special: #0057b8;
+}
+
+/* ---- Both variants ------------------------------------------------------ */
+
+/* Flat chrome: the bars blend into the page, set apart by a hairline only. */
+[data-slot="workspace-rail"],
+[data-slot="home-header"],
+[data-slot="filter-bar"],
+[data-slot="status-bar"],
+[data-slot="audio-player-bar"] {
+  background-color: var(--c-bg);
+}
+[data-slot="workspace-rail"] {
+  border-right: 1px solid var(--c-border);
+}
+[data-slot="home-header"] {
+  border-bottom: 1px solid var(--c-border);
+}
+[data-slot="status-bar"],
+[data-slot="audio-player-bar"] {
+  border-top: 1px solid var(--c-border);
+}
+
+/* The focus marker is an outline, so the app's own selection rings
+   (box-shadow) and the card's selected border stay as they are. */
+[data-slot="media-card"][aria-current="true"],
+[data-slot="media-row"][aria-current="true"] {
+  outline: 1px solid var(--c-bright-fg);
+  outline-offset: 2px;
+}
+
+[data-slot="modal-panel"] {
+  border: 1px solid var(--c-border-strong);
+}

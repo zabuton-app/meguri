@@ -21,6 +21,7 @@ import {
 } from "../../shared/autoTag.js";
 import { MAX_TAG_NAME } from "../../shared/tags.js";
 import { autoTagSettingsChanged, autoTagSettingsVersion } from "./autoTag.js";
+import { isThemeFileName } from "./cssThemes.js";
 import type { AutoTagEngine } from "./autoTagDeriver.js";
 import log from "./logger.js";
 
@@ -43,7 +44,25 @@ export interface AppConfig {
   logo: LogoId;
   /** Auto-tagging rules and dictionary, shared by every workspace (shared/autoTag.ts). */
   autoTag: AutoTagConfig;
+  /**
+   * User stylesheet (<userData>/custom.css). Lives here rather than in the
+   * renderer's localStorage because main owns the file watcher, which runs
+   * only while this is on.
+   */
+  customCss: CustomCssConfig;
+  /**
+   * File name of the CSS theme picked from <userData>/themes, or null for
+   * none. Main reads it to send the theme's contents with the list.
+   */
+  cssTheme: string | null;
 }
+
+export interface CustomCssConfig {
+  /** Whether custom.css is applied. Off until the user turns it on. */
+  enabled: boolean;
+}
+
+const DEFAULT_CUSTOM_CSS_CONFIG: CustomCssConfig = { enabled: false };
 
 export const DEFAULT_LOGO: LogoId = "dark";
 
@@ -109,6 +128,8 @@ export function loadConfig(): AppConfig {
       update: parseUpdateConfig(c.update),
       logo: parseLogo(c.logo),
       autoTag: parseAutoTag(c.autoTag),
+      customCss: parseCustomCss(c.customCss),
+      cssTheme: parseCssTheme(c.cssTheme),
     };
   } catch {
     return {
@@ -119,8 +140,21 @@ export function loadConfig(): AppConfig {
       update: { ...DEFAULT_UPDATE_CONFIG },
       logo: DEFAULT_LOGO,
       autoTag: defaultAutoTagConfig(),
+      customCss: { ...DEFAULT_CUSTOM_CSS_CONFIG },
+      cssTheme: null,
     };
   }
+}
+
+function parseCssTheme(value: unknown): string | null {
+  return typeof value === "string" && isThemeFileName(value) ? value : null;
+}
+
+function parseCustomCss(value: unknown): CustomCssConfig {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_CUSTOM_CSS_CONFIG };
+  const c = value as Record<string, unknown>;
+  return { enabled: c.enabled === true };
 }
 
 /**

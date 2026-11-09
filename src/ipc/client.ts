@@ -8,6 +8,9 @@ import type {
   ChannelInput,
   ChannelName,
   ChannelOutput,
+  CssThemesState,
+  CustomCssChanged,
+  CustomCssState,
 } from "@shared/ipc/channels";
 import type { PreloadInvokeChannel } from "@shared/ipc/channelNames";
 import type {
@@ -245,6 +248,15 @@ export const api = {
   /** App logo variant (window + tray icon), persisted in main's config.json. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
+  /** User stylesheet (<userData>/custom.css); the switch is persisted in main's config.json. */
+  customCssGet: () => invoke("custom_css_get"),
+  customCssSetEnabled: (enabled: boolean) =>
+    invoke("custom_css_set_enabled", { enabled }),
+  customCssOpen: () => invoke("custom_css_open"),
+  /** CSS theme files in <userData>/themes; the pick is persisted in main's config.json. */
+  cssThemesGet: () => invoke("css_themes_get"),
+  cssThemeSelect: (file: string | null) => invoke("css_theme_select", { file }),
+  cssThemesOpenFolder: () => invoke("css_themes_open_folder"),
 };
 
 export {
@@ -257,6 +269,8 @@ export {
 // Re-exported for compatibility with components that imported these from this module.
 export type {
   AboutInfo,
+  CssThemesState,
+  CustomCssState,
   LogoId,
   ScanDone,
   ScanProgress,
@@ -286,5 +300,13 @@ export const events = {
   onLibraryMerge: (cb: (e: LibraryMergeEvent) => void): Promise<Unlisten> =>
     Promise.resolve(
       bridge.on("library:merge", (p) => cb(p as LibraryMergeEvent)),
+    ),
+  onCssThemesChanged: (cb: (s: CssThemesState) => void): Promise<Unlisten> =>
+    Promise.resolve(
+      bridge.on("css-themes:changed", (p) => cb(p as CssThemesState)),
+    ),
+  onCustomCssChanged: (cb: (e: CustomCssChanged) => void): Promise<Unlisten> =>
+    Promise.resolve(
+      bridge.on("custom-css:changed", (p) => cb(p as CustomCssChanged)),
     ),
 };

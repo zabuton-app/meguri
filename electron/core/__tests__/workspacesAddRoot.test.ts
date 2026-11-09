@@ -145,3 +145,30 @@ describe("removing a workspace that has not been merged yet", () => {
     ws.closeAll();
   });
 });
+
+describe("Workspaces persistence", () => {
+  // Settings written through updateConfig() after the Workspaces snapshot was
+  // taken must survive a workspace write (regression: switching workspaces
+  // reverted custom CSS, the CSS theme and the logo to their startup values).
+  it("keeps settings it does not own when it writes config.json", async () => {
+    const { loadConfig, updateConfig } = await import("../appConfig.js");
+    const ws = new Workspaces();
+    updateConfig((c) => ({
+      ...c,
+      customCss: { ...c.customCss, enabled: true },
+      cssTheme: "dark.css",
+      update: { ...c.update, autoCheck: false },
+    }));
+
+    const added = ws.addRoot(root);
+    ws.setActive(added.path);
+
+    const saved = loadConfig();
+    expect(saved.activePath).toBe(added.path);
+    expect(saved.roots).toContain(added.path);
+    expect(saved.customCss.enabled).toBe(true);
+    expect(saved.cssTheme).toBe("dark.css");
+    expect(saved.update.autoCheck).toBe(false);
+    ws.closeAll();
+  });
+});

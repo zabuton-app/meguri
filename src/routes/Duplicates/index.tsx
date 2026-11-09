@@ -156,12 +156,21 @@ export default function Duplicates() {
                   </h3>
                   <ul className="flex flex-col gap-1">
                     {g.files.map((file) => (
-                      <li key={`${file.workspaceId}:${file.id}`}>
+                      // content-visibility: a group can hold any number of
+                      // copies, and rows out of view skip style, layout and
+                      // paint. The intrinsic size stands in until a row is
+                      // laid out once: the w-24 aspect-video thumbnail plus
+                      // the link's p-1.5. Paint is contained to the row, so
+                      // the link draws its focus ring inside it.
+                      <li
+                        key={`${file.workspaceId}:${file.id}`}
+                        className="[content-visibility:auto] [contain-intrinsic-size:auto_4.125rem]"
+                      >
                         <Link
                           to={fileHref(file.id, file.workspaceId, {
                             autoplay: false,
                           })}
-                          className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
+                          className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                         >
                           <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
                             <MediaThumbnail

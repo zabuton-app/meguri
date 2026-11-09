@@ -52,7 +52,7 @@ function boxClass(checked: boolean, active: boolean, className?: string) {
     "flex size-[18px] items-center justify-center rounded border transition",
     checked
       ? "border-primary bg-primary text-primary-foreground opacity-100"
-      : "border-fg/70 bg-bg/60 text-transparent opacity-0 backdrop-blur-[1px] focus-visible:opacity-100 group-hover:opacity-100",
+      : "border-fg/70 bg-bg/60 text-transparent opacity-0 focus-visible:opacity-100 group-hover:opacity-100",
     // Once selecting, every box stays out so the selection can be read at a
     // glance instead of one card at a time.
     active && "opacity-100",

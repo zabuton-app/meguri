@@ -68,14 +68,20 @@ export function FilterBar({
   const collapsedCount = collapsedConditionCount(descriptors);
 
   return (
-    <div className="flex flex-col gap-2 border-b border-border bg-bg px-4 py-2">
+    <div
+      data-slot="filter-bar"
+      className="flex flex-col gap-2 border-b border-border bg-bg px-4 py-2"
+    >
       <div className="flex flex-wrap items-center gap-3">
         {/* grow + a non-zero basis (flex-1 would zero it): with a 0 basis this box
           never counts toward a row's width, so the wrapping bar never breaks a
           line and the fixed-width controls squeeze the input down to nothing.
           min-w-0 stays so it can still shrink below the basis when one row is
           all we get. */}
-        <div className="flex min-w-0 grow basis-48 items-center">
+        <div
+          data-tour="search"
+          className="flex min-w-0 grow basis-48 items-center"
+        >
           <SearchTokenInput
             id="list-search-input"
             value={value.q ?? ""}

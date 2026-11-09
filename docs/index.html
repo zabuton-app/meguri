@@ -85,6 +85,9 @@
     font-size: .9rem; overflow-x: auto; white-space: nowrap;
   }
   .note { color: var(--muted); font-size: .9rem; margin-top: 1rem; }
+  .feature img { display: block; width: 100%; border: 1px solid var(--border); border-radius: 6px; margin-bottom: .75rem; }
+  .feature p { font-size: .95rem; }
+  .feature a { color: var(--accent); }
   nav.top { margin-top: 1rem; font-size: .95rem; }
   nav.top a { color: var(--accent); text-decoration: none; }
   nav.top a:hover { text-decoration: underline; }
@@ -156,6 +159,42 @@
   <p class="note">All downloads are also available on the
   <a href="https://github.com/zabuton-app/meguri/releases">GitHub Releases</a> page.
   Meguri only ever reads the folders you point it at — your media files are never modified.</p>
+
+  <h2>Highlights</h2>
+  <div class="cards">
+    <div class="card feature">
+      <img src="./assets/auto-tag.png" alt="The auto-tagging screen with a regex rule and the files it would tag" loading="lazy">
+      <h3>🤖 Auto tagging</h3>
+      <p>Turn file names and folders into tags with regex rules, keywords, and
+      folder rules, applied on every scan. Suggestions point out the words no
+      rule covers yet. <a href="./guide.html#auto-tag">More</a></p>
+    </div>
+    <div class="card feature">
+      <img src="./assets/tags-cloud.png" alt="The Tags screen as a tag cloud" loading="lazy">
+      <h3>🏷️ Tags across workspaces</h3>
+      <p>One tag is one tag in every workspace, letter case aside. Rename,
+      merge, or delete tags across workspaces from one screen, and see them as
+      a list or a cloud.
+      <a href="./guide.html#tags">More</a></p>
+    </div>
+    <div class="card feature">
+      <img src="./assets/graph-2d.png" alt="The graph view: files and their tags as a network" loading="lazy">
+      <h3>🕸️ Timeline, graph, and contribution graph</h3>
+      <p>Walk through the library day by day, see files and tags as a network,
+      or narrow the list from a year-long heatmap.
+      <a href="./guide.html#browsing">More</a></p>
+    </div>
+    <div class="card feature">
+      <img src="./assets/css-theme-cyberpunk-dark.png" alt="Meguri with the Cyberpunk sample CSS theme" loading="lazy">
+      <h3>🎨 Themes and custom CSS</h3>
+      <p>Pick a built-in theme, drop in CSS theme files, or restyle anything
+      with your own <code>custom.css</code>.
+      <a href="./guide.html#appearance">More</a></p>
+    </div>
+  </div>
+  <p class="note">Also: drag files straight into other apps, a guided tour
+  on first launch, playlists, Discovery, and more — see the
+  <a href="./guide.html">User Guide</a>.</p>
 
   <footer>
     <p>Free &amp; open source (MIT) ·

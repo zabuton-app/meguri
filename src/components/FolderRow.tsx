@@ -20,15 +20,12 @@ import { cn } from "@/lib/utils";
 export const FolderRow = memo(function FolderRow({
   entry,
   mediaBase,
-  thumbVersion,
   thumbWidth,
   focused,
   onOpen,
 }: {
   entry: FolderEntry;
   mediaBase: string;
-  /** workspaceId:id → thumb:done counter, the same map the media rows read. */
-  thumbVersion: Record<string, number>;
   /** Tailwind width class for the thumbnail slot (the list's thumbnail size). */
   thumbWidth: string;
   focused?: boolean;
@@ -50,6 +47,7 @@ export const FolderRow = memo(function FolderRow({
   return (
     <div
       data-testid="folder-row"
+      data-slot="folder-row"
       aria-current={focused ? "true" : undefined}
       className={cn(
         "folder-art group relative flex items-center gap-4 rounded-lg p-2 pr-4 transition-colors hover:bg-overlay/50",
@@ -67,11 +65,7 @@ export const FolderRow = memo(function FolderRow({
           thumbWidth,
         )}
       >
-        <FolderArt
-          previews={entry.previews}
-          mediaBase={mediaBase}
-          thumbVersion={thumbVersion}
-        />
+        <FolderArt previews={entry.previews} mediaBase={mediaBase} />
         <FolderSelectionCheck
           entry={entry}
           className="absolute left-1.5 top-[calc(var(--folder-tab-h)+4px)] z-10"

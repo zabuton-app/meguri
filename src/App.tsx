@@ -15,7 +15,10 @@ import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { StatusBar } from "@/components/StatusBar";
 import { LibraryMergeModal } from "@/components/LibraryMergeModal";
+import { useAppearanceAttribute } from "@/hooks/useAppearanceAttribute";
 import { useContentZoom } from "@/hooks/useContentZoom";
+import { useCssThemeStyle } from "@/hooks/useCssThemes";
+import { useCustomCssStyle } from "@/hooks/useCustomCss";
 import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
 import { useLibraryRestoreNotifier } from "@/hooks/useLibraryRestoreNotifier";
@@ -49,6 +52,9 @@ export default function App() {
   useSelectAllGuard();
   useUpdateNotifier();
   useLibraryRestoreNotifier();
+  useAppearanceAttribute();
+  useCssThemeStyle();
+  useCustomCssStyle();
   return (
     <div className="flex h-full">
       <WorkspaceRail />

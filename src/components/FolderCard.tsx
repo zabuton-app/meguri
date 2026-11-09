@@ -23,8 +23,6 @@ import { cn } from "@/lib/utils";
 interface Props {
   entry: FolderEntry;
   mediaBase: string;
-  /** workspaceId:id → thumb:done counter, the same map the media cards read. */
-  thumbVersion: Record<string, number>;
   focused?: boolean;
   onOpen: (path: string) => void;
 }
@@ -40,7 +38,6 @@ const META_EDGE =
 export const FolderCard = memo(function FolderCard({
   entry,
   mediaBase,
-  thumbVersion,
   focused,
   onOpen,
 }: Props) {
@@ -61,6 +58,7 @@ export const FolderCard = memo(function FolderCard({
   return (
     <div
       data-testid="folder-card"
+      data-slot="folder-card"
       aria-current={focused ? "true" : undefined}
       className={cn(
         "folder-art group relative flex flex-col rounded-lg border border-transparent",
@@ -76,12 +74,7 @@ export const FolderCard = memo(function FolderCard({
         onClick={open}
         className="group/thumb relative block aspect-video cursor-pointer"
       >
-        <FolderArt
-          previews={entry.previews}
-          mediaBase={mediaBase}
-          thumbVersion={thumbVersion}
-          joined
-        />
+        <FolderArt previews={entry.previews} mediaBase={mediaBase} joined />
       </div>
       <FolderSelectionCheck
         entry={entry}

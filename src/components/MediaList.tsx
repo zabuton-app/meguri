@@ -1,7 +1,7 @@
 // Media listing as a vertical list (alternative to MediaGrid). Each row shows a
 // thumbnail, the name with its folder and tags, the resolution/duration/size in
 // aligned columns, and the rating / favorite / Watch Later controls.
-// thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
+// A regenerated thumbnail is picked up by the thumbnail itself (thumbVersionStore).
 import {
   memo,
   useCallback,
@@ -10,7 +10,7 @@ import {
   useState,
   type Ref,
 } from "react";
-import { Link } from "react-router";
+import { HashLink } from "@/components/HashLink";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Folder } from "lucide-react";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
@@ -72,8 +72,6 @@ interface Props {
   /** Global index offset of items[0] within the full filtered result set. */
   listOffset?: number;
   loading: boolean;
-  /** workspaceId:id→update counter. Incrementing on thumb:done reloads the corresponding thumbnail. */
-  thumbVersion: Record<string, number>;
   /** Handler for tag clicks (reflected into the search query). */
   onTagClick?: (name: string) => void;
   /** Whether a next page exists (for infinite scroll). */
@@ -110,15 +108,14 @@ interface Props {
 
 const noop = () => {};
 
-// Memoized: Home re-renders on every thumbVersion flush and its other props are
-// referentially stable, so the list only re-renders when the data actually changes.
+// Memoized: Home's props are referentially stable, so the list only re-renders
+// when the data actually changes.
 export const MediaList = memo(function MediaList({
   items,
   mediaBase,
   workspaceId: wsId,
   listOffset = 0,
   loading,
-  thumbVersion,
   onTagClick,
   hasNextPage,
   fetchNextPage,
@@ -281,7 +278,6 @@ export const MediaList = memo(function MediaList({
                     <FolderRow
                       entry={entry.folder}
                       mediaBase={mediaBase}
-                      thumbVersion={thumbVersion}
                       thumbWidth={thumbWidth}
                       focused={focused}
                       onOpen={onOpenFolder ?? noop}
@@ -293,7 +289,6 @@ export const MediaList = memo(function MediaList({
                   <MediaRow
                     file={file}
                     index={entry.fileIndex}
-                    version={thumbVersion[mediaSortId(file)] ?? 0}
                     mediaBase={mediaBase}
                     thumbWidth={thumbWidth}
                     onTagClick={onTagClick}
@@ -317,11 +312,10 @@ export const MediaList = memo(function MediaList({
   );
 });
 
-// Memoize so only rows whose version changed re-render (onTagClick is stabilized in the parent).
+// Memoize so only rows whose own props changed re-render (onTagClick is stabilized in the parent).
 const MediaRow = memo(function MediaRow({
   file,
   index,
-  version,
   mediaBase,
   thumbWidth,
   onTagClick,
@@ -333,7 +327,6 @@ const MediaRow = memo(function MediaRow({
   file: FileRow;
   /** Position in the loaded list — what a Shift-click ranges from. */
   index: number;
-  version: number;
   mediaBase: string;
   /** Tailwind width class for the thumbnail (from the list thumbnail-size preference). */
   thumbWidth: string;
@@ -378,6 +371,7 @@ const MediaRow = memo(function MediaRow({
   return (
     <div
       {...dragProps}
+      data-slot="media-row"
       aria-current={focused ? "true" : undefined}
       className={cn(
         "group @container relative flex items-center gap-4 rounded-lg p-2 pr-4 transition-colors hover:bg-overlay/50",
@@ -391,7 +385,7 @@ const MediaRow = memo(function MediaRow({
           thumbWidth,
         )}
       >
-        <Link
+        <HashLink
           to={fileHref(file.id, file.workspaceId)}
           onClick={(e) => {
             if (onSelectableClick(e)) return;
@@ -399,13 +393,13 @@ const MediaRow = memo(function MediaRow({
           }}
           className="group/thumb absolute inset-0 block"
         >
-          <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
+          <MediaThumbnail file={file} mediaBase={mediaBase} />
           {duration && (
             <span className="absolute bottom-1 right-1 rounded bg-bg/80 px-1 text-[11px] leading-4 tabular-nums text-bright-fg">
               {duration}
             </span>
           )}
-        </Link>
+        </HashLink>
         <SelectionCheck
           file={file}
           index={index}
@@ -418,14 +412,14 @@ const MediaRow = memo(function MediaRow({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <Link
+        <HashLink
           to={fileHref(file.id, file.workspaceId, { autoplay: false })}
           onClick={onSelectableClick}
           title={file.relPath}
           className="h-6 truncate text-[15px] font-medium leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
         >
           {fileNameOf(file.relPath)}
-        </Link>
+        </HashLink>
         {/* Wide rows give the metadata its own columns and show the folder
             here; narrow ones (a docked side peek) fold the metadata into this
             line instead, which keeps the row height the same. */}

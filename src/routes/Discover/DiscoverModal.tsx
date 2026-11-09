@@ -36,7 +36,11 @@ export function DiscoverModal({
       role="dialog"
       aria-modal="true"
     >
-      <div className={innerClass} onClick={(e) => e.stopPropagation()}>
+      <div
+        data-slot="modal-panel"
+        className={innerClass}
+        onClick={(e) => e.stopPropagation()}
+      >
         {children}
       </div>
     </div>

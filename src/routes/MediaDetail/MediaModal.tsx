@@ -139,6 +139,7 @@ export function MediaModal({
     >
       <div
         ref={panelRef}
+        data-slot="modal-panel"
         className={innerClass}
         // Inline rather than a Tailwind class: the ceiling is derived from
         // LIST_MIN_WIDTH, and a class built from it would not be scanned.

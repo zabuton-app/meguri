@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/themes/ThemeProvider";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { PreferencesProvider } from "@/settings/PreferencesProvider";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
+import { TourProvider } from "@/tour/TourProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import log from "@/lib/logger";
 import App from "@/App";
@@ -35,26 +36,28 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <ThemeProvider>
           <I18nProvider>
             <PreferencesProvider>
-              <ConfirmProvider>
-                <App />
-                <Toaster
-                  position="top-right"
-                  visibleToasts={4}
-                  gap={8}
-                  closeButton
-                  toastOptions={{
-                    classNames: {
-                      // select-text: error toasts render raw error.message.
-                      // Sonner captures the pointer for swipe-to-dismiss, so
-                      // dragging across a toast selects nothing; double- and
-                      // triple-click still do.
-                      toast: "meguri-toast select-text",
-                      title: "text-bright-fg",
-                      description: "meguri-toast-description",
-                    },
-                  }}
-                />
-              </ConfirmProvider>
+              <TourProvider>
+                <ConfirmProvider>
+                  <App />
+                  <Toaster
+                    position="top-right"
+                    visibleToasts={4}
+                    gap={8}
+                    closeButton
+                    toastOptions={{
+                      classNames: {
+                        // select-text: error toasts render raw error.message.
+                        // Sonner captures the pointer for swipe-to-dismiss, so
+                        // dragging across a toast selects nothing; double- and
+                        // triple-click still do.
+                        toast: "meguri-toast select-text",
+                        title: "text-bright-fg",
+                        description: "meguri-toast-description",
+                      },
+                    }}
+                  />
+                </ConfirmProvider>
+              </TourProvider>
             </PreferencesProvider>
           </I18nProvider>
         </ThemeProvider>

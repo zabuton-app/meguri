@@ -104,3 +104,15 @@ export async function expectStarRating(
     }
   }
 }
+
+/**
+ * Every test starts from a fresh profile, which is a first launch: mark the
+ * first-launch tour as seen and reload, or its overlay would sit over the test.
+ */
+export async function skipFirstLaunchTour(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    localStorage.setItem("meguri.tours", JSON.stringify(["first-launch"])),
+  );
+  await page.reload();
+  await page.waitForLoadState("domcontentloaded");
+}

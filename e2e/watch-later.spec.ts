@@ -51,6 +51,8 @@ test.describe("Watch Later", () => {
     // Add from the workspace grid.
     await ready.getByRole("button", { name: "media" }).click();
     await waitForIndexedMedia(ready);
+    // A card mounts its hover-only controls once pointed at.
+    await fileCard(ready).hover();
     await fileCard(ready)
       .getByRole("button", { name: "Add to Watch Later" })
       .click();
@@ -78,6 +80,8 @@ test.describe("Watch Later", () => {
     // broadcast while the detail view is up, the open file would drop out of the
     // navigation order and prev/next would dead-end mid-session.
     await waitForIndexedMedia(ready);
+    // A card mounts its hover-only controls once pointed at.
+    await fileCard(ready).hover();
     await fileCard(ready)
       .getByRole("button", { name: "Add to Watch Later" })
       .click();
@@ -122,6 +126,8 @@ test.describe("Watch Later", () => {
 
   test("offers removal for a file already collected", async ({ ready }) => {
     await waitForIndexedMedia(ready);
+    // A card mounts its hover-only controls once pointed at.
+    await fileCard(ready).hover();
     await fileCard(ready)
       .getByRole("button", { name: "Add to Watch Later" })
       .click();

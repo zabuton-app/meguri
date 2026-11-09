@@ -108,6 +108,8 @@ test.describe("Home", () => {
 
   test("filters by minimum rating", async ({ ready }) => {
     const card = fileCard(ready);
+    // A card mounts its editable stars once pointed at.
+    await card.hover();
     await card.getByRole("button", { name: "4 stars" }).click();
 
     await ready
@@ -217,6 +219,8 @@ test.describe("Home", () => {
 
   test("sets rating from grid card", async ({ ready }) => {
     const card = fileCard(ready);
+    // A card mounts its editable stars once pointed at.
+    await card.hover();
     await card.getByRole("button", { name: "3 stars" }).click();
     await expectStarRating(card, 3);
   });

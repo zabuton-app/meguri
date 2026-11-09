@@ -62,6 +62,9 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
 - `thumb:done` — a thumbnail finished generating.
 - `scan:done` — a scan job completed (with stats, or an abort/error flag).
 - `workspace:changed` — the active workspace changed.
+- `update:available` — the update check found a newer release.
+- `custom-css:changed` — `custom.css` was saved or deleted (see
+  [Custom CSS](#custom-css)).
 
 ### Adding a new IPC channel
 
@@ -116,7 +119,8 @@ lifecycle behavior:
   therefore `before-quit`, which advances `quitPhase`.
 - `before-quit` is a two-pass gate (Linux / Windows): the first pass calls
   `preventDefault()`, runs the async `shutdown()` (hide the window, stop the
-  local servers, abort scans, dispose the query worker), then closes every
+  local servers, abort scans and workspace passes, dispose the query and
+  auto-tagging workers), then closes every
   workspace DB handle and re-enters `app.quit()`; the second pass lets the quit
   proceed. Repeated quit requests during the wait are absorbed, and the wait is
   bounded so a stuck teardown cannot keep the app alive. Once quitting, no scan
@@ -152,8 +156,12 @@ ratings, tags, bookmarks, play history — lives in one library,
 `Workspaces.idFor()` / `pathHash()`; that ID is also the name of the directory
 holding the workspace's generated files.
 
-- `electron/core/appConfig.ts` is the lone layer that persists `roots`,
-  `activePath`, `collections`, and `autoTag` to `<userData>/config.json`.
+- `electron/core/appConfig.ts` is the lone layer that persists
+  `<userData>/config.json`: `roots`, `activePath`, `collections` and
+  `workspaceEmojis` (owned by `Workspaces`), plus `update`, `logo`, `autoTag`,
+  `customCss` and `cssTheme`. Each owner writes only its own fields through
+  `updateConfig()`, which merges over what is on disk; writing a snapshot back
+  wholesale would revert the fields another owner changed since.
 - `electron/core/workspaces.ts` reads the config and caches a `Core` per ID. It
   distinguishes `active()` (the active workspace) from `byId()` (any workspace by
   ID). Code that opens files should be deliberate about which it needs — the
@@ -371,3 +379,54 @@ default applies in every workspace, so its folder and a manual sort, both
 bound to one place, are left out (`defaultQueryOf()`). The hook is owned by
 `FilterBar`, which passes it to the menu, so the menu and "Clear all" read the
 same state.
+
+## Custom CSS
+
+The user stylesheet lives at `<userData>/custom.css` and is layered over the
+theme. Main owns the file, its watcher, and the on/off switch; the renderer only
+injects what it is given.
+
+- `electron/core/customCss.ts` reads the file, writes the template (never over
+  an existing file), and watches it. The watcher is on the directory, not the
+  file, because editors that save by renaming a new file over the old one would
+  end a watch on the file after the first save. Events are debounced so one save
+  is read once.
+- The switch is persisted as `customCss.enabled` in `config.json` (off by
+  default) and works whether or not the file exists. The watcher runs only while
+  it is on.
+- `electron/ipc/customCss.ts` handles `custom_css_get`,
+  `custom_css_set_enabled`, and `custom_css_open`, and emits
+  `custom-css:changed` with the new contents on every save or deletion.
+- `useCustomCssStyle()` (mounted once in `App`) writes the contents into a
+  `<style id="meguri-custom-css">` appended to `<head>` after the theme
+  variables, via `textContent`. `useCustomCss()` shares the state through the
+  react-query cache with the Settings section.
+- The themes declare `--c-*` on `html[data-theme="<id>"]`, so overrides must
+  match at least that specificity; the template documents this.
+- `useAppearanceAttribute()` sets `<html data-appearance="light|dark">` so a
+  stylesheet can write light and dark variants. What a stylesheet may rely on
+  is listed in [Theming Meguri with CSS](theming.md#public-api).
+- The CSS is loaded asynchronously, so on startup the plain theme can show for
+  a moment before the stylesheet applies.
+
+### CSS theme files
+
+A second, optional layer sits between the base16 scheme and `custom.css`: one
+theme file picked from `<userData>/themes/*.css`.
+
+- `electron/core/cssThemes.ts` lists the folder (plain `.css` names only, so a
+  pick can never resolve outside it), names each file from an `@name` line in
+  its leading comment, and reads the picked one. The folder watch shares
+  `electron/core/watchDirectory.ts` with `custom.css`; it runs for the whole
+  session, since a file added while nothing is picked must still reach the
+  list.
+- The pick is `cssTheme` in `config.json` (null for none). A picked file that
+  disappears reads as none without clearing the stored pick, so it comes back
+  with the file.
+- `electron/ipc/cssThemes.ts` handles `css_themes_get`, `css_theme_select`
+  (validated as a plain `.css` name, then checked against the listing) and
+  `css_themes_open_folder`, and emits `css-themes:changed` with the whole state
+  (list, pick, contents) on any change in the folder.
+- `useCssThemeStyle()` writes the picked theme into
+  `<style id="meguri-css-theme">`, inserted before `custom.css`'s element so
+  that `custom.css` wins at equal specificity.
