@@ -1,7 +1,7 @@
 // Cross-search filter controls. The primary row holds what gets reached for
 // constantly — text, kind, rating, favorites — and everything rarer collapses
 // into MoreFiltersPopover, which reports how many of its conditions are on.
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CalendarDays, Heart } from "lucide-react";
 import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
 import type { SmartCollection } from "@/lib/smartCollections";
+import { AudioFilters } from "./AudioFilters";
 
 interface Props {
   value: SearchQuery;
@@ -54,12 +55,18 @@ export function FilterBar({
   heatmapOpen = false,
 }: Props) {
   const { t } = useI18n();
+  const [audioValid, setAudioValid] = useState(true);
+  const [audioReset, setAudioReset] = useState(0);
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
 
   const smart = useSmartCollections();
   const { defaultQuery } = smart;
   // "Clear all" returns to the default saved search, if one is set.
-  const clearAll = () => onChange(clearAllTarget(value, defaultQuery));
+  const clearAll = () => {
+    setAudioReset((n) => n + 1);
+    setAudioValid(true);
+    onChange(clearAllTarget(value, defaultQuery));
+  };
 
   const descriptors = useMemo(
     () => describeConditions(value, t, defaultQuery),
@@ -101,8 +108,19 @@ export function FilterBar({
             { value: "image", label: t("kind.image") },
             { value: "audio", label: t("kind.audio") },
           ]}
-          onChange={(kind) => patch({ kind })}
+          onChange={(kind) => {
+            setAudioValid(true);
+            patch({ kind, audio: kind === "audio" ? value.audio : undefined });
+          }}
         />
+        {value.kind === "audio" && (
+          <AudioFilters
+            key={audioReset}
+            onValidityChange={setAudioValid}
+            value={value.audio}
+            onChange={(audio) => patch({ audio })}
+          />
+        )}
 
         <div
           className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2"
@@ -161,14 +179,17 @@ export function FilterBar({
 
         {/* Pushed to the far end: saved searches are a way *into* a set of
             conditions, not one more condition to set. */}
-        <div className="ml-auto">
+        <fieldset
+          className="ml-auto"
+          disabled={value.kind === "audio" && !audioValid}
+        >
           <SmartCollectionsMenu
             value={value}
             workspaceId={workspaceId}
             onApply={onApplySaved ?? ((c) => onChange(c.query))}
             smart={smart}
           />
-        </div>
+        </fieldset>
       </div>
 
       <ActiveFilterChips

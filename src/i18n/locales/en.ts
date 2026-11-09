@@ -14,6 +14,42 @@ export const en: Record<TranslationKey, string> = {
   "kind.video": "Video",
   "kind.image": "Image",
   "kind.audio": "Audio",
+  "audio.sampleRateMatch": "Sample rate match",
+  "audio.bitDepthMatch": "Bit depth match",
+  "audio.durationMatch": "Duration match",
+  "audio.durationFormat": "Duration format",
+  "audio.seconds": "Seconds",
+  "audio.minutes": "Minutes",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "Minutes:seconds (MM:SS)",
+  "audio.durationTimeHint":
+    "Enter MM:SS, e.g. 02:30 = 2 minutes, 30 seconds. Seconds must be 00–59.",
+  "audio.durationMinutesHint":
+    "Enter minutes, e.g. 2.5 = 2 minutes, 30 seconds.",
+  "audio.durationSecondsHint":
+    "Enter seconds, e.g. 150 = 2 minutes, 30 seconds.",
+  "audio.atMost": "At most",
+  "audio.between": "Between",
+  "audio.durationOrderError":
+    "The minimum duration must not exceed the maximum.",
+  "audio.filters": "Audio properties",
+  "audio.any": "Any",
+  "audio.sampleRate": "Sample rate",
+  "audio.bitDepth": "Bit depth",
+  "audio.bits": "{count}-bit",
+  "audio.channels": "Channels",
+  "audio.mono": "Mono",
+  "audio.stereo": "Stereo",
+  "audio.multichannel": "Multichannel",
+  "audio.channelCount": "{count} channels",
+  "audio.bitRate": "Bitrate",
+  "audio.bitRateMin": "Minimum bitrate (kbps)",
+  "audio.durationMin": "Minimum duration (seconds)",
+  "audio.durationMax": "Maximum duration (seconds)",
+  "audio.unknownHint":
+    "Files with unknown values do not match a filter on that property.",
+  "audio.atLeast": "At least",
+  "audio.exact": "Exactly",
 
   // sort
   "sort.added": "Added",

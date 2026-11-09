@@ -363,6 +363,28 @@ bound to one place, are left out (`defaultQueryOf()`). The hook is owned by
 `FilterBar`, which passes it to the menu, so the menu and "Clear all" read the
 same state.
 
+### Audio properties
+
+Select **Audio → Audio properties** in the filter bar to narrow recordings by
+sample rate, source bit depth, channels, codec, bitrate, or duration. Sample rate
+and bit depth support **Exactly** and **At least**. Channels include mono, stereo,
+and multichannel. Duration accepts seconds, decimal minutes, or `MM:SS`
+(for example, `02:30` for two minutes and thirty seconds). The duration can be
+exact, a minimum, a maximum, or a range. Save a combination through
+**Smart collections → Save current filters**.
+
+`SearchQuery.audio` stores the selected properties and uses seconds for duration
+bounds. Audio conditions apply only to audio files. Unknown values do not match
+a filter on that property.
+
+The catalogue stores the first audio stream's sample rate, source bit depth,
+channel count, and bitrate in four nullable `files` columns. The database adds
+and backfills those columns in one transaction when it opens an older catalogue,
+reading stored ffprobe JSON in batches without reopening any media. The same
+metadata reader feeds new scans and the detail view. It reads declared source
+bit depth rather than decoder sample format, which may reflect how a compressed
+file is decoded.
+
 ## Custom CSS
 
 The user stylesheet lives at `<userData>/custom.css` and is layered over the
