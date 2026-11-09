@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { Core } from "./index.js";
 import {
   loadConfig,
-  saveConfig,
+  updateConfig,
   cleanupStaleTemp,
   normalizeDir,
   type AppConfig,
@@ -60,17 +60,21 @@ export class Workspaces {
   }
 
   /**
-   * Persist our snapshot, refreshing the fields this class never owns first.
-   * `update` and `autoTag` are written independently via `updateConfig()`, so
-   * spreading our startup snapshot back wholesale would silently revert the
-   * user's update preferences and their auto-tagging rules. Every write below goes
-   * through here rather than calling saveConfig directly.
+   * Persist only the fields this class owns, merged over what is on disk.
+   * Everything else in config.json (`update`, `autoTag`, `logo`, `customCss`,
+   * `cssTheme`, ...) is written independently via `updateConfig()`, so writing
+   * our startup snapshot back wholesale would silently revert those settings.
+   * Every write below goes through here rather than calling saveConfig directly.
    */
   private persist(): void {
-    const { update, autoTag } = loadConfig();
-    this.config.update = update;
-    this.config.autoTag = autoTag;
-    saveConfig(this.config);
+    const { roots, activePath, collections, workspaceEmojis } = this.config;
+    updateConfig((c) => ({
+      ...c,
+      roots,
+      activePath,
+      collections,
+      workspaceEmojis,
+    }));
   }
 
   /**
