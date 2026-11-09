@@ -410,6 +410,14 @@ To switch between several themes, put their `.css` files in
 and pick one in the **Theme** list, where they appear next to the built-in
 themes. `custom.css` still applies on top.
 
+The sample themes Cyberpunk (dark) and Sky (light); see
+[the sample themes](docs/theming.md#sample-themes) for every one in both
+variants:
+
+![Cyberpunk sample theme, dark](./docs/assets/css-theme-cyberpunk-dark.png)
+
+![Sky sample theme, light](./docs/assets/css-theme-sky-light.png)
+
 External resources (`@import` or `url()` pointing at the network) are blocked by
 the app's Content Security Policy, so a stylesheet cannot make Meguri go
 online. If a stylesheet makes the UI unusable, delete or rename `custom.css`
