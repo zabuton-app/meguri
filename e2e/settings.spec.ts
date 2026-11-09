@@ -1,9 +1,24 @@
 import { test, expect } from "./fixtures/app";
-import { closeTopDialog, openSettings } from "./fixtures/helpers";
+import {
+  closeTopDialog,
+  openSettings,
+  openSettingsTab,
+} from "./fixtures/helpers";
 
 test.describe("Settings", () => {
-  test("opens from sidebar and closes with Escape", async ({ ready }) => {
-    await openSettings(ready);
+  test("shows the same version and build in the sidebar and About", async ({
+    ready,
+  }) => {
+    const readout = ready.locator('[data-slot="build-readout"]');
+    await expect(readout).toBeVisible();
+    await expect(readout).toHaveAttribute("title", /^v\S+ · Build [a-z0-9]+$/);
+    const title = (await readout.getAttribute("title"))!;
+    const [version, build] = title.slice(1).split(" · ");
+    const dialog = await openSettingsTab(ready, "App");
+    await expect(dialog.getByText(build, { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByText(`巡 version ${version}`, { exact: true }),
+    ).toBeVisible();
     await closeTopDialog(ready);
     await expect(ready).toHaveURL(/#\/$/);
   });

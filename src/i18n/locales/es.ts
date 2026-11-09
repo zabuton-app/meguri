@@ -199,6 +199,7 @@ export const es: Record<TranslationKey, string> = {
   "update.upToDate": "Estás al día ({version}).",
   "settings.about": "Acerca de",
   "about.version": "{name} versión {version}",
+  "about.build": "Compilación {build}",
   "about.appLicense": "{name} se publica bajo la licencia MIT.",
   "about.ossTitle": "Licencias de código abierto",
   "about.ossDesc":

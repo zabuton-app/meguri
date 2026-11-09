@@ -7,6 +7,8 @@ import { resolve } from "node:path";
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    // Stamp the build once. Relaunching the bundle keeps the same identifier.
+    define: { __MEGURI_BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
     build: {
       outDir: "out/main",
       lib: {

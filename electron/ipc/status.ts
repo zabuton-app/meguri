@@ -5,6 +5,8 @@ import { ALL_ID } from "../core/workspaces.js";
 import type { IpcContext } from "./context.js";
 import { queryTargets } from "./helpers.js";
 
+declare const __MEGURI_BUILD_ID__: string;
+
 export function registerStatusHandlers(ctx: IpcContext): void {
   const { ws, queryClient } = ctx;
 
@@ -53,9 +55,10 @@ export function registerStatusHandlers(ctx: IpcContext): void {
     };
   });
 
-  // Static app/runtime versions for the Settings "About" section.
+  // Static build and runtime info shared by About and the workspace rail.
   handle("about_info", () => ({
     version: app.getVersion(),
+    buildId: __MEGURI_BUILD_ID__,
     electron: process.versions.electron ?? "",
     chrome: process.versions.chrome ?? "",
     node: process.versions.node ?? "",

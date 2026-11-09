@@ -179,6 +179,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "update.upToDate": "已是最新版本（{version}）。",
   "settings.about": "关于",
   "about.version": "{name} 版本 {version}",
+  "about.build": "构建 {build}",
   "about.appLicense": "{name} 基于 MIT License 发布。",
   "about.ossTitle": "开源许可证",
   "about.ossDesc": "本应用包含以下开源软件。",

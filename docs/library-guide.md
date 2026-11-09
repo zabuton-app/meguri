@@ -4,6 +4,10 @@ Meguri builds a catalogue of files in folders you scan. Your original media stay
 where it is. You can find clips across folders, keep reusable searches, and review
 footage before bringing it into your edit.
 
+The left rail shows Meguri's version and build ID below the settings cog. Both
+also appear in **Settings → App → About**, where you can select and copy them
+when reporting an issue.
+
 - [Make a Smart bin](#make-a-smart-bin)
 - [Find new downloads](#find-new-downloads)
 - [Find audio by its properties](#find-audio-by-its-properties)

@@ -191,6 +191,7 @@ export const ko: Record<TranslationKey, string> = {
   "update.upToDate": "최신 버전입니다 ({version}).",
   "settings.about": "정보",
   "about.version": "{name} 버전 {version}",
+  "about.build": "빌드 {build}",
   "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
   "about.ossTitle": "오픈소스 라이선스",
   "about.ossDesc": "이 앱은 다음 오픈소스 소프트웨어를 포함합니다.",

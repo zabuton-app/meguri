@@ -63,6 +63,7 @@ import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { useFileDropTarget } from "@/hooks/useFileDropTarget";
 import { useOsFolderDrop, type DroppedItems } from "@/hooks/useOsFolderDrop";
 import { useAddFilesToCollection } from "@/hooks/useAddFilesToCollection";
+import { useAboutInfo } from "@/hooks/useAboutInfo";
 import type { DraggedFile } from "@/lib/fileDrag";
 
 /** Never animate sortable layout changes, so items snap to their final position on drop. */
@@ -91,6 +92,7 @@ export function WorkspaceRail() {
   const { t } = useI18n();
   // In-app logo mark follows the selected variant (Settings > App logo).
   const { logo } = useLogo();
+  const { data: info } = useAboutInfo();
   const addedWorkspaceScanJobs = useRef(new Set<string>());
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   // null = create mode; a collection = edit mode for it.
@@ -489,6 +491,21 @@ export function WorkspaceRail() {
         >
           <Settings className="size-5" />
         </button>
+        {info && (
+          <div
+            data-slot="build-readout"
+            title={`v${info.version} · ${t("about.build", { build: info.buildId })}`}
+            className="-mt-1.5 flex w-full shrink-0 select-text flex-col px-1 text-center font-mono text-[10px] leading-3 text-fg"
+          >
+            <span className="truncate">v{info.version}</span>
+            <span aria-hidden="true" className="truncate text-muted">
+              {info.buildId}
+            </span>
+            <span className="sr-only">
+              {t("about.build", { build: info.buildId })}
+            </span>
+          </div>
+        )}
       </nav>
 
       {osDragActive && <FolderDropOverlay t={t} />}

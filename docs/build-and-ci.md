@@ -31,6 +31,10 @@ launching, so Electron does not accidentally start in node mode.
 - TypeScript uses separate tsconfigs for `src` and `electron`, both `strict` with
   `noUnusedLocals` / `noUnusedParameters`.
 
+The main bundle gets a short build ID when Vite loads its configuration.
+**Settings → App → About** and the left rail read the same ID from the running
+bundle, alongside the release version. Starting an existing bundle keeps its ID.
+
 ## Testing
 
 Tests run under Vitest (`vitest.config.ts`) as two projects.

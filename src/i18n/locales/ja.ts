@@ -194,6 +194,7 @@ export const ja = {
   "update.upToDate": "最新です（{version}）。",
   "settings.about": "このアプリについて",
   "about.version": "{name} バージョン {version}",
+  "about.build": "ビルド {build}",
   "about.appLicense": "{name}は MIT License の下で公開されています。",
   "about.ossTitle": "オープンソースライセンス",
   "about.ossDesc": "本アプリは以下のオープンソースソフトウェアを含んでいます。",

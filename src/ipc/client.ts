@@ -67,7 +67,7 @@ export const api = {
     autoplay: boolean,
   ) => invoke("media_popout", { id, workspaceId, sec, autoplay }),
   appStatus: () => invoke("app_status"),
-  /** App + runtime versions for the Settings "About" section. */
+  /** Version, build ID, and runtime versions. */
   aboutInfo: () => invoke("about_info"),
   workspaceStats: () => invoke("workspace_stats"),
   workspacesList: () => invoke("workspaces_list"),

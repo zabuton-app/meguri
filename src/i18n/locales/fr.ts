@@ -201,6 +201,7 @@ export const fr: Record<TranslationKey, string> = {
   "update.upToDate": "Vous êtes à jour ({version}).",
   "settings.about": "À propos",
   "about.version": "{name} version {version}",
+  "about.build": "Build {build}",
   "about.appLicense": "{name} est publié sous licence MIT.",
   "about.ossTitle": "Licences open source",
   "about.ossDesc":

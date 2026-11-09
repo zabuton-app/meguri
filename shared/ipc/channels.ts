@@ -727,10 +727,12 @@ type AssertChannelOutputsMatch =
         Exclude<InvokeChannel, ChannelOutputKeys>,
       ];
 
-/** Static app/runtime info for the About section (Settings). */
+/** Static app, build, and runtime info. */
 export interface AboutInfo {
   /** App version (app.getVersion(), e.g. "0.1.0"). */
   version: string;
+  /** Identifier baked into the running bundle. */
+  buildId: string;
   /** Bundled runtime versions (process.versions.*). */
   electron: string;
   chrome: string;

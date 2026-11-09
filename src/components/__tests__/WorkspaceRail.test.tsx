@@ -29,6 +29,13 @@ vi.mock("sonner", () => ({
 vi.mock("@/ipc/client", () => ({
   api: {
     appStatus: () => mocks.appStatus(),
+    aboutInfo: vi.fn().mockResolvedValue({
+      version: "0.9.0",
+      buildId: "testbuild",
+      electron: "",
+      chrome: "",
+      node: "",
+    }),
     workspacesList: () => mocks.workspacesList(),
     workspaceSwitch: (id: string) => mocks.workspaceSwitch(id),
     workspaceAdd: () => mocks.workspaceAdd(),

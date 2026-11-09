@@ -2,10 +2,10 @@
 // bundled third-party license attributions. The FFmpeg/FFprobe entry matters
 // legally: the bundled binaries are GPL-licensed, so we must surface the
 // license text and a way to obtain the corresponding source.
-import { useEffect, useState } from "react";
 import { ExternalLink, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, type AboutInfo } from "@/ipc/client";
+import { api } from "@/ipc/client";
+import { useAboutInfo } from "@/hooks/useAboutInfo";
 import { useI18n } from "@/i18n/I18nProvider";
 
 const GITHUB_URL = "https://github.com/zabuton-app/meguri";
@@ -89,17 +89,7 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
 
 export function AboutSection() {
   const { t } = useI18n();
-  const [info, setInfo] = useState<AboutInfo | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    void api.aboutInfo().then((i) => {
-      if (active) setInfo(i);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { data: info } = useAboutInfo();
 
   // The section opts into selection as a whole: version strings get pasted into
   // bug reports, and the attributions below are notices we are obliged to
@@ -121,10 +111,15 @@ export function AboutSection() {
               : t("app.name")}
           </span>
           {info && (
-            <span className="text-xs text-muted">
-              Electron {info.electron} / Chromium {info.chrome} / Node{" "}
-              {info.node}
-            </span>
+            <>
+              <span className="text-xs text-fg">
+                {t("about.build", { build: info.buildId })}
+              </span>
+              <span className="text-xs text-muted">
+                Electron {info.electron} / Chromium {info.chrome} / Node{" "}
+                {info.node}
+              </span>
+            </>
           )}
         </div>
         <Button

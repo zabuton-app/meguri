@@ -198,6 +198,7 @@ export const en: Record<TranslationKey, string> = {
   "update.upToDate": "You're up to date ({version}).",
   "settings.about": "About",
   "about.version": "{name} version {version}",
+  "about.build": "Build {build}",
   "about.appLicense": "{name} is released under the MIT License.",
   "about.ossTitle": "Open-source licenses",
   "about.ossDesc": "This app includes the following open-source software.",
