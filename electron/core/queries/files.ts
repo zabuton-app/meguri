@@ -252,6 +252,40 @@ export function appendSearchConditions(
     sql += " AND f.kind = ?";
     args.push(query.kind);
   }
+  if (query.kind === "audio" && query.audio) {
+    const audio = query.audio;
+    for (const [column, value, match] of [
+      ["sample_rate", audio.sampleRate, audio.sampleRateMatch],
+      ["bit_depth", audio.bitDepth, audio.bitDepthMatch],
+    ] as const) {
+      if (value != null) {
+        sql += ` AND f.${column} ${match === "atLeast" ? ">=" : "="} ?`;
+        args.push(value);
+      }
+    }
+    if (audio.channels) {
+      sql +=
+        audio.channels === "multichannel"
+          ? " AND f.audio_channels > 2"
+          : " AND f.audio_channels = ?";
+      if (audio.channels !== "multichannel")
+        args.push(audio.channels === "mono" ? 1 : 2);
+    }
+    if (audio.codec) {
+      sql += audio.codec === "pcm" ? " AND f.codec GLOB ?" : " AND f.codec = ?";
+      args.push(audio.codec === "pcm" ? "pcm_*" : audio.codec);
+    }
+    for (const [column, operator, value] of [
+      ["audio_bit_rate", ">=", audio.bitRateMin],
+      ["duration", ">=", audio.durationMin],
+      ["duration", "<=", audio.durationMax],
+    ] as const) {
+      if (value != null) {
+        sql += ` AND f.${column} ${operator} ?`;
+        args.push(value);
+      }
+    }
+  }
   if (query.fileIds?.length) {
     // Pass the IDs as a single JSON array bound to one placeholder rather than
     // one placeholder per ID. A large collection would otherwise blow past
