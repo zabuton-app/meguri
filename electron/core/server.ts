@@ -4,7 +4,8 @@
 // (even with non-faststart where moov is at the end, it can read it via a Range request to the tail).
 // So these are served as raw files via Range to enable full seeking. Only containers Chromium
 // cannot demux (mkv/avi/wmv/flv/ts) are remuxed on the fly to fragmented MP4 with ffmpeg
-// and served, supporting time seeking via ?t=<seconds> (this path is a stream).
+// and served. ProRes uses a compatible H.264 preview instead of stream copy.
+// Both streams support time seeking via ?t=<seconds>.
 //
 // URLs have the form /ws/<workspaceId>/<kind>/<fileId> (kind = thumb|media|frame).
 // Requests must include X-Api-Token; the Electron session injects it for in-app media loads.
@@ -16,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Core } from "./index.js";
-import { absPathOf, thumbPathIfDone } from "./tags.js";
+import { thumbPathIfDone } from "./tags.js";
 import { isInsideRoot } from "./paths.js";
 import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
@@ -26,7 +27,7 @@ import { scopedLog } from "./logger.js";
 const log = scopedLog("server");
 
 // Only containers Chromium cannot demux are remuxed with ffmpeg and served.
-// Everything else (mp4/m4v/mov/webm) is served as a raw file via Range to enable full seeking.
+// Browser-compatible files are served via Range to enable full seeking.
 const REMUX_CONTAINERS = new Set(["mkv", "avi", "wmv", "flv", "ts"]);
 
 // Hard cap on ffmpeg streaming/transcoding requests. Without this a corrupt
@@ -44,6 +45,9 @@ const FFMPEG_KILL_SIGNAL = "SIGKILL" as const;
 // open at once) rather than anything CPU-derived.
 const REMUX_MAX_CONCURRENT = 8;
 const remuxSlots = new Semaphore(REMUX_MAX_CONCURRENT);
+// Playback can stay open for a long time. Keep its decoders separate from the
+// thumbnail and scrub pool, and cap concurrent previews and FFmpeg threads.
+const proResPreviewSlots = new Semaphore(2);
 // Requests queued for a slot are bounded too, so a burst of frame grabs (or
 // a renderer gone haywire) cannot pile up sockets and waiters without limit;
 // beyond this the request is shed with 503. A client that disconnects while
@@ -234,11 +238,17 @@ async function handle(
       return;
     }
 
-    const abs = absPathOf(core.db, id);
-    if (!abs) {
+    const file = core.db
+      .prepare(
+        "SELECT abs_path AS abs, codec, kind FROM files WHERE id = ? AND deleted_at IS NULL",
+      )
+      .get(id) as
+      { abs: string; codec: string | null; kind: string } | undefined;
+    if (!file) {
       res.writeHead(404).end();
       return;
     }
+    const { abs } = file;
     if (!isInsideRoot(abs, core.root)) {
       res.writeHead(403).end();
       return;
@@ -254,11 +264,17 @@ async function handle(
 
     // kind === "media"
     const startT = url.searchParams.get("t");
-    // Only Chromium-unsupported containers are served via remux (time seek via ?t).
-    if (REMUX_CONTAINERS.has(ext(abs))) {
+    // Repack unsupported containers. ProRes needs a codec conversion even
+    // when it lives in a container Chromium can demux, such as MOV.
+    const proResPreview = file.kind === "video" && file.codec === "prores";
+    if (proResPreview || REMUX_CONTAINERS.has(ext(abs))) {
+      if (req.method === "HEAD") {
+        res.writeHead(200, { "Content-Type": "video/mp4" }).end();
+        return;
+      }
       const parsed = startT != null ? Number(startT) : NaN;
       const start = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      serveRemux(res, abs, start);
+      serveRemux(res, abs, start, proResPreview);
       return;
     }
     // Chromium-unsupported image formats (heic/heif/tiff) are transcoded to JPEG.
@@ -387,14 +403,21 @@ type RemuxSession = {
 
 const remuxInflight = new Map<string, RemuxSession>();
 
-function remuxKey(file: string, start: number | null): string {
-  return `${file}\0${start ?? ""}`;
+function remuxKey(
+  file: string,
+  start: number | null,
+  proResPreview: boolean,
+): string {
+  return `${file}\0${start ?? ""}\0${proResPreview}`;
 }
 
-function spawnFfmpegChild(args: string[]): ChildProcess {
+function spawnFfmpegChild(
+  args: string[],
+  timeout = FFMPEG_REQUEST_TIMEOUT_MS,
+): ChildProcess {
   return spawn(FFMPEG, args, {
     stdio: ["ignore", "pipe", "ignore"],
-    timeout: FFMPEG_REQUEST_TIMEOUT_MS,
+    timeout,
     killSignal: FFMPEG_KILL_SIGNAL,
   });
 }
@@ -510,14 +533,45 @@ function startRemuxSession(
   start: number | null,
   res: http.ServerResponse,
   releaseSlot: () => void,
+  proResPreview: boolean,
 ) {
   const args = ["-v", "error"];
+  if (proResPreview)
+    args.push(
+      "-threads",
+      String(DECODE_FFMPEG_THREADS),
+      "-filter_threads",
+      "1",
+    );
   if (start != null && start > 0) args.push("-ss", start.toFixed(3));
+  args.push("-i", file);
+  if (proResPreview) {
+    args.push(
+      "-map",
+      "0:v:0",
+      "-map",
+      "0:a:0?",
+      "-write_tmcd",
+      "0",
+      "-vf",
+      "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-pix_fmt",
+      "yuv420p",
+      "-threads:v",
+      "2",
+      "-force_key_frames",
+      "expr:gte(t,n_forced*1)",
+      "-c:a",
+      "aac",
+    );
+  } else {
+    args.push("-c", "copy");
+  }
   args.push(
-    "-i",
-    file,
-    "-c",
-    "copy",
     "-movflags",
     "frag_keyframe+empty_moov+default_base_moof",
     "-f",
@@ -525,7 +579,12 @@ function startRemuxSession(
     "pipe:1",
   );
 
-  const child = spawnFfmpegChild(args);
+  // A long preview can legitimately outlive the one-shot FFmpeg deadline.
+  // Bound periods without output, excluding pauses caused by the client.
+  const child = spawnFfmpegChild(
+    args,
+    proResPreview ? 0 : FFMPEG_REQUEST_TIMEOUT_MS,
+  );
   const session: RemuxSession = {
     child,
     clients: new Set([res]),
@@ -540,8 +599,17 @@ function startRemuxSession(
   res.on("close", () => detachRemuxClient(key, session, res));
 
   let sawOutput = false;
+  let lastOutputAt = Date.now();
+  const watchdog = proResPreview
+    ? setInterval(() => {
+        if (session.blocked.size > 0) lastOutputAt = Date.now();
+        else if (Date.now() - lastOutputAt >= FFMPEG_REQUEST_TIMEOUT_MS)
+          child.kill(FFMPEG_KILL_SIGNAL);
+      }, 5_000).unref()
+    : undefined;
   child.stdout!.on("data", (chunk: Buffer) => {
     sawOutput = true;
+    lastOutputAt = Date.now();
     broadcastRemuxChunk(key, session, chunk);
   });
   child.on("error", () => {
@@ -549,6 +617,7 @@ function startRemuxSession(
     endRemuxSession(key, session);
   });
   child.on("close", (code) => {
+    clearInterval(watchdog);
     finishRemuxClients(session, code === 0 && sawOutput);
     endRemuxSession(key, session);
   });
@@ -660,8 +729,9 @@ function serveRemux(
   res: http.ServerResponse,
   file: string,
   start: number | null,
+  proResPreview: boolean,
 ) {
-  const key = remuxKey(file, start);
+  const key = remuxKey(file, start, proResPreview);
   const existing = remuxInflight.get(key);
   if (existing) {
     attachRemuxClient(key, existing, res);
@@ -669,7 +739,10 @@ function serveRemux(
   }
 
   void (async () => {
-    const releaseSlot = await acquireForResponse(remuxSlots, res);
+    const releaseSlot = await acquireForResponse(
+      proResPreview ? proResPreviewSlots : remuxSlots,
+      res,
+    );
     if (!releaseSlot) return;
 
     const again = remuxInflight.get(key);
@@ -680,7 +753,7 @@ function serveRemux(
     }
 
     try {
-      startRemuxSession(key, file, start, res, releaseSlot);
+      startRemuxSession(key, file, start, res, releaseSlot, proResPreview);
     } catch (e) {
       // spawn() can throw synchronously; the slot would otherwise never be
       // released (it only reaches the session on success).
