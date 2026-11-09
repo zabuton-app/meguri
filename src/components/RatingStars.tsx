@@ -83,7 +83,9 @@ export function RatingStars({
             >
               <Star
                 style={{ width: size, height: size }}
-                className={n <= value ? "fill-accent2 text-accent2" : "text-muted"}
+                className={
+                  n <= value ? "fill-accent2 text-accent2" : "text-muted"
+                }
               />
             </span>
             {animated && fx.variant === "set" && n === fx.upTo && (
@@ -98,6 +100,40 @@ export function RatingStars({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The same five stars, drawn only: no buttons, no effect state, a third of the
+ * DOM. For a card that is not being hovered (see useHoverActivation), which
+ * swaps in the editable RatingButton once it is. Laid out exactly as
+ * RatingStars inside RatingButton, so the swap moves nothing.
+ */
+export function RatingStarsView({
+  value,
+  size = 16,
+}: {
+  value: number;
+  size?: number;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      role="img"
+      aria-label={t("rating.value", { n: value })}
+      className="flex items-center"
+    >
+      <div className="flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Star
+            key={n}
+            aria-hidden
+            style={{ width: size, height: size }}
+            className={n <= value ? "fill-accent2 text-accent2" : "text-muted"}
+          />
+        ))}
+      </div>
     </div>
   );
 }

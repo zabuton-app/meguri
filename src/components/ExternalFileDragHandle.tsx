@@ -21,7 +21,7 @@ export function ExternalFileDragHandle({
       draggable
       onDragStart={onDragStart}
       className={cn(
-        "pointer-events-none absolute z-10 flex size-6 cursor-grab items-center justify-center rounded bg-bg/70 text-fg opacity-0 backdrop-blur-[1px] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 active:cursor-grabbing",
+        "pointer-events-none absolute z-10 flex size-6 cursor-grab items-center justify-center rounded bg-bg/70 text-fg opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 active:cursor-grabbing",
         className,
       )}
     >

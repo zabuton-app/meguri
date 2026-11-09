@@ -2,8 +2,16 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import "@/test/mockVirtualizer";
 import { MediaGrid } from "@/components/MediaGrid";
+import { HOVER_RELEASE_MS } from "@/hooks/useHoverActivation";
 import { defaultWorkspacesList, sampleFileRow, WS_ID } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
+
+/** A card mounts its hover-only controls once pointed at (useHoverActivation). */
+function hoverCards() {
+  for (const card of screen.queryAllByTestId("media-card")) {
+    fireEvent.mouseEnter(card);
+  }
+}
 
 const mocks = vi.hoisted(() => ({
   fileSetFavorite: vi.fn(),
@@ -82,7 +90,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
         />,
       );
       await waitFor(() => {
@@ -111,7 +118,6 @@ describe("MediaGrid", () => {
         mediaBase="http://127.0.0.1:17345"
         workspaceId={WS_ID}
         loading={false}
-        thumbVersion={{}}
       />,
     );
 
@@ -133,7 +139,6 @@ describe("MediaGrid", () => {
         mediaBase="http://127.0.0.1:17345"
         workspaceId={WS_ID}
         loading={false}
-        thumbVersion={{}}
       />,
     );
     expect(screen.getByText(/No media to display/i)).toBeTruthy();
@@ -146,7 +151,6 @@ describe("MediaGrid", () => {
         mediaBase="http://127.0.0.1:17345"
         workspaceId={WS_ID}
         loading={false}
-        thumbVersion={{}}
         watchLater
       />,
     );
@@ -154,10 +158,77 @@ describe("MediaGrid", () => {
     expect(screen.queryByText(/No media to display/i)).toBeNull();
   });
 
+  describe("hover-only controls", () => {
+    const renderOne = (file = sampleFileRow) =>
+      renderWithProviders(
+        <MediaGrid
+          items={[file]}
+          mediaBase="http://127.0.0.1:17345"
+          workspaceId={WS_ID}
+          loading={false}
+        />,
+      );
+    const controls = () => ({
+      check: screen.queryByRole("button", { name: "Select" }),
+      favorite: screen.queryByRole("button", { name: "Add to favorites" }),
+      watchLater: screen.queryByRole("button", { name: /Watch Later/ }),
+      stars: screen.queryAllByRole("button", { name: /stars$/ }),
+    });
+
+    it("draws only what is visible until the card is hovered", () => {
+      renderOne();
+      const before = controls();
+      expect(before.check).toBeNull();
+      expect(before.favorite).toBeNull();
+      expect(before.watchLater).toBeNull();
+      expect(before.stars).toHaveLength(0);
+      // The rating is still shown, just not editable yet.
+      expect(screen.getByRole("img", { name: /^Rated/ })).toBeTruthy();
+
+      fireEvent.mouseEnter(screen.getByTestId("media-card"));
+      const after = controls();
+      expect(after.check).not.toBeNull();
+      expect(after.favorite).not.toBeNull();
+      expect(after.watchLater).not.toBeNull();
+      expect(after.stars).toHaveLength(5);
+    });
+
+    it("mounts them when focus moves into the card", () => {
+      renderOne();
+      fireEvent.focus(screen.getAllByRole("link")[0]);
+      expect(controls().check).not.toBeNull();
+    });
+
+    it("keeps a favorite's toggle on screen without a hover", () => {
+      renderOne({ ...sampleFileRow, favorite: 1 });
+      expect(
+        screen.getByRole("button", { name: "Remove from favorites" }),
+      ).toBeTruthy();
+    });
+
+    it("lets them fade out before taking them down", () => {
+      vi.useFakeTimers();
+      try {
+        renderOne();
+        const card = screen.getByTestId("media-card");
+        fireEvent.mouseEnter(card);
+        fireEvent.mouseLeave(card);
+        expect(controls().check).not.toBeNull();
+        act(() => {
+          vi.advanceTimersByTime(HOVER_RELEASE_MS);
+        });
+        expect(controls().check).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("Watch Later button", () => {
     // The toggle stays disabled until workspaces_list resolves (it needs the
     // collection id), so wait for that rather than clicking a dead button.
     const button = async () => {
+      hoverCards();
       const btn = await screen.findByRole("button", { name: /Watch Later/ });
       await waitFor(() => expect(btn.hasAttribute("disabled")).toBe(false));
       return btn;
@@ -170,7 +241,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
         />,
       );
 
@@ -208,7 +278,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
         />,
       );
 
@@ -242,7 +311,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
         />,
       );
 
@@ -264,7 +332,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
         />,
       );
 
@@ -284,7 +351,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
           navActive
         />,
       );
@@ -292,6 +358,7 @@ describe("MediaGrid", () => {
     // The toggle is disabled until workspaces_list resolves (it needs the
     // collection id), so let that settle before pressing anything.
     const ready = async () => {
+      hoverCards();
       const btn = await screen.findByRole("button", { name: /Watch Later/ });
       await waitFor(() => expect(btn.hasAttribute("disabled")).toBe(false));
     };
@@ -362,7 +429,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
           navActive={false}
         />,
       );
@@ -377,8 +443,9 @@ describe("MediaGrid", () => {
       // claiming the key would eat it while nothing can act on it.
       mocks.workspacesList.mockReturnValue(new Promise(() => {}));
       renderGrid();
-      await screen.findByRole("button", { name: /Watch Later/ });
       fireEvent.keyDown(window, { code: "ArrowDown" });
+      // The focused card keeps its toggle mounted for the shortcut.
+      await screen.findByRole("button", { name: /Watch Later/ });
 
       // fireEvent returns false when a handler called preventDefault.
       const notSwallowed = fireEvent.keyDown(window, { code: "KeyW" });
@@ -436,7 +503,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
           folders={[folder("Movie"), folder("Photos", 7)]}
           onOpenFolder={onOpenFolder}
         />,
@@ -467,7 +533,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
           navActive
           folders={[folder("Movie")]}
           onOpenFolder={onOpenFolder}
@@ -490,7 +555,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
           listOffset={100}
           folders={[folder("Movie")]}
         />,
@@ -506,7 +570,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
           folders={[
             {
               ...folder("Many", 9),
@@ -532,7 +595,6 @@ describe("MediaGrid", () => {
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
           inFolder
         />,
       );
@@ -554,7 +616,6 @@ describe("MediaGrid", () => {
         mediaBase="http://127.0.0.1:17345"
         workspaceId={WS_ID}
         loading={false}
-        thumbVersion={{}}
         listOffset={100}
       />,
     );

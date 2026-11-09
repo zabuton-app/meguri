@@ -17,12 +17,10 @@ import { cn } from "@/lib/utils";
 export function FolderArt({
   previews,
   mediaBase,
-  thumbVersion,
   joined = false,
 }: {
   previews: FileRow[];
   mediaBase: string;
-  thumbVersion: Record<string, number>;
   joined?: boolean;
 }) {
   return (
@@ -42,11 +40,7 @@ export function FolderArt({
             joined ? "bottom-0" : "bottom-1.5",
           )}
         >
-          <Mosaic
-            previews={previews}
-            mediaBase={mediaBase}
-            thumbVersion={thumbVersion}
-          />
+          <Mosaic previews={previews} mediaBase={mediaBase} />
         </div>
       </div>
       <div
@@ -69,11 +63,9 @@ const LAYOUT: Record<number, { grid: string; first?: string }> = {
 function Mosaic({
   previews,
   mediaBase,
-  thumbVersion,
 }: {
   previews: FileRow[];
   mediaBase: string;
-  thumbVersion: Record<string, number>;
 }) {
   const layout = LAYOUT[previews.length];
   if (!layout) {
@@ -99,7 +91,6 @@ function Mosaic({
           <MediaThumbnail
             file={file}
             mediaBase={mediaBase}
-            version={thumbVersion[`${file.workspaceId}:${file.id}`] ?? 0}
             fallbackIconSize="size-5"
             showPlayOverlay={false}
             scrubPreview={false}

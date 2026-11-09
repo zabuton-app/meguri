@@ -15,6 +15,8 @@ test("favorite add bursts at the card heart; remove settles without particles", 
   ready,
 }) => {
   const card = fileCard(ready);
+  // A card mounts its hover-only controls once pointed at.
+  await card.hover();
 
   await card.getByRole("button", { name: "Add to favorites" }).click();
   await expect(card.locator(BURST)).toBeVisible();
@@ -34,6 +36,8 @@ test("watch later add bursts at the card clock; remove settles without particles
   ready,
 }) => {
   const card = fileCard(ready);
+  // A card mounts its hover-only controls once pointed at.
+  await card.hover();
 
   await card.getByRole("button", { name: "Add to Watch Later" }).click();
   await expect(card.locator(BURST)).toBeVisible();
@@ -66,6 +70,8 @@ test("rapid re-activation restarts the effect instead of stacking overlays", asy
   ready,
 }) => {
   const card = fileCard(ready);
+  // A card mounts its hover-only controls once pointed at.
+  await card.hover();
   const heart = card.getByRole("button", { name: /favorites$/ });
 
   for (let i = 0; i < 5; i += 1) {
@@ -125,6 +131,8 @@ test("prefers-reduced-motion suppresses effects while state changes stay visible
 }) => {
   await ready.emulateMedia({ reducedMotion: "reduce" });
   const card = fileCard(ready);
+  // A card mounts its hover-only controls once pointed at.
+  await card.hover();
 
   await card.getByRole("button", { name: "Add to favorites" }).click();
   await expect(

@@ -899,6 +899,7 @@ export const ja = {
 
   // レーティング
   "rating.star": "{n} つ星",
+  "rating.value": "評価 {n}/5",
 
   // お気に入り
   "favorite.add": "お気に入りに追加",

@@ -858,6 +858,7 @@ export const zhCN: Record<TranslationKey, string> = {
 
   // rating
   "rating.star": "{n} 星",
+  "rating.value": "评分 {n}/5",
 
   // favorite
   "favorite.add": "添加到收藏",

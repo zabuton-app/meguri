@@ -897,6 +897,7 @@ export const ko: Record<TranslationKey, string> = {
 
   // rating
   "rating.star": "별 {n}개",
+  "rating.value": "평점 {n}/5",
 
   // favorite
   "favorite.add": "즐겨찾기에 추가",

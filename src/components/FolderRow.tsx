@@ -20,15 +20,12 @@ import { cn } from "@/lib/utils";
 export const FolderRow = memo(function FolderRow({
   entry,
   mediaBase,
-  thumbVersion,
   thumbWidth,
   focused,
   onOpen,
 }: {
   entry: FolderEntry;
   mediaBase: string;
-  /** workspaceId:id → thumb:done counter, the same map the media rows read. */
-  thumbVersion: Record<string, number>;
   /** Tailwind width class for the thumbnail slot (the list's thumbnail size). */
   thumbWidth: string;
   focused?: boolean;
@@ -68,11 +65,7 @@ export const FolderRow = memo(function FolderRow({
           thumbWidth,
         )}
       >
-        <FolderArt
-          previews={entry.previews}
-          mediaBase={mediaBase}
-          thumbVersion={thumbVersion}
-        />
+        <FolderArt previews={entry.previews} mediaBase={mediaBase} />
         <FolderSelectionCheck
           entry={entry}
           className="absolute left-1.5 top-[calc(var(--folder-tab-h)+4px)] z-10"
