@@ -1,4 +1,20 @@
 const OPEN_COMMAND_MENU = "meguri:open-command-menu";
+const BROWSE_LIBRARY = "meguri:browse-library";
+
+/** Explicit navigation out of a Smart bin, including clicking All when already in All. */
+export interface LibraryNavigation {
+  workspaceId?: string;
+  keepBin?: boolean;
+}
+export function browseLibrary(detail: LibraryNavigation = {}) {
+  window.dispatchEvent(new CustomEvent(BROWSE_LIBRARY, { detail }));
+}
+export function onBrowseLibrary(listener: (detail: LibraryNavigation) => void) {
+  const handler = (event: Event) =>
+    listener((event as CustomEvent<LibraryNavigation>).detail ?? {});
+  window.addEventListener(BROWSE_LIBRARY, handler);
+  return () => window.removeEventListener(BROWSE_LIBRARY, handler);
+}
 const OPEN_SHORTCUTS = "meguri:open-shortcuts";
 const APPLY_TAG_FILTER = "meguri:apply-tag-filter";
 const HIGHLIGHT_SEARCH_TOKEN = "meguri:highlight-search-token";

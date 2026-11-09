@@ -1,5 +1,7 @@
 // File search, listing and detail queries. Dynamic SQL is built safely with placeholders.
 import type { DB } from "../db.js";
+import { RESOLUTIONS } from "../../../shared/resolutions.js";
+import { recentFilesRange } from "../../../shared/recentFiles.js";
 import { fileTags } from "../tags.js";
 import { listBookmarksByMetaKey } from "./bookmarks.js";
 import { thumbOffsetByKey } from "./meta.js";
@@ -171,7 +173,9 @@ function resolveSearchTagIds(db: DB, value: string): number[] {
  * The root has no range to walk. Exported for the index-plan tests.
  */
 export function fromFor(query: SearchQuery): string {
-  return query.folder?.path ? FOLDER_FILE_FROM : FILE_FROM;
+  return query.folder?.path || query.allOf?.some((part) => part.folder?.path)
+    ? FOLDER_FILE_FROM
+    : FILE_FROM;
 }
 
 /**
@@ -186,6 +190,9 @@ export function appendSearchConditions(
   /** rel_path's separator; see folderRange(). Injected only by tests. */
   sep?: string,
 ): string {
+  if (query.matchNone) return sql + " AND 0";
+  for (const clause of query.allOf ?? [])
+    sql = appendSearchConditions(db, sql, args, clause, sep);
   const terms = query.q
     ? buildSearchTerms(query.q)
     : { match: null, anyOf: [], tagTokens: [] };
@@ -248,9 +255,55 @@ export function appendSearchConditions(
       args.push(...cond.args);
     }
   }
-  if (query.kind) {
+  if (query.kind === "visual") {
+    sql += " AND f.kind IN ('video', 'image')";
+  } else if (query.kind) {
     sql += " AND f.kind = ?";
     args.push(query.kind);
+  }
+  if (query.resolution && query.kind !== "audio") {
+    const { width, height } = RESOLUTIONS[query.resolution.preset];
+    // Match the resolution badges, including portrait and cropped cinema clips.
+    // Exact matching checks both dimensions.
+    sql +=
+      query.resolution.match === "exact"
+        ? " AND MAX(f.width, f.height) = ? AND MIN(f.width, f.height) = ?"
+        : " AND f.width > 0 AND f.height > 0 AND (MAX(f.width, f.height) >= ? OR MIN(f.width, f.height) >= ?)";
+    args.push(width, height);
+  }
+  if (query.kind === "audio" && query.audio) {
+    const audio = query.audio;
+    for (const [column, value, match] of [
+      ["sample_rate", audio.sampleRate, audio.sampleRateMatch],
+      ["bit_depth", audio.bitDepth, audio.bitDepthMatch],
+    ] as const) {
+      if (value != null) {
+        sql += ` AND f.${column} ${match === "atLeast" ? ">=" : "="} ?`;
+        args.push(value);
+      }
+    }
+    if (audio.channels) {
+      sql +=
+        audio.channels === "multichannel"
+          ? " AND f.audio_channels > 2"
+          : " AND f.audio_channels = ?";
+      if (audio.channels !== "multichannel")
+        args.push(audio.channels === "mono" ? 1 : 2);
+    }
+    if (audio.codec) {
+      sql += audio.codec === "pcm" ? " AND f.codec GLOB ?" : " AND f.codec = ?";
+      args.push(audio.codec === "pcm" ? "pcm_*" : audio.codec);
+    }
+    for (const [column, operator, value] of [
+      ["audio_bit_rate", ">=", audio.bitRateMin],
+      ["duration", ">=", audio.durationMin],
+      ["duration", "<=", audio.durationMax],
+    ] as const) {
+      if (value != null) {
+        sql += ` AND f.${column} ${operator} ?`;
+        args.push(value);
+      }
+    }
   }
   if (query.fileIds?.length) {
     // Pass the IDs as a single JSON array bound to one placeholder rather than
@@ -258,6 +311,12 @@ export function appendSearchConditions(
     // SQLite's SQLITE_MAX_VARIABLE_NUMBER limit and throw "too many SQL variables".
     sql += " AND f.id IN (SELECT value FROM json_each(?))";
     args.push(JSON.stringify(query.fileIds));
+  }
+  if (query.recent) {
+    const [from, to] = recentFilesRange(query.recent.period);
+    const column = query.recent.basis === "created" ? "btime" : "created_at";
+    sql += ` AND f.${column} >= ? AND f.${column} <= ?`;
+    args.push(from, to);
   }
   if (query.ratingMin != null) {
     sql += " AND COALESCE(m.rating, 0) >= ?";

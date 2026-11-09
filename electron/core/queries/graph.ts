@@ -4,7 +4,7 @@ import type { DB } from "../db.js";
 import {
   appendSearchConditions,
   FILE_COLS,
-  FILE_FROM,
+  fromFor,
   orderByFor,
 } from "./files.js";
 import type { FileRow, SearchQuery } from "../types.js";
@@ -33,7 +33,7 @@ export function* graphFiles(
 ): Generator<GraphFileRow, void, undefined> {
   const q = graphQuery(query);
   const args: unknown[] = [];
-  let sql = `SELECT ${FILE_COLS}, f.meta_key AS metaKey ${FILE_FROM} WHERE f.deleted_at IS NULL`;
+  let sql = `SELECT ${FILE_COLS}, f.meta_key AS metaKey ${fromFor(q)} WHERE f.deleted_at IS NULL`;
   sql = appendSearchConditions(db, sql, args, q);
   sql += ` ORDER BY ${orderByFor(q.sort, q.sortDir)}`;
   if (limit != null) {
@@ -67,7 +67,7 @@ export function graphFileCount(
   query: SearchQuery,
 ): { rows: number; nodes: number } {
   const args: unknown[] = [];
-  let sql = `SELECT COUNT(*) AS rows, COUNT(DISTINCT f.meta_key) AS nodes ${FILE_FROM} WHERE f.deleted_at IS NULL`;
+  let sql = `SELECT COUNT(*) AS rows, COUNT(DISTINCT f.meta_key) AS nodes ${fromFor(graphQuery(query))} WHERE f.deleted_at IS NULL`;
   sql = appendSearchConditions(db, sql, args, graphQuery(query));
   return db.prepare(sql).get(...args) as { rows: number; nodes: number };
 }

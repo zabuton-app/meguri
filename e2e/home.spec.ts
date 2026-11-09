@@ -71,7 +71,9 @@ test.describe("Home", () => {
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
 
     await input.fill("nomatch-xyz");
-    await expect(ready.getByText("No media to display.")).toBeVisible();
+    await expect(
+      ready.getByText("No files match these filter criteria.", { exact: true }),
+    ).toBeVisible();
 
     await input.fill("");
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
@@ -82,11 +84,13 @@ test.describe("Home", () => {
     // fixture reports ready and its completion re-renders the bar out from
     // under the control being clicked.
     await waitForIdle(ready);
-    await ready.getByRole("radio", { name: "Image" }).click();
+    await ready.getByRole("radio", { name: "Image", exact: true }).click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
 
-    await ready.getByRole("radio", { name: "Video" }).click();
-    await expect(ready.getByText("No media to display.")).toBeVisible();
+    await ready.getByRole("radio", { name: "Video", exact: true }).click();
+    await expect(
+      ready.getByText("No files match these filter criteria.", { exact: true }),
+    ).toBeVisible();
 
     await ready.getByRole("radio", { name: "All" }).click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
@@ -114,7 +118,9 @@ test.describe("Home", () => {
       .locator('[title="Filter by minimum rating"]')
       .getByRole("button", { name: "5 stars" })
       .click();
-    await expect(ready.getByText("No media to display.")).toBeVisible();
+    await expect(
+      ready.getByText("No files match these filter criteria.", { exact: true }),
+    ).toBeVisible();
 
     await ready
       .locator('[title="Filter by minimum rating"]')

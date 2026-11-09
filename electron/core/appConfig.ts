@@ -43,6 +43,8 @@ export interface AppConfig {
   logo: LogoId;
   /** Auto-tagging rules and dictionary, shared by every workspace (shared/autoTag.ts). */
   autoTag: AutoTagConfig;
+  /** Use native change notifications while Meguri is running. */
+  watchFolders?: boolean;
 }
 
 export const DEFAULT_LOGO: LogoId = "dark";
@@ -109,6 +111,7 @@ export function loadConfig(): AppConfig {
       update: parseUpdateConfig(c.update),
       logo: parseLogo(c.logo),
       autoTag: parseAutoTag(c.autoTag),
+      watchFolders: c.watchFolders !== false,
     };
   } catch {
     return {
@@ -119,6 +122,7 @@ export function loadConfig(): AppConfig {
       update: { ...DEFAULT_UPDATE_CONFIG },
       logo: DEFAULT_LOGO,
       autoTag: defaultAutoTagConfig(),
+      watchFolders: true,
     };
   }
 }

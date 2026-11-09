@@ -1,7 +1,7 @@
 // Cross-search filter controls. The primary row holds what gets reached for
 // constantly — text, kind, rating, favorites — and everything rarer collapses
 // into MoreFiltersPopover, which reports how many of its conditions are on.
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Heart } from "lucide-react";
 import type { SearchQuery } from "@/ipc/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,9 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
 import type { SmartCollection } from "@/lib/smartCollections";
+import { ResolutionFilter } from "./ResolutionFilter";
+import { AudioFilters } from "./AudioFilters";
+import { RecentFilesFilter } from "./RecentFilesFilter";
 
 interface Props {
   value: SearchQuery;
@@ -41,6 +44,15 @@ interface Props {
    */
   onToggleHeatmap?: () => void;
   heatmapOpen?: boolean;
+  /** The smart-bin editor reuses these controls without nesting saved searches. */
+  showSaved?: boolean;
+  searchInputId?: string;
+  onValidityChange?: (valid: boolean) => void;
+  /** Within a bin, Clear all affects only visitor filters. */
+  onClearFilters?: () => void;
+  allowedKinds?: string[];
+  portableBins?: boolean;
+  showClearFilters?: boolean;
 }
 
 export function FilterBar({
@@ -52,14 +64,36 @@ export function FilterBar({
   onApplySaved,
   onToggleHeatmap,
   heatmapOpen = false,
+  showSaved = true,
+  searchInputId = "list-search-input",
+  onValidityChange,
+  onClearFilters,
+  allowedKinds,
+  portableBins = false,
+  showClearFilters = false,
 }: Props) {
   const { t } = useI18n();
+  const [valid, setValid] = useState(true);
+  const [audioReset, setAudioReset] = useState(0);
+  const audioMode =
+    value.kind === "audio" ||
+    (!value.kind && allowedKinds?.length === 1 && allowedKinds[0] === "audio");
+  const filtersValid = !audioMode || valid;
+  useEffect(
+    () => onValidityChange?.(filtersValid),
+    [filtersValid, onValidityChange],
+  );
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
 
   const smart = useSmartCollections();
   const { defaultQuery } = smart;
   // "Clear all" returns to the default saved search, if one is set.
-  const clearAll = () => onChange(clearAllTarget(value, defaultQuery));
+  const clearAll = () => {
+    setAudioReset((n) => n + 1);
+    setValid(true);
+    if (onClearFilters) onClearFilters();
+    else onChange(showSaved ? clearAllTarget(value, defaultQuery) : {});
+  };
 
   const descriptors = useMemo(
     () => describeConditions(value, t, defaultQuery),
@@ -80,7 +114,7 @@ export function FilterBar({
           className="flex min-w-0 grow basis-48 items-center"
         >
           <SearchTokenInput
-            id="list-search-input"
+            id={searchInputId}
             value={value.q ?? ""}
             onChange={(q) => patch({ q: q || undefined })}
             placeholder={t("filter.searchPlaceholder")}
@@ -96,10 +130,41 @@ export function FilterBar({
             { value: undefined, label: t("filter.all") },
             { value: "video", label: t("kind.video") },
             { value: "image", label: t("kind.image") },
+            { value: "visual", label: t("kind.visual") },
             { value: "audio", label: t("kind.audio") },
-          ]}
-          onChange={(kind) => patch({ kind })}
+          ].filter(
+            (option) =>
+              !allowedKinds ||
+              !option.value ||
+              (option.value === "visual"
+                ? allowedKinds.some(
+                    (kind) => kind === "video" || kind === "image",
+                  )
+                : allowedKinds.includes(option.value)),
+          )}
+          onChange={(kind) => {
+            setValid(true);
+            patch({
+              kind,
+              resolution: kind === "audio" ? undefined : value.resolution,
+              audio: kind === "audio" ? value.audio : undefined,
+            });
+          }}
         />
+
+        {audioMode ? (
+          <AudioFilters
+            key={audioReset}
+            onValidityChange={setValid}
+            value={value.audio}
+            onChange={(audio) => patch({ audio, kind: "audio" })}
+          />
+        ) : (
+          <ResolutionFilter
+            value={value.resolution}
+            onChange={(resolution) => patch({ resolution })}
+          />
+        )}
 
         <div
           className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2"
@@ -111,6 +176,25 @@ export function FilterBar({
             size={14}
           />
         </div>
+        <RecentFilesFilter
+          value={value.recent}
+          rememberView={showSaved}
+          onChange={(recent) =>
+            patch({
+              recent,
+              ...(recent
+                ? {
+                    addedFrom: undefined,
+                    addedTo: undefined,
+                    btimeFrom: undefined,
+                    btimeTo: undefined,
+                    sort: recent.basis === "added" ? "added" : "btime",
+                    sortDir: "desc",
+                  }
+                : {}),
+            })
+          }
+        />
 
         <button
           type="button"
@@ -158,14 +242,17 @@ export function FilterBar({
 
         {/* Pushed to the far end: saved searches are a way *into* a set of
             conditions, not one more condition to set. */}
-        <div className="ml-auto">
-          <SmartCollectionsMenu
-            value={value}
-            workspaceId={workspaceId}
-            onApply={onApplySaved ?? ((c) => onChange(c.query))}
-            smart={smart}
-          />
-        </div>
+        {showSaved && (
+          <fieldset className="ml-auto" disabled={!filtersValid}>
+            <SmartCollectionsMenu
+              value={value}
+              workspaceId={workspaceId}
+              onApply={onApplySaved ?? ((c) => onChange(c.query))}
+              smart={smart}
+              portable={portableBins}
+            />
+          </fieldset>
+        )}
       </div>
 
       <ActiveFilterChips
@@ -173,6 +260,7 @@ export function FilterBar({
         onRemove={(chip) => onChange(chip.clear(value))}
         onClearAll={clearAll}
         t={t}
+        showClearAll={showClearFilters}
       />
     </div>
   );

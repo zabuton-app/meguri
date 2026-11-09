@@ -23,10 +23,14 @@ import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
 import {
   cleanConditions,
   describeDateRange,
+  describeSearchQuery,
   scopedFolderPath,
 } from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
+import { resolutionLabel } from "@shared/resolutions";
 import { tagHumanLabel } from "@/lib/tagLabel";
+import { describeAudioFilters } from "./audioFilters";
+import { describeRecentFiles } from "./recentFiles";
 
 /** Which surface owns the control that sets a condition. */
 export type ConditionGroup = "primary" | "collapsed";
@@ -72,6 +76,14 @@ export function describeConditions(
   defaultQuery: SearchQuery | null = null,
 ): ConditionDescriptor[] {
   const out: ConditionDescriptor[] = [];
+  for (const [index, clause] of (query.allOf ?? []).entries())
+    out.push({
+      key: `allOf-${index}`,
+      label: describeSearchQuery(t, clause),
+      group: "primary",
+      chip: true,
+      clear: (q) => ({ ...q, allOf: q.allOf?.filter((_, at) => at !== index) }),
+    });
 
   // First: it is where the list is, and every other condition narrows within it.
   const folder = scopedFolderPath(query);
@@ -142,7 +154,7 @@ export function describeConditions(
       label: kindLabel(t, query.kind),
       group: "primary",
       chip: true,
-      clear: (q) => without(q, "kind"),
+      clear: (q) => without(q, "kind", "audio"),
     });
 
   if (query.ratingMin)
@@ -154,6 +166,45 @@ export function describeConditions(
       clear: (q) => without(q, "ratingMin"),
     });
 
+  if (query.kind === "audio") {
+    for (const { key, label } of describeAudioFilters(t, query.audio))
+      out.push({
+        key: `audio.${key}`,
+        label,
+        group: "primary",
+        chip: true,
+        clear: (q) => {
+          const audio = { ...q.audio };
+          const exactDuration =
+            audio.durationMin != null &&
+            audio.durationMin === audio.durationMax;
+          delete audio[key];
+          if (key === "sampleRate") delete audio.sampleRateMatch;
+          if (key === "bitDepth") delete audio.bitDepthMatch;
+          if (
+            (key === "durationMin" || key === "durationMax") &&
+            exactDuration
+          ) {
+            delete audio.durationMin;
+            delete audio.durationMax;
+          }
+          if (audio.durationMin == null && audio.durationMax == null)
+            delete audio.durationMatch;
+          return Object.values(audio).some((v) => v != null)
+            ? { ...q, audio }
+            : without(q, "audio");
+        },
+      });
+  }
+  if (query.resolution && query.kind !== "audio")
+    out.push({
+      key: "resolution",
+      label: `${t(query.resolution.match === "exact" ? "resolution.exact" : "resolution.atLeast")} ${resolutionLabel(query.resolution.preset)}`,
+      group: "primary",
+      chip: true,
+      clear: (q) => without(q, "resolution"),
+    });
+
   if (query.favorite)
     out.push({
       key: "favorite",
@@ -161,6 +212,14 @@ export function describeConditions(
       group: "primary",
       chip: true,
       clear: (q) => without(q, "favorite"),
+    });
+  if (query.recent)
+    out.push({
+      key: "recent",
+      label: describeRecentFiles(t, query.recent),
+      group: "primary",
+      chip: true,
+      clear: (q) => without(q, "recent"),
     });
 
   if (query.played != null)

@@ -1,9 +1,16 @@
 // Scan pipeline: walk → sync → thumbnail/meta (parallel).
 // Progress is reported via callbacks.
 import fsp from "node:fs/promises";
+import { constants } from "node:fs";
 import path from "node:path";
 import type { Core } from "./index.js";
-import { emptyScanStats, syncFiles, walk, type ScanStats } from "./scan.js";
+import {
+  emptyScanStats,
+  syncFiles,
+  walk,
+  walkChanges,
+  type ScanStats,
+} from "./scan.js";
 import { coverArtStreamIndex, extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
 import { syncFts } from "./tags.js";
@@ -51,8 +58,21 @@ export type JobEvent =
  * therefore wiped too — a rebuild deliberately resets that list, so files previously removed
  * from the index reappear. This is spelled out in the rebuild confirmation dialog.
  */
-async function clearIndex(core: Core): Promise<void> {
+async function ensureScanRoot(core: Core): Promise<void> {
+  if (!(await fsp.stat(core.root)).isDirectory())
+    throw new Error("scan root is not a directory");
+  await fsp.access(core.root, constants.R_OK | constants.X_OK);
+}
+
+async function clearIndex(core: Core): Promise<Map<string, number>> {
   const { db } = core;
+  const firstSeen = new Map(
+    (
+      db
+        .prepare("SELECT rel_path, created_at FROM files WHERE root_id = ?")
+        .all(core.rootId) as { rel_path: string; created_at: number }[]
+    ).map((row) => [row.rel_path, row.created_at]),
+  );
   db.transaction(() => {
     db.prepare(
       "DELETE FROM files_fts WHERE rowid IN (SELECT id FROM files WHERE root_id = ?)",
@@ -67,7 +87,7 @@ async function clearIndex(core: Core): Promise<void> {
   try {
     names = await fsp.readdir(thumbs);
   } catch {
-    return; // thumbs dir may not exist yet
+    return firstSeen; // thumbs dir may not exist yet
   }
   await pool(names, 8, async (name) => {
     try {
@@ -76,6 +96,7 @@ async function clearIndex(core: Core): Promise<void> {
       /* best-effort; a leftover thumb is overwritten by the rescan */
     }
   });
+  return firstSeen;
 }
 
 export async function runScan(
@@ -85,6 +106,9 @@ export async function runScan(
   opts: {
     rebuild?: boolean;
     signal?: AbortSignal;
+    /** Root-relative filesystem notifications; omitted for a full reconciliation. */
+    paths?: readonly string[];
+    ignoredRoots?: readonly string[];
     /** The workspace being scanned, for the configuration's folder rules. */
     workspaceId?: string;
   } & (
@@ -104,24 +128,41 @@ export async function runScan(
 ): Promise<ScanStats> {
   const { signal } = opts;
   const { db } = core;
+  // An unplugged drive is not an empty folder. Check again after enumeration,
+  // before reconciling, in case the drive disappeared during the walk.
+  await ensureScanRoot(core);
 
   // A rebuild discards the derived file index (keeping durable metadata) before rescanning.
-  if (opts.rebuild) await clearIndex(core);
+  const firstSeen = opts.rebuild ? await clearIndex(core) : undefined;
 
   // --- walk + sync (both async with concurrent IO, so they don't block the event loop) ---
   // On SMB these phases dominate the time before thumbnails start, so report their progress.
-  const discovered = await walk(
-    core.root,
-    (count) =>
-      onEvent({
-        type: "progress",
-        jobId,
-        phase: "walk",
-        done: count,
-        total: 0,
-      }),
-    signal,
-  );
+  const changes = opts.paths
+    ? await walkChanges(
+        db,
+        core.rootId,
+        core.root,
+        opts.paths,
+        signal,
+        opts.ignoredRoots,
+      )
+    : null;
+  const discovered = changes
+    ? changes.discovered
+    : await walk(
+        core.root,
+        (count) =>
+          onEvent({
+            type: "progress",
+            jobId,
+            phase: "walk",
+            done: count,
+            total: 0,
+          }),
+        signal,
+        undefined,
+        opts.ignoredRoots,
+      );
 
   if (signal?.aborted) {
     const empty = emptyScanStats();
@@ -129,6 +170,7 @@ export async function runScan(
     return empty;
   }
 
+  await ensureScanRoot(core);
   const { stats, ftsTargets } = await syncFiles(
     db,
     core.rootId,
@@ -136,6 +178,8 @@ export async function runScan(
     (done, total) =>
       onEvent({ type: "progress", jobId, phase: "hash", done, total }),
     signal,
+    changes?.scope,
+    firstSeen,
   );
   q.touchScanRoot(db, core.rootId);
 
@@ -214,7 +258,11 @@ export async function runScan(
   }
 
   // --- thumbnail/meta (parallel) ---
-  const pending = q.filesNeedingThumb(db, core.rootId);
+  const pending = q.filesNeedingThumb(
+    db,
+    core.rootId,
+    changes ? ftsTargets : undefined,
+  );
   const total = pending.length;
   let processed = 0;
   const thumbs = core.thumbsDir();
@@ -435,7 +483,7 @@ export async function runScan(
   // leaves their thumb_status alone), so an existing library only gains derived
   // tags through this pass. It reads the ffprobe columns already on `files`, so
   // no media file is touched.
-  if (!signal?.aborted && needsAutoMetaBackfill(db)) {
+  if (!signal?.aborted && !changes && needsAutoMetaBackfill(db)) {
     await backfillAutoMetaTags(db, {
       signal,
       onProgress: (d, t) =>
@@ -445,7 +493,7 @@ export async function runScan(
 
   // Reclaim durable metadata whose file row no longer exists (mainly post-rebuild orphans).
   // Skipped on abort to avoid purging metadata for files not yet re-indexed (especially after rebuild).
-  if (!signal?.aborted) q.pruneOrphanMeta(db);
+  if (!signal?.aborted && !changes) q.pruneOrphanMeta(db);
 
   // Every file failing points at the tooling, not the files. Reported
   // regardless of batch size: a tiny incremental scan may flag a merely

@@ -23,7 +23,7 @@ videos and images with thumbnails. It recursively scans any folder you point it 
 generates thumbnails, tags, and metadata, and lets you browse the collection in
 a native window.
 
-The name **Meguri** comes from the Japanese word *巡り* — "going around,
+The name **Meguri** comes from the Japanese word _巡り_ — "going around,
 coming back around" — with the sentiment of wandering back through your
 memories and rediscovering them.
 
@@ -166,6 +166,15 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
 - 🔍 **Powerful search** — filter and sort by full text (FTS5), tags, kind,
   rating, and captured, created, added, and played date ranges, with
   conditions shown as removable badges
+- 🗃️ **Smart bins** — save live searches for all scanned folders or your
+  current folder, with resolution, audio properties, and browsing filters you
+  can carry between bins
+- 🕒 **New files and folder watching** — find recently discovered or created
+  media, with optional automatic updates when downloads settle
+- 🔍 **Clean clip previews** — hold Option/Alt while scrubbing a thumbnail, or
+  add Command/Ctrl for a sharper enlarged preview beside it
+- 🪟 **Flexible review player** — move or resize the player with its scene strip
+  attached, or open a separate window beside the catalogue
 - 🏷️ **Tags, ratings & history** — manual tags with autocomplete, ★ ratings,
   and playback history that survive file moves and renames, plus a day-grouped
   history timeline across all workspaces
@@ -332,18 +341,25 @@ already run Electron apps locally.
 
 ## Basic Usage
 
-| Action     | How                                                                                                                |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| Scan       | Runs automatically at startup. Re-scan via the header "Scan" (incremental, move tracking)                          |
+| Action     | How                                                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| Scan       | Runs automatically at startup. Re-scan via the header "Scan" (incremental, move tracking)                            |
 | Play       | Click a thumbnail → play in the detail view (audio plays in the bottom bar). When unsupported, use "Open externally" |
-| Tag / Rate | Assign in the detail view (tags have autocomplete). Click a tag in the grid to search                              |
-| Search     | Filter and sort by full text, kind, and rating in the top bar (conditions shown as badges, individually removable) |
-| Theme      | Switch from Theme at the top-right of the header                                                                   |
-| Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset                                                                          |
+| Tag / Rate | Assign in the detail view (tags have autocomplete). Click a tag in the grid to search                                |
+| Search     | Filter and sort by full text, kind, and rating in the top bar (conditions shown as badges, individually removable)   |
+| Theme      | Switch from Theme at the top-right of the header                                                                     |
+| Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset                                                                            |
 
 To drag a file to another app, hover over it in grid or list view and drag
 the arrow beside its selection checkbox. Drag from a selected file's arrow
 to carry the whole selection.
+
+### Organize and review your catalogue
+
+The [library guide](docs/library-guide.md) walks through creating a global 4K
+Smart bin, watching a download folder, filtering audio by its properties, and
+reviewing clips without losing sight of the catalogue. It also explains what to
+do when a filter has no matches or is paused.
 
 ## Where Data Is Stored
 

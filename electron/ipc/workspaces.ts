@@ -67,6 +67,7 @@ export function registerWorkspaceHandlers(ctx: IpcContext): void {
   const removing = new Map<string, Promise<void>>();
 
   const removeWorkspace = async (id: string): Promise<void> => {
+    ctx.scans.unwatch(id);
     const p = ws.pathOf(id);
     if (p) {
       // Nothing may write into its database as it is closed: neither a scan

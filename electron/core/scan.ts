@@ -8,6 +8,7 @@ import { nowUnix } from "./db.js";
 import { migrateMetaKey } from "./queries.js";
 import { pool } from "./concurrency.js";
 import type { Kind } from "./types.js";
+import { folderRange } from "./queries/folderRange.js";
 
 // Concurrency for parallelizing IO waits on network FS such as SMB.
 // Kept modest because too high would hit the server's connection limit.
@@ -58,6 +59,18 @@ export function kindForExt(ext: string): Kind | null {
   if (IMAGE_EXTS.has(e)) return "image";
   if (AUDIO_EXTS.has(e)) return "audio";
   return null;
+}
+
+/** The same ignored paths for full scans and filesystem notifications. */
+export function ignoredScanPath(relative: string): boolean {
+  return relative
+    .split(path.sep)
+    .some(
+      (part) =>
+        part.startsWith(".") ||
+        part === "node_modules" ||
+        part.endsWith(".download"),
+    );
 }
 
 // MPEG transport stream packets start with this sync byte. The `ts` extension is
@@ -151,6 +164,8 @@ export async function walk(
   root: string,
   onProgress?: (count: number) => void,
   signal?: AbortSignal,
+  onUnreadable?: (absolute: string) => void,
+  ignoredRoots: readonly string[] = [],
 ): Promise<Discovered[]> {
   const out: Discovered[] = [];
   // Directories pending traversal. Dequeued in BFS order, with discovered child directories appended.
@@ -169,13 +184,25 @@ export async function walk(
         let entries: fs.Dirent[];
         try {
           entries = await fsp.readdir(dir, { withFileTypes: true });
-        } catch {
+        } catch (error) {
+          if (
+            !["ENOENT", "ENOTDIR"].includes(
+              (error as NodeJS.ErrnoException).code ?? "",
+            )
+          )
+            onUnreadable?.(dir);
           return;
         }
         for (const ent of entries) {
           if (ent.isSymbolicLink()) continue;
-          if (ent.name.startsWith(".")) continue; // exclude hidden
+          if (ignoredScanPath(ent.name)) continue;
           const full = path.join(dir, ent.name);
+          if (
+            ignoredRoots.some(
+              (p) => full === p || full.startsWith(p + path.sep),
+            )
+          )
+            continue;
           if (ent.isDirectory()) {
             if (SKIPPED_DIRS.has(ent.name)) continue;
             if (!signal?.aborted) next.push(full);
@@ -200,7 +227,13 @@ export async function walk(
         let st: fs.Stats;
         try {
           st = await fsp.stat(t.full);
-        } catch {
+        } catch (error) {
+          if (
+            !["ENOENT", "ENOTDIR"].includes(
+              (error as NodeJS.ErrnoException).code ?? "",
+            )
+          )
+            onUnreadable?.(t.full);
           return;
         }
         // Only the ambiguous extension pays for the extra read.
@@ -226,6 +259,133 @@ export async function walk(
     level = next;
   }
   return out;
+}
+
+/** Enumerate only notified files/subtrees, retaining the catalogue's other rows. */
+export async function walkChanges(
+  db: DB,
+  rootId: number,
+  root: string,
+  paths: readonly string[],
+  signal?: AbortSignal,
+  ignoredRoots: readonly string[] = [],
+): Promise<{ discovered: Discovered[]; scope: string[] }> {
+  const realRoot = await fsp.realpath(root);
+  const discovered = new Map<string, Discovered>();
+  const scope = new Set<string>();
+  const descendants = db.prepare(
+    "SELECT rel_path FROM files WHERE root_id = ? AND (rel_path = ? OR (rel_path >= ? AND rel_path < ?))",
+  );
+  // Collapse nested notifications so a new directory is walked just once.
+  const normalized = [...new Set(paths.map((p) => path.normalize(p)))].filter(
+    (p) =>
+      p !== "." &&
+      !path.isAbsolute(p) &&
+      p !== ".." &&
+      !p.startsWith(`..${path.sep}`) &&
+      !ignoredScanPath(p),
+  );
+  const selected: string[] = [];
+  for (const relative of normalized.sort((a, b) => {
+    const left = a.split(path.sep).join("/");
+    const right = b.split(path.sep).join("/");
+    return left < right ? -1 : left > right ? 1 : 0;
+  })) {
+    const parent = selected[selected.length - 1];
+    if (!parent || !relative.startsWith(`${parent}${path.sep}`))
+      selected.push(relative);
+  }
+  await pool(
+    selected,
+    SCAN_IO_CONCURRENCY,
+    async (relative) => {
+      if (signal?.aborted) return;
+      const absolute = path.join(root, relative);
+      if (
+        ignoredRoots.some(
+          (p) => absolute === p || absolute.startsWith(p + path.sep),
+        )
+      )
+        return;
+      let stat: fs.Stats | undefined;
+      try {
+        stat = await fsp.lstat(absolute);
+      } catch (error) {
+        if (
+          !["ENOENT", "ENOTDIR"].includes(
+            (error as NodeJS.ErrnoException).code ?? "",
+          )
+        )
+          return;
+      }
+      if (stat?.isSymbolicLink()) return;
+      if (stat) {
+        const resolved = await fsp.realpath(absolute).catch(() => null);
+        if (
+          !resolved ||
+          (resolved !== realRoot &&
+            !resolved.startsWith(
+              realRoot.endsWith(path.sep) ? realRoot : realRoot + path.sep,
+            ))
+        )
+          return;
+      }
+      if (!stat || stat.isDirectory()) {
+        const range = folderRange(relative.split(path.sep).join("/"));
+        const old = descendants.all(
+          rootId,
+          relative,
+          range.prefix,
+          range.upper,
+        ) as { rel_path: string }[];
+        if (!stat) {
+          for (const row of old) scope.add(row.rel_path);
+          scope.add(relative);
+          return;
+        }
+        const unreadable: string[] = [];
+        const files = await walk(
+          absolute,
+          undefined,
+          signal,
+          (p) => unreadable.push(path.relative(root, p)),
+          ignoredRoots,
+        );
+        const blocked = (p: string) =>
+          unreadable.some(
+            (blocked) => p === blocked || p.startsWith(`${blocked}${path.sep}`),
+          );
+        for (const row of old)
+          if (!blocked(row.rel_path)) scope.add(row.rel_path);
+        for (const file of files) {
+          const relPath = path.relative(root, file.absPath);
+          if (blocked(relPath)) continue;
+          discovered.set(relPath, { ...file, relPath });
+          scope.add(relPath);
+        }
+        return;
+      }
+      if (!stat.isFile()) return;
+      const ext = path.extname(relative).slice(1).toLowerCase();
+      const kind = kindForExt(ext);
+      if (!kind) return;
+      scope.add(relative);
+      if (ext === "ts" && !(await looksLikeMpegTs(absolute))) return;
+      discovered.set(relative, {
+        absPath: absolute,
+        relPath: relative,
+        ext,
+        kind,
+        size: stat.size,
+        mtime: Math.floor(stat.mtimeMs / 1000),
+        btime:
+          stat.birthtimeMs > 0 ? Math.floor(stat.birthtimeMs / 1000) : null,
+        inode: Number(stat.ino),
+      });
+    },
+    signal,
+  );
+  return { discovered: [...discovered.values()], scope: [...scope] };
 }
 
 const SAMPLE = 1024 * 1024; // 1 MiB
@@ -285,6 +445,8 @@ export async function syncFiles(
   discovered: Discovered[],
   onHashProgress?: (done: number, total: number) => void,
   signal?: AbortSignal,
+  scope?: readonly string[],
+  firstSeen?: ReadonlyMap<string, number>,
 ): Promise<{ stats: ScanStats; needsThumb: number[]; ftsTargets: number[] }> {
   const stats: ScanStats = {
     inserted: 0,
@@ -294,14 +456,20 @@ export async function syncFiles(
     unchanged: 0,
   };
   const needsThumb: number[] = [];
+  const scoped = scope == null ? null : new Set(scope);
+  const scopeSql =
+    scoped == null ? "" : " AND rel_path IN (SELECT value FROM json_each(?))";
+  const scopeArgs =
+    scoped == null ? [rootId] : [rootId, JSON.stringify([...scoped])];
   const ftsTargets: number[] = [];
   const excluded = new Set(
     (
       db
         .prepare(
-          "SELECT rel_path FROM files WHERE root_id = ? AND excluded_at IS NOT NULL",
+          "SELECT rel_path FROM files WHERE root_id = ? AND excluded_at IS NOT NULL" +
+            scopeSql,
         )
-        .all(rootId) as { rel_path: string }[]
+        .all(...scopeArgs) as { rel_path: string }[]
     ).map((r) => r.rel_path),
   );
   const scannable = discovered.filter((d) => !excluded.has(d.relPath));
@@ -347,9 +515,10 @@ export async function syncFiles(
     (
       db
         .prepare(
-          "SELECT id, rel_path, size, mtime, content_hash FROM files WHERE root_id = ?",
+          "SELECT id, rel_path, size, mtime, content_hash FROM files WHERE root_id = ?" +
+            scopeSql,
         )
-        .all(rootId) as {
+        .all(...scopeArgs) as {
         id: number;
         rel_path: string;
         size: number;
@@ -446,7 +615,10 @@ export async function syncFiles(
               ext: string | null;
             }[])
           : [];
-      const moved = cands.find((c) => !seen.has(c.rel_path));
+      const moved = cands.find(
+        (c) =>
+          !seen.has(c.rel_path) && (scoped == null || scoped.has(c.rel_path)),
+      );
       if (moved) {
         moveStmt.run(
           d.relPath,
@@ -477,7 +649,7 @@ export async function syncFiles(
           d.btime,
           d.inode,
           hash,
-          now,
+          firstSeen?.get(d.relPath) ?? now,
         );
         const id = Number(info.lastInsertRowid);
         needsThumb.push(id);
@@ -502,9 +674,10 @@ export async function syncFiles(
   const softDelete = db.transaction(() => {
     const alive = db
       .prepare(
-        "SELECT id, rel_path FROM files WHERE root_id = ? AND deleted_at IS NULL",
+        "SELECT id, rel_path FROM files WHERE root_id = ? AND deleted_at IS NULL" +
+          scopeSql,
       )
-      .all(rootId) as { id: number; rel_path: string }[];
+      .all(...scopeArgs) as { id: number; rel_path: string }[];
     const del = db.prepare("UPDATE files SET deleted_at = ? WHERE id = ?");
     for (const row of alive) {
       if (!seen.has(row.rel_path)) {

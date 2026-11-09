@@ -8,6 +8,25 @@ import {
 } from "@/lib/smartCollections";
 
 describe("useSmartCollections", () => {
+  it("shares create, edit and delete immediately between sidebar and menu readers", () => {
+    const first = renderHook(() => useSmartCollections());
+    const second = renderHook(() => useSmartCollections());
+    act(() => {
+      first.result.current.addCollection("4K", { kind: "video" }, null, "all");
+    });
+    const bin = second.result.current.collections[0];
+    expect(bin.name).toBe("4K");
+    act(() => {
+      second.result.current.updateCollection({
+        ...bin,
+        name: "4K picks",
+        query: { ratingMin: 4 },
+      });
+    });
+    expect(first.result.current.collections[0].query).toEqual({ ratingMin: 4 });
+    act(() => first.result.current.removeCollection(bin.id));
+    expect(second.result.current.collections).toEqual([]);
+  });
   it("loads persisted collections on mount", () => {
     const stored: SmartCollection[] = [
       {

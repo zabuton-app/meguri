@@ -3,6 +3,107 @@ import type { TranslationKey } from "./ja";
 
 export const es: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.sampleRateMatch": "Coincidencia de frecuencia de muestreo",
+  "audio.bitDepthMatch": "Coincidencia de profundidad de bits",
+  "audio.durationMatch": "Coincidencia de duración",
+  "audio.durationFormat": "Formato de duración",
+  "audio.seconds": "Segundos",
+  "audio.minutes": "Minutos",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "Minutos:segundos (MM:SS)",
+  "audio.durationTimeHint":
+    "Introduce MM:SS; p. ej., 02:30 = 2 minutos y 30 segundos. Los segundos deben ser 00–59.",
+  "audio.durationMinutesHint":
+    "Introduce minutos; p. ej., 2.5 = 2 minutos y 30 segundos.",
+  "audio.durationSecondsHint":
+    "Introduce segundos; p. ej., 150 = 2 minutos y 30 segundos.",
+  "audio.atMost": "Como máximo",
+  "audio.between": "Entre",
+  "audio.durationOrderError": "La duración mínima no puede superar la máxima.",
+  "recent.title": "Archivos nuevos",
+  "recent.window": "Periodo",
+  "recent.basis": "Definir nuevos según",
+  "recent.today": "Hoy",
+  "recent.thisWeek": "Esta semana",
+  "recent.lastHour": "Última hora",
+  "recent.last24Hours": "Últimas 24 horas",
+  "recent.last7Days": "Últimos 7 días",
+  "recent.added": "Primera detección por Meguri",
+  "recent.created": "Fecha de creación del archivo",
+  "recent.addedHint":
+    "Usa la primera incorporación al catálogo, independientemente de las fechas internas del medio.",
+  "recent.createdHint":
+    "Usa la fecha de creación del sistema de archivos. Los archivos sin esa fecha no coinciden.",
+  "recent.calendarHint":
+    "Hoy y esta semana usan tu zona horaria local. La semana empieza el lunes.",
+  "watch.title": "Vigilar carpetas",
+  "watch.off": "Desactivado",
+  "watch.enable": "Vigilar automáticamente las carpetas escaneadas",
+  "watch.hint":
+    "Actualiza mientras Meguri está abierto. Usa notificaciones del sistema y espera a que se estabilicen las descargas.",
+  "watch.count": "Vigilando {count} carpetas escaneadas.",
+  "watch.unavailable":
+    "No se pueden vigilar {count} carpetas. Usa Escanear para actualizarlas.",
+  "watch.error": "No se pudo leer o actualizar la configuración de vigilancia.",
+  "audio.filters": "Propiedades de audio",
+  "audio.any": "Cualquiera",
+  "audio.sampleRate": "Frecuencia de muestreo",
+  "audio.bitDepth": "Profundidad de bits",
+  "audio.bits": "{count} bits",
+  "audio.channels": "Canales",
+  "audio.mono": "Mono",
+  "audio.stereo": "Estéreo",
+  "audio.multichannel": "Multicanal",
+  "audio.channelCount": "{count} canales",
+  "audio.bitRate": "Tasa de bits",
+  "audio.bitRateMin": "Tasa mínima (kbps)",
+  "audio.durationMin": "Duración mínima (segundos)",
+  "audio.durationMax": "Duración máxima (segundos)",
+  "audio.unknownHint":
+    "Los archivos con valores desconocidos no coinciden con un filtro de esa propiedad.",
+  "kind.visual": "Vídeo + Imagen",
+  "resolution.title": "Resolución",
+  "resolution.any": "Cualquier resolución",
+  "resolution.match": "Coincidencia de resolución",
+  "resolution.atLeast": "Como mínimo",
+  "resolution.exact": "Exactamente",
+  "smartBin.leave": "Salir del contenedor inteligente",
+  "smartBin.omitted":
+    "Excluidos durante esta visita: {filters}. Se revisarán al salir y volver.",
+  "smartBin.global": "Global",
+  "smartBin.local": "Local",
+  "smartBin.location": "Ubicación de búsqueda",
+  "smartBin.locationPending": "Cargando biblioteca…",
+  "smartBin.browse": "Explorar sin un contenedor inteligente",
+  "smartBin.noLocal": "Añade una carpeta escaneada para usar el modo local.",
+  "smartBin.globalHint": "Buscar en todas las carpetas escaneadas.",
+  "smartBin.localHint":
+    "Volver a la última carpeta visitada; elige otra en la barra izquierda.",
+  "smartBin.scopeManaged":
+    "Usa Global/Local junto a los contenedores inteligentes para elegir dónde buscar.",
+  "smartBin.inactiveFilters": "Filtros recordados — no aplicados",
+  "smartBin.enableFilter": "Activar filtro: {filter}",
+  "smartBin.off": "Desactivado",
+  "smartBin.unavailable": "No disponible",
+  "smartBin.offHint":
+    "Ahora es compatible. Haz clic para activarlo; editar el contenedor lo mantiene desactivado.",
+  "smartBin.unavailableHint":
+    "Este filtro entra en conflicto con las reglas actuales del contenedor.",
+  "smartBin.title": "Bins inteligentes",
+  "smartBin.create": "Crear bin inteligente",
+  "smartBin.edit": "Editar bin inteligente",
+  "smartBin.delete": "Eliminar bin inteligente",
+  "smartBin.deleteConfirm": "¿Eliminar el bin inteligente «{name}»?",
+  "smartBin.name": "Nombre",
+  "smartBin.scope": "Buscar en",
+  "smartBin.all": "Todas las carpetas escaneadas",
+  "smartBin.selected": "Carpeta escaneada seleccionada",
+  "smartBin.current": "Vista actual",
+  "smartBin.live":
+    "Los resultados se actualizan al escanear archivos o cambiar sus valoraciones y etiquetas.",
+  "smartBin.empty":
+    "Guarda una búsqueda para encontrar medios que coincidan en todo tu catálogo.",
+
   "app.name": "巡",
 
   // common
@@ -50,10 +151,10 @@ export const es: Record<TranslationKey, string> = {
     "Cuántas miniaturas de escena generar en la pantalla de detalles.",
   "settings.hoverPreview": "Vista previa al pasar el cursor",
   "settings.hoverPreviewDesc":
-    "Muestra la escena bajo el cursor al pasar sobre la miniatura de un vídeo.",
+    "Mueve el cursor sobre las miniaturas de vídeo para explorar escenas. Mantén Opción/Alt para ocultar los iconos; añade Comando/Ctrl para ampliar la vista previa.",
   "settings.frameQuality": "Calidad de la vista previa",
   "settings.frameQualityDesc":
-    "Calidad de las vistas previas al pasar el cursor y de la fila de escenas en Descubrir. Cuanto más alta, más lenta la generación.",
+    "Calidad de las vistas previas de miniaturas y Descubrir, y de la fila de escenas. Cuanto más alta, más lenta la generación.",
   "settings.frameQualityLow": "Baja (240px)",
   "settings.frameQualityStandard": "Estándar (480px)",
   "settings.frameQualityHigh": "Alta (960px)",
@@ -221,6 +322,15 @@ export const es: Record<TranslationKey, string> = {
   "media.openAsPeek": "Abrir como panel lateral",
   "media.openAsModal": "Abrir como ventana",
   "media.peekResize": "Cambiar el ancho del panel lateral",
+  "media.moveWindow": "Arrastra para mover esta ventana",
+  "media.movePlayer":
+    "Mover reproductor (arrastrar la barra de título o usar las flechas)",
+  "media.popout": "Abrir en una ventana independiente",
+  "media.popoutFailed": "No se pudo abrir la ventana de vista previa.",
+  "media.resizeWidth": "Cambiar el ancho del reproductor",
+  "media.resizeHeight": "Cambiar la altura del reproductor",
+  "media.resizePlayer":
+    "Cambiar el tamaño del reproductor (arrastrar la esquina o usar las flechas)",
   "media.playAsPlaylist": "Reproducir como lista desde aquí",
   "media.deleteFromIndex": "Eliminar del índice",
   "media.deleteFromIndexConfirm":
@@ -390,6 +500,16 @@ export const es: Record<TranslationKey, string> = {
   "select.tagsFailed": "No se pudieron aplicar las etiquetas: {msg}",
 
   // media grid
+  "home.noCombinationMatches":
+    "La combinación de filtros no tiene coincidencias.",
+  "home.pausedFilterHint":
+    "Filtros en pausa: {filters}. Actívalos, elimínalos o elige una colección compatible. No se muestra contenido mientras estén en pausa.",
+  "smartBin.removeHeld": "Eliminar filtro recordado: {filter}",
+  "smartBin.pausedResultsHint":
+    "Los resultados están en pausa mientras estos filtros estén desactivados. Actívalos o elimínalos para continuar.",
+  "home.noFilterMatches": "Ningún archivo coincide con estos filtros.",
+  "home.noFilterMatchesHint":
+    "Revisa las reglas de la colección y los filtros de arriba, o borra los filtros para ampliar la búsqueda.",
   "grid.empty": "No hay medios que mostrar.",
   "grid.emptyHint":
     "Ejecuta «Escanear» para listar aquí los vídeos e imágenes.",
@@ -832,6 +952,7 @@ export const es: Record<TranslationKey, string> = {
   "tags.value.orientSquare": "Cuadrada",
 
   // workspace rail
+  "workspace.navigation": "Navegación de la biblioteca",
   "workspace.all": "Todo",
   "workspace.settings": "Ajustes",
   "workspace.edit": "Editar espacio de trabajo",

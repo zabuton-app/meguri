@@ -5,7 +5,7 @@
 // Frames come from the media server's `frame` endpoint and are requested
 // sequentially (one in-flight image per hovered card) so a single hover never
 // occupies more than one slot of the server-side ffmpeg semaphore.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /** Delay before the first frame request, so sweeping the cursor across the list stays free. */
 const DEFAULT_START_DELAY_MS = 300;
@@ -39,8 +39,14 @@ interface Options {
   frameUrl: (t: number) => string;
   duration: number | null;
   /** Reset key — virtualized rows reuse mounted cards for different files. */
-  fileId: number;
+  fileId: number | string;
   startDelayMs?: number;
+}
+
+/** Shared by React handlers and the thumbnail surface's native mouse listeners. */
+export interface ScrubPointer {
+  clientX: number;
+  currentTarget: Pick<Element, "getBoundingClientRect">;
 }
 
 interface HoverFramePreview {
@@ -48,8 +54,8 @@ interface HoverFramePreview {
   previewSrc: string | null;
   /** 0..1 pointer position for the seekbar-style indicator, or null while inactive. */
   scrubFraction: number | null;
-  onMouseEnter: (e?: React.MouseEvent) => void;
-  onMouseMove: (e: React.MouseEvent) => void;
+  onMouseEnter: (e?: ScrubPointer) => void;
+  onMouseMove: (e: ScrubPointer) => void;
   onMouseLeave: () => void;
 }
 
@@ -67,13 +73,15 @@ export function useHoverFramePreview({
   const loadingRef = useRef<HTMLImageElement | null>(null);
   // Latest wanted / currently displayed timestamps.
   const desiredRef = useRef<number | null>(null);
-  const shownRef = useRef<number | null>(null);
+  const shownRef = useRef<string | null>(null);
   // Whether the start delay has elapsed for the current hover.
   const activeRef = useRef(false);
   const failuresRef = useRef(0);
   // Latest values readable from timer/onload callbacks without re-subscribing.
   const optsRef = useRef({ enabled, frameUrl, duration });
-  optsRef.current = { enabled, frameUrl, duration };
+  useLayoutEffect(() => {
+    optsRef.current = { enabled, frameUrl, duration };
+  });
 
   const stop = () => {
     if (timerRef.current !== null) {
@@ -94,7 +102,9 @@ export function useHoverFramePreview({
     failuresRef.current = 0;
   };
   const stopRef = useRef(stop);
-  stopRef.current = stop;
+  useLayoutEffect(() => {
+    stopRef.current = stop;
+  });
 
   // Reset when the card is reused for another file, the feature is toggled
   // off, or the component unmounts.
@@ -111,14 +121,16 @@ export function useHoverFramePreview({
     if (loadingRef.current) return;
     if (failuresRef.current >= SCRUB_MAX_FAILURES) return;
     const t = desiredRef.current;
-    if (t == null || t === shownRef.current) return;
+    if (t == null) return;
+    const source = optsRef.current.frameUrl(t);
+    if (source === shownRef.current) return;
     const img = new Image();
     loadingRef.current = img;
     img.onload = () => {
       if (loadingRef.current !== img) return;
       loadingRef.current = null;
       failuresRef.current = 0;
-      shownRef.current = t;
+      shownRef.current = source;
       setPreviewSrc(img.src);
       pump(); // the pointer may have moved on while this frame loaded
     };
@@ -128,11 +140,19 @@ export function useHoverFramePreview({
       loadingRef.current = null;
       failuresRef.current += 1;
     };
-    img.src = optsRef.current.frameUrl(t);
+    img.src = source;
   };
 
+  const pumpRef = useRef(pump);
+  useLayoutEffect(() => {
+    pumpRef.current = pump;
+  });
+  useEffect(() => {
+    if (activeRef.current) pumpRef.current();
+  }, [frameUrl]);
+
   /** Track the pointer: remember the wanted timestamp and the indicator fraction. */
-  const updateScrub = (e: React.MouseEvent) => {
+  const updateScrub = (e: ScrubPointer) => {
     const dur = optsRef.current.duration;
     if (dur == null || dur < MIN_SCRUB_DURATION_SEC) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -147,7 +167,7 @@ export function useHoverFramePreview({
     setScrubFraction(fraction);
   };
 
-  const onMouseEnter = (e?: React.MouseEvent) => {
+  const onMouseEnter = (e?: ScrubPointer) => {
     const { enabled: on, duration: dur } = optsRef.current;
     if (!on || dur == null || dur < MIN_SCRUB_DURATION_SEC) return;
     stop();
@@ -159,7 +179,7 @@ export function useHoverFramePreview({
     }, startDelayMs);
   };
 
-  const onMouseMove = (e: React.MouseEvent) => {
+  const onMouseMove = (e: ScrubPointer) => {
     if (!optsRef.current.enabled) return;
     updateScrub(e);
     if (activeRef.current) pump();

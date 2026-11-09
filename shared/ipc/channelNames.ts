@@ -5,6 +5,7 @@
 /** Renderer → main invoke channels (ipcMain.handle). */
 export const INVOKE_CHANNELS = [
   "app_status",
+  "media_popout",
   "about_info",
   "workspace_stats",
   "workspaces_list",
@@ -24,6 +25,8 @@ export const INVOKE_CHANNELS = [
   "collection_set_membership",
   "scan_start",
   "scan_cancel",
+  "watch_get",
+  "watch_set",
   "files_search",
   "files_random",
   "folders_list",
@@ -95,6 +98,7 @@ export const EVENT_CHANNELS = [
   "thumb:done",
   "scan:done",
   "workspace:changed",
+  "watch:changed",
   "update:available",
 ] as const;
 

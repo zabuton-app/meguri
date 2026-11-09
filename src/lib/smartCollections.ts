@@ -8,6 +8,9 @@ import type { TFunc } from "@/i18n/I18nProvider";
 import { kindLabelKey } from "@/lib/mediaKind";
 import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
+import { resolutionLabel } from "@shared/resolutions";
+import { describeAudioFilters } from "./audioFilters";
+import { describeRecentFiles, loadRecentView } from "./recentFiles";
 
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
 
@@ -16,10 +19,12 @@ export const SmartCollectionSchema = z.object({
   name: z.string(),
   query: SearchQuerySchema,
   /**
-   * The workspace `query.folder` lies in. A folder path means nothing outside
-   * its own workspace, so it is saved only together with one.
+   * The workspace for a scoped bin or a legacy folder search. A folder path
+   * means nothing outside its own workspace.
    */
   workspaceId: z.string().optional(),
+  /** Absent on older saved searches, which continue to use the current view. */
+  scope: z.enum(["all", "workspace"]).optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -42,6 +47,25 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.tags?.length) next.tags = query.tags.filter(Boolean);
   if (query.tagSource) next.tagSource = query.tagSource;
   if (query.kind) next.kind = query.kind;
+  if (query.allOf?.length) {
+    const clauses = query.allOf
+      .map(cleanSearchQuery)
+      .filter((part) => Object.keys(part).length > 0);
+    if (clauses.length) next.allOf = clauses;
+  }
+  if (query.recent) next.recent = query.recent;
+  if (query.resolution && query.kind !== "audio")
+    next.resolution = query.resolution;
+  if (query.kind === "audio" && query.audio) {
+    const audio = Object.fromEntries(
+      Object.entries(query.audio).filter(([, value]) => value != null),
+    );
+    if (audio.sampleRate == null) delete audio.sampleRateMatch;
+    if (audio.bitDepth == null) delete audio.bitDepthMatch;
+    if (audio.durationMin == null && audio.durationMax == null)
+      delete audio.durationMatch;
+    if (Object.keys(audio).length) next.audio = audio;
+  }
   if (query.ratingMin != null && query.ratingMin > 0)
     next.ratingMin = query.ratingMin;
   if (query.favorite) next.favorite = true;
@@ -78,12 +102,15 @@ export function hasSearchConditions(query: SearchQuery): boolean {
  * its own contents; with a condition, it searches everything below it.
  */
 export function hasFilterConditions(query: SearchQuery): boolean {
+  if (query.matchNone) return true;
   const rest = cleanSearchQuery(query);
   delete rest.sort;
   delete rest.sortDir;
   // The folder is where the view is, not what narrows it.
   delete rest.folder;
-  return Object.keys(rest).length > 0;
+  const clauses = rest.allOf;
+  delete rest.allOf;
+  return Object.keys(rest).length > 0 || !!clauses?.some(hasFilterConditions);
 }
 
 export function parseSmartCollections(raw: string | null): SmartCollection[] {
@@ -154,11 +181,19 @@ export function defaultQueryOf(
 /** The filter the list starts with: the default saved search, or nothing. */
 export function loadInitialFilter(): SearchQuery {
   try {
+    const recent = loadRecentView();
     return (
       defaultQueryOf(
         parseSmartCollections(localStorage.getItem(SMART_COLLECTIONS_KEY)),
         loadDefaultSmartCollectionId(),
-      ) ?? {}
+      ) ??
+      (recent
+        ? {
+            recent,
+            sort: recent.basis === "added" ? "added" : "btime",
+            sortDir: "desc",
+          }
+        : {})
     );
   } catch {
     return {};
@@ -166,22 +201,30 @@ export function loadInitialFilter(): SearchQuery {
 }
 
 /**
- * `workspaceId` is the workspace the list shows; it is kept only when the
- * query has a folder, and a folder with no workspace to place it is dropped.
+ * Explicit bins keep their scope. Legacy saved searches keep a workspace only
+ * with a folder, preserving their current-view behavior.
  */
 export function makeSmartCollection(
   name: string,
   query: SearchQuery,
   workspaceId?: string | null,
+  scope?: SmartCollection["scope"],
 ): SmartCollection {
   const now = Math.floor(Date.now() / 1000);
   const cleaned = cleanSearchQuery(query);
-  if (cleaned.folder && !workspaceId) delete cleaned.folder;
+  if (scope === "all" || !workspaceId) delete cleaned.folder;
+  if (scope && cleaned.sort === MANUAL_SORT) {
+    delete cleaned.sort;
+    delete cleaned.sortDir;
+  }
   return {
     id: `${now}-${Math.random().toString(36).slice(2, 10)}`,
     name: name.trim(),
     query: cleaned,
-    ...(cleaned.folder && workspaceId ? { workspaceId } : {}),
+    ...((cleaned.folder || scope === "workspace") && workspaceId
+      ? { workspaceId }
+      : {}),
+    ...(scope ? { scope } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -214,6 +257,8 @@ export function describeDateRange(
 
 export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   const parts: string[] = [];
+  for (const clause of query.allOf ?? [])
+    parts.push(`(${describeSearchQuery(t, clause)})`);
   const folder = scopedFolderPath(query);
   if (folder != null) parts.push(`${t("folder.chip")}: ${folder}`);
   if (query.q) parts.push(`"${query.q}"`);
@@ -222,6 +267,13 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
     parts.push(key ? t(key) : query.kind);
   }
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
+  if (query.recent) parts.push(describeRecentFiles(t, query.recent));
+  if (query.kind === "audio")
+    parts.push(...describeAudioFilters(t, query.audio).map((d) => d.label));
+  if (query.resolution && query.kind !== "audio")
+    parts.push(
+      `${t(query.resolution.match === "exact" ? "resolution.exact" : "resolution.atLeast")} ${resolutionLabel(query.resolution.preset)}`,
+    );
   if (query.favorite) parts.push(t("favorite.chip"));
   if (query.duplicates) parts.push(t("duplicates.chip"));
   if (query.played != null) {

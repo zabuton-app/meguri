@@ -1,3 +1,4 @@
+import { filterFeedback as describeFilterFeedback } from "@/lib/heldFilters";
 // List screen. Header (root/scan/theme) + filters + condition badges + progress +
 // infinite-scroll grid. On thumb:done, reload the corresponding thumbnail.
 import {
@@ -42,6 +43,7 @@ import { usePreferences } from "@/settings/PreferencesProvider";
 import { NAV_BINDINGS, isHelpKey, matchAny } from "@/settings/keybindings";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "@/components/FilterBar";
+import { SmartBinsSidebar } from "@/components/SmartBinsSidebar";
 import { ScanProgress } from "@/components/ScanProgress";
 import { CommandMenu } from "@/components/CommandMenu";
 import { Pet } from "@/components/pet/Pet";
@@ -56,6 +58,7 @@ import {
 } from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useSmartCollections } from "@/hooks/useSmartCollections";
 import { recordRecentSearch } from "@/hooks/useRecentSearches";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
@@ -69,7 +72,17 @@ import { SelectionProvider } from "@/components/SelectionContext";
 import { walksPlaybackOrder } from "@/lib/playbackOrder";
 import { readInBulkBatches } from "@/lib/bulkEdit";
 import { FolderHeader } from "@/components/FolderHeader";
-import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
+import { hasFilterConditions } from "@/lib/smartCollections";
+import { useLibraryFilters } from "@/hooks/useLibraryFilters";
+import { SmartBinContext } from "@/components/SmartBinContext";
+import { binKinds } from "@/lib/binFilters";
+import {
+  isLocalWorkspace,
+  rememberLibraryLocation,
+  useLibraryLocation,
+  type LibraryScope,
+} from "@/hooks/useLibraryLocation";
+import { useRecentFilesRefresh } from "@/hooks/useRecentFilesRefresh";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
 import { useHeatmapFilter } from "./useHeatmapFilter";
@@ -118,10 +131,42 @@ export default function Home() {
   const scanning = useScanning();
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  // Opens on the default saved search, if one is set (see loadInitialFilter).
-  const [filter, setFilter] = useState<SearchQuery>(loadInitialFilter);
+  // Restore visitor filters and bin identity independently of saved bin rules.
+  const status = useAppStatus();
+  const smart = useSmartCollections();
+  const browsingWorkspace = status.data?.workspaceId ?? null;
+  const scopeMode =
+    browsingWorkspace === ALL_ID
+      ? "global"
+      : isLocalWorkspace(browsingWorkspace)
+        ? "local"
+        : null;
+  const lastLocal = useLibraryLocation();
+  const library = useLibraryFilters(
+    smart.collections,
+    smart.defaultId,
+    status.data?.workspaceId ?? null,
+    scopeMode,
+  );
+  const filterFeedback = useMemo(
+    () =>
+      describeFilterFeedback(
+        library.controls,
+        library.omitted ?? {},
+        library.activeBin?.query ?? {},
+        t,
+      ),
+    [library.controls, library.omitted, library.activeBin, t],
+  );
+  const filter = library.query;
+  const setFilter = library.setQuery;
+  useRecentFilesRefresh(
+    filter.recent ?? filter.allOf?.find((part) => part.recent)?.recent,
+  );
+  const [launchBin] = useState(() => library.launchBin);
+  const restoredLaunchBin = useRef(false);
   // Compared by identity below: every later filter is a new object.
-  const openedWith = useRef(filter);
+  const openedWith = useRef(library.controls);
   const [thumbVersion, setThumbVersion] = useState<Record<string, number>>({});
   const manualScanJobs = useRef(
     new Map<string, "scan" | "resync" | "rebuild">(),
@@ -136,7 +181,6 @@ export default function Home() {
     false,
     (raw) => raw === "true",
   );
-  const status = useAppStatus();
   const workspaces = useQuery({
     queryKey: ["workspaces_list"],
     queryFn: api.workspacesList,
@@ -174,6 +218,10 @@ export default function Home() {
     [setByFolder],
   );
   const folderNav = useFolderNav(workspaceId);
+  useEffect(() => {
+    if (status.data?.ready && isLocalWorkspace(workspaceId))
+      rememberLibraryLocation(workspaceId, folderView ? folderNav.path : "");
+  }, [workspaceId, folderView, folderNav.path, status.data?.ready]);
   // With nothing narrowing the list a folder shows its own contents (child
   // folders as cards, then its direct files); a search or filter covers
   // everything below it instead, as a flat result.
@@ -215,14 +263,33 @@ export default function Home() {
     [setByFolder, setViewMode],
   );
 
-  const { filterValue, onFilterChange, onApplySaved, onApplyRecent } =
-    useFolderFilter({
-      folderView,
-      folderNav,
-      filter,
-      setFilter,
-      setByFolder: showByFolder,
-    });
+  const scopeForBin = useCallback(
+    () => ({
+      workspaceId: isLocalWorkspace(workspaceId) ? workspaceId : ALL_ID,
+      path: folderView ? folderNav.path : "",
+    }),
+    [workspaceId, folderView, folderNav.path],
+  );
+  const {
+    filterValue,
+    onFilterChange,
+    onApplySaved,
+    onApplyRecent,
+    onOpenLocation,
+  } = useFolderFilter({
+    folderView,
+    folderNav,
+    filter: library.controls,
+    setFilter: library.setControls,
+    setByFolder: showByFolder,
+    applySaved: library.enter,
+    scopeForBin,
+  });
+  useEffect(() => {
+    if (!launchBin || !status.data?.ready || restoredLaunchBin.current) return;
+    restoredLaunchBin.current = true;
+    onApplySaved(launchBin);
+  }, [launchBin, status.data?.ready, onApplySaved]);
   const heatmap = useHeatmapFilter({ filterValue, onFilterChange });
   // What the heatmap counts over: the filter, within the folder shown and
   // everything below it — what the list becomes once a day narrows it (a
@@ -370,14 +437,13 @@ export default function Home() {
     if (activeCollection || !manualSort) return;
     // Settles in one pass: clearing the sort makes manualSort false, so the
     // guard above stops the next run.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFilter((f) => {
       const next = { ...f };
       delete next.sort;
       delete next.sortDir;
       return next;
     });
-  }, [activeCollection, manualSort]);
+  }, [activeCollection, manualSort, setFilter]);
   const reorder = useMemo(
     () =>
       reorderCollectionId
@@ -496,13 +562,13 @@ export default function Home() {
   // with: the default saved search was not searched for, and would otherwise
   // head the recents after every launch.
   useEffect(() => {
-    if (filter === openedWith.current) return;
+    if (library.controls === openedWith.current) return;
     const timer = window.setTimeout(
-      () => recordRecentSearch(filter),
+      () => recordRecentSearch(library.controls),
       RECENT_SEARCH_SETTLE_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [filter]);
+  }, [library.controls]);
 
   // Stabilize the reference so MediaCard's memo stays effective.
   // A click AND-appends an exact tag condition rather than overwriting the
@@ -515,14 +581,17 @@ export default function Home() {
   useEffect(() => {
     filterRef.current = filter;
   }, [filter]);
-  const onTagClick = useCallback((token: string) => {
-    const current = filterRef.current;
-    const next = addSearchTokens(current, [token]);
-    // Same reference means the condition was already there. Point at the chip
-    // instead of doing nothing, which reads as a dead click.
-    if (next === current) highlightSearchToken(token);
-    else setFilter(next);
-  }, []);
+  const onTagClick = useCallback(
+    (token: string) => {
+      const current = filterRef.current;
+      const next = addSearchTokens(current, [token]);
+      // Same reference means the condition was already there. Point at the chip
+      // instead of doing nothing, which reads as a dead click.
+      if (next === current) highlightSearchToken(token);
+      else setFilter(next);
+    },
+    [setFilter],
+  );
 
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {
@@ -768,7 +837,7 @@ export default function Home() {
       unApplyTags();
       unSearch();
     };
-  }, []);
+  }, [setFilter]);
 
   // Esc on the bare list screen closes the window (hides to tray). Only when
   // nothing else consumes Esc: no child-route modal, no overlay/dialog/popup
@@ -832,13 +901,48 @@ export default function Home() {
   const listResetKey = folderView ? `folder:${folderNav.path}` : undefined;
   // Names the list on screen: the workspace, how it is browsed and the filter.
   const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : view === "timeline" ? `timeline:${timeline.axis}` : (listResetKey ?? "flat")}|${JSON.stringify(filter)}`;
+  const localTarget =
+    workspaces.data?.workspaces.find(
+      (workspace) =>
+        workspace.id === lastLocal?.workspaceId &&
+        isLocalWorkspace(workspace.id),
+    ) ??
+    workspaces.data?.workspaces.find((workspace) =>
+      isLocalWorkspace(workspace.id),
+    );
+  const locationLabel =
+    scopeMode === "global"
+      ? t("smartBin.all")
+      : activeWorkspace
+        ? `${activeWorkspace.label}${folderView && folderNav.path ? ` / ${folderNav.path}` : ""}`
+        : (activeCollection?.name ?? t("smartBin.locationPending"));
+  const setScopeMode = (mode: LibraryScope) => {
+    if (mode === "global") onOpenLocation(ALL_ID);
+    else if (localTarget)
+      onOpenLocation(
+        localTarget.id,
+        localTarget.id === lastLocal?.workspaceId ? lastLocal.path : "",
+      );
+  };
   // A pass the playlist parked belongs to the list it was playing. Once the
   // list becomes another one it is dropped, so nothing (the pet's "Resume
   // playback") can pick it back up and graft the new list onto the old queue.
   useEffect(() => dropPass, [listScope]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col sm:pl-56">
+      <SmartBinsSidebar
+        query={filterValue}
+        workspaceId={workspaceId}
+        workspaces={workspaces.data?.workspaces ?? []}
+        onApply={onApplySaved}
+        activeId={library.activeBin?.id}
+        scopeMode={scopeMode}
+        onScopeChange={setScopeMode}
+        localAvailable={!!localTarget}
+        locationLabel={locationLabel}
+        onBrowse={library.leave}
+      />
       <HomeHeader
         root={status.data?.root}
         rootFetched={status.isFetched}
@@ -871,6 +975,16 @@ export default function Home() {
         </div>
       )}
 
+      {library.activeBin && (
+        <SmartBinContext
+          bin={library.activeBin}
+          omitted={library.omitted}
+          onLeave={library.leave}
+          activeFilters={library.controls}
+          onEnableFilter={library.enableOmitted}
+          onRemoveFilter={library.removeOmitted}
+        />
+      )}
       <FilterBar
         value={filterValue}
         onChange={onFilterChange}
@@ -880,6 +994,19 @@ export default function Home() {
         onApplySaved={onApplySaved}
         onToggleHeatmap={heatmap.toggle}
         heatmapOpen={heatmap.open}
+        onClearFilters={
+          library.activeBin ||
+          smart.collections.some(
+            (bin) => bin.id === smart.defaultId && bin.scope,
+          )
+            ? library.clear
+            : undefined
+        }
+        allowedKinds={
+          library.activeBin ? binKinds(library.activeBin.query) : undefined
+        }
+        portableBins
+        showClearFilters={!!Object.keys(library.omitted ?? {}).length}
       />
 
       {/* The heatmap: a panel under the filter bar, over whichever view is
@@ -988,6 +1115,7 @@ export default function Home() {
                   key={status.data?.workspaceId ?? ""}
                   scope={status.data?.workspaceId ?? ""}
                   query={filter}
+                  filterFeedback={filterFeedback}
                   ready={
                     (status.data?.ready ?? false) && !!status.data?.workspaceId
                   }
@@ -999,6 +1127,7 @@ export default function Home() {
               <TimelineView
                 scope={status.data?.workspaceId ?? ""}
                 query={filter}
+                filterFeedback={filterFeedback}
                 axis={timeline.axis}
                 onAxisChange={timeline.setAxis}
                 ready={
@@ -1042,6 +1171,8 @@ export default function Home() {
                 onOpenFolder={folderNav.enter}
                 resetKey={listResetKey}
                 inFolder={folderSearching}
+                filtered={hasFilterConditions(filter)}
+                filterFeedback={filterFeedback}
               />
             ) : (
               // By folder, either view gets the folders ahead of the files
@@ -1067,6 +1198,8 @@ export default function Home() {
                 onOpenFolder={folderNav.enter}
                 resetKey={listResetKey}
                 inFolder={folderSearching}
+                filtered={hasFilterConditions(filter)}
+                filterFeedback={filterFeedback}
               />
             )}
           </main>

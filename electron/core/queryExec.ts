@@ -126,7 +126,12 @@ interface DupRefsCacheEntry {
  * derived list off as the order the user arranged by hand.
  */
 function isStoredOrder(query: SearchQuery, refs?: cw.FileRef[]): boolean {
-  return query.sort === MANUAL_SORT && !!refs && !query.duplicates;
+  return (
+    query.sort === MANUAL_SORT &&
+    !!refs &&
+    !query.duplicates &&
+    !query.allOf?.some((part) => part.duplicates)
+  );
 }
 
 export class QueryExecutor {
@@ -209,7 +214,8 @@ export class QueryExecutor {
     query: SearchQuery,
     refs?: cw.FileRef[],
   ): cw.FileRef[] | undefined {
-    if (!query.duplicates) return refs;
+    if (!query.duplicates && !query.allOf?.some((part) => part.duplicates))
+      return refs;
     if (refs) return cw.duplicateFileRefs(cores, refs);
 
     const now = Date.now();

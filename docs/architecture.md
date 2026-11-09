@@ -338,24 +338,83 @@ is what the `manual` sort reads. The UI lives in
 
 ### Smart collections
 
-Saved searches: a named `SearchQuery`. These never touch the main process —
-they persist in the renderer's `localStorage` (`SMART_COLLECTIONS_KEY`). The
-schema and normalization live in `src/lib/smartCollections.ts`, the hook in
-`src/hooks/useSmartCollections.ts`, and the UI in
-`src/components/SmartCollectionsMenu.tsx`. A query is passed through
-`cleanSearchQuery()` to drop empty fields before it is stored. A folder below
-the root is kept as `folder: { path, recursive: true }` and saved together with
-the collection's `workspaceId`, since a folder path means nothing outside its
-own workspace; a folder with no workspace to place it in is dropped. Opening
-such a search switches to that workspace and browses the folder by folder.
+The Smart bins sidebar and saved-filter menu share the renderer's saved-rule
+store. Modern bins are reusable rule objects: the Global/Local sidebar control
+supplies the current search location independently of their stored criteria.
+Global searches all scanned roots; Local searches the chosen root/subfolder and
+remembers its last location across Global browsing and restarts. Folder switches
+keep the selected bin. The rail identifies the active location, while the bin
+list identifies either one bin or All media. Legacy searches without explicit
+bin scope retain their original folder/workspace opening behaviour.
 
-One saved search can be marked as the default (the star in the menu; its id is
-stored under `DEFAULT_SMART_COLLECTION_KEY`, apart from the collections). Its
-conditions and sort become Home's initial filter at launch
-(`loadInitialFilter()`), and "Clear all" returns to them — or empties the
-filter once it already shows exactly them (`clearAllTarget()` in
-`src/lib/searchConditions.ts`); removing the sort chip restores its sort. The
-default applies in every workspace, so its folder and a manual sort, both
-bound to one place, are left out (`defaultQueryOf()`). The hook is owned by
-`FilterBar`, which passes it to the menu, so the menu and "Clear all" read the
-same state.
+Saved queries persist in `localStorage` under `SMART_COLLECTIONS_KEY`, validated
+and normalized in `src/lib/smartCollections.ts`. `useLibraryFilters` keeps saved
+membership criteria, incoming browsing filters, and this visit's applied/inactive
+subsets separate. Flat AND clauses preserve both sets of rules. Bin edits can
+turn newly conflicting filters off but cannot revive excluded ones; remembered
+filters show as unavailable or compatible-but-off until explicitly enabled.
+See the [renderer guide](renderer.md#smart-bin-visits-and-persistent-filters) for
+session storage, location navigation, inactive snapshots, and request-order guards.
+
+A saved bin can be marked as the launch default. A selected visit takes precedence
+on restart; otherwise its rules open in the remembered Global/Local location.
+Clear all in a modern bin clears visitor and inactive filters, not membership.
+Legacy default saved searches retain their replacement/clear behaviour through
+`loadInitialFilter()`, `defaultQueryOf()` and `clearAllTarget()`.
+
+Resolution presets live in `shared/resolutions.ts`. `SearchQuery.resolution`
+stores the preset and either an exact dimension match or an at-least class.
+The latter follows the resolution badges' edge thresholds, including portrait
+and cropped cinema footage. `kind: "visual"` selects videos and images together.
+Both conditions use `appendSearchConditions()`, so ordinary listings, cross-workspace
+search, graphs and saved searches apply the same SQL conditions.
+
+Audio-only searches replace resolution with `AudioFilters`: sample rate, source
+bit depth, mono/stereo/multichannel, codec, minimum stream bitrate and duration
+bounds in seconds. These persist in `SearchQuery.audio`; switching away from audio
+clears them. The query schema also removes stale audio/resolution combinations
+from older saved bins. Unknown properties never satisfy a filter on that property.
+Sample rate and bit depth each support exact or at-least matching; omitted modes
+retain exact matching for compatibility. Duration supports exact, at-least,
+at-most, or between matching, backed by second-based minimum/maximum bounds.
+Its editor remembers seconds, decimal minutes or `MM:SS` display separately from
+the query, shows an explicit input example, and preserves the stored value when
+changing formats. Invalid text and reversed ranges prevent saving a Smart bin.
+
+`shared/audioMetadata.ts` reads the first audio stream in the stored ffprobe JSON,
+ignoring cover artwork. Bit depth comes from `bits_per_raw_sample` or
+`bits_per_sample`, never the decoder's `sample_fmt`; lossy audio can have no known
+source bit depth. The same reader feeds the detail badges, scan-time metadata
+writes, and a one-time, batched database backfill for existing audio rows. This
+adds searchable columns without accessing media files or changing ratings/tags.
+
+### Recent files and folder watching
+
+`SearchQuery.recent` stores a relative period and date basis (`added`, the
+default discovery date, or `created`, filesystem birthtime). Shared calendar
+logic in `shared/recentFiles.ts` resolves the window for every query, so saved
+Today/This week bins keep moving. Days use local time; weeks start on Monday.
+The New files control works within the current workspace or All and saves
+relative rules in Smart bins. Its last active view and date preference persist
+across restarts as part of the visitor session. Active recent views
+refresh indexed results every 30 seconds while visible; this does not scan files.
+An ordinary rebuild preserves discovery dates for existing relative paths.
+
+`electron/folderWatcher.ts` uses native recursive `fs.watch` notifications,
+with no idle stat polling or periodic rescans. Per-path quiet times and two
+stability samples batch downloads without one busy file holding back settled
+ones. Known temporary downloads, hidden paths, and the application's own data
+are excluded. Normal batches enumerate only notified files/subtrees and reconcile
+only that scope; unknown filenames or queue overflow request a full reconciliation.
+Copies cannot take an unrelated original's identity; notified moves retain it.
+Metadata/thumbnail processing is restricted to the changed files and uses the
+existing process-wide concurrency limits.
+
+ScanManager serializes each workspace's work and coalesces notifications that
+arrive during a scan. Startup catches up scanned roots one at a time. Watch
+settings persist in app config independently of workspace writes; disabling
+watching closes subscriptions and cancels automatic work. Watchers close before
+workspace removal and application shutdown. A disconnected root is not reconciled
+as an empty directory. Actual watch failures appear in the Watch folders control,
+and synchronization on window focus retries unavailable roots. Native notification
+support remains filesystem-dependent ([Node documentation](https://nodejs.org/api/fs.html#fswatchfilename-options-listener)); manual Scan stays available.

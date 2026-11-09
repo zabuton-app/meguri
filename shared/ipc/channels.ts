@@ -266,6 +266,10 @@ const FileTarget = z.object({
 
 export const ChannelInputs = {
   app_status: z.void(),
+  media_popout: FileTarget.extend({
+    sec: z.number().finite().min(0).max(MAX_MEDIA_SEC),
+    autoplay: z.boolean(),
+  }),
   about_info: z.void(),
   workspace_stats: z.void(),
   workspaces_list: z.void(),
@@ -322,6 +326,8 @@ export const ChannelInputs = {
     })
     .default({}),
   scan_cancel: z.object({ wsId: z.string().optional() }).default({}),
+  watch_get: z.void(),
+  watch_set: z.object({ enabled: z.boolean() }),
   files_search: z.object({ query: SearchQuerySchema }),
   files_random: z.object({ query: SearchQuerySchema.optional() }).default({}),
   folders_list: z.object({
@@ -589,6 +595,7 @@ export interface WorkspaceAddResult {
 // signature and the renderer client wrapper to match.
 export interface ChannelOutputs {
   app_status: AppStatus;
+  media_popout: void;
   about_info: AboutInfo;
   workspace_stats: WorkspaceStats;
   workspaces_list: WorkspacesList;
@@ -610,6 +617,8 @@ export interface ChannelOutputs {
   collection_set_membership: { changed: number };
   scan_start: string;
   scan_cancel: void;
+  watch_get: { enabled: boolean; watched: number; unavailable: string[] };
+  watch_set: { enabled: boolean; watched: number; unavailable: string[] };
   files_search: SearchResult;
   files_random: FileRow[];
   folders_list: FolderListing;

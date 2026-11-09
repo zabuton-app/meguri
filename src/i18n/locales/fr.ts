@@ -3,6 +3,109 @@ import type { TranslationKey } from "./ja";
 
 export const fr: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.sampleRateMatch": "Comparaison de fréquence d’échantillonnage",
+  "audio.bitDepthMatch": "Comparaison de profondeur de bits",
+  "audio.durationMatch": "Comparaison de durée",
+  "audio.durationFormat": "Format de durée",
+  "audio.seconds": "Secondes",
+  "audio.minutes": "Minutes",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "Minutes:secondes (MM:SS)",
+  "audio.durationTimeHint":
+    "Saisissez MM:SS, par ex. 02:30 = 2 minutes et 30 secondes. Les secondes vont de 00 à 59.",
+  "audio.durationMinutesHint":
+    "Saisissez des minutes, par ex. 2.5 = 2 minutes et 30 secondes.",
+  "audio.durationSecondsHint":
+    "Saisissez des secondes, par ex. 150 = 2 minutes et 30 secondes.",
+  "audio.atMost": "Au plus",
+  "audio.between": "Entre",
+  "audio.durationOrderError":
+    "La durée minimale ne doit pas dépasser la durée maximale.",
+  "recent.title": "Nouveaux fichiers",
+  "recent.window": "Période",
+  "recent.basis": "Définir les nouveaux fichiers selon",
+  "recent.today": "Aujourd’hui",
+  "recent.thisWeek": "Cette semaine",
+  "recent.lastHour": "Dernière heure",
+  "recent.last24Hours": "Dernières 24 heures",
+  "recent.last7Days": "7 derniers jours",
+  "recent.added": "Première détection par Meguri",
+  "recent.created": "Date de création du fichier",
+  "recent.addedHint":
+    "Utilise la première entrée dans ce catalogue, indépendamment des dates intégrées au média.",
+  "recent.createdHint":
+    "Utilise la date de création du système de fichiers. Les fichiers sans cette date ne correspondent pas.",
+  "recent.calendarHint":
+    "Aujourd’hui et cette semaine suivent votre fuseau horaire local. La semaine commence le lundi.",
+  "watch.title": "Surveiller les dossiers",
+  "watch.off": "Désactivé",
+  "watch.enable": "Surveiller automatiquement les dossiers analysés",
+  "watch.hint":
+    "Met à jour pendant l’exécution de Meguri. Utilise les notifications du système et attend la stabilisation des téléchargements.",
+  "watch.count": "Surveillance de {count} dossiers analysés.",
+  "watch.unavailable":
+    "Surveillance indisponible pour {count} dossiers. Utilisez Analyser pour les actualiser.",
+  "watch.error":
+    "Impossible de lire ou de modifier les paramètres de surveillance.",
+  "audio.filters": "Propriétés audio",
+  "audio.any": "Tous",
+  "audio.sampleRate": "Fréquence d’échantillonnage",
+  "audio.bitDepth": "Profondeur de bits",
+  "audio.bits": "{count} bits",
+  "audio.channels": "Canaux",
+  "audio.mono": "Mono",
+  "audio.stereo": "Stéréo",
+  "audio.multichannel": "Multicanal",
+  "audio.channelCount": "{count} canaux",
+  "audio.bitRate": "Débit",
+  "audio.bitRateMin": "Débit minimal (kbps)",
+  "audio.durationMin": "Durée minimale (secondes)",
+  "audio.durationMax": "Durée maximale (secondes)",
+  "audio.unknownHint":
+    "Les fichiers dont une valeur est inconnue ne correspondent pas au filtre de cette propriété.",
+  "kind.visual": "Vidéo + Image",
+  "resolution.title": "Résolution",
+  "resolution.any": "Toutes les résolutions",
+  "resolution.match": "Correspondance de résolution",
+  "resolution.atLeast": "Au moins",
+  "resolution.exact": "Exactement",
+  "smartBin.leave": "Quitter le chutier intelligent",
+  "smartBin.omitted":
+    "Écartés pour cette visite : {filters}. Ils seront vérifiés à votre retour.",
+  "smartBin.global": "Global",
+  "smartBin.local": "Local",
+  "smartBin.location": "Lieu de recherche",
+  "smartBin.locationPending": "Chargement de la bibliothèque…",
+  "smartBin.browse": "Parcourir sans chutier intelligent",
+  "smartBin.noLocal": "Ajoutez un dossier analysé pour utiliser le mode local.",
+  "smartBin.globalHint": "Rechercher dans tous les dossiers analysés.",
+  "smartBin.localHint":
+    "Revenir au dernier dossier consulté ; choisissez-en un autre dans la barre gauche.",
+  "smartBin.scopeManaged":
+    "Utilisez Global/Local à côté des chutiers intelligents pour choisir où chercher.",
+  "smartBin.inactiveFilters": "Filtres mémorisés — non appliqués",
+  "smartBin.enableFilter": "Activer le filtre : {filter}",
+  "smartBin.off": "Désactivé",
+  "smartBin.unavailable": "Indisponible",
+  "smartBin.offHint":
+    "Compatible maintenant. Cliquez pour l’activer ; modifier le chutier le laisse désactivé.",
+  "smartBin.unavailableHint":
+    "Ce filtre est incompatible avec les règles actuelles du chutier.",
+  "smartBin.title": "Chutiers intelligents",
+  "smartBin.create": "Créer un chutier intelligent",
+  "smartBin.edit": "Modifier le chutier intelligent",
+  "smartBin.delete": "Supprimer le chutier intelligent",
+  "smartBin.deleteConfirm": "Supprimer le chutier intelligent « {name} » ?",
+  "smartBin.name": "Nom",
+  "smartBin.scope": "Rechercher dans",
+  "smartBin.all": "Tous les dossiers analysés",
+  "smartBin.selected": "Dossier analysé sélectionné",
+  "smartBin.current": "Vue actuelle",
+  "smartBin.live":
+    "Les résultats évoluent avec les analyses et les modifications des notes et des tags.",
+  "smartBin.empty":
+    "Enregistrez une recherche pour retrouver les médias correspondants dans tout votre catalogue.",
+
   "app.name": "巡",
 
   // common
@@ -50,10 +153,10 @@ export const fr: Record<TranslationKey, string> = {
     "Nombre de miniatures de scène à générer sur l'écran de détail.",
   "settings.hoverPreview": "Aperçu au survol",
   "settings.hoverPreviewDesc":
-    "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
+    "Parcourez les scènes en déplaçant le curseur sur les miniatures vidéo. Maintenez Option/Alt pour masquer les icônes ; ajoutez Commande/Ctrl pour agrandir l'aperçu.",
   "settings.frameQuality": "Qualité des aperçus",
   "settings.frameQualityDesc":
-    "Qualité des aperçus au survol et de la rangée de scènes dans Découverte. Plus elle est élevée, plus la génération est lente.",
+    "Qualité des aperçus des miniatures et de Découverte, et de la rangée de scènes. Plus elle est élevée, plus la génération est lente.",
   "settings.frameQualityLow": "Basse (240px)",
   "settings.frameQualityStandard": "Standard (480px)",
   "settings.frameQualityHigh": "Haute (960px)",
@@ -222,6 +325,15 @@ export const fr: Record<TranslationKey, string> = {
   "media.openAsPeek": "Ouvrir en panneau latéral",
   "media.openAsModal": "Ouvrir en fenêtre",
   "media.peekResize": "Redimensionner le panneau latéral",
+  "media.moveWindow": "Glisser pour déplacer cette fenêtre",
+  "media.movePlayer":
+    "Déplacer le lecteur (glisser le titre ou utiliser les flèches)",
+  "media.popout": "Ouvrir dans une fenêtre séparée",
+  "media.popoutFailed": "Impossible d’ouvrir la fenêtre d’aperçu.",
+  "media.resizeWidth": "Redimensionner la largeur du lecteur",
+  "media.resizeHeight": "Redimensionner la hauteur du lecteur",
+  "media.resizePlayer":
+    "Redimensionner le lecteur (glisser le coin ou utiliser les flèches)",
   "media.playAsPlaylist": "Lire comme une liste à partir d’ici",
   "media.deleteFromIndex": "Supprimer de l'index",
   "media.deleteFromIndexConfirm":
@@ -391,6 +503,17 @@ export const fr: Record<TranslationKey, string> = {
   "select.tagsFailed": "Impossible d’appliquer les tags : {msg}",
 
   // media grid
+  "home.noCombinationMatches":
+    "La combinaison de filtres ne donne aucun résultat.",
+  "home.pausedFilterHint":
+    "Filtres en pause : {filters}. Activez-les, retirez-les ou choisissez une collection compatible. Aucun média ne s’affiche tant qu’ils sont en pause.",
+  "smartBin.removeHeld": "Retirer le filtre mémorisé : {filter}",
+  "smartBin.pausedResultsHint":
+    "Les résultats sont en pause tant que ces filtres sont désactivés. Activez-les ou retirez-les pour continuer.",
+  "home.noFilterMatches":
+    "Aucun fichier ne correspond à ces critères de filtre.",
+  "home.noFilterMatchesHint":
+    "Vérifiez les règles de la collection et les filtres ci-dessus, ou effacez les filtres pour élargir la recherche.",
   "grid.empty": "Aucun média à afficher.",
   "grid.emptyHint":
     "Lancez « Analyser » pour lister ici les vidéos et les images.",
@@ -835,6 +958,7 @@ export const fr: Record<TranslationKey, string> = {
   "tags.value.orientSquare": "Carré",
 
   // workspace rail
+  "workspace.navigation": "Navigation de la bibliothèque",
   "workspace.all": "Tout",
   "workspace.settings": "Paramètres",
   "workspace.edit": "Modifier l'espace de travail",

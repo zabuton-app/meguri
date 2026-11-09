@@ -192,6 +192,7 @@ describe("MediaDetail presentation", () => {
     await openDetail(`/file/1?ws=${WS_ID}`);
     expect(dialog().getAttribute("aria-modal")).toBe("true");
     expect(barSuppressed()).toBe(true);
+    expect(screen.getByRole("button", { name: "Enlarge modal" })).toBeTruthy();
   });
 
   it("switches to the side peek from the header, keeping the bar, and remembers it", async () => {
@@ -224,7 +225,7 @@ describe("MediaDetail presentation", () => {
 
   it("reopens as the peek and returns to the modal at its remembered size", async () => {
     localStorage.setItem("meguri.media.detail.presentation", "peek");
-    localStorage.setItem("meguri.media.modalSize", "small");
+    localStorage.setItem("meguri.media.detail.modalSize.v2", "small");
     await openDetail(`/file/1?ws=${WS_ID}`);
     expect(dialog().dataset.presentation).toBe("peek");
     // The peek offers no size toggle of its own — only the way back.
@@ -249,8 +250,10 @@ describe("MediaDetail presentation", () => {
     expect(dialog().style.width).toBe("600px");
     expect(peekInset()).toBe("600px");
     fireEvent.click(screen.getByRole("button", { name: "Open as modal" }));
-    // Back to a modal: no width of its own, and the FABs return to the edge.
-    expect(dialog().style.width).toBe("");
+    // Back to the compact modal width, and the FABs return to the edge.
+    const modal = dialog().querySelector<HTMLElement>("[data-presentation]")!;
+    expect(parseFloat(modal.style.width)).toBeGreaterThan(0);
+    expect(parseFloat(modal.style.width)).toBeLessThan(window.innerWidth);
     expect(peekInset()).toBe("0px");
   });
 

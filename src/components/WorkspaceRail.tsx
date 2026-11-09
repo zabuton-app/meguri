@@ -56,7 +56,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
 import { cn } from "@/lib/utils";
 import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
-import { openCommandMenu, openShortcuts } from "@/lib/ui-events";
+import { isLocalWorkspace } from "@/hooks/useLibraryLocation";
+import { browseLibrary, openCommandMenu, openShortcuts } from "@/lib/ui-events";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { useFileDropTarget } from "@/hooks/useFileDropTarget";
@@ -193,7 +194,13 @@ export function WorkspaceRail() {
   const dropOnto = useAddFilesToCollection();
   const switchTo = useMutation({
     mutationFn: (id: string) => api.workspaceSwitch(id),
-    onSuccess: refreshAll,
+    onSuccess: async (_result, id) => {
+      browseLibrary({
+        workspaceId: id,
+        keepBin: id === ALL_ID || isLocalWorkspace(id),
+      });
+      await refreshAll();
+    },
   });
   const remove = useMutation({
     mutationFn: ({ id }: { id: string; label: string }) =>
@@ -306,7 +313,10 @@ export function WorkspaceRail() {
 
   return (
     <>
-      <nav className="flex h-full w-16 shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-3">
+      <nav
+        aria-label={t("workspace.navigation")}
+        className="flex h-full w-16 shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-3"
+      >
         <img
           src={LOGO_SRC[logo]}
           alt="Meguri"
@@ -337,6 +347,7 @@ export function WorkspaceRail() {
                   workspace={allWorkspace}
                   onClick={() => {
                     if (!allWorkspace.active) switchTo.mutate(allWorkspace.id);
+                    else browseLibrary({ workspaceId: ALL_ID, keepBin: true });
                   }}
                   t={t}
                 />
@@ -347,6 +358,7 @@ export function WorkspaceRail() {
                   onClick={() => {
                     if (!watchLater.active)
                       switchTo.mutate(collectionTarget(watchLater.id));
+                    else browseLibrary();
                   }}
                   onDropFiles={dropOnto(watchLater.id, t("watchLater.name"))}
                   t={t}
@@ -363,6 +375,7 @@ export function WorkspaceRail() {
                     onClick={() => {
                       if (!collection.active)
                         switchTo.mutate(collectionTarget(collection.id));
+                      else browseLibrary();
                     }}
                     onRemove={() => {
                       void (async () => {
@@ -410,6 +423,7 @@ export function WorkspaceRail() {
                     workspace={w}
                     onClick={() => {
                       if (!w.active) switchTo.mutate(w.id);
+                      else browseLibrary({ workspaceId: w.id, keepBin: true });
                     }}
                     onRemove={() => {
                       void (async () => {
@@ -657,6 +671,7 @@ function WorkspaceButton({
       onClick={onClick}
       title={isAll ? t("workspace.all") : workspace.path}
       aria-label={isAll ? t("workspace.all") : workspace.label}
+      aria-current={workspace.active ? "location" : undefined}
       {...(isAll ? {} : sortable.attributes)}
       {...(isAll ? {} : sortable.listeners)}
       className={cn(

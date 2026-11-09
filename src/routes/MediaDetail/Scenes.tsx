@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import type { TFunc } from "@/i18n/I18nProvider";
@@ -42,18 +41,21 @@ export function Scenes({
     Math.floor((total * (i + 0.5)) / sceneCount),
   );
   return (
-    <section className="rounded-xl border border-border bg-surface p-3">
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+    <section
+      aria-label={t("media.scenes")}
+      className="detail-scenes shrink-0 rounded-xl border border-border bg-surface p-2"
+    >
+      <div className="mb-2 flex min-w-0 items-center justify-between gap-2 px-1">
         <h3 className="text-xs font-semibold uppercase text-muted">
           {t("media.scenes")}
         </h3>
         {/* Live preview of the file's main thumbnail so the user sees the change land,
             instead of having to navigate back to the list to confirm. */}
         {mainThumbUrl && (
-          <div className="flex items-center gap-2 text-[11px] text-muted">
-            <span>{t("media.currentMainThumb")}</span>
+          <div className="flex min-w-0 items-center gap-2 text-[11px] text-muted">
+            <span className="truncate">{t("media.currentMainThumb")}</span>
             <div
-              className="relative h-10 overflow-hidden rounded border border-border bg-black"
+              className="relative h-7 shrink-0 overflow-hidden rounded border border-border bg-black"
               aria-busy={mainThumbPending}
             >
               <img src={mainThumbUrl} alt="" className="h-full w-auto" />
@@ -66,7 +68,14 @@ export function Scenes({
           </div>
         )}
       </div>
-      <ScrollArea className="w-full" viewportClassName="pb-3">
+      {/* Native scrollbars end their drag on release/cancel. A custom rail can
+          retain pointer capture and chase the cursor on its way to a scene. */}
+      <div
+        data-slot="scene-scroll"
+        tabIndex={0}
+        aria-label={t("media.scenes")}
+        className="w-full overflow-x-auto overflow-y-hidden pb-1"
+      >
         <div className="flex gap-2">
           {scenes.map((sec, i) => {
             const isMain = isSameThumbSource(thumbOffsetSec, sec);
@@ -87,7 +96,7 @@ export function Scenes({
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
     </section>
   );
 }
@@ -133,9 +142,7 @@ function SceneThumb({
           alt={t("scene.alt", { time: fmtTime(sec) })}
           loading="lazy"
           onLoad={() => setLoaded(true)}
-          className={`h-24 bg-black transition group-hover/scene:opacity-85 ${
-            loaded ? "w-auto opacity-100" : "w-40 opacity-0"
-          }`}
+          className={`detail-scene-image aspect-video max-w-none bg-black object-contain transition group-hover/scene:opacity-85 ${loaded ? "opacity-100" : "opacity-0"}`}
         />
         <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1 text-[10px] tabular-nums text-white">
           {fmtTime(sec)}

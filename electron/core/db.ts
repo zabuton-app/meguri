@@ -1,6 +1,7 @@
 // SQLite (better-sqlite3). Schema definition and connection.
 import Database from "better-sqlite3";
 import { tagIdentityKey } from "../../shared/tags.js";
+import { readAudioMetadata } from "../../shared/audioMetadata.js";
 
 export type DB = Database.Database;
 
@@ -68,6 +69,7 @@ CREATE TABLE IF NOT EXISTS files (
   kind TEXT NOT NULL CHECK (kind IN ('video','image','audio')),
   ext TEXT, size INTEGER, mtime INTEGER, btime INTEGER, inode INTEGER, content_hash TEXT,
   width INTEGER, height INTEGER, duration REAL, codec TEXT, fps REAL, captured_at INTEGER,
+  sample_rate INTEGER, bit_depth INTEGER, audio_channels INTEGER, audio_bit_rate INTEGER,
   thumb_path TEXT, thumb_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (thumb_status IN ('pending','done','error')),
   deleted_at INTEGER, excluded_at INTEGER, created_at INTEGER NOT NULL, meta TEXT,
@@ -208,6 +210,50 @@ function hasColumn(db: DB, table: string, column: string): boolean {
  *  IF NOT EXISTS leaves existing tables alone, so columns added after first release must
  *  be added explicitly with ALTER. Each step must be safe to run repeatedly. */
 function backfillColumns(db: DB): void {
+  const audioColumns = [
+    "sample_rate",
+    "bit_depth",
+    "audio_channels",
+    "audio_bit_rate",
+  ];
+  const missingAudioColumns = audioColumns.filter(
+    (column) => !hasColumn(db, "files", column),
+  );
+  if (missingAudioColumns.length) {
+    db.transaction(() => {
+      for (const column of missingAudioColumns)
+        db.exec(`ALTER TABLE files ADD COLUMN ${column} INTEGER`);
+      // Older catalogues already hold ffprobe JSON: no scan or media access is
+      // needed. Complete the additions and backfill atomically, once per DB.
+      const update = db.prepare(
+        "UPDATE files SET sample_rate = ?, bit_depth = ?, audio_channels = ?, audio_bit_rate = ? WHERE id = ?",
+      );
+      const read = db.prepare(
+        "SELECT id, meta FROM files WHERE kind = 'audio' AND id > ? ORDER BY id LIMIT 500",
+      );
+      let after = 0;
+      for (;;) {
+        // Finish each read before writing on the same connection. Batches keep
+        // a catalogue's raw metadata from all being loaded into memory at once.
+        const rows = read.all(after) as { id: number; meta: string | null }[];
+        if (!rows.length) break;
+        for (const row of rows) {
+          const audio = readAudioMetadata(row.meta);
+          update.run(
+            audio.sampleRate,
+            audio.bitDepth,
+            audio.channels,
+            audio.bitRate,
+            row.id,
+          );
+        }
+        after = rows[rows.length - 1].id;
+      }
+    })();
+  }
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_audio ON files(kind, sample_rate, bit_depth, audio_channels) WHERE deleted_at IS NULL",
+  );
   if (!hasColumn(db, "file_meta", "thumb_offset_sec")) {
     db.exec("ALTER TABLE file_meta ADD COLUMN thumb_offset_sec REAL");
   }

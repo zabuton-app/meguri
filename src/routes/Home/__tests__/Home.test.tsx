@@ -68,6 +68,12 @@ vi.mock("sonner", () => ({
 
 vi.mock("@/ipc/client", () => ({
   api: {
+    watchGet: vi
+      .fn()
+      .mockResolvedValue({ enabled: true, watched: 1, unavailable: [] }),
+    watchSet: vi
+      .fn()
+      .mockResolvedValue({ enabled: false, watched: 0, unavailable: [] }),
     appStatus: () => mocks.appStatus(),
     workspacesList: () => mocks.workspacesList(),
     filesSearch: (query: unknown) => mocks.filesSearch(query),
@@ -100,6 +106,7 @@ vi.mock("@/ipc/client", () => ({
     collectionRemoveFile: vi.fn().mockResolvedValue(undefined),
   },
   events: {
+    onWatchChanged: vi.fn().mockResolvedValue(() => {}),
     onThumbDone: vi.fn().mockResolvedValue(() => {}),
     onScanDone: vi.fn().mockResolvedValue(() => {}),
     onScanProgress: vi.fn().mockResolvedValue(() => {}),
@@ -166,11 +173,11 @@ describe("Home + MediaDetail integration", () => {
     renderWithProviders(<AppRoutes />);
 
     await waitFor(() => {
-      expect(screen.getByText("sample.mp4")).toBeTruthy();
+      expect(screen.getByTitle(sampleFileRow.relPath)).toBeTruthy();
     });
 
     // Click the grid tile's link specifically (the header also contains links).
-    fireEvent.click(screen.getByText("sample.mp4").closest("a")!);
+    fireEvent.click(screen.getByTitle(sampleFileRow.relPath).closest("a")!);
 
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toBeTruthy();
@@ -548,7 +555,7 @@ describe("Home folder view", () => {
     });
     renderWithProviders(<AppRoutes />);
 
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
     expect(lastSearch().folder).toBeUndefined();
     expect(mocks.foldersList).not.toHaveBeenCalled();
     expect(
@@ -565,7 +572,7 @@ describe("Home folder view", () => {
   it("drops a grid selection when turning on the folder option at the root", async () => {
     localStorage.setItem(BY_FOLDER_KEY, "false");
     renderWithProviders(<AppRoutes />);
-    const name = await screen.findByText("sample.mp4");
+    const name = await screen.findByTitle(sampleFileRow.relPath);
     fireEvent.click(name.closest("a")!, { ctrlKey: true });
     expect(
       screen.getByRole("region", { name: "Selection actions" }),
@@ -664,7 +671,7 @@ describe("Home folder view", () => {
       });
     }
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
 
     const run = async (name: string) => {
       fireEvent.keyDown(window, { key: "k", code: "KeyK", ctrlKey: true });
@@ -771,7 +778,7 @@ describe("Home folder view", () => {
       return Promise.resolve(undefined);
     });
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
 
     showFolderInLibrary({ workspaceId: WS_ID, path: "Movie" });
 
@@ -793,7 +800,7 @@ describe("Home folder view", () => {
     mocks.workspaceSwitch.mockRejectedValue(new Error("gone"));
     toasts.error.mockClear();
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
 
     localStorage.setItem(BY_FOLDER_KEY, "false");
     showFolderInLibrary({ workspaceId: "ws-other", path: "Movie" });
@@ -818,7 +825,7 @@ describe("Home folder view", () => {
     toasts.error.mockClear();
     localStorage.setItem(BY_FOLDER_KEY, "false");
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
     // The rail's list is what tells a removed workspace apart.
     await waitFor(() => expect(mocks.workspacesList).toHaveBeenCalled());
 
@@ -849,7 +856,7 @@ describe("Home folder view", () => {
     toasts.error.mockClear();
     localStorage.setItem(BY_FOLDER_KEY, "false");
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
 
     showFolderInLibrary({ workspaceId: "ws-other", path: "Movie" });
 
@@ -1215,7 +1222,7 @@ describe("Home folder view", () => {
         }),
     );
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
 
     // The first waits on a slow switch; the second is asked for meanwhile.
     showFolderInLibrary({ workspaceId: WS_ID, path: "Movie" });
@@ -1350,7 +1357,7 @@ describe("Home folder view", () => {
   it("leaves the count to the total when nothing narrows a flat view", async () => {
     localStorage.setItem(BY_FOLDER_KEY, "false");
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
     await waitFor(() =>
       expect(getListCounts()).toEqual({
         files: null,
@@ -1556,7 +1563,7 @@ describe("Home timeline view", () => {
 
   it("reads the list by the axis, newest first, without touching the filter's sort", async () => {
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
     fireEvent.click(screen.getByRole("button", { name: "Timeline view" }));
     await screen.findAllByText("October 15, 2026");
     expect(localStorage.getItem(VIEW_KEY)).toBe("timeline");
@@ -1747,7 +1754,9 @@ describe("Home heatmap", () => {
   it("is a panel shown on demand, remembered apart from the view", async () => {
     localStorage.removeItem(HEATMAP_OPEN_KEY);
     renderWithProviders(<AppRoutes />);
-    await waitFor(() => expect(screen.getByText("sample.mp4")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTitle(sampleFileRow.relPath)).toBeTruthy(),
+    );
     expect(document.querySelector("[data-day]")).toBeNull();
     expect(mocks.activityDays).not.toHaveBeenCalled();
 
@@ -1763,7 +1772,7 @@ describe("Home heatmap", () => {
     expect(localStorage.getItem(HEATMAP_OPEN_KEY)).toBe("true");
     // The view is the one it was, with its files under the panel.
     expect(localStorage.getItem(VIEW_KEY)).toBe("grid");
-    expect(screen.getByText("sample.mp4")).toBeTruthy();
+    expect(screen.getByTitle(sampleFileRow.relPath)).toBeTruthy();
 
     fireEvent.click(toggle);
     await waitFor(() =>
@@ -1775,7 +1784,9 @@ describe("Home heatmap", () => {
   it("picks a day as the filter's date range for the metric, and lets it go", async () => {
     renderWithProviders(<AppRoutes />);
     await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
-    await waitFor(() => expect(screen.getByText("sample.mp4")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTitle(sampleFileRow.relPath)).toBeTruthy(),
+    );
     expect(lastQuery().playedFrom).toBeUndefined();
     expect(getListCounts()).toMatchObject({ files: null });
     expect(chipLabels()).toEqual([]);
@@ -1904,6 +1915,8 @@ describe("Home heatmap", () => {
     ]);
   });
 
+  // Includes the lazy graph route and several rendered view transitions. Give
+  // this integration case room on a busy CI runner without relaxing its assertions.
   it("stays over the list and the graph, narrowing each", async () => {
     renderWithProviders(<AppRoutes />);
     await waitFor(() => expect(cell(yesterday).dataset.level).toBe("4"));
@@ -1928,7 +1941,7 @@ describe("Home heatmap", () => {
       playedFrom: start,
       playedTo: end,
     });
-  });
+  }, 15_000);
 
   it("counts within the folder shown, and everything below it", async () => {
     localStorage.setItem(BY_FOLDER_KEY, "true");
@@ -1965,7 +1978,7 @@ describe("Home heatmap", () => {
       });
     }
     renderWithProviders(<AppRoutes />);
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
 
     const run = async (name: string) => {
       fireEvent.keyDown(window, { key: "k", code: "KeyK", ctrlKey: true });

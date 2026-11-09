@@ -18,6 +18,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   cleanSearchQuery,
@@ -36,6 +43,7 @@ interface Props {
    * the default picked here, so both have to read the same state.
    */
   smart: SmartCollectionsState;
+  portable?: boolean;
 }
 
 export function SmartCollectionsMenu({
@@ -43,6 +51,7 @@ export function SmartCollectionsMenu({
   workspaceId,
   onApply,
   smart,
+  portable = false,
 }: Props) {
   const { t } = useI18n();
   const {
@@ -55,6 +64,7 @@ export function SmartCollectionsMenu({
   const [menuOpen, setMenuOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [name, setName] = useState("");
+  const [scope, setScope] = useState<"all" | "workspace">("all");
   const canSave = hasSearchConditions(value);
 
   // The full condition summary doubles as the default name, so the dialog can
@@ -73,7 +83,12 @@ export function SmartCollectionsMenu({
   const onSave = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    addCollection(trimmed, value, workspaceId);
+    addCollection(
+      trimmed,
+      value,
+      portable ? undefined : workspaceId,
+      portable ? "all" : scope,
+    );
     setSaveOpen(false);
   };
 
@@ -100,7 +115,10 @@ export function SmartCollectionsMenu({
             onSelect={() => {
               if (!canSave) return;
               setMenuOpen(false);
-              window.requestAnimationFrame(() => setSaveOpen(true));
+              window.requestAnimationFrame(() => {
+                setScope(value.folder && workspaceId ? "workspace" : "all");
+                setSaveOpen(true);
+              });
             }}
           >
             <BookmarkPlus />
@@ -211,6 +229,31 @@ export function SmartCollectionsMenu({
                 placeholder={t("smartCollection.namePlaceholder")}
               />
               <p className="select-text text-xs text-muted">{summary}</p>
+              {!portable && (
+                <Select
+                  value={scope}
+                  onValueChange={(next) =>
+                    setScope(next as "all" | "workspace")
+                  }
+                >
+                  <SelectTrigger aria-label={t("smartBin.scope")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("smartBin.all")}</SelectItem>
+                    {workspaceId && (
+                      <SelectItem value="workspace">
+                        {t("smartBin.selected")}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+              {portable && (
+                <p className="text-xs text-muted">
+                  {t("smartBin.scopeManaged")}
+                </p>
+              )}
             </div>
             <DialogFooter className="border-t border-border p-4">
               <Button

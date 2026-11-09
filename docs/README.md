@@ -5,7 +5,8 @@ source. It explains how the app is put together and why — the mechanisms,
 invariants, data flow, and extension procedures behind the codebase.
 
 For what the app is, how to install it, and how to use it, see the top-level
-[README](../README.md). This set assumes you have already read it.
+[README](../README.md) and the [library guide](library-guide.md). This set assumes
+you have already read the README.
 
 ## What's here
 
@@ -35,13 +36,14 @@ Read in this order for a top-down picture:
 
 ## Relationship to other docs
 
-| Doc                                   | Audience                        | Role                                                                                    |
-| ------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
-| [README](../README.md)                | Users and first-time developers | What the app is, install, basic usage, and the canonical "Where Data Is Stored" layout. |
-| `docs/**` (this set)                  | Contributors                    | How the code works and why — the architecture reference.                                |
-| [CLAUDE.md](../CLAUDE.md)             | Claude Code agent               | Concise agent guidance, conventions, and invariants (Japanese).                         |
-| [CONTRIBUTING.md](../CONTRIBUTING.md) | Contributors                    | Branch model, pull-request flow, and releases.                                          |
+| Doc                                   | Audience                        | Role                                                       |
+| ------------------------------------- | ------------------------------- | ---------------------------------------------------------- |
+| [README](../README.md)                | Users and first-time developers | Overview, installation, and storage layout.                |
+| [Library guide](library-guide.md)     | Users                           | Step-by-step catalogue, filtering, and playback workflows. |
+| `docs/**` (this set)                  | Contributors                    | How the code works and why — the architecture reference.   |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | Contributors                    | Branch model, pull-request flow, and releases.             |
 
-The top-level [README](../README.md) remains the single source of truth for
-install/usage and the on-disk storage layout. These docs link to it rather than
-restating it.
+The top-level [README](../README.md) owns installation and the on-disk storage
+layout. The [library guide](library-guide.md) owns the user workflows. Keep it in
+sync when a control or its behaviour changes; update the corresponding
+architecture reference when the implementation changes.

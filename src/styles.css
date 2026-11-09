@@ -1,6 +1,13 @@
 @import "tailwindcss";
 @import "./styles/emoji-fonts.css";
 
+/* Hold Option/Alt for an unobstructed scrub. Include sibling controls, which
+   otherwise sit above MediaThumbnail and intercept the pointer. */
+[data-scrub-surface]:has([data-scrub-mode="clean"])
+  :is(button, [draggable="true"], [data-thumbnail-overlay]) {
+  visibility: hidden;
+}
+
 /*
  * Three-stage bridge (PLAN "Frontend UI / Theme"):
  *   base16(base00..0F)  →  contrast-corrected values --c-* (src/themes/derive.ts, injected by
@@ -372,4 +379,24 @@ textarea,
 .driver-active [data-tour-bubble],
 .driver-active [data-tour-bubble] * {
   pointer-events: auto;
+}
+
+/* The scene rail shares the player's bounded area, never its metadata scroll.
+   Container height units let the thumbnails shrink with an edge resize, even
+   when the window itself has not changed size. Width stays 16:9 and the whole
+   frame remains visible (portrait scenes are letterboxed). */
+.detail-review {
+  container-type: size;
+}
+.detail-scene-image {
+  height: clamp(40px, 16cqh, 96px);
+}
+
+/* The independent desktop preview's title can move its native window too.
+   Controls remain clickable rather than becoming part of the drag region. */
+.player-native-title {
+  -webkit-app-region: drag;
+}
+.player-native-title button {
+  -webkit-app-region: no-drag;
 }

@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { WatchFoldersControl } from "@/components/WatchFoldersControl";
 import { cn } from "@/lib/utils";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
@@ -248,6 +249,7 @@ export function HomeHeader({
         >
           <FolderTree className="size-4" />
         </button>
+        <WatchFoldersControl ready={ready} />
         <ButtonGroup className="[&>button]:border [&>button]:border-muted/35 [&>button]:bg-surface [&>button:not(:first-child)]:relative [&>button:not(:first-child)]:z-[1]">
           <Button
             size="sm"

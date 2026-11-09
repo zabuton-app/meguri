@@ -3,6 +3,108 @@ import type { TranslationKey } from "./ja";
 
 export const en: Record<TranslationKey, string> = {
   // App name: the single-kanji display name (guideline 00), identical in every locale.
+  "audio.sampleRateMatch": "Sample rate match",
+  "audio.bitDepthMatch": "Bit depth match",
+  "audio.durationMatch": "Duration match",
+  "audio.durationFormat": "Duration format",
+  "audio.seconds": "Seconds",
+  "audio.minutes": "Minutes",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "Minutes:seconds (MM:SS)",
+  "audio.durationTimeHint":
+    "Enter MM:SS, e.g. 02:30 = 2 minutes, 30 seconds. Seconds must be 00–59.",
+  "audio.durationMinutesHint":
+    "Enter minutes, e.g. 2.5 = 2 minutes, 30 seconds.",
+  "audio.durationSecondsHint":
+    "Enter seconds, e.g. 150 = 2 minutes, 30 seconds.",
+  "audio.atMost": "At most",
+  "audio.between": "Between",
+  "audio.durationOrderError":
+    "The minimum duration must not exceed the maximum.",
+  "recent.title": "New files",
+  "recent.window": "Time window",
+  "recent.basis": "Define new using",
+  "recent.today": "Today",
+  "recent.thisWeek": "This week",
+  "recent.lastHour": "Last hour",
+  "recent.last24Hours": "Last 24 hours",
+  "recent.last7Days": "Last 7 days",
+  "recent.added": "First discovered by Meguri",
+  "recent.created": "File creation date",
+  "recent.addedHint":
+    "Uses when Meguri first adds a file to this catalogue, independently of dates embedded in the media.",
+  "recent.createdHint":
+    "Uses the filesystem creation date. Files without this date do not match.",
+  "recent.calendarHint":
+    "Today and this week use your local time zone. Weeks start on Monday.",
+  "watch.title": "Watch folders",
+  "watch.off": "Off",
+  "watch.enable": "Automatically watch scanned folders",
+  "watch.hint":
+    "Updates while Meguri is running. Uses filesystem notifications and waits for downloads to settle.",
+  "watch.count": "Watching {count} scanned folders.",
+  "watch.unavailable":
+    "Watching is unavailable for {count} folders. Use Scan to update them.",
+  "watch.error": "Could not read or update watch-folder settings.",
+  "audio.filters": "Audio properties",
+  "audio.any": "Any",
+  "audio.sampleRate": "Sample rate",
+  "audio.bitDepth": "Bit depth",
+  "audio.bits": "{count}-bit",
+  "audio.channels": "Channels",
+  "audio.mono": "Mono",
+  "audio.stereo": "Stereo",
+  "audio.multichannel": "Multichannel",
+  "audio.channelCount": "{count} channels",
+  "audio.bitRate": "Bitrate",
+  "audio.bitRateMin": "Minimum bitrate (kbps)",
+  "audio.durationMin": "Minimum duration (seconds)",
+  "audio.durationMax": "Maximum duration (seconds)",
+  "audio.unknownHint":
+    "Files with unknown values do not match a filter on that property.",
+  "kind.visual": "Video + Image",
+  "resolution.title": "Resolution",
+  "resolution.any": "Any resolution",
+  "resolution.match": "Resolution match",
+  "resolution.atLeast": "At least",
+  "resolution.exact": "Exactly",
+  "smartBin.leave": "Leave smart bin",
+  "smartBin.omitted":
+    "Left out for this visit: {filters}. Filters are checked again when you leave and return.",
+  "smartBin.global": "Global",
+  "smartBin.local": "Local",
+  "smartBin.location": "Search location",
+  "smartBin.locationPending": "Loading library…",
+  "smartBin.browse": "Browse without a smart bin",
+  "smartBin.noLocal": "Add a scanned folder to use Local mode.",
+  "smartBin.globalHint": "Search all scanned folders.",
+  "smartBin.localHint":
+    "Return to the last visited folder; choose another in the left sidebar.",
+  "smartBin.scopeManaged":
+    "Use Global/Local beside Smart bins to choose where these rules search.",
+  "smartBin.inactiveFilters": "Remembered filters — not applied",
+  "smartBin.enableFilter": "Enable filter: {filter}",
+  "smartBin.off": "Off",
+  "smartBin.unavailable": "Unavailable",
+  "smartBin.offHint":
+    "Compatible now. Click to apply; bin edits leave this filter off.",
+  "smartBin.unavailableHint":
+    "This filter conflicts with the bin’s current rules.",
+  "smartBin.title": "Smart bins",
+  "smartBin.create": "Create smart bin",
+  "smartBin.edit": "Edit smart bin",
+  "smartBin.delete": "Delete smart bin",
+  "smartBin.deleteConfirm": 'Delete smart bin "{name}"?',
+  "smartBin.name": "Name",
+  "smartBin.scope": "Search in",
+  "smartBin.all": "All scanned folders",
+  "smartBin.selected": "Selected scanned folder",
+  "smartBin.current": "Current view",
+  "smartBin.live":
+    "Matches update as files are scanned or their ratings and tags change.",
+  "smartBin.empty":
+    "Save a search here to find matching media across your catalogue.",
+
   "app.name": "巡",
 
   // common
@@ -50,10 +152,10 @@ export const en: Record<TranslationKey, string> = {
     "How many scene thumbnails to generate on the detail screen.",
   "settings.hoverPreview": "Hover preview",
   "settings.hoverPreviewDesc":
-    "Preview the scene under the cursor while hovering over a video thumbnail.",
+    "Hover to scrub video thumbnails. Hold Option/Alt for a clean view; add Command/Ctrl for an enlarged preview.",
   "settings.frameQuality": "Preview quality",
   "settings.frameQualityDesc":
-    "Quality of Discovery hover previews and scene rail frames. Higher is slower to generate.",
+    "Quality of thumbnail and Discovery hover previews and scene rail frames. Higher is slower to generate.",
   "settings.frameQualityLow": "Low (240px)",
   "settings.frameQualityStandard": "Standard (480px)",
   "settings.frameQualityHigh": "High (960px)",
@@ -217,6 +319,13 @@ export const en: Record<TranslationKey, string> = {
   "media.openAsPeek": "Open as side peek",
   "media.openAsModal": "Open as modal",
   "media.peekResize": "Resize side peek",
+  "media.moveWindow": "Drag to move this window",
+  "media.movePlayer": "Move player (drag title bar or use arrow keys)",
+  "media.popout": "Open in separate window",
+  "media.popoutFailed": "Could not open the preview window.",
+  "media.resizeWidth": "Resize player width",
+  "media.resizeHeight": "Resize player height",
+  "media.resizePlayer": "Resize player (drag corner or use arrow keys)",
   "media.playAsPlaylist": "Play as playlist from here",
   "media.deleteFromIndex": "Delete From Index",
   "media.deleteFromIndexConfirm":
@@ -382,6 +491,15 @@ export const en: Record<TranslationKey, string> = {
   "select.tagsFailed": "Could not apply the tags: {msg}",
 
   // media grid
+  "home.noCombinationMatches": "Filter combination has no matches.",
+  "home.pausedFilterHint":
+    "Paused filters: {filters}. Enable or remove these filters, or choose a compatible bin. No footage is shown while they are paused.",
+  "smartBin.removeHeld": "Remove remembered filter: {filter}",
+  "smartBin.pausedResultsHint":
+    "Results are paused while these filters are off. Enable or remove them to continue.",
+  "home.noFilterMatches": "No files match these filter criteria.",
+  "home.noFilterMatchesHint":
+    "Review the active bin rules and filters above, or clear filters to broaden your search.",
   "grid.empty": "No media to display.",
   "grid.emptyHint": 'Run "Scan" to list videos and images here.',
   "grid.searchByTag": 'Filter by "{name}"',
@@ -805,6 +923,7 @@ export const en: Record<TranslationKey, string> = {
   "tags.value.orientSquare": "Square",
 
   // workspace rail
+  "workspace.navigation": "Library navigation",
   "workspace.all": "All",
   "workspace.settings": "Settings",
   "workspace.edit": "Edit workspace",

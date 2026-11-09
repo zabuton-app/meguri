@@ -2,6 +2,105 @@
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
   // アプリ名（表示名の漢字1文字。ガイドライン00）
+  "audio.sampleRateMatch": "サンプルレートの一致条件",
+  "audio.bitDepthMatch": "ビット深度の一致条件",
+  "audio.durationMatch": "時間の一致条件",
+  "audio.durationFormat": "時間の入力形式",
+  "audio.seconds": "秒",
+  "audio.minutes": "分",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "分:秒 (MM:SS)",
+  "audio.durationTimeHint":
+    "MM:SS形式で入力してください。例：02:30は2分30秒。秒は00〜59です。",
+  "audio.durationMinutesHint": "分で入力してください。例：2.5は2分30秒です。",
+  "audio.durationSecondsHint": "秒で入力してください。例：150は2分30秒です。",
+  "audio.atMost": "以下",
+  "audio.between": "範囲",
+  "audio.durationOrderError": "最短時間は最長時間以下にしてください。",
+  "recent.title": "新しいファイル",
+  "recent.window": "期間",
+  "recent.basis": "新しさの基準",
+  "recent.today": "今日",
+  "recent.thisWeek": "今週",
+  "recent.lastHour": "過去1時間",
+  "recent.last24Hours": "過去24時間",
+  "recent.last7Days": "過去7日間",
+  "recent.added": "Meguriで初めて検出した日時",
+  "recent.created": "ファイルの作成日時",
+  "recent.addedHint":
+    "メディア内の日付ではなく、このカタログに初めて追加された日時を使います。",
+  "recent.createdHint":
+    "ファイルシステムの作成日時を使います。日時が不明なファイルは一致しません。",
+  "recent.calendarHint":
+    "今日と今週はローカル時間に基づきます。週は月曜日から始まります。",
+  "watch.title": "フォルダー監視",
+  "watch.off": "オフ",
+  "watch.enable": "スキャン済みフォルダーを自動監視",
+  "watch.hint":
+    "Meguriの実行中に更新します。ファイルシステム通知を利用し、ダウンロードが落ち着いてから処理します。",
+  "watch.count": "{count}個のフォルダーを監視中。",
+  "watch.unavailable":
+    "{count}個のフォルダーを監視できません。スキャンで更新してください。",
+  "watch.error": "フォルダー監視設定を読み込みまたは更新できませんでした。",
+  "audio.filters": "オーディオの詳細",
+  "audio.any": "指定なし",
+  "audio.sampleRate": "サンプルレート",
+  "audio.bitDepth": "ビット深度",
+  "audio.bits": "{count}ビット",
+  "audio.channels": "チャンネル",
+  "audio.mono": "モノラル",
+  "audio.stereo": "ステレオ",
+  "audio.multichannel": "マルチチャンネル",
+  "audio.channelCount": "{count}チャンネル",
+  "audio.bitRate": "ビットレート",
+  "audio.bitRateMin": "最小ビットレート (kbps)",
+  "audio.durationMin": "最短時間（秒）",
+  "audio.durationMax": "最長時間（秒）",
+  "audio.unknownHint":
+    "値が不明なファイルは、その項目のフィルターに一致しません。",
+  "kind.visual": "動画＋画像",
+  "resolution.title": "解像度",
+  "resolution.any": "すべての解像度",
+  "resolution.match": "解像度の条件",
+  "resolution.atLeast": "以上",
+  "resolution.exact": "完全一致",
+  "smartBin.leave": "スマートビンから退出",
+  "smartBin.omitted":
+    "今回の表示では除外: {filters}。退出して戻ると再確認します。",
+  "smartBin.global": "全体",
+  "smartBin.local": "フォルダー",
+  "smartBin.location": "検索場所",
+  "smartBin.locationPending": "ライブラリを読み込み中…",
+  "smartBin.browse": "スマートビンなしで閲覧",
+  "smartBin.noLocal":
+    "フォルダーモードを使うにはスキャンフォルダーを追加してください。",
+  "smartBin.globalHint": "すべてのスキャンフォルダーを検索します。",
+  "smartBin.localHint":
+    "最後に閲覧したフォルダーに戻ります。左側で別のフォルダーも選べます。",
+  "smartBin.scopeManaged": "スマートビン横の切り替えで検索範囲を選びます。",
+  "smartBin.inactiveFilters": "記憶したフィルター — 未適用",
+  "smartBin.enableFilter": "フィルターを有効化: {filter}",
+  "smartBin.off": "オフ",
+  "smartBin.unavailable": "使用不可",
+  "smartBin.offHint":
+    "現在は使用可能です。クリックで有効化します。ビンの編集では自動的に有効になりません。",
+  "smartBin.unavailableHint":
+    "このフィルターは現在のビンの条件と一致しません。",
+  "smartBin.title": "スマートビン",
+  "smartBin.create": "スマートビンを作成",
+  "smartBin.edit": "スマートビンを編集",
+  "smartBin.delete": "スマートビンを削除",
+  "smartBin.deleteConfirm": "スマートビン「{name}」を削除しますか？",
+  "smartBin.name": "名前",
+  "smartBin.scope": "検索範囲",
+  "smartBin.all": "すべてのスキャン済みフォルダー",
+  "smartBin.selected": "選択中のスキャン済みフォルダー",
+  "smartBin.current": "現在の表示",
+  "smartBin.live":
+    "スキャンや評価・タグの変更に応じて、条件に合うファイルが更新されます。",
+  "smartBin.empty":
+    "検索を保存して、カタログ全体から条件に合うメディアを見つけられます。",
+
   "app.name": "巡",
 
   // 共通
@@ -48,10 +147,10 @@ export const ja = {
   "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
   "settings.hoverPreview": "ホバープレビュー",
   "settings.hoverPreviewDesc":
-    "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
+    "動画サムネ上で左右に動かしてプレビュー。Option/Alt を押すとアイコンを非表示にし、Command/Ctrl も押すと拡大表示します。",
   "settings.frameQuality": "プレビュー画質",
   "settings.frameQualityDesc":
-    "ディスカバリーのホバープレビューとシーンレールの画質。高いほど生成が遅くなります。",
+    "サムネイルとディスカバリーのホバープレビュー、シーンレールの画質。高いほど生成が遅くなります。",
   "settings.frameQualityLow": "低 (240px)",
   "settings.frameQualityStandard": "標準 (480px)",
   "settings.frameQualityHigh": "高 (960px)",
@@ -216,6 +315,15 @@ export const ja = {
   "media.openAsPeek": "サイドピークで開く",
   "media.openAsModal": "モーダルで開く",
   "media.peekResize": "サイドピークの幅を変更",
+  "media.moveWindow": "ドラッグしてウィンドウを移動",
+  "media.movePlayer":
+    "プレーヤーを移動（タイトルバーをドラッグ、または矢印キー）",
+  "media.popout": "別のウィンドウで開く",
+  "media.popoutFailed": "プレビューウィンドウを開けませんでした。",
+  "media.resizeWidth": "プレーヤーの幅を変更",
+  "media.resizeHeight": "プレーヤーの高さを変更",
+  "media.resizePlayer":
+    "プレーヤーのサイズを変更（角をドラッグ、または矢印キー）",
   "media.playAsPlaylist": "ここからプレイリスト再生",
   "media.deleteFromIndex": "インデックスから削除",
   "media.deleteFromIndexConfirm":
@@ -382,6 +490,16 @@ export const ja = {
   "select.tagsFailed": "タグを適用できませんでした: {msg}",
 
   // メディアグリッド
+  "home.noCombinationMatches":
+    "フィルターの組み合わせに一致するファイルはありません。",
+  "home.pausedFilterHint":
+    "一時停止中のフィルター: {filters}。有効にするか削除するか、対応するビンを選んでください。一時停止中はメディアを表示しません。",
+  "smartBin.removeHeld": "記憶したフィルターを削除: {filter}",
+  "smartBin.pausedResultsHint":
+    "これらのフィルターがオフの間、結果は一時停止します。有効にするか削除して続行してください。",
+  "home.noFilterMatches": "このフィルター条件に一致するファイルはありません。",
+  "home.noFilterMatchesHint":
+    "上のスマートビンのルールとフィルターを確認するか、フィルターを解除して検索範囲を広げてください。",
   "grid.empty": "表示できるメディアがありません。",
   "grid.emptyHint":
     "「スキャン」を実行すると、配下の動画・画像がここに並びます。",
@@ -811,6 +929,7 @@ export const ja = {
   "tags.value.orientSquare": "正方形",
 
   // ワークスペースレール
+  "workspace.navigation": "ライブラリナビゲーション",
   "workspace.all": "すべて",
   "workspace.settings": "設定",
   "workspace.edit": "ワークスペースを編集",

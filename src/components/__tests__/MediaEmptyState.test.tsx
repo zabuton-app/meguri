@@ -4,6 +4,18 @@ import { MediaEmptyState } from "@/components/MediaEmptyState";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
 describe("MediaEmptyState", () => {
+  it("explains empty filter results without suggesting a scan", () => {
+    renderWithProviders(<MediaEmptyState filtered />);
+
+    expect(screen.getByRole("status").textContent).toContain(
+      "No files match these filter criteria.",
+    );
+    expect(
+      screen.getByText(/active bin rules and filters above/i),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Run.*Scan/i)).toBeNull();
+  });
+
   it("tells the user to scan for a regular empty workspace", () => {
     renderWithProviders(<MediaEmptyState />);
 

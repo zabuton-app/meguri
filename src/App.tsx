@@ -1,6 +1,7 @@
 // Routing. List / detail / settings.
 import { createHashRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
+import { useCatalogueWindowSync } from "@/hooks/useCatalogueWindowSync";
 import Home from "@/routes/Home";
 import MediaDetail from "@/routes/MediaDetail";
 import Discover from "@/routes/Discover";
@@ -23,6 +24,7 @@ import { registerRouterNavigate } from "@/lib/routerBridge";
 // /file/:id, /play and /settings are child routes of Home so a modal overlays on top while the list stays mounted
 // (the player also inherits the list order through MediaNavContext).
 const router = createHashRouter([
+  { path: "/detached/:id", element: <MediaDetail detached /> },
   {
     path: "/",
     element: <Home />,
@@ -43,9 +45,18 @@ const router = createHashRouter([
 registerRouterNavigate((to, opts) => void router.navigate(to, opts));
 
 export default function App() {
+  useCatalogueWindowSync();
   useContentZoom();
   useSelectAllGuard();
   useUpdateNotifier();
+  if (window.location.hash.startsWith("#/detached/"))
+    return (
+      <AudioPlayerProvider>
+        <div className="h-full">
+          <RouterProvider router={router} />
+        </div>
+      </AudioPlayerProvider>
+    );
   return (
     <div className="flex h-full">
       <WorkspaceRail />

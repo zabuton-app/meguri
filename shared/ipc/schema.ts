@@ -4,6 +4,9 @@
 // values can be used at runtime (e.g. for .parse() validation in main); the
 // inferred types satisfy the prior hand-written interfaces.
 import { z } from "zod";
+import { RESOLUTION_IDS } from "../resolutions.js";
+import { AUDIO_CODECS } from "../audioMetadata.js";
+import { RECENT_BASES, RECENT_PERIODS } from "../recentFiles.js";
 import { MAX_TAG_NAME, MAX_TAG_REF_NAME } from "../tags.js";
 import {
   CASE_MODES,
@@ -171,12 +174,39 @@ export const SearchCursorSchema = z.object({
 });
 export type SearchCursor = z.infer<typeof SearchCursorSchema>;
 
-export const SearchQuerySchema = z.object({
+export const SearchFilterFieldsSchema = z.object({
+  /** Internal view guard: paused filters must never broaden results to the whole bin. */
+  matchNone: z.boolean().optional(),
   q: z.string().optional(),
   tags: z.array(z.string()).optional(),
   tagSource: z.string().optional(),
   kind: z.string().optional(),
   ratingMin: z.number().optional(),
+  recent: z
+    .object({ period: z.enum(RECENT_PERIODS), basis: z.enum(RECENT_BASES) })
+    .optional(),
+  audio: z
+    .object({
+      sampleRate: z.number().int().positive().optional(),
+      sampleRateMatch: z.enum(["exact", "atLeast"]).optional(),
+      bitDepth: z.number().int().positive().optional(),
+      bitDepthMatch: z.enum(["exact", "atLeast"]).optional(),
+      channels: z.enum(["mono", "stereo", "multichannel"]).optional(),
+      codec: z.enum(AUDIO_CODECS).optional(),
+      bitRateMin: z.number().nonnegative().optional(),
+      durationMin: z.number().nonnegative().optional(),
+      durationMax: z.number().nonnegative().optional(),
+      durationMatch: z
+        .enum(["exact", "atLeast", "atMost", "between"])
+        .optional(),
+    })
+    .optional(),
+  resolution: z
+    .object({
+      preset: z.enum(RESOLUTION_IDS),
+      match: z.enum(["exact", "atLeast"]),
+    })
+    .optional(),
   favorite: z.boolean().optional(),
   /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
   duplicates: z.boolean().optional(),
@@ -207,6 +237,35 @@ export const SearchQuerySchema = z.object({
   // workspace path, where the per-core clamp doesn't bound the merged slice.
   limit: z.number().int().min(1).max(500).optional(),
 });
+
+const SearchConditionsSchema = SearchFilterFieldsSchema.transform((query) => {
+  // A saved search from an older build may contain an audio/resolution pair.
+  if (query.kind === "audio") delete query.resolution;
+  else delete query.audio;
+  if (query.audio?.sampleRate == null && query.audio)
+    delete query.audio.sampleRateMatch;
+  if (query.audio?.bitDepth == null && query.audio)
+    delete query.audio.bitDepthMatch;
+  if (query.audio) {
+    if (query.audio.durationMatch === "atLeast") delete query.audio.durationMax;
+    if (query.audio.durationMatch === "atMost") delete query.audio.durationMin;
+    if (query.audio.durationMatch === "exact") {
+      const duration = query.audio.durationMin ?? query.audio.durationMax;
+      query.audio.durationMin = duration;
+      query.audio.durationMax = duration;
+    }
+    if (query.audio.durationMin == null && query.audio.durationMax == null)
+      delete query.audio.durationMatch;
+  }
+  if (query.audio && !Object.values(query.audio).some((v) => v != null))
+    delete query.audio;
+  return query;
+});
+// A bin's rules and a visitor's filters are independent AND conditions. Keep
+// clauses flat and bounded so IPC cannot receive an arbitrarily recursive tree.
+export const SearchQuerySchema = SearchConditionsSchema.and(
+  z.object({ allOf: z.array(SearchConditionsSchema).max(32).optional() }),
+);
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 
 export const HistoryQuerySchema = z.object({

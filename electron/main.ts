@@ -17,7 +17,12 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import { DEFAULT_LOGO, loadAutoTag, loadConfig } from "./core/appConfig.js";
+import {
+  DEFAULT_LOGO,
+  loadAutoTag,
+  loadConfig,
+  normalizeDir,
+} from "./core/appConfig.js";
 import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import log, { setupLogger } from "./core/logger.js";
 import { withTimeout } from "./core/concurrency.js";
@@ -62,6 +67,7 @@ const mediaToken = randomBytes(32).toString("base64url");
 const controlToken = randomBytes(32).toString("base64url");
 const MEDIA_TOKEN_HEADER = "X-Api-Token";
 let mainWindow: BrowserWindow | null = null;
+let mediaWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 // Quit lifecycle. "disposing" = async teardown in flight (see before-quit),
 // "done" = teardown finished (or skipped) and the quit may proceed. Any
@@ -265,7 +271,7 @@ app.on("render-process-gone", (_e, wc, details) => {
  */
 function reloadRenderer(win: BrowserWindow): void {
   if (isAppUrl(win.webContents.getURL())) win.webContents.reload();
-  else loadRenderer(win);
+  else void loadRenderer(win);
 }
 
 /** Crash-loop / integrity fallback: let the user choose instead of a blank window. */
@@ -336,8 +342,9 @@ function resolveCliRoot(): string | null {
 }
 
 function emit(channel: string, payload: unknown): void {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.webContents.send(channel, payload);
+  if (channel === "workspace:changed") scans.syncWatchers();
+  for (const win of BrowserWindow.getAllWindows())
+    if (!win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
 // Scans are orchestrated by ScanManager (electron/scanManager.ts); main only
@@ -347,6 +354,10 @@ const autoTagWorker = new AutoTagWorkerClient(
 );
 const passes = new WorkspacePasses();
 const scans = new ScanManager({
+  ignoredRoots: [
+    app.getPath("userData"),
+    normalizeDir(app.getPath("userData")),
+  ],
   ws,
   queryClient,
   emit,
@@ -445,14 +456,61 @@ function createWindow(): void {
     teardownSync();
   });
 
-  loadRenderer(mainWindow);
+  void loadRenderer(mainWindow);
 }
 
 /** Load the app entry (dev server in development, bundled renderer otherwise). */
-function loadRenderer(win: BrowserWindow): void {
+function loadRenderer(win: BrowserWindow, hash = ""): Promise<void> {
   const devUrl = process.env["ELECTRON_RENDERER_URL"];
-  if (devUrl) void win.loadURL(devUrl);
-  else void win.loadFile(path.join(__dirname, "../renderer/index.html"));
+  if (devUrl) {
+    const url = new URL(devUrl);
+    url.hash = hash;
+    return win.loadURL(url.toString());
+  }
+  return win.loadFile(path.join(__dirname, "../renderer/index.html"), { hash });
+}
+
+async function openMediaWindow(input: {
+  id: number;
+  workspaceId: string;
+  sec: number;
+  autoplay: boolean;
+}): Promise<void> {
+  if (isQuitting()) return;
+  if (!mediaWindow || mediaWindow.isDestroyed()) {
+    const win = new BrowserWindow({
+      width: 1000,
+      height: 800,
+      minWidth: 480,
+      minHeight: 420,
+      title: "Meguri — Preview",
+      show: false,
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: path.join(__dirname, "../preload/preload.js"),
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        webSecurity: true,
+        devTools: isDevMode(),
+      },
+    });
+    mediaWindow = win;
+    win.on("closed", () => {
+      if (mediaWindow === win) mediaWindow = null;
+    });
+  }
+  const win = mediaWindow;
+  const params = new URLSearchParams({
+    ws: input.workspaceId,
+    t: String(input.sec),
+    autoplay: input.autoplay ? "1" : "0",
+  });
+  await loadRenderer(win, `/detached/${input.id}?${params.toString()}`);
+  if (!win.isDestroyed()) {
+    win.show();
+    win.focus();
+  }
 }
 
 /** Show and focus the main window, recreating it if it was destroyed. */
@@ -572,6 +630,7 @@ void app.whenReady().then(async () => {
     queryClient,
     positions,
     mainWindow: () => mainWindow,
+    openMediaWindow,
     mediaBase: () => (mediaPort ? `http://127.0.0.1:${mediaPort}` : null),
     isDevMode,
     emit,
@@ -594,7 +653,10 @@ void app.whenReady().then(async () => {
       mainWindow?.webContents.openDevTools({ mode: "right" });
     });
   }
-  scans.start();
+  scans.setWatching(loadConfig().watchFolders !== false);
+  if (loadConfig().watchFolders !== false) void scans.catchUp();
+  else scans.start();
+  mainWindow?.on("focus", () => scans.syncWatchers());
   scheduleStartupUpdateCheck();
 
   app.on("activate", () => showWindow());
@@ -622,6 +684,7 @@ void app.whenReady().then(async () => {
 const SHUTDOWN_DRAIN_WAIT_MS = 1_000;
 
 function stopIntake(): void {
+  scans.stopWatching();
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
   mediaServer?.close();
   controlServer?.close();
