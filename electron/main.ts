@@ -34,6 +34,7 @@ import {
 import { Workspaces } from "./core/workspaces.js";
 import {
   backupLibraryNow,
+  isLibraryLost,
   maintainLibrary,
   newestBackupTime,
 } from "./core/libraryBackup.js";
@@ -654,6 +655,19 @@ void app.whenReady().then(async () => {
   // Before any workspace opens the library: put a copy back if it is damaged,
   // and keep the copies current otherwise.
   libraryRestoredFrom = maintainLibrary(libraryDbPath(), libraryBackupDir());
+  // Still gone though copies of it exist: putting one back failed (a full
+  // disk, say). Opening a workspace now would start an empty library in its
+  // place, with every workspace's metadata out of sight and the copies aged
+  // out by empty ones. Stop before that, and leave the copies as they are.
+  if (isLibraryLost(libraryDbPath(), libraryBackupDir())) {
+    log.error("the library is missing and no copy of it could be put back");
+    dialog.showErrorBox(
+      "Meguri",
+      `Your library (${libraryDbPath()}) is missing, and Meguri could not put back a copy of it from ${libraryBackupDir()}.\n\nMeguri will quit without opening it, so the copies stay as they are. Free some disk space and start Meguri again, or copy the newest file in that folder to the library's place yourself. To start over with an empty library instead, move that folder somewhere else first.`,
+    );
+    app.exit(1);
+    return;
+  }
   ws.bootstrap(resolveCliRoot());
   // Workspaces that merged outside the startup merge (a tag rename reaching
   // every workspace, a removal) kept their own copies until now. Not when the

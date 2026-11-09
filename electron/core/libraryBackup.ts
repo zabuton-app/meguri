@@ -224,6 +224,19 @@ function restoreNewest(
 }
 
 /**
+ * Whether the library is gone while copies of it exist: what is left after
+ * maintainLibrary could not put one back. Opening a workspace then would
+ * start an empty library in its place.
+ */
+export function isLibraryLost(
+  file: string,
+  dir: string,
+  now: number = Date.now(),
+): boolean {
+  return !fs.existsSync(file) && listBackups(dir, now).length > 0;
+}
+
+/**
  * Check the library and keep its copies current; put the newest copy back
  * when it is damaged, or gone while copies of it exist (a library is only
  * ever copied once it holds something, so no copy means a first launch).

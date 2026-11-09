@@ -7,6 +7,7 @@ import {
   BACKUP_EVERY_MS,
   BACKUPS_KEPT,
   backupLibraryNow,
+  isLibraryLost,
   maintainLibrary,
   newestBackupTime,
 } from "../libraryBackup.js";
@@ -211,5 +212,44 @@ describe("maintainLibrary", () => {
       expect.any(Number),
     );
     expect(copies()).toHaveLength(2);
+  });
+});
+
+describe("isLibraryLost", () => {
+  it("is false on a first launch: no library and no copies", () => {
+    expect(maintainLibrary(library, backups, T0)).toBeNull();
+    expect(isLibraryLost(library, backups, T0)).toBe(false);
+  });
+
+  it("is false while the library is there", () => {
+    writeLibrary(3);
+    maintainLibrary(library, backups, T0);
+    expect(isLibraryLost(library, backups, T0)).toBe(false);
+  });
+
+  it("is true when the library is gone and no copy could be put back", () => {
+    writeLibrary(3);
+    maintainLibrary(library, backups, T0);
+    dateCopies(T0);
+    // Every copy unusable, then the library gone: nothing to put back.
+    for (const n of copies()) {
+      fs.writeFileSync(path.join(backups, n), "not a database ".repeat(500));
+    }
+    dateCopies(T0);
+    fs.rmSync(library);
+
+    expect(maintainLibrary(library, backups, T0 + DAY)).toBeNull();
+    expect(fs.existsSync(library)).toBe(false);
+    expect(isLibraryLost(library, backups, T0 + DAY)).toBe(true);
+  });
+
+  it("is false once a copy has been put back", () => {
+    writeLibrary(3);
+    maintainLibrary(library, backups, T0);
+    dateCopies(T0);
+    fs.rmSync(library);
+
+    expect(maintainLibrary(library, backups, T0 + DAY)).not.toBeNull();
+    expect(isLibraryLost(library, backups, T0 + DAY)).toBe(false);
   });
 });

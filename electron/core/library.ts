@@ -127,13 +127,15 @@ export function migrateWorkspaceMetadata(
       }
     })();
 
+    // The drop alone, kept small: rebuilding the keyword index grows the WAL
+    // by the whole files_fts, and on a nearly full disk that is what fails.
+    // A failed drop leaves the workspace on its own tables after the merge
+    // has committed, and edits made there are then lost to the next merge
+    // (the library's values win it).
     db.transaction(() => {
       for (const table of OWN_METADATA_TABLES) {
         db.exec(`DROP TABLE IF EXISTS main.${table}`);
       }
-      // tags_text now comes from the library, which may carry tags other
-      // workspaces gave the same content.
-      rebuildTagIndex(db);
     })();
     // Only once the drop has committed: complete with the tables still there
     // would let a write to every workspace skip them.
@@ -146,6 +148,18 @@ export function migrateWorkspaceMetadata(
     return { merged: false, failure: isDiskFull(e) ? "diskFull" : "merge" };
   }
   log.info(`merged the metadata of workspace ${workspaceId} into the library`);
+  // tags_text now comes from the library, which may carry tags other
+  // workspaces gave the same content. A failure leaves the index as it was
+  // and its sequence behind, so the catch-up right after (Core.init) or on the
+  // next open brings it up to date.
+  try {
+    db.transaction(() => rebuildTagIndex(db))();
+  } catch (e) {
+    log.warn(
+      `could not rebuild the keyword index of workspace ${workspaceId} after its merge:`,
+      e,
+    );
+  }
   // The copy stays until a copy of the library holds what it guards
   // (Workspaces.dropCoveredBackups).
   return { merged: true };
