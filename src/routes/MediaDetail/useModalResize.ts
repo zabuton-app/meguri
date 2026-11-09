@@ -177,7 +177,13 @@ export function useModalResize(
       remember(fit(next, viewport()));
     };
     const end = (ev: globalThis.PointerEvent) => {
-      if (ev.pointerId === pointerId) finish();
+      if (ev.pointerId !== pointerId) return;
+      // A pointermove can be coalesced immediately before release.
+      if (ev.type === "pointerup") {
+        next = adjust(start, edge, ev.clientX - x, ev.clientY - y);
+        setBounds(next);
+      }
+      finish();
     };
     handle.setPointerCapture(pointerId);
     window.addEventListener("pointermove", move);
