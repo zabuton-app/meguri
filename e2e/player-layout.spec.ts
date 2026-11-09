@@ -177,14 +177,11 @@ test("compact video review keeps scenes visible through edge resizing, scrolling
     await page
       .locator("video")
       .evaluate((v) => v.setAttribute("data-same-player", "yes"));
+    const title = panel.locator("[data-player-title]");
+    // Wait for a stable hit target before starting the native pointer gesture.
+    await title.hover();
     const beforeMove = (await panel.boundingBox())!;
-    const titleBar = (await panel
-      .locator("[data-player-title]")
-      .boundingBox())!;
-    await page.mouse.move(
-      titleBar.x + titleBar.width * 0.5,
-      titleBar.y + titleBar.height / 2,
-    );
+    const titleBar = (await title.boundingBox())!;
     await page.mouse.down();
     await page.mouse.move(
       titleBar.x + titleBar.width * 0.5 - 80,

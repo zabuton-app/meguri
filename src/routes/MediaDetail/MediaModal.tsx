@@ -96,6 +96,7 @@ export function MediaModal({
   // The panel element, for measuring and for live-resizing during a drag
   // without a render per pointer move (the parent's ref is served too).
   const panelRef = useRef<HTMLDivElement>(null);
+  const pressedBackdrop = useRef(false);
   useImperativeHandle(containerRef, () => panelRef.current as HTMLDivElement);
   const peek = usePeekResize(docked, panelRef);
   const modal = useModalResize(
@@ -146,7 +147,21 @@ export function MediaModal({
   return (
     <div
       className={outerClass}
-      onClick={isPeek || detached ? undefined : onClose}
+      onPointerDownCapture={(event) => {
+        pressedBackdrop.current = event.target === event.currentTarget;
+      }}
+      onClick={(event) => {
+        // A drag that starts in the player can release over the backdrop.
+        // Only a click that also started on the backdrop dismisses the player.
+        if (
+          !isPeek &&
+          !detached &&
+          pressedBackdrop.current &&
+          event.target === event.currentTarget
+        )
+          onClose();
+        pressedBackdrop.current = false;
+      }}
       role={isPeek ? undefined : "dialog"}
       aria-modal={isPeek ? undefined : "true"}
     >

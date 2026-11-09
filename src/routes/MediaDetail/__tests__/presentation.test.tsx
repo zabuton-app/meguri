@@ -195,6 +195,22 @@ describe("MediaDetail presentation", () => {
     expect(screen.getByRole("button", { name: "Enlarge modal" })).toBeTruthy();
   });
 
+  it("keeps the player open when a resize ends on the backdrop", async () => {
+    await openDetail(`/file/1?ws=${WS_ID}`);
+    const backdrop = dialog();
+    const handle = backdrop.querySelector('[data-resize-edge="right"]')!;
+
+    fireEvent.pointerDown(handle, { button: 0, clientX: 800, pointerId: 1 });
+    fireEvent.pointerUp(backdrop, { clientX: 900, pointerId: 1 });
+    fireEvent.click(backdrop);
+    expect(dialog()).toBe(backdrop);
+
+    fireEvent.pointerDown(backdrop, { button: 0, pointerId: 1 });
+    fireEvent.pointerUp(backdrop, { pointerId: 1 });
+    fireEvent.click(backdrop);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("switches to the side peek from the header, keeping the bar, and remembers it", async () => {
     await openDetail(`/file/1?ws=${WS_ID}`);
     fireEvent.click(screen.getByRole("button", { name: "Open as side peek" }));
