@@ -378,10 +378,52 @@ to carry the whole selection.
 
 ## Custom CSS
 
-Turn on **Settings → General → Custom CSS** and press **Open file**. Meguri
-creates `<userData>/custom.css` from a commented template (an existing file is
-never overwritten) and opens it in your default app. Every save applies right
-away.
+Meguri's look can be changed with plain CSS in two ways, and both can be used
+together:
+
+- **CSS themes** — whole stylesheets kept in a themes folder and picked from
+  the **Theme** list, next to the built-in themes
+- **`custom.css`** — one stylesheet always layered on top of whichever theme
+  is active, for small tweaks
+
+Every save applies right away, with no restart.
+
+### Applying a CSS theme
+
+1. Open **Settings → General → CSS theme** and press **Open themes folder**.
+   This opens `<userData>/themes/`.
+2. Put the theme's `.css` file there (the extension in lower case). It appears
+   in the **Theme** list right away, under the name from the `@name` line at
+   the top of the file (or the file name if there is none).
+3. Pick it in the **Theme** list.
+
+To try one, download a sample theme from [`docs/themes/`](docs/themes/):
+
+| File                                               | Look                  |
+| -------------------------------------------------- | --------------------- |
+| [cyberpunk.css](docs/themes/cyberpunk.css)         | Neon on black         |
+| [oled.css](docs/themes/oled.css)                   | True black            |
+| [matrix.css](docs/themes/matrix.css)               | Green terminal rain   |
+| [sky.css](docs/themes/sky.css)                     | Sky, clouds and trees |
+| [high-contrast.css](docs/themes/high-contrast.css) | 7:1 text, bold lines  |
+
+Each has a dark and a light variant, picked by the app's light / dark switch.
+The sample themes Cyberpunk (dark) and Sky (light); see
+[the sample themes](docs/theming.md#sample-themes) for every one in both
+variants:
+
+![Cyberpunk sample theme, dark](./docs/assets/css-theme-cyberpunk-dark.png)
+
+![Sky sample theme, light](./docs/assets/css-theme-sky-light.png)
+
+### Applying custom.css
+
+1. Open **Settings → General → Custom CSS** and turn the switch on.
+2. Press **Open file**. Meguri creates `<userData>/custom.css` from a
+   commented template (an existing file is never overwritten) and opens it in
+   your default app.
+3. Edit and save the file. `custom.css` applies on top of the active theme,
+   including a CSS theme. Pasting a sample theme into it works too.
 
 Theme colors are the `--c-*` CSS variables. The themes declare them on
 `html[data-theme="<id>"]`, so a plain `:root` rule loses to them; target
@@ -402,26 +444,15 @@ html[data-appearance="dark"] {
 
 Parts of the UI carry a `data-slot` attribute, such as `workspace-rail` for
 the side rail. See [Theming Meguri with CSS](docs/theming.md) for every
-variable and slot, what is safe to rely on across updates, contrast guidance,
-and [sample themes](docs/themes/).
+variable and slot, what is safe to rely on across updates, and contrast
+guidance.
 
-To switch between several themes, put their `.css` files in
-`<userData>/themes/` (**Settings → General → CSS theme → Open themes folder**)
-and pick one in the **Theme** list, where they appear next to the built-in
-themes. `custom.css` still applies on top.
-
-The sample themes Cyberpunk (dark) and Sky (light); see
-[the sample themes](docs/theming.md#sample-themes) for every one in both
-variants:
-
-![Cyberpunk sample theme, dark](./docs/assets/css-theme-cyberpunk-dark.png)
-
-![Sky sample theme, light](./docs/assets/css-theme-sky-light.png)
+### Safety and recovery
 
 External resources (`@import` or `url()` pointing at the network) are blocked by
 the app's Content Security Policy, so a stylesheet cannot make Meguri go
 online. If a stylesheet makes the UI unusable, delete or rename `custom.css`
-and the app returns to normal.
+(or the theme file in `<userData>/themes/`) and the app returns to normal.
 
 ## Where Data Is Stored
 
