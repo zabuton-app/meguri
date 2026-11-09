@@ -535,9 +535,11 @@ describe("GraphView", () => {
 
   it("cools the graph down when the dragged node left with the data", async () => {
     const release = vi.spyOn(SimClient.prototype, "release");
+    const load = vi.spyOn(SimClient.prototype, "load");
     const { queryClient } = render();
     await readyToDrag();
     fireEvent.mouseDown(screen.getByTestId(`node ${fk("c.mp4")}`));
+    const loads = load.mock.calls.length;
     api.graphBuild.mockResolvedValue(payloadOf(FILES.slice(0, 2)));
     await act(() =>
       queryClient.invalidateQueries({ queryKey: ["graph_build"] }),
@@ -545,6 +547,9 @@ describe("GraphView", () => {
     await waitFor(() =>
       expect(canvas.props?.visibility.nodes.has(fk("c.mp4"))).toBe(false),
     );
+    // The new graph is drawn before the effect that hands it to the
+    // simulation runs; until then the old index still holds the node.
+    await waitFor(() => expect(load.mock.calls.length).toBeGreaterThan(loads));
     // The canvas ends the drag of a node that is gone.
     const props = canvas.props as unknown as { onDragEnd: (k: string) => void };
     act(() => props.onDragEnd(fk("c.mp4")));
