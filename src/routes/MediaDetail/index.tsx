@@ -1,12 +1,13 @@
 // File detail + player. /file/:id. Plays via local HTTP serving, offers external-player launch,
-// tag editing, rating, and metadata display. Single-column YouTube-like layout: a large
-// player on top, title/controls right below, then meta, tags, scenes, and history stacked as cards.
+// tag editing, rating, and metadata display. The video and scene rail share a
+// bounded review area; details scroll separately so picking a scene never hides playback.
 //
 // This file composes the route. The pieces live beside it: where closing lands
 // (useCloseTarget), modal / side peek / full screen (useDetailPresentation),
 // every write to the file (useDetailMutations), audio in the bottom bar
 // (useAudioDetail), prev/next (usePrevNextNavigation), and the title row,
 // rating/tags card and play history as components.
+import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -51,7 +52,11 @@ import {
 
 const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
 
-export default function MediaDetail() {
+export default function MediaDetail({
+  detached = false,
+}: {
+  detached?: boolean;
+}) {
   const { t } = useI18n();
   const { id } = useParams();
   const fileId = Number(id);
@@ -141,6 +146,7 @@ export default function MediaDetail() {
   const {
     modalSize,
     toggleModalSize,
+    compactModal,
     presentation,
     setPresentation,
     isPeek,
@@ -202,13 +208,36 @@ export default function MediaDetail() {
   // Include the workspace ID in the URL path (/ws/<id>/...) to avoid collisions with another DB after switching.
   const mediaSrc =
     mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
-  const { onClose, openPlaylist } = useCloseTarget({
+  const { onClose: closeInApp, openPlaylist } = useCloseTarget({
     fileId,
     wsId,
     startAt,
     playerRef,
     mediaSrc,
   });
+
+  const onClose = useCallback(() => {
+    if (detached) window.close();
+    else closeInApp();
+  }, [detached, closeInApp]);
+  const openPopout = async () => {
+    const video = modalRef.current?.querySelector("video");
+    const playing = !!video && !video.paused;
+    const sec = playerRef.current?.currentTime() ?? 0;
+    playerRef.current?.pause();
+    try {
+      await api.mediaPopout(fileId, wsId, sec, playing);
+      onClose();
+    } catch (error) {
+      if (playing) void video?.play().catch(() => {});
+      console.error("Preview window failed", error);
+      toast.error(t("media.popoutFailed"));
+    }
+  };
+  useEffect(() => {
+    if (detached && detail.data)
+      document.title = `${fileNameOf(detail.data.relPath)} — Meguri`;
+  }, [detached, detail.data]);
 
   // Bar suppression, auto-start and video↔audio exclusivity for audio files.
   const {
@@ -282,17 +311,20 @@ export default function MediaDetail() {
   if (detail.isLoading) {
     return (
       <MediaModal
+        detached={detached}
         onClose={onClose}
         size={modalSize}
+        onResize={compactModal}
         presentation={presentation}
         t={t}
       >
         <TopBar
+          detached={detached}
           onClose={onClose}
           size={modalSize}
-          onToggleSize={toggleModalSize}
+          onToggleSize={detached ? undefined : toggleModalSize}
           presentation={presentation}
-          onSetPresentation={setPresentation}
+          onSetPresentation={detached ? undefined : setPresentation}
           t={t}
         />
         <div className="flex w-full flex-col gap-4 px-4 py-4">
@@ -307,17 +339,20 @@ export default function MediaDetail() {
   if (!d) {
     return (
       <MediaModal
+        detached={detached}
         onClose={onClose}
         size={modalSize}
+        onResize={compactModal}
         presentation={presentation}
         t={t}
       >
         <TopBar
+          detached={detached}
           onClose={onClose}
           size={modalSize}
-          onToggleSize={toggleModalSize}
+          onToggleSize={detached ? undefined : toggleModalSize}
           presentation={presentation}
-          onSetPresentation={setPresentation}
+          onSetPresentation={detached ? undefined : setPresentation}
           t={t}
         />
         <Centered>{t("media.notFound")}</Centered>
@@ -334,8 +369,10 @@ export default function MediaDetail() {
 
   return (
     <MediaModal
+      detached={detached}
       onClose={onClose}
       size={modalSize}
+      onResize={compactModal}
       presentation={presentation}
       fullscreen={isFullscreen}
       containerRef={modalRef}
@@ -343,6 +380,7 @@ export default function MediaDetail() {
     >
       {!isFullscreen && (
         <TopBar
+          detached={detached}
           onClose={onClose}
           title={basename}
           onPrev={goPrev}
@@ -351,88 +389,125 @@ export default function MediaDetail() {
           canNext={canNext}
           prevHint={formatChords(navBinding.prev)}
           nextHint={formatChords(navBinding.next)}
-          onOpenPlaylist={hasList ? openPlaylist : undefined}
+          onOpenPlaylist={!detached && hasList ? openPlaylist : undefined}
+          onPopout={
+            !detached && d.kind !== "audio"
+              ? () => void openPopout()
+              : undefined
+          }
           canOpenPlaylist={canOpenPlaylist}
           size={modalSize}
-          onToggleSize={toggleModalSize}
+          onToggleSize={detached ? undefined : toggleModalSize}
           presentation={presentation}
-          onSetPresentation={setPresentation}
+          onSetPresentation={detached ? undefined : setPresentation}
           t={t}
         />
       )}
 
-      <ScrollArea className="page-scroll min-h-0 flex-1">
+      {d.kind === "video" && (
+        <div
+          className="detail-review flex min-h-0 flex-[3] flex-col gap-2 p-3"
+          data-slot="detail-review"
+        >
+          <div className="min-h-0 flex-1" data-slot="detail-video">
+            <VideoPlayer
+              ref={playerRef}
+              fitToParent
+              id={fileId}
+              src={mediaSrc}
+              duration={d.duration}
+              width={d.width}
+              height={d.height}
+              mediaBase={mediaBase}
+              wsId={wsId}
+              startAt={startAt}
+              autoplay={autoplay}
+              navKeys={navBinding}
+              fullscreenTargetRef={modalRef}
+              bookmarks={d.bookmarks}
+              bookmarkPending={actions.pending.bookmark}
+              onAddBookmark={actions.addBookmark}
+              onRemoveBookmark={actions.removeBookmark}
+              exportPending={actions.pending.export}
+              onExportFrame={actions.exportFrame}
+              onNativeDuration={setNativeDur}
+              onPlayed={() => {
+                invalidatePlayedSearches(qc);
+                dropFromWatchLaterCache(qc, wsId, fileId);
+              }}
+              onOpenExternal={() => {
+                dropFromWatchLaterCache(qc, wsId, fileId);
+                invalidatePlayedSearches(qc);
+              }}
+              // Video demands attention, background audio yields. Pause rather
+              // than close, so the bar stays visible and the user can resume.
+              onPlaybackStart={claimPlayback}
+              t={t}
+            />
+          </div>
+          {/* Scenes: evenly spaced thumbnails. Click to seek to that position. */}
+          {total != null && total > 0 && (
+            <Scenes
+              id={fileId}
+              total={total}
+              mediaBase={mediaBase}
+              wsId={wsId}
+              thumbOffsetSec={d.thumbOffsetSec}
+              pendingThumbSec={actions.pendingThumbSec}
+              // Status alone, not hasThumbFile: a video marked done always has
+              // a frame behind it, and the scene picker shows the slot itself.
+              mainThumbUrl={
+                d.thumbStatus === "done"
+                  ? thumbUrl(mediaBase, wsId, fileId, thumbVersion)
+                  : null
+              }
+              mainThumbPending={actions.pending.mainThumb}
+              onSeek={(sec) => playerRef.current?.seek(sec)}
+              onSetMainThumb={actions.setMainThumb}
+              t={t}
+            />
+          )}
+        </div>
+      )}
+
+      <ScrollArea
+        className="page-scroll min-h-0 flex-1"
+        data-slot="detail-metadata"
+      >
         <div className="flex w-full flex-col gap-4 px-4 py-4">
           {/* Player / viewer */}
-          {d.kind === "video" ? (
-            // In fullscreen, cancel the surrounding padding so the video is
-            // edge-to-edge for the first screenful (the rest scrolls below).
-            <div className={isFullscreen ? "-mx-4 -mt-4" : "contents"}>
-              <VideoPlayer
-                ref={playerRef}
-                id={fileId}
-                src={mediaSrc}
-                duration={d.duration}
-                width={d.width}
-                height={d.height}
-                mediaBase={mediaBase}
-                wsId={wsId}
-                startAt={startAt}
-                autoplay={autoplay}
-                navKeys={navBinding}
-                fullscreenTargetRef={modalRef}
-                bookmarks={d.bookmarks}
-                bookmarkPending={actions.pending.bookmark}
-                onAddBookmark={actions.addBookmark}
-                onRemoveBookmark={actions.removeBookmark}
-                exportPending={actions.pending.export}
-                onExportFrame={actions.exportFrame}
-                onNativeDuration={setNativeDur}
-                onPlayed={() => {
-                  invalidatePlayedSearches(qc);
-                  dropFromWatchLaterCache(qc, wsId, fileId);
-                }}
-                onOpenExternal={() => {
-                  dropFromWatchLaterCache(qc, wsId, fileId);
-                  invalidatePlayedSearches(qc);
-                }}
-                // Video demands attention, background audio yields. Pause rather
-                // than close, so the bar stays visible and the user can resume.
-                onPlaybackStart={claimPlayback}
-                t={t}
-              />
-            </div>
-          ) : d.kind === "audio" ? (
-            // In the peek the bottom bar stays on screen as the transport, so
-            // the sheet shows the track as a tile rather than a second stage.
-            isPeek ? (
-              <AudioCompact
-                file={d}
-                wsId={wsId}
-                mediaBase={mediaBase}
-                coverSrc={coverSrc}
-              />
+          {d.kind !== "video" &&
+            (d.kind === "audio" ? (
+              // In the peek the bottom bar stays on screen as the transport, so
+              // the sheet shows the track as a tile rather than a second stage.
+              isPeek ? (
+                <AudioCompact
+                  file={d}
+                  wsId={wsId}
+                  mediaBase={mediaBase}
+                  coverSrc={coverSrc}
+                />
+              ) : (
+                <AudioStage
+                  file={d}
+                  wsId={wsId}
+                  mediaBase={mediaBase}
+                  coverSrc={coverSrc}
+                />
+              )
             ) : (
-              <AudioStage
-                file={d}
-                wsId={wsId}
-                mediaBase={mediaBase}
-                coverSrc={coverSrc}
-              />
-            )
-          ) : (
-            <div
-              className={`flex justify-center overflow-hidden rounded-xl ${
-                imageBgInverted ? "bg-white" : "bg-black"
-              }`}
-            >
-              <img
-                src={mediaSrc}
-                alt={d.relPath}
-                className="max-h-[78vh] max-w-full object-contain"
-              />
-            </div>
-          )}
+              <div
+                className={`flex justify-center overflow-hidden rounded-xl ${
+                  imageBgInverted ? "bg-white" : "bg-black"
+                }`}
+              >
+                <img
+                  src={mediaSrc}
+                  alt={d.relPath}
+                  className="max-h-[78vh] max-w-full object-contain"
+                />
+              </div>
+            ))}
 
           {/* Resumed where it was left: say so, and offer the way back to
               zero. Audio only when this view started the track itself —
@@ -474,29 +549,6 @@ export default function MediaDetail() {
             }
             t={t}
           />
-
-          {/* Scenes: evenly spaced thumbnails. Click to seek to that position. */}
-          {d.kind === "video" && total && (
-            <Scenes
-              id={fileId}
-              total={total}
-              mediaBase={mediaBase}
-              wsId={wsId}
-              thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={actions.pendingThumbSec}
-              // Status alone, not hasThumbFile: a video marked done always has
-              // a frame behind it, and the scene picker shows the slot itself.
-              mainThumbUrl={
-                d.thumbStatus === "done"
-                  ? thumbUrl(mediaBase, wsId, fileId, thumbVersion)
-                  : null
-              }
-              mainThumbPending={actions.pending.mainThumb}
-              onSeek={(sec) => playerRef.current?.seek(sec)}
-              onSetMainThumb={actions.setMainThumb}
-              t={t}
-            />
-          )}
 
           {/* User-curated scene bookmarks. Hidden when empty (the player has a button to add one). */}
           {d.kind === "video" && d.bookmarks.length > 0 && (

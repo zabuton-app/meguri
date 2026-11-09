@@ -21,6 +21,12 @@ export interface IpcContext {
   // these freely, and none of them relies on `this`.
   /** Live values, read on each call: they change after registration. */
   mainWindow: () => BrowserWindow | null;
+  openMediaWindow?: (input: {
+    id: number;
+    workspaceId: string;
+    sec: number;
+    autoplay: boolean;
+  }) => Promise<void>;
   mediaBase: () => string | null;
   isDevMode: () => boolean;
   /** Send an event to the renderer (no-op when the window is gone). */

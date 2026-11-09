@@ -266,6 +266,10 @@ const FileTarget = z.object({
 
 export const ChannelInputs = {
   app_status: z.void(),
+  media_popout: FileTarget.extend({
+    sec: z.number().finite().min(0).max(MAX_MEDIA_SEC),
+    autoplay: z.boolean(),
+  }),
   about_info: z.void(),
   workspace_stats: z.void(),
   workspaces_list: z.void(),
@@ -604,6 +608,7 @@ export interface WorkspaceAddResult {
 // signature and the renderer client wrapper to match.
 export interface ChannelOutputs {
   app_status: AppStatus;
+  media_popout: void;
   about_info: AboutInfo;
   workspace_stats: WorkspaceStats;
   workspaces_list: WorkspacesList;

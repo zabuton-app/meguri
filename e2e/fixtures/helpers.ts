@@ -40,7 +40,8 @@ export async function openFileDetail(
 ): Promise<Locator> {
   await waitForIndexedMedia(page, fileName);
   await page
-    .getByRole("link", { name: new RegExp(fileName) })
+    .getByRole("main")
+    .getByText(fileName, { exact: true })
     .first()
     .click();
   const dialog = page.getByRole("dialog");

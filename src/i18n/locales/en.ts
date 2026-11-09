@@ -234,6 +234,13 @@ export const en: Record<TranslationKey, string> = {
   "media.deleteFileFromIndexConfirm":
     'Delete "{name}" from the index?\nIt will not be registered again by future scans.',
   "media.moreActions": "More actions",
+  "media.movePlayer": "Move player (drag title bar or use arrow keys)",
+  "media.moveWindow": "Drag to move this window",
+  "media.popout": "Open in separate window",
+  "media.popoutFailed": "Could not open the preview window.",
+  "media.resizePlayer": "Resize player (drag corner or use arrow keys)",
+  "media.resizeWidth": "Resize player width",
+  "media.resizeHeight": "Resize player height",
   "media.prev": "Previous file",
   "media.next": "Next file",
   "shortcuts.title": "Keyboard shortcuts",

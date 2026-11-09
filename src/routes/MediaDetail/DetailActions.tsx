@@ -15,6 +15,7 @@ import { api } from "@/ipc/client";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { Button } from "@/components/ui/button";
+import { MediaFileName, FileExtensionBadge } from "@/components/MediaFileName";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
   DropdownMenu,
@@ -75,10 +76,14 @@ export function DetailActions({
       <div className="min-w-0 flex-1">
         {/* File name and folder are the two strings users copy out. */}
         <h1
-          className="select-text truncate text-lg font-semibold text-bright-fg"
+          className="flex min-w-0 select-text items-center gap-2 text-lg font-semibold text-bright-fg"
           title={detail.relPath}
+          aria-label={basename}
         >
-          {basename}
+          <span className="min-w-0 truncate">
+            <MediaFileName relPath={basename} />
+          </span>
+          <FileExtensionBadge relPath={basename} />
         </h1>
         {dir && (
           <p

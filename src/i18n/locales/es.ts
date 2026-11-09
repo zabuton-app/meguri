@@ -238,6 +238,15 @@ export const es: Record<TranslationKey, string> = {
   "media.deleteFileFromIndexConfirm":
     "¿Eliminar «{name}» del índice?\nNo se volverá a registrar en futuros escaneos.",
   "media.moreActions": "Más acciones",
+  "media.movePlayer":
+    "Mover reproductor (arrastrar la barra de título o usar las flechas)",
+  "media.moveWindow": "Arrastra para mover esta ventana",
+  "media.popout": "Abrir en una ventana independiente",
+  "media.popoutFailed": "No se pudo abrir la ventana de vista previa.",
+  "media.resizePlayer":
+    "Cambiar el tamaño del reproductor (arrastrar la esquina o usar las flechas)",
+  "media.resizeWidth": "Cambiar el ancho del reproductor",
+  "media.resizeHeight": "Cambiar la altura del reproductor",
   "media.prev": "Archivo anterior",
   "media.next": "Archivo siguiente",
   "shortcuts.title": "Atajos de teclado",

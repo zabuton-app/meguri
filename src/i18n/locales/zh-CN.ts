@@ -227,6 +227,13 @@ export const zhCN: Record<TranslationKey, string> = {
   "media.deleteFileFromIndexConfirm":
     "要将“{name}”从索引中删除吗？\n以后扫描将不会再次注册它。",
   "media.moreActions": "更多操作",
+  "media.movePlayer": "移动播放器（拖动标题栏或使用方向键）",
+  "media.moveWindow": "拖动以移动此窗口",
+  "media.popout": "在独立窗口中打开",
+  "media.popoutFailed": "无法打开预览窗口。",
+  "media.resizePlayer": "调整播放器大小（拖动角落或使用方向键）",
+  "media.resizeWidth": "调整播放器宽度",
+  "media.resizeHeight": "调整播放器高度",
   "media.prev": "上一个文件",
   "media.next": "下一个文件",
   "shortcuts.title": "键盘快捷键",

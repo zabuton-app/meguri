@@ -19,6 +19,55 @@ and stays fully usable along with the toolbar and the bottom player bar
 choice, the modal size and the peek width are all remembered in
 `localStorage`.
 
+File detail starts compact and centered, at about 55% of the window width up to
+960 CSS pixels. The earlier width-driven layout let the video fill most of the
+window and pushed scene selection below the fold. The frame now reserves room for
+the scene strip and gives metadata its own scroll area. Drag any edge or corner
+to resize around the opposite side, or drag the title to move the panel inside
+the app. Handles use resize cursors and focus outlines without colored hover
+fills, which previously looked like scrollbars. Focused handles accept arrow keys;
+the focused title accepts arrows to move the frame.
+
+`useModalResize.ts` clamps the frame to the current viewport, including after a
+window resize or content zoom, and remembers width, height and position on
+release. Existing width/height-only records remain valid and start centered.
+Enlarging and shrinking from the header preserves the compact bounds. Detail uses
+`meguri.media.detail.modalSize.v2` and `meguri.media.detail.dimensions.v1`. The
+new mode key starts existing users compact once. Discovery keeps its own size
+preference.
+
+The **Open in separate window** action invokes the validated `media_popout`
+channel with a file/workspace ID, playback second and play state, never a URL or
+path. Main resolves the actual file and loads the bundled `/detached/:id` route
+in a sandboxed, isolated `BrowserWindow` independent of the library. It reuses one
+preview window; native borders handle movement/resizing outside the app. That
+route mounts `MediaDetail` without Home, the workspace rail or status/audio bars;
+its frame fills the native client area and Escape/Close closes only the preview.
+The source view pauses before opening, closes after successful load, and resumes
+on failure. Main emits catalogue events to all app windows. The
+`useCatalogueWindowSync` broadcast channel invalidates the other window’s active
+queries after successful mutations, without broadcasting query refreshes or
+changing the existing local invalidation paths.
+
+For video, the player and `Scenes` live in one bounded flex area outside the
+metadata scroll region. The video uses `fitToParent` and `object-contain`
+so it yields space to the rail even for portrait footage. Container-height
+units scale the scene thumbnails with the review area, not just the window.
+Scenes scroll horizontally; their full height, seek targets, and main-thumbnail
+stars stay visible while tags, history, and other details scroll independently.
+This also holds in the side peek and detail fullscreen. Resizing or changing
+presentation keeps the same video element and its current playback position.
+
+Scene and bookmark strips use native horizontal overflow. The custom scrollbar
+could keep its drag state after lost capture or cancellation, moving the strip
+when the pointer returned to it. Native scrollbars handle release and cancellation
+without any extra pointer bookkeeping. The metadata area still scrolls separately.
+
+The detail header and filename row share `MediaFileName` with the cards and show
+`FileExtensionBadge` beside the stem. The extension stays visible without taking
+space inside a long name. Tooltips, accessibility, copying a path, search and
+file actions retain the original filename.
+
 Each route is a directory: `index.tsx` is the entry point and composes the
 route, sitting alongside its companion components and hooks — for example
 `src/routes/MediaDetail/MediaModal.tsx`,
@@ -432,6 +481,21 @@ the Discover main media); the `hoverPreview` preference in
 `PreferencesProvider` toggles it.
 
 Styling is Tailwind CSS v4 (`@tailwindcss/vite`). `@/*` is an alias for `src/*`.
+
+### Thumbnail scrubbing
+
+Hover a video in the grid or list and move the pointer across the thumbnail to
+scrub. Hold **Option** (**Alt**) to hide thumbnail controls. Hold
+**Command + Option** (**Ctrl + Alt**) for a larger frame next to the thumbnail.
+Keep the pointer on the original thumbnail. Release the keys or move away to
+return to the normal preview.
+
+`useThumbnailScrub` binds to the thumbnail surface, including its sibling
+controls, and registers key listeners only while hovered. A pointer-transparent
+portal shows the enlarged frame beside the original without affecting the
+virtualized card layout. The thumbnail and portal share the sequential frame
+loader. Enlarged previews request 720px frames, or 960px at the High setting.
+Ordinary hover previews keep the configured quality.
 
 ## Internationalization
 
