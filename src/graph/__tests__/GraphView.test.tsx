@@ -184,6 +184,16 @@ async function ready() {
   await screen.findByTestId(`node ${fk("a.mp4")}`);
 }
 
+/**
+ * ready(), and the simulation loaded too: a node is drawn before the effect
+ * that hands the graph to the simulation runs, and a drag before it finds no
+ * node to hold. That effect frames the graph as it ends (fit(false)).
+ */
+async function readyToDrag() {
+  await ready();
+  await waitFor(() => expect(canvas.fit).toHaveBeenCalledWith(false));
+}
+
 describe("GraphView", () => {
   it("draws the files and tags, hiding generated tags and orphans by default", async () => {
     render();
@@ -338,7 +348,7 @@ describe("GraphView", () => {
 
   it("shows a file's thumbnail while the pointer is on its node", async () => {
     const { container } = render();
-    await ready();
+    await readyToDrag();
     const preview = () =>
       container.querySelector('[data-slot="graph-hover-thumbnail"] img');
     const a = screen.getByTestId(`node ${fk("a.mp4")}`);
@@ -511,7 +521,7 @@ describe("GraphView", () => {
     const drag = vi.spyOn(SimClient.prototype, "drag");
     const release = vi.spyOn(SimClient.prototype, "release");
     render();
-    await ready();
+    await readyToDrag();
     fireEvent.mouseDown(screen.getByTestId(`node ${fk("a.mp4")}`));
     // Pinned where it was, then moved with the pointer.
     expect(drag).toHaveBeenCalledTimes(2);
@@ -526,7 +536,7 @@ describe("GraphView", () => {
   it("cools the graph down when the dragged node left with the data", async () => {
     const release = vi.spyOn(SimClient.prototype, "release");
     const { queryClient } = render();
-    await ready();
+    await readyToDrag();
     fireEvent.mouseDown(screen.getByTestId(`node ${fk("c.mp4")}`));
     api.graphBuild.mockResolvedValue(payloadOf(FILES.slice(0, 2)));
     await act(() =>
