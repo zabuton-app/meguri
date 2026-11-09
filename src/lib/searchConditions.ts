@@ -27,6 +27,7 @@ import {
 } from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
+import { describeAudioFilters } from "./audioFilters";
 
 /** Which surface owns the control that sets a condition. */
 export type ConditionGroup = "primary" | "collapsed";
@@ -142,7 +143,7 @@ export function describeConditions(
       label: kindLabel(t, query.kind),
       group: "primary",
       chip: true,
-      clear: (q) => without(q, "kind"),
+      clear: (q) => without(q, "kind", "audio"),
     });
 
   if (query.ratingMin)
@@ -153,6 +154,37 @@ export function describeConditions(
       chip: true,
       clear: (q) => without(q, "ratingMin"),
     });
+
+  if (query.kind === "audio") {
+    for (const { key, label } of describeAudioFilters(t, query.audio))
+      out.push({
+        key: `audio.${key}`,
+        label,
+        group: "primary",
+        chip: true,
+        clear: (q) => {
+          const audio = { ...q.audio };
+          const exactDuration =
+            audio.durationMin != null &&
+            audio.durationMin === audio.durationMax;
+          delete audio[key];
+          if (key === "sampleRate") delete audio.sampleRateMatch;
+          if (key === "bitDepth") delete audio.bitDepthMatch;
+          if (
+            (key === "durationMin" || key === "durationMax") &&
+            exactDuration
+          ) {
+            delete audio.durationMin;
+            delete audio.durationMax;
+          }
+          if (audio.durationMin == null && audio.durationMax == null)
+            delete audio.durationMatch;
+          return Object.values(audio).some((v) => v != null)
+            ? { ...q, audio }
+            : without(q, "audio");
+        },
+      });
+  }
 
   if (query.favorite)
     out.push({

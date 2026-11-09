@@ -3,6 +3,7 @@ import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { hasTimeline, kindLabel } from "@/lib/mediaKind";
+import { readAudioMetadata, sampleRateLabel } from "@shared/audioMetadata";
 
 interface Props {
   detail: FileDetail;
@@ -23,6 +24,7 @@ export function MetaChips({
   total,
   t,
 }: Props) {
+  const audio = detail.kind === "audio" ? readAudioMetadata(detail.meta) : null;
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Chip
@@ -31,14 +33,48 @@ export function MetaChips({
         title={workspacePath || workspaceLabel || wsId}
       />
       <Chip label={t("media.metaKind")} value={kindLabel(t, detail.kind)} />
-      <Chip
-        label={t("media.metaResolution")}
-        value={
-          detail.width && detail.height
-            ? `${detail.width}×${detail.height}`
-            : "—"
-        }
-      />
+      {detail.kind !== "audio" && (
+        <Chip
+          label={t("media.metaResolution")}
+          value={
+            detail.width && detail.height
+              ? `${detail.width}×${detail.height}`
+              : "—"
+          }
+        />
+      )}
+      {audio && (
+        <>
+          <Chip
+            label={t("audio.sampleRate")}
+            value={audio.sampleRate ? sampleRateLabel(audio.sampleRate) : "—"}
+          />
+          <Chip
+            label={t("audio.bitDepth")}
+            value={
+              audio.bitDepth ? t("audio.bits", { count: audio.bitDepth }) : "—"
+            }
+          />
+          <Chip
+            label={t("audio.channels")}
+            value={
+              audio.channels === 1
+                ? t("audio.mono")
+                : audio.channels === 2
+                  ? t("audio.stereo")
+                  : audio.channels
+                    ? t("audio.channelCount", { count: audio.channels })
+                    : "—"
+            }
+          />
+          <Chip
+            label={t("audio.bitRate")}
+            value={
+              audio.bitRate ? `${Math.round(audio.bitRate / 1000)} kbps` : "—"
+            }
+          />
+        </>
+      )}
       <Chip label={t("media.metaSize")} value={formatSize(detail.size, "—")} />
       {hasTimeline(detail.kind) && (
         <>

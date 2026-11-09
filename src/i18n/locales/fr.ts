@@ -14,6 +14,42 @@ export const fr: Record<TranslationKey, string> = {
   "kind.video": "Vidéo",
   "kind.image": "Image",
   "kind.audio": "Audio",
+  "audio.sampleRateMatch": "Comparaison de fréquence d’échantillonnage",
+  "audio.bitDepthMatch": "Comparaison de profondeur de bits",
+  "audio.durationMatch": "Comparaison de durée",
+  "audio.durationFormat": "Format de durée",
+  "audio.seconds": "Secondes",
+  "audio.minutes": "Minutes",
+  "audio.mmss": "MM:SS",
+  "audio.minutesSeconds": "Minutes:secondes (MM:SS)",
+  "audio.durationTimeHint":
+    "Saisissez MM:SS, par ex. 02:30 = 2 minutes et 30 secondes. Les secondes vont de 00 à 59.",
+  "audio.durationMinutesHint":
+    "Saisissez des minutes, par ex. 2.5 = 2 minutes et 30 secondes.",
+  "audio.durationSecondsHint":
+    "Saisissez des secondes, par ex. 150 = 2 minutes et 30 secondes.",
+  "audio.atMost": "Au plus",
+  "audio.between": "Entre",
+  "audio.durationOrderError":
+    "La durée minimale ne doit pas dépasser la durée maximale.",
+  "audio.filters": "Propriétés audio",
+  "audio.any": "Tous",
+  "audio.sampleRate": "Fréquence d’échantillonnage",
+  "audio.bitDepth": "Profondeur de bits",
+  "audio.bits": "{count} bits",
+  "audio.channels": "Canaux",
+  "audio.mono": "Mono",
+  "audio.stereo": "Stéréo",
+  "audio.multichannel": "Multicanal",
+  "audio.channelCount": "{count} canaux",
+  "audio.bitRate": "Débit",
+  "audio.bitRateMin": "Débit minimal (kbps)",
+  "audio.durationMin": "Durée minimale (secondes)",
+  "audio.durationMax": "Durée maximale (secondes)",
+  "audio.unknownHint":
+    "Les fichiers dont une valeur est inconnue ne correspondent pas au filtre de cette propriété.",
+  "audio.atLeast": "Au moins",
+  "audio.exact": "Exactement",
 
   // sort
   "sort.added": "Ajout",
