@@ -23,7 +23,7 @@ jobs:
           # Intel mac (--mac --x64) was dropped: the macos-13 x64 runners are
           # being retired and queue for hours. If it is ever needed again,
           # cross-build it from an arm64 runner instead.
-          - os: macos-14
+          - os: macos-15
             platform: mac-arm64
             arch: arm64
             args: --mac --arm64
