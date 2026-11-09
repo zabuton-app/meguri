@@ -2,7 +2,7 @@
 // Tags are keyed by the stable meta_key (resolved from a file id) rather than files.id,
 // so they survive rebuilding the files table.
 import type { DB } from "./db.js";
-import { resyncTagIndexForKeys } from "./library.js";
+import { resyncTagIndexForKeys } from "./tagIndex.js";
 import type { TagInfo } from "./types.js";
 import {
   RESERVED_TAG_ERROR,

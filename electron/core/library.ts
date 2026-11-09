@@ -23,10 +23,14 @@ import {
 import { scopedLog } from "./logger.js";
 import { BOOKMARK_NEAR_EPS } from "./queries/bookmarks.js";
 import { FILE_META_MERGE_SET } from "./queries/meta.js";
-import { getSetting, setSetting } from "./queries/settings.js";
+import { setSetting } from "./queries/settings.js";
+import { FTS_TAG_SEQ_KEY, latestTagChange, tagIndexSeq } from "./tagIndex.js";
 import type { LibraryMergeFailureReason } from "../../shared/ipc/schema.js";
 
 const log = scopedLog("library");
+
+// Lives in tagIndex.ts (see there for why); still reachable from here.
+export { FTS_TAG_SEQ_KEY } from "./tagIndex.js";
 
 /** A workspace's own metadata tables, in drop order: tags last, after the
  *  meta_tags rows that reference it. */
@@ -370,28 +374,6 @@ function mergeIntoLibrary(db: DB, from: "main" | "kept" = "main"): void {
   }
 }
 
-/**
- * Workspace setting: the last `lib.tag_changes` seq this workspace's
- * files_fts.tags_text reflects. Unset until the index is first built from the
- * library.
- */
-export const FTS_TAG_SEQ_KEY = "fts_tag_seq";
-
-/** The last seq `lib.tag_changes` handed out, rows trimmed or not; 0 before the first. */
-function latestTagChange(db: DB): number {
-  const row = db
-    .prepare("SELECT seq FROM lib.sqlite_sequence WHERE name = 'tag_changes'")
-    .get() as { seq: number } | undefined;
-  return row?.seq ?? 0;
-}
-
-/** The FTS_TAG_SEQ_KEY this workspace has recorded, or null if none (or unreadable). */
-function tagIndexSeq(db: DB): number | null {
-  const stored = getSetting(db, FTS_TAG_SEQ_KEY);
-  const seq = stored === null ? NaN : Number(stored);
-  return Number.isSafeInteger(seq) ? seq : null;
-}
-
 /** Rebuild files_fts and record it as reflecting every tag change so far. Caller supplies the transaction. */
 function rebuildTagIndex(db: DB): void {
   rebuildFtsAll(db);
@@ -474,37 +456,6 @@ export function catchUpTagIndex(db: DB): void {
     resyncFtsForKeys(db, keys);
     setSetting(db, FTS_TAG_SEQ_KEY, String(latest));
   })();
-}
-
-/**
- * Re-index the files behind `metaKeys` after a tag write that changed them,
- * and record the index as current when those keys are all the log holds past
- * it: the write's own changes, so catchUpTagIndex (syncTagIndexes after every
- * write) does not apply them a second time, which for a large write would
- * mean rebuilding the whole index. Caller supplies the transaction, the one
- * the write ran in.
- */
-export function resyncTagIndexForKeys(
-  db: DB,
-  metaKeys: readonly string[],
-): void {
-  resyncFtsForKeys(db, [...metaKeys]);
-  if (usesOwnMetadata(db)) return;
-  const seen = tagIndexSeq(db);
-  const latest = latestTagChange(db);
-  if (seen === null || seen >= latest) return;
-  const { oldest } = db
-    .prepare("SELECT MIN(seq) AS oldest FROM lib.tag_changes")
-    .get() as { oldest: number | null };
-  // Rows the index has not applied are gone from the log: only a rebuild knows.
-  if (oldest === null || oldest > seen + 1) return;
-  const other = db
-    .prepare(
-      `SELECT 1 FROM lib.tag_changes WHERE seq > ?
-         AND meta_key NOT IN (SELECT value FROM json_each(?)) LIMIT 1`,
-    )
-    .get(seen, JSON.stringify(metaKeys));
-  if (!other) setSetting(db, FTS_TAG_SEQ_KEY, String(latest));
 }
 
 /**
