@@ -47,6 +47,7 @@ import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
+import { CustomCssSection } from "./CustomCssSection";
 import { useTour } from "@/tour/TourProvider";
 import {
   isSpectrumPattern,
@@ -359,6 +360,9 @@ export default function Settings() {
                   })}
                 </div>
               </section>
+
+              {/* User stylesheet (custom.css) layered over the theme */}
+              <CustomCssSection />
 
               {/* Emoji glyph style (applies to all emoji in the UI) */}
               <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">

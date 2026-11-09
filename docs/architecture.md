@@ -62,6 +62,9 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
 - `thumb:done` — a thumbnail finished generating.
 - `scan:done` — a scan job completed (with stats, or an abort/error flag).
 - `workspace:changed` — the active workspace changed.
+- `update:available` — the update check found a newer release.
+- `custom-css:changed` — `custom.css` was saved or deleted (see
+  [Custom CSS](#custom-css)).
 
 ### Adding a new IPC channel
 
@@ -359,3 +362,29 @@ default applies in every workspace, so its folder and a manual sort, both
 bound to one place, are left out (`defaultQueryOf()`). The hook is owned by
 `FilterBar`, which passes it to the menu, so the menu and "Clear all" read the
 same state.
+
+## Custom CSS
+
+The user stylesheet lives at `<userData>/custom.css` and is layered over the
+theme. Main owns the file, its watcher, and the on/off switch; the renderer only
+injects what it is given.
+
+- `electron/core/customCss.ts` reads the file, writes the template (never over
+  an existing file), and watches it. The watcher is on the directory, not the
+  file, because editors that save by renaming a new file over the old one would
+  end a watch on the file after the first save. Events are debounced so one save
+  is read once.
+- The switch is persisted as `customCss.enabled` in `config.json` (off by
+  default) and works whether or not the file exists. The watcher runs only while
+  it is on.
+- `electron/ipc/customCss.ts` handles `custom_css_get`,
+  `custom_css_set_enabled`, and `custom_css_open`, and emits
+  `custom-css:changed` with the new contents on every save or deletion.
+- `useCustomCssStyle()` (mounted once in `App`) writes the contents into a
+  `<style id="meguri-custom-css">` appended to `<head>` after the theme
+  variables, via `textContent`. `useCustomCss()` shares the state through the
+  react-query cache with the Settings section.
+- The themes declare `--c-*` on `html[data-theme="<id>"]`, so overrides must
+  match at least that specificity; the template documents this.
+- The CSS is loaded asynchronously, so on startup the plain theme can show for
+  a moment before the stylesheet applies.

@@ -198,6 +198,8 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   Discovery, or put it away from its menu
 - 🎨 **Themes** — base16-based multi-theme switching (gruvbox / solarized /
   monokai / nord / dracula, etc.)
+- 🖌️ **Custom CSS** — layer your own `custom.css` over the theme to recolor or
+  restyle the UI; saved changes apply instantly
 - 🔎 **Content zoom** — Ctrl + wheel (and Ctrl +/-/0)
 - 🔒 **Privacy-first** — no telemetry, no analytics, no external network
   communication ([see below](#privacy))
@@ -345,6 +347,57 @@ To drag a file to another app, hover over it in grid or list view and drag
 the arrow beside its selection checkbox. Drag from a selected file's arrow
 to carry the whole selection.
 
+## Custom CSS
+
+Turn on **Settings → General → Custom CSS** and press **Open file**. Meguri
+creates `<userData>/custom.css` from a commented template (an existing file is
+never overwritten) and opens it in your default app. Every save applies right
+away.
+
+Theme colors are the `--c-*` CSS variables. The themes declare them on
+`html[data-theme="<id>"]`, so a plain `:root` rule loses to them; target
+`html[data-theme]` instead, or a single theme id:
+
+```css
+/* Every theme */
+html[data-theme] {
+  --c-primary: #e06c75;
+}
+
+/* Only gruvbox dark */
+html[data-theme="gruvbox-dark"] {
+  --c-bg: #1d2021;
+}
+```
+
+Some parts of the UI carry a `data-slot` attribute to target:
+
+| `data-slot`        | Part                                                                     |
+| ------------------ | ------------------------------------------------------------------------ |
+| `workspace-rail`   | Side rail                                                                |
+| `home-header`      | Workspace info header                                                    |
+| `filter-bar`       | Search and filters                                                       |
+| `status-bar`       | Footer                                                                   |
+| `audio-player-bar` | Audio player at the bottom                                               |
+| `media-card`       | A file in the grid                                                       |
+| `media-row`        | A file in the list                                                       |
+| `folder-card`      | A folder in the grid                                                     |
+| `folder-row`       | A folder in the list                                                     |
+| `modal-panel`      | The panel of a full-size window (settings, file details, discovery, ...) |
+
+The focused item has `aria-current="true"`. For example:
+
+```css
+[data-slot="workspace-rail"] {
+  background-color: var(--c-surface);
+}
+```
+
+External resources (`@import` or `url()` pointing at the network) are blocked by
+the app's Content Security Policy, so a stylesheet cannot make Meguri go
+online. If a stylesheet makes the UI unusable, delete or rename `custom.css`
+and the app returns to normal.
+
 ## Where Data Is Stored
 
 Scan root paths are hashed for identification and managed centrally under
@@ -353,6 +406,7 @@ Electron's userData.
 ```text
 <userData>/                 # e.g. ~/.config/Meguri
 ├─ config.json              # registered workspaces and the active root
+├─ custom.css               # optional user stylesheet (see "Custom CSS")
 └─ roots/<hash of root>/
    ├─ db.sqlite             # metadata (WAL)
    └─ thumbs/               # generated thumbnails (webp)

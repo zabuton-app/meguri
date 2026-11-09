@@ -104,6 +104,7 @@ export function SettingsModal({
     >
       <div
         ref={panelRef}
+        data-slot="modal-panel"
         tabIndex={-1}
         role="dialog"
         aria-modal="true"

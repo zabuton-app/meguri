@@ -43,7 +43,20 @@ export interface AppConfig {
   logo: LogoId;
   /** Auto-tagging rules and dictionary, shared by every workspace (shared/autoTag.ts). */
   autoTag: AutoTagConfig;
+  /**
+   * User stylesheet (<userData>/custom.css). Lives here rather than in the
+   * renderer's localStorage because main owns the file watcher, which runs
+   * only while this is on.
+   */
+  customCss: CustomCssConfig;
 }
+
+export interface CustomCssConfig {
+  /** Whether custom.css is applied. Off until the user turns it on. */
+  enabled: boolean;
+}
+
+const DEFAULT_CUSTOM_CSS_CONFIG: CustomCssConfig = { enabled: false };
 
 export const DEFAULT_LOGO: LogoId = "dark";
 
@@ -109,6 +122,7 @@ export function loadConfig(): AppConfig {
       update: parseUpdateConfig(c.update),
       logo: parseLogo(c.logo),
       autoTag: parseAutoTag(c.autoTag),
+      customCss: parseCustomCss(c.customCss),
     };
   } catch {
     return {
@@ -119,8 +133,16 @@ export function loadConfig(): AppConfig {
       update: { ...DEFAULT_UPDATE_CONFIG },
       logo: DEFAULT_LOGO,
       autoTag: defaultAutoTagConfig(),
+      customCss: { ...DEFAULT_CUSTOM_CSS_CONFIG },
     };
   }
+}
+
+function parseCustomCss(value: unknown): CustomCssConfig {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_CUSTOM_CSS_CONFIG };
+  const c = value as Record<string, unknown>;
+  return { enabled: c.enabled === true };
 }
 
 /**

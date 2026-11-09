@@ -78,6 +78,9 @@ export const INVOKE_CHANNELS = [
   "update_ignore",
   "logo_get",
   "logo_set",
+  "custom_css_get",
+  "custom_css_set_enabled",
+  "custom_css_open",
 ] as const;
 
 /**
@@ -96,6 +99,7 @@ export const EVENT_CHANNELS = [
   "scan:done",
   "workspace:changed",
   "update:available",
+  "custom-css:changed",
 ] as const;
 
 export type PreloadInvokeChannel = (typeof PRELOAD_INVOKE_CHANNELS)[number];

@@ -112,6 +112,7 @@ export function StatusBar() {
 
   return (
     <footer
+      data-slot="status-bar"
       className="flex items-center justify-between gap-4 border-t border-border bg-bg px-4 py-1 text-xs text-muted"
       aria-label={t("statusbar.label")}
     >

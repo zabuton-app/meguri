@@ -542,6 +542,9 @@ export const ChannelInputs = {
   auto_tag_reapply: z.void(),
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
+  custom_css_get: z.void(),
+  custom_css_set_enabled: z.object({ enabled: z.boolean() }),
+  custom_css_open: z.void(),
 } as const satisfies Record<InvokeChannel, z.ZodTypeAny>;
 
 type ChannelInputKeys = keyof typeof ChannelInputs;
@@ -702,6 +705,12 @@ export interface ChannelOutputs {
   logo_get: LogoId;
   // Echoes the applied variant so the renderer can settle on main's value.
   logo_set: LogoId;
+  custom_css_get: CustomCssState;
+  // Returns the state after the switch, so the renderer applies (or drops)
+  // the stylesheet without a second round trip.
+  custom_css_set_enabled: CustomCssState;
+  // Creates the file from a template when it does not exist, then opens it.
+  custom_css_open: void;
 }
 
 type ChannelOutputKeys = keyof ChannelOutputs;
@@ -734,6 +743,19 @@ export interface UpdateSettings {
   autoCheck: boolean;
   /** Version the user chose to skip ("don't notify me about this one"), if any. */
   ignoredVersion: string | null;
+}
+/** The user stylesheet: whether it is on, where it lives, and what it holds. */
+export interface CustomCssState {
+  enabled: boolean;
+  /** Absolute path of custom.css, shown so the user knows where to look. */
+  path: string;
+  /** File contents; null while disabled or when the file does not exist. */
+  css: string | null;
+}
+
+/** Payload of the custom-css:changed event. */
+export interface CustomCssChanged {
+  css: string | null;
 }
 export type ChannelOutput<C extends ChannelName> =
   Expect<AssertChannelOutputsMatch> extends true ? ChannelOutputs[C] : never;
