@@ -5,7 +5,7 @@
 // Tags are addressed by (namespace, name), never by tags.id — ids are
 // database-local and meaningless in the cross-workspace "All" view.
 import type { DB } from "./db.js";
-import { resyncTagIndexForKeys } from "./library.js";
+import { resyncTagIndexForKeys } from "./tagIndex.js";
 import { findManualTag } from "./tags.js";
 import {
   RESERVED_TAG_ERROR,

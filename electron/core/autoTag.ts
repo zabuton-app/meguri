@@ -7,7 +7,7 @@
 // index has to follow every change.
 import path from "node:path";
 import type { DB } from "./db.js";
-import { resyncTagIndexForKeys } from "./library.js";
+import { resyncTagIndexForKeys } from "./tagIndex.js";
 import { getSetting, setSetting } from "./queries/settings.js";
 import type { AutoTagEngine, DeriveAutoTags } from "./autoTagDeriver.js";
 import { upsertTag } from "./tags.js";
