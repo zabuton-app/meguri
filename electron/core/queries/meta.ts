@@ -265,6 +265,12 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
     ).run(toKey, fromKey);
     db.prepare("DELETE FROM file_meta WHERE meta_key = ?").run(fromKey);
     db.prepare(
+      "UPDATE OR IGNORE lib.pexels_sources SET meta_key = ? WHERE meta_key = ?",
+    ).run(toKey, fromKey);
+    db.prepare("DELETE FROM lib.pexels_sources WHERE meta_key = ?").run(
+      fromKey,
+    );
+    db.prepare(
       "UPDATE OR IGNORE meta_tags SET meta_key = ? WHERE meta_key = ?",
     ).run(toKey, fromKey);
     db.prepare("DELETE FROM meta_tags WHERE meta_key = ?").run(fromKey);

@@ -11,6 +11,7 @@ import { registerFileHandlers } from "./files.js";
 import { registerFolderHandlers } from "./folders.js";
 import { registerGraphHandlers } from "./graph.js";
 import { registerLogoHandlers } from "./logo.js";
+import { registerPexelsSourceHandlers } from "./pexelsSources.js";
 import { registerScanHandlers } from "./scan.js";
 import { registerShellHandlers } from "./shell.js";
 import { registerStatusHandlers } from "./status.js";
@@ -27,6 +28,7 @@ export function registerIpc(ctx: IpcContext): void {
   registerWorkspaceHandlers(ctx);
   registerScanHandlers(ctx);
   registerFileHandlers(ctx);
+  registerPexelsSourceHandlers(ctx);
   registerFolderHandlers(ctx);
   registerGraphHandlers(ctx);
   registerActivityHandlers(ctx);

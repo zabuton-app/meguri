@@ -86,6 +86,11 @@ In the library (`LIB_DDL`):
 
 - `tags` — the tag master (described above).
 - `file_meta` — durable user metadata (see below).
+- `pexels_sources` — one confirmed Pexels video ID and canonical page URL
+  per content key in the shared library. Suggestions are derived from the file
+  name and written only on confirmation. When a file first gains a hash, a
+  confirmed link already stored under that hash takes precedence over a
+  path-keyed link.
 - `meta_tags` — tag associations.
 - `play_history` — playback history.
 - `scene_bookmarks` — user-created scene positions.

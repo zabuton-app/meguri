@@ -8,6 +8,9 @@ import { useCallback, useEffect, useState } from "react";
 import { BulkTagDialog } from "@/components/BulkTagDialog";
 import { MAX_BULK_FILES } from "@shared/tags";
 import { SelectionBar } from "@/components/SelectionBar";
+import { PexelsSourceReview } from "@/components/PexelsSourceReview";
+import { bulkTargets } from "@/lib/bulkEdit";
+import type { BulkTargets } from "@shared/ipc/channels";
 import { useSelection } from "@/components/SelectionContext";
 import { isSelectAllKey } from "@/hooks/useSelectAllGuard";
 
@@ -23,12 +26,14 @@ interface Props {
 export function SelectionLayer({ active }: Props) {
   const selection = useSelection();
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [sourceTargets, setSourceTargets] = useState<BulkTargets | null>(null);
 
   // Leaving selection mode closes the dialog with it: keeping it open over an
   // empty selection, or having it reappear the next time selection mode starts,
   // are both worse than closing here.
   const exitSelection = useCallback(() => {
     setTagsOpen(false);
+    setSourceTargets(null);
     selection.exit();
   }, [selection]);
 
@@ -41,7 +46,8 @@ export function SelectionLayer({ active }: Props) {
         (el.tagName === "INPUT" ||
           el.tagName === "TEXTAREA" ||
           el.isContentEditable);
-      if (typing || tagsOpen) return;
+      if (typing || tagsOpen || document.querySelector("[data-source-review]"))
+        return;
 
       // Shared with useSelectAllGuard, which suppresses the browser default
       // for the same chord: matching on the produced character rather than the
@@ -86,9 +92,20 @@ export function SelectionLayer({ active }: Props) {
     <>
       <SelectionBar
         onEditTags={() => setTagsOpen(true)}
+        onRecoverSources={() =>
+          setSourceTargets(
+            bulkTargets(selection.rows.filter((row) => row.kind === "video")),
+          )
+        }
         onExit={exitSelection}
       />
       {/* Mounted only while open so each pass starts from a clean staged edit. */}
+      {sourceTargets && (
+        <PexelsSourceReview
+          scope={{ targets: sourceTargets }}
+          onClose={() => setSourceTargets(null)}
+        />
+      )}
       {tagsOpen && (
         <BulkTagDialog
           open

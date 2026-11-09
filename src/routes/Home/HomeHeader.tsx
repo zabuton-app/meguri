@@ -14,6 +14,7 @@ import {
   Sparkles,
   Tags as TagsIcon,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { UserCollection, WorkspaceInfo } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ export function HomeHeader({
   onScan,
   onScanWithDeleted,
   onRebuild,
+  sourceAction,
   t,
 }: {
   root: string | null | undefined;
@@ -82,6 +84,7 @@ export function HomeHeader({
   onScan: () => void;
   onScanWithDeleted: () => void;
   onRebuild: () => void;
+  sourceAction?: ReactNode;
   t: TFunc;
 }) {
   return (
@@ -251,6 +254,7 @@ export function HomeHeader({
         >
           <FolderTree className="size-4" />
         </button>
+        {sourceAction}
         <ButtonGroup className="[&>button]:border [&>button]:border-muted/35 [&>button]:bg-surface [&>button:not(:first-child)]:relative [&>button:not(:first-child)]:z-[1]">
           <Button
             size="sm"

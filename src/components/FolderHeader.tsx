@@ -52,6 +52,7 @@ export function FolderHeader({
   summary,
   onOpenInFileManager,
   onCopyPath,
+  sourceAction,
 }: {
   /** The workspace browsed; without it the folder shown has no subfolder menu. */
   workspaceId?: string;
@@ -68,6 +69,7 @@ export function FolderHeader({
   onOpenInFileManager: () => void;
   /** Copies the folder's absolute path to the clipboard. */
   onCopyPath: () => void;
+  sourceAction?: ReactNode;
 }) {
   const { t } = useI18n();
   const segments = splitFolderPath(path);
@@ -195,6 +197,7 @@ export function FolderHeader({
         <span className="shrink-0 text-xs text-muted">{summary}</span>
       )}
       {/* Same group styling as the header's Scan button. */}
+      {sourceAction}
       <ButtonGroup className="shrink-0 [&>button]:border [&>button]:border-muted/35 [&>button]:bg-surface [&>button:not(:first-child)]:relative [&>button:not(:first-child)]:z-[1]">
         <Button
           size="sm"
