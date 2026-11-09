@@ -93,7 +93,7 @@ describe("MediaGrid", () => {
         />,
       );
       await waitFor(() => {
-        expect(screen.getByText("b.mp4")).toBeTruthy();
+        expect(screen.getByTitle("b.mp4")).toBeTruthy();
       });
       // Rows mount before the width is measured; the height must come from
       // a measurement taken after it (300px per row), not from one that
@@ -122,7 +122,7 @@ describe("MediaGrid", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("sample.mp4")).toBeTruthy();
+      expect(screen.getByTitle(sampleFileRow.relPath)).toBeTruthy();
     });
 
     const links = screen.getAllByRole("link");
@@ -636,7 +636,7 @@ describe("MediaGrid", () => {
         listOffset={100}
       />,
     );
-    await screen.findByText("clip-1.mp4");
+    await screen.findByTitle("clip-1.mp4");
     const rows = container.querySelectorAll<HTMLElement>(
       "[style*='translateY'] > div",
     );
