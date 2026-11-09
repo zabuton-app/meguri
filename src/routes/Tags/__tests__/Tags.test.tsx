@@ -327,6 +327,37 @@ describe("Tags screen", () => {
     );
   });
 
+  it("keeps each memoized row's box in step with the selection and a pending action", async () => {
+    let finish!: () => void;
+    mocks.tagMerge.mockReturnValue(
+      new Promise((resolve) => {
+        finish = () => resolve({ affectedFiles: 1 });
+      }),
+    );
+    render();
+    await screen.findByText("Manual tags");
+    const boxes = () => screen.getAllByRole<HTMLInputElement>("checkbox");
+    fireEvent.click(boxes()[0]);
+    fireEvent.click(boxes()[1]);
+    expect(boxes().map((b) => b.checked)).toEqual([true, true, false]);
+
+    await screen.findByText("2 selected");
+    fireEvent.click(screen.getByText("Merge", { selector: "button" }));
+    const dialog = (await screen.findByText("Merge tags")).closest<HTMLElement>(
+      '[role="dialog"]',
+    )!;
+    fireEvent.click(within(dialog).getByText("Merge", { selector: "button" }));
+
+    // Blocked while the merge runs, then cleared once it lands.
+    await waitFor(() => expect(boxes().every((b) => b.disabled)).toBe(true));
+    finish();
+    await waitFor(() =>
+      expect(boxes().map((b) => [b.checked, b.disabled])).toEqual(
+        boxes().map(() => [false, false]),
+      ),
+    );
+  });
+
   it("applies the tag as a filter and returns to the library", async () => {
     const seen: string[][] = [];
     const onEvent = (e: Event) =>

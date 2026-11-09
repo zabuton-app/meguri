@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import type { TagSummary } from "@/ipc/types";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,9 @@ import { tagColorClass } from "@/lib/tagColorClass";
 import { tagHumanLabel, tagSourceLabel } from "@/lib/tagLabel";
 import { useI18n } from "@/i18n/I18nProvider";
 
-export function TagRow({
+// Memoized so ticking one box re-renders only that row: the list holds up to
+// MAX_TAG_LIST rows, and the screen passes stable callbacks.
+export const TagRow = memo(function TagRow({
   tag,
   selected,
   busy,
@@ -32,7 +35,19 @@ export function TagRow({
   const primarySource = tag.bySource[0]?.source ?? "manual";
 
   return (
-    <li className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition hover:bg-fg/5">
+    // content-visibility: rows scrolled out of view skip style, layout and
+    // paint, and stand in at the intrinsic size until laid out once (`auto`
+    // remembers the real one after that). The size is the content box, inside
+    // the py-1: an editable row is as tall as its h-7 buttons; a read-only one
+    // has no buttons, and its source badge is the tallest thing in it.
+    <li
+      className={cn(
+        "flex items-center gap-2 rounded-lg px-1.5 py-1 transition hover:bg-fg/5 [content-visibility:auto]",
+        editable
+          ? "[contain-intrinsic-size:auto_1.75rem]"
+          : "[contain-intrinsic-size:auto_1.3125rem]",
+      )}
+    >
       {editable ? (
         <input
           type="checkbox"
@@ -108,4 +123,4 @@ export function TagRow({
       )}
     </li>
   );
-}
+});

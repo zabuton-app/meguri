@@ -167,16 +167,7 @@ export function replaceSearchTokens(
 
 /**
  * DOM id of Home's `<main>`, the box the list lives in. Read from outside
- * Home's tree by id: the page-scroll keys below, and the pet, whose floor is
- * this box's bottom edge.
+ * Home's tree by id: the page keys (pageScroll.ts), and the pet, whose floor
+ * is this box's bottom edge.
  */
 export const LIST_MAIN_ID = "list-main";
-
-/** Scroll the list's scroll viewport by ~one screen (dir: 1 = down, -1 = up). */
-export function scrollListByPage(dir: number) {
-  const vp = document.querySelector<HTMLElement>(
-    `#${LIST_MAIN_ID} [data-slot="scroll-area-viewport"]`,
-  );
-  if (!vp) return;
-  vp.scrollBy({ top: dir * vp.clientHeight * 0.9, behavior: "smooth" });
-}

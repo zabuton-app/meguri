@@ -94,8 +94,8 @@ import {
   hasFolderForm,
   isFolderView,
   parseViewMode,
-  scrollListByPage,
 } from "./utils";
+import { scrollListByPage, turnListPage } from "./pageScroll";
 
 // The graph view carries WebGL and graph libraries the list views never need,
 // so it is loaded the first time it is shown.
@@ -774,10 +774,13 @@ export default function Home() {
       if (el?.closest('[data-presentation="peek"]')) return;
       if (matchAny(e, b.pageDown)) {
         e.preventDefault();
-        scrollListByPage(1);
+        // A held key turns whole pages; a press eases one along.
+        if (e.repeat) turnListPage(1);
+        else scrollListByPage(1);
       } else if (matchAny(e, b.pageUp)) {
         e.preventDefault();
-        scrollListByPage(-1);
+        if (e.repeat) turnListPage(-1);
+        else scrollListByPage(-1);
       }
     };
     window.addEventListener("keydown", onKey);

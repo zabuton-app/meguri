@@ -210,6 +210,9 @@ export default function Tags() {
     [navigate],
   );
 
+  // `mutate` is stable where the mutation result object is not: depending on
+  // the object would hand every TagRow a new onDelete on each render.
+  const deleteTagsMutate = deleteTags.mutate;
   const onDeleteOne = useCallback(
     async (tag: TagSummary) => {
       const ok = await confirm({
@@ -221,9 +224,13 @@ export default function Tags() {
         confirmText: t("tags.deleteAction"),
         destructive: true,
       });
-      if (ok) deleteTags.mutate([refOf(tag)]);
+      if (ok) deleteTagsMutate([refOf(tag)]);
     },
-    [confirm, deleteTags, t],
+    [confirm, deleteTagsMutate, t],
+  );
+  const onDeleteRow = useCallback(
+    (tag: TagSummary) => void onDeleteOne(tag),
+    [onDeleteOne],
   );
 
   const onDeleteSelected = useCallback(async () => {
@@ -465,7 +472,7 @@ export default function Tags() {
                           onToggleSelect={toggleSelect}
                           onFilter={onFilterByTag}
                           onRename={setRenameTarget}
-                          onDelete={(target) => void onDeleteOne(target)}
+                          onDelete={onDeleteRow}
                         />
                       ))}
                     </ul>
