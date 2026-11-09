@@ -231,6 +231,13 @@ export const ko: Record<TranslationKey, string> = {
   "media.deleteFileFromIndexConfirm":
     "「{name}」을(를) 인덱스에서 삭제하시겠습니까?\n이후 스캔해도 다시 등록되지 않습니다.",
   "media.moreActions": "기타 작업",
+  "media.movePlayer": "플레이어 이동 (제목 표시줄 드래그 또는 방향키)",
+  "media.moveWindow": "드래그하여 이 창 이동",
+  "media.popout": "별도 창에서 열기",
+  "media.popoutFailed": "미리보기 창을 열 수 없습니다.",
+  "media.resizePlayer": "플레이어 크기 조절 (모서리 드래그 또는 방향키)",
+  "media.resizeWidth": "플레이어 너비 조절",
+  "media.resizeHeight": "플레이어 높이 조절",
   "media.prev": "이전 파일",
   "media.next": "다음 파일",
   "shortcuts.title": "키보드 단축키",

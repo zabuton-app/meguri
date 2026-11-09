@@ -16,6 +16,13 @@ import {
 
 export function registerFileHandlers(ctx: IpcContext): void {
   const { ws, queryClient, positions, emit } = ctx;
+  handle("media_popout", async (input) => {
+    const file = q.fileDetail(coreById(ws, input.workspaceId).db, input.id);
+    if (!file || file.kind === "audio")
+      throw new Error("This file cannot open in the preview window");
+    if (!ctx.openMediaWindow) throw new Error("Preview window unavailable");
+    await ctx.openMediaWindow(input);
+  });
 
   // List queries can be invalidated by the renderer just as the active workspace
   // disappears (e.g. removing the last workspace). Return empty instead of throwing

@@ -233,6 +233,15 @@ export const ja = {
   "media.deleteFileFromIndexConfirm":
     "「{name}」をインデックスから削除しますか？\n今後スキャンしても再登録されません。",
   "media.moreActions": "その他の操作",
+  "media.movePlayer":
+    "プレーヤーを移動（タイトルバーをドラッグ、または矢印キー）",
+  "media.moveWindow": "ドラッグしてウィンドウを移動",
+  "media.popout": "別のウィンドウで開く",
+  "media.popoutFailed": "プレビューウィンドウを開けませんでした。",
+  "media.resizePlayer":
+    "プレーヤーのサイズを変更（角をドラッグ、または矢印キー）",
+  "media.resizeWidth": "プレーヤーの幅を変更",
+  "media.resizeHeight": "プレーヤーの高さを変更",
   "media.prev": "前のファイル",
   "media.next": "次のファイル",
   "shortcuts.title": "キーボードショートカット",

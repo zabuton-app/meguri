@@ -1,10 +1,11 @@
 import { createElement, useState } from "react";
+import { createPortal } from "react-dom";
 import { Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import type { FileRow } from "@/ipc/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
+import { useThumbnailScrub } from "@/hooks/useThumbnailScrub";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -97,16 +98,20 @@ export function MediaThumbnail({
   // across rows by the virtualizer, so a sticky `true` would hide a perfectly
   // good thumbnail on whichever row recycled the instance.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const { hoverPreview } = usePreferences();
-  const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
-    useHoverFramePreview({
+  const { hoverPreview, frameQuality } = usePreferences();
+  const { ref, previewSrc, scrubFraction, clean, enlargedBounds } =
+    useThumbnailScrub({
       enabled: Boolean(
-        scrubPreview && hoverPreview && hasThumb && file.kind === "video",
+        scrubPreview &&
+        hoverPreview &&
+        hasThumb &&
+        failedSrc !== src &&
+        file.kind === "video",
       ),
       frameUrl: (t) =>
-        `${mediaBase}/ws/${file.workspaceId}/frame/${file.id}?t=${t}`,
+        `${mediaBase}/ws/${file.workspaceId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
       duration: file.duration,
-      fileId: file.id,
+      fileId: `${file.workspaceId}:${file.id}`,
     });
 
   const progress =
@@ -129,10 +134,9 @@ export function MediaThumbnail({
 
   return (
     <div
+      ref={ref}
+      data-scrub-mode={clean ? "clean" : undefined}
       className="absolute inset-0"
-      onMouseEnter={onMouseEnter}
-      onMouseMove={onMouseMove}
-      onMouseLeave={onMouseLeave}
     >
       {!imgLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
       <img
@@ -154,10 +158,10 @@ export function MediaThumbnail({
         />
       )}
       {/* The scrub bar takes the same edge while the pointer is over it. */}
-      {progress != null && !(previewSrc && scrubFraction != null) && (
+      {!clean && progress != null && !(previewSrc && scrubFraction != null) && (
         <ResumeProgress progress={progress} />
       )}
-      {previewSrc && scrubFraction != null && (
+      {!clean && previewSrc && scrubFraction != null && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-bg/40">
           <div
             className="h-full bg-primary"
@@ -165,7 +169,7 @@ export function MediaThumbnail({
           />
         </div>
       )}
-      {file.kind === "video" && showPlayOverlay && (
+      {!clean && file.kind === "video" && showPlayOverlay && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span
             className={cn(
@@ -177,6 +181,22 @@ export function MediaThumbnail({
           </span>
         </div>
       )}
+      {enlargedBounds &&
+        createPortal(
+          <div
+            data-slot="enlarged-scrub-preview"
+            aria-hidden="true"
+            className="pointer-events-none fixed z-50 overflow-hidden rounded-md bg-black shadow-2xl ring-1 ring-border"
+            style={{ ...enlargedBounds }}
+          >
+            <img
+              src={previewSrc ?? src}
+              alt=""
+              className="h-full w-full object-contain"
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

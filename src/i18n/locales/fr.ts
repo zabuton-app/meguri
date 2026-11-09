@@ -239,6 +239,15 @@ export const fr: Record<TranslationKey, string> = {
   "media.deleteFileFromIndexConfirm":
     "Supprimer « {name} » de l'index ?\nIl ne sera pas réenregistré lors des prochaines analyses.",
   "media.moreActions": "Autres actions",
+  "media.movePlayer":
+    "Déplacer le lecteur (glisser le titre ou utiliser les flèches)",
+  "media.moveWindow": "Glisser pour déplacer cette fenêtre",
+  "media.popout": "Ouvrir dans une fenêtre séparée",
+  "media.popoutFailed": "Impossible d’ouvrir la fenêtre d’aperçu.",
+  "media.resizePlayer":
+    "Redimensionner le lecteur (glisser le coin ou utiliser les flèches)",
+  "media.resizeWidth": "Redimensionner la largeur du lecteur",
+  "media.resizeHeight": "Redimensionner la hauteur du lecteur",
   "media.prev": "Fichier précédent",
   "media.next": "Fichier suivant",
   "shortcuts.title": "Raccourcis clavier",

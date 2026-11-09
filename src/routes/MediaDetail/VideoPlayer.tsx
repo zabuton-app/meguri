@@ -157,6 +157,8 @@ export const VideoPlayer = forwardRef<
      * appear on top of it the moment playback pauses.
      */
     chromeless?: boolean;
+    /** Use the detail review area's remaining space, keeping its scene rail visible. */
+    fitToParent?: boolean;
     /**
      * Fired instead of rendering the built-in error panel when playback fails
      * for good. The playlist player uses this to skip to the next item; the
@@ -200,6 +202,7 @@ export const VideoPlayer = forwardRef<
     onFatalError,
     onOpenExternal,
     chromeless = false,
+    fitToParent = false,
     t,
   },
   handleRef,
@@ -845,7 +848,9 @@ export const VideoPlayer = forwardRef<
 
   if (error) {
     return (
-      <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl bg-surface p-8 text-center text-muted">
+      <div
+        className={`flex ${fitToParent ? "h-full min-h-0" : "aspect-video"} flex-col items-center justify-center gap-2 overflow-auto rounded-xl bg-surface p-4 text-center text-muted`}
+      >
         <p>{t("player.playFailed")}</p>
         {/* Selectable: the raw codec / MediaError string belongs in bug reports. */}
         <p className="select-text text-xs">{error}</p>
@@ -907,11 +912,10 @@ export const VideoPlayer = forwardRef<
     onExportFrame?.(Math.max(0, displayPos));
   };
 
-  // The detail view boxes the video to its aspect ratio and caps it at 78vh so
-  // the metadata below it stays on screen. Neither applies when the video is the
-  // whole screen: the playlist player hands it the entire stage, and letterboxing
-  // is the blurred backdrop's job, not a gap in the layout.
-  const fillsParent = chromeless || isFullscreen;
+  // Detail reserves room for its scene rail before giving the player the rest.
+  // object-contain fits landscape and portrait footage into that same space.
+  // The playlist also supplies its own stage, without the detail decorations.
+  const fillsParent = fitToParent || chromeless || isFullscreen;
 
   return (
     <div
@@ -923,7 +927,7 @@ export const VideoPlayer = forwardRef<
         chromeless ? "bg-transparent" : "bg-black"
       } ${
         fillsParent
-          ? `${chromeless ? "h-full" : "h-screen"} rounded-none`
+          ? `${fitToParent || chromeless ? "h-full min-h-0" : "h-screen"} ${fitToParent && !isFullscreen ? "rounded-xl" : "rounded-none"}`
           : "max-h-[78vh] rounded-xl"
       }`}
       style={fillsParent ? undefined : { aspectRatio }}
@@ -943,7 +947,7 @@ export const VideoPlayer = forwardRef<
         src={src}
         autoPlay={autoplay}
         className={`h-full w-full object-contain transition-opacity ${
-          chromeless
+          fitToParent || chromeless
             ? "max-h-full"
             : isFullscreen
               ? "max-h-screen"

@@ -15,12 +15,15 @@ import {
   Minimize2,
   PanelRight,
   PlayCircle,
+  PictureInPicture2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MediaFileName, FileExtensionBadge } from "@/components/MediaFileName";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { holdPeekDocked } from "./peekDocked";
 import { LIST_MIN_WIDTH, PEEK_MIN_WIDTH, usePeekResize } from "./usePeekResize";
+import { useModalResize } from "./useModalResize";
 
 export type ModalSize = "large" | "small";
 
@@ -29,8 +32,11 @@ export type ModalSize = "large" | "small";
 // list, the toolbar and the bottom player bar visible and usable.
 export type Presentation = "modal" | "peek";
 
-// Shared localStorage key: MediaDetail and Discover persist one common size.
+// Legacy size key, still used by Discovery.
 export const MODAL_SIZE_KEY = "meguri.media.modalSize";
+// Detail starts compact once, including for people upgrading from the old
+// near-fullscreen default. Discovery keeps its existing size preference.
+export const DETAIL_MODAL_SIZE_KEY = "meguri.media.detail.modalSize.v2";
 // Remembered separately from the size, so switching to the peek and back lands
 // on the modal size that was last chosen.
 // Detail-only (unlike MODAL_SIZE_KEY above), hence the `detail` segment.
@@ -47,18 +53,22 @@ export const PRESENTATION_KEY = "meguri.media.detail.presentation";
 // fullscreen element.
 export function MediaModal({
   onClose,
-  size = "large",
+  detached = false,
+  size = "small",
   presentation = "modal",
   fullscreen = false,
   containerRef,
+  onResize,
   t,
   children,
 }: {
   onClose: () => void;
+  detached?: boolean;
   size?: ModalSize;
   presentation?: Presentation;
   fullscreen?: boolean;
   containerRef?: Ref<HTMLDivElement>;
+  onResize?: () => void;
   t: TFunc;
   children: ReactNode;
 }) {
@@ -80,14 +90,21 @@ export function MediaModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const isPeek = presentation === "peek";
+  const isPeek = !detached && presentation === "peek";
   const docked = isPeek && !fullscreen;
 
   // The panel element, for measuring and for live-resizing during a drag
   // without a render per pointer move (the parent's ref is served too).
   const panelRef = useRef<HTMLDivElement>(null);
+  const pressedBackdrop = useRef(false);
   useImperativeHandle(containerRef, () => panelRef.current as HTMLDivElement);
   const peek = usePeekResize(docked, panelRef);
+  const modal = useModalResize(
+    !isPeek && !fullscreen && !detached,
+    size,
+    panelRef,
+    onResize,
+  );
   // Tell Home the list is in use beside the sheet (see peekDocked.ts).
   useLayoutEffect(() => {
     if (!docked) return;
@@ -107,7 +124,10 @@ export function MediaModal({
   const innerBase = "flex min-h-0 flex-col bg-bg";
   let outerClass: string;
   let innerClass: string;
-  if (isPeek) {
+  if (detached) {
+    outerClass = "contents";
+    innerClass = `${innerBase} relative h-full w-full overflow-hidden`;
+  } else if (isPeek) {
     outerClass = "contents";
     // No backdrop: the list stays interactive beside the sheet, which takes
     // its share of the row so the list narrows rather than being covered. A
@@ -118,22 +138,30 @@ export function MediaModal({
       fullscreen ? "" : " border-l border-border"
     }`;
   } else {
-    const outerBase = "fixed inset-0 z-50 flex bg-black/70 backdrop-blur-sm";
-    outerClass =
-      size === "small"
-        ? `${outerBase} justify-center p-4 sm:p-6 md:p-10`
-        : `${outerBase} p-2 sm:p-4 md:p-6`;
+    outerClass = "fixed inset-0 z-50 bg-black/40";
     innerClass = fullscreen
       ? `${innerBase} relative w-full overflow-hidden`
-      : `${innerBase} relative w-full overflow-hidden rounded-xl border border-border shadow-2xl${
-          size === "small" ? " max-w-4xl" : ""
-        }`;
+      : `${innerBase} absolute overflow-hidden rounded-xl border border-border shadow-2xl`;
   }
 
   return (
     <div
       className={outerClass}
-      onClick={isPeek ? undefined : onClose}
+      onPointerDownCapture={(event) => {
+        pressedBackdrop.current = event.target === event.currentTarget;
+      }}
+      onClick={(event) => {
+        // A drag that starts in the player can release over the backdrop.
+        // Only a click that also started on the backdrop dismisses the player.
+        if (
+          !isPeek &&
+          !detached &&
+          pressedBackdrop.current &&
+          event.target === event.currentTarget
+        )
+          onClose();
+        pressedBackdrop.current = false;
+      }}
       role={isPeek ? undefined : "dialog"}
       aria-modal={isPeek ? undefined : "true"}
     >
@@ -149,11 +177,42 @@ export function MediaModal({
                 width: peek.width,
                 maxWidth: `calc(100% - ${LIST_MIN_WIDTH}px)`,
               }
-            : undefined
+            : fullscreen || detached
+              ? undefined
+              : {
+                  width: modal.width,
+                  height: modal.height,
+                  left: modal.left,
+                  top: modal.top,
+                }
         }
+        onPointerDown={(e) => {
+          if (
+            isPeek ||
+            fullscreen ||
+            detached ||
+            !(e.target instanceof Element)
+          )
+            return;
+          if (
+            e.target.closest("[data-player-title]") &&
+            !e.target.closest("button,a,input,select,textarea")
+          )
+            modal.onPointerDown("move", e);
+        }}
+        onKeyDown={(e) => {
+          if (
+            !isPeek &&
+            !fullscreen &&
+            !detached &&
+            e.target instanceof Element &&
+            e.target.matches("[data-player-title]")
+          )
+            modal.onKeyDown("move", e);
+        }}
         onClick={(e) => e.stopPropagation()}
         role={isPeek ? "dialog" : undefined}
-        data-presentation={presentation}
+        data-presentation={detached ? "window" : presentation}
       >
         {docked && (
           // Grab strip along the sheet's left edge. Wider than its 1px look
@@ -181,6 +240,68 @@ export function MediaModal({
           </div>
         )}
         {children}
+        {!isPeek && !fullscreen && !detached && (
+          <>
+            {(["left", "right", "top", "bottom"] as const).map((edge) => {
+              const horizontal = edge === "left" || edge === "right";
+              const label = t(
+                horizontal ? "media.resizeWidth" : "media.resizeHeight",
+              );
+              const position: Record<
+                "left" | "right" | "top" | "bottom",
+                string
+              > = {
+                left: "inset-y-2 left-0 w-2 cursor-col-resize",
+                right: "inset-y-2 right-0 w-2 cursor-col-resize",
+                top: "inset-x-2 top-0 h-2 cursor-row-resize",
+                bottom: "inset-x-2 bottom-0 h-2 cursor-row-resize",
+              };
+              return (
+                <div
+                  key={edge}
+                  role="separator"
+                  aria-orientation={horizontal ? "vertical" : "horizontal"}
+                  aria-label={label}
+                  aria-valuenow={horizontal ? modal.width : modal.height}
+                  aria-valuemin={Math.min(
+                    horizontal ? 480 : 420,
+                    horizontal ? modal.max.width : modal.max.height,
+                  )}
+                  aria-valuemax={
+                    horizontal ? modal.max.width : modal.max.height
+                  }
+                  tabIndex={0}
+                  title={label}
+                  data-resize-edge={edge}
+                  onPointerDown={(e) => modal.onPointerDown(edge, e)}
+                  onKeyDown={(e) => modal.onKeyDown(edge, e)}
+                  className={`absolute z-20 touch-none focus-visible:outline-2 focus-visible:outline-primary ${position[edge]}`}
+                />
+              );
+            })}
+            {(["topLeft", "topRight", "bottomLeft", "corner"] as const).map(
+              (edge) => (
+                <button
+                  key={edge}
+                  type="button"
+                  aria-label={t("media.resizePlayer")}
+                  title={t("media.resizePlayer")}
+                  data-resize-edge={edge}
+                  onPointerDown={(e) => modal.onPointerDown(edge, e)}
+                  onKeyDown={(e) => modal.onKeyDown(edge, e)}
+                  className={`absolute z-30 flex size-4 touch-none items-center justify-center text-muted focus-visible:outline-2 focus-visible:outline-primary ${edge === "topLeft" ? "left-0 top-0 cursor-nwse-resize" : edge === "topRight" ? "right-0 top-0 cursor-nesw-resize" : edge === "bottomLeft" ? "bottom-0 left-0 cursor-nesw-resize" : "bottom-0 right-0 cursor-nwse-resize"}`}
+                >
+                  {edge === "corner" && (
+                    <span
+                      aria-hidden
+                      className="size-2 border-b-2 border-r-2 border-current"
+                    />
+                  )}
+                </button>
+              ),
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -188,6 +309,7 @@ export function MediaModal({
 
 export function TopBar({
   onClose,
+  detached = false,
   title,
   onPrev,
   onNext,
@@ -197,6 +319,7 @@ export function TopBar({
   nextHint,
   onOpenPlaylist,
   canOpenPlaylist = true,
+  onPopout,
   size,
   onToggleSize,
   presentation = "modal",
@@ -204,6 +327,7 @@ export function TopBar({
   t,
 }: {
   onClose: () => void;
+  detached?: boolean;
   title?: string;
   onPrev?: () => void;
   onNext?: () => void;
@@ -216,6 +340,7 @@ export function TopBar({
   onOpenPlaylist?: () => void;
   /** False while the list does not hold this file. */
   canOpenPlaylist?: boolean;
+  onPopout?: () => void;
   size?: ModalSize;
   onToggleSize?: () => void;
   presentation?: Presentation;
@@ -228,7 +353,18 @@ export function TopBar({
     ? t("media.modalMaximize")
     : t("media.modalMinimize");
   return (
-    <header className="flex items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
+    <header
+      data-player-title
+      tabIndex={isPeek || detached ? undefined : 0}
+      title={
+        detached
+          ? t("media.moveWindow")
+          : isPeek
+            ? undefined
+            : t("media.movePlayer")
+      }
+      className={`flex shrink-0 items-center gap-2 border-b border-border bg-bg px-3 py-2.5 ${detached ? "player-native-title" : isPeek ? "" : "cursor-grab touch-none active:cursor-grabbing"}`}
+    >
       {(onPrev || onNext) && (
         <div className="flex items-center gap-0.5">
           <Button
@@ -261,13 +397,16 @@ export function TopBar({
       )}
       {title && (
         <span
-          className="select-text truncate text-sm font-medium text-fg"
+          className="flex min-w-0 select-text items-center gap-2 text-sm font-medium text-bright-fg"
           title={title}
         >
-          {title}
+          <span className="min-w-0 truncate">
+            <MediaFileName relPath={title} />
+          </span>
+          <FileExtensionBadge relPath={title} />
         </span>
       )}
-      <div className="ml-auto flex items-center gap-0.5">
+      <div className="ml-auto flex shrink-0 items-center gap-0.5">
         {/* Not a toggle: this one leaves the detail view for the playlist,
             the way the player's own detail button leaves the playlist. */}
         {onOpenPlaylist && (
@@ -281,6 +420,18 @@ export function TopBar({
             title={t("media.playAsPlaylist")}
           >
             <PlayCircle />
+          </Button>
+        )}
+        {onPopout && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            onClick={onPopout}
+            aria-label={t("media.popout")}
+            title={t("media.popout")}
+          >
+            <PictureInPicture2 />
           </Button>
         )}
         {/* Peek: one button back to the modal (at its remembered size).

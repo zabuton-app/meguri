@@ -51,7 +51,7 @@ describe("MediaList by folder", () => {
     expect(rows).toHaveLength(2);
     expect(screen.getByText("Subfolders: 2")).toBeTruthy();
     // Folder rows come before the file's name in the document.
-    const file = screen.getByText("sample.mp4");
+    const file = screen.getByTitle(sampleFileRow.relPath);
     expect(
       rows[1].compareDocumentPosition(file) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -77,7 +77,7 @@ describe("MediaList by folder", () => {
 
   it("drops the folder rows from a window that starts past the top", async () => {
     renderList({ folders: [folder("Movie")], listOffset: 100 });
-    await screen.findByText("sample.mp4");
+    await screen.findByTitle(sampleFileRow.relPath);
     expect(screen.queryByTestId("folder-row")).toBeNull();
   });
 

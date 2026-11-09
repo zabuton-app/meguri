@@ -608,6 +608,7 @@ function serveBufferedFfmpeg(
 const FRAME_QUALITY = {
   low: { width: 240, qv: null },
   standard: { width: 480, qv: 4 },
+  enlarged: { width: 720, qv: 3 },
   high: { width: 960, qv: 2 },
 } as const;
 type FrameQuality = keyof typeof FRAME_QUALITY;
