@@ -1,0 +1,252 @@
+/*
+ * @name Sky
+ *
+ * A sample Meguri CSS theme.
+ *
+ * Looking up at the sky: the page is a gradient of deep blue, the media
+ * float on it as white clouds, the footer and player bar are the brown
+ * ground below, and sky blue, sea teal and wheat gold are the accents. The
+ * light variant is a clear daytime sky. Picked by the app's light / dark switch through
+ * html[data-appearance]. Uses only the public API described in
+ * docs/theming.md, so it keeps working across updates.
+ *
+ * To use it, put this file in the themes folder and pick "Sky" in the
+ * Settings > General > Theme list ("Open themes folder" below it shows where
+ * the folder is). Pasting it into custom.css works too.
+ */
+
+/* ---- Palette: dark ------------------------------------------------------ */
+
+html[data-appearance="dark"] {
+  --c-bg: #0a2a5e;
+  --c-surface: #0d3068;
+  --c-overlay: #1d4a8a;
+  --c-hover: #26579e;
+  --c-border: #265593;
+  --c-border-strong: #6d93c8;
+
+  --c-muted: #a9c0d8;
+  --c-secondary-fg: #c6d6e6;
+  --c-fg: #e8f0f8;
+  --c-bright-fg: #ffffff;
+  --c-highlight: #e6b850;
+
+  --c-primary: #8fd3ff; /* sky */
+  --c-info: #7ee3d6; /* sea */
+  --c-accent2: #e6b850; /* wheat */
+  --c-success: #8cbf6a;
+  --c-warn: #eda866;
+  --c-error: #f59080; /* clay */
+  --c-secondary-accent: #d8b084; /* wood */
+  --c-special: #7ee3d6;
+
+  /* The page: night-blue sky, deepening toward the top. Every stop keeps the
+     contrast the palette above has against --c-bg. */
+  --sk-sky: linear-gradient(180deg, #061d44 0%, #0a2a5e 45%, #0e377a 100%);
+  --sk-chrome: #051736;
+  /* Header and search bar: veils of light over the sky, so the gradient
+     still shows through. The header is the brighter of the two. */
+  --sk-header: rgb(255 255 255 / 0.09);
+  --sk-search: rgb(255 255 255 / 0.045);
+
+  /* The media: clouds. The sky blue is deepened inside them so the white
+     check on a selected card stays readable; it still stands out from the
+     sky as the selection ring. */
+  --sk-cloud-primary: #3a8ee6;
+
+  /* Trees standing on the ground, drawn like a quick doodle in Paint. */
+  --sk-trees: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='110' viewBox='0 0 260 110'><g opacity='0.35' stroke='%23020a14' stroke-width='3' stroke-linejoin='round' stroke-linecap='round'><path d='M40 110 L43 70 L53 71 L55 110 Z' fill='%234f3218'/><path d='M47 12 C27 11 15 27 21 41 C7 47 11 69 29 69 C35 79 57 80 63 71 C81 74 89 55 77 45 C85 29 69 10 47 12 Z' fill='%232c6b2a'/><path d='M36 34 C40 30 46 30 49 33 M58 52 C61 49 66 50 68 53' fill='none'/><path d='M131 110 L132 92 L140 93 L141 110 Z' fill='%234f3218'/><path d='M136 26 L118 58 L127 57 L110 82 L121 81 L104 96 L168 95 L151 80 L161 81 L146 56 L154 57 Z' fill='%231c4d22'/><path d='M208 110 L210 84 L217 85 L218 110 Z' fill='%234f3218'/><path d='M213 50 C199 49 192 61 197 69 C189 75 196 89 209 86 C215 93 228 90 230 83 C241 82 242 69 234 65 C237 55 226 49 213 50 Z' fill='%233f7f30'/></g></svg>");
+
+  /* The ground under the page: footer and player bar. */
+  --sk-ground: #2f2217;
+  --sk-ground-raised: #45321f;
+  --sk-ground-edge: #6a4f36;
+  --sk-ground-muted: #cbb393;
+}
+
+/* ---- Palette: light ----------------------------------------------------- */
+
+html[data-appearance="light"] {
+  --c-bg: #a9d1f2;
+  --c-surface: #c4e1f7;
+  --c-overlay: #83b6e2;
+  --c-hover: #8cbde6;
+  --c-border: #6f9fcb;
+  --c-border-strong: #3a668f;
+
+  --c-muted: #1d3850;
+  --c-secondary-fg: #142d42;
+  --c-fg: #0a2034;
+  --c-bright-fg: #02101c;
+  --c-highlight: #5a4000;
+
+  --c-primary: #0d3f7a;
+  --c-info: #0a5552;
+  --c-accent2: #5a4000;
+  --c-success: #22501a;
+  --c-warn: #6b2f0b;
+  --c-error: #8a1f14;
+  --c-secondary-accent: #583a1e;
+  --c-special: #0a5552;
+
+  /* The page: daytime sky, deepening toward the bottom. */
+  --sk-sky: linear-gradient(180deg, #bfe0f8 0%, #a9d1f2 45%, #93c4ec 100%);
+  --sk-chrome: var(--c-surface);
+  --sk-header: rgb(255 255 255 / 0.5);
+  --sk-search: rgb(255 255 255 / 0.25);
+
+  --sk-cloud-primary: #1f5fae;
+
+  --sk-trees: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='110' viewBox='0 0 260 110'><g opacity='0.35' stroke='%231d1d1d' stroke-width='3' stroke-linejoin='round' stroke-linecap='round'><path d='M40 110 L43 70 L53 71 L55 110 Z' fill='%238b5a2b'/><path d='M47 12 C27 11 15 27 21 41 C7 47 11 69 29 69 C35 79 57 80 63 71 C81 74 89 55 77 45 C85 29 69 10 47 12 Z' fill='%234cae3c'/><path d='M36 34 C40 30 46 30 49 33 M58 52 C61 49 66 50 68 53' fill='none'/><path d='M131 110 L132 92 L140 93 L141 110 Z' fill='%238b5a2b'/><path d='M136 26 L118 58 L127 57 L110 82 L121 81 L104 96 L168 95 L151 80 L161 81 L146 56 L154 57 Z' fill='%232f7d32'/><path d='M208 110 L210 84 L217 85 L218 110 Z' fill='%238b5a2b'/><path d='M213 50 C199 49 192 61 197 69 C189 75 196 89 209 86 C215 93 228 90 230 83 C241 82 242 69 234 65 C237 55 226 49 213 50 Z' fill='%237cc242'/></g></svg>");
+
+  /* The ground under the page: footer and player bar. */
+  --sk-ground: #dcc6a3;
+  --sk-ground-raised: #c9ae84;
+  --sk-ground-edge: #a88c63;
+  --sk-ground-muted: #4f3c27;
+}
+
+/* ---- Both variants ------------------------------------------------------ */
+
+::selection {
+  background-color: color-mix(in srgb, var(--c-primary) 40%, transparent);
+  color: var(--c-bright-fg);
+}
+
+/* The page shows through the file list, so the sky goes on body, with a row
+   of trees on top of it standing just above the footer (26px tall). Fixed,
+   so both stay put while the list scrolls; the files pass in front of the
+   trees. The trees are faint, so the pet walking along the footer stands
+   out against them. */
+html[data-appearance] body {
+  background:
+    var(--sk-trees) left bottom 26px / 260px 110px repeat-x fixed,
+    var(--sk-sky) fixed;
+}
+
+/* Side rail: the upper sky */
+[data-slot="workspace-rail"] {
+  background-color: var(--sk-chrome);
+  border-right: 1px solid var(--c-border);
+}
+
+/* Header and search bar: see-through veils of different strength, so each
+   band reads apart from the rail and from the other while the sky still
+   runs up to the top. */
+[data-slot="home-header"] {
+  background-color: var(--sk-header);
+}
+[data-slot="filter-bar"] {
+  background-color: var(--sk-search);
+}
+
+/* Header: horizon line, from sky to sea */
+[data-slot="home-header"] {
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(
+      90deg,
+      var(--c-primary),
+      var(--c-accent2),
+      var(--c-info)
+    )
+    1;
+}
+
+/* Buttons in the rail, header and search bar: little clouds, white with dark
+   ink in both variants. Active ones keep their blue (bg-primary), so the
+   current view and filter still stand out.
+
+   Not public API: buttons carry no data-slot, so this picks the framed ones
+   (filled with --c-surface or outlined with --c-border) by their utility
+   classes. It may need updating when the app's markup changes. */
+:is(
+    [data-slot="workspace-rail"],
+    [data-slot="home-header"],
+    [data-slot="filter-bar"]
+  )
+  :is(button, a, div):is([class~="bg-surface"], [class~="border-border"]):not(
+    [class~="bg-primary"]
+  ) {
+  --c-fg: #10263a;
+  --c-muted: #3f566b;
+  --c-border: #b9cad9;
+  --c-surface: #f4f8fc;
+  background-color: #f4f8fc;
+  /* Some buttons inherit the bar's text color instead of setting their own. */
+  color: var(--c-fg);
+}
+:is(
+    [data-slot="workspace-rail"],
+    [data-slot="home-header"],
+    [data-slot="filter-bar"]
+  )
+  :is(button, a):is([class~="bg-surface"], [class~="border-border"]):not(
+    [class~="bg-primary"]
+  ):hover {
+  background-color: #dfe9f3;
+}
+
+/* Files and folders: clouds. A card is a little world of its own: white
+   (--c-surface), with its thumbnail placeholder (--c-overlay), its badges
+   (--c-bg) and its text in dark ink, the same in both variants. The
+   selection ring and the selected border use --c-primary, which stays
+   visible against the sky. Rows show their selected state with their
+   background, so they are left on the sky. */
+[data-slot="media-card"],
+[data-slot="folder-card"] {
+  --c-bg: #ffffff;
+  --c-surface: #f4f8fc;
+  --c-overlay: #dde8f2;
+  --c-border: #b9cad9;
+  --c-muted: #3f566b;
+  --c-secondary-fg: #2b4459;
+  --c-fg: #10263a;
+  --c-bright-fg: #061522;
+  --c-primary: var(--sk-cloud-primary);
+  --c-info: #0a5552;
+  --c-accent2: #7a5500;
+  --c-warn: #924510;
+  --c-error: #a8322a;
+  border-radius: 12px;
+  /* A filter, not box-shadow: the selection ring is a box-shadow. */
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.2));
+}
+[data-slot="media-card"][aria-current="true"],
+[data-slot="media-row"][aria-current="true"] {
+  outline: 1px solid var(--c-accent2);
+  outline-offset: 2px;
+}
+[data-slot="folder-row"] {
+  border-left: 2px solid var(--c-secondary-accent);
+}
+
+/* Footer and player bar: the ground. They are painted with --c-bg, and their
+   buttons and track with --c-overlay and --c-border, so those are swapped
+   inside the bars. Text on a primary fill is drawn in --c-bg too, so it stays
+   readable on the play button. */
+[data-slot="status-bar"],
+[data-slot="audio-player-bar"] {
+  --c-bg: var(--sk-ground);
+  --c-overlay: var(--sk-ground-raised);
+  --c-border: var(--sk-ground-edge);
+  --c-muted: var(--sk-ground-muted);
+  background-color: var(--c-bg);
+  border-top: 2px solid var(--sk-ground-edge);
+}
+
+/* On the light ground the page's accents fall short of 4.5:1, so the bars
+   use deeper shades of them. */
+html[data-appearance="light"]
+  :is([data-slot="status-bar"], [data-slot="audio-player-bar"]) {
+  --c-primary: #174a80;
+  --c-success: #2d5a1c;
+  --c-error: #8f2b1e;
+  --c-info: #0f5550;
+  --c-accent2: #6a4a00;
+  --c-warn: #7a3a12;
+}
+
+[data-slot="modal-panel"] {
+  border: 1px solid var(--c-border-strong);
+  border-radius: 12px;
+}

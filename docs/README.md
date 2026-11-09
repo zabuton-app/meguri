@@ -24,9 +24,9 @@ For what the app is, how to install it, and how to use it, see the top-level
 
 For people writing stylesheets rather than code:
 
-- [Theming Meguri with CSS](theming.md) — the public API for `custom.css`
-  (color variables, `data-slot`, `data-appearance`), contrast guidance, and a
-  sample theme.
+- [Theming Meguri with CSS](theming.md) — installing CSS themes, the public
+  API for theme files and `custom.css` (color variables, `data-slot`,
+  `data-appearance`), contrast guidance, and sample themes.
 
 ## Where to start
 

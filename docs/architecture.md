@@ -391,3 +391,25 @@ injects what it is given.
   is listed in [Theming Meguri with CSS](theming.md#public-api).
 - The CSS is loaded asynchronously, so on startup the plain theme can show for
   a moment before the stylesheet applies.
+
+### CSS theme files
+
+A second, optional layer sits between the base16 scheme and `custom.css`: one
+theme file picked from `<userData>/themes/*.css`.
+
+- `electron/core/cssThemes.ts` lists the folder (plain `.css` names only, so a
+  pick can never resolve outside it), names each file from an `@name` line in
+  its leading comment, and reads the picked one. The folder watch shares
+  `electron/core/watchDirectory.ts` with `custom.css`; it runs for the whole
+  session, since a file added while nothing is picked must still reach the
+  list.
+- The pick is `cssTheme` in `config.json` (null for none). A picked file that
+  disappears reads as none without clearing the stored pick, so it comes back
+  with the file.
+- `electron/ipc/cssThemes.ts` handles `css_themes_get`, `css_theme_select`
+  (validated as a plain `.css` name, then checked against the listing) and
+  `css_themes_open_folder`, and emits `css-themes:changed` with the whole state
+  (list, pick, contents) on any change in the folder.
+- `useCssThemeStyle()` writes the picked theme into
+  `<style id="meguri-css-theme">`, inserted before `custom.css`'s element so
+  that `custom.css` wins at equal specificity.

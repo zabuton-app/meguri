@@ -12,10 +12,11 @@ import { baseDataDir } from "../core/paths.js";
 import type { IpcContext } from "./context.js";
 import { openDetached } from "./shell.js";
 
-// The one IPC group that holds state of its own: the custom.css watcher. It
-// lives here rather than in main.ts because nothing outside these handlers
-// starts or stops it, and it needs no teardown on quit (it dies with the
-// process; emit is a no-op once the window is gone).
+// This IPC group holds state of its own, the custom.css watcher (as does
+// ./cssThemes.ts for the themes folder). It lives here rather than in main.ts
+// because nothing outside these handlers starts or stops it, and it needs no
+// teardown on quit (it dies with the process; emit is a no-op once the window
+// is gone).
 export function registerCustomCssHandlers(ctx: IpcContext): void {
   const file = path.join(baseDataDir(), CUSTOM_CSS_FILE);
   let stopWatching: (() => void) | null = null;

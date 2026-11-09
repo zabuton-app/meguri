@@ -8,7 +8,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, events, type CustomCssState } from "@/ipc/client";
 
 const QUERY_KEY = ["customCss"] as const;
-const STYLE_ID = "meguri-custom-css";
+/** Also read by useCssThemes, which places the theme's <style> before it. */
+export const CUSTOM_CSS_STYLE_ID = "meguri-custom-css";
 
 function useCustomCssState(): CustomCssState | undefined {
   // Changes arrive through setEnabled and the custom-css:changed event, both
@@ -63,12 +64,14 @@ export function useCustomCssStyle(): void {
   }, [qc]);
 
   useEffect(() => {
-    let el = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
+    let el = document.getElementById(
+      CUSTOM_CSS_STYLE_ID,
+    ) as HTMLStyleElement | null;
     if (!el) {
       // Appended last, after the theme variables ThemeProvider injects at
       // import time, so that equal-specificity rules here win.
       el = document.createElement("style");
-      el.id = STYLE_ID;
+      el.id = CUSTOM_CSS_STYLE_ID;
       document.head.appendChild(el);
     }
     // textContent: the file is only ever parsed as CSS, never as markup.

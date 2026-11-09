@@ -81,6 +81,9 @@ export const INVOKE_CHANNELS = [
   "custom_css_get",
   "custom_css_set_enabled",
   "custom_css_open",
+  "css_themes_get",
+  "css_theme_select",
+  "css_themes_open_folder",
 ] as const;
 
 /**
@@ -100,6 +103,7 @@ export const EVENT_CHANNELS = [
   "workspace:changed",
   "update:available",
   "custom-css:changed",
+  "css-themes:changed",
 ] as const;
 
 export type PreloadInvokeChannel = (typeof PRELOAD_INVOKE_CHANNELS)[number];

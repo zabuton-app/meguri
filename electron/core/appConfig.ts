@@ -21,6 +21,7 @@ import {
 } from "../../shared/autoTag.js";
 import { MAX_TAG_NAME } from "../../shared/tags.js";
 import { autoTagSettingsChanged, autoTagSettingsVersion } from "./autoTag.js";
+import { isThemeFileName } from "./cssThemes.js";
 import type { AutoTagEngine } from "./autoTagDeriver.js";
 import log from "./logger.js";
 
@@ -49,6 +50,11 @@ export interface AppConfig {
    * only while this is on.
    */
   customCss: CustomCssConfig;
+  /**
+   * File name of the CSS theme picked from <userData>/themes, or null for
+   * none. Main reads it to send the theme's contents with the list.
+   */
+  cssTheme: string | null;
 }
 
 export interface CustomCssConfig {
@@ -123,6 +129,7 @@ export function loadConfig(): AppConfig {
       logo: parseLogo(c.logo),
       autoTag: parseAutoTag(c.autoTag),
       customCss: parseCustomCss(c.customCss),
+      cssTheme: parseCssTheme(c.cssTheme),
     };
   } catch {
     return {
@@ -134,8 +141,13 @@ export function loadConfig(): AppConfig {
       logo: DEFAULT_LOGO,
       autoTag: defaultAutoTagConfig(),
       customCss: { ...DEFAULT_CUSTOM_CSS_CONFIG },
+      cssTheme: null,
     };
   }
+}
+
+function parseCssTheme(value: unknown): string | null {
+  return typeof value === "string" && isThemeFileName(value) ? value : null;
 }
 
 function parseCustomCss(value: unknown): CustomCssConfig {

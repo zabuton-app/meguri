@@ -5,11 +5,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import log from "./logger.js";
+import { watchDirectory } from "./watchDirectory.js";
 
 export const CUSTOM_CSS_FILE = "custom.css";
-
-/** Editors fire several events per save; wait for them to settle. */
-const WATCH_DEBOUNCE_MS = 100;
 
 export const CUSTOM_CSS_TEMPLATE = `/*
  * Meguri custom CSS
@@ -106,35 +104,14 @@ export function ensureCustomCssFile(file: string): void {
 }
 
 /**
- * Call `onChange` after the file is created, saved or deleted. Watches the
- * directory rather than the file: editors that save by writing a new file and
- * renaming it over the old one would end a watch on the file itself after the
- * first save. Returns a function that stops watching.
+ * Call `onChange` after the file is created, saved or deleted. Returns a
+ * function that stops watching.
  */
 export function watchCustomCss(file: string, onChange: () => void): () => void {
-  const dir = path.dirname(file);
   const name = path.basename(file);
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let watcher: fs.FSWatcher;
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-    watcher = fs.watch(dir, (_event, filename) => {
-      // Some platforms do not report the name; treat that as a possible hit.
-      if (filename != null && filename.toString() !== name) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        onChange();
-      }, WATCH_DEBOUNCE_MS);
-    });
-  } catch (e) {
-    log.warn("[customCss] failed to watch", dir, e);
-    return () => {};
-  }
-  watcher.on("error", (e) => log.warn("[customCss] watcher error", e));
-  return () => {
-    if (timer) clearTimeout(timer);
-    timer = null;
-    watcher.close();
-  };
+  return watchDirectory(
+    path.dirname(file),
+    (entry) => entry === null || entry === name,
+    onChange,
+  );
 }
