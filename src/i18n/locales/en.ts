@@ -892,6 +892,7 @@ export const en: Record<TranslationKey, string> = {
 
   // rating
   "rating.star": "{n} stars",
+  "rating.value": "Rated {n} of 5",
 
   // favorite
   "favorite.add": "Add to favorites",

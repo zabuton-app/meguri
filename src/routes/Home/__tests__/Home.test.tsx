@@ -282,7 +282,13 @@ describe("Home + MediaDetail integration", () => {
       await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
 
       // The chip re-renders once the refetch settles; clicking it again is a no-op.
-      fireEvent.click(await screen.findByText("beach"));
+      // On the card: the list stays on screen while the search refetches, so
+      // the search box's new chip reads "beach" too.
+      fireEvent.click(
+        await within(await screen.findByTestId("media-card")).findByText(
+          "beach",
+        ),
+      );
       await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
     });
 
@@ -309,7 +315,11 @@ describe("Home + MediaDetail integration", () => {
       expect(chip.dataset.selected).toBeUndefined();
 
       // A second click adds nothing, so without this it reads as a dead click.
-      fireEvent.click(await screen.findByText("beach"));
+      fireEvent.click(
+        await within(await screen.findByTestId("media-card")).findByText(
+          "beach",
+        ),
+      );
       await waitFor(() =>
         expect(
           document
@@ -317,7 +327,8 @@ describe("Home + MediaDetail integration", () => {
             ?.getAttribute("data-selected"),
         ).toBe("true"),
       );
-      expect(lastQuery().q).toBe("tag:beach");
+      // The search text reaches the query once it settles (useSettledFilter).
+      await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
     });
 
     it("removes the directive as a whole from the search box", async () => {

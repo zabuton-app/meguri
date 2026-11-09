@@ -33,6 +33,7 @@ import { HeatmapView } from "@/heatmap/HeatmapView";
 import { MediaList } from "@/components/MediaList";
 import {
   MediaNavProvider,
+  type MediaNav,
   PlaylistNavProvider,
 } from "@/components/MediaNavContext";
 import { CollectionEditDialog } from "@/components/CollectionEditDialog";
@@ -72,6 +73,9 @@ import { FolderHeader } from "@/components/FolderHeader";
 import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
+import { useSettledFilter } from "./useSettledFilter";
+import { bumpThumbVersions } from "@/lib/thumbVersionStore";
+import { mediaSortId } from "@/lib/mediaSortId";
 import { useHeatmapFilter } from "./useHeatmapFilter";
 import { setListCounts, type ListCounts } from "@/hooks/useListCounts";
 import { useFolderNavKeys } from "./useFolderNavKeys";
@@ -122,7 +126,9 @@ export default function Home() {
   const [filter, setFilter] = useState<SearchQuery>(loadInitialFilter);
   // Compared by identity below: every later filter is a new object.
   const openedWith = useRef(filter);
-  const [thumbVersion, setThumbVersion] = useState<Record<string, number>>({});
+  // What the list queries run on: `filter` with its free text held back while
+  // it is being typed (see useSettledFilter). The filter bar shows `filter`.
+  const queryFilter = useSettledFilter(filter);
   const manualScanJobs = useRef(
     new Map<string, "scan" | "resync" | "rebuild">(),
   );
@@ -177,25 +183,29 @@ export default function Home() {
   // With nothing narrowing the list a folder shows its own contents (child
   // folders as cards, then its direct files); a search or filter covers
   // everything below it instead, as a flat result.
-  const folderSearching = folderView && hasFilterConditions(filter);
+  const folderSearching = folderView && hasFilterConditions(queryFilter);
   // The folder rides on the query sent, never on `filter` itself: that state
   // is what Discover opens with, which scopes to the folder its own way. The
   // filter bar reads the folder back through `filterValue` instead.
   // The timeline orders the list itself, by its axis: the sort rides on the
   // query the same way, and the filter keeps the one the other views use.
-  const timeline = useTimelineView({ view, workspaceId, filter });
+  const timeline = useTimelineView({
+    view,
+    workspaceId,
+    filter: queryFilter,
+  });
   const searchQuery = useMemo<SearchQuery>(
     () =>
       view === "timeline"
         ? timeline.searchQuery
         : folderView
           ? {
-              ...filter,
+              ...queryFilter,
               folder: { path: folderNav.path, recursive: folderSearching },
             }
-          : filter,
+          : queryFilter,
     [
-      filter,
+      queryFilter,
       view,
       timeline.searchQuery,
       folderView,
@@ -230,9 +240,9 @@ export default function Home() {
   const heatmapQuery = useMemo<SearchQuery>(
     () =>
       folderView
-        ? { ...filter, folder: { path: folderNav.path, recursive: true } }
-        : filter,
-    [filter, folderView, folderNav.path],
+        ? { ...queryFilter, folder: { path: folderNav.path, recursive: true } }
+        : queryFilter,
+    [queryFilter, folderView, folderNav.path],
   );
 
   // Include the workspace ID in the key so switching workspaces (incl. "All") refetches separately.
@@ -241,6 +251,7 @@ export default function Home() {
     searchQuery,
     status.data?.ready ?? false,
     timeline.anchor,
+    true, // keepWhileTyping: the fetch callbacks below hold paging meanwhile
   );
 
   const folderListing = useQuery({
@@ -291,7 +302,7 @@ export default function Home() {
   // nothing narrowing it, the whole scope (null: the status bar's total).
   const browsing =
     folderView && !folderSearching && listedPath === folderNav.path;
-  const narrowed = folderView || hasFilterConditions(filter);
+  const narrowed = folderView || hasFilterConditions(queryFilter);
   const listCounts = useMemo<ListCounts>(
     () =>
       browsing && folderListing.data
@@ -347,7 +358,7 @@ export default function Home() {
   const { subtreeFilter, playlistNav } = useFolderPlaylist({
     workspaceId: status.data?.workspaceId,
     ready: status.data?.ready ?? false,
-    filter,
+    filter: queryFilter,
     folderView,
     path: folderNav.path,
     browsing,
@@ -471,7 +482,7 @@ export default function Home() {
   const onThumbDone = useCallback(
     (event: ThumbDone) => {
       const key = event.workspaceId
-        ? `${event.workspaceId}:${event.id}`
+        ? mediaSortId({ workspaceId: event.workspaceId, id: event.id })
         : String(event.id);
       const pending = pendingThumbs.current;
       pending.set(key, (pending.get(key) ?? 0) + 1);
@@ -480,11 +491,9 @@ export default function Home() {
         thumbFlushTimer.current = null;
         const batch = pendingThumbs.current;
         pendingThumbs.current = new Map();
-        setThumbVersion((v) => {
-          const next = { ...v };
-          for (const [k, n] of batch) next[k] = (next[k] ?? 0) + n;
-          return next;
-        });
+        // Straight to the thumbnails of those files: nothing above them
+        // re-renders (see thumbVersionStore).
+        bumpThumbVersions(batch);
         if (folderViewRef.current) scheduleFolderRefresh();
       }, 100);
     },
@@ -652,15 +661,58 @@ export default function Home() {
   // Delegate infinite scroll to MediaGrid's virtualization (last-row detection).
   // Depend on the stable react-query method (not the whole `search` result object,
   // which is a new reference every render) so the memoized views don't re-render.
+  // Not while the previous search's rows stand in for the new one's (see
+  // useFilesSearch): their pages belong to the other query.
+  const placeholder = search.isPlaceholderData;
   const fetchNextPage = useCallback(() => {
-    void search.fetchNextPage();
+    if (!placeholder) void search.fetchNextPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.fetchNextPage]);
+  }, [search.fetchNextPage, placeholder]);
 
   const fetchPreviousPage = useCallback(() => {
-    void search.fetchPreviousPage();
+    if (!placeholder) void search.fetchPreviousPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.fetchPreviousPage]);
+  }, [search.fetchPreviousPage, placeholder]);
+
+  // The detail view and the player under the Outlet read this. A fresh object
+  // on every render of Home (each thumbnail flush, every keystroke in the
+  // search box) would re-render the whole of whichever is open, video player
+  // included, even though nothing they show has moved.
+  const {
+    hasNextPage,
+    isFetchingNextPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+    isLoading: searchLoading,
+  } = search;
+  const mediaNav = useMemo<MediaNav>(
+    () => ({
+      items,
+      listOffset,
+      fetchNextPage,
+      // Not while the previous search stands in: stepping past its end would
+      // wait on a page that is never fetched, then jump once the new results
+      // land.
+      hasNextPage: hasNextPage && !placeholder,
+      isFetchingNextPage,
+      fetchPreviousPage,
+      hasPreviousPage: hasPreviousPage && !placeholder,
+      isFetchingPreviousPage,
+      isLoading: searchLoading,
+    }),
+    [
+      items,
+      listOffset,
+      fetchNextPage,
+      hasNextPage,
+      isFetchingNextPage,
+      fetchPreviousPage,
+      hasPreviousPage,
+      isFetchingPreviousPage,
+      searchLoading,
+      placeholder,
+    ],
+  );
 
   // "?" opens the shortcuts overlay (works over any screen; ignored while typing).
   useEffect(() => {
@@ -830,8 +882,12 @@ export default function Home() {
 
   // Changing it scrolls the list back to its top, as another folder does.
   const listResetKey = folderView ? `folder:${folderNav.path}` : undefined;
+  // The grid and the list keep the previous results on screen while only the
+  // search text changes (useFilesSearch's keepWhileTyping), so nothing
+  // remounts them: a new search has to send them back to the top itself.
+  const viewResetKey = `${listResetKey ?? ""}|${queryFilter.q ?? ""}`;
   // Names the list on screen: the workspace, how it is browsed and the filter.
-  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : view === "timeline" ? `timeline:${timeline.axis}` : (listResetKey ?? "flat")}|${JSON.stringify(filter)}`;
+  const listScope = `${status.data?.workspaceId ?? ""}|${view === "graph" ? "graph" : view === "timeline" ? `timeline:${timeline.axis}` : (listResetKey ?? "flat")}|${JSON.stringify(queryFilter)}`;
   // A pass the playlist parked belongs to the list it was playing. Once the
   // list becomes another one it is dropped, so nothing (the pet's "Resume
   // playback") can pick it back up and graft the new list onto the old queue.
@@ -987,7 +1043,7 @@ export default function Home() {
                 <GraphView
                   key={status.data?.workspaceId ?? ""}
                   scope={status.data?.workspaceId ?? ""}
-                  query={filter}
+                  query={queryFilter}
                   ready={
                     (status.data?.ready ?? false) && !!status.data?.workspaceId
                   }
@@ -998,7 +1054,7 @@ export default function Home() {
             ) : view === "timeline" ? (
               <TimelineView
                 scope={status.data?.workspaceId ?? ""}
-                query={filter}
+                query={queryFilter}
                 axis={timeline.axis}
                 onAxisChange={timeline.setAxis}
                 ready={
@@ -1008,7 +1064,6 @@ export default function Home() {
                 listOffset={listOffset}
                 loading={listLoading}
                 mediaBase={status.data?.mediaBase ?? ""}
-                thumbVersion={thumbVersion}
                 onTagClick={onTagClick}
                 hasNextPage={search.hasNextPage}
                 fetchNextPage={fetchNextPage}
@@ -1027,7 +1082,6 @@ export default function Home() {
                 workspaceId={status.data?.workspaceId ?? ""}
                 listOffset={listOffset}
                 loading={listLoading}
-                thumbVersion={thumbVersion}
                 onTagClick={onTagClick}
                 hasNextPage={search.hasNextPage}
                 fetchNextPage={fetchNextPage}
@@ -1040,7 +1094,7 @@ export default function Home() {
                 reorder={reorder}
                 folders={folderEntries}
                 onOpenFolder={folderNav.enter}
-                resetKey={listResetKey}
+                resetKey={viewResetKey}
                 inFolder={folderSearching}
               />
             ) : (
@@ -1052,7 +1106,6 @@ export default function Home() {
                 workspaceId={status.data?.workspaceId ?? ""}
                 listOffset={listOffset}
                 loading={listLoading}
-                thumbVersion={thumbVersion}
                 onTagClick={onTagClick}
                 hasNextPage={search.hasNextPage}
                 fetchNextPage={fetchNextPage}
@@ -1065,7 +1118,7 @@ export default function Home() {
                 reorder={reorder}
                 folders={folderEntries}
                 onOpenFolder={folderNav.enter}
-                resetKey={listResetKey}
+                resetKey={viewResetKey}
                 inFolder={folderSearching}
               />
             )}
@@ -1074,19 +1127,7 @@ export default function Home() {
           {/* The /file/:id detail overlays here — as a modal over the window or as
           a side peek docked to this list area (the list stays mounted either
           way). Share the current list order so the detail can step prev/next. */}
-          <MediaNavProvider
-            value={{
-              items,
-              listOffset,
-              fetchNextPage,
-              hasNextPage: search.hasNextPage,
-              isFetchingNextPage: search.isFetchingNextPage,
-              fetchPreviousPage,
-              hasPreviousPage: search.hasPreviousPage,
-              isFetchingPreviousPage: search.isFetchingPreviousPage,
-              isLoading: search.isLoading,
-            }}
-          >
+          <MediaNavProvider value={mediaNav}>
             <PlaylistNavProvider value={playlistNav}>
               <Outlet />
             </PlaylistNavProvider>

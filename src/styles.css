@@ -354,11 +354,28 @@ textarea,
   animation: none;
 }
 
+/*
+ * A media card's hover-only controls are mounted when the card is hovered
+ * (src/hooks/useHoverActivation.ts), already in their hovered state, so the
+ * opacity transition they carry has nothing to run from. This plays the same
+ * fade-in on mount instead; the fade-out still comes from the transition,
+ * which runs before they are unmounted.
+ */
+@keyframes card-control-in {
+  from {
+    opacity: 0;
+  }
+}
+.card-control-in {
+  animation: card-control-in 150ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fx-pop,
   .fx-settle,
   .fx-particle,
-  .fx-eq-bar {
+  .fx-eq-bar,
+  .card-control-in {
     animation: none;
   }
   .fx-overlay {

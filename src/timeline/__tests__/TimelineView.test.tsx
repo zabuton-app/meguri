@@ -51,7 +51,6 @@ function view(
       listOffset={0}
       loading={false}
       mediaBase="http://127.0.0.1:17345"
-      thumbVersion={{}}
       onAnchor={noop}
       {...extra}
     />

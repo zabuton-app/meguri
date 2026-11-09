@@ -106,7 +106,6 @@ function Harness({
           mediaBase="http://127.0.0.1:17345"
           workspaceId={WS_ID}
           loading={false}
-          thumbVersion={{}}
         />
         <SelectionLayer active />
       </SelectionProvider>
@@ -121,9 +120,18 @@ function renderGrid(props?: Partial<React.ComponentProps<typeof Harness>>) {
 /** The selection bar, or null while selection mode is off. */
 const bar = () => screen.queryByRole("region", { name: "Selection actions" });
 
+/** A card mounts its hover-only controls once pointed at (useHoverActivation). */
+const hoverCards = () => {
+  for (const card of screen.queryAllByTestId("media-card")) {
+    fireEvent.mouseEnter(card);
+  }
+};
+
 /** Accessible names read "Select" until picked and "Deselect" afterwards. */
-const checkboxes = () =>
-  screen.getAllByRole("button", { name: /^(Select|Deselect)$/ });
+const checkboxes = () => {
+  hoverCards();
+  return screen.getAllByRole("button", { name: /^(Select|Deselect)$/ });
+};
 
 const selectedCount = () => {
   const region = bar();
@@ -293,7 +301,6 @@ describe("selection", () => {
                 mediaBase="http://127.0.0.1:17345"
                 workspaceId={WS_ID}
                 loading={false}
-                thumbVersion={{}}
               />
               <SelectionLayer active />
             </SelectionProvider>
@@ -745,7 +752,6 @@ describe("reading the selection again after an edit", () => {
             mediaBase="http://127.0.0.1:17345"
             workspaceId={WS_ID}
             loading={false}
-            thumbVersion={{}}
           />
           <SelectionLayer active />
           <Controls />
@@ -1009,7 +1015,6 @@ describe("folder selection", () => {
             mediaBase="http://127.0.0.1:17345"
             workspaceId={WS_ID}
             loading={false}
-            thumbVersion={{}}
             folders={folders}
             onOpenFolder={() => {}}
           />
@@ -1020,12 +1025,14 @@ describe("folder selection", () => {
     );
   }
 
-  const mediaBoxes = () =>
-    screen
+  const mediaBoxes = () => {
+    hoverCards();
+    return screen
       .getAllByTestId("media-card")
       .map((card) =>
         within(card).getByRole("button", { name: /^(Select|Deselect)$/ }),
       );
+  };
   const folderBoxes = () =>
     screen
       .getAllByTestId("folder-card")

@@ -10,6 +10,11 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 
+/** How star `n` is drawn for a rating of `value`: lit up to the value. */
+function starClass(n: number, value: number): string {
+  return n <= value ? "fill-accent2 text-accent2" : "text-muted";
+}
+
 /** Per-star delay of the staggered pop when setting a rating. */
 const STAGGER_MS = 40;
 
@@ -83,7 +88,7 @@ export function RatingStars({
             >
               <Star
                 style={{ width: size, height: size }}
-                className={n <= value ? "fill-accent2 text-accent2" : "text-muted"}
+                className={starClass(n, value)}
               />
             </span>
             {animated && fx.variant === "set" && n === fx.upTo && (
@@ -98,6 +103,40 @@ export function RatingStars({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The same five stars, drawn only: no buttons, no effect state, a third of the
+ * DOM. For a card that is not being hovered (see useHoverActivation), which
+ * swaps in the editable RatingButton once it is. Laid out exactly as
+ * RatingStars inside RatingButton, so the swap moves nothing.
+ */
+export function RatingStarsView({
+  value,
+  size = 16,
+}: {
+  value: number;
+  size?: number;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      role="img"
+      aria-label={t("rating.value", { n: value })}
+      className="flex items-center"
+    >
+      <div className="flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Star
+            key={n}
+            aria-hidden
+            style={{ width: size, height: size }}
+            className={starClass(n, value)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

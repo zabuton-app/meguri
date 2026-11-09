@@ -1,5 +1,5 @@
 // Media listing grid. Shows thumbnails via thumb://; click to open detail.
-// thumbVersion forces a reload (cache bust) after a thumbnail-completion event.
+// A regenerated thumbnail is picked up by the thumbnail itself (thumbVersionStore).
 import {
   Fragment,
   memo,
@@ -10,7 +10,7 @@ import {
   useState,
   type Ref,
 } from "react";
-import { Link } from "react-router";
+import { HashLink } from "@/components/HashLink";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import {
@@ -33,6 +33,9 @@ import {
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { ExternalFileDragHandle } from "@/components/ExternalFileDragHandle";
 import { RatingButton } from "@/components/RatingButton";
+import { RatingStarsView } from "@/components/RatingStars";
+import { useSelectionMode } from "@/components/SelectionContext";
+import { useHoverActivation } from "@/hooks/useHoverActivation";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
 import { SelectionCheck } from "@/components/SelectionCheck";
@@ -59,6 +62,7 @@ const SIDE_PAD = 16; // px-4
 const ROW_ESTIMATE = 220; // initial row-height estimate (corrected by measurement)
 const THUMB_ASPECT = 9 / 16; // aspect-video on the card thumbnail
 const CARD_BORDER = 1; // border on the card: the thumbnail is inset by it on each side
+const OVERSCAN_ROWS = 2; // rows mounted beyond each edge of the viewport
 
 interface Props {
   items: FileRow[];
@@ -69,8 +73,6 @@ interface Props {
   /** Global index offset of items[0] within the full filtered result set. */
   listOffset?: number;
   loading: boolean;
-  /** workspaceId:id→update counter. Incrementing on thumb:done reloads the corresponding thumbnail. */
-  thumbVersion: Record<string, number>;
   /** Handler for tag clicks (reflected into the search query). */
   onTagClick?: (name: string) => void;
   /** Whether a next page exists (for infinite scroll). */
@@ -198,15 +200,14 @@ export function useCardGridMetrics(scrollEl: HTMLDivElement | null) {
   return { cols, rowEstimate, measureRow };
 }
 
-// Memoized: Home re-renders on every thumbVersion flush and its other props are
-// referentially stable, so the grid only re-renders when the data actually changes.
+// Memoized: Home's props are referentially stable, so the grid only re-renders
+// when the data actually changes.
 export const MediaGrid = memo(function MediaGrid({
   items,
   mediaBase,
   workspaceId: wsId,
   listOffset = 0,
   loading,
-  thumbVersion,
   onTagClick,
   hasNextPage,
   fetchNextPage,
@@ -265,7 +266,12 @@ export const MediaGrid = memo(function MediaGrid({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowEstimate,
-    overscan: 4,
+    // Rows of full cards are expensive to mount and lay out, and the scroll
+    // renders the rows it reaches synchronously, so a deep margin mostly adds
+    // cards to every frame of a fling: two rows each side measured ~10-15%
+    // cheaper per frame than four. The infinite-scroll threshold below grows
+    // by the same two rows, so the next page is still asked for as early.
+    overscan: OVERSCAN_ROWS,
     paddingStart: leadingRows * rowEstimate,
   });
   const virtualRows = virtualizer.getVirtualItems();
@@ -313,7 +319,11 @@ export const MediaGrid = memo(function MediaGrid({
   useInfiniteScrollTrigger({
     virtualRows,
     totalRows: rows.length,
-    threshold: 2,
+    // Counted from the rows mounted, which reach OVERSCAN_ROWS past the view:
+    // the next or previous page is asked for once the view is within six rows
+    // of either end, as it was with the overscan at four.
+    threshold: 6 - OVERSCAN_ROWS,
+    prevThreshold: 6 - OVERSCAN_ROWS,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
@@ -389,7 +399,6 @@ export const MediaGrid = memo(function MediaGrid({
                         entry={entry.folder}
                         focused={focused}
                         mediaBase={mediaBase}
-                        thumbVersion={thumbVersion}
                         onOpen={onOpenFolder ?? noop}
                       />
                     );
@@ -399,7 +408,6 @@ export const MediaGrid = memo(function MediaGrid({
                     <MediaCard
                       file={f}
                       index={entry.fileIndex}
-                      version={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
                       mediaBase={mediaBase}
                       onTagClick={onTagClick}
                       focused={focused}
@@ -426,12 +434,11 @@ export const MediaGrid = memo(function MediaGrid({
   );
 });
 
-// The parent (MediaGrid) re-renders on every thumb:done, so memoize this and
-// only re-render cards whose version changed (onTagClick is stabilized in the parent).
+// Memoized so a grid re-render (paging, focus moving) only re-renders the cards
+// whose own props changed (onTagClick is stabilized in the parent).
 export const MediaCard = memo(function MediaCard({
   file,
   index,
-  version,
   mediaBase,
   onTagClick,
   focused,
@@ -442,7 +449,6 @@ export const MediaCard = memo(function MediaCard({
   file: FileRow;
   /** Position in the loaded list — what a Shift-click ranges from. */
   index: number;
-  version: number;
   mediaBase: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
@@ -464,9 +470,26 @@ export const MediaCard = memo(function MediaCard({
     selected,
     fileDraggable,
   );
+  // The hover-only controls are mounted only while the card is hovered or
+  // focused, or while their state keeps them on screen anyway (see
+  // useHoverActivation). The keyboard-focused card keeps its Watch Later
+  // toggle mounted: the "W" shortcut presses it through watchLaterRef.
+  const { active: hot, handlers: hoverHandlers } = useHoverActivation();
+  const { active: selecting } = useSelectionMode();
+  // Each "always on" condition here matches the class that keeps the control
+  // opaque (boxClass's checked/active, `opacity-100` for a favorite,
+  // `aria-pressed:` for a queued file): one without the other would mount a
+  // control that stays invisible, or hide one that should show.
+  const pinnedCheck = selecting || selected;
+  const pinnedWatchLater =
+    !!focused || watchLater.has(file.workspaceId, file.id);
+  const showCheck = hot || pinnedCheck;
+  const showFavorite = hot || file.favorite;
+  const showWatchLater = hot || pinnedWatchLater;
   return (
     <div
       {...dragProps}
+      {...hoverHandlers}
       data-testid="media-card"
       data-slot="media-card"
       aria-current={focused ? "true" : undefined}
@@ -476,7 +499,7 @@ export const MediaCard = memo(function MediaCard({
         selected && "border-primary ring-1 ring-primary",
       )}
     >
-      <Link
+      <HashLink
         to={fileHref(file.id, file.workspaceId)}
         onClick={(e) => {
           if (onSelectableClick(e)) return;
@@ -485,49 +508,68 @@ export const MediaCard = memo(function MediaCard({
         data-thumb
         className="group/thumb relative block aspect-video overflow-hidden bg-overlay text-muted"
       >
-        <SelectionCheck
-          file={file}
-          index={index}
-          className="absolute left-1 top-1 z-10"
-        />
-        <MediaThumbnail file={file} mediaBase={mediaBase} version={version} />
+        {showCheck && (
+          <SelectionCheck
+            file={file}
+            index={index}
+            className={cn(
+              "absolute left-1 top-1 z-10",
+              // The fade is for a hover; a box out for the selection is
+              // simply there, as it was before.
+              !pinnedCheck && "card-control-in",
+            )}
+          />
+        )}
+        <MediaThumbnail file={file} mediaBase={mediaBase} />
         {hasTimeline(file.kind) && file.duration && (
           <span className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg">
             {formatDuration(file.duration)}
           </span>
         )}
-        {/* Favorite toggle. Always visible when favorited; on hover otherwise. */}
-        <FavoriteButton
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          favorite={file.favorite}
-          size={16}
-          className={cn(
-            "absolute right-1 top-1 rounded bg-bg/70 p-1 backdrop-blur-[1px] transition-opacity",
-            file.favorite
-              ? "opacity-100"
-              : "opacity-0 focus:opacity-100 group-hover:opacity-100",
-          )}
-        />
+        {/* Favorite toggle. Always visible when favorited; on hover otherwise.
+            No backdrop-blur on this or the other overlays of a card: a
+            backdrop-filter per card made every scroll frame re-layerize the
+            whole grid, several times over what the cards cost to render. */}
+        {showFavorite && (
+          <FavoriteButton
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            favorite={file.favorite}
+            size={16}
+            className={cn(
+              "absolute right-1 top-1 rounded bg-bg/70 p-1 transition-opacity",
+              file.favorite
+                ? "opacity-100"
+                : "card-control-in opacity-0 focus:opacity-100 group-hover:opacity-100",
+            )}
+          />
+        )}
         {/* Watch Later toggle, mirroring the favorite affordance below it. */}
-        <WatchLaterButton
-          ref={watchLaterRef}
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          watchLater={watchLater}
-          size={16}
-          className="absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 backdrop-blur-[1px] transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100"
+        {showWatchLater && (
+          <WatchLaterButton
+            ref={watchLaterRef}
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            watchLater={watchLater}
+            size={16}
+            className={cn(
+              "absolute right-1 top-9 rounded bg-bg/70 p-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100",
+              !pinnedWatchLater && "card-control-in",
+            )}
+          />
+        )}
+      </HashLink>
+      {hot && (
+        <ExternalFileDragHandle
+          onDragStart={onExternalDragStart}
+          className="card-control-in left-7 top-1"
         />
-      </Link>
-      <ExternalFileDragHandle
-        onDragStart={onExternalDragStart}
-        className="left-7 top-1"
-      />
+      )}
       {/* Metadata. Fixed height so the card height doesn't change with tag
           count — and independent of the card width (single-line truncation,
           no wrapping): the grid's row-height estimate measures this block
           once per column count and derives the rest from the width. */}
-      <Link
+      <HashLink
         to={fileHref(file.id, file.workspaceId, { autoplay: false })}
         onClick={onSelectableClick}
         className="flex flex-col gap-1 border-t border-border px-2 py-1.5"
@@ -536,18 +578,23 @@ export const MediaCard = memo(function MediaCard({
           {fileNameOf(file.relPath)}
         </div>
         <div className="truncate text-[10px] text-muted">{metaLine(file)}</div>
-        {/* Editable rating. Stops click propagation so it doesn't open the detail. */}
-        <RatingButton
-          fileId={file.id}
-          workspaceId={file.workspaceId}
-          rating={file.rating}
-          size={14}
-        />
+        {/* Editable rating once the card is hovered or focused (drawn only
+            until then). Stops click propagation so it doesn't open the detail. */}
+        {hot ? (
+          <RatingButton
+            fileId={file.id}
+            workspaceId={file.workspaceId}
+            rating={file.rating}
+            size={14}
+          />
+        ) : (
+          <RatingStarsView value={file.rating} size={14} />
+        )}
         {/* Tags shown in full via horizontal scroll. Click to reflect into the search query. Fixed height. */}
         <div className="no-scrollbar flex h-6 items-center gap-1 overflow-x-auto overflow-y-hidden">
           <TagChips tags={file.tags} onTagClick={onTagClick} />
         </div>
-      </Link>
+      </HashLink>
     </div>
   );
 });

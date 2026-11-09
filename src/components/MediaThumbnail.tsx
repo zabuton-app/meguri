@@ -8,13 +8,18 @@ import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useThumbVersionOf } from "@/lib/thumbVersionStore";
 
 interface Props {
   file: FileRow;
   /** Base URL of the local media server (status.data.mediaBase). */
   mediaBase: string;
-  /** thumb:done cache buster — incrementing the value forces an <img> reload. */
-  version: number;
+  /**
+   * thumb:done cache buster — incrementing the value forces an <img> reload.
+   * Left out, the thumbnail follows the file's own entry in the shared store
+   * (thumbVersionStore), so a regenerated thumbnail re-renders just this one.
+   */
+  version?: number;
   /** Tailwind size class for the fallback icon (when no thumbnail is available). */
   fallbackIconSize?: string;
   /** Tailwind size class for the play overlay circle (videos only). */
@@ -68,7 +73,7 @@ function ResumeProgress({ progress }: { progress: number }) {
 export function MediaThumbnail({
   file,
   mediaBase,
-  version,
+  version: versionProp,
   fallbackIconSize = "size-8",
   playOverlaySize = "size-10",
   playIconSize = "size-5",
@@ -76,6 +81,8 @@ export function MediaThumbnail({
   scrubPreview = true,
   showProgress = true,
 }: Props) {
+  const storedVersion = useThumbVersionOf(file.workspaceId, file.id);
+  const version = versionProp ?? storedVersion;
   // Keys on whether a thumbnail file actually exists, not on kind: audio is
   // marked thumb_status 'done' whether or not it embeds cover art, so status
   // alone would build a URL that 404s for the cover-less ones. Audio *with* a
@@ -162,7 +169,7 @@ export function MediaThumbnail({
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span
             className={cn(
-              "flex items-center justify-center rounded-full bg-bg/40 text-fg/80 backdrop-blur-[1px] transition group-hover/thumb:bg-bg/55 group-hover/thumb:text-fg",
+              "flex items-center justify-center rounded-full bg-bg/40 text-fg/80 transition group-hover/thumb:bg-bg/55 group-hover/thumb:text-fg",
               playOverlaySize,
             )}
           >
