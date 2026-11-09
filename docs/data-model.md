@@ -202,11 +202,23 @@ both. The match is a case-insensitive substring — a tag is as often remembered
 a word in the middle of it — ranked prefix-first then by file count, and capped
 at `MAX_TAG_SUGGESTIONS`. Tab or Enter accepts the highlighted candidate and
 chips it; Tab preventDefaults so the caret stays put for the next condition,
-while Shift+Tab still leaves the field. The candidates come from the
-`tags_list_all` catalog the tag management screen already caches, filtered in the
-renderer: one query instead of one per keystroke, and correct in the `All` view
-and in collections, where a workspace-scoped `tags_list` cannot resolve a
-database at all.
+while Shift+Tab still leaves the field. The candidates come from a
+`tags_list_all` catalog fetched once (under the tag screen's query-key prefix,
+so every tag mutation invalidates it too) and filtered in the renderer: one
+query instead of one per keystroke, and correct in the `All` view and in
+collections, where a workspace-scoped `tags_list` cannot resolve a database at
+all. The box asks for the catalog of **every** workspace
+(`tags_list_all` with `allWorkspaces`), so a tag kept in another workspace is
+offered too: the view's own tags come first, and the rest are marked as held in
+other workspaces only. Past the catalog's cap the view's own tags are the ones
+kept (`prefer`).
+
+The tag management screen's rename, merge and delete fan out over the
+workspaces in view — every workspace in `All` and in collections — and each
+database resolves the names by `tagIdentityKey()`, so `Trip` in one workspace
+and `trip` in another are renamed, merged or deleted together. An operation
+that an auto-tagging condition reaches runs in every workspace (see
+[Auto tagging](#auto-tagging)).
 
 ## Derived tags
 

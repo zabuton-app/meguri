@@ -30,7 +30,7 @@ node tools/demo-capture/shoot-history.mjs    # history.png — play-history view
 node tools/demo-capture/shoot-peek.mjs       # side-peek.png — side peek
 node tools/demo-capture/shoot-audio.mjs      # audio.png — player bar
 node tools/demo-capture/shoot-spectrum.mjs   # spectrum*.png — audio spectrum
-node tools/demo-capture/shoot-auto-tag.mjs   # auto-tag.png — auto-tagging screen
+node tools/demo-capture/shoot-auto-tag.mjs   # auto-tag*.png, tags-cloud.png — auto tagging and the tag cloud
 ```
 
 `record-graph.mjs`, `record-folders.mjs`, `record-bulk-edit.mjs` and

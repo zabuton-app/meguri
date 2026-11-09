@@ -119,7 +119,8 @@ lifecycle behavior:
   therefore `before-quit`, which advances `quitPhase`.
 - `before-quit` is a two-pass gate (Linux / Windows): the first pass calls
   `preventDefault()`, runs the async `shutdown()` (hide the window, stop the
-  local servers, abort scans, dispose the query worker), then closes every
+  local servers, abort scans and workspace passes, dispose the query and
+  auto-tagging workers), then closes every
   workspace DB handle and re-enters `app.quit()`; the second pass lets the quit
   proceed. Repeated quit requests during the wait are absorbed, and the wait is
   bounded so a stuck teardown cannot keep the app alive. Once quitting, no scan
@@ -150,8 +151,12 @@ The root path is hashed (SHA1, first 16 hex characters) into a stable ID via
 `Workspaces.idFor()` / `pathHash()`; that ID is also the name of the directory
 holding the workspace's generated files.
 
-- `electron/core/appConfig.ts` is the lone layer that persists `roots`,
-  `activePath`, `collections`, and `autoTag` to `<userData>/config.json`.
+- `electron/core/appConfig.ts` is the lone layer that persists
+  `<userData>/config.json`: `roots`, `activePath`, `collections` and
+  `workspaceEmojis` (owned by `Workspaces`), plus `update`, `logo`, `autoTag`,
+  `customCss` and `cssTheme`. Each owner writes only its own fields through
+  `updateConfig()`, which merges over what is on disk; writing a snapshot back
+  wholesale would revert the fields another owner changed since.
 - `electron/core/workspaces.ts` reads the config and caches a `Core` per ID. It
   distinguishes `active()` (the active workspace) from `byId()` (any workspace by
   ID). Code that opens files should be deliberate about which it needs — the

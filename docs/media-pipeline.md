@@ -51,6 +51,14 @@ supports cancellation via `AbortSignal` while idle. `ScanManager` guards
 against concurrent scans of the same workspace with its `scanning` set, which
 avoids chunked-transaction conflicts.
 
+Writes over every workspace outside a scan ("Apply to existing files" on the
+auto-tagging screen) run through `WorkspacePasses`
+(`electron/core/workspacePasses.ts`), one workspace at a time. Removing a
+workspace goes through `holding()`, which aborts and waits for the pass on it
+and keeps new ones off it until the removal is done; quitting calls
+`abortAll()` next to `ScanManager.abortAll()`, so no pass writes into a
+database after it is closed. A new pass of that kind belongs there too.
+
 ffmpeg processes that decode video are capped process-wide by the
 `videoDecodeSlots` semaphore in `electron/core/mediaConcurrency.ts`, shared between
 the scan pipeline (video thumbnails) and the media server (frame grabs, image
