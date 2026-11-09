@@ -178,10 +178,15 @@ open after the upgrade:
    again.
 2. Merge its tables into the library and record it in `migrated_workspaces`,
    in one transaction.
-3. Drop its own tables and rebuild `files_fts`, in another. Then mark the
+3. Drop its own tables, in another transaction of their own. Then mark the
    record `complete`. A workspace recorded but not complete still has its own
-   tables, and is treated as not merged until it is.
-4. Keep the copy. Once the move is complete, the library is the only place
+   tables, and is treated as not merged until it is. The drop is kept small
+   on purpose: a drop that failed after the merge had committed would leave
+   the workspace writing to its own tables, edits the next merge would undo.
+4. Rebuild `files_fts` from the library. A failure here is logged and leaves
+   the index behind; `catchUpTagIndex()`, which `Core.init` runs right after,
+   or the next open rebuilds it.
+5. Keep the copy. Once the move is complete, the library is the only place
    that metadata lives, so `Workspaces.dropCoveredBackups()` deletes the copy
    only when a copy of the library taken after it exists.
 
@@ -213,6 +218,10 @@ runs `PRAGMA quick_check` on it:
   while copies of it exist. The window says so, and from when the copy is:
   anything changed after it is lost. The copy's change log is emptied and its
   sequence moved far ahead, so every workspace rebuilds its keyword index.
+- A library that is gone while copies of it exist, after none of them could
+  be put back (a full disk, for one), stops the startup with an error
+  (`isLibraryLost()`): opening the workspaces would start an empty library in
+  its place and push the good copies out.
 - A damaged library with no copy, or one that cannot be read, is left as it
   is.
 
