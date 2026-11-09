@@ -228,7 +228,15 @@ html[data-theme] body {
 | [themes/sky.css](themes/sky.css)                     | Sky, clouds and trees |
 | [themes/high-contrast.css](themes/high-contrast.css) | 7:1 text, bold lines  |
 
-Each has a dark and a light variant and meets the contrast minimums above.
+Each has a dark and a light variant and meets the contrast minimums above:
+
+| Theme         | Dark                                                            | Light                                                             |
+| ------------- | --------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Cyberpunk     | ![Cyberpunk, dark](assets/css-theme-cyberpunk-dark.png)         | ![Cyberpunk, light](assets/css-theme-cyberpunk-light.png)         |
+| OLED          | ![OLED, dark](assets/css-theme-oled-dark.png)                   | ![OLED, light](assets/css-theme-oled-light.png)                   |
+| High Contrast | ![High Contrast, dark](assets/css-theme-high-contrast-dark.png) | ![High Contrast, light](assets/css-theme-high-contrast-light.png) |
+| Sky           | ![Sky, dark](assets/css-theme-sky-dark.png)                     | ![Sky, light](assets/css-theme-sky-light.png)                     |
+
 They keep to the public API, except for a few rules in Cyberpunk and Sky
 whose comments say so. Install one as a CSS theme to try it, or copy it as a
 starting point.

@@ -37,7 +37,12 @@ export function resolveMediaRoot() {
  * Launch the built app against a throwaway user-data dir.
  * Returns { app, page, close }; always await close() when done.
  */
-export async function launchApp({ mediaRoot, width = 1280, height = 800 }) {
+export async function launchApp({
+  mediaRoot,
+  width = 1280,
+  height = 800,
+  themeFiles = [],
+}) {
   if (!fs.existsSync(mainScript)) {
     throw new Error("Built main script not found. Run `npm run build` first.");
   }
@@ -50,6 +55,14 @@ export async function launchApp({ mediaRoot, width = 1280, height = 800 }) {
     path.join(userDataDir, "config.json"),
     JSON.stringify({ update: { autoCheck: false } }),
   );
+  // CSS theme files to offer (<userData>/themes), picked with selectCssTheme.
+  if (themeFiles.length > 0) {
+    const themesDir = path.join(userDataDir, "themes");
+    fs.mkdirSync(themesDir, { recursive: true });
+    for (const file of themeFiles) {
+      fs.copyFileSync(file, path.join(themesDir, path.basename(file)));
+    }
+  }
   const app = await _electron.launch(
     electronLaunchOptions({
       args: [`--user-data-dir=${userDataDir}`, "--force-device-scale-factor=1"],
@@ -177,6 +190,17 @@ export async function seedTags(page) {
 }
 
 /** Switch the base16 theme (persisted the same way the ThemeProvider does). */
+/**
+ * Pick a CSS theme file from <userData>/themes (null for none). Takes effect
+ * with the next setTheme(), which reloads the window.
+ */
+export async function selectCssTheme(page, file) {
+  await page.evaluate(
+    (f) => window.api.invoke("css_theme_select", { file: f }),
+    file,
+  );
+}
+
 export async function setTheme(page, themeId) {
   await page.evaluate((t) => localStorage.setItem("meguri.theme", t), themeId);
   await page.reload();
