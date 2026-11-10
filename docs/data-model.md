@@ -143,8 +143,10 @@ before this change are rebuilt once on open and the metadata under their old
 `p:<root_id>:<rel_path>` keys is moved to the new ones. Because metadata is
 keyed this way, it **survives file moves, renames, and rebuilds of the
 `files` / `files_fts` tables** — anything that would change or regenerate
-`files.id`. It is also what makes the library shared: two workspaces holding
-the same content (the same `content_hash`) read and write the same rows.
+`files.id`. (An index rebuild keeps `files.id` itself: it soft-deletes and
+resets the rows, and the rescan revives them in place.) It is also what makes
+the library shared: two workspaces holding the same content (the same
+`content_hash`) read and write the same rows.
 
 When a file gains its first hash, `migrateMetaKey()` moves its metadata from
 the path key to the hash. Another workspace's copy may already hold metadata
@@ -471,13 +473,13 @@ refused operation changes neither, and one that fails partway is finished by
 doing it again. Regex rules name their tags through a template
 and are left alone.
 
-The screen sends ids it loaded earlier, and a rebuild hands ids to other files
-while a move gives a file another name. So `auto_tag_apply` and `auto_tag_edit`
-take, with each id, the place the screen read it at, and write only to the
-files still there (`keepStillAt`, the same check a scan's pass makes before
-its writes); the rest come back as `moved`, and the screen reads the files
-again. Each call is split to fit the file count, the (file, tag) pairs and the
-places' total length (`MAX_AUTO_TAG_PLACE_CHARS`).
+The screen sends ids it loaded earlier, and meanwhile a move gives a file
+another name, or a rebuild drops the row of a file that is gone. So
+`auto_tag_apply` and `auto_tag_edit` take, with each id, the place the screen
+read it at, and write only to the files still there (`keepStillAt`, the same
+check a scan's pass makes before its writes); the rest come back as `moved`, and
+the screen reads the files again. Each call is split to fit the file count, the
+(file, tag) pairs and the places' total length (`MAX_AUTO_TAG_PLACE_CHARS`).
 
 The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed
 suggestions and excluded terms) is app-wide, in `config.json` under `autoTag`.

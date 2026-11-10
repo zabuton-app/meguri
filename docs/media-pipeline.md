@@ -25,11 +25,17 @@ A root that cannot be read (an unplugged drive, a share that is down) fails the
 scan before the index is touched, so its files are not soft-deleted. The root is
 read again at the end of the walk, so one that goes away partway through fails
 the scan too, instead of its folders reading as deleted (a subfolder or file
-that turns out to be gone triggers the same check right away). A rebuild clears
-the index only after the root has been read. A subdirectory that cannot be
-listed, or a file that cannot be stat'ed, is skipped: its rows are kept as they
-are, with their IDs and thumbnails, by a rebuild too (not soft-deleted, not
-taken over by move detection, and not sent to thumbnail generation).
+that turns out to be gone triggers the same check right away). A rebuild resets
+the index only after the root has been read. It soft-deletes the rows (clearing
+their probed fields, thumbnails and search entries) instead of deleting them, so
+the rescan revives each file still there with the same `files.id`; rows of files
+already gone are deleted. The rescan
+hashes every file, so content replaced with its size and mtime kept is caught as
+a change; an unchanged file is not auto-tagged again, which "Apply to existing
+files" on the auto-tag screen does. A subdirectory that cannot be listed, or a
+file that cannot be stat'ed, is skipped: its rows are kept as they are, with
+their IDs and thumbnails, by a rebuild too (not soft-deleted, not taken over by
+move detection, and not sent to thumbnail generation).
 
 A file whose content cannot be read for hashing (permission denied, locked by
 another process, removed since the walk) is skipped for that scan instead of
