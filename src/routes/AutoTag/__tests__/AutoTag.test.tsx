@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// happy-dom does not reflect aria-* attributes to element properties (ariaSelected and so on).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import type { QueryClient } from "@tanstack/react-query";

@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// happy-dom's Animation.cancel() leaves its finished promise rejected and unhandled.
 // The player's one way out that is not an exit: open the detail view for the
 // file on screen, then come back to the same pass at the same second. The
 // detail route is a sibling of the player's, so the trip always unmounts the

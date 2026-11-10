@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// The width test narrows clientWidth on Element.prototype, which happy-dom
+// hides behind its own HTMLElement.prototype property.
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import "@/test/mockVirtualizer";

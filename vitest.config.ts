@@ -46,7 +46,9 @@ export default defineConfig({
         },
         test: {
           name: "renderer",
-          environment: "jsdom",
+          // happy-dom sets up much faster than jsdom. Files that rely on jsdom's
+          // behaviour opt back in with `// @vitest-environment jsdom`.
+          environment: "happy-dom",
           include: ["src/**/*.test.{ts,tsx}"],
           setupFiles: ["./vitest.setup.ts"],
         },
