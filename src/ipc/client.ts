@@ -145,6 +145,8 @@ export const api = {
     invoke("file_set_rating", { id, workspaceId, rating }),
   fileSetFavorite: (id: number, workspaceId: string, favorite: boolean) =>
     invoke("file_set_favorite", { id, workspaceId, favorite }),
+  fileSetNote: (id: number, workspaceId: string, note: string | null) =>
+    invoke("file_set_note", { id, workspaceId, note }),
   fileDeleteFromIndex: (id: number, workspaceId: string) =>
     invoke("file_delete_from_index", { id, workspaceId }),
   fileAddTag: (id: number, workspaceId: string, name: string) =>

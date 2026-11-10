@@ -118,6 +118,8 @@ export const FileDetailSchema = FileRowSchema.extend({
   bookmarks: z.array(SceneBookmarkSchema),
   /** User-chosen thumbnail offset in seconds. Null when the auto frame is in use. */
   thumbOffsetSec: z.number().nullable(),
+  /** The user's note, as Markdown. Null when there is none. */
+  note: z.string().nullable(),
 });
 export type FileDetail = z.infer<typeof FileDetailSchema>;
 

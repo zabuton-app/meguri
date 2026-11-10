@@ -58,6 +58,7 @@ describe("syncFileRowAcrossCaches", () => {
       playHistory: [],
       bookmarks: [],
       thumbOffsetSec: null,
+      note: null,
     });
 
     syncFileRowAcrossCaches(qc, "ws", 1, { favorite: 1, rating: 4 });

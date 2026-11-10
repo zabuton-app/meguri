@@ -390,3 +390,98 @@ textarea,
 .driver-active [data-tour-bubble] * {
   pointer-events: auto;
 }
+
+/* A file's note (src/routes/MediaDetail/NoteCard.tsx): the Markdown the editor
+   renders, in the theme's colors. */
+.note-content {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.note-content > * + * {
+  margin-top: 0.6em;
+}
+.note-content h1,
+.note-content h2,
+.note-content h3 {
+  color: var(--c-bright-fg);
+  font-weight: 700;
+  line-height: 1.35;
+}
+.note-content h1 {
+  font-size: 1.25rem;
+}
+.note-content h2 {
+  font-size: 1.1rem;
+}
+.note-content h3 {
+  font-size: 1rem;
+}
+.note-content ul,
+.note-content ol {
+  padding-left: 1.25rem;
+}
+.note-content ul {
+  list-style: disc;
+}
+.note-content ol {
+  list-style: decimal;
+}
+.note-content li > p {
+  margin: 0;
+}
+.note-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+.note-content ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.note-content ul[data-type="taskList"] li > label {
+  margin-top: 0.2em;
+}
+.note-content ul[data-type="taskList"] input {
+  accent-color: var(--c-primary);
+}
+.note-content blockquote {
+  border-left: 3px solid var(--c-border-strong);
+  padding-left: 0.75rem;
+  color: var(--c-secondary-fg);
+}
+.note-content code {
+  border: 1px solid var(--c-border);
+  border-radius: 0.25rem;
+  background: var(--c-bg);
+  padding: 0.05em 0.3em;
+  font-size: 0.85em;
+}
+.note-content pre {
+  border: 1px solid var(--c-border);
+  border-radius: 0.375rem;
+  background: var(--c-bg);
+  padding: 0.6rem 0.75rem;
+  overflow-x: auto;
+}
+.note-content pre code {
+  border: 0;
+  padding: 0;
+}
+.note-content hr {
+  border: 0;
+  border-top: 1px solid var(--c-border);
+}
+.note-content a {
+  color: var(--c-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.note-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--c-muted);
+  pointer-events: none;
+}

@@ -655,12 +655,13 @@ interface FileDetailRow extends FileRow {
   mtime: number;
   meta: string | null;
   metaKey: string;
+  note: string | null;
 }
 
 export function fileDetail(db: DB, fileId: number): FileDetail | null {
   const r = db
     .prepare(
-      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.codec, f.fps, f.mtime, f.meta, f.meta_key AS metaKey
+      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.codec, f.fps, f.mtime, f.meta, f.meta_key AS metaKey, m.note
        ${FILE_FROM} WHERE f.id = ? AND f.deleted_at IS NULL`,
     )
     .get(fileId) as FileDetailRow | undefined;
@@ -688,5 +689,6 @@ export function fileDetail(db: DB, fileId: number): FileDetail | null {
     playHistory,
     bookmarks,
     thumbOffsetSec: thumbOffsetByKey(db, r.metaKey),
+    note: r.note ?? null,
   };
 }

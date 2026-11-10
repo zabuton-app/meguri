@@ -310,6 +310,21 @@ variable (once added, it is persisted to settings thereafter).
 MEGURI_ROOT=/path/to/media npm run dev
 ```
 
+#### Trying changes without touching your own library
+
+Development mode uses the same data directory as the installed app (see
+[Where Data Is Stored](#where-data-is-stored)), so a branch that changes the
+database writes to your real library, tags, notes and settings. To try such a
+branch safely, give Electron a throwaway profile with `--user-data-dir`:
+
+```bash
+npm run dev -- -- --user-data-dir=/tmp/meguri-dev
+```
+
+The first `--` passes the rest to `electron-vite`, and the second passes
+`--user-data-dir` on to Electron. The app starts with an empty library and no
+workspaces; add a folder to try it on. Delete the directory to start over.
+
 ### Docker development mode
 
 ```bash
@@ -368,6 +383,7 @@ Electron needs, `npm run test:e2e:install` pulls them in.
 | Scan       | Runs automatically at startup. Re-scan via the header "Scan" (incremental, move tracking)                          |
 | Play       | Click a thumbnail → play in the detail view (audio plays in the bottom bar). When unsupported, use "Open externally" |
 | Tag / Rate | Assign in the detail view (tags have autocomplete). Click a tag in the grid to search                              |
+| Note       | Write a Markdown note in the detail view (source URL, licence, where it was used). It saves as you type            |
 | Search     | Filter and sort by full text, kind, and rating in the top bar (conditions shown as badges, individually removable) |
 | Theme      | Switch from Theme at the top-right of the header                                                                   |
 | Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset                                                                          |
