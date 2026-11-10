@@ -5,8 +5,13 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { openDb, type DB } from "../db.js";
-import { upsertScanRoot } from "../queries.js";
+import { openDb, rebuildFtsAll, type DB } from "../db.js";
+import {
+  clearExcludedFiles,
+  deleteFromIndex,
+  upsertScanRoot,
+} from "../queries.js";
+import { syncFts } from "../tags.js";
 import {
   contentHash,
   kindForExt,
@@ -405,6 +410,67 @@ describe("syncFiles lifecycle", () => {
       db.prepare("SELECT COUNT(*) c FROM files").get() as { c: number }
     ).c;
     expect(totalRows).toBe(2); // soft delete keeps the row
+  });
+
+  it("reports an unchanged file restored from the index as missing its FTS row", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    await fsp.writeFile(path.join(root, "b.mp4"), "BBBBBBBBBB");
+    const first = await rescan();
+    for (const id of first.ftsTargets) syncFts(db, id);
+    const { id } = db
+      .prepare("SELECT id FROM files WHERE rel_path = 'a.mp4'")
+      .get() as { id: number };
+    const ftsRow = () =>
+      db.prepare("SELECT rowid FROM files_fts WHERE rowid = ?").get(id);
+
+    deleteFromIndex(db, id); // also drops its FTS row
+    expect(ftsRow()).toBeUndefined();
+    clearExcludedFiles(db, rootId); // "rescan including excluded"
+    const res = await rescan();
+
+    // Unchanged on disk, so not in ftsTargets (and not auto-tagged again).
+    expect(res.ftsTargets).toEqual([]);
+    expect(res.ftsMissing).toEqual([id]);
+    for (const r of res.ftsMissing) syncFts(db, r);
+    expect(ftsRow()).toEqual({ rowid: id });
+  });
+
+  it("does not rebuild the FTS row of a file that comes back with its row intact", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    const first = await rescan();
+    for (const id of first.ftsTargets) syncFts(db, id);
+
+    // Gone for a scan (soft-deleted, FTS row kept), then back unchanged.
+    await fsp.rename(path.join(root, "a.mp4"), path.join(root, "a.tmp"));
+    await rescan();
+    await fsp.rename(path.join(root, "a.tmp"), path.join(root, "a.mp4"));
+    const res = await rescan();
+
+    expect(res.stats.unchanged).toBe(1);
+    expect(res.ftsMissing).toEqual([]);
+  });
+
+  it("reports a file whose FTS row a rebuild dropped while it was gone", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    const first = await rescan();
+    for (const id of first.ftsTargets) syncFts(db, id);
+
+    await fsp.rename(path.join(root, "a.mp4"), path.join(root, "a.tmp"));
+    await rescan(); // soft-deleted
+    rebuildFtsAll(db); // skips deleted rows, so its FTS row is gone
+    await fsp.rename(path.join(root, "a.tmp"), path.join(root, "a.mp4"));
+    const res = await rescan();
+
+    expect(res.ftsMissing).toEqual(first.ftsTargets);
+  });
+
+  it("reports rows a scan aborted before its index phase left without an FTS row", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    const first = await rescan(); // FTS never synced, as if aborted
+    const res = await rescan();
+
+    expect(res.stats.unchanged).toBe(1);
+    expect(res.ftsMissing).toEqual(first.ftsTargets);
   });
 
   it("keeps the rows under a directory that could not be read", async () => {
