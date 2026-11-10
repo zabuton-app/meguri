@@ -1,12 +1,14 @@
 // Main-process client for the query worker thread. Owns the worker lifecycle
 // (lazy spawn, respawn after a crash, terminate on quit) and falls back to
-// executing on the main thread when the worker cannot be spawned at all, so
-// query behavior degrades gracefully instead of breaking.
+// executing on the main thread when the worker cannot be spawned at all, or
+// fails to start with requests in flight, so query behavior degrades
+// gracefully instead of breaking.
 import { Worker } from "node:worker_threads";
 import { withTimeout } from "./concurrency.js";
 import type {
   WorkerMessage,
   WorkerPayload,
+  WorkerReady,
   WorkerReply,
 } from "../queryWorker.js";
 import { scopedLog } from "./logger.js";
@@ -19,6 +21,7 @@ import {
 const log = scopedLog("queryWorker");
 
 interface Pending {
+  msg: WorkerPayload;
   resolve: (result: unknown) => void;
   reject: (err: Error) => void;
 }
@@ -55,7 +58,14 @@ export class QueryWorkerClient {
     try {
       const worker = new Worker(this.workerPath);
       worker.unref(); // never keep the app alive on its own
-      worker.on("message", (reply: WorkerReply) => {
+      // Whether this worker finished loading (its "ready", or any reply). One
+      // that dies before that failed to start, not on a particular query.
+      let started = false;
+      worker.on("message", (reply: WorkerReply | WorkerReady) => {
+        started = true;
+        // Not a round-trip: a worker that loads but dies on every query must
+        // still reach the crash limit below.
+        if ("type" in reply) return;
         // A round-trip proves the worker is functional; reset the crash streak.
         this.crashes = 0;
         const p = this.pending.get(reply.id);
@@ -69,7 +79,7 @@ export class QueryWorkerClient {
       const drop = (err: Error) => {
         if (dropped) return;
         dropped = true;
-        // Reject everything in flight and let the next request respawn —
+        // Release everything in flight and let the next request respawn —
         // unless the worker keeps dying, in which case give up on it.
         if (this.worker === worker) this.worker = null;
         if (!this.disposed && ++this.crashes >= MAX_CONSECUTIVE_CRASHES) {
@@ -78,9 +88,19 @@ export class QueryWorkerClient {
             `query worker crashed ${this.crashes} times; falling back to the main thread`,
           );
         }
+        // A worker that never started ran none of its requests, so they are
+        // safe to run on the main thread. Once it has started, a crash may
+        // have been caused by a query itself (e.g. out of memory), which
+        // would block or crash the main process if retried there.
+        // Everything is replayed in the order sent, not just the queries: a
+        // closeWorkspace sent after a query must still close the handle that
+        // query opens on the fallback. (closeAll is only sent by dispose(),
+        // which sets `disposed` first, so it is never replayed.)
+        const retry = !started && !this.disposed;
         for (const [id, p] of this.pending) {
           this.pending.delete(id);
-          p.reject(err);
+          if (retry) this.runFallback(p.msg).then(p.resolve, p.reject);
+          else p.reject(err);
         }
       };
       worker.on("error", (err) => {
@@ -107,27 +127,29 @@ export class QueryWorkerClient {
       return Promise.reject(new Error("query client disposed"));
     }
     const worker = this.ensureWorker();
-    if (!worker) {
-      // Main-thread fallback: same executor logic, synchronous. Run inside
-      // then() so a synchronous throw becomes a rejection — callers must be
-      // able to rely on .catch() regardless of which path served the request.
-      return Promise.resolve().then(() => {
-        switch (msg.type) {
-          case "query":
-            return this.fallback.run(msg.req);
-          case "closeWorkspace":
-            this.fallback.closeWorkspace(msg.wsId);
-            return undefined;
-          case "invalidateCaches":
-            this.fallback.invalidateCaches();
-            return undefined;
-          case "closeAll":
-            this.fallback.closeAll();
-            return undefined;
-        }
-      });
-    }
+    if (!worker) return this.runFallback(msg);
     return this.post(worker, msg);
+  }
+
+  /** Main-thread fallback: same executor logic, synchronous. Run inside
+   *  then() so a synchronous throw becomes a rejection — callers must be able
+   *  to rely on .catch() regardless of which path served the request. */
+  private runFallback(msg: WorkerPayload): Promise<unknown> {
+    return Promise.resolve().then(() => {
+      switch (msg.type) {
+        case "query":
+          return this.fallback.run(msg.req);
+        case "closeWorkspace":
+          this.fallback.closeWorkspace(msg.wsId);
+          return undefined;
+        case "invalidateCaches":
+          this.fallback.invalidateCaches();
+          return undefined;
+        case "closeAll":
+          this.fallback.closeAll();
+          return undefined;
+      }
+    });
   }
 
   /** Post a message to a specific worker and await its reply. Raw path below
@@ -136,7 +158,7 @@ export class QueryWorkerClient {
   private post(worker: Worker, msg: WorkerPayload): Promise<unknown> {
     const id = ++this.seq;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { msg, resolve, reject });
       try {
         worker.postMessage({ ...msg, id } satisfies WorkerMessage);
       } catch (e) {

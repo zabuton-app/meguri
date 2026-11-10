@@ -1,7 +1,8 @@
 // Tests for QueryWorkerClient's degradation paths. A worker pointed at a
 // missing bundle spawns but dies on every request (async MODULE_NOT_FOUND) —
-// after enough consecutive crashes the client must pin itself to the
-// main-thread fallback instead of respawning forever.
+// the queries in flight are answered by the main-thread fallback, and after
+// enough consecutive crashes the client pins itself to the fallback instead of
+// respawning forever.
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -40,11 +41,31 @@ const statsReq = () => ({
 });
 
 describe("QueryWorkerClient", () => {
+  it("answers a query in flight from the fallback when the worker fails to start", async () => {
+    // The worker bundle doesn't exist: the spawn dies with an async module
+    // error before replying, so the query is retried on the main thread.
+    const stats = await client.run<WorkspaceStats>(statsReq());
+    expect(stats.fileCount).toBe(4);
+  });
+
+  it("replays a closeWorkspace sent after the query, so the fallback handle is closed", async () => {
+    const fallbackDbs = (
+      client as unknown as { fallback: { dbs: Map<string, unknown> } }
+    ).fallback.dbs;
+    const query = client.run(statsReq()); // spawns the worker that fails to start
+    const closed = client.closeWorkspace("ws1"); // queued behind the query
+    await query; // answered on the fallback, opening ws1 there
+    await closed;
+    expect(fallbackDbs.has("ws1")).toBe(false);
+  });
+
   it("falls back to the main thread after repeated worker crashes", async () => {
-    // The worker bundle doesn't exist: each spawn dies with an async module
-    // error, rejecting the in-flight request.
+    // Each request spawns a worker that dies on start; its query is still
+    // answered from the fallback.
     for (let i = 0; i < 3; i++) {
-      await expect(client.run(statsReq())).rejects.toThrow();
+      await expect(client.run(statsReq())).resolves.toMatchObject({
+        fileCount: 4,
+      });
     }
     // Crash limit reached: the client now executes on the main thread.
     const stats = await client.run<WorkspaceStats>(statsReq());
@@ -78,9 +99,9 @@ describe("QueryWorkerClient", () => {
   });
 });
 
-// Stand-in workers speaking the real message protocol, so dispose()'s
-// closeAll-before-terminate path (which the missing-bundle tests above never
-// reach) is exercised against an actual worker thread.
+// Stand-in workers speaking the real message protocol, for the paths the
+// missing-bundle tests above never reach (a worker that started, dispose()'s
+// closeAll-before-terminate).
 function writeWorker(file: string, body: string): string {
   writeFileSync(
     file,
@@ -113,5 +134,46 @@ describe("QueryWorkerClient.dispose() with a live worker", () => {
     const inflight = silent.run(statsReq()).catch(() => "rejected"); // spawns
     await silent.dispose(); // bounded by DISPOSE_TIMEOUT_MS (< the test timeout)
     expect(await inflight).toBe("rejected"); // pending request was released
+  });
+});
+
+describe("QueryWorkerClient with a live worker", () => {
+  const badReq = () => ({
+    kind: "search" as const,
+    targets: [{ id: "ws1", dbPath, libraryPath }],
+  });
+
+  it("rejects the queries in flight when the worker crashes after a reply", async () => {
+    const script = writeWorker(
+      path.join(dir, "worker-crash.js"),
+      `if (m.type === "query" && m.req.kind === "search") process.exit(1);
+       parentPort.postMessage({ id: m.id, ok: true, result: null });`,
+    );
+    const crashing = new QueryWorkerClient(script);
+    try {
+      await crashing.run(statsReq()); // a reply: the worker started fine
+      // Not retried on the main thread: the query may be what killed it.
+      await expect(crashing.run(badReq() as never)).rejects.toThrow(/exited/);
+    } finally {
+      await crashing.dispose();
+    }
+  });
+
+  it("rejects a query that kills a worker after it reported ready", async () => {
+    const script = path.join(dir, "worker-ready-crash.js");
+    writeFileSync(
+      script,
+      `const { parentPort } = require("node:worker_threads");
+parentPort.on("message", () => process.exit(1));
+parentPort.postMessage({ type: "ready" });
+`,
+    );
+    const crashing = new QueryWorkerClient(script);
+    try {
+      // Its first message, but the worker had started: not a start failure.
+      await expect(crashing.run(statsReq())).rejects.toThrow(/exited/);
+    } finally {
+      await crashing.dispose();
+    }
   });
 });
