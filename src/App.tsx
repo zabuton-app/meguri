@@ -22,6 +22,7 @@ import { useCustomCssStyle } from "@/hooks/useCustomCss";
 import { useSelectAllGuard } from "@/hooks/useSelectAllGuard";
 import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
 import { useLibraryRestoreNotifier } from "@/hooks/useLibraryRestoreNotifier";
+import { useConfigProblemNotifier } from "@/hooks/useConfigProblemNotifier";
 import { registerRouterNavigate } from "@/lib/routerBridge";
 
 // In a webview, a hash router is more stable than a file-path-style history.
@@ -52,6 +53,7 @@ export default function App() {
   useSelectAllGuard();
   useUpdateNotifier();
   useLibraryRestoreNotifier();
+  useConfigProblemNotifier();
   useAppearanceAttribute();
   useCssThemeStyle();
   useCustomCssStyle();

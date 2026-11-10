@@ -123,6 +123,14 @@ export const en: Record<TranslationKey, string> = {
     "Your library was damaged, so Meguri restored the copy from {date}",
   "library.restoredDesc":
     "Favorites, ratings, tags and other changes made after that are lost. The damaged file is kept in the same folder as the library.",
+  "config.movedAside":
+    "Your settings file (config.json) was damaged, so Meguri started with the default settings",
+  "config.movedAsideDesc":
+    "Your workspaces and collections are kept in the damaged file, saved as config.json.corrupt-<date> in the same folder.",
+  "config.unreadable":
+    "Meguri could not read your settings file (config.json) and is running with the default settings",
+  "config.unreadableDesc":
+    "The file has not been changed. Make sure no other app is using it, then restart Meguri.",
   "settings.about": "About",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} is released under the MIT License.",

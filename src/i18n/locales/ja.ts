@@ -122,6 +122,14 @@ export const ja = {
     "ライブラリが壊れていたため、{date}時点の写しから戻しました",
   "library.restoredDesc":
     "それより後に付けたお気に入り・評価・タグなどは失われています。壊れたファイルは、ライブラリと同じフォルダに残してあります。",
+  "config.movedAside":
+    "設定ファイル（config.json）が壊れていたため、初期設定で起動しました",
+  "config.movedAsideDesc":
+    "登録していたワークスペースやコレクションは、壊れたファイルと一緒に config.json.corrupt-<日時> として同じフォルダに残してあります。",
+  "config.unreadable":
+    "設定ファイル（config.json）を読み込めなかったため、初期設定で起動しています",
+  "config.unreadableDesc":
+    "ファイルは変更していません。ほかのアプリが使っていないか確認して、Meguriを再起動してください。",
   "settings.about": "このアプリについて",
   "about.version": "{name} バージョン {version}",
   "about.appLicense": "{name}は MIT License の下で公開されています。",

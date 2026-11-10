@@ -161,7 +161,14 @@ holding the workspace's generated files.
   `workspaceEmojis` (owned by `Workspaces`), plus `update`, `logo`, `autoTag`,
   `customCss` and `cssTheme`. Each owner writes only its own fields through
   `updateConfig()`, which merges over what is on disk; writing a snapshot back
-  wholesale would revert the fields another owner changed since.
+  wholesale would revert the fields another owner changed since. A
+  `config.json` that cannot be parsed is renamed to
+  `config.json.corrupt-<time>` before anything saves, and one that cannot be
+  read at startup (locked, no permission) is not written over for the rest of
+  the session; either way the app runs on defaults and tells the user
+  (`app_status.configProblem`). A read or parse that fails later, once the
+  file was read, only skips the save that met it, and readers get the last
+  config read or saved meanwhile.
 - `electron/core/workspaces.ts` reads the config and caches a `Core` per ID. It
   distinguishes `active()` (the active workspace) from `byId()` (any workspace by
   ID). Code that opens files should be deliberate about which it needs — the
