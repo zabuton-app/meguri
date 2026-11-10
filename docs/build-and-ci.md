@@ -6,7 +6,7 @@ test setup, packaging, continuous integration, and Docker-based development.
 ## npm scripts
 
 ```bash
-npm install        # postinstall rebuilds better-sqlite3 for Electron
+npm install        # postinstall prepares the native dependencies
 npm run dev        # development mode (electron-vite dev)
 npm run build      # build main / preload / renderer into out/
 npm run preview    # launch the built app (= npm start)
@@ -15,6 +15,10 @@ npm run typecheck  # tsc --noEmit over both src and electron
 npm test           # regression tests (Vitest): core then renderer
 npm run install:local  # install into the local environment
 ```
+
+better-sqlite3 ships prebuilt Node-API binaries. npm 12 still reports a
+`node-gyp rebuild` install script for it and warns that it was blocked, so
+`allowScripts` in `package.json` denies it explicitly.
 
 `dev`, `preview`, and `start` go through `scripts/run-electron-vite.mjs` rather
 than calling `electron-vite` directly. The wrapper strips
@@ -40,7 +44,7 @@ Tests run under Vitest (`vitest.config.ts`) as two projects.
 ### Core project
 
 `npm run test:core` covers the main/core logic (`electron/**/*.test.ts`). Because
-better-sqlite3 is built for Electron's ABI, this **runs Electron as Node**
+the tests exercise the same native dependencies as the app, this **runs Electron as Node**
 (`ELECTRON_RUN_AS_NODE=1` plus `--experimental-require-module` to allow
 `require()` of ESM). It exercises real SQL against an in-memory SQLite database.
 The config carries a plugin that resolves NodeNext-style `.js` import specifiers
@@ -62,6 +66,11 @@ the jsdom worker does not start under Electron's experimental loader.
 
 Distribution targets are Linux (AppImage / deb), Windows (nsis / portable), and
 macOS (dmg / zip).
+
+Electron 45 packages require macOS 13 (Ventura) or later. The existing
+Windows x64 and Linux x64 release targets are supported by Electron 45.
+The Node.js version used to run npm and the build scripts is separate from
+the Node.js version bundled with Electron.
 
 ### macOS code signing
 

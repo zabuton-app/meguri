@@ -455,7 +455,9 @@ describe("searchCollection k-way merge", () => {
   });
 });
 
-describe("listTagsWorkspaces", () => {
+// The cap cases seed a couple of thousand manual tags one at a time, which takes
+// several seconds on a CI runner, so they get more than the default 5s.
+describe("listTagsWorkspaces", { timeout: 15_000 }, () => {
   /** One file carrying `manualCount` manual tags plus every given generated tag. */
   function seedTags(
     manualCount: number,

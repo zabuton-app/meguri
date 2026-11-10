@@ -7,7 +7,11 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { skipFirstLaunchTour, waitForIndexedMedia } from "./helpers";
+import {
+  skipFirstLaunchTour,
+  waitForIndexedMedia,
+  waitForRenderer,
+} from "./helpers";
 import {
   electronLaunchOptions,
   mainScript,
@@ -53,12 +57,11 @@ export const test = base.extend<MeguriFixtures>({
   },
   firstLaunchWindow: async ({ app }, use) => {
     const window = await app.firstWindow();
-    await window.waitForLoadState("domcontentloaded");
+    await waitForRenderer(window);
     await use(window);
   },
   window: async ({ app }, use) => {
     const window = await app.firstWindow();
-    await window.waitForLoadState("domcontentloaded");
     await skipFirstLaunchTour(window);
     await use(window);
   },

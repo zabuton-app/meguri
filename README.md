@@ -87,7 +87,7 @@ Prebuilt packages for all platforms are also available on
 | -------- | --------------------------------------------- |
 | Linux    | AppImage / deb                                |
 | Windows  | Microsoft Store / Installer (NSIS) / portable |
-| macOS    | dmg / zip (Apple silicon)                     |
+| macOS    | dmg / zip (Apple silicon, macOS 13 or later)  |
 
 ### macOS: first launch
 

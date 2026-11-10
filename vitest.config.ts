@@ -30,7 +30,7 @@ export default defineConfig({
     projects: [
       {
         // Main-process / core logic. Run under Electron's Node (see the `test` npm script)
-        // so the Electron-ABI better-sqlite3 binary loads against a real in-memory SQLite.
+        // so better-sqlite3 runs on the app's runtime against a real in-memory SQLite.
         plugins: [resolveTsJs()],
         test: {
           name: "core",

@@ -8,7 +8,7 @@
 //     After the app has scanned <dir>: tags its files with 200 manual tags,
 //     1-4 per file, skewed so a few tags become large hubs. Tags live in the
 //     library every workspace shares (library.sqlite), attached as `lib`.
-//     Runs under Electron because better-sqlite3 is built for Electron's ABI.
+//     Runs under Electron, the runtime the app loads better-sqlite3 with.
 //     userDataDir defaults to the platform's Meguri directory; pass the one
 //     the app ran with (--user-data-dir) to keep a throwaway profile.
 //     Quit the app first: it holds the DB open.
