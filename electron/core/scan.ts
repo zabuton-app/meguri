@@ -423,7 +423,7 @@ export async function syncFiles(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   );
   const moveCandidates = db.prepare(
-    "SELECT id, rel_path, kind, ext FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL",
+    "SELECT id, rel_path, kind, ext, deleted_at FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL",
   );
   // A move can change the extension, and with it the kind (the same MPEG-4 bytes
   // are video as .mp4 and audio as .m4a). The row would otherwise keep the old
@@ -621,13 +621,23 @@ export async function syncFiles(
               rel_path: string;
               kind: string;
               ext: string | null;
+              deleted_at: number | null;
             }[])
           : [];
       // A candidate walk() could not reach is probably still in place: this
       // is a copy, not a move.
-      const moved = cands.find(
+      const unseen = cands.filter(
         (c) => !seen.has(c.rel_path) && !isUnreadable(c.rel_path),
       );
+      // Only an unambiguous match is a move: with identical copies gone at
+      // once, picking one would hand a file's id (which collections refer to)
+      // to another copy, so the file is inserted instead (its metadata follows
+      // through the shared content hash). A row that was still there before
+      // this scan is the likelier source than one long gone, so when any live
+      // row is unseen, only live rows count.
+      const live = unseen.filter((c) => c.deleted_at == null);
+      const choices = live.length > 0 ? live : unseen;
+      const moved = choices.length === 1 ? choices[0] : undefined;
       if (moved) {
         moveStmt.run(
           d.relPath,

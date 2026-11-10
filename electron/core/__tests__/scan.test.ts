@@ -412,6 +412,83 @@ describe("syncFiles lifecycle", () => {
     expect(totalRows).toBe(2); // soft delete keeps the row
   });
 
+  it("does not treat a new path as a move when identical copies disappeared together", async () => {
+    await fsp.mkdir(path.join(root, "a"));
+    await fsp.mkdir(path.join(root, "b"));
+    await fsp.writeFile(path.join(root, "a", "x.mp4"), "SAMESAMESA");
+    await fsp.writeFile(path.join(root, "b", "x.mp4"), "SAMESAMESA");
+    await rescan();
+    const ids = (
+      db.prepare("SELECT id FROM files ORDER BY id").all() as { id: number }[]
+    ).map((r) => r.id);
+
+    // Both copies moved at once: which new path is which old row is unknown.
+    await fsp.mkdir(path.join(root, "c"));
+    await fsp.mkdir(path.join(root, "d"));
+    await fsp.rename(
+      path.join(root, "a", "x.mp4"),
+      path.join(root, "c", "x.mp4"),
+    );
+    await fsp.rename(
+      path.join(root, "b", "x.mp4"),
+      path.join(root, "d", "x.mp4"),
+    );
+    const res = await rescan();
+
+    expect(res.stats).toMatchObject({ moved: 0, inserted: 2, deleted: 2 });
+    const alive = db
+      .prepare("SELECT id FROM files WHERE deleted_at IS NULL")
+      .all() as { id: number }[];
+    for (const { id } of alive) expect(ids).not.toContain(id);
+  });
+
+  it("still detects a move while an identical copy stays where it was", async () => {
+    await fsp.writeFile(path.join(root, "keep.mp4"), "SAMESAMESA");
+    await fsp.writeFile(path.join(root, "a.mp4"), "SAMESAMESA");
+    await rescan();
+    const a = (
+      db.prepare("SELECT id FROM files WHERE rel_path = 'a.mp4'").get() as {
+        id: number;
+      }
+    ).id;
+
+    await fsp.rename(path.join(root, "a.mp4"), path.join(root, "b.mp4"));
+    const res = await rescan();
+
+    expect(res.stats).toMatchObject({ moved: 1, inserted: 0 });
+    expect(
+      db.prepare("SELECT rel_path FROM files WHERE id = ?").pluck().get(a),
+    ).toBe("b.mp4");
+  });
+
+  it("prefers the copy that was there before over one gone long ago", async () => {
+    await fsp.writeFile(path.join(root, "aa-old.mp4"), "SAMESAMESA");
+    await fsp.writeFile(path.join(root, "zz.mp4"), "SAMESAMESA");
+    await rescan();
+    const idOf = (rel: string) =>
+      (
+        db.prepare("SELECT id FROM files WHERE rel_path = ?").get(rel) as {
+          id: number;
+        }
+      ).id;
+    const old = idOf("aa-old.mp4");
+    const a = idOf("zz.mp4");
+    await fsp.rm(path.join(root, "aa-old.mp4"));
+    await rescan(); // aa-old.mp4 soft-deleted; it sorts (and was inserted) first
+
+    await fsp.rename(path.join(root, "zz.mp4"), path.join(root, "b.mp4"));
+    const res = await rescan();
+
+    // Both rows are unseen candidates; the live one is the file that moved.
+    expect(res.stats).toMatchObject({ moved: 1, inserted: 0 });
+    expect(
+      db.prepare("SELECT rel_path FROM files WHERE id = ?").pluck().get(a),
+    ).toBe("b.mp4");
+    expect(
+      db.prepare("SELECT deleted_at FROM files WHERE id = ?").pluck().get(old),
+    ).not.toBeNull();
+  });
+
   it("reports an unchanged file restored from the index as missing its FTS row", async () => {
     await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
     await fsp.writeFile(path.join(root, "b.mp4"), "BBBBBBBBBB");

@@ -19,7 +19,12 @@ them all on quit.
 database. It tracks moves and renames via `content_hash` and decides what changed
 incrementally from `mtime` and `size`, so unchanged files are skipped and a moved
 file keeps its identity (and therefore its metadata — see
-[`meta_key`](data-model.md#metadata-and-meta_key)).
+[`meta_key`](data-model.md#metadata-and-meta_key)). A new path counts as a move
+only when the match is unambiguous: among the rows with the same hash and size
+not seen in this scan, exactly one is live (or, when none is live, exactly one
+is soft-deleted). When identical copies disappear together, the file is
+inserted instead of taking over a copy's id at random; its metadata still
+follows through the shared hash.
 
 A root that cannot be read (an unplugged drive, a share that is down) fails the
 scan before the index is touched, so its files are not soft-deleted. The root is
