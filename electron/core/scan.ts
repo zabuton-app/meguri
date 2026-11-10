@@ -263,6 +263,13 @@ export interface ScanStats {
   unchanged: number;
 }
 
+/** A file skipped by a scan because its content could not be read. */
+export interface UnreadableFile {
+  relPath: string;
+  /** The fs error code, e.g. EACCES / EBUSY / ENOENT. */
+  code: string;
+}
+
 /** Stats for a scan that did nothing (aborted before starting, or failed). */
 export function emptyScanStats(): ScanStats {
   return { inserted: 0, updated: 0, moved: 0, deleted: 0, unchanged: 0 };
@@ -278,6 +285,9 @@ export function emptyScanStats(): ScanStats {
  *      and yield between chunks. Move detection uses values in the DB, so it doesn't depend on chunk order.
  *
  * ftsTargets are the file ids that need FTS re-sync (inserted/moved/updated). unchanged ones are excluded.
+ * unreadable lists the files whose content could not be read for hashing
+ * (permission denied, locked by another process, gone since the walk). They
+ * are left as they are for this scan and retried on the next one.
  */
 export async function syncFiles(
   db: DB,
@@ -285,7 +295,12 @@ export async function syncFiles(
   discovered: Discovered[],
   onHashProgress?: (done: number, total: number) => void,
   signal?: AbortSignal,
-): Promise<{ stats: ScanStats; needsThumb: number[]; ftsTargets: number[] }> {
+): Promise<{
+  stats: ScanStats;
+  needsThumb: number[];
+  ftsTargets: number[];
+  unreadable: UnreadableFile[];
+}> {
   const stats: ScanStats = {
     inserted: 0,
     updated: 0,
@@ -295,6 +310,7 @@ export async function syncFiles(
   };
   const needsThumb: number[] = [];
   const ftsTargets: number[] = [];
+  const unreadable: UnreadableFile[] = [];
   const excluded = new Set(
     (
       db
@@ -395,7 +411,11 @@ export async function syncFiles(
 
   // --- 2. Compute content_hash for new + changed candidates concurrently ---
   // On network FS (SMB) this reads 2 MiB per file, so report progress (determinate total).
+  // A file that cannot be read is skipped instead of failing the whole scan:
+  // a new one is not inserted and a changed one keeps its row as it is (its
+  // path is still in `seen`, so it is not soft-deleted either).
   const hashOf = new Map<number, string>();
+  const unreadableIdx = new Set<number>();
   const hashTotal = hashIdx.length;
   let hashed = 0;
   await pool(
@@ -403,7 +423,16 @@ export async function syncFiles(
     SCAN_IO_CONCURRENCY,
     async (idx) => {
       if (signal?.aborted) return;
-      hashOf.set(idx, await contentHash(scannable[idx].absPath));
+      try {
+        hashOf.set(idx, await contentHash(scannable[idx].absPath));
+      } catch (error) {
+        // Only fs errors mean "this file can't be read"; anything else is a
+        // bug and should still fail the scan.
+        const code = (error as NodeJS.ErrnoException | null)?.code;
+        if (typeof code !== "string") throw error;
+        unreadableIdx.add(idx);
+        unreadable.push({ relPath: scannable[idx].relPath, code });
+      }
       hashed++;
       if (hashed % 8 === 0 || hashed === hashTotal)
         onHashProgress?.(hashed, hashTotal);
@@ -411,11 +440,12 @@ export async function syncFiles(
     signal,
   );
 
-  if (signal?.aborted) return { stats, needsThumb, ftsTargets };
+  if (signal?.aborted) return { stats, needsThumb, ftsTargets, unreadable };
 
   // --- 3. DB apply (chunked tx + yield between chunks) ---
   const applyChunk = db.transaction((idxs: number[]) => {
     for (const i of idxs) {
+      if (unreadableIdx.has(i)) continue;
       const d = scannable[i];
       const existing = existingOf[i];
       if (existing) {
@@ -516,7 +546,7 @@ export async function syncFiles(
     await yieldToLoop();
   }
 
-  if (signal?.aborted) return { stats, needsThumb, ftsTargets };
+  if (signal?.aborted) return { stats, needsThumb, ftsTargets, unreadable };
 
   // Soft-delete existing rows not seen this time (in a single transaction at the end).
   const softDelete = db.transaction(() => {
@@ -535,5 +565,5 @@ export async function syncFiles(
   });
   softDelete();
 
-  return { stats, needsThumb, ftsTargets };
+  return { stats, needsThumb, ftsTargets, unreadable };
 }
