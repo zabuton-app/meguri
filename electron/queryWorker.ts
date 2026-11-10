@@ -18,6 +18,10 @@ export type WorkerReply =
   | { id: number; ok: true; result: unknown }
   | { id: number; ok: false; error: string };
 
+/** Sent once the worker has loaded and is about to take messages. A worker
+ *  that dies before this failed to start, not on a query. */
+export type WorkerReady = { type: "ready" };
+
 const port = parentPort;
 if (!port) throw new Error("queryWorker must run inside a worker thread");
 
@@ -59,3 +63,8 @@ port.on("message", (msg: WorkerMessage) => {
     } satisfies WorkerReply);
   }
 });
+
+// Last statement of the module: everything above loaded, so a crash from here
+// on happens while handling a message. Queued messages are delivered only
+// after this, so it reaches the client before any reply.
+port.postMessage({ type: "ready" } satisfies WorkerReady);
