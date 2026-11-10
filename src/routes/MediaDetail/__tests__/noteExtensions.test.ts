@@ -1,6 +1,6 @@
 // The note's Markdown reads back as what the user wrote: typed text that looks
 // like a block marker stays text, and text typed after a link is not linked.
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Editor, type JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
@@ -10,8 +10,16 @@ import {
   escapeLineStarts,
 } from "@/routes/MediaDetail/noteExtensions";
 
+// Every editor made here is destroyed after its test. A live one keeps a
+// ProseMirror DOM observer whose timer can fire after the test environment
+// has torn down `document`, which fails the whole run as an unhandled error.
+const editors: Editor[] = [];
+afterEach(() => {
+  for (const editor of editors.splice(0)) editor.destroy();
+});
+
 function editorWith(content: JSONContent | string): Editor {
-  return new Editor({
+  const editor = new Editor({
     extensions: [
       StarterKit.configure({ paragraph: false, link: false }),
       NoteParagraph,
@@ -21,6 +29,8 @@ function editorWith(content: JSONContent | string): Editor {
     content,
     ...(typeof content === "string" ? { contentType: "markdown" } : {}),
   });
+  editors.push(editor);
+  return editor;
 }
 
 function paragraphOf(text: string): JSONContent {
