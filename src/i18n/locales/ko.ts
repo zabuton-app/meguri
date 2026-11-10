@@ -169,6 +169,11 @@ export const ko: Record<TranslationKey, string> = {
   "home.scanRootUnreadableNamed": '"{name}" 폴더에 접근할 수 없습니다',
   "home.scanRootUnreadableDesc":
     "폴더가 이동되거나 삭제되지 않았는지, 드라이브나 네트워크 공유가 연결되어 있는지, Meguri가 읽을 수 있는지 확인한 뒤 다시 스캔하세요. 파일 목록은 그대로 두었습니다.",
+  "home.scanSkipped": "읽을 수 없는 폴더나 파일 {count}개를 건너뛰었습니다",
+  "home.scanSkippedNamed":
+    '"{name}"에서 읽을 수 없는 폴더나 파일 {count}개를 건너뛰었습니다',
+  "home.scanSkippedDesc":
+    "Meguri에 읽기 권한이 없거나 다른 프로그램이 사용 중일 수 있습니다. 파일 목록의 해당 부분은 그대로 두었으며, 다음 스캔에서 다시 시도합니다.",
   "home.scanStartFailed": "스캔을 시작할 수 없습니다",
   "home.scanAlreadyRunning": "스캔이 이미 실행 중입니다",
 

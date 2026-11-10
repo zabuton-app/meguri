@@ -61,7 +61,8 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
 - `scan:progress` — scan progress updates.
 - `thumb:done` — a thumbnail finished generating.
 - `scan:done` — a scan job completed (with stats, or an abort/error flag),
-  with the `workspaceId` scanned and, when its folder could not be read,
+  with the `workspaceId` scanned. `stats.skipped` counts the folders and files
+  it could not read; when its folder could not be read, it carries
   `errorReason: "root-unreadable"`. Since the startup scan can finish before a
   view listens, `scan_unreadable_workspaces` returns the workspaces whose last
   scan failed that way.

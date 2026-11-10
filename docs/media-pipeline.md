@@ -53,6 +53,14 @@ readable, the next scan detects the move and revives that row with its ID and
 metadata. The scan log
 records only how many files were skipped, by error code, not their names.
 
+Both kinds are counted in the scan's `stats.skipped`, and the renderer shows a
+warning with that count and the workspace's name after a scan, automatic or
+not, since nothing else would show them; a startup scan that ends before the
+window listens is not reported, and the next scan reports the same items. It
+does not list the paths. The walk does not descend into `node_modules` or into
+the folders a file system keeps at a drive's root (`lost+found`,
+`System Volume Information`, `$RECYCLE.BIN`).
+
 ### Metadata and thumbnails
 
 `electron/core/media.ts` extracts metadata with ffprobe and generates thumbnails

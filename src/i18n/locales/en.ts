@@ -172,6 +172,12 @@ export const en: Record<TranslationKey, string> = {
   "home.scanRootUnreadableNamed": 'The folder of "{name}" could not be reached',
   "home.scanRootUnreadableDesc":
     "Check that the folder has not been moved or deleted, that its drive or network share is connected, and that Meguri can read it, then scan again. The file list has been left as it was.",
+  "home.scanSkipped":
+    "Skipped {count} folder(s) or file(s) that could not be read",
+  "home.scanSkippedNamed":
+    'Skipped {count} folder(s) or file(s) in "{name}" that could not be read',
+  "home.scanSkippedDesc":
+    "Meguri may not have permission to read them, or another program may be using them. That part of the file list has been left as it was, and the next scan will try again.",
   "home.scanStartFailed": "Could not start scan",
   "home.scanAlreadyRunning": "A scan is already in progress",
 

@@ -67,6 +67,7 @@ const toasts = vi.hoisted(() => ({
   error: vi.fn(),
   info: vi.fn(),
   success: vi.fn(),
+  warning: vi.fn(),
 }));
 vi.mock("sonner", () => ({
   toast: Object.assign(vi.fn(), toasts),
@@ -174,32 +175,35 @@ describe("Home + MediaDetail integration", () => {
     mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
   });
 
+  const STATS = {
+    inserted: 0,
+    updated: 0,
+    moved: 0,
+    deleted: 0,
+    unchanged: 0,
+    skipped: 0,
+  };
+  const fireScanDone = (done: Record<string, unknown>) => {
+    for (const fire of scanDone.handlers) {
+      fire({ jobId: "job-1", stats: STATS, ...done });
+    }
+  };
+  const renderReady = async () => {
+    scanDone.handlers.length = 0;
+    const { queryClient } = renderWithProviders(<AppRoutes />);
+    await waitFor(() => {
+      expect(queryClient.getQueryData(["workspaces_list"])).toBeTruthy();
+      expect(scanDone.handlers.length).toBeGreaterThan(0);
+    });
+  };
+
   describe("a workspace folder that could not be read", () => {
-    const fireUnreadable = (workspaceId: string) => {
-      for (const fire of scanDone.handlers) {
-        fire({
-          jobId: "job-1",
-          stats: {
-            inserted: 0,
-            updated: 0,
-            moved: 0,
-            deleted: 0,
-            unchanged: 0,
-          },
-          error: true,
-          errorReason: "root-unreadable",
-          workspaceId,
-        });
-      }
-    };
-    const renderReady = async () => {
-      scanDone.handlers.length = 0;
-      const { queryClient } = renderWithProviders(<AppRoutes />);
-      await waitFor(() => {
-        expect(queryClient.getQueryData(["workspaces_list"])).toBeTruthy();
-        expect(scanDone.handlers.length).toBeGreaterThan(0);
+    const fireUnreadable = (workspaceId: string) =>
+      fireScanDone({
+        error: true,
+        errorReason: "root-unreadable",
+        workspaceId,
       });
-    };
 
     it("names the workspace", async () => {
       await renderReady();
@@ -239,6 +243,58 @@ describe("Home + MediaDetail integration", () => {
       expect(String(toasts.error.mock.calls.at(-1)?.[0])).toBe(
         "The workspace folder could not be reached",
       );
+    });
+  });
+
+  describe("folders or files a scan could not read", () => {
+    const fireSkipped = (workspaceId: string, skipped: number) =>
+      fireScanDone({ stats: { ...STATS, skipped }, workspaceId });
+    beforeEach(() => {
+      toasts.warning.mockClear();
+      toasts.success.mockClear();
+    });
+
+    it("names the workspace and the count, also for an automatic scan", async () => {
+      await renderReady();
+      fireSkipped(WS_ID, 3);
+      await waitFor(() =>
+        expect(toasts.warning).toHaveBeenCalledWith(
+          'Skipped 3 folder(s) or file(s) in "Media" that could not be read',
+          expect.objectContaining({ id: `scan-skipped:${WS_ID}` }),
+        ),
+      );
+      expect(toasts.success).not.toHaveBeenCalled();
+    });
+
+    it("says it without a name when the workspace is not known", async () => {
+      await renderReady();
+      fireSkipped("ws-gone", 1);
+      await waitFor(() =>
+        expect(toasts.warning).toHaveBeenCalledWith(
+          "Skipped 1 folder(s) or file(s) that could not be read",
+          expect.anything(),
+        ),
+      );
+    });
+
+    it("leaves it to the cancel notice when the scan was aborted", async () => {
+      await renderReady();
+      fireScanDone({
+        stats: { ...STATS, skipped: 2 },
+        aborted: true,
+        workspaceId: WS_ID,
+      });
+      await waitFor(() => expect(toasts.info).toHaveBeenCalled());
+      await new Promise((r) => setTimeout(r, 50));
+      expect(toasts.warning).not.toHaveBeenCalled();
+    });
+
+    it("stays quiet when nothing was skipped", async () => {
+      await renderReady();
+      fireSkipped(WS_ID, 0);
+      // Let the name lookup a notice would wait on settle first.
+      await new Promise((r) => setTimeout(r, 50));
+      expect(toasts.warning).not.toHaveBeenCalled();
     });
   });
 
