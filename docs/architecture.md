@@ -347,7 +347,9 @@ owns them, so keep them distinct.
 Manually curated virtual folders that span workspaces. They are stored in the
 `collections` array of `<userData>/config.json` (see `UserCollectionConfig` in
 `electron/core/appConfig.ts`), and each item references a file by
-`workspaceId + fileId`. The main process is the source of truth, manipulated
+`workspaceId + fileId`. A file keeps its id across moves, renames and index
+rebuilds (a rebuild soft-deletes the rows and the rescan revives them in place),
+so these references stay valid. The main process is the source of truth, manipulated
 through the `collection_create` / `collection_remove` / `collection_reorder` /
 `collection_reorder_items` / `collection_set_emoji` / `collection_rename` /
 `collection_add_file` / `collection_remove_file` IPC channels. Note the two

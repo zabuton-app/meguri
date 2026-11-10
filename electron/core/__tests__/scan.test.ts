@@ -485,9 +485,9 @@ describe("syncFiles lifecycle", () => {
     const discovered = (await walk(root)).filter(
       (d) => !d.relPath.startsWith("sub" + path.sep),
     );
-    const res = await syncFiles(db, rootId, discovered, undefined, undefined, [
-      "sub",
-    ]);
+    const res = await syncFiles(db, rootId, discovered, {
+      unreadablePaths: ["sub"],
+    });
 
     expect(res.stats.deleted).toBe(1);
     const alive = db
@@ -500,9 +500,9 @@ describe("syncFiles lifecycle", () => {
     await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
     await rescan();
 
-    const res = await syncFiles(db, rootId, [], undefined, undefined, [
-      "a.mp4",
-    ]);
+    const res = await syncFiles(db, rootId, [], {
+      unreadablePaths: ["a.mp4"],
+    });
 
     expect(res.stats.deleted).toBe(0);
     expect(aliveCount()).toBe(1);
@@ -522,9 +522,9 @@ describe("syncFiles lifecycle", () => {
     const discovered = (await walk(root)).filter(
       (d) => !d.relPath.startsWith("sub" + path.sep),
     );
-    const res = await syncFiles(db, rootId, discovered, undefined, undefined, [
-      "sub",
-    ]);
+    const res = await syncFiles(db, rootId, discovered, {
+      unreadablePaths: ["sub"],
+    });
 
     expect(res.stats).toMatchObject({ moved: 0, inserted: 1, deleted: 0 });
     expect(

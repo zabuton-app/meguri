@@ -365,9 +365,14 @@ export async function syncFiles(
   db: DB,
   rootId: number,
   discovered: Discovered[],
-  onHashProgress?: (done: number, total: number) => void,
-  signal?: AbortSignal,
-  unreadablePaths: readonly string[] = [],
+  opts: {
+    onHashProgress?: (done: number, total: number) => void;
+    signal?: AbortSignal;
+    unreadablePaths?: readonly string[];
+    /** Hash every file, not only new and changed ones (a rebuild): a file whose
+     *  content changed with its size and mtime kept is then caught too. */
+    rehash?: boolean;
+  } = {},
 ): Promise<{
   stats: ScanStats;
   needsThumb: number[];
@@ -375,6 +380,7 @@ export async function syncFiles(
   ftsMissing: number[];
   unreadable: UnreadableFile[];
 }> {
+  const { onHashProgress, signal, unreadablePaths = [], rehash = false } = opts;
   const stats: ScanStats = {
     inserted: 0,
     updated: 0,
@@ -425,10 +431,15 @@ export async function syncFiles(
   const reclassifyMoved = db.prepare(
     "UPDATE files SET kind = ?, ext = ?, thumb_path = NULL, thumb_status = 'pending' WHERE id = ?",
   );
+  // A rebuild's re-hash gives a row that had none its first hash, without
+  // treating the unchanged file as changed.
+  const setHash = db.prepare("UPDATE files SET content_hash = ? WHERE id = ?");
 
   type Existing =
     | {
         id: number;
+        kind: string;
+        ext: string | null;
         size: number;
         mtime: number;
         content_hash: string | null;
@@ -447,13 +458,15 @@ export async function syncFiles(
     (
       db
         .prepare(
-          `SELECT id, rel_path, meta_key, size, mtime, content_hash,
+          `SELECT id, rel_path, kind, ext, meta_key, size, mtime, content_hash,
                   NOT EXISTS (SELECT 1 FROM files_fts WHERE rowid = files.id) AS no_fts
              FROM files WHERE root_id = ?`,
         )
         .all(rootId) as {
         id: number;
         rel_path: string;
+        kind: string;
+        ext: string | null;
         meta_key: string;
         size: number;
         mtime: number;
@@ -464,6 +477,8 @@ export async function syncFiles(
       r.rel_path,
       {
         id: r.id,
+        kind: r.kind,
+        ext: r.ext,
         size: r.size,
         mtime: r.mtime,
         content_hash: r.content_hash,
@@ -472,16 +487,17 @@ export async function syncFiles(
       },
     ]),
   );
-  // hashIdx holds new files (move detection) plus changed files (content_hash refresh).
+  // hashIdx holds new files (move detection) plus changed files (content_hash
+  // refresh); with rehash, every file.
   const existingOf: Existing[] = new Array<Existing>(scannable.length);
   const hashIdx: number[] = [];
   for (let i = 0; i < scannable.length; i++) {
     if (signal?.aborted) break;
     const existing = existingByRelPath.get(scannable[i].relPath);
     existingOf[i] = existing;
-    if (!existing) {
-      hashIdx.push(i);
-    } else if (
+    if (
+      !existing ||
+      rehash ||
       existing.size !== scannable[i].size ||
       existing.mtime !== scannable[i].mtime
     ) {
@@ -530,9 +546,16 @@ export async function syncFiles(
   // --- 3. DB apply (chunked tx + yield between chunks) ---
   const applyChunk = db.transaction((idxs: number[]) => {
     for (const i of idxs) {
-      if (unreadableIdx.has(i)) continue;
       const d = scannable[i];
       const existing = existingOf[i];
+      const sameStat =
+        existing !== undefined &&
+        existing.size === d.size &&
+        existing.mtime === d.mtime;
+      // Skipped when its content could not be read, unless only a rebuild's
+      // re-hash failed: the file looks unchanged, so it is revived as such
+      // rather than left soft-deleted by the reset.
+      if (unreadableIdx.has(i) && !(rehash && sameStat)) continue;
       if (existing) {
         // A row without a hash keys its metadata by its path (the path
         // fallback). The update below can change that key: a hash appears, or
@@ -543,13 +566,31 @@ export async function syncFiles(
             migrateMetaKey(db, existing.meta_key, newKey);
           }
         };
-        if (existing.size === d.size && existing.mtime === d.mtime) {
-          carryMeta(pathMetaKey(d.absPath));
+        const newHash = hashOf.get(i);
+        // On a re-hash, a different hash means changed content; a first hash
+        // for a row without one does not.
+        const unchanged =
+          sameStat &&
+          (newHash === undefined ||
+            existing.content_hash == null ||
+            newHash === existing.content_hash);
+        if (unchanged) {
+          if (newHash !== undefined && existing.content_hash == null) {
+            carryMeta(newHash);
+            setHash.run(newHash, existing.id);
+          } else {
+            carryMeta(pathMetaKey(d.absPath));
+          }
           touchUnchanged.run(d.absPath, d.inode, d.btime, existing.id);
+          // The extension-to-kind mapping can change between versions; follow
+          // it, as an inserted row would.
+          if (existing.kind !== d.kind || existing.ext !== d.ext) {
+            reclassifyMoved.run(d.kind, d.ext, existing.id);
+            if (d.kind !== "audio") needsThumb.push(existing.id);
+          }
           if (existing.noFts) ftsMissing.push(existing.id);
           stats.unchanged++;
         } else {
-          const newHash = hashOf.get(i) ?? null;
           carryMeta(newHash ?? pathMetaKey(d.absPath));
           updateChanged.run(
             d.size,
@@ -557,7 +598,7 @@ export async function syncFiles(
             d.btime,
             d.absPath,
             d.inode,
-            newHash,
+            newHash ?? null,
             existing.id,
           );
           needsThumb.push(existing.id);

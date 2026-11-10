@@ -203,6 +203,7 @@ export function savePlayPosition(
   return resume;
 }
 
+/** The probed fields. resetIndex (jobs.ts) clears the same list for a rebuild; keep them in step. */
 export function updateExtractedMeta(
   db: DB,
   fileId: number,
