@@ -470,6 +470,93 @@ describe("syncFiles lifecycle", () => {
     ).toEqual({ rel_path: path.join("sub", "a.mp4") });
   });
 
+  it("skips a new file that cannot be read instead of failing the scan", async () => {
+    await fsp.writeFile(path.join(root, "ok.mp4"), "OKOKOKOKOK");
+    await fsp.writeFile(path.join(root, "gone.mp4"), "GONEGONEGO");
+    const discovered = await walk(root);
+    // Removed between the walk and the hash, like a download moved away.
+    await fsp.rm(path.join(root, "gone.mp4"));
+
+    const res = await syncFiles(db, rootId, discovered);
+
+    expect(res.stats.inserted).toBe(1);
+    expect(res.unreadable).toEqual([{ relPath: "gone.mp4", code: "ENOENT" }]);
+    const rows = db.prepare("SELECT rel_path FROM files").all() as {
+      rel_path: string;
+    }[];
+    expect(rows.map((r) => r.rel_path)).toEqual(["ok.mp4"]);
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "keeps the row of a changed file that cannot be read, and updates it once readable",
+    async () => {
+      const f = path.join(root, "locked.mp4");
+      await fsp.writeFile(f, "AAAAAAAAAA");
+      await rescan();
+      const before = db
+        .prepare("SELECT id, size, content_hash FROM files")
+        .get() as { id: number; size: number; content_hash: string };
+
+      await fsp.writeFile(f, "BBBBBBBBBBBBBBBBBBBB");
+      await fsp.chmod(f, 0o000);
+      try {
+        const locked = await rescan();
+        expect(locked.unreadable.map((u) => u.relPath)).toEqual(["locked.mp4"]);
+        expect(locked.stats).toMatchObject({ updated: 0, deleted: 0 });
+        // Untouched: same size and hash, still alive.
+        expect(
+          db
+            .prepare(
+              "SELECT id, size, content_hash FROM files WHERE deleted_at IS NULL",
+            )
+            .get(),
+        ).toEqual(before);
+      } finally {
+        await fsp.chmod(f, 0o644);
+      }
+
+      const readable = await rescan();
+      expect(readable.unreadable).toEqual([]);
+      expect(readable.stats.updated).toBe(1);
+      const after = db
+        .prepare("SELECT id, size FROM files WHERE deleted_at IS NULL")
+        .get() as { id: number; size: number };
+      expect(after).toEqual({ id: before.id, size: 20 });
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "soft-deletes a file moved to an unreadable path, then revives the same row once readable",
+    async () => {
+      await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+      await rescan();
+      const { id } = db.prepare("SELECT id FROM files").get() as {
+        id: number;
+      };
+
+      const moved = path.join(root, "b.mp4");
+      await fsp.rename(path.join(root, "a.mp4"), moved);
+      await fsp.chmod(moved, 0o000);
+      try {
+        // The move can't be detected without the new path's hash.
+        const locked = await rescan();
+        expect(locked.unreadable.map((u) => u.relPath)).toEqual(["b.mp4"]);
+        expect(locked.stats).toMatchObject({ moved: 0, deleted: 1 });
+        expect(aliveCount()).toBe(0);
+      } finally {
+        await fsp.chmod(moved, 0o644);
+      }
+
+      const readable = await rescan();
+      expect(readable.stats).toMatchObject({ moved: 1, inserted: 0 });
+      expect(
+        db
+          .prepare("SELECT id, rel_path FROM files WHERE deleted_at IS NULL")
+          .all(),
+      ).toEqual([{ id, rel_path: "b.mp4" }]);
+    },
+  );
+
   it("drops a .ts row indexed by an older scan once its content is found not to be MPEG-TS", async () => {
     const f = path.join(root, "app.ts");
     await fsp.writeFile(f, TYPESCRIPT_SOURCE);

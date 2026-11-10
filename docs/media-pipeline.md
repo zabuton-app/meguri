@@ -30,6 +30,16 @@ taken over by move detection, and not sent to thumbnail generation). A rebuild
 is the exception, since it has already cleared the index: those files come back
 with their metadata on the first scan that can read them.
 
+A file whose content cannot be read for hashing (permission denied, locked by
+another process, removed since the walk) is skipped for that scan instead of
+failing it: a new file is not inserted, and an existing row is left as it is
+(not updated, not soft-deleted). The next scan tries it again. One exception:
+when a file was moved or renamed to a path that cannot be read, the move is not
+detected, so the row at the old path is soft-deleted; once the new path is
+readable, the next scan detects the move and revives that row with its ID and
+metadata. The scan log
+records only how many files were skipped, by error code, not their names.
+
 ### Metadata and thumbnails
 
 `electron/core/media.ts` extracts metadata with ffprobe and generates thumbnails
