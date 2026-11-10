@@ -28,8 +28,8 @@ jobs:
           node-version: 22.22.x
           cache: npm
 
-      # postinstall (electron-builder install-app-deps) rebuilds better-sqlite3 for Electron,
-      # which is exactly the ABI the core tests load via ELECTRON_RUN_AS_NODE.
+      # postinstall (electron-builder install-app-deps) prepares better-sqlite3 for Electron,
+      # the runtime the core tests use via ELECTRON_RUN_AS_NODE.
       - name: Install dependencies
         run: npm ci
 

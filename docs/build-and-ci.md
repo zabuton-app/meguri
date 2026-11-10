@@ -16,6 +16,10 @@ npm test           # regression tests (Vitest): core then renderer
 npm run install:local  # install into the local environment
 ```
 
+better-sqlite3 ships prebuilt Node-API binaries. npm 12 still reports a
+`node-gyp rebuild` install script for it and warns that it was blocked, so
+`allowScripts` in `package.json` denies it explicitly.
+
 `dev`, `preview`, and `start` go through `scripts/run-electron-vite.mjs` rather
 than calling `electron-vite` directly. The wrapper strips
 `ELECTRON_RUN_AS_NODE` (which the test runner sets) from the environment before

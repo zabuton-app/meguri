@@ -20,9 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Install deps as a separate layer so source edits don't bust the cache.
-# postinstall runs `electron-builder install-app-deps`, which rebuilds
-# better-sqlite3 against Electron's ABI. Electron 42 exposes its downloader as
-# a bin script rather than an npm lifecycle hook, so fetch the runtime explicitly.
+# postinstall runs `electron-builder install-app-deps`, which prepares
+# better-sqlite3 for Electron. Electron exposes its downloader as a bin script
+# rather than an npm lifecycle hook, so fetch the runtime explicitly.
 COPY package.json package-lock.json ./
 RUN npm ci \
   && ./node_modules/.bin/install-electron
