@@ -172,11 +172,12 @@ accepted as it is:
   set in between, so a favorite or a tag removed in between comes back
 - a copy of the old content still listed: the same plays show under both
 
-Nothing is copied to empty content: every file truncated to nothing (a failed
-sync, say) has the same hash, and would merge all their metadata into it. A
-changed file moved or renamed in the same step is not recognized, and starts
-without metadata. The copies left under old hashes are not cleaned up, so a tag
-kept only there still counts as in use for tag completion.
+Nothing is copied to or from empty content: every empty file (truncated by a
+failed sync, or not written yet) has the same hash, which would gather all
+their metadata and hand it to each one that gets content. A changed file moved
+or renamed in the same step is not recognized, and starts without metadata.
+The copies left under old hashes are not cleaned up, so a tag kept only there
+still counts as in use for tag completion.
 
 `file_meta` holds `favorite`, `rating` (0–5), `last_accessed_at`, and
 `thumb_offset_sec` (the user-chosen thumbnail frame offset, `NULL` meaning the

@@ -24,7 +24,9 @@ only when the match is unambiguous: among the rows with the same hash and size
 not seen in this scan, exactly one is live (or, when none is live, exactly one
 is soft-deleted). When identical copies disappear together, the file is
 inserted instead of taking over a copy's id at random; its metadata still
-follows through the shared hash.
+follows through the shared hash. A file whose content changes at the same path
+keeps its metadata too: it is copied to the new hash (see
+[`meta_key`](data-model.md#metadata-and-meta_key)).
 
 A root that cannot be read (an unplugged drive, a share that is down) fails the
 scan before the index is touched, so its files are not soft-deleted, and the

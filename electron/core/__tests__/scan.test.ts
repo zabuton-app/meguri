@@ -416,6 +416,35 @@ describe("syncFiles lifecycle", () => {
       expect(meta(bKey)).toEqual({ favorite: 0, rating: 1 });
     });
 
+    it("does not hand out what empty files share to one that gets content", async () => {
+      const a = path.join(root, "a.mp4");
+      const b = path.join(root, "b.mp4");
+      // Not written yet: both empty, so both under the one empty-content key.
+      await fsp.writeFile(a, "");
+      await fsp.writeFile(b, "");
+      await rescan();
+      const emptyKey = keyOf("a.mp4");
+      expect(keyOf("b.mp4")).toBe(emptyKey);
+      const aId = (
+        db.prepare("SELECT id FROM files WHERE rel_path = 'a.mp4'").get() as {
+          id: number;
+        }
+      ).id;
+      addManualTag(db, aId, "OnlyA");
+      setMeta(emptyKey, 1, 5);
+
+      await edit(b, "BBBBBBBBBBBB");
+      await rescan();
+
+      const bId = (
+        db.prepare("SELECT id FROM files WHERE rel_path = 'b.mp4'").get() as {
+          id: number;
+        }
+      ).id;
+      expect(fileTags(db, bId)).toEqual([]);
+      expect(meta(keyOf("b.mp4"))).toBeUndefined();
+    });
+
     // The path decides over the hash: accepted for the rare cases where the
     // two disagree (#263).
     it("takes its metadata to another file's content copied over it", async () => {

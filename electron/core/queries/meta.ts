@@ -293,9 +293,9 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
  * Copy a file's metadata to the key of its new content, for a file whose
  * content changed in place (#263): the path, not only the hash, tells it is
  * the same file. The old key keeps its copy, since another file may still have
- * the old content. Merged into what the new key holds as migrateMetaKey does
- * (a play already recorded, or a bookmark near one it has, is not added
- * again). Only the user's tags are copied: the derived ones (resolution,
+ * the old content. Merged into what the new key holds by the library merge's
+ * rules (FILE_META_MERGE_SET, and as mergeIntoLibrary in library.ts does: a
+ * play already recorded, or a bookmark near one it has, is not added again). Only the user's tags are copied: the derived ones (resolution,
  * codec...) describe the old content, and the new one gets its own.
  */
 export function copyMetaKey(db: DB, fromKey: string, toKey: string): void {

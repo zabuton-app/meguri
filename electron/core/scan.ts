@@ -362,6 +362,11 @@ async function readFully(
   }
 }
 
+/** The content_hash of every empty file (contentHash of size 0). */
+const EMPTY_CONTENT_HASH = createHash("sha256")
+  .update(Buffer.from(BigInt64Array.of(0n).buffer))
+  .digest("hex");
+
 /** Sampled content_hash (sha256 of size + the first/last 1MiB). */
 export async function contentHash(file: string): Promise<string> {
   const h = createHash("sha256");
@@ -678,11 +683,18 @@ export async function syncFiles(
           // (tags or cover art edited, a recording that grew): its metadata
           // follows the new content (#263). Copied rather than moved from a
           // hash key, which another copy of the old content may still use.
-          // Not to empty content: every file truncated to nothing (a failed
-          // sync) has the same hash, and would merge all their metadata.
+          // Neither to nor from empty content: every empty file (truncated by
+          // a failed sync, or not written yet) has the same hash, and it
+          // would gather and hand out all their metadata.
           const newKey = newHash ?? pathMetaKey(d.absPath);
-          if (existing.content_hash == null) carryMeta(newKey);
-          else if (d.size > 0) copyMetaKey(db, existing.meta_key, newKey);
+          carryMeta(newKey);
+          if (
+            existing.content_hash != null &&
+            existing.content_hash !== EMPTY_CONTENT_HASH &&
+            newKey !== EMPTY_CONTENT_HASH
+          ) {
+            copyMetaKey(db, existing.meta_key, newKey);
+          }
           updateChanged.run(
             d.size,
             d.mtime,
