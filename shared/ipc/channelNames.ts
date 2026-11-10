@@ -25,6 +25,7 @@ export const INVOKE_CHANNELS = [
   "collection_set_membership",
   "scan_start",
   "scan_cancel",
+  "scan_unreadable_workspaces",
   "files_search",
   "files_random",
   "folders_list",

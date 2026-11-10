@@ -43,6 +43,7 @@ import {
 } from "../queries.js";
 import { fileTags } from "../tags.js";
 import { runScan, type JobEvent } from "../jobs.js";
+import { ScanRootUnreadableError } from "../scan.js";
 import { deriveAutoTagsInProcess } from "../autoTagDeriver.js";
 import { autoTagSettingsVersion } from "../autoTag.js";
 import { defaultAutoTagConfig, defaultRules } from "../../../shared/autoTag.js";
@@ -160,6 +161,17 @@ describe("runScan", () => {
 
     await expect(scan()).rejects.toThrow(/thumbnail extraction failed for all/);
     expect(rows()[0].thumb_status).toBe("error");
+  });
+
+  it("blames the folder, not ffmpeg, when it goes away during the thumbnails", async () => {
+    write("a.mp4", "AAAAAAAAAA");
+    // Unplugged mid-scan: every thumbnail fails, and the root is gone.
+    media.failThumb = () => {
+      fs.rmSync(root, { recursive: true, force: true });
+      return true;
+    };
+
+    await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
   });
 
   it("does not report the toolchain when only some thumbnails fail", async () => {

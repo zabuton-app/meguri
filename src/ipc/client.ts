@@ -110,6 +110,7 @@ export const api = {
   scanStart: (includeExcluded?: boolean, rebuild?: boolean) =>
     invoke("scan_start", { includeExcluded, rebuild }),
   scanCancel: (wsId?: string) => invoke("scan_cancel", { wsId }),
+  scanUnreadableWorkspaces: () => invoke("scan_unreadable_workspaces"),
   filesSearch: (query: ChannelInput<"files_search">["query"]) =>
     invoke("files_search", { query }),
   filesRandom: (query?: ChannelInput<"files_random">["query"]) =>

@@ -5,6 +5,7 @@ import path from "node:path";
 import type { Core } from "./index.js";
 import { nowUnix } from "./db.js";
 import {
+  assertScanRootReadable,
   emptyScanStats,
   syncFiles,
   unreadableMatcher,
@@ -534,6 +535,9 @@ export async function runScan(
   // cannot starve them indefinitely.
   const attempted = pending.length - skipped;
   if (failed > 0 && failed === attempted && !signal?.aborted) {
+    // A drive or share that went away during the thumbnails fails them all
+    // too: say so, rather than blame ffmpeg (#313).
+    await assertScanRootReadable(core.root);
     throw new Error(
       `thumbnail extraction failed for all ${failed} attempted file(s) (is ffmpeg/ffprobe working?)`,
     );

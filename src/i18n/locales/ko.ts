@@ -168,7 +168,7 @@ export const ko: Record<TranslationKey, string> = {
   "home.scanRootUnreadable": "워크스페이스 폴더에 접근할 수 없습니다",
   "home.scanRootUnreadableNamed": '"{name}" 폴더에 접근할 수 없습니다',
   "home.scanRootUnreadableDesc":
-    "드라이브나 네트워크 공유가 연결되어 있는지 확인한 뒤 다시 스캔하세요. 파일 목록은 그대로 두었습니다.",
+    "폴더가 이동되거나 삭제되지 않았는지, 드라이브나 네트워크 공유가 연결되어 있는지, Meguri가 읽을 수 있는지 확인한 뒤 다시 스캔하세요. 파일 목록은 그대로 두었습니다.",
   "home.scanStartFailed": "스캔을 시작할 수 없습니다",
   "home.scanAlreadyRunning": "스캔이 이미 실행 중입니다",
 

@@ -163,6 +163,26 @@ describe("ScanManager", () => {
     );
   });
 
+  it("remembers a workspace whose folder could not be read until a scan reaches it", async () => {
+    runScan.mockRejectedValueOnce(
+      new ScanRootUnreadableError("the scan root cannot be read (ENOENT)"),
+    );
+    const scans = new ScanManager(makeDeps());
+    scans.start();
+    await scans.abort("a");
+    expect(scans.unreadableWorkspaces()).toEqual(["a"]);
+
+    runScan.mockImplementationOnce(
+      (_core: unknown, jobId: string, report: (e: unknown) => void) => {
+        report({ type: "done", jobId, stats: {} });
+        return Promise.resolve();
+      },
+    );
+    scans.start();
+    await scans.abort("a");
+    expect(scans.unreadableWorkspaces()).toEqual([]);
+  });
+
   it("reports a failed scan as scan:done with an error flag and frees the workspace", async () => {
     runScan.mockRejectedValue(new Error("boom"));
     const deps = makeDeps();

@@ -161,7 +161,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "home.scanRootUnreadable": "无法访问工作区文件夹",
   "home.scanRootUnreadableNamed": "无法访问“{name}”的文件夹",
   "home.scanRootUnreadableDesc":
-    "请确认驱动器或网络共享已连接，然后重新扫描。文件列表保持不变。",
+    "请确认该文件夹未被移动或删除、其驱动器或网络共享已连接，且 Meguri 有读取权限，然后重新扫描。文件列表保持不变。",
   "home.scanStartFailed": "无法开始扫描",
   "home.scanAlreadyRunning": "扫描已在进行中",
 

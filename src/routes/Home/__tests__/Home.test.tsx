@@ -54,6 +54,7 @@ const mocks = vi.hoisted(() => ({
     vi.fn<(ws: string, path: string) => Promise<unknown>>(),
   folderCopyPath: vi.fn<(ws: string, path: string) => Promise<unknown>>(),
   workspaceSwitch: vi.fn<(id: string) => Promise<unknown>>(),
+  scanUnreadableWorkspaces: vi.fn<() => Promise<string[]>>(),
 }));
 
 // The scan:done listeners Home subscribes, for a test to fire.
@@ -84,6 +85,7 @@ vi.mock("@/ipc/client", () => ({
     fileSetRating: (...args: unknown[]) => mocks.fileSetRating(...args),
     fileRecordPlay: (...args: unknown[]) => mocks.fileRecordPlay(...args),
     scanStart: (...args: unknown[]) => mocks.scanStart(...args),
+    scanUnreadableWorkspaces: () => mocks.scanUnreadableWorkspaces(),
     workspaceStats: () => mocks.workspaceStats(),
     foldersList: (ws: string, path: string) => mocks.foldersList(ws, path),
     folderFiles: (ws: string, paths: string[]) => mocks.folderFiles(ws, paths),
@@ -168,6 +170,7 @@ describe("Home + MediaDetail integration", () => {
     mocks.fileSetRating.mockResolvedValue(undefined);
     mocks.fileRecordPlay.mockResolvedValue(undefined);
     mocks.scanStart.mockResolvedValue(null);
+    mocks.scanUnreadableWorkspaces.mockResolvedValue([]);
     mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
   });
 
@@ -205,6 +208,28 @@ describe("Home + MediaDetail integration", () => {
       expect(String(toasts.error.mock.calls.at(-1)?.[0])).toBe(
         'The folder of "Media" could not be reached',
       );
+    });
+
+    it("tells about a failure from before the view was listening", async () => {
+      mocks.scanUnreadableWorkspaces.mockResolvedValue([WS_ID]);
+      renderWithProviders(<AppRoutes />);
+      await waitFor(() =>
+        expect(toasts.error).toHaveBeenCalledWith(
+          'The folder of "Media" could not be reached',
+          expect.objectContaining({ id: `scan-root-unreadable:${WS_ID}` }),
+        ),
+      );
+    });
+
+    it("keeps one notice per workspace", async () => {
+      await renderReady();
+      fireUnreadable(WS_ID);
+      fireUnreadable("ws-other");
+      await waitFor(() => expect(toasts.error).toHaveBeenCalledTimes(2));
+      const ids = toasts.error.mock.calls.map(
+        (c) => (c[1] as { id: string }).id,
+      );
+      expect(new Set(ids).size).toBe(2);
     });
 
     it("says it without a name when the workspace is not known", async () => {

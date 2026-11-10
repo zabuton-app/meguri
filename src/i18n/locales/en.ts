@@ -171,7 +171,7 @@ export const en: Record<TranslationKey, string> = {
   "home.scanRootUnreadable": "The workspace folder could not be reached",
   "home.scanRootUnreadableNamed": 'The folder of "{name}" could not be reached',
   "home.scanRootUnreadableDesc":
-    "Check that the drive or network share is connected, then scan again. The file list has been left as it was.",
+    "Check that the folder has not been moved or deleted, that its drive or network share is connected, and that Meguri can read it, then scan again. The file list has been left as it was.",
   "home.scanStartFailed": "Could not start scan",
   "home.scanAlreadyRunning": "A scan is already in progress",
 

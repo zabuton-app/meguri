@@ -176,7 +176,7 @@ export const es: Record<TranslationKey, string> = {
     "No se pudo acceder a la carpeta del espacio de trabajo",
   "home.scanRootUnreadableNamed": "No se pudo acceder a la carpeta de «{name}»",
   "home.scanRootUnreadableDesc":
-    "Comprueba que la unidad o el recurso compartido de red estén conectados y vuelve a escanear. La lista de archivos se ha dejado como estaba.",
+    "Comprueba que la carpeta no se haya movido ni eliminado, que su unidad o recurso compartido de red esté conectado y que Meguri pueda leerla, y vuelve a escanear. La lista de archivos se ha dejado como estaba.",
   "home.scanStartFailed": "No se pudo iniciar el escaneo",
   "home.scanAlreadyRunning": "Ya hay un escaneo en curso",
 

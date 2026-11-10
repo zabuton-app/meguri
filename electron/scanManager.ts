@@ -40,6 +40,10 @@ export class ScanManager {
   private readonly controllers = new Map<string, AbortController>();
   // Completion promises for in-progress scans, keyed by workspace ID.
   private readonly promises = new Map<string, Promise<void>>();
+  // Workspaces whose last scan could not read their folder. Kept for the
+  // renderer to ask about: the startup scan can fail before it listens for
+  // scan:done, and that event would be lost (#313).
+  private readonly unreadable = new Set<string>();
   private seq = 1;
 
   constructor(private readonly deps: ScanManagerDeps) {}
@@ -62,6 +66,11 @@ export class ScanManager {
     const core = ws.active();
     if (!core) return "";
     return this.scanCore(core, ws.activeId, opts);
+  }
+
+  /** Workspaces whose last scan could not read their folder. */
+  unreadableWorkspaces(): string[] {
+    return [...this.unreadable];
   }
 
   /** Abort one workspace's scan and wait for it to settle. */
@@ -101,13 +110,17 @@ export class ScanManager {
               });
             else if (e.type === "thumbDone")
               emit("thumb:done", { id: e.id, workspaceId: wsId });
-            else if (e.type === "done")
+            else if (e.type === "done") {
+              // Finished, so the folder was read: whatever happened before
+              // is over. A canceled scan may not have got that far.
+              if (wsId && !e.aborted) this.unreadable.delete(wsId);
               emit("scan:done", {
                 jobId: e.jobId,
                 stats: e.stats,
                 aborted: e.aborted,
                 workspaceId: wsId ?? undefined,
               });
+            }
           },
           {
             rebuild: opts.rebuild,
@@ -120,6 +133,10 @@ export class ScanManager {
         );
       } catch (err) {
         log.error("scan failed", err);
+        if (wsId) {
+          if (err instanceof ScanRootUnreadableError) this.unreadable.add(wsId);
+          else this.unreadable.delete(wsId);
+        }
         emit("scan:done", {
           jobId,
           stats: emptyScanStats(),

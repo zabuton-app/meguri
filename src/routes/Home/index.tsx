@@ -534,6 +534,36 @@ export default function Home() {
     else setFilter(next);
   }, []);
 
+  // A workspace whose folder could not be read: named when known, since in
+  // the "All" view any workspace can be the one. The id is per workspace, so
+  // the same notice from the event and from the query below shows once.
+  const notifyRootUnreadable = useCallback(
+    (workspaceId: string | undefined) => {
+      const show = (name: string | undefined) =>
+        toast.error(
+          name
+            ? t("home.scanRootUnreadableNamed", { name })
+            : t("home.scanRootUnreadable"),
+          {
+            id: `scan-root-unreadable:${workspaceId ?? ""}`,
+            description: t("home.scanRootUnreadableDesc"),
+          },
+        );
+      // The list may not be loaded yet right after launch: fetch it then.
+      void qc
+        .fetchQuery({
+          queryKey: ["workspaces_list"],
+          queryFn: api.workspacesList,
+        })
+        .then(
+          (list: WorkspacesList) =>
+            show(list.workspaces.find((w) => w.id === workspaceId)?.label),
+          () => show(undefined),
+        );
+    },
+    [qc, t],
+  );
+
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {
     let un: (() => void) | undefined;
@@ -562,19 +592,7 @@ export default function Home() {
           return;
         }
         if (done.errorReason === "root-unreadable") {
-          // Named when known: in the "All" view any workspace can be the one.
-          const name = qc
-            .getQueryData<WorkspacesList>(["workspaces_list"])
-            ?.workspaces.find((w) => w.id === done.workspaceId)?.label;
-          toast.error(
-            name
-              ? t("home.scanRootUnreadableNamed", { name })
-              : t("home.scanRootUnreadable"),
-            {
-              id: `scan-root-unreadable:${done.workspaceId ?? ""}`,
-              description: t("home.scanRootUnreadableDesc"),
-            },
-          );
+          notifyRootUnreadable(done.workspaceId);
           return;
         }
         if (done.error) {
@@ -596,12 +614,20 @@ export default function Home() {
           },
         );
       })
-      .then((u) => (un = u));
+      .then((u) => {
+        un = u;
+        // Listening now; a scan that failed before (the startup scan can
+        // finish before this view mounts) is asked about instead.
+        void api
+          .scanUnreadableWorkspaces()
+          .then((ids) => ids.forEach(notifyRootUnreadable))
+          .catch(() => {});
+      });
     return () => un?.();
     // search/status are react-query results; only their stable `refetch` is used.
     // Depending on the whole objects would re-subscribe the listener every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.refetch, status.refetch, t]);
+  }, [search.refetch, status.refetch, t, notifyRootUnreadable]);
 
   // Empty-state add button (the rail's "+" lives in WorkspaceRail). Mirror its
   // toast + scan-job tracking so the first workspace also notifies on add/sync.

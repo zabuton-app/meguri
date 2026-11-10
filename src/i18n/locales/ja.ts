@@ -170,7 +170,7 @@ export const ja = {
   "home.scanRootUnreadable": "ワークスペースのフォルダにアクセスできません",
   "home.scanRootUnreadableNamed": "「{name}」のフォルダにアクセスできません",
   "home.scanRootUnreadableDesc":
-    "ドライブやネットワーク共有が接続されているか確認してから、もう一度スキャンしてください。ファイル一覧はそのまま残しています。",
+    "フォルダが移動・削除されていないか、ドライブやネットワーク共有が接続されているか、読み取りの権限があるかを確認してから、もう一度スキャンしてください。ファイル一覧はそのまま残しています。",
   "home.scanStartFailed": "スキャンを開始できませんでした",
   "home.scanAlreadyRunning": "スキャンは既に実行中です",
 
