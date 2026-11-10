@@ -63,6 +63,7 @@ export const INVOKE_CHANNELS = [
   "bookmark_add",
   "bookmark_remove",
   "thumb_set_offset",
+  "audio_artwork_import",
   "frame_export",
   "open_external",
   "open_folder",

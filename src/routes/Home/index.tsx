@@ -634,6 +634,21 @@ export default function Home() {
     if (ok) void onScan(false, true);
   };
 
+  const onImportAudioArtwork = async () => {
+    if (!activeWorkspace) return;
+    try {
+      const result = await api.audioArtworkImport(activeWorkspace.id);
+      if (result) {
+        toast.info(t("home.audioArtworkImported", result));
+        void search.refetch();
+      }
+    } catch (error) {
+      toast.error(t("home.audioArtworkImportFailed"), {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   const focusSearch = useCallback(() => {
     const input = document.getElementById(
       "list-search-input",
@@ -915,6 +930,7 @@ export default function Home() {
         onScan={() => void onScan()}
         onScanWithDeleted={() => void onScan(true)}
         onRebuild={() => void onRebuild()}
+        onImportAudioArtwork={() => void onImportAudioArtwork()}
         t={t}
       />
 

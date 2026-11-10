@@ -6,6 +6,7 @@ import {
   FolderOpen,
   FolderTree,
   History,
+  ImagePlus,
   LayoutGrid,
   List,
   Waypoints,
@@ -60,6 +61,7 @@ export function HomeHeader({
   onScan,
   onScanWithDeleted,
   onRebuild,
+  onImportAudioArtwork,
   t,
 }: {
   root: string | null | undefined;
@@ -82,6 +84,7 @@ export function HomeHeader({
   onScan: () => void;
   onScanWithDeleted: () => void;
   onRebuild: () => void;
+  onImportAudioArtwork: () => void;
   t: TFunc;
 }) {
   return (
@@ -294,6 +297,15 @@ export function HomeHeader({
                   <DatabaseBackup />
                   {t("home.rebuildIndex")}
                 </DropdownMenuItem>
+                {workspace && (
+                  <DropdownMenuItem
+                    className="rounded-none px-3 py-2 text-xs"
+                    onSelect={onImportAudioArtwork}
+                  >
+                    <ImagePlus />
+                    {t("home.importAudioArtwork")}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -154,6 +154,11 @@ export const es: Record<TranslationKey, string> = {
     "También puedes añadir o cambiar desde la barra lateral izquierda.",
   "home.scanWithDeleted": "Resincronizar incluyendo elementos eliminados",
   "home.rebuildIndex": "Reconstruir índice",
+  "home.importAudioArtwork": "Importar portadas de audio",
+  "home.audioArtworkImported":
+    "Portadas de audio asociadas: {matched}. Omitidas: {skipped}.",
+  "home.audioArtworkImportFailed":
+    "No se pudieron importar las portadas de audio.",
   "home.rebuildConfirm":
     "Descarta la lista de archivos y las miniaturas y vuelve a escanear desde cero. Se conservan los favoritos, las valoraciones, las etiquetas y el historial de reproducción, pero los archivos que quitaste del índice volverán a aparecer. ¿Continuar?",
   "home.scanComplete": "Escaneo completado",

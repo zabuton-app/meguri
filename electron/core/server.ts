@@ -18,6 +18,7 @@ import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Core } from "./index.js";
 import { mediaFileOf, thumbPathIfDone } from "./tags.js";
+import { audioArtworkFor } from "./audioArtwork.js";
 import { isInsideRoot } from "./paths.js";
 import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
@@ -227,6 +228,22 @@ async function handle(
 
     if (kind === "thumb") {
       const tp = thumbPathIfDone(core.db, id);
+      const artwork = tp ? null : audioArtworkFor(core.db, id);
+      if (artwork) {
+        const etag = `"${artwork.imageHash}"`;
+        res.setHeader("Cache-Control", "private, no-cache");
+        res.setHeader("ETag", etag);
+        if (etagMatches(req.headers["if-none-match"], etag)) {
+          res.writeHead(304).end();
+          return;
+        }
+        res.writeHead(200, {
+          "Content-Type": "image/png",
+          "Content-Length": artwork.png.length,
+        });
+        res.end(req.method === "HEAD" ? undefined : artwork.png);
+        return;
+      }
       if (!tp || !isInsideRoot(tp, core.dataDir)) {
         res.writeHead(404).end();
         return;

@@ -201,6 +201,8 @@ export const api = {
   /** Regenerate the main thumbnail from the given video offset; pass null to revert to auto. */
   thumbSetOffset: (id: number, workspaceId: string, sec: number | null) =>
     invoke("thumb_set_offset", { id, workspaceId, sec }),
+  audioArtworkImport: (workspaceId: string) =>
+    invoke("audio_artwork_import", { workspaceId }),
   /** Export the frame at `sec` as a still image via a native save dialog. */
   frameExport: (id: number, workspaceId: string, sec: number) =>
     invoke("frame_export", { id, workspaceId, sec }),

@@ -147,6 +147,10 @@ export const ko: Record<TranslationKey, string> = {
   "home.addFromSidebar": "왼쪽 사이드바에서도 추가하거나 전환할 수 있습니다.",
   "home.scanWithDeleted": "삭제된 항목 포함 재동기화",
   "home.rebuildIndex": "인덱스 다시 빌드",
+  "home.importAudioArtwork": "오디오 커버 가져오기",
+  "home.audioArtworkImported":
+    "일치한 오디오 커버: {matched}개. 건너뜀: {skipped}개.",
+  "home.audioArtworkImportFailed": "오디오 커버를 가져오지 못했습니다.",
   "home.rebuildConfirm":
     "파일 목록과 썸네일을 폐기하고 처음부터 다시 스캔합니다. 즐겨찾기, 평점, 태그, 재생 기록은 유지되지만 인덱스에서 삭제한 파일은 다시 표시됩니다. 계속할까요?",
   "home.scanComplete": "스캔이 완료되었습니다",
