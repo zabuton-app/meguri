@@ -7,7 +7,6 @@
 import type { Core } from "./core/index.js";
 import { runScan } from "./core/jobs.js";
 import log from "./core/logger.js";
-import * as q from "./core/queries.js";
 import { emptyScanStats } from "./core/scan.js";
 import type { QueryWorkerClient } from "./core/queryWorkerClient.js";
 import type { DeriveAutoTags } from "./core/autoTagDeriver.js";
@@ -87,7 +86,6 @@ export class ScanManager {
     if (wsId) this.controllers.set(wsId, controller);
     const promise = (async () => {
       try {
-        if (opts.includeExcluded) q.clearExcludedFiles(core.db, core.rootId);
         await runScan(
           core,
           jobId,
@@ -110,6 +108,7 @@ export class ScanManager {
           },
           {
             rebuild: opts.rebuild,
+            includeExcluded: opts.includeExcluded,
             signal: controller.signal,
             // Read when the scan starts tagging (see runScan).
             autoTag: this.deps.autoTag,

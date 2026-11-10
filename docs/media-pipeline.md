@@ -21,6 +21,15 @@ incrementally from `mtime` and `size`, so unchanged files are skipped and a move
 file keeps its identity (and therefore its metadata — see
 [`meta_key`](data-model.md#metadata-and-meta_key)).
 
+A root that cannot be read (an unplugged drive, a share that is down) fails the
+scan before the index is touched, so its files are not soft-deleted; a rebuild,
+and a rescan that brings removed files back, change the index only after the
+root has been read. A subdirectory that cannot be listed, or a file that cannot
+be stat'ed, is skipped: its rows are kept as they are (not soft-deleted, not
+taken over by move detection, and not sent to thumbnail generation). A rebuild
+is the exception, since it has already cleared the index: those files come back
+with their metadata on the first scan that can read them.
+
 ### Metadata and thumbnails
 
 `electron/core/media.ts` extracts metadata with ffprobe and generates thumbnails

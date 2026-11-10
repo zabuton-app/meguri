@@ -3,7 +3,13 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
-import { emptyScanStats, syncFiles, walk, type ScanStats } from "./scan.js";
+import {
+  emptyScanStats,
+  syncFiles,
+  unreadableMatcher,
+  walk,
+  type ScanStats,
+} from "./scan.js";
 import { coverArtStreamIndex, extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
 import { syncFts } from "./tags.js";
@@ -84,6 +90,8 @@ export async function runScan(
   onEvent: (e: JobEvent) => void,
   opts: {
     rebuild?: boolean;
+    /** Bring files removed from the index back (clears excluded_at first). */
+    includeExcluded?: boolean;
     signal?: AbortSignal;
     /** The workspace being scanned, for the configuration's folder rules. */
     workspaceId?: string;
@@ -105,11 +113,11 @@ export async function runScan(
   const { signal } = opts;
   const { db } = core;
 
-  // A rebuild discards the derived file index (keeping durable metadata) before rescanning.
-  if (opts.rebuild) await clearIndex(core);
-
   // --- walk + sync (both async with concurrent IO, so they don't block the event loop) ---
   // On SMB these phases dominate the time before thumbnails start, so report their progress.
+  // walk() throws when the root cannot be read, before anything below touches
+  // the index.
+  const unreadablePaths: string[] = [];
   const discovered = await walk(
     core.root,
     (count) =>
@@ -121,6 +129,7 @@ export async function runScan(
         total: 0,
       }),
     signal,
+    (relPath) => unreadablePaths.push(relPath),
   );
 
   if (signal?.aborted) {
@@ -129,6 +138,12 @@ export async function runScan(
     return empty;
   }
 
+  // A rebuild discards the derived file index (keeping durable metadata), and
+  // includeExcluded drops the exclusion list, before syncing. Only after the
+  // walk, so an unreachable root keeps both.
+  if (opts.includeExcluded) q.clearExcludedFiles(db, core.rootId);
+  if (opts.rebuild) await clearIndex(core);
+
   const { stats, ftsTargets } = await syncFiles(
     db,
     core.rootId,
@@ -136,7 +151,16 @@ export async function runScan(
     (done, total) =>
       onEvent({ type: "progress", jobId, phase: "hash", done, total }),
     signal,
+    unreadablePaths,
   );
+  if (unreadablePaths.length > 0) {
+    // A count only: the log may be shared, and folder names can be private.
+    // A rebuild has already cleared their rows; they come back once readable.
+    log.warn(
+      `skipped ${unreadablePaths.length} folder(s) or file(s) that could not be read` +
+        (opts.rebuild ? "" : "; their rows are kept as they are"),
+    );
+  }
   q.touchScanRoot(db, core.rootId);
 
   // Tag what this scan added or changed (ftsTargets is exactly that set). Ahead
@@ -214,7 +238,12 @@ export async function runScan(
   }
 
   // --- thumbnail/meta (parallel) ---
-  const pending = q.filesNeedingThumb(db, core.rootId);
+  // Rows walk() could not reach would only fail here and be marked 'error'
+  // for good; leave them pending for a scan that can read them.
+  const isUnreadable = unreadableMatcher(unreadablePaths);
+  const pending = q
+    .filesNeedingThumb(db, core.rootId)
+    .filter((f) => !isUnreadable(path.relative(core.root, f.abs_path)));
   const total = pending.length;
   let processed = 0;
   const thumbs = core.thumbsDir();
