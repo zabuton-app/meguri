@@ -15,10 +15,15 @@ export function setThumb(
 export function filesNeedingThumb(
   db: DB,
   rootId: number,
-): { id: number; abs_path: string; kind: string }[] {
+): { id: number; rel_path: string; abs_path: string; kind: string }[] {
   return db
     .prepare(
-      "SELECT id, abs_path, kind FROM files WHERE root_id = ? AND deleted_at IS NULL AND thumb_status = 'pending'",
+      "SELECT id, rel_path, abs_path, kind FROM files WHERE root_id = ? AND deleted_at IS NULL AND thumb_status = 'pending'",
     )
-    .all(rootId) as { id: number; abs_path: string; kind: string }[];
+    .all(rootId) as {
+    id: number;
+    rel_path: string;
+    abs_path: string;
+    kind: string;
+  }[];
 }

@@ -188,8 +188,22 @@ export async function walk(
   signal?: AbortSignal,
   onUnreadablePath?: (relPath: string) => void,
 ): Promise<Discovered[]> {
-  const reportUnreadable = (full: string, code: string | undefined) => {
-    if (code === "ENOENT" || code === "ENOTDIR") return; // gone, not unreadable
+  // Opening the root (without listing it) answers "is it still there?"
+  // cheaply, even for a root with many entries on a network share.
+  const assertRootReadable = async () => {
+    try {
+      await (await fsp.opendir(root)).close();
+    } catch (err) {
+      throw rootUnreadableError(errorCode(err));
+    }
+  };
+  const reportUnreadable = async (full: string, code: string | undefined) => {
+    if (code === "ENOENT" || code === "ENOTDIR") {
+      // Gone, unless the whole root went away (an unmounted drive): check now,
+      // while it is still away, rather than only at the end of the walk.
+      await assertRootReadable();
+      return;
+    }
     onUnreadablePath?.(path.relative(root, full));
   };
   const out: Discovered[] = [];
@@ -212,7 +226,7 @@ export async function walk(
         } catch (err) {
           const code = errorCode(err);
           if (dir === root) throw rootUnreadableError(code);
-          reportUnreadable(dir, code);
+          await reportUnreadable(dir, code);
           return;
         }
         for (const ent of entries) {
@@ -244,7 +258,7 @@ export async function walk(
         try {
           st = await fsp.stat(t.full);
         } catch (err) {
-          reportUnreadable(t.full, errorCode(err));
+          await reportUnreadable(t.full, errorCode(err));
           return;
         }
         // Only the ambiguous extension pays for the extra read.
@@ -269,16 +283,10 @@ export async function walk(
     onProgress?.(out.length);
     level = next;
   }
-  // A share or a removable drive can go away after the root was listed; its
-  // entries then fail with ENOENT and would read as deleted. Check the root
+  // A share or a removable drive can go away after the root was listed (its
+  // entries then fail with ENOENT and would read as deleted); check the root
   // once more before anyone acts on this result.
-  if (!signal?.aborted) {
-    try {
-      await fsp.readdir(root);
-    } catch (err) {
-      throw rootUnreadableError(errorCode(err));
-    }
-  }
+  if (!signal?.aborted) await assertRootReadable();
   return out;
 }
 
@@ -487,7 +495,7 @@ export async function syncFiles(
       } catch (error) {
         // Only fs errors mean "this file can't be read"; anything else is a
         // bug and should still fail the scan.
-        const code = (error as NodeJS.ErrnoException | null)?.code;
+        const code = errorCode(error);
         if (typeof code !== "string") throw error;
         unreadableIdx.add(idx);
         unreadable.push({ relPath: scannable[idx].relPath, code });

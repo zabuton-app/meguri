@@ -56,14 +56,35 @@ export type JobEvent =
  * Note: the removed-from-index exclusions (files.excluded_at) live on the files rows and are
  * therefore wiped too — a rebuild deliberately resets that list, so files previously removed
  * from the index reappear. This is spelled out in the rebuild confirmation dialog.
+ *
+ * Rows for which `keep` is true (paths the walk could not read) are left as they are, with
+ * their thumbnails: they could not be scanned again now.
  */
-async function clearIndex(core: Core): Promise<void> {
+async function clearIndex(
+  core: Core,
+  keep: (relPath: string) => boolean,
+): Promise<void> {
   const { db } = core;
+  const kept = new Set<number>();
   db.transaction(() => {
-    db.prepare(
-      "DELETE FROM files_fts WHERE rowid IN (SELECT id FROM files WHERE root_id = ?)",
-    ).run(core.rootId);
-    db.prepare("DELETE FROM files WHERE root_id = ?").run(core.rootId);
+    const rows = db
+      .prepare("SELECT id, rel_path FROM files WHERE root_id = ?")
+      .all(core.rootId) as { id: number; rel_path: string }[];
+    for (const r of rows) if (keep(r.rel_path)) kept.add(r.id);
+    if (kept.size === 0) {
+      db.prepare(
+        "DELETE FROM files_fts WHERE rowid IN (SELECT id FROM files WHERE root_id = ?)",
+      ).run(core.rootId);
+      db.prepare("DELETE FROM files WHERE root_id = ?").run(core.rootId);
+      return;
+    }
+    const delFts = db.prepare("DELETE FROM files_fts WHERE rowid = ?");
+    const delFile = db.prepare("DELETE FROM files WHERE id = ?");
+    for (const r of rows) {
+      if (kept.has(r.id)) continue;
+      delFts.run(r.id);
+      delFile.run(r.id);
+    }
   })();
   // Thumbnails are named by the (now invalidated) file id, so wipe them to avoid
   // orphans. Async with a small concurrent pool — a synchronous unlink loop over
@@ -76,6 +97,7 @@ async function clearIndex(core: Core): Promise<void> {
     return; // thumbs dir may not exist yet
   }
   await pool(names, 8, async (name) => {
+    if (kept.has(Number(name.split(".")[0]))) return;
     try {
       await fsp.rm(path.join(thumbs, name), { force: true });
     } catch {
@@ -90,8 +112,6 @@ export async function runScan(
   onEvent: (e: JobEvent) => void,
   opts: {
     rebuild?: boolean;
-    /** Bring files removed from the index back (clears excluded_at first). */
-    includeExcluded?: boolean;
     signal?: AbortSignal;
     /** The workspace being scanned, for the configuration's folder rules. */
     workspaceId?: string;
@@ -138,11 +158,13 @@ export async function runScan(
     return empty;
   }
 
-  // A rebuild discards the derived file index (keeping durable metadata), and
-  // includeExcluded drops the exclusion list, before syncing. Only after the
-  // walk, so an unreachable root keeps both.
-  if (opts.includeExcluded) q.clearExcludedFiles(db, core.rootId);
-  if (opts.rebuild) await clearIndex(core);
+  // Rows walk() could not reach (a folder or file that exists but cannot be
+  // read) are kept as they are by the rebuild, the sync and the thumbnails.
+  const isUnreadable = unreadableMatcher(unreadablePaths);
+
+  // A rebuild discards the derived file index (keeping durable metadata) before
+  // syncing. Only after the walk, so an unreachable root keeps its index.
+  if (opts.rebuild) await clearIndex(core, isUnreadable);
 
   const { stats, ftsTargets, unreadable } = await syncFiles(
     db,
@@ -155,10 +177,8 @@ export async function runScan(
   );
   if (unreadablePaths.length > 0) {
     // A count only: the log may be shared, and folder names can be private.
-    // A rebuild has already cleared their rows; they come back once readable.
     log.warn(
-      `skipped ${unreadablePaths.length} folder(s) or file(s) that could not be read` +
-        (opts.rebuild ? "" : "; their rows are kept as they are"),
+      `skipped ${unreadablePaths.length} folder(s) or file(s) that could not be read; their rows are kept as they are`,
     );
   }
   if (unreadable.length > 0) {
@@ -253,10 +273,7 @@ export async function runScan(
   // for good; leave them pending for a scan that can read them.
   let pending = q.filesNeedingThumb(db, core.rootId);
   if (unreadablePaths.length > 0) {
-    const isUnreadable = unreadableMatcher(unreadablePaths);
-    pending = pending.filter(
-      (f) => !isUnreadable(path.relative(core.root, f.abs_path)),
-    );
+    pending = pending.filter((f) => !isUnreadable(f.rel_path));
   }
   const total = pending.length;
   let processed = 0;
