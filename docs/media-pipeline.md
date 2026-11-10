@@ -24,7 +24,9 @@ only when the match is unambiguous: among the rows with the same hash and size
 not seen in this scan, exactly one is live (or, when none is live, exactly one
 is soft-deleted). When identical copies disappear together, the file is
 inserted instead of taking over a copy's id at random; its metadata still
-follows through the shared hash.
+follows through the shared hash. A file whose content changes at the same path
+keeps its metadata too: it is copied to the new hash (see
+[`meta_key`](data-model.md#metadata-and-meta_key)).
 
 A root that cannot be read (an unplugged drive, a share that is down) fails the
 scan before the index is touched, so its files are not soft-deleted, and the
@@ -56,9 +58,10 @@ their IDs and thumbnails, by a rebuild too (not soft-deleted, not taken over by
 move detection, and not sent to thumbnail generation).
 
 A file whose content cannot be read for hashing (permission denied, locked by
-another process, removed since the walk) is skipped for that scan instead of
-failing it: a new file is not inserted, and an existing row is left as it is
-(not updated, not soft-deleted). The next scan tries it again. One exception:
+another process, removed since the walk, shrunk while it was read) is skipped
+for that scan instead of failing it: a new file is not inserted, and an
+existing row is left as it is (not updated, not soft-deleted). The next scan
+tries it again. One exception:
 when a file was moved or renamed to a path that cannot be read, the move is not
 detected, so the row at the old path is soft-deleted; once the new path is
 readable, the next scan detects the move and revives that row with its ID and

@@ -5,7 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import type { DB } from "./db.js";
 import { nowUnix, pathMetaKey } from "./db.js";
-import { migrateMetaKey } from "./queries.js";
+import { copyMetaKey, migrateMetaKey } from "./queries.js";
 import { pool } from "./concurrency.js";
 import type { Kind } from "./types.js";
 
@@ -334,6 +334,39 @@ export async function walk(
 
 const SAMPLE = 1024 * 1024; // 1 MiB
 
+/**
+ * Fill buf from the file at position. A read can return fewer bytes than
+ * asked (a network share in particular), so read on until it is full; the end
+ * of the file before that means it shrank while it was read, which throws with
+ * a code, so the scan skips the file and tries it again next time (#263).
+ */
+async function readFully(
+  fd: fsp.FileHandle,
+  buf: Buffer,
+  position: number,
+): Promise<void> {
+  let filled = 0;
+  while (filled < buf.length) {
+    const { bytesRead } = await fd.read(
+      buf,
+      filled,
+      buf.length - filled,
+      position + filled,
+    );
+    if (bytesRead === 0) {
+      throw Object.assign(new Error("the file shrank while it was read"), {
+        code: "ESHRUNK",
+      });
+    }
+    filled += bytesRead;
+  }
+}
+
+/** The content_hash of every empty file (contentHash of size 0). */
+const EMPTY_CONTENT_HASH = createHash("sha256")
+  .update(Buffer.from(BigInt64Array.of(0n).buffer))
+  .digest("hex");
+
 /** Sampled content_hash (sha256 of size + the first/last 1MiB). */
 export async function contentHash(file: string): Promise<string> {
   const h = createHash("sha256");
@@ -343,14 +376,14 @@ export async function contentHash(file: string): Promise<string> {
     h.update(Buffer.from(BigInt64Array.of(BigInt(size)).buffer));
     if (size <= SAMPLE * 2) {
       const buf = Buffer.alloc(size);
-      await fd.read(buf, 0, size, 0);
+      await readFully(fd, buf, 0);
       h.update(buf);
     } else {
       const head = Buffer.alloc(SAMPLE);
-      await fd.read(head, 0, SAMPLE, 0);
+      await readFully(fd, head, 0);
       h.update(head);
       const tail = Buffer.alloc(SAMPLE);
-      await fd.read(tail, 0, SAMPLE, size - SAMPLE);
+      await readFully(fd, tail, size - SAMPLE);
       h.update(tail);
     }
   } finally {
@@ -374,7 +407,8 @@ export interface ScanStats {
 /** A file skipped by a scan because its content could not be read. */
 export interface UnreadableFile {
   relPath: string;
-  /** The fs error code, e.g. EACCES / EBUSY / ENOENT. */
+  /** The fs error code, e.g. EACCES / EBUSY / ENOENT, or ESHRUNK when the
+   *  file shrank while it was read. */
   code: string;
 }
 
@@ -645,7 +679,22 @@ export async function syncFiles(
           if (existing.noFts) ftsMissing.push(existing.id);
           stats.unchanged++;
         } else {
-          carryMeta(newHash ?? pathMetaKey(d.absPath));
+          // Changed content at the same path is the same file to the user
+          // (tags or cover art edited, a recording that grew): its metadata
+          // follows the new content (#263). Copied rather than moved from a
+          // hash key, which another copy of the old content may still use.
+          // Neither to nor from empty content: every empty file (truncated by
+          // a failed sync, or not written yet) has the same hash, and it
+          // would gather and hand out all their metadata.
+          const newKey = newHash ?? pathMetaKey(d.absPath);
+          carryMeta(newKey);
+          if (
+            existing.content_hash != null &&
+            existing.content_hash !== EMPTY_CONTENT_HASH &&
+            newKey !== EMPTY_CONTENT_HASH
+          ) {
+            copyMetaKey(db, existing.meta_key, newKey);
+          }
           updateChanged.run(
             d.size,
             d.mtime,

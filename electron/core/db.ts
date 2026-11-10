@@ -476,7 +476,7 @@ function migrateFilesTable(db: DB): void {
 }
 
 /** The tables that hold user-curated metadata under a meta_key. migrateMetaKey
- *  (queries/meta.ts) lists the same tables; keep the two in step. */
+ *  and copyMetaKey (queries/meta.ts) list the same tables; keep them in step. */
 export const META_KEYED_TABLES = [
   "file_meta",
   "meta_tags",
