@@ -401,6 +401,55 @@ describe("frame serving (ffmpeg path)", () => {
   });
 });
 
+describe("unindexed ProRes playback", () => {
+  it("serves an H.264 preview before the scan writes the codec", async () => {
+    const clip = path.join(root, "unindexed.mov");
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=96x64:rate=12:duration=1",
+      "-c:v",
+      "prores_ks",
+      "-profile:v",
+      "standard",
+      "-pix_fmt",
+      "yuv422p10le",
+      clip,
+    ]);
+    const id = insert("unindexed.mov", clip, null, "pending", "video", "mov");
+    const url = `${base}/ws/${WS}/media/${id}`;
+    const head = await fetch(url, { ...authHeaders(), method: "HEAD" });
+    expect(head.status).toBe(200);
+    expect(head.headers.get("content-type")).toBe("video/mp4");
+    const preview = await fetch(url, authHeaders());
+    expect(preview.status).toBe(200);
+    expect(preview.headers.get("content-type")).toBe("video/mp4");
+    const output = Buffer.from(await preview.arrayBuffer());
+    const streams = JSON.parse(
+      execFileSync(
+        FFPROBE,
+        [
+          "-v",
+          "error",
+          "-show_entries",
+          "stream=codec_name",
+          "-of",
+          "json",
+          "pipe:0",
+        ],
+        { input: output, encoding: "utf8" },
+      ),
+    ) as { streams: unknown };
+    expect(streams.streams).toEqual([{ codec_name: "h264" }]);
+    expect(db.prepare("SELECT codec FROM files WHERE id = ?").get(id)).toEqual({
+      codec: null,
+    });
+  });
+});
+
 describe("media remux (ffmpeg path)", () => {
   it.each(["ac3", "eac3"])(
     "copies the HEVC picture and converts Dolby Digital %s surround audio to AAC",
@@ -435,8 +484,10 @@ describe("media remux (ffmpeg path)", () => {
       const original = fs.readFileSync(clip);
       const metadata = await extractMeta(clip, "video");
       const id = insert(name, clip, null, "done", "video", "mkv");
-      const updateMeta = db.prepare("UPDATE files SET meta = ? WHERE id = ?");
-      updateMeta.run(JSON.stringify(metadata.raw), id);
+      const updateMeta = db.prepare(
+        "UPDATE files SET codec = ?, meta = ? WHERE id = ?",
+      );
+      updateMeta.run(metadata.codec, JSON.stringify(metadata.raw), id);
       const url = `${base}/ws/${WS}/media/${id}`;
 
       const videoPackets = (input: Buffer) => {
@@ -511,7 +562,7 @@ describe("media remux (ffmpeg path)", () => {
           );
         }
         // A subsequent seek still works if scan metadata is not ready.
-        updateMeta.run(null, id);
+        updateMeta.run(null, null, id);
       }
       expect(fs.readFileSync(clip)).toEqual(original);
     },
