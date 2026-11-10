@@ -130,6 +130,31 @@ describe("describeConditions", () => {
     );
   });
 
+  it("gives the note directives chips of their own, apart from free text", () => {
+    const query = { q: 'sunset note:"pexels clip" has:note' };
+    expect(keys(query)).toEqual(["q", "directive-1", "directive-2"]);
+    expect(find(query, "q").label).toBe('"sunset"');
+    expect(find(query, "directive-1").label).toBe(
+      `${en["media.note"]}: "pexels clip"`,
+    );
+    expect(find(query, "directive-2").label).toBe(en["filter.hasNote"]);
+  });
+
+  it("keeps the note directives when the free text is cleared, and drops each alone", () => {
+    const query = { q: "sunset note:pexels has:note" };
+    expect(find(query, "q").clear(query)).toEqual({
+      q: "note:pexels has:note",
+    });
+    expect(find(query, "directive-2").clear(query)).toEqual({
+      q: "sunset note:pexels",
+    });
+    expect(clearEverything(query)).toEqual({});
+  });
+
+  it("leaves a has: value other than note as text", () => {
+    expect(keys({ q: "has:tags" })).toEqual(["q"]);
+  });
+
   it("labels conditions with translated text", () => {
     expect(find({ kind: "video" }, "kind").label).toBe(en["kind.video"]);
     expect(find({ ratingMin: 4 }, "rating").label).toBe("★4+");

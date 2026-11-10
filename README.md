@@ -384,6 +384,7 @@ Electron needs, `npm run test:e2e:install` pulls them in.
 | Play       | Click a thumbnail → play in the detail view (audio plays in the bottom bar). When unsupported, use "Open externally" |
 | Tag / Rate | Assign in the detail view (tags have autocomplete). Click a tag in the grid to search                              |
 | Note       | Write a Markdown note in the detail view (source URL, licence, where it was used). It saves as you type            |
+| Find notes | Search `note:pexels` for files whose note contains the text, or `has:note` for files that have a note              |
 | Search     | Filter and sort by full text, kind, and rating in the top bar (conditions shown as badges, individually removable) |
 | Theme      | Switch from Theme at the top-right of the header                                                                   |
 | Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset                                                                          |

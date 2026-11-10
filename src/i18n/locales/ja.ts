@@ -211,10 +211,11 @@ export const ja = {
 
   // フィルタ（FilterBar / 条件バッジ）
   "filter.searchHint":
-    'ファイル名とタグを検索します。tag:旅行 や tag:4k で、手動タグも自動タグも完全一致で絞り込めます。空白を含むタグは tag:"夏 旅行" のように引用符で囲みます。',
+    'ファイル名とタグを検索します。tag:旅行 や tag:4k で、手動タグも自動タグも完全一致で絞り込めます。空白を含むタグは tag:"夏 旅行" のように引用符で囲みます。note:pexels でメモにその文字を含むファイルを、has:note でメモのあるファイルを絞り込めます。',
   "filter.searchPlaceholder": "ファイル名・タグを検索",
   "filter.tagSuggestions": "タグの候補",
   "filter.tagElsewhere": "他のワークスペースのみ",
+  "filter.hasNote": "メモあり",
   "filter.all": "すべて",
   "filter.played": "視聴済み",
   "filter.unplayed": "未視聴",

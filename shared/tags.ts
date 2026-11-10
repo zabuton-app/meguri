@@ -11,6 +11,11 @@
  * The two forms are joined by a colon for display and for filter values:
  * `beach` for a manual tag, `res:4k` for a namespaced one.
  */
+import {
+  NOTE_SEARCH_PREFIX,
+  isHasNoteToken,
+  parseNoteSearchToken,
+} from "./noteSearch.js";
 
 /** `meta_tags.source` written by the metadata classifier. */
 export const AUTO_META_SOURCE = "auto-meta";
@@ -205,7 +210,7 @@ export function isEditableTag(namespace: string): boolean {
 }
 
 /**
- * The one search-box directive that targets a tag exactly instead of searching
+ * The search-box directive that targets a tag exactly instead of searching
  * text: `tag:beach` for a user's own tag, `tag:4k` / `tag:res:4k` for a
  * generated one.
  *
@@ -288,10 +293,20 @@ export function tagSearchToken(name: string): string {
  * that the directive exists to avoid — the one failure the user cannot see.
  */
 function foldSpacedDirectives(tokens: string[]): string[] {
-  const bare = `${TAG_SEARCH_PREFIX}:`;
+  // `note:` (shared/noteSearch.ts) the same way, for the same reason.
+  const bare = [`${TAG_SEARCH_PREFIX}:`, `${NOTE_SEARCH_PREFIX}:`];
+  // A directive typed after an abandoned `note: ` is a condition of its own,
+  // not the value: `note: tag:beach` must not search notes for "tag:beach".
+  const isDirectiveStart = (token: string) =>
+    bare.some((head) => token.toLowerCase().startsWith(head)) ||
+    isHasNoteToken(token);
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i].toLowerCase() === bare && i + 1 < tokens.length) {
+    if (
+      bare.includes(tokens[i].toLowerCase()) &&
+      i + 1 < tokens.length &&
+      !isDirectiveStart(tokens[i + 1])
+    ) {
       out.push(tokens[i] + tokens[i + 1]);
       i++;
       continue;
@@ -363,6 +378,10 @@ export function joinSearchTokens(tokens: string[]): string {
       // A directive quotes only its value, so the prefix stays readable.
       const value = parseTagSearchToken(token);
       if (value !== null) return tagSearchToken(value);
+      const note = parseNoteSearchToken(token);
+      if (note !== null && needsQuoting(note)) {
+        return `${NOTE_SEARCH_PREFIX}:"${note.replace(/"/g, '""')}"`;
+      }
       return needsQuoting(token) ? `"${token.replace(/"/g, '""')}"` : token;
     })
     .join(" ");

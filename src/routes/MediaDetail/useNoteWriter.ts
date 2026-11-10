@@ -5,7 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import log from "@/lib/logger";
 import { api } from "@/ipc/client";
-import { patchFileDetailInCache } from "@/lib/queryCache";
+import {
+  invalidateNoteSearches,
+  patchFileDetailInCache,
+} from "@/lib/queryCache";
 import { normalizeNote } from "@shared/note";
 
 /** How long typing has to pause before the note is written. */
@@ -47,6 +50,8 @@ export function useNoteWriter(
         saved.current = value;
         wrote = true;
         patchFileDetailInCache(qc, wsId, fileId, { note: value });
+        // Only the views filtered by a note can change membership.
+        invalidateNoteSearches(qc);
       } catch (e) {
         log.warn("could not save the note:", e);
         // Newer text typed meanwhile wins; otherwise retry this one.

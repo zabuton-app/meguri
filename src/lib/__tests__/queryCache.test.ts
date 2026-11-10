@@ -13,6 +13,7 @@ import {
   invalidateCollectionSearches,
   GRAPH_SIZED_BY_PLAYS,
   invalidateInProgressSearches,
+  invalidateNoteSearches,
   invalidatePlayedSearches,
   invalidateTagSearches,
   syncFileRowAcrossCaches,
@@ -292,6 +293,19 @@ describe("targeted files_search invalidation", () => {
     });
     invalidateTagSearches(qc);
     expect(invalidated().sort()).toEqual(["tagged", "text"]);
+  });
+
+  it("invalidateNoteSearches hits note-filtered queries only", () => {
+    const { qc, invalidated } = seed({
+      plain: { ws: "ws", filter: {} },
+      text: { ws: "ws", filter: { q: "beach" } },
+      noteText: { ws: "ws", filter: { q: "beach note:pexels" } },
+      hasNote: { ws: "ws", filter: { q: "HAS:NOTE" } },
+      otherHas: { ws: "ws", filter: { q: "has:tags" } },
+      tagged: { ws: "ws", filter: { tags: ["cat"] } },
+    });
+    invalidateNoteSearches(qc);
+    expect(invalidated().sort()).toEqual(["hasNote", "noteText"]);
   });
 
   it("invalidateCollectionSearches hits collection-scoped workspaces only", () => {
