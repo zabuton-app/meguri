@@ -337,6 +337,11 @@ export const en: Record<TranslationKey, string> = {
   "player.unmute": "Unmute (M)",
   "player.fullscreen": "Fullscreen (F)",
   "player.volume": "Volume",
+  "player.audioTrack": "Audio track",
+  "player.audioTrackNumber": "Track {number}",
+  "player.audioTrackDefault": "Default",
+  "player.audioTrackUnavailable":
+    "This audio track could not play. Restored the previous track.",
   "player.seek": "Seek",
   "player.playFailed": "Could not play in the built-in player.",
   "player.openExternal": "Open in external player",

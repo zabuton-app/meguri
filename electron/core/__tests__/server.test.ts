@@ -401,6 +401,138 @@ describe("frame serving (ffmpeg path)", () => {
   });
 });
 
+describe("MKV audio track selection", () => {
+  it("copies selected AAC and converts selected Dolby Digital without changing the picture", async () => {
+    const clip = path.join(root, "alternate-language.mkv");
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=96x64:rate=12:duration=1",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=128x72:rate=12:duration=1",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=44100:duration=1",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=880:sample_rate=48000:duration=1",
+      "-map",
+      "0:v",
+      "-map",
+      "1:v",
+      "-map",
+      "2:a",
+      "-map",
+      "3:a",
+      "-c:v",
+      "libx264",
+      "-c:a:0",
+      "aac",
+      "-c:a:1",
+      "ac3",
+      "-ac:a:1",
+      "2",
+      "-disposition:v:0",
+      "default",
+      "-disposition:v:1",
+      "0",
+      "-disposition:a:0",
+      "0",
+      "-disposition:a:1",
+      "0",
+      clip,
+    ]);
+    const original = fs.readFileSync(clip);
+    const metadata = await extractMeta(clip, "video");
+    const id = insert(
+      "alternate-language.mkv",
+      clip,
+      null,
+      "done",
+      "video",
+      "mkv",
+    );
+    db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+      metadata.codec,
+      JSON.stringify(metadata.raw),
+      id,
+    );
+    const url = `${base}/ws/${WS}/media/${id}`;
+    const preview = async (search: string) => {
+      const result = await fetch(url + search, authHeaders());
+      expect(result.status).toBe(200);
+      return Buffer.from(await result.arrayBuffer());
+    };
+    const streams = (input: Buffer) =>
+      JSON.parse(
+        execFileSync(
+          FFPROBE,
+          [
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_name,width,sample_rate",
+            "-of",
+            "json",
+            "pipe:0",
+          ],
+          { input, encoding: "utf8" },
+        ),
+      ) as {
+        streams: { codec_name: string; width?: number; sample_rate?: string }[];
+      };
+    const audioPacketHashes = (input: Buffer) =>
+      JSON.parse(
+        execFileSync(
+          FFPROBE,
+          [
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-show_entries",
+            "packet=data_hash",
+            "-of",
+            "json",
+            "pipe:0",
+          ],
+          { input, encoding: "utf8" },
+        ),
+      ) as { packets: { data_hash: string }[] };
+    const [automatic, aac, dolby] = await Promise.all([
+      preview(""),
+      preview("?audioTrack=0"),
+      preview("?audioTrack=1"),
+    ]);
+    expect(streams(automatic).streams).toEqual([
+      { codec_name: "h264", width: 96 },
+      { codec_name: "aac", sample_rate: "48000" },
+    ]);
+    expect(streams(aac).streams).toEqual([
+      { codec_name: "h264", width: 96 },
+      { codec_name: "aac", sample_rate: "44100" },
+    ]);
+    expect(streams(dolby).streams).toEqual(streams(automatic).streams);
+    const sourceHashes = audioPacketHashes(original);
+    expect(sourceHashes.packets.length).toBeGreaterThan(0);
+    expect(audioPacketHashes(aac)).toEqual(sourceHashes);
+    expect((await fetch(url + "?audioTrack=2", authHeaders())).status).toBe(
+      400,
+    );
+    expect(fs.readFileSync(clip)).toEqual(original);
+  });
+});
+
 describe("media remux (ffmpeg path)", () => {
   it.each(["ac3", "eac3"])(
     "copies the HEVC picture and converts Dolby Digital %s surround audio to AAC",

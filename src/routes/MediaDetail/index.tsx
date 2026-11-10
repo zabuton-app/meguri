@@ -28,6 +28,7 @@ import { useResumeStart } from "@/hooks/useResumeStart";
 import { ResumeNotice } from "@/components/ResumeNotice";
 import { MediaModal, TopBar } from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
+import { isRemuxedVideo, readAudioTracks } from "@shared/playbackTracks";
 import { useAudioActions } from "@/audio/useAudioPlayer";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
 import { AudioCompact, AudioStage } from "./AudioStage";
@@ -373,6 +374,11 @@ export default function MediaDetail() {
                 ref={playerRef}
                 id={fileId}
                 src={mediaSrc}
+                audioTracks={
+                  isRemuxedVideo(d.codec, d.ext)
+                    ? readAudioTracks(d.meta)
+                    : undefined
+                }
                 duration={d.duration}
                 width={d.width}
                 height={d.height}

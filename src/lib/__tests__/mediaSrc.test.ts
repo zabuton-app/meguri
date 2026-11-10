@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isSameMediaSource,
   streamOffsetOf,
-  withoutStreamSeek,
+  withoutPlaybackOptions,
   withStreamSeek,
 } from "@/lib/mediaSrc";
 
@@ -21,7 +21,8 @@ describe("mediaSrc", () => {
     expect(isSameMediaSource(SRC, "http://127.0.0.1:1/ws/ws1/media/8")).toBe(
       false,
     );
-    // Only `t` is ignored; any other query still tells sources apart.
+    expect(isSameMediaSource(`${SRC}?audioTrack=1&t=90`, SRC)).toBe(true);
+    // Other query parameters still tell sources apart.
     expect(isSameMediaSource(`${SRC}?v=1`, `${SRC}?v=2`)).toBe(false);
     expect(isSameMediaSource(null, "")).toBe(true);
   });
@@ -30,6 +31,6 @@ describe("mediaSrc", () => {
     expect(streamOffsetOf(`${SRC}?t=90`)).toBe(90);
     expect(streamOffsetOf(SRC)).toBe(0);
     expect(streamOffsetOf(null)).toBe(0);
-    expect(withoutStreamSeek(`${SRC}?t=90`)).toBe(SRC);
+    expect(withoutPlaybackOptions(`${SRC}?t=90`)).toBe(SRC);
   });
 });
