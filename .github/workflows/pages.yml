@@ -1,0 +1,42 @@
+name: Deploy to GitHub Pages
+
+# Deploy docs/ only when it changes. The legacy "deploy from branch" source
+# rebuilt the site on every push to main, so unrelated merges kept queueing
+# Pages deployments that sometimes timed out on GitHub's side.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let an in-progress deployment finish instead of cancelling it midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # docs/ is served as-is (no Jekyll), so upload the directory directly.
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
