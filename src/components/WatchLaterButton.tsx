@@ -61,19 +61,20 @@ export function WatchLaterButton({
     variant: "add",
   });
 
+  // The file goes in with the variables, as in FavoriteButton (#258).
   const toggle = useMutation({
-    mutationFn: (next: boolean) => {
+    mutationFn: (v: { fileId: number; workspaceId: string; next: boolean }) => {
       if (!watchLater.id) return Promise.resolve();
-      return next
-        ? api.collectionAddFile(watchLater.id, fileId, workspaceId)
-        : api.collectionRemoveFile(watchLater.id, fileId, workspaceId);
+      return v.next
+        ? api.collectionAddFile(watchLater.id, v.fileId, v.workspaceId)
+        : api.collectionRemoveFile(watchLater.id, v.fileId, v.workspaceId);
     },
-    onSuccess: (_d, next) => {
+    onSuccess: (_d, v) => {
       void qc.invalidateQueries({ queryKey: ["workspaces_list"] });
       // Membership changes only affect collection-scoped lists, not workspace lists.
       if (!deferListRefresh) invalidateCollectionSearches(qc);
       toast.success(
-        next ? t("watchLater.addedToast") : t("watchLater.removedToast"),
+        v.next ? t("watchLater.addedToast") : t("watchLater.removedToast"),
       );
     },
     onError: (error: unknown) => {
@@ -96,7 +97,7 @@ export function WatchLaterButton({
         e.stopPropagation();
         const next = !included;
         setFx((f) => ({ seq: f.seq + 1, variant: next ? "add" : "remove" }));
-        toggle.mutate(next);
+        toggle.mutate({ fileId, workspaceId, next });
       }}
       disabled={toggle.isPending || !watchLater.id}
       aria-pressed={included}

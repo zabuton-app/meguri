@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { useAudioDetail } from "@/routes/MediaDetail/useAudioDetail";
+import { useAudioPlayer } from "@/audio/useAudioPlayer";
 import type { FileDetail } from "@/ipc/types";
 import {
   defaultAppStatus,
@@ -130,5 +131,51 @@ describe("useAudioDetail auto-start", () => {
     rerender(<Probe file={audio} />);
     expect(playSpy).toHaveBeenCalledTimes(1);
     expect(startedHere()).toBe("false");
+  });
+});
+
+describe("useAudioDetail closeIfCurrent", () => {
+  type Seen = {
+    close: (removed: { fileId: number; wsId: string }) => void;
+    barFileId: number | undefined;
+  };
+  function CloseProbe({
+    file,
+    onRender,
+  }: {
+    file: FileDetail;
+    onRender: (seen: Seen) => void;
+  }) {
+    const { closeIfCurrent } = useAudioDetail({
+      file,
+      wsId: WS_ID,
+      mediaBase: defaultAppStatus.mediaBase ?? "",
+      autoplay: true,
+      startAt: 0,
+      pauseVideo: () => {},
+    });
+    const barFileId = useAudioPlayer().current?.file.id;
+    onRender({ close: closeIfCurrent, barFileId });
+    return null;
+  }
+  const other: FileDetail = { ...audio, id: audio.id + 1 };
+
+  it("closes the bar only for the file that was removed, whatever the view shows", () => {
+    let seen!: Seen;
+    const onRender = (s: Seen) => {
+      seen = s;
+    };
+    const { rerender } = renderWithProviders(
+      <CloseProbe file={audio} onRender={onRender} />,
+    );
+    // prev/next to another track while the delete dialog was open
+    rerender(<CloseProbe file={other} onRender={onRender} />);
+    expect(seen.barFileId).toBe(other.id);
+
+    act(() => seen.close({ fileId: audio.id, wsId: WS_ID }));
+    expect(seen.barFileId).toBe(other.id);
+
+    act(() => seen.close({ fileId: other.id, wsId: WS_ID }));
+    expect(seen.barFileId).toBeUndefined();
   });
 });

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import log from "@/lib/logger";
@@ -55,6 +56,20 @@ export interface DetailActions {
   pendingThumbSec: number | null | undefined;
 }
 
+/** The file an action acts on (file ids are unique only within a workspace). */
+export interface Target {
+  fileId: number;
+  wsId: string;
+}
+
+function sameTarget(a: Target, b: Target): boolean {
+  return a.fileId === b.fileId && a.wsId === b.wsId;
+}
+
+function detailKeyOf(target: Target) {
+  return ["file_get", target.wsId, target.fileId] as const;
+}
+
 /**
  * Everything the detail view does *to* the file, with the cache upkeep each
  * one needs: rating, tags, bookmarks, the main thumbnail, frame export,
@@ -69,6 +84,7 @@ export interface DetailActions {
 export function useDetailMutations({
   fileId,
   wsId,
+  fileName,
   onIndexEntryRemoved,
   onDeleteFinished,
   pauseVideo,
@@ -76,8 +92,11 @@ export function useDetailMutations({
 }: {
   fileId: number;
   wsId: string;
-  /** The main process has dropped the file; the list caches are not yet patched. */
-  onIndexEntryRemoved?: () => void;
+  /** Named in the delete confirmation, once the detail has loaded. */
+  fileName?: string;
+  /** The main process has dropped this file (the one shown when the delete
+   *  started); the list caches are not yet patched. */
+  onIndexEntryRemoved?: (removed: Target) => void;
   /** The file is gone from the index and every cache: time to close the view. */
   onDeleteFinished?: () => void;
   /** Pause this view's video before an external player takes the file. */
@@ -89,12 +108,23 @@ export function useDetailMutations({
   const confirm = useConfirm();
   const qc = useQueryClient();
   const forgetSelected = useForgetSelected();
-  const detailKey = ["file_get", wsId, fileId] as const;
+  // Every mutation takes the file it acts on as a variable, set when the
+  // action starts. The route keeps this hook mounted across prev/next, and
+  // react-query runs a mutation with the options of the latest render: a file
+  // read from the closure would be the one shown when it runs or settles, not
+  // the one the action was started on (#258).
+  const here: Target = { fileId, wsId };
+  // The file shown now, for what only makes sense while it still is.
+  const shownNow = useRef(here);
+  useEffect(() => {
+    shownNow.current = { fileId, wsId };
+  }, [fileId, wsId]);
 
   const setRating = useMutation({
-    mutationFn: (r: number) => api.fileSetRating(fileId, wsId, r),
-    onSuccess: (_d, r) => {
-      syncFileRowAcrossCaches(qc, wsId, fileId, { rating: r });
+    mutationFn: ({ target, rating }: { target: Target; rating: number }) =>
+      api.fileSetRating(target.fileId, target.wsId, rating),
+    onSuccess: (_d, { target, rating }) => {
+      syncFileRowAcrossCaches(qc, target.wsId, target.fileId, { rating });
     },
   });
 
@@ -102,16 +132,17 @@ export function useDetailMutations({
   // server-side) and mirror its tags into the list caches, instead of
   // refetching every page of every list. Only searches whose membership
   // depends on tags (tag filter / text query) are invalidated.
-  const onTagsChanged = async () => {
+  const onTagsChanged = async (target: Target) => {
+    const key = detailKeyOf(target);
     try {
       const fresh = await qc.fetchQuery({
-        queryKey: detailKey,
-        queryFn: () => api.fileGet(fileId, wsId),
+        queryKey: key,
+        queryFn: () => api.fileGet(target.fileId, target.wsId),
       });
       if (fresh) {
         // FileRow omits pipeline sources (see attachTags); patching straight from
         // the detail response would put them back into the list caches.
-        patchFileRowInCaches(qc, wsId, fileId, {
+        patchFileRowInCaches(qc, target.wsId, target.fileId, {
           tags: fresh.tags.filter(
             (tag) => !LIST_HIDDEN_SOURCES.includes(tag.source),
           ),
@@ -120,15 +151,16 @@ export function useDetailMutations({
     } catch {
       // The tag edit itself succeeded; if the refetch fails (transient IPC
       // error), fall back to invalidating the detail so it reloads lazily.
-      void qc.invalidateQueries({ queryKey: detailKey });
+      void qc.invalidateQueries({ queryKey: key });
     }
     invalidateTagSearches(qc);
     void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
   };
   const addTag = useMutation({
-    mutationFn: (name: string) => api.fileAddTag(fileId, wsId, name),
-    onSuccess: onTagsChanged,
-    onError: (error, name) => {
+    mutationFn: ({ target, name }: { target: Target; name: string }) =>
+      api.fileAddTag(target.fileId, target.wsId, name),
+    onSuccess: (_d, { target }) => onTagsChanged(target),
+    onError: (error, { name }) => {
       // main rejects a name that impersonates a pipeline-owned namespace; any
       // other failure (DB error, unknown workspace) deserves its own message.
       const message = error instanceof Error ? error.message : String(error);
@@ -144,34 +176,44 @@ export function useDetailMutations({
     },
   });
   const removeTag = useMutation({
-    mutationFn: (tagId: number) => api.fileRemoveTag(fileId, wsId, tagId),
-    onSuccess: onTagsChanged,
+    mutationFn: ({ target, tagId }: { target: Target; tagId: number }) =>
+      api.fileRemoveTag(target.fileId, target.wsId, tagId),
+    onSuccess: (_d, { target }) => onTagsChanged(target),
   });
 
   const deleteFromIndexMutation = useMutation({
-    mutationFn: () => api.fileDeleteFromIndex(fileId, wsId),
-    onSuccess: onIndexEntryRemoved,
+    mutationFn: (target: Target) =>
+      api.fileDeleteFromIndex(target.fileId, target.wsId),
   });
   /**
    * Ask, then drop the file from the index and from every list cache it
-   * appears in, then hand back to the caller (which closes the view).
+   * appears in, then hand back to the caller (which closes the view). The
+   * file is the one shown when this was called, even if the view moved on
+   * while the dialog was open; the view is only closed if it still shows it.
    */
   const deleteFromIndex = async () => {
+    const target = here;
     const ok = await confirm({
       title: t("media.deleteFromIndex"),
-      message: t("media.deleteFromIndexConfirm"),
+      // Named, so the file being removed is clear even if the view moves on
+      // behind the dialog.
+      message: fileName
+        ? t("media.deleteFileFromIndexConfirm", { name: fileName })
+        : t("media.deleteFromIndexConfirm"),
       confirmText: t("media.deleteFromIndex"),
       destructive: true,
     });
     if (!ok) return;
-    const deleted = await deleteFromIndexMutation.mutateAsync();
-    forgetDeletedFile(qc, wsId, deleted.id);
+    const deleted = await deleteFromIndexMutation.mutateAsync(target);
+    onIndexEntryRemoved?.(target);
+    forgetDeletedFile(qc, target.wsId, deleted.id);
     // A selected row outlives the list's copy of it (see forget).
-    forgetSelected({ id: deleted.id, workspaceId: wsId });
-    onDeleteFinished?.();
+    forgetSelected({ id: deleted.id, workspaceId: target.wsId });
+    if (sameTarget(shownNow.current, target)) onDeleteFinished?.();
   };
 
   const openExternal = () => {
+    const target = here;
     // The external player is about to play this very file: stop it here.
     pauseVideo?.();
     pauseAudio?.();
@@ -180,9 +222,9 @@ export function useDetailMutations({
     // missing under the root), and patching regardless would show the file
     // as consumed when it is not.
     void api
-      .openExternal(fileId, wsId)
+      .openExternal(target.fileId, target.wsId)
       .then(() => {
-        dropFromWatchLaterCache(qc, wsId, fileId);
+        dropFromWatchLaterCache(qc, target.wsId, target.fileId);
         invalidatePlayedSearches(qc);
       })
       .catch((e: unknown) => log.error("open external", e));
@@ -199,17 +241,18 @@ export function useDetailMutations({
     });
   };
   const addToCollection = useMutation({
-    mutationFn: (c: CollectionRef) => api.collectionAddFile(c.id, fileId, wsId),
-    onSuccess: (_data, c) => {
+    mutationFn: ({ target, c }: { target: Target; c: CollectionRef }) =>
+      api.collectionAddFile(c.id, target.fileId, target.wsId),
+    onSuccess: (_data, { c }) => {
       invalidateCollections();
       toast.success(t("collection.addedToast", { name: c.name }));
     },
     onError: onCollectionError,
   });
   const removeFromCollection = useMutation({
-    mutationFn: (c: CollectionRef) =>
-      api.collectionRemoveFile(c.id, fileId, wsId),
-    onSuccess: (_data, c) => {
+    mutationFn: ({ target, c }: { target: Target; c: CollectionRef }) =>
+      api.collectionRemoveFile(c.id, target.fileId, target.wsId),
+    onSuccess: (_data, { c }) => {
       invalidateCollections();
       toast.success(t("collection.removedFromToast", { name: c.name }));
     },
@@ -217,10 +260,11 @@ export function useDetailMutations({
   });
 
   const addBookmark = useMutation({
-    mutationFn: (sec: number) => api.bookmarkAdd(fileId, wsId, sec),
-    onSuccess: (created) => {
+    mutationFn: ({ target, sec }: { target: Target; sec: number }) =>
+      api.bookmarkAdd(target.fileId, target.wsId, sec),
+    onSuccess: (created, { target }) => {
       if (!created) return;
-      qc.setQueryData<FileDetail | null>(detailKey, (old) =>
+      qc.setQueryData<FileDetail | null>(detailKeyOf(target), (old) =>
         old
           ? {
               ...old,
@@ -234,10 +278,15 @@ export function useDetailMutations({
     },
   });
   const removeBookmark = useMutation({
-    mutationFn: (bookmarkId: number) =>
-      api.bookmarkRemove(fileId, wsId, bookmarkId),
-    onSuccess: (_void, bookmarkId) => {
-      qc.setQueryData<FileDetail | null>(detailKey, (old) =>
+    mutationFn: ({
+      target,
+      bookmarkId,
+    }: {
+      target: Target;
+      bookmarkId: number;
+    }) => api.bookmarkRemove(target.fileId, target.wsId, bookmarkId),
+    onSuccess: (_void, { target, bookmarkId }) => {
+      qc.setQueryData<FileDetail | null>(detailKeyOf(target), (old) =>
         old
           ? {
               ...old,
@@ -250,34 +299,37 @@ export function useDetailMutations({
 
   const setMainThumb = useMutation({
     // `sec=null` reverts to the auto-extracted frame.
-    mutationFn: (sec: number | null) => api.thumbSetOffset(fileId, wsId, sec),
+    mutationFn: ({ target, sec }: { target: Target; sec: number | null }) =>
+      api.thumbSetOffset(target.fileId, target.wsId, sec),
     // Snap the highlighted star to the chosen scene immediately; if ffmpeg fails the
     // backend throws and we roll back so the UI doesn't lie about the saved offset.
-    onMutate: async (sec) => {
-      await qc.cancelQueries({ queryKey: detailKey });
-      const prev = qc.getQueryData<FileDetail | null>(detailKey);
-      qc.setQueryData<FileDetail | null>(detailKey, (old) =>
+    onMutate: async ({ target, sec }) => {
+      const key = detailKeyOf(target);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<FileDetail | null>(key);
+      qc.setQueryData<FileDetail | null>(key, (old) =>
         old ? { ...old, thumbOffsetSec: sec } : old,
       );
       return { prev };
     },
-    onError: (_err, _sec, ctx) => {
+    onError: (_err, { target }, ctx) => {
       if (ctx?.prev !== undefined) {
-        qc.setQueryData(detailKey, ctx.prev);
+        qc.setQueryData(detailKeyOf(target), ctx.prev);
       }
     },
-    onSuccess: (res) => {
+    onSuccess: (res, { target }) => {
       // Reconcile to the server-confirmed value (in case clamping happened).
       // List/grid thumbnails refresh via the `thumb:done` event from the main process —
       // no manual cache surgery needed for ["files_search"]/["files_random"].
-      qc.setQueryData<FileDetail | null>(detailKey, (old) =>
+      qc.setQueryData<FileDetail | null>(detailKeyOf(target), (old) =>
         old ? { ...old, thumbOffsetSec: res.thumbOffsetSec } : old,
       );
     },
   });
 
   const exportFrame = useMutation({
-    mutationFn: (sec: number) => api.frameExport(fileId, wsId, sec),
+    mutationFn: ({ target, sec }: { target: Target; sec: number }) =>
+      api.frameExport(target.fileId, target.wsId, sec),
     onSuccess: (res) => {
       // A canceled save dialog resolves with saved=false — stay silent.
       if (res.saved) toast.success(t("player.frameExported"));
@@ -285,28 +337,39 @@ export function useDetailMutations({
     onError: () => toast.error(t("player.frameExportFailed")),
   });
 
+  // Busy flags only for a mutation running on the file shown now.
+  const busyHere = (m: {
+    isPending: boolean;
+    variables?: { target: Target };
+  }) =>
+    m.isPending &&
+    m.variables !== undefined &&
+    sameTarget(m.variables.target, here);
+
   // Single-argument wrappers, not the mutate functions themselves: mutate
   // takes options as a second argument, and a DOM handler wired straight to
   // it would pass the event there.
   return {
-    setRating: (rating) => setRating.mutate(rating),
-    addTag: (name) => addTag.mutate(name),
-    removeTag: (tagId) => removeTag.mutate(tagId),
-    addToCollection: (c) => addToCollection.mutate(c),
-    removeFromCollection: (c) => removeFromCollection.mutate(c),
-    addBookmark: (sec) => addBookmark.mutate(sec),
-    removeBookmark: (bookmarkId) => removeBookmark.mutate(bookmarkId),
-    setMainThumb: (sec) => setMainThumb.mutate(sec),
-    exportFrame: (sec) => exportFrame.mutate(sec),
+    setRating: (rating) => setRating.mutate({ target: here, rating }),
+    addTag: (name) => addTag.mutate({ target: here, name }),
+    removeTag: (tagId) => removeTag.mutate({ target: here, tagId }),
+    addToCollection: (c) => addToCollection.mutate({ target: here, c }),
+    removeFromCollection: (c) =>
+      removeFromCollection.mutate({ target: here, c }),
+    addBookmark: (sec) => addBookmark.mutate({ target: here, sec }),
+    removeBookmark: (bookmarkId) =>
+      removeBookmark.mutate({ target: here, bookmarkId }),
+    setMainThumb: (sec) => setMainThumb.mutate({ target: here, sec }),
+    exportFrame: (sec) => exportFrame.mutate({ target: here, sec }),
     deleteFromIndex,
     openExternal,
     pending: {
-      bookmark: addBookmark.isPending || removeBookmark.isPending,
-      export: exportFrame.isPending,
-      mainThumb: setMainThumb.isPending,
+      bookmark: busyHere(addBookmark) || busyHere(removeBookmark),
+      export: busyHere(exportFrame),
+      mainThumb: busyHere(setMainThumb),
     },
-    pendingThumbSec: setMainThumb.isPending
-      ? (setMainThumb.variables ?? null)
+    pendingThumbSec: busyHere(setMainThumb)
+      ? (setMainThumb.variables?.sec ?? null)
       : undefined,
   };
 }

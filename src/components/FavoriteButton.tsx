@@ -40,12 +40,15 @@ export function FavoriteButton({
   // wrapper via key so a running effect restarts cleanly (FR-008).
   const [fx, playFx] = useFavoriteFx({ id: fileId, workspaceId });
 
+  // The file goes in with the variables: a button kept mounted while its
+  // fileId prop changes (the detail view's prev/next) would otherwise write,
+  // and patch the caches of, the file shown when the mutation runs (#258).
   const toggle = useMutation({
-    mutationFn: (next: boolean) =>
-      api.fileSetFavorite(fileId, workspaceId, next),
-    onSuccess: (_d, next) => {
-      syncFileRowAcrossCaches(qc, workspaceId, fileId, {
-        favorite: next ? 1 : 0,
+    mutationFn: (v: { fileId: number; workspaceId: string; next: boolean }) =>
+      api.fileSetFavorite(v.fileId, v.workspaceId, v.next),
+    onSuccess: (_d, v) => {
+      syncFileRowAcrossCaches(qc, v.workspaceId, v.fileId, {
+        favorite: v.next ? 1 : 0,
       });
     },
   });
@@ -61,7 +64,7 @@ export function FavoriteButton({
         e.stopPropagation();
         const next = !isFav;
         playFx({ variant: next ? "add" : "remove" });
-        toggle.mutate(next);
+        toggle.mutate({ fileId, workspaceId, next });
       }}
       disabled={toggle.isPending}
       aria-pressed={isFav}

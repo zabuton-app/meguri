@@ -23,10 +23,14 @@ export function RatingButton({
 }: Props) {
   const qc = useQueryClient();
 
+  // The file goes in with the variables, as in FavoriteButton (#258).
   const setRating = useMutation({
-    mutationFn: (next: number) => api.fileSetRating(fileId, workspaceId, next),
-    onSuccess: (_d, next) => {
-      syncFileRowAcrossCaches(qc, workspaceId, fileId, { rating: next });
+    mutationFn: (v: { fileId: number; workspaceId: string; rating: number }) =>
+      api.fileSetRating(v.fileId, v.workspaceId, v.rating),
+    onSuccess: (_d, v) => {
+      syncFileRowAcrossCaches(qc, v.workspaceId, v.fileId, {
+        rating: v.rating,
+      });
     },
   });
 
@@ -41,7 +45,7 @@ export function RatingButton({
     >
       <RatingStars
         value={rating}
-        onChange={(r) => setRating.mutate(r)}
+        onChange={(r) => setRating.mutate({ fileId, workspaceId, rating: r })}
         size={size}
         disabled={setRating.isPending}
         file={{ id: fileId, workspaceId }}

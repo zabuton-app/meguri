@@ -234,6 +234,7 @@ export default function MediaDetail() {
   const actions = useDetailMutations({
     fileId,
     wsId,
+    fileName: detail.data ? fileNameOf(detail.data.relPath) : undefined,
     onIndexEntryRemoved: closeAudioIfCurrent,
     onDeleteFinished: onClose,
     pauseVideo: () => playerRef.current?.pause(),

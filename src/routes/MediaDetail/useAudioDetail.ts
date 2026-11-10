@@ -117,11 +117,26 @@ export function useAudioDetail({
     setStartedFor(visitKey);
   }, [file, wsId, mediaBase, autoplay, startAt, current, isPlaying, play]);
 
+  // The bar's track as of now, for a call made after an await: the render the
+  // caller closed over may be older (#258).
+  const barTrack = useRef(current);
+  useEffect(() => {
+    barTrack.current = current;
+  }, [current]);
   /** For "delete from index": the bar outlives this modal, so a track that was
-   *  playing would keep going (and 404 on the next seek) after its row is gone. */
-  const closeIfCurrent = useCallback(() => {
-    if (isCurrentAudio) close();
-  }, [isCurrentAudio, close]);
+   *  playing would keep going (and 404 on the next seek) after its row is gone.
+   *  Closes the bar only if it is playing the file that was removed. */
+  const closeIfCurrent = useCallback(
+    (removed: { fileId: number; wsId: string }) => {
+      const track = barTrack.current;
+      if (
+        track?.file.id === removed.fileId &&
+        track.workspaceId === removed.wsId
+      )
+        close();
+    },
+    [close],
+  );
 
   const startedHere =
     isAudio && startedFor === `${wsId}:${file?.id}` && isCurrentAudio;
