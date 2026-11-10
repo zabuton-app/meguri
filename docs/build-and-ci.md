@@ -95,6 +95,10 @@ GitHub Actions workflows live in `.github/workflows/`:
   `test:renderer`, and the E2E tests (`test:e2e:headless`).
 - `build.yml` triggers on `v*` tag pushes and builds a three-way matrix (linux
   x64, win x64, mac arm64), then creates a draft release.
+- `pages.yml` deploys `docs/` to GitHub Pages as-is (no Jekyll). It runs only
+  when `docs/` or the workflow itself changes on `main`, or on manual dispatch.
+  The repository's Pages source must be set to "GitHub Actions"; after
+  switching it, run the workflow once by hand so the site is redeployed.
 
 ffmpeg-static and @derhuerst/ffprobe-static each fetch a single-architecture
 binary at install time (`npm_config_arch || os.arch()`), so CI pins
