@@ -171,6 +171,12 @@ export const ja = {
   "home.scanRootUnreadableNamed": "「{name}」のフォルダにアクセスできません",
   "home.scanRootUnreadableDesc":
     "フォルダが移動・削除されていないか、ドライブやネットワーク共有が接続されているか、読み取りの権限があるかを確認してから、もう一度スキャンしてください。ファイル一覧はそのまま残しています。",
+  "home.scanSkipped":
+    "ワークスペースで、読み取れなかった{count}件のフォルダやファイルをスキップしました",
+  "home.scanSkippedNamed":
+    "「{name}」で、読み取れなかった{count}件のフォルダやファイルをスキップしました",
+  "home.scanSkippedDesc":
+    "読み取りの権限がないか、ほかのプログラムが使用中の可能性があります。ファイル一覧のその部分はそのまま残し、次のスキャンで再試行します。",
   "home.scanStartFailed": "スキャンを開始できませんでした",
   "home.scanAlreadyRunning": "スキャンは既に実行中です",
 

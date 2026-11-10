@@ -177,6 +177,12 @@ export const es: Record<TranslationKey, string> = {
   "home.scanRootUnreadableNamed": "No se pudo acceder a la carpeta de «{name}»",
   "home.scanRootUnreadableDesc":
     "Comprueba que la carpeta no se haya movido ni eliminado, que su unidad o recurso compartido de red esté conectado y que Meguri pueda leerla, y vuelve a escanear. La lista de archivos se ha dejado como estaba.",
+  "home.scanSkipped":
+    "Se omitieron {count} carpeta(s) o archivo(s) que no se pudieron leer",
+  "home.scanSkippedNamed":
+    "Se omitieron {count} carpeta(s) o archivo(s) de «{name}» que no se pudieron leer",
+  "home.scanSkippedDesc":
+    "Puede que Meguri no tenga permiso para leerlos o que otro programa los esté usando. Esa parte de la lista de archivos se ha dejado como estaba y el próximo escaneo lo volverá a intentar.",
   "home.scanStartFailed": "No se pudo iniciar el escaneo",
   "home.scanAlreadyRunning": "Ya hay un escaneo en curso",
 

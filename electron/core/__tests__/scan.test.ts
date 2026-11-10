@@ -820,6 +820,26 @@ describe("walk", () => {
     expect(found).toEqual(["keep.mp4"]);
   });
 
+  it("does not descend into the folders a file system keeps at a drive's root", async () => {
+    for (const dir of [
+      "lost+found",
+      "System Volume Information",
+      "$RECYCLE.BIN",
+    ]) {
+      await fsp.mkdir(path.join(root, dir));
+      await fsp.writeFile(path.join(root, dir, "a.mp4"), "x");
+    }
+    await fsp.writeFile(path.join(root, "keep.mp4"), "x");
+    const unreadable: string[] = [];
+
+    const found = (
+      await walk(root, undefined, undefined, (p) => unreadable.push(p))
+    ).map((d) => d.relPath);
+
+    expect(found).toEqual(["keep.mp4"]);
+    expect(unreadable).toEqual([]);
+  });
+
   it("throws when the root goes away during the walk", async () => {
     await fsp.mkdir(path.join(root, "sub"));
     await fsp.writeFile(path.join(root, "sub", "a.mp4"), "x");

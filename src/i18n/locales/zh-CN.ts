@@ -162,6 +162,10 @@ export const zhCN: Record<TranslationKey, string> = {
   "home.scanRootUnreadableNamed": "无法访问“{name}”的文件夹",
   "home.scanRootUnreadableDesc":
     "请确认该文件夹未被移动或删除、其驱动器或网络共享已连接，且 Meguri 有读取权限，然后重新扫描。文件列表保持不变。",
+  "home.scanSkipped": "已跳过 {count} 个无法读取的文件夹或文件",
+  "home.scanSkippedNamed": "已跳过“{name}”中 {count} 个无法读取的文件夹或文件",
+  "home.scanSkippedDesc":
+    "Meguri 可能没有读取权限，或其他程序正在使用它们。文件列表中的这部分保持不变，下次扫描时会重试。",
   "home.scanStartFailed": "无法开始扫描",
   "home.scanAlreadyRunning": "扫描已在进行中",
 

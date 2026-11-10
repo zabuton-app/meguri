@@ -196,6 +196,9 @@ export async function runScan(
       rehash: opts.rebuild,
     },
   );
+  // Told to the user (counts only) so a folder or file that never shows up
+  // does not go unnoticed (#314).
+  stats.skipped = unreadablePaths.length + unreadable.length;
   if (unreadablePaths.length > 0) {
     // A count only: the log may be shared, and folder names can be private.
     log.warn(
@@ -392,7 +395,7 @@ export async function runScan(
   // Audio without cover art never attempts a thumbnail, so it counts towards
   // neither success nor failure of the tooling — it is taken out of the
   // denominator of the all-failed check below.
-  let skipped = 0;
+  let noCoverArt = 0;
   const processOne = async (f: (typeof pending)[number]): Promise<void> => {
     if (signal?.aborted) return;
     const kind = f.kind as Kind;
@@ -421,7 +424,7 @@ export async function runScan(
         }
         const coverIndex = coverArtStreamIndex(meta.raw);
         if (coverIndex == null) {
-          skipped++;
+          noCoverArt++;
           buffer.push({
             id: f.id,
             kind,
@@ -533,7 +536,7 @@ export async function runScan(
   // scans and reporting success with zero thumbnails — is worse. Raised only
   // after the backfill/prune passes above, so a file that fails on every scan
   // cannot starve them indefinitely.
-  const attempted = pending.length - skipped;
+  const attempted = pending.length - noCoverArt;
   if (failed > 0 && failed === attempted && !signal?.aborted) {
     // A drive or share that went away during the thumbnails fails them all
     // too: say so, rather than blame ffmpeg (#313).

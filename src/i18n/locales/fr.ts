@@ -178,6 +178,11 @@ export const fr: Record<TranslationKey, string> = {
   "home.scanRootUnreadableNamed": "Le dossier de « {name} » est inaccessible",
   "home.scanRootUnreadableDesc":
     "Vérifiez que le dossier n’a pas été déplacé ou supprimé, que son disque ou partage réseau est connecté et que Meguri peut le lire, puis relancez le scan. La liste des fichiers a été laissée telle quelle.",
+  "home.scanSkipped": "{count} dossier(s) ou fichier(s) illisible(s) ignoré(s)",
+  "home.scanSkippedNamed":
+    "{count} dossier(s) ou fichier(s) illisible(s) ignoré(s) dans « {name} »",
+  "home.scanSkippedDesc":
+    "Meguri n’a peut-être pas l’autorisation de les lire, ou un autre programme les utilise. Cette partie de la liste des fichiers a été laissée telle quelle, et le prochain scan réessaiera.",
   "home.scanStartFailed": "Impossible de démarrer le scan",
   "home.scanAlreadyRunning": "Un scan est déjà en cours",
 

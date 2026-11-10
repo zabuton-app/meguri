@@ -25,7 +25,6 @@ import type {
   SearchResult,
   UserCollection,
   WorkspaceInfo,
-  WorkspacesList,
 } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { MANUAL_SORT } from "@shared/sortDir";
@@ -83,6 +82,7 @@ import { useFolderNavKeys } from "./useFolderNavKeys";
 import { useFolderPlaylist } from "./useFolderPlaylist";
 import { useTour } from "@/tour/TourProvider";
 import { HomeHeader } from "./HomeHeader";
+import { useScanNotices, type ManualScanMode } from "./useScanNotices";
 import { SelectionLayer } from "./SelectionLayer";
 import {
   VIEW_KEY,
@@ -130,9 +130,8 @@ export default function Home() {
   // What the list queries run on: `filter` with its free text held back while
   // it is being typed (see useSettledFilter). The filter bar shows `filter`.
   const queryFilter = useSettledFilter(filter);
-  const manualScanJobs = useRef(
-    new Map<string, "scan" | "resync" | "rebuild">(),
-  );
+  const manualScanJobs = useRef(new Map<string, ManualScanMode>());
+  const { notifyScanDone, notifyRootUnreadable } = useScanNotices();
   const [view, setViewMode] = useLocalStorage<ViewMode>(
     VIEW_KEY,
     "grid",
@@ -534,36 +533,6 @@ export default function Home() {
     else setFilter(next);
   }, []);
 
-  // A workspace whose folder could not be read: named when known, since in
-  // the "All" view any workspace can be the one. The id is per workspace, so
-  // the same notice from the event and from the query below shows once.
-  const notifyRootUnreadable = useCallback(
-    (workspaceId: string | undefined) => {
-      const show = (name: string | undefined) =>
-        toast.error(
-          name
-            ? t("home.scanRootUnreadableNamed", { name })
-            : t("home.scanRootUnreadable"),
-          {
-            id: `scan-root-unreadable:${workspaceId ?? ""}`,
-            description: t("home.scanRootUnreadableDesc"),
-          },
-        );
-      // The list may not be loaded yet right after launch: fetch it then.
-      void qc
-        .fetchQuery({
-          queryKey: ["workspaces_list"],
-          queryFn: api.workspacesList,
-        })
-        .then(
-          (list: WorkspacesList) =>
-            show(list.workspaces.find((w) => w.id === workspaceId)?.label),
-          () => show(undefined),
-        );
-    },
-    [qc, t],
-  );
-
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {
     let un: (() => void) | undefined;
@@ -582,37 +551,7 @@ export default function Home() {
         void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
         const mode = manualScanJobs.current.get(done.jobId);
         manualScanJobs.current.delete(done.jobId);
-        // Cancel/error are explicit, user-visible outcomes: notify regardless of
-        // whether the scan was started manually (mode) or automatically (startup/switch).
-        // Fixed toast IDs coalesce the per-workspace done events in the "All" view
-        // into a single toast instead of one per workspace — except an
-        // unreadable folder, which is named, so it gets one per workspace.
-        if (done.aborted) {
-          toast.info(t("home.scanCanceled"), { id: "scan-canceled" });
-          return;
-        }
-        if (done.errorReason === "root-unreadable") {
-          notifyRootUnreadable(done.workspaceId);
-          return;
-        }
-        if (done.error) {
-          toast.error(t("home.scanError"), { id: "scan-error" });
-          return;
-        }
-        // The success toast is only for manual scans (avoid noise on every auto-scan).
-        if (!mode) return;
-        toast.success(
-          t(
-            mode === "rebuild"
-              ? "home.rebuildComplete"
-              : mode === "resync"
-                ? "home.resyncComplete"
-                : "home.scanComplete",
-          ),
-          {
-            description: t("home.scanCompleteDetail", done.stats),
-          },
-        );
+        notifyScanDone(done, mode);
       })
       .then((u) => {
         un = u;
@@ -627,7 +566,7 @@ export default function Home() {
     // search/status are react-query results; only their stable `refetch` is used.
     // Depending on the whole objects would re-subscribe the listener every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.refetch, status.refetch, t, notifyRootUnreadable]);
+  }, [search.refetch, status.refetch, notifyScanDone, notifyRootUnreadable]);
 
   // Empty-state add button (the rail's "+" lives in WorkspaceRail). Mirror its
   // toast + scan-job tracking so the first workspace also notifies on add/sync.

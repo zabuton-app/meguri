@@ -124,8 +124,16 @@ export async function looksLikeMpegTs(file: string): Promise<boolean> {
   );
 }
 
-// Dependency trees of code repositories: never media, and often huge.
-const SKIPPED_DIRS = new Set(["node_modules"]);
+// Dependency trees of code repositories: never media, and often huge. And the
+// folders a file system keeps at a drive's root, which are usually not
+// readable: listing them would warn about skipped folders after every scan of
+// a dedicated drive (#314).
+const SKIPPED_DIRS = new Set([
+  "node_modules",
+  "lost+found",
+  "System Volume Information",
+  "$RECYCLE.BIN",
+]);
 
 export interface Discovered {
   absPath: string;
@@ -339,6 +347,10 @@ export interface ScanStats {
   moved: number;
   deleted: number;
   unchanged: number;
+  /** Folders and files left as they were because they could not be read
+   *  (the walk could not list or stat them, or their content could not be
+   *  hashed). Set by runScan; retried by the next scan. */
+  skipped: number;
 }
 
 /** A file skipped by a scan because its content could not be read. */
@@ -350,7 +362,14 @@ export interface UnreadableFile {
 
 /** Stats for a scan that did nothing (aborted before starting, or failed). */
 export function emptyScanStats(): ScanStats {
-  return { inserted: 0, updated: 0, moved: 0, deleted: 0, unchanged: 0 };
+  return {
+    inserted: 0,
+    updated: 0,
+    moved: 0,
+    deleted: 0,
+    unchanged: 0,
+    skipped: 0,
+  };
 }
 
 /**
@@ -403,6 +422,7 @@ export async function syncFiles(
     moved: 0,
     deleted: 0,
     unchanged: 0,
+    skipped: 0,
   };
   const needsThumb: number[] = [];
   const ftsTargets: number[] = [];

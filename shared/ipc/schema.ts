@@ -520,6 +520,8 @@ export const ScanDoneSchema = z.object({
     moved: z.number(),
     deleted: z.number(),
     unchanged: z.number(),
+    /** Folders and files skipped because they could not be read. */
+    skipped: z.number(),
   }),
   aborted: z.boolean().optional(),
   error: z.boolean().optional(),

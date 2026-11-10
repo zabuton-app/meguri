@@ -100,7 +100,7 @@ describe("runScan", () => {
 
     const stats = await scan();
 
-    expect(stats).toMatchObject({ inserted: 2 });
+    expect(stats).toMatchObject({ inserted: 2, skipped: 0 });
     for (const r of rows()) {
       expect(r).toMatchObject({
         deleted_at: null,
@@ -288,6 +288,20 @@ describe("runScan", () => {
   });
 
   it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "counts a file whose content cannot be read as skipped",
+    async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      write("b.mp4", "BBBBBBBBBB");
+      await fsp.chmod(path.join(root, "b.mp4"), 0o000);
+
+      const stats = await scan();
+
+      expect(stats).toMatchObject({ inserted: 1, skipped: 1 });
+      expect(events.at(-1)).toMatchObject({ type: "done", stats });
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     "keeps the rows under a folder it cannot read out of deletion and thumbnails",
     async () => {
       write("open/a.mp4", "AAAAAAAAAA");
@@ -299,7 +313,8 @@ describe("runScan", () => {
       ).run(path.join("locked", "b.mp4"));
       await fsp.chmod(path.join(root, "locked"), 0o000);
       try {
-        await scan();
+        // Counted, so the user can be told (#314).
+        expect(await scan()).toMatchObject({ skipped: 1 });
         const b = rows().find(
           (r) => r.rel_path === path.join("locked", "b.mp4"),
         )!;
