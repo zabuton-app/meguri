@@ -384,6 +384,15 @@ When the player repackages a container such as MKV, it converts Dolby Digital
 (AC-3) or Dolby Digital Plus (E-AC-3) audio to AAC for playback. The preview
 keeps the original picture and the surround channel count.
 
+### Embedded subtitles
+
+Use **Subtitle track** in the clip player or fullscreen to choose an embedded
+text track or turn captions off. Meguri remembers the choice per clip. When the
+audio language is known, **Match audio language** can choose the corresponding
+subtitle. Meguri loads text near the playhead as you watch or seek.
+
+Supported tracks include SRT, ASS/SSA as plain text, WebVTT, and MP4 timed text.
+
 ## Custom CSS
 
 Meguri's look can be changed with plain CSS in two ways, and both can be used

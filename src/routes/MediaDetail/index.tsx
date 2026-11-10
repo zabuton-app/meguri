@@ -12,6 +12,8 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyTagFilter, showFolderInLibrary } from "@/lib/ui-events";
 import { fileNameOf, folderPathOf } from "@/lib/relPath";
+import { subtitlePreferenceKey } from "@/lib/subtitlePreference";
+import { readEmbeddedTracks } from "@shared/embeddedSubtitles";
 import { isNormalizedFolderPath } from "@shared/folderPath";
 import { api, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
@@ -326,6 +328,7 @@ export default function MediaDetail() {
     );
   }
 
+  const audioTracks = readEmbeddedTracks(d.meta, "audio");
   const total = d.duration && d.duration > 0 ? d.duration : (nativeDur ?? null);
   const slash = d.relPath.lastIndexOf("/");
   const basename = slash >= 0 ? d.relPath.slice(slash + 1) : d.relPath;
@@ -373,6 +376,13 @@ export default function MediaDetail() {
                 ref={playerRef}
                 id={fileId}
                 src={mediaSrc}
+                subtitleTracks={readEmbeddedTracks(d.meta, "subtitle")}
+                subtitleAudioLanguage={
+                  d.codec === "prores" || audioTracks.length === 1
+                    ? audioTracks[0]?.language
+                    : undefined
+                }
+                subtitleKey={subtitlePreferenceKey(wsId, d.relPath)}
                 duration={d.duration}
                 width={d.width}
                 height={d.height}
