@@ -87,10 +87,14 @@ describe("useHoverFramePreview", () => {
     const { result } = renderPreview();
     act(() => result.current.onMouseEnter(mouseEvt(50)));
     expect(result.current.scrubFraction).toBe(0.5);
-    act(() => vi.advanceTimersByTime(299));
+    act(() => {
+      vi.advanceTimersByTime(299);
+    });
     expect(MockImage.instances).toHaveLength(0);
 
-    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     expect(MockImage.instances).toHaveLength(1);
     expect(MockImage.instances[0].src).toBe(frameUrl(1800));
     act(() => MockImage.instances[0].onload?.());
@@ -100,7 +104,9 @@ describe("useHoverFramePreview", () => {
   it("tracks pointer moves, keeping a single in-flight request", () => {
     const { result } = renderPreview();
     act(() => result.current.onMouseEnter(mouseEvt(0)));
-    act(() => vi.advanceTimersByTime(300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     expect(MockImage.instances).toHaveLength(1);
     expect(MockImage.instances[0].src).toBe(frameUrl(0));
 
@@ -122,7 +128,9 @@ describe("useHoverFramePreview", () => {
   it("does not reload when the pointer stays on the same quantized time", () => {
     const { result } = renderPreview();
     act(() => result.current.onMouseEnter(mouseEvt(50)));
-    act(() => vi.advanceTimersByTime(300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     act(() => MockImage.instances[0].onload?.());
     expect(MockImage.instances).toHaveLength(1);
 
@@ -134,7 +142,9 @@ describe("useHoverFramePreview", () => {
   it("resets on mouse leave and stops all timers", () => {
     const { result } = renderPreview();
     act(() => result.current.onMouseEnter(mouseEvt(50)));
-    act(() => vi.advanceTimersByTime(300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     act(() => MockImage.instances[0].onload?.());
     expect(result.current.previewSrc).not.toBeNull();
 
@@ -142,7 +152,9 @@ describe("useHoverFramePreview", () => {
     expect(result.current.previewSrc).toBeNull();
     expect(result.current.scrubFraction).toBeNull();
     const count = MockImage.instances.length;
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
     expect(MockImage.instances).toHaveLength(count);
   });
 
@@ -157,7 +169,9 @@ describe("useHoverFramePreview", () => {
     );
     act(() => result.current.onMouseEnter(mouseEvt(50)));
     act(() => result.current.onMouseMove(mouseEvt(60)));
-    act(() => vi.advanceTimersByTime(5000));
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(MockImage.instances).toHaveLength(0);
     expect(result.current.previewSrc).toBeNull();
   });
@@ -165,7 +179,9 @@ describe("useHoverFramePreview", () => {
   it("does nothing for unusable durations", () => {
     const { result } = renderPreview({ duration: 0 });
     act(() => result.current.onMouseEnter(mouseEvt(50)));
-    act(() => vi.advanceTimersByTime(5000));
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(MockImage.instances).toHaveLength(0);
   });
 
@@ -173,7 +189,9 @@ describe("useHoverFramePreview", () => {
     const { result } = renderPreview({ duration: 1.5 });
     act(() => result.current.onMouseEnter(mouseEvt(50)));
     act(() => result.current.onMouseMove(mouseEvt(80)));
-    act(() => vi.advanceTimersByTime(5000));
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(MockImage.instances).toHaveLength(0);
     expect(result.current.scrubFraction).toBeNull();
   });
@@ -181,21 +199,27 @@ describe("useHoverFramePreview", () => {
   it("resets when the card is reused for a different file", () => {
     const { result, rerender } = renderPreview();
     act(() => result.current.onMouseEnter(mouseEvt(50)));
-    act(() => vi.advanceTimersByTime(300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     act(() => MockImage.instances[0].onload?.());
     expect(result.current.previewSrc).not.toBeNull();
 
     const count = MockImage.instances.length;
     rerender({ fileId: 2, enabled: true });
     expect(result.current.previewSrc).toBeNull();
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
     expect(MockImage.instances).toHaveLength(count);
   });
 
   it("stops retrying after repeated load failures until the next hover", () => {
     const { result } = renderPreview();
     act(() => result.current.onMouseEnter(mouseEvt(0)));
-    act(() => vi.advanceTimersByTime(300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
 
     // 5 distinct positions each failing exhausts the failure budget.
     for (let i = 0; i < 5; i++) {

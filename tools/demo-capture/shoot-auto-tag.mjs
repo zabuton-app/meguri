@@ -53,11 +53,15 @@ NAMES.forEach((name, i) => {
   const dest = path.join(mediaRoot, name);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   execFileSync(ffmpegPath, [
-    "-loglevel", "error",
+    "-loglevel",
+    "error",
     "-y",
-    "-f", "lavfi",
-    "-i", `gradients=s=640x426:seed=${i + 1}:speed=0`,
-    "-frames:v", "1",
+    "-f",
+    "lavfi",
+    "-i",
+    `gradients=s=640x426:seed=${i + 1}:speed=0`,
+    "-frames:v",
+    "1",
     dest,
   ]);
 });

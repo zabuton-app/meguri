@@ -38,8 +38,9 @@ function renderPicker() {
 describe("EmojiPicker", () => {
   it("keeps wheel events over the picker from reaching document", () => {
     renderPicker();
-    const host = screen.getByRole("dialog").querySelector("em-emoji-picker")
-      ?.parentElement;
+    const host = screen
+      .getByRole("dialog")
+      .querySelector("em-emoji-picker")?.parentElement;
     expect(host).toBeTruthy();
 
     const onDocumentWheel = vi.fn();

@@ -88,6 +88,7 @@ try {
     await sleep(2500);
     await stage.evaluate((el, text) => {
       el.querySelector(".capture-label")?.remove();
+      // eslint-disable-next-line no-undef -- runs in the page, where document is defined
       const tag = document.createElement("div");
       tag.className = "capture-label";
       tag.textContent = text;

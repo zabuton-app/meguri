@@ -85,6 +85,8 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
     [navigate, searchParams, playbackOrder],
   );
 
+  const pendingNext = useRef(false);
+  const pendingPrev = useRef(false);
   const goPrev = useCallback(() => {
     if (prevItem) {
       goTo(prevItem);
@@ -95,8 +97,6 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
       nav.fetchPreviousPage();
     }
   }, [prevItem, goTo, index, nav]);
-  const pendingNext = useRef(false);
-  const pendingPrev = useRef(false);
   const goNext = useCallback(() => {
     if (nextItem) {
       goTo(nextItem);

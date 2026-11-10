@@ -16,8 +16,7 @@ class ResizeObserverStub {
   unobserve() {}
   disconnect() {}
 }
-globalThis.ResizeObserver =
-  ResizeObserverStub as unknown as typeof ResizeObserver;
+globalThis.ResizeObserver = ResizeObserverStub;
 
 if (typeof HTMLElement !== "undefined" && !HTMLElement.prototype.scrollTo) {
   HTMLElement.prototype.scrollTo = vi.fn();

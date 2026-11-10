@@ -84,15 +84,17 @@ export function registerShellHandlers(ctx: IpcContext): void {
 
   // The folder's path as the user knows it (the configured root, links left
   // as they are), once it is confirmed to be a real directory inside the root.
-  handle("folder_copy_path", ({ workspaceId, path }) => {
+  // clipboard.writeText returns a promise since Electron 45: awaited, so a
+  // failure reaches the renderer instead of going unhandled.
+  handle("folder_copy_path", async ({ workspaceId, path }) => {
     const c = coreById(ws, workspaceId);
     if (!folderDirInsideRoot(c.root, path)) throw new Error("folder not found");
-    clipboard.writeText(folderPathUnderRoot(c.root, path));
+    await clipboard.writeText(folderPathUnderRoot(c.root, path));
   });
 
-  handle("copy_file_path", ({ id, workspaceId }) => {
+  handle("copy_file_path", async ({ id, workspaceId }) => {
     const abs = ensureFileInsideRoot(coreById(ws, workspaceId), id);
-    clipboard.writeText(abs);
+    await clipboard.writeText(abs);
   });
 
   // Open an arbitrary external URL (e.g. the support/donation link). Only

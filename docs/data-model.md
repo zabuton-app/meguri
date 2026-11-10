@@ -268,15 +268,15 @@ of the clock counts as the stalest, never as the newest.
 
 Rows for the same `meta_key` are merged so that nothing the user set is lost:
 
-| What | Rule |
-| --- | --- |
-| `favorite` | either one set |
-| `rating`, `last_accessed_at` | the higher |
-| `thumb_offset_sec`, `resume_position` | the newer row's, unless it has none |
-| `tags` | matched on the exact `(namespace, name)` |
-| `meta_tags` | one row per `(meta_key, tag, source)` |
-| `scene_bookmarks` | one within `BOOKMARK_NEAR_EPS` of another is not added |
-| `play_history` | identical events are kept once |
+| What                                  | Rule                                                   |
+| ------------------------------------- | ------------------------------------------------------ |
+| `favorite`                            | either one set                                         |
+| `rating`, `last_accessed_at`          | the higher                                             |
+| `thumb_offset_sec`, `resume_position` | the newer row's, unless it has none                    |
+| `tags`                                | matched on the exact `(namespace, name)`               |
+| `meta_tags`                           | one row per `(meta_key, tag, source)`                  |
+| `scene_bookmarks`                     | one within `BOOKMARK_NEAR_EPS` of another is not added |
+| `play_history`                        | identical events are kept once                         |
 
 Merging the same rows again changes nothing. `FILE_META_MERGE_SET` in
 `queries/meta.ts` holds the `file_meta` rules for this merge,

@@ -36,9 +36,9 @@ describe("RatingStars", () => {
     expect(onChange).toHaveBeenCalledWith(4);
     const popped = pops();
     expect(popped.length).toBe(4);
-    expect([...popped].map((el) => (el as HTMLElement).style.animationDelay)).toEqual(
-      ["0ms", "40ms", "80ms", "120ms"],
-    );
+    expect(
+      [...popped].map((el) => (el as HTMLElement).style.animationDelay),
+    ).toEqual(["0ms", "40ms", "80ms", "120ms"]);
     expect(burst().length).toBe(1);
     // The burst sits inside the selected (4th) star's button.
     expect(stars()[3].contains(burst()[0])).toBe(true);
@@ -108,13 +108,13 @@ describe("RatingStars", () => {
 
   it("suppresses all decorative effects under prefers-reduced-motion while still changing state", () => {
     const orig = window.matchMedia;
-    window.matchMedia = ((query: string) =>
+    window.matchMedia = (query: string) =>
       ({
         matches: query.includes("prefers-reduced-motion"),
         media: query,
         addEventListener: () => {},
         removeEventListener: () => {},
-      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      }) as unknown as MediaQueryList;
     try {
       const onChange = vi.fn();
       setup(0, onChange);

@@ -8,6 +8,7 @@ import globals from "globals";
 export default tseslint.config(
   // Build artifacts and generated output are out of scope, and assembly/ is
   // AssemblyScript (compiled by scripts/build-wasm.mjs), not TypeScript.
+  // .claude/ holds local agent worktrees: whole other checkouts.
   {
     ignores: [
       "out/**",
@@ -15,6 +16,7 @@ export default tseslint.config(
       "dist/**",
       "node_modules/**",
       "assembly/**",
+      ".claude/**",
     ],
   },
 
@@ -57,6 +59,17 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+    },
+  },
+
+  // Tests: vi.mock factories forward to vi.fn mocks, whose results are `any`,
+  // and `await act(async () => ...)` is how React flushes an update even when
+  // the callback itself awaits nothing.
+  {
+    files: ["**/__tests__/**/*.{ts,tsx}", "**/*.test.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/require-await": "off",
     },
   },
 

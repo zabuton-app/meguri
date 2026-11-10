@@ -37,9 +37,7 @@ export async function copyImageToClipboard(src: string): Promise<void> {
   if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
   const blob = await res.blob();
   const png = blob.type === "image/png" ? blob : await toPngBlob(blob);
-  await navigator.clipboard.write([
-    new ClipboardItem({ "image/png": png }),
-  ]);
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
 }
 
 async function toPngBlob(blob: Blob): Promise<Blob> {
