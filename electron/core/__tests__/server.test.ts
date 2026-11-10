@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFileSync, type SpawnOptions } from "node:child_process";
 import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
 import { extractMeta } from "../media.js";
+import { supportsToneMapping } from "../proResPreview.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -666,5 +667,96 @@ describe("media remux (ffmpeg path)", () => {
       expect(rb.body.equals(ra.body)).toBe(true);
     },
     15_000,
+  );
+});
+
+describe("ProRes previews", () => {
+  it.each([
+    ["PQ", "smpte2084", "bt2020", "bt2020nc"],
+    ["HLG", "arib-std-b67", "bt2020", "bt2020nc"],
+    ["SDR", "bt709", "bt709", "bt709"],
+    ["wide-gamut SDR", "bt2020-10", "bt2020", "bt2020nc"],
+    ["untagged", "unknown", "unknown", "unknown"],
+  ])(
+    "serves %s footage with the appropriate color tags",
+    async (name, transfer, primaries, matrix) => {
+      const filename = `preview-${name}.mov`;
+      const clip = path.join(root, filename);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=12:duration=1",
+        "-c:v",
+        "prores_ks",
+        "-profile:v",
+        "standard",
+        "-pix_fmt",
+        "yuv422p10le",
+        "-color_trc",
+        transfer,
+        "-color_primaries",
+        primaries,
+        "-colorspace",
+        matrix,
+        "-movflags",
+        "+write_colr",
+        clip,
+      ]);
+      const original = fs.readFileSync(clip);
+      const meta = await extractMeta(clip, "video");
+      expect(meta.codec).toBe("prores");
+      const id = insert(filename, clip, null, "done", "video", "mov");
+      db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+        meta.codec,
+        JSON.stringify(meta.raw),
+        id,
+      );
+
+      const res = await fetch(
+        `${base}/ws/${WS}/media/${id}?t=0.25`,
+        authHeaders(),
+      );
+      expect(res.status).toBe(200);
+      const bytes = Buffer.from(await res.arrayBuffer());
+      const { streams } = JSON.parse(
+        execFileSync(
+          FFPROBE,
+          [
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_streams",
+            "-of",
+            "json",
+            "pipe:0",
+          ],
+          { input: bytes, encoding: "utf8" },
+        ),
+      ) as {
+        streams: {
+          codec_name: string;
+          color_transfer?: string;
+          color_primaries?: string;
+          color_space?: string;
+        }[];
+      };
+      expect(streams[0].codec_name).toBe("h264");
+      const toneMapped =
+        (name === "PQ" || name === "HLG") && (await supportsToneMapping());
+      expect(streams[0].color_transfer ?? "unknown").toBe(
+        toneMapped ? "bt709" : transfer,
+      );
+      expect(streams[0].color_primaries ?? "unknown").toBe(
+        toneMapped ? "bt709" : primaries,
+      );
+      expect(streams[0].color_space ?? "unknown").toBe(
+        toneMapped ? "bt709" : matrix,
+      );
+      expect(fs.readFileSync(clip)).toEqual(original);
+    },
   );
 });

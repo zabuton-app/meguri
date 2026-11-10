@@ -23,6 +23,11 @@ import { isInsideRoot } from "./paths.js";
 import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
 import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
+import {
+  isTaggedHdr,
+  proResPreviewFilter,
+  supportsToneMapping,
+} from "./proResPreview.js";
 import { scopedLog } from "./logger.js";
 import { extractMeta } from "./media.js";
 
@@ -321,8 +326,12 @@ async function handle(
         : hasDolbyDigitalAudio(await remuxMetadata(core, id, abs, res))
           ? "aac"
           : "copy";
+      const toneMap =
+        proResPreview &&
+        isTaggedHdr(file.proResMeta) &&
+        (await supportsToneMapping());
       if (!res.destroyed && !res.writableEnded)
-        serveRemux(res, abs, start, mode);
+        serveRemux(res, abs, start, toneMap ? "prores-hdr" : mode);
       return;
     }
     // Chromium-unsupported image formats (heic/heif/tiff) are transcoded to JPEG.
@@ -451,7 +460,7 @@ type RemuxSession = {
 
 const remuxInflight = new Map<string, RemuxSession>();
 
-type RemuxMode = "copy" | "aac" | "prores";
+type RemuxMode = "copy" | "aac" | "prores" | "prores-hdr";
 
 function remuxKey(file: string, start: number | null, mode: RemuxMode): string {
   return `${file}\0${start ?? ""}\0${mode}`;
@@ -581,7 +590,7 @@ function startRemuxSession(
   releaseSlot: () => void,
   mode: RemuxMode,
 ) {
-  const proResPreview = mode === "prores";
+  const proResPreview = mode === "prores" || mode === "prores-hdr";
   const args = ["-v", "error"];
   if (proResPreview)
     args.push(
@@ -601,7 +610,7 @@ function startRemuxSession(
       "-write_tmcd",
       "0",
       "-vf",
-      "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+      proResPreviewFilter(mode === "prores-hdr"),
       "-c:v",
       "libx264",
       "-preset",
@@ -787,7 +796,9 @@ function serveRemux(
 
   void (async () => {
     const releaseSlot = await acquireForResponse(
-      mode === "prores" ? proResPreviewSlots : remuxSlots,
+      mode === "prores" || mode === "prores-hdr"
+        ? proResPreviewSlots
+        : remuxSlots,
       res,
     );
     if (!releaseSlot) return;
