@@ -315,10 +315,21 @@ function writeBackup(db: DB, backupPath: string): unknown {
  * transaction.
  */
 function mergeIntoLibrary(db: DB, from: "main" | "kept" = "main"): void {
+  // `main` always has a `note` column (backfillColumns adds it), but `kept` is
+  // a workspace copy that may have been written by a version before notes,
+  // and nothing adds columns to it. `from` is one of the two literals above,
+  // never caller input.
+  const note = (
+    db.prepare(`PRAGMA ${from}.table_info(file_meta)`).all() as {
+      name: string;
+    }[]
+  ).some((c) => c.name === "note")
+    ? ", note"
+    : "";
   db.exec(`
     INSERT INTO lib.file_meta
-      (meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at)
-    SELECT meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at
+      (meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at${note})
+    SELECT meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at${note}
     FROM ${from}.file_meta WHERE true
     ON CONFLICT (meta_key) DO UPDATE SET ${FILE_META_MERGE_SET};
   `);

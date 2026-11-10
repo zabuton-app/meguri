@@ -63,6 +63,9 @@ export function registerFileHandlers(ctx: IpcContext): void {
   handle("file_set_favorite", ({ id, workspaceId, favorite }) =>
     q.setFavorite(coreById(ws, workspaceId).db, id, favorite),
   );
+  handle("file_set_note", ({ id, workspaceId, note }) =>
+    q.setNote(coreById(ws, workspaceId).db, id, note),
+  );
   // Favorite / rating over a whole selection. One transaction per database; the
   // Cores are resolved before the first write, so an unknown workspace id fails
   // the call rather than leaving the earlier workspaces already changed.

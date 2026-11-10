@@ -155,7 +155,11 @@ under that hash; the two are merged by the rules below.
 
 `file_meta` holds `favorite`, `rating` (0–5), `last_accessed_at`, and
 `thumb_offset_sec` (the user-chosen thumbnail frame offset, `NULL` meaning the
-auto-extracted representative frame).
+auto-extracted representative frame), `resume_position`, and `note` (the
+user's free-form note as Markdown, `NULL` when there is none). A note that is
+only whitespace is stored as `NULL`. The IPC boundary caps a note at
+`NOTE_MAX_MARKDOWN` characters of Markdown, and the editor stops input at
+`NOTE_MAX_CHARS` characters of text (`shared/note.ts`).
 
 ## Derived tables
 
@@ -247,6 +251,7 @@ Rows for the same `meta_key` are merged so that nothing the user set is lost:
 | `favorite` | either one set |
 | `rating`, `last_accessed_at` | the higher |
 | `thumb_offset_sec`, `resume_position` | the newer row's, unless it has none |
+| `note` | both, held one first, joined by a `---` line; one that is already a whole part of the other is not added |
 | `tags` | matched on the exact `(namespace, name)` |
 | `meta_tags` | one row per `(meta_key, tag, source)` |
 | `scene_bookmarks` | one within `BOOKMARK_NEAR_EPS` of another is not added |

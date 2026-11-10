@@ -6,6 +6,7 @@ import { BOOKMARK_NEAR_EPS } from "./bookmarks.js";
 import { metaKeyOf } from "../tags.js";
 import type { ExtractedMeta } from "../media.js";
 import { resumePointOf } from "../../../shared/resume.js";
+import { normalizeNote } from "../../../shared/note.js";
 
 /**
  * Insert-or-update the file_meta row for a file, applying `mutate` to the column being set.
@@ -16,8 +17,9 @@ import { resumePointOf } from "../../../shared/resume.js";
 function upsertMeta(
   db: DB,
   fileId: number,
-  column: "rating" | "favorite" | "last_accessed_at" | "thumb_offset_sec",
-  value: number | null,
+  column:
+    "rating" | "favorite" | "last_accessed_at" | "thumb_offset_sec" | "note",
+  value: number | string | null,
 ): void {
   const metaKey = metaKeyOf(db, fileId);
   if (!metaKey) return;
@@ -33,6 +35,23 @@ export function setRating(db: DB, fileId: number, rating: number): void {
 
 export function setFavorite(db: DB, fileId: number, favorite: boolean): void {
   upsertMeta(db, fileId, "favorite", favorite ? 1 : 0);
+}
+
+/**
+ * Replace a file's note (Markdown). Text that is only whitespace counts as no
+ * note and is stored as NULL; removing a note creates no row for it.
+ */
+export function setNote(db: DB, fileId: number, note: string | null): void {
+  const value = normalizeNote(note);
+  if (value != null) {
+    upsertMeta(db, fileId, "note", value);
+    return;
+  }
+  const metaKey = metaKeyOf(db, fileId);
+  if (!metaKey) return;
+  db.prepare(
+    "UPDATE file_meta SET note = NULL, updated_at = ? WHERE meta_key = ? AND note IS NOT NULL",
+  ).run(nowUnix(), metaKey);
 }
 
 /** Durable per-file fields a bulk edit can set. Omitted fields are left alone. */
@@ -229,10 +248,23 @@ export function updateExtractedMeta(
  * `ON CONFLICT (meta_key) DO UPDATE`: favorite is OR and rating the higher one;
  * the thumbnail frame and the resume point come from whichever row was updated
  * last, unless that row has none, since updated_at also moves when only the
- * rating or favorite changed. SET expressions all read the row as it was
- * before this update, and merging the same row again changes nothing.
+ * rating or favorite changed. Notes are never dropped: two different notes
+ * are joined with a thematic break (NOTE_JOIN), the held one first. A note
+ * that is already one whole part of the other (between breaks, or all of
+ * it) is not added again; a note that merely appears inside the other's text
+ * ("OK" in "Not OK") is still added. SET expressions all read the row as it
+ * was before this update, and merging the same row again changes nothing.
  */
+const NOTE_JOIN = `char(10) || char(10) || '---' || char(10) || char(10)`;
 export const FILE_META_MERGE_SET = `
+  note = CASE
+    WHEN excluded.note IS NULL THEN note
+    WHEN note IS NULL THEN excluded.note
+    WHEN instr(${NOTE_JOIN} || note || ${NOTE_JOIN},
+               ${NOTE_JOIN} || excluded.note || ${NOTE_JOIN}) > 0 THEN note
+    WHEN instr(${NOTE_JOIN} || excluded.note || ${NOTE_JOIN},
+               ${NOTE_JOIN} || note || ${NOTE_JOIN}) > 0 THEN excluded.note
+    ELSE note || ${NOTE_JOIN} || excluded.note END,
   rating = MAX(rating, excluded.rating),
   favorite = MAX(favorite, excluded.favorite),
   last_accessed_at = MAX(
@@ -259,8 +291,8 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
   db.transaction(() => {
     db.prepare(
       `INSERT INTO file_meta
-         (meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at)
-       SELECT ?, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at
+         (meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at, note)
+       SELECT ?, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at, note
        FROM file_meta WHERE meta_key = ?
        ON CONFLICT (meta_key) DO UPDATE SET ${FILE_META_MERGE_SET}`,
     ).run(toKey, fromKey);

@@ -38,6 +38,7 @@ export const INVOKE_CHANNELS = [
   "file_get",
   "file_set_rating",
   "file_set_favorite",
+  "file_set_note",
   "file_delete_from_index",
   "file_record_play",
   "file_save_position",

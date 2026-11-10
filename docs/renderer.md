@@ -25,7 +25,8 @@ Each route is a directory: `index.tsx` is the entry point and composes the
 route, sitting alongside its companion components and hooks — for example
 `src/routes/MediaDetail/MediaModal.tsx`,
 `src/routes/MediaDetail/VideoPlayer.tsx`,
-`src/routes/MediaDetail/useDetailMutations.ts` (every write to the file), and
+`src/routes/MediaDetail/useDetailMutations.ts` (every write to the file but
+the note, which `useNoteWriter.ts` saves as the user types), and
 `src/routes/Player/usePlayerKeys.ts` (the playlist's keyboard control). Keep
 mechanics in such hooks and components; `index.tsx` should stay a composition.
 

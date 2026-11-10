@@ -162,7 +162,9 @@ CREATE TABLE IF NOT EXISTS lib.file_meta (
   -- Where playback was last stopped (seconds). NULL when there is nothing to
   -- resume: never played, played to the end, or barely begun (shared/resume.ts).
   resume_position REAL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  -- The user's free-form note, as Markdown (shared/note.ts). NULL when there is none.
+  note TEXT
 );
 CREATE INDEX IF NOT EXISTS lib.idx_file_meta_favorite ON file_meta(favorite);
 CREATE INDEX IF NOT EXISTS lib.idx_file_meta_accessed ON file_meta(last_accessed_at);
@@ -322,6 +324,12 @@ function backfillLibraryColumns(db: DB): void {
       "ALTER TABLE lib.migrated_workspaces ADD COLUMN complete INTEGER NOT NULL DEFAULT 0",
     );
   }
+  const metaCols = (
+    db.prepare("PRAGMA lib.table_info(file_meta)").all() as { name: string }[]
+  ).map((c) => c.name);
+  if (!metaCols.includes("note")) {
+    db.exec("ALTER TABLE lib.file_meta ADD COLUMN note TEXT");
+  }
 }
 
 function attachLibrary(db: DB, libraryFile: string): void {
@@ -376,6 +384,9 @@ function backfillColumns(db: DB): void {
     }
     if (!hasColumn(db, "file_meta", "resume_position")) {
       db.exec("ALTER TABLE main.file_meta ADD COLUMN resume_position REAL");
+    }
+    if (!hasColumn(db, "file_meta", "note")) {
+      db.exec("ALTER TABLE main.file_meta ADD COLUMN note TEXT");
     }
     // Drives the "In progress" filter (see appendSearchConditions).
     db.exec(
