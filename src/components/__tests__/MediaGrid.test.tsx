@@ -3,7 +3,12 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import "@/test/mockVirtualizer";
 import { MediaGrid } from "@/components/MediaGrid";
 import { HOVER_RELEASE_MS } from "@/hooks/useHoverActivation";
-import { defaultWorkspacesList, sampleFileRow, WS_ID } from "@/test/fixtures";
+import {
+  defaultWorkspacesList,
+  sampleFileRow,
+  sampleTags,
+  WS_ID,
+} from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
 /** A card mounts its hover-only controls once pointed at (useHoverActivation). */
@@ -191,6 +196,42 @@ describe("MediaGrid", () => {
       expect(after.favorite).not.toBeNull();
       expect(after.watchLater).not.toBeNull();
       expect(after.stars).toHaveLength(5);
+    });
+
+    it("keeps every control outside the card's links", () => {
+      renderOne({ ...sampleFileRow, tags: sampleTags });
+      const card = screen.getByTestId("media-card");
+      fireEvent.mouseEnter(card);
+      expect(controls().favorite).not.toBeNull();
+      expect(screen.getByRole("button", { name: "beach" })).toBeTruthy();
+      expect(
+        card.querySelectorAll("a button, a [role='button'], a input"),
+      ).toHaveLength(0);
+      // Both regions still link to the detail: the thumbnail auto-plays,
+      // the metadata opens it paused.
+      const hrefs = screen
+        .getAllByRole("link")
+        .map((a) => a.getAttribute("href"));
+      expect(hrefs).toHaveLength(2);
+      expect(hrefs[0]).not.toContain("autoplay=0");
+      expect(hrefs[1]).toContain("autoplay=0");
+    });
+
+    it("names the thumbnail link after the file and keeps the path tooltip on the name", () => {
+      renderOne({ ...sampleFileRow, duration: 0 });
+      // Both links read as the file: the thumbnail (auto-play) first.
+      const [thumbLink, nameLink] = screen.getAllByRole("link", {
+        name: "sample.mp4",
+      });
+      expect(thumbLink.getAttribute("href")).not.toContain("autoplay=0");
+      expect(nameLink.getAttribute("href")).toContain("autoplay=0");
+      // A zero duration draws no badge (not a stray "0").
+      expect(thumbLink.textContent).toBe("");
+      const tooltip = screen.getByTitle(sampleFileRow.relPath);
+      expect(tooltip.tagName).toBe("SPAN");
+      expect(
+        screen.getByTestId("media-card").querySelector("a[title]"),
+      ).toBeNull();
     });
 
     it("mounts them when focus moves into the card", () => {

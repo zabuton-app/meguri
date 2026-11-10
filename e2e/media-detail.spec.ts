@@ -97,7 +97,8 @@ test.describe("Media detail", () => {
   test("opens detail paused from metadata link", async ({ ready }) => {
     const metaLink = ready.locator('a[href*="autoplay=0"]');
     await expect(metaLink).toBeVisible();
-    // The link wraps rating buttons; click the filename text, not the star controls.
+    // Click the filename text: the star controls above the link's overlay
+    // take their own clicks.
     await metaLink.getByText(FIXTURE_FILE, { exact: true }).click();
     await expect(ready.getByRole("dialog")).toBeVisible();
     await expect(ready).toHaveURL(/autoplay=0/);
