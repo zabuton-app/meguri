@@ -357,9 +357,9 @@ To watch the app while debugging, run on the current display instead:
 npm run test:e2e
 ```
 
-CI installs Playwright browser dependencies with `npm run test:e2e:install`
-(Ubuntu/Debian only). On other distros (e.g. Arch), skip `--with-deps` if you
-already run Electron apps locally.
+The tests launch the Electron app, not Playwright's browsers, so CI installs no
+Playwright browsers. On a fresh Ubuntu/Debian machine that lacks the libraries
+Electron needs, `npm run test:e2e:install` pulls them in.
 
 ## Basic Usage
 
