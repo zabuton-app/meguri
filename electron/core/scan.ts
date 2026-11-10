@@ -143,9 +143,33 @@ function errorCode(err: unknown): string | undefined {
   return (err as NodeJS.ErrnoException | null)?.code;
 }
 
+/** The workspace's folder could not be read: an unplugged drive, a share that
+ *  is down. Told apart so the user can be told (#313). */
+export class ScanRootUnreadableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ScanRootUnreadableError";
+  }
+}
+
 /** No path in the message: the scan log may be shared. */
 function rootUnreadableError(code: string | undefined): Error {
-  return new Error(`the scan root cannot be read (${code ?? "unknown"})`);
+  return new ScanRootUnreadableError(
+    `the scan root cannot be read (${code ?? "unknown"})`,
+  );
+}
+
+/**
+ * Throws a ScanRootUnreadableError unless the root can be opened. Opening it
+ * (without listing it) answers "is it still there?" cheaply, even for a root
+ * with many entries on a network share.
+ */
+export async function assertScanRootReadable(root: string): Promise<void> {
+  try {
+    await (await fsp.opendir(root)).close();
+  } catch (err) {
+    throw rootUnreadableError(errorCode(err));
+  }
 }
 
 /**
@@ -188,15 +212,7 @@ export async function walk(
   signal?: AbortSignal,
   onUnreadablePath?: (relPath: string) => void,
 ): Promise<Discovered[]> {
-  // Opening the root (without listing it) answers "is it still there?"
-  // cheaply, even for a root with many entries on a network share.
-  const assertRootReadable = async () => {
-    try {
-      await (await fsp.opendir(root)).close();
-    } catch (err) {
-      throw rootUnreadableError(errorCode(err));
-    }
-  };
+  const assertRootReadable = () => assertScanRootReadable(root);
   const reportUnreadable = async (full: string, code: string | undefined) => {
     if (code === "ENOENT" || code === "ENOTDIR") {
       // Gone, unless the whole root went away (an unmounted drive): check now,

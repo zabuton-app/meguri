@@ -16,6 +16,7 @@ import {
   contentHash,
   kindForExt,
   looksLikeMpegTs,
+  ScanRootUnreadableError,
   syncFiles,
   unreadableMatcher,
   walk,
@@ -851,9 +852,11 @@ describe("walk", () => {
   });
 
   it("throws when the root cannot be read instead of returning nothing", async () => {
-    await expect(walk(path.join(root, "unplugged"))).rejects.toThrow(
+    const unplugged = walk(path.join(root, "unplugged"));
+    await expect(unplugged).rejects.toThrow(
       "the scan root cannot be read (ENOENT)",
     );
+    await expect(unplugged).rejects.toBeInstanceOf(ScanRootUnreadableError);
   });
 
   it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(

@@ -6,6 +6,8 @@ export function registerScanHandlers(ctx: IpcContext): void {
     ctx.scans.start({ includeExcluded, rebuild }),
   );
 
+  handle("scan_unreadable_workspaces", () => ctx.scans.unreadableWorkspaces());
+
   handle("scan_cancel", ({ wsId }) => {
     if (wsId) void ctx.scans.abort(wsId);
     else void ctx.scans.abortAll();

@@ -523,6 +523,12 @@ export const ScanDoneSchema = z.object({
   }),
   aborted: z.boolean().optional(),
   error: z.boolean().optional(),
+  /** Why the scan failed, when it is a known case: "root-unreadable" when
+   *  the workspace's folder could not be read (an unplugged drive, a share
+   *  that is down). */
+  errorReason: z.enum(["root-unreadable"]).optional(),
+  /** The workspace scanned (absent for a scan not tied to one). */
+  workspaceId: z.string().optional(),
 });
 export type ScanDone = z.infer<typeof ScanDoneSchema>;
 

@@ -323,6 +323,7 @@ export const ChannelInputs = {
     })
     .default({}),
   scan_cancel: z.object({ wsId: z.string().optional() }).default({}),
+  scan_unreadable_workspaces: z.void(),
   files_search: z.object({ query: SearchQuerySchema }),
   files_random: z.object({ query: SearchQuerySchema.optional() }).default({}),
   folders_list: z.object({
@@ -627,6 +628,8 @@ export interface ChannelOutputs {
   collection_set_membership: { changed: number };
   scan_start: string;
   scan_cancel: void;
+  /** Workspaces whose last scan could not read their folder (#313). */
+  scan_unreadable_workspaces: string[];
   files_search: SearchResult;
   files_random: FileRow[];
   folders_list: FolderListing;

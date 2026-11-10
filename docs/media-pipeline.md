@@ -27,7 +27,8 @@ inserted instead of taking over a copy's id at random; its metadata still
 follows through the shared hash.
 
 A root that cannot be read (an unplugged drive, a share that is down) fails the
-scan before the index is touched, so its files are not soft-deleted. The root is
+scan before the index is touched, so its files are not soft-deleted, and the
+user is told which workspace's folder could not be reached. The root is
 read again at the end of the walk, so one that goes away partway through fails
 the scan too, instead of its folders reading as deleted (a subfolder or file
 that turns out to be gone triggers the same check right away). A rebuild resets

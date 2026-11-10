@@ -60,7 +60,11 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
 
 - `scan:progress` — scan progress updates.
 - `thumb:done` — a thumbnail finished generating.
-- `scan:done` — a scan job completed (with stats, or an abort/error flag).
+- `scan:done` — a scan job completed (with stats, or an abort/error flag),
+  with the `workspaceId` scanned and, when its folder could not be read,
+  `errorReason: "root-unreadable"`. Since the startup scan can finish before a
+  view listens, `scan_unreadable_workspaces` returns the workspaces whose last
+  scan failed that way.
 - `workspace:changed` — the active workspace changed.
 - `update:available` — the update check found a newer release.
 - `custom-css:changed` — `custom.css` was saved or deleted (see
