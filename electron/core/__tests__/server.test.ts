@@ -421,9 +421,40 @@ describe("media remux (ffmpeg path)", () => {
       updateMeta.run(JSON.stringify(metadata.raw), id);
       const url = `${base}/ws/${WS}/media/${id}`;
 
-      for (const search of ["", "?t=0.25"]) {
+      const videoPackets = (input: Buffer) => {
+        const packets = JSON.parse(
+          execFileSync(
+            FFPROBE,
+            [
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_packets",
+              "-show_data_hash",
+              "md5",
+              "-show_entries",
+              "packet=pts_time,data_hash",
+              "-of",
+              "json",
+              "pipe:0",
+            ],
+            { input, encoding: "utf8" },
+          ),
+        ) as { packets: { pts_time: string; data_hash: string }[] };
+        return packets.packets;
+      };
+      const originalTimestamps = new Map(
+        videoPackets(original).map((packet) => [
+          packet.data_hash,
+          Number(packet.pts_time),
+        ]),
+      );
+
+      for (const search of ["", "?t=0.5"]) {
         const response = await fetch(url + search, authHeaders());
         expect(response.status).toBe(200);
+        const bytes = Buffer.from(await response.arrayBuffer());
         const result = JSON.parse(
           execFileSync(
             FFPROBE,
@@ -437,7 +468,7 @@ describe("media remux (ffmpeg path)", () => {
               "pipe:0",
             ],
             {
-              input: Buffer.from(await response.arrayBuffer()),
+              input: bytes,
               encoding: "utf8",
             },
           ),
@@ -450,6 +481,17 @@ describe("media remux (ffmpeg path)", () => {
           },
           { codec_name: "aac", channels: 6 },
         ]);
+        if (search) {
+          const firstPacket = videoPackets(bytes)[0];
+          const originalTime = originalTimestamps.get(firstPacket.data_hash);
+          expect(originalTime).toBeDefined();
+          // The preroll picture keeps its offset relative to the seek target,
+          // instead of starting at zero while the audio is already at 0.5 s.
+          expect(originalTime! - Number(firstPacket.pts_time)).toBeCloseTo(
+            0.5,
+            1,
+          );
+        }
         // A subsequent seek still works if scan metadata is not ready.
         updateMeta.run(null, id);
       }

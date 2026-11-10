@@ -623,7 +623,11 @@ function startRemuxSession(
   }
   args.push(
     "-movflags",
-    "frag_keyframe+empty_moov+default_base_moof",
+    // Delay the header until FFmpeg knows the copied video's keyframe
+    // preroll and can put it on the same timeline as re-encoded audio.
+    mode === "aac"
+      ? "frag_keyframe+delay_moov+default_base_moof"
+      : "frag_keyframe+empty_moov+default_base_moof",
     "-f",
     "mp4",
     "pipe:1",
