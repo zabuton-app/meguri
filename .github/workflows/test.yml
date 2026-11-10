@@ -13,11 +13,21 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
+# The checks run as parallel jobs, so the wall-clock time is bound by the
+# slowest one (E2E) rather than the sum of all steps. Each job runs its own
+# `npm ci`.
+#
+# All jobs pin the image: the core suite and E2E run Electron, and the Electron
+# binary dynamically links GUI libs (libnss3 / gtk / gbm / asound …) that the
+# GitHub ubuntu runner already provides via its preinstalled browsers. The
+# renderer job does not need Electron but uses the same image to keep the jobs
+# alike.
+#
+# Keep node-version the same in every job and in build.yml (see engines.node in
+# package.json).
 jobs:
-  test:
-    # Pin the image: the core suite runs Electron as Node, and the Electron binary
-    # dynamically links GUI libs (libnss3 / gtk / gbm / asound …) that the GitHub
-    # ubuntu runner already provides via its preinstalled browsers.
+  core:
+    name: Type check and core tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -36,16 +46,46 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      # Runs test:core (Electron-as-Node, better-sqlite3 against in-memory SQLite) then
-      # test:renderer (plain Node + jsdom).
-      - name: Run unit tests
-        run: npm test
+      # Electron-as-Node, better-sqlite3 against in-memory SQLite.
+      - name: Run core tests
+        run: npm run test:core
 
-      # E2E: launch the built Electron app under xvfb (headless display).
+  renderer:
+    name: Renderer tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Plain Node + jsdom.
+      - name: Run renderer tests
+        run: npm run test:renderer
+
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # E2E launches the built Electron app, not Playwright's browsers, so there is no
+      # `playwright install` step: xvfb comes with the runner image.
+      #
       # Ubuntu 24.04 restricts unprivileged user namespaces; Electron needs this sysctl.
-      - name: Install Playwright browser deps
-        run: npx playwright install --with-deps
-
       # Builds, then runs under Xvfb pinned to X11 (same as local runs).
       - name: Run E2E tests
         run: |
