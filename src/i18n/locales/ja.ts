@@ -580,6 +580,7 @@ export const ja = {
     "内容が同一（ハッシュとサイズが一致）のファイルが複数あるとここに表示されます。",
   "duplicates.loadFailed":
     "重複ファイルを読み込めませんでした。もう一度お試しください。",
+  "duplicates.retry": "もう一度読み込む",
   "duplicates.fileCount": "{count} 件",
   "duplicates.truncated":
     "グループ数が多いため上位 {max} 件のみ表示しています。",

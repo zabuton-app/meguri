@@ -558,6 +558,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "duplicates.empty": "未找到重复文件。",
   "duplicates.emptyHint": "内容相同（哈希和大小一致）的文件会显示在这里。",
   "duplicates.loadFailed": "无法加载重复文件。请重试。",
+  "duplicates.retry": "重试",
   "duplicates.fileCount": "{count} 个",
   "duplicates.truncated": "组数过多，仅显示前 {max} 组。",
   "duplicates.filter": "仅显示重复文件",

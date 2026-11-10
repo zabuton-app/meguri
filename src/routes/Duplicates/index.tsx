@@ -181,7 +181,7 @@ export default function Duplicates() {
             onClick={() => void duplicates.refetch()}
             disabled={duplicates.isFetching}
           >
-            {t("libraryMerge.retry")}
+            {t("duplicates.retry")}
           </Button>
         </div>
       ) : groups.length === 0 ? (
