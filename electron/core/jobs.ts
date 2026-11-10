@@ -129,7 +129,7 @@ export async function runScan(
     return empty;
   }
 
-  const { stats, ftsTargets } = await syncFiles(
+  const { stats, ftsTargets, unreadable } = await syncFiles(
     db,
     core.rootId,
     discovered,
@@ -137,6 +137,17 @@ export async function runScan(
       onEvent({ type: "progress", jobId, phase: "hash", done, total }),
     signal,
   );
+  if (unreadable.length > 0) {
+    // Only counts per error code: the log is meant to be attached to bug
+    // reports, and relative paths or fs error messages would expose media
+    // file names that the logger's home-path redaction does not catch.
+    const byCode: Record<string, number> = {};
+    for (const { code } of unreadable) byCode[code] = (byCode[code] ?? 0) + 1;
+    log.warn(
+      `skipped ${unreadable.length} file(s) that could not be read:`,
+      byCode,
+    );
+  }
   q.touchScanRoot(db, core.rootId);
 
   // Tag what this scan added or changed (ftsTargets is exactly that set). Ahead
