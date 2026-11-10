@@ -28,6 +28,7 @@ import { FolderRow } from "@/components/FolderRow";
 import { FileContextMenu } from "@/components/FileContextMenu";
 import { useFolderEntries } from "@/hooks/useFolderEntries";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { useFavoriteFxLive, useRatingFxLive } from "@/lib/fileFxStore";
 import { ExternalFileDragHandle } from "@/components/ExternalFileDragHandle";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import {
@@ -367,6 +368,10 @@ const MediaRow = memo(function MediaRow({
   // Values that are set stay on screen; unset toggles only show up on the row
   // under the pointer or keyboard focus. Their space stays reserved either way
   // so the columns do not shift from row to row.
+  // A rating or heart a menu just cleared stays for its settle
+  // (lib/fileFxStore).
+  const favoriteFxLive = useFavoriteFxLive(file);
+  const ratingFxLive = useRatingFxLive(file);
   const reveal = (isSet: boolean) =>
     isSet || focused
       ? undefined
@@ -476,7 +481,12 @@ const MediaRow = memo(function MediaRow({
           only the toggles themselves take the pointer. Narrow rows drop the
           rating, which the side peek beside them shows anyway. */}
       <div className="pointer-events-none relative z-10 flex shrink-0 items-center gap-3 [&>*]:pointer-events-auto">
-        <div className={cn("hidden @lg:block", reveal(file.rating > 0))}>
+        <div
+          className={cn(
+            "hidden @lg:block",
+            reveal(file.rating > 0 || ratingFxLive),
+          )}
+        >
           <RatingButton
             fileId={file.id}
             workspaceId={file.workspaceId}
@@ -484,7 +494,7 @@ const MediaRow = memo(function MediaRow({
             size={13}
           />
         </div>
-        <div className={reveal(!!file.favorite)}>
+        <div className={reveal(!!file.favorite || favoriteFxLive)}>
           <FavoriteButton
             fileId={file.id}
             workspaceId={file.workspaceId}

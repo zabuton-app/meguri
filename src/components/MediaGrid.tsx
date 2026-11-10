@@ -35,6 +35,7 @@ import { FavoriteButton } from "@/components/FavoriteButton";
 import { ExternalFileDragHandle } from "@/components/ExternalFileDragHandle";
 import { RatingButton } from "@/components/RatingButton";
 import { RatingStarsView } from "@/components/RatingStars";
+import { useFavoriteFxLive } from "@/lib/fileFxStore";
 import { useSelectionMode } from "@/components/SelectionContext";
 import { useHoverActivation } from "@/hooks/useHoverActivation";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
@@ -489,7 +490,10 @@ export const MediaCard = memo(function MediaCard({
   const pinnedWatchLater =
     !!focused || watchLater.has(file.workspaceId, file.id);
   const showCheck = hot || pinnedCheck;
-  const showFavorite = hot || file.favorite;
+  // A heart a menu just took off stays for its settle (see lib/fileFxStore).
+  const favoriteFxLive = useFavoriteFxLive(file);
+  const pinnedFavorite = !!file.favorite || favoriteFxLive;
+  const showFavorite = hot || pinnedFavorite;
   const showWatchLater = hot || pinnedWatchLater;
   return (
     <div
@@ -557,7 +561,7 @@ export const MediaCard = memo(function MediaCard({
             size={16}
             className={cn(
               "absolute right-1 top-1 z-10 rounded bg-bg/70 p-1 transition-opacity",
-              file.favorite
+              pinnedFavorite
                 ? "opacity-100"
                 : "card-control-in opacity-0 focus:opacity-100 group-hover:opacity-100",
             )}
@@ -614,7 +618,7 @@ export const MediaCard = memo(function MediaCard({
             />
           </div>
         ) : (
-          <RatingStarsView value={file.rating} size={14} />
+          <RatingStarsView value={file.rating} size={14} file={file} />
         )}
         {/* Tags shown in full via horizontal scroll. Click to reflect into the
             search query. Fixed height. Only the chips take the pointer: a
