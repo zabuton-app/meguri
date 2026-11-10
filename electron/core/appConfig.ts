@@ -9,6 +9,7 @@ import {
   AutoTagRuleSchema,
   LogoIdSchema,
   type LogoId,
+  type ConfigProblem,
 } from "../../shared/ipc/schema.js";
 import {
   MAX_AUTO_TAG_KEYWORD_TERMS,
@@ -112,38 +113,134 @@ function configPath(): string {
   return path.join(app.getPath("userData"), "config.json");
 }
 
+/**
+ * What went wrong reading config.json at startup, for the renderer to tell the
+ * user (app_status.configProblem):
+ * - "moved-aside": it could not be parsed, so it was renamed to
+ *   `config.json.corrupt-<time>` and the app started from defaults.
+ * - "unreadable": it exists but could not be read (locked, no permission), or
+ *   could not be moved aside, so the app runs on defaults and does not write
+ *   over it until the next launch.
+ */
+let configProblem: ConfigProblem | null = null;
+// Whether config.json has been read since launch. Until it has, a file that
+// cannot be read blocks writes for the session: the in-memory state (e.g. the
+// workspaces) started from defaults, and saving it would replace the real file.
+// After it has, a read that fails is a passing lock, and only that save is
+// skipped (see updateConfig).
+let loadedOnce = false;
+// The last config read or saved successfully, served while a later read fails.
+let lastGood: AppConfig | null = null;
+
+export function configLoadProblem(): ConfigProblem | null {
+  return configProblem;
+}
+
+function defaultConfig(): AppConfig {
+  return {
+    roots: [],
+    activePath: null,
+    collections: [],
+    workspaceEmojis: {},
+    update: { ...DEFAULT_UPDATE_CONFIG },
+    logo: DEFAULT_LOGO,
+    autoTag: defaultAutoTagConfig(),
+    customCss: { ...DEFAULT_CUSTOM_CSS_CONFIG },
+    cssTheme: null,
+  };
+}
+
 export function loadConfig(): AppConfig {
+  // While a read fails mid-session, readers get what was last read rather than
+  // defaults (an update check would otherwise lose its throttle, and so on).
+  return (
+    readConfig() ?? (lastGood ? structuredClone(lastGood) : defaultConfig())
+  );
+}
+
+/** The config, or null when config.json exists but could not be read now. */
+function readConfig(): AppConfig | null {
+  // Blocked for the session: keep to the defaults the app started from.
+  if (configProblem === "unreadable") return defaultConfig();
+  const file = configPath();
+  let text: string;
   try {
-    const c = JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    return {
-      roots: Array.isArray(c.roots)
-        ? c.roots.filter((x: unknown) => typeof x === "string")
-        : [],
-      activePath: typeof c.activePath === "string" ? c.activePath : null,
-      collections: parseCollections(c.collections),
-      workspaceEmojis: parseEmojiMap(c.workspaceEmojis),
-      update: parseUpdateConfig(c.update),
-      logo: parseLogo(c.logo),
-      autoTag: parseAutoTag(c.autoTag),
-      customCss: parseCustomCss(c.customCss),
-      cssTheme: parseCssTheme(c.cssTheme),
-    };
-  } catch {
-    return {
-      roots: [],
-      activePath: null,
-      collections: [],
-      workspaceEmojis: {},
-      update: { ...DEFAULT_UPDATE_CONFIG },
-      logo: DEFAULT_LOGO,
-      autoTag: defaultAutoTagConfig(),
-      customCss: { ...DEFAULT_CUSTOM_CSS_CONFIG },
-      cssTheme: null,
-    };
+    text = fs.readFileSync(file, "utf8");
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      // First launch, or moved aside: a known state, and an empty config.
+      loadedOnce = true;
+      lastGood = defaultConfig();
+      return defaultConfig();
+    }
+    if (loadedOnce) {
+      log.warn(`config.json could not be read (${code ?? "unknown"})`);
+      return null;
+    }
+    log.error(
+      `config.json could not be read (${code ?? "unknown"}); not writing over it`,
+    );
+    configProblem = "unreadable";
+    return defaultConfig();
   }
+  let c: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("not a JSON object");
+    }
+    c = parsed as Record<string, unknown>;
+  } catch {
+    // Unparsable mid-session: caught half-written by something else (a hand
+    // edit, a sync tool). The state in memory came from a good read, so treat
+    // it like a read that failed rather than as damage.
+    if (loadedOnce) {
+      log.warn("config.json could not be parsed");
+      return null;
+    }
+    // Unparsable at startup: keep it for recovery, out of the way of the saves
+    // to come. The parse error is not logged: its message quotes the file's
+    // text, and that holds folder names.
+    const aside = `${file}.corrupt-${fileTimestamp(new Date())}`;
+    try {
+      fs.renameSync(file, aside);
+      log.error(
+        `config.json could not be parsed; moved it to ${path.basename(aside)}`,
+      );
+      configProblem = "moved-aside";
+    } catch (moveErr) {
+      const code = (moveErr as NodeJS.ErrnoException).code;
+      log.error(
+        `config.json could not be parsed or moved aside (${code ?? "unknown"}); not writing over it`,
+      );
+      configProblem = "unreadable";
+    }
+    loadedOnce = true;
+    lastGood = defaultConfig();
+    return defaultConfig();
+  }
+  loadedOnce = true;
+  const config: AppConfig = {
+    roots: Array.isArray(c.roots)
+      ? c.roots.filter((x: unknown) => typeof x === "string")
+      : [],
+    activePath: typeof c.activePath === "string" ? c.activePath : null,
+    collections: parseCollections(c.collections),
+    workspaceEmojis: parseEmojiMap(c.workspaceEmojis),
+    update: parseUpdateConfig(c.update),
+    logo: parseLogo(c.logo),
+    autoTag: parseAutoTag(c.autoTag),
+    customCss: parseCustomCss(c.customCss),
+    cssTheme: parseCssTheme(c.cssTheme),
+  };
+  lastGood = structuredClone(config);
+  return config;
+}
+
+/** 2026-11-10T12:00:00.000Z → 20261110-120000, safe in a file name. */
+function fileTimestamp(d: Date): string {
+  return d.toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
 }
 
 function parseCssTheme(value: unknown): string | null {
@@ -262,6 +359,7 @@ export function cleanupStaleTemp(): void {
 }
 
 export function saveConfig(c: AppConfig): void {
+  if (configProblem === "unreadable") return; // see readConfig
   try {
     const dest = configPath();
     fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -279,6 +377,7 @@ export function saveConfig(c: AppConfig): void {
       fs.closeSync(fd);
     }
     fs.renameSync(tmp, dest);
+    lastGood = structuredClone(c); // what the file now holds
   } catch (e) {
     log.error("saveConfig failed", e);
   }
@@ -293,7 +392,14 @@ export function saveConfig(c: AppConfig): void {
  * result into `saveConfig`.
  */
 export function updateConfig(mutator: (c: AppConfig) => AppConfig): void {
-  saveConfig(mutator(loadConfig()));
+  const current = readConfig();
+  // A read that failed mid-session (a passing lock): saving the change over
+  // defaults would drop everything else, so this one change is not saved.
+  if (current === null) {
+    log.warn("a settings change was not saved: config.json could not be read");
+    return;
+  }
+  saveConfig(mutator(current));
 }
 
 /**

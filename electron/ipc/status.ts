@@ -3,6 +3,7 @@ import { handle } from "../core/ipcHandler.js";
 import log from "../core/logger.js";
 import type { WorkspaceStats } from "../core/types.js";
 import { ALL_ID } from "../core/workspaces.js";
+import { configLoadProblem } from "../core/appConfig.js";
 import type { IpcContext } from "./context.js";
 import { queryTargets } from "./helpers.js";
 
@@ -34,11 +35,13 @@ export function registerStatusHandlers(ctx: IpcContext): void {
         devMode: ctx.isDevMode(),
         libraryMerge,
         libraryRestoredFrom: ctx.libraryRestoredFrom() ?? undefined,
+        configProblem: configLoadProblem() ?? undefined,
       };
     }
     const failed = ws.mergeFailures();
     const libraryMergeFailed = failed.length > 0 ? failed : undefined;
     const libraryRestoredFrom = ctx.libraryRestoredFrom() ?? undefined;
+    const configProblem = configLoadProblem() ?? undefined;
     if (ws.isAll()) {
       return {
         root: "All",
@@ -50,6 +53,7 @@ export function registerStatusHandlers(ctx: IpcContext): void {
         devMode: ctx.isDevMode(),
         libraryMergeFailed,
         libraryRestoredFrom,
+        configProblem,
       };
     }
     const activeCollection = ws.activeCollection();
@@ -64,6 +68,7 @@ export function registerStatusHandlers(ctx: IpcContext): void {
         devMode: ctx.isDevMode(),
         libraryMergeFailed,
         libraryRestoredFrom,
+        configProblem,
       };
     }
     const core = ws.active();
@@ -77,6 +82,7 @@ export function registerStatusHandlers(ctx: IpcContext): void {
       devMode: ctx.isDevMode(),
       libraryMergeFailed,
       libraryRestoredFrom,
+      configProblem,
     };
   });
 

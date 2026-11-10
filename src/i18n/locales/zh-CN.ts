@@ -113,6 +113,14 @@ export const zhCN: Record<TranslationKey, string> = {
   "library.restored": "资料库已损坏，已从 {date} 的副本恢复",
   "library.restoredDesc":
     "此后对收藏、评分、标签等所做的更改已丢失。损坏的文件保留在资料库所在的文件夹中。",
+  "config.movedAside":
+    "设置文件（config.json）已损坏，Meguri 已使用默认设置启动",
+  "config.movedAsideDesc":
+    "已登记的工作区和收藏集保留在损坏的文件中，该文件已另存为同一文件夹中的 config.json.corrupt-<日期>。",
+  "config.unreadable":
+    "无法读取设置文件（config.json），Meguri 正以默认设置运行",
+  "config.unreadableDesc":
+    "该文件未被修改。请确认没有其他应用正在使用它，然后重新启动 Meguri。",
   "settings.about": "关于",
   "about.version": "{name} 版本 {version}",
   "about.appLicense": "{name} 基于 MIT License 发布。",
