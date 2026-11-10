@@ -25,6 +25,7 @@ import type {
   SearchResult,
   UserCollection,
   WorkspaceInfo,
+  WorkspacesList,
 } from "@/ipc/types";
 import { Button } from "@/components/ui/button";
 import { MANUAL_SORT } from "@shared/sortDir";
@@ -554,9 +555,26 @@ export default function Home() {
         // Cancel/error are explicit, user-visible outcomes: notify regardless of
         // whether the scan was started manually (mode) or automatically (startup/switch).
         // Fixed toast IDs coalesce the per-workspace done events in the "All" view
-        // into a single toast instead of one per workspace.
+        // into a single toast instead of one per workspace — except an
+        // unreadable folder, which is named, so it gets one per workspace.
         if (done.aborted) {
           toast.info(t("home.scanCanceled"), { id: "scan-canceled" });
+          return;
+        }
+        if (done.errorReason === "root-unreadable") {
+          // Named when known: in the "All" view any workspace can be the one.
+          const name = qc
+            .getQueryData<WorkspacesList>(["workspaces_list"])
+            ?.workspaces.find((w) => w.id === done.workspaceId)?.label;
+          toast.error(
+            name
+              ? t("home.scanRootUnreadableNamed", { name })
+              : t("home.scanRootUnreadable"),
+            {
+              id: `scan-root-unreadable:${done.workspaceId ?? ""}`,
+              description: t("home.scanRootUnreadableDesc"),
+            },
+          );
           return;
         }
         if (done.error) {

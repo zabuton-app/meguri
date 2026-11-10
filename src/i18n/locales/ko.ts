@@ -165,6 +165,10 @@ export const ko: Record<TranslationKey, string> = {
   "home.scanCanceled": "스캔을 취소했습니다",
   "home.escCloseHint": "Esc 키를 한 번 더 누르면 창이 닫힙니다",
   "home.scanError": "스캔 중 오류가 발생했습니다",
+  "home.scanRootUnreadable": "워크스페이스 폴더에 접근할 수 없습니다",
+  "home.scanRootUnreadableNamed": '"{name}" 폴더에 접근할 수 없습니다',
+  "home.scanRootUnreadableDesc":
+    "드라이브나 네트워크 공유가 연결되어 있는지 확인한 뒤 다시 스캔하세요. 파일 목록은 그대로 두었습니다.",
   "home.scanStartFailed": "스캔을 시작할 수 없습니다",
   "home.scanAlreadyRunning": "스캔이 이미 실행 중입니다",
 

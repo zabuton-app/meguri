@@ -173,6 +173,11 @@ export const fr: Record<TranslationKey, string> = {
   "home.scanCanceled": "Scan annulé",
   "home.escCloseHint": "Appuyez à nouveau sur Échap pour fermer la fenêtre",
   "home.scanError": "Une erreur s'est produite pendant le scan",
+  "home.scanRootUnreadable":
+    "Le dossier de l’espace de travail est inaccessible",
+  "home.scanRootUnreadableNamed": "Le dossier de « {name} » est inaccessible",
+  "home.scanRootUnreadableDesc":
+    "Vérifiez que le disque ou le partage réseau est connecté, puis relancez le scan. La liste des fichiers a été laissée telle quelle.",
   "home.scanStartFailed": "Impossible de démarrer le scan",
   "home.scanAlreadyRunning": "Un scan est déjà en cours",
 

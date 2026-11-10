@@ -56,6 +56,11 @@ const mocks = vi.hoisted(() => ({
   workspaceSwitch: vi.fn<(id: string) => Promise<unknown>>(),
 }));
 
+// The scan:done listeners Home subscribes, for a test to fire.
+const scanDone = vi.hoisted(() => ({
+  handlers: [] as ((done: unknown) => void)[],
+}));
+
 // Toasts are asserted on the call: no Toaster is mounted in these tests.
 const toasts = vi.hoisted(() => ({
   error: vi.fn(),
@@ -102,7 +107,10 @@ vi.mock("@/ipc/client", () => ({
   },
   events: {
     onThumbDone: vi.fn().mockResolvedValue(() => {}),
-    onScanDone: vi.fn().mockResolvedValue(() => {}),
+    onScanDone: (cb: (done: unknown) => void) => {
+      scanDone.handlers.push(cb);
+      return Promise.resolve(() => {});
+    },
     onScanProgress: vi.fn().mockResolvedValue(() => {}),
     onWorkspaceChanged: vi.fn().mockResolvedValue(() => {}),
   },
@@ -161,6 +169,52 @@ describe("Home + MediaDetail integration", () => {
     mocks.fileRecordPlay.mockResolvedValue(undefined);
     mocks.scanStart.mockResolvedValue(null);
     mocks.workspaceStats.mockResolvedValue({ fileCount: 1, lastScanAt: null });
+  });
+
+  describe("a workspace folder that could not be read", () => {
+    const fireUnreadable = (workspaceId: string) => {
+      for (const fire of scanDone.handlers) {
+        fire({
+          jobId: "job-1",
+          stats: {
+            inserted: 0,
+            updated: 0,
+            moved: 0,
+            deleted: 0,
+            unchanged: 0,
+          },
+          error: true,
+          errorReason: "root-unreadable",
+          workspaceId,
+        });
+      }
+    };
+    const renderReady = async () => {
+      scanDone.handlers.length = 0;
+      const { queryClient } = renderWithProviders(<AppRoutes />);
+      await waitFor(() => {
+        expect(queryClient.getQueryData(["workspaces_list"])).toBeTruthy();
+        expect(scanDone.handlers.length).toBeGreaterThan(0);
+      });
+    };
+
+    it("names the workspace", async () => {
+      await renderReady();
+      fireUnreadable(WS_ID);
+      await waitFor(() => expect(toasts.error).toHaveBeenCalled());
+      expect(String(toasts.error.mock.calls.at(-1)?.[0])).toBe(
+        'The folder of "Media" could not be reached',
+      );
+    });
+
+    it("says it without a name when the workspace is not known", async () => {
+      await renderReady();
+      fireUnreadable("ws-gone");
+      await waitFor(() => expect(toasts.error).toHaveBeenCalled());
+      expect(String(toasts.error.mock.calls.at(-1)?.[0])).toBe(
+        "The workspace folder could not be reached",
+      );
+    });
   });
 
   it("lists files on Home and opens MediaDetail from a grid link", async () => {

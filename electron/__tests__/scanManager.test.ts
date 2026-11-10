@@ -9,6 +9,7 @@ vi.mock("../core/logger.js", () => ({
 }));
 
 import { ScanManager } from "../scanManager.js";
+import { ScanRootUnreadableError } from "../core/scan.js";
 
 type Deps = ConstructorParameters<typeof ScanManager>[0];
 
@@ -142,6 +143,24 @@ describe("ScanManager", () => {
     expect(scans.start()).toBe("job-1");
     expect(runScan).toHaveBeenCalledTimes(2);
     await scans.abortAll();
+  });
+
+  it("says why a scan failed when the workspace's folder could not be read", async () => {
+    runScan.mockRejectedValue(
+      new ScanRootUnreadableError("the scan root cannot be read (ENOENT)"),
+    );
+    const deps = makeDeps();
+    const scans = new ScanManager(deps);
+    scans.start();
+    await scans.abort("a");
+    expect(deps.emit).toHaveBeenCalledWith(
+      "scan:done",
+      expect.objectContaining({
+        error: true,
+        errorReason: "root-unreadable",
+        workspaceId: "a",
+      }),
+    );
   });
 
   it("reports a failed scan as scan:done with an error flag and frees the workspace", async () => {

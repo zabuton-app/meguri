@@ -172,6 +172,11 @@ export const es: Record<TranslationKey, string> = {
   "home.scanCanceled": "Escaneo cancelado",
   "home.escCloseHint": "Pulsa Esc de nuevo para cerrar la ventana",
   "home.scanError": "Se produjo un error durante el escaneo",
+  "home.scanRootUnreadable":
+    "No se pudo acceder a la carpeta del espacio de trabajo",
+  "home.scanRootUnreadableNamed": "No se pudo acceder a la carpeta de «{name}»",
+  "home.scanRootUnreadableDesc":
+    "Comprueba que la unidad o el recurso compartido de red estén conectados y vuelve a escanear. La lista de archivos se ha dejado como estaba.",
   "home.scanStartFailed": "No se pudo iniciar el escaneo",
   "home.scanAlreadyRunning": "Ya hay un escaneo en curso",
 

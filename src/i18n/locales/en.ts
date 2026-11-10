@@ -168,6 +168,10 @@ export const en: Record<TranslationKey, string> = {
   "home.scanCanceled": "Scan canceled",
   "home.escCloseHint": "Press Esc again to close the window",
   "home.scanError": "An error occurred during the scan",
+  "home.scanRootUnreadable": "The workspace folder could not be reached",
+  "home.scanRootUnreadableNamed": 'The folder of "{name}" could not be reached',
+  "home.scanRootUnreadableDesc":
+    "Check that the drive or network share is connected, then scan again. The file list has been left as it was.",
   "home.scanStartFailed": "Could not start scan",
   "home.scanAlreadyRunning": "A scan is already in progress",
 
