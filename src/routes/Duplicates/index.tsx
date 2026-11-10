@@ -1,9 +1,11 @@
 // Duplicate file browser. /duplicates. Lists groups of files sharing the same
 // (content_hash, size) pair, scoped like history: the active workspace, or all
-// workspaces when All / a collection is active. Read-only — resolving
-// duplicates (deleting copies) is out of scope. Overlays the list as a modal.
-import { useCallback, useMemo } from "react";
-import { Link, useNavigate } from "react-router";
+// workspaces when All / a collection is active. Two panes: the group list on
+// the left, the selected group's copies compared on the right. Read-only —
+// resolving duplicates (deleting copies) is out of scope. Overlays the list
+// as a modal.
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CopyCheck, Maximize2, Minimize2, X } from "lucide-react";
 import { MAX_DUPLICATE_GROUPS } from "@shared/duplicates";
@@ -12,19 +14,29 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { HistoryModal } from "@/routes/History/HistoryModal";
-import { fileHref } from "@/lib/fileHref";
 import { formatSize } from "@/lib/format";
-import type { DuplicateGroup } from "@/ipc/types";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { useI18n } from "@/i18n/I18nProvider";
+import { GroupDetail } from "./GroupDetail";
+import { GroupList } from "./GroupList";
+import {
+  groupKey,
+  reclaimableBytes,
+  visibleGroups,
+  type DuplicateKindFilter,
+  type DuplicateSort,
+} from "./groupView";
 
 const MODAL_SIZE_KEY = "meguri.duplicates.modalSize";
 
-function wastedBytes(group: DuplicateGroup): number {
-  return group.size * (group.files.length - 1);
+function SummaryChip({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5 rounded-full bg-surface px-2.5 py-0.5 text-xs text-fg tabular-nums">
+      {children}
+    </span>
+  );
 }
 
 export default function Duplicates() {
@@ -57,21 +69,45 @@ export default function Duplicates() {
   const wsLabels = useMemo(() => {
     const map = new Map<string, string>();
     for (const w of wsList.data?.workspaces ?? []) map.set(w.id, w.label);
-    return map;
+    // The list always contains the virtual "All" entry, so > 2 means
+    // multiple real roots; with one root the label says nothing.
+    return map.size > 2 ? map : null;
   }, [wsList.data]);
-  // The list always contains the virtual "All" entry, so > 2 means multiple real roots.
-  const showWsLabel = wsLabels.size > 2;
 
   const duplicates = useQuery({
     queryKey: ["duplicates_list", wsId],
     queryFn: api.duplicatesList,
     enabled: ready,
   });
-  const groups = duplicates.data?.groups ?? [];
-  const totalWasted = useMemo(
-    () => groups.reduce((sum, g) => sum + wastedBytes(g), 0),
+  const groups = useMemo(
+    () => duplicates.data?.groups ?? [],
+    [duplicates.data],
+  );
+  const totalReclaimable = useMemo(
+    () => groups.reduce((sum, g) => sum + reclaimableBytes(g), 0),
     [groups],
   );
+  const maxReclaimable = useMemo(
+    () => groups.reduce((max, g) => Math.max(max, reclaimableBytes(g)), 0),
+    [groups],
+  );
+
+  const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<DuplicateKindFilter>("all");
+  const [sort, setSort] = useState<DuplicateSort>("reclaimable");
+  const visible = useMemo(
+    () => visibleGroups(groups, { query, kind, sort }),
+    [groups, query, kind, sort],
+  );
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // A selection the filter hid (or that is gone after a rescan) falls back to
+  // the first visible group, so the detail pane always matches the list. The
+  // fallback becomes the selection: clearing the filter later must not jump
+  // back to a group the user no longer sees as selected.
+  const selected =
+    visible.find((g) => groupKey(g) === selectedKey) ?? visible[0] ?? null;
+  const shownKey = selected ? groupKey(selected) : null;
+  if (shownKey && shownKey !== selectedKey) setSelectedKey(shownKey);
 
   const loading = ready && duplicates.isLoading;
 
@@ -81,19 +117,26 @@ export default function Duplicates() {
     : t("media.modalMinimize");
   return (
     <HistoryModal onClose={onClose} size={modalSize}>
-      <header className="flex items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
+      <header className="flex flex-wrap items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
         <CopyCheck className="size-4 text-primary" />
-        <span className="text-sm font-medium text-fg">
-          {t("duplicates.title")}
-        </span>
+        <h1 className="text-sm font-medium text-fg">{t("duplicates.title")}</h1>
         {groups.length > 0 && (
-          <span className="text-xs text-muted">
-            {t("duplicates.summary", {
-              groups: groups.length,
-              files: duplicates.data?.fileCount ?? 0,
-              size: formatSize(totalWasted, "0 B"),
-            })}
-          </span>
+          <div className="flex flex-wrap gap-1.5 sm:ml-2">
+            <SummaryChip>
+              <strong className="text-sm font-semibold text-warn">
+                {formatSize(totalReclaimable, "0 B")}
+              </strong>
+              <span className="text-muted">{t("duplicates.reclaimable")}</span>
+            </SummaryChip>
+            <SummaryChip>
+              {t("duplicates.groupCount", { count: groups.length })}
+            </SummaryChip>
+            <SummaryChip>
+              {t("duplicates.fileCount", {
+                count: duplicates.data?.fileCount ?? 0,
+              })}
+            </SummaryChip>
+          </div>
         )}
         <div className="ml-auto flex items-center gap-2">
           <Button
@@ -120,90 +163,56 @@ export default function Duplicates() {
         </div>
       </header>
 
-      {!loading && groups.length === 0 ? (
+      {loading ? (
+        <div className="flex flex-col gap-2 p-4">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : groups.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
           <CopyCheck className="size-10 opacity-50" />
           <p>{t("duplicates.empty")}</p>
           <p className="text-xs">{t("duplicates.emptyHint")}</p>
         </div>
       ) : (
-        <ScrollArea className="page-scroll min-h-0 flex-1">
-          {loading ? (
-            <div className="flex flex-col gap-2 p-4">
-              {Array.from({ length: 6 }, (_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 p-3">
-              {duplicates.data?.truncated && (
-                <p className="px-1 text-xs text-muted">
-                  {t("duplicates.truncated", { max: MAX_DUPLICATE_GROUPS })}
-                </p>
-              )}
-              {groups.map((g) => (
-                <section key={`${g.contentHash}:${g.size}`}>
-                  <h3 className="sticky top-0 z-10 flex items-baseline gap-2 bg-bg px-1 py-1.5 text-xs font-semibold text-muted">
-                    <span className="tabular-nums text-fg">
-                      {formatSize(g.size, "0 B")}
-                    </span>
-                    <span>
-                      {t("duplicates.fileCount", { count: g.files.length })}
-                    </span>
-                    <span className="font-mono font-normal opacity-60">
-                      {g.contentHash.slice(0, 8)}
-                    </span>
-                  </h3>
-                  <ul className="flex flex-col gap-1">
-                    {g.files.map((file) => (
-                      // content-visibility: a group can hold any number of
-                      // copies, and rows out of view skip style, layout and
-                      // paint. The intrinsic size stands in until a row is
-                      // laid out once: the w-24 aspect-video thumbnail plus
-                      // the link's p-1.5. Paint is contained to the row, so
-                      // the link draws its focus ring inside it.
-                      <li
-                        key={`${file.workspaceId}:${file.id}`}
-                        className="[content-visibility:auto] [contain-intrinsic-size:auto_4.125rem]"
-                      >
-                        <Link
-                          to={fileHref(file.id, file.workspaceId, {
-                            autoplay: false,
-                          })}
-                          className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                        >
-                          <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
-                            <MediaThumbnail
-                              file={file}
-                              mediaBase={mediaBase}
-                              version={0}
-                              fallbackIconSize="size-5"
-                              playOverlaySize="size-7"
-                              playIconSize="size-3.5"
-                            />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span
-                              className="block truncate text-sm text-fg"
-                              title={file.relPath}
-                            >
-                              {file.relPath}
-                            </span>
-                            {showWsLabel && wsLabels.get(file.workspaceId) && (
-                              <span className="mt-0.5 block truncate text-xs text-muted">
-                                {wsLabels.get(file.workspaceId)}
-                              </span>
-                            )}
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
+        <>
+          {duplicates.data?.truncated && (
+            <p className="border-b border-border px-4 py-1.5 text-xs text-muted">
+              {t("duplicates.truncated", { max: MAX_DUPLICATE_GROUPS })}
+            </p>
           )}
-        </ScrollArea>
+          {/* Side by side from md up; below that the panes stack, so a narrow
+              window does not squeeze the copy cards next to a fixed-width list. */}
+          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+            <GroupList
+              className={cn(
+                "max-h-[45%] shrink-0 border-b md:max-h-none md:border-r md:border-b-0",
+                isSmall ? "md:w-72" : "md:w-96",
+              )}
+              groups={visible}
+              selectedKey={shownKey}
+              onSelect={setSelectedKey}
+              maxReclaimable={maxReclaimable}
+              query={query}
+              onQueryChange={setQuery}
+              kind={kind}
+              onKindChange={setKind}
+              sort={sort}
+              onSortChange={setSort}
+              mediaBase={mediaBase}
+            />
+            {selected && (
+              <GroupDetail
+                key={groupKey(selected)}
+                className="min-w-0 flex-1"
+                group={selected}
+                mediaBase={mediaBase}
+                wsLabels={wsLabels}
+              />
+            )}
+          </div>
+        </>
       )}
     </HistoryModal>
   );
