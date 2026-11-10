@@ -116,6 +116,8 @@ export const VideoPlayer = forwardRef<
     startAt: number;
     /** Whether the video should start playing automatically (default true). */
     autoplay?: boolean;
+    /** ProRes streams can be reopened at their current position after a network interruption. */
+    isProResPreview?: boolean;
     /** Active paging chords; the player yields these keys so they don't also seek. */
     navKeys: NavBinding;
     /**
@@ -184,6 +186,7 @@ export const VideoPlayer = forwardRef<
     wsId,
     startAt,
     autoplay = true,
+    isProResPreview = false,
     navKeys,
     fullscreenTargetRef,
     bookmarks,
@@ -363,9 +366,25 @@ export const VideoPlayer = forwardRef<
     attachedRef.current = { el, adopted };
   }, []);
 
-  /** Map a MediaError to the message shown, or handle the transient cases.
-   *  Shared by the element's `error` event and adoption (an element that
-   *  failed while parked has no event left to deliver). */
+  const restartPreview = (
+    v: HTMLVideoElement,
+    nextSrc: string,
+    at: number,
+    resume: boolean,
+  ) => {
+    const next = withStreamSeek(nextSrc, at, true);
+    haveMetadataRef.current = false;
+    appliedStartRef.current = true;
+    setLoaded(false);
+    setOffset(streamOffsetOf(next));
+    setPosition(streamOffsetOf(next));
+    v.autoplay = resume;
+    v.src = next;
+    v.load();
+    if (resume) void v.play().catch(() => {});
+  };
+
+  /** Handles both a live error event and a failed element adopted during a hand-off. */
   const handleElementError = (v: HTMLVideoElement) => {
     const code = v.error?.code;
     // MEDIA_ERR_ABORTED fires on normal load interruptions (src swap /
@@ -381,6 +400,22 @@ export const VideoPlayer = forwardRef<
       networkState: v.networkState,
       code,
     });
+    if (
+      code === MEDIA_ERR_NETWORK &&
+      isProResPreview &&
+      haveMetadataRef.current &&
+      !netRetriedRef.current
+    ) {
+      netRetriedRef.current = true;
+      const source = v.getAttribute("src") ?? src;
+      const at = streamOffsetOf(source) + v.currentTime;
+      const resume = !v.paused;
+      retryTimerRef.current = window.setTimeout(() => {
+        retryTimerRef.current = null;
+        if (ref.current === v && v.error) restartPreview(v, source, at, resume);
+      }, NETWORK_RETRY_DELAY_MS);
+      return;
+    }
     // A network error right after opening is often transient (the media
     // request can be starved while frame previews hold the origin's
     // connection slots) — reload once before surfacing the error. Only
@@ -540,15 +575,16 @@ export const VideoPlayer = forwardRef<
     // Playback has been placed; a start position arriving late (see the
     // effect below `seekRef`) must not move it again.
     appliedStartRef.current = true;
+    const relative = t - streamOffsetOf(v.getAttribute("src"));
     let inSeekable = false;
     for (let i = 0; i < v.seekable.length; i++) {
-      if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) {
+      if (relative >= v.seekable.start(i) && relative <= v.seekable.end(i)) {
         inSeekable = true;
         break;
       }
     }
     if (isFinite(v.duration) && inSeekable) {
-      v.currentTime = t;
+      v.currentTime = relative;
     } else {
       // Stream: re-serve from the specified second.
       lastStreamSeekRef.current = Date.now();
@@ -618,8 +654,10 @@ export const VideoPlayer = forwardRef<
   /** Whether the element can reach `t` on its own, without re-serving. */
   const canSeekNatively = (v: HTMLVideoElement, t: number) => {
     if (!haveMetadataRef.current || !isFinite(v.duration)) return false;
+    const relative = t - streamOffsetOf(v.getAttribute("src"));
     for (let i = 0; i < v.seekable.length; i++) {
-      if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) return true;
+      if (relative >= v.seekable.start(i) && relative <= v.seekable.end(i))
+        return true;
     }
     return false;
   };
@@ -1023,7 +1061,8 @@ export const VideoPlayer = forwardRef<
           if (!v || target == null) return;
           // The run moved on while this seek was in flight; go where it points
           // now. Landing on the target ends the chain.
-          if (Math.abs(v.currentTime - target) > SEEK_SETTLED_SEC) flushSeek();
+          const reached = streamOffsetOf(v.getAttribute("src")) + v.currentTime;
+          if (Math.abs(reached - target) > SEEK_SETTLED_SEC) flushSeek();
         }}
         onError={() => {
           const v = ref.current;

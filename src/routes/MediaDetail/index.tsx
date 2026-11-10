@@ -379,6 +379,7 @@ export default function MediaDetail() {
                 wsId={wsId}
                 startAt={startAt}
                 autoplay={autoplay}
+                isProResPreview={d.codec === "prores"}
                 navKeys={navBinding}
                 fullscreenTargetRef={modalRef}
                 bookmarks={d.bookmarks}

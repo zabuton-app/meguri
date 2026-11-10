@@ -5,9 +5,16 @@
 // read it back as its position offset — one place for all three.
 
 /** `src` re-served from `sec` seconds in. */
-export function withStreamSeek(src: string, sec: number): string {
+export function withStreamSeek(
+  src: string,
+  sec: number,
+  precise = false,
+): string {
   const url = new URL(src);
-  url.searchParams.set("t", String(Math.floor(sec)));
+  url.searchParams.set(
+    "t",
+    String(precise ? Math.round(sec * 1000) / 1000 : Math.floor(sec)),
+  );
   return url.toString();
 }
 
