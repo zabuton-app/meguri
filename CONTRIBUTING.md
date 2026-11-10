@@ -5,6 +5,26 @@ and contributions of all kinds — bug reports, features, docs, translations —
 welcome. This guide explains the branch model and the workflow for sending a pull
 request.
 
+## Start with a conversation
+
+For a new feature or another larger change, please open an issue before
+sending a pull request. Share what you'd like to solve and what you have in
+mind, and let's agree on the direction together before the implementation
+starts.
+
+We would much rather shape a feature with you from the beginning than see your
+time go into work that later has to change course. A short conversation up
+front makes things smoother for both of us.
+
+You are welcome to send a pull request directly for:
+
+- Bug fixes
+- Documentation and translation updates
+- Small, self-contained improvements
+
+If you're not sure whether your change counts as larger, opening an issue is
+always welcome.
+
 ## Branching model
 
 Meguri follows a simple **GitHub Flow**:
@@ -49,6 +69,8 @@ External contributors work through a fork:
 
 A few notes:
 
+- For a new feature or another larger change, please link the issue where we
+  discussed the direction (see [Start with a conversation](#start-with-a-conversation)).
 - Keep each PR focused on a single concern; smaller PRs are easier to review.
 - Pull requests are merged with **squash merge**, so your branch can contain as
   many work-in-progress commits as you like — they will be collapsed into one.
