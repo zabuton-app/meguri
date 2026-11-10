@@ -1,6 +1,6 @@
 // Regression tests for the scan pipeline: extension classification, sampled content_hash,
 // and the incremental syncFiles lifecycle (insert / unchanged / move / update / delete).
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -11,7 +11,8 @@ import {
   deleteFromIndex,
   upsertScanRoot,
 } from "../queries.js";
-import { syncFts } from "../tags.js";
+import { addManualTag, fileTags, syncFts } from "../tags.js";
+import { AUTO_META_SOURCE } from "../autoMetaTags.js";
 import {
   contentHash,
   isMountpoint,
@@ -164,6 +165,43 @@ describe("contentHash", () => {
     expect(await contentHash(b)).toBe(ha); // content-addressed (move detection relies on this)
   });
 
+  // A handle on the real file whose reads return at most `chunk` bytes, and
+  // nothing past `eof` (a file that shrank after its size was taken).
+  const shortReads = (chunk: number, eof = Infinity) => {
+    const open = fsp.open.bind(fsp);
+    return vi.spyOn(fsp, "open").mockImplementation(async (...args) => {
+      const fd = await open(...args);
+      const read = fd.read.bind(fd) as (
+        buf: Buffer,
+        off: number,
+        len: number,
+        pos: number,
+      ) => ReturnType<typeof fd.read>;
+      return Object.assign(fd, {
+        read: (buf: Buffer, off: number, len: number, pos: number) =>
+          pos >= eof
+            ? Promise.resolve({ bytesRead: 0, buffer: buf })
+            : read(buf, off, Math.min(len, chunk, eof - pos), pos),
+      });
+    });
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  it("reads on through short reads (#263)", async () => {
+    const f = path.join(dir, "d.bin");
+    await fsp.writeFile(f, "hello world, read in pieces");
+    const whole = await contentHash(f);
+    shortReads(3);
+    expect(await contentHash(f)).toBe(whole);
+  });
+
+  it("throws with a code when the file ends early", async () => {
+    const f = path.join(dir, "e.bin");
+    await fsp.writeFile(f, "hello world");
+    shortReads(64, 5);
+    await expect(contentHash(f)).rejects.toMatchObject({ code: "ESHRUNK" });
+  });
+
   it("changes when the content changes", async () => {
     const f = path.join(dir, "c.bin");
     await fsp.writeFile(f, "one");
@@ -230,6 +268,152 @@ describe("syncFiles lifecycle", () => {
     expect(
       db.prepare("SELECT 1 FROM file_meta WHERE meta_key = ?").get(pathKey),
     ).toBeUndefined();
+  });
+
+  describe("a file whose content changed in place (#263)", () => {
+    const keyOf = (relPath: string) =>
+      (
+        db
+          .prepare("SELECT meta_key FROM files WHERE rel_path = ?")
+          .get(relPath) as { meta_key: string }
+      ).meta_key;
+    const meta = (key: string) =>
+      db
+        .prepare("SELECT favorite, rating FROM file_meta WHERE meta_key = ?")
+        .get(key);
+    const bookmarks = (key: string) =>
+      db
+        .prepare("SELECT sec FROM scene_bookmarks WHERE meta_key = ?")
+        .pluck()
+        .all(key);
+    const plays = (key: string) =>
+      db
+        .prepare(
+          "SELECT position FROM play_history WHERE meta_key = ? ORDER BY position",
+        )
+        .pluck()
+        .all(key);
+    const setMeta = (key: string, favorite: number, rating: number) =>
+      db
+        .prepare(
+          "INSERT INTO file_meta (meta_key, favorite, rating, updated_at) VALUES (?, ?, ?, 0)",
+        )
+        .run(key, favorite, rating);
+    const bookmark = (key: string, sec: number) =>
+      db
+        .prepare(
+          "INSERT INTO scene_bookmarks (meta_key, sec, created_at) VALUES (?, ?, 0)",
+        )
+        .run(key, sec);
+    const play = (key: string, position: number) =>
+      db
+        .prepare(
+          "INSERT INTO play_history (meta_key, played_at, position, via) VALUES (?, 100, ?, 'browser')",
+        )
+        .run(key, position);
+    const edit = async (file: string, content: string) => {
+      await fsp.writeFile(file, content);
+      await fsp.utimes(file, new Date(), new Date(Date.now() + 60_000));
+    };
+
+    it("copies its metadata to the new content, and moves its plays", async () => {
+      const file = path.join(root, "song.mp3");
+      await fsp.writeFile(file, "BBBBBBBBBB");
+      await rescan();
+      const row = db
+        .prepare("SELECT id FROM files WHERE rel_path = 'song.mp3'")
+        .get() as { id: number };
+      const oldKey = keyOf("song.mp3");
+      setMeta(oldKey, 1, 4);
+      addManualTag(db, row.id, "Live");
+      // A tag derived from the content, which the new content gets its own of.
+      const derived = Number(
+        db
+          .prepare("INSERT INTO tags (namespace, name) VALUES ('res', '720p')")
+          .run().lastInsertRowid,
+      );
+      db.prepare(
+        "INSERT INTO meta_tags (meta_key, tag_id, source) VALUES (?, ?, ?)",
+      ).run(oldKey, derived, AUTO_META_SOURCE);
+      bookmark(oldKey, 12);
+      play(oldKey, 30);
+
+      // Its tags edited: new content, same path.
+      await edit(file, "CCCCCCCCCCCC");
+      const res = await rescan();
+
+      expect(res.stats).toMatchObject({ updated: 1, inserted: 0 });
+      const newKey = keyOf("song.mp3");
+      expect(newKey).not.toBe(oldKey);
+      // Copied, not moved: a copy elsewhere in the library may share the old
+      // content and its metadata.
+      for (const key of [newKey, oldKey]) {
+        expect(meta(key)).toEqual({ favorite: 1, rating: 4 });
+        expect(bookmarks(key)).toEqual([12]);
+      }
+      expect(fileTags(db, row.id).map((t) => t.name)).toEqual(["Live"]);
+      expect(
+        db
+          .prepare("SELECT COUNT(*) FROM meta_tags WHERE meta_key = ?")
+          .pluck()
+          .get(oldKey),
+      ).toBe(2);
+      // A copy of the old content still listed would show them twice.
+      expect(plays(newKey)).toEqual([30]);
+      expect(plays(oldKey)).toEqual([]);
+    });
+
+    it("merges into what the library holds for the new content", async () => {
+      const file = path.join(root, "a.mp4");
+      await fsp.writeFile(file, "BBBBBBBBBB");
+      await rescan();
+      const oldKey = keyOf("a.mp4");
+      setMeta(oldKey, 0, 2);
+      bookmark(oldKey, 12);
+      play(oldKey, 30);
+      play(oldKey, 45);
+      // The new content, known to another workspace sharing the library.
+      const scratch = path.join(root, "..", `${path.basename(root)}-new`);
+      await fsp.writeFile(scratch, "CCCCCCCCCCCC");
+      const newKey = await contentHash(scratch);
+      await fsp.rm(scratch);
+      setMeta(newKey, 1, 1);
+      bookmark(newKey, 12.1);
+      play(newKey, 30);
+
+      await edit(file, "CCCCCCCCCCCC");
+      await rescan();
+
+      expect(keyOf("a.mp4")).toBe(newKey);
+      expect(meta(newKey)).toEqual({ favorite: 1, rating: 2 });
+      // A bookmark near one it holds is not added again; the same play is
+      // kept once, another position is another play.
+      expect(bookmarks(newKey)).toEqual([12.1]);
+      expect(plays(newKey)).toEqual([30, 45]);
+    });
+
+    it("leaves another file's metadata alone when its content is copied over this one", async () => {
+      const a = path.join(root, "a.mp4");
+      const b = path.join(root, "b.mp4");
+      await fsp.writeFile(a, "AAAAAAAAAA");
+      await fsp.writeFile(b, "BBBBBBBBBBBB");
+      await rescan();
+      const aKey = keyOf("a.mp4");
+      const bKey = keyOf("b.mp4");
+      setMeta(aKey, 1, 5);
+      bookmark(aKey, 12);
+      play(aKey, 30);
+
+      // cp b.mp4 a.mp4
+      await edit(a, "BBBBBBBBBBBB");
+      await rescan();
+
+      expect(keyOf("a.mp4")).toBe(bKey);
+      expect(meta(bKey)).toBeUndefined();
+      expect(bookmarks(bKey)).toEqual([]);
+      expect(plays(bKey)).toEqual([]);
+      expect(meta(aKey)).toEqual({ favorite: 1, rating: 5 });
+    });
   });
 
   it("carries metadata from the key the row derived, not from the path found now", async () => {

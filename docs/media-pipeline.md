@@ -56,9 +56,10 @@ their IDs and thumbnails, by a rebuild too (not soft-deleted, not taken over by
 move detection, and not sent to thumbnail generation).
 
 A file whose content cannot be read for hashing (permission denied, locked by
-another process, removed since the walk) is skipped for that scan instead of
-failing it: a new file is not inserted, and an existing row is left as it is
-(not updated, not soft-deleted). The next scan tries it again. One exception:
+another process, removed since the walk, shrunk while it was read) is skipped
+for that scan instead of failing it: a new file is not inserted, and an
+existing row is left as it is (not updated, not soft-deleted). The next scan
+tries it again. One exception:
 when a file was moved or renamed to a path that cannot be read, the move is not
 detected, so the row at the old path is soft-deleted; once the new path is
 readable, the next scan detects the move and revives that row with its ID and

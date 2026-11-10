@@ -153,6 +153,25 @@ When a file gains its first hash, `migrateMetaKey()` moves its metadata from
 the path key to the hash. Another workspace's copy may already hold metadata
 under that hash; the two are merged by the rules below.
 
+When the content of a file changes at the same path (its tags or cover art
+edited, a recording that grew), it gets a new hash but stays the same file to
+the user: `copyMetaKey()` copies its metadata to the new hash, merged by the
+same rules. It is copied rather than moved, since another file, in this
+workspace or another one, may still have the old content. Two parts are
+treated differently:
+
+- only the user's tags are copied; the tags derived from the content
+  (resolution, codec and so on) are derived again for the new content
+- the plays are moved, since they happened on this file, and a copy of the old
+  content still listed would show each of them twice
+
+Nothing is copied when another file in the workspace already has the new
+content (one copied over this file): the content's metadata is that file's. A
+changed file moved or renamed in the same step is not recognized, and starts
+without metadata. What stays under the old hash is merged back if the content
+returns to it (an edit undone), so a favorite or a tag removed in between comes
+back; and a tag kept only there still counts as in use for tag completion.
+
 `file_meta` holds `favorite`, `rating` (0–5), `last_accessed_at`, and
 `thumb_offset_sec` (the user-chosen thumbnail frame offset, `NULL` meaning the
 auto-extracted representative frame).
@@ -253,8 +272,8 @@ Rows for the same `meta_key` are merged so that nothing the user set is lost:
 | `play_history` | identical events are kept once |
 
 Merging the same rows again changes nothing. `FILE_META_MERGE_SET` in
-`queries/meta.ts` holds the `file_meta` rules for both this merge and
-`migrateMetaKey()`.
+`queries/meta.ts` holds the `file_meta` rules for this merge,
+`migrateMetaKey()` and `copyMetaKey()`.
 
 Since every workspace reads the same rows, an edit made in one shows in every
 workspace holding the same content. Tag rename, merge and delete, and clearing
