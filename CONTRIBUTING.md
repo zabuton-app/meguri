@@ -7,14 +7,25 @@ request.
 
 ## Start with a conversation
 
-For a new feature or another larger change, please open an issue before
-sending a pull request. Share what you'd like to solve and what you have in
-mind, and let's agree on the direction together before the implementation
-starts.
+For a new feature or another larger change, please talk with us before sending
+a pull request. Share what you'd like to solve and what you have in mind, and
+let's agree on the direction together before the implementation starts.
 
 We would much rather shape a feature with you from the beginning than see your
 time go into work that later has to change course. A short conversation up
 front makes things smoother for both of us.
+
+Where to start depends on how far along your idea is:
+
+- **An idea that is still taking shape**: start a thread in [Ideas] in
+  Discussions.
+- **A concrete proposal you'd like to implement**: open an [issue][issues].
+- **A bug report**: open an [issue][issues].
+- **A question about using or building Meguri**: ask in [Q&A] in Discussions.
+
+An idea discussed in Ideas becomes an issue once we agree on the direction;
+the issue is where the implementation is tracked and what your pull request
+links to.
 
 You are welcome to send a pull request directly for:
 
@@ -22,8 +33,11 @@ You are welcome to send a pull request directly for:
 - Documentation and translation updates
 - Small, self-contained improvements
 
-If you're not sure whether your change counts as larger, opening an issue is
-always welcome.
+If you're not sure whether your change counts as larger, starting a discussion
+or opening an issue is always welcome. Issues labelled
+[`good first issue`](https://github.com/zabuton-app/meguri/labels/good%20first%20issue)
+are a good place to start if you'd like to help but don't have a change in
+mind yet.
 
 ## Branching model
 
@@ -137,3 +151,7 @@ done by maintainers.
 
 By contributing, you agree that your contributions will be licensed under the
 [MIT License](LICENSE) that covers this project.
+
+[Ideas]: https://github.com/zabuton-app/meguri/discussions/categories/ideas
+[Q&A]: https://github.com/zabuton-app/meguri/discussions/categories/q-a
+[issues]: https://github.com/zabuton-app/meguri/issues

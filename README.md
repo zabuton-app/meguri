@@ -549,13 +549,17 @@ welcome!** 🎉
 You don't need to write code to help. Ideas, feature requests, bug reports,
 UI/UX feedback, translations, and documentation improvements are all just as
 appreciated — if Meguri could do something better for your library, please
-[open an issue](https://github.com/zabuton-app/meguri/issues) and tell us
-about it.
+tell us about it: share ideas and feedback in
+[Discussions](https://github.com/zabuton-app/meguri/discussions), and report
+bugs as [issues](https://github.com/zabuton-app/meguri/issues).
 
 ## Contributing
 
 Issues and pull requests are welcome. Before opening a larger change, please
-start with an issue so the scope and direction can be discussed first.
+start a conversation — an idea in
+[Discussions](https://github.com/zabuton-app/meguri/discussions/categories/ideas)
+or an issue — so the scope and direction can be agreed first. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 For development:
 

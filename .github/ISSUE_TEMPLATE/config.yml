@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask a question
+    url: https://github.com/zabuton-app/meguri/discussions/categories/q-a
+    about: Questions about using or building Meguri go to Q&A in Discussions.
+  - name: Share an idea
+    url: https://github.com/zabuton-app/meguri/discussions/categories/ideas
+    about: Ideas that are still taking shape can start in Ideas in Discussions.
