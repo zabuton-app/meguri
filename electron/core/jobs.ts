@@ -166,7 +166,7 @@ export async function runScan(
   // syncing. Only after the walk, so an unreachable root keeps its index.
   if (opts.rebuild) await clearIndex(core, isUnreadable);
 
-  const { stats, ftsTargets, unreadable } = await syncFiles(
+  const { stats, ftsTargets, ftsMissing, unreadable } = await syncFiles(
     db,
     core.rootId,
     discovered,
@@ -241,9 +241,9 @@ export async function runScan(
     clearAutoTagPending(db);
   }
 
-  // Sync FTS only for new/moved/updated entries (unchanged ones need no re-sync),
-  // less those auto tagging re-synced as it tagged them.
-  const ftsIds = ftsTargets.filter((id) => !tagged.has(id));
+  // Sync FTS for new/moved/updated entries and for unchanged rows that have no
+  // FTS row (see syncFiles), less those auto tagging re-synced as it tagged them.
+  const ftsIds = [...ftsTargets, ...ftsMissing].filter((id) => !tagged.has(id));
   const ftsTotal = ftsIds.length;
   let done = 0;
   for (const id of ftsIds) {

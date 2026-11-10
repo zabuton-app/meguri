@@ -347,6 +347,12 @@ export function emptyScanStats(): ScanStats {
  *      and yield between chunks. Move detection uses values in the DB, so it doesn't depend on chunk order.
  *
  * ftsTargets are the file ids that need FTS re-sync (inserted/moved/updated). unchanged ones are excluded.
+ * ftsMissing are unchanged rows that have no FTS row. A soft-deleted row loses
+ * its FTS row when the file is removed from the index, or when the index is
+ * re-synced or rebuilt meanwhile (resyncFtsForKeys / rebuildFtsAll skip deleted
+ * rows); a scan aborted before its index phase leaves new rows without one.
+ * When such a file is found unchanged, its FTS row needs rebuilding, but
+ * unlike ftsTargets it is not auto-tagged again.
  * unreadablePaths are directories and files (relative to the root) that walk()
  * could not read: their rows (a file's own row, or every row under a directory)
  * are kept as they are instead of being soft-deleted, and are not taken over by
@@ -366,6 +372,7 @@ export async function syncFiles(
   stats: ScanStats;
   needsThumb: number[];
   ftsTargets: number[];
+  ftsMissing: number[];
   unreadable: UnreadableFile[];
 }> {
   const stats: ScanStats = {
@@ -377,6 +384,7 @@ export async function syncFiles(
   };
   const needsThumb: number[] = [];
   const ftsTargets: number[] = [];
+  const ftsMissing: number[] = [];
   const unreadable: UnreadableFile[] = [];
   const excluded = new Set(
     (
@@ -426,6 +434,8 @@ export async function syncFiles(
         content_hash: string | null;
         /** The key its metadata is stored under (META_KEY_EXPR). */
         meta_key: string;
+        /** Has no files_fts row (see ftsMissing). */
+        noFts: boolean;
       }
     | undefined;
 
@@ -437,7 +447,9 @@ export async function syncFiles(
     (
       db
         .prepare(
-          "SELECT id, rel_path, meta_key, size, mtime, content_hash FROM files WHERE root_id = ?",
+          `SELECT id, rel_path, meta_key, size, mtime, content_hash,
+                  NOT EXISTS (SELECT 1 FROM files_fts WHERE rowid = files.id) AS no_fts
+             FROM files WHERE root_id = ?`,
         )
         .all(rootId) as {
         id: number;
@@ -446,6 +458,7 @@ export async function syncFiles(
         size: number;
         mtime: number;
         content_hash: string | null;
+        no_fts: number;
       }[]
     ).map((r) => [
       r.rel_path,
@@ -455,6 +468,7 @@ export async function syncFiles(
         mtime: r.mtime,
         content_hash: r.content_hash,
         meta_key: r.meta_key,
+        noFts: r.no_fts === 1,
       },
     ]),
   );
@@ -507,7 +521,8 @@ export async function syncFiles(
     signal,
   );
 
-  if (signal?.aborted) return { stats, needsThumb, ftsTargets, unreadable };
+  if (signal?.aborted)
+    return { stats, needsThumb, ftsTargets, ftsMissing, unreadable };
 
   // Rows walk() could not reach were not seen, but may well still be there.
   const isUnreadable = unreadableMatcher(unreadablePaths);
@@ -531,6 +546,7 @@ export async function syncFiles(
         if (existing.size === d.size && existing.mtime === d.mtime) {
           carryMeta(pathMetaKey(d.absPath));
           touchUnchanged.run(d.absPath, d.inode, d.btime, existing.id);
+          if (existing.noFts) ftsMissing.push(existing.id);
           stats.unchanged++;
         } else {
           const newHash = hashOf.get(i) ?? null;
@@ -620,7 +636,8 @@ export async function syncFiles(
     await yieldToLoop();
   }
 
-  if (signal?.aborted) return { stats, needsThumb, ftsTargets, unreadable };
+  if (signal?.aborted)
+    return { stats, needsThumb, ftsTargets, ftsMissing, unreadable };
 
   // Soft-delete existing rows not seen this time (in a single transaction at the end).
   const softDelete = db.transaction(() => {
@@ -639,5 +656,5 @@ export async function syncFiles(
   });
   softDelete();
 
-  return { stats, needsThumb, ftsTargets, unreadable };
+  return { stats, needsThumb, ftsTargets, ftsMissing, unreadable };
 }

@@ -277,6 +277,14 @@ files — a tag rename, a merge, the derived-tag backfill — use
 `resyncFtsForKeys()` in `db.ts` instead, which re-indexes a whole set of
 `meta_key`s in one pair of statements.
 
+A soft-deleted file has no `files_fts` row once it is removed from the index, or
+once the index is re-synced or rebuilt while it is gone (both skip deleted
+rows); a scan aborted before its index phase leaves new rows without one too.
+When a scan finds such a file unchanged (brought back by "rescan including
+excluded", or a folder that is back), `syncFiles()` reports it in `ftsMissing`,
+and `runScan()` re-syncs its row along with the new, moved and changed files;
+those files are not auto-tagged again.
+
 `tags_text` holds the **user's own** tag names, joined by spaces and
 deduplicated across sources. Three places produce it — `syncFts()`,
 `resyncFtsForKeys()` and the trigram rebuild — and they must never drift, so the
