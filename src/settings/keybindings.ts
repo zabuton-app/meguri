@@ -133,6 +133,12 @@ export const HELP_KEY: KeyPress = { code: "Slash", shift: true };
  * for layouts/IMEs where `key` may not surface "?" and stays strict about
  * modifiers so it never fires alongside a real shortcut.
  */
+/** The menu key, or Shift+F10: the keyboard's way to ask for a context menu. */
+export function isContextMenuKey(e: KeyboardEvent): boolean {
+  if (e.key === "ContextMenu") return true;
+  return e.key === "F10" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey;
+}
+
 export function isHelpKey(e: KeyboardEvent): boolean {
   if (e.key === "?") {
     if (e.metaKey) return false;

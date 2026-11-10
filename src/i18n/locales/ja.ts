@@ -232,6 +232,10 @@ export const ja = {
   // メディア詳細（MediaDetail）
   "media.notFound": "ファイルが見つかりません。",
   "media.openExternal": "外部で開く",
+  "media.openExternalFailed": "外部で開けませんでした",
+  "fileMenu.open": "開く",
+  "fileMenu.inspect": "詳細を開く（再生しない）",
+  "fileMenu.some": "一部",
   "media.openFolder": "フォルダを開く",
   "media.copyFilePath": "ファイルパスをコピー",
   "media.filePathCopied": "ファイルパスをコピーしました",
@@ -266,6 +270,7 @@ export const ja = {
   "shortcuts.openFocused": "選択中の項目を開く",
   "shortcuts.inspectFocused": "選択中の項目の詳細を開く（再生しない）",
   "shortcuts.watchLater": "後で見るを切り替え",
+  "shortcuts.fileMenu": "ファイルのメニューを開く",
   "shortcuts.selectAll": "表示中をすべて選択",
   "shortcuts.bulkTags": "選択したメディアのタグを編集",
   "shortcuts.help": "このヘルプ",

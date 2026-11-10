@@ -10,6 +10,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaCard, useCardGridMetrics } from "@/components/MediaGrid";
+import { FileContextMenu } from "@/components/FileContextMenu";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -435,84 +436,88 @@ export const TimelineView = memo(function TimelineView({
   return (
     <div className="flex h-full min-h-0" data-slot="timeline">
       <div className="relative min-w-0 flex-1">
-        <ScrollArea className="page-scroll h-full" viewportRef={setScrollRef}>
-          <div
-            style={{
-              height: virtualizer.getTotalSize(),
-              position: "relative",
-              width: "100%",
-            }}
-          >
-            {virtualRows.map((vr) => {
-              const row = rowAt(layout, vr.index);
-              if (!row) return null;
-              if (row.kind === "header") {
+        <FileContextMenu items={items} mediaBase={mediaBase} active={navActive}>
+          <ScrollArea className="page-scroll h-full" viewportRef={setScrollRef}>
+            <div
+              style={{
+                height: virtualizer.getTotalSize(),
+                position: "relative",
+                width: "100%",
+              }}
+            >
+              {virtualRows.map((vr) => {
+                const row = rowAt(layout, vr.index);
+                if (!row) return null;
+                if (row.kind === "header") {
+                  return (
+                    <div
+                      key={vr.key}
+                      className="absolute left-0 top-0 w-full"
+                      style={{ transform: `translateY(${vr.start}px)` }}
+                    >
+                      <SectionHeader
+                        label={sectionLabel(row.section)}
+                        count={t("timeline.count", {
+                          count: row.section.count,
+                        })}
+                      />
+                    </div>
+                  );
+                }
+                const cells = Array.from(
+                  { length: row.length },
+                  (_, i) => row.first + i,
+                );
+                // Only a row holding a card is measured: a row of placeholders
+                // has no thumbnail to read the height from.
+                const loaded = cells.some((i) => fileAt(i));
                 return (
                   <div
                     key={vr.key}
+                    ref={loaded ? measureRow : undefined}
                     className="absolute left-0 top-0 w-full"
                     style={{ transform: `translateY(${vr.start}px)` }}
                   >
-                    <SectionHeader
-                      label={sectionLabel(row.section)}
-                      count={t("timeline.count", { count: row.section.count })}
-                    />
-                  </div>
-                );
-              }
-              const cells = Array.from(
-                { length: row.length },
-                (_, i) => row.first + i,
-              );
-              // Only a row holding a card is measured: a row of placeholders
-              // has no thumbnail to read the height from.
-              const loaded = cells.some((i) => fileAt(i));
-              return (
-                <div
-                  key={vr.key}
-                  ref={loaded ? measureRow : undefined}
-                  className="absolute left-0 top-0 w-full"
-                  style={{ transform: `translateY(${vr.start}px)` }}
-                >
-                  <div
-                    className="grid gap-3 px-4 pb-3"
-                    style={{
-                      gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                    }}
-                  >
-                    {cells.map((index) => {
-                      const file = fileAt(index);
-                      if (!file)
+                    <div
+                      className="grid gap-3 px-4 pb-3"
+                      style={{
+                        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                      }}
+                    >
+                      {cells.map((index) => {
+                        const file = fileAt(index);
+                        if (!file)
+                          return (
+                            <Skeleton
+                              key={`pending:${index}`}
+                              data-testid="timeline-pending"
+                              style={{ height: rowEstimate - ROW_GAP }}
+                            />
+                          );
+                        const focused = index === focusedIndex;
                         return (
-                          <Skeleton
-                            key={`pending:${index}`}
-                            data-testid="timeline-pending"
-                            style={{ height: rowEstimate - ROW_GAP }}
+                          <MediaCard
+                            key={`${file.workspaceId}:${file.id}`}
+                            file={file}
+                            index={index - listOffset}
+                            mediaBase={mediaBase}
+                            onTagClick={onTagClick}
+                            focused={focused}
+                            watchLater={watchLaterMembership}
+                            watchLaterRef={
+                              focused ? focusedWatchLaterRef : undefined
+                            }
+                            fileDraggable
                           />
                         );
-                      const focused = index === focusedIndex;
-                      return (
-                        <MediaCard
-                          key={`${file.workspaceId}:${file.id}`}
-                          file={file}
-                          index={index - listOffset}
-                          mediaBase={mediaBase}
-                          onTagClick={onTagClick}
-                          focused={focused}
-                          watchLater={watchLaterMembership}
-                          watchLaterRef={
-                            focused ? focusedWatchLaterRef : undefined
-                          }
-                          fileDraggable
-                        />
-                      );
-                    })}
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </FileContextMenu>
         {/* The header of the section at the top, over the rows scrolling
             under it. Rows are placed by transform, where `position: sticky`
             has nothing to hold on to, so it is drawn once here instead. */}

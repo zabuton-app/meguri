@@ -25,6 +25,7 @@ import { useSelectableClick } from "@/hooks/useSelectableClick";
 import { useFileDrag } from "@/hooks/useFileDrag";
 import type { FileRow, FolderEntry } from "@/ipc/types";
 import { FolderRow } from "@/components/FolderRow";
+import { FileContextMenu } from "@/components/FileContextMenu";
 import { useFolderEntries } from "@/hooks/useFolderEntries";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { ExternalFileDragHandle } from "@/components/ExternalFileDragHandle";
@@ -251,63 +252,65 @@ export const MediaList = memo(function MediaList({
 
   return (
     <MediaReorderProvider items={items} reorder={reorder}>
-      <ScrollArea
-        className="page-scroll h-full"
-        viewportClassName="pt-4"
-        viewportRef={setScrollRef}
-      >
-        <div
-          style={{
-            height: virtualizer.getTotalSize(),
-            position: "relative",
-            width: "100%",
-          }}
+      <FileContextMenu items={items} mediaBase={mediaBase} active={navActive}>
+        <ScrollArea
+          className="page-scroll h-full"
+          viewportClassName="pt-4"
+          viewportRef={setScrollRef}
         >
-          {virtualRows.map((vr) => (
-            <div
-              key={vr.key}
-              ref={measureRow}
-              className="absolute left-0 top-0 w-full px-3 pb-0.5"
-              style={{ transform: `translateY(${vr.start}px)` }}
-            >
-              {(() => {
-                const entry = entries[vr.index];
-                const focused = vr.index === focusedIndex;
-                if (entry.kind === "folder") {
-                  return (
-                    <FolderRow
-                      entry={entry.folder}
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              position: "relative",
+              width: "100%",
+            }}
+          >
+            {virtualRows.map((vr) => (
+              <div
+                key={vr.key}
+                ref={measureRow}
+                className="absolute left-0 top-0 w-full px-3 pb-0.5"
+                style={{ transform: `translateY(${vr.start}px)` }}
+              >
+                {(() => {
+                  const entry = entries[vr.index];
+                  const focused = vr.index === focusedIndex;
+                  if (entry.kind === "folder") {
+                    return (
+                      <FolderRow
+                        entry={entry.folder}
+                        mediaBase={mediaBase}
+                        thumbWidth={thumbWidth}
+                        focused={focused}
+                        onOpen={onOpenFolder ?? noop}
+                      />
+                    );
+                  }
+                  const file = entry.file;
+                  const row = (
+                    <MediaRow
+                      file={file}
+                      index={entry.fileIndex}
                       mediaBase={mediaBase}
                       thumbWidth={thumbWidth}
+                      onTagClick={onTagClick}
                       focused={focused}
-                      onOpen={onOpenFolder ?? noop}
+                      watchLater={watchLaterMembership}
+                      watchLaterRef={focused ? focusedWatchLaterRef : undefined}
+                      fileDraggable={!reorder}
                     />
                   );
-                }
-                const file = entry.file;
-                const row = (
-                  <MediaRow
-                    file={file}
-                    index={entry.fileIndex}
-                    mediaBase={mediaBase}
-                    thumbWidth={thumbWidth}
-                    onTagClick={onTagClick}
-                    focused={focused}
-                    watchLater={watchLaterMembership}
-                    watchLaterRef={focused ? focusedWatchLaterRef : undefined}
-                    fileDraggable={!reorder}
-                  />
-                );
-                return reorder ? (
-                  <SortableMedia id={mediaSortId(file)}>{row}</SortableMedia>
-                ) : (
-                  row
-                );
-              })()}
-            </div>
-          ))}
-        </div>
-      </ScrollArea>
+                  return reorder ? (
+                    <SortableMedia id={mediaSortId(file)}>{row}</SortableMedia>
+                  ) : (
+                    row
+                  );
+                })()}
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </FileContextMenu>
     </MediaReorderProvider>
   );
 });
@@ -372,6 +375,7 @@ const MediaRow = memo(function MediaRow({
     <div
       {...dragProps}
       data-slot="media-row"
+      data-file-key={mediaSortId(file)}
       aria-current={focused ? "true" : undefined}
       className={cn(
         "group @container relative flex items-center gap-4 rounded-lg p-2 pr-4 transition-colors hover:bg-overlay/50",

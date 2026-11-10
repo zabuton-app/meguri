@@ -230,6 +230,10 @@ export const ko: Record<TranslationKey, string> = {
   // media detail
   "media.notFound": "파일을 찾을 수 없습니다.",
   "media.openExternal": "외부에서 열기",
+  "media.openExternalFailed": "외부 앱에서 열 수 없습니다",
+  "fileMenu.open": "열기",
+  "fileMenu.inspect": "재생하지 않고 상세 열기",
+  "fileMenu.some": "일부",
   "media.openFolder": "폴더 열기",
   "media.copyFilePath": "파일 경로 복사",
   "media.filePathCopied": "파일 경로를 복사했습니다",
@@ -264,6 +268,7 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.openFocused": "선택한 항목 열기",
   "shortcuts.inspectFocused": "선택한 항목의 상세 열기(재생 안 함)",
   "shortcuts.watchLater": "나중에 보기 전환",
+  "shortcuts.fileMenu": "파일 메뉴 열기",
   "shortcuts.selectAll": "불러온 항목 모두 선택",
   "shortcuts.bulkTags": "선택 항목의 태그 편집",
   "shortcuts.help": "이 도움말",
