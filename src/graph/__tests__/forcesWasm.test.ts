@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// happy-dom's Response is not one WebAssembly.instantiateStreaming accepts.
 // The committed WebAssembly module is what assembly/forces.ts compiles to.
 import { describe, expect, it } from "vitest";
 import { compileForces, moduleText } from "../../../scripts/build-wasm.mjs";

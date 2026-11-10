@@ -52,7 +52,9 @@ to `.ts`.
 
 ### Renderer project
 
-`npm run test:renderer` covers the renderer (`src/**/*.test.{ts,tsx}`, jsdom).
+`npm run test:renderer` covers the renderer (`src/**/*.test.{ts,tsx}`). It runs
+under happy-dom, which sets up much faster than jsdom; files that rely on jsdom's
+behaviour opt back in with `// @vitest-environment jsdom` and a one-line reason.
 With no native dependency it runs under plain Node; it is kept separate because
 the jsdom worker does not start under Electron's experimental loader.
 
@@ -89,7 +91,8 @@ automatically.
 
 GitHub Actions workflows live in `.github/workflows/`:
 
-- `test.yml` runs `npm run typecheck` and `npm test`.
+- `test.yml` runs three parallel jobs: type check and `test:core`,
+  `test:renderer`, and the E2E tests (`test:e2e:headless`).
 - `build.yml` triggers on `v*` tag pushes and builds a three-way matrix (linux
   x64, win x64, mac arm64), then creates a draft release.
 

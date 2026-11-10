@@ -26,8 +26,11 @@ test.describe("Pet", () => {
     await ready.mouse.move(start.x + 20, start.y + 20);
     await ready.mouse.down();
     await ready.mouse.move(start.x + 220, start.y - 300, { steps: 5 });
-    const held = (await pet.boundingBox())!;
-    expect(held.y).toBeLessThan(start.y - 200);
+    // The pet follows the pointer on the next frame, which can lag behind the last
+    // move when the machine is busy (several workers), so wait for it.
+    await expect
+      .poll(async () => (await pet.boundingBox())!.y)
+      .toBeLessThan(start.y - 200);
     await ready.mouse.up();
     await expect
       .poll(async () => Math.round((await pet.boundingBox())!.y))

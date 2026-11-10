@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// happy-dom binds Storage methods to each instance on first use, so a later spy on
+// Storage.prototype.setItem does not see the writes.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";

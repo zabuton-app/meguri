@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// happy-dom's Animation.cancel() leaves its finished promise rejected and unhandled.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MediaNavProvider, type MediaNav } from "@/components/MediaNavContext";

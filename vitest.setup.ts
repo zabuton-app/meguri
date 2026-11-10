@@ -23,17 +23,22 @@ if (typeof HTMLElement !== "undefined" && !HTMLElement.prototype.scrollTo) {
   HTMLElement.prototype.scrollTo = vi.fn();
 }
 
-// Give scroll/virtualization targets a non-zero viewport in jsdom.
-Object.defineProperty(Element.prototype, "clientHeight", {
+// Give scroll/virtualization targets a non-zero viewport. jsdom defines these on
+// Element.prototype and happy-dom on HTMLElement.prototype; stub whichever owns
+// them, so a test can still narrow them on that same prototype.
+const viewportProto = Object.hasOwn(HTMLElement.prototype, "clientWidth")
+  ? HTMLElement.prototype
+  : Element.prototype;
+Object.defineProperty(viewportProto, "clientHeight", {
   configurable: true,
   get: () => 800,
 });
-Object.defineProperty(Element.prototype, "clientWidth", {
+Object.defineProperty(viewportProto, "clientWidth", {
   configurable: true,
   get: () => 1200,
 });
 
-// jsdom's HTMLMediaElement is minimal; stub playback so player tests can drive events.
+// The test DOM's HTMLMediaElement does not play media; stub playback so player tests can drive events.
 Object.defineProperty(HTMLMediaElement.prototype, "play", {
   configurable: true,
   value: vi.fn().mockResolvedValue(undefined),
@@ -48,6 +53,6 @@ afterEach(() => {
   try {
     localStorage.clear();
   } catch {
-    // jsdom may not have localStorage in every config; ignore.
+    // The test DOM may not have localStorage in every config; ignore.
   }
 });
