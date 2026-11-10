@@ -48,6 +48,8 @@ const remuxSlots = new Semaphore(REMUX_MAX_CONCURRENT);
 // Playback can stay open for a long time. Keep its decoders separate from the
 // thumbnail and scrub pool, and cap concurrent previews and FFmpeg threads.
 const proResPreviewSlots = new Semaphore(2);
+// Reclaim a preview only under contention, after sustained socket backpressure.
+const PREVIEW_READER_TIMEOUT_MS = 120_000;
 // Requests queued for a slot are bounded too, so a burst of frame grabs (or
 // a renderer gone haywire) cannot pile up sockets and waiters without limit;
 // beyond this the request is shed with 503. A client that disconnects while
@@ -393,7 +395,7 @@ type RemuxSession = {
   historyBytes: number;
   joinable: boolean;
   // Clients whose socket buffer is full; ffmpeg stdout stays paused until all drain.
-  blocked: Set<http.ServerResponse>;
+  blocked: Map<http.ServerResponse, { since: number; pending: number }>;
 };
 
 const remuxInflight = new Map<string, RemuxSession>();
@@ -443,7 +445,7 @@ function detachRemuxClient(
   session: RemuxSession,
   res: http.ServerResponse,
 ) {
-  session.clients.delete(res);
+  if (!session.clients.delete(res)) return;
   session.blocked.delete(res);
   if (session.clients.size === 0) {
     session.child.kill("SIGKILL");
@@ -485,7 +487,10 @@ function writeRemuxChunk(
   }
   if (!client.write(chunk)) {
     if (!session.blocked.has(client)) {
-      session.blocked.add(client);
+      session.blocked.set(client, {
+        since: performance.now(),
+        pending: client.writableLength,
+      });
       client.once("drain", () => {
         session.blocked.delete(client);
         resumeIfDrained(session);
@@ -588,23 +593,41 @@ function startRemuxSession(
     history: [],
     historyBytes: 0,
     joinable: true,
-    blocked: new Set(),
+    blocked: new Map(),
   };
   remuxInflight.set(key, session);
   res.on("close", () => detachRemuxClient(key, session, res));
 
   let sawOutput = false;
-  let lastOutputAt = Date.now();
+  let lastOutputAt = performance.now();
   const watchdog = proResPreview
     ? setInterval(() => {
-        if (session.blocked.size > 0) lastOutputAt = Date.now();
-        else if (Date.now() - lastOutputAt >= FFMPEG_REQUEST_TIMEOUT_MS)
-          child.kill(FFMPEG_KILL_SIGNAL);
+        const now = performance.now();
+        if (session.blocked.size === 0) {
+          if (now - lastOutputAt >= FFMPEG_REQUEST_TIMEOUT_MS)
+            child.kill(FFMPEG_KILL_SIGNAL);
+          return;
+        }
+        lastOutputAt = now;
+        for (const [client, blocked] of session.blocked) {
+          const pending = client.writableLength;
+          if (pending < blocked.pending) blocked.since = now;
+          blocked.pending = pending;
+          // Pauses and slow readers can hold the stream while capacity is free.
+          if (
+            proResPreviewSlots.waiting > 0 &&
+            now - blocked.since >= PREVIEW_READER_TIMEOUT_MS
+          ) {
+            client.destroy();
+            detachRemuxClient(key, session, client);
+            break;
+          }
+        }
       }, 5_000).unref()
     : undefined;
   child.stdout!.on("data", (chunk: Buffer) => {
     sawOutput = true;
-    lastOutputAt = Date.now();
+    lastOutputAt = performance.now();
     broadcastRemuxChunk(key, session, chunk);
   });
   child.on("error", () => {

@@ -45,10 +45,11 @@ test("plays and seeks an indexed ProRes 422 MOV in the full player", async () =>
     const page = await app.firstWindow();
     await skipFirstLaunchTour(page);
     await waitForIdle(page);
-    await page
+    const card = page
       .getByTestId("media-card")
-      .filter({ hasText: "ProRes 422" })
-      .click();
+      .filter({ hasText: "ProRes 422" });
+    await expect(card).toContainText(/320.*180/);
+    await card.click();
     const player = page.locator("video");
     await expect(player).toBeVisible();
     if (await player.evaluate((video: HTMLVideoElement) => video.paused)) {

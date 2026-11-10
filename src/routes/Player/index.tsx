@@ -463,6 +463,7 @@ export default function Player() {
                   wsId={wsId}
                   startAt={resumeStart.startAt}
                   autoplay
+                  isProResPreview={detailFor?.codec === "prores"}
                   navKeys={navBinding}
                   fullscreenTargetRef={rootRef}
                   onNativeDuration={() => undefined}
