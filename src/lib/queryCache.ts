@@ -11,6 +11,8 @@ import type {
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
+import { isNoteDirective } from "@shared/noteSearch";
+import { splitSearchTokens } from "@shared/tags";
 
 /**
  * The SearchQuery part of a ["files_search", wsId, filter] query key. The
@@ -235,6 +237,26 @@ export function invalidateTagSearches(qc: QueryClient): void {
     queryKey: ["timeline_counts"],
     predicate: byTags,
   });
+}
+
+/**
+ * Invalidate only the views filtered by a note (`note:` or `has:note` in the
+ * query), after a note is saved: a list of files that have a note must lose
+ * the one whose note was just removed. Other views do not show the note.
+ */
+export function invalidateNoteSearches(qc: QueryClient): void {
+  const byNote = (q: { queryKey: readonly unknown[] }) =>
+    splitSearchTokens(searchFilterOf(q.queryKey)?.q ?? "").some(
+      isNoteDirective,
+    );
+  for (const key of [
+    "files_search",
+    "graph_build",
+    "activity_days",
+    "timeline_counts",
+  ]) {
+    void qc.invalidateQueries({ queryKey: [key], predicate: byNote });
+  }
 }
 
 /**

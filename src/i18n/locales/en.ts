@@ -212,10 +212,11 @@ export const en: Record<TranslationKey, string> = {
 
   // filter
   "filter.searchHint":
-    'Searches file names and tags. Use tag:beach or tag:4k to match a tag exactly, whether you added it or the scan did. Quote values with spaces: tag:"beach house".',
+    'Searches file names and tags. Use tag:beach or tag:4k to match a tag exactly, whether you added it or the scan did. Quote values with spaces: tag:"beach house". note:pexels finds files whose note contains the text, and has:note files that have a note.',
   "filter.searchPlaceholder": "Search file name or tags",
   "filter.tagSuggestions": "Tag suggestions",
   "filter.tagElsewhere": "other workspaces only",
+  "filter.hasNote": "Has a note",
   "filter.all": "All",
   "filter.played": "Played",
   "filter.unplayed": "Unplayed",

@@ -208,10 +208,11 @@ export const ko: Record<TranslationKey, string> = {
 
   // filter
   "filter.searchHint":
-    '파일 이름과 태그를 검색합니다. tag:여행 이나 tag:4k 로 직접 붙인 태그와 자동 태그를 모두 정확히 일치시켜 필터링합니다. 공백이 있는 값은 tag:"여름 여행" 처럼 따옴표로 묶습니다.',
+    '파일 이름과 태그를 검색합니다. tag:여행 이나 tag:4k 로 직접 붙인 태그와 자동 태그를 모두 정확히 일치시켜 필터링합니다. 공백이 있는 값은 tag:"여름 여행" 처럼 따옴표로 묶습니다. note:pexels 로 메모에 그 글자가 들어 있는 파일을, has:note 로 메모가 있는 파일을 필터링합니다.',
   "filter.searchPlaceholder": "파일 이름·태그 검색",
   "filter.tagSuggestions": "태그 제안",
   "filter.tagElsewhere": "다른 워크스페이스에만 있음",
+  "filter.hasNote": "메모 있음",
   "filter.all": "전체",
   "filter.played": "시청함",
   "filter.unplayed": "미시청",

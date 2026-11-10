@@ -218,10 +218,11 @@ export const fr: Record<TranslationKey, string> = {
 
   // filter
   "filter.searchHint":
-    'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage ou tag:4k pour une correspondance exacte, sur vos tags comme sur ceux du scan. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage".',
+    'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage ou tag:4k pour une correspondance exacte, sur vos tags comme sur ceux du scan. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage". note:pexels trouve les fichiers dont le mémo contient le texte, et has:note ceux qui ont un mémo.',
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
   "filter.tagSuggestions": "Suggestions de tags",
   "filter.tagElsewhere": "autres espaces de travail seulement",
+  "filter.hasNote": "Avec un mémo",
   "filter.all": "Tout",
   "filter.played": "Lu",
   "filter.unplayed": "Non lu",

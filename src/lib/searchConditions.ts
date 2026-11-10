@@ -17,6 +17,11 @@ import {
   parseTagSearchToken,
   splitSearchTokens,
 } from "@shared/tags";
+import {
+  isHasNoteToken,
+  isNoteDirective,
+  parseNoteSearchToken,
+} from "@shared/noteSearch";
 import type { SearchQuery } from "@/ipc/types";
 import type { Lang, TFunc } from "@/i18n/I18nProvider";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
@@ -57,6 +62,24 @@ function tagLabel(t: TFunc, raw: string): string {
 }
 
 /**
+ * A token that is a condition of its own (`tag:`, `note:`, `has:note`), not
+ * text. Wider than what the search box draws as a chip (`tag:` only).
+ */
+function isConditionToken(token: string): boolean {
+  return isTagDirective(token) || isNoteDirective(token);
+}
+
+/** The chip label for a directive token, or null for free text. */
+function directiveLabel(t: TFunc, token: string): string | null {
+  const tag = parseTagSearchToken(token);
+  if (tag != null) return tagLabel(t, tag);
+  if (isHasNoteToken(token)) return t("filter.hasNote");
+  const note = parseNoteSearchToken(token);
+  if (note != null) return `${t("media.note")}: "${note}"`;
+  return null;
+}
+
+/**
  * Every active condition, in a stable order. Empty when nothing is filtering.
  *
  * Tag directives inside `q` (`tag:beach`) get a chip here even though the search
@@ -86,7 +109,7 @@ export function describeConditions(
     });
 
   const freeText = splitSearchTokens(query.q ?? "").filter(
-    (token) => !isTagDirective(token),
+    (token) => !isConditionToken(token),
   );
   if (freeText.length)
     out.push({
@@ -95,18 +118,20 @@ export function describeConditions(
       group: "primary",
       chip: true,
       clear: (q) => {
-        const directives = splitSearchTokens(q.q ?? "").filter(isTagDirective);
+        const directives = splitSearchTokens(q.q ?? "").filter(
+          isConditionToken,
+        );
         const rest = joinSearchTokens(directives);
         return rest ? { ...q, q: rest } : without(q, "q");
       },
     });
 
   splitSearchTokens(query.q ?? "").forEach((token, i) => {
-    const tag = isTagDirective(token) ? parseTagSearchToken(token) : null;
-    if (tag == null) return;
+    const label = directiveLabel(t, token);
+    if (label == null) return;
     out.push({
       key: `directive-${i}`,
-      label: tagLabel(t, tag),
+      label,
       group: "primary",
       chip: true,
       // Removed whole and by position: whole because a partial edit would leave
