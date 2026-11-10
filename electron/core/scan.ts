@@ -139,6 +139,35 @@ export interface Discovered {
   inode: number;
 }
 
+function errorCode(err: unknown): string | undefined {
+  return (err as NodeJS.ErrnoException | null)?.code;
+}
+
+/** No path in the message: the scan log may be shared. */
+function rootUnreadableError(code: string | undefined): Error {
+  return new Error(`the scan root cannot be read (${code ?? "unknown"})`);
+}
+
+/**
+ * A predicate for rows walk() could not reach: the path itself, or anything
+ * under a directory, reported through onUnreadablePath. O(depth) per check, so
+ * it stays cheap with many reported paths.
+ */
+export function unreadableMatcher(
+  unreadablePaths: readonly string[],
+): (relPath: string) => boolean {
+  const paths = new Set(unreadablePaths);
+  return (relPath) => {
+    if (paths.size === 0) return false;
+    for (let p = relPath; ;) {
+      if (paths.has(p)) return true;
+      const parent = path.dirname(p);
+      if (parent === p || parent === ".") return false;
+      p = parent;
+    }
+  };
+}
+
 /**
  * Recursively enumerate media files under the root. Hidden directories and
  * dependency directories (node_modules) are excluded, and `.ts` files are kept
@@ -146,12 +175,37 @@ export interface Discovered {
  * Directory traversal (readdir) and file stat run in concurrent pools so that IO
  * waits don't stall even on network FS such as SMB (the main thread yields to the
  * event loop on each await, so it doesn't freeze).
+ *
+ * A root that cannot be read throws: an unplugged drive or a share that is down
+ * must not look like an empty folder. A subdirectory or a file that exists but
+ * cannot be read (permission denied, a share dropping mid-walk) is reported
+ * through onUnreadablePath (relative to the root) and skipped; one that is gone
+ * (ENOENT / ENOTDIR) is simply not found.
  */
 export async function walk(
   root: string,
   onProgress?: (count: number) => void,
   signal?: AbortSignal,
+  onUnreadablePath?: (relPath: string) => void,
 ): Promise<Discovered[]> {
+  // Opening the root (without listing it) answers "is it still there?"
+  // cheaply, even for a root with many entries on a network share.
+  const assertRootReadable = async () => {
+    try {
+      await (await fsp.opendir(root)).close();
+    } catch (err) {
+      throw rootUnreadableError(errorCode(err));
+    }
+  };
+  const reportUnreadable = async (full: string, code: string | undefined) => {
+    if (code === "ENOENT" || code === "ENOTDIR") {
+      // Gone, unless the whole root went away (an unmounted drive): check now,
+      // while it is still away, rather than only at the end of the walk.
+      await assertRootReadable();
+      return;
+    }
+    onUnreadablePath?.(path.relative(root, full));
+  };
   const out: Discovered[] = [];
   // Directories pending traversal. Dequeued in BFS order, with discovered child directories appended.
   let level: string[] = [root];
@@ -169,7 +223,10 @@ export async function walk(
         let entries: fs.Dirent[];
         try {
           entries = await fsp.readdir(dir, { withFileTypes: true });
-        } catch {
+        } catch (err) {
+          const code = errorCode(err);
+          if (dir === root) throw rootUnreadableError(code);
+          await reportUnreadable(dir, code);
           return;
         }
         for (const ent of entries) {
@@ -200,7 +257,8 @@ export async function walk(
         let st: fs.Stats;
         try {
           st = await fsp.stat(t.full);
-        } catch {
+        } catch (err) {
+          await reportUnreadable(t.full, errorCode(err));
           return;
         }
         // Only the ambiguous extension pays for the extra read.
@@ -225,6 +283,10 @@ export async function walk(
     onProgress?.(out.length);
     level = next;
   }
+  // A share or a removable drive can go away after the root was listed (its
+  // entries then fail with ENOENT and would read as deleted); check the root
+  // once more before anyone acts on this result.
+  if (!signal?.aborted) await assertRootReadable();
   return out;
 }
 
@@ -285,6 +347,10 @@ export function emptyScanStats(): ScanStats {
  *      and yield between chunks. Move detection uses values in the DB, so it doesn't depend on chunk order.
  *
  * ftsTargets are the file ids that need FTS re-sync (inserted/moved/updated). unchanged ones are excluded.
+ * unreadablePaths are directories and files (relative to the root) that walk()
+ * could not read: their rows (a file's own row, or every row under a directory)
+ * are kept as they are instead of being soft-deleted, and are not taken over by
+ * move detection.
  * unreadable lists the files whose content could not be read for hashing
  * (permission denied, locked by another process, gone since the walk). They
  * are left as they are for this scan and retried on the next one.
@@ -295,6 +361,7 @@ export async function syncFiles(
   discovered: Discovered[],
   onHashProgress?: (done: number, total: number) => void,
   signal?: AbortSignal,
+  unreadablePaths: readonly string[] = [],
 ): Promise<{
   stats: ScanStats;
   needsThumb: number[];
@@ -428,7 +495,7 @@ export async function syncFiles(
       } catch (error) {
         // Only fs errors mean "this file can't be read"; anything else is a
         // bug and should still fail the scan.
-        const code = (error as NodeJS.ErrnoException | null)?.code;
+        const code = errorCode(error);
         if (typeof code !== "string") throw error;
         unreadableIdx.add(idx);
         unreadable.push({ relPath: scannable[idx].relPath, code });
@@ -441,6 +508,9 @@ export async function syncFiles(
   );
 
   if (signal?.aborted) return { stats, needsThumb, ftsTargets, unreadable };
+
+  // Rows walk() could not reach were not seen, but may well still be there.
+  const isUnreadable = unreadableMatcher(unreadablePaths);
 
   // --- 3. DB apply (chunked tx + yield between chunks) ---
   const applyChunk = db.transaction((idxs: number[]) => {
@@ -496,7 +566,11 @@ export async function syncFiles(
               ext: string | null;
             }[])
           : [];
-      const moved = cands.find((c) => !seen.has(c.rel_path));
+      // A candidate walk() could not reach is probably still in place: this
+      // is a copy, not a move.
+      const moved = cands.find(
+        (c) => !seen.has(c.rel_path) && !isUnreadable(c.rel_path),
+      );
       if (moved) {
         moveStmt.run(
           d.relPath,
@@ -557,7 +631,7 @@ export async function syncFiles(
       .all(rootId) as { id: number; rel_path: string }[];
     const del = db.prepare("UPDATE files SET deleted_at = ? WHERE id = ?");
     for (const row of alive) {
-      if (!seen.has(row.rel_path)) {
+      if (!seen.has(row.rel_path) && !isUnreadable(row.rel_path)) {
         del.run(now, row.id);
         stats.deleted++;
       }

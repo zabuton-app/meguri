@@ -12,6 +12,7 @@ import {
   kindForExt,
   looksLikeMpegTs,
   syncFiles,
+  unreadableMatcher,
   walk,
 } from "../scan.js";
 
@@ -406,6 +407,69 @@ describe("syncFiles lifecycle", () => {
     expect(totalRows).toBe(2); // soft delete keeps the row
   });
 
+  it("keeps the rows under a directory that could not be read", async () => {
+    await fsp.mkdir(path.join(root, "sub"));
+    await fsp.writeFile(path.join(root, "sub", "a.mp4"), "AAAAAAAAAA");
+    await fsp.mkdir(path.join(root, "sub2"));
+    await fsp.writeFile(path.join(root, "sub2", "b.mp4"), "BBBBBBBBBB");
+    await rescan();
+
+    // "sub" could not be read this time; "sub2" (same prefix) is really gone.
+    await fsp.rm(path.join(root, "sub2"), { recursive: true });
+    const discovered = (await walk(root)).filter(
+      (d) => !d.relPath.startsWith("sub" + path.sep),
+    );
+    const res = await syncFiles(db, rootId, discovered, undefined, undefined, [
+      "sub",
+    ]);
+
+    expect(res.stats.deleted).toBe(1);
+    const alive = db
+      .prepare("SELECT rel_path FROM files WHERE deleted_at IS NULL")
+      .all() as { rel_path: string }[];
+    expect(alive.map((r) => r.rel_path)).toEqual([path.join("sub", "a.mp4")]);
+  });
+
+  it("keeps the row of a file that could not be stat'ed", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    await rescan();
+
+    const res = await syncFiles(db, rootId, [], undefined, undefined, [
+      "a.mp4",
+    ]);
+
+    expect(res.stats.deleted).toBe(0);
+    expect(aliveCount()).toBe(1);
+  });
+
+  it("does not take a row under an unreadable directory over as a move", async () => {
+    await fsp.mkdir(path.join(root, "sub"));
+    await fsp.writeFile(path.join(root, "sub", "a.mp4"), "AAAAAAAAAA");
+    await rescan();
+    const { id } = db.prepare("SELECT id FROM files").get() as { id: number };
+
+    // A copy appears elsewhere while "sub" can't be read.
+    await fsp.copyFile(
+      path.join(root, "sub", "a.mp4"),
+      path.join(root, "copy.mp4"),
+    );
+    const discovered = (await walk(root)).filter(
+      (d) => !d.relPath.startsWith("sub" + path.sep),
+    );
+    const res = await syncFiles(db, rootId, discovered, undefined, undefined, [
+      "sub",
+    ]);
+
+    expect(res.stats).toMatchObject({ moved: 0, inserted: 1, deleted: 0 });
+    expect(
+      db
+        .prepare(
+          "SELECT rel_path FROM files WHERE id = ? AND deleted_at IS NULL",
+        )
+        .get(id),
+    ).toEqual({ rel_path: path.join("sub", "a.mp4") });
+  });
+
   it("skips a new file that cannot be read instead of failing the scan", async () => {
     await fsp.writeFile(path.join(root, "ok.mp4"), "OKOKOKOKOK");
     await fsp.writeFile(path.join(root, "gone.mp4"), "GONEGONEGO");
@@ -548,6 +612,26 @@ describe("syncFiles lifecycle", () => {
   });
 });
 
+describe("unreadableMatcher", () => {
+  it("matches a reported file and everything under a reported directory", () => {
+    const isUnreadable = unreadableMatcher([
+      "sub",
+      path.join("other", "a.mp4"),
+    ]);
+    expect(isUnreadable(path.join("sub", "a.mp4"))).toBe(true);
+    expect(isUnreadable(path.join("sub", "deep", "b.mp4"))).toBe(true);
+    expect(isUnreadable(path.join("other", "a.mp4"))).toBe(true);
+    // Same prefix, different entry.
+    expect(isUnreadable(path.join("sub2", "a.mp4"))).toBe(false);
+    expect(isUnreadable(path.join("other", "a.mp40"))).toBe(false);
+    expect(isUnreadable("top.mp4")).toBe(false);
+  });
+
+  it("matches nothing when nothing was reported", () => {
+    expect(unreadableMatcher([])("a.mp4")).toBe(false);
+  });
+});
+
 describe("walk", () => {
   let root: string;
   beforeEach(async () => {
@@ -591,4 +675,83 @@ describe("walk", () => {
     const found = (await walk(root)).map((d) => d.relPath);
     expect(found).toEqual(["keep.mp4"]);
   });
+
+  it("throws when the root goes away during the walk", async () => {
+    await fsp.mkdir(path.join(root, "sub"));
+    await fsp.writeFile(path.join(root, "sub", "a.mp4"), "x");
+    let removed = false;
+    // Called after the root level is listed: unmount it before "sub" is read.
+    const onProgress = () => {
+      if (removed) return;
+      removed = true;
+      fs.rmSync(root, { recursive: true, force: true });
+    };
+    await expect(walk(root, onProgress)).rejects.toThrow(
+      "the scan root cannot be read (ENOENT)",
+    );
+  });
+
+  it("throws when the root goes away and comes back during the walk", async () => {
+    await fsp.mkdir(path.join(root, "sub"));
+    await fsp.writeFile(path.join(root, "sub", "a.mp4"), "x");
+    let calls = 0;
+    const onProgress = () => {
+      calls++;
+      // After the root level: unmount. After the next level: mount again,
+      // so the root is back by the end of the walk.
+      if (calls === 1) fs.rmSync(root, { recursive: true, force: true });
+      if (calls === 2) fs.mkdirSync(root);
+    };
+    await expect(walk(root, onProgress)).rejects.toThrow(
+      "the scan root cannot be read (ENOENT)",
+    );
+  });
+
+  it("throws when the root cannot be read instead of returning nothing", async () => {
+    await expect(walk(path.join(root, "unplugged"))).rejects.toThrow(
+      "the scan root cannot be read (ENOENT)",
+    );
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "reports a subdirectory that cannot be read and keeps walking the rest",
+    async () => {
+      await fsp.writeFile(path.join(root, "keep.mp4"), "x");
+      const locked = path.join(root, "locked");
+      await fsp.mkdir(locked);
+      await fsp.writeFile(path.join(locked, "a.mp4"), "x");
+      await fsp.chmod(locked, 0o000);
+      try {
+        const dirs: string[] = [];
+        const found = await walk(root, undefined, undefined, (d) =>
+          dirs.push(d),
+        );
+        expect(found.map((d) => d.relPath)).toEqual(["keep.mp4"]);
+        expect(dirs).toEqual(["locked"]);
+      } finally {
+        await fsp.chmod(locked, 0o755);
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "reports a file that is listed but cannot be stat'ed",
+    async () => {
+      // Readable but not searchable: readdir works, stat of its entries fails.
+      const dir = path.join(root, "noexec");
+      await fsp.mkdir(dir);
+      await fsp.writeFile(path.join(dir, "a.mp4"), "x");
+      await fsp.chmod(dir, 0o444);
+      try {
+        const paths: string[] = [];
+        const found = await walk(root, undefined, undefined, (p) =>
+          paths.push(p),
+        );
+        expect(found).toEqual([]);
+        expect(paths).toEqual([path.join("noexec", "a.mp4")]);
+      } finally {
+        await fsp.chmod(dir, 0o755);
+      }
+    },
+  );
 });

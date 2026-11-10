@@ -3,7 +3,13 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
-import { emptyScanStats, syncFiles, walk, type ScanStats } from "./scan.js";
+import {
+  emptyScanStats,
+  syncFiles,
+  unreadableMatcher,
+  walk,
+  type ScanStats,
+} from "./scan.js";
 import { coverArtStreamIndex, extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
 import { syncFts } from "./tags.js";
@@ -50,14 +56,35 @@ export type JobEvent =
  * Note: the removed-from-index exclusions (files.excluded_at) live on the files rows and are
  * therefore wiped too — a rebuild deliberately resets that list, so files previously removed
  * from the index reappear. This is spelled out in the rebuild confirmation dialog.
+ *
+ * Rows for which `keep` is true (paths the walk could not read) are left as they are, with
+ * their thumbnails: they could not be scanned again now.
  */
-async function clearIndex(core: Core): Promise<void> {
+async function clearIndex(
+  core: Core,
+  keep: (relPath: string) => boolean,
+): Promise<void> {
   const { db } = core;
+  const kept = new Set<number>();
   db.transaction(() => {
-    db.prepare(
-      "DELETE FROM files_fts WHERE rowid IN (SELECT id FROM files WHERE root_id = ?)",
-    ).run(core.rootId);
-    db.prepare("DELETE FROM files WHERE root_id = ?").run(core.rootId);
+    const rows = db
+      .prepare("SELECT id, rel_path FROM files WHERE root_id = ?")
+      .all(core.rootId) as { id: number; rel_path: string }[];
+    for (const r of rows) if (keep(r.rel_path)) kept.add(r.id);
+    if (kept.size === 0) {
+      db.prepare(
+        "DELETE FROM files_fts WHERE rowid IN (SELECT id FROM files WHERE root_id = ?)",
+      ).run(core.rootId);
+      db.prepare("DELETE FROM files WHERE root_id = ?").run(core.rootId);
+      return;
+    }
+    const delFts = db.prepare("DELETE FROM files_fts WHERE rowid = ?");
+    const delFile = db.prepare("DELETE FROM files WHERE id = ?");
+    for (const r of rows) {
+      if (kept.has(r.id)) continue;
+      delFts.run(r.id);
+      delFile.run(r.id);
+    }
   })();
   // Thumbnails are named by the (now invalidated) file id, so wipe them to avoid
   // orphans. Async with a small concurrent pool — a synchronous unlink loop over
@@ -70,6 +97,7 @@ async function clearIndex(core: Core): Promise<void> {
     return; // thumbs dir may not exist yet
   }
   await pool(names, 8, async (name) => {
+    if (kept.has(Number(name.split(".")[0]))) return;
     try {
       await fsp.rm(path.join(thumbs, name), { force: true });
     } catch {
@@ -105,11 +133,11 @@ export async function runScan(
   const { signal } = opts;
   const { db } = core;
 
-  // A rebuild discards the derived file index (keeping durable metadata) before rescanning.
-  if (opts.rebuild) await clearIndex(core);
-
   // --- walk + sync (both async with concurrent IO, so they don't block the event loop) ---
   // On SMB these phases dominate the time before thumbnails start, so report their progress.
+  // walk() throws when the root cannot be read, before anything below touches
+  // the index.
+  const unreadablePaths: string[] = [];
   const discovered = await walk(
     core.root,
     (count) =>
@@ -121,6 +149,7 @@ export async function runScan(
         total: 0,
       }),
     signal,
+    (relPath) => unreadablePaths.push(relPath),
   );
 
   if (signal?.aborted) {
@@ -129,6 +158,14 @@ export async function runScan(
     return empty;
   }
 
+  // Rows walk() could not reach (a folder or file that exists but cannot be
+  // read) are kept as they are by the rebuild, the sync and the thumbnails.
+  const isUnreadable = unreadableMatcher(unreadablePaths);
+
+  // A rebuild discards the derived file index (keeping durable metadata) before
+  // syncing. Only after the walk, so an unreachable root keeps its index.
+  if (opts.rebuild) await clearIndex(core, isUnreadable);
+
   const { stats, ftsTargets, unreadable } = await syncFiles(
     db,
     core.rootId,
@@ -136,7 +173,14 @@ export async function runScan(
     (done, total) =>
       onEvent({ type: "progress", jobId, phase: "hash", done, total }),
     signal,
+    unreadablePaths,
   );
+  if (unreadablePaths.length > 0) {
+    // A count only: the log may be shared, and folder names can be private.
+    log.warn(
+      `skipped ${unreadablePaths.length} folder(s) or file(s) that could not be read; their rows are kept as they are`,
+    );
+  }
   if (unreadable.length > 0) {
     // Only counts per error code: the log is meant to be attached to bug
     // reports, and relative paths or fs error messages would expose media
@@ -225,7 +269,12 @@ export async function runScan(
   }
 
   // --- thumbnail/meta (parallel) ---
-  const pending = q.filesNeedingThumb(db, core.rootId);
+  // Rows walk() could not reach would only fail here and be marked 'error'
+  // for good; leave them pending for a scan that can read them.
+  let pending = q.filesNeedingThumb(db, core.rootId);
+  if (unreadablePaths.length > 0) {
+    pending = pending.filter((f) => !isUnreadable(f.rel_path));
+  }
   const total = pending.length;
   let processed = 0;
   const thumbs = core.thumbsDir();
