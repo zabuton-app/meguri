@@ -18,7 +18,7 @@ import {
   splitSearchTokens,
 } from "@shared/tags";
 import type { SearchQuery } from "@/ipc/types";
-import type { TFunc } from "@/i18n/I18nProvider";
+import type { Lang, TFunc } from "@/i18n/I18nProvider";
 import { toggleDuplicatesPatch } from "@/lib/duplicatesFilter";
 import {
   cleanConditions,
@@ -68,6 +68,7 @@ function tagLabel(t: TFunc, raw: string): string {
 export function describeConditions(
   query: SearchQuery,
   t: TFunc,
+  lang: Lang,
   /** The default saved search, which removing the sort chip returns to. */
   defaultQuery: SearchQuery | null = null,
 ): ConditionDescriptor[] {
@@ -185,7 +186,7 @@ export function describeConditions(
     if (query[from] == null && query[to] == null) continue;
     out.push({
       key,
-      label: `${t(label)}: ${describeDateRange(t, query[from], query[to])}`,
+      label: `${t(label)}: ${describeDateRange(t, lang, query[from], query[to])}`,
       group: "collapsed",
       chip: true,
       clear: (q) => without(q, from, to),

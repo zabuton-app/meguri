@@ -51,7 +51,7 @@ import {
 } from "@/hooks/useRecentSearches";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
 import { useWatchLater } from "@/hooks/useWatchLater";
-import { useI18n, type TFunc } from "@/i18n/I18nProvider";
+import { useI18n, type Lang, type TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import type { FileRow, SearchQuery } from "@/ipc/types";
 import { fileNameOf } from "@/lib/relPath";
@@ -256,7 +256,7 @@ function CommandMenuBody({
   page: Page;
   setPage: (page: Page) => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [search, setSearch] = useState("");
   const typed = search.trim();
   const targets = useCommandTargets(focused, fileActionsAvailable);
@@ -343,11 +343,13 @@ function CommandMenuBody({
             )}
             <RecentSearchesGroup
               t={t}
+              lang={lang}
               typing={typed !== ""}
               onApply={(query) => closeThen(() => onApplySearch(query))}
             />
             <SmartCollectionsGroup
               t={t}
+              lang={lang}
               typing={typed !== ""}
               onApply={(c) => closeThen(() => onApplySaved(c))}
             />
@@ -641,10 +643,12 @@ function MoreHint({ t, count }: { t: TFunc; count: number }) {
 
 function RecentSearchesGroup({
   t,
+  lang,
   typing,
   onApply,
 }: {
   t: TFunc;
+  lang: Lang;
   typing: boolean;
   onApply: (query: SearchQuery) => void;
 }) {
@@ -652,7 +656,7 @@ function RecentSearchesGroup({
   const entries = useMemo(
     () =>
       recent.map((query) => {
-        const labels = describeConditions(query, t)
+        const labels = describeConditions(query, t, lang)
           .filter((c) => c.chip)
           .map((c) => c.label);
         return {
@@ -660,10 +664,10 @@ function RecentSearchesGroup({
           key: recentSearchKey(query),
           // A search narrowed only by something without a chip of its own
           // still needs something to show and to match.
-          chips: labels.length ? labels : [describeSearchQuery(t, query)],
+          chips: labels.length ? labels : [describeSearchQuery(t, lang, query)],
         };
       }),
-    [recent, t],
+    [recent, t, lang],
   );
   if (entries.length === 0) return null;
   const { shown, hidden } = capped(entries, typing);
@@ -705,10 +709,12 @@ function RecentSearchesGroup({
 
 function SmartCollectionsGroup({
   t,
+  lang,
   typing,
   onApply,
 }: {
   t: TFunc;
+  lang: Lang;
   typing: boolean;
   onApply: (collection: SmartCollection) => void;
 }) {
@@ -722,7 +728,7 @@ function SmartCollectionsGroup({
     <>
       <CommandGroup heading={t("smartCollection.title")}>
         {shown.map((c) => {
-          const summary = describeSearchQuery(t, c.query);
+          const summary = describeSearchQuery(t, lang, c.query);
           return (
             <CommandItem
               key={c.id}

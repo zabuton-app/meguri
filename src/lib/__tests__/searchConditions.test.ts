@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/locales/en";
 import type { SearchQuery } from "@/ipc/types";
+import { formatDate } from "@/lib/dates";
 import {
   clearAllTarget,
   collapsedConditionCount,
@@ -17,7 +18,7 @@ const t = (key: keyof typeof en, params?: Record<string, string | number>) => {
   return s;
 };
 
-const describe_ = (query: SearchQuery) => describeConditions(query, t);
+const describe_ = (query: SearchQuery) => describeConditions(query, t, "en");
 const keys = (query: SearchQuery) => describe_(query).map((d) => d.key);
 const find = (query: SearchQuery, key: string) =>
   describe_(query).find((d) => d.key === key) as ConditionDescriptor;
@@ -358,7 +359,7 @@ describe("the default saved search", () => {
   it("gives its sort back when the sort chip is removed", () => {
     const def = { sort: "btime", sortDir: "asc" as const };
     const clear = (q: SearchQuery) =>
-      describeConditions(q, t, def)
+      describeConditions(q, t, "en", def)
         .find((d) => d.key === "sort")!
         .clear(q);
     expect(clear({ sort: "name", kind: "image" })).toEqual({
@@ -369,13 +370,15 @@ describe("the default saved search", () => {
     // Already on the default's sort, spelled out or not: the sort is dropped.
     expect(clear({ sort: "btime", sortDir: "asc" })).toEqual({});
     expect(
-      describeConditions({ sort: "name", sortDir: "asc" }, t, { sort: "name" })
+      describeConditions({ sort: "name", sortDir: "asc" }, t, "en", {
+        sort: "name",
+      })
         .find((d) => d.key === "sort")!
         .clear({ sort: "name", sortDir: "asc" }),
     ).toEqual({});
     // A default without a sort: the sort is just dropped.
     expect(
-      describeConditions({ sort: "name" }, t, { kind: "video" })
+      describeConditions({ sort: "name" }, t, "en", { kind: "video" })
         .find((d) => d.key === "sort")!
         .clear({ sort: "name" }),
     ).toEqual({});
@@ -386,12 +389,30 @@ describe("a date range of one day", () => {
   it("reads as that day rather than as a range onto itself", () => {
     const start = Math.floor(new Date(2026, 2, 7).getTime() / 1000);
     const end = Math.floor(new Date(2026, 2, 8).getTime() / 1000) - 1;
-    const day = new Date(2026, 2, 7).toLocaleDateString();
+    const day = formatDate(new Date(2026, 2, 7), "en");
     expect(find({ addedFrom: start, addedTo: end }, "addedAt").label).toBe(
       `Added date: ${day}`,
     );
     expect(
       find({ addedFrom: start, addedTo: end + 86_400 }, "addedAt").label,
     ).toContain("–");
+  });
+});
+
+describe("a date in the chip", () => {
+  it("is spelled in the language it is asked for, not in the OS locale", () => {
+    const start = Math.floor(new Date(2026, 2, 7).getTime() / 1000);
+    const label = (lang: "en" | "ja") =>
+      describeConditions({ addedFrom: start }, t, lang).find(
+        (d) => d.key === "addedAt",
+      )!.label;
+
+    expect(label("en")).toBe(
+      `Added date: From ${formatDate(new Date(2026, 2, 7), "en")}`,
+    );
+    expect(label("ja")).toBe(
+      `Added date: From ${formatDate(new Date(2026, 2, 7), "ja")}`,
+    );
+    expect(label("en")).not.toBe(label("ja"));
   });
 });

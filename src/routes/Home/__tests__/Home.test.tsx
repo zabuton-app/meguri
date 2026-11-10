@@ -34,6 +34,7 @@ import {
   VIEW_KEY,
 } from "@/routes/Home/utils";
 import { addDays, daySeconds, formatDay } from "@shared/day";
+import { formatDate } from "@/lib/dates";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
@@ -1699,7 +1700,7 @@ describe("Home heatmap", () => {
   const date = addDays(new Date(), -1);
   const yesterday = formatDay(date);
   const [start, end] = daySeconds(date);
-  const shown = date.toLocaleDateString();
+  const shown = formatDate(date, "en");
 
   /** The most recent files_search query the component issued. */
   function lastQuery(): Record<string, unknown> {
@@ -1833,7 +1834,7 @@ describe("Home heatmap", () => {
       }),
     );
     expect(chipLabels()).toEqual([
-      `Played date: ${before.toLocaleDateString()}–${shown}`,
+      `Played date: ${formatDate(before, "en")}–${shown}`,
     ]);
     for (const day of [
       formatDay(before),

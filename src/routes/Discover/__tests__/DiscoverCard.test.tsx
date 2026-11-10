@@ -55,7 +55,7 @@ const membership = (included: boolean): WatchLaterMembership => ({
 });
 
 function Harness({ included }: { included: boolean }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   return (
     <DiscoverCard
       file={file}
@@ -65,6 +65,7 @@ function Harness({ included }: { included: boolean }) {
       watchLater={membership(included)}
       isActive={false}
       t={t}
+      lang={lang}
     />
   );
 }
@@ -130,7 +131,7 @@ describe("DiscoverCard watch later", () => {
 describe("DiscoverCard non-audio", () => {
   it("has no spectrum toggle for a video", () => {
     function Harness() {
-      const { t } = useI18n();
+      const { t, lang } = useI18n();
       return (
         <DiscoverCard
           file={{ ...file, kind: "video" }}
@@ -140,6 +141,7 @@ describe("DiscoverCard non-audio", () => {
           watchLater={membership(false)}
           isActive={false}
           t={t}
+          lang={lang}
         />
       );
     }
@@ -152,7 +154,7 @@ describe("DiscoverCard non-audio", () => {
 describe("DiscoverCard thumbnail fallback", () => {
   function renderCard(overrides: Partial<FileRow>) {
     function Harness() {
-      const { t } = useI18n();
+      const { t, lang } = useI18n();
       return (
         <DiscoverCard
           file={{ ...file, ...overrides }}
@@ -162,6 +164,7 @@ describe("DiscoverCard thumbnail fallback", () => {
           watchLater={membership(false)}
           isActive={false}
           t={t}
+          lang={lang}
         />
       );
     }
@@ -193,7 +196,7 @@ describe("DiscoverCard thumbnail fallback", () => {
     fireEvent.error(container.querySelector(`img[alt="${file.relPath}"]`)!);
     expect(container.querySelector("img")).toBeNull();
     function Bumped() {
-      const { t } = useI18n();
+      const { t, lang } = useI18n();
       return (
         <DiscoverCard
           file={{ ...file, thumbStatus: "done", hasThumb: 1 }}
@@ -203,6 +206,7 @@ describe("DiscoverCard thumbnail fallback", () => {
           watchLater={membership(false)}
           isActive={false}
           t={t}
+          lang={lang}
         />
       );
     }
@@ -214,7 +218,7 @@ describe("DiscoverCard thumbnail fallback", () => {
 describe("DiscoverCard audio", () => {
   function renderAudio() {
     function Harness() {
-      const { t } = useI18n();
+      const { t, lang } = useI18n();
       return (
         <DiscoverCard
           file={{ ...file, kind: "audio", relPath: "music/track.mp3" }}
@@ -224,6 +228,7 @@ describe("DiscoverCard audio", () => {
           watchLater={membership(false)}
           isActive={false}
           t={t}
+          lang={lang}
         />
       );
     }
