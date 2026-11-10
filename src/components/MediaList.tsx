@@ -391,6 +391,9 @@ const MediaRow = memo(function MediaRow({
             if (onSelectableClick(e)) return;
             onThumbnailClick(file)(e);
           }}
+          // Named after the file: without a thumbnail the link holds only an
+          // aria-hidden icon and the duration.
+          aria-label={fileNameOf(file.relPath)}
           className="group/thumb absolute inset-0 block"
         >
           <MediaThumbnail file={file} mediaBase={mediaBase} />
@@ -415,10 +418,11 @@ const MediaRow = memo(function MediaRow({
         <HashLink
           to={fileHref(file.id, file.workspaceId, { autoplay: false })}
           onClick={onSelectableClick}
-          title={file.relPath}
           className="h-6 truncate text-[15px] font-medium leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
         >
-          {fileNameOf(file.relPath)}
+          {/* The path tooltip is on the name only: on the link it would show
+              over the whole row its overlay covers. */}
+          <span title={file.relPath}>{fileNameOf(file.relPath)}</span>
         </HashLink>
         {/* Wide rows give the metadata its own columns and show the folder
             here; narrow ones (a docked side peek) fold the metadata into this
@@ -432,7 +436,9 @@ const MediaRow = memo(function MediaRow({
               .join(" · ") || "—"}
           </span>
         </div>
-        <div className="no-scrollbar relative z-10 flex h-5 w-fit max-w-full items-center gap-1 overflow-x-auto overflow-y-hidden">
+        {/* Only the chips take the pointer: a click on the gaps or on the
+            "no tags" label falls through to the row link. */}
+        <div className="no-scrollbar pointer-events-none relative z-10 flex h-5 w-fit max-w-full items-center gap-1 overflow-x-auto overflow-y-hidden [&>button]:pointer-events-auto">
           <TagChips tags={file.tags} onTagClick={onTagClick} />
         </div>
       </div>

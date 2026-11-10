@@ -2,9 +2,9 @@
 //
 // Visible on hover (and always once it is checked or focused), so the affordance
 // is discoverable without putting a permanent box on every card. It is a real
-// button with aria-pressed rather than an <input type="checkbox">: it sits
-// inside the card's link, where a labelled input has nowhere to put its label,
-// and the surrounding hit area already carries the same toggle.
+// button with aria-pressed rather than an <input type="checkbox">: the
+// surrounding hit area already carries the same toggle. It sits beside the
+// card's link, never inside it (no interactive content nested in an <a>).
 import { Check, Loader2 } from "lucide-react";
 import {
   useFolderSelection,
