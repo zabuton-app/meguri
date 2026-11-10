@@ -47,6 +47,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
     { label: t("shortcuts.openFocused"), keys: formatChords(g.open) },
     { label: t("shortcuts.inspectFocused"), keys: formatChords(g.inspect) },
     { label: t("shortcuts.watchLater"), keys: "W" },
+    { label: t("shortcuts.fileMenu"), keys: "Shift+F10 / Menu" },
     { label: t("shortcuts.selectAll"), keys: "Ctrl+A / Cmd+A" },
     { label: t("shortcuts.bulkTags"), keys: "T" },
     { label: t("shortcuts.folderBack"), keys: "Alt+← / Backspace" },

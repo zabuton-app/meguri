@@ -223,6 +223,10 @@ export const zhCN: Record<TranslationKey, string> = {
   // media detail
   "media.notFound": "未找到文件。",
   "media.openExternal": "用外部程序打开",
+  "media.openExternalFailed": "无法在外部应用中打开",
+  "fileMenu.open": "打开",
+  "fileMenu.inspect": "打开详情（不播放）",
+  "fileMenu.some": "部分",
   "media.openFolder": "打开所在文件夹",
   "media.copyFilePath": "复制文件路径",
   "media.filePathCopied": "已复制文件路径",
@@ -256,6 +260,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "shortcuts.openFocused": "打开选中项",
   "shortcuts.inspectFocused": "打开选中项的详情（不播放）",
   "shortcuts.watchLater": "切换稍后观看",
+  "shortcuts.fileMenu": "打开文件菜单",
   "shortcuts.selectAll": "全选已加载项",
   "shortcuts.bulkTags": "编辑选中项的标签",
   "shortcuts.help": "本帮助",

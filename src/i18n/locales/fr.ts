@@ -239,6 +239,10 @@ export const fr: Record<TranslationKey, string> = {
   // media detail
   "media.notFound": "Fichier introuvable.",
   "media.openExternal": "Ouvrir avec une application externe",
+  "media.openExternalFailed": "Impossible d’ouvrir dans l’application externe",
+  "fileMenu.open": "Ouvrir",
+  "fileMenu.inspect": "Ouvrir les détails sans lecture",
+  "fileMenu.some": "Certains",
   "media.openFolder": "Ouvrir le dossier",
   "media.copyFilePath": "Copier le chemin du fichier",
   "media.filePathCopied": "Chemin du fichier copié",
@@ -274,6 +278,7 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.inspectFocused":
     "Ouvrir les détails de l'élément ciblé (sans lecture)",
   "shortcuts.watchLater": "Basculer À regarder plus tard",
+  "shortcuts.fileMenu": "Ouvrir le menu du fichier",
   "shortcuts.selectAll": "Tout sélectionner (chargé)",
   "shortcuts.bulkTags": "Modifier les tags de la sélection",
   "shortcuts.help": "Cette aide",

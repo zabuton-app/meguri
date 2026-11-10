@@ -26,6 +26,7 @@ import {
 } from "@/hooks/useWatchLater";
 import type { FileRow, FolderEntry } from "@/ipc/types";
 import { FolderCard } from "@/components/FolderCard";
+import { FileContextMenu } from "@/components/FileContextMenu";
 import {
   useFolderEntries,
   type FolderViewEntry,
@@ -361,75 +362,79 @@ export const MediaGrid = memo(function MediaGrid({
   // display:table to block so absolutely positioned rows track the width correctly.
   return (
     <MediaReorderProvider items={items} reorder={reorder}>
-      <ScrollArea
-        className="page-scroll h-full"
-        viewportClassName="pt-4"
-        viewportRef={setScrollRef}
-      >
-        <div
-          style={{
-            height: virtualizer.getTotalSize(),
-            position: "relative",
-            width: "100%",
-          }}
+      <FileContextMenu items={items} mediaBase={mediaBase} active={navActive}>
+        <ScrollArea
+          className="page-scroll h-full"
+          viewportClassName="pt-4"
+          viewportRef={setScrollRef}
         >
-          {virtualRows.map((vr) => (
-            <div
-              key={vr.key}
-              ref={measureRow}
-              className="absolute left-0 top-0 w-full"
-              style={{ transform: `translateY(${vr.start}px)` }}
-            >
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              position: "relative",
+              width: "100%",
+            }}
+          >
+            {virtualRows.map((vr) => (
               <div
-                className="grid gap-3 px-4 pb-3"
-                style={{
-                  gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                }}
+                key={vr.key}
+                ref={measureRow}
+                className="absolute left-0 top-0 w-full"
+                style={{ transform: `translateY(${vr.start}px)` }}
               >
-                {rows[vr.index].map((entry, localIndex) => {
-                  const cell = vr.index * cols + localIndex;
-                  if (!entry) {
-                    return <div key={`lead:${cell}`} aria-hidden />;
-                  }
-                  const focused = cell - leadCells === focusedIndex;
-                  if (entry.kind === "folder") {
-                    return (
-                      <FolderCard
-                        key={`folder:${entry.folder.path}`}
-                        entry={entry.folder}
-                        focused={focused}
+                <div
+                  className="grid gap-3 px-4 pb-3"
+                  style={{
+                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {rows[vr.index].map((entry, localIndex) => {
+                    const cell = vr.index * cols + localIndex;
+                    if (!entry) {
+                      return <div key={`lead:${cell}`} aria-hidden />;
+                    }
+                    const focused = cell - leadCells === focusedIndex;
+                    if (entry.kind === "folder") {
+                      return (
+                        <FolderCard
+                          key={`folder:${entry.folder.path}`}
+                          entry={entry.folder}
+                          focused={focused}
+                          mediaBase={mediaBase}
+                          onOpen={onOpenFolder ?? noop}
+                        />
+                      );
+                    }
+                    const f = entry.file;
+                    const card = (
+                      <MediaCard
+                        file={f}
+                        index={entry.fileIndex}
                         mediaBase={mediaBase}
-                        onOpen={onOpenFolder ?? noop}
+                        onTagClick={onTagClick}
+                        focused={focused}
+                        watchLater={watchLaterMembership}
+                        watchLaterRef={
+                          focused ? focusedWatchLaterRef : undefined
+                        }
+                        fileDraggable={!reorder}
                       />
                     );
-                  }
-                  const f = entry.file;
-                  const card = (
-                    <MediaCard
-                      file={f}
-                      index={entry.fileIndex}
-                      mediaBase={mediaBase}
-                      onTagClick={onTagClick}
-                      focused={focused}
-                      watchLater={watchLaterMembership}
-                      watchLaterRef={focused ? focusedWatchLaterRef : undefined}
-                      fileDraggable={!reorder}
-                    />
-                  );
-                  const key = mediaSortId(f);
-                  return reorder ? (
-                    <SortableMedia key={key} id={key}>
-                      {card}
-                    </SortableMedia>
-                  ) : (
-                    <Fragment key={key}>{card}</Fragment>
-                  );
-                })}
+                    const key = mediaSortId(f);
+                    return reorder ? (
+                      <SortableMedia key={key} id={key}>
+                        {card}
+                      </SortableMedia>
+                    ) : (
+                      <Fragment key={key}>{card}</Fragment>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </ScrollArea>
+            ))}
+          </div>
+        </ScrollArea>
+      </FileContextMenu>
     </MediaReorderProvider>
   );
 });
@@ -492,6 +497,7 @@ export const MediaCard = memo(function MediaCard({
       {...hoverHandlers}
       data-testid="media-card"
       data-slot="media-card"
+      data-file-key={mediaSortId(file)}
       aria-current={focused ? "true" : undefined}
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-primary",

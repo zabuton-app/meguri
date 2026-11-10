@@ -233,6 +233,10 @@ export const en: Record<TranslationKey, string> = {
   // media detail
   "media.notFound": "File not found.",
   "media.openExternal": "Open externally",
+  "media.openExternalFailed": "Could not open externally",
+  "fileMenu.open": "Open",
+  "fileMenu.inspect": "Open details without playing",
+  "fileMenu.some": "Some",
   "media.openFolder": "Open containing folder",
   "media.copyFilePath": "Copy File Path",
   "media.filePathCopied": "File path copied",
@@ -267,6 +271,7 @@ export const en: Record<TranslationKey, string> = {
   "shortcuts.openFocused": "Open focused item",
   "shortcuts.inspectFocused": "Open focused item's details (no playback)",
   "shortcuts.watchLater": "Toggle Watch Later",
+  "shortcuts.fileMenu": "Open the file menu",
   "shortcuts.selectAll": "Select everything loaded",
   "shortcuts.bulkTags": "Edit tags on the selection",
   "shortcuts.help": "This help",

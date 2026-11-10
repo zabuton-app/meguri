@@ -1,6 +1,7 @@
 // What can be done to one file or a selection of them from outside the file's
 // own controls: favorite, Watch Later, rating, collection membership, and, for
-// a single file, revealing it, copying its path and dropping it from the index.
+// a single file, opening it externally, revealing it, copying its path and
+// dropping it from the index.
 //
 // One hook for one file and for many: the writes go through the bulk channels
 // (useBulkEdit, collection_set_membership), which take a single target as
@@ -28,8 +29,10 @@ import {
   type BulkFlag,
 } from "@/lib/bulkEdit";
 import {
+  dropFromWatchLaterCache,
   forgetDeletedFile,
   invalidateCollectionSearches,
+  invalidatePlayedSearches,
 } from "@/lib/queryCache";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
@@ -43,6 +46,8 @@ export interface CollectionMembership {
 
 /** Actions that only make sense for one file. */
 export interface SingleFileActions {
+  /** Opens the file in the external player, as the detail view's button does. */
+  openExternal: () => void;
   openFolder: () => void;
   copyPath: () => void;
   /** Asks first; resolves once the file is gone from the index and the lists. */
@@ -115,7 +120,11 @@ export function useFileActions(
   const confirm = useConfirm();
   const bulk = useBulkEdit(rows, watchLater.id, deferListRefresh);
   const { forget } = useSelection();
-  const { isCurrent: isCurrentAudio, close: closeAudio } = useAudioActions();
+  const {
+    isCurrent: isCurrentAudio,
+    close: closeAudio,
+    pauseIfCurrent: pauseAudioIfCurrent,
+  } = useAudioActions();
 
   const membership = useMutation({
     // Rows captured at click time and carried to onSuccess, for the same
@@ -168,6 +177,23 @@ export function useFileActions(
     const { id, workspaceId } = file;
     const name = fileNameOf(file.relPath);
     return {
+      openExternal: () => {
+        // The external player is about to play this very file: stop the
+        // audio bar if it has it, or both would sound.
+        pauseAudioIfCurrent(id, workspaceId);
+        // The main process records the play and consumes the Watch Later
+        // entry; mirror that once it confirms (see useDetailMutations).
+        api.openExternal(id, workspaceId).then(
+          () => {
+            dropFromWatchLaterCache(qc, workspaceId, id);
+            invalidatePlayedSearches(qc);
+          },
+          (e: unknown) =>
+            toast.error(t("media.openExternalFailed"), {
+              description: errorText(e),
+            }),
+        );
+      },
       openFolder: () => {
         api
           .openFolder(id, workspaceId)
@@ -209,7 +235,16 @@ export function useFileActions(
         }
       },
     };
-  }, [file, t, confirm, qc, forget, isCurrentAudio, closeAudio]);
+  }, [
+    file,
+    t,
+    confirm,
+    qc,
+    forget,
+    isCurrentAudio,
+    closeAudio,
+    pauseAudioIfCurrent,
+  ]);
 
   return {
     favorite,
