@@ -314,6 +314,22 @@ export function absPathOf(db: DB, fileId: number): string | null {
   return row?.abs_path ?? null;
 }
 
+/** What the media server needs to choose how a live file is served. */
+export interface MediaFile {
+  absPath: string;
+  codec: string | null;
+  kind: string;
+}
+
+export function mediaFileOf(db: DB, fileId: number): MediaFile | null {
+  const row = db
+    .prepare(
+      "SELECT abs_path AS absPath, codec, kind FROM files WHERE id = ? AND deleted_at IS NULL",
+    )
+    .get(fileId) as MediaFile | undefined;
+  return row ?? null;
+}
+
 export function thumbPathIfDone(db: DB, fileId: number): string | null {
   const row = db
     .prepare(

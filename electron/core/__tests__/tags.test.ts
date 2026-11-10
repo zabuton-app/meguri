@@ -6,6 +6,7 @@ import {
   addManualTag,
   fileTags,
   listTagNames,
+  mediaFileOf,
   removeManualTag,
   syncFts,
   tagsText,
@@ -36,6 +37,22 @@ describe("tags", () => {
       db.prepare("SELECT COUNT(*) c FROM tags").get() as { c: number }
     ).c;
     expect(count).toBe(1);
+  });
+
+  it("mediaFileOf returns a live file's path, codec and kind", () => {
+    const id = insertFile(db, rootId, { relPath: "clip.mov", codec: "prores" });
+    expect(mediaFileOf(db, id)).toEqual({
+      absPath: "/fake/root/clip.mov",
+      codec: "prores",
+      kind: "video",
+    });
+  });
+
+  it("mediaFileOf returns null for a deleted or unknown file", () => {
+    const id = insertFile(db, rootId, { relPath: "gone.mp4" });
+    db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(id);
+    expect(mediaFileOf(db, id)).toBeNull();
+    expect(mediaFileOf(db, id + 1)).toBeNull();
   });
 
   it("adds and removes a manual tag for a file", () => {

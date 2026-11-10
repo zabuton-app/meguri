@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Core } from "./index.js";
-import { thumbPathIfDone } from "./tags.js";
+import { mediaFileOf, thumbPathIfDone } from "./tags.js";
 import { isInsideRoot } from "./paths.js";
 import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
@@ -238,17 +238,12 @@ async function handle(
       return;
     }
 
-    const file = core.db
-      .prepare(
-        "SELECT abs_path AS abs, codec, kind FROM files WHERE id = ? AND deleted_at IS NULL",
-      )
-      .get(id) as
-      { abs: string; codec: string | null; kind: string } | undefined;
+    const file = mediaFileOf(core.db, id);
     if (!file) {
       res.writeHead(404).end();
       return;
     }
-    const { abs } = file;
+    const abs = file.absPath;
     if (!isInsideRoot(abs, core.root)) {
       res.writeHead(403).end();
       return;
