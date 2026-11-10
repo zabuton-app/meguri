@@ -608,6 +608,9 @@ export const fr: Record<TranslationKey, string> = {
   "duplicates.empty": "Aucun fichier en double trouvé.",
   "duplicates.emptyHint":
     "Les fichiers au contenu identique (hachage et taille correspondants) apparaîtront ici.",
+  "duplicates.loadFailed":
+    "Impossible de charger les fichiers en double. Veuillez réessayer.",
+  "duplicates.retry": "Réessayer",
   "duplicates.fileCount": "{count} fichiers",
   "duplicates.truncated":
     "Trop de groupes ; seuls les {max} premiers sont affichés.",

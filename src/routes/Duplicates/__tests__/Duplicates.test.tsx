@@ -163,4 +163,31 @@ describe("Duplicates", () => {
     renderWithProviders(<DuplicatesRoute />, { route: "/duplicates" });
     expect(await screen.findByText("No duplicate files found.")).toBeTruthy();
   });
+
+  it("shows an error and retries when loading duplicates fails", async () => {
+    mocks.duplicatesList
+      .mockRejectedValueOnce(new Error("network failure"))
+      .mockResolvedValueOnce({
+        groups: [],
+        fileCount: 0,
+        truncated: false,
+      });
+
+    renderWithProviders(<DuplicatesRoute />, { route: "/duplicates" });
+
+    const alert = await screen.findByRole("alert");
+
+    expect(alert.textContent).toContain(
+      "Could not load duplicate files. Please try again.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => {
+      expect(mocks.duplicatesList).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    expect(screen.getByText("No duplicate files found.")).toBeTruthy();
+  });
 });

@@ -169,6 +169,21 @@ export default function Duplicates() {
             <Skeleton key={i} className="h-14 w-full rounded-lg" />
           ))}
         </div>
+      ) : duplicates.isError && !duplicates.data ? (
+        <div
+          role="alert"
+          className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center text-muted"
+        >
+          <p>{t("duplicates.loadFailed")}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void duplicates.refetch()}
+            disabled={duplicates.isFetching}
+          >
+            {t("duplicates.retry")}
+          </Button>
+        </div>
       ) : groups.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
           <CopyCheck className="size-10 opacity-50" />
