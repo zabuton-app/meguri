@@ -143,6 +143,11 @@ function errorCode(err: unknown): string | undefined {
   return (err as NodeJS.ErrnoException | null)?.code;
 }
 
+/** No path in the message: the scan log may be shared. */
+function rootUnreadableError(code: string | undefined): Error {
+  return new Error(`the scan root cannot be read (${code ?? "unknown"})`);
+}
+
 /**
  * A predicate for rows walk() could not reach: the path itself, or anything
  * under a directory, reported through onUnreadablePath. O(depth) per check, so
@@ -206,12 +211,7 @@ export async function walk(
           entries = await fsp.readdir(dir, { withFileTypes: true });
         } catch (err) {
           const code = errorCode(err);
-          if (dir === root) {
-            // No path in the message: the scan log may be shared.
-            throw new Error(
-              `the scan root cannot be read (${code ?? "unknown"})`,
-            );
-          }
+          if (dir === root) throw rootUnreadableError(code);
           reportUnreadable(dir, code);
           return;
         }
@@ -268,6 +268,16 @@ export async function walk(
 
     onProgress?.(out.length);
     level = next;
+  }
+  // A share or a removable drive can go away after the root was listed; its
+  // entries then fail with ENOENT and would read as deleted. Check the root
+  // once more before anyone acts on this result.
+  if (!signal?.aborted) {
+    try {
+      await fsp.readdir(root);
+    } catch (err) {
+      throw rootUnreadableError(errorCode(err));
+    }
   }
   return out;
 }

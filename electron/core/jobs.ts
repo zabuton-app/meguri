@@ -251,10 +251,13 @@ export async function runScan(
   // --- thumbnail/meta (parallel) ---
   // Rows walk() could not reach would only fail here and be marked 'error'
   // for good; leave them pending for a scan that can read them.
-  const isUnreadable = unreadableMatcher(unreadablePaths);
-  const pending = q
-    .filesNeedingThumb(db, core.rootId)
-    .filter((f) => !isUnreadable(path.relative(core.root, f.abs_path)));
+  let pending = q.filesNeedingThumb(db, core.rootId);
+  if (unreadablePaths.length > 0) {
+    const isUnreadable = unreadableMatcher(unreadablePaths);
+    pending = pending.filter(
+      (f) => !isUnreadable(path.relative(core.root, f.abs_path)),
+    );
+  }
   const total = pending.length;
   let processed = 0;
   const thumbs = core.thumbsDir();

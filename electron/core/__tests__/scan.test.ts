@@ -676,6 +676,21 @@ describe("walk", () => {
     expect(found).toEqual(["keep.mp4"]);
   });
 
+  it("throws when the root goes away during the walk", async () => {
+    await fsp.mkdir(path.join(root, "sub"));
+    await fsp.writeFile(path.join(root, "sub", "a.mp4"), "x");
+    let removed = false;
+    // Called after the root level is listed: unmount it before "sub" is read.
+    const onProgress = () => {
+      if (removed) return;
+      removed = true;
+      fs.rmSync(root, { recursive: true, force: true });
+    };
+    await expect(walk(root, onProgress)).rejects.toThrow(
+      "the scan root cannot be read (ENOENT)",
+    );
+  });
+
   it("throws when the root cannot be read instead of returning nothing", async () => {
     await expect(walk(path.join(root, "unplugged"))).rejects.toThrow(
       "the scan root cannot be read (ENOENT)",
