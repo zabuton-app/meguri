@@ -578,12 +578,29 @@ export const ja = {
   "duplicates.empty": "重複ファイルは見つかりませんでした。",
   "duplicates.emptyHint":
     "内容が同一（ハッシュとサイズが一致）のファイルが複数あるとここに表示されます。",
-  "duplicates.summary": "{groups} グループ / {files} ファイル / 重複 {size}",
   "duplicates.fileCount": "{count} 件",
   "duplicates.truncated":
     "グループ数が多いため上位 {max} 件のみ表示しています。",
   "duplicates.filter": "重複ファイルのみ表示",
   "duplicates.chip": "重複",
+  "duplicates.groupCount": "{count} グループ",
+  "duplicates.reclaimable": "削減可能",
+  "duplicates.search": "ファイル名・パスで絞り込み",
+  "duplicates.sortLabel": "並び順",
+  "duplicates.sort.reclaimable": "削減可能サイズ",
+  "duplicates.sort.size": "ファイルサイズ",
+  "duplicates.sort.count": "コピー数",
+  "duplicates.sort.added": "最近追加",
+  "duplicates.groupList": "重複グループ",
+  "duplicates.groupDetail": "グループの詳細",
+  "duplicates.noMatch": "条件に一致するグループはありません。",
+  "duplicates.copies": "コピー",
+  "duplicates.diffLegend": "他のコピーと異なる部分をハイライトしています",
+  "duplicates.oldest": "最古",
+  "duplicates.oldestHint": "最初にインデックスされたコピー",
+  "duplicates.added": "追加 {date}",
+  "duplicates.lastViewed": "最終閲覧 {date}",
+  "duplicates.open": "開く",
 
   // タグ管理画面
   // auto tagging

@@ -578,11 +578,29 @@ export const en: Record<TranslationKey, string> = {
   "duplicates.empty": "No duplicate files found.",
   "duplicates.emptyHint":
     "Files with identical content (matching hash and size) will appear here.",
-  "duplicates.summary": "{groups} groups / {files} files / {size} duplicated",
   "duplicates.fileCount": "{count} files",
   "duplicates.truncated": "Too many groups; showing only the top {max}.",
   "duplicates.filter": "Show only duplicate files",
   "duplicates.chip": "Duplicates",
+  "duplicates.groupCount": "{count} groups",
+  "duplicates.reclaimable": "Reclaimable",
+  "duplicates.search": "Filter by file name or path",
+  "duplicates.sortLabel": "Sort by",
+  "duplicates.sort.reclaimable": "Reclaimable size",
+  "duplicates.sort.size": "File size",
+  "duplicates.sort.count": "Copy count",
+  "duplicates.sort.added": "Recently added",
+  "duplicates.groupList": "Duplicate groups",
+  "duplicates.groupDetail": "Group details",
+  "duplicates.noMatch": "No groups match the filter.",
+  "duplicates.copies": "Copies",
+  "duplicates.diffLegend":
+    "Highlighted: where this copy differs from the others",
+  "duplicates.oldest": "Oldest",
+  "duplicates.oldestHint": "The copy that was indexed first",
+  "duplicates.added": "Added {date}",
+  "duplicates.lastViewed": "Last viewed {date}",
+  "duplicates.open": "Open",
 
   // Tag management screen
   // auto tagging

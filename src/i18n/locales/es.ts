@@ -592,13 +592,30 @@ export const es: Record<TranslationKey, string> = {
   "duplicates.empty": "No se encontraron archivos duplicados.",
   "duplicates.emptyHint":
     "Los archivos con contenido idéntico (hash y tamaño coincidentes) aparecerán aquí.",
-  "duplicates.summary":
-    "{groups} grupos / {files} archivos / {size} duplicados",
   "duplicates.fileCount": "{count} archivos",
   "duplicates.truncated":
     "Demasiados grupos; solo se muestran los {max} primeros.",
   "duplicates.filter": "Mostrar solo archivos duplicados",
   "duplicates.chip": "Duplicados",
+  "duplicates.groupCount": "{count} grupos",
+  "duplicates.reclaimable": "Recuperable",
+  "duplicates.search": "Filtrar por nombre o ruta",
+  "duplicates.sortLabel": "Ordenar por",
+  "duplicates.sort.reclaimable": "Tamaño recuperable",
+  "duplicates.sort.size": "Tamaño del archivo",
+  "duplicates.sort.count": "Número de copias",
+  "duplicates.sort.added": "Añadidos recientemente",
+  "duplicates.groupList": "Grupos de duplicados",
+  "duplicates.groupDetail": "Detalles del grupo",
+  "duplicates.noMatch": "Ningún grupo coincide con el filtro.",
+  "duplicates.copies": "Copias",
+  "duplicates.diffLegend":
+    "Resaltado: lo que distingue esta copia de las demás",
+  "duplicates.oldest": "Más antigua",
+  "duplicates.oldestHint": "La copia que se indexó primero",
+  "duplicates.added": "Añadido {date}",
+  "duplicates.lastViewed": "Visto por última vez {date}",
+  "duplicates.open": "Abrir",
 
   // Pantalla de gestión de etiquetas
   // auto tagging

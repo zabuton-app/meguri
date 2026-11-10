@@ -595,13 +595,30 @@ export const fr: Record<TranslationKey, string> = {
   "duplicates.empty": "Aucun fichier en double trouvé.",
   "duplicates.emptyHint":
     "Les fichiers au contenu identique (hachage et taille correspondants) apparaîtront ici.",
-  "duplicates.summary":
-    "{groups} groupes / {files} fichiers / {size} en double",
   "duplicates.fileCount": "{count} fichiers",
   "duplicates.truncated":
     "Trop de groupes ; seuls les {max} premiers sont affichés.",
   "duplicates.filter": "Afficher uniquement les fichiers en double",
   "duplicates.chip": "Doublons",
+  "duplicates.groupCount": "{count} groupes",
+  "duplicates.reclaimable": "Récupérable",
+  "duplicates.search": "Filtrer par nom ou chemin",
+  "duplicates.sortLabel": "Trier par",
+  "duplicates.sort.reclaimable": "Taille récupérable",
+  "duplicates.sort.size": "Taille du fichier",
+  "duplicates.sort.count": "Nombre de copies",
+  "duplicates.sort.added": "Ajoutés récemment",
+  "duplicates.groupList": "Groupes de doublons",
+  "duplicates.groupDetail": "Détails du groupe",
+  "duplicates.noMatch": "Aucun groupe ne correspond au filtre.",
+  "duplicates.copies": "Copies",
+  "duplicates.diffLegend":
+    "En surbrillance : ce qui distingue cette copie des autres",
+  "duplicates.oldest": "La plus ancienne",
+  "duplicates.oldestHint": "La copie indexée en premier",
+  "duplicates.added": "Ajouté le {date}",
+  "duplicates.lastViewed": "Vu le {date}",
+  "duplicates.open": "Ouvrir",
 
   // Écran de gestion des tags
   // auto tagging
