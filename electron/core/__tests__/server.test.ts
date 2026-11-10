@@ -1,8 +1,9 @@
 // Regression tests for the media HTTP server: URL routing, Range serving, the
-// path-confinement guards, and the ffmpeg remux path (status-code behaviour only).
+// path-confinement guards, and the ffmpeg remux path.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { FFMPEG } from "../ffmpeg-paths.js";
+import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
+import { extractMeta } from "../media.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -383,6 +384,79 @@ describe("frame serving (ffmpeg path)", () => {
 });
 
 describe("media remux (ffmpeg path)", () => {
+  it.each(["ac3", "eac3"])(
+    "copies the HEVC picture and converts Dolby Digital %s surround audio to AAC",
+    async (codec) => {
+      const name = `dolby-${codec}.mkv`;
+      const clip = path.join(root, name);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=12:duration=1",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc=channel_layout=5.1:sample_rate=48000:duration=1",
+        "-c:v",
+        "libx265",
+        "-pix_fmt",
+        "yuv420p10le",
+        "-preset",
+        "ultrafast",
+        "-x265-params",
+        "pools=none:frame-threads=1:log-level=error",
+        "-color_trc",
+        "bt709",
+        "-c:a",
+        codec,
+        clip,
+      ]);
+      const original = fs.readFileSync(clip);
+      const metadata = await extractMeta(clip, "video");
+      const id = insert(name, clip, null, "done", "video", "mkv");
+      const updateMeta = db.prepare("UPDATE files SET meta = ? WHERE id = ?");
+      updateMeta.run(JSON.stringify(metadata.raw), id);
+      const url = `${base}/ws/${WS}/media/${id}`;
+
+      for (const search of ["", "?t=0.25"]) {
+        const response = await fetch(url + search, authHeaders());
+        expect(response.status).toBe(200);
+        const result = JSON.parse(
+          execFileSync(
+            FFPROBE,
+            [
+              "-v",
+              "error",
+              "-show_entries",
+              "stream=codec_name,pix_fmt,color_transfer,channels",
+              "-of",
+              "json",
+              "pipe:0",
+            ],
+            {
+              input: Buffer.from(await response.arrayBuffer()),
+              encoding: "utf8",
+            },
+          ),
+        ) as { streams: unknown };
+        expect(result.streams).toEqual([
+          {
+            codec_name: "hevc",
+            pix_fmt: "yuv420p10le",
+            color_transfer: "bt709",
+          },
+          { codec_name: "aac", channels: 6 },
+        ]);
+        // A subsequent seek still works if scan metadata is not ready.
+        updateMeta.run(null, id);
+      }
+      expect(fs.readFileSync(clip)).toEqual(original);
+    },
+  );
+
   it("remuxes an mkv to fragmented MP4 with a 200", async () => {
     const res = await fetch(`${base}/ws/${WS}/media/${remuxId}`, authHeaders());
     expect(res.status).toBe(200);

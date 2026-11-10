@@ -380,6 +380,10 @@ ProRes clips play in Meguri through a local H.264 preview at up to
 1920 × 1080. The original clip is still used when you drag it into an editor
 or open it externally.
 
+When the player repackages a container such as MKV, it converts Dolby Digital
+(AC-3) or Dolby Digital Plus (E-AC-3) audio to AAC for playback. The preview
+keeps the original picture and the surround channel count.
+
 ## Custom CSS
 
 Meguri's look can be changed with plain CSS in two ways, and both can be used
