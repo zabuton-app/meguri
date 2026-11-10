@@ -79,6 +79,8 @@
   .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); font-weight: 500; }
   .btn:hover { filter: brightness(1.08); }
   .size { color: var(--muted); font-weight: 400; font-size: .85rem; }
+  .card .desc { color: var(--muted); font-size: .9rem; margin: .5rem 0; }
+  .card .desc a { color: var(--accent); }
   code.cmd {
     display: block; background: var(--card); border: 1px solid var(--border);
     border-radius: 8px; padding: .55rem .9rem; margin: .4rem 0;
@@ -145,16 +147,28 @@
   <h2>Package managers</h2>
   <div class="cards">
     <div class="card" data-os="linux">
-      <h3>Arch Linux (AUR)</h3>
+      <h3>Arch Linux (AUR) — meguri-bin</h3>
+      <p class="desc"><a href="https://aur.archlinux.org/packages/meguri-bin">meguri-bin</a>
+      is maintained by this project and installs the prebuilt release binaries.
+      Recommended on Arch. Install it with your favorite AUR helper:</p>
       <code class="cmd">yay -S meguri-bin</code>
+      <code class="cmd">paru -S meguri-bin</code>
+      <p class="desc">Or build it manually:</p>
+      <code class="cmd">git clone https://aur.archlinux.org/meguri-bin.git</code>
+      <code class="cmd">cd meguri-bin &amp;&amp; makepkg -si</code>
+    </div>
+    <div class="card">
+      <h3>Arch Linux (AUR) — meguri <span class="size">(unofficial)</span></h3>
+      <p class="desc">A third-party
+      <a href="https://aur.archlinux.org/packages/meguri">meguri</a> package
+      builds from source against the distribution's Electron:</p>
+      <code class="cmd">yay -S meguri</code>
+      <p class="desc">It is maintained by a community packager, not by this
+      project: it is unofficial, its build is not verified here, and it may lag
+      behind the latest release. Check its version before installing if you want
+      the newest features.</p>
     </div>
   </div>
-
-  <p class="note">A community-maintained
-  <a href="https://aur.archlinux.org/packages/meguri">meguri</a> AUR package
-  that builds from source also exists. It is not maintained by this project and
-  may lag behind the latest release — <code>meguri-bin</code> is the official
-  one.</p>
 
   <p class="note">All downloads are also available on the
   <a href="https://github.com/zabuton-app/meguri/releases">GitHub Releases</a> page.
