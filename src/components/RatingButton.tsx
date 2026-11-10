@@ -44,6 +44,7 @@ export function RatingButton({
         onChange={(r) => setRating.mutate(r)}
         size={size}
         disabled={setRating.isPending}
+        file={{ id: fileId, workspaceId }}
       />
     </div>
   );

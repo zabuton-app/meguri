@@ -1,14 +1,16 @@
 // What can be done to one file or a selection of them from outside the file's
 // own controls: favorite, Watch Later, rating, collection membership, and, for
 // a single file, opening it externally, revealing it, copying its path and
-// dropping it from the index.
+// dropping it from the index. A favorite or rating change on a single file
+// also asks its card to play its effect (lib/fileFxStore); a bulk one plays
+// nothing, as a screenful of cards bursting at once is more noise than news.
 //
 // One hook for one file and for many: the writes go through the bulk channels
 // (useBulkEdit, collection_set_membership), which take a single target as
 // readily as a selection, so a toggle reads and levels the same way whether it
 // was aimed at the focused card or at a hundred selected ones (see
-// src/lib/bulkEdit.ts for those rules). The command menu is the first caller;
-// the file context menu (#120) is meant to be the next.
+// src/lib/bulkEdit.ts for those rules). The command menu and the file context
+// menu call it.
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,6 +22,7 @@ import { useSelection } from "@/components/SelectionContext";
 import { useBulkEdit } from "@/hooks/useBulkEdit";
 import type { WatchLaterMembership } from "@/hooks/useWatchLater";
 import { useI18n } from "@/i18n/I18nProvider";
+import { playFavoriteFx, playRatingFx } from "@/lib/fileFxStore";
 import { fileNameOf } from "@/lib/relPath";
 import {
   bulkFlagOf,
@@ -248,13 +251,22 @@ export function useFileActions(
 
   return {
     favorite,
-    toggleFavorite: () => bulk.setFavorite(bulkToggleTarget(favorite)),
+    toggleFavorite: () => {
+      const next = bulkToggleTarget(favorite);
+      // The card's own button plays on the click, before the write lands;
+      // its card plays now too (not for a bulk edit: see the header).
+      if (rows.length === 1) playFavoriteFx(rows, next);
+      bulk.setFavorite(next);
+    },
     watchLater: queued,
     toggleWatchLater: watchLater.id
       ? () => bulk.setWatchLater(bulkToggleTarget(queued))
       : null,
     rating: uniformRating(rows),
-    setRating: bulk.setRating,
+    setRating: (rating) => {
+      if (rows.length === 1) playRatingFx(rows, rating);
+      bulk.setRating(rating);
+    },
     toggleCollection: (collection) =>
       membership.mutate({
         collection,

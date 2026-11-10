@@ -10,9 +10,11 @@ import {
   within,
 } from "@testing-library/react";
 import { useEffect } from "react";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { FileContextMenu } from "@/components/FileContextMenu";
 import { useSelection } from "@/components/SelectionContext";
 import { setFocusedFile } from "@/hooks/useFocusedFile";
+import { resetFileFxForTest } from "@/lib/fileFxStore";
 import { mediaSortId } from "@/lib/mediaSortId";
 import { sampleFileRow } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -71,6 +73,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => setFocusedFile(null));
+  resetFileFxForTest();
 });
 
 const file = (id: number, over: Partial<FileRow> = {}): FileRow => ({
@@ -202,6 +205,55 @@ describe("FileContextMenu", () => {
         rating: 3,
       }),
     );
+  });
+
+  it("plays the card's own favorite effect for a change made from it", () => {
+    const f = file(21);
+    renderWithProviders(
+      <FileContextMenu items={[f]} mediaBase="http://media" active>
+        <div data-file-key={mediaSortId(f)} data-testid="card-21">
+          <FavoriteButton
+            fileId={f.id}
+            workspaceId={f.workspaceId}
+            favorite={f.favorite}
+          />
+        </div>
+      </FileContextMenu>,
+    );
+    const card = screen.getByTestId("card-21");
+    expect(card.querySelector(".fx-pop")).toBeNull();
+
+    fireEvent.contextMenu(card);
+    fireEvent.click(item(/^add to favorites/i));
+    expect(card.querySelector(".fx-pop")).not.toBeNull();
+  });
+
+  it("plays no effect for a bulk edit", () => {
+    const a = file(22);
+    const b = file(23);
+    renderWithProviders(
+      <>
+        <Select rows={[a, b]} />
+        <FileContextMenu items={[a, b]} mediaBase="http://media" active>
+          {[a, b].map((f) => (
+            <div
+              key={f.id}
+              data-file-key={mediaSortId(f)}
+              data-testid={`card-${f.id}`}
+            >
+              <FavoriteButton
+                fileId={f.id}
+                workspaceId={f.workspaceId}
+                favorite={f.favorite}
+              />
+            </div>
+          ))}
+        </FileContextMenu>
+      </>,
+    );
+    fireEvent.contextMenu(screen.getByTestId("card-22"));
+    fireEvent.click(item(/^add to favorites/i));
+    expect(document.querySelector(".fx-pop")).toBeNull();
   });
 
   it("acts on the whole selection when the clicked file is in it", async () => {
