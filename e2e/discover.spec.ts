@@ -41,8 +41,15 @@ test.describe("Discover", () => {
       timeout: 30_000,
     });
     await dialog.getByRole("link", { name: "Open" }).click();
+    // The Discover card titles the file too (an h2), so a bare heading match
+    // passes while Discover is still on screen and the Escape below closes
+    // Discover instead. Only the detail view titles it with an h1, so wait for
+    // the detail route and then for that h1 to be rendered.
+    await expect(ready).toHaveURL(/#\/file\//);
     await expect(
-      ready.getByRole("dialog").getByRole("heading", { name: FIXTURE_FILE }),
+      ready
+        .getByRole("dialog")
+        .getByRole("heading", { level: 1, name: FIXTURE_FILE }),
     ).toBeVisible();
     await ready.keyboard.press("Escape");
     await expect(
