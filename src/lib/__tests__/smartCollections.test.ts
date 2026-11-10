@@ -66,14 +66,14 @@ describe("smartCollections", () => {
 
   it("describeSearchQuery builds a human-readable summary", () => {
     expect(
-      describeSearchQuery(t, {
+      describeSearchQuery(t, "en", {
         q: "cat",
         kind: "video",
         ratingMin: 3,
         favorite: true,
       }),
     ).toContain("cat");
-    expect(describeSearchQuery(t, { kind: "video" })).toContain(
+    expect(describeSearchQuery(t, "en", { kind: "video" })).toContain(
       en["kind.video"],
     );
   });
@@ -81,7 +81,7 @@ describe("smartCollections", () => {
   it("describeSearchQuery joins every condition in a fixed order", () => {
     // This string is also the pre-filled name in the save dialog.
     expect(
-      describeSearchQuery(t, {
+      describeSearchQuery(t, "en", {
         ratingMin: 4,
         favorite: true,
         sort: "btime",
@@ -180,7 +180,7 @@ describe("folder condition", () => {
 
   it("names the folder in the description", () => {
     expect(
-      describeSearchQuery(t, {
+      describeSearchQuery(t, "en", {
         folder: { path: "a/b", recursive: true },
         kind: "video",
       }),

@@ -31,7 +31,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { useI18n, type TFunc } from "@/i18n/I18nProvider";
+import { useI18n, type Lang, type TFunc } from "@/i18n/I18nProvider";
+import { formatDate, formatDateTime } from "@/lib/dates";
 import { HistoryModal } from "./HistoryModal";
 
 const PAGE_SIZE = 50;
@@ -39,7 +40,7 @@ const MODAL_SIZE_KEY = "meguri.history.modalSize";
 
 /** Day bucket label: today / yesterday / locale date. Calendar-day comparison
  *  (not ms arithmetic) so DST transitions can't shift the bucket boundaries. */
-function dayLabel(playedAt: number, t: TFunc): string {
+function dayLabel(playedAt: number, t: TFunc, lang: Lang): string {
   const day = new Date(playedAt * 1000);
   const today = new Date();
   const sameDay = (a: Date, b: Date) =>
@@ -54,11 +55,11 @@ function dayLabel(playedAt: number, t: TFunc): string {
     today.getDate() - 1,
   );
   if (sameDay(day, yesterday)) return t("history.yesterday");
-  return day.toLocaleDateString();
+  return formatDate(day, lang);
 }
 
 export default function History() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -152,13 +153,13 @@ export default function History() {
   const groups = useMemo(() => {
     const out: { label: string; rows: HistoryEntryRow[] }[] = [];
     for (const row of items) {
-      const label = dayLabel(row.playedAt, t);
+      const label = dayLabel(row.playedAt, t, lang);
       const last = out[out.length - 1];
       if (last && last.label === label) last.rows.push(row);
       else out.push({ label, rows: [row] });
     }
     return out;
-  }, [items, t]);
+  }, [items, t, lang]);
 
   const loading = ready && history.isLoading;
 
@@ -258,7 +259,10 @@ export default function History() {
                             </span>
                             <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
                               <span className="tabular-nums">
-                                {new Date(row.playedAt * 1000).toLocaleString()}
+                                {formatDateTime(
+                                  new Date(row.playedAt * 1000),
+                                  lang,
+                                )}
                               </span>
                               <Badge variant="outline" className="font-normal">
                                 {row.via === "external"

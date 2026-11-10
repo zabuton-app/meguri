@@ -53,7 +53,7 @@ export function FilterBar({
   onToggleHeatmap,
   heatmapOpen = false,
 }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
 
   const smart = useSmartCollections();
@@ -62,8 +62,8 @@ export function FilterBar({
   const clearAll = () => onChange(clearAllTarget(value, defaultQuery));
 
   const descriptors = useMemo(
-    () => describeConditions(value, t, defaultQuery),
-    [value, t, defaultQuery],
+    () => describeConditions(value, t, lang, defaultQuery),
+    [value, t, lang, defaultQuery],
   );
   const collapsedCount = collapsedConditionCount(descriptors);
 

@@ -51,7 +51,7 @@ let savedPosition: { wsId: string; filterKey: string; index: number } | null =
   null;
 
 export default function Discover() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
@@ -351,6 +351,7 @@ export default function Discover() {
                     workspaceName={wsNames.get(f.workspaceId)}
                     isActive={i === current}
                     t={t}
+                    lang={lang}
                   />
                 </CarouselItem>
               ))}

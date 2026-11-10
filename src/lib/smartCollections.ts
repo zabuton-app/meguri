@@ -4,7 +4,8 @@ import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
 import { ROOT_FOLDER } from "@shared/folderPath";
 import { MANUAL_SORT, resolveSortDir } from "@shared/sortDir";
 import { parseQualifiedTagName } from "@shared/tags";
-import type { TFunc } from "@/i18n/I18nProvider";
+import type { Lang, TFunc } from "@/i18n/I18nProvider";
+import { formatDate } from "@/lib/dates";
 import { kindLabelKey } from "@/lib/mediaKind";
 import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
@@ -188,8 +189,8 @@ export function makeSmartCollection(
 }
 
 /** Format a Unix-seconds timestamp as a short local date for query descriptions. */
-function formatDate(sec: number): string {
-  return new Date(sec * 1000).toLocaleDateString();
+function formatTimestamp(sec: number, lang: Lang): string {
+  return formatDate(new Date(sec * 1000), lang);
 }
 
 /**
@@ -199,20 +200,29 @@ function formatDate(sec: number): string {
  */
 export function describeDateRange(
   t: TFunc,
+  lang: Lang,
   from: number | undefined,
   to: number | undefined,
 ): string {
   if (from != null && to != null) {
     // One day (a day picked on the heatmap, say) reads as that day.
-    const [first, last] = [formatDate(from), formatDate(to)];
+    const [first, last] = [
+      formatTimestamp(from, lang),
+      formatTimestamp(to, lang),
+    ];
     return first === last ? first : `${first}–${last}`;
   }
-  if (from != null) return `${t("filter.dateFrom")} ${formatDate(from)}`;
-  if (to != null) return `${t("filter.dateTo")} ${formatDate(to)}`;
+  if (from != null)
+    return `${t("filter.dateFrom")} ${formatTimestamp(from, lang)}`;
+  if (to != null) return `${t("filter.dateTo")} ${formatTimestamp(to, lang)}`;
   return "";
 }
 
-export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
+export function describeSearchQuery(
+  t: TFunc,
+  lang: Lang,
+  query: SearchQuery,
+): string {
   const parts: string[] = [];
   const folder = scopedFolderPath(query);
   if (folder != null) parts.push(`${t("folder.chip")}: ${folder}`);
@@ -232,7 +242,7 @@ export function describeSearchQuery(t: TFunc, query: SearchQuery): string {
   for (const { label, from, to } of DATE_RANGES) {
     if (query[from] != null || query[to] != null)
       parts.push(
-        `${t(label)}: ${describeDateRange(t, query[from], query[to])}`,
+        `${t(label)}: ${describeDateRange(t, lang, query[from], query[to])}`,
       );
   }
   for (const tag of query.tags ?? []) {

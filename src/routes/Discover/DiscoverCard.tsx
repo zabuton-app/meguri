@@ -27,6 +27,8 @@ import { RatingStars } from "@/components/RatingStars";
 import { useHoverFramePreview } from "@/hooks/useHoverFramePreview";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { formatDuration, formatSize } from "@/lib/format";
+import { formatDate } from "@/lib/dates";
+import type { Lang } from "@/i18n/I18nProvider";
 import { LIST_HIDDEN_SOURCES } from "@shared/tags";
 import { tagColorClass } from "@/lib/tagColorClass";
 import { tagHumanLabel } from "@/lib/tagLabel";
@@ -53,6 +55,7 @@ export function DiscoverCard({
   workspaceName,
   isActive,
   t,
+  lang,
 }: {
   file: FileRow;
   mediaBase: string;
@@ -69,6 +72,7 @@ export function DiscoverCard({
   /** Whether this slide is the selected one (scene frames load lazily per slide). */
   isActive: boolean;
   t: TFunc;
+  lang: Lang;
 }) {
   const qc = useQueryClient();
   const { pause: pauseAudio } = useAudioActions();
@@ -270,7 +274,7 @@ export function DiscoverCard({
                 {file.size ? <Chip>{formatSize(file.size)}</Chip> : null}
                 {file.capturedAt ? (
                   <Chip>
-                    {new Date(file.capturedAt * 1000).toLocaleDateString()}
+                    {formatDate(new Date(file.capturedAt * 1000), lang)}
                   </Chip>
                 ) : null}
               </>

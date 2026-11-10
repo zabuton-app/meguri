@@ -44,7 +44,7 @@ export function SmartCollectionsMenu({
   onApply,
   smart,
 }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const {
     collections,
     defaultId,
@@ -60,8 +60,8 @@ export function SmartCollectionsMenu({
   // The full condition summary doubles as the default name, so the dialog can
   // be confirmed as-is and the saved entry still says what it filters.
   const summary = useMemo(
-    () => describeSearchQuery(t, cleanSearchQuery(value)),
-    [t, value],
+    () => describeSearchQuery(t, lang, cleanSearchQuery(value)),
+    [t, lang, value],
   );
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export function SmartCollectionsMenu({
                         {collection.name}
                       </span>
                       <span className="block truncate text-xs text-muted">
-                        {describeSearchQuery(t, collection.query)}
+                        {describeSearchQuery(t, lang, collection.query)}
                       </span>
                     </span>
                   </DropdownMenuItem>

@@ -52,7 +52,7 @@ import {
 const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
 
 export default function MediaDetail() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { id } = useParams();
   const fileId = Number(id);
   // Optional initial seek position (seconds), e.g. when arriving from a Discovery scene click.
@@ -541,7 +541,7 @@ export default function MediaDetail() {
             t={t}
           />
 
-          <PlayHistory history={d.playHistory} t={t} />
+          <PlayHistory history={d.playHistory} t={t} lang={lang} />
         </div>
       </ScrollArea>
     </MediaModal>

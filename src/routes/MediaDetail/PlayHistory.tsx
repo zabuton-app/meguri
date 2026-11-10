@@ -1,14 +1,17 @@
 import type { FileDetail } from "@/ipc/types";
-import type { TFunc } from "@/i18n/I18nProvider";
+import type { Lang, TFunc } from "@/i18n/I18nProvider";
+import { formatDateTime } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 
 /** The most recent plays of the file. Renders nothing when there are none. */
 export function PlayHistory({
   history,
   t,
+  lang,
 }: {
   history: FileDetail["playHistory"];
   t: TFunc;
+  lang: Lang;
 }) {
   if (history.length === 0) return null;
   return (
@@ -20,7 +23,7 @@ export function PlayHistory({
         {history.slice(0, 8).map((p, i) => (
           <li key={i} className="flex items-center gap-2">
             <span className="tabular-nums text-fg">
-              {new Date(p.playedAt * 1000).toLocaleString()}
+              {formatDateTime(new Date(p.playedAt * 1000), lang)}
             </span>
             <Badge variant="outline" className="font-normal">
               {p.via}
