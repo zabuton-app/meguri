@@ -2,6 +2,13 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 export const FIXTURE_FILE = "test.png";
 
+export async function waitForRenderer(page: Page): Promise<void> {
+  // Electron can expose the initial blank page before it loads the app.
+  await page.waitForURL(/\/out\/renderer\/index\.html(?:[?#].*)?$/, {
+    waitUntil: "domcontentloaded",
+  });
+}
+
 export function statusBar(page: Page): Locator {
   return page.getByRole("contentinfo", { name: "Status bar" });
 }
@@ -110,6 +117,7 @@ export async function expectStarRating(
  * first-launch tour as seen and reload, or its overlay would sit over the test.
  */
 export async function skipFirstLaunchTour(page: Page): Promise<void> {
+  await waitForRenderer(page);
   await page.evaluate(() =>
     localStorage.setItem("meguri.tours", JSON.stringify(["first-launch"])),
   );
