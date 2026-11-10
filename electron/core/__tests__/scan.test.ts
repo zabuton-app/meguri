@@ -14,6 +14,7 @@ import {
 import { syncFts } from "../tags.js";
 import {
   contentHash,
+  isMountpoint,
   kindForExt,
   looksLikeMpegTs,
   ScanRootUnreadableError,
@@ -838,6 +839,14 @@ describe("walk", () => {
 
     expect(found).toEqual(["keep.mp4"]);
     expect(unreadable).toEqual([]);
+  });
+
+  it("tells a mountpoint by its device, unlike its parent's", async () => {
+    // A plain folder shares its parent's device; a file system's root has no
+    // parent to differ from; a root that is gone is not known.
+    expect(await isMountpoint(root)).toBe(false);
+    expect(await isMountpoint(path.parse(root).root)).toBe(false);
+    expect(await isMountpoint(path.join(root, "gone"))).toBeNull();
   });
 
   it("throws when the root goes away during the walk", async () => {

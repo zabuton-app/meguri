@@ -7,6 +7,8 @@ import { nowUnix } from "./db.js";
 import {
   assertScanRootReadable,
   emptyScanStats,
+  isMountpoint,
+  ScanRootUnreadableError,
   syncFiles,
   unreadableMatcher,
   walk,
@@ -154,6 +156,7 @@ export async function runScan(
   // walk() throws when the root cannot be read, before anything below touches
   // the index.
   const unreadablePaths: string[] = [];
+  const mountpointBefore = await isMountpoint(core.root);
   const discovered = await walk(
     core.root,
     (count) =>
@@ -172,6 +175,30 @@ export async function runScan(
     const empty = emptyScanStats();
     onEvent({ type: "done", jobId, stats: empty, aborted: true });
     return empty;
+  }
+
+  // A root that was a mountpoint and now is a folder on its parent's device
+  // with no media is a drive that is not mounted (readdir succeeds on the bare
+  // mountpoint): fail as an unreachable root before anything is deleted
+  // (#312). Media found means the user put files there instead. Whatever else
+  // the bare folder holds (a desktop's hidden file, a "not mounted" marker)
+  // does not count. Taken before and after the walk, so a drive unmounted (or
+  // mounted, or gone) during it fails the scan too rather than recording what
+  // it saw.
+  const mountpoint = await isMountpoint(core.root);
+  if (mountpointBefore !== null && mountpointBefore !== mountpoint) {
+    throw new ScanRootUnreadableError(
+      "the scan root was mounted or unmounted during the scan",
+    );
+  }
+  if (
+    mountpoint === false &&
+    discovered.length === 0 &&
+    q.scanRootWasMountpoint(db, core.rootId)
+  ) {
+    throw new ScanRootUnreadableError(
+      "the scan root looks like a mountpoint with nothing mounted",
+    );
   }
 
   // Rows walk() could not reach (a folder or file that exists but cannot be
@@ -217,6 +244,7 @@ export async function runScan(
     );
   }
   q.touchScanRoot(db, core.rootId);
+  if (mountpoint !== null) q.setScanRootMountpoint(db, core.rootId, mountpoint);
 
   // Tag what this scan added or changed (ftsTargets is exactly that set). Ahead
   // of the FTS sync and the thumbnail pool: the engine reads nothing but file
@@ -539,8 +567,14 @@ export async function runScan(
   const attempted = pending.length - noCoverArt;
   if (failed > 0 && failed === attempted && !signal?.aborted) {
     // A drive or share that went away during the thumbnails fails them all
-    // too: say so, rather than blame ffmpeg (#313).
+    // too: say so, rather than blame ffmpeg (#313). An unmounted mountpoint
+    // can still be read, as a bare folder (#312).
     await assertScanRootReadable(core.root);
+    if (mountpoint === true && (await isMountpoint(core.root)) === false) {
+      throw new ScanRootUnreadableError(
+        "the scan root was unmounted during the scan",
+      );
+    }
     throw new Error(
       `thumbnail extraction failed for all ${failed} attempted file(s) (is ffmpeg/ffprobe working?)`,
     );

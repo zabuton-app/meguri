@@ -20,6 +20,27 @@ export function touchScanRoot(db: DB, rootId: number): void {
   );
 }
 
+/** Whether the root was a mountpoint at its last scan (false if unknown). */
+export function scanRootWasMountpoint(db: DB, rootId: number): boolean {
+  return (
+    db
+      .prepare("SELECT mountpoint FROM scan_roots WHERE id = ?")
+      .pluck()
+      .get(rootId) === 1
+  );
+}
+
+export function setScanRootMountpoint(
+  db: DB,
+  rootId: number,
+  mountpoint: boolean,
+): void {
+  db.prepare("UPDATE scan_roots SET mountpoint = ? WHERE id = ?").run(
+    mountpoint ? 1 : 0,
+    rootId,
+  );
+}
+
 /** Last completed-scan timestamp for the workspace (max across registered roots; usually one row). */
 export function lastScanAt(db: DB): number | null {
   const row = db
