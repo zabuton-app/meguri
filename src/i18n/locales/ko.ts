@@ -576,6 +576,8 @@ export const ko: Record<TranslationKey, string> = {
   "duplicates.empty": "중복 파일을 찾을 수 없습니다.",
   "duplicates.emptyHint":
     "내용이 동일한(해시와 크기가 일치하는) 파일이 여러 개 있으면 여기에 표시됩니다.",
+  "duplicates.loadFailed":
+    "중복 파일을 불러오지 못했습니다. 다시 시도해 주세요.",
   "duplicates.fileCount": "{count}개",
   "duplicates.truncated": "그룹이 많아 상위 {max}개만 표시합니다.",
   "duplicates.filter": "중복 파일만 표시",

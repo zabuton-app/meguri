@@ -578,6 +578,7 @@ export const en: Record<TranslationKey, string> = {
   "duplicates.empty": "No duplicate files found.",
   "duplicates.emptyHint":
     "Files with identical content (matching hash and size) will appear here.",
+  "duplicates.loadFailed": "Could not load duplicate files. Please try again.",
   "duplicates.fileCount": "{count} files",
   "duplicates.truncated": "Too many groups; showing only the top {max}.",
   "duplicates.filter": "Show only duplicate files",
