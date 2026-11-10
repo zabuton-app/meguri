@@ -34,11 +34,28 @@ vi.mock("../media.js", async (importOriginal) => ({
   },
 }));
 
+// Whether the root is a mountpoint now: a real one cannot be made here.
+// `next` answers the following calls first (runScan asks before and after the
+// walk).
+const mount = vi.hoisted(() => {
+  const state: { now: boolean | null; next: (boolean | null)[] } = {
+    now: false,
+    next: [],
+  };
+  return state;
+});
+vi.mock("../scan.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../scan.js")>()),
+  isMountpoint: () =>
+    Promise.resolve(mount.next.length > 0 ? mount.next.shift()! : mount.now),
+}));
+
 import { openDb, type DB } from "../db.js";
 import type { Core } from "../index.js";
 import {
   clearExcludedFiles,
   deleteFromIndex,
+  scanRootWasMountpoint,
   upsertScanRoot,
 } from "../queries.js";
 import { fileTags } from "../tags.js";
@@ -58,6 +75,8 @@ describe("runScan", () => {
 
   beforeEach(async () => {
     media.failThumb = () => false;
+    mount.now = false;
+    mount.next = [];
     db = openDb(":memory:", ":memory:");
     root = await fsp.mkdtemp(path.join(os.tmpdir(), "meguri-runscan-"));
     thumbs = await fsp.mkdtemp(path.join(os.tmpdir(), "meguri-runscan-th-"));
@@ -237,6 +256,103 @@ describe("runScan", () => {
       "the scan root cannot be read",
     );
     expect(rows()).toEqual(before);
+  });
+
+  describe("a root that was a mountpoint (#312)", () => {
+    const scanMounted = async () => {
+      mount.now = true;
+      write("a.mp4", "AAAAAAAAAA");
+      await scan();
+      expect(scanRootWasMountpoint(db, rootId)).toBe(true);
+    };
+    // Unmounted: the bare mountpoint, an empty folder on its parent's device.
+    const unmount = () => {
+      fs.rmSync(path.join(root, "a.mp4"));
+      mount.now = false;
+    };
+
+    it("fails without touching the index when nothing is mounted there", async () => {
+      await scanMounted();
+      const before = rows();
+      unmount();
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+      await expect(scan({ rebuild: true })).rejects.toBeInstanceOf(
+        ScanRootUnreadableError,
+      );
+      expect(rows()).toEqual(before);
+      // Still known as a mountpoint, for the scan after.
+      expect(scanRootWasMountpoint(db, rootId)).toBe(true);
+    });
+
+    it("scans files put in the folder once it is no longer mounted on", async () => {
+      await scanMounted();
+      unmount();
+      write("b.mp4", "BBBBBBBBBB");
+
+      expect(await scan()).toMatchObject({ inserted: 1, deleted: 1 });
+      expect(scanRootWasMountpoint(db, rootId)).toBe(false);
+    });
+
+    it("fails also when the bare mountpoint holds other files", async () => {
+      await scanMounted();
+      const before = rows();
+      unmount();
+      // A desktop's hidden file, or a marker some put in a mountpoint.
+      write(".directory", "[Desktop Entry]");
+      write("NOT_MOUNTED", "");
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+      expect(rows()).toEqual(before);
+    });
+
+    it("fails when the drive is unmounted during the walk", async () => {
+      await scanMounted();
+      write("b.mp4", "BBBBBBBBBB");
+      const before = rows();
+      // Mounted when the walk starts, the bare mountpoint when it ends.
+      mount.next = [true, false];
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+      expect(rows()).toEqual(before);
+      expect(scanRootWasMountpoint(db, rootId)).toBe(true);
+    });
+
+    it("fails when the root cannot be told apart after the walk", async () => {
+      await scanMounted();
+      const before = rows();
+      mount.next = [true, null];
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+      expect(rows()).toEqual(before);
+    });
+
+    it("blames the drive, not ffmpeg, when it is unmounted during the thumbnails", async () => {
+      await scanMounted();
+      write("b.mp4", "BBBBBBBBBB");
+      // Mounted through the walk; the bare mountpoint by the thumbnails.
+      mount.next = [true, true];
+      mount.now = false;
+      media.failThumb = () => true;
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+    });
+
+    it("empties the list of a mounted drive that was emptied", async () => {
+      await scanMounted();
+      fs.rmSync(path.join(root, "a.mp4"));
+
+      expect(await scan()).toMatchObject({ deleted: 1 });
+    });
+
+    it("empties the list of a plain folder that was emptied", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      await scan();
+      fs.rmSync(path.join(root, "a.mp4"));
+
+      expect(await scan()).toMatchObject({ deleted: 1 });
+      expect(scanRootWasMountpoint(db, rootId)).toBe(false);
+    });
   });
 
   it("keeps file ids and rebuilds search entries and thumbnails on a rebuild", async () => {

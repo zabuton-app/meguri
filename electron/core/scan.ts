@@ -168,6 +168,24 @@ function rootUnreadableError(code: string | undefined): Error {
 }
 
 /**
+ * Whether the root is a mountpoint: on another device than its parent folder.
+ * An unmounted one is a plain empty folder on its parent's device. Only the
+ * two are compared, since a network share can get a new device id on every
+ * mount. False for a file system's root ("/", "D:\\"), null when either
+ * cannot be stat'ed.
+ */
+export async function isMountpoint(root: string): Promise<boolean | null> {
+  const parent = path.dirname(root);
+  if (parent === root) return false;
+  try {
+    const [r, p] = await Promise.all([fsp.stat(root), fsp.stat(parent)]);
+    return r.dev !== p.dev;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Throws a ScanRootUnreadableError unless the root can be opened. Opening it
  * (without listing it) answers "is it still there?" cheaply, even for a root
  * with many entries on a network share.

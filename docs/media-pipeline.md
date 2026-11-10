@@ -31,11 +31,23 @@ scan before the index is touched, so its files are not soft-deleted, and the
 user is told which workspace's folder could not be reached. The root is
 read again at the end of the walk, so one that goes away partway through fails
 the scan too, instead of its folders reading as deleted (a subfolder or file
-that turns out to be gone triggers the same check right away). A rebuild resets
-the index only after the root has been read. It soft-deletes the rows (clearing
-their probed fields, thumbnails and search entries) instead of deleting them, so
-the rescan revives each file still there with the same `files.id`; rows of files
-already gone are deleted. The rescan
+that turns out to be gone triggers the same check right away).
+
+An unmounted mountpoint (an `/etc/fstab` entry whose drive is not attached) can
+be read, as an empty folder, so each scan records whether the root is a
+mountpoint: on another device than its parent folder (only those two are
+compared, since a network share can get a new device id on every mount). A root
+that was one at the last scan, is on its parent's device now and holds no media
+fails the scan the same way (whatever else the bare folder holds, such as a
+desktop's hidden file, does not count), and so does a root mounted or unmounted
+while it is walked. A drive unmounted during the thumbnails is reported the same
+way rather than as a broken ffmpeg. An existing workspace is covered from its
+first scan with the drive mounted.
+
+A rebuild resets the index only after the root has been read. It soft-deletes
+the rows (clearing their probed fields, thumbnails and search entries) instead
+of deleting them, so the rescan revives each file still there with the same
+`files.id`; rows of files already gone are deleted. The rescan
 hashes every file, so content replaced with its size and mtime kept is caught as
 a change; an unchanged file is not auto-tagged again, which "Apply to existing
 files" on the auto-tag screen does. A subdirectory that cannot be listed, or a

@@ -46,7 +46,8 @@ with `lib.`: an unqualified `CREATE INDEX` or `CREATE TRIGGER` would land in
 
 In the workspace database (`CORE_DDL`):
 
-- `scan_roots` — the registered root for this database.
+- `scan_roots` — the registered root for this database, with `last_scan_at`
+  and `mountpoint` (whether the root was a mountpoint at the last scan).
 - `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image` |
   `audio`), size/mtime/inode, `content_hash`, media metadata (`width`, `height`,
   `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`, and
