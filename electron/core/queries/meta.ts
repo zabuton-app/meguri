@@ -290,14 +290,13 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
 }
 
 /**
- * Copy a file's metadata to another key, keeping it under the one it had: for
- * a file whose content changed in place (#263), whose old content may still be
- * another file's, in this workspace or another one sharing the library. Merged
- * into what the target holds as migrateMetaKey does; a bookmark near one it
- * has is not added again. Only the user's tags are copied: the derived ones
- * (resolution, codec...) describe the old content, and the new one gets its
- * own. The plays are moved, not copied: they happened on this file, and a
- * copy of the old content still listed would show each of them twice.
+ * Copy a file's metadata to the key of its new content, for a file whose
+ * content changed in place (#263): the path, not only the hash, tells it is
+ * the same file. The old key keeps its copy, since another file may still have
+ * the old content. Merged into what the new key holds as migrateMetaKey does
+ * (a play already recorded, or a bookmark near one it has, is not added
+ * again). Only the user's tags are copied: the derived ones (resolution,
+ * codec...) describe the old content, and the new one gets its own.
  */
 export function copyMetaKey(db: DB, fromKey: string, toKey: string): void {
   if (fromKey === toKey) return;
@@ -322,7 +321,6 @@ export function copyMetaKey(db: DB, fromKey: string, toKey: string): void {
            WHERE t.meta_key = ? AND t.played_at = s.played_at AND t.via = s.via
              AND t.position IS s.position)`,
     ).run(toKey, fromKey, toKey);
-    db.prepare("DELETE FROM play_history WHERE meta_key = ?").run(fromKey);
     db.prepare(
       `INSERT INTO scene_bookmarks (meta_key, sec, created_at)
        SELECT ?, s.sec, s.created_at FROM scene_bookmarks s

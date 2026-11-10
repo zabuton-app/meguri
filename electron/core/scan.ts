@@ -495,9 +495,6 @@ export async function syncFiles(
   );
   // Recompute content_hash for changed files so meta_key stays anchored to the hash
   // (rather than dropping to the path fallback) and metadata keeps linking.
-  const hashHeldElsewhere = db.prepare(
-    "SELECT 1 FROM files WHERE content_hash = ? AND id <> ? AND deleted_at IS NULL LIMIT 1",
-  );
   const updateChanged = db.prepare(
     "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL WHERE id = ?",
   );
@@ -681,18 +678,11 @@ export async function syncFiles(
           // (tags or cover art edited, a recording that grew): its metadata
           // follows the new content (#263). Copied rather than moved from a
           // hash key, which another copy of the old content may still use.
-          // Unless another file here already has the new content (one copied
-          // over this one): that file's metadata is the content's, and this
-          // file's must not be merged into it.
+          // Not to empty content: every file truncated to nothing (a failed
+          // sync) has the same hash, and would merge all their metadata.
           const newKey = newHash ?? pathMetaKey(d.absPath);
-          if (existing.content_hash == null) {
-            carryMeta(newKey);
-          } else if (
-            newHash === undefined ||
-            hashHeldElsewhere.get(newHash, existing.id) === undefined
-          ) {
-            copyMetaKey(db, existing.meta_key, newKey);
-          }
+          if (existing.content_hash == null) carryMeta(newKey);
+          else if (d.size > 0) copyMetaKey(db, existing.meta_key, newKey);
           updateChanged.run(
             d.size,
             d.mtime,

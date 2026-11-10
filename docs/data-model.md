@@ -155,22 +155,28 @@ under that hash; the two are merged by the rules below.
 
 When the content of a file changes at the same path (its tags or cover art
 edited, a recording that grew), it gets a new hash but stays the same file to
-the user: `copyMetaKey()` copies its metadata to the new hash, merged by the
-same rules. It is copied rather than moved, since another file, in this
-workspace or another one, may still have the old content. Two parts are
-treated differently:
+the user: the path, not only the hash, tells it apart. `copyMetaKey()` copies
+its metadata to the new hash, plays and bookmarks included, merged by the rules
+below into what the library already holds there. It is copied rather than
+moved, since another file, in this workspace or another one, may still have the
+old content. Only the user's tags are copied; the tags derived from the content
+(resolution, codec and so on) are derived again for the new content.
 
-- only the user's tags are copied; the tags derived from the content
-  (resolution, codec and so on) are derived again for the new content
-- the plays are moved, since they happened on this file, and a copy of the old
-  content still listed would show each of them twice
+Where the path and the hash disagree, the path decides, and the outcome is
+accepted as it is:
 
-Nothing is copied when another file in the workspace already has the new
-content (one copied over this file): the content's metadata is that file's. A
+- another file's content copied over this one: this file's metadata is merged
+  into that content, so the other file shows it too
+- two files that swap their content: both end up with both files' metadata
+- an edit undone: the content gets back its old metadata merged with what was
+  set in between, so a favorite or a tag removed in between comes back
+- a copy of the old content still listed: the same plays show under both
+
+Nothing is copied to empty content: every file truncated to nothing (a failed
+sync, say) has the same hash, and would merge all their metadata into it. A
 changed file moved or renamed in the same step is not recognized, and starts
-without metadata. What stays under the old hash is merged back if the content
-returns to it (an edit undone), so a favorite or a tag removed in between comes
-back; and a tag kept only there still counts as in use for tag completion.
+without metadata. The copies left under old hashes are not cleaned up, so a tag
+kept only there still counts as in use for tag completion.
 
 `file_meta` holds `favorite`, `rating` (0–5), `last_accessed_at`, and
 `thumb_offset_sec` (the user-chosen thumbnail frame offset, `NULL` meaning the

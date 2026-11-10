@@ -316,7 +316,7 @@ describe("syncFiles lifecycle", () => {
       await fsp.utimes(file, new Date(), new Date(Date.now() + 60_000));
     };
 
-    it("copies its metadata to the new content, and moves its plays", async () => {
+    it("copies its metadata to the new content", async () => {
       const file = path.join(root, "song.mp3");
       await fsp.writeFile(file, "BBBBBBBBBB");
       await rescan();
@@ -350,6 +350,7 @@ describe("syncFiles lifecycle", () => {
       for (const key of [newKey, oldKey]) {
         expect(meta(key)).toEqual({ favorite: 1, rating: 4 });
         expect(bookmarks(key)).toEqual([12]);
+        expect(plays(key)).toEqual([30]);
       }
       expect(fileTags(db, row.id).map((t) => t.name)).toEqual(["Live"]);
       expect(
@@ -358,9 +359,6 @@ describe("syncFiles lifecycle", () => {
           .pluck()
           .get(oldKey),
       ).toBe(2);
-      // A copy of the old content still listed would show them twice.
-      expect(plays(newKey)).toEqual([30]);
-      expect(plays(oldKey)).toEqual([]);
     });
 
     it("merges into what the library holds for the new content", async () => {
@@ -372,7 +370,8 @@ describe("syncFiles lifecycle", () => {
       bookmark(oldKey, 12);
       play(oldKey, 30);
       play(oldKey, 45);
-      // The new content, known to another workspace sharing the library.
+      // The new content, known to another workspace sharing the library (or
+      // this file's own before an edit that is now undone).
       const scratch = path.join(root, "..", `${path.basename(root)}-new`);
       await fsp.writeFile(scratch, "CCCCCCCCCCCC");
       const newKey = await contentHash(scratch);
@@ -392,7 +391,7 @@ describe("syncFiles lifecycle", () => {
       expect(plays(newKey)).toEqual([30, 45]);
     });
 
-    it("leaves another file's metadata alone when its content is copied over this one", async () => {
+    it("does not copy to empty content, which every truncated file shares", async () => {
       const a = path.join(root, "a.mp4");
       const b = path.join(root, "b.mp4");
       await fsp.writeFile(a, "AAAAAAAAAA");
@@ -401,18 +400,61 @@ describe("syncFiles lifecycle", () => {
       const aKey = keyOf("a.mp4");
       const bKey = keyOf("b.mp4");
       setMeta(aKey, 1, 5);
-      bookmark(aKey, 12);
-      play(aKey, 30);
+      setMeta(bKey, 0, 1);
+
+      // A failed sync leaves both empty, then they are restored.
+      await edit(a, "");
+      await edit(b, "");
+      await rescan();
+      const emptyKey = keyOf("a.mp4");
+      expect(meta(emptyKey)).toBeUndefined();
+      await edit(a, "AAAAAAAAAA");
+      await edit(b, "BBBBBBBBBBBB");
+      await rescan();
+
+      expect(meta(aKey)).toEqual({ favorite: 1, rating: 5 });
+      expect(meta(bKey)).toEqual({ favorite: 0, rating: 1 });
+    });
+
+    // The path decides over the hash: accepted for the rare cases where the
+    // two disagree (#263).
+    it("takes its metadata to another file's content copied over it", async () => {
+      const a = path.join(root, "a.mp4");
+      const b = path.join(root, "b.mp4");
+      await fsp.writeFile(a, "AAAAAAAAAA");
+      await fsp.writeFile(b, "BBBBBBBBBBBB");
+      await rescan();
+      const aKey = keyOf("a.mp4");
+      const bKey = keyOf("b.mp4");
+      setMeta(aKey, 1, 5);
 
       // cp b.mp4 a.mp4
       await edit(a, "BBBBBBBBBBBB");
       await rescan();
 
       expect(keyOf("a.mp4")).toBe(bKey);
-      expect(meta(bKey)).toBeUndefined();
-      expect(bookmarks(bKey)).toEqual([]);
-      expect(plays(bKey)).toEqual([]);
+      expect(meta(bKey)).toEqual({ favorite: 1, rating: 5 });
       expect(meta(aKey)).toEqual({ favorite: 1, rating: 5 });
+    });
+
+    it("keeps both files' metadata when two files swap their content", async () => {
+      const a = path.join(root, "a.mp4");
+      const b = path.join(root, "b.mp4");
+      await fsp.writeFile(a, "AAAAAAAAAA");
+      await fsp.writeFile(b, "BBBBBBBBBBBB");
+      await rescan();
+      const aKey = keyOf("a.mp4");
+      const bKey = keyOf("b.mp4");
+      play(aKey, 30);
+      play(bKey, 45);
+
+      await edit(a, "BBBBBBBBBBBB");
+      await edit(b, "AAAAAAAAAA");
+      await rescan();
+
+      // Merged: nothing is lost, and both now show both.
+      expect(plays(aKey)).toEqual([30, 45]);
+      expect(plays(bKey)).toEqual([30, 45]);
     });
   });
 
