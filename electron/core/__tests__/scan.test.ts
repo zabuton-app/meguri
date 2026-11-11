@@ -769,6 +769,67 @@ describe("syncFiles lifecycle", () => {
     expect(ftsRow()).toEqual({ rowid: id });
   });
 
+  it("leaves a file removed from the index during the scan removed (#266)", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    await fsp.writeFile(path.join(root, "b.mp4"), "BBBBBBBBBB");
+    await rescan();
+    const idOf = (rel: string) =>
+      db
+        .prepare("SELECT id FROM files WHERE rel_path = ?")
+        .pluck()
+        .get(rel) as number;
+    const a = idOf("a.mp4");
+    const b = idOf("b.mp4");
+
+    // a changed (so it is hashed), b unchanged; both are removed from the
+    // index while the scan is hashing, after it read the excluded set.
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAAAA");
+    const discovered = await walk(root);
+    const res = await syncFiles(db, rootId, discovered, {
+      onHashProgress: (done, total) => {
+        if (done !== total) return;
+        deleteFromIndex(db, a);
+        deleteFromIndex(db, b);
+      },
+    });
+
+    expect(res.stats).toMatchObject({ updated: 0, unchanged: 0, deleted: 0 });
+    expect(res.ftsTargets).toEqual([]);
+    expect(res.ftsMissing).toEqual([]);
+    expect(res.needsThumb).toEqual([]);
+    const rows = db
+      .prepare(
+        "SELECT id, deleted_at, excluded_at, size FROM files WHERE id IN (?, ?) ORDER BY id",
+      )
+      .all(a, b) as {
+      id: number;
+      deleted_at: number | null;
+      excluded_at: number | null;
+      size: number;
+    }[];
+    for (const r of rows) {
+      expect(r.deleted_at).not.toBeNull();
+      expect(r.excluded_at).not.toBeNull();
+    }
+    // The changed file's row was not updated either.
+    expect(rows.find((r) => r.id === a)?.size).toBe(10);
+  });
+
+  it("does not add back the FTS row of a file removed from the index (#266)", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    const first = await rescan();
+    const [id] = first.ftsTargets;
+    syncFts(db, id);
+
+    // Removed after the scan listed it for FTS sync, before the sync ran.
+    deleteFromIndex(db, id);
+    syncFts(db, id);
+
+    expect(
+      db.prepare("SELECT rowid FROM files_fts WHERE rowid = ?").get(id),
+    ).toBeUndefined();
+  });
+
   it("does not rebuild the FTS row of a file that comes back with its row intact", async () => {
     await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
     const first = await rescan();
