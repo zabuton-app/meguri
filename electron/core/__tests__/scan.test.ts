@@ -138,11 +138,29 @@ describe("looksLikeMpegTs", () => {
     expect(await looksLikeMpegTs(path.join(dir, "nope.ts"))).toBe(false);
   });
 
-  it("keeps the extension's verdict when the file exists but can't be read", async () => {
-    // A directory opens but fails to read (EISDIR), standing in for an I/O error.
-    const sub = path.join(dir, "unreadable.ts");
+  it("rejects a directory named *.ts, which can be opened on Windows", async () => {
+    const sub = path.join(dir, "folder.ts");
     await fsp.mkdir(sub);
-    expect(await looksLikeMpegTs(sub)).toBe(true);
+    expect(await looksLikeMpegTs(sub)).toBe(false);
+  });
+
+  it("keeps the extension's verdict when the file exists but can't be read", async () => {
+    // Simulated I/O error on read of a regular file (not a directory).
+    const f = path.join(dir, "unreadable.ts");
+    await fsp.writeFile(f, tsBytes(8));
+    const real = await fsp.open(f, "r");
+    const spy = vi.spyOn(fsp, "open").mockResolvedValueOnce({
+      stat: () => real.stat(),
+      read: async () => {
+        throw Object.assign(new Error("EIO: i/o error"), { code: "EIO" });
+      },
+      close: () => real.close(),
+    } as unknown as Awaited<ReturnType<typeof fsp.open>>);
+    try {
+      expect(await looksLikeMpegTs(f)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
