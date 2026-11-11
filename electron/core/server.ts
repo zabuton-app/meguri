@@ -24,14 +24,15 @@ import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
 import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
 import { scopedLog } from "./logger.js";
-import { extractMeta } from "./media.js";
+import { extractMeta, type ExtractedMeta } from "./media.js";
 
 const log = scopedLog("server");
 
 // Only containers Chromium cannot demux are remuxed with ffmpeg and served.
 // Browser-compatible files are served via Range to enable full seeking.
 const REMUX_CONTAINERS = new Set(["mkv", "avi", "wmv", "flv", "ts"]);
-const remuxProbeSlots = new Semaphore(2);
+const playbackProbeSlots = new Semaphore(2);
+const PLAYBACK_PROBE_TIMEOUT_MS = 5_000;
 
 // Cap one-shot FFmpeg requests and periods without output in remux streams.
 // This prevents corrupt media from pinning a slot indefinitely.
@@ -99,6 +100,7 @@ async function remuxMetadata(
   id: number,
   file: string,
   res: http.ServerResponse,
+  probed: ExtractedMeta | null | undefined,
 ): Promise<unknown> {
   const row = core.db.prepare("SELECT meta FROM files WHERE id = ?").get(id) as
     { meta: string | null } | undefined;
@@ -109,14 +111,35 @@ async function remuxMetadata(
       // Fall back to probing if cached metadata is unreadable.
     }
   }
+  // The codec lookup may already have probed this request's file.
+  const metadata =
+    probed === undefined ? await probePlaybackVideo(file, res) : probed;
+  return metadata?.raw ?? null;
+}
+
+async function probePlaybackVideo(
+  file: string,
+  res: http.ServerResponse,
+): Promise<ExtractedMeta | null> {
   const stat = await fs.promises.stat(file).catch(() => null);
   if (!stat?.isFile() || res.destroyed) return null;
-  const release = await acquireForResponse(remuxProbeSlots, res);
+  const release = await acquireForResponse(playbackProbeSlots, res);
   if (!release) return null;
+  const disconnected = new AbortController();
+  const onClose = () => disconnected.abort();
+  res.once("close", onClose);
   try {
     if (res.destroyed) return null;
-    return (await extractMeta(file, "video", AbortSignal.timeout(5_000))).raw;
+    return await extractMeta(
+      file,
+      "video",
+      AbortSignal.any([
+        disconnected.signal,
+        AbortSignal.timeout(PLAYBACK_PROBE_TIMEOUT_MS),
+      ]),
+    );
   } finally {
+    res.off("close", onClose);
     release();
   }
 }
@@ -306,8 +329,18 @@ async function handle(
     const startT = url.searchParams.get("t");
     // Repack unsupported containers. ProRes needs a codec conversion even
     // when it lives in a container Chromium can demux, such as MOV.
-    const proResPreview = file.kind === "video" && file.codec === "prores";
-    if (proResPreview || REMUX_CONTAINERS.has(ext(abs))) {
+    const remuxContainer = REMUX_CONTAINERS.has(ext(abs));
+    // A scan can publish the file before writing its codec.
+    const probed =
+      file.kind === "video" &&
+      file.codec == null &&
+      (!remuxContainer || req.method !== "HEAD")
+        ? await probePlaybackVideo(abs, res)
+        : undefined;
+    if (res.destroyed || res.writableEnded) return;
+    const proResPreview =
+      file.kind === "video" && (file.codec ?? probed?.codec) === "prores";
+    if (proResPreview || remuxContainer) {
       if (req.method === "HEAD") {
         res.writeHead(200, { "Content-Type": "video/mp4" }).end();
         return;
@@ -318,7 +351,7 @@ async function handle(
       // Dolby Digital track, encode the selected audio before writing the MP4.
       const mode = proResPreview
         ? "prores"
-        : hasDolbyDigitalAudio(await remuxMetadata(core, id, abs, res))
+        : hasDolbyDigitalAudio(await remuxMetadata(core, id, abs, res, probed))
           ? "aac"
           : "copy";
       if (!res.destroyed && !res.writableEnded)
