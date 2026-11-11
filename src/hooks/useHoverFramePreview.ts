@@ -5,7 +5,7 @@
 // Frames come from the media server's `frame` endpoint and are requested
 // sequentially (one in-flight image per hovered card) so a single hover never
 // occupies more than one slot of the server-side ffmpeg semaphore.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /** Delay before the first frame request, so sweeping the cursor across the list stays free. */
 const DEFAULT_START_DELAY_MS = 300;
@@ -73,7 +73,11 @@ export function useHoverFramePreview({
   const failuresRef = useRef(0);
   // Latest values readable from timer/onload callbacks without re-subscribing.
   const optsRef = useRef({ enabled, frameUrl, duration });
-  optsRef.current = { enabled, frameUrl, duration };
+  // Updated after commit, so a discarded render cannot leave values that never
+  // committed for a pending timer or onload to read.
+  useLayoutEffect(() => {
+    optsRef.current = { enabled, frameUrl, duration };
+  });
 
   const stop = () => {
     if (timerRef.current !== null) {
@@ -94,7 +98,9 @@ export function useHoverFramePreview({
     failuresRef.current = 0;
   };
   const stopRef = useRef(stop);
-  stopRef.current = stop;
+  useLayoutEffect(() => {
+    stopRef.current = stop;
+  });
 
   // Reset when the card is reused for another file, the feature is toggled
   // off, or the component unmounts.

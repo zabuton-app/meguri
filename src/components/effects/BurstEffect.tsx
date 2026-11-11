@@ -2,7 +2,13 @@
 // Purely decorative: aria-hidden, pointer-events-none, absolutely positioned so
 // it never affects layout or the accessibility tree. The parent element must be
 // position:relative. Restart is handled by the caller remounting via `key`.
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +37,11 @@ export function BurstEffect({
   const [visible, setVisible] = useState(true);
   const doneRef = useRef(false);
   const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
+  // The latest onDone, for the timer and animation callbacks; updated after
+  // commit, so a discarded render cannot leave one that never committed.
+  useLayoutEffect(() => {
+    onDoneRef.current = onDone;
+  });
 
   const finish = useCallback(() => {
     if (doneRef.current) return;

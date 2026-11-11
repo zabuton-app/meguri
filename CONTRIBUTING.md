@@ -121,8 +121,10 @@ upstream ships a release that accepts React 19.
 Before opening a pull request, run the same checks CI runs:
 
 ```bash
-npm run typecheck  # type-check both src and electron
-npm test           # run the test suites (core, then renderer)
+npm run typecheck     # type-check both src and electron
+npm test              # run the test suites (core, then renderer)
+npm run lint          # ESLint
+npm run format:check  # Prettier (npm run format to fix)
 ```
 
 See [README.md](README.md) for the architecture overview, and

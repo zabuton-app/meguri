@@ -7,7 +7,17 @@ on:
   workflow_dispatch:
 
 jobs:
+  # A release is built only from a commit that passes the same checks as a pull
+  # request (#289).
+  test:
+    uses: ./.github/workflows/test.yml
+    # Read only, whatever the repository's default token permissions become:
+    # the checks run npm install scripts.
+    permissions:
+      contents: read
+
   build:
+    needs: test
     strategy:
       fail-fast: false
       matrix:

@@ -7,7 +7,10 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { electronLaunchOptions, mainScript } from "../../scripts/electron-launch.cjs";
+import {
+  electronLaunchOptions,
+  mainScript,
+} from "../../scripts/electron-launch.cjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const repoRoot = path.resolve(__dirname, "../..");
@@ -73,10 +76,13 @@ export async function launchApp({
 
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
-  await app.evaluate(({ BrowserWindow }, size) => {
-    const win = BrowserWindow.getAllWindows()[0];
-    win.setSize(size.width, size.height);
-  }, { width, height });
+  await app.evaluate(
+    ({ BrowserWindow }, size) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      win.setSize(size.width, size.height);
+    },
+    { width, height },
+  );
 
   // Selectors in the capture scripts assume the English locale, and the
   // screenshots should not depend on the host machine's saved preferences.
@@ -212,13 +218,20 @@ export async function setTheme(page, themeId) {
  * Record the page via CDP screencast. Returns { stop } where stop() ends the
  * capture and encodes the frames into an optimized GIF at outGif.
  */
-export async function startRecording(page, outGif, { fps = 8, width = 800, colors = 128 } = {}) {
+export async function startRecording(
+  page,
+  outGif,
+  { fps = 8, width = 800, colors = 128 } = {},
+) {
   const framesDir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-frames-"));
   const cdp = await page.context().newCDPSession(page);
   const frames = [];
   let frameNo = 0;
   cdp.on("Page.screencastFrame", async (ev) => {
-    const file = path.join(framesDir, `f${String(frameNo).padStart(5, "0")}.jpg`);
+    const file = path.join(
+      framesDir,
+      `f${String(frameNo).padStart(5, "0")}.jpg`,
+    );
     frameNo += 1;
     fs.writeFileSync(file, Buffer.from(ev.data, "base64"));
     frames.push({ file, ts: ev.metadata.timestamp });
@@ -251,14 +264,18 @@ export async function startRecording(page, outGif, { fps = 8, width = 800, color
     fs.mkdirSync(path.dirname(outGif), { recursive: true });
     execFileSync(ffmpegPath, [
       "-y",
-      "-f", "concat",
-      "-safe", "0",
-      "-i", concatFile,
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      concatFile,
       "-vf",
       `fps=${fps},scale=${width}:-1:flags=lanczos,split[s0][s1];` +
         `[s0]palettegen=max_colors=${colors}[p];` +
         "[s1][p]paletteuse=dither=bayer:bayer_scale=5",
-      "-loop", "0",
+      "-loop",
+      "0",
       outGif,
     ]);
     fs.rmSync(framesDir, { recursive: true, force: true });
@@ -274,10 +291,14 @@ export async function screenshotTo(page, outPng, { width = 800 } = {}) {
   fs.mkdirSync(path.dirname(outPng), { recursive: true });
   execFileSync(ffmpegPath, [
     "-y",
-    "-i", tmp,
-    "-vf", `scale=${width}:-1:flags=lanczos`,
-    "-update", "1",
-    "-frames:v", "1",
+    "-i",
+    tmp,
+    "-vf",
+    `scale=${width}:-1:flags=lanczos`,
+    "-update",
+    "1",
+    "-frames:v",
+    "1",
     outPng,
   ]);
   fs.rmSync(tmp, { force: true });

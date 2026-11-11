@@ -72,9 +72,12 @@ describe("isInsideRoot", () => {
     fs.writeFileSync(siblingFile, "x");
     try {
       expect(isInsideRoot(siblingFile, root)).toBe(false);
-      expect(isInsideRoot(path.join(root, "..", path.basename(sibling), "a.mp4"), root)).toBe(
-        false,
-      );
+      expect(
+        isInsideRoot(
+          path.join(root, "..", path.basename(sibling), "a.mp4"),
+          root,
+        ),
+      ).toBe(false);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
       fs.rmSync(sibling, { recursive: true, force: true });
@@ -168,7 +171,9 @@ describe("folderDirInsideRoot", () => {
     try {
       expect(folderDirInsideRoot(root, "a\\..\\b", "\\")).toBeNull();
       expect(folderDirInsideRoot(root, "C:", "\\")).toBeNull();
-      expect(folderDirInsideRoot(root, "dir::$INDEX_ALLOCATION", "\\")).toBeNull();
+      expect(
+        folderDirInsideRoot(root, "dir::$INDEX_ALLOCATION", "\\"),
+      ).toBeNull();
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

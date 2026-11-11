@@ -7,11 +7,17 @@ on:
       - develop
   pull_request:
   workflow_dispatch:
+  # build.yml runs these checks before it builds a release.
+  workflow_call:
 
 # Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+# Called from build.yml, github.workflow is the caller's name: a release build
+# run by hand on main does not cancel, nor get cancelled by, the tests of a
+# push to main; and a release build's checks are never cancelled, so a second
+# build of the same ref waits instead of silently skipping the first.
 concurrency:
-  group: test-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.workflow == 'Test' }}
 
 # The checks run as parallel jobs, so the wall-clock time is bound by the
 # slowest one (E2E) rather than the sum of all steps. Each job runs its own
@@ -20,8 +26,8 @@ concurrency:
 # All jobs pin the image: the core suite and E2E run Electron, and the Electron
 # binary dynamically links GUI libs (libnss3 / gtk / gbm / asound …) that the
 # GitHub ubuntu runner already provides via its preinstalled browsers. The
-# renderer job does not need Electron but uses the same image to keep the jobs
-# alike.
+# renderer and lint jobs do not need Electron but use the same image to keep
+# the jobs alike.
 #
 # Keep node-version the same in every job and in build.yml (see engines.node in
 # package.json).
@@ -67,6 +73,28 @@ jobs:
       # Plain Node + jsdom.
       - name: Run renderer tests
         run: npm run test:renderer
+
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.x
+          cache: npm
+
+      # Linting reads the sources and the installed type declarations only, so
+      # the install scripts (Electron download, native rebuild) are skipped.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
 
   e2e:
     name: E2E tests

@@ -13,6 +13,8 @@ npm run preview    # launch the built app (= npm start)
 npm run dist       # produce distributables (electron-builder)
 npm run typecheck  # tsc --noEmit over both src and electron
 npm test           # regression tests (Vitest): core then renderer
+npm run lint       # ESLint
+npm run format:check  # Prettier (npm run format to fix)
 npm run install:local  # install into the local environment
 ```
 
@@ -91,10 +93,14 @@ automatically.
 
 GitHub Actions workflows live in `.github/workflows/`:
 
-- `test.yml` runs three parallel jobs: type check and `test:core`,
-  `test:renderer`, and the E2E tests (`test:e2e:headless`).
-- `build.yml` triggers on `v*` tag pushes and builds a three-way matrix (linux
-  x64, win x64, mac arm64), then creates a draft release.
+- `test.yml` runs four parallel jobs: type check and `test:core`,
+  `test:renderer`, the E2E tests (`test:e2e:headless`), and `lint` with
+  `format:check`. The hand-written Pages HTML (`docs/*.html`) is left out of
+  Prettier.
+- `build.yml` triggers on `v*` tag pushes. It first runs `test.yml` (as a
+  reusable workflow), so a tag on a commit that fails it builds nothing; then it
+  builds a three-way matrix (linux x64, win x64, mac arm64) and creates a draft
+  release.
 - `pages.yml` deploys `docs/` to GitHub Pages as-is (no Jekyll). It runs only
   when `docs/` or the workflow itself changes on `main`, or on manual dispatch.
   The repository's Pages source must be set to "GitHub Actions"; after
