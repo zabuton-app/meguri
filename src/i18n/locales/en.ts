@@ -575,7 +575,7 @@ export const en: Record<TranslationKey, string> = {
   "discover.empty": "No media to recommend.",
   "discover.emptyHint":
     'Run "Scan" to import videos and images, and they\'ll be recommended here at random.',
-  "discover.sceneHint": "Hover to enlarge · click to play from that point",
+  "discover.sceneHint": "Click a scene to jump to it",
   "discover.moreScenes": "+{count}",
 
   // Play history

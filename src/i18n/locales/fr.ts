@@ -590,8 +590,7 @@ export const fr: Record<TranslationKey, string> = {
   "discover.empty": "Aucun média à recommander.",
   "discover.emptyHint":
     "Lancez « Analyser » pour importer des vidéos et des images ; elles seront recommandées ici au hasard.",
-  "discover.sceneHint":
-    "Survolez pour agrandir · cliquez pour lire à partir de ce point",
+  "discover.sceneHint": "Cliquez sur une scène pour y accéder",
   "discover.moreScenes": "+{count}",
 
   // Historique de lecture

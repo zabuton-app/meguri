@@ -517,7 +517,7 @@ export const VideoPlayer = forwardRef<
    *   seek asked for outright, and supersedes the run: leaving its target in
    *   place would have `onSeeked` chase it and undo the seek just made.
    */
-  const seek = (t: number, fromRun = false) => {
+  const seek = (t: number, fromRun = false, resumeOnLoad?: boolean) => {
     const v = ref.current;
     if (!v) return;
     if (fromRun) {
@@ -540,23 +540,29 @@ export const VideoPlayer = forwardRef<
     // Playback has been placed; a start position arriving late (see the
     // effect below `seekRef`) must not move it again.
     appliedStartRef.current = true;
+    const relative = t - streamOffsetOf(v.getAttribute("src"));
     let inSeekable = false;
     for (let i = 0; i < v.seekable.length; i++) {
-      if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) {
+      if (relative >= v.seekable.start(i) && relative <= v.seekable.end(i)) {
         inSeekable = true;
         break;
       }
     }
     if (isFinite(v.duration) && inSeekable) {
-      v.currentTime = t;
+      v.currentTime = relative;
     } else {
-      // Stream: re-serve from the specified second.
+      // Loading a remuxed stream must carry over play/pause. The previous
+      // load can still be pending if the user selects another scene quickly.
+      const resume =
+        resumeOnLoad ??
+        (!v.paused || (v.readyState < v.HAVE_METADATA && v.autoplay));
+      v.autoplay = resume;
       lastStreamSeekRef.current = Date.now();
       setOffset(t);
       setPosition(t);
       v.src = withStreamSeek(src, t);
       v.load();
-      void v.play().catch(() => {});
+      if (resume) void v.play().catch(() => {});
     }
   };
 
@@ -575,9 +581,9 @@ export const VideoPlayer = forwardRef<
   useEffect(() => {
     if (startAt > 0 && haveMetadataRef.current && !appliedStartRef.current) {
       appliedStartRef.current = true;
-      seekRef.current(startAt);
+      seekRef.current(startAt, false, autoplay);
     }
-  }, [startAt]);
+  }, [startAt, autoplay]);
   // Stable, so the imperative handle below can just close over it.
   const togglePlay = useCallback(() => {
     const v = ref.current;
@@ -996,7 +1002,7 @@ export const VideoPlayer = forwardRef<
           // Apply the initial seek (e.g. from a Discovery scene click) once.
           if (startAt > 0 && !appliedStartRef.current) {
             appliedStartRef.current = true;
-            seekRef.current(startAt);
+            seekRef.current(startAt, false, autoplay);
           }
           // A seek asked for while there was nothing loaded yet. It comes after
           // the initial seek because it is the newer intent of the two.
