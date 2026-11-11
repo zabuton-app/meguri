@@ -107,6 +107,8 @@ export async function looksLikeMpegTs(file: string): Promise<boolean> {
     return (err as NodeJS.ErrnoException).code !== "ENOENT";
   }
   try {
+    // Windows opens directories too; a folder named *.ts is not a stream.
+    if ((await fd.stat()).isDirectory()) return false;
     // Network filesystems may return short reads; fill the probe window.
     while (len < buf.length) {
       const { bytesRead } = await fd.read(buf, len, buf.length - len, len);
