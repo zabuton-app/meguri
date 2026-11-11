@@ -27,8 +27,8 @@ import { scopedLog } from "./logger.js";
 import {
   PREVIEW_AUDIO_TRACK_PARAM,
   REMUX_CONTAINERS,
+  hasRemuxVideo,
   readAudioTracks,
-  remuxVideoIndex,
 } from "../../shared/playbackTracks.js";
 import { probePlaybackMetadata } from "./playbackMetadata.js";
 
@@ -271,7 +271,7 @@ async function handle(
     const proResPreview = file.kind === "video" && file.codec === "prores";
     if (proResPreview || REMUX_CONTAINERS.has(ext(abs))) {
       const requested = url.searchParams.get(PREVIEW_AUDIO_TRACK_PARAM);
-      let track: RemuxTrack | undefined;
+      let audioTrack: number | undefined;
       let mode: RemuxMode = proResPreview ? "prores" : "copy";
       if (requested !== null || (!proResPreview && req.method !== "HEAD")) {
         const row = core.db
@@ -282,23 +282,22 @@ async function handle(
         const tracks = readAudioTracks(metadata);
         if (requested !== null) {
           const audio = /^\d+$/.test(requested) ? Number(requested) : -1;
-          const video = proResPreview ? undefined : remuxVideoIndex(metadata);
           if (
             !Number.isSafeInteger(audio) ||
             audio < 0 ||
             audio >= tracks.length ||
-            (!proResPreview && video === undefined)
+            (!proResPreview && !hasRemuxVideo(metadata))
           ) {
             res.writeHead(400).end();
             return;
           }
-          track = { audio, video };
+          audioTrack = audio;
         }
         // Keep the Dolby fallback for FFmpeg's automatic track selection.
         if (
           !proResPreview &&
-          (track
-            ? isDolbyDigital(tracks[track.audio].codec)
+          (audioTrack !== undefined
+            ? isDolbyDigital(tracks[audioTrack].codec)
             : tracks.some(({ codec }) => isDolbyDigital(codec)))
         ) {
           mode = "aac";
@@ -310,7 +309,7 @@ async function handle(
       }
       const parsed = startT != null ? Number(startT) : NaN;
       const start = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      serveRemux(res, abs, start, mode, track);
+      serveRemux(res, abs, start, mode, audioTrack);
       return;
     }
     // Chromium-unsupported image formats (heic/heif/tiff) are transcoded to JPEG.
@@ -445,15 +444,14 @@ type RemuxSession = {
 const remuxInflight = new Map<string, RemuxSession>();
 
 type RemuxMode = "copy" | "aac" | "prores";
-type RemuxTrack = { audio: number; video?: number };
 
 function remuxKey(
   file: string,
   start: number | null,
   mode: RemuxMode,
-  track?: RemuxTrack,
+  audioTrack?: number,
 ): string {
-  return `${file}\0${start ?? ""}\0${mode}\0${track?.audio ?? ""}\0${track?.video ?? ""}`;
+  return `${file}\0${start ?? ""}\0${mode}\0${audioTrack ?? ""}`;
 }
 
 function spawnFfmpegChild(
@@ -579,7 +577,7 @@ function startRemuxSession(
   res: http.ServerResponse,
   releaseSlot: () => void,
   mode: RemuxMode,
-  track?: RemuxTrack,
+  audioTrack?: number,
 ) {
   const proResPreview = mode === "prores";
   const args = ["-v", "error"];
@@ -591,13 +589,17 @@ function startRemuxSession(
       "1",
     );
   if (start != null && start > 0) args.push("-ss", start.toFixed(3));
+  // Keep FFmpeg's automatic picture selection in both playback modes.
+  // The last matching input discard option keeps just the chosen audio track.
+  if (!proResPreview && audioTrack !== undefined)
+    args.push("-discard:a", "all", `-discard:a:${audioTrack}`, "none");
   args.push("-i", file);
   if (proResPreview) {
     args.push(
       "-map",
       "0:v:0",
       "-map",
-      `0:a:${track?.audio ?? 0}?`,
+      `0:a:${audioTrack ?? 0}?`,
       "-write_tmcd",
       "0",
       "-vf",
@@ -616,8 +618,7 @@ function startRemuxSession(
       "aac",
     );
   } else {
-    if (track)
-      args.push("-map", `0:${track.video}`, "-map", `0:a:${track.audio}`);
+    if (audioTrack !== undefined) args.push("-sn", "-dn");
     args.push("-c", "copy");
     if (mode === "aac") args.push("-c:a", "aac", "-b:a", "384k");
   }
@@ -779,9 +780,9 @@ function serveRemux(
   file: string,
   start: number | null,
   mode: RemuxMode,
-  track?: RemuxTrack,
+  audioTrack?: number,
 ) {
-  const key = remuxKey(file, start, mode, track);
+  const key = remuxKey(file, start, mode, audioTrack);
   const existing = remuxInflight.get(key);
   if (existing) {
     attachRemuxClient(key, existing, res);
@@ -803,7 +804,7 @@ function serveRemux(
     }
 
     try {
-      startRemuxSession(key, file, start, res, releaseSlot, mode, track);
+      startRemuxSession(key, file, start, res, releaseSlot, mode, audioTrack);
     } catch (e) {
       // spawn() can throw synchronously; the slot would otherwise never be
       // released (it only reaches the session on success).

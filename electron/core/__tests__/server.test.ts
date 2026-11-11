@@ -402,19 +402,25 @@ describe("frame serving (ffmpeg path)", () => {
 });
 
 describe("MKV audio track selection", () => {
-  it("copies selected AAC and converts selected Dolby Digital without changing the picture", async () => {
-    const clip = path.join(root, "alternate-language.mkv");
+  const fixtures = [
+    { first: "96x64", second: "128x72", expectedWidth: 96 },
+    { first: "1920x1080", second: "3840x2160", expectedWidth: 3840 },
+  ];
+  it.each(fixtures)("keeps picture for $first / $second", async (fixture) => {
+    const { first, second, expectedWidth } = fixture;
+    const name = `alternate-language-${second}.mkv`;
+    const clip = path.join(root, name);
     execFileSync(FFMPEG, [
       "-v",
       "error",
       "-f",
       "lavfi",
       "-i",
-      "testsrc2=size=96x64:rate=12:duration=1",
+      `color=red:size=${first}:rate=12:duration=1`,
       "-f",
       "lavfi",
       "-i",
-      "testsrc2=size=128x72:rate=12:duration=1",
+      `color=blue:size=${second}:rate=12:duration=1`,
       "-f",
       "lavfi",
       "-i",
@@ -433,6 +439,10 @@ describe("MKV audio track selection", () => {
       "3:a",
       "-c:v",
       "libx264",
+      "-preset",
+      "ultrafast",
+      "-threads:v",
+      "2",
       "-c:a:0",
       "aac",
       "-c:a:1",
@@ -451,14 +461,7 @@ describe("MKV audio track selection", () => {
     ]);
     const original = fs.readFileSync(clip);
     const metadata = await extractMeta(clip, "video");
-    const id = insert(
-      "alternate-language.mkv",
-      clip,
-      null,
-      "done",
-      "video",
-      "mkv",
-    );
+    const id = insert(name, clip, null, "done", "video", "mkv");
     db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
       metadata.codec,
       JSON.stringify(metadata.raw),
@@ -486,7 +489,11 @@ describe("MKV audio track selection", () => {
           { input, encoding: "utf8" },
         ),
       ) as {
-        streams: { codec_name: string; width?: number; sample_rate?: string }[];
+        streams: {
+          codec_name: string;
+          width?: number;
+          sample_rate?: string;
+        }[];
       };
     const audioPacketHashes = (input: Buffer) =>
       JSON.parse(
@@ -515,11 +522,11 @@ describe("MKV audio track selection", () => {
       preview("?audioTrack=1"),
     ]);
     expect(streams(automatic).streams).toEqual([
-      { codec_name: "h264", width: 96 },
+      { codec_name: "h264", width: expectedWidth },
       { codec_name: "aac", sample_rate: "48000" },
     ]);
     expect(streams(aac).streams).toEqual([
-      { codec_name: "h264", width: 96 },
+      { codec_name: "h264", width: expectedWidth },
       { codec_name: "aac", sample_rate: "44100" },
     ]);
     expect(streams(dolby).streams).toEqual(streams(automatic).streams);
@@ -529,7 +536,7 @@ describe("MKV audio track selection", () => {
     expect((await fetch(url + "?audioTrack=2", authHeaders())).status).toBe(
       400,
     );
-    expect(fs.readFileSync(clip)).toEqual(original);
+    expect(fs.readFileSync(clip).equals(original)).toBe(true);
   });
 });
 
