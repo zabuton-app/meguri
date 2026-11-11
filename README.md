@@ -377,8 +377,10 @@ the arrow beside its selection checkbox. Drag from a selected file's arrow
 to carry the whole selection.
 
 ProRes clips play in Meguri through a local H.264 preview at up to
-1920 × 1080. The original clip is still used when you drag it into an editor
-or open it externally.
+1920 × 1080. For ProRes clips tagged as PQ or HLG HDR, the player uses the
+available FFmpeg color filters to fit the highlights and colors into an SDR
+preview. SDR clips use the regular preview. Dragging a clip into an editor or
+opening it externally uses the original file.
 
 When the player repackages a container such as MKV, it converts Dolby Digital
 (AC-3) or Dolby Digital Plus (E-AC-3) audio to AAC for playback. The preview

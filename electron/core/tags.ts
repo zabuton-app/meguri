@@ -321,12 +321,15 @@ export interface MediaFile {
   absPath: string;
   codec: string | null;
   kind: string;
+  proResMeta: string | null;
 }
 
 export function mediaFileOf(db: DB, fileId: number): MediaFile | null {
   const row = db
     .prepare(
-      "SELECT abs_path AS absPath, codec, kind FROM files WHERE id = ? AND deleted_at IS NULL",
+      `SELECT abs_path AS absPath, codec, kind,
+              CASE WHEN codec = 'prores' THEN meta END AS proResMeta
+       FROM files WHERE id = ? AND deleted_at IS NULL`,
     )
     .get(fileId) as MediaFile | undefined;
   return row ?? null;
