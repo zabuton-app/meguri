@@ -33,9 +33,8 @@ const log = scopedLog("server");
 const REMUX_CONTAINERS = new Set(["mkv", "avi", "wmv", "flv", "ts"]);
 const remuxProbeSlots = new Semaphore(2);
 
-// Hard cap on ffmpeg streaming/transcoding requests. Without this a corrupt
-// media file can hang ffmpeg and pin a request slot indefinitely. 60s matches
-// the extractor side in media.ts and gives long-range seeks enough headroom.
+// Cap one-shot FFmpeg requests and periods without output in remux streams.
+// This prevents corrupt media from pinning a slot indefinitely.
 // SIGKILL ensures the child actually dies if it ignores SIGTERM.
 const FFMPEG_REQUEST_TIMEOUT_MS = 60_000;
 const FFMPEG_KILL_SIGNAL = "SIGKILL" as const;
@@ -583,7 +582,6 @@ function startRemuxSession(
   mode: RemuxMode,
 ) {
   const proResPreview = mode === "prores";
-  const transcode = mode !== "copy";
   const args = ["-v", "error"];
   if (proResPreview)
     args.push(
@@ -633,12 +631,8 @@ function startRemuxSession(
     "pipe:1",
   );
 
-  // A long preview can legitimately outlive the one-shot FFmpeg deadline.
-  // Bound periods without output, excluding pauses caused by the client.
-  const child = spawnFfmpegChild(
-    args,
-    transcode ? 0 : FFMPEG_REQUEST_TIMEOUT_MS,
-  );
+  // A remux can legitimately outlive the one-shot FFmpeg deadline.
+  const child = spawnFfmpegChild(args, 0);
   const session: RemuxSession = {
     child,
     clients: new Set([res]),
@@ -654,13 +648,12 @@ function startRemuxSession(
 
   let sawOutput = false;
   let lastOutputAt = Date.now();
-  const watchdog = transcode
-    ? setInterval(() => {
-        if (session.blocked.size > 0) lastOutputAt = Date.now();
-        else if (Date.now() - lastOutputAt >= FFMPEG_REQUEST_TIMEOUT_MS)
-          child.kill(FFMPEG_KILL_SIGNAL);
-      }, 5_000).unref()
-    : undefined;
+  // Bound periods without output, excluding pauses caused by the client.
+  const watchdog = setInterval(() => {
+    if (session.blocked.size > 0) lastOutputAt = Date.now();
+    else if (Date.now() - lastOutputAt >= FFMPEG_REQUEST_TIMEOUT_MS)
+      child.kill(FFMPEG_KILL_SIGNAL);
+  }, 5_000).unref();
   child.stdout!.on("data", (chunk: Buffer) => {
     sawOutput = true;
     lastOutputAt = Date.now();

@@ -1,7 +1,7 @@
 // Regression tests for the media HTTP server: URL routing, Range serving, the
 // path-confinement guards, and the ffmpeg remux path.
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { execFileSync, type SpawnOptions } from "node:child_process";
 import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
 import { extractMeta } from "../media.js";
 import fs from "node:fs";
@@ -13,6 +13,24 @@ import { openDb, nowUnix, type DB } from "../db.js";
 import { upsertScanRoot } from "../queries.js";
 import { startServer } from "../server.js";
 import type { Core } from "../index.js";
+
+// Shorten any wall-clock limit passed to spawn for the backpressure test.
+// FFmpeg and the HTTP server still run normally.
+const wallClockLimit = vi.hoisted(() => ({ ms: 0 }));
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    spawn: (command: string, args: readonly string[], options?: SpawnOptions) =>
+      actual.spawn(
+        command,
+        args,
+        wallClockLimit.ms && options?.timeout
+          ? { ...options, timeout: wallClockLimit.ms }
+          : (options ?? {}),
+      ),
+  };
+});
 
 const WS = "abc123";
 const TOKEN = "test-token";
@@ -534,7 +552,7 @@ describe("media remux (ffmpeg path)", () => {
 
   // Streamed GET that resolves `first` on the first body chunk and `done` with
   // the full body — fetch() cannot observe mid-stream progress like this.
-  function getStreaming(pathname: string) {
+  function getStreaming(pathname: string, pauseMs = 0) {
     const chunks: Buffer[] = [];
     let resolveFirst!: () => void;
     const first = new Promise<void>((r) => (resolveFirst = r));
@@ -544,6 +562,10 @@ describe("media remux (ffmpeg path)", () => {
           `${base}${pathname}`,
           { headers: authHeader() },
           (res) => {
+            if (pauseMs) {
+              res.pause();
+              setTimeout(() => res.resume(), pauseMs);
+            }
             res.on("data", (c: Buffer) => {
               chunks.push(c);
               resolveFirst();
@@ -561,6 +583,57 @@ describe("media remux (ffmpeg path)", () => {
     );
     return { first, done };
   }
+
+  it("completes a copy remux after the client pauses beyond the old deadline", async () => {
+    const name = "backpressure.mkv";
+    const clip = path.join(root, name);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=640x360:rate=24:duration=90",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-crf",
+      "13",
+      "-g",
+      "24",
+      clip,
+    ]);
+    const id = insert(name, clip, null, "pending", "video", "mkv");
+    wallClockLimit.ms = 1_000;
+    try {
+      const { status, body } = await getStreaming(
+        `/ws/${WS}/media/${id}`,
+        1_500,
+      ).done;
+      expect(status).toBe(200);
+      const packets = execFileSync(
+        FFPROBE,
+        [
+          "-v",
+          "error",
+          "-select_streams",
+          "v:0",
+          "-count_packets",
+          "-show_entries",
+          "stream=nb_read_packets",
+          "-of",
+          "csv=p=0",
+          "pipe:0",
+        ],
+        { input: body, encoding: "utf8" },
+      );
+      expect(Number(packets.trim())).toBe(90 * 24);
+    } finally {
+      wallClockLimit.ms = 0;
+      fs.unlinkSync(clip);
+    }
+  }, 15_000);
 
   it.skipIf(process.platform === "win32")(
     "replays the fMP4 init segment to a client joining an in-flight session",
