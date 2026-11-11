@@ -541,6 +541,130 @@ describe("MKV audio track selection", () => {
 });
 
 describe("media remux (ffmpeg path)", () => {
+  it.each([
+    { container: "mp4", codec: "eac3", indexed: true },
+    { container: "m4v", codec: "ac3", indexed: true },
+    { container: "mov", codec: "eac3", indexed: false },
+  ])(
+    "converts default $codec in $container and preserves Range for default AAC",
+    async ({ container, codec, indexed }) => {
+      const clip = path.join(root, `dolby-default.${container}`);
+      const aac = path.join(root, `aac-default.${container}`);
+      const outputFormat = container === "mov" ? "mov" : "mp4";
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-nostdin",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=12:duration=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=48000:duration=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=660:sample_rate=48000:duration=2",
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
+        "-map",
+        "2:a",
+        "-c:v",
+        "libx264",
+        "-g",
+        "6",
+        "-c:a:0",
+        "aac",
+        "-c:a:1",
+        codec,
+        "-ac:a:1",
+        "6",
+        "-disposition:a:0",
+        "0",
+        "-disposition:a:1",
+        "default",
+        "-f",
+        outputFormat,
+        clip,
+      ]);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-nostdin",
+        "-i",
+        clip,
+        "-map",
+        "0",
+        "-c",
+        "copy",
+        "-disposition:a:0",
+        "default",
+        "-disposition:a:1",
+        "0",
+        "-f",
+        outputFormat,
+        aac,
+      ]);
+      const original = fs.readFileSync(clip);
+      async function route(file: string) {
+        const id = insert(
+          path.basename(file),
+          file,
+          null,
+          "done",
+          "video",
+          container,
+        );
+        if (indexed) {
+          const metadata = await extractMeta(file, "video");
+          db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+            metadata.codec,
+            JSON.stringify(metadata.raw),
+            id,
+          );
+        }
+        return `${base}/ws/${WS}/media/${id}`;
+      }
+      const url = await route(clip);
+      const head = await fetch(url, { ...authHeaders(), method: "HEAD" });
+      expect(head.headers.get("Content-Type")).toBe("video/mp4");
+      for (const seek of ["", "?t=0.5"]) {
+        const response = await fetch(`${url}${seek}`, authHeaders());
+        expect(response.status).toBe(200);
+        const streams = execFileSync(
+          FFPROBE,
+          [
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_name,channels",
+            "-of",
+            "compact=p=0:nk=1",
+            "pipe:0",
+          ],
+          {
+            input: Buffer.from(await response.arrayBuffer()),
+            encoding: "utf8",
+          },
+        );
+        expect(streams.trim().split("\n")).toEqual(["h264", "aac|6"]);
+      }
+      expect(fs.readFileSync(clip)).toEqual(original);
+
+      const range = await fetch(await route(aac), {
+        headers: { ...authHeaders().headers, Range: "bytes=0-15" },
+      });
+      expect(range.status).toBe(206);
+      expect(Buffer.from(await range.arrayBuffer())).toEqual(
+        fs.readFileSync(aac).subarray(0, 16),
+      );
+    },
+  );
+
   it.each(["ac3", "eac3"])(
     "copies the HEVC picture and converts Dolby Digital %s surround audio to AAC",
     async (codec) => {
