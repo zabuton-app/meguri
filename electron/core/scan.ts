@@ -480,6 +480,8 @@ export async function syncFiles(
   const ftsTargets: number[] = [];
   const ftsMissing: number[] = [];
   const unreadable: UnreadableFile[] = [];
+  // Read once to filter what is scanned; the apply step checks again for files
+  // removed from the index meanwhile (#266).
   const excluded = new Set(
     (
       db
@@ -632,10 +634,27 @@ export async function syncFiles(
   const isUnreadable = unreadableMatcher(unreadablePaths);
 
   // --- 3. DB apply (chunked tx + yield between chunks) ---
+  // A file can be removed from the index while this scan awaits (hashing, the
+  // yields between chunks), after the excluded set above was read. Each chunk
+  // re-reads it, so such a row is left removed instead of being restored (#266).
+  // Looked up by primary key for the chunk's rows only: excluded rows pile up
+  // until a rebuild, so reading all of them per chunk would grow with them.
+  const excludedAmong = db
+    .prepare(
+      "SELECT id FROM files WHERE id IN (SELECT value FROM json_each(?)) AND excluded_at IS NOT NULL",
+    )
+    .pluck();
   const applyChunk = db.transaction((idxs: number[]) => {
+    const ids = idxs.flatMap((i) => existingOf[i]?.id ?? []);
+    const excludedNow = new Set(
+      ids.length > 0
+        ? (excludedAmong.all(JSON.stringify(ids)) as number[])
+        : [],
+    );
     for (const i of idxs) {
       const d = scannable[i];
       const existing = existingOf[i];
+      if (existing && excludedNow.has(existing.id)) continue;
       const sameStat =
         existing !== undefined &&
         existing.size === d.size &&
