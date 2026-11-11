@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { compareVersions, releasesPage, updateDownloadUrl } from "../updater.js";
+import {
+  compareVersions,
+  releasesPage,
+  updateDownloadUrl,
+} from "../updater.js";
 
 describe("compareVersions", () => {
   it("treats equal versions as 0", () => {

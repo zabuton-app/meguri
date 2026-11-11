@@ -290,6 +290,48 @@ export function migrateMetaKey(db: DB, fromKey: string, toKey: string): void {
 }
 
 /**
+ * Copy a file's metadata to the key of its new content, for a file whose
+ * content changed in place (#263): the path, not only the hash, tells it is
+ * the same file. The old key keeps its copy, since another file may still have
+ * the old content. Merged into what the new key holds by the library merge's
+ * rules (FILE_META_MERGE_SET, and as mergeIntoLibrary in library.ts does: a
+ * play already recorded, or a bookmark near one it has, is not added again). Only the user's tags are copied: the derived ones (resolution,
+ * codec...) describe the old content, and the new one gets its own.
+ */
+export function copyMetaKey(db: DB, fromKey: string, toKey: string): void {
+  if (fromKey === toKey) return;
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO file_meta
+         (meta_key, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at)
+       SELECT ?, rating, favorite, last_accessed_at, thumb_offset_sec, resume_position, updated_at
+       FROM file_meta WHERE meta_key = ?
+       ON CONFLICT (meta_key) DO UPDATE SET ${FILE_META_MERGE_SET}`,
+    ).run(toKey, fromKey);
+    db.prepare(
+      `INSERT OR IGNORE INTO meta_tags (meta_key, tag_id, source, score)
+       SELECT ?, tag_id, source, score FROM meta_tags
+        WHERE meta_key = ? AND source = 'manual'`,
+    ).run(toKey, fromKey);
+    db.prepare(
+      `INSERT INTO play_history (meta_key, played_at, position, via)
+       SELECT ?, s.played_at, s.position, s.via FROM play_history s
+        WHERE s.meta_key = ? AND NOT EXISTS (
+          SELECT 1 FROM play_history t
+           WHERE t.meta_key = ? AND t.played_at = s.played_at AND t.via = s.via
+             AND t.position IS s.position)`,
+    ).run(toKey, fromKey, toKey);
+    db.prepare(
+      `INSERT INTO scene_bookmarks (meta_key, sec, created_at)
+       SELECT ?, s.sec, s.created_at FROM scene_bookmarks s
+        WHERE s.meta_key = ? AND NOT EXISTS (
+          SELECT 1 FROM scene_bookmarks t
+           WHERE t.meta_key = ? AND t.sec BETWEEN s.sec - ? AND s.sec + ?)`,
+    ).run(toKey, fromKey, toKey, BOOKMARK_NEAR_EPS, BOOKMARK_NEAR_EPS);
+  })();
+}
+
+/**
  * Drop tags no file carries any more, so tag completion does not keep offering
  * them. Metadata itself is never dropped for lack of a file row: it lives in
  * the library every workspace shares, where a key missing from this

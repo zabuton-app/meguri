@@ -2,7 +2,12 @@
 // favorite and rating controls.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DB } from "../db.js";
-import { bulkSetMeta, searchFiles, setFavorite, setRating } from "../queries.js";
+import {
+  bulkSetMeta,
+  searchFiles,
+  setFavorite,
+  setRating,
+} from "../queries.js";
 import { insertFile, newDb } from "./helpers.js";
 
 describe("bulkSetMeta", () => {

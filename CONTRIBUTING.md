@@ -37,7 +37,80 @@ If you're not sure whether your change counts as larger, starting a discussion
 or opening an issue is always welcome. Issues labelled
 [`good first issue`](https://github.com/zabuton-app/meguri/labels/good%20first%20issue)
 are a good place to start if you'd like to help but don't have a change in
-mind yet.
+mind yet. See [Labels](#labels) for what each label means.
+
+## Labels
+
+Issues and pull requests are labelled along a few independent axes. An issue
+usually has one type label, one or two `area:` labels, and a `status:` label
+when something has to happen before the work can start. Even the labels whose
+meaning seems obvious are listed here, so everyone reads them the same way.
+
+### Type
+
+- `bug`: something does not work as intended.
+- `enhancement`: a new feature, or an improvement to an existing one.
+- `documentation`: a change to the README or `docs/` only.
+- `question`: a question rather than a change; more information is requested.
+
+### Area
+
+Where in the code the change lands. These follow the directory layout, so the
+label tells you where to start reading.
+
+- `area: ui`: renderer views and components under `src/`, themes,
+  accessibility.
+- `area: player`: playback UI and behaviour: the video player, the Player
+  route, audio.
+- `area: scan`: scanning, folder watching and move detection (`scan.ts`,
+  `scanManager.ts`).
+- `area: db`: schema, queries, the query worker, full-text search, the
+  cross-workspace (`All`) merge.
+- `area: media-server`: the local media server (`server.ts`), ffmpeg remux and
+  transcode, thumbnail serving.
+- `area: ipc`: the IPC boundary: `shared/ipc`, the preload script, the
+  renderer IPC client.
+- `area: app`: main-process foundation: config, tray, updater, CSP,
+  permissions.
+- `area: i18n`: the translation mechanism and the locale files.
+- `area: tests`: test infrastructure and E2E tests.
+- `area: ci`: GitHub workflows, builds, releases, store submission.
+- `area: deps`: dependency updates.
+
+### Status
+
+What has to happen before the work can start. An issue without a `status:`
+label is ready to be worked on.
+
+- `status: needs repro`: found by reading the code and not yet reproduced in
+  the running app. Reproduce it first; if you can't, say so in the issue. A
+  fix should come with a test or reproduction steps.
+- `status: needs design`: the scope or design is not settled. Join the
+  discussion in the issue instead of sending a pull request.
+- `status: blocked`: waiting on another issue or pull request, named in the
+  issue.
+- `status: proposal`: a suggestion from a contributor, waiting for a
+  maintainer decision.
+- `on hold`: paused on purpose until there is demand or an external blocker is
+  resolved.
+
+### Other
+
+- `good first issue`: small and well scoped, with the files to change named in
+  the issue. A good place to start. Please comment before you start, so two
+  people don't work on the same issue.
+- `help wanted`: the maintainers would welcome help with this one.
+- `performance`: about speed, memory or resource use. Can be combined with any
+  area.
+- `dependencies`: added by Dependabot to its dependency update pull requests.
+- `javascript`: added by Dependabot to pull requests that update JavaScript
+  packages.
+- `duplicate`: the same issue or pull request already exists; the original is
+  linked.
+- `invalid`: not a valid report or change, for example a misunderstanding or a
+  change unrelated to Meguri.
+- `wontfix`: understood, but will not be worked on, with the reason given in
+  the issue.
 
 ## Branching model
 
@@ -121,8 +194,10 @@ upstream ships a release that accepts React 19.
 Before opening a pull request, run the same checks CI runs:
 
 ```bash
-npm run typecheck  # type-check both src and electron
-npm test           # run the test suites (core, then renderer)
+npm run typecheck     # type-check both src and electron
+npm test              # run the test suites (core, then renderer)
+npm run lint          # ESLint
+npm run format:check  # Prettier (npm run format to fix)
 ```
 
 See [README.md](README.md) for the architecture overview, and

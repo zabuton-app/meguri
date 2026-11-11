@@ -1,6 +1,6 @@
 // Regression tests for the scan pipeline: extension classification, sampled content_hash,
 // and the incremental syncFiles lifecycle (insert / unchanged / move / update / delete).
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -11,7 +11,8 @@ import {
   deleteFromIndex,
   upsertScanRoot,
 } from "../queries.js";
-import { syncFts } from "../tags.js";
+import { addManualTag, fileTags, syncFts } from "../tags.js";
+import { AUTO_META_SOURCE } from "../autoMetaTags.js";
 import {
   contentHash,
   isMountpoint,
@@ -137,11 +138,29 @@ describe("looksLikeMpegTs", () => {
     expect(await looksLikeMpegTs(path.join(dir, "nope.ts"))).toBe(false);
   });
 
-  it("keeps the extension's verdict when the file exists but can't be read", async () => {
-    // A directory opens but fails to read (EISDIR), standing in for an I/O error.
-    const sub = path.join(dir, "unreadable.ts");
+  it("rejects a directory named *.ts, which can be opened on Windows", async () => {
+    const sub = path.join(dir, "folder.ts");
     await fsp.mkdir(sub);
-    expect(await looksLikeMpegTs(sub)).toBe(true);
+    expect(await looksLikeMpegTs(sub)).toBe(false);
+  });
+
+  it("keeps the extension's verdict when the file exists but can't be read", async () => {
+    // Simulated I/O error on read of a regular file (not a directory).
+    const f = path.join(dir, "unreadable.ts");
+    await fsp.writeFile(f, tsBytes(8));
+    const real = await fsp.open(f, "r");
+    const spy = vi.spyOn(fsp, "open").mockResolvedValueOnce({
+      stat: () => real.stat(),
+      read: async () => {
+        throw Object.assign(new Error("EIO: i/o error"), { code: "EIO" });
+      },
+      close: () => real.close(),
+    } as unknown as Awaited<ReturnType<typeof fsp.open>>);
+    try {
+      expect(await looksLikeMpegTs(f)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -162,6 +181,43 @@ describe("contentHash", () => {
     const ha = await contentHash(a);
     expect(await contentHash(a)).toBe(ha); // stable
     expect(await contentHash(b)).toBe(ha); // content-addressed (move detection relies on this)
+  });
+
+  // A handle on the real file whose reads return at most `chunk` bytes, and
+  // nothing past `eof` (a file that shrank after its size was taken).
+  const shortReads = (chunk: number, eof = Infinity) => {
+    const open = fsp.open.bind(fsp);
+    return vi.spyOn(fsp, "open").mockImplementation(async (...args) => {
+      const fd = await open(...args);
+      const read = fd.read.bind(fd) as (
+        buf: Buffer,
+        off: number,
+        len: number,
+        pos: number,
+      ) => ReturnType<typeof fd.read>;
+      return Object.assign(fd, {
+        read: (buf: Buffer, off: number, len: number, pos: number) =>
+          pos >= eof
+            ? Promise.resolve({ bytesRead: 0, buffer: buf })
+            : read(buf, off, Math.min(len, chunk, eof - pos), pos),
+      });
+    });
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  it("reads on through short reads (#263)", async () => {
+    const f = path.join(dir, "d.bin");
+    await fsp.writeFile(f, "hello world, read in pieces");
+    const whole = await contentHash(f);
+    shortReads(3);
+    expect(await contentHash(f)).toBe(whole);
+  });
+
+  it("throws with a code when the file ends early", async () => {
+    const f = path.join(dir, "e.bin");
+    await fsp.writeFile(f, "hello world");
+    shortReads(64, 5);
+    await expect(contentHash(f)).rejects.toMatchObject({ code: "ESHRUNK" });
   });
 
   it("changes when the content changes", async () => {
@@ -230,6 +286,223 @@ describe("syncFiles lifecycle", () => {
     expect(
       db.prepare("SELECT 1 FROM file_meta WHERE meta_key = ?").get(pathKey),
     ).toBeUndefined();
+  });
+
+  describe("a file whose content changed in place (#263)", () => {
+    const keyOf = (relPath: string) =>
+      (
+        db
+          .prepare("SELECT meta_key FROM files WHERE rel_path = ?")
+          .get(relPath) as { meta_key: string }
+      ).meta_key;
+    const meta = (key: string) =>
+      db
+        .prepare("SELECT favorite, rating FROM file_meta WHERE meta_key = ?")
+        .get(key);
+    const bookmarks = (key: string) =>
+      db
+        .prepare("SELECT sec FROM scene_bookmarks WHERE meta_key = ?")
+        .pluck()
+        .all(key);
+    const plays = (key: string) =>
+      db
+        .prepare(
+          "SELECT position FROM play_history WHERE meta_key = ? ORDER BY position",
+        )
+        .pluck()
+        .all(key);
+    const setMeta = (key: string, favorite: number, rating: number) =>
+      db
+        .prepare(
+          "INSERT INTO file_meta (meta_key, favorite, rating, updated_at) VALUES (?, ?, ?, 0)",
+        )
+        .run(key, favorite, rating);
+    const bookmark = (key: string, sec: number) =>
+      db
+        .prepare(
+          "INSERT INTO scene_bookmarks (meta_key, sec, created_at) VALUES (?, ?, 0)",
+        )
+        .run(key, sec);
+    const play = (key: string, position: number) =>
+      db
+        .prepare(
+          "INSERT INTO play_history (meta_key, played_at, position, via) VALUES (?, 100, ?, 'browser')",
+        )
+        .run(key, position);
+    const edit = async (file: string, content: string) => {
+      await fsp.writeFile(file, content);
+      await fsp.utimes(file, new Date(), new Date(Date.now() + 60_000));
+    };
+
+    it("copies its metadata to the new content", async () => {
+      const file = path.join(root, "song.mp3");
+      await fsp.writeFile(file, "BBBBBBBBBB");
+      await rescan();
+      const row = db
+        .prepare("SELECT id FROM files WHERE rel_path = 'song.mp3'")
+        .get() as { id: number };
+      const oldKey = keyOf("song.mp3");
+      setMeta(oldKey, 1, 4);
+      addManualTag(db, row.id, "Live");
+      // A tag derived from the content, which the new content gets its own of.
+      const derived = Number(
+        db
+          .prepare("INSERT INTO tags (namespace, name) VALUES ('res', '720p')")
+          .run().lastInsertRowid,
+      );
+      db.prepare(
+        "INSERT INTO meta_tags (meta_key, tag_id, source) VALUES (?, ?, ?)",
+      ).run(oldKey, derived, AUTO_META_SOURCE);
+      bookmark(oldKey, 12);
+      play(oldKey, 30);
+
+      // Its tags edited: new content, same path.
+      await edit(file, "CCCCCCCCCCCC");
+      const res = await rescan();
+
+      expect(res.stats).toMatchObject({ updated: 1, inserted: 0 });
+      const newKey = keyOf("song.mp3");
+      expect(newKey).not.toBe(oldKey);
+      // Copied, not moved: a copy elsewhere in the library may share the old
+      // content and its metadata.
+      for (const key of [newKey, oldKey]) {
+        expect(meta(key)).toEqual({ favorite: 1, rating: 4 });
+        expect(bookmarks(key)).toEqual([12]);
+        expect(plays(key)).toEqual([30]);
+      }
+      expect(fileTags(db, row.id).map((t) => t.name)).toEqual(["Live"]);
+      expect(
+        db
+          .prepare("SELECT COUNT(*) FROM meta_tags WHERE meta_key = ?")
+          .pluck()
+          .get(oldKey),
+      ).toBe(2);
+    });
+
+    it("merges into what the library holds for the new content", async () => {
+      const file = path.join(root, "a.mp4");
+      await fsp.writeFile(file, "BBBBBBBBBB");
+      await rescan();
+      const oldKey = keyOf("a.mp4");
+      setMeta(oldKey, 0, 2);
+      bookmark(oldKey, 12);
+      play(oldKey, 30);
+      play(oldKey, 45);
+      // The new content, known to another workspace sharing the library (or
+      // this file's own before an edit that is now undone).
+      const scratch = path.join(root, "..", `${path.basename(root)}-new`);
+      await fsp.writeFile(scratch, "CCCCCCCCCCCC");
+      const newKey = await contentHash(scratch);
+      await fsp.rm(scratch);
+      setMeta(newKey, 1, 1);
+      bookmark(newKey, 12.1);
+      play(newKey, 30);
+
+      await edit(file, "CCCCCCCCCCCC");
+      await rescan();
+
+      expect(keyOf("a.mp4")).toBe(newKey);
+      expect(meta(newKey)).toEqual({ favorite: 1, rating: 2 });
+      // A bookmark near one it holds is not added again; the same play is
+      // kept once, another position is another play.
+      expect(bookmarks(newKey)).toEqual([12.1]);
+      expect(plays(newKey)).toEqual([30, 45]);
+    });
+
+    it("does not copy to empty content, which every truncated file shares", async () => {
+      const a = path.join(root, "a.mp4");
+      const b = path.join(root, "b.mp4");
+      await fsp.writeFile(a, "AAAAAAAAAA");
+      await fsp.writeFile(b, "BBBBBBBBBBBB");
+      await rescan();
+      const aKey = keyOf("a.mp4");
+      const bKey = keyOf("b.mp4");
+      setMeta(aKey, 1, 5);
+      setMeta(bKey, 0, 1);
+
+      // A failed sync leaves both empty, then they are restored.
+      await edit(a, "");
+      await edit(b, "");
+      await rescan();
+      const emptyKey = keyOf("a.mp4");
+      expect(meta(emptyKey)).toBeUndefined();
+      await edit(a, "AAAAAAAAAA");
+      await edit(b, "BBBBBBBBBBBB");
+      await rescan();
+
+      expect(meta(aKey)).toEqual({ favorite: 1, rating: 5 });
+      expect(meta(bKey)).toEqual({ favorite: 0, rating: 1 });
+    });
+
+    it("does not hand out what empty files share to one that gets content", async () => {
+      const a = path.join(root, "a.mp4");
+      const b = path.join(root, "b.mp4");
+      // Not written yet: both empty, so both under the one empty-content key.
+      await fsp.writeFile(a, "");
+      await fsp.writeFile(b, "");
+      await rescan();
+      const emptyKey = keyOf("a.mp4");
+      expect(keyOf("b.mp4")).toBe(emptyKey);
+      const aId = (
+        db.prepare("SELECT id FROM files WHERE rel_path = 'a.mp4'").get() as {
+          id: number;
+        }
+      ).id;
+      addManualTag(db, aId, "OnlyA");
+      setMeta(emptyKey, 1, 5);
+
+      await edit(b, "BBBBBBBBBBBB");
+      await rescan();
+
+      const bId = (
+        db.prepare("SELECT id FROM files WHERE rel_path = 'b.mp4'").get() as {
+          id: number;
+        }
+      ).id;
+      expect(fileTags(db, bId)).toEqual([]);
+      expect(meta(keyOf("b.mp4"))).toBeUndefined();
+    });
+
+    // The path decides over the hash: accepted for the rare cases where the
+    // two disagree (#263).
+    it("takes its metadata to another file's content copied over it", async () => {
+      const a = path.join(root, "a.mp4");
+      const b = path.join(root, "b.mp4");
+      await fsp.writeFile(a, "AAAAAAAAAA");
+      await fsp.writeFile(b, "BBBBBBBBBBBB");
+      await rescan();
+      const aKey = keyOf("a.mp4");
+      const bKey = keyOf("b.mp4");
+      setMeta(aKey, 1, 5);
+
+      // cp b.mp4 a.mp4
+      await edit(a, "BBBBBBBBBBBB");
+      await rescan();
+
+      expect(keyOf("a.mp4")).toBe(bKey);
+      expect(meta(bKey)).toEqual({ favorite: 1, rating: 5 });
+      expect(meta(aKey)).toEqual({ favorite: 1, rating: 5 });
+    });
+
+    it("keeps both files' metadata when two files swap their content", async () => {
+      const a = path.join(root, "a.mp4");
+      const b = path.join(root, "b.mp4");
+      await fsp.writeFile(a, "AAAAAAAAAA");
+      await fsp.writeFile(b, "BBBBBBBBBBBB");
+      await rescan();
+      const aKey = keyOf("a.mp4");
+      const bKey = keyOf("b.mp4");
+      play(aKey, 30);
+      play(bKey, 45);
+
+      await edit(a, "BBBBBBBBBBBB");
+      await edit(b, "AAAAAAAAAA");
+      await rescan();
+
+      // Merged: nothing is lost, and both now show both.
+      expect(plays(aKey)).toEqual([30, 45]);
+      expect(plays(bKey)).toEqual([30, 45]);
+    });
   });
 
   it("carries metadata from the key the row derived, not from the path found now", async () => {
@@ -512,6 +785,67 @@ describe("syncFiles lifecycle", () => {
     expect(res.ftsMissing).toEqual([id]);
     for (const r of res.ftsMissing) syncFts(db, r);
     expect(ftsRow()).toEqual({ rowid: id });
+  });
+
+  it("leaves a file removed from the index during the scan removed (#266)", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    await fsp.writeFile(path.join(root, "b.mp4"), "BBBBBBBBBB");
+    await rescan();
+    const idOf = (rel: string) =>
+      db
+        .prepare("SELECT id FROM files WHERE rel_path = ?")
+        .pluck()
+        .get(rel) as number;
+    const a = idOf("a.mp4");
+    const b = idOf("b.mp4");
+
+    // a changed (so it is hashed), b unchanged; both are removed from the
+    // index while the scan is hashing, after it read the excluded set.
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAAAA");
+    const discovered = await walk(root);
+    const res = await syncFiles(db, rootId, discovered, {
+      onHashProgress: (done, total) => {
+        if (done !== total) return;
+        deleteFromIndex(db, a);
+        deleteFromIndex(db, b);
+      },
+    });
+
+    expect(res.stats).toMatchObject({ updated: 0, unchanged: 0, deleted: 0 });
+    expect(res.ftsTargets).toEqual([]);
+    expect(res.ftsMissing).toEqual([]);
+    expect(res.needsThumb).toEqual([]);
+    const rows = db
+      .prepare(
+        "SELECT id, deleted_at, excluded_at, size FROM files WHERE id IN (?, ?) ORDER BY id",
+      )
+      .all(a, b) as {
+      id: number;
+      deleted_at: number | null;
+      excluded_at: number | null;
+      size: number;
+    }[];
+    for (const r of rows) {
+      expect(r.deleted_at).not.toBeNull();
+      expect(r.excluded_at).not.toBeNull();
+    }
+    // The changed file's row was not updated either.
+    expect(rows.find((r) => r.id === a)?.size).toBe(10);
+  });
+
+  it("does not add back the FTS row of a file removed from the index (#266)", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    const first = await rescan();
+    const [id] = first.ftsTargets;
+    syncFts(db, id);
+
+    // Removed after the scan listed it for FTS sync, before the sync ran.
+    deleteFromIndex(db, id);
+    syncFts(db, id);
+
+    expect(
+      db.prepare("SELECT rowid FROM files_fts WHERE rowid = ?").get(id),
+    ).toBeUndefined();
   });
 
   it("does not rebuild the FTS row of a file that comes back with its row intact", async () => {

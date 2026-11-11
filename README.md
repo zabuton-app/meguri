@@ -23,7 +23,7 @@ videos and images with thumbnails. It recursively scans any folder you point it 
 generates thumbnails, tags, and metadata, and lets you browse the collection in
 a native window.
 
-The name **Meguri** comes from the Japanese word *巡り* — "going around,
+The name **Meguri** comes from the Japanese word _巡り_ — "going around,
 coming back around" — with the sentiment of wandering back through your
 memories and rediscovering them.
 
@@ -363,14 +363,14 @@ Electron needs, `npm run test:e2e:install` pulls them in.
 
 ## Basic Usage
 
-| Action     | How                                                                                                                |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| Scan       | Runs automatically at startup. Re-scan via the header "Scan" (incremental, move tracking)                          |
+| Action     | How                                                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| Scan       | Runs automatically at startup. Re-scan via the header "Scan" (incremental, move tracking)                            |
 | Play       | Click a thumbnail → play in the detail view (audio plays in the bottom bar). When unsupported, use "Open externally" |
-| Tag / Rate | Assign in the detail view (tags have autocomplete). Click a tag in the grid to search                              |
-| Search     | Filter and sort by full text, kind, and rating in the top bar (conditions shown as badges, individually removable) |
-| Theme      | Switch from Theme at the top-right of the header                                                                   |
-| Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset                                                                          |
+| Tag / Rate | Assign in the detail view (tags have autocomplete). Click a tag in the grid to search                                |
+| Search     | Filter and sort by full text, kind, and rating in the top bar (conditions shown as badges, individually removable)   |
+| Theme      | Switch from Theme at the top-right of the header                                                                     |
+| Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset                                                                            |
 
 To drag a file to another app, hover over it in grid or list view and drag
 the arrow beside its selection checkbox. Drag from a selected file's arrow
@@ -379,6 +379,10 @@ to carry the whole selection.
 ProRes clips play in Meguri through a local H.264 preview at up to
 1920 × 1080. The original clip is still used when you drag it into an editor
 or open it externally.
+
+When the player repackages a container such as MKV, it converts Dolby Digital
+(AC-3) or Dolby Digital Plus (E-AC-3) audio to AAC for playback. The preview
+keeps the original picture and the surround channel count.
 
 ## Custom CSS
 
@@ -574,6 +578,8 @@ Before submitting a pull request, run:
 npm run typecheck
 npm test
 npm run test:e2e:headless
+npm run lint
+npm run format:check
 ```
 
 Keep changes focused, avoid unrelated refactors, and include tests when a change

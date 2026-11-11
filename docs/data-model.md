@@ -153,6 +153,32 @@ When a file gains its first hash, `migrateMetaKey()` moves its metadata from
 the path key to the hash. Another workspace's copy may already hold metadata
 under that hash; the two are merged by the rules below.
 
+When the content of a file changes at the same path (its tags or cover art
+edited, a recording that grew), it gets a new hash but stays the same file to
+the user: the path, not only the hash, tells it apart. `copyMetaKey()` copies
+its metadata to the new hash, plays and bookmarks included, merged by the rules
+below into what the library already holds there. It is copied rather than
+moved, since another file, in this workspace or another one, may still have the
+old content. Only the user's tags are copied; the tags derived from the content
+(resolution, codec and so on) are derived again for the new content.
+
+Where the path and the hash disagree, the path decides, and the outcome is
+accepted as it is:
+
+- another file's content copied over this one: this file's metadata is merged
+  into that content, so the other file shows it too
+- two files that swap their content: both end up with both files' metadata
+- an edit undone: the content gets back its old metadata merged with what was
+  set in between, so a favorite or a tag removed in between comes back
+- a copy of the old content still listed: the same plays show under both
+
+Nothing is copied to or from empty content: every empty file (truncated by a
+failed sync, or not written yet) has the same hash, which would gather all
+their metadata and hand it to each one that gets content. A changed file moved
+or renamed in the same step is not recognized, and starts without metadata.
+The copies left under old hashes are not cleaned up, so a tag kept only there
+still counts as in use for tag completion.
+
 `file_meta` holds `favorite`, `rating` (0–5), `last_accessed_at`, and
 `thumb_offset_sec` (the user-chosen thumbnail frame offset, `NULL` meaning the
 auto-extracted representative frame).
@@ -242,19 +268,19 @@ of the clock counts as the stalest, never as the newest.
 
 Rows for the same `meta_key` are merged so that nothing the user set is lost:
 
-| What | Rule |
-| --- | --- |
-| `favorite` | either one set |
-| `rating`, `last_accessed_at` | the higher |
-| `thumb_offset_sec`, `resume_position` | the newer row's, unless it has none |
-| `tags` | matched on the exact `(namespace, name)` |
-| `meta_tags` | one row per `(meta_key, tag, source)` |
-| `scene_bookmarks` | one within `BOOKMARK_NEAR_EPS` of another is not added |
-| `play_history` | identical events are kept once |
+| What                                  | Rule                                                   |
+| ------------------------------------- | ------------------------------------------------------ |
+| `favorite`                            | either one set                                         |
+| `rating`, `last_accessed_at`          | the higher                                             |
+| `thumb_offset_sec`, `resume_position` | the newer row's, unless it has none                    |
+| `tags`                                | matched on the exact `(namespace, name)`               |
+| `meta_tags`                           | one row per `(meta_key, tag, source)`                  |
+| `scene_bookmarks`                     | one within `BOOKMARK_NEAR_EPS` of another is not added |
+| `play_history`                        | identical events are kept once                         |
 
 Merging the same rows again changes nothing. `FILE_META_MERGE_SET` in
-`queries/meta.ts` holds the `file_meta` rules for both this merge and
-`migrateMetaKey()`.
+`queries/meta.ts` holds the `file_meta` rules for this merge,
+`migrateMetaKey()` and `copyMetaKey()`.
 
 Since every workspace reads the same rows, an edit made in one shows in every
 workspace holding the same content. Tag rename, merge and delete, and clearing

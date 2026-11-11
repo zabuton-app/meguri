@@ -5,7 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import type { DB } from "./db.js";
 import { nowUnix, pathMetaKey } from "./db.js";
-import { migrateMetaKey } from "./queries.js";
+import { copyMetaKey, migrateMetaKey } from "./queries.js";
 import { pool } from "./concurrency.js";
 import type { Kind } from "./types.js";
 
@@ -107,6 +107,8 @@ export async function looksLikeMpegTs(file: string): Promise<boolean> {
     return (err as NodeJS.ErrnoException).code !== "ENOENT";
   }
   try {
+    // Windows opens directories too; a folder named *.ts is not a stream.
+    if ((await fd.stat()).isDirectory()) return false;
     // Network filesystems may return short reads; fill the probe window.
     while (len < buf.length) {
       const { bytesRead } = await fd.read(buf, len, buf.length - len, len);
@@ -334,6 +336,39 @@ export async function walk(
 
 const SAMPLE = 1024 * 1024; // 1 MiB
 
+/**
+ * Fill buf from the file at position. A read can return fewer bytes than
+ * asked (a network share in particular), so read on until it is full; the end
+ * of the file before that means it shrank while it was read, which throws with
+ * a code, so the scan skips the file and tries it again next time (#263).
+ */
+async function readFully(
+  fd: fsp.FileHandle,
+  buf: Buffer,
+  position: number,
+): Promise<void> {
+  let filled = 0;
+  while (filled < buf.length) {
+    const { bytesRead } = await fd.read(
+      buf,
+      filled,
+      buf.length - filled,
+      position + filled,
+    );
+    if (bytesRead === 0) {
+      throw Object.assign(new Error("the file shrank while it was read"), {
+        code: "ESHRUNK",
+      });
+    }
+    filled += bytesRead;
+  }
+}
+
+/** The content_hash of every empty file (contentHash of size 0). */
+const EMPTY_CONTENT_HASH = createHash("sha256")
+  .update(Buffer.from(BigInt64Array.of(0n).buffer))
+  .digest("hex");
+
 /** Sampled content_hash (sha256 of size + the first/last 1MiB). */
 export async function contentHash(file: string): Promise<string> {
   const h = createHash("sha256");
@@ -343,14 +378,14 @@ export async function contentHash(file: string): Promise<string> {
     h.update(Buffer.from(BigInt64Array.of(BigInt(size)).buffer));
     if (size <= SAMPLE * 2) {
       const buf = Buffer.alloc(size);
-      await fd.read(buf, 0, size, 0);
+      await readFully(fd, buf, 0);
       h.update(buf);
     } else {
       const head = Buffer.alloc(SAMPLE);
-      await fd.read(head, 0, SAMPLE, 0);
+      await readFully(fd, head, 0);
       h.update(head);
       const tail = Buffer.alloc(SAMPLE);
-      await fd.read(tail, 0, SAMPLE, size - SAMPLE);
+      await readFully(fd, tail, size - SAMPLE);
       h.update(tail);
     }
   } finally {
@@ -374,7 +409,8 @@ export interface ScanStats {
 /** A file skipped by a scan because its content could not be read. */
 export interface UnreadableFile {
   relPath: string;
-  /** The fs error code, e.g. EACCES / EBUSY / ENOENT. */
+  /** The fs error code, e.g. EACCES / EBUSY / ENOENT, or ESHRUNK when the
+   *  file shrank while it was read. */
   code: string;
 }
 
@@ -446,6 +482,8 @@ export async function syncFiles(
   const ftsTargets: number[] = [];
   const ftsMissing: number[] = [];
   const unreadable: UnreadableFile[] = [];
+  // Read once to filter what is scanned; the apply step checks again for files
+  // removed from the index meanwhile (#266).
   const excluded = new Set(
     (
       db
@@ -598,10 +636,27 @@ export async function syncFiles(
   const isUnreadable = unreadableMatcher(unreadablePaths);
 
   // --- 3. DB apply (chunked tx + yield between chunks) ---
+  // A file can be removed from the index while this scan awaits (hashing, the
+  // yields between chunks), after the excluded set above was read. Each chunk
+  // re-reads it, so such a row is left removed instead of being restored (#266).
+  // Looked up by primary key for the chunk's rows only: excluded rows pile up
+  // until a rebuild, so reading all of them per chunk would grow with them.
+  const excludedAmong = db
+    .prepare(
+      "SELECT id FROM files WHERE id IN (SELECT value FROM json_each(?)) AND excluded_at IS NOT NULL",
+    )
+    .pluck();
   const applyChunk = db.transaction((idxs: number[]) => {
+    const ids = idxs.flatMap((i) => existingOf[i]?.id ?? []);
+    const excludedNow = new Set(
+      ids.length > 0
+        ? (excludedAmong.all(JSON.stringify(ids)) as number[])
+        : [],
+    );
     for (const i of idxs) {
       const d = scannable[i];
       const existing = existingOf[i];
+      if (existing && excludedNow.has(existing.id)) continue;
       const sameStat =
         existing !== undefined &&
         existing.size === d.size &&
@@ -645,7 +700,22 @@ export async function syncFiles(
           if (existing.noFts) ftsMissing.push(existing.id);
           stats.unchanged++;
         } else {
-          carryMeta(newHash ?? pathMetaKey(d.absPath));
+          // Changed content at the same path is the same file to the user
+          // (tags or cover art edited, a recording that grew): its metadata
+          // follows the new content (#263). Copied rather than moved from a
+          // hash key, which another copy of the old content may still use.
+          // Neither to nor from empty content: every empty file (truncated by
+          // a failed sync, or not written yet) has the same hash, and it
+          // would gather and hand out all their metadata.
+          const newKey = newHash ?? pathMetaKey(d.absPath);
+          carryMeta(newKey);
+          if (
+            existing.content_hash != null &&
+            existing.content_hash !== EMPTY_CONTENT_HASH &&
+            newKey !== EMPTY_CONTENT_HASH
+          ) {
+            copyMetaKey(db, existing.meta_key, newKey);
+          }
           updateChanged.run(
             d.size,
             d.mtime,

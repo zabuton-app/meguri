@@ -4,7 +4,8 @@
 // (even with non-faststart where moov is at the end, it can read it via a Range request to the tail).
 // So these are served as raw files via Range to enable full seeking. Only containers Chromium
 // cannot demux (mkv/avi/wmv/flv/ts) are remuxed on the fly to fragmented MP4 with ffmpeg
-// and served. ProRes uses a compatible H.264 preview instead of stream copy.
+// and served. Dolby Digital audio is converted to AAC for the built-in player.
+// ProRes uses a compatible H.264 preview instead of stream copy.
 // Both streams support time seeking via ?t=<seconds>.
 //
 // URLs have the form /ws/<workspaceId>/<kind>/<fileId> (kind = thumb|media|frame).
@@ -23,12 +24,14 @@ import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
 import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
 import { scopedLog } from "./logger.js";
+import { extractMeta } from "./media.js";
 
 const log = scopedLog("server");
 
 // Only containers Chromium cannot demux are remuxed with ffmpeg and served.
 // Browser-compatible files are served via Range to enable full seeking.
 const REMUX_CONTAINERS = new Set(["mkv", "avi", "wmv", "flv", "ts"]);
+const remuxProbeSlots = new Semaphore(2);
 
 // Cap one-shot FFmpeg requests and periods without output in remux streams.
 // This prevents corrupt media from pinning a slot indefinitely.
@@ -37,8 +40,8 @@ const FFMPEG_REQUEST_TIMEOUT_MS = 60_000;
 const FFMPEG_KILL_SIGNAL = "SIGKILL" as const;
 // Decoding requests (frame grabs, image transcodes) take a slot from the
 // process-wide `videoDecodeSlots` pool shared with the scan pipeline
-// (mediaConcurrency.ts). Remux sessions are `-c copy` — no decode, little memory,
-// but they live as long as playback — so they get their own cap: one long
+// (mediaConcurrency.ts). Remux sessions copy the picture and may encode audio.
+// They live as long as playback, so they get their own cap: one long
 // movie must not pin a decode slot for hours. The number is a count of
 // concurrent playback sessions (a single user rarely has more than a couple
 // open at once) rather than anything CPU-derived.
@@ -89,6 +92,49 @@ const TRANSCODE_IMAGES = new Set(["heic", "heif", "tiff"]);
 
 function ext(p: string): string {
   return path.extname(p).slice(1).toLowerCase();
+}
+
+async function remuxMetadata(
+  core: Core,
+  id: number,
+  file: string,
+  res: http.ServerResponse,
+): Promise<unknown> {
+  const row = core.db.prepare("SELECT meta FROM files WHERE id = ?").get(id) as
+    { meta: string | null } | undefined;
+  if (row?.meta) {
+    try {
+      return JSON.parse(row.meta);
+    } catch {
+      // Fall back to probing if cached metadata is unreadable.
+    }
+  }
+  const stat = await fs.promises.stat(file).catch(() => null);
+  if (!stat?.isFile() || res.destroyed) return null;
+  const release = await acquireForResponse(remuxProbeSlots, res);
+  if (!release) return null;
+  try {
+    if (res.destroyed) return null;
+    return (await extractMeta(file, "video", AbortSignal.timeout(5_000))).raw;
+  } finally {
+    release();
+  }
+}
+
+function hasDolbyDigitalAudio(raw: unknown): boolean {
+  const streams = (
+    raw as {
+      streams?: { codec_type?: string; codec_name?: string }[];
+    } | null
+  )?.streams;
+  return (
+    Array.isArray(streams) &&
+    streams.some(
+      (stream) =>
+        stream?.codec_type === "audio" &&
+        (stream.codec_name === "ac3" || stream.codec_name === "eac3"),
+    )
+  );
 }
 
 function contentType(p: string): string {
@@ -268,7 +314,15 @@ async function handle(
       }
       const parsed = startT != null ? Number(startT) : NaN;
       const start = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      serveRemux(res, abs, start, proResPreview);
+      // Leave FFmpeg's automatic track selection in place. If it can select a
+      // Dolby Digital track, encode the selected audio before writing the MP4.
+      const mode = proResPreview
+        ? "prores"
+        : hasDolbyDigitalAudio(await remuxMetadata(core, id, abs, res))
+          ? "aac"
+          : "copy";
+      if (!res.destroyed && !res.writableEnded)
+        serveRemux(res, abs, start, mode);
       return;
     }
     // Chromium-unsupported image formats (heic/heif/tiff) are transcoded to JPEG.
@@ -397,12 +451,10 @@ type RemuxSession = {
 
 const remuxInflight = new Map<string, RemuxSession>();
 
-function remuxKey(
-  file: string,
-  start: number | null,
-  proResPreview: boolean,
-): string {
-  return `${file}\0${start ?? ""}\0${proResPreview}`;
+type RemuxMode = "copy" | "aac" | "prores";
+
+function remuxKey(file: string, start: number | null, mode: RemuxMode): string {
+  return `${file}\0${start ?? ""}\0${mode}`;
 }
 
 function spawnFfmpegChild(
@@ -527,8 +579,9 @@ function startRemuxSession(
   start: number | null,
   res: http.ServerResponse,
   releaseSlot: () => void,
-  proResPreview: boolean,
+  mode: RemuxMode,
 ) {
+  const proResPreview = mode === "prores";
   const args = ["-v", "error"];
   if (proResPreview)
     args.push(
@@ -564,10 +617,15 @@ function startRemuxSession(
     );
   } else {
     args.push("-c", "copy");
+    if (mode === "aac") args.push("-c:a", "aac", "-b:a", "384k");
   }
   args.push(
     "-movflags",
-    "frag_keyframe+empty_moov+default_base_moof",
+    // Delay the header until FFmpeg knows the copied video's keyframe
+    // preroll and can put it on the same timeline as re-encoded audio.
+    mode === "aac"
+      ? "frag_keyframe+delay_moov+default_base_moof"
+      : "frag_keyframe+empty_moov+default_base_moof",
     "-f",
     "mp4",
     "pipe:1",
@@ -718,9 +776,9 @@ function serveRemux(
   res: http.ServerResponse,
   file: string,
   start: number | null,
-  proResPreview: boolean,
+  mode: RemuxMode,
 ) {
-  const key = remuxKey(file, start, proResPreview);
+  const key = remuxKey(file, start, mode);
   const existing = remuxInflight.get(key);
   if (existing) {
     attachRemuxClient(key, existing, res);
@@ -729,7 +787,7 @@ function serveRemux(
 
   void (async () => {
     const releaseSlot = await acquireForResponse(
-      proResPreview ? proResPreviewSlots : remuxSlots,
+      mode === "prores" ? proResPreviewSlots : remuxSlots,
       res,
     );
     if (!releaseSlot) return;
@@ -742,7 +800,7 @@ function serveRemux(
     }
 
     try {
-      startRemuxSession(key, file, start, res, releaseSlot, proResPreview);
+      startRemuxSession(key, file, start, res, releaseSlot, mode);
     } catch (e) {
       // spawn() can throw synchronously; the slot would otherwise never be
       // released (it only reaches the session on success).

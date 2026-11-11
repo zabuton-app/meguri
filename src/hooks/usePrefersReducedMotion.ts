@@ -7,7 +7,9 @@ import { useSyncExternalStore } from "react";
 const QUERY = "(prefers-reduced-motion: reduce)";
 
 function canQuery(): boolean {
-  return typeof window !== "undefined" && typeof window.matchMedia === "function";
+  return (
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+  );
 }
 
 function subscribe(onChange: () => void): () => void {

@@ -276,8 +276,10 @@ export function tagsText(db: DB, fileId: number): string {
 }
 
 export function syncFts(db: DB, fileId: number): void {
+  // A file removed from the index has no FTS row (deleteFromIndex drops it);
+  // a scan or thumbnail pass still holding its id must not add one back (#266).
   const row = db
-    .prepare("SELECT rel_path FROM files WHERE id = ?")
+    .prepare("SELECT rel_path FROM files WHERE id = ? AND excluded_at IS NULL")
     .get(fileId) as { rel_path: string } | undefined;
   if (!row) return;
   const text = tagsText(db, fileId);
