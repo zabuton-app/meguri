@@ -77,6 +77,13 @@ export interface AppOptions {
    * for updates; leave it out for an app that is not on the Store.
    */
   msStoreProductId?: string;
+  /**
+   * Prefix of the environment variables the main process reads, without the
+   * trailing "_": `<prefix>_ROOT` (initial scan root), `<prefix>_DISABLE_TRAY`
+   * and, in development, `<prefix>_UPDATE_REPO`. Each app has its own so one
+   * app's exported variables do not reach another.
+   */
+  envPrefix: string;
 }
 
 /** Start the app. Call once, from the entry point, before anything else runs. */
@@ -89,6 +96,7 @@ export function startApp(options: AppOptions): void {
   configureUpdater({
     repo: options.updateRepo,
     msStoreProductId: options.msStoreProductId,
+    envPrefix: options.envPrefix,
   });
 
   // Set up logging before anything else so early failures land in the log file.
@@ -367,12 +375,13 @@ export function startApp(options: AppOptions): void {
   }
 
   function isTrayEnabled(): boolean {
-    return process.env.MEGURI_DISABLE_TRAY !== "1";
+    return process.env[`${options.envPrefix}_DISABLE_TRAY`] !== "1";
   }
 
   /** Get only the root explicitly specified via CLI/env var (does not fall back to cwd). */
   function resolveCliRoot(): string | null {
-    if (process.env.MEGURI_ROOT) return process.env.MEGURI_ROOT;
+    const envRoot = process.env[`${options.envPrefix}_ROOT`];
+    if (envRoot) return envRoot;
     const appPath = app.getAppPath();
     const args = process.argv
       .slice(1)

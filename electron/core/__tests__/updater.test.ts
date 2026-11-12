@@ -12,6 +12,7 @@ beforeEach(() =>
   configureUpdater({
     repo: { owner: "zabuton-app", name: "meguri" },
     msStoreProductId: "9NRSM11RRH8Z",
+    envPrefix: "MEGURI",
   }),
 );
 
@@ -77,6 +78,7 @@ describe("updateDownloadUrl", () => {
     configureUpdater({
       repo: { owner: "someone", name: "other-app" },
       msStoreProductId: "9ABCDEFGHIJK",
+      envPrefix: "OTHER",
     });
     expect(updateDownloadUrl(htmlUrl, true)).toBe(
       "ms-windows-store://pdp/?ProductId=9ABCDEFGHIJK",
@@ -84,7 +86,10 @@ describe("updateDownloadUrl", () => {
   });
 
   it("sends Store installs to GitHub when the app has no product ID", () => {
-    configureUpdater({ repo: { owner: "someone", name: "other-app" } });
+    configureUpdater({
+      repo: { owner: "someone", name: "other-app" },
+      envPrefix: "OTHER",
+    });
     expect(updateDownloadUrl(htmlUrl, true)).toBe(htmlUrl);
     expect(updateDownloadUrl(null, true)).toBe(
       "https://github.com/someone/other-app/releases",
@@ -94,7 +99,10 @@ describe("updateDownloadUrl", () => {
 
 describe("releasesPage", () => {
   it("points at the repository the app was started with", () => {
-    configureUpdater({ repo: { owner: "someone", name: "other-app" } });
+    configureUpdater({
+      repo: { owner: "someone", name: "other-app" },
+      envPrefix: "OTHER",
+    });
     expect(releasesPage()).toBe(
       "https://github.com/someone/other-app/releases",
     );
