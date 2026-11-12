@@ -2,7 +2,7 @@
 
 Scripts that (re)generate the README demo GIFs and gallery screenshots in
 `docs/assets/`. They drive the built app with Playwright, capture frames via
-CDP screencast, and encode with the bundled ffmpeg-static — no system ffmpeg
+CDP screencast, and encode with the bundled ffmpeg — no system ffmpeg
 or extra npm install required.
 
 ## Prerequisites
