@@ -42,7 +42,8 @@ mind yet. See [Labels](#labels) for what each label means.
 ## Labels
 
 Issues and pull requests are labelled along a few independent axes. An issue
-usually has one type label, one or two `area:` labels, and a `status:` label
+usually has one type label, one or two `area:` labels, a `feature:` label when
+it belongs to a feature tracked across several issues, and a `status:` label
 when something has to happen before the work can start. Even the labels whose
 meaning seems obvious are listed here, so everyone reads them the same way.
 
@@ -76,6 +77,14 @@ label tells you where to start reading.
 - `area: tests`: test infrastructure and E2E tests.
 - `area: ci`: GitHub workflows, builds, releases, store submission.
 - `area: deps`: dependency updates.
+
+### Feature
+
+A user-facing feature whose work spans several areas. Add it alongside the
+`area:` labels, so all the issues about one feature can be found together.
+
+- `feature: subtitles`: embedded subtitles: track selection, extraction and
+  display.
 
 ### Status
 
