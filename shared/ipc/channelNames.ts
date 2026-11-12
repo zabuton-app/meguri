@@ -36,6 +36,7 @@ export const INVOKE_CHANNELS = [
   "activity_days",
   "timeline_counts",
   "file_get",
+  "file_subtitles",
   "file_set_rating",
   "file_set_favorite",
   "file_delete_from_index",

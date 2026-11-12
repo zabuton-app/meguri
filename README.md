@@ -389,6 +389,15 @@ For ProRes, MKV, AVI, WMV, FLV, or TS clips with multiple audio tracks, use
 uses the usual playback selection when you open a clip. Switching tracks
 keeps the playhead and play or pause state.
 
+### Embedded subtitles
+
+Use **Subtitle track** in the clip player or fullscreen to choose an embedded
+text track or turn captions off. Meguri remembers the choice per clip. When the
+audio language is known, **Match audio language** can choose the corresponding
+subtitle. Meguri loads text near the playhead as you watch or seek.
+
+Supported tracks include SRT, ASS/SSA as plain text, WebVTT, and MP4 timed text.
+
 ## Custom CSS
 
 Meguri's look can be changed with plain CSS in two ways, and both can be used

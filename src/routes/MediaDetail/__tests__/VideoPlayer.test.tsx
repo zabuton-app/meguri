@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import { StrictMode, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -17,12 +18,15 @@ import {
 } from "@/routes/MediaDetail/VideoPlayer";
 import { announceVideoHandOff, resetVideoHandOff } from "@/video/videoHandOff";
 
+const fileSubtitles = vi.fn<typeof import("@/ipc/client").api.fileSubtitles>();
 const fileRecordPlay = vi.fn().mockResolvedValue(undefined);
 const fileSavePosition = vi
   .fn<(...args: unknown[]) => Promise<void>>()
   .mockResolvedValue(undefined);
 vi.mock("@/ipc/client", () => ({
   api: {
+    fileSubtitles: (...args: Parameters<typeof fileSubtitles>) =>
+      fileSubtitles(...args),
     fileRecordPlay: (...args: unknown[]) => fileRecordPlay(...args),
     fileSavePosition: (...args: unknown[]) => fileSavePosition(...args),
     openExternal: vi.fn().mockResolvedValue(undefined),
@@ -115,6 +119,84 @@ function fireVideoError(video: HTMLVideoElement, code: number) {
   });
   fireEvent.error(video);
 }
+
+describe("embedded subtitles", () => {
+  it("shows initial loading but keeps the banner hidden between cue windows", async () => {
+    fileSubtitles.mockReset();
+    let finishFirstWindow: () => void = () => {};
+    let finishNextWindow: () => void = () => {};
+    fileSubtitles
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishFirstWindow = () => resolve([]);
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishNextWindow = () => resolve([]);
+          }),
+      );
+    const { video } = renderPlayer({
+      duration: 300,
+      subtitleTracks: [{ title: "English", language: "eng", codec: "subrip" }],
+    });
+    loadVideo(video);
+    const select = screen.getByRole("combobox", { name: "player.subtitles" });
+    fireEvent.change(select, { target: { value: "0" } });
+    expect(await screen.findByText("player.subtitleLoading")).toBeTruthy();
+    finishFirstWindow();
+    await waitFor(() =>
+      expect(screen.queryByText("player.subtitleLoading")).toBeNull(),
+    );
+
+    video.currentTime = 125;
+    fireEvent.timeUpdate(video);
+    expect(fileSubtitles).toHaveBeenCalledWith(1, "ws1", 0, 120);
+    expect(screen.queryByText("player.subtitleLoading")).toBeNull();
+    await act(async () => finishNextWindow());
+  });
+
+  it("loads the chosen track in the regular player and requests new cues after seeking", async () => {
+    fileSubtitles.mockReset();
+    fileSubtitles.mockImplementation(
+      (_id: number, _ws: string, track: number, start: number) =>
+        Promise.resolve([
+          {
+            start: start + 2,
+            end: start + 10,
+            text: track === 0 ? "Hello" : "Bonjour",
+          },
+        ]),
+    );
+    const { video } = renderPlayer({
+      duration: 300,
+      subtitleTracks: [
+        { title: "English", language: "eng", codec: "subrip" },
+        { title: "French", language: "fra", codec: "subrip" },
+      ],
+    });
+    loadVideo(video);
+    video.currentTime = 5;
+    fireEvent.timeUpdate(video);
+    const select = screen.getByRole("combobox", { name: "player.subtitles" });
+    fireEvent.change(select, { target: { value: "0" } });
+    expect(await screen.findByText("Hello")).toBeTruthy();
+    expect(fileSubtitles).toHaveBeenCalledWith(1, "ws1", 0, 0);
+
+    fireEvent.change(select, { target: { value: "1" } });
+    expect(screen.queryByText("Hello")).toBeNull();
+    expect(await screen.findByText("Bonjour")).toBeTruthy();
+    video.currentTime = 125;
+    fireEvent.timeUpdate(video);
+    expect(await screen.findByText("Bonjour")).toBeTruthy();
+    expect(fileSubtitles).toHaveBeenCalledWith(1, "ws1", 1, 120);
+
+    fireEvent.change(select, { target: { value: "-1" } });
+    expect(screen.queryByText("Bonjour")).toBeNull();
+  });
+});
 
 describe("VideoPlayer", () => {
   beforeEach(() => {

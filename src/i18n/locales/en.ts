@@ -328,6 +328,12 @@ export const en: Record<TranslationKey, string> = {
   "media.currentMainThumb": "Current main thumbnail:",
 
   // player controls
+  "player.subtitles": "Subtitle track",
+  "player.subtitleAuto": "Match audio language",
+  "player.subtitleOff": "Off",
+  "player.subtitleLoading": "Loading subtitles…",
+  "player.subtitleUnavailable": "This subtitle track could not be loaded.",
+  "player.subtitleTrackNumber": "Track {number}",
   "player.play": "Play",
   "player.playKey": "Play (Space)",
   "player.pauseKey": "Pause (Space)",

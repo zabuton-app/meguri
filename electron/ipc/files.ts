@@ -1,3 +1,13 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { FFMPEG } from "../core/ffmpeg-paths.js";
+import { Semaphore } from "../core/concurrency.js";
+import {
+  SUBTITLE_WINDOW_SECONDS,
+  isTextSubtitle,
+  readEmbeddedTracks,
+  readWebVtt,
+} from "../../shared/embeddedSubtitles.js";
 import { handle } from "../core/ipcHandler.js";
 import { isRemuxedVideo } from "../../shared/playbackTracks.js";
 import { isInsideRoot } from "../core/paths.js";
@@ -13,9 +23,15 @@ import type { IpcContext } from "./context.js";
 import {
   bulkTargetCores,
   coreById,
+  ensureFileInsideRoot,
   queryTargets,
   scopedCores,
 } from "./helpers.js";
+
+const execFileAsync = promisify(execFile);
+const subtitleSlots = new Semaphore(2);
+// The overlap covers cues that begin before a boundary or span it.
+const SUBTITLE_OVERLAP_SECONDS = 30;
 
 export function registerFileHandlers(ctx: IpcContext): void {
   const { ws, queryClient, positions, emit } = ctx;
@@ -71,6 +87,45 @@ export function registerFileHandlers(ctx: IpcContext): void {
       return { ...file, meta };
     }
     return file;
+  });
+  handle("file_subtitles", async ({ id, workspaceId, track, windowStart }) => {
+    const core = coreById(ws, workspaceId);
+    const file = q.fileDetail(core.db, id);
+    if (file?.kind !== "video") throw new Error("Unsupported subtitle track");
+    const abs = ensureFileInsideRoot(core, id);
+    const selected = readEmbeddedTracks(file.meta, "subtitle")[track];
+    if (!selected || !isTextSubtitle(selected.codec))
+      throw new Error("Unsupported subtitle track");
+    const release = await subtitleSlots.acquire({ maxWaiting: 4 });
+    try {
+      const { stdout } = await execFileAsync(
+        FFMPEG,
+        [
+          "-nostdin",
+          "-v",
+          "error",
+          "-ss",
+          String(Math.max(0, windowStart - SUBTITLE_OVERLAP_SECONDS)),
+          "-copyts",
+          "-start_at_zero",
+          "-i",
+          abs,
+          "-map",
+          `0:s:${track}`,
+          "-to",
+          String(
+            windowStart + SUBTITLE_WINDOW_SECONDS + SUBTITLE_OVERLAP_SECONDS,
+          ),
+          "-f",
+          "webvtt",
+          "pipe:1",
+        ],
+        { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 },
+      );
+      return readWebVtt(stdout);
+    } finally {
+      release();
+    }
   });
   handle("file_set_rating", ({ id, workspaceId, rating }) =>
     q.setRating(coreById(ws, workspaceId).db, id, rating),

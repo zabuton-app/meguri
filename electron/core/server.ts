@@ -28,8 +28,8 @@ import {
   PREVIEW_AUDIO_TRACK_PARAM,
   REMUX_CONTAINERS,
   hasRemuxVideo,
-  readAudioTracks,
 } from "../../shared/playbackTracks.js";
+import { readEmbeddedTracks } from "../../shared/embeddedSubtitles.js";
 import { probePlaybackMetadata } from "./playbackMetadata.js";
 
 const log = scopedLog("server");
@@ -279,7 +279,7 @@ async function handle(
           .get(id) as { meta: string | null } | undefined;
         const metadata = await probePlaybackMetadata(abs, row?.meta);
         if (res.destroyed || res.writableEnded) return;
-        const tracks = readAudioTracks(metadata);
+        const tracks = readEmbeddedTracks(metadata, "audio");
         if (requested !== null) {
           const audio = /^\d+$/.test(requested) ? Number(requested) : -1;
           if (

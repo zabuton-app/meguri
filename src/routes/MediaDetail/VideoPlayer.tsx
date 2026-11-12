@@ -1,3 +1,16 @@
+import { useQuery } from "@tanstack/react-query";
+import {
+  SUBTITLE_WINDOW_SECONDS,
+  isTextSubtitle,
+  sameSubtitleLanguage,
+  type EmbeddedTrack,
+} from "@shared/embeddedSubtitles";
+import {
+  AUTO_SUBTITLE,
+  SUBTITLES_OFF,
+  readSubtitlePreference,
+  saveSubtitlePreference,
+} from "@/lib/subtitlePreference";
 import {
   forwardRef,
   useCallback,
@@ -58,10 +71,7 @@ import {
   type PositionSample,
 } from "@/lib/positionReporter";
 import { fmtTime } from "./utils";
-import {
-  DEFAULT_AUDIO_TRACK,
-  type PlaybackTrack,
-} from "@shared/playbackTracks";
+import { DEFAULT_AUDIO_TRACK } from "@shared/playbackTracks";
 
 // readyState at which metadata is in (HTMLMediaElement.HAVE_METADATA), as a
 // plain number: the constant lives on a global jsdom does not provide.
@@ -125,7 +135,10 @@ export const VideoPlayer = forwardRef<
     startAt: number;
     /** Whether the video should start playing automatically (default true). */
     autoplay?: boolean;
-    audioTracks?: Pick<PlaybackTrack, "title" | "language">[];
+    audioTracks?: Pick<EmbeddedTrack, "title" | "language">[];
+    subtitleTracks?: EmbeddedTrack[];
+    subtitleAudioLanguage?: string;
+    subtitleKey?: string;
     /** Active paging chords; the player yields these keys so they don't also seek. */
     navKeys: NavBinding;
     /**
@@ -195,6 +208,9 @@ export const VideoPlayer = forwardRef<
     startAt,
     autoplay = true,
     audioTracks,
+    subtitleTracks,
+    subtitleAudioLanguage = "",
+    subtitleKey,
     navKeys,
     fullscreenTargetRef,
     bookmarks,
@@ -235,6 +251,44 @@ export const VideoPlayer = forwardRef<
   const [loaded, setLoaded] = useState(false);
   // Whether this player is currently the fullscreen element (used to drop the max-height cap).
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [subtitle, setSubtitle] = useState(() =>
+    readSubtitlePreference(subtitleKey),
+  );
+  const chosenSubtitle =
+    subtitle === AUTO_SUBTITLE
+      ? (subtitleTracks?.findIndex(
+          (track) =>
+            isTextSubtitle(track.codec) &&
+            sameSubtitleLanguage(subtitleAudioLanguage, track.language),
+        ) ?? SUBTITLES_OFF)
+      : subtitle;
+  const showSubtitles = !chromeless;
+  const subtitleWindow =
+    Math.floor(Math.max(0, position) / SUBTITLE_WINDOW_SECONDS) *
+    SUBTITLE_WINDOW_SECONDS;
+  const subtitleQuery = useQuery({
+    queryKey: ["file_subtitles", wsId, id, chosenSubtitle, subtitleWindow],
+    queryFn: () => api.fileSubtitles(id, wsId, chosenSubtitle, subtitleWindow),
+    enabled:
+      showSubtitles &&
+      chosenSubtitle >= 0 &&
+      isTextSubtitle(subtitleTracks?.[chosenSubtitle]?.codec ?? ""),
+    staleTime: Infinity,
+    retry: false,
+    placeholderData: (previous, query) =>
+      query?.queryKey[1] === wsId &&
+      query.queryKey[2] === id &&
+      query.queryKey[3] === chosenSubtitle
+        ? previous
+        : undefined,
+  });
+  const caption =
+    showSubtitles && chosenSubtitle >= 0
+      ? subtitleQuery.data
+          ?.filter((cue) => cue.start <= position && position < cue.end)
+          .map((cue) => cue.text)
+          .join("\n")
+      : undefined;
   // Volume lives outside this component so the playlist chrome and the detail
   // view stay in step (see hooks/useVolume.ts).
   const { volume, muted } = useVolume();
@@ -356,6 +410,7 @@ export const VideoPlayer = forwardRef<
     setAudioTrack(DEFAULT_AUDIO_TRACK);
     setTrackUnavailable(false);
     pendingAudio.current = null;
+    setSubtitle(readSubtitlePreference(subtitleKey));
     setError(null);
     setOffset(0);
     setPosition(0);
@@ -568,7 +623,7 @@ export const VideoPlayer = forwardRef<
     playedRef.current = false;
     adoptLoadedElement();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, src]);
+  }, [id, src, subtitleKey]);
 
   useEffect(
     () => () => {
@@ -1116,7 +1171,34 @@ export const VideoPlayer = forwardRef<
           {t("player.audioTrackUnavailable")}
         </div>
       )}
-
+      {caption && (
+        <div
+          data-slot="video-subtitles"
+          className="pointer-events-none absolute inset-x-5 bottom-20 text-center"
+        >
+          <span
+            className={`inline-block whitespace-pre-line rounded bg-black/80 px-3 py-1 text-white ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
+          >
+            {caption}
+          </span>
+        </div>
+      )}
+      {showSubtitles &&
+        (subtitleQuery.isError ||
+          (subtitleQuery.isFetching &&
+            !subtitleQuery.isPlaceholderData &&
+            !caption)) && (
+          <div
+            role="status"
+            className="pointer-events-none absolute inset-x-0 top-10 mx-auto w-fit rounded bg-black/80 px-2 py-1 text-xs text-white"
+          >
+            {t(
+              subtitleQuery.isError
+                ? "player.subtitleUnavailable"
+                : "player.subtitleLoading",
+            )}
+          </div>
+        )}
       {/* Center play/pause indicator (shown large while paused). */}
       {!chromeless && loaded && !playing && (
         <button
@@ -1138,7 +1220,7 @@ export const VideoPlayer = forwardRef<
       */}
       {!chromeless && (
         <div
-          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity hover:opacity-100 focus-within:opacity-100 ${
+          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity has-[select:focus]:opacity-100 ${
             controlsVisible ? "opacity-100" : "opacity-0"
           } group-hover:opacity-100`}
         >
@@ -1274,6 +1356,52 @@ export const VideoPlayer = forwardRef<
                   </select>
                 </label>
               )}
+              {showSubtitles &&
+                subtitleTracks?.some((track) =>
+                  isTextSubtitle(track.codec),
+                ) && (
+                  <label className="flex min-w-0 flex-col gap-0.5 text-xs font-medium">
+                    <span>{t("player.subtitles")}</span>
+                    <select
+                      title={t("player.subtitles")}
+                      className="min-w-0 max-w-32 rounded border border-white/30 bg-black/75 px-1 py-1 text-xs text-white"
+                      value={
+                        subtitle >= 0 &&
+                        !isTextSubtitle(subtitleTracks[subtitle]?.codec ?? "")
+                          ? SUBTITLES_OFF
+                          : subtitle
+                      }
+                      onChange={(e) => {
+                        const choice = Number(e.target.value);
+                        setSubtitle(choice);
+                        saveSubtitlePreference(subtitleKey, choice);
+                      }}
+                    >
+                      <option value={AUTO_SUBTITLE}>
+                        {t("player.subtitleAuto")}
+                      </option>
+                      <option value={SUBTITLES_OFF}>
+                        {t("player.subtitleOff")}
+                      </option>
+                      {subtitleTracks.map(
+                        ({ title, language, codec }, index) =>
+                          isTextSubtitle(codec) && (
+                            <option key={index} value={index}>
+                              {[
+                                t("player.subtitleTrackNumber", {
+                                  number: index + 1,
+                                }),
+                                title,
+                                language,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </option>
+                          ),
+                      )}
+                    </select>
+                  </label>
+                )}
               <div className="group/vol flex items-center">
                 <CtrlButton
                   onClick={toggleMuted}

@@ -336,6 +336,13 @@ export const fr: Record<TranslationKey, string> = {
   "media.currentMainThumb": "Miniature principale actuelle :",
 
   // player controls
+  "player.subtitles": "Sous-titres",
+  "player.subtitleAuto": "Suivre la langue audio",
+  "player.subtitleOff": "Désactivés",
+  "player.subtitleLoading": "Chargement des sous-titres…",
+  "player.subtitleUnavailable":
+    "Impossible de charger cette piste de sous-titres.",
+  "player.subtitleTrackNumber": "Piste {number}",
   "player.play": "Lecture",
   "player.playKey": "Lecture (Space)",
   "player.pauseKey": "Pause (Space)",
