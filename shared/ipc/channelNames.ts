@@ -2,6 +2,16 @@
 // validation schemas. ChannelInputs / ChannelOutputs in channels.ts must cover
 // every INVOKE_CHANNELS entry (enforced at compile time there).
 
+/**
+ * Prefixes of the renderer process arguments that carry the app's name and
+ * one-character mark from the main process (webPreferences.additionalArguments)
+ * to the preload, which exposes them as window.api.appName and appGlyph.
+ * Arguments rather than a channel so the renderer has them synchronously,
+ * before its first render.
+ */
+export const APP_NAME_ARG = "--app-name=";
+export const APP_GLYPH_ARG = "--app-glyph=";
+
 /** Renderer → main invoke channels (ipcMain.handle). */
 export const INVOKE_CHANNELS = [
   "app_status",

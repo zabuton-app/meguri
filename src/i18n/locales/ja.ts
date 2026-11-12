@@ -1,9 +1,6 @@
 // 日本語カタログ（原典）。キーはドット区切りのフラット構造。
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
-  // アプリ名（表示名の漢字1文字。ガイドライン00）
-  "app.name": "巡",
-
   // 共通
   "common.close": "閉じる",
   "common.cancel": "キャンセル",
@@ -129,7 +126,7 @@ export const ja = {
   "config.unreadable":
     "設定ファイル（config.json）を読み込めなかったため、初期設定で起動しています",
   "config.unreadableDesc":
-    "ファイルは変更していません。ほかのアプリが使っていないか確認して、Meguriを再起動してください。",
+    "ファイルは変更していません。ほかのアプリが使っていないか確認して、{app}を再起動してください。",
   "settings.about": "このアプリについて",
   "about.version": "{name} バージョン {version}",
   "about.appLicense": "{name}は MIT License の下で公開されています。",
@@ -1077,7 +1074,7 @@ export const ja = {
   "tour.languageTitle": "言語を選んでね",
   "tour.languageBody":
     "使う言語を選んでね。この案内もこの言語で進むよ。あとから設定でも変えられるよ",
-  "tour.welcomeTitle": "Meguriへようこそ",
+  "tour.welcomeTitle": "{app}へようこそ",
   "tour.welcomeBody": "使い方をざっと案内するね。Escでいつでも飛ばせるよ",
   "tour.addWorkspaceTitle": "フォルダを追加",
   "tour.addWorkspaceBody":

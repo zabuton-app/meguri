@@ -97,6 +97,7 @@ import {
   parseViewMode,
 } from "./utils";
 import { scrollListByPage, turnListPage } from "./pageScroll";
+import { appName } from "@/lib/appName";
 
 // The graph view carries WebGL and graph libraries the list views never need,
 // so it is loaded the first time it is shown.
@@ -443,8 +444,8 @@ export default function Home() {
 
   useEffect(() => {
     document.title = status.data?.root
-      ? `Meguri — ${status.data.root}`
-      : "Meguri";
+      ? `${appName()} — ${status.data.root}`
+      : appName();
   }, [status.data?.root]);
 
   // On thumb:done, bump the version for that id to force the thumbnail to reload.

@@ -1,10 +1,11 @@
 // Regression tests for the I18nProvider: default language, {param} interpolation, and switching.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { I18nProvider, useI18n } from "@/i18n/I18nProvider";
 import { en } from "@/i18n/locales/en";
 import { ja } from "@/i18n/locales/ja";
+import { appName } from "@/lib/appName";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <I18nProvider>{children}</I18nProvider>
@@ -26,6 +27,13 @@ describe("I18nProvider", () => {
   it("leaves a placeholder intact when its param is missing", () => {
     const { result } = renderHook(() => useI18n(), { wrapper });
     expect(result.current.t("home.initError")).toContain("{msg}");
+  });
+
+  it("fills {app} with the app's name, without a param", () => {
+    const { result } = renderHook(() => useI18n(), { wrapper });
+    expect(result.current.t("tour.welcomeTitle")).toBe("Welcome to Meguri");
+    vi.mocked(appName).mockReturnValueOnce("Other App");
+    expect(result.current.t("tour.welcomeTitle")).toBe("Welcome to Other App");
   });
 
   it("switches catalog and persists the choice on setLang", () => {

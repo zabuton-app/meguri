@@ -2,9 +2,6 @@
 import type { TranslationKey } from "./ja";
 
 export const zhCN: Record<TranslationKey, string> = {
-  // App name: the single-kanji display name (guideline 00), identical in every locale.
-  "app.name": "巡",
-
   // common
   "common.close": "关闭",
   "common.cancel": "取消",
@@ -114,13 +111,13 @@ export const zhCN: Record<TranslationKey, string> = {
   "library.restoredDesc":
     "此后对收藏、评分、标签等所做的更改已丢失。损坏的文件保留在资料库所在的文件夹中。",
   "config.movedAside":
-    "设置文件（config.json）已损坏，Meguri 已使用默认设置启动",
+    "设置文件（config.json）已损坏，{app} 已使用默认设置启动",
   "config.movedAsideDesc":
     "已登记的工作区和收藏集保留在损坏的文件中，该文件已另存为同一文件夹中的 config.json.corrupt-<日期>。",
   "config.unreadable":
-    "无法读取设置文件（config.json），Meguri 正以默认设置运行",
+    "无法读取设置文件（config.json），{app} 正以默认设置运行",
   "config.unreadableDesc":
-    "该文件未被修改。请确认没有其他应用正在使用它，然后重新启动 Meguri。",
+    "该文件未被修改。请确认没有其他应用正在使用它，然后重新启动 {app}。",
   "settings.about": "关于",
   "about.version": "{name} 版本 {version}",
   "about.appLicense": "{name} 基于 MIT License 发布。",
@@ -161,11 +158,11 @@ export const zhCN: Record<TranslationKey, string> = {
   "home.scanRootUnreadable": "无法访问工作区文件夹",
   "home.scanRootUnreadableNamed": "无法访问“{name}”的文件夹",
   "home.scanRootUnreadableDesc":
-    "请确认该文件夹未被移动或删除、其驱动器或网络共享已连接，且 Meguri 有读取权限，然后重新扫描。文件列表保持不变。",
+    "请确认该文件夹未被移动或删除、其驱动器或网络共享已连接，且 {app} 有读取权限，然后重新扫描。文件列表保持不变。",
   "home.scanSkipped": "已跳过 {count} 个无法读取的文件夹或文件",
   "home.scanSkippedNamed": "已跳过“{name}”中 {count} 个无法读取的文件夹或文件",
   "home.scanSkippedDesc":
-    "Meguri 可能没有读取权限，或其他程序正在使用它们。文件列表中的这部分保持不变，下次扫描时会重试。",
+    "{app} 可能没有读取权限，或其他程序正在使用它们。文件列表中的这部分保持不变，下次扫描时会重试。",
   "home.scanStartFailed": "无法开始扫描",
   "home.scanAlreadyRunning": "扫描已在进行中",
 
@@ -1030,7 +1027,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "tour.languageTitle": "选择语言",
   "tour.languageBody":
     "选择要使用的语言。接下来的教程也会使用该语言，之后也可以在设置中更改",
-  "tour.welcomeTitle": "欢迎使用 Meguri",
+  "tour.welcomeTitle": "欢迎使用 {app}",
   "tour.welcomeBody": "我来带你快速了解一下。随时按 Esc 可以跳过",
   "tour.addWorkspaceTitle": "添加文件夹",
   "tour.addWorkspaceBody":

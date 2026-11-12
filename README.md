@@ -610,7 +610,8 @@ A few conventions to follow:
   (e.g. `feat/#9-hover-preview`), branched from `main`.
 - **Keep all locales in sync**: when adding or changing UI strings, update every
   locale in [src/i18n/locales/](src/i18n/locales/) (ja / en / es / fr / ko /
-  zh-CN). `ja.ts` is the source of truth for translation keys.
+  zh-CN). `ja.ts` is the source of truth for translation keys. Write `{app}`
+  for the app's name instead of "Meguri"; it is filled in at run time.
 - **Read the developer docs first**: [docs/README.md](docs/README.md) is the
   index of the architecture reference — worth a look before touching scanning,
   the database, IPC, or the media server.

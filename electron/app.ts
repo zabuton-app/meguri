@@ -48,6 +48,7 @@ import { registerIpc } from "./ipc/index.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
+import { APP_GLYPH_ARG, APP_NAME_ARG } from "../shared/ipc/channelNames.js";
 import type {
   LibraryMergeFailure,
   LibraryMergeProgress,
@@ -62,6 +63,11 @@ export interface AppOptions {
    * package.json, so an app with its own package.json gets its own data.
    */
   name: string;
+  /**
+   * The app's one-character mark, shown where the renderer names the app
+   * briefly (the About section).
+   */
+  glyph: string;
   /** Custom URL scheme, without "://". */
   urlScheme: string;
   /** GitHub repository the update check looks at. */
@@ -460,6 +466,11 @@ export function startApp(options: AppOptions): void {
       autoHideMenuBar: true,
       webPreferences: {
         preload: path.join(__dirname, "../preload/preload.js"),
+        // The renderer's text names the app (window.api.appName / appGlyph).
+        additionalArguments: [
+          `${APP_NAME_ARG}${options.name}`,
+          `${APP_GLYPH_ARG}${options.glyph}`,
+        ],
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,

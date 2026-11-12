@@ -2,9 +2,6 @@
 import type { TranslationKey } from "./ja";
 
 export const en: Record<TranslationKey, string> = {
-  // App name: the single-kanji display name (guideline 00), identical in every locale.
-  "app.name": "巡",
-
   // common
   "common.close": "Close",
   "common.cancel": "Cancel",
@@ -110,7 +107,7 @@ export const en: Record<TranslationKey, string> = {
   "libraryMerge.progress": "{done} / {total} workspaces",
   "libraryMerge.failed": "Some workspaces could not be moved",
   "libraryMerge.failedDesc":
-    "{list}\nThey keep working as before. Meguri tries again at the next launch.",
+    "{list}\nThey keep working as before. {app} tries again at the next launch.",
   "libraryMerge.failedItem": "{name}: {reason}",
   "libraryMerge.reason.diskFull":
     "The disk is full. Free some space, then try again.",
@@ -120,17 +117,17 @@ export const en: Record<TranslationKey, string> = {
   "libraryMerge.reason.open": "Its database could not be opened.",
   "libraryMerge.retry": "Try again",
   "library.restored":
-    "Your library was damaged, so Meguri restored the copy from {date}",
+    "Your library was damaged, so {app} restored the copy from {date}",
   "library.restoredDesc":
     "Favorites, ratings, tags and other changes made after that are lost. The damaged file is kept in the same folder as the library.",
   "config.movedAside":
-    "Your settings file (config.json) was damaged, so Meguri started with the default settings",
+    "Your settings file (config.json) was damaged, so {app} started with the default settings",
   "config.movedAsideDesc":
     "Your workspaces and collections are kept in the damaged file, saved as config.json.corrupt-<date> in the same folder.",
   "config.unreadable":
-    "Meguri could not read your settings file (config.json) and is running with the default settings",
+    "{app} could not read your settings file (config.json) and is running with the default settings",
   "config.unreadableDesc":
-    "The file has not been changed. Make sure no other app is using it, then restart Meguri.",
+    "The file has not been changed. Make sure no other app is using it, then restart {app}.",
   "settings.about": "About",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} is released under the MIT License.",
@@ -171,13 +168,13 @@ export const en: Record<TranslationKey, string> = {
   "home.scanRootUnreadable": "The workspace folder could not be reached",
   "home.scanRootUnreadableNamed": 'The folder of "{name}" could not be reached',
   "home.scanRootUnreadableDesc":
-    "Check that the folder has not been moved or deleted, that its drive or network share is connected, and that Meguri can read it, then scan again. The file list has been left as it was.",
+    "Check that the folder has not been moved or deleted, that its drive or network share is connected, and that {app} can read it, then scan again. The file list has been left as it was.",
   "home.scanSkipped":
     "Skipped {count} folder(s) or file(s) that could not be read",
   "home.scanSkippedNamed":
     'Skipped {count} folder(s) or file(s) in "{name}" that could not be read',
   "home.scanSkippedDesc":
-    "Meguri may not have permission to read them, or another program may be using them. That part of the file list has been left as it was, and the next scan will try again.",
+    "{app} may not have permission to read them, or another program may be using them. That part of the file list has been left as it was, and the next scan will try again.",
   "home.scanStartFailed": "Could not start scan",
   "home.scanAlreadyRunning": "A scan is already in progress",
 
@@ -908,7 +905,7 @@ export const en: Record<TranslationKey, string> = {
   "workspace.alreadyAddedToast": "This folder is already a workspace",
   "drop.overlayTitle": "Drop folders to add them as workspaces",
   "drop.foldersOnly":
-    "Meguri indexes folders, not individual files. Drop a folder instead.",
+    "{app} indexes folders, not individual files. Drop a folder instead.",
   "drop.addTitle": "Add workspace",
   "drop.addConfirm": 'Add "{name}" as a workspace and scan it?',
   "drop.addAction": "Add",
@@ -1075,7 +1072,7 @@ export const en: Record<TranslationKey, string> = {
   "tour.languageTitle": "Choose your language",
   "tour.languageBody":
     "Pick the language to use. The rest of this tour follows it, and you can change it later in Settings.",
-  "tour.welcomeTitle": "Welcome to Meguri",
+  "tour.welcomeTitle": "Welcome to {app}",
   "tour.welcomeBody": "Let me show you around. Press Esc to skip at any time.",
   "tour.addWorkspaceTitle": "Add a folder",
   "tour.addWorkspaceBody":

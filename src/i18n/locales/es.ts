@@ -2,9 +2,6 @@
 import type { TranslationKey } from "./ja";
 
 export const es: Record<TranslationKey, string> = {
-  // App name: the single-kanji display name (guideline 00), identical in every locale.
-  "app.name": "巡",
-
   // common
   "common.close": "Cerrar",
   "common.cancel": "Cancelar",
@@ -112,7 +109,7 @@ export const es: Record<TranslationKey, string> = {
   "libraryMerge.progress": "{done} / {total} espacios de trabajo",
   "libraryMerge.failed": "No se pudieron trasladar algunos espacios de trabajo",
   "libraryMerge.failedDesc":
-    "{list}\nSiguen funcionando como antes. Meguri lo intentará de nuevo en el próximo inicio.",
+    "{list}\nSiguen funcionando como antes. {app} lo intentará de nuevo en el próximo inicio.",
   "libraryMerge.failedItem": "{name}: {reason}",
   "libraryMerge.reason.diskFull":
     "El disco está lleno. Libera espacio y vuelve a intentarlo.",
@@ -122,17 +119,17 @@ export const es: Record<TranslationKey, string> = {
   "libraryMerge.reason.open": "No se pudo abrir su base de datos.",
   "libraryMerge.retry": "Reintentar",
   "library.restored":
-    "Tu biblioteca estaba dañada, así que Meguri restauró la copia del {date}",
+    "Tu biblioteca estaba dañada, así que {app} restauró la copia del {date}",
   "library.restoredDesc":
     "Se han perdido los favoritos, las valoraciones, las etiquetas y demás cambios posteriores. El archivo dañado se conserva en la misma carpeta que la biblioteca.",
   "config.movedAside":
-    "El archivo de configuración (config.json) estaba dañado, así que Meguri se ha iniciado con la configuración predeterminada",
+    "El archivo de configuración (config.json) estaba dañado, así que {app} se ha iniciado con la configuración predeterminada",
   "config.movedAsideDesc":
     "Tus espacios de trabajo y colecciones se conservan en el archivo dañado, guardado como config.json.corrupt-<fecha> en la misma carpeta.",
   "config.unreadable":
-    "Meguri no pudo leer el archivo de configuración (config.json) y funciona con la configuración predeterminada",
+    "{app} no pudo leer el archivo de configuración (config.json) y funciona con la configuración predeterminada",
   "config.unreadableDesc":
-    "El archivo no se ha modificado. Comprueba que ninguna otra aplicación lo esté usando y reinicia Meguri.",
+    "El archivo no se ha modificado. Comprueba que ninguna otra aplicación lo esté usando y reinicia {app}.",
   "settings.about": "Acerca de",
   "about.version": "{name} versión {version}",
   "about.appLicense": "{name} se publica bajo la licencia MIT.",
@@ -176,13 +173,13 @@ export const es: Record<TranslationKey, string> = {
     "No se pudo acceder a la carpeta del espacio de trabajo",
   "home.scanRootUnreadableNamed": "No se pudo acceder a la carpeta de «{name}»",
   "home.scanRootUnreadableDesc":
-    "Comprueba que la carpeta no se haya movido ni eliminado, que su unidad o recurso compartido de red esté conectado y que Meguri pueda leerla, y vuelve a escanear. La lista de archivos se ha dejado como estaba.",
+    "Comprueba que la carpeta no se haya movido ni eliminado, que su unidad o recurso compartido de red esté conectado y que {app} pueda leerla, y vuelve a escanear. La lista de archivos se ha dejado como estaba.",
   "home.scanSkipped":
     "Se omitieron {count} carpeta(s) o archivo(s) que no se pudieron leer",
   "home.scanSkippedNamed":
     "Se omitieron {count} carpeta(s) o archivo(s) de «{name}» que no se pudieron leer",
   "home.scanSkippedDesc":
-    "Puede que Meguri no tenga permiso para leerlos o que otro programa los esté usando. Esa parte de la lista de archivos se ha dejado como estaba y el próximo escaneo lo volverá a intentar.",
+    "Puede que {app} no tenga permiso para leerlos o que otro programa los esté usando. Esa parte de la lista de archivos se ha dejado como estaba y el próximo escaneo lo volverá a intentar.",
   "home.scanStartFailed": "No se pudo iniciar el escaneo",
   "home.scanAlreadyRunning": "Ya hay un escaneo en curso",
 
@@ -934,7 +931,7 @@ export const es: Record<TranslationKey, string> = {
   "drop.overlayTitle":
     "Suelta carpetas para añadirlas como espacios de trabajo",
   "drop.foldersOnly":
-    "Meguri indexa carpetas, no archivos sueltos. Suelta una carpeta.",
+    "{app} indexa carpetas, no archivos sueltos. Suelta una carpeta.",
   "drop.addTitle": "Añadir espacio de trabajo",
   "drop.addConfirm": "¿Añadir «{name}» como espacio de trabajo y escanearla?",
   "drop.addAction": "Añadir",
@@ -1104,7 +1101,7 @@ export const es: Record<TranslationKey, string> = {
   "tour.languageTitle": "Elige tu idioma",
   "tour.languageBody":
     "Elige el idioma que quieres usar. El resto del recorrido lo seguirá, y puedes cambiarlo luego en Ajustes.",
-  "tour.welcomeTitle": "Te damos la bienvenida a Meguri",
+  "tour.welcomeTitle": "Te damos la bienvenida a {app}",
   "tour.welcomeBody":
     "Te enseño cómo funciona. Pulsa Esc para saltarlo cuando quieras.",
   "tour.addWorkspaceTitle": "Añadir una carpeta",

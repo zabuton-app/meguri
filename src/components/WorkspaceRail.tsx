@@ -63,6 +63,7 @@ import { useFileDropTarget } from "@/hooks/useFileDropTarget";
 import { useOsFolderDrop, type DroppedItems } from "@/hooks/useOsFolderDrop";
 import { useAddFilesToCollection } from "@/hooks/useAddFilesToCollection";
 import type { DraggedFile } from "@/lib/fileDrag";
+import { appName } from "@/lib/appName";
 
 /** Never animate sortable layout changes, so items snap to their final position on drop. */
 const animateLayoutChanges: AnimateLayoutChanges = () => false;
@@ -314,7 +315,7 @@ export function WorkspaceRail() {
       >
         <img
           src={LOGO_SRC[logo]}
-          alt="Meguri"
+          alt={appName()}
           className="size-[50px] shrink-0"
         />
 
