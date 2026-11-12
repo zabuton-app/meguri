@@ -21,8 +21,10 @@ database, or ffmpeg directly. Everything goes over IPC or the media server.
 The main process starts in `startApp()` (`electron/app.ts`); nothing in it runs
 on import. `electron/main.ts` is only the entry point that calls it with
 Meguri's identity: the app name, its one-character mark, the URL scheme, the
-GitHub repository the update check looks at and the Microsoft Store product ID
-(optional: an app that is not on the Store leaves it out). Another app built on
+GitHub repository the update check looks at, the Microsoft Store product ID
+(optional: an app that is not on the Store leaves it out) and the prefix of the
+environment variables it reads (`MEGURI`, for `MEGURI_ROOT`,
+`MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`). Another app built on
 this code can call `startApp()` from its own entry point with its own values.
 The `userData` directory is not part of these options: it is `<appData>/` plus the top-level `productName`, or
 else `name`, of the package.json Electron loads. Meguri has no top-level

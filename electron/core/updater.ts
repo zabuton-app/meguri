@@ -25,29 +25,34 @@ let updateRepo: UpdateRepo | null = null;
 // Microsoft Store product ID (Partner Center → Product identity), from the
 // same options. Unset for an app that is not on the Store.
 let msStoreProductId: string | undefined;
+// Name of the env var that overrides the repo in development, built from the
+// app's env prefix.
+let repoOverrideEnv: string | undefined;
 
 /** Called once by startApp(), before anything checks for updates. */
 export function configureUpdater(options: {
   repo: UpdateRepo;
   msStoreProductId?: string;
+  envPrefix: string;
 }): void {
   updateRepo = options.repo;
   msStoreProductId = options.msStoreProductId;
+  repoOverrideEnv = `${options.envPrefix}_UPDATE_REPO`;
 }
 
 /**
  * Resolve the target repo as `owner/name`. In development only, the
- * MEGURI_UPDATE_REPO env var (e.g. "amgsk/meguri-update-test") overrides it so
- * the update flow can be exercised against a throwaway public repo before this
- * one is published. Ignored in packaged builds so a stray env var can't point
- * release users at someone else's repo.
+ * `<envPrefix>_UPDATE_REPO` env var (e.g. "amgsk/meguri-update-test") overrides
+ * it so the update flow can be exercised against a throwaway public repo
+ * before this one is published. Ignored in packaged builds so a stray env var
+ * can't point release users at someone else's repo.
  */
 function resolveRepo(): UpdateRepo {
   // Only honor the override when we can positively confirm a dev build
   // (isPackaged === false). If it's undefined (e.g. a partial app stub) we fall
   // through to the real repo — fail safe so release users can't be redirected.
-  if (app?.isPackaged === false) {
-    const override = process.env.MEGURI_UPDATE_REPO?.trim();
+  if (app?.isPackaged === false && repoOverrideEnv) {
+    const override = process.env[repoOverrideEnv]?.trim();
     const match = override?.match(/^([\w.-]+)\/([\w.-]+)$/);
     if (match) {
       log.info(`using update repo override: ${match[1]}/${match[2]}`);
