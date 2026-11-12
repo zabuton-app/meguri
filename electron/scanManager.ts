@@ -1,8 +1,8 @@
 // Scan orchestration: which workspaces are being scanned, how to abort them,
-// and the renderer events a scan reports. main.ts owns one instance and hands
+// and the renderer events a scan reports. app.ts owns one instance and hands
 // it to the IPC layer; nothing else keeps scan state.
 //
-// Lives beside main.ts rather than under core/: it drives core's pipeline
+// Lives beside app.ts rather than under core/: it drives core's pipeline
 // (jobs.ts) but also knows the renderer event channels, which core does not.
 import type { Core } from "./core/index.js";
 import { runScan } from "./core/jobs.js";

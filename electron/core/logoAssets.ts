@@ -1,5 +1,5 @@
 // App logo bitmaps, embedded as base64 to avoid bundle path resolution
-// (same reasoning as the original tray icon constant in main.ts).
+// (same reasoning as the original tray icon constant in app.ts).
 //
 // Regenerate after changing logo/ assets:
 //   base64 -w0 logo/tray-32.png            -> TRAY_ICON_BASE64.dark

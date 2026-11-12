@@ -1,0 +1,60 @@
+name: Bug report
+description: Something in Meguri does not work as intended.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please search the existing issues first.
+        For a security vulnerability, do not open an issue; follow the security policy instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you see, and what did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Meguri version
+      description: Shown in Settings → About.
+      placeholder: e.g. 0.10.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: How you installed Meguri
+      options:
+        - GitHub Release
+        - AUR (meguri-bin)
+        - Microsoft Store
+        - Built from source
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Screenshots, logs, the file type involved, or anything else that helps.
