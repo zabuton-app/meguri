@@ -13,7 +13,7 @@ import type { IpcContext } from "./context.js";
 import { openDetached } from "./shell.js";
 
 // This IPC group holds state of its own, the custom.css watcher (as does
-// ./cssThemes.ts for the themes folder). It lives here rather than in main.ts
+// ./cssThemes.ts for the themes folder). It lives here rather than in app.ts
 // because nothing outside these handlers starts or stops it, and it needs no
 // teardown on quit (it dies with the process; emit is a no-op once the window
 // is gone).

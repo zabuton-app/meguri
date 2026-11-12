@@ -4,7 +4,7 @@
 // else holds it, so a damaged library would leave every workspace unable to
 // open with nothing to go back to.
 //
-// Runs at startup before any workspace is opened (main.ts): the library is
+// Runs at startup before any workspace is opened (app.ts): the library is
 // checked (`PRAGMA quick_check`); a sound one gets a copy when the newest is
 // older than BACKUP_EVERY_MS, keeping the BACKUPS_KEPT newest; a damaged one is
 // set aside next to itself and the newest copy put in its place. With no copy

@@ -18,6 +18,16 @@ server that lives inside the main process (see [Media Pipeline](media-pipeline.m
 This separation is strict: the renderer never touches the filesystem, the
 database, or ffmpeg directly. Everything goes over IPC or the media server.
 
+The main process starts in `startApp()` (`electron/app.ts`); nothing in it runs
+on import. `electron/main.ts` is only the entry point that calls it with
+Meguri's identity: the app name, the URL scheme and the GitHub repository the
+update check looks at. Another app built on this code can call `startApp()`
+from its own entry point with its own values. The `userData` directory is not
+part of these options: it is `<appData>/` plus the top-level `productName`, or
+else `name`, of the package.json Electron loads. Meguri has no top-level
+`productName` (`build.productName` does not count), so its data is in
+`<appData>/meguri`; an app with its own package.json gets its own directory.
+
 ## IPC type system
 
 The schemas in `shared/ipc/` are the single source of truth for IPC, imported by
@@ -112,7 +122,7 @@ registering it.
 ## Tray-resident lifecycle
 
 The app lives in the system tray and **does not quit when its window is closed**.
-This is an invariant in `electron/main.ts`; preserve it when changing window or
+This is an invariant in `electron/app.ts`; preserve it when changing window or
 lifecycle behavior:
 
 - The window's `close` event calls `preventDefault()` and hides the window to the
@@ -183,7 +193,7 @@ holding the workspace's generated files.
   (with the library attached), `root`, and `dataDir`. `Core.init` moves a
   workspace's own metadata into the library on the first open after the
   upgrade, and catches its keyword index up with tag changes made elsewhere.
-  On the first launch after the upgrade, `main.ts` opens every workspace that
+  On the first launch after the upgrade, `app.ts` opens every workspace that
   still has to move before scans start, while a modal shows the progress.
 - `electron/core/paths.ts` resolves the storage layout; see
   [Data Model](data-model.md#storage-layout).
