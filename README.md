@@ -554,6 +554,7 @@ Meguri/
 │  ├─ ipc/                  # typed client for window.api
 │  ├─ components/  routes/  themes/  hooks/
 ├─ electron.vite.config.ts  # unified build of main/preload/renderer
+├─ electron.vite.shared.ts  # the build settings it uses
 └─ index.html
 ```
 
