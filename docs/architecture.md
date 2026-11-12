@@ -20,13 +20,21 @@ database, or ffmpeg directly. Everything goes over IPC or the media server.
 
 The main process starts in `startApp()` (`electron/app.ts`); nothing in it runs
 on import. `electron/main.ts` is only the entry point that calls it with
-Meguri's identity: the app name, the URL scheme and the GitHub repository the
-update check looks at. Another app built on this code can call `startApp()`
+Meguri's identity: the app name, its one-character mark, the URL scheme and
+the GitHub repository the update check looks at. Another app built on this code can call `startApp()`
 from its own entry point with its own values. The `userData` directory is not
 part of these options: it is `<appData>/` plus the top-level `productName`, or
 else `name`, of the package.json Electron loads. Meguri has no top-level
 `productName` (`build.productName` does not count), so its data is in
 `<appData>/meguri`; an app with its own package.json gets its own directory.
+
+The renderer gets the app name synchronously, not over an IPC channel, so it is
+there before the first render: the window passes it to the preload as a process argument
+(`webPreferences.additionalArguments`, `APP_NAME_ARG` in
+`shared/ipc/channelNames.ts`), and the preload exposes it as
+`window.api.appName`. The app's one-character mark (`glyph`, Meguri's 巡)
+travels the same way, as `window.api.appGlyph`. The renderer's text uses it through `{app}` in the
+locale strings (see [Renderer](renderer.md#internationalization)).
 
 ## IPC type system
 

@@ -7,6 +7,7 @@ import { ExternalLink, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, type AboutInfo } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
+import { appGlyph } from "@/lib/appName";
 
 const GITHUB_URL = "https://github.com/zabuton-app/meguri";
 
@@ -115,10 +116,10 @@ export function AboutSection() {
           <span className="text-xs text-muted">
             {info
               ? t("about.version", {
-                  name: t("app.name"),
+                  name: appGlyph(),
                   version: info.version,
                 })
-              : t("app.name")}
+              : appGlyph()}
           </span>
           {info && (
             <span className="text-xs text-muted">
@@ -140,7 +141,7 @@ export function AboutSection() {
 
       {/* App license */}
       <p className="text-xs text-muted">
-        {t("about.appLicense", { name: t("app.name") })}{" "}
+        {t("about.appLicense", { name: appGlyph() })}{" "}
         <button
           type="button"
           className="cursor-pointer underline hover:text-fg"

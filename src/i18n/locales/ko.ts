@@ -2,9 +2,6 @@
 import type { TranslationKey } from "./ja";
 
 export const ko: Record<TranslationKey, string> = {
-  // App name: the single-kanji display name (guideline 00), identical in every locale.
-  "app.name": "巡",
-
   // common
   "common.close": "닫기",
   "common.cancel": "취소",
@@ -127,7 +124,7 @@ export const ko: Record<TranslationKey, string> = {
   "config.unreadable":
     "설정 파일(config.json)을 읽을 수 없어 기본 설정으로 실행 중입니다",
   "config.unreadableDesc":
-    "파일은 변경하지 않았습니다. 다른 앱이 사용 중인지 확인한 뒤 Meguri를 다시 시작하세요.",
+    "파일은 변경하지 않았습니다. 다른 앱이 사용 중인지 확인한 뒤 {app}를 다시 시작하세요.",
   "settings.about": "정보",
   "about.version": "{name} 버전 {version}",
   "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
@@ -168,12 +165,12 @@ export const ko: Record<TranslationKey, string> = {
   "home.scanRootUnreadable": "워크스페이스 폴더에 접근할 수 없습니다",
   "home.scanRootUnreadableNamed": '"{name}" 폴더에 접근할 수 없습니다',
   "home.scanRootUnreadableDesc":
-    "폴더가 이동되거나 삭제되지 않았는지, 드라이브나 네트워크 공유가 연결되어 있는지, Meguri가 읽을 수 있는지 확인한 뒤 다시 스캔하세요. 파일 목록은 그대로 두었습니다.",
+    "폴더가 이동되거나 삭제되지 않았는지, 드라이브나 네트워크 공유가 연결되어 있는지, {app}가 읽을 수 있는지 확인한 뒤 다시 스캔하세요. 파일 목록은 그대로 두었습니다.",
   "home.scanSkipped": "읽을 수 없는 폴더나 파일 {count}개를 건너뛰었습니다",
   "home.scanSkippedNamed":
     '"{name}"에서 읽을 수 없는 폴더나 파일 {count}개를 건너뛰었습니다',
   "home.scanSkippedDesc":
-    "Meguri에 읽기 권한이 없거나 다른 프로그램이 사용 중일 수 있습니다. 파일 목록의 해당 부분은 그대로 두었으며, 다음 스캔에서 다시 시도합니다.",
+    "{app}에 읽기 권한이 없거나 다른 프로그램이 사용 중일 수 있습니다. 파일 목록의 해당 부분은 그대로 두었으며, 다음 스캔에서 다시 시도합니다.",
   "home.scanStartFailed": "스캔을 시작할 수 없습니다",
   "home.scanAlreadyRunning": "스캔이 이미 실행 중입니다",
 
@@ -1077,7 +1074,7 @@ export const ko: Record<TranslationKey, string> = {
   "tour.languageTitle": "언어를 골라 줘",
   "tour.languageBody":
     "사용할 언어를 골라 줘. 이 안내도 그 언어로 진행할게. 나중에 설정에서 바꿀 수도 있어",
-  "tour.welcomeTitle": "Meguri에 오신 걸 환영해",
+  "tour.welcomeTitle": "{app}에 오신 걸 환영해",
   "tour.welcomeBody":
     "사용법을 간단히 안내할게. Esc를 누르면 언제든 건너뛸 수 있어",
   "tour.addWorkspaceTitle": "폴더 추가",

@@ -443,6 +443,12 @@ to `localStorage`). The supported languages are `ja`, `en`, `es`, `fr`, `ko`, an
 `TranslationKey` is defined primarily in `src/i18n/locales/ja.ts`. When adding a
 key, sync **all** locales.
 
+Strings do not spell out the app's name: write `{app}`, which `t()` always
+fills in with `appName()` (`src/lib/appName.ts`), the name the main process
+was started with. Because it needs no param, a locale may use `{app}` where
+`ja` does not. The About section names the app by its one-character mark
+instead, `appGlyph()` from the same file (Meguri's is 巡).
+
 ## UI primitives and dialogs
 
 UI primitives are in `src/components/ui/` (Radix plus class-variance-authority,

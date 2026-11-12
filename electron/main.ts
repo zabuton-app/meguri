@@ -3,6 +3,7 @@ import { startApp } from "./app.js";
 
 startApp({
   name: "Meguri",
+  glyph: "巡",
   urlScheme: "meguri",
   updateRepo: { owner: "zabuton-app", name: "meguri" },
 });

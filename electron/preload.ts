@@ -5,6 +5,8 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 // (__ELECTRON_LOG__ / __ELECTRON_LOG_IPC__). Independent of the API whitelist below.
 import "electron-log/preload";
 import {
+  APP_GLYPH_ARG,
+  APP_NAME_ARG,
   EVENT_CHANNELS as EVENT_CHANNEL_NAMES,
   INVOKE_CHANNELS as INVOKE_CHANNEL_NAMES,
   type PreloadInvokeChannel,
@@ -17,7 +19,18 @@ import {
 const INVOKE_CHANNELS = new Set<string>(INVOKE_CHANNEL_NAMES);
 const EVENT_CHANNELS = new Set<string>(EVENT_CHANNEL_NAMES);
 
+/** The value main passed as `<prefix><value>` (additionalArguments). */
+function argValue(prefix: string): string {
+  return (
+    process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) ??
+    ""
+  );
+}
+
 contextBridge.exposeInMainWorld("api", {
+  /** The app's name and one-character mark, as passed to startApp() (electron/app.ts). */
+  appName: argValue(APP_NAME_ARG),
+  appGlyph: argValue(APP_GLYPH_ARG),
   /** Command invocation (maps to ipcMain.handle). */
   invoke: (channel: string, args?: unknown) => {
     if (!INVOKE_CHANNELS.has(channel)) {
