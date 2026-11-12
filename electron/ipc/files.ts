@@ -9,6 +9,9 @@ import {
   readWebVtt,
 } from "../../shared/embeddedSubtitles.js";
 import { handle } from "../core/ipcHandler.js";
+import { isRemuxedVideo } from "../../shared/playbackTracks.js";
+import { isInsideRoot } from "../core/paths.js";
+import { probePlaybackMetadata } from "../core/playbackMetadata.js";
 import * as q from "../core/queries.js";
 import type {
   DuplicatesResult,
@@ -68,10 +71,22 @@ export function registerFileHandlers(ctx: IpcContext): void {
           query: query ?? {},
         });
   });
-  handle("file_get", ({ id, workspaceId }) => {
-    const db = coreById(ws, workspaceId).db;
+  handle("file_get", async ({ id, workspaceId }) => {
+    const { db, root } = coreById(ws, workspaceId);
     q.recordAccess(db, id);
-    return q.fileDetail(db, id);
+    const file = q.fileDetail(db, id);
+    if (
+      file?.kind === "video" &&
+      file.meta == null &&
+      isRemuxedVideo(file.codec, file.ext) &&
+      isInsideRoot(file.absPath, root)
+    ) {
+      // Before the scan stores metadata, opening details may wait up to five
+      // seconds for the shared playback probe.
+      const meta = await probePlaybackMetadata(file.absPath).catch(() => null);
+      return { ...file, meta };
+    }
+    return file;
   });
   handle("file_subtitles", async ({ id, workspaceId, track, windowStart }) => {
     const core = coreById(ws, workspaceId);

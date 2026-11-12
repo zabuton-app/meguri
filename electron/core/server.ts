@@ -24,14 +24,15 @@ import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
 import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
 import { scopedLog } from "./logger.js";
-import { extractMeta } from "./media.js";
+import {
+  PREVIEW_AUDIO_TRACK_PARAM,
+  REMUX_CONTAINERS,
+  hasRemuxVideo,
+} from "../../shared/playbackTracks.js";
+import { readEmbeddedTracks } from "../../shared/embeddedSubtitles.js";
+import { probePlaybackMetadata } from "./playbackMetadata.js";
 
 const log = scopedLog("server");
-
-// Only containers Chromium cannot demux are remuxed with ffmpeg and served.
-// Browser-compatible files are served via Range to enable full seeking.
-const REMUX_CONTAINERS = new Set(["mkv", "avi", "wmv", "flv", "ts"]);
-const remuxProbeSlots = new Semaphore(2);
 
 // Cap one-shot FFmpeg requests and periods without output in remux streams.
 // This prevents corrupt media from pinning a slot indefinitely.
@@ -94,47 +95,8 @@ function ext(p: string): string {
   return path.extname(p).slice(1).toLowerCase();
 }
 
-async function remuxMetadata(
-  core: Core,
-  id: number,
-  file: string,
-  res: http.ServerResponse,
-): Promise<unknown> {
-  const row = core.db.prepare("SELECT meta FROM files WHERE id = ?").get(id) as
-    { meta: string | null } | undefined;
-  if (row?.meta) {
-    try {
-      return JSON.parse(row.meta);
-    } catch {
-      // Fall back to probing if cached metadata is unreadable.
-    }
-  }
-  const stat = await fs.promises.stat(file).catch(() => null);
-  if (!stat?.isFile() || res.destroyed) return null;
-  const release = await acquireForResponse(remuxProbeSlots, res);
-  if (!release) return null;
-  try {
-    if (res.destroyed) return null;
-    return (await extractMeta(file, "video", AbortSignal.timeout(5_000))).raw;
-  } finally {
-    release();
-  }
-}
-
-function hasDolbyDigitalAudio(raw: unknown): boolean {
-  const streams = (
-    raw as {
-      streams?: { codec_type?: string; codec_name?: string }[];
-    } | null
-  )?.streams;
-  return (
-    Array.isArray(streams) &&
-    streams.some(
-      (stream) =>
-        stream?.codec_type === "audio" &&
-        (stream.codec_name === "ac3" || stream.codec_name === "eac3"),
-    )
-  );
+function isDolbyDigital(codec: string): boolean {
+  return codec === "ac3" || codec === "eac3";
 }
 
 function contentType(p: string): string {
@@ -308,21 +270,46 @@ async function handle(
     // when it lives in a container Chromium can demux, such as MOV.
     const proResPreview = file.kind === "video" && file.codec === "prores";
     if (proResPreview || REMUX_CONTAINERS.has(ext(abs))) {
+      const requested = url.searchParams.get(PREVIEW_AUDIO_TRACK_PARAM);
+      let audioTrack: number | undefined;
+      let mode: RemuxMode = proResPreview ? "prores" : "copy";
+      if (requested !== null || (!proResPreview && req.method !== "HEAD")) {
+        const row = core.db
+          .prepare("SELECT meta FROM files WHERE id = ?")
+          .get(id) as { meta: string | null } | undefined;
+        const metadata = await probePlaybackMetadata(abs, row?.meta);
+        if (res.destroyed || res.writableEnded) return;
+        const tracks = readEmbeddedTracks(metadata, "audio");
+        if (requested !== null) {
+          const audio = /^\d+$/.test(requested) ? Number(requested) : -1;
+          if (
+            !Number.isSafeInteger(audio) ||
+            audio < 0 ||
+            audio >= tracks.length ||
+            (!proResPreview && !hasRemuxVideo(metadata))
+          ) {
+            res.writeHead(400).end();
+            return;
+          }
+          audioTrack = audio;
+        }
+        // Keep the Dolby fallback for FFmpeg's automatic track selection.
+        if (
+          !proResPreview &&
+          (audioTrack !== undefined
+            ? isDolbyDigital(tracks[audioTrack].codec)
+            : tracks.some(({ codec }) => isDolbyDigital(codec)))
+        ) {
+          mode = "aac";
+        }
+      }
       if (req.method === "HEAD") {
         res.writeHead(200, { "Content-Type": "video/mp4" }).end();
         return;
       }
       const parsed = startT != null ? Number(startT) : NaN;
       const start = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      // Leave FFmpeg's automatic track selection in place. If it can select a
-      // Dolby Digital track, encode the selected audio before writing the MP4.
-      const mode = proResPreview
-        ? "prores"
-        : hasDolbyDigitalAudio(await remuxMetadata(core, id, abs, res))
-          ? "aac"
-          : "copy";
-      if (!res.destroyed && !res.writableEnded)
-        serveRemux(res, abs, start, mode);
+      serveRemux(res, abs, start, mode, audioTrack);
       return;
     }
     // Chromium-unsupported image formats (heic/heif/tiff) are transcoded to JPEG.
@@ -333,6 +320,11 @@ async function handle(
     // Everything else (mp4/mov/webm/images) is served via Range = full seeking.
     await serveFile(req, res, abs);
   } catch (e) {
+    if (e instanceof QueueFullError) {
+      if (!res.headersSent && !res.destroyed)
+        res.writeHead(503, { "Retry-After": "1" }).end();
+      return;
+    }
     log.error("request failed:", req.method, req.url ?? "", e);
     if (!res.headersSent) res.writeHead(500).end();
   }
@@ -453,8 +445,13 @@ const remuxInflight = new Map<string, RemuxSession>();
 
 type RemuxMode = "copy" | "aac" | "prores";
 
-function remuxKey(file: string, start: number | null, mode: RemuxMode): string {
-  return `${file}\0${start ?? ""}\0${mode}`;
+function remuxKey(
+  file: string,
+  start: number | null,
+  mode: RemuxMode,
+  audioTrack?: number,
+): string {
+  return `${file}\0${start ?? ""}\0${mode}\0${audioTrack ?? ""}`;
 }
 
 function spawnFfmpegChild(
@@ -580,6 +577,7 @@ function startRemuxSession(
   res: http.ServerResponse,
   releaseSlot: () => void,
   mode: RemuxMode,
+  audioTrack?: number,
 ) {
   const proResPreview = mode === "prores";
   const args = ["-v", "error"];
@@ -591,13 +589,17 @@ function startRemuxSession(
       "1",
     );
   if (start != null && start > 0) args.push("-ss", start.toFixed(3));
+  // Keep FFmpeg's automatic picture selection in both playback modes.
+  // The last matching input discard option keeps just the chosen audio track.
+  if (!proResPreview && audioTrack !== undefined)
+    args.push("-discard:a", "all", `-discard:a:${audioTrack}`, "none");
   args.push("-i", file);
   if (proResPreview) {
     args.push(
       "-map",
       "0:v:0",
       "-map",
-      "0:a:0?",
+      `0:a:${audioTrack ?? 0}?`,
       "-write_tmcd",
       "0",
       "-vf",
@@ -616,6 +618,7 @@ function startRemuxSession(
       "aac",
     );
   } else {
+    if (audioTrack !== undefined) args.push("-sn", "-dn");
     args.push("-c", "copy");
     if (mode === "aac") args.push("-c:a", "aac", "-b:a", "384k");
   }
@@ -777,8 +780,9 @@ function serveRemux(
   file: string,
   start: number | null,
   mode: RemuxMode,
+  audioTrack?: number,
 ) {
-  const key = remuxKey(file, start, mode);
+  const key = remuxKey(file, start, mode, audioTrack);
   const existing = remuxInflight.get(key);
   if (existing) {
     attachRemuxClient(key, existing, res);
@@ -800,7 +804,7 @@ function serveRemux(
     }
 
     try {
-      startRemuxSession(key, file, start, res, releaseSlot, mode);
+      startRemuxSession(key, file, start, res, releaseSlot, mode, audioTrack);
     } catch (e) {
       // spawn() can throw synchronously; the slot would otherwise never be
       // released (it only reaches the session on success).

@@ -384,6 +384,11 @@ When the player repackages a container such as MKV, it converts Dolby Digital
 (AC-3) or Dolby Digital Plus (E-AC-3) audio to AAC for playback. The preview
 keeps the original picture and the surround channel count.
 
+For ProRes, MKV, AVI, WMV, FLV, or TS clips with multiple audio tracks, use
+**Audio track** beside the volume control in the full player. **Default**
+uses the usual playback selection when you open a clip. Switching tracks
+keeps the playhead and play or pause state.
+
 ### Embedded subtitles
 
 Use **Subtitle track** in the clip player or fullscreen to choose an embedded

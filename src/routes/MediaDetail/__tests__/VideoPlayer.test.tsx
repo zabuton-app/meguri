@@ -196,6 +196,41 @@ describe("embedded subtitles", () => {
     fireEvent.change(select, { target: { value: "-1" } });
     expect(screen.queryByText("Bonjour")).toBeNull();
   });
+
+  it("matches the audio track chosen in the player on Auto", async () => {
+    fileSubtitles.mockReset();
+    fileSubtitles.mockImplementation(
+      (_id: number, _ws: string, track: number, start: number) =>
+        Promise.resolve([
+          {
+            start,
+            end: start + 10,
+            text: track === 0 ? "こんにちは" : "Hello",
+          },
+        ]),
+    );
+    const { video } = renderPlayer({
+      duration: 300,
+      audioTracks: [
+        { title: "", language: "jpn" },
+        { title: "", language: "eng" },
+      ],
+      subtitleAudioLanguage: "jpn",
+      subtitleTracks: [
+        { title: "", language: "jpn", codec: "subrip" },
+        { title: "", language: "eng", codec: "subrip" },
+      ],
+    });
+    loadVideo(video);
+    expect(await screen.findByText("こんにちは")).toBeTruthy();
+
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "player.audioTrack" }),
+      { target: { value: "1" } },
+    );
+    expect(await screen.findByText("Hello")).toBeTruthy();
+    expect(fileSubtitles).toHaveBeenLastCalledWith(1, "ws1", 1, 0);
+  });
 });
 
 describe("VideoPlayer", () => {
@@ -204,6 +239,36 @@ describe("VideoPlayer", () => {
   });
   afterEach(() => {
     resetVideoHandOff();
+  });
+
+  it("keeps position and pause when changing audio and opens each clip on Default", () => {
+    const audioTracks = [
+      { title: "English", language: "eng", codec: "aac" },
+      { title: "Japanese", language: "jpn", codec: "aac" },
+    ];
+    const first = renderPlayer({ audioTracks, autoplay: false });
+    loadVideo(first.video);
+    first.video.currentTime = 12.75;
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "player.audioTrack" }),
+      { target: { value: "1" } },
+    );
+    const search = new URL(first.video.src).searchParams;
+    expect(search.get("audioTrack")).toBe("1");
+    expect(search.get("t")).toBe("12.75");
+    expect(first.video.autoplay).toBe(false);
+    loadVideo(first.video);
+    first.view.unmount();
+
+    const reopened = renderPlayer({ audioTracks });
+    expect(
+      new URL(reopened.video.src).searchParams.get("audioTrack"),
+    ).toBeNull();
+    expect(
+      screen.getByRole<HTMLSelectElement>("combobox", {
+        name: "player.audioTrack",
+      }).value,
+    ).toBe("-1");
   });
 
   describe("adopting a handed-over element", () => {
