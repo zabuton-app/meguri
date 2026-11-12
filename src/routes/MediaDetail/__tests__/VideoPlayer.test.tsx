@@ -460,6 +460,112 @@ describe("VideoPlayer", () => {
     expect(video.currentTime).toBe(42);
   });
 
+  describe("re-serving a stream on a seek", () => {
+    /** A stream: nothing is seekable, so every seek re-serves the file. */
+    function streamOf(video: HTMLVideoElement) {
+      const play = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(video, "load", {
+        configurable: true,
+        value: vi.fn(),
+      });
+      Object.defineProperty(video, "play", { configurable: true, value: play });
+      return play;
+    }
+
+    function playedRanges(video: HTMLVideoElement, length: number) {
+      Object.defineProperty(video, "played", {
+        configurable: true,
+        value: { length },
+      });
+    }
+
+    /** The metadata arriving, with the element's readyState saying so. */
+    function metadataIn(video: HTMLVideoElement) {
+      Object.defineProperty(video, "readyState", {
+        configurable: true,
+        value: 1,
+      });
+      fireEvent.loadedMetadata(video);
+    }
+
+    it("still starts a video whose autoplay was pending when the seek was asked for", () => {
+      // The seek arrives before the metadata (a scene picked right after
+      // Play), so it waits; by the time it lands the element is paused only
+      // because autoplay has not kicked in yet.
+      const { video, ref } = renderPlayer();
+      const play = streamOf(video);
+      playedRanges(video, 0);
+
+      ref.current?.seek(30);
+      metadataIn(video);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(video.autoplay).toBe(true);
+      expect(play).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps a video paused before it ever played paused", () => {
+      // Paused while still loading: nothing has played, but autoplay is no
+      // longer what is about to happen.
+      const { video, ref } = renderPlayer();
+      const play = streamOf(video);
+      playedRanges(video, 0);
+      metadataIn(video);
+
+      // Whoever paused it: the bar, a media key, the frame export.
+      fireEvent.pause(video);
+      ref.current?.seek(30);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(video.autoplay).toBe(false);
+      expect(play).not.toHaveBeenCalled();
+    });
+
+    it("starts at the opening position playing when Play came before the metadata", () => {
+      // Opened paused at a scene, then started while still loading: the
+      // opening seek must carry that over rather than the `autoplay` prop.
+      const { video } = renderPlayer({ autoplay: false, startAt: 30 });
+      const play = streamOf(video);
+      playedRanges(video, 0);
+      Object.defineProperty(video, "paused", {
+        configurable: true,
+        value: false,
+      });
+
+      metadataIn(video);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(play).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps a video the user paused paused", () => {
+      const { video, ref } = renderPlayer();
+      const play = streamOf(video);
+      metadataIn(video);
+      // It played and was paused: `paused` is the element's default here.
+      playedRanges(video, 1);
+
+      ref.current?.seek(30);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(video.autoplay).toBe(false);
+      expect(play).not.toHaveBeenCalled();
+    });
+  });
+
+  it("leaves the keyboard alone when its shortcuts are off", () => {
+    const { video } = renderPlayer({ shortcuts: false });
+    loadVideo(video);
+    const play = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(video, "play", { configurable: true, value: play });
+
+    // fireEvent returns false when a handler called preventDefault.
+    expect(fireEvent.keyDown(window, { code: "ArrowRight" })).toBe(true);
+    expect(fireEvent.keyDown(window, { code: "Space" })).toBe(true);
+    expect(video.currentTime).toBe(0);
+    expect(play).not.toHaveBeenCalled();
+  });
+
   describe("holding a seek key", () => {
     /** Press the key `times` times in a row, as a held key repeats. */
     function press(times: number, code = "ArrowRight") {
@@ -796,6 +902,20 @@ describe("VideoPlayer", () => {
         duration: 120,
         urgent: true,
       });
+    });
+
+    it("reports nothing when told not to record the position", () => {
+      const { video, view } = renderPlayer({
+        autoplay: false,
+        recordPosition: false,
+      });
+      loadVideo(video);
+      standAt(video, 0, false);
+      fireEvent.play(video);
+      standAt(video, 3, true);
+      fireEvent.pause(video);
+      view.unmount();
+      expect(fileSavePosition).not.toHaveBeenCalled();
     });
 
     it("reports nothing for a file that never played", () => {

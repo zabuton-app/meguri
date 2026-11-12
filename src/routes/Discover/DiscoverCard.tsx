@@ -7,7 +7,7 @@ import {
 } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { AudioLines, ExternalLink, ImageIcon, Pause, Play } from "lucide-react";
+import { AudioLines, ExternalLink, Pause, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import { fileHref } from "@/lib/fileHref";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
@@ -103,13 +103,13 @@ export function DiscoverCard({
   const [videoPlaying, setVideoPlaying] = useState(false);
   const activePreview = isActive ? preview : null;
   const [wasActive, setWasActive] = useState(isActive);
-  // Moving to another card ends this card's preview, so going back is quiet.
+  // Moving to another card ends this card's preview, so going back is quiet;
+  // arriving clears it too, so a Play pressed on a slide still off stage does
+  // not start it later.
   if (isActive !== wasActive) {
     setWasActive(isActive);
-    if (!isActive) {
-      setPreview(null);
-      setVideoPlaying(false);
-    }
+    setPreview(null);
+    setVideoPlaying(false);
   }
   const seekVideo = (at: number) => {
     if (videoRef.current) videoRef.current.seek(at);
@@ -139,7 +139,6 @@ export function DiscoverCard({
   const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
   const isVideo = file.kind === "video";
   const isAudio = file.kind === "audio";
-  const ActionIcon = isVideo || isAudio ? Play : ImageIcon;
   // Audio follows the list views' gesture split: "Play" starts the track in the
   // bottom bar without leaving Discover, and opening the card is the inspect
   // gesture, so its detail view must not start playback on its own.
@@ -177,7 +176,9 @@ export function DiscoverCard({
   const { hoverPreview, frameQuality, keybindingPreset } = usePreferences();
   const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
     useHoverFramePreview({
-      enabled: Boolean(hoverPreview && src && isVideo && !activePreview),
+      // Off only while the preview plays: a paused one (a scene just picked)
+      // is still a frame to scrub away from.
+      enabled: Boolean(hoverPreview && src && isVideo && !videoPlaying),
       frameUrl: (t) =>
         `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
       duration: file.duration,
@@ -197,6 +198,7 @@ export function DiscoverCard({
       {/* Media layers. Click anywhere to open the detail/player. */}
       <Link
         to={detailTo}
+        data-slot="discover-media"
         className="absolute inset-0 block"
         onMouseEnter={onMouseEnter}
         onMouseMove={onMouseMove}
@@ -243,7 +245,11 @@ export function DiscoverCard({
       {activePreview && mediaBase && (
         <div
           data-slot="discover-video"
-          className="pointer-events-none absolute inset-0"
+          className={cn(
+            "pointer-events-none absolute inset-0",
+            // The scrub frame is drawn in the layer below; step aside for it.
+            previewSrc && "invisible",
+          )}
         >
           <VideoPlayer
             ref={videoRef}
@@ -270,6 +276,11 @@ export function DiscoverCard({
               toast.error(message);
             }}
             chromeless
+            // A preview: it samples the file, so the place it was left at
+            // stays, and the keyboard stays with Discovery (arrows page the
+            // slides, Space activates the focused button).
+            recordPosition={false}
+            shortcuts={false}
             t={t}
           />
         </div>
@@ -292,7 +303,7 @@ export function DiscoverCard({
         <button
           type="button"
           onClick={toggleVideo}
-          aria-label={t(videoPlaying ? "playlist.pause" : "discover.play")}
+          aria-label={t(videoPlaying ? "player.audio.pause" : "discover.play")}
           className={cn(
             CENTER_PLAY_CLASS,
             videoPlaying &&
@@ -399,15 +410,17 @@ export function DiscoverCard({
               {audioPlaying ? (
                 <Pause className="fill-current" />
               ) : (
-                <ActionIcon className="fill-current" />
+                <Play className="fill-current" />
               )}
               {audioLabel}
             </Button>
           ) : (
             <Button asChild size="lg" className="px-7 font-bold shadow-lg">
               <Link to={detailTo}>
-                <ActionIcon className={isVideo ? "fill-current" : undefined} />
-                {isVideo ? t("discover.play") : t("discover.open")}
+                {/* Playing is the centre button's job and stays in Discovery;
+                    this one leaves for the details. */}
+                {createElement(kindIcon(file.kind))}
+                {t("discover.open")}
               </Link>
             </Button>
           )}

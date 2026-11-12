@@ -5,7 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import ffmpeg from "ffmpeg-static";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
-import { openDiscover, skipFirstLaunchTour } from "./fixtures/helpers";
+import {
+  openDiscover,
+  skipFirstLaunchTour,
+  waitForIdle,
+} from "./fixtures/helpers";
 
 test("seeks from scenes inside the compact Discovery view and keeps play or pause", async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-discovery-seek-"));
@@ -36,6 +40,8 @@ test("seeks from scenes inside the compact Discovery view and keeps play or paus
     const page = await app.firstWindow();
     await skipFirstLaunchTour(page);
     await expect(page.getByTitle(name, { exact: true }).first()).toBeVisible();
+    // The scene rail needs the duration, which is probed after the row shows.
+    await waitForIdle(page);
     const dialog = await openDiscover(page);
     const shrink = dialog.getByRole("button", { name: "Shrink modal" });
     if (await shrink.count()) await shrink.click();
