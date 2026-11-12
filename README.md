@@ -380,9 +380,11 @@ ProRes clips play in Meguri through a local H.264 preview at up to
 1920 × 1080. The original clip is still used when you drag it into an editor
 or open it externally.
 
-When the player repackages a container such as MKV, it converts Dolby Digital
-(AC-3) or Dolby Digital Plus (E-AC-3) audio to AAC for playback. The preview
-keeps the original picture and the surround channel count.
+The built-in player converts Dolby Digital (AC-3) or Dolby Digital Plus
+(E-AC-3) audio to AAC when needed for playback. This includes MP4, M4V, and MOV
+clips with a default Dolby audio track, as well as repackaged containers such
+as MKV. The Dolby conversion copies the original picture stream and preserves
+the surround channel count. The original file stays untouched.
 
 For ProRes, MKV, AVI, WMV, FLV, or TS clips with multiple audio tracks, use
 **Audio track** beside the volume control in the full player. **Default**
