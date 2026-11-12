@@ -22,9 +22,17 @@ export interface UpdateRepo {
 // from the entry point's options (not package.json `repository`, so a
 // missing/odd repo field can't break the check silently).
 let updateRepo: UpdateRepo | null = null;
+// Microsoft Store product ID (Partner Center → Product identity), from the
+// same options. Unset for an app that is not on the Store.
+let msStoreProductId: string | undefined;
 
-export function setUpdateRepo(repo: UpdateRepo): void {
-  updateRepo = repo;
+/** Called once by startApp(), before anything checks for updates. */
+export function configureUpdater(options: {
+  repo: UpdateRepo;
+  msStoreProductId?: string;
+}): void {
+  updateRepo = options.repo;
+  msStoreProductId = options.msStoreProductId;
 }
 
 /**
@@ -60,22 +68,19 @@ function releasesPage(): string {
   return `https://github.com/${owner}/${name}/releases`;
 }
 
-// Microsoft Store product ID (Partner Center → Product identity). Store installs
-// are updated by the Store itself, so "view this update" should land on the
-// product page instead of the GitHub release.
-const MS_STORE_PRODUCT_ID = "9NRSM11RRH8Z";
-
 /**
  * Where the "View" action for an update should send the user. Store-installed
- * builds (appx, `process.windowsStore`) go to the Store product page; everything
- * else goes to the GitHub release page (or the releases list as a fallback).
+ * builds (appx, `process.windowsStore`) are updated by the Store itself, so
+ * they go to the Store product page; everything else, and a Store install of
+ * an app started without a product ID, goes to the GitHub release page (or
+ * the releases list as a fallback).
  */
 export function updateDownloadUrl(
   releaseHtmlUrl?: string | null,
   isWindowsStore: boolean = process.windowsStore === true,
 ): string {
-  if (isWindowsStore) {
-    return `ms-windows-store://pdp/?ProductId=${MS_STORE_PRODUCT_ID}`;
+  if (isWindowsStore && msStoreProductId) {
+    return `ms-windows-store://pdp/?ProductId=${encodeURIComponent(msStoreProductId)}`;
   }
   return releaseHtmlUrl || releasesPage();
 }

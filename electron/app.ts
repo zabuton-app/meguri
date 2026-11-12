@@ -31,7 +31,7 @@ import { startServer } from "./core/server.js";
 import {
   checkForUpdates,
   isAutoCheckEnabled,
-  setUpdateRepo,
+  configureUpdater,
   updateDownloadUrl,
   type UpdateRepo,
 } from "./core/updater.js";
@@ -72,6 +72,11 @@ export interface AppOptions {
   urlScheme: string;
   /** GitHub repository the update check looks at. */
   updateRepo: UpdateRepo;
+  /**
+   * Microsoft Store product ID. Store installs are sent to its product page
+   * for updates; leave it out for an app that is not on the Store.
+   */
+  msStoreProductId?: string;
 }
 
 /** Start the app. Call once, from the entry point, before anything else runs. */
@@ -81,7 +86,10 @@ export function startApp(options: AppOptions): void {
   // <appData>/ plus package.json's name (~/.config/meguri for Meguri) and no
   // longer depends on where app.setName() is called.
   app.setPath("userData", app.getPath("userData"));
-  setUpdateRepo(options.updateRepo);
+  configureUpdater({
+    repo: options.updateRepo,
+    msStoreProductId: options.msStoreProductId,
+  });
 
   // Set up logging before anything else so early failures land in the log file.
   setupLogger();
@@ -533,7 +541,8 @@ export function startApp(options: AppOptions): void {
                 emit("update:available", info);
               } else if (info) {
                 // Reached GitHub and we're current: take the user to the releases
-                // page (or the Store product page on Store installs).
+                // page (or the Store product page on Store installs of an
+                // app with a Store product ID).
                 void shell.openExternal(updateDownloadUrl(null));
               } else {
                 // Couldn't reach GitHub (offline / rate-limited): don't silently
