@@ -8,7 +8,7 @@ FROM node:22-bookworm-slim
 # build-essential + python3: node-gyp deps to rebuild better-sqlite3.
 # The rest are shared libs Chromium dlopen()s at runtime (incl. Wayland/EGL).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential python3 ca-certificates \
+    build-essential python3 ca-certificates curl \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libgbm1 libgtk-3-0 libasound2 libxcomposite1 libxdamage1 libxfixes3 \
     libxrandr2 libxkbcommon0 libpango-1.0-0 libcairo2 libatspi2.0-0 \

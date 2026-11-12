@@ -2,7 +2,7 @@
 // native binaries live in app.asar.unpacked (see electron-builder asarUnpack),
 // so the static paths need rewriting at runtime.
 import ffmpegStatic from "ffmpeg-static";
-import ffprobeStatic from "@derhuerst/ffprobe-static";
+import ffprobeStatic from "@hoardodile/ffprobe-bin";
 
 function unpacked(p: string): string {
   return p.replace("app.asar", "app.asar.unpacked");

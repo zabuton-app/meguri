@@ -39,12 +39,10 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
     sourceUrl: "https://github.com/eugeneware/ffmpeg-static",
   },
   {
-    name: "@derhuerst/ffprobe-static (npm)",
-    license: "GPL-3.0-or-later",
-    licenseUrl:
-      "https://github.com/eugeneware/ffmpeg-static/blob/master/LICENSE",
-    sourceUrl:
-      "https://github.com/eugeneware/ffmpeg-static/tree/master/packages/ffprobe-static",
+    name: "@hoardodile/ffprobe-bin (npm)",
+    license: "GPL-3.0",
+    licenseUrl: "https://github.com/hoardodile/ffprobe-bin/blob/v1.0.0/LICENSE",
+    sourceUrl: "https://github.com/hoardodile/ffprobe-bin/tree/v1.0.0",
   },
   {
     name: "Electron (Chromium / Node.js)",
