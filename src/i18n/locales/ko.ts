@@ -324,6 +324,12 @@ export const ko: Record<TranslationKey, string> = {
   "media.currentMainThumb": "현재 메인 썸네일:",
 
   // player controls
+  "player.subtitles": "자막",
+  "player.subtitleAuto": "오디오 언어와 일치",
+  "player.subtitleOff": "끄기",
+  "player.subtitleLoading": "자막 불러오는 중…",
+  "player.subtitleUnavailable": "이 자막 트랙을 불러올 수 없습니다.",
+  "player.subtitleTrackNumber": "트랙 {number}",
   "player.play": "재생",
   "player.playKey": "재생 (Space)",
   "player.pauseKey": "일시정지 (Space)",

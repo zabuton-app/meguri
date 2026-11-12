@@ -327,6 +327,12 @@ export const ja = {
   "media.currentMainThumb": "現在のメインサムネ:",
 
   // プレイヤー操作
+  "player.subtitles": "字幕",
+  "player.subtitleAuto": "音声の言語に合わせる",
+  "player.subtitleOff": "オフ",
+  "player.subtitleLoading": "字幕を読み込み中…",
+  "player.subtitleUnavailable": "字幕トラックを読み込めませんでした。",
+  "player.subtitleTrackNumber": "トラック {number}",
   "player.play": "再生",
   "player.playKey": "再生 (Space)",
   "player.pauseKey": "一時停止 (Space)",
