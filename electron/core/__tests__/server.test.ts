@@ -7,6 +7,7 @@ import { extractMeta } from "../media.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { Server } from "node:http";
 import { openDb, nowUnix, type DB } from "../db.js";
@@ -930,4 +931,56 @@ describe("media remux (ffmpeg path)", () => {
     },
     15_000,
   );
+});
+
+it("serves a full-size JPEG with both tiles of a HEIF photo", async () => {
+  const fixture = fileURLToPath(
+    new URL("./fixtures/grid-1024x512.heic", import.meta.url),
+  );
+  const rel = "tiled-preview.heic";
+  const file = path.join(root, rel);
+  fs.copyFileSync(fixture, file);
+  const id = insert(rel, file, null, "done", "image", "heic");
+  const response = await fetch(`${base}/ws/${WS}/media/${id}`, authHeaders());
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Content-Type")).toBe("image/jpeg");
+  const jpeg = Buffer.from(await response.arrayBuffer());
+  const dimensions = execFileSync(
+    FFPROBE,
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=width,height",
+      "-of",
+      "csv=p=0",
+      "pipe:0",
+    ],
+    { input: jpeg, encoding: "utf8" },
+  );
+  expect(dimensions.trim()).toBe("1024,512");
+  for (const x of [256, 768]) {
+    const pixel = execFileSync(
+      FFMPEG,
+      [
+        "-v",
+        "error",
+        "-i",
+        "pipe:0",
+        "-vf",
+        `crop=2:2:${x}:256`,
+        "-frames:v",
+        "1",
+        "-pix_fmt",
+        "rgb24",
+        "-f",
+        "rawvideo",
+        "pipe:1",
+      ],
+      { input: jpeg },
+    );
+    expect(pixel[2]).toBeGreaterThan(170);
+    expect(pixel[0]).toBeLessThan(70);
+  }
+  expect(fs.readFileSync(file)).toEqual(fs.readFileSync(fixture));
 });

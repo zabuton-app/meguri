@@ -67,6 +67,8 @@ the jsdom worker does not start under Electron's experimental loader.
 @derhuerst/ffprobe-static; code that uses ffmpeg paths must apply the
 `app.asar` → `app.asar.unpacked` substitution (see
 [ffmpeg/ffprobe path resolution](media-pipeline.md#ffmpegffprobe-path-resolution)).
+The HEIF worker and its decoder package are also unpacked, so the worker can
+load its local WebAssembly module with Node's module loader.
 
 Distribution targets are Linux (AppImage / deb), Windows (nsis / portable), and
 macOS (dmg / zip).

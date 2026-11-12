@@ -55,6 +55,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@dusrel/image-heic": "1.0.1",
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
     "@radix-ui/react-context-menu": "^2.3.1",
@@ -140,9 +141,12 @@
     ],
     "files": [
       "out/**/*",
+      "electron/core/heifWorker.cjs",
       "package.json"
     ],
     "asarUnpack": [
+      "electron/core/heifWorker.cjs",
+      "**/node_modules/@dusrel/image-heic/**",
       "**/node_modules/better-sqlite3/**",
       "**/node_modules/ffmpeg-static/**",
       "**/node_modules/@derhuerst/ffprobe-static/**"

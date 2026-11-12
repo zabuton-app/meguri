@@ -138,6 +138,24 @@ describe("runScan", () => {
     expect(events.at(-1)).toMatchObject({ type: "done", stats });
   });
 
+  it("retries legacy HEIF thumbnail errors once and leaves other errors alone", async () => {
+    write("grid.heic", "AAAAAAAAAA");
+    write("broken.jpg", "BBBBBBBBBB");
+    await scan();
+    db.exec("DELETE FROM settings WHERE key LIKE 'heif_thumbnail_retry_v1:%'");
+    db.exec("UPDATE files SET thumb_status = 'error', thumb_path = NULL");
+
+    await scan();
+
+    expect(rows()).toMatchObject([
+      { rel_path: "broken.jpg", thumb_status: "error" },
+      { rel_path: "grid.heic", thumb_status: "done" },
+    ]);
+    db.exec("UPDATE files SET thumb_status = 'error' WHERE ext = 'heic'");
+    await scan();
+    expect(rows()[1].thumb_status).toBe("error");
+  });
+
   it("follows a rename: same id, search entry under the new name", async () => {
     write("a.mp4", "AAAAAAAAAA");
     await scan();

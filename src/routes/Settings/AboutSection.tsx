@@ -47,6 +47,12 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
       "https://github.com/eugeneware/ffmpeg-static/tree/master/packages/ffprobe-static",
   },
   {
+    name: "@dusrel/image-heic (libheif and libde265)",
+    license: "MIT / LGPL-3.0-or-later",
+    licenseUrl: "https://www.gnu.org/licenses/lgpl-3.0.html",
+    sourceUrl: "https://github.com/dusmamud/dusrel-image/tree/main/native/heic",
+  },
+  {
     name: "Electron (Chromium / Node.js)",
     license: "MIT",
     licenseUrl: "https://github.com/electron/electron/blob/main/LICENSE",

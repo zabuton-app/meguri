@@ -154,8 +154,16 @@ Containers Chromium cannot demux — `REMUX_CONTAINERS` = `mkv` / `avi` / `wmv` 
 `?t=<seconds>` query parameter. The server also uses fragmented MP4 for MP4,
 M4V, and MOV with a default AC-3 or E-AC-3 audio track. It copies the primary
 picture stream and converts that audio track to AAC, keeping its channel count.
-ProRes uses a local H.264 preview. Chromium-unsupported still images (`heic` /
-`heif` / `tiff`, `TRANSCODE_IMAGES`) are transcoded to JPEG.
+ProRes uses a local H.264 preview.
+
+### HEIC and HEIF images
+
+A local WebAssembly worker decodes the primary image, including every tile in a
+grid. Meguri uses those pixels for the WebP thumbnail and the full-size JPEG
+preview. HEIF jobs share one decoder slot to bound memory use. FFmpeg remains
+the fallback for HEIF variants it can decode directly and handles TIFF previews.
+The original file is left untouched. The next scan retries previously failed or
+unsized HEIF thumbnails once, so an existing library needs only a normal scan.
 
 ### Frame previews
 

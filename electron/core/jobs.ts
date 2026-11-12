@@ -321,6 +321,7 @@ export async function runScan(
   }
 
   // --- thumbnail/meta (parallel) ---
+  q.retryLegacyHeifThumbnails(db, core.rootId);
   // Rows walk() could not reach would only fail here and be marked 'error'
   // for good; leave them pending for a scan that can read them.
   let pending = q.filesNeedingThumb(db, core.rootId);

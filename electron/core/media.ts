@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { promises as fsPromises } from "node:fs";
 import { promisify } from "node:util";
 import { FFMPEG, FFPROBE } from "./ffmpeg-paths.js";
+import { isHeif, renderHeif } from "./heif.js";
 import { DECODE_FFMPEG_THREADS } from "./mediaConcurrency.js";
 import log from "./logger.js";
 import type { Kind } from "./types.js";
@@ -235,6 +236,20 @@ export async function generateThumb(
       false,
       coverStreamIndex,
     );
+  }
+  if (kind === "image" && isHeif(src)) {
+    try {
+      const image = await renderHeif(
+        src,
+        { thumbnailWidth: THUMB_MAX },
+        signal,
+      );
+      await fsPromises.writeFile(dest, image, { signal });
+      return true;
+    } catch {
+      if (signal?.aborted) return false;
+      // FFmpeg can still handle some HEIF variants, such as image sequences.
+    }
   }
   const useOffset =
     kind === "video" &&
