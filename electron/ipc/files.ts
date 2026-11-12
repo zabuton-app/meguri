@@ -81,8 +81,8 @@ export function registerFileHandlers(ctx: IpcContext): void {
       isRemuxedVideo(file.codec, file.ext) &&
       isInsideRoot(file.absPath, root)
     ) {
-      // Before the scan stores metadata, opening details may wait up to five
-      // seconds for the shared playback probe.
+      // Before the scan stores metadata, opening details waits for the shared
+      // playback probe: a free slot, then up to five seconds of ffprobe.
       const meta = await probePlaybackMetadata(file.absPath).catch(() => null);
       return { ...file, meta };
     }

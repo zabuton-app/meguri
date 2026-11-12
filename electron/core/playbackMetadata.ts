@@ -21,12 +21,15 @@ export async function probePlaybackMetadata(
   const existing = pending.get(file);
   if (existing) return existing;
   const task = (async () => {
-    const signal = AbortSignal.timeout(5_000);
     try {
       const stat = await fs.promises.stat(file);
       if (!stat.isFile()) return null;
-      const release = await slots.acquire({ signal, maxWaiting: 32 });
+      // The wait is not timed: several requests share this probe, so it cannot
+      // follow one client's disconnect, and the queue bound keeps it finite.
+      // Timing it would turn a busy moment into missing track info (#382).
+      const release = await slots.acquire({ maxWaiting: 32 });
       try {
+        const signal = AbortSignal.timeout(5_000);
         return (await extractMeta(file, "video", signal)).raw;
       } finally {
         release();
