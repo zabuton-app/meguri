@@ -6,4 +6,6 @@ startApp({
   glyph: "巡",
   urlScheme: "meguri",
   updateRepo: { owner: "zabuton-app", name: "meguri" },
+  msStoreProductId: "9NRSM11RRH8Z",
+  envPrefix: "MEGURI",
 });

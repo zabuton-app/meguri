@@ -551,7 +551,8 @@ export const UpdateInfoSchema = z.object({
   available: z.boolean(),
   /**
    * Where the "View" action should send the user: the GitHub release page, or
-   * the MS Store product deep link (`ms-windows-store://`) on Store installs.
+   * the MS Store product deep link (`ms-windows-store://`) on Store installs
+   * of an app that has a Store product ID.
    */
   url: z.url(),
   /** Release name/title, when present. */
