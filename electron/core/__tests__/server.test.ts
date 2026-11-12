@@ -495,8 +495,8 @@ describe("MKV audio track selection", () => {
           sample_rate?: string;
         }[];
       };
-    const audioPacketHashes = (input: Buffer) =>
-      JSON.parse(
+    const audioPacketHashes = (input: Buffer) => {
+      const { packets } = JSON.parse(
         execFileSync(
           FFPROBE,
           [
@@ -516,6 +516,10 @@ describe("MKV audio track selection", () => {
           { input, encoding: "utf8" },
         ),
       ) as { packets: { data_hash: string }[] };
+      // Newer ffprobe versions may also report container-specific side data.
+      // This assertion checks the encoded AAC packet payloads.
+      return packets.map(({ data_hash }) => data_hash);
+    };
     const [automatic, aac, dolby] = await Promise.all([
       preview(""),
       preview("?audioTrack=0"),
@@ -531,7 +535,7 @@ describe("MKV audio track selection", () => {
     ]);
     expect(streams(dolby).streams).toEqual(streams(automatic).streams);
     const sourceHashes = audioPacketHashes(original);
-    expect(sourceHashes.packets.length).toBeGreaterThan(0);
+    expect(sourceHashes.length).toBeGreaterThan(0);
     expect(audioPacketHashes(aac)).toEqual(sourceHashes);
     expect((await fetch(url + "?audioTrack=2", authHeaders())).status).toBe(
       400,
