@@ -30,14 +30,57 @@ launching, so Electron does not accidentally start in node mode.
 ## electron-vite config
 
 `electron.vite.config.ts` builds main, preload, and renderer from one config.
+The settings are in `appBuildConfig()` (`electron.vite.shared.ts`);
+`electron.vite.config.ts` only passes it Meguri's entry point.
 
 - Preload is emitted as **CommonJS** (`.js`); ESM `.mjs` preload can fail to
   load, and `electron/app.ts` resolves the preload, the renderer entry and
   the worker threads (`queryWorker.js`, `autoTagWorker.js`) through
   `__dirname`, which assumes CJS output. Each worker is its own main-build
-  entry in `electron.vite.config.ts`.
+  entry in `electron.vite.shared.ts`.
 - TypeScript uses separate tsconfigs for `src` and `electron`, both `strict` with
   `noUnusedLocals` / `noUnusedParameters`.
+
+### Building from another project
+
+`electron/app.ts` finds the workers, the preload and the renderer relative to
+its own output file, so it needs exactly this layout:
+
+```text
+out/main/main.js            the entry point that calls startApp()
+out/main/queryWorker.js
+out/main/autoTagWorker.js
+out/preload/preload.js      CommonJS
+out/renderer/index.html
+```
+
+A project that keeps this repository in a subdirectory gets the same layout
+from `appBuildConfig()`, without copying the config:
+
+```ts
+// electron.vite.config.ts of the other project
+import { defineConfig } from "electron-vite";
+import { resolve } from "node:path";
+import { appBuildConfig } from "./vendor/meguri/electron.vite.shared";
+
+export default defineConfig(
+  appBuildConfig({ mainEntry: resolve("app/main.ts") }),
+);
+```
+
+- `mainEntry` is that project's own entry point, which imports `startApp()`
+  from this repository's `electron/app.ts`. Everything else (the workers, the
+  preload, the renderer) is built from this repository's sources, wherever the
+  build runs.
+- `out/` is created in the working directory, so the project's package.json
+  uses `"main": "out/main/main.js"`.
+- Import the shared file by a relative path. electron-vite bundles relative
+  imports of the config file but leaves package imports to Node, which cannot
+  load a `.ts` file from `node_modules`.
+- The project installs this repository's `dependencies` and the build tools
+  the shared file imports (`electron-vite`, `@vitejs/plugin-react`,
+  `@tailwindcss/vite`). The main and preload builds keep those `dependencies`
+  external by name, whether or not the project's package.json lists them.
 
 ## Testing
 

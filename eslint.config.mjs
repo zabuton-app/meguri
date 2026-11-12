@@ -32,6 +32,7 @@ export default tseslint.config(
           // discovers on its own (allowDefaultProject rejects '**' globs).
           allowDefaultProject: [
             "electron.vite.config.ts",
+            "electron.vite.shared.ts",
             "vitest.config.ts",
             "vitest.setup.ts",
             "playwright.config.ts",
