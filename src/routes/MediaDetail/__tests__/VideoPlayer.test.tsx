@@ -196,6 +196,41 @@ describe("embedded subtitles", () => {
     fireEvent.change(select, { target: { value: "-1" } });
     expect(screen.queryByText("Bonjour")).toBeNull();
   });
+
+  it("matches the audio track chosen in the player on Auto", async () => {
+    fileSubtitles.mockReset();
+    fileSubtitles.mockImplementation(
+      (_id: number, _ws: string, track: number, start: number) =>
+        Promise.resolve([
+          {
+            start,
+            end: start + 10,
+            text: track === 0 ? "こんにちは" : "Hello",
+          },
+        ]),
+    );
+    const { video } = renderPlayer({
+      duration: 300,
+      audioTracks: [
+        { title: "", language: "jpn" },
+        { title: "", language: "eng" },
+      ],
+      subtitleAudioLanguage: "jpn",
+      subtitleTracks: [
+        { title: "", language: "jpn", codec: "subrip" },
+        { title: "", language: "eng", codec: "subrip" },
+      ],
+    });
+    loadVideo(video);
+    expect(await screen.findByText("こんにちは")).toBeTruthy();
+
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "player.audioTrack" }),
+      { target: { value: "1" } },
+    );
+    expect(await screen.findByText("Hello")).toBeTruthy();
+    expect(fileSubtitles).toHaveBeenLastCalledWith(1, "ws1", 1, 0);
+  });
 });
 
 describe("VideoPlayer", () => {

@@ -254,12 +254,18 @@ export const VideoPlayer = forwardRef<
   const [subtitle, setSubtitle] = useState(() =>
     readSubtitlePreference(subtitleKey),
   );
+  // A track chosen in the player is the audio that plays, whatever the caller
+  // could infer from the metadata alone.
+  const audioLanguage =
+    audioTrack === DEFAULT_AUDIO_TRACK
+      ? subtitleAudioLanguage
+      : (audioTracks?.[audioTrack]?.language ?? "");
   const chosenSubtitle =
     subtitle === AUTO_SUBTITLE
       ? (subtitleTracks?.findIndex(
           (track) =>
             isTextSubtitle(track.codec) &&
-            sameSubtitleLanguage(subtitleAudioLanguage, track.language),
+            sameSubtitleLanguage(audioLanguage, track.language),
         ) ?? SUBTITLES_OFF)
       : subtitle;
   const showSubtitles = !chromeless;
