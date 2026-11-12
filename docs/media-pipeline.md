@@ -10,7 +10,7 @@ ffmpeg/ffprobe binaries, whose path resolution is described at the end.
 walk → `syncFiles` → thumbnail/metadata extraction (via a parallel pool),
 reporting progress through a callback. `ScanManager` (`electron/scanManager.ts`)
 owns the scan state and fires a scan with `start()` whenever a workspace is
-added, switched to, or re-scanned; `main.ts` starts the initial scan and aborts
+added, switched to, or re-scanned; `app.ts` starts the initial scan and aborts
 them all on quit.
 
 ### Walk and incremental sync

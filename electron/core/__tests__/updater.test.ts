@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   compareVersions,
   releasesPage,
+  setUpdateRepo,
   updateDownloadUrl,
 } from "../updater.js";
+
+// The repo is module state set at startup; reset it so no test sees another's.
+beforeEach(() => setUpdateRepo({ owner: "zabuton-app", name: "meguri" }));
 
 describe("compareVersions", () => {
   it("treats equal versions as 0", () => {
@@ -60,6 +64,15 @@ describe("updateDownloadUrl", () => {
     );
     expect(updateDownloadUrl(null, true)).toBe(
       "ms-windows-store://pdp/?ProductId=9NRSM11RRH8Z",
+    );
+  });
+});
+
+describe("releasesPage", () => {
+  it("points at the repository the app was started with", () => {
+    setUpdateRepo({ owner: "someone", name: "other-app" });
+    expect(releasesPage()).toBe(
+      "https://github.com/someone/other-app/releases",
     );
   });
 });

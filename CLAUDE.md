@@ -48,7 +48,7 @@ A change is verified with `npm run typecheck`, `npm test`, `npm run lint` and `n
 ## Invariants
 
 - The renderer reaches the main process only through `preload` and the typed IPC in `shared/ipc/`.
-- The app stays in the tray: closing the window hides it, and only "Quit" (or Cmd+Q on macOS) exits ([electron/main.ts](electron/main.ts)).
+- The app stays in the tray: closing the window hides it, and only "Quit" (or Cmd+Q on macOS) exits ([electron/app.ts](electron/app.ts)).
 - Each workspace (scan root) has its own DB and thumbnails. Code that serves or edits a file resolves the workspace by ID (`byId()`), not by whichever is active (`active()`), unless it really means the active one.
 
 ## Releases

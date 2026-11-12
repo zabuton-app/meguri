@@ -13,10 +13,19 @@ import { scopedLog } from "./logger.js";
 
 const log = scopedLog("updater");
 
-// GitHub repo to check releases against. Mirrors package.json `repository`, but
-// hard-coded here so a missing/odd repo field can't break the check silently.
-const REPO_OWNER = "zabuton-app";
-const REPO_NAME = "meguri";
+export interface UpdateRepo {
+  owner: string;
+  name: string;
+}
+
+// GitHub repo to check releases against, set once at startup by startApp()
+// from the entry point's options (not package.json `repository`, so a
+// missing/odd repo field can't break the check silently).
+let updateRepo: UpdateRepo | null = null;
+
+export function setUpdateRepo(repo: UpdateRepo): void {
+  updateRepo = repo;
+}
 
 /**
  * Resolve the target repo as `owner/name`. In development only, the
@@ -25,7 +34,7 @@ const REPO_NAME = "meguri";
  * one is published. Ignored in packaged builds so a stray env var can't point
  * release users at someone else's repo.
  */
-function resolveRepo(): { owner: string; name: string } {
+function resolveRepo(): UpdateRepo {
   // Only honor the override when we can positively confirm a dev build
   // (isPackaged === false). If it's undefined (e.g. a partial app stub) we fall
   // through to the real repo — fail safe so release users can't be redirected.
@@ -37,7 +46,8 @@ function resolveRepo(): { owner: string; name: string } {
       return { owner: match[1], name: match[2] };
     }
   }
-  return { owner: REPO_OWNER, name: REPO_NAME };
+  if (!updateRepo) throw new Error("update repository is not set");
+  return updateRepo;
 }
 
 function latestReleaseApi(): string {
@@ -121,7 +131,7 @@ function fetchLatestRelease(): Promise<GithubRelease> {
   return new Promise((resolve, reject) => {
     const request = net.request({ method: "GET", url: latestReleaseApi() });
     request.setHeader("Accept", "application/vnd.github+json");
-    request.setHeader("User-Agent", `Meguri/${app.getVersion()}`);
+    request.setHeader("User-Agent", `${app.getName()}/${app.getVersion()}`);
 
     const timer = setTimeout(() => {
       request.abort();
