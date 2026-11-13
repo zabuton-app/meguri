@@ -35,9 +35,9 @@ vi.mock("@/ipc/client", () => ({
   events: {
     onThumbDone: (cb: (e: { id: number; workspaceId?: string }) => void) => {
       thumbDone.emit = cb;
-      return Promise.resolve(() => {
+      return () => {
         thumbDone.emit = null;
-      });
+      };
     },
   },
 }));

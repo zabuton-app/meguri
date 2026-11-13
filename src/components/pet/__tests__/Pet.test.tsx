@@ -42,7 +42,7 @@ vi.mock("sonner", () => ({
 vi.mock("@/ipc/client", () => {
   const listen = (name: string) => (cb: Listener) => {
     mocks.listeners[name] = cb;
-    return Promise.resolve(() => {});
+    return () => {};
   };
   return {
     api: {

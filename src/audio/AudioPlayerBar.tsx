@@ -59,28 +59,14 @@ function useTrackCover(track: AudioTrack | null): {
   const workspaceId = track?.workspaceId;
   useEffect(() => {
     if (!key) return;
-    // The unlisten arrives a microtask after the subscription is live, and the
-    // track can change in the very same commit — so a cleanup that runs before
-    // then must still take the subscription down, or it leaks one listener.
-    let cancelled = false;
-    let unlisten: (() => void) | undefined;
-    void events
-      .onThumbDone((event) => {
-        if (event.id !== fileId) return;
-        if (event.workspaceId && event.workspaceId !== workspaceId) return;
-        setSeen((prev) => {
-          const version = prev?.key === key ? (prev.version ?? 0) + 1 : 1;
-          return { key, hasCover: true, version };
-        });
-      })
-      .then((u) => {
-        if (cancelled) u();
-        else unlisten = u;
+    return events.onThumbDone((event) => {
+      if (event.id !== fileId) return;
+      if (event.workspaceId && event.workspaceId !== workspaceId) return;
+      setSeen((prev) => {
+        const version = prev?.key === key ? (prev.version ?? 0) + 1 : 1;
+        return { key, hasCover: true, version };
       });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
+    });
   }, [key, fileId, workspaceId]);
   if (seen && seen.key === key)
     return { hasCover: seen.hasCover, version: seen.version };

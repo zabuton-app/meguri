@@ -56,23 +56,18 @@ export function StatusBar() {
   // fires many times a second). Use the query client to invalidate stats so the
   // effect doesn't need a closure over the (per-render) `stats` object.
   useEffect(() => {
-    const unlistens: Array<() => void> = [];
-    void events
-      .onScanProgress((p) =>
+    const unlistens = [
+      events.onScanProgress((p) =>
         setProgress({ phase: p.phase, done: p.done, total: p.total }),
-      )
-      .then((u) => unlistens.push(u));
-    void events
-      .onScanDone(() => {
+      ),
+      events.onScanDone(() => {
         setProgress(null);
         void qc.invalidateQueries({ queryKey: ["workspace_stats"] });
-      })
-      .then((u) => unlistens.push(u));
-    void events
-      .onWorkspaceChanged(() => {
+      }),
+      events.onWorkspaceChanged(() => {
         void qc.invalidateQueries({ queryKey: ["workspace_stats"] });
-      })
-      .then((u) => unlistens.push(u));
+      }),
+    ];
     return () => {
       unlistens.forEach((u) => u());
     };

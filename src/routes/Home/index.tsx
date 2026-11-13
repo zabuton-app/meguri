@@ -536,34 +536,29 @@ export default function Home() {
 
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {
-    let un: (() => void) | undefined;
-    void events
-      .onScanDone((done) => {
-        setScanning(false);
-        void status.refetch();
-        void search.refetch();
-        // Folders appear, fill up and empty out with a scan like files do.
-        void qc.invalidateQueries({ queryKey: ["folders_list"] });
-        void qc.invalidateQueries({ queryKey: ["graph_build"] });
-        void qc.invalidateQueries({ queryKey: ["activity_days"] });
-        void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
-        // A scan can add tags (new files, the derived-tag backfill), so a tag
-        // screen left open would otherwise show a stale catalog.
-        void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
-        const mode = manualScanJobs.current.get(done.jobId);
-        manualScanJobs.current.delete(done.jobId);
-        notifyScanDone(done, mode);
-      })
-      .then((u) => {
-        un = u;
-        // Listening now; a scan that failed before (the startup scan can
-        // finish before this view mounts) is asked about instead.
-        void api
-          .scanUnreadableWorkspaces()
-          .then((ids) => ids.forEach(notifyRootUnreadable))
-          .catch(() => {});
-      });
-    return () => un?.();
+    const unlisten = events.onScanDone((done) => {
+      setScanning(false);
+      void status.refetch();
+      void search.refetch();
+      // Folders appear, fill up and empty out with a scan like files do.
+      void qc.invalidateQueries({ queryKey: ["folders_list"] });
+      void qc.invalidateQueries({ queryKey: ["graph_build"] });
+      void qc.invalidateQueries({ queryKey: ["activity_days"] });
+      void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
+      // A scan can add tags (new files, the derived-tag backfill), so a tag
+      // screen left open would otherwise show a stale catalog.
+      void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+      const mode = manualScanJobs.current.get(done.jobId);
+      manualScanJobs.current.delete(done.jobId);
+      notifyScanDone(done, mode);
+    });
+    // Listening now; a scan that failed before (the startup scan can
+    // finish before this view mounts) is asked about instead.
+    void api
+      .scanUnreadableWorkspaces()
+      .then((ids) => ids.forEach(notifyRootUnreadable))
+      .catch(() => {});
+    return unlisten;
     // search/status are react-query results; only their stable `refetch` is used.
     // Depending on the whole objects would re-subscribe the listener every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps

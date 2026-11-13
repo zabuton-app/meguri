@@ -51,7 +51,7 @@ vi.mock("@/ipc/client", () => ({
     collectionRemoveFile: vi.fn().mockResolvedValue(undefined),
   },
   events: {
-    onThumbDone: vi.fn().mockResolvedValue(() => {}),
+    onThumbDone: vi.fn().mockReturnValue(() => {}),
   },
   ALL_ID: "__all__",
   COLLECTION_ID_PREFIX: "collection:",
