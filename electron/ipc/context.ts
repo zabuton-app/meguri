@@ -11,6 +11,7 @@ import type { WorkspacePasses } from "../core/workspacePasses.js";
 import type { Workspaces } from "../core/workspaces.js";
 import type { ScanManager } from "../scanManager.js";
 import type { LogoId } from "../../shared/ipc/schema.js";
+import type { LogoImages } from "../app.js";
 
 export interface IpcContext {
   ws: Workspaces;
@@ -29,6 +30,8 @@ export interface IpcContext {
   scans: ScanManager;
   /** Re-apply the logo variant to the live tray and window/dock icons. */
   applyLogo: (logo: LogoId) => void;
+  /** The app's logo bitmaps, from startApp()'s options. */
+  logos: LogoImages;
   /** Evaluates the auto-tagging engine off the main thread. */
   deriveAutoTags: DeriveAutoTags;
   /**

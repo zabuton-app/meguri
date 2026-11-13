@@ -20,7 +20,6 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { DEFAULT_LOGO, loadAutoTag, loadConfig } from "./core/appConfig.js";
-import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import log, { setupLogger } from "./core/logger.js";
 import { withTimeout } from "./core/concurrency.js";
 import {
@@ -56,6 +55,17 @@ import type {
 } from "../shared/ipc/schema.js";
 
 /** What sets one app apart from another built on this main process. */
+/**
+ * An app's bitmaps for each logo variant: PNG, base64 without the data URL
+ * prefix.
+ */
+export interface LogoImages {
+  /** 32px: the tray icon and the drag icon. */
+  tray: Record<LogoId, string>;
+  /** 256px: the window / dock icon and the logo shown inside the app. */
+  app: Record<LogoId, string>;
+}
+
 export interface AppOptions {
   /**
    * App name, as Electron reports it. It does not move userData: that is
@@ -84,6 +94,11 @@ export interface AppOptions {
    * app's exported variables do not reach another.
    */
   envPrefix: string;
+  /**
+   * The app's logo in each of the three variants the user picks from in
+   * Settings: the tray, the window / dock icon and the logo inside the app.
+   */
+  logos: LogoImages;
 }
 
 /** Start the app. Call once, from the entry point, before anything else runs. */
@@ -420,13 +435,13 @@ export function startApp(options: AppOptions): void {
 
   function trayImage(logo: LogoId): Electron.NativeImage {
     return nativeImage.createFromDataURL(
-      `data:image/png;base64,${TRAY_ICON_BASE64[logo]}`,
+      `data:image/png;base64,${options.logos.tray[logo]}`,
     );
   }
 
   function windowImage(logo: LogoId): Electron.NativeImage {
     return nativeImage.createFromDataURL(
-      `data:image/png;base64,${WINDOW_ICON_BASE64[logo]}`,
+      `data:image/png;base64,${options.logos.app[logo]}`,
     );
   }
 
@@ -762,6 +777,7 @@ export function startApp(options: AppOptions): void {
       emit,
       scans,
       applyLogo,
+      logos: options.logos,
       deriveAutoTags: autoTagWorker.derive,
       passes,
       retryLibraryMerge,

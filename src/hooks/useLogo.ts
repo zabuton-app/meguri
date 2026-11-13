@@ -9,18 +9,26 @@ import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/ipc/client";
 import type { LogoId } from "@shared/ipc/schema";
-import logoDarkPng from "../../logo/app-256.png";
-import logoLightPng from "../../logo/light/app-256.png";
-import logoEnsoPng from "../../logo/enso/app-256.png";
-
-/** Bundled preview/in-app bitmap per logo variant. */
-export const LOGO_SRC: Record<LogoId, string> = {
-  dark: logoDarkPng,
-  light: logoLightPng,
-  enso: logoEnsoPng,
-};
 
 const LOGO_QUERY_KEY = ["logo"] as const;
+
+/**
+ * The preview / in-app bitmap of each logo variant, as a data URL. They come
+ * from main (the entry point passes them to startApp()), so this is undefined
+ * until the first fetch resolves. They never change while the app runs.
+ */
+export function useLogoImages(): Record<LogoId, string> | undefined {
+  return useQuery(logoImagesQuery).data;
+}
+
+/** Exported so the entry point can start the fetch before the first render. */
+export const logoImagesQuery = {
+  // Not under LOGO_QUERY_KEY: cancelling or invalidating that key matches
+  // by prefix and would take this query with it.
+  queryKey: ["logo-images"],
+  queryFn: () => api.logoImages(),
+  staleTime: Infinity,
+};
 
 export function useLogo(): {
   logo: LogoId;

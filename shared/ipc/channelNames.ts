@@ -91,6 +91,7 @@ export const INVOKE_CHANNELS = [
   "update_ignore",
   "logo_get",
   "logo_set",
+  "logo_images",
   "custom_css_get",
   "custom_css_set_enabled",
   "custom_css_open",
