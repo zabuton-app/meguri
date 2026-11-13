@@ -9,6 +9,7 @@ import { TourProvider } from "@/tour/TourProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import log from "@/lib/logger";
 import App from "@/App";
+import { logoImagesQuery } from "@/hooks/useLogo";
 import { Toaster } from "sonner";
 import "@/styles.css";
 
@@ -28,6 +29,9 @@ window.addEventListener("unhandledrejection", (e) => {
 const queryClient: QueryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
+// The rail's logo comes from main; ask before the first render so it is
+// there as early as it can be.
+void queryClient.prefetchQuery(logoImagesQuery);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -255,6 +255,8 @@ export const api = {
   /** App logo variant (window + tray icon), persisted in main's config.json. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
+  /** The in-app logo of each variant, as a data URL. */
+  logoImages: () => invoke("logo_images"),
   /** User stylesheet (<userData>/custom.css); the switch is persisted in main's config.json. */
   customCssGet: () => invoke("custom_css_get"),
   customCssSetEnabled: (enabled: boolean) =>

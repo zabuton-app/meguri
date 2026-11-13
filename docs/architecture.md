@@ -22,10 +22,10 @@ The main process starts in `startApp()` (`electron/app.ts`); nothing in it runs
 on import. `electron/main.ts` is only the entry point that calls it with
 Meguri's identity: the app name, its one-character mark, the URL scheme, the
 GitHub repository the update check looks at, the Microsoft Store product ID
-(optional: an app that is not on the Store leaves it out) and the prefix of the
+(optional: an app that is not on the Store leaves it out), the prefix of the
 environment variables it reads (`MEGURI`, for `MEGURI_ROOT`,
-`MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`). Another app built on
-this code can call `startApp()` from its own entry point with its own values.
+`MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`) and the logo bitmaps. Another
+app built on this code can call `startApp()` from its own entry point with its own values.
 The `userData` directory is not part of these options: it is `<appData>/` plus the top-level `productName`, or
 else `name`, of the package.json Electron loads. Meguri has no top-level
 `productName` (`build.productName` does not count), so its data is in
@@ -160,15 +160,18 @@ lifecycle behavior:
   delay, bounded per minute; past that (or on a launch / integrity failure) the
   user is asked to reload or quit instead of being left with a blank window.
 - A single-instance lock prevents a second copy from launching.
-- The tray and window icons are base64-embedded images
-  (`electron/core/logoAssets.ts`), to avoid bundle path-resolution issues.
+- The tray and window icons are base64 images the entry point passes to
+  `startApp()` (`logos`; Meguri's are in `electron/core/logoAssets.ts`),
+  embedded to avoid bundle path-resolution issues.
   Three logo variants exist (`dark` = vermilion kanji, `light` = inverted,
   `enso` = pictorial brush circle with a media card, raster-sourced — no SVG
   master); the choice is persisted as `logo` in
   main's `config.json` and switched from Settings via the `logo_get` /
   `logo_set` IPC channels. The renderer mirrors the same choice through
   `useLogo()` (react-query cache), which drives the Settings picker and the
-  in-app logo in the workspace rail.
+  in-app logo in the workspace rail. The renderer does not bundle the
+  bitmaps: it gets them from main as data URLs (`logo_images`,
+  `useLogoImages()`).
 
 ## Workspace model
 
