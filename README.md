@@ -215,8 +215,9 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   restyle the UI, or keep several stylesheets as CSS themes and pick one next
   to the built-in themes; saved changes apply instantly
 - 🔎 **Content zoom** — Ctrl + wheel (and Ctrl +/-/0)
-- 🔒 **Privacy-first** — no telemetry, no analytics, no external network
-  communication ([see below](#privacy))
+- 🔒 **Privacy-first** — no telemetry, no analytics, and your data never
+  leaves your machine; the only external request is an optional update check
+  ([see below](#privacy))
 
 ## Screenshots
 
@@ -526,11 +527,19 @@ Meguri is **privacy-first**: everything stays on your machine.
 - **No telemetry, no analytics.** Meguri contains no usage-tracking mechanism
   such as Google Analytics, crash reporters, or any other third-party
   measurement SDK.
-- **No external network communication.** The app never sends your data —
-  file names, paths, tags, search queries, playback history, or anything
-  else — to any external server. The only network activity is a local HTTP
-  media server bound to `127.0.0.1`, used solely to stream your own files to
-  the app window.
+- **Your data never leaves your machine.** The app never sends file names,
+  paths, tags, search queries, playback history, or anything else about your
+  library to any external server. Your files are streamed to the app window
+  by a local HTTP media server bound to `127.0.0.1`.
+- **One external request: the update check.** To tell you about new
+  versions, Meguri asks GitHub's API for the latest release
+  (`api.github.com/repos/zabuton-app/meguri/releases/latest`). The request
+  carries nothing but the app name and version in its `User-Agent`, though
+  GitHub sees your IP address, as with any request. It runs shortly after
+  startup, at most once every six hours, and when you click **Check now** in
+  the settings or **Check for Updates…** in the tray menu. To turn the
+  automatic check off, open **Settings → App → Updates** and turn off
+  **Check automatically on startup**.
 - **Fully offline.** All features work without an internet connection.
 
 ## Architecture
