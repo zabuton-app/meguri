@@ -1,7 +1,7 @@
 // The Watch Later toggle on a Discovery slide: it reflects the shared membership
 // passed down by the route, and activating it hits the same collection IPC the
 // list views use. The mutation itself is covered by WatchLaterButton's own tests.
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   openExternal: vi.fn(),
   fileSetFavorite: vi.fn(),
   fileRecordPlay: vi.fn(),
+  fileSavePosition: vi.fn(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -28,6 +29,8 @@ vi.mock("@/ipc/client", () => ({
       mocks.fileSetFavorite(...args) as Promise<void>,
     fileRecordPlay: (...args: unknown[]): Promise<void> =>
       mocks.fileRecordPlay(...args) as Promise<void>,
+    fileSavePosition: (...args: unknown[]): Promise<void> =>
+      mocks.fileSavePosition(...args) as Promise<void>,
   },
   ALL_ID: "__all__",
   COLLECTION_ID_PREFIX: "collection:",
@@ -148,6 +151,155 @@ describe("DiscoverCard non-audio", () => {
     renderWithProviders(<Harness />);
     expect(screen.queryByRole("button", { name: /spectrum/i })).toBeNull();
     expect(screen.queryByTestId("audio-spectrum")).toBeNull();
+  });
+});
+
+/** An active video slide with a media server to play from. */
+function ActiveVideoCard({
+  overrides,
+  isActive = true,
+}: {
+  overrides?: Partial<FileRow>;
+  isActive?: boolean;
+}) {
+  const { t, lang } = useI18n();
+  return (
+    <DiscoverCard
+      file={{ ...file, ...overrides }}
+      mediaBase="http://127.0.0.1:17345"
+      thumbVersion={0}
+      onRate={() => {}}
+      watchLater={membership(false)}
+      isActive={isActive}
+      t={t}
+      lang={lang}
+    />
+  );
+}
+
+describe("DiscoverCard video", () => {
+  beforeEach(() => {
+    mocks.fileRecordPlay.mockReset().mockResolvedValue(undefined);
+    mocks.fileSavePosition.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("keeps Play in Discovery and labels the way to the details Open", () => {
+    renderWithProviders(<ActiveVideoCard />);
+    expect(screen.getAllByRole("button", { name: /^play$/i })).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: /^play$/i })).toBeNull();
+    expect(screen.getByRole("link", { name: /^open$/i })).toBeTruthy();
+  });
+
+  it("does not start on arrival from a Play pressed while the slide was off stage", () => {
+    const { rerender } = renderWithProviders(
+      <ActiveVideoCard isActive={false} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    rerender(<ActiveVideoCard />);
+    expect(document.querySelector("video")).toBeNull();
+  });
+
+  it("names the centre button Pause while the preview plays", () => {
+    renderWithProviders(<ActiveVideoCard />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    fireEvent.play(document.querySelector("video") as HTMLVideoElement);
+    // No "(Space)" hint: the player's shortcuts are off in Discovery.
+    expect(screen.getByRole("button", { name: /^pause$/i })).toBeTruthy();
+  });
+
+  it("previews without moving the resume point or taking the keyboard", () => {
+    const { unmount } = renderWithProviders(<ActiveVideoCard />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    const video = document.querySelector("video") as HTMLVideoElement;
+    Object.defineProperty(video, "readyState", {
+      configurable: true,
+      value: 1,
+    });
+    fireEvent.loadedMetadata(video);
+    // Playing, as far as the element says: positions are only sampled then.
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      value: false,
+    });
+    fireEvent.play(video);
+    video.currentTime = 30;
+    fireEvent.timeUpdate(video);
+
+    // fireEvent returns false when a handler called preventDefault.
+    expect(fireEvent.keyDown(window, { code: "Space" })).toBe(true);
+    expect(fireEvent.keyDown(window, { code: "ArrowRight" })).toBe(true);
+
+    unmount();
+    expect(mocks.fileRecordPlay).toHaveBeenCalled();
+    expect(mocks.fileSavePosition).not.toHaveBeenCalled();
+  });
+});
+
+describe("DiscoverCard video hover scrub", () => {
+  // The test DOM's Image never loads, so the frame's onload is driven by hand.
+  class MockImage {
+    static last: MockImage | null = null;
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    src = "";
+    constructor() {
+      MockImage.last = this;
+    }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("Image", MockImage);
+    MockImage.last = null;
+    mocks.fileRecordPlay.mockReset().mockResolvedValue(undefined);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  /** Hover the media area long enough for a frame to be asked for. */
+  function hover() {
+    const link = document.querySelector(
+      '[data-slot="discover-media"]',
+    ) as HTMLAnchorElement;
+    // The test DOM lays nothing out; the pointer's fraction needs a width.
+    link.getBoundingClientRect = () => ({ left: 0, width: 100 }) as DOMRect;
+    fireEvent.mouseEnter(link, { clientX: 10 });
+    fireEvent.mouseMove(link, { clientX: 10 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    return link;
+  }
+
+  const withThumb = { thumbStatus: "done", hasThumb: 1 } as Partial<FileRow>;
+
+  it("still scrubs over a paused preview, and steps the video aside for the frame", () => {
+    renderWithProviders(<ActiveVideoCard overrides={withThumb} />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    const video = document.querySelector("video") as HTMLVideoElement;
+    fireEvent.play(video);
+    fireEvent.pause(video);
+
+    hover();
+    expect(MockImage.last?.src).toContain("/frame/7?t=");
+    act(() => MockImage.last?.onload?.());
+
+    expect(
+      document
+        .querySelector('[data-slot="discover-video"]')
+        ?.classList.contains("invisible"),
+    ).toBe(true);
+  });
+
+  it("does not scrub while the preview plays", () => {
+    renderWithProviders(<ActiveVideoCard overrides={withThumb} />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    fireEvent.play(document.querySelector("video") as HTMLVideoElement);
+
+    hover();
+    expect(MockImage.last).toBeNull();
   });
 });
 

@@ -135,11 +135,26 @@ export const VideoPlayer = forwardRef<
     startAt: number;
     /** Whether the video should start playing automatically (default true). */
     autoplay?: boolean;
+    /**
+     * Whether playing here moves the file's resume point (default true). Off
+     * for Discovery's in-place preview: sampling a file there must not replace
+     * the place it was left at.
+     */
+    recordPosition?: boolean;
+    /**
+     * Whether the player takes its window-level keyboard shortcuts (default
+     * true). Off where the host owns those keys: Discovery pages its slides
+     * with the arrows, and Space belongs to whichever of its buttons has focus.
+     */
+    shortcuts?: boolean;
     audioTracks?: Pick<EmbeddedTrack, "title" | "language">[];
     subtitleTracks?: EmbeddedTrack[];
     subtitleAudioLanguage?: string;
     subtitleKey?: string;
-    /** Active paging chords; the player yields these keys so they don't also seek. */
+    /**
+     * Active paging chords; the player yields these keys so they don't also
+     * seek. Unused while `shortcuts` is false.
+     */
     navKeys: NavBinding;
     /**
      * Element to fullscreen instead of the player itself (e.g. the whole modal,
@@ -207,6 +222,8 @@ export const VideoPlayer = forwardRef<
     wsId,
     startAt,
     autoplay = true,
+    recordPosition = true,
+    shortcuts = true,
     audioTracks,
     subtitleTracks,
     subtitleAudioLanguage = "",
@@ -363,7 +380,7 @@ export const VideoPlayer = forwardRef<
   // Fire onPlayed only on the first play of each loaded file (not on every pause/resume).
   const playedRef = useRef(false);
   // Where playback stands, for the resume point (see usePlaybackPosition).
-  const playbackPosition = usePlaybackPosition(wsId, id);
+  const playbackPosition = usePlaybackPosition(wsId, id, recordPosition);
   /**
    * The element's position in the file, or null while it has none to give
    * (nothing loaded, or a stream being re-served from a new second). Read off
@@ -685,13 +702,19 @@ export const VideoPlayer = forwardRef<
     if (isFinite(v.duration) && inSeekable) {
       v.currentTime = relative;
     } else {
-      // Stream: re-serve from the specified second.
+      // Loading a remuxed stream must carry over play/pause. A seek asked for
+      // before the metadata loaded reaches here with the element still paused:
+      // it has not played yet (`played` is empty) and autoplay is about to
+      // start it. That is not the same as one that was paused, which
+      // `onPause` tells apart by withdrawing autoplay.
+      const resume = !v.paused || (v.autoplay && v.played.length === 0);
+      v.autoplay = resume;
       lastStreamSeekRef.current = Date.now();
       setOffset(t);
       setPosition(t);
       v.src = withStreamSeek(source, t);
       v.load();
-      void v.play().catch(() => {});
+      if (resume) void v.play().catch(() => {});
     }
   };
 
@@ -852,8 +875,10 @@ export const VideoPlayer = forwardRef<
     navKeysRef.current = navKeys;
   });
 
-  // Keyboard shortcuts. Disabled while a tag input or similar is focused.
+  // Keyboard shortcuts. Disabled while a tag input or similar is focused, or
+  // when the host owns the keys (`shortcuts`).
   useEffect(() => {
+    if (!shortcuts) return;
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
       if (
@@ -917,9 +942,10 @@ export const VideoPlayer = forwardRef<
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // All handlers go through refs / stable references, so registering once is
-    // enough; `chromeless` is a prop the handler reads directly, so it re-binds
-    // on the rare occasion that changes.
-  }, [togglePlay, chromeless]);
+    // enough; `chromeless` (read by the handler) and `shortcuts` (whether to
+    // listen at all) are props, so it re-binds on the rare occasion either
+    // changes.
+  }, [togglePlay, chromeless, shortcuts]);
 
   // Event coordinates on the seek bar → {ratio, t}.
   // ratio is computed from getBoundingClientRect+clientX (consistent even under CSS zoom). Positioning
@@ -1098,6 +1124,10 @@ export const VideoPlayer = forwardRef<
         }}
         onPause={() => {
           setPlaying(false);
+          // A pause, whoever asked for it, withdraws autoplay: a stream paused
+          // while still loading has not played either, and `seek` must not
+          // take it for one that is about to start.
+          if (ref.current) ref.current.autoplay = false;
           const v = ref.current;
           const sample = v && sampleOf(v);
           if (sample) playbackPosition.flush(sample);
@@ -1131,7 +1161,7 @@ export const VideoPlayer = forwardRef<
             setNativeDur(v.duration);
             onNativeDuration(v.duration);
           }
-          // Apply the initial seek (e.g. from a Discovery scene click) once.
+          // Apply the initial seek (a resume point, a scene, a bookmark) once.
           if (startAt > 0 && !appliedStartRef.current) {
             appliedStartRef.current = true;
             seekRef.current(startAt);

@@ -1,11 +1,22 @@
-import { createElement, useState, type ReactNode, type Ref } from "react";
+import {
+  createElement,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { AudioLines, ExternalLink, ImageIcon, Pause, Play } from "lucide-react";
+import { AudioLines, ExternalLink, Pause, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import { fileHref } from "@/lib/fileHref";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
-import { useAudioActions, useAudioPlayer } from "@/audio/useAudioPlayer";
+import { toast } from "sonner";
+import {
+  useAudioActions,
+  useAudioPlayer,
+  useExclusivePlayback,
+} from "@/audio/useAudioPlayer";
 import { AudioSpectrum } from "@/audio/AudioSpectrum";
 import { useSpectrumPattern } from "@/audio/useSpectrumPattern";
 import { PATTERN_LAYOUT } from "@/audio/spectrumPatterns";
@@ -34,6 +45,11 @@ import { tagColorClass } from "@/lib/tagColorClass";
 import { tagHumanLabel } from "@/lib/tagLabel";
 import { TagChipLabel } from "@/components/TagChipLabel";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { NAV_BINDINGS } from "@/settings/keybindings";
+import {
+  VideoPlayer,
+  type PlayerHandle,
+} from "@/routes/MediaDetail/VideoPlayer";
 import { SceneRail } from "./SceneRail";
 
 // Full-bleed immersive slide: the media fills the card (blurred cover backdrop
@@ -76,6 +92,33 @@ export function DiscoverCard({
 }) {
   const qc = useQueryClient();
   const { pause: pauseAudio } = useAudioActions();
+  const videoRef = useRef<PlayerHandle>(null);
+  const { claim: claimVideo } = useExclusivePlayback(() =>
+    videoRef.current?.pause(),
+  );
+  const [preview, setPreview] = useState<{
+    at: number;
+    autoplay: boolean;
+  } | null>(null);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const activePreview = isActive ? preview : null;
+  const [wasActive, setWasActive] = useState(isActive);
+  // Moving to another card ends this card's preview, so going back is quiet;
+  // arriving clears it too, so a Play pressed on a slide still off stage does
+  // not start it later.
+  if (isActive !== wasActive) {
+    setWasActive(isActive);
+    setPreview(null);
+    setVideoPlaying(false);
+  }
+  const seekVideo = (at: number) => {
+    if (videoRef.current) videoRef.current.seek(at);
+    else setPreview({ at, autoplay: false });
+  };
+  const toggleVideo = () => {
+    if (videoRef.current) videoRef.current.togglePlay();
+    else setPreview({ at: 0, autoplay: true });
+  };
   const { activate } = useActivateFile();
   // Discover shows at most a handful of slides, so subscribing to the player
   // state here is fine (unlike the virtualized lists): the slide has to say
@@ -96,7 +139,6 @@ export function DiscoverCard({
   const basename = slash >= 0 ? file.relPath.slice(slash + 1) : file.relPath;
   const isVideo = file.kind === "video";
   const isAudio = file.kind === "audio";
-  const ActionIcon = isVideo || isAudio ? Play : ImageIcon;
   // Audio follows the list views' gesture split: "Play" starts the track in the
   // bottom bar without leaving Discover, and opening the card is the inspect
   // gesture, so its detail view must not start playback on its own.
@@ -131,10 +173,12 @@ export function DiscoverCard({
 
   // Hover scrub preview on the main media (same behavior/preference as the
   // list thumbnails): pointer X maps onto the video timeline.
-  const { hoverPreview, frameQuality } = usePreferences();
+  const { hoverPreview, frameQuality, keybindingPreset } = usePreferences();
   const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
     useHoverFramePreview({
-      enabled: Boolean(hoverPreview && src && isVideo),
+      // Off only while the preview plays: a paused one (a scene just picked)
+      // is still a frame to scrub away from.
+      enabled: Boolean(hoverPreview && src && isVideo && !videoPlaying),
       frameUrl: (t) =>
         `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
       duration: file.duration,
@@ -147,13 +191,14 @@ export function DiscoverCard({
     // so a cover-less slide sits on the theme's surface instead.
     <div
       className={cn(
-        "relative h-full w-full overflow-hidden",
+        "group/discover relative h-full w-full overflow-hidden",
         src ? "bg-black" : "bg-surface",
       )}
     >
       {/* Media layers. Click anywhere to open the detail/player. */}
       <Link
         to={detailTo}
+        data-slot="discover-media"
         className="absolute inset-0 block"
         onMouseEnter={onMouseEnter}
         onMouseMove={onMouseMove}
@@ -197,6 +242,50 @@ export function DiscoverCard({
         )}
       </Link>
 
+      {activePreview && mediaBase && (
+        <div
+          data-slot="discover-video"
+          className={cn(
+            "pointer-events-none absolute inset-0",
+            // The scrub frame is drawn in the layer below; step aside for it.
+            previewSrc && "invisible",
+          )}
+        >
+          <VideoPlayer
+            ref={videoRef}
+            id={file.id}
+            src={`${mediaBase}/ws/${wsId}/media/${file.id}`}
+            duration={file.duration}
+            width={file.width}
+            height={file.height}
+            mediaBase={mediaBase}
+            wsId={wsId}
+            startAt={activePreview.at}
+            autoplay={activePreview.autoplay}
+            navKeys={NAV_BINDINGS[keybindingPreset]}
+            onNativeDuration={() => undefined}
+            onPlayed={() => {
+              invalidatePlayedSearches(qc);
+              dropFromWatchLaterCache(qc, wsId, file.id);
+            }}
+            onPlaybackStart={claimVideo}
+            onPlayingChange={setVideoPlaying}
+            onFatalError={(message) => {
+              setPreview(null);
+              setVideoPlaying(false);
+              toast.error(message);
+            }}
+            chromeless
+            // A preview: it samples the file, so the place it was left at
+            // stays, and the keyboard stays with Discovery (arrows page the
+            // slides, Space activates the focused button).
+            recordPosition={false}
+            shortcuts={false}
+            t={t}
+          />
+        </div>
+      )}
+
       {isAudio && spectrumLayout && (
         <AudioSpectrum
           active={audioPlaying}
@@ -209,16 +298,24 @@ export function DiscoverCard({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[22%] bg-gradient-to-b from-bg/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-bg/90 via-bg/40 to-transparent" />
 
-      {/* Center play affordance: opens the video, or plays the track in the
-          bottom bar. Images have nothing to play. */}
+      {/* Video transport stays in Discovery. Audio uses the shared bar. */}
       {isVideo && (
-        <Link
-          to={detailTo}
-          aria-label={t("discover.play")}
-          className={CENTER_PLAY_CLASS}
+        <button
+          type="button"
+          onClick={toggleVideo}
+          aria-label={t(videoPlaying ? "player.audio.pause" : "discover.play")}
+          className={cn(
+            CENTER_PLAY_CLASS,
+            videoPlaying &&
+              "opacity-0 focus-visible:opacity-100 group-hover/discover:opacity-100",
+          )}
         >
-          <Play className="size-7 translate-x-0.5 fill-current" />
-        </Link>
+          {videoPlaying ? (
+            <Pause className="size-7 fill-current" />
+          ) : (
+            <Play className="size-7 translate-x-0.5 fill-current" />
+          )}
+        </button>
       )}
       {isAudio && (
         <button
@@ -245,7 +342,7 @@ export function DiscoverCard({
               total={file.duration}
               mediaBase={mediaBase}
               wsId={wsId}
-              filterParam={filterParam}
+              onSeek={seekVideo}
               t={t}
               className="pointer-events-auto mb-2"
             />
@@ -313,15 +410,17 @@ export function DiscoverCard({
               {audioPlaying ? (
                 <Pause className="fill-current" />
               ) : (
-                <ActionIcon className="fill-current" />
+                <Play className="fill-current" />
               )}
               {audioLabel}
             </Button>
           ) : (
             <Button asChild size="lg" className="px-7 font-bold shadow-lg">
               <Link to={detailTo}>
-                <ActionIcon className={isVideo ? "fill-current" : undefined} />
-                {isVideo ? t("discover.play") : t("discover.open")}
+                {/* Playing is the centre button's job and stays in Discovery;
+                    this one leaves for the details. */}
+                {createElement(kindIcon(file.kind))}
+                {t("discover.open")}
               </Link>
             </Button>
           )}

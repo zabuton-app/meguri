@@ -58,7 +58,7 @@ export default function MediaDetail() {
   const { t, lang } = useI18n();
   const { id } = useParams();
   const fileId = Number(id);
-  // Optional initial seek position (seconds), e.g. when arriving from a Discovery scene click.
+  // Optional initial seek position (seconds), e.g. when the playlist hands over.
   const [searchParams] = useSearchParams();
   // Null when absent: `?t=0` is a start asked for, not a missing one.
   const tParam = searchParams.get("t");

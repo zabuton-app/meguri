@@ -1,7 +1,9 @@
 // Discovery queue. /discover. Picks random media matching the current filters and presents them one at a time,
 // Steam-discovery-queue style: a large preview, meta, tags, inline rating, and actions.
-// Overlays the list as a modal (like MediaDetail). No video autoplay; videos get
-// a hover scrub preview (frame endpoint) gated by the hoverPreview preference.
+// Overlays the list as a modal (like MediaDetail). Videos do not start on their
+// own: they play in place once asked to (Play, or a scene picked from the rail),
+// and get a hover scrub preview (frame endpoint) gated by the hoverPreview
+// preference whenever they are not playing.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

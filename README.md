@@ -52,8 +52,9 @@ rediscovering, and enjoying what you already have.
 of it sinks out of sight. Discovery deals you a random hand from your library
 and shows each pick full-screen — the video front and center over a blurred
 backdrop, with a rail of scene previews to jump from — so every visit surfaces
-something worth rediscovering. One click reshuffles the deck; one more starts
-playback.
+something worth rediscovering. Play or pause the clip in Discovery, or click a
+scene thumbnail to jump to that moment while keeping the current view and
+playback state. **Open** takes you to the file details.
 
 ![Discovery demo — immersive random picks with a scene-preview rail and reshuffle](./docs/assets/discover.gif)
 

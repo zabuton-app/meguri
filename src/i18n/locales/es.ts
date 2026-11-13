@@ -597,8 +597,7 @@ export const es: Record<TranslationKey, string> = {
   "discover.empty": "No hay medios para recomendar.",
   "discover.emptyHint":
     "Ejecuta «Escanear» para importar vídeos e imágenes y se recomendarán aquí al azar.",
-  "discover.sceneHint":
-    "Pasa el cursor para ampliar · haz clic para reproducir desde ese punto",
+  "discover.sceneHint": "Haz clic en una escena para saltar a ese punto",
   "discover.moreScenes": "+{count}",
 
   // Historial de reproducción
