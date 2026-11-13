@@ -52,8 +52,13 @@ export function isInsideRoot(abs: string, root: string): boolean {
   let normalizedAbs: string;
   let normalizedRoot: string;
   try {
-    normalizedAbs = fs.realpathSync(abs);
-    normalizedRoot = fs.realpathSync(root);
+    // On macOS the JS realpath can preserve different spellings of the same
+    // path. Native realpath returns the spelling on disk, including on
+    // case-sensitive volumes where differently cased folders are distinct.
+    const realpath =
+      process.platform === "darwin" ? fs.realpathSync.native : fs.realpathSync;
+    normalizedAbs = realpath(abs);
+    normalizedRoot = realpath(root);
   } catch {
     return false;
   }
