@@ -366,7 +366,9 @@ export default function Settings() {
                     {t("settings.logoDesc")}
                   </span>
                 </div>
-                <div className="flex gap-2">
+                {/* shrink-0: Preflight's img max-width:100% lets a squeezed
+                    button narrow the preview while its height stays fixed. */}
+                <div className="flex shrink-0 gap-2">
                   {LOGO_IDS.map((id) => {
                     const active = logo === id;
                     return (

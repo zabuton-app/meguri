@@ -109,7 +109,7 @@ export function SettingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={SETTINGS_MODAL_TITLE_ID}
-        className="relative flex h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl outline-none"
+        className="relative flex h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {children}
