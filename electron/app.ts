@@ -725,6 +725,13 @@ export function startApp(options: AppOptions): void {
   void app.whenReady().then(async () => {
     // Completely remove the native app menu (File/Edit/View…).
     Menu.setApplicationMenu(null);
+    // On Windows and Linux the spell checker downloads Hunspell dictionaries
+    // from Google's CDN at startup, breaking the privacy promise in the
+    // README. Turning it off is not enough: the download follows the language
+    // list, which must be emptied (webPreferences.spellcheck = false and
+    // setSpellCheckerEnabled(false) both still download).
+    session.defaultSession.setSpellCheckerEnabled(false);
+    session.defaultSession.setSpellCheckerLanguages([]);
 
     // Before any workspace opens the library: put a copy back if it is damaged,
     // and keep the copies current otherwise.
