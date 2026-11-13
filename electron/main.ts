@@ -31,6 +31,10 @@ import {
   isAutoCheckEnabled,
   updateDownloadUrl,
 } from "./core/updater.js";
+import {
+  needsWaylandVideoWorkaround,
+  WAYLAND_VIDEO_WORKAROUND_SWITCH,
+} from "./core/waylandVideoWorkaround.js";
 import { Workspaces } from "./core/workspaces.js";
 import {
   backupLibraryNow,
@@ -52,6 +56,16 @@ import type {
 
 // Set up logging before anything else so early failures land in the log file.
 setupLogger();
+
+// Chromium reads its switches at start-up, so this has to run before `ready`.
+if (
+  needsWaylandVideoWorkaround(
+    process.platform,
+    app.commandLine.getSwitchValue("ozone-platform"),
+  )
+) {
+  app.commandLine.appendSwitch(WAYLAND_VIDEO_WORKAROUND_SWITCH);
+}
 
 // In CJS output, __dirname exists globally (out/main/).
 
