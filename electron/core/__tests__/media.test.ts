@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FFMPEG } from "../ffmpeg-paths.js";
+import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
 import {
   coverArtStreamIndex,
   exportFrame,
@@ -207,6 +207,28 @@ describe("exportFrame", () => {
       expect(fs.existsSync(dest)).toBe(false);
     }
   });
+});
+
+it("generates a WebP thumbnail of the entire tiled HEIF image", async () => {
+  const source = fileURLToPath(
+    new URL("./fixtures/grid-1024x512.heic", import.meta.url),
+  );
+  const dest = path.join(dir, "grid.webp");
+  expect(await generateThumb(source, "image", dest)).toBe(true);
+  const dimensions = execFileSync(
+    FFPROBE,
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=width,height",
+      "-of",
+      "csv=p=0",
+      dest,
+    ],
+    { encoding: "utf8" },
+  );
+  expect(dimensions.trim()).toBe("480,240");
 });
 
 describe("extractMeta", () => {

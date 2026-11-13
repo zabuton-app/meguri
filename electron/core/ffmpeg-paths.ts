@@ -4,9 +4,11 @@
 import ffmpegStatic from "ffmpeg-static";
 import ffprobeStatic from "@derhuerst/ffprobe-static";
 
-function unpacked(p: string): string {
+export function unpackedPath(p: string): string {
   return p.replace("app.asar", "app.asar.unpacked");
 }
 
-export const FFMPEG = unpacked((ffmpegStatic as unknown as string) || "ffmpeg");
-export const FFPROBE = unpacked(ffprobeStatic || "ffprobe");
+export const FFMPEG = unpackedPath(
+  (ffmpegStatic as unknown as string) || "ffmpeg",
+);
+export const FFPROBE = unpackedPath(ffprobeStatic || "ffprobe");
