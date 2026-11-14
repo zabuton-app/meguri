@@ -251,9 +251,8 @@ async function handle(
         res.writeHead(404).end();
         return;
       }
-      // Thumbnails get max-age + ETag (not `immutable` — see the note on
-      // THUMB_CACHE_CONTROL) so repeat grid renders hit the browser cache and
-      // revalidations come back as cheap 304s.
+      // Thumbnails are revalidated on every load (see THUMB_CACHE_CONTROL);
+      // the ETag makes an unchanged one a cheap 304.
       await serveFile(req, res, tp, THUMB_CACHE_CONTROL);
       return;
     }
@@ -397,12 +396,12 @@ function etagMatches(
   });
 }
 
-// Let the browser cache thumbnails instead of re-requesting on every grid
-// render. Not `immutable`: the renderer's `?v=` cache buster is a per-component
-// counter (not a persistent version), so a regenerated thumbnail can be
-// requested under an old `?v=`. The ETag below lets those revalidations come
-// back as a cheap 304 instead of a full body once max-age expires.
-const THUMB_CACHE_CONTROL = "public, max-age=3600";
+// Revalidate a cached thumbnail on every load instead of trusting it for a
+// while. The renderer's `?v=` cache buster is a per-view counter, not a
+// persistent version, so a view can ask for a regenerated thumbnail under a
+// `?v=` another view already cached with the old picture (#295). The ETag
+// below answers an unchanged thumbnail with a 304.
+const THUMB_CACHE_CONTROL = "no-cache";
 
 async function serveFile(
   req: http.IncomingMessage,
