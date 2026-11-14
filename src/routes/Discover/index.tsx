@@ -108,16 +108,12 @@ export default function Discover() {
   // <thumbsDir>/<id>.webp since the path itself didn't change.
   const [thumbVersion, setThumbVersion] = useState<Record<string, number>>({});
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void events
-      .onThumbDone((event) => {
-        const key = event.workspaceId
-          ? `${event.workspaceId}:${event.id}`
-          : String(event.id);
-        setThumbVersion((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
-      })
-      .then((u) => (unlisten = u));
-    return () => unlisten?.();
+    return events.onThumbDone((event) => {
+      const key = event.workspaceId
+        ? `${event.workspaceId}:${event.id}`
+        : String(event.id);
+      setThumbVersion((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
+    });
   }, []);
 
   const [embla, setEmbla] = useState<CarouselApi>();

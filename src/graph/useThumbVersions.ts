@@ -55,37 +55,27 @@ export function useThumbVersions(): ThumbVersions {
   useEffect(() => {
     let pending = new Set<string>();
     let timer: ReturnType<typeof setTimeout> | null = null;
-    // The unlisten arrives a microtask after the subscription is live; a
-    // cleanup that runs first must still take the subscription down.
-    let cancelled = false;
-    let unlisten: (() => void) | undefined;
-    void events
-      .onThumbDone((event) => {
-        pending.add(
-          event.workspaceId
-            ? `${event.workspaceId}:${event.id}`
-            : String(event.id),
-        );
-        // Dozens arrive per second during a scan: one update per window.
-        timer ??= setTimeout(() => {
-          timer = null;
-          const batch = pending;
-          pending = new Set();
-          const version = nextVersion();
-          setRegenerated((prev) => {
-            const next = new Map(prev);
-            for (const key of batch) next.set(key, version);
-            return next;
-          });
-        }, VERSION_FLUSH_MS);
-      })
-      .then((u) => {
-        if (cancelled) u();
-        else unlisten = u;
-      });
+    const unlisten = events.onThumbDone((event) => {
+      pending.add(
+        event.workspaceId
+          ? `${event.workspaceId}:${event.id}`
+          : String(event.id),
+      );
+      // Dozens arrive per second during a scan: one update per window.
+      timer ??= setTimeout(() => {
+        timer = null;
+        const batch = pending;
+        pending = new Set();
+        const version = nextVersion();
+        setRegenerated((prev) => {
+          const next = new Map(prev);
+          for (const key of batch) next.set(key, version);
+          return next;
+        });
+      }, VERSION_FLUSH_MS);
+    });
     return () => {
-      cancelled = true;
-      unlisten?.();
+      unlisten();
       if (timer) clearTimeout(timer);
     };
   }, []);

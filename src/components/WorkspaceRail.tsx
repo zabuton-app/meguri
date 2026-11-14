@@ -115,12 +115,9 @@ export function WorkspaceRail() {
 
   // Also track changes from other paths (e.g. the add button in the empty state).
   useEffect(() => {
-    const unlistens: Array<() => void> = [];
-    void events
-      .onWorkspaceChanged(() => void invalidateWorkspaceScoped(qc))
-      .then((u) => unlistens.push(u));
-    void events
-      .onScanDone((done) => {
+    const unlistens = [
+      events.onWorkspaceChanged(() => void invalidateWorkspaceScoped(qc)),
+      events.onScanDone((done) => {
         if (!addedWorkspaceScanJobs.current.has(done.jobId)) return;
         addedWorkspaceScanJobs.current.delete(done.jobId);
         // A failed or canceled scan is told about by Home (#313).
@@ -128,8 +125,8 @@ export function WorkspaceRail() {
         toast.success(t("home.scanComplete"), {
           description: t("home.scanCompleteDetail", done.stats),
         });
-      })
-      .then((u) => unlistens.push(u));
+      }),
+    ];
     return () => unlistens.forEach((u) => u());
   }, [qc, t]);
 

@@ -44,18 +44,9 @@ export function useCssThemeStyle(): void {
   const css = useCssThemesState()?.css ?? "";
 
   useEffect(() => {
-    let active = true;
-    let unlisten: (() => void) | undefined;
-    void events
-      .onCssThemesChanged((next) => qc.setQueryData(QUERY_KEY, next))
-      .then((un) => {
-        if (active) unlisten = un;
-        else un();
-      });
-    return () => {
-      active = false;
-      unlisten?.();
-    };
+    return events.onCssThemesChanged((next) =>
+      qc.setQueryData(QUERY_KEY, next),
+    );
   }, [qc]);
 
   useEffect(() => {
