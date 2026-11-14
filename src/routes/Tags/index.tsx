@@ -172,6 +172,7 @@ export default function Tags() {
           : t("tags.renamed", { from: vars.from.name, to: vars.to }),
       );
     },
+    meta: { reportsOwnError: true },
     onError: (error) =>
       toast.error(t("tags.renameFailed"), {
         description: error instanceof Error ? error.message : String(error),
@@ -184,6 +185,7 @@ export default function Tags() {
       afterMutation();
       toast.success(t("tags.merged", { count: vars.from.length }));
     },
+    meta: { reportsOwnError: true },
     onError: (error) =>
       toast.error(t("tags.mergeFailed"), {
         description: error instanceof Error ? error.message : String(error),
@@ -195,6 +197,7 @@ export default function Tags() {
       afterMutation();
       toast.success(t("tags.deleted"));
     },
+    meta: { reportsOwnError: true },
     onError: (error) =>
       toast.error(t("tags.deleteFailed"), {
         description: error instanceof Error ? error.message : String(error),

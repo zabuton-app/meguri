@@ -6,6 +6,7 @@ export const ko: Record<TranslationKey, string> = {
   "common.close": "닫기",
   "common.cancel": "취소",
   "common.ok": "확인",
+  "common.actionFailed": "작업에 실패했습니다",
 
   // kind
   "kind.video": "동영상",

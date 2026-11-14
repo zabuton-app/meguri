@@ -6,6 +6,7 @@ export const fr: Record<TranslationKey, string> = {
   "common.close": "Fermer",
   "common.cancel": "Annuler",
   "common.ok": "OK",
+  "common.actionFailed": "Impossible d'effectuer l'action",
 
   // kind
   "kind.video": "Vidéo",

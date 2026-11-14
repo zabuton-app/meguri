@@ -47,6 +47,7 @@ export function useAddFilesToCollection(): (
         );
       }
     },
+    meta: { reportsOwnError: true },
     onError: (e) =>
       toast.error(t("drop.addToCollectionFailed"), {
         description: e instanceof Error ? e.message : String(e),
