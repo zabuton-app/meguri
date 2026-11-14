@@ -18,6 +18,12 @@ server that lives inside the main process (see [Media Pipeline](media-pipeline.m
 This separation is strict: the renderer never touches the filesystem, the
 database, or ffmpeg directly. Everything goes over IPC or the media server.
 
+Web permissions are denied unless listed in `ALLOWED` in
+`electron/core/permissions.ts` (clipboard write and fullscreen today), and so
+are device requests (HID, serial, USB). A feature that needs another permission
+adds it there with the reason; a denial is logged under the `permissions`
+scope.
+
 The main process starts in `startApp()` (`electron/app.ts`); nothing in it runs
 on import. `electron/main.ts` is only the entry point that calls it with
 Meguri's identity: the app name, its one-character mark, the URL scheme, the

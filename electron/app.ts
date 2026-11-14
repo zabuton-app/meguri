@@ -49,6 +49,7 @@ import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
 import { isAppUrl, setRendererIndex } from "./core/appUrl.js";
+import { restrictPermissions } from "./core/permissions.js";
 import { APP_GLYPH_ARG, APP_NAME_ARG } from "../shared/ipc/channelNames.js";
 import type {
   LibraryMergeFailure,
@@ -726,6 +727,7 @@ export function startApp(options: AppOptions): void {
     // setSpellCheckerEnabled(false) both still download).
     session.defaultSession.setSpellCheckerEnabled(false);
     session.defaultSession.setSpellCheckerLanguages([]);
+    restrictPermissions(session.defaultSession);
 
     // Before any workspace opens the library: put a copy back if it is damaged,
     // and keep the copies current otherwise.
