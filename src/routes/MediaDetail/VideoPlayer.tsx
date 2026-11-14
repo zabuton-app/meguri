@@ -52,6 +52,7 @@ import {
 import { matchAny, type NavBinding } from "@/settings/keybindings";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { VideoElement } from "@/video/VideoElement";
+import { VideoGradeOverlay } from "@/video/VideoGradeOverlay";
 import { isSameSource } from "@/video/videoHandOff";
 import {
   previewAudioTrackOf,
@@ -154,6 +155,8 @@ export const VideoPlayer = forwardRef<
     subtitleTracks?: EmbeddedTrack[];
     subtitleAudioLanguage?: string;
     subtitleKey?: string;
+    /** Enable the SDR adjustment controls for the detail viewer. */
+    videoAdjustments?: boolean;
     /**
      * Active paging chords; the player yields these keys so they don't also
      * seek. Unused while `shortcuts` is false.
@@ -232,6 +235,7 @@ export const VideoPlayer = forwardRef<
     subtitleTracks,
     subtitleAudioLanguage = "",
     subtitleKey,
+    videoAdjustments,
     navKeys,
     fullscreenTargetRef,
     bookmarks,
@@ -1228,6 +1232,15 @@ export const VideoPlayer = forwardRef<
           if (v) handleElementError(v);
         }}
       />
+
+      {videoAdjustments && (
+        <VideoGradeOverlay
+          key={`${wsId}:${id}`}
+          videoRef={ref}
+          loaded={loaded}
+          t={t}
+        />
+      )}
 
       {trackUnavailable && (
         <div

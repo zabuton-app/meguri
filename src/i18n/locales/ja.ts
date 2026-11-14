@@ -337,6 +337,26 @@ export const ja = {
   "media.currentMainThumb": "現在のメインサムネ:",
 
   // プレイヤー操作
+  "grade.cool": "寒色",
+  "grade.warm": "暖色",
+  "grade.green": "緑",
+  "grade.magenta": "マゼンタ",
+  "grade.title": "映像調整",
+  "grade.exposure": "露出",
+  "grade.contrast": "コントラスト",
+  "grade.pivot": "ピボット",
+  "grade.saturation": "減算彩度",
+  "grade.temperature": "色温度",
+  "grade.tint": "色かぶり補正",
+  "grade.toggle": "映像調整を有効にする",
+  "grade.on": "オン",
+  "grade.off": "オフ",
+  "grade.resetAll": "すべてリセット",
+  "grade.holdHint":
+    "調整名を押し続けると、その項目の初期値でプレビューできます。",
+  "grade.preview": "リニア sRGB プレビュー",
+  "grade.unavailable": "このデバイスでは映像調整を使用できません。",
+
   "player.subtitles": "字幕",
   "player.subtitleAuto": "音声の言語に合わせる",
   "player.subtitleOff": "オフ",

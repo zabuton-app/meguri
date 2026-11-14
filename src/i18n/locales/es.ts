@@ -345,6 +345,26 @@ export const es: Record<TranslationKey, string> = {
   "media.currentMainThumb": "Miniatura principal actual:",
 
   // player controls
+  "grade.cool": "Frío",
+  "grade.warm": "Cálido",
+  "grade.green": "Verde",
+  "grade.magenta": "Magenta",
+  "grade.title": "Ajustes de vídeo",
+  "grade.exposure": "Exposición",
+  "grade.contrast": "Contraste",
+  "grade.pivot": "Pivote",
+  "grade.saturation": "Saturación sustractiva",
+  "grade.temperature": "Temperatura",
+  "grade.tint": "Matiz",
+  "grade.toggle": "Activar ajustes de vídeo",
+  "grade.on": "Sí",
+  "grade.off": "No",
+  "grade.resetAll": "Restablecer todo",
+  "grade.holdHint": "Mantén pulsado un control para ver su valor neutro.",
+  "grade.preview": "Vista previa sRGB lineal",
+  "grade.unavailable":
+    "Los ajustes de vídeo no están disponibles en este dispositivo.",
+
   "player.subtitles": "Subtítulos",
   "player.subtitleAuto": "Coincidir con el idioma del audio",
   "player.subtitleOff": "Desactivados",

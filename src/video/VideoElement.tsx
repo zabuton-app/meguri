@@ -136,6 +136,8 @@ export function VideoElement({
       if (!el) {
         el = document.createElement("video");
         el.autoplay = autoPlay;
+        // The loopback media server permits cross-origin video texture uploads.
+        el.crossOrigin = "anonymous";
         // Never an empty `src` attribute: unlike React (which drops the
         // attribute for ""), assigning "" starts a load that fails with
         // MEDIA_ERR_SRC_NOT_SUPPORTED — fatal to the player.
