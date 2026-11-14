@@ -161,14 +161,10 @@ Containers Chromium cannot demux — `REMUX_CONTAINERS` = `mkv` / `avi` / `wmv` 
 (`-movflags frag_keyframe+empty_moov+default_base_moof`). Time seeking uses a
 `?t=<seconds>` query parameter.
 
-Which codecs need converting was checked in the built app (#294). Video other
-than H.264, HEVC, VP8, VP9 and AV1 (`needsVideoPreview` in
-`shared/playbackTracks.ts`), such as ProRes, MPEG-4 Part 2 or Motion JPEG, gets
-a local H.264 preview in whatever container it is in. HEVC is left as it is,
-though Chromium on Linux has no decoder for it. Audio other than AAC, MP3,
-Opus, Vorbis, FLAC and 16-bit, 24-bit or 32-bit float PCM (`needsAacAudio` in
-`electron/core/playbackAudio.ts`), such as AC-3, E-AC-3, DTS, TrueHD, ALAC, MP2
-or A-law PCM, is converted to AAC, keeping its channel count. A remux converts it when any track has such audio, and an MP4,
+Which codecs need converting is listed in [Playback support](#playback-support).
+A video codec the player cannot decode gets a local H.264 preview in whatever
+container it is in, and audio it cannot decode is converted to AAC, keeping its
+channel count. A remux converts the audio when any track needs it, and an MP4,
 M4V, or MOV played directly is remuxed when its default audio does; both copy
 the picture stream.
 
@@ -177,6 +173,41 @@ zscale and tonemap (`electron/core/videoPreview.ts`), when the bundled ffmpeg
 has both filters; the server checks that once, with `ffmpeg -filters`, and
 retries after a failed check. Chromium-unsupported still images (`heic` /
 `heif` / `tiff`, `TRANSCODE_IMAGES`) are transcoded to JPEG.
+
+### Playback support
+
+How the media server serves each container and codec to the built-in player.
+"Checked" means a clip played with picture and sound in the built app on Linux
+(#294); the other rows follow from the same rule. The video rule is
+`needsVideoPreview` in `shared/playbackTracks.ts` and the audio rule is
+`needsAacAudio` in `electron/core/playbackAudio.ts`. When either changes, update
+these tables, and `e2e/playback-codecs.spec.ts` for a codec worth keeping under
+test.
+
+| Container              | Served as                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| MP4, M4V, MOV          | The file itself, with Range, when the player decodes its video and default audio; otherwise remuxed or previewed |
+| WebM                   | The file itself, with Range                                                                                      |
+| MKV, AVI, WMV, FLV, TS | Remuxed to fragmented MP4, or previewed                                                                          |
+
+| Video codec                                                           | Handling                                                               | Checked              |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------- |
+| H.264 (8-bit, 10-bit, 4:2:2)                                          | Copied                                                                 | Yes                  |
+| VP8, VP9, AV1                                                         | Copied                                                                 | Yes                  |
+| HEVC                                                                  | Copied; plays only where the platform decodes it, which Linux does not | Yes (black on Linux) |
+| ProRes                                                                | H.264 preview, PQ and HLG tone mapped                                  | Yes                  |
+| MPEG-4 Part 2, Motion JPEG, WMV, MPEG-2, Sorenson Spark (FLV), Theora | H.264 preview                                                          | Yes                  |
+| Any other codec                                                       | H.264 preview                                                          | No                   |
+
+| Audio codec                                               | Handling | Checked |
+| --------------------------------------------------------- | -------- | ------- |
+| AAC, MP3, Opus, Vorbis, FLAC                              | Copied   | Yes     |
+| PCM: 16-bit (little and big endian), 24-bit, 32-bit float | Copied   | Yes     |
+| AC-3, E-AC-3, DTS, TrueHD, ALAC, MP2                      | AAC      | Yes     |
+| PCM: 8-bit, A-law, µ-law (the MP4 muxer refuses them)     | AAC      | Yes     |
+| Any other codec                                           | AAC      | No      |
+
+A previewed video always gets AAC audio.
 
 ### Frame previews
 
