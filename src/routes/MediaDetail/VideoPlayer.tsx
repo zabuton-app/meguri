@@ -533,7 +533,7 @@ export const VideoPlayer = forwardRef<
       networkState: v.networkState,
       code,
     });
-    // The server can end a ProRes preview that stopped reading while another
+    // The server can end a video preview that stopped reading while another
     // preview waits for its slot. Reopen it once where it stopped; a reopen
     // that loads restores the retry (see onLoadedMetadata).
     if (

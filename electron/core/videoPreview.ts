@@ -4,7 +4,7 @@ import { FFMPEG } from "./ffmpeg-paths.js";
 const PREVIEW_SCALE =
   "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2";
 
-export function proResPreviewFilter(toneMap: boolean): string {
+export function videoPreviewFilter(toneMap: boolean): string {
   if (!toneMap) return PREVIEW_SCALE;
   // Scale in 10-bit before the more expensive linear-light conversion.
   return [
@@ -27,7 +27,7 @@ export function isTaggedHdr(raw: unknown): boolean {
     } | null
   )?.streams;
   if (!Array.isArray(streams)) return false;
-  // Use the same first video stream as FFmpeg's 0:v:0 map. Leave SDR and
+  // Use the same first video stream as FFmpeg's 0:V:0 map. Leave SDR and
   // missing or unrecognized color metadata on the regular preview path.
   const video = (
     streams as ({
@@ -35,8 +35,12 @@ export function isTaggedHdr(raw: unknown): boolean {
       color_transfer?: string;
       color_primaries?: string;
       color_space?: string;
+      disposition?: { attached_pic?: number };
     } | null)[]
-  ).find((stream) => stream?.codec_type === "video");
+  ).find(
+    (stream) =>
+      stream?.codec_type === "video" && stream.disposition?.attached_pic !== 1,
+  );
   return (
     (video?.color_transfer === "smpte2084" ||
       video?.color_transfer === "arib-std-b67") &&

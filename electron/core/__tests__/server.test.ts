@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFileSync, type SpawnOptions } from "node:child_process";
 import { FFMPEG, FFPROBE } from "../ffmpeg-paths.js";
 import { extractMeta } from "../media.js";
-import { supportsToneMapping } from "../proResPreview.js";
+import { supportsToneMapping } from "../videoPreview.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -1322,4 +1322,244 @@ describe("ProRes previews", () => {
       expect(fs.readFileSync(clip)).toEqual(original);
     },
   );
+});
+
+describe("codecs the player cannot decode", () => {
+  // Make a two-second clip, index it as the scan would, and return its URL.
+  async function indexed(name: string, video: string[], audio: string[]) {
+    const clip = path.join(root, name);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-nostdin",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=96x64:rate=12:duration=2",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=2",
+      ...video,
+      ...audio,
+      clip,
+    ]);
+    const metadata = await extractMeta(clip, "video");
+    const id = insert(
+      name,
+      clip,
+      null,
+      "done",
+      "video",
+      path.extname(name).slice(1),
+    );
+    db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+      metadata.codec,
+      JSON.stringify(metadata.raw),
+      id,
+    );
+    return { clip, url: `${base}/ws/${WS}/media/${id}` };
+  }
+
+  async function served(url: string): Promise<string[]> {
+    const response = await fetch(url, authHeaders());
+    expect(response.status).toBe(200);
+    return execFileSync(
+      FFPROBE,
+      [
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=codec_name",
+        "-of",
+        "compact=p=0:nk=1",
+        "pipe:0",
+      ],
+      { input: Buffer.from(await response.arrayBuffer()), encoding: "utf8" },
+    )
+      .trim()
+      .split("\n");
+  }
+
+  it.each([
+    {
+      name: "mpeg4.avi",
+      video: ["-c:v", "mpeg4"],
+      audio: ["-c:a", "libmp3lame"],
+    },
+    { name: "mpeg4.mp4", video: ["-c:v", "mpeg4"], audio: ["-c:a", "aac"] },
+    {
+      name: "mjpeg.mov",
+      video: ["-c:v", "mjpeg"],
+      audio: ["-c:a", "pcm_s16le"],
+    },
+  ])(
+    "serves $name as an H.264 preview with AAC audio",
+    async ({ name, video, audio }) => {
+      const { clip, url } = await indexed(name, video, audio);
+      const original = fs.readFileSync(clip);
+      expect(await served(`${url}?t=0.5`)).toEqual(["h264", "aac"]);
+      expect(fs.readFileSync(clip)).toEqual(original);
+    },
+  );
+
+  it.each([
+    { name: "mp2.mkv", codec: "mp2" },
+    { name: "alac.mov", codec: "alac" },
+    { name: "alaw.mkv", codec: "pcm_alaw" },
+  ])(
+    "copies the picture of $name and converts its audio to AAC",
+    async ({ name, codec }) => {
+      const { url } = await indexed(
+        name,
+        ["-c:v", "libx264", "-g", "6"],
+        ["-c:a", codec],
+      );
+      expect(await served(url)).toEqual(["h264", "aac"]);
+    },
+  );
+
+  it("serves an MP4 or MOV with PCM audio as it is, with Range", async () => {
+    const { clip, url } = await indexed(
+      "pcm.mov",
+      ["-c:v", "libx264"],
+      ["-c:a", "pcm_s16le"],
+    );
+    const range = await fetch(url, {
+      headers: { ...authHeader(), Range: "bytes=0-15" },
+    });
+    expect(range.status).toBe(206);
+    expect(Buffer.from(await range.arrayBuffer())).toEqual(
+      fs.readFileSync(clip).subarray(0, 16),
+    );
+  });
+});
+
+// Some tools write the cover's udta box before the tracks, so ffprobe lists the
+// cover (attached_pic) as stream 0. ffmpeg's own MP4 muxer always puts it
+// after, so the test moves the box. Moving it inside moov keeps moov's size,
+// so the chunk offsets into mdat stay valid.
+function moveCoverFirst(file: string) {
+  const data = fs.readFileSync(file);
+  const boxes = (buf: Buffer, start: number, end: number) => {
+    const found: { type: string; start: number; end: number }[] = [];
+    for (let at = start; at + 8 <= end;) {
+      const size = buf.readUInt32BE(at);
+      found.push({
+        type: buf.toString("latin1", at + 4, at + 8),
+        start: at,
+        end: at + size,
+      });
+      at += size;
+    }
+    return found;
+  };
+  const moov = boxes(data, 0, data.length).find((b) => b.type === "moov")!;
+  const children = boxes(data, moov.start + 8, moov.end);
+  const udta = children.find((b) => b.type === "udta")!;
+  const firstTrak = children.find((b) => b.type === "trak")!;
+  const rest = children.filter((b) => b !== udta);
+  const ordered = [
+    ...rest.slice(0, rest.indexOf(firstTrak)),
+    udta,
+    ...rest.slice(rest.indexOf(firstTrak)),
+  ];
+  const body = Buffer.concat(ordered.map((b) => data.subarray(b.start, b.end)));
+  body.copy(data, moov.start + 8);
+  fs.writeFileSync(file, data);
+}
+
+describe("a cover picture listed before the video stream", () => {
+  async function withCover(name: string, codec: string) {
+    const clip = path.join(root, name);
+    const cover = path.join(root, `${name}.png`);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-nostdin",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=red:size=64x64",
+      "-frames:v",
+      "1",
+      cover,
+    ]);
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-nostdin",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=96x64:rate=12:duration=2",
+      "-i",
+      cover,
+      "-map",
+      "0",
+      "-map",
+      "1",
+      "-c:v:0",
+      codec,
+      "-c:v:1",
+      "png",
+      "-disposition:v:1",
+      "attached_pic",
+      clip,
+    ]);
+    moveCoverFirst(clip);
+    const metadata = await extractMeta(clip, "video");
+    const streams = (metadata.raw as { streams: { codec_name: string }[] })
+      .streams;
+    expect(streams[0].codec_name).toBe("png");
+    const id = insert(name, clip, null, "done", "video", "mp4");
+    db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+      metadata.codec,
+      JSON.stringify(metadata.raw),
+      id,
+    );
+    return { clip, codec: metadata.codec, url: `${base}/ws/${WS}/media/${id}` };
+  }
+
+  it("stores the picture's codec and serves an H.264 file as it is", async () => {
+    const { clip, codec, url } = await withCover("cover-h264.mp4", "libx264");
+    expect(codec).toBe("h264");
+    const range = await fetch(url, {
+      headers: { ...authHeader(), Range: "bytes=0-15" },
+    });
+    expect(range.status).toBe(206);
+    expect(Buffer.from(await range.arrayBuffer())).toEqual(
+      fs.readFileSync(clip).subarray(0, 16),
+    );
+  });
+
+  it("previews the picture, not the cover", async () => {
+    const { codec, url } = await withCover("cover-mpeg4.mp4", "mpeg4");
+    expect(codec).toBe("mpeg4");
+    const response = await fetch(url, authHeaders());
+    expect(response.status).toBe(200);
+    const { streams } = JSON.parse(
+      execFileSync(
+        FFPROBE,
+        [
+          "-v",
+          "error",
+          "-count_frames",
+          "-select_streams",
+          "v:0",
+          "-show_entries",
+          "stream=codec_name,width,nb_read_frames",
+          "-of",
+          "json",
+          "pipe:0",
+        ],
+        { input: Buffer.from(await response.arrayBuffer()), encoding: "utf8" },
+      ),
+    ) as {
+      streams: { codec_name: string; width: number; nb_read_frames: string }[];
+    };
+    expect(streams[0].codec_name).toBe("h264");
+    expect(streams[0].width).toBe(96);
+    expect(Number(streams[0].nb_read_frames)).toBeGreaterThan(12);
+  });
 });

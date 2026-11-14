@@ -5,12 +5,31 @@ interface Stream {
   disposition?: { attached_pic?: number; default?: number };
 }
 
-export function isDolbyDigital(codec: string | undefined): boolean {
-  return codec === "ac3" || codec === "eac3";
+// Audio codecs the built-in player decodes, both in an MP4 or MOV played
+// directly and copied into the fragmented MP4 of a remux. Checked in the
+// built app (#294): AC-3, E-AC-3, DTS, TrueHD, ALAC and MP2 play silently or
+// fail. Only the PCM forms that played are listed; the MP4 muxer refuses some
+// others, such as 8-bit, A-law and µ-law.
+const PLAYABLE_AUDIO_CODECS = new Set([
+  "aac",
+  "mp3",
+  "opus",
+  "vorbis",
+  "flac",
+  "pcm_s16le",
+  "pcm_s16be",
+  "pcm_s24le",
+  "pcm_f32le",
+]);
+
+/** Whether an audio track is converted to AAC for the built-in player. An
+ *  unknown codec keeps the direct or copy path. */
+export function needsAacAudio(codec: string | undefined): boolean {
+  return !!codec && !PLAYABLE_AUDIO_CODECS.has(codec);
 }
 
 /** Match the primary video and default audio of a directly played file. */
-export function directDolbyTracks(
+export function directAacTracks(
   raw: unknown,
 ): { audio: number; video: number } | undefined {
   let streams: Stream[];
@@ -28,7 +47,7 @@ export function directDolbyTracks(
     0,
     audio.findIndex((stream) => stream.disposition?.default),
   );
-  if (!isDolbyDigital(audio[selectedAudio]?.codec_name)) return;
+  if (!needsAacAudio(audio[selectedAudio]?.codec_name)) return;
   const videos = streams.filter(
     (stream) =>
       stream.codec_type === "video" && !stream.disposition?.attached_pic,

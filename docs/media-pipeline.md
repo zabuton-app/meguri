@@ -150,23 +150,64 @@ view cached before; revalidating keeps it from showing the old picture.
 ### Range streaming
 
 Directly playable files use HTTP Range requests for full seeking. The server
-serves MP4, M4V, and MOV this way when the default audio is directly playable,
-such as AAC. ProRes and MP4, M4V, or MOV with default Dolby Digital audio
-use the streaming preview paths below.
+serves MP4, M4V, and MOV this way when the player decodes their video and
+default audio. Other video codecs, and MP4, M4V, or MOV whose default audio it
+cannot decode, use the streaming paths below.
 
 ### On-the-fly remux
 
 Containers Chromium cannot demux — `REMUX_CONTAINERS` = `mkv` / `avi` / `wmv` /
 `flv` / `ts` — are remuxed to fragmented MP4 on the fly
 (`-movflags frag_keyframe+empty_moov+default_base_moof`). Time seeking uses a
-`?t=<seconds>` query parameter. The server also uses fragmented MP4 for MP4,
-M4V, and MOV with a default AC-3 or E-AC-3 audio track. It copies the primary
-picture stream and converts that audio track to AAC, keeping its channel count.
-ProRes uses a local H.264 preview. A ProRes clip tagged as PQ or HLG HDR is
-tone mapped to Rec.709 with zscale and tonemap (`electron/core/proResPreview.ts`),
-when the bundled ffmpeg has both filters; the server checks that once, with
-`ffmpeg -filters`, and retries after a failed check. Chromium-unsupported still images (`heic` /
+`?t=<seconds>` query parameter.
+
+Which codecs need converting is listed in [Playback support](#playback-support).
+A video codec the player cannot decode gets a local H.264 preview in whatever
+container it is in, and audio it cannot decode is converted to AAC, keeping its
+channel count. A remux converts the audio when any track needs it, and an MP4,
+M4V, or MOV played directly is remuxed when its default audio does; both copy
+the picture stream.
+
+A preview of a clip tagged as PQ or HLG HDR is tone mapped to Rec.709 with
+zscale and tonemap (`electron/core/videoPreview.ts`), when the bundled ffmpeg
+has both filters; the server checks that once, with `ffmpeg -filters`, and
+retries after a failed check. Chromium-unsupported still images (`heic` /
 `heif` / `tiff`, `TRANSCODE_IMAGES`) are transcoded to JPEG.
+
+### Playback support
+
+How the media server serves each container and codec to the built-in player.
+"Checked" means a clip played with picture and sound in the built app on Linux
+(#294); the other rows follow from the same rule. The video rule is
+`needsVideoPreview` in `shared/playbackTracks.ts` and the audio rule is
+`needsAacAudio` in `electron/core/playbackAudio.ts`. When either changes, update
+these tables, and `e2e/playback-codecs.spec.ts` for a codec worth keeping under
+test.
+
+| Container              | Served as                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| MP4, M4V, MOV          | The file itself, with Range, when the player decodes its video and default audio; otherwise remuxed or previewed |
+| WebM                   | The file itself, with Range                                                                                      |
+| MKV, AVI, WMV, FLV, TS | Remuxed to fragmented MP4, or previewed                                                                          |
+
+| Video codec                                                           | Handling                                                               | Checked              |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------- |
+| H.264 (8-bit, 10-bit, 4:2:2)                                          | Copied                                                                 | Yes                  |
+| VP8, VP9, AV1                                                         | Copied                                                                 | Yes                  |
+| HEVC                                                                  | Copied; plays only where the platform decodes it, which Linux does not | Yes (black on Linux) |
+| ProRes                                                                | H.264 preview, PQ and HLG tone mapped                                  | Yes                  |
+| MPEG-4 Part 2, Motion JPEG, WMV, MPEG-2, Sorenson Spark (FLV), Theora | H.264 preview                                                          | Yes                  |
+| Any other codec                                                       | H.264 preview                                                          | No                   |
+
+| Audio codec                                               | Handling | Checked |
+| --------------------------------------------------------- | -------- | ------- |
+| AAC, MP3, Opus, Vorbis, FLAC                              | Copied   | Yes     |
+| PCM: 16-bit (little and big endian), 24-bit, 32-bit float | Copied   | Yes     |
+| AC-3, E-AC-3, DTS, TrueHD, ALAC, MP2                      | AAC      | Yes     |
+| PCM: 8-bit, A-law, µ-law (the MP4 muxer refuses them)     | AAC      | Yes     |
+| Any other codec                                           | AAC      | No      |
+
+A previewed video always gets AAC audio.
 
 ### Frame previews
 
