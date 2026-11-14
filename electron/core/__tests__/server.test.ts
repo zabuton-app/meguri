@@ -220,7 +220,7 @@ describe("thumb serving", () => {
   it("serves thumbnails with Cache-Control and an ETag", async () => {
     const res = await fetch(`${base}/ws/${WS}/thumb/${thumbId}`, authHeaders());
     expect(res.status).toBe(200);
-    expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
     expect(res.headers.get("etag")).toMatch(/^"\d+-\d+"$/);
   });
 

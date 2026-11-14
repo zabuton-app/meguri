@@ -139,6 +139,14 @@ where `kind` is `thumb`, `media`, or `frame`. The server resolves the workspace
 by ID (not the active selection), so playback is independent of which workspace
 is currently focused.
 
+### Thumbnails
+
+Thumbnails are served with `Cache-Control: no-cache` and an ETag from the
+file's size and modification time, so the browser asks again on every load and
+an unchanged thumbnail comes back as a 304. Each view puts its own `?v=` count
+in the URL, so one view can ask for a regenerated thumbnail under a URL another
+view cached before; revalidating keeps it from showing the old picture.
+
 ### Range streaming
 
 Directly playable files use HTTP Range requests for full seeking. The server
