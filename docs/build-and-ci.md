@@ -116,6 +116,10 @@ the jsdom worker does not start under Electron's experimental loader.
 Distribution targets are Linux (AppImage / deb), Windows (nsis / portable /
 appx), and macOS (dmg / zip).
 
+The two Windows `.exe` targets have their own `artifactName`
+(`...-setup.exe` for nsis, `...-portable.exe` for portable). With the shared
+name, the portable build overwrote the installer.
+
 Electron 45 packages require macOS 13 (Ventura) or later. The existing
 Windows x64 and Linux x64 release targets are supported by Electron 45.
 The Node.js version used to run npm and the build scripts is separate from
