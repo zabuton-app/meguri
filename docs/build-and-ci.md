@@ -149,6 +149,19 @@ GitHub Actions workflows live in `.github/workflows/`:
   The repository's Pages source must be set to "GitHub Actions"; after
   switching it, run the workflow once by hand so the site is redeployed.
 
+Dependabot (`.github/dependabot.yml`) opens update PRs weekly for npm packages
+and GitHub Actions. npm's minor and patch updates come grouped into one PR, and
+a major update gets its own; the Actions' updates, majors since the workflows
+reference major tags, come as one PR. A version update must be a week old
+before it is proposed. Security updates are not held back or grouped: they
+arrive as soon as an advisory is published.
+
+`allowScripts` in `package.json` names exact versions. A PR that updates one of
+those packages also needs its entry updated (`npm approve-scripts`), or npm 12
+skips the package's install script, and with it, for ffmpeg-static, the binary.
+CI's npm (the one bundled with Node 22) does not read `allowScripts`, so CI
+stays green either way.
+
 ffmpeg-static and @derhuerst/ffprobe-static each fetch a single-architecture
 binary at install time (`npm_config_arch || os.arch()`), so CI pins
 `npm_config_arch` to the target arch to keep the bundled binaries consistent.

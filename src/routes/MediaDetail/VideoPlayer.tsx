@@ -1249,7 +1249,7 @@ export const VideoPlayer = forwardRef<
       */}
       {!chromeless && (
         <div
-          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity has-[select:focus]:opacity-100 ${
+          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity has-[select:focus]:opacity-100 ${
             controlsVisible ? "opacity-100" : "opacity-0"
           } group-hover:opacity-100`}
         >

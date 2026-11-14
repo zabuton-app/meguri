@@ -232,7 +232,7 @@ export function DiscoverCard({
           // tile, in the theme's own tones, so the slide reads as "a track
           // with no artwork" rather than as a failed image.
           <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(ellipse_70%_60%_at_50%_45%,color-mix(in_oklab,var(--c-primary)_14%,transparent),transparent_70%)] text-muted">
-            <div className="flex size-64 items-center justify-center rounded-[20px] border border-bright-fg/10 bg-gradient-to-br from-overlay to-surface shadow-2xl shadow-black/15">
+            <div className="flex size-64 items-center justify-center rounded-[20px] border border-bright-fg/10 bg-linear-to-br from-overlay to-surface shadow-2xl shadow-black/15">
               {createElement(kindIcon(file.kind), {
                 className: "size-28",
                 strokeWidth: 1.5,
@@ -295,8 +295,8 @@ export function DiscoverCard({
       )}
 
       {/* Gradient scrims for overlay legibility. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[22%] bg-gradient-to-b from-bg/70 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-bg/90 via-bg/40 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[22%] bg-linear-to-b from-bg/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-linear-to-t from-bg/90 via-bg/40 to-transparent" />
 
       {/* Video transport stays in Discovery. Audio uses the shared bar. */}
       {isVideo && (

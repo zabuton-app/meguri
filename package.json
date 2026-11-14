@@ -84,7 +84,7 @@
     "react-router": "^8.3.0",
     "sigma": "^3.0.3",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^2.6.0",
+    "tailwind-merge": "^3.7.0",
     "three": "0.186.1",
     "tinykeys": "^3.1.0",
     "zod": "^4.6.7"
