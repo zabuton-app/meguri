@@ -27,10 +27,10 @@ concurrency:
 # binary dynamically links GUI libs (libnss3 / gtk / gbm / asound …) that the
 # GitHub ubuntu runner already provides via its preinstalled browsers. The
 # renderer and lint jobs do not need Electron but use the same image to keep
-# the jobs alike.
+# the jobs alike. `core-macos` is the one job off Ubuntu.
 #
 # Keep node-version the same in every job and in build.yml (see engines.node in
-# package.json).
+# package.json), and the macOS runner the same as the mac build in build.yml.
 jobs:
   core:
     name: Type check and core tests
@@ -53,6 +53,26 @@ jobs:
         run: npm run typecheck
 
       # Electron-as-Node, better-sqlite3 against in-memory SQLite.
+      - name: Run core tests
+        run: npm run test:core
+
+  # Core tests that only make sense on macOS (`skipIf(process.platform !==
+  # "darwin")`) are skipped on Ubuntu, so they run here. Only the core suite
+  # has such tests, so the other checks stay on Ubuntu only.
+  core-macos:
+    name: Core tests (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Run core tests
         run: npm run test:core
 
