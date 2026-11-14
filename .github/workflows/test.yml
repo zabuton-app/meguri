@@ -36,9 +36,9 @@ jobs:
     name: Type check and core tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # Keep in sync with engines.node in package.json; react-router v8 needs 22.22+.
           node-version: 22.22.x
@@ -63,9 +63,9 @@ jobs:
     name: Core tests (macOS)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.22.x
           cache: npm
@@ -80,9 +80,9 @@ jobs:
     name: Renderer tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.22.x
           cache: npm
@@ -98,9 +98,9 @@ jobs:
     name: Lint and format
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.22.x
           cache: npm
@@ -120,9 +120,9 @@ jobs:
     name: E2E tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.22.x
           cache: npm
