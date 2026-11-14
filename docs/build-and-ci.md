@@ -171,10 +171,12 @@ GitHub Actions workflows live in `.github/workflows/`:
 
 Dependabot (`.github/dependabot.yml`) opens update PRs weekly for npm packages
 and GitHub Actions. npm's minor and patch updates come grouped into one PR, and
-a major update gets its own; the Actions' updates, majors since the workflows
-reference major tags, come as one PR. A version update must be a week old
-before it is proposed. Security updates are not held back or grouped: they
-arrive as soon as an advisory is published.
+a major update gets its own; the Actions' updates come as one PR. The
+workflows pin every action to a full commit SHA with the version in a trailing
+comment (`@<sha> # vX.Y.Z`), so a moved tag cannot change the action code that
+runs; Dependabot updates the SHA and the comment together. A version update
+must be a week old before it is proposed. Security updates are not held back or
+grouped: they arrive as soon as an advisory is published.
 
 `allowScripts` in `package.json` names exact versions. A PR that updates one of
 those packages also needs its entry updated (`npm approve-scripts`), or npm 12
