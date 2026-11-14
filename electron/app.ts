@@ -50,7 +50,11 @@ import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
 import { isAppUrl, setRendererIndex } from "./core/appUrl.js";
 import { restrictPermissions } from "./core/permissions.js";
-import { APP_GLYPH_ARG, APP_NAME_ARG } from "../shared/ipc/channelNames.js";
+import {
+  APP_GLYPH_ARG,
+  APP_NAME_ARG,
+  MEDIA_ORIGIN_ARG,
+} from "../shared/ipc/channelNames.js";
 import type {
   LibraryMergeFailure,
   LibraryMergeProgress,
@@ -136,12 +140,17 @@ export function startApp(options: AppOptions): void {
     log.warn("saving a playback position failed:", e),
   );
   let mediaPort = 0;
+  /** The media server's origin, or null until it has started. */
+  const mediaOrigin = (): string | null =>
+    mediaPort ? `http://127.0.0.1:${mediaPort}` : null;
   const mediaToken = randomBytes(32).toString("base64url");
   // Separate from mediaToken: control.json is read by a shell handler, so a leak
   // of this token should raise the window at most, never open the media server.
   const controlToken = randomBytes(32).toString("base64url");
   const MEDIA_TOKEN_HEADER = "X-Api-Token";
   let mainWindow: BrowserWindow | null = null;
+  // Startup threw before it made the first window (see showWindow).
+  let startupFailed = false;
   let tray: Tray | null = null;
   // Quit lifecycle. "disposing" = async teardown in flight (see before-quit),
   // "done" = teardown finished (or skipped) and the quit may proceed. Any
@@ -494,6 +503,8 @@ export function startApp(options: AppOptions): void {
         additionalArguments: [
           `${APP_NAME_ARG}${options.name}`,
           `${APP_GLYPH_ARG}${options.glyph}`,
+          // The media server starts before the first window and keeps its port.
+          `${MEDIA_ORIGIN_ARG}${mediaOrigin() ?? ""}`,
         ],
         sandbox: true,
         contextIsolation: true,
@@ -536,6 +547,11 @@ export function startApp(options: AppOptions): void {
   /** Show and focus the main window, recreating it if it was destroyed. */
   function showWindow(): void {
     if (isQuitting()) return;
+    // Startup has not made the first window yet (a second launch while it
+    // waits for the media server): it will, and shows it. One made now would
+    // have no media server origin to allow, and a second window would follow.
+    // If startup failed instead, a window is still the user's way in.
+    if (!mainWindow && !startupFailed) return;
     if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow();
       return;
@@ -717,7 +733,7 @@ export function startApp(options: AppOptions): void {
     emit("library:merge", { state: "done", failed });
   }
 
-  void app.whenReady().then(async () => {
+  const startup = app.whenReady().then(async () => {
     // Completely remove the native app menu (File/Edit/View…).
     Menu.setApplicationMenu(null);
     // On Windows and Linux the spell checker downloads Hunspell dictionaries
@@ -775,7 +791,7 @@ export function startApp(options: AppOptions): void {
       queryClient,
       positions,
       mainWindow: () => mainWindow,
-      mediaBase: () => (mediaPort ? `http://127.0.0.1:${mediaPort}` : null),
+      mediaBase: mediaOrigin,
       isDevMode,
       emit,
       scans,
@@ -806,6 +822,10 @@ export function startApp(options: AppOptions): void {
     if (isQuitting()) return;
     scans.start();
     scheduleStartupUpdateCheck();
+  });
+  startup.catch((e: unknown) => {
+    startupFailed = true;
+    log.error("startup failed:", e);
   });
 
   // Async teardown before quit: leave no live better-sqlite3 handle behind
