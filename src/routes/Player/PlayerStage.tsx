@@ -42,7 +42,7 @@ export function PlayerStage({
         {children}
       </div>
       {/* Scrim so the chrome stays legible over bright media. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[32%] bg-gradient-to-t from-bg/90 via-bg/40 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[32%] bg-linear-to-t from-bg/90 via-bg/40 to-transparent" />
     </div>
   );
 }

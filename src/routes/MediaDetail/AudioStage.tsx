@@ -216,7 +216,7 @@ export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
         role="region"
         aria-label={t("player.audio.region")}
         className={cn(
-          "absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-3 pt-8 text-sm text-white transition-opacity",
+          "absolute inset-x-0 bottom-0 flex items-center gap-3 bg-linear-to-t from-black/85 via-black/40 to-transparent px-3 pb-3 pt-8 text-sm text-white transition-opacity",
           playing &&
             "opacity-0 group-hover:opacity-100 focus-within:opacity-100",
         )}
