@@ -11,16 +11,24 @@ import {
   waitForIdle,
 } from "./fixtures/helpers";
 
-// #294: codecs Chromium cannot decode play through a conversion. Each clip
-// must show a picture, sound and advancing time in the detail view. VP8 in
-// MKV plays through the preview the server retries after the copy fails.
+// Each clip must show a picture, sound and advancing time in the detail view:
+// ordinary videos (#299) and codecs Chromium cannot decode (#294).
 const H264 = ["-c:v", "libx264", "-pix_fmt", "yuv420p"];
 const CLIPS: Record<string, string[]> = {
+  "H.264 AAC.mp4": [...H264, "-c:a", "aac"],
+  "H.264 AAC.mkv": [...H264, "-c:a", "aac"],
   "MPEG-4 Part 2.avi": ["-c:v", "mpeg4", "-c:a", "libmp3lame"],
   "MJPEG.mov": ["-c:v", "mjpeg", "-c:a", "pcm_s16le"],
   "DTS.mkv": [...H264, "-c:a", "dca", "-strict", "-2"],
   "ALAC.mov": [...H264, "-c:a", "alac"],
+  // The copy fails, so the server retries it as a preview.
   "VP8.mkv": ["-c:v", "libvpx", "-c:a", "libvorbis"],
+};
+// How the ordinary videos are served: the MP4 as it is, a Range request
+// answered with 206, and the MKV as a remux streamed with 200.
+const SERVED_WITH: Record<string, number> = {
+  "H.264 AAC.mp4": 206,
+  "H.264 AAC.mkv": 200,
 };
 // The exception: HEVC is served as it is, and Chromium on Linux has no decoder
 // for it, so the player says the picture could not be decoded instead of
@@ -30,7 +38,7 @@ const NO_PICTURE: Record<string, string[]> =
     ? { "HEVC.mp4": ["-c:v", "libx265", "-tag:v", "hvc1", "-c:a", "aac"] }
     : {};
 
-test("plays video and audio codecs Chromium cannot decode", async () => {
+test("plays ordinary videos and codecs Chromium cannot decode", async () => {
   test.setTimeout(180_000);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-codecs-e2e-"));
   const media = path.join(tmp, "media");
@@ -69,9 +77,18 @@ test("plays video and audio codecs Chromium cannot decode", async () => {
     await waitForIdle(page);
     for (const name of Object.keys(CLIPS)) {
       await test.step(name, async () => {
+        const served =
+          name in SERVED_WITH
+            ? page.waitForResponse(
+                (response) =>
+                  response.request().method() === "GET" &&
+                  /\/media\/\d+/.test(response.url()),
+              )
+            : undefined;
         await page.getByTestId("media-card").filter({ hasText: name }).click();
         const player = page.locator("video");
         await expect(player).toBeVisible();
+        if (served) expect((await served).status()).toBe(SERVED_WITH[name]);
         await player.evaluate((video: HTMLVideoElement) => {
           if (video.paused) void video.play();
         });
@@ -83,6 +100,8 @@ test("plays video and audio codecs Chromium cannot decode", async () => {
             };
             return {
               error: video.error?.code ?? null,
+              // A frame is there to show, not only the metadata.
+              ready: video.readyState >= video.HAVE_CURRENT_DATA,
               picture: video.videoWidth > 0,
               video: counts.webkitVideoDecodedByteCount > 0,
               audio: counts.webkitAudioDecodedByteCount > 0,
@@ -91,6 +110,7 @@ test("plays video and audio codecs Chromium cannot decode", async () => {
           });
         await expect.poll(decoded, { timeout: 20_000 }).toEqual({
           error: null,
+          ready: true,
           picture: true,
           video: true,
           audio: true,
