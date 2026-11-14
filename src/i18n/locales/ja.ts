@@ -370,6 +370,8 @@ export const ja = {
   // 再生エラー
   "player.errAborted": "読み込みが中断されました (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "ネットワークエラー (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture":
+    "映像をデコードできませんでした — この環境ではコーデック未対応の可能性",
   "player.errDecode":
     "デコードに失敗しました — コーデック未対応の可能性 (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported":

@@ -166,7 +166,12 @@ A video codec the player cannot decode gets a local H.264 preview in whatever
 container it is in, and audio it cannot decode is converted to AAC, keeping its
 channel count. A remux converts the audio when any track needs it, and an MP4,
 M4V, or MOV played directly is remuxed when its default audio does; both copy
-the picture stream.
+the picture stream. A copy FFmpeg gives up on before writing anything, such as
+VP8 in MKV, which the MP4 muxer refuses, is tried once more as a preview.
+
+If a video loads but the player decodes no picture although the scan measured
+one (HEVC on Linux), the player shows that the picture could not be decoded
+instead of playing sound over a black frame.
 
 A preview of a clip tagged as PQ or HLG HDR is tone mapped to Rec.709 with
 zscale and tonemap (`electron/core/videoPreview.ts`), when the bundled ffmpeg
@@ -193,8 +198,9 @@ test.
 | Video codec                                                           | Handling                                                               | Checked              |
 | --------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------- |
 | H.264 (8-bit, 10-bit, 4:2:2)                                          | Copied                                                                 | Yes                  |
-| VP8, VP9, AV1                                                         | Copied                                                                 | Yes                  |
-| HEVC                                                                  | Copied; plays only where the platform decodes it, which Linux does not | Yes (black on Linux) |
+| VP9, AV1                                                              | Copied                                                                 | Yes                  |
+| VP8                                                                   | Copied in WebM; a preview in other containers, after the copy fails    | Yes                  |
+| HEVC                                                                  | Copied; plays only where the platform decodes it, which Linux does not | Yes (error on Linux) |
 | ProRes                                                                | H.264 preview, PQ and HLG tone mapped                                  | Yes                  |
 | MPEG-4 Part 2, Motion JPEG, WMV, MPEG-2, Sorenson Spark (FLV), Theora | H.264 preview                                                          | Yes                  |
 | Any other codec                                                       | H.264 preview                                                          | No                   |

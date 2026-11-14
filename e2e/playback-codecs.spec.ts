@@ -12,21 +12,30 @@ import {
 } from "./fixtures/helpers";
 
 // #294: codecs Chromium cannot decode play through a conversion. Each clip
-// must show a picture, sound and advancing time in the detail view.
+// must show a picture, sound and advancing time in the detail view. VP8 in
+// MKV plays through the preview the server retries after the copy fails.
 const H264 = ["-c:v", "libx264", "-pix_fmt", "yuv420p"];
 const CLIPS: Record<string, string[]> = {
   "MPEG-4 Part 2.avi": ["-c:v", "mpeg4", "-c:a", "libmp3lame"],
   "MJPEG.mov": ["-c:v", "mjpeg", "-c:a", "pcm_s16le"],
   "DTS.mkv": [...H264, "-c:a", "dca", "-strict", "-2"],
   "ALAC.mov": [...H264, "-c:a", "alac"],
+  "VP8.mkv": ["-c:v", "libvpx", "-c:a", "libvorbis"],
 };
+// The exception: HEVC is served as it is, and Chromium on Linux has no decoder
+// for it, so the player says the picture could not be decoded instead of
+// playing sound over a black frame.
+const NO_PICTURE: Record<string, string[]> =
+  process.platform === "linux"
+    ? { "HEVC.mp4": ["-c:v", "libx265", "-tag:v", "hvc1", "-c:a", "aac"] }
+    : {};
 
 test("plays video and audio codecs Chromium cannot decode", async () => {
   test.setTimeout(180_000);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-codecs-e2e-"));
   const media = path.join(tmp, "media");
   fs.mkdirSync(media);
-  for (const [name, codecs] of Object.entries(CLIPS)) {
+  for (const [name, codecs] of Object.entries({ ...CLIPS, ...NO_PICTURE })) {
     execFileSync(ffmpeg!, [
       "-v",
       "error",
@@ -45,7 +54,12 @@ test("plays video and audio codecs Chromium cannot decode", async () => {
   }
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${path.join(tmp, "profile")}`],
+      args: [
+        `--user-data-dir=${path.join(tmp, "profile")}`,
+        // A machine whose GPU decodes HEVC through VA-API would play it; the
+        // check is about Chromium's own decoders.
+        "--disable-accelerated-video-decode",
+      ],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: media },
     }),
   );
@@ -82,6 +96,15 @@ test("plays video and audio codecs Chromium cannot decode", async () => {
           audio: true,
           playing: true,
         });
+        await closeTopDialog(page);
+      });
+    }
+    for (const name of Object.keys(NO_PICTURE)) {
+      await test.step(name, async () => {
+        await page.getByTestId("media-card").filter({ hasText: name }).click();
+        await expect(
+          page.getByText("The picture could not be decoded", { exact: false }),
+        ).toBeVisible({ timeout: 20_000 });
         await closeTopDialog(page);
       });
     }

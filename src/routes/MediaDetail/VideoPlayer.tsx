@@ -1193,6 +1193,16 @@ export const VideoPlayer = forwardRef<
             seekRef.current(deferred);
           }
         }}
+        onLoadedData={() => {
+          const v = ref.current;
+          // A codec this Chromium has no decoder for, such as HEVC on Linux,
+          // loads and plays its sound with a black picture and no error. The
+          // scan measured a picture (width), so report it as undecodable.
+          if (v && width != null && width > 0 && v.videoWidth === 0) {
+            log.error("video loaded without a picture", { src });
+            setError(t("player.errNoPicture"));
+          }
+        }}
         onTimeUpdate={() => {
           const v = ref.current;
           if (!v) return;

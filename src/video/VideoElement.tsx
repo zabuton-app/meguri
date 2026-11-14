@@ -22,6 +22,7 @@ export interface VideoElementHandlers {
   onEnded?: () => void;
   onVolumeChange?: () => void;
   onLoadedMetadata?: () => void;
+  onLoadedData?: () => void;
   onTimeUpdate?: () => void;
   onSeeked?: () => void;
   onError?: () => void;
@@ -34,6 +35,7 @@ const EVENT_NAMES: Record<keyof VideoElementHandlers, string> = {
   onEnded: "ended",
   onVolumeChange: "volumechange",
   onLoadedMetadata: "loadedmetadata",
+  onLoadedData: "loadeddata",
   onTimeUpdate: "timeupdate",
   onSeeked: "seeked",
   onError: "error",

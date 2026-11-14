@@ -18,7 +18,11 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
-import { directAacTracks, needsAacAudio } from "./playbackAudio.js";
+import {
+  defaultAudioTrack,
+  directAacTracks,
+  needsAacAudio,
+} from "./playbackAudio.js";
 import type { Core } from "./index.js";
 import { mediaFileOf, thumbPathIfDone } from "./tags.js";
 import { isInsideRealRoot, realpathForRootCheck } from "./paths.js";
@@ -410,7 +414,15 @@ async function handle(
         if (res.destroyed || res.writableEnded) return;
         if (toneMap) mode = "preview-hdr";
       }
-      serveRemux(res, abs, start, mode, audioTrack);
+      serveRemux(
+        res,
+        abs,
+        start,
+        mode,
+        audioTrack,
+        undefined,
+        defaultAudioTrack(metadata),
+      );
       return;
     }
     // Chromium-unsupported image formats (heic/heif/tiff) are transcoded to JPEG.
@@ -702,6 +714,9 @@ function startRemuxSession(
   mode: RemuxMode,
   audioTrack?: number,
   videoTrack?: number,
+  // The track a preview plays when none was chosen. A copy leaves the choice
+  // to FFmpeg; a preview maps its streams itself.
+  defaultAudio = 0,
 ) {
   const videoPreview = mode === "preview" || mode === "preview-hdr";
   const args = ["-v", "error"];
@@ -724,11 +739,12 @@ function startRemuxSession(
   if (videoPreview) {
     args.push(
       "-map",
-      // The first picture that is not an embedded cover (attached_pic), which
-      // can come first; it is the stream the stored codec describes.
-      "0:V:0",
+      // The picture a direct file's remux picked, else the first that is not
+      // an embedded cover (attached_pic), which can come first; that is the
+      // stream the stored codec describes.
+      videoTrack !== undefined ? `0:${videoTrack}` : "0:V:0",
       "-map",
-      `0:a:${audioTrack ?? 0}?`,
+      `0:a:${audioTrack ?? defaultAudio}?`,
       "-write_tmcd",
       "0",
       "-vf",
@@ -822,6 +838,30 @@ function startRemuxSession(
   });
   child.on("close", (code) => {
     clearInterval(watchdog);
+    // A copy FFmpeg gave up on before writing anything is tried once more as
+    // a preview, which encodes both streams. This catches whatever the codec
+    // allowlists let through but the MP4 muxer refuses, such as VP8 in MKV,
+    // without listing each container and codec pair up front. Not after a
+    // kill: the watchdog or the last client leaving would end the preview the
+    // same way.
+    if (!videoPreview && !sawOutput && code !== null && code !== 0) {
+      const clients = [...session.clients];
+      session.clients.clear();
+      endRemuxSession(key, session);
+      log.warn("remux produced no output, retrying as a preview:", file);
+      for (const client of clients)
+        if (!client.destroyed && !client.headersSent)
+          serveRemux(
+            client,
+            file,
+            start,
+            "preview",
+            audioTrack,
+            videoTrack,
+            defaultAudio,
+          );
+      return;
+    }
     finishRemuxClients(session, code === 0 && sawOutput);
     endRemuxSession(key, session);
   });
@@ -938,6 +978,7 @@ function serveRemux(
   mode: RemuxMode,
   audioTrack?: number,
   videoTrack?: number,
+  defaultAudio?: number,
 ) {
   const key = remuxKey(file, start, mode, audioTrack, videoTrack);
   const existing = remuxInflight.get(key);
@@ -972,6 +1013,7 @@ function serveRemux(
         mode,
         audioTrack,
         videoTrack,
+        defaultAudio,
       );
     } catch (e) {
       // spawn() can throw synchronously; the slot would otherwise never be

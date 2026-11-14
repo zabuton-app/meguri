@@ -367,6 +367,8 @@ export const ko: Record<TranslationKey, string> = {
   // playback errors
   "player.errAborted": "로드가 중단되었습니다 (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "네트워크 오류 (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture":
+    "영상을 디코딩하지 못했습니다 — 이 환경에서 코덱 미지원 가능성",
   "player.errDecode":
     "디코딩에 실패했습니다 — 코덱 미지원 가능성 (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported":

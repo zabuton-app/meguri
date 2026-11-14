@@ -378,6 +378,8 @@ export const es: Record<TranslationKey, string> = {
   // playback errors
   "player.errAborted": "Se canceló la carga (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "Error de red (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture":
+    "No se pudo decodificar la imagen — puede que su códec no sea compatible aquí",
   "player.errDecode":
     "Error al decodificar — puede que el códec no sea compatible (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported":

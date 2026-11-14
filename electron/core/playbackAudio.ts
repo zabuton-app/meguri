@@ -28,25 +28,42 @@ export function needsAacAudio(codec: string | undefined): boolean {
   return !!codec && !PLAYABLE_AUDIO_CODECS.has(codec);
 }
 
-/** Match the primary video and default audio of a directly played file. */
-export function directAacTracks(
-  raw: unknown,
-): { audio: number; video: number } | undefined {
-  let streams: Stream[];
+function streamsOf(raw: unknown): Stream[] | undefined {
   try {
     const data = (typeof raw === "string" ? JSON.parse(raw) : raw) as {
       streams?: Stream[];
     } | null;
-    if (!Array.isArray(data?.streams)) return;
-    streams = data.streams.filter(Boolean);
+    return Array.isArray(data?.streams)
+      ? data.streams.filter(Boolean)
+      : undefined;
   } catch {
-    return;
+    return undefined;
   }
-  const audio = streams.filter((stream) => stream.codec_type === "audio");
-  const selectedAudio = Math.max(
+}
+
+function defaultAudioOf(audio: Stream[]): number {
+  return Math.max(
     0,
     audio.findIndex((stream) => stream.disposition?.default),
   );
+}
+
+/** The audio track (among the audio streams) played when none is chosen: the
+ *  one marked default, else the first. */
+export function defaultAudioTrack(raw: unknown): number {
+  return defaultAudioOf(
+    (streamsOf(raw) ?? []).filter((stream) => stream.codec_type === "audio"),
+  );
+}
+
+/** Match the primary video and default audio of a directly played file. */
+export function directAacTracks(
+  raw: unknown,
+): { audio: number; video: number } | undefined {
+  const streams = streamsOf(raw);
+  if (!streams) return;
+  const audio = streams.filter((stream) => stream.codec_type === "audio");
+  const selectedAudio = defaultAudioOf(audio);
   if (!needsAacAudio(audio[selectedAudio]?.codec_name)) return;
   const videos = streams.filter(
     (stream) =>

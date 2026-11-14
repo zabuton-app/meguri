@@ -380,6 +380,8 @@ export const fr: Record<TranslationKey, string> = {
   // playback errors
   "player.errAborted": "Le chargement a été interrompu (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "Erreur réseau (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture":
+    "L'image n'a pas pu être décodée — son codec n'est peut-être pas pris en charge ici",
   "player.errDecode":
     "Échec du décodage — le codec n'est peut-être pas pris en charge (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported":

@@ -1419,6 +1419,89 @@ describe("codecs the player cannot decode", () => {
     },
   );
 
+  it("previews a remux whose copy FFmpeg refuses", async () => {
+    // The MP4 muxer has no tag for VP8, so copying it out of MKV writes nothing.
+    const { url } = await indexed(
+      "vp8.mkv",
+      ["-c:v", "libvpx"],
+      ["-c:a", "libvorbis"],
+    );
+    expect(await served(url)).toEqual(["h264", "aac"]);
+  });
+
+  it.each([
+    { name: "default-second-mpeg4.mkv", codec: "mpeg4" },
+    { name: "default-second-vp8.mkv", codec: "libvpx" },
+  ])(
+    "previews $name with the audio track marked default",
+    async ({ name, codec }) => {
+      // A mono first track and a stereo default second one, told apart by
+      // their channel count in the output.
+      const clip = path.join(root, name);
+      execFileSync(FFMPEG, [
+        "-v",
+        "error",
+        "-nostdin",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=96x64:rate=12:duration=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=48000:duration=2",
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
+        "-map",
+        "1:a",
+        "-c:v",
+        codec,
+        "-c:a",
+        "libvorbis",
+        "-ac:a:0",
+        "1",
+        "-ac:a:1",
+        "2",
+        "-disposition:a:0",
+        "0",
+        "-disposition:a:1",
+        "default",
+        clip,
+      ]);
+      const metadata = await extractMeta(clip, "video");
+      const id = insert(name, clip, null, "done", "video", "mkv");
+      db.prepare("UPDATE files SET codec = ?, meta = ? WHERE id = ?").run(
+        metadata.codec,
+        JSON.stringify(metadata.raw),
+        id,
+      );
+      const response = await fetch(
+        `${base}/ws/${WS}/media/${id}`,
+        authHeaders(),
+      );
+      expect(response.status).toBe(200);
+      const streams = execFileSync(
+        FFPROBE,
+        [
+          "-v",
+          "error",
+          "-show_entries",
+          "stream=codec_name,channels",
+          "-of",
+          "compact=p=0:nk=1",
+          "pipe:0",
+        ],
+        {
+          input: Buffer.from(await response.arrayBuffer()),
+          encoding: "utf8",
+        },
+      );
+      expect(streams.trim().split("\n")).toEqual(["h264", "aac|2"]);
+    },
+  );
+
   it("serves an MP4 or MOV with PCM audio as it is, with Range", async () => {
     const { clip, url } = await indexed(
       "pcm.mov",
