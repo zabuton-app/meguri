@@ -470,7 +470,11 @@ injects what it is given.
   an existing file), and watches it. The watcher is on the directory, not the
   file, because editors that save by renaming a new file over the old one would
   end a watch on the file after the first save. Events are debounced so one save
-  is read once.
+  is read once. Because macOS can drop events made just after a watch starts,
+  the directory is also compared once with a snapshot taken at registration.
+  A watch that is already running is not checked again, though macOS rebuilds
+  its event stream whenever any watch starts or stops (such as when custom CSS
+  is switched): a save at that moment shows only after the next save.
 - The switch is persisted as `customCss.enabled` in `config.json` (off by
   default) and works whether or not the file exists. The watcher runs only while
   it is on.
