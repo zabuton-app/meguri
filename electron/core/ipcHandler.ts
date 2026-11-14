@@ -1,5 +1,6 @@
-// Typed wrapper around ipcMain.handle that validates the renderer payload
-// against the channel's Zod schema before invoking the handler.
+// Typed wrapper around ipcMain.handle that checks the call comes from the app's
+// own page and validates the renderer payload against the channel's Zod schema
+// before invoking the handler.
 //
 // Defends against malformed payloads from a compromised renderer / preload
 // bypass, and removes the need for ad-hoc destructuring type annotations at
@@ -11,6 +12,7 @@ import {
   type ChannelName,
   type ChannelOutput,
 } from "../../shared/ipc/channels.js";
+import { isAppUrl } from "./appUrl.js";
 
 export function handle<C extends ChannelName>(
   channel: C,
@@ -21,6 +23,14 @@ export function handle<C extends ChannelName>(
 ): void {
   const schema = ChannelInputs[channel];
   ipcMain.handle(channel, async (event, raw: unknown) => {
+    // Only the app's own page may call in: a page the window was somehow
+    // navigated to, or a frame inside it, would otherwise reach every handler.
+    const sender = event.senderFrame?.url ?? "";
+    if (!isAppUrl(sender)) {
+      throw new Error(
+        `IPC "${channel}" rejected from ${sender || "a detached frame"}`,
+      );
+    }
     const parsed = schema.safeParse(raw);
     if (!parsed.success) {
       const issues = parsed.error.issues

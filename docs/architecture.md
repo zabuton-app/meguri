@@ -67,11 +67,14 @@ their own.
 
 ### Validation
 
-`electron/core/ipcHandler.ts` exposes a `handle(channel, fn)` helper. It looks up
-`ChannelInputs[channel]`, runs `safeParse()` on the incoming payload, and only
-then calls `fn` with the parsed data. Malformed payloads are rejected here, which
-makes this a real defense layer even though calls already pass through the
-preload whitelist.
+`electron/core/ipcHandler.ts` exposes a `handle(channel, fn)` helper. It first
+rejects a call whose sending frame is not the app's own page (`isAppUrl()` in
+`electron/core/appUrl.ts`: the bundled `index.html`, or the dev server's origin
+when unpackaged; the same check keeps the window from navigating away). It then
+looks up `ChannelInputs[channel]`, runs `safeParse()` on the incoming payload,
+and only then calls `fn` with the parsed data. Malformed payloads are rejected
+here, which makes this a real defense layer even though calls already pass
+through the preload whitelist.
 
 ### Events
 
