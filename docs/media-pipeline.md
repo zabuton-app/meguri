@@ -150,22 +150,32 @@ view cached before; revalidating keeps it from showing the old picture.
 ### Range streaming
 
 Directly playable files use HTTP Range requests for full seeking. The server
-serves MP4, M4V, and MOV this way when the default audio is directly playable,
-such as AAC. ProRes and MP4, M4V, or MOV with default Dolby Digital audio
-use the streaming preview paths below.
+serves MP4, M4V, and MOV this way when the player decodes their video and
+default audio. Other video codecs, and MP4, M4V, or MOV whose default audio it
+cannot decode, use the streaming paths below.
 
 ### On-the-fly remux
 
 Containers Chromium cannot demux — `REMUX_CONTAINERS` = `mkv` / `avi` / `wmv` /
 `flv` / `ts` — are remuxed to fragmented MP4 on the fly
 (`-movflags frag_keyframe+empty_moov+default_base_moof`). Time seeking uses a
-`?t=<seconds>` query parameter. The server also uses fragmented MP4 for MP4,
-M4V, and MOV with a default AC-3 or E-AC-3 audio track. It copies the primary
-picture stream and converts that audio track to AAC, keeping its channel count.
-ProRes uses a local H.264 preview. A ProRes clip tagged as PQ or HLG HDR is
-tone mapped to Rec.709 with zscale and tonemap (`electron/core/proResPreview.ts`),
-when the bundled ffmpeg has both filters; the server checks that once, with
-`ffmpeg -filters`, and retries after a failed check. Chromium-unsupported still images (`heic` /
+`?t=<seconds>` query parameter.
+
+Which codecs need converting was checked in the built app (#294). Video other
+than H.264, HEVC, VP8, VP9 and AV1 (`needsVideoPreview` in
+`shared/playbackTracks.ts`), such as ProRes, MPEG-4 Part 2 or Motion JPEG, gets
+a local H.264 preview in whatever container it is in. HEVC is left as it is,
+though Chromium on Linux has no decoder for it. Audio other than AAC, MP3,
+Opus, Vorbis, FLAC and 16-bit, 24-bit or 32-bit float PCM (`needsAacAudio` in
+`electron/core/playbackAudio.ts`), such as AC-3, E-AC-3, DTS, TrueHD, ALAC, MP2
+or A-law PCM, is converted to AAC, keeping its channel count. A remux converts it when any track has such audio, and an MP4,
+M4V, or MOV played directly is remuxed when its default audio does; both copy
+the picture stream.
+
+A preview of a clip tagged as PQ or HLG HDR is tone mapped to Rec.709 with
+zscale and tonemap (`electron/core/videoPreview.ts`), when the bundled ffmpeg
+has both filters; the server checks that once, with `ffmpeg -filters`, and
+retries after a failed check. Chromium-unsupported still images (`heic` /
 `heif` / `tiff`, `TRANSCODE_IMAGES`) are transcoded to JPEG.
 
 ### Frame previews

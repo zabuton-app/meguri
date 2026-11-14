@@ -54,7 +54,7 @@ import { usePlaylistAudio } from "./usePlaylistAudio";
 import { useStageTransition } from "./useStageTransition";
 import { useFolderScopeLabel } from "@/hooks/useFolderScopeLabel";
 import { usePlaybackNav } from "@/components/MediaNavContext";
-import { isProResCodec } from "@shared/playbackTracks";
+import { needsVideoPreview } from "@shared/playbackTracks";
 
 /**
  * Half of one item-to-item transition: the outgoing item fades out over this
@@ -465,8 +465,8 @@ export default function Player() {
                   wsId={wsId}
                   startAt={resumeStart.startAt}
                   autoplay
-                  // The server can end a ProRes preview that stops reading.
-                  reopenOnNetworkError={isProResCodec(detailFor?.codec)}
+                  // The server can end a video preview that stops reading.
+                  reopenOnNetworkError={needsVideoPreview(detailFor?.codec)}
                   navKeys={navBinding}
                   fullscreenTargetRef={rootRef}
                   onNativeDuration={() => undefined}

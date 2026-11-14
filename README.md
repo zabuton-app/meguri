@@ -378,22 +378,25 @@ To drag a file to another app, hover over it in grid or list view and drag
 the arrow beside its selection checkbox. Drag from a selected file's arrow
 to carry the whole selection.
 
-ProRes clips play in Meguri through a local H.264 preview at up to
-1920 × 1080. For ProRes clips tagged as PQ or HLG HDR, the player uses the
-available FFmpeg color filters to fit the highlights and colors into an SDR
-preview. SDR clips use the regular preview. Dragging a clip into an editor or
-opening it externally uses the original file.
+Clips whose video the built-in player cannot decode, such as ProRes, MPEG-4
+Part 2, Motion JPEG, WMV or MPEG-2, play in Meguri through a local H.264 preview
+at up to 1920 × 1080. H.264, HEVC, VP8, VP9 and AV1 play as they are. For
+clips tagged as PQ or HLG HDR, the preview uses the available FFmpeg color
+filters to fit the highlights and colors into SDR. SDR clips use the regular
+preview. Dragging a clip into an editor or opening it externally uses the
+original file.
 
-The built-in player converts Dolby Digital (AC-3) or Dolby Digital Plus
-(E-AC-3) audio to AAC when needed for playback. This includes MP4, M4V, and MOV
-clips with a default Dolby audio track, as well as repackaged containers such
-as MKV. The Dolby conversion copies the original picture stream and preserves
-the surround channel count. The original file stays untouched.
+The built-in player converts audio it cannot decode, such as Dolby Digital
+(AC-3), Dolby Digital Plus (E-AC-3), DTS, TrueHD, ALAC or MP2, to AAC. This
+includes MP4, M4V, and MOV clips with such a default audio track, as well as
+repackaged containers such as MKV. The conversion copies the original picture
+stream when the player can decode it and preserves the surround channel count.
+The original file stays untouched.
 
-For ProRes, MKV, AVI, WMV, FLV, or TS clips with multiple audio tracks, use
-**Audio track** beside the volume control in the full player. **Default**
-uses the usual playback selection when you open a clip. Switching tracks
-keeps the playhead and play or pause state.
+For previewed clips and MKV, AVI, WMV, FLV, or TS clips with multiple audio
+tracks, use **Audio track** beside the volume control in the full player.
+**Default** uses the usual playback selection when you open a clip. Switching
+tracks keeps the playhead and play or pause state.
 
 ### Embedded subtitles
 

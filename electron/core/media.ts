@@ -112,8 +112,12 @@ export async function extractMeta(
     const json = JSON.parse(stdout) as FfprobeOutput;
     const streams = json.streams ?? [];
     const wantAudio = kind === "audio";
+    // A video's embedded cover picture (attached_pic) can come before the
+    // picture itself; its codec and size describe the artwork.
     const v = streams.find((s) =>
-      wantAudio ? s.codec_type === "audio" : s.codec_type === "video",
+      wantAudio
+        ? s.codec_type === "audio"
+        : s.codec_type === "video" && s.disposition?.attached_pic !== 1,
     );
     const fmt = json.format ?? {};
     const tiled = kind === "image" && isTiledImage(streams);
@@ -197,11 +201,16 @@ export function coverArtStreamIndex(raw: unknown): number | null {
 }
 
 /** The codec a scan stores for a video (see extractMeta): its first video
- *  stream's. Takes the already-probed JSON, like coverArtStreamIndex. */
+ *  stream's that is not a cover picture. Takes the already-probed JSON, like
+ *  coverArtStreamIndex. */
 export function videoCodecOf(raw: unknown): string | null {
   const streams = (raw as FfprobeOutput | null)?.streams;
   if (!Array.isArray(streams)) return null;
-  return streams.find((s) => s?.codec_type === "video")?.codec_name ?? null;
+  return (
+    streams.find(
+      (s) => s?.codec_type === "video" && s.disposition?.attached_pic !== 1,
+    )?.codec_name ?? null
+  );
 }
 
 // How many seconds of margin to leave when doing the coarse pre-input seek of the hybrid
