@@ -42,7 +42,7 @@ import {
   type KeybindingPreset,
 } from "@/settings/keybindings";
 import { LOGO_IDS, type LogoId } from "@shared/ipc/schema";
-import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
+import { useLogo, useLogoImages } from "@/hooks/useLogo";
 import { SettingsModal, SETTINGS_MODAL_TITLE_ID } from "./SettingsModal";
 import { UpdateSection } from "./UpdateSection";
 import { AboutSection } from "./AboutSection";
@@ -177,6 +177,7 @@ export default function Settings() {
   const onClose = useCallback(() => navigate("/"), [navigate]);
 
   const { logo, setLogo: selectLogo } = useLogo();
+  const logoImages = useLogoImages();
 
   return (
     <SettingsModal onClose={() => void onClose()}>
@@ -365,7 +366,9 @@ export default function Settings() {
                     {t("settings.logoDesc")}
                   </span>
                 </div>
-                <div className="flex gap-2">
+                {/* shrink-0: Preflight's img max-width:100% lets a squeezed
+                    button narrow the preview while its height stays fixed. */}
+                <div className="flex shrink-0 gap-2">
                   {LOGO_IDS.map((id) => {
                     const active = logo === id;
                     return (
@@ -382,7 +385,7 @@ export default function Settings() {
                         }
                       >
                         <img
-                          src={LOGO_SRC[id]}
+                          src={logoImages?.[id]}
                           alt=""
                           className="size-12 rounded-md"
                           draggable={false}

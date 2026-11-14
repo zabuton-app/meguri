@@ -148,6 +148,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
           : undefined,
       );
     },
+    meta: { reportsOwnError: true },
     onError: (e: unknown) => {
       // main rejects a name that impersonates a pipeline-owned namespace; the
       // detail view explains that case rather than showing the raw error, and

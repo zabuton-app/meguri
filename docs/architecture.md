@@ -18,14 +18,20 @@ server that lives inside the main process (see [Media Pipeline](media-pipeline.m
 This separation is strict: the renderer never touches the filesystem, the
 database, or ffmpeg directly. Everything goes over IPC or the media server.
 
+Web permissions are denied unless listed in `ALLOWED` in
+`electron/core/permissions.ts` (clipboard write and fullscreen today), and so
+are device requests (HID, serial, USB). A feature that needs another permission
+adds it there with the reason; a denial is logged under the `permissions`
+scope.
+
 The main process starts in `startApp()` (`electron/app.ts`); nothing in it runs
 on import. `electron/main.ts` is only the entry point that calls it with
 Meguri's identity: the app name, its one-character mark, the URL scheme, the
 GitHub repository the update check looks at, the Microsoft Store product ID
-(optional: an app that is not on the Store leaves it out) and the prefix of the
+(optional: an app that is not on the Store leaves it out), the prefix of the
 environment variables it reads (`MEGURI`, for `MEGURI_ROOT`,
-`MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`). Another app built on
-this code can call `startApp()` from its own entry point with its own values.
+`MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`) and the logo bitmaps. Another
+app built on this code can call `startApp()` from its own entry point with its own values.
 The `userData` directory is not part of these options: it is `<appData>/` plus the top-level `productName`, or
 else `name`, of the package.json Electron loads. Meguri has no top-level
 `productName` (`build.productName` does not count), so its data is in
@@ -37,7 +43,23 @@ there before the first render: the window passes it to the preload as a process 
 `shared/ipc/channelNames.ts`), and the preload exposes it as
 `window.api.appName`. The app's one-character mark (`glyph`, Meguri's 巡)
 travels the same way, as `window.api.appGlyph`. The renderer's text uses it through `{app}` in the
-locale strings (see [Renderer](renderer.md#internationalization)).
+locale strings (see [Renderer](renderer.md#internationalization)). The media
+server's origin travels the same way too, as `window.api.mediaOrigin`, for the
+Content Security Policy below.
+
+The renderer's Content Security Policy is in three places:
+
+- `index.html` holds the packaged app's policy.
+- `devServerCsp()` in `electron.vite.shared.ts` adds the dev server's own
+  sources (`localhost`, its HMR socket) while serving.
+- `public/media-csp.js` appends a second policy in the packaged app that allows
+  only the media server's port on `127.0.0.1`, which is picked at startup. A
+  request must pass both policies, so the second can only narrow the first.
+
+A new source goes into `index.html`, and also into `media-csp.js` when it is
+for `img-src`, `media-src` or `connect-src`. A change to `connect-src` also
+needs the string `devServerCsp()` looks for, or `npm run dev` stops with an
+error saying so.
 
 ## IPC type system
 
@@ -56,10 +78,12 @@ both processes so there is nothing to hand-sync.
     Outputs are plain types, not Zod schemas, because the renderer trusts data
     coming from main and needs no runtime check.
 
-There are roughly three dozen invoke channels, covering app status, workspace and
-collection management, scanning, file search and mutation, tags, scene
-bookmarks, thumbnail offsets, and shell operations (open externally, open
-folder, copy path, open URL, toggle DevTools).
+There are over eighty invoke channels, covering app status, workspace and
+collection management, scanning, file search and mutation, folders, the graph,
+heatmap and timeline views, play history, duplicates, tags and auto tagging,
+scene bookmarks, thumbnail offsets, the update check, logos, custom CSS and CSS
+themes, and shell operations (open externally, open folder, copy path, open
+URL, toggle DevTools).
 
 `electron/core/types.ts` and `src/ipc/types.ts` are thin re-export shims over the
 shared schemas, kept for import-path compatibility; they hold no definitions of
@@ -67,11 +91,14 @@ their own.
 
 ### Validation
 
-`electron/core/ipcHandler.ts` exposes a `handle(channel, fn)` helper. It looks up
-`ChannelInputs[channel]`, runs `safeParse()` on the incoming payload, and only
-then calls `fn` with the parsed data. Malformed payloads are rejected here, which
-makes this a real defense layer even though calls already pass through the
-preload whitelist.
+`electron/core/ipcHandler.ts` exposes a `handle(channel, fn)` helper. It first
+rejects a call whose sending frame is not the app's own page (`isAppUrl()` in
+`electron/core/appUrl.ts`: the bundled `index.html`, or the dev server's origin
+when unpackaged; the same check keeps the window from navigating away). It then
+looks up `ChannelInputs[channel]`, runs `safeParse()` on the incoming payload,
+and only then calls `fn` with the parsed data. Malformed payloads are rejected
+here, which makes this a real defense layer even though calls already pass
+through the preload whitelist.
 
 ### Events
 
@@ -87,10 +114,21 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
   `errorReason: "root-unreadable"`. Since the startup scan can finish before a
   view listens, `scan_unreadable_workspaces` returns the workspaces whose last
   scan failed that way.
-- `workspace:changed` — the active workspace changed.
+- `workspace:changed` — the workspaces or collections changed: the active one,
+  the list (added, removed, reordered, renamed, or given an emoji), or which
+  files a collection holds. Not sent when a collection's files are reordered
+  (a refetch would undo the order the renderer already shows) or a played file
+  leaves Watch Later (it would drop the open file from prev/next); the renderer
+  updates its own view for those.
 - `update:available` — the update check found a newer release.
+- `library:merge` — progress of merging workspaces' metadata into the shared
+  library, at startup or when retried (`library_merge_retry`), then its end
+  with the workspaces that failed (see
+  [The shared library](data-model.md#the-shared-library)).
 - `custom-css:changed` — `custom.css` was saved or deleted (see
   [Custom CSS](#custom-css)).
+- `css-themes:changed` — a `.css` file in the CSS themes folder was added,
+  changed or removed (see [CSS theme files](#css-theme-files)).
 
 ### Adding a new IPC channel
 
@@ -103,12 +141,13 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
 4. Add `handle("<channel>", (input) => ...)` inside the relevant
    `register*Handlers()` under `electron/ipc/`. Handlers are grouped by domain,
    one module each (`status.ts`, `workspaces.ts`, `scan.ts`, `files.ts`,
-   `tags.ts`, `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`,
-   `logo.ts`, `updates.ts`); `electron/ipc/index.ts` wires them up in `registerIpc()`.
-   Each group receives an `IpcContext` (`electron/ipc/context.ts`) with what it
-   needs from the main process — the `Workspaces`, the query worker client,
-   `emit()`, the `ScanManager`, and live getters for the window and media
-   server.
+   `folders.ts`, `graph.ts`, `activity.ts`, `timeline.ts`, `tags.ts`,
+   `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`, `updates.ts`,
+   `logo.ts`, `customCss.ts`, `cssThemes.ts`); `electron/ipc/index.ts` wires
+   them up in `registerIpc()`. Each group but `updates.ts` receives an
+   `IpcContext` (`electron/ipc/context.ts`) with what it needs from the main
+   process — the `Workspaces`, the query worker client, `emit()`, the
+   `ScanManager`, and live getters for the window and media server.
    Shared helpers (`coreById`, `queryTargets`, `scopedCores`,
    `ensureFileInsideRoot`) are in `electron/ipc/helpers.ts`; a handler that
    hands a file path to the OS must resolve it through `ensureFileInsideRoot`
@@ -160,15 +199,18 @@ lifecycle behavior:
   delay, bounded per minute; past that (or on a launch / integrity failure) the
   user is asked to reload or quit instead of being left with a blank window.
 - A single-instance lock prevents a second copy from launching.
-- The tray and window icons are base64-embedded images
-  (`electron/core/logoAssets.ts`), to avoid bundle path-resolution issues.
+- The tray and window icons are base64 images the entry point passes to
+  `startApp()` (`logos`; Meguri's are in `electron/core/logoAssets.ts`),
+  embedded to avoid bundle path-resolution issues.
   Three logo variants exist (`dark` = vermilion kanji, `light` = inverted,
   `enso` = pictorial brush circle with a media card, raster-sourced — no SVG
   master); the choice is persisted as `logo` in
   main's `config.json` and switched from Settings via the `logo_get` /
   `logo_set` IPC channels. The renderer mirrors the same choice through
   `useLogo()` (react-query cache), which drives the Settings picker and the
-  in-app logo in the workspace rail.
+  in-app logo in the workspace rail. The renderer does not bundle the
+  bitmaps: it gets them from main as data URLs (`logo_images`,
+  `useLogoImages()`).
 
 ## Workspace model
 

@@ -33,9 +33,9 @@ vi.mock("@/ipc/client", () => ({
       mocks.fileRecordPlay(...args) as Promise<void>,
   },
   events: {
-    onThumbDone: (cb: (event: ThumbDone) => void): Promise<() => void> => {
+    onThumbDone: (cb: (event: ThumbDone) => void): (() => void) => {
       mocks.thumbDoneListeners.add(cb);
-      return Promise.resolve(() => mocks.thumbDoneListeners.delete(cb));
+      return () => mocks.thumbDoneListeners.delete(cb);
     },
   },
   ALL_ID: "__all__",
@@ -443,16 +443,13 @@ describe("AudioPlayerBar", () => {
     expect(screen.getByText("track.mp3")).toBeTruthy();
   });
 
-  it("drops its thumb:done subscription even when unmounted in the same tick", async () => {
+  it("drops its thumb:done subscription even when unmounted in the same tick", () => {
     // The detail view opening over the bar unmounts the cover in the very
-    // commit that subscribed it, before the unlisten has been handed back.
+    // commit that subscribed it.
     const { unmount } = render(<Harness />, { wrapper: Wrapper });
     loadTrack();
     expect(mocks.thumbDoneListeners.size).toBe(1);
     unmount();
-    await act(async () => {
-      await Promise.resolve();
-    });
     expect(mocks.thumbDoneListeners.size).toBe(0);
   });
 

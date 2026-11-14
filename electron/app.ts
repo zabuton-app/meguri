@@ -19,8 +19,8 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { DEFAULT_LOGO, loadAutoTag, loadConfig } from "./core/appConfig.js";
-import { TRAY_ICON_BASE64, WINDOW_ICON_BASE64 } from "./core/logoAssets.js";
 import log, { setupLogger } from "./core/logger.js";
 import { withTimeout } from "./core/concurrency.js";
 import {
@@ -35,6 +35,10 @@ import {
   updateDownloadUrl,
   type UpdateRepo,
 } from "./core/updater.js";
+import {
+  needsWaylandVideoWorkaround,
+  WAYLAND_VIDEO_WORKAROUND_SWITCH,
+} from "./core/waylandVideoWorkaround.js";
 import { Workspaces } from "./core/workspaces.js";
 import {
   backupLibraryNow,
@@ -48,7 +52,13 @@ import { registerIpc } from "./ipc/index.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
-import { APP_GLYPH_ARG, APP_NAME_ARG } from "../shared/ipc/channelNames.js";
+import { isAppUrl, setRendererIndex } from "./core/appUrl.js";
+import { restrictPermissions } from "./core/permissions.js";
+import {
+  APP_GLYPH_ARG,
+  APP_NAME_ARG,
+  MEDIA_ORIGIN_ARG,
+} from "../shared/ipc/channelNames.js";
 import type {
   LibraryMergeFailure,
   LibraryMergeProgress,
@@ -56,6 +66,17 @@ import type {
 } from "../shared/ipc/schema.js";
 
 /** What sets one app apart from another built on this main process. */
+/**
+ * An app's bitmaps for each logo variant: PNG, base64 without the data URL
+ * prefix.
+ */
+export interface LogoImages {
+  /** 32px: the tray icon and the drag icon. */
+  tray: Record<LogoId, string>;
+  /** 256px: the window / dock icon and the logo shown inside the app. */
+  app: Record<LogoId, string>;
+}
+
 export interface AppOptions {
   /**
    * App name, as Electron reports it. It does not move userData: that is
@@ -84,6 +105,11 @@ export interface AppOptions {
    * app's exported variables do not reach another.
    */
   envPrefix: string;
+  /**
+   * The app's logo in each of the three variants the user picks from in
+   * Settings: the tray, the window / dock icon and the logo inside the app.
+   */
+  logos: LogoImages;
 }
 
 /** Start the app. Call once, from the entry point, before anything else runs. */
@@ -102,7 +128,19 @@ export function startApp(options: AppOptions): void {
   // Set up logging before anything else so early failures land in the log file.
   setupLogger();
 
+  // Chromium reads its switches at start-up, so this has to run before `ready`.
+  if (
+    needsWaylandVideoWorkaround(
+      process.platform,
+      app.commandLine.getSwitchValue("ozone-platform"),
+    )
+  ) {
+    app.commandLine.appendSwitch(WAYLAND_VIDEO_WORKAROUND_SWITCH);
+  }
+
   // In CJS output, __dirname exists globally (out/main/).
+  const rendererIndex = path.join(__dirname, "../renderer/index.html");
+  setRendererIndex(rendererIndex, { allowDevServer: !app.isPackaged });
 
   const ws = new Workspaces();
   // Heavy read-only list/search queries run on a worker thread so a slow query
@@ -116,12 +154,17 @@ export function startApp(options: AppOptions): void {
     log.warn("saving a playback position failed:", e),
   );
   let mediaPort = 0;
+  /** The media server's origin, or null until it has started. */
+  const mediaOrigin = (): string | null =>
+    mediaPort ? `http://127.0.0.1:${mediaPort}` : null;
   const mediaToken = randomBytes(32).toString("base64url");
   // Separate from mediaToken: control.json is read by a shell handler, so a leak
   // of this token should raise the window at most, never open the media server.
   const controlToken = randomBytes(32).toString("base64url");
   const MEDIA_TOKEN_HEADER = "X-Api-Token";
   let mainWindow: BrowserWindow | null = null;
+  // Startup threw before it made the first window (see showWindow).
+  let startupFailed = false;
   let tray: Tray | null = null;
   // Quit lifecycle. "disposing" = async teardown in flight (see before-quit),
   // "done" = teardown finished (or skipped) and the quit may proceed. Any
@@ -254,22 +297,6 @@ export function startApp(options: AppOptions): void {
     });
   }
 
-  // Restrict in-window navigation to the bundled renderer (or the Vite dev server
-  // in development). Anything else is sent to the OS browser via shell.openExternal.
-  // setWindowOpenHandler is also applied here so a future BrowserWindow inherits it.
-  // `file:` is always permitted (bundled renderer); the dev origin is read on each
-  // call so a late-resolved ELECTRON_RENDERER_URL is honored.
-  function isAppUrl(url: string): boolean {
-    try {
-      const u = new URL(url);
-      if (u.protocol === "file:") return true;
-      const dev = process.env["ELECTRON_RENDERER_URL"];
-      if (dev) return u.origin === new URL(dev).origin;
-      return false;
-    } catch {
-      return false;
-    }
-  }
   // Renderer crash recovery. A crashed renderer (OOM, a decoder fault, ...)
   // otherwise leaves the tray-resident app with a blank window until the user
   // quits and relaunches. Reload the main window instead — with a growing
@@ -354,6 +381,9 @@ export function startApp(options: AppOptions): void {
     log.error("child process gone:", details);
   });
 
+  // Restrict in-window navigation to the app (see isAppUrl). Other http(s) URLs
+  // open in the OS browser; anything else is dropped. setWindowOpenHandler is also
+  // applied here so a future BrowserWindow inherits it.
   app.on("web-contents-created", (_e, contents) => {
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
     contents.on("will-navigate", (event, url) => {
@@ -420,13 +450,13 @@ export function startApp(options: AppOptions): void {
 
   function trayImage(logo: LogoId): Electron.NativeImage {
     return nativeImage.createFromDataURL(
-      `data:image/png;base64,${TRAY_ICON_BASE64[logo]}`,
+      `data:image/png;base64,${options.logos.tray[logo]}`,
     );
   }
 
   function windowImage(logo: LogoId): Electron.NativeImage {
     return nativeImage.createFromDataURL(
-      `data:image/png;base64,${WINDOW_ICON_BASE64[logo]}`,
+      `data:image/png;base64,${options.logos.app[logo]}`,
     );
   }
 
@@ -487,6 +517,8 @@ export function startApp(options: AppOptions): void {
         additionalArguments: [
           `${APP_NAME_ARG}${options.name}`,
           `${APP_GLYPH_ARG}${options.glyph}`,
+          // The media server starts before the first window and keeps its port.
+          `${MEDIA_ORIGIN_ARG}${mediaOrigin() ?? ""}`,
         ],
         sandbox: true,
         contextIsolation: true,
@@ -518,14 +550,22 @@ export function startApp(options: AppOptions): void {
 
   /** Load the app entry (dev server in development, bundled renderer otherwise). */
   function loadRenderer(win: BrowserWindow): void {
-    const devUrl = process.env["ELECTRON_RENDERER_URL"];
+    // Packaged, the env var is not trusted (see setRendererIndex).
+    const devUrl = !app.isPackaged && process.env["ELECTRON_RENDERER_URL"];
     if (devUrl) void win.loadURL(devUrl);
-    else void win.loadFile(path.join(__dirname, "../renderer/index.html"));
+    // Not loadFile(): it leaves a "%" in the path unescaped, so the URL would
+    // name another file than the one isAppUrl() accepts.
+    else void win.loadURL(pathToFileURL(rendererIndex).href);
   }
 
   /** Show and focus the main window, recreating it if it was destroyed. */
   function showWindow(): void {
     if (isQuitting()) return;
+    // Startup has not made the first window yet (a second launch while it
+    // waits for the media server): it will, and shows it. One made now would
+    // have no media server origin to allow, and a second window would follow.
+    // If startup failed instead, a window is still the user's way in.
+    if (!mainWindow && !startupFailed) return;
     if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow();
       return;
@@ -707,9 +747,17 @@ export function startApp(options: AppOptions): void {
     emit("library:merge", { state: "done", failed });
   }
 
-  void app.whenReady().then(async () => {
+  const startup = app.whenReady().then(async () => {
     // Completely remove the native app menu (File/Edit/View…).
     Menu.setApplicationMenu(null);
+    // On Windows and Linux the spell checker downloads Hunspell dictionaries
+    // from Google's CDN at startup, breaking the privacy promise in the
+    // README. Turning it off is not enough: the download follows the language
+    // list, which must be emptied (webPreferences.spellcheck = false and
+    // setSpellCheckerEnabled(false) both still download).
+    session.defaultSession.setSpellCheckerEnabled(false);
+    session.defaultSession.setSpellCheckerLanguages([]);
+    restrictPermissions(session.defaultSession);
 
     // Before any workspace opens the library: put a copy back if it is damaged,
     // and keep the copies current otherwise.
@@ -757,11 +805,12 @@ export function startApp(options: AppOptions): void {
       queryClient,
       positions,
       mainWindow: () => mainWindow,
-      mediaBase: () => (mediaPort ? `http://127.0.0.1:${mediaPort}` : null),
+      mediaBase: mediaOrigin,
       isDevMode,
       emit,
       scans,
       applyLogo,
+      logos: options.logos,
       deriveAutoTags: autoTagWorker.derive,
       passes,
       retryLibraryMerge,
@@ -787,6 +836,10 @@ export function startApp(options: AppOptions): void {
     if (isQuitting()) return;
     scans.start();
     scheduleStartupUpdateCheck();
+  });
+  startup.catch((e: unknown) => {
+    startupFailed = true;
+    log.error("startup failed:", e);
   });
 
   // Async teardown before quit: leave no live better-sqlite3 handle behind

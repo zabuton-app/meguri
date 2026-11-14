@@ -9,14 +9,16 @@ import type { LogoId } from "@shared/ipc/schema";
 
 const logoGet = vi.fn<() => Promise<LogoId>>();
 const logoSet = vi.fn<(logo: LogoId) => Promise<LogoId>>();
+const logoImages = vi.fn<() => Promise<Record<LogoId, string>>>();
 vi.mock("@/ipc/client", () => ({
   api: {
     logoGet: (): Promise<LogoId> => logoGet(),
     logoSet: (logo: LogoId): Promise<LogoId> => logoSet(logo),
+    logoImages: (): Promise<Record<LogoId, string>> => logoImages(),
   },
 }));
 
-const { useLogo } = await import("@/hooks/useLogo");
+const { useLogo, useLogoImages } = await import("@/hooks/useLogo");
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -38,6 +40,7 @@ function wrapper({ children }: { children: ReactNode }) {
 beforeEach(() => {
   logoGet.mockReset();
   logoSet.mockReset();
+  logoImages.mockReset();
 });
 
 describe("useLogo", () => {
@@ -97,5 +100,35 @@ describe("useLogo", () => {
 
     act(() => result.current.setLogo("light"));
     expect(logoSet).not.toHaveBeenCalled();
+  });
+});
+
+describe("useLogoImages", () => {
+  const images = {
+    dark: "data:image/png;base64,ZGFyaw==",
+    light: "data:image/png;base64,bGlnaHQ=",
+    enso: "data:image/png;base64,ZW5zbw==",
+  };
+
+  it("is undefined until main answers, then holds main's images", async () => {
+    logoImages.mockResolvedValue(images);
+    const { result } = renderHook(() => useLogoImages(), { wrapper });
+    expect(result.current).toBeUndefined();
+    await waitFor(() => expect(result.current).toEqual(images));
+  });
+
+  it("keeps the images when a pick cancels the logo query", async () => {
+    logoGet.mockResolvedValue("dark");
+    logoSet.mockResolvedValue("light");
+    logoImages.mockResolvedValue(images);
+    const { result } = renderHook(
+      () => ({ logo: useLogo(), images: useLogoImages() }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.images).toEqual(images));
+    act(() => result.current.logo.setLogo("light"));
+    await waitFor(() => expect(result.current.logo.logo).toBe("light"));
+    expect(result.current.images).toEqual(images);
+    expect(logoImages).toHaveBeenCalledTimes(1);
   });
 });

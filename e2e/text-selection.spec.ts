@@ -92,6 +92,10 @@ test.describe("Text selection", () => {
     const toast = ready.locator("[data-sonner-toast]").first();
     await expect(toast).toBeVisible();
     await expect(toast).toHaveCSS("user-select", "text");
+    // Sonner slides a toast in while fading it from 0 to 1. It already counts
+    // as visible during that, and clicks on a moving toast select nothing, so
+    // wait until it has settled.
+    await expect(toast).toHaveCSS("opacity", "1");
     // Sonner captures the pointer for swipe-to-dismiss, so a drag selects
     // nothing here; triple-click is the gesture that works.
     await toast.click({ clickCount: 3 });

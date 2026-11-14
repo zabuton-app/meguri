@@ -9,4 +9,13 @@ export function registerLogoHandlers(ctx: IpcContext): void {
     ctx.applyLogo(logo);
     return logo;
   });
+  handle("logo_images", () => ({
+    dark: dataUrl(ctx.logos.app.dark),
+    light: dataUrl(ctx.logos.app.light),
+    enso: dataUrl(ctx.logos.app.enso),
+  }));
+}
+
+function dataUrl(base64: string): string {
+  return `data:image/png;base64,${base64}`;
 }

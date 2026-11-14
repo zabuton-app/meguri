@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useModalFocus } from "@/hooks/useModalFocus";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { holdPeekDocked } from "./peekDocked";
 import { LIST_MIN_WIDTH, PEEK_MIN_WIDTH, usePeekResize } from "./usePeekResize";
@@ -51,6 +52,7 @@ export function MediaModal({
   presentation = "modal",
   fullscreen = false,
   containerRef,
+  titleId,
   t,
   children,
 }: {
@@ -59,6 +61,8 @@ export function MediaModal({
   presentation?: Presentation;
   fullscreen?: boolean;
   containerRef?: Ref<HTMLDivElement>;
+  /** The id TopBar puts on the title, for aria-labelledby. */
+  titleId?: string;
   t: TFunc;
   children: ReactNode;
 }) {
@@ -88,6 +92,8 @@ export function MediaModal({
   const panelRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(containerRef, () => panelRef.current as HTMLDivElement);
   const peek = usePeekResize(docked, panelRef);
+  // The peek leaves the list beside it usable, so only the modal holds focus.
+  useModalFocus(panelRef, { active: !isPeek });
   // Tell Home the list is in use beside the sheet (see peekDocked.ts).
   useLayoutEffect(() => {
     if (!docked) return;
@@ -104,7 +110,7 @@ export function MediaModal({
   // string).
   // The modal clips its content to its rounded corners; the peek must not
   // clip, or the grip that straddles its left edge loses its outer half.
-  const innerBase = "flex min-h-0 flex-col bg-bg";
+  const innerBase = "flex min-h-0 flex-col bg-bg outline-none";
   let outerClass: string;
   let innerClass: string;
   if (isPeek) {
@@ -136,9 +142,11 @@ export function MediaModal({
       onClick={isPeek ? undefined : onClose}
       role={isPeek ? undefined : "dialog"}
       aria-modal={isPeek ? undefined : "true"}
+      aria-labelledby={isPeek ? undefined : titleId}
     >
       <div
         ref={panelRef}
+        tabIndex={-1}
         data-slot="modal-panel"
         className={innerClass}
         // Inline rather than a Tailwind class: the ceiling is derived from
@@ -153,6 +161,7 @@ export function MediaModal({
         }
         onClick={(e) => e.stopPropagation()}
         role={isPeek ? "dialog" : undefined}
+        aria-labelledby={isPeek ? titleId : undefined}
         data-presentation={presentation}
       >
         {docked && (
@@ -189,6 +198,7 @@ export function MediaModal({
 export function TopBar({
   onClose,
   title,
+  titleId,
   onPrev,
   onNext,
   canPrev,
@@ -205,6 +215,8 @@ export function TopBar({
 }: {
   onClose: () => void;
   title?: string;
+  /** Put on the title so the frame can name itself by it (see MediaModal). */
+  titleId?: string;
   onPrev?: () => void;
   onNext?: () => void;
   canPrev?: boolean;
@@ -261,6 +273,7 @@ export function TopBar({
       )}
       {title && (
         <span
+          id={titleId}
           className="select-text truncate text-sm font-medium text-fg"
           title={title}
         >

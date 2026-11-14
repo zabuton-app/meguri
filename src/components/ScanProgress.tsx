@@ -37,32 +37,25 @@ export function ScanProgress({
   });
 
   useEffect(() => {
-    const unlistens: Array<() => void> = [];
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
 
-    void events
-      .onScanProgress((p) =>
+    const unlistens = [
+      events.onScanProgress((p) =>
         setState({
           phase: p.phase,
           done: p.done,
           total: p.total,
           active: true,
         }),
-      )
-      .then((u) => unlistens.push(u));
-
-    void events
-      .onThumbDone((event) => onThumbDone?.(event))
-      .then((u) => unlistens.push(u));
-
-    void events
-      .onScanDone(() => {
+      ),
+      events.onThumbDone((event) => onThumbDone?.(event)),
+      events.onScanDone(() => {
         hideTimer = setTimeout(
           () => setState((s) => ({ ...s, active: false })),
           1200,
         );
-      })
-      .then((u) => unlistens.push(u));
+      }),
+    ];
 
     return () => {
       unlistens.forEach((u) => u());

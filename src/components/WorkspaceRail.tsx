@@ -58,7 +58,7 @@ import { cn } from "@/lib/utils";
 import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import { openCommandMenu, openShortcuts } from "@/lib/ui-events";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
-import { LOGO_SRC, useLogo } from "@/hooks/useLogo";
+import { useLogo, useLogoImages } from "@/hooks/useLogo";
 import { useFileDropTarget } from "@/hooks/useFileDropTarget";
 import { useOsFolderDrop, type DroppedItems } from "@/hooks/useOsFolderDrop";
 import { useAddFilesToCollection } from "@/hooks/useAddFilesToCollection";
@@ -91,6 +91,7 @@ export function WorkspaceRail() {
   const { t } = useI18n();
   // In-app logo mark follows the selected variant (Settings > App logo).
   const { logo } = useLogo();
+  const logoImages = useLogoImages();
   const addedWorkspaceScanJobs = useRef(new Set<string>());
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   // null = create mode; a collection = edit mode for it.
@@ -114,12 +115,9 @@ export function WorkspaceRail() {
 
   // Also track changes from other paths (e.g. the add button in the empty state).
   useEffect(() => {
-    const unlistens: Array<() => void> = [];
-    void events
-      .onWorkspaceChanged(() => void invalidateWorkspaceScoped(qc))
-      .then((u) => unlistens.push(u));
-    void events
-      .onScanDone((done) => {
+    const unlistens = [
+      events.onWorkspaceChanged(() => void invalidateWorkspaceScoped(qc)),
+      events.onScanDone((done) => {
         if (!addedWorkspaceScanJobs.current.has(done.jobId)) return;
         addedWorkspaceScanJobs.current.delete(done.jobId);
         // A failed or canceled scan is told about by Home (#313).
@@ -127,8 +125,8 @@ export function WorkspaceRail() {
         toast.success(t("home.scanComplete"), {
           description: t("home.scanCompleteDetail", done.stats),
         });
-      })
-      .then((u) => unlistens.push(u));
+      }),
+    ];
     return () => unlistens.forEach((u) => u());
   }, [qc, t]);
 
@@ -156,6 +154,7 @@ export function WorkspaceRail() {
       }
       onAdded(r);
     },
+    meta: { reportsOwnError: true },
     onError: (e, dir) =>
       toast.error(t("drop.addFailed", { name: dir.name }), {
         description: e instanceof Error ? e.message : String(e),
@@ -313,11 +312,17 @@ export function WorkspaceRail() {
         data-slot="workspace-rail"
         className="flex h-full w-16 shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-3"
       >
-        <img
-          src={LOGO_SRC[logo]}
-          alt={appName()}
-          className="size-[50px] shrink-0"
-        />
+        {/* The bitmaps arrive from main just after the first paint; hold the
+          space meanwhile, without an <img> that would show its alt text. */}
+        {logoImages ? (
+          <img
+            src={logoImages[logo]}
+            alt={appName()}
+            className="size-[50px] shrink-0"
+          />
+        ) : (
+          <div className="size-[50px] shrink-0" />
+        )}
 
         {/* Workspace list (scrolls only here when there are many).
           Add padding so the first avatar's selection ring (ring-2) is not clipped at the top edge. */}

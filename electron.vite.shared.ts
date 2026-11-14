@@ -2,6 +2,7 @@ import type { UserConfig } from "electron-vite";
 import { externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import type { Plugin } from "vite";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,29 @@ const { dependencies } = JSON.parse(
   readFileSync(fromRepo("package.json"), "utf8"),
 ) as { dependencies: Record<string, string> };
 const runtimeDeps = Object.keys(dependencies);
+
+/**
+ * index.html's CSP is the packaged app's. The dev server also needs its own
+ * origin over http and its HMR socket; add those while serving only.
+ */
+function devServerCsp(): Plugin {
+  return {
+    name: "dev-server-csp",
+    apply: "serve",
+    transformIndexHtml(html) {
+      const prod = "connect-src 'self' http://127.0.0.1:*;";
+      if (!html.includes(prod)) {
+        throw new Error(
+          "index.html's connect-src changed; update devServerCsp",
+        );
+      }
+      return html.replace(
+        prod,
+        "connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*;",
+      );
+    },
+  };
+}
 
 export interface AppBuildOptions {
   /** The entry point that calls startApp(); becomes out/main/main.js. */
@@ -70,7 +94,7 @@ export function appBuildConfig(options: AppBuildOptions): UserConfig {
     renderer: {
       root: repoRoot,
       base: "./",
-      plugins: [react(), tailwindcss()],
+      plugins: [react(), tailwindcss(), devServerCsp()],
       resolve: {
         alias: { "@": fromRepo("src"), "@shared": fromRepo("shared") },
       },

@@ -6,6 +6,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "common.close": "关闭",
   "common.cancel": "取消",
   "common.ok": "确定",
+  "common.actionFailed": "操作失败",
 
   // kind
   "kind.video": "视频",
@@ -560,7 +561,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "discover.inFolder": "正在从“{path}”中挑选",
   "discover.empty": "没有可推荐的媒体。",
   "discover.emptyHint": "执行“扫描”导入视频和图片后，这里会随机推荐。",
-  "discover.sceneHint": "悬停放大 · 点击从该时间点播放",
+  "discover.sceneHint": "点击场景即可跳转",
   "discover.moreScenes": "+{count}",
 
   // 播放历史

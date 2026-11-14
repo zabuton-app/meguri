@@ -21,6 +21,13 @@ and stays fully usable along with the toolbar and the bottom player bar
 choice, the modal size and the peek width are all remembered in
 `localStorage`.
 
+A modal's frame closes itself on Esc (unless a layer on top already took the
+key) and keeps keyboard focus inside with `useModalFocus`
+(`src/hooks/useModalFocus.ts`): focus moves into the panel (`tabIndex={-1}`) on
+open, Tab cycles inside it, and focus returns to the opener on close. The
+dialog element is named with `aria-labelledby` pointing at the title the route
+renders. The peek is not a modal, so it does neither.
+
 Each route is a directory: `index.tsx` is the entry point and composes the
 route, sitting alongside its companion components and hooks — for example
 `src/routes/MediaDetail/MediaModal.tsx`,
@@ -141,6 +148,12 @@ Data fetching uses `@tanstack/react-query`. The file list is an
 `useInfiniteQuery` combined with `@tanstack/react-virtual` for infinite scroll
 plus virtualization (`src/components/MediaGrid.tsx`). Four view modes — grid,
 list, timeline and graph — are switchable.
+
+A mutation that fails is reported by a generic toast
+(`src/hooks/useMutationErrorNotifier.ts`), so an action never fails silently.
+A mutation that shows its own error message sets
+`meta: { reportsOwnError: true }` to keep the failure from being reported
+twice.
 
 The grid and the list have a "show by folder" option (`BY_FOLDER_KEY`, remembered apart
 from the view mode) that browses one workspace like a file manager: the current

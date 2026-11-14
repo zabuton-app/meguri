@@ -5,6 +5,7 @@ export const ja = {
   "common.close": "閉じる",
   "common.cancel": "キャンセル",
   "common.ok": "OK",
+  "common.actionFailed": "操作に失敗しました",
 
   // 種別
   "kind.video": "動画",
@@ -583,7 +584,7 @@ export const ja = {
   "discover.empty": "おすすめできるメディアがありません。",
   "discover.emptyHint":
     "「スキャン」で動画や画像を取り込むと、ここでランダムにおすすめされます。",
-  "discover.sceneHint": "ホバーで拡大 · クリックでその時点から再生",
+  "discover.sceneHint": "シーンをクリックするとその位置に移動します",
   "discover.moreScenes": "+{count}",
 
   // 再生履歴

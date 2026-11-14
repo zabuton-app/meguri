@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { useModalFocus } from "@/hooks/useModalFocus";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 
 // Near-fullscreen modal frame. Close on backdrop click / Esc. `size` toggles
@@ -7,15 +8,24 @@ import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 export function DiscoverModal({
   onClose,
   size = "large",
+  titleId,
   children,
 }: {
   onClose: () => void;
   size?: ModalSize;
+  /** The id of the title element the caller renders, for aria-labelledby. */
+  titleId: string;
   children: ReactNode;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalFocus(panelRef);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      // A layer on top (the command menu, a Radix popup, ConfirmDialog) calls
+      // preventDefault on the Escape it consumed; closing Discover too would
+      // take the view out from under it.
+      if (e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
         onClose();
       }
@@ -35,10 +45,13 @@ export function DiscoverModal({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
+        ref={panelRef}
+        tabIndex={-1}
         data-slot="modal-panel"
-        className={innerClass}
+        className={`${innerClass} outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}

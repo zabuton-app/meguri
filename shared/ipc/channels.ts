@@ -549,6 +549,7 @@ export const ChannelInputs = {
   auto_tag_reapply: z.void(),
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
+  logo_images: z.void(),
   custom_css_get: z.void(),
   custom_css_set_enabled: z.object({ enabled: z.boolean() }),
   custom_css_open: z.void(),
@@ -728,6 +729,9 @@ export interface ChannelOutputs {
   logo_get: LogoId;
   // Echoes the applied variant so the renderer can settle on main's value.
   logo_set: LogoId;
+  // The in-app logo of each variant, as a data URL. The bitmaps come from
+  // startApp()'s options, so the renderer cannot bundle them.
+  logo_images: Record<LogoId, string>;
   custom_css_get: CustomCssState;
   // Returns the state after the switch, so the renderer applies (or drops)
   // the stylesheet without a second round trip.

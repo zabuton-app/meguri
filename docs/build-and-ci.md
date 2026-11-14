@@ -97,12 +97,14 @@ Tests run under Vitest (`vitest.config.ts`) as two projects.
 
 ### Core project
 
-`npm run test:core` covers the main/core logic (`electron/**/*.test.ts`). Because
-the tests exercise the same native dependencies as the app, this **runs Electron as Node**
-(`ELECTRON_RUN_AS_NODE=1` plus `--experimental-require-module` to allow
-`require()` of ESM). It exercises real SQL against an in-memory SQLite database.
-The config carries a plugin that resolves NodeNext-style `.js` import specifiers
-to `.ts`.
+`npm run test:core` covers the main/core logic (`electron/**/*.test.ts`).
+Because the tests exercise the same native dependencies as the app, this **runs
+Electron as Node** (`ELECTRON_RUN_AS_NODE=1` plus `--experimental-require-module`
+to allow `require()` of ESM). `scripts/test-core.mjs` sets these and starts
+Electron, so the command does not depend on a POSIX shell; arguments after `--`
+go to Vitest. It exercises real SQL against an in-memory SQLite database. The
+config carries a plugin that resolves NodeNext-style `.js` import specifiers to
+`.ts`.
 
 ### Renderer project
 
@@ -120,8 +122,8 @@ that uses ffmpeg paths must apply the
 `app.asar` → `app.asar.unpacked` substitution (see
 [ffmpeg/ffprobe path resolution](media-pipeline.md#ffmpegffprobe-path-resolution)).
 
-Distribution targets are Linux (AppImage / deb), Windows (nsis / portable), and
-macOS (dmg / zip).
+Distribution targets are Linux (AppImage / deb), Windows (nsis / portable /
+appx), and macOS (dmg / zip).
 
 Electron 45 packages require macOS 13 (Ventura) or later. The existing
 Windows x64 and Linux x64 release targets are supported by Electron 45.
@@ -160,6 +162,18 @@ GitHub Actions workflows live in `.github/workflows/`:
   when `docs/` or the workflow itself changes on `main`, or on manual dispatch.
   The repository's Pages source must be set to "GitHub Actions"; after
   switching it, run the workflow once by hand so the site is redeployed.
+
+Dependabot (`.github/dependabot.yml`) opens update PRs weekly for npm packages
+and GitHub Actions. npm's minor and patch updates come grouped into one PR, and
+a major update gets its own; the Actions' updates, majors since the workflows
+reference major tags, come as one PR. A version update must be a week old
+before it is proposed. Security updates are not held back or grouped: they
+arrive as soon as an advisory is published.
+
+`allowScripts` in `package.json` names exact versions. A PR that updates one of
+those packages also needs its entry updated (`npm approve-scripts`), or npm 12
+skips the package's install script. CI's npm (the one bundled with Node 22) does
+not read `allowScripts`, so CI stays green either way.
 
 @zabuton-app/ffmpeg-binaries fetches the ffmpeg and ffprobe executables of a
 single architecture at install time (`npm_config_arch || process.arch`), so CI

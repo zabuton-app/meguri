@@ -79,6 +79,17 @@ describe("useSelectAllGuard", () => {
     }
   });
 
+  it("still suppresses Ctrl+A on a focused select", () => {
+    // A <select> has no text of its own: the default selects the whole page.
+    const el = focusTemp(document.createElement("select"));
+    renderHook(() => useSelectAllGuard());
+    try {
+      expect(pressSelectAll().defaultPrevented).toBe(true);
+    } finally {
+      el.remove();
+    }
+  });
+
   it("leaves Ctrl+A alone inside a contenteditable", () => {
     const el = document.createElement("div");
     el.contentEditable = "true";

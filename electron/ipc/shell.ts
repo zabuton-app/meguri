@@ -3,7 +3,6 @@ import { spawn } from "node:child_process";
 import { statSync } from "node:fs";
 import { handle } from "../core/ipcHandler.js";
 import log from "../core/logger.js";
-import { TRAY_ICON_BASE64 } from "../core/logoAssets.js";
 import { folderDirInsideRoot, folderPathUnderRoot } from "../core/paths.js";
 import * as q from "../core/queries.js";
 import type { IpcContext } from "./context.js";
@@ -56,7 +55,7 @@ export function registerShellHandlers(ctx: IpcContext): void {
     // Resolve the entire selection before starting the OS drag. A stale or
     // out-of-root entry must not silently turn this into a partial drag.
     const icon = nativeImage.createFromBuffer(
-      Buffer.from(TRAY_ICON_BASE64.dark, "base64"),
+      Buffer.from(ctx.logos.tray.dark, "base64"),
     );
     event.sender.startDrag({
       file: files[0],

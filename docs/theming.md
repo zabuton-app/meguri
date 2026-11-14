@@ -203,9 +203,9 @@ more.
 ## Fonts and images
 
 Meguri makes no network requests apart from the optional update check. Its
-Content Security Policy blocks `@import` and `url()` pointing at other hosts;
-images from the local machine (`127.0.0.1`) are allowed, because the app
-serves its own media from there. A stylesheet can use:
+Content Security Policy blocks `@import` and `url()` pointing at other hosts,
+and at other services on the local machine: of `127.0.0.1`, only the port the
+app serves its own media from is allowed. A stylesheet can use:
 
 - Fonts installed on the system, by name
 - Fonts and images embedded as `data:` URIs

@@ -11,6 +11,13 @@
  */
 export const APP_NAME_ARG = "--app-name=";
 export const APP_GLYPH_ARG = "--app-glyph=";
+/**
+ * The media server's origin (window.api.mediaOrigin). The same value as
+ * app_status's mediaBase, but the renderer's CSP needs it synchronously,
+ * before the first request, to allow that one port on 127.0.0.1 instead of
+ * all of them (public/media-csp.js).
+ */
+export const MEDIA_ORIGIN_ARG = "--media-origin=";
 
 /** Renderer → main invoke channels (ipcMain.handle). */
 export const INVOKE_CHANNELS = [
@@ -91,6 +98,7 @@ export const INVOKE_CHANNELS = [
   "update_ignore",
   "logo_get",
   "logo_set",
+  "logo_images",
   "custom_css_get",
   "custom_css_set_enabled",
   "custom_css_open",

@@ -98,6 +98,7 @@ import {
 } from "./utils";
 import { scrollListByPage, turnListPage } from "./pageScroll";
 import { appName } from "@/lib/appName";
+import { isTyping } from "@/lib/keyTarget";
 
 // The graph view carries WebGL and graph libraries the list views never need,
 // so it is loaded the first time it is shown.
@@ -536,34 +537,29 @@ export default function Home() {
 
   // Refresh search results for every scan path (startup, workspace add/switch, manual scan).
   useEffect(() => {
-    let un: (() => void) | undefined;
-    void events
-      .onScanDone((done) => {
-        setScanning(false);
-        void status.refetch();
-        void search.refetch();
-        // Folders appear, fill up and empty out with a scan like files do.
-        void qc.invalidateQueries({ queryKey: ["folders_list"] });
-        void qc.invalidateQueries({ queryKey: ["graph_build"] });
-        void qc.invalidateQueries({ queryKey: ["activity_days"] });
-        void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
-        // A scan can add tags (new files, the derived-tag backfill), so a tag
-        // screen left open would otherwise show a stale catalog.
-        void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
-        const mode = manualScanJobs.current.get(done.jobId);
-        manualScanJobs.current.delete(done.jobId);
-        notifyScanDone(done, mode);
-      })
-      .then((u) => {
-        un = u;
-        // Listening now; a scan that failed before (the startup scan can
-        // finish before this view mounts) is asked about instead.
-        void api
-          .scanUnreadableWorkspaces()
-          .then((ids) => ids.forEach(notifyRootUnreadable))
-          .catch(() => {});
-      });
-    return () => un?.();
+    const unlisten = events.onScanDone((done) => {
+      setScanning(false);
+      void status.refetch();
+      void search.refetch();
+      // Folders appear, fill up and empty out with a scan like files do.
+      void qc.invalidateQueries({ queryKey: ["folders_list"] });
+      void qc.invalidateQueries({ queryKey: ["graph_build"] });
+      void qc.invalidateQueries({ queryKey: ["activity_days"] });
+      void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
+      // A scan can add tags (new files, the derived-tag backfill), so a tag
+      // screen left open would otherwise show a stale catalog.
+      void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+      const mode = manualScanJobs.current.get(done.jobId);
+      manualScanJobs.current.delete(done.jobId);
+      notifyScanDone(done, mode);
+    });
+    // Listening now; a scan that failed before (the startup scan can
+    // finish before this view mounts) is asked about instead.
+    void api
+      .scanUnreadableWorkspaces()
+      .then((ids) => ids.forEach(notifyRootUnreadable))
+      .catch(() => {});
+    return unlisten;
     // search/status are react-query results; only their stable `refetch` is used.
     // Depending on the whole objects would re-subscribe the listener every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -702,14 +698,7 @@ export default function Home() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (helpOpen) return;
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping()) return;
       if (isHelpKey(e)) {
         e.preventDefault();
         setHelpOpen(true);
@@ -739,11 +728,7 @@ export default function Home() {
     const onKey = (e: KeyboardEvent) => {
       if (helpOpen) return;
       const el = document.activeElement as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
+      const typing = isTyping();
       const b = NAV_BINDINGS[keybindingPreset];
       if (matchAny(e, b.focusSearch)) {
         // Let the key type normally if a field already has focus.
@@ -773,14 +758,7 @@ export default function Home() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping()) return;
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyK") {
         e.preventDefault();
         setCommandOpen((open) => !open);
@@ -821,12 +799,7 @@ export default function Home() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      const el = document.activeElement as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
+      const typing = isTyping();
       const overlayOpen =
         location.pathname !== "/" ||
         helpOpen ||
