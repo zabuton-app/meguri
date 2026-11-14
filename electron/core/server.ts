@@ -450,21 +450,39 @@ async function serveFile(
       "Content-Range": `bytes ${start}-${end}/${size}`,
       "Content-Length": end - start + 1,
     });
-    const stream = fs.createReadStream(file, { start, end });
-    res.on("close", () => stream.destroy());
-    stream.on("error", () => res.end());
-    stream.pipe(res);
+    pipeBody(fs.createReadStream(file, { start, end }), res, end - start + 1);
   } else {
     res.writeHead(200, {
       "Content-Type": ctype,
       "Accept-Ranges": "bytes",
       "Content-Length": size,
     });
-    const stream = fs.createReadStream(file);
-    res.on("close", () => stream.destroy());
-    stream.on("error", () => res.end());
-    stream.pipe(res);
+    pipeBody(fs.createReadStream(file), res, size);
   }
+}
+
+// Headers (and Content-Length) are already sent when the body starts, so a
+// failed or short read must abort the response: end() would close a body that
+// is shorter than announced and leave the client waiting for the missing bytes.
+function pipeBody(
+  stream: fs.ReadStream,
+  res: http.ServerResponse,
+  expected: number,
+) {
+  let sent = 0;
+  res.on("close", () => stream.destroy());
+  stream.on("error", (err) => res.destroy(err));
+  stream.on("data", (chunk) => {
+    sent += chunk.length;
+  });
+  stream.on("end", () => {
+    if (sent === expected) res.end();
+    else
+      res.destroy(
+        new Error(`file read ended after ${sent} of ${expected} bytes`),
+      );
+  });
+  stream.pipe(res, { end: false });
 }
 
 // Quickly extract a single frame at the given seconds using input seek (-ss before -i) and return it as JPEG.
