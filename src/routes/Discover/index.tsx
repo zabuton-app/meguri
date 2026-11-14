@@ -41,6 +41,7 @@ import {
   QUEUE_SIZE,
   parseDiscoverFilter,
 } from "./utils";
+import { isLayerOnTop, isTyping } from "@/lib/keyTarget";
 
 // The arrows overlay the card, so keep their disabled-hover background identical
 // to the resting one (the primitive clears it, assuming arrows sit outside).
@@ -92,6 +93,7 @@ export default function Discover() {
   // Points at the selected slide's toggle so the "w" shortcut can activate it
   // through the button itself (same mutation, toast, effect and disabled state).
   const activeWatchLaterRef = useRef<HTMLButtonElement>(null);
+  const viewRef = useRef<HTMLDivElement>(null);
 
   // Keep the queue stable across remounts; reshuffle is explicit (the button below).
   const queue = useQuery({
@@ -169,14 +171,8 @@ export default function Discover() {
   useEffect(() => {
     if (!embla) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      // The shortcuts overlay or a confirm dialog over Discover owns the keys.
+      if (isTyping() || isLayerOnTop(viewRef.current)) return;
       if (e.code === "KeyR" && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault();
         void reshuffle();
@@ -306,7 +302,7 @@ export default function Discover() {
         </div>
       </header>
 
-      <div className="h-full w-full">
+      <div ref={viewRef} className="h-full w-full">
         {loading ? (
           <Skeleton className="h-full w-full rounded-none" />
         ) : items.length === 0 ? (

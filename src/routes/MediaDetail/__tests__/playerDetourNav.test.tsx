@@ -137,3 +137,52 @@ describe("detail view reached from the player", () => {
     ).toBe(true);
   });
 });
+
+describe("detail view keys under a layer", () => {
+  beforeEach(() => {
+    mocks.fileGet.mockResolvedValue({
+      ...sampleFileDetail,
+      id: 5,
+      relPath: "Movie/deep.mp4",
+    });
+  });
+
+  it("leaves prev/next to a dialog open over it", async () => {
+    renderWithProviders(<Detail />, {
+      route: `/file/5?ws=${WS_ID}&from=player`,
+    });
+    await screen.findByRole("heading", { name: "deep.mp4" });
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Next file" })
+          .hasAttribute("disabled"),
+      ).toBe(false),
+    );
+    // The shortcuts overlay, or a confirm dialog, over the detail view (#268).
+    const layer = document.createElement("div");
+    layer.setAttribute("role", "dialog");
+    document.body.append(layer);
+    try {
+      fireEvent.keyDown(window, { code: "BracketRight" });
+      expect(window.location.hash).toContain("/file/5");
+    } finally {
+      layer.remove();
+    }
+    fireEvent.keyDown(window, { code: "BracketRight" });
+    await waitFor(() => expect(window.location.hash).toContain("/file/6"));
+  });
+});
+
+describe("detail view keys while a file loads", () => {
+  it("steps to the next file before the shown one has loaded", async () => {
+    mocks.fileGet.mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<Detail />, {
+      route: `/file/5?ws=${WS_ID}&from=player`,
+    });
+    // The loading frame is up and stays up: fileGet never answers.
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { code: "BracketRight" });
+    await waitFor(() => expect(window.location.hash).toContain("/file/6"));
+  });
+});

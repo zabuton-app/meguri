@@ -15,7 +15,10 @@ export function DiscoverModal({
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      // A layer on top (the command menu, a Radix popup, ConfirmDialog) calls
+      // preventDefault on the Escape it consumed; closing Discover too would
+      // take the view out from under it.
+      if (e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
         onClose();
       }

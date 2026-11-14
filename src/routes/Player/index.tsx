@@ -355,6 +355,7 @@ export default function Player() {
     exit,
     navBinding,
     wake,
+    viewRef: rootRef,
   });
 
   // Nothing playable: say so rather than sitting on a black screen (FR-016).

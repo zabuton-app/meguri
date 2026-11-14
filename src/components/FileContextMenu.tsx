@@ -62,16 +62,13 @@ import {
 } from "@/settings/keybindings";
 import { isNormalizedFolderPath } from "@shared/folderPath";
 import { MAX_BULK_FILES } from "@shared/tags";
+import { isTyping } from "@/lib/keyTarget";
 
 /** The attribute a file's card or row carries, so the menu can tell which was clicked. */
 const FILE_KEY_ATTR = "data-file-key";
 
 const NO_FILES: FileRow[] = [];
 const RATINGS = [0, 1, 2, 3, 4, 5];
-
-const isTyping = (el: Element | null) =>
-  el instanceof HTMLElement &&
-  (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
 
 function cardOf(target: EventTarget | null): Element | null {
   return target instanceof Element
@@ -99,7 +96,7 @@ export function FileContextMenu({
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!isContextMenuKey(e) || isTyping(document.activeElement)) return;
+      if (!isContextMenuKey(e) || isTyping()) return;
       const focused = getFocusedFile();
       if (!focused) return;
       const key = mediaSortId(focused);
