@@ -24,7 +24,7 @@ interface ThirdPartyEntry {
 const THIRD_PARTY: ThirdPartyEntry[] = [
   // The ffmpeg/ffprobe executables themselves are GPL builds of FFmpeg; the
   // GPL corresponding-source obligation is satisfied by pointing at the
-  // FFmpeg source download page (not just the npm wrappers below).
+  // FFmpeg source download page (not just the download scripts below).
   {
     name: "FFmpeg / FFprobe (bundled binaries)",
     license: "GPL-3.0",
@@ -32,19 +32,11 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
     sourceUrl: "https://ffmpeg.org/download.html",
   },
   {
-    name: "ffmpeg-static (npm)",
-    license: "GPL-3.0-or-later",
+    name: "ffmpeg-binaries (download scripts)",
+    license: "MIT",
     licenseUrl:
-      "https://github.com/eugeneware/ffmpeg-static/blob/master/LICENSE",
-    sourceUrl: "https://github.com/eugeneware/ffmpeg-static",
-  },
-  {
-    name: "@derhuerst/ffprobe-static (npm)",
-    license: "GPL-3.0-or-later",
-    licenseUrl:
-      "https://github.com/eugeneware/ffmpeg-static/blob/master/LICENSE",
-    sourceUrl:
-      "https://github.com/eugeneware/ffmpeg-static/tree/master/packages/ffprobe-static",
+      "https://github.com/zabuton-app/ffmpeg-binaries/blob/main/LICENSE",
+    sourceUrl: "https://github.com/zabuton-app/ffmpeg-binaries",
   },
   {
     name: "Electron (Chromium / Node.js)",

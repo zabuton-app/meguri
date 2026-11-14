@@ -19,7 +19,7 @@ export const defaultMediaDir = path.join(__dirname, ".media");
 
 const require = createRequire(path.join(repoRoot, "package.json"));
 const { _electron } = require("@playwright/test");
-export const ffmpegPath = require("ffmpeg-static");
+export const { ffmpegPath } = require("@zabuton-app/ffmpeg-binaries");
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

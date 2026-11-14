@@ -8,6 +8,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Server } from "node:http";
 import { openDb, nowUnix, type DB } from "../db.js";
 import { upsertScanRoot } from "../queries.js";
@@ -401,6 +402,35 @@ describe("frame serving (ffmpeg path)", () => {
   });
 });
 
+describe("still image transcoding (ffmpeg path)", () => {
+  it("serves the whole grid of a tiled HEIF as a JPEG", async () => {
+    const heic = path.join(root, "grid.heic");
+    fs.copyFileSync(
+      fileURLToPath(new URL("./fixtures/grid-1024x512.heic", import.meta.url)),
+      heic,
+    );
+    const id = insert("grid.heic", heic, null, "done", "image", "heic");
+    const res = await fetch(`${base}/ws/${WS}/media/${id}`, authHeaders());
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    const size = execFileSync(
+      FFPROBE,
+      [
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=width,height",
+        "-of",
+        "csv=p=0",
+        "pipe:0",
+      ],
+      { input: Buffer.from(await res.arrayBuffer()), encoding: "utf8" },
+    );
+    // One 512x512 tile would come out square.
+    expect(size.trim()).toBe("1024,512");
+  });
+});
+
 describe("MKV audio track selection", () => {
   const fixtures = [
     { first: "96x64", second: "128x72", expectedWidth: 96 },
@@ -495,8 +525,8 @@ describe("MKV audio track selection", () => {
           sample_rate?: string;
         }[];
       };
-    const audioPacketHashes = (input: Buffer) =>
-      JSON.parse(
+    const audioPacketHashes = (input: Buffer) => {
+      const { packets } = JSON.parse(
         execFileSync(
           FFPROBE,
           [
@@ -516,6 +546,10 @@ describe("MKV audio track selection", () => {
           { input, encoding: "utf8" },
         ),
       ) as { packets: { data_hash: string }[] };
+      // ffprobe 9 also reports the container's side data on a packet (the
+      // AAC priming samples to skip); this compares the encoded payloads.
+      return packets.map(({ data_hash }) => data_hash);
+    };
     const [automatic, aac, dolby] = await Promise.all([
       preview(""),
       preview("?audioTrack=0"),
@@ -531,7 +565,7 @@ describe("MKV audio track selection", () => {
     ]);
     expect(streams(dolby).streams).toEqual(streams(automatic).streams);
     const sourceHashes = audioPacketHashes(original);
-    expect(sourceHashes.packets.length).toBeGreaterThan(0);
+    expect(sourceHashes.length).toBeGreaterThan(0);
     expect(audioPacketHashes(aac)).toEqual(sourceHashes);
     expect((await fetch(url + "?audioTrack=2", authHeaders())).status).toBe(
       400,
@@ -688,9 +722,9 @@ describe("media remux (ffmpeg path)", () => {
         "-preset",
         "ultrafast",
         "-x265-params",
-        "pools=none:frame-threads=1:log-level=error",
-        "-color_trc",
-        "bt709",
+        // With ffmpeg 9, -color_trc no longer tags this stream, so x265 is
+        // told the transfer directly.
+        "pools=none:frame-threads=1:log-level=error:transfer=bt709",
         "-c:a",
         codec,
         clip,

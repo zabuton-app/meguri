@@ -19,7 +19,7 @@ import {
 } from "./lib.mjs";
 
 const require = createRequire(path.join(repoRoot, "package.json"));
-const ffmpegPath = require("ffmpeg-static");
+const { ffmpegPath } = require("@zabuton-app/ffmpeg-binaries");
 
 // Settings order (src/audio/spectrumPatterns.ts) with the Settings labels.
 const PATTERNS = [

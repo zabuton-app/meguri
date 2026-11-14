@@ -781,8 +781,10 @@ function serveTranscodedImage(res: http.ServerResponse, file: string) {
   const args = [
     "-v",
     "error",
+    // One thread: a tiled HEIF gets one decoder per tile, each with this many
+    // threads (see runFfmpegThumb in media.ts).
     "-threads",
-    String(DECODE_FFMPEG_THREADS),
+    "1",
     "-i",
     file,
     "-frames:v",

@@ -48,8 +48,8 @@ jobs:
           cache: npm
 
       # postinstall (electron-builder install-app-deps) prepares better-sqlite3 for Electron.
-      # ffmpeg-static and @derhuerst/ffprobe-static each download a SINGLE binary at install
-      # time based on npm_config_arch || os.arch(), so we pin npm_config_arch to the
+      # @zabuton-app/ffmpeg-binaries downloads the binaries of a SINGLE arch at install
+      # time based on npm_config_arch || process.arch, so we pin npm_config_arch to the
       # electron-builder target arch to guarantee the bundled binaries match (e.g. avoids an
       # x64-under-Rosetta Node fetching the wrong arch).
       - name: Install dependencies

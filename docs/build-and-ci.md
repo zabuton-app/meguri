@@ -22,6 +22,12 @@ better-sqlite3 ships prebuilt Node-API binaries. npm 12 still reports a
 `node-gyp rebuild` install script for it and warns that it was blocked, so
 `allowScripts` in `package.json` denies it explicitly.
 
+@zabuton-app/ffmpeg-binaries is installed from a tarball URL (see
+[CI](#ci)). npm 12 refuses URL dependencies by default, so `.npmrc` sets
+`allow-remote=root`, which allows only the URLs written in this `package.json`.
+Its install script downloads the binaries, and `allowScripts` allows it under
+the same URL, because npm matches a URL dependency by its URL, not its name.
+
 `dev`, `preview`, and `start` go through `scripts/run-electron-vite.mjs` rather
 than calling `electron-vite` directly. The wrapper strips
 `ELECTRON_RUN_AS_NODE` (which the test runner sets) from the environment before
@@ -81,6 +87,9 @@ export default defineConfig(
   the shared file imports (`electron-vite`, `@vitejs/plugin-react`,
   `@tailwindcss/vite`). The main and preload builds keep those `dependencies`
   external by name, whether or not the project's package.json lists them.
+- For @zabuton-app/ffmpeg-binaries the project also needs `allow-remote=root`
+  in its `.npmrc` and the tarball URL in its own `allowScripts` (see
+  [npm scripts](#npm-scripts)).
 
 ## Testing
 
@@ -108,8 +117,8 @@ the jsdom worker does not start under Electron's experimental loader.
 ## Packaging
 
 `npm run dist` runs `electron-vite build` then `electron-builder`. The builder's
-`asarUnpack` includes better-sqlite3, ffmpeg-static, and
-@derhuerst/ffprobe-static; code that uses ffmpeg paths must apply the
+`asarUnpack` includes better-sqlite3 and @zabuton-app/ffmpeg-binaries; code
+that uses ffmpeg paths must apply the
 `app.asar` → `app.asar.unpacked` substitution (see
 [ffmpeg/ffprobe path resolution](media-pipeline.md#ffmpegffprobe-path-resolution)).
 
@@ -118,6 +127,9 @@ appx), and macOS (dmg / zip).
 
 Electron 45 packages require macOS 13 (Ventura) or later. The existing
 Windows x64 and Linux x64 release targets are supported by Electron 45.
+On Linux the bundled ffmpeg and ffprobe need glibc 2.35 or later (Ubuntu
+22.04, Debian 12); on an older system they do not start, so files get no
+metadata or thumbnails.
 The Node.js version used to run npm and the build scripts is separate from
 the Node.js version bundled with Electron.
 
@@ -160,13 +172,20 @@ arrive as soon as an advisory is published.
 
 `allowScripts` in `package.json` names exact versions. A PR that updates one of
 those packages also needs its entry updated (`npm approve-scripts`), or npm 12
-skips the package's install script, and with it, for ffmpeg-static, the binary.
-CI's npm (the one bundled with Node 22) does not read `allowScripts`, so CI
-stays green either way.
+skips the package's install script. CI's npm (the one bundled with Node 22) does
+not read `allowScripts`, so CI stays green either way.
 
-ffmpeg-static and @derhuerst/ffprobe-static each fetch a single-architecture
-binary at install time (`npm_config_arch || os.arch()`), so CI pins
-`npm_config_arch` to the target arch to keep the bundled binaries consistent.
+@zabuton-app/ffmpeg-binaries fetches the ffmpeg and ffprobe executables of a
+single architecture at install time (`npm_config_arch || process.arch`), so CI
+pins `npm_config_arch` to the target arch to keep the bundled binaries
+consistent. The package is
+[zabuton-app/ffmpeg-binaries](https://github.com/zabuton-app/ffmpeg-binaries),
+installed from the package tarball attached to one of its releases: the
+releases mirror upstream FFmpeg builds, and the install checks each download
+against a SHA-256 kept in the package. To move to a newer FFmpeg, publish a
+release there, change the URL in both `dependencies` and `allowScripts` in
+`package.json`, and run `npm install` to update the lockfile. With only one of
+the two changed, npm blocks the install script and the binaries are missing.
 
 ## Docker development
 
