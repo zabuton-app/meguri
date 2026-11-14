@@ -1,6 +1,8 @@
 // Metadata extraction (ffprobe) and thumbnail generation (ffmpeg). Bundled static binaries, no system dependency.
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { promises as fsPromises } from "node:fs";
+import path from "node:path";
 import { promisify } from "node:util";
 import { FFMPEG, FFPROBE } from "./ffmpeg-paths.js";
 import { DECODE_FFMPEG_THREADS } from "./mediaConcurrency.js";
@@ -370,6 +372,9 @@ async function runFfmpegThumb(
   complexFilter = false,
 ): Promise<boolean> {
   const useOffset = typeof offsetSec === "number";
+  const output = useOffset
+    ? path.join(path.dirname(dest), `${randomUUID()}.webp`)
+    : dest;
   // scale BEFORE thumbnail: the thumbnail filter keeps its whole scoring
   // window (default 100 frames) in memory, so at full 4K that is ~1.2 GB per
   // process versus ~140 MB once the frames are already 480px. Its histogram
@@ -417,23 +422,21 @@ async function runFfmpegThumb(
     "libwebp",
     "-quality",
     "78",
-    dest,
+    output,
   );
   try {
     await execFileAsync(FFMPEG, args, { timeout: 60000, signal });
-    // A corrupt attached picture can leave ffmpeg exiting 0 having written
-    // nothing (or an empty file). Reporting success there would persist
-    // thumb_path with hasThumb = 1, and every request for it would 404. The
-    // video/image path reaches here only after decoding a real frame, so this
-    // check stays scoped to audio rather than changing existing behaviour.
-    if (kind === "audio") {
-      const st = await fsPromises.stat(dest).catch(() => null);
+    // FFmpeg can exit successfully without writing a frame at a requested
+    // time. Check the new output so an older thumbnail cannot mask a miss.
+    if (kind === "audio" || useOffset) {
+      const st = await fsPromises.stat(output).catch(() => null);
       if (!st || st.size === 0) {
-        if (st) await fsPromises.unlink(dest).catch(() => {});
-        log.warn(`ffmpeg cover extraction produced no output for ${src}`);
+        if (st && !useOffset) await fsPromises.unlink(output).catch(() => {});
+        log.warn(`ffmpeg thumbnail extraction produced no output for ${src}`);
         return false;
       }
     }
+    if (useOffset) await fsPromises.rename(output, dest);
     return true;
   } catch (err) {
     // Surface ffmpeg's reason so the next failure isn't silent. Aborted runs are expected
@@ -469,5 +472,7 @@ async function runFfmpegThumb(
       );
     }
     return false;
+  } finally {
+    if (useOffset) await fsPromises.unlink(output).catch(() => {});
   }
 }
