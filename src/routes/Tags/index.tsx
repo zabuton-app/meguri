@@ -2,7 +2,7 @@
 // and origin, and lets the user rename, merge and delete the ones they created.
 // A second view draws the same catalog as a cloud, sized by use.
 // Overlays the library as a modal, like /duplicates and /history.
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -59,6 +59,7 @@ const refOf = (tag: TagSummary): TagRef => ({
 
 export default function Tags() {
   const { t } = useI18n();
+  const titleId = useId();
   const qc = useQueryClient();
   const confirm = useConfirm();
   const navigate = useNavigate();
@@ -304,10 +305,12 @@ export default function Tags() {
     : t("media.modalMinimize");
 
   return (
-    <HistoryModal onClose={onClose} size={modalSize}>
+    <HistoryModal onClose={onClose} size={modalSize} titleId={titleId}>
       <header className="flex flex-wrap items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
         <TagsIcon className="size-4 text-primary" />
-        <span className="text-sm font-medium text-fg">{t("tags.title")}</span>
+        <span id={titleId} className="text-sm font-medium text-fg">
+          {t("tags.title")}
+        </span>
         {all.length > 0 && (
           <span className="text-xs text-muted">
             {t("tags.summary", {

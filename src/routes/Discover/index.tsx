@@ -4,7 +4,14 @@
 // own: they play in place once asked to (Play, or a scene picked from the rail),
 // and get a hover scrub preview (frame endpoint) gated by the hoverPreview
 // preference whenever they are not playing.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Maximize2, Minimize2, RefreshCw, Sparkles, X } from "lucide-react";
@@ -55,6 +62,7 @@ let savedPosition: { wsId: string; filterKey: string; index: number } | null =
 
 export default function Discover() {
   const { t, lang } = useI18n();
+  const titleId = useId();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
@@ -244,11 +252,18 @@ export default function Discover() {
   const folderLabel = useFolderScopeLabel(discoverFilter.folder?.path);
 
   return (
-    <DiscoverModal onClose={() => void onClose()} size={modalSize}>
+    <DiscoverModal
+      onClose={() => void onClose()}
+      size={modalSize}
+      titleId={titleId}
+    >
       {/* Header overlaid on the media; empty header space clicks through to the card. */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center gap-2.5 px-4 py-3">
         <Sparkles className="size-4 text-primary drop-shadow-md" />
-        <span className="text-sm font-semibold text-bright-fg drop-shadow-md">
+        <span
+          id={titleId}
+          className="text-sm font-semibold text-bright-fg drop-shadow-md"
+        >
           {t("discover.title")}
         </span>
         {items.length > 0 && (

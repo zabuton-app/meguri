@@ -33,3 +33,18 @@ export function isLayerOnTop(inView: Element | null): boolean {
   }
   return false;
 }
+
+/**
+ * For a menu's onCloseAutoFocus. An item that asked for confirmation opened
+ * the confirm dialog while the menu still held focus, so the menu took focus
+ * back from it on the way out; returning it to the trigger would leave it
+ * behind the dialog's backdrop. Give it to the dialog instead.
+ */
+export function focusOpenConfirm(e: Event): void {
+  const dialog = document.querySelector<HTMLElement>(
+    '[role="alertdialog"][aria-modal="true"]',
+  );
+  if (!dialog) return;
+  e.preventDefault();
+  if (!dialog.contains(document.activeElement)) dialog.focus();
+}

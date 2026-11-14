@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { useModalFocus } from "@/hooks/useModalFocus";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 
 // Modal frame. Close on backdrop click / Esc. `size` toggles between a
@@ -7,12 +8,18 @@ import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 export function HistoryModal({
   onClose,
   size = "small",
+  titleId,
   children,
 }: {
   onClose: () => void;
   size?: ModalSize;
+  /** The id of the title element the caller renders, for aria-labelledby. */
+  titleId: string;
   children: ReactNode;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalFocus(panelRef);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // A nested layer (a Radix dialog, ConfirmDialog) calls preventDefault on
@@ -46,10 +53,13 @@ export function HistoryModal({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
+        ref={panelRef}
+        tabIndex={-1}
         data-slot="modal-panel"
-        className={innerClass}
+        className={`${innerClass} outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
