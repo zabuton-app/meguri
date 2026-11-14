@@ -248,6 +248,18 @@ export const en: Record<TranslationKey, string> = {
 
   // media detail
   "media.notFound": "File not found.",
+  "downloadOrigin.title": "Where from",
+  "downloadOrigin.website": "Website",
+  "downloadOrigin.recorded": "Recorded URLs",
+  "downloadOrigin.download": "Download URL",
+  "downloadOrigin.referrer": "Referrer URL",
+  "downloadOrigin.other": "Other recorded URL",
+  "downloadOrigin.copy": "Copy",
+  "downloadOrigin.copyLabel": "Copy {label}",
+  "downloadOrigin.openLabel": "Open {label}",
+  "downloadOrigin.copied": "URL copied to clipboard",
+  "downloadOrigin.copyFailed": "Could not copy the URL.",
+  "downloadOrigin.openFailed": "Could not open the URL.",
   "media.openExternal": "Open externally",
   "media.openExternalFailed": "Could not open externally",
   "fileMenu.open": "Open",

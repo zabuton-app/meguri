@@ -110,7 +110,10 @@ export function registerShellHandlers(ctx: IpcContext): void {
     if (!allowed.includes(parsed.protocol)) {
       throw new Error("unsupported protocol");
     }
-    void shell.openExternal(parsed.toString());
+    return shell.openExternal(parsed.toString()).catch(() => {
+      // Recorded download URLs can contain credentials in their query strings.
+      throw new Error("could not open external URL");
+    });
   });
 
   handle("open_devtools", () => {

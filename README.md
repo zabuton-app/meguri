@@ -395,6 +395,15 @@ For ProRes, MKV, AVI, WMV, FLV, or TS clips with multiple audio tracks, use
 uses the usual playback selection when you open a clip. Switching tracks
 keeps the playhead and play or pause state.
 
+### Download origin on macOS
+
+Open a file’s details and look for **Where from**. When macOS has a download
+record, Meguri shows the website and lets you expand **Recorded URLs** to copy
+or open the recorded download link or referrer. These links can expire. If the
+browser or filesystem did not preserve the record, the section is hidden.
+Meguri reads this metadata when you open the details and keeps it out of the
+catalogue. A link opens in your browser only when you choose **Open**.
+
 ### Embedded subtitles
 
 Use **Subtitle track** in the clip player or fullscreen to choose an embedded

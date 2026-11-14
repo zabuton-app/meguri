@@ -244,6 +244,18 @@ export const ko: Record<TranslationKey, string> = {
 
   // media detail
   "media.notFound": "파일을 찾을 수 없습니다.",
+  "downloadOrigin.title": "다운로드 출처",
+  "downloadOrigin.website": "웹사이트",
+  "downloadOrigin.recorded": "기록된 URL",
+  "downloadOrigin.download": "다운로드 URL",
+  "downloadOrigin.referrer": "참조 페이지 URL",
+  "downloadOrigin.other": "기타 기록된 URL",
+  "downloadOrigin.copy": "복사",
+  "downloadOrigin.copyLabel": "{label} 복사",
+  "downloadOrigin.openLabel": "{label} 열기",
+  "downloadOrigin.copied": "URL을 클립보드에 복사했습니다",
+  "downloadOrigin.copyFailed": "URL을 복사할 수 없습니다.",
+  "downloadOrigin.openFailed": "URL을 열 수 없습니다.",
   "media.openExternal": "외부에서 열기",
   "media.openExternalFailed": "외부 앱에서 열 수 없습니다",
   "fileMenu.open": "열기",

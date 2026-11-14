@@ -236,6 +236,18 @@ export const zhCN: Record<TranslationKey, string> = {
 
   // media detail
   "media.notFound": "未找到文件。",
+  "downloadOrigin.title": "下载来源",
+  "downloadOrigin.website": "网站",
+  "downloadOrigin.recorded": "已记录的网址",
+  "downloadOrigin.download": "下载网址",
+  "downloadOrigin.referrer": "来源页面网址",
+  "downloadOrigin.other": "其他已记录的网址",
+  "downloadOrigin.copy": "复制",
+  "downloadOrigin.copyLabel": "复制{label}",
+  "downloadOrigin.openLabel": "打开{label}",
+  "downloadOrigin.copied": "已将网址复制到剪贴板",
+  "downloadOrigin.copyFailed": "无法复制网址。",
+  "downloadOrigin.openFailed": "无法打开网址。",
   "media.openExternal": "用外部程序打开",
   "media.openExternalFailed": "无法在外部应用中打开",
   "fileMenu.open": "打开",

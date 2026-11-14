@@ -247,6 +247,18 @@ export const ja = {
 
   // メディア詳細（MediaDetail）
   "media.notFound": "ファイルが見つかりません。",
+  "downloadOrigin.title": "ダウンロード元",
+  "downloadOrigin.website": "ウェブサイト",
+  "downloadOrigin.recorded": "記録された URL",
+  "downloadOrigin.download": "ダウンロード URL",
+  "downloadOrigin.referrer": "参照元 URL",
+  "downloadOrigin.other": "その他の記録された URL",
+  "downloadOrigin.copy": "コピー",
+  "downloadOrigin.copyLabel": "{label}をコピー",
+  "downloadOrigin.openLabel": "{label}を開く",
+  "downloadOrigin.copied": "URL をクリップボードにコピーしました",
+  "downloadOrigin.copyFailed": "URL をコピーできませんでした。",
+  "downloadOrigin.openFailed": "URL を開けませんでした。",
   "media.openExternal": "外部で開く",
   "media.openExternalFailed": "外部で開けませんでした",
   "fileMenu.open": "開く",

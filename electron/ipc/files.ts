@@ -8,6 +8,8 @@ import {
   readEmbeddedTracks,
   readWebVtt,
 } from "../../shared/embeddedSubtitles.js";
+import { readDownloadOrigin } from "../core/downloadOrigin.js";
+import { absPathOf } from "../core/tags.js";
 import { handle } from "../core/ipcHandler.js";
 import { isRemuxedVideo } from "../../shared/playbackTracks.js";
 import { isInsideRoot } from "../core/paths.js";
@@ -87,6 +89,12 @@ export function registerFileHandlers(ctx: IpcContext): void {
       return { ...file, meta };
     }
     return file;
+  });
+  handle("file_download_origin", ({ id, workspaceId }) => {
+    if (process.platform !== "darwin") return [];
+    const core = ws.byId(workspaceId);
+    const abs = core && absPathOf(core.db, id);
+    return core && abs ? readDownloadOrigin(abs, core.root) : [];
   });
   handle("file_subtitles", async ({ id, workspaceId, track, windowStart }) => {
     const core = coreById(ws, workspaceId);

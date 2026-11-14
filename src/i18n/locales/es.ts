@@ -253,6 +253,18 @@ export const es: Record<TranslationKey, string> = {
 
   // media detail
   "media.notFound": "Archivo no encontrado.",
+  "downloadOrigin.title": "Origen de la descarga",
+  "downloadOrigin.website": "Sitio web",
+  "downloadOrigin.recorded": "URL registradas",
+  "downloadOrigin.download": "URL de descarga",
+  "downloadOrigin.referrer": "URL de referencia",
+  "downloadOrigin.other": "Otra URL registrada",
+  "downloadOrigin.copy": "Copiar",
+  "downloadOrigin.copyLabel": "Copiar {label}",
+  "downloadOrigin.openLabel": "Abrir {label}",
+  "downloadOrigin.copied": "URL copiada al portapapeles",
+  "downloadOrigin.copyFailed": "No se pudo copiar la URL.",
+  "downloadOrigin.openFailed": "No se pudo abrir la URL.",
   "media.openExternal": "Abrir externamente",
   "media.openExternalFailed": "No se pudo abrir en la aplicación externa",
   "fileMenu.open": "Abrir",
