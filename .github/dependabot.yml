@@ -1,7 +1,8 @@
 # Update PRs for npm packages and GitHub Actions (#290), at most a few a week.
 # npm: minor and patch updates arrive as one PR; a major update gets its own,
-# since it may need code changes. Actions are referenced by major tag, so
-# their updates are majors; they arrive as one PR, and CI shows a break.
+# since it may need code changes. Actions are pinned to a commit SHA with the
+# version in a trailing comment, and Dependabot updates the SHA and the
+# comment together; all their updates arrive as one PR, and CI shows a break.
 version: 2
 updates:
   - package-ecosystem: npm
