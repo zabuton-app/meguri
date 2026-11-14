@@ -469,7 +469,7 @@ function pipeBody(
   let sent = 0;
   res.on("close", () => stream.destroy());
   stream.on("error", (err) => res.destroy(err));
-  stream.on("data", (chunk: Buffer) => {
+  stream.on("data", (chunk) => {
     sent += chunk.length;
   });
   stream.on("end", () => {
