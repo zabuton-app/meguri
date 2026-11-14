@@ -28,7 +28,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test:core && npm run test:renderer",
-    "test:core": "ELECTRON_RUN_AS_NODE=1 NODE_OPTIONS=--experimental-require-module electron node_modules/vitest/vitest.mjs run --project core",
+    "test:core": "node scripts/test-core.mjs",
     "test:renderer": "vitest run --project renderer",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:headless": "npm run build && MEGURI_FORCE_X11=1 xvfb-run -a -s \"-screen 0 1280x960x24\" -- playwright test",

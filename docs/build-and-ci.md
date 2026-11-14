@@ -88,12 +88,14 @@ Tests run under Vitest (`vitest.config.ts`) as two projects.
 
 ### Core project
 
-`npm run test:core` covers the main/core logic (`electron/**/*.test.ts`). Because
-the tests exercise the same native dependencies as the app, this **runs Electron as Node**
-(`ELECTRON_RUN_AS_NODE=1` plus `--experimental-require-module` to allow
-`require()` of ESM). It exercises real SQL against an in-memory SQLite database.
-The config carries a plugin that resolves NodeNext-style `.js` import specifiers
-to `.ts`.
+`npm run test:core` covers the main/core logic (`electron/**/*.test.ts`).
+Because the tests exercise the same native dependencies as the app, this **runs
+Electron as Node** (`ELECTRON_RUN_AS_NODE=1` plus `--experimental-require-module`
+to allow `require()` of ESM). `scripts/test-core.mjs` sets these and starts
+Electron, so the command does not depend on a POSIX shell; arguments after `--`
+go to Vitest. It exercises real SQL against an in-memory SQLite database. The
+config carries a plugin that resolves NodeNext-style `.js` import specifiers to
+`.ts`.
 
 ### Renderer project
 
