@@ -255,6 +255,8 @@ export const api = {
   /** App logo variant (window + tray icon), persisted in main's config.json. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
+  /** The in-app logo of each variant, as a data URL. */
+  logoImages: () => invoke("logo_images"),
   /** User stylesheet (<userData>/custom.css); the switch is persisted in main's config.json. */
   customCssGet: () => invoke("custom_css_get"),
   customCssSetEnabled: (enabled: boolean) =>
@@ -285,35 +287,26 @@ export type {
   UpdateInfo,
 };
 
-// Returns a Promise so existing components can receive the unlisten function via `.then(unlisten => ...)`.
+// bridge.on subscribes synchronously, so the unlisten function is returned
+// directly: an effect can hand it straight back as its cleanup.
 type Unlisten = () => void;
 export const events = {
-  onScanProgress: (cb: (p: ScanProgress) => void): Promise<Unlisten> =>
-    Promise.resolve(bridge.on("scan:progress", (p) => cb(p as ScanProgress))),
-  onThumbDone: (cb: (event: ThumbDone) => void): Promise<Unlisten> =>
-    Promise.resolve(bridge.on("thumb:done", (p) => cb(p as ThumbDone))),
-  onScanDone: (cb: (d: ScanDone) => void): Promise<Unlisten> =>
-    Promise.resolve(bridge.on("scan:done", (p) => cb(p as ScanDone))),
-  onWorkspaceChanged: (
-    cb: (activeId: string | null) => void,
-  ): Promise<Unlisten> =>
-    Promise.resolve(
-      bridge.on("workspace:changed", (p) =>
-        cb((p as { activeId: string | null }).activeId),
-      ),
+  onScanProgress: (cb: (p: ScanProgress) => void): Unlisten =>
+    bridge.on("scan:progress", (p) => cb(p as ScanProgress)),
+  onThumbDone: (cb: (event: ThumbDone) => void): Unlisten =>
+    bridge.on("thumb:done", (p) => cb(p as ThumbDone)),
+  onScanDone: (cb: (d: ScanDone) => void): Unlisten =>
+    bridge.on("scan:done", (p) => cb(p as ScanDone)),
+  onWorkspaceChanged: (cb: (activeId: string | null) => void): Unlisten =>
+    bridge.on("workspace:changed", (p) =>
+      cb((p as { activeId: string | null }).activeId),
     ),
-  onUpdateAvailable: (cb: (info: UpdateInfo) => void): Promise<Unlisten> =>
-    Promise.resolve(bridge.on("update:available", (p) => cb(p as UpdateInfo))),
-  onLibraryMerge: (cb: (e: LibraryMergeEvent) => void): Promise<Unlisten> =>
-    Promise.resolve(
-      bridge.on("library:merge", (p) => cb(p as LibraryMergeEvent)),
-    ),
-  onCssThemesChanged: (cb: (s: CssThemesState) => void): Promise<Unlisten> =>
-    Promise.resolve(
-      bridge.on("css-themes:changed", (p) => cb(p as CssThemesState)),
-    ),
-  onCustomCssChanged: (cb: (e: CustomCssChanged) => void): Promise<Unlisten> =>
-    Promise.resolve(
-      bridge.on("custom-css:changed", (p) => cb(p as CustomCssChanged)),
-    ),
+  onUpdateAvailable: (cb: (info: UpdateInfo) => void): Unlisten =>
+    bridge.on("update:available", (p) => cb(p as UpdateInfo)),
+  onLibraryMerge: (cb: (e: LibraryMergeEvent) => void): Unlisten =>
+    bridge.on("library:merge", (p) => cb(p as LibraryMergeEvent)),
+  onCssThemesChanged: (cb: (s: CssThemesState) => void): Unlisten =>
+    bridge.on("css-themes:changed", (p) => cb(p as CssThemesState)),
+  onCustomCssChanged: (cb: (e: CustomCssChanged) => void): Unlisten =>
+    bridge.on("custom-css:changed", (p) => cb(p as CustomCssChanged)),
 };

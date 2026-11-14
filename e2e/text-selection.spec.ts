@@ -76,8 +76,8 @@ test.describe("Text selection", () => {
   test("the About section stays selectable", async ({ ready }) => {
     // About lives on the App tab, and only the selected tab's panel is mounted.
     const dialog = await openSettingsTab(ready, "App");
-    // about.version renders as "<app name> version <x.y.z>", and the app name is
-    // the brand glyph in every locale (app.name), not the romanized "Meguri".
+    // about.version renders as "<app> version <x.y.z>", where the app is named
+    // by its one-character mark (startApp()'s glyph), not the romanized "Meguri".
     const version = dialog.getByText(/^巡 version /);
     await expect(version).toHaveCSS("user-select", "text");
     await version.click({ clickCount: 3 });
@@ -92,6 +92,10 @@ test.describe("Text selection", () => {
     const toast = ready.locator("[data-sonner-toast]").first();
     await expect(toast).toBeVisible();
     await expect(toast).toHaveCSS("user-select", "text");
+    // Sonner slides a toast in while fading it from 0 to 1. It already counts
+    // as visible during that, and clicks on a moving toast select nothing, so
+    // wait until it has settled.
+    await expect(toast).toHaveCSS("opacity", "1");
     // Sonner captures the pointer for swipe-to-dismiss, so a drag selects
     // nothing here; triple-click is the gesture that works.
     await toast.click({ clickCount: 3 });

@@ -1,9 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   compareVersions,
   releasesPage,
+  configureUpdater,
   updateDownloadUrl,
 } from "../updater.js";
+
+// The repo and the Store product ID are module state set at startup; reset
+// them so no test sees another's.
+beforeEach(() =>
+  configureUpdater({
+    repo: { owner: "zabuton-app", name: "meguri" },
+    msStoreProductId: "9NRSM11RRH8Z",
+    envPrefix: "MEGURI",
+  }),
+);
 
 describe("compareVersions", () => {
   it("treats equal versions as 0", () => {
@@ -60,6 +71,40 @@ describe("updateDownloadUrl", () => {
     );
     expect(updateDownloadUrl(null, true)).toBe(
       "ms-windows-store://pdp/?ProductId=9NRSM11RRH8Z",
+    );
+  });
+
+  it("uses the product ID the app was started with", () => {
+    configureUpdater({
+      repo: { owner: "someone", name: "other-app" },
+      msStoreProductId: "9ABCDEFGHIJK",
+      envPrefix: "OTHER",
+    });
+    expect(updateDownloadUrl(htmlUrl, true)).toBe(
+      "ms-windows-store://pdp/?ProductId=9ABCDEFGHIJK",
+    );
+  });
+
+  it("sends Store installs to GitHub when the app has no product ID", () => {
+    configureUpdater({
+      repo: { owner: "someone", name: "other-app" },
+      envPrefix: "OTHER",
+    });
+    expect(updateDownloadUrl(htmlUrl, true)).toBe(htmlUrl);
+    expect(updateDownloadUrl(null, true)).toBe(
+      "https://github.com/someone/other-app/releases",
+    );
+  });
+});
+
+describe("releasesPage", () => {
+  it("points at the repository the app was started with", () => {
+    configureUpdater({
+      repo: { owner: "someone", name: "other-app" },
+      envPrefix: "OTHER",
+    });
+    expect(releasesPage()).toBe(
+      "https://github.com/someone/other-app/releases",
     );
   });
 });

@@ -1,6 +1,7 @@
 // shadcn/ui DropdownMenu (Radix implementation). Colors use our semantic tokens.
 import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { focusOpenConfirm } from "@/lib/keyTarget";
 import { cn } from "@/lib/utils";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
@@ -22,6 +23,10 @@ function DropdownMenuContent({
           className,
         )}
         {...props}
+        onCloseAutoFocus={(e) => {
+          props.onCloseAutoFocus?.(e);
+          focusOpenConfirm(e);
+        }}
       />
     </DropdownMenuPrimitive.Portal>
   );

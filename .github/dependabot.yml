@@ -1,0 +1,35 @@
+# Update PRs for npm packages and GitHub Actions (#290), at most a few a week.
+# npm: minor and patch updates arrive as one PR; a major update gets its own,
+# since it may need code changes. Actions are referenced by major tag, so
+# their updates are majors; they arrive as one PR, and CI shows a break.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # A release that turns out to be malicious is usually pulled within days.
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, "area: deps"]
+    # chore(deps) / chore(deps-dev), as the history already uses.
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels: [dependencies, "area: deps"]
+    commit-message:
+      prefix: chore
+      include: scope

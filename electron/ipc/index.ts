@@ -1,4 +1,4 @@
-// IPC handler registration, one module per domain. main.ts builds the
+// IPC handler registration, one module per domain. app.ts builds the
 // IpcContext and calls registerIpc() once the app is ready; adding a channel
 // means adding a handle() to the matching group here (see docs/architecture.md).
 import type { IpcContext } from "./context.js";

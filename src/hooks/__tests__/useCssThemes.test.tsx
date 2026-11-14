@@ -19,9 +19,9 @@ vi.mock("@/ipc/client", () => ({
   events: {
     onCssThemesChanged: (cb: (s: CssThemesState) => void) => {
       emitChanged = cb;
-      return Promise.resolve(() => {
+      return () => {
         emitChanged = null;
-      });
+      };
     },
   },
 }));

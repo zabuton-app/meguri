@@ -10,7 +10,7 @@ ffmpeg/ffprobe binaries, whose path resolution is described at the end.
 walk → `syncFiles` → thumbnail/metadata extraction (via a parallel pool),
 reporting progress through a callback. `ScanManager` (`electron/scanManager.ts`)
 owns the scan state and fires a scan with `start()` whenever a workspace is
-added, switched to, or re-scanned; `main.ts` starts the initial scan and aborts
+added, switched to, or re-scanned; `app.ts` starts the initial scan and aborts
 them all on quit.
 
 ### Walk and incremental sync
@@ -141,15 +141,20 @@ is currently focused.
 
 ### Range streaming
 
-`mp4` / `m4v` / `mov` / `webm` are served as raw files with HTTP Range support,
-giving full seeking.
+Directly playable files use HTTP Range requests for full seeking. The server
+serves MP4, M4V, and MOV this way when the default audio is directly playable,
+such as AAC. ProRes and MP4, M4V, or MOV with default Dolby Digital audio
+use the streaming preview paths below.
 
 ### On-the-fly remux
 
 Containers Chromium cannot demux — `REMUX_CONTAINERS` = `mkv` / `avi` / `wmv` /
 `flv` / `ts` — are remuxed to fragmented MP4 on the fly
 (`-movflags frag_keyframe+empty_moov+default_base_moof`). Time seeking uses a
-`?t=<seconds>` query parameter. Chromium-unsupported still images (`heic` /
+`?t=<seconds>` query parameter. The server also uses fragmented MP4 for MP4,
+M4V, and MOV with a default AC-3 or E-AC-3 audio track. It copies the primary
+picture stream and converts that audio track to AAC, keeping its channel count.
+ProRes uses a local H.264 preview. Chromium-unsupported still images (`heic` /
 `heif` / `tiff`, `TRANSCODE_IMAGES`) are transcoded to JPEG.
 
 ### Frame previews

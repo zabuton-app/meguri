@@ -109,13 +109,13 @@ vi.mock("@/ipc/client", () => ({
     collectionRemoveFile: vi.fn().mockResolvedValue(undefined),
   },
   events: {
-    onThumbDone: vi.fn().mockResolvedValue(() => {}),
+    onThumbDone: vi.fn().mockReturnValue(() => {}),
     onScanDone: (cb: (done: unknown) => void) => {
       scanDone.handlers.push(cb);
-      return Promise.resolve(() => {});
+      return () => {};
     },
-    onScanProgress: vi.fn().mockResolvedValue(() => {}),
-    onWorkspaceChanged: vi.fn().mockResolvedValue(() => {}),
+    onScanProgress: vi.fn().mockReturnValue(() => {}),
+    onWorkspaceChanged: vi.fn().mockReturnValue(() => {}),
   },
   ALL_ID: "__all__",
   COLLECTION_ID_PREFIX: "collection:",

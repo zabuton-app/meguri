@@ -120,6 +120,7 @@ export function useBulkEdit(
       }
       if (lines.length > 0) toast.success(lines.join(" / "));
     },
+    meta: { reportsOwnError: true },
     onError: (e) => {
       // Each workspace commits on its own (see files_bulk_meta), so a call
       // that failed may still have written the workspaces ahead of the one
@@ -154,6 +155,7 @@ export function useBulkEdit(
           : t("select.watchLaterRemoved", { count: result.changed }),
       );
     },
+    meta: { reportsOwnError: true },
     onError: fail,
   });
 

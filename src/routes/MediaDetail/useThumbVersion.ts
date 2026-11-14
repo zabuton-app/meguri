@@ -17,35 +17,19 @@ export function useThumbVersion(fileId: number, wsId: string): number {
   const qc = useQueryClient();
   const [thumbVersion, setThumbVersion] = useState(0);
   useEffect(() => {
-    // The subscription resolves asynchronously; a cleanup that lands first
-    // (StrictMode's replay, a quick prev/next) must still drop it once it
-    // arrives, or the listener would outlive the file it was keyed on.
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void events
-      .onThumbDone((event) => {
-        if (
-          event.id === fileId &&
-          (!event.workspaceId || event.workspaceId === wsId)
-        ) {
-          setThumbVersion((v) => v + 1);
-          qc.setQueryData<FileDetail | null>(
-            ["file_get", wsId, fileId],
-            (old) =>
-              old && !hasThumbFile(old)
-                ? { ...old, thumbStatus: "done", hasThumb: 1 }
-                : old,
-          );
-        }
-      })
-      .then((u) => {
-        if (cancelled) u();
-        else unlisten = u;
-      });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
+    return events.onThumbDone((event) => {
+      if (
+        event.id === fileId &&
+        (!event.workspaceId || event.workspaceId === wsId)
+      ) {
+        setThumbVersion((v) => v + 1);
+        qc.setQueryData<FileDetail | null>(["file_get", wsId, fileId], (old) =>
+          old && !hasThumbFile(old)
+            ? { ...old, thumbStatus: "done", hasThumb: 1 }
+            : old,
+        );
+      }
+    });
   }, [fileId, wsId, qc]);
   return thumbVersion;
 }

@@ -87,25 +87,14 @@ export function LibraryMergeModal() {
   );
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let active = true;
-    void events
-      .onLibraryMerge((e) => {
-        if (e.state === "running") {
-          seen.current = true;
-          setProgress({ done: e.done, total: e.total });
-        } else {
-          finish(e.failed);
-        }
-      })
-      .then((un) => {
-        if (active) unlisten = un;
-        else un();
-      });
-    return () => {
-      active = false;
-      unlisten?.();
-    };
+    return events.onLibraryMerge((e) => {
+      if (e.state === "running") {
+        seen.current = true;
+        setProgress({ done: e.done, total: e.total });
+      } else {
+        finish(e.failed);
+      }
+    });
   }, [finish]);
 
   const data = status.data;

@@ -44,7 +44,8 @@ mind yet. See [Labels](#labels) for what each label means.
 Issues and pull requests are labelled along a few independent axes. An issue
 usually has one type label, one or two `area:` labels, a `feature:` label when
 it belongs to a feature tracked across several issues, and a `status:` label
-when something has to happen before the work can start. Even the labels whose
+when something has to happen before the work can start. A pull request under
+review has a `status:` label that says whose turn it is. Even the labels whose
 meaning seems obvious are listed here, so everyone reads them the same way.
 
 ### Type
@@ -102,6 +103,15 @@ label is ready to be worked on.
   maintainer decision.
 - `on hold`: paused on purpose until there is demand or an external blocker is
   resolved.
+
+On a pull request, the `status:` label says whose turn it is. It has one of
+these at a time, and a pull request nobody has reviewed yet has neither.
+
+- `status: in review`: a maintainer is reviewing it, or will review the
+  changes you pushed or the reply you gave. Nothing is needed from you.
+- `status: changes requested`: a maintainer has reviewed it and is waiting for
+  you to address the feedback, given in a review or in a comment. Push your
+  changes or reply, and it goes back to `status: in review`.
 
 ### Other
 

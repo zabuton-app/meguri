@@ -62,7 +62,7 @@ export async function closeTopDialog(page: Page): Promise<void> {
 }
 
 export async function openSettings(page: Page): Promise<Locator> {
-  await page.getByTitle("Settings").click();
+  await page.getByTitle("Settings", { exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Settings", { exact: true })).toBeVisible();
   return dialog;

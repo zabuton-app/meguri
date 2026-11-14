@@ -43,24 +43,13 @@ export function useCustomCssStyle(): void {
   const css = state?.enabled ? (state.css ?? "") : "";
 
   useEffect(() => {
-    let active = true;
-    let unlisten: (() => void) | undefined;
-    void events
-      .onCustomCssChanged(({ css: next }) => {
-        qc.setQueryData<CustomCssState>(QUERY_KEY, (prev) =>
-          // An event that lands after the switch went off must not bring
-          // the stylesheet back.
-          prev?.enabled ? { ...prev, css: next } : prev,
-        );
-      })
-      .then((un) => {
-        if (active) unlisten = un;
-        else un();
-      });
-    return () => {
-      active = false;
-      unlisten?.();
-    };
+    return events.onCustomCssChanged(({ css: next }) => {
+      qc.setQueryData<CustomCssState>(QUERY_KEY, (prev) =>
+        // An event that lands after the switch went off must not bring
+        // the stylesheet back.
+        prev?.enabled ? { ...prev, css: next } : prev,
+      );
+    });
   }, [qc]);
 
   useEffect(() => {

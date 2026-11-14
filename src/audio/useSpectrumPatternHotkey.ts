@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { cycleSpectrumPattern } from "./spectrumPatterns";
+import { isTyping } from "@/lib/keyTarget";
 
 export function useCycleSpectrumPattern(): (dir: 1 | -1) => void {
   const {
@@ -46,14 +47,7 @@ export function isSpectrumPatternKey(e: KeyboardEvent): boolean {
   // Each step rebuilds the display (and its bitmap); a held key would do
   // that at the OS repeat rate for nothing anyone can follow.
   if (e.repeat) return false;
-  const el = document.activeElement as HTMLElement | null;
-  if (
-    el &&
-    (el.tagName === "INPUT" ||
-      el.tagName === "TEXTAREA" ||
-      el.isContentEditable)
-  )
-    return false;
+  if (isTyping()) return false;
   return true;
 }
 

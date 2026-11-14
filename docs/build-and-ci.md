@@ -30,14 +30,57 @@ launching, so Electron does not accidentally start in node mode.
 ## electron-vite config
 
 `electron.vite.config.ts` builds main, preload, and renderer from one config.
+The settings are in `appBuildConfig()` (`electron.vite.shared.ts`);
+`electron.vite.config.ts` only passes it Meguri's entry point.
 
 - Preload is emitted as **CommonJS** (`.js`); ESM `.mjs` preload can fail to
-  load, and `electron/main.ts` resolves the preload, the renderer entry and
+  load, and `electron/app.ts` resolves the preload, the renderer entry and
   the worker threads (`queryWorker.js`, `autoTagWorker.js`) through
   `__dirname`, which assumes CJS output. Each worker is its own main-build
-  entry in `electron.vite.config.ts`.
+  entry in `electron.vite.shared.ts`.
 - TypeScript uses separate tsconfigs for `src` and `electron`, both `strict` with
   `noUnusedLocals` / `noUnusedParameters`.
+
+### Building from another project
+
+`electron/app.ts` finds the workers, the preload and the renderer relative to
+its own output file, so it needs exactly this layout:
+
+```text
+out/main/main.js            the entry point that calls startApp()
+out/main/queryWorker.js
+out/main/autoTagWorker.js
+out/preload/preload.js      CommonJS
+out/renderer/index.html
+```
+
+A project that keeps this repository in a subdirectory gets the same layout
+from `appBuildConfig()`, without copying the config:
+
+```ts
+// electron.vite.config.ts of the other project
+import { defineConfig } from "electron-vite";
+import { resolve } from "node:path";
+import { appBuildConfig } from "./vendor/meguri/electron.vite.shared";
+
+export default defineConfig(
+  appBuildConfig({ mainEntry: resolve("app/main.ts") }),
+);
+```
+
+- `mainEntry` is that project's own entry point, which imports `startApp()`
+  from this repository's `electron/app.ts`. Everything else (the workers, the
+  preload, the renderer) is built from this repository's sources, wherever the
+  build runs.
+- `out/` is created in the working directory, so the project's package.json
+  uses `"main": "out/main/main.js"`.
+- Import the shared file by a relative path. electron-vite bundles relative
+  imports of the config file but leaves package imports to Node, which cannot
+  load a `.ts` file from `node_modules`.
+- The project installs this repository's `dependencies` and the build tools
+  the shared file imports (`electron-vite`, `@vitejs/plugin-react`,
+  `@tailwindcss/vite`). The main and preload builds keep those `dependencies`
+  external by name, whether or not the project's package.json lists them.
 
 ## Testing
 
@@ -45,12 +88,14 @@ Tests run under Vitest (`vitest.config.ts`) as two projects.
 
 ### Core project
 
-`npm run test:core` covers the main/core logic (`electron/**/*.test.ts`). Because
-the tests exercise the same native dependencies as the app, this **runs Electron as Node**
-(`ELECTRON_RUN_AS_NODE=1` plus `--experimental-require-module` to allow
-`require()` of ESM). It exercises real SQL against an in-memory SQLite database.
-The config carries a plugin that resolves NodeNext-style `.js` import specifiers
-to `.ts`.
+`npm run test:core` covers the main/core logic (`electron/**/*.test.ts`).
+Because the tests exercise the same native dependencies as the app, this **runs
+Electron as Node** (`ELECTRON_RUN_AS_NODE=1` plus `--experimental-require-module`
+to allow `require()` of ESM). `scripts/test-core.mjs` sets these and starts
+Electron, so the command does not depend on a POSIX shell; arguments after `--`
+go to Vitest. It exercises real SQL against an in-memory SQLite database. The
+config carries a plugin that resolves NodeNext-style `.js` import specifiers to
+`.ts`.
 
 ### Renderer project
 
@@ -68,8 +113,8 @@ the jsdom worker does not start under Electron's experimental loader.
 `app.asar` → `app.asar.unpacked` substitution (see
 [ffmpeg/ffprobe path resolution](media-pipeline.md#ffmpegffprobe-path-resolution)).
 
-Distribution targets are Linux (AppImage / deb), Windows (nsis / portable), and
-macOS (dmg / zip).
+Distribution targets are Linux (AppImage / deb), Windows (nsis / portable /
+appx), and macOS (dmg / zip).
 
 Electron 45 packages require macOS 13 (Ventura) or later. The existing
 Windows x64 and Linux x64 release targets are supported by Electron 45.
@@ -105,6 +150,19 @@ GitHub Actions workflows live in `.github/workflows/`:
   when `docs/` or the workflow itself changes on `main`, or on manual dispatch.
   The repository's Pages source must be set to "GitHub Actions"; after
   switching it, run the workflow once by hand so the site is redeployed.
+
+Dependabot (`.github/dependabot.yml`) opens update PRs weekly for npm packages
+and GitHub Actions. npm's minor and patch updates come grouped into one PR, and
+a major update gets its own; the Actions' updates, majors since the workflows
+reference major tags, come as one PR. A version update must be a week old
+before it is proposed. Security updates are not held back or grouped: they
+arrive as soon as an advisory is published.
+
+`allowScripts` in `package.json` names exact versions. A PR that updates one of
+those packages also needs its entry updated (`npm approve-scripts`), or npm 12
+skips the package's install script, and with it, for ffmpeg-static, the binary.
+CI's npm (the one bundled with Node 22) does not read `allowScripts`, so CI
+stays green either way.
 
 ffmpeg-static and @derhuerst/ffprobe-static each fetch a single-architecture
 binary at install time (`npm_config_arch || os.arch()`), so CI pins

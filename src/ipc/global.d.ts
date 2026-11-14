@@ -4,6 +4,12 @@ export {};
 declare global {
   interface Window {
     api: {
+      /** The app's name, as passed to startApp() in the main process. */
+      appName: string;
+      /** The app's one-character mark, from the same options. */
+      appGlyph: string;
+      /** The media server's origin (http://127.0.0.1:<port>), or "" if it failed to start. */
+      mediaOrigin: string;
       invoke<T = unknown>(channel: string, args?: unknown): Promise<T>;
       on(channel: string, cb: (payload: unknown) => void): () => void;
       setZoomFactor(factor: number): void;

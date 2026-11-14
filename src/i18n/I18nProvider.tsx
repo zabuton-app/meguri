@@ -14,6 +14,7 @@ import { zhCN } from "./locales/zh-CN";
 import { ko } from "./locales/ko";
 import { es } from "./locales/es";
 import { fr } from "./locales/fr";
+import { appName } from "@/lib/appName";
 
 const LS_KEY = "meguri.lang";
 
@@ -59,12 +60,12 @@ function detectLang(): Lang {
   return "en";
 }
 
-/** Replace {name} with values from params. */
+/** Replace {name} with values from params; {app} is always the app's name. */
 function interpolate(template: string, params?: TParams): string {
-  if (!params) return template;
-  return template.replace(/\{(\w+)\}/g, (_, k: string) =>
-    k in params ? String(params[k]) : `{${k}}`,
-  );
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => {
+    if (params && k in params) return String(params[k]);
+    return k === "app" ? appName() : `{${k}}`;
+  });
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {

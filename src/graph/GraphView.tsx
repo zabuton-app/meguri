@@ -58,6 +58,7 @@ import { REHEAT_ALPHA } from "./sim/physics";
 import { SimClient } from "./sim/simClient";
 import { useGraphColors } from "./useGraphColors";
 import { useGraphData } from "./useGraphData";
+import { isTyping } from "@/lib/keyTarget";
 
 /** Positions are written this long after the simulation last cooled down. */
 const SAVE_DEBOUNCE_MS = 2_000;
@@ -107,17 +108,6 @@ function sameArray<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
-}
-
-function isTyping(): boolean {
-  const el = document.activeElement as HTMLElement | null;
-  return (
-    !!el &&
-    (el.tagName === "INPUT" ||
-      el.tagName === "TEXTAREA" ||
-      el.tagName === "SELECT" ||
-      el.isContentEditable)
-  );
 }
 
 function CameraButton({

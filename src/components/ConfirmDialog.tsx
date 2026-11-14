@@ -6,11 +6,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { Button } from "@/components/ui/button";
+import { useModalFocus } from "@/hooks/useModalFocus";
 import { useI18n } from "@/i18n/I18nProvider";
 
 export interface ConfirmCheckbox {
@@ -58,6 +60,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State | null>(null);
   const [checked, setChecked] = useState(false);
   const okRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const messageId = useId();
 
   // One prompt shows at a time. A confirm requested while another is open
   // waits its turn rather than replacing it, so neither the prompt the user is
@@ -91,6 +96,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     [checked, showNext],
   );
 
+  // Active while any prompt shows (queued prompts follow without a gap), so
+  // focus returns to the opener once the last one is answered. Called before
+  // the effect below so the opener is read before the OK button takes focus.
+  useModalFocus(panelRef, { active: state !== null, initialFocus: okRef });
+
   // Esc cancels / Enter confirms. Focus the confirm button when opened.
   useEffect(() => {
     if (!state) return;
@@ -103,7 +113,18 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         e.preventDefault();
         // Not a key still held from whatever opened the dialog: its repeats
         // would answer the question before it was read.
-        if (!e.repeat) close(true);
+        if (e.repeat) return;
+        // Tab reaches Cancel, and Enter there means Cancel.
+        const focused = document.activeElement;
+        if (
+          focused instanceof HTMLButtonElement &&
+          focused !== okRef.current &&
+          panelRef.current?.contains(focused)
+        ) {
+          focused.click();
+          return;
+        }
+        close(true);
       }
     };
     // Capture phase, matching Radix's dismissable layer: this dialog is on top,
@@ -122,17 +143,25 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           onClick={() => close(false)}
         >
           <div
+            ref={panelRef}
+            tabIndex={-1}
             role="alertdialog"
             aria-modal="true"
-            className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 shadow-xl"
+            // Named by its title, or by the question itself when it has none.
+            aria-labelledby={state.title ? titleId : messageId}
+            aria-describedby={state.title ? messageId : undefined}
+            className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 shadow-xl outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             {state.title && (
-              <h2 className="mb-1 text-sm font-semibold text-bright-fg">
+              <h2
+                id={titleId}
+                className="mb-1 text-sm font-semibold text-bright-fg"
+              >
                 {state.title}
               </h2>
             )}
-            <p className="whitespace-pre-line text-sm text-fg">
+            <p id={messageId} className="whitespace-pre-line text-sm text-fg">
               {state.message}
             </p>
             {state.checkbox && (

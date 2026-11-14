@@ -45,8 +45,8 @@ vi.mock("@/ipc/client", () => ({
       mocks.collectionSetMembership(...args),
   },
   events: {
-    onWorkspaceChanged: vi.fn().mockResolvedValue(() => {}),
-    onScanDone: vi.fn().mockResolvedValue(() => {}),
+    onWorkspaceChanged: vi.fn().mockReturnValue(() => {}),
+    onScanDone: vi.fn().mockReturnValue(() => {}),
   },
   ALL_ID: "__all__",
   COLLECTION_ID_PREFIX: "collection:",

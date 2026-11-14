@@ -17,10 +17,26 @@ const catalogs: Record<string, Record<TranslationKey, string>> = {
 };
 const jaKeys = Object.keys(ja).sort();
 
-/** The sorted set of {placeholder} tokens in a translation string. */
+/**
+ * The sorted set of {placeholder} tokens in a translation string. {app} is
+ * left out: t() always fills it in, so a locale may name the app where ja
+ * does not.
+ */
 function tokens(s: string): string[] {
-  return (s.match(/\{(\w+)\}/g) ?? []).sort();
+  return (s.match(/\{(\w+)\}/g) ?? []).filter((t) => t !== "{app}").sort();
 }
+
+// The name comes from the main process (startApp()), so an app started with
+// another name must not show this one: strings say {app} instead.
+it.each(Object.entries({ ja, ...catalogs }))(
+  "%s does not spell out the app's name",
+  (_name, catalog) => {
+    const named = Object.keys(catalog).filter((k) =>
+      catalog[k as TranslationKey].includes("Meguri"),
+    );
+    expect(named).toEqual([]);
+  },
+);
 
 describe.each(Object.entries(catalogs))("%s locale", (_name, catalog) => {
   it("has exactly the same keys as ja", () => {
