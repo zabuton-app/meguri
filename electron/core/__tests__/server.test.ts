@@ -220,7 +220,7 @@ describe("thumb serving", () => {
   it("serves thumbnails with Cache-Control and an ETag", async () => {
     const res = await fetch(`${base}/ws/${WS}/thumb/${thumbId}`, authHeaders());
     expect(res.status).toBe(200);
-    expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
     expect(res.headers.get("etag")).toMatch(/^"\d+-\d+"$/);
   });
 
@@ -298,6 +298,96 @@ describe("media serving and Range", () => {
     expect(res.headers.get("content-range")).toBe("bytes */10");
   });
 
+  it("aborts the response when the read fails after Content-Length was sent", async () => {
+    // A short body that ends cleanly would leave a keep-alive client waiting
+    // for the missing bytes; the client must see the failure instead.
+    const { Readable } = await import("node:stream");
+    const spy = vi.spyOn(fs, "createReadStream").mockImplementation(() => {
+      const s = new Readable({ read() {} });
+      s.push("01234");
+      setImmediate(() => s.destroy(new Error("EIO")));
+      return s as unknown as fs.ReadStream;
+    });
+    try {
+      const res = await fetch(
+        `${base}/ws/${WS}/media/${mediaId}`,
+        authHeaders(),
+      );
+      expect(res.headers.get("content-length")).toBe("10");
+      // Bounded wait: on the unfixed code the body never completes (the client
+      // waits for the 5 missing bytes), so report that as an assertion, not a timeout.
+      const outcome = await Promise.race([
+        res.text().then(
+          () => "resolved",
+          () => "rejected",
+        ),
+        new Promise<string>((resolve) =>
+          setTimeout(() => resolve("still waiting"), 1000),
+        ),
+      ]);
+      expect(outcome).toBe("rejected");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("aborts the response when the file shrinks mid-read (clean end, short body)", async () => {
+    const { Readable } = await import("node:stream");
+    const spy = vi.spyOn(fs, "createReadStream").mockImplementation(() => {
+      const s = new Readable({ read() {} });
+      s.push("01234");
+      s.push(null);
+      return s as unknown as fs.ReadStream;
+    });
+    try {
+      // The abort may surface as a rejected fetch (headers never arrive) or as a
+      // failed body read; either way the client must not see a clean 10-byte body.
+      const outcome = await Promise.race([
+        fetch(`${base}/ws/${WS}/media/${mediaId}`, authHeaders())
+          .then((r) => r.text())
+          .then(
+            () => "resolved",
+            () => "rejected",
+          ),
+        new Promise<string>((resolve) =>
+          setTimeout(() => resolve("still waiting"), 1000),
+        ),
+      ]);
+      expect(outcome).toBe("rejected");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("aborts a ranged (206) response when the read fails after Content-Length was sent", async () => {
+    const { Readable } = await import("node:stream");
+    const spy = vi.spyOn(fs, "createReadStream").mockImplementation(() => {
+      const s = new Readable({ read() {} });
+      s.push("01234");
+      setImmediate(() => s.destroy(new Error("EIO")));
+      return s as unknown as fs.ReadStream;
+    });
+    try {
+      const res = await fetch(`${base}/ws/${WS}/media/${mediaId}`, {
+        headers: { ...authHeader(), Range: "bytes=0-9" },
+      });
+      expect(res.status).toBe(206);
+      expect(res.headers.get("content-length")).toBe("10");
+      const outcome = await Promise.race([
+        res.text().then(
+          () => "resolved",
+          () => "rejected",
+        ),
+        new Promise<string>((resolve) =>
+          setTimeout(() => resolve("still waiting"), 1000),
+        ),
+      ]);
+      expect(outcome).toBe("rejected");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("refuses an abs_path outside the scan root with 403 (path confinement)", async () => {
     expect(
       (await fetch(`${base}/ws/${WS}/media/${outsideMediaId}`, authHeaders()))
@@ -310,6 +400,31 @@ describe("media serving and Range", () => {
       (await fetch(`${base}/ws/${WS}/media/${symlinkMediaId}`, authHeaders()))
         .status,
     ).toBe(403);
+  });
+
+  // A synchronous realpath on a root on a network share would block the main
+  // process on every thumbnail, media and frame request (#275).
+  it("checks the paths without a synchronous realpath", async () => {
+    const native = vi.spyOn(fs.realpathSync, "native");
+    const sync = vi.spyOn(fs, "realpathSync");
+    try {
+      const statuses = [];
+      for (const url of [
+        `${base}/ws/${WS}/thumb/${thumbId}`,
+        `${base}/ws/${WS}/media/${mediaId}`,
+        `${base}/ws/${WS}/media/${outsideMediaId}`,
+      ]) {
+        const res = await fetch(url, authHeaders());
+        await res.arrayBuffer();
+        statuses.push(res.status);
+      }
+      expect(statuses).toEqual([200, 200, 403]);
+      expect(sync).not.toHaveBeenCalled();
+      expect(native).not.toHaveBeenCalled();
+    } finally {
+      sync.mockRestore();
+      native.mockRestore();
+    }
   });
 });
 

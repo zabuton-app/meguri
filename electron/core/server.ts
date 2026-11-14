@@ -20,7 +20,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { directDolbyTracks, isDolbyDigital } from "./dolbyAudio.js";
 import type { Core } from "./index.js";
 import { mediaFileOf, thumbPathIfDone } from "./tags.js";
-import { isInsideRoot } from "./paths.js";
+import { isInsideRealRoot, realpathForRootCheck } from "./paths.js";
 import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
 import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
@@ -199,6 +199,48 @@ const AUTH_HEADER = "x-api-token";
 // URLs have the form /ws/<workspaceId>/<kind>/<fileId>.
 const ROUTE = /^\/ws\/([0-9a-f]+)\/(thumb|media|frame)\/(\d+)$/;
 
+// Each workspace's roots as resolved for the path check, kept for the
+// workspace's lifetime: resolving the root again on every request would walk
+// a network share twice per request. Core.init has already resolved the root,
+// so a root re-pointed while the workspace is open is picked up when it is
+// opened again; until then its files are refused, not served from the old
+// place. A failed resolution is dropped, so a root that comes back (a
+// remounted drive) is resolved again.
+const realRoots = new WeakMap<Core, Map<string, Promise<string>>>();
+
+function realRootOf(core: Core, root: string): Promise<string> {
+  let roots = realRoots.get(core);
+  if (!roots) {
+    roots = new Map();
+    realRoots.set(core, roots);
+  }
+  const known = roots.get(root);
+  if (known) return known;
+  const real = realpathForRootCheck(root);
+  roots.set(root, real);
+  real.catch(() => {
+    if (roots.get(root) === real) roots.delete(root);
+  });
+  return real;
+}
+
+/** isInsideRoot without blocking the main process on a slow share. */
+async function insideRoot(
+  core: Core,
+  abs: string,
+  root: string,
+): Promise<boolean> {
+  try {
+    const [realAbs, realRoot] = await Promise.all([
+      realpathForRootCheck(abs),
+      realRootOf(core, root),
+    ]);
+    return isInsideRealRoot(realAbs, realRoot);
+  } catch {
+    return false;
+  }
+}
+
 async function handle(
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -247,13 +289,14 @@ async function handle(
 
     if (kind === "thumb") {
       const tp = thumbPathIfDone(core.db, id);
-      if (!tp || !isInsideRoot(tp, core.dataDir)) {
+      const inside = tp != null && (await insideRoot(core, tp, core.dataDir));
+      if (res.destroyed || res.writableEnded) return;
+      if (!inside) {
         res.writeHead(404).end();
         return;
       }
-      // Thumbnails get max-age + ETag (not `immutable` — see the note on
-      // THUMB_CACHE_CONTROL) so repeat grid renders hit the browser cache and
-      // revalidations come back as cheap 304s.
+      // Thumbnails are revalidated on every load (see THUMB_CACHE_CONTROL);
+      // the ETag makes an unchanged one a cheap 304.
       await serveFile(req, res, tp, THUMB_CACHE_CONTROL);
       return;
     }
@@ -264,7 +307,9 @@ async function handle(
       return;
     }
     const abs = file.absPath;
-    if (!isInsideRoot(abs, core.root)) {
+    const inside = await insideRoot(core, abs, core.root);
+    if (res.destroyed || res.writableEnded) return;
+    if (!inside) {
       res.writeHead(403).end();
       return;
     }
@@ -397,12 +442,12 @@ function etagMatches(
   });
 }
 
-// Let the browser cache thumbnails instead of re-requesting on every grid
-// render. Not `immutable`: the renderer's `?v=` cache buster is a per-component
-// counter (not a persistent version), so a regenerated thumbnail can be
-// requested under an old `?v=`. The ETag below lets those revalidations come
-// back as a cheap 304 instead of a full body once max-age expires.
-const THUMB_CACHE_CONTROL = "public, max-age=3600";
+// Revalidate a cached thumbnail on every load instead of trusting it for a
+// while. The renderer's `?v=` cache buster is a per-view counter, not a
+// persistent version, so a view can ask for a regenerated thumbnail under a
+// `?v=` another view already cached with the old picture (#295). The ETag
+// below answers an unchanged thumbnail with a 304.
+const THUMB_CACHE_CONTROL = "no-cache";
 
 async function serveFile(
   req: http.IncomingMessage,
@@ -450,21 +495,39 @@ async function serveFile(
       "Content-Range": `bytes ${start}-${end}/${size}`,
       "Content-Length": end - start + 1,
     });
-    const stream = fs.createReadStream(file, { start, end });
-    res.on("close", () => stream.destroy());
-    stream.on("error", () => res.end());
-    stream.pipe(res);
+    pipeBody(fs.createReadStream(file, { start, end }), res, end - start + 1);
   } else {
     res.writeHead(200, {
       "Content-Type": ctype,
       "Accept-Ranges": "bytes",
       "Content-Length": size,
     });
-    const stream = fs.createReadStream(file);
-    res.on("close", () => stream.destroy());
-    stream.on("error", () => res.end());
-    stream.pipe(res);
+    pipeBody(fs.createReadStream(file), res, size);
   }
+}
+
+// Headers (and Content-Length) are already sent when the body starts, so a
+// failed or short read must abort the response: end() would close a body that
+// is shorter than announced and leave the client waiting for the missing bytes.
+function pipeBody(
+  stream: fs.ReadStream,
+  res: http.ServerResponse,
+  expected: number,
+) {
+  let sent = 0;
+  res.on("close", () => stream.destroy());
+  stream.on("error", (err) => res.destroy(err));
+  stream.on("data", (chunk) => {
+    sent += chunk.length;
+  });
+  stream.on("end", () => {
+    if (sent === expected) res.end();
+    else
+      res.destroy(
+        new Error(`file read ended after ${sent} of ${expected} bytes`),
+      );
+  });
+  stream.pipe(res, { end: false });
 }
 
 // Quickly extract a single frame at the given seconds using input seek (-ss before -i) and return it as JPEG.

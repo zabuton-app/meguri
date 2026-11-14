@@ -1,6 +1,6 @@
 // How many times each file's thumbnail has been regenerated in this run, the
 // cache buster a list thumbnail puts in its URL (the WebP is rewritten in
-// place and served with a max-age, so only a new URL shows the new picture).
+// place, and an <img> loads its picture again only when the URL changes).
 //
 // Lives outside React and is read per file: Home used to keep it as state and
 // hand the whole record down, so every `thumb:done` flush during a scan

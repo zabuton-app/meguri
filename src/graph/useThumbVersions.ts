@@ -32,8 +32,8 @@ export interface ThumbVersions {
 }
 
 /**
- * The WebP is rewritten in place when a thumbnail is regenerated, and served
- * with a max-age, so the URL has to change for the new picture to show.
+ * The WebP is rewritten in place when a thumbnail is regenerated, and a loaded
+ * picture is fetched again only under a new URL.
  * Every mount starts from a version of its own: the view cannot know what
  * was regenerated while it was away (a 2D / 3D switch remounts it, and so
  * does a visit to the list). A file regenerated since then, by `thumb:done`,

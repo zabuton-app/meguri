@@ -125,6 +125,10 @@ that uses ffmpeg paths must apply the
 Distribution targets are Linux (AppImage / deb), Windows (nsis / portable /
 appx), and macOS (dmg / zip).
 
+The two Windows `.exe` targets have their own `artifactName`
+(`...-setup.exe` for nsis, `...-portable.exe` for portable). With the shared
+name, the portable build overwrote the installer.
+
 Electron 45 packages require macOS 13 (Ventura) or later. The existing
 Windows x64 and Linux x64 release targets are supported by Electron 45.
 On Linux the bundled ffmpeg and ffprobe need glibc 2.35 or later (Ubuntu
@@ -150,10 +154,12 @@ automatically.
 
 GitHub Actions workflows live in `.github/workflows/`:
 
-- `test.yml` runs four parallel jobs: type check and `test:core`,
-  `test:renderer`, the E2E tests (`test:e2e:headless`), and `lint` with
-  `format:check`. The hand-written Pages HTML (`docs/*.html`) is left out of
-  Prettier.
+- `test.yml` runs five parallel jobs: type check and `test:core`,
+  `test:core` again on macOS, `test:renderer`, the E2E tests
+  (`test:e2e:headless`), and `lint` with `format:check`. Everything but the
+  macOS job runs on Ubuntu; the macOS job is there for the core tests that are
+  skipped on other platforms. The hand-written Pages HTML (`docs/*.html`) is
+  left out of Prettier.
 - `build.yml` triggers on `v*` tag pushes. It first runs `test.yml` (as a
   reusable workflow), so a tag on a commit that fails it builds nothing; then it
   builds a three-way matrix (linux x64, win x64, mac arm64) and creates a draft

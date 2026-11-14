@@ -132,6 +132,7 @@
       <h3>🪟 Windows</h3>
       <a class="btn" href="https://apps.microsoft.com/detail/9NRSM11RRH8Z">Microsoft Store</a>
       <a class="btn secondary" data-asset="exe" href="https://github.com/zabuton-app/meguri/releases/latest">Installer (x64)</a>
+      <a class="btn secondary" data-asset="portable" href="https://github.com/zabuton-app/meguri/releases/latest">Portable (x64)</a>
     </div>
     <div class="card" data-os="mac">
       <h3>🍎 macOS</h3>
@@ -231,7 +232,11 @@
       const match = {
         AppImage: (a) => a.name.endsWith(".AppImage"),
         deb: (a) => a.name.endsWith(".deb"),
-        exe: (a) => a.name.endsWith(".exe"),
+        // The installer is "-setup.exe". Releases up to v0.10.2 have a single
+        // ".exe", so match any .exe that is not the portable build.
+        exe: (a) =>
+          a.name.endsWith(".exe") && !a.name.endsWith("-portable.exe"),
+        portable: (a) => a.name.endsWith("-portable.exe"),
         dmg: (a) => a.name.endsWith(".dmg"),
         zip: (a) => a.name.endsWith(".zip"),
       };
