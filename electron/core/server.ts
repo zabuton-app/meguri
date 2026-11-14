@@ -20,7 +20,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { directDolbyTracks, isDolbyDigital } from "./dolbyAudio.js";
 import type { Core } from "./index.js";
 import { mediaFileOf, thumbPathIfDone } from "./tags.js";
-import { isInsideRoot } from "./paths.js";
+import { isInsideRealRoot, realpathForRootCheck } from "./paths.js";
 import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
 import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
@@ -199,6 +199,48 @@ const AUTH_HEADER = "x-api-token";
 // URLs have the form /ws/<workspaceId>/<kind>/<fileId>.
 const ROUTE = /^\/ws\/([0-9a-f]+)\/(thumb|media|frame)\/(\d+)$/;
 
+// Each workspace's roots as resolved for the path check, kept for the
+// workspace's lifetime: resolving the root again on every request would walk
+// a network share twice per request. Core.init has already resolved the root,
+// so a root re-pointed while the workspace is open is picked up when it is
+// opened again; until then its files are refused, not served from the old
+// place. A failed resolution is dropped, so a root that comes back (a
+// remounted drive) is resolved again.
+const realRoots = new WeakMap<Core, Map<string, Promise<string>>>();
+
+function realRootOf(core: Core, root: string): Promise<string> {
+  let roots = realRoots.get(core);
+  if (!roots) {
+    roots = new Map();
+    realRoots.set(core, roots);
+  }
+  const known = roots.get(root);
+  if (known) return known;
+  const real = realpathForRootCheck(root);
+  roots.set(root, real);
+  real.catch(() => {
+    if (roots.get(root) === real) roots.delete(root);
+  });
+  return real;
+}
+
+/** isInsideRoot without blocking the main process on a slow share. */
+async function insideRoot(
+  core: Core,
+  abs: string,
+  root: string,
+): Promise<boolean> {
+  try {
+    const [realAbs, realRoot] = await Promise.all([
+      realpathForRootCheck(abs),
+      realRootOf(core, root),
+    ]);
+    return isInsideRealRoot(realAbs, realRoot);
+  } catch {
+    return false;
+  }
+}
+
 async function handle(
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -247,7 +289,9 @@ async function handle(
 
     if (kind === "thumb") {
       const tp = thumbPathIfDone(core.db, id);
-      if (!tp || !isInsideRoot(tp, core.dataDir)) {
+      const inside = tp != null && (await insideRoot(core, tp, core.dataDir));
+      if (res.destroyed || res.writableEnded) return;
+      if (!inside) {
         res.writeHead(404).end();
         return;
       }
@@ -264,7 +308,9 @@ async function handle(
       return;
     }
     const abs = file.absPath;
-    if (!isInsideRoot(abs, core.root)) {
+    const inside = await insideRoot(core, abs, core.root);
+    if (res.destroyed || res.writableEnded) return;
+    if (!inside) {
       res.writeHead(403).end();
       return;
     }

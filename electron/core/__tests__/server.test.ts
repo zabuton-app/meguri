@@ -401,6 +401,31 @@ describe("media serving and Range", () => {
         .status,
     ).toBe(403);
   });
+
+  // A synchronous realpath on a root on a network share would block the main
+  // process on every thumbnail, media and frame request (#275).
+  it("checks the paths without a synchronous realpath", async () => {
+    const native = vi.spyOn(fs.realpathSync, "native");
+    const sync = vi.spyOn(fs, "realpathSync");
+    try {
+      const statuses = [];
+      for (const url of [
+        `${base}/ws/${WS}/thumb/${thumbId}`,
+        `${base}/ws/${WS}/media/${mediaId}`,
+        `${base}/ws/${WS}/media/${outsideMediaId}`,
+      ]) {
+        const res = await fetch(url, authHeaders());
+        await res.arrayBuffer();
+        statuses.push(res.status);
+      }
+      expect(statuses).toEqual([200, 200, 403]);
+      expect(sync).not.toHaveBeenCalled();
+      expect(native).not.toHaveBeenCalled();
+    } finally {
+      sync.mockRestore();
+      native.mockRestore();
+    }
+  });
 });
 
 describe("audio serving", () => {
