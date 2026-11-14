@@ -7,6 +7,7 @@ import "electron-log/preload";
 import {
   APP_GLYPH_ARG,
   APP_NAME_ARG,
+  MEDIA_ORIGIN_ARG,
   EVENT_CHANNELS as EVENT_CHANNEL_NAMES,
   INVOKE_CHANNELS as INVOKE_CHANNEL_NAMES,
   type PreloadInvokeChannel,
@@ -31,6 +32,8 @@ contextBridge.exposeInMainWorld("api", {
   /** The app's name and one-character mark, as passed to startApp() (electron/app.ts). */
   appName: argValue(APP_NAME_ARG),
   appGlyph: argValue(APP_GLYPH_ARG),
+  /** The media server's origin, for the renderer's CSP (public/media-csp.js). */
+  mediaOrigin: argValue(MEDIA_ORIGIN_ARG),
   /** Command invocation (maps to ipcMain.handle). */
   invoke: (channel: string, args?: unknown) => {
     if (!INVOKE_CHANNELS.has(channel)) {

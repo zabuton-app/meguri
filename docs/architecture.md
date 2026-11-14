@@ -43,7 +43,23 @@ there before the first render: the window passes it to the preload as a process 
 `shared/ipc/channelNames.ts`), and the preload exposes it as
 `window.api.appName`. The app's one-character mark (`glyph`, Meguri's 巡)
 travels the same way, as `window.api.appGlyph`. The renderer's text uses it through `{app}` in the
-locale strings (see [Renderer](renderer.md#internationalization)).
+locale strings (see [Renderer](renderer.md#internationalization)). The media
+server's origin travels the same way too, as `window.api.mediaOrigin`, for the
+Content Security Policy below.
+
+The renderer's Content Security Policy is in three places:
+
+- `index.html` holds the packaged app's policy.
+- `devServerCsp()` in `electron.vite.shared.ts` adds the dev server's own
+  sources (`localhost`, its HMR socket) while serving.
+- `public/media-csp.js` appends a second policy in the packaged app that allows
+  only the media server's port on `127.0.0.1`, which is picked at startup. A
+  request must pass both policies, so the second can only narrow the first.
+
+A new source goes into `index.html`, and also into `media-csp.js` when it is
+for `img-src`, `media-src` or `connect-src`. A change to `connect-src` also
+needs the string `devServerCsp()` looks for, or `npm run dev` stops with an
+error saying so.
 
 ## IPC type system
 
