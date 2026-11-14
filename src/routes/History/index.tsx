@@ -1,7 +1,7 @@
 // Cross-file play-history timeline. /history. Lists play events newest-first
 // (consecutive re-plays of the same file are collapsed main-process-side),
 // grouped by day, with a clear-all action. Overlays the list as a modal.
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   useInfiniteQuery,
@@ -60,6 +60,7 @@ function dayLabel(playedAt: number, t: TFunc, lang: Lang): string {
 
 export default function History() {
   const { t, lang } = useI18n();
+  const titleId = useId();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -168,10 +169,10 @@ export default function History() {
     ? t("media.modalMaximize")
     : t("media.modalMinimize");
   return (
-    <HistoryModal onClose={onClose} size={modalSize}>
+    <HistoryModal onClose={onClose} size={modalSize} titleId={titleId}>
       <header className="flex items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
         <HistoryIcon className="size-4 text-primary" />
-        <span className="text-sm font-medium text-fg">
+        <span id={titleId} className="text-sm font-medium text-fg">
           {t("history.title")}
         </span>
         <div className="ml-auto flex items-center gap-2">

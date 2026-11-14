@@ -2,6 +2,7 @@
 import * as React from "react";
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
 import { ChevronRight } from "lucide-react";
+import { focusOpenConfirm } from "@/lib/keyTarget";
 import { cn } from "@/lib/utils";
 
 const ContextMenu = ContextMenuPrimitive.Root;
@@ -22,6 +23,10 @@ function ContextMenuContent({
           className,
         )}
         {...props}
+        onCloseAutoFocus={(e) => {
+          props.onCloseAutoFocus?.(e);
+          focusOpenConfirm(e);
+        }}
       />
     </ContextMenuPrimitive.Portal>
   );

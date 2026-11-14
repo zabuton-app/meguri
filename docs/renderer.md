@@ -21,6 +21,13 @@ and stays fully usable along with the toolbar and the bottom player bar
 choice, the modal size and the peek width are all remembered in
 `localStorage`.
 
+A modal's frame closes itself on Esc (unless a layer on top already took the
+key) and keeps keyboard focus inside with `useModalFocus`
+(`src/hooks/useModalFocus.ts`): focus moves into the panel (`tabIndex={-1}`) on
+open, Tab cycles inside it, and focus returns to the opener on close. The
+dialog element is named with `aria-labelledby` pointing at the title the route
+renders. The peek is not a modal, so it does neither.
+
 Each route is a directory: `index.tsx` is the entry point and composes the
 route, sitting alongside its companion components and hooks — for example
 `src/routes/MediaDetail/MediaModal.tsx`,

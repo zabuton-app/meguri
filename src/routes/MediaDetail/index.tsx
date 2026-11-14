@@ -7,7 +7,14 @@
 // every write to the file (useDetailMutations), audio in the bottom bar
 // (useAudioDetail), prev/next (usePrevNextNavigation), and the title row,
 // rating/tags card and play history as components.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyTagFilter, showFolderInLibrary } from "@/lib/ui-events";
@@ -56,6 +63,7 @@ const IMAGE_BG_INVERTED_KEY = "meguri.image.backgroundInverted";
 
 export default function MediaDetail() {
   const { t, lang } = useI18n();
+  const titleId = useId();
   const { id } = useParams();
   const fileId = Number(id);
   // Optional initial seek position (seconds), e.g. when the playlist hands over.
@@ -349,12 +357,14 @@ export default function MediaDetail() {
       presentation={presentation}
       fullscreen={isFullscreen}
       containerRef={modalRef}
+      titleId={titleId}
       t={t}
     >
       {!isFullscreen && (
         <TopBar
           onClose={onClose}
           title={basename}
+          titleId={titleId}
           onPrev={goPrev}
           onNext={goNext}
           canPrev={canPrev}
