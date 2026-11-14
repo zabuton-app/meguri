@@ -51,6 +51,7 @@ import { useDetailPresentation } from "./useDetailPresentation";
 import { useThumbVersion } from "./useThumbVersion";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
+import { DownloadOriginCard } from "./DownloadOriginCard";
 import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
 import {
@@ -571,6 +572,12 @@ export default function MediaDetail() {
             workspacePath={owningWorkspace?.path ?? null}
             total={total}
             t={t}
+          />
+
+          <DownloadOriginCard
+            key={`${wsId}:${fileId}`}
+            id={fileId}
+            workspaceId={wsId}
           />
 
           <PlayHistory history={d.playHistory} t={t} lang={lang} />

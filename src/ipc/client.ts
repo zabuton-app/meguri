@@ -141,6 +141,8 @@ export const api = {
   ) => invoke("graph_layout_set", { scope, keys, xy, dims }),
   fileGet: (id: number, workspaceId: string) =>
     invoke("file_get", { id, workspaceId }),
+  fileDownloadOrigin: (id: number, workspaceId: string) =>
+    invoke("file_download_origin", { id, workspaceId }),
   fileSubtitles: (
     id: number,
     workspaceId: string,

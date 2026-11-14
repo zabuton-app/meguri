@@ -254,6 +254,18 @@ export const fr: Record<TranslationKey, string> = {
 
   // media detail
   "media.notFound": "Fichier introuvable.",
+  "downloadOrigin.title": "Origine du téléchargement",
+  "downloadOrigin.website": "Site web",
+  "downloadOrigin.recorded": "URL enregistrées",
+  "downloadOrigin.download": "URL de téléchargement",
+  "downloadOrigin.referrer": "URL de la page d’origine",
+  "downloadOrigin.other": "Autre URL enregistrée",
+  "downloadOrigin.copy": "Copier",
+  "downloadOrigin.copyLabel": "Copier {label}",
+  "downloadOrigin.openLabel": "Ouvrir {label}",
+  "downloadOrigin.copied": "URL copiée dans le presse-papiers",
+  "downloadOrigin.copyFailed": "Impossible de copier l’URL.",
+  "downloadOrigin.openFailed": "Impossible d’ouvrir l’URL.",
   "media.openExternal": "Ouvrir avec une application externe",
   "media.openExternalFailed": "Impossible d’ouvrir dans l’application externe",
   "fileMenu.open": "Ouvrir",
