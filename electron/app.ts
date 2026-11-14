@@ -19,6 +19,7 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { DEFAULT_LOGO, loadAutoTag, loadConfig } from "./core/appConfig.js";
 import log, { setupLogger } from "./core/logger.js";
 import { withTimeout } from "./core/concurrency.js";
@@ -47,6 +48,7 @@ import { registerIpc } from "./ipc/index.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
+import { isAppUrl, setRendererIndex } from "./core/appUrl.js";
 import { APP_GLYPH_ARG, APP_NAME_ARG } from "../shared/ipc/channelNames.js";
 import type {
   LibraryMergeFailure,
@@ -118,6 +120,8 @@ export function startApp(options: AppOptions): void {
   setupLogger();
 
   // In CJS output, __dirname exists globally (out/main/).
+  const rendererIndex = path.join(__dirname, "../renderer/index.html");
+  setRendererIndex(rendererIndex, { allowDevServer: !app.isPackaged });
 
   const ws = new Workspaces();
   // Heavy read-only list/search queries run on a worker thread so a slow query
@@ -269,22 +273,6 @@ export function startApp(options: AppOptions): void {
     });
   }
 
-  // Restrict in-window navigation to the bundled renderer (or the Vite dev server
-  // in development). Anything else is sent to the OS browser via shell.openExternal.
-  // setWindowOpenHandler is also applied here so a future BrowserWindow inherits it.
-  // `file:` is always permitted (bundled renderer); the dev origin is read on each
-  // call so a late-resolved ELECTRON_RENDERER_URL is honored.
-  function isAppUrl(url: string): boolean {
-    try {
-      const u = new URL(url);
-      if (u.protocol === "file:") return true;
-      const dev = process.env["ELECTRON_RENDERER_URL"];
-      if (dev) return u.origin === new URL(dev).origin;
-      return false;
-    } catch {
-      return false;
-    }
-  }
   // Renderer crash recovery. A crashed renderer (OOM, a decoder fault, ...)
   // otherwise leaves the tray-resident app with a blank window until the user
   // quits and relaunches. Reload the main window instead — with a growing
@@ -369,6 +357,9 @@ export function startApp(options: AppOptions): void {
     log.error("child process gone:", details);
   });
 
+  // Restrict in-window navigation to the app (see isAppUrl). Other http(s) URLs
+  // open in the OS browser; anything else is dropped. setWindowOpenHandler is also
+  // applied here so a future BrowserWindow inherits it.
   app.on("web-contents-created", (_e, contents) => {
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
     contents.on("will-navigate", (event, url) => {
@@ -533,9 +524,12 @@ export function startApp(options: AppOptions): void {
 
   /** Load the app entry (dev server in development, bundled renderer otherwise). */
   function loadRenderer(win: BrowserWindow): void {
-    const devUrl = process.env["ELECTRON_RENDERER_URL"];
+    // Packaged, the env var is not trusted (see setRendererIndex).
+    const devUrl = !app.isPackaged && process.env["ELECTRON_RENDERER_URL"];
     if (devUrl) void win.loadURL(devUrl);
-    else void win.loadFile(path.join(__dirname, "../renderer/index.html"));
+    // Not loadFile(): it leaves a "%" in the path unescaped, so the URL would
+    // name another file than the one isAppUrl() accepts.
+    else void win.loadURL(pathToFileURL(rendererIndex).href);
   }
 
   /** Show and focus the main window, recreating it if it was destroyed. */
