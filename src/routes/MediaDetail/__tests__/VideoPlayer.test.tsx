@@ -510,6 +510,26 @@ describe("VideoPlayer", () => {
     expect(localStorage.getItem("meguri.player.muted")).toBe("1");
   });
 
+  it.each([
+    { case: "reports no picture", width: 1920, videoWidth: 0, shown: true },
+    { case: "plays a picture", width: 1920, videoWidth: 1920, shown: false },
+    {
+      case: "plays a file the scan saw no picture in",
+      width: null,
+      videoWidth: 0,
+      shown: false,
+    },
+  ])("$case on loadeddata", ({ width, videoWidth, shown }) => {
+    const { video } = renderPlayer({ width });
+    loadVideo(video);
+    Object.defineProperty(video, "videoWidth", {
+      configurable: true,
+      value: videoWidth,
+    });
+    fireEvent.loadedData(video);
+    expect(screen.queryByText("player.errNoPicture") != null).toBe(shown);
+  });
+
   it("exposes seek via ref handle", () => {
     const { video, ref } = renderPlayer();
     loadVideo(video);

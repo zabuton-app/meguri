@@ -371,6 +371,8 @@ export const en: Record<TranslationKey, string> = {
   // playback errors
   "player.errAborted": "Loading was aborted (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "Network error (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture":
+    "The picture could not be decoded — its codec may be unsupported here",
   "player.errDecode":
     "Failed to decode — codec may be unsupported (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported":

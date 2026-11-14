@@ -384,7 +384,9 @@ at up to 1920 × 1080. H.264, HEVC, VP8, VP9 and AV1 play as they are. For
 clips tagged as PQ or HLG HDR, the preview uses the available FFmpeg color
 filters to fit the highlights and colors into SDR. SDR clips use the regular
 preview. Dragging a clip into an editor or opening it externally uses the
-original file.
+original file. HEVC plays only where the system has a decoder for it; on Linux
+the player says the picture could not be decoded, and **Open in external
+player** plays the clip.
 
 The built-in player converts audio it cannot decode, such as Dolby Digital
 (AC-3), Dolby Digital Plus (E-AC-3), DTS, TrueHD, ALAC or MP2, to AAC. This

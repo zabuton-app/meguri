@@ -357,6 +357,7 @@ export const zhCN: Record<TranslationKey, string> = {
   // playback errors
   "player.errAborted": "加载已中止 (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "网络错误 (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture": "无法解码画面 — 此环境可能不支持该编解码器",
   "player.errDecode": "解码失败 — 可能不支持该编解码器 (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported": "无法播放此格式 (MEDIA_ERR_SRC_NOT_SUPPORTED)",
   "player.errUnknown": "未知错误",
