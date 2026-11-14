@@ -4,6 +4,7 @@
 // values can be used at runtime (e.g. for .parse() validation in main); the
 // inferred types satisfy the prior hand-written interfaces.
 import { z } from "zod";
+import { RESOLUTION_IDS } from "../resolutions.js";
 import { MAX_TAG_NAME, MAX_TAG_REF_NAME } from "../tags.js";
 import {
   CASE_MODES,
@@ -177,6 +178,12 @@ export const SearchQuerySchema = z.object({
   tagSource: z.string().optional(),
   kind: z.string().optional(),
   ratingMin: z.number().optional(),
+  resolution: z
+    .object({
+      preset: z.enum(RESOLUTION_IDS),
+      match: z.enum(["exact", "atLeast"]),
+    })
+    .optional(),
   favorite: z.boolean().optional(),
   /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
   duplicates: z.boolean().optional(),

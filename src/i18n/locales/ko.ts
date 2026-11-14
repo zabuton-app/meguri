@@ -12,6 +12,12 @@ export const ko: Record<TranslationKey, string> = {
   "kind.video": "동영상",
   "kind.image": "이미지",
   "kind.audio": "오디오",
+  "kind.visual": "동영상 + 이미지",
+  "resolution.title": "해상도",
+  "resolution.any": "모든 해상도",
+  "resolution.match": "해상도 일치 방식",
+  "resolution.atLeast": "이상",
+  "resolution.exact": "정확히",
 
   // sort
   "sort.added": "추가순",

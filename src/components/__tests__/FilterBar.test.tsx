@@ -92,7 +92,7 @@ describe("kind segments", () => {
   it("exposes exactly one checked radio", () => {
     setup({ kind: "video" });
     const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(4);
+    expect(radios).toHaveLength(5);
     expect(
       radios.filter((r) => r.getAttribute("aria-checked") === "true"),
     ).toHaveLength(1);

@@ -12,6 +12,12 @@ export const es: Record<TranslationKey, string> = {
   "kind.video": "Vídeo",
   "kind.image": "Imagen",
   "kind.audio": "Audio",
+  "kind.visual": "Vídeo + Imagen",
+  "resolution.title": "Resolución",
+  "resolution.any": "Cualquier resolución",
+  "resolution.match": "Coincidencia de resolución",
+  "resolution.atLeast": "Como mínimo",
+  "resolution.exact": "Exactamente",
 
   // sort
   "sort.added": "Añadido",
