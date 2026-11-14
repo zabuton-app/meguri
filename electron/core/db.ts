@@ -171,6 +171,16 @@ CREATE INDEX IF NOT EXISTS lib.idx_file_meta_accessed ON file_meta(last_accessed
 -- them rather than scanning every file for a meta row that has one.
 CREATE INDEX IF NOT EXISTS lib.idx_file_meta_resume ON file_meta(meta_key) WHERE resume_position IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS lib.audio_artwork_images (
+  image_hash TEXT PRIMARY KEY,
+  png BLOB NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lib.audio_artwork (
+  meta_key TEXT PRIMARY KEY,
+  image_hash TEXT NOT NULL REFERENCES audio_artwork_images(image_hash)
+);
+CREATE INDEX IF NOT EXISTS lib.idx_audio_artwork_image ON audio_artwork(image_hash);
+
 CREATE TABLE IF NOT EXISTS lib.meta_tags (
   meta_key TEXT NOT NULL,
   tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,

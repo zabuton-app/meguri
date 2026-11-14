@@ -497,6 +497,9 @@ export const ChannelInputs = {
   bookmark_add: FileTarget.extend({ sec: z.number() }),
   bookmark_remove: FileTarget.extend({ bookmarkId: z.number() }),
   thumb_set_offset: FileTarget.extend({ sec: z.number().nullable() }),
+  audio_artwork_import: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  }),
   frame_export: FileTarget.extend({ sec: z.number().finite().min(0) }),
   open_external: FileTarget,
   open_folder: FileTarget,
@@ -690,6 +693,7 @@ export interface ChannelOutputs {
   bookmark_add: SceneBookmark | null;
   bookmark_remove: void;
   thumb_set_offset: { ok: boolean; thumbOffsetSec: number | null };
+  audio_artwork_import: { matched: number; skipped: number } | null;
   // saved=false means the user canceled the save dialog (not an error);
   // extraction failures reject instead.
   frame_export: { saved: boolean; path: string | null };

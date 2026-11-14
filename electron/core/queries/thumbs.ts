@@ -1,6 +1,11 @@
 // Per-file thumbnail status (path on disk + status flag).
 import type { DB } from "../db.js";
 
+export const FILE_HAS_THUMB = `(f.thumb_path IS NOT NULL OR
+  (f.kind = 'audio' AND EXISTS (
+    SELECT 1 FROM lib.audio_artwork WHERE meta_key = f.meta_key
+  )))`;
+
 export function setThumb(
   db: DB,
   fileId: number,

@@ -161,6 +161,10 @@ export const fr: Record<TranslationKey, string> = {
     "Vous pouvez aussi ajouter ou changer depuis la barre latérale gauche.",
   "home.scanWithDeleted": "Resynchroniser en incluant les éléments supprimés",
   "home.rebuildIndex": "Reconstruire l’index",
+  "home.importAudioArtwork": "Importer des pochettes audio",
+  "home.audioArtworkImported":
+    "Pochettes audio associées : {matched}. Ignorées : {skipped}.",
+  "home.audioArtworkImportFailed": "Impossible d’importer les pochettes audio.",
   "home.rebuildConfirm":
     "Supprime la liste des fichiers et les miniatures, puis relance une analyse complète. Les favoris, les notes, les tags et l’historique de lecture sont conservés, mais les fichiers que vous avez retirés de l’index réapparaîtront. Continuer ?",
   "home.scanComplete": "Analyse terminée",

@@ -155,6 +155,10 @@ export const ja = {
   "home.addFromSidebar": "左のサイドバーからも追加・切り替えできます。",
   "home.scanWithDeleted": "削除したものを含めて再同期",
   "home.rebuildIndex": "インデックスを再構築",
+  "home.importAudioArtwork": "音声のカバー画像を読み込む",
+  "home.audioArtworkImported":
+    "一致した音声カバー: {matched} 件。スキップ: {skipped} 件。",
+  "home.audioArtworkImportFailed": "音声のカバー画像を読み込めませんでした。",
   "home.rebuildConfirm":
     "ファイル一覧とサムネイルを破棄して最初から再スキャンします。お気に入り・評価・タグ・再生履歴は保持されますが、「インデックスから削除」したファイルは再び表示されます。続行しますか？",
   "home.scanComplete": "スキャンが完了しました",

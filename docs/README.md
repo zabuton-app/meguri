@@ -7,6 +7,8 @@ invariants, data flow, and extension procedures behind the codebase.
 For what the app is, how to install it, and how to use it, see the top-level
 [README](../README.md). This set assumes you have already read it.
 
+For the local audio cover import, see [Import local audio covers](audio-artwork.md).
+
 ## What's here
 
 - [Architecture](architecture.md) — process boundaries, the IPC type system,

@@ -115,7 +115,7 @@ export function MediaThumbnail({
       : null;
 
   if (!src || failedSrc === src) {
-    // Reached for audio without embedded cover art, for any file whose
+    // Reached for audio without cover art, for any file whose
     // thumbnail generation failed or has not run yet, and for a recorded
     // thumbnail whose file has since gone missing (without the onError
     // fallback that last case would sit on the skeleton forever).
@@ -142,7 +142,8 @@ export function MediaThumbnail({
         onLoad={() => setImgLoaded(true)}
         onError={() => setFailedSrc(src)}
         className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity",
+          "absolute inset-0 h-full w-full transition-opacity",
+          file.kind === "audio" ? "object-contain" : "object-cover",
           imgLoaded ? "opacity-100" : "opacity-0",
         )}
       />

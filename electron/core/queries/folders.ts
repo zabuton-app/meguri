@@ -6,6 +6,7 @@
 // workspaceId, which crossWorkspace.ts stamps on.
 import type { DB } from "../db.js";
 import { FILE_COLS, FILE_FROM, attachTags } from "./files.js";
+import { FILE_HAS_THUMB } from "./thumbs.js";
 import {
   FOLDER_FILE_FROM,
   PINNED_FILES,
@@ -40,7 +41,7 @@ interface SepOpt {
 // PINNED_FILES for why the index is named).
 const RANGED = PINNED_FILES;
 
-const HAS_THUMB = "f.thumb_status = 'done' AND f.thumb_path IS NOT NULL";
+const HAS_THUMB = `f.thumb_status = 'done' AND ${FILE_HAS_THUMB}`;
 
 // Every non-root folder shares one statement shape (the root has no range),
 // so the statements below are prepared once per call and reused per folder:

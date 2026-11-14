@@ -146,6 +146,10 @@ export const zhCN: Record<TranslationKey, string> = {
   "home.addFromSidebar": "你也可以从左侧边栏添加或切换。",
   "home.scanWithDeleted": "重新同步（包含已删除项）",
   "home.rebuildIndex": "重建索引",
+  "home.importAudioArtwork": "导入音频封面",
+  "home.audioArtworkImported":
+    "已匹配 {matched} 个音频封面，已跳过 {skipped} 个。",
+  "home.audioArtworkImportFailed": "无法导入音频封面。",
   "home.rebuildConfirm":
     "丢弃文件列表和缩略图并从头重新扫描。收藏、评分、标签和播放记录将会保留，但已从索引中删除的文件将重新出现。是否继续？",
   "home.scanComplete": "扫描完成",
