@@ -154,6 +154,7 @@ export function WorkspaceRail() {
       }
       onAdded(r);
     },
+    meta: { reportsOwnError: true },
     onError: (e, dir) =>
       toast.error(t("drop.addFailed", { name: dir.name }), {
         description: e instanceof Error ? e.message : String(e),

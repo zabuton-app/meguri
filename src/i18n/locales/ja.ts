@@ -5,6 +5,7 @@ export const ja = {
   "common.close": "閉じる",
   "common.cancel": "キャンセル",
   "common.ok": "OK",
+  "common.actionFailed": "操作に失敗しました",
 
   // 種別
   "kind.video": "動画",

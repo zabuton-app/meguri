@@ -142,6 +142,12 @@ Data fetching uses `@tanstack/react-query`. The file list is an
 plus virtualization (`src/components/MediaGrid.tsx`). Four view modes — grid,
 list, timeline and graph — are switchable.
 
+A mutation that fails is reported by a generic toast
+(`src/hooks/useMutationErrorNotifier.ts`), so an action never fails silently.
+A mutation that shows its own error message sets
+`meta: { reportsOwnError: true }` to keep the failure from being reported
+twice.
+
 The grid and the list have a "show by folder" option (`BY_FOLDER_KEY`, remembered apart
 from the view mode) that browses one workspace like a file manager: the current
 folder's child folders first, then its direct files, with a header above naming

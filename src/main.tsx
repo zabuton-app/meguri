@@ -26,6 +26,8 @@ window.addEventListener("unhandledrejection", (e) => {
 // Mutations patch or invalidate only the queries they affect (see
 // src/lib/queryCache.ts). Avoid a global MutationCache.onSuccess: it refetched
 // every active query on each toggle and doubled work with per-mutation handlers.
+// A failed mutation gets a generic toast from useMutationErrorNotifier; one
+// that shows its own error sets `meta: { reportsOwnError: true }`.
 const queryClient: QueryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });

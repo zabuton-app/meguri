@@ -160,6 +160,7 @@ export function useDetailMutations({
     mutationFn: ({ target, name }: { target: Target; name: string }) =>
       api.fileAddTag(target.fileId, target.wsId, name),
     onSuccess: (_d, { target }) => onTagsChanged(target),
+    meta: { reportsOwnError: true },
     onError: (error, { name }) => {
       // main rejects a name that impersonates a pipeline-owned namespace; any
       // other failure (DB error, unknown workspace) deserves its own message.
@@ -247,6 +248,7 @@ export function useDetailMutations({
       invalidateCollections();
       toast.success(t("collection.addedToast", { name: c.name }));
     },
+    meta: { reportsOwnError: true },
     onError: onCollectionError,
   });
   const removeFromCollection = useMutation({
@@ -256,6 +258,7 @@ export function useDetailMutations({
       invalidateCollections();
       toast.success(t("collection.removedFromToast", { name: c.name }));
     },
+    meta: { reportsOwnError: true },
     onError: onCollectionError,
   });
 
@@ -334,6 +337,7 @@ export function useDetailMutations({
       // A canceled save dialog resolves with saved=false — stay silent.
       if (res.saved) toast.success(t("player.frameExported"));
     },
+    meta: { reportsOwnError: true },
     onError: () => toast.error(t("player.frameExportFailed")),
   });
 

@@ -6,6 +6,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "common.close": "关闭",
   "common.cancel": "取消",
   "common.ok": "确定",
+  "common.actionFailed": "操作失败",
 
   // kind
   "kind.video": "视频",
