@@ -210,7 +210,7 @@ Or run from source — see [Setup and Launch](#setup-and-launch).
   window: drop a file on it to queue it in Watch Later, double-click it for
   Discovery, or put it away from its menu
 - 🎨 **Themes** — base16-based multi-theme switching (gruvbox / solarized /
-  monokai / nord / dracula, etc.)
+  monokai / nord / catppuccin, etc.)
 - 🖌️ **Custom CSS** — layer your own `custom.css` over the theme to recolor or
   restyle the UI, or keep several stylesheets as CSS themes and pick one next
   to the built-in themes; saved changes apply instantly
@@ -327,7 +327,7 @@ the seed step with `MEGURI_SEED_SAMPLE_CONFIG=force`.
 
 ```bash
 npm run build      # build main / preload / renderer
-npm run dist       # generate AppImage / deb (electron-builder)
+npm run dist       # this platform's packages (electron-builder; see Download)
 ```
 
 ### Type checking

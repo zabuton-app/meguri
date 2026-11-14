@@ -78,10 +78,12 @@ both processes so there is nothing to hand-sync.
     Outputs are plain types, not Zod schemas, because the renderer trusts data
     coming from main and needs no runtime check.
 
-There are roughly three dozen invoke channels, covering app status, workspace and
-collection management, scanning, file search and mutation, tags, scene
-bookmarks, thumbnail offsets, and shell operations (open externally, open
-folder, copy path, open URL, toggle DevTools).
+There are over eighty invoke channels, covering app status, workspace and
+collection management, scanning, file search and mutation, folders, the graph,
+heatmap and timeline views, play history, duplicates, tags and auto tagging,
+scene bookmarks, thumbnail offsets, the update check, logos, custom CSS and CSS
+themes, and shell operations (open externally, open folder, copy path, open
+URL, toggle DevTools).
 
 `electron/core/types.ts` and `src/ipc/types.ts` are thin re-export shims over the
 shared schemas, kept for import-path compatibility; they hold no definitions of
@@ -112,10 +114,21 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
   `errorReason: "root-unreadable"`. Since the startup scan can finish before a
   view listens, `scan_unreadable_workspaces` returns the workspaces whose last
   scan failed that way.
-- `workspace:changed` — the active workspace changed.
+- `workspace:changed` — the workspaces or collections changed: the active one,
+  the list (added, removed, reordered, renamed, or given an emoji), or which
+  files a collection holds. Not sent when a collection's files are reordered
+  (a refetch would undo the order the renderer already shows) or a played file
+  leaves Watch Later (it would drop the open file from prev/next); the renderer
+  updates its own view for those.
 - `update:available` — the update check found a newer release.
+- `library:merge` — progress of merging workspaces' metadata into the shared
+  library, at startup or when retried (`library_merge_retry`), then its end
+  with the workspaces that failed (see
+  [The shared library](data-model.md#the-shared-library)).
 - `custom-css:changed` — `custom.css` was saved or deleted (see
   [Custom CSS](#custom-css)).
+- `css-themes:changed` — a `.css` file in the CSS themes folder was added,
+  changed or removed (see [CSS theme files](#css-theme-files)).
 
 ### Adding a new IPC channel
 
@@ -128,12 +141,13 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
 4. Add `handle("<channel>", (input) => ...)` inside the relevant
    `register*Handlers()` under `electron/ipc/`. Handlers are grouped by domain,
    one module each (`status.ts`, `workspaces.ts`, `scan.ts`, `files.ts`,
-   `tags.ts`, `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`,
-   `logo.ts`, `updates.ts`); `electron/ipc/index.ts` wires them up in `registerIpc()`.
-   Each group receives an `IpcContext` (`electron/ipc/context.ts`) with what it
-   needs from the main process — the `Workspaces`, the query worker client,
-   `emit()`, the `ScanManager`, and live getters for the window and media
-   server.
+   `folders.ts`, `graph.ts`, `activity.ts`, `timeline.ts`, `tags.ts`,
+   `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`, `updates.ts`,
+   `logo.ts`, `customCss.ts`, `cssThemes.ts`); `electron/ipc/index.ts` wires
+   them up in `registerIpc()`. Each group but `updates.ts` receives an
+   `IpcContext` (`electron/ipc/context.ts`) with what it needs from the main
+   process — the `Workspaces`, the query worker client, `emit()`, the
+   `ScanManager`, and live getters for the window and media server.
    Shared helpers (`coreById`, `queryTargets`, `scopedCores`,
    `ensureFileInsideRoot`) are in `electron/ipc/helpers.ts`; a handler that
    hands a file path to the OS must resolve it through `ensureFileInsideRoot`

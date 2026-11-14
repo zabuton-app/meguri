@@ -111,8 +111,8 @@ the jsdom worker does not start under Electron's experimental loader.
 `app.asar` → `app.asar.unpacked` substitution (see
 [ffmpeg/ffprobe path resolution](media-pipeline.md#ffmpegffprobe-path-resolution)).
 
-Distribution targets are Linux (AppImage / deb), Windows (nsis / portable), and
-macOS (dmg / zip).
+Distribution targets are Linux (AppImage / deb), Windows (nsis / portable /
+appx), and macOS (dmg / zip).
 
 Electron 45 packages require macOS 13 (Ventura) or later. The existing
 Windows x64 and Linux x64 release targets are supported by Electron 45.
