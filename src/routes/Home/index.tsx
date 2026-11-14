@@ -98,6 +98,7 @@ import {
 } from "./utils";
 import { scrollListByPage, turnListPage } from "./pageScroll";
 import { appName } from "@/lib/appName";
+import { isTyping } from "@/lib/keyTarget";
 
 // The graph view carries WebGL and graph libraries the list views never need,
 // so it is loaded the first time it is shown.
@@ -697,14 +698,7 @@ export default function Home() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (helpOpen) return;
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping()) return;
       if (isHelpKey(e)) {
         e.preventDefault();
         setHelpOpen(true);
@@ -734,11 +728,7 @@ export default function Home() {
     const onKey = (e: KeyboardEvent) => {
       if (helpOpen) return;
       const el = document.activeElement as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
+      const typing = isTyping();
       const b = NAV_BINDINGS[keybindingPreset];
       if (matchAny(e, b.focusSearch)) {
         // Let the key type normally if a field already has focus.
@@ -768,14 +758,7 @@ export default function Home() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping()) return;
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyK") {
         e.preventDefault();
         setCommandOpen((open) => !open);
@@ -816,12 +799,7 @@ export default function Home() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      const el = document.activeElement as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
+      const typing = isTyping();
       const overlayOpen =
         location.pathname !== "/" ||
         helpOpen ||

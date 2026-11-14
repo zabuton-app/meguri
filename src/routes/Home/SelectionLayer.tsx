@@ -10,6 +10,7 @@ import { MAX_BULK_FILES } from "@shared/tags";
 import { SelectionBar } from "@/components/SelectionBar";
 import { useSelection } from "@/components/SelectionContext";
 import { isSelectAllKey } from "@/hooks/useSelectAllGuard";
+import { isTyping } from "@/lib/keyTarget";
 
 interface Props {
   /**
@@ -35,13 +36,7 @@ export function SelectionLayer({ active }: Props) {
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
-      if (typing || tagsOpen) return;
+      if (isTyping() || tagsOpen) return;
 
       // Shared with useSelectAllGuard, which suppresses the browser default
       // for the same chord: matching on the produced character rather than the

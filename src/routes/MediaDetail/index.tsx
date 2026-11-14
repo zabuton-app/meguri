@@ -266,6 +266,7 @@ export default function MediaDetail() {
       fileId,
       wsId,
       kind,
+      viewRef: modalRef,
     });
   // The way into the playlist from here (see useCloseTarget). Offered only
   // while a list is mounted underneath, and only for a file that list has
@@ -289,6 +290,8 @@ export default function MediaDetail() {
         onClose={onClose}
         size={modalSize}
         presentation={presentation}
+        // The prev/next keys look for layers over this frame, here too.
+        containerRef={modalRef}
         t={t}
       >
         <TopBar
@@ -314,6 +317,8 @@ export default function MediaDetail() {
         onClose={onClose}
         size={modalSize}
         presentation={presentation}
+        // The prev/next keys look for layers over this frame, here too.
+        containerRef={modalRef}
         t={t}
       >
         <TopBar

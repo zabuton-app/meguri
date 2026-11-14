@@ -72,6 +72,7 @@ import {
 } from "@/lib/positionReporter";
 import { fmtTime } from "./utils";
 import { DEFAULT_AUDIO_TRACK } from "@shared/playbackTracks";
+import { isLayerOnTop, isTyping } from "@/lib/keyTarget";
 
 // readyState at which metadata is in (HTMLMediaElement.HAVE_METADATA), as a
 // plain number: the constant lives on a global jsdom does not provide.
@@ -880,15 +881,7 @@ export const VideoPlayer = forwardRef<
   useEffect(() => {
     if (!shortcuts) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.tagName === "SELECT" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping() || isLayerOnTop(wrapRef.current)) return;
       // Ignore modified combos (browser / Emacs-style shortcuts).
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Yield keys claimed by file paging (e.g. Vim's "l") so they don't also seek.

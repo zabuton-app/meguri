@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMediaNav, usePlaybackNav } from "@/components/MediaNavContext";
 import { keepPlaybackOrder, walksPlaybackOrder } from "@/lib/playbackOrder";
@@ -8,12 +8,15 @@ import {
   matchAny,
   type NavBinding,
 } from "@/settings/keybindings";
+import { isLayerOnTop, isTyping } from "@/lib/keyTarget";
 
 interface Args {
   fileId: number;
   wsId: string;
   /** Currently displayed file's kind. Affects arrow-key behavior (images use arrows for prev/next). */
   kind: string | undefined;
+  /** The detail view's own element: keys are left alone while a layer is over it. */
+  viewRef: RefObject<HTMLElement | null>;
 }
 
 interface Result {
@@ -38,7 +41,12 @@ interface Result {
  * - Prefetching ahead so stepping stays seamless
  * - Keyboard chords (preset bindings always; arrows for images, since videos seek with arrows)
  */
-export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
+export function usePrevNextNavigation({
+  fileId,
+  wsId,
+  kind,
+  viewRef,
+}: Args): Result {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { keybindingPreset } = usePreferences();
@@ -162,14 +170,7 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping() || isLayerOnTop(viewRef.current)) return;
       const b = navBindingRef.current;
       if (matchAny(e, b.prev)) {
         e.preventDefault();
@@ -193,8 +194,9 @@ export function usePrevNextNavigation({ fileId, wsId, kind }: Args): Result {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // Handlers go through refs above, so registering once is enough.
-  }, []);
+    // Handlers go through refs above (viewRef is one too), so registering
+    // once is enough.
+  }, [viewRef]);
 
   return {
     goPrev,

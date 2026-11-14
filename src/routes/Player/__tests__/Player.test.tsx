@@ -219,6 +219,39 @@ describe("Player keyboard control", () => {
     expect(await screen.findByText("1 / 3")).toBeTruthy();
   });
 
+  it("leaves the keys to a dialog open over it", async () => {
+    renderPlayer([row(1, "video"), row(3, "video"), row(5, "video")]);
+    await screen.findByText("1 / 3");
+    // The shortcuts overlay, or a confirm dialog, on top of the player (#268).
+    const layer = document.createElement("div");
+    layer.setAttribute("role", "dialog");
+    document.body.append(layer);
+    fireEvent.keyDown(window, { code: "KeyN" });
+    expect(screen.getByText("1 / 3")).toBeTruthy();
+    layer.remove();
+    fireEvent.keyDown(window, { code: "KeyN" });
+    expect(await screen.findByText("2 / 3")).toBeTruthy();
+  });
+
+  it("stays open when a layer on top claimed the Escape", async () => {
+    renderPlayer([row(1, "video"), row(3, "video")]);
+    await screen.findByText("1 / 2");
+    // What the shortcuts overlay and Radix's command menu do: take the key in
+    // the capture phase, mark it as theirs and close themselves.
+    const claim = (e: KeyboardEvent) => e.preventDefault();
+    window.addEventListener("keydown", claim, true);
+    try {
+      fireEvent.keyDown(window, { code: "Escape", key: "Escape" });
+    } finally {
+      window.removeEventListener("keydown", claim, true);
+    }
+    // Leaving the player navigates to "/"; it is still on /play.
+    expect(window.location.hash).toBe("#/play");
+    // An Esc nobody claimed still leaves.
+    fireEvent.keyDown(window, { code: "Escape", key: "Escape" });
+    await waitFor(() => expect(window.location.hash).toBe("#/"));
+  });
+
   it("steps with the arrow keys while an image is on screen", async () => {
     renderPlayer([row(2, "image"), row(4, "image")]);
     await screen.findByText("1 / 2");
