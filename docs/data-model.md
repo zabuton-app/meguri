@@ -384,6 +384,15 @@ chip the box draws and the SQL the query produces can never disagree about it.
 tag the user creates. The structured `SearchQuery.tags[]` field still works and
 is what saved searches and Discover URLs carry.
 
+The **`hash:` directive** finds files by content hash (#302): `hash:3fa9c1d2`
+matches every file whose `content_hash` starts with those hex digits, at least
+four of them (`MIN_HASH_SEARCH_LENGTH`), in any case. It becomes a range on the
+indexed column (`>= prefix AND < prefix || 'g'`, every hex digit sorting before
+`g`), so a file without a hash never matches. Shorter or non-hex values stay
+free text. The Duplicates view copies a group's full hash and opens the list on
+`hash:<hash>`, which is how a group's copies are found from the list. It is a
+chip like `tag:`, and the condition row names it.
+
 The box itself (`SearchTokenInput`) renders a directive as a **chip** rather than
 as raw text, so it is added and removed as one unit: a directive only means
 anything whole, and backspacing through the middle of one silently turns an exact

@@ -11,9 +11,11 @@ import { DATE_RANGES } from "@/lib/dateRanges";
 import { kindLabel } from "@/lib/mediaKind";
 import { resolveSortDir } from "@shared/sortDir";
 import {
+  isSearchDirective,
   isTagDirective,
   joinSearchTokens,
   parseQualifiedTagName,
+  parseHashSearchToken,
   parseTagSearchToken,
   splitSearchTokens,
 } from "@shared/tags";
@@ -86,7 +88,7 @@ export function describeConditions(
     });
 
   const freeText = splitSearchTokens(query.q ?? "").filter(
-    (token) => !isTagDirective(token),
+    (token) => !isSearchDirective(token),
   );
   if (freeText.length)
     out.push({
@@ -95,18 +97,24 @@ export function describeConditions(
       group: "primary",
       chip: true,
       clear: (q) => {
-        const directives = splitSearchTokens(q.q ?? "").filter(isTagDirective);
+        const directives = splitSearchTokens(q.q ?? "").filter(
+          isSearchDirective,
+        );
         const rest = joinSearchTokens(directives);
         return rest ? { ...q, q: rest } : without(q, "q");
       },
     });
 
   splitSearchTokens(query.q ?? "").forEach((token, i) => {
+    const hash = parseHashSearchToken(token);
     const tag = isTagDirective(token) ? parseTagSearchToken(token) : null;
-    if (tag == null) return;
+    let label: string;
+    if (hash != null) label = `${t("filter.hashChip")}: ${hash}`;
+    else if (tag != null) label = tagLabel(t, tag);
+    else return;
     out.push({
       key: `directive-${i}`,
-      label: tagLabel(t, tag),
+      label,
       group: "primary",
       chip: true,
       // Removed whole and by position: whole because a partial edit would leave

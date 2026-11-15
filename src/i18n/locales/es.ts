@@ -244,6 +244,7 @@ export const es: Catalog = {
     one: "Más filtros ({count} activo)",
     other: "Más filtros ({count} activos)",
   },
+  "filter.hashChip": "Hash del contenido",
   "filter.kindFilter": "Filtrar por tipo",
   "filter.playState": "Estado de reproducción",
   "filter.sortSection": "Orden",
@@ -755,6 +756,10 @@ export const es: Catalog = {
   "duplicates.loadFailed":
     "No se pudieron cargar los archivos duplicados. Inténtalo de nuevo.",
   "duplicates.retry": "Reintentar",
+  "duplicates.copyHash": "Copiar hash",
+  "duplicates.hashCopied": "Hash copiado",
+  "duplicates.hashCopyFailed": "No se pudo copiar el hash",
+  "duplicates.showInList": "Mostrar en la lista",
   "duplicates.fileCount": {
     one: "{count} archivo",
     other: "{count} archivos",

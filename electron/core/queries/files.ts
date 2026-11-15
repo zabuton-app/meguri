@@ -11,6 +11,7 @@ import {
 } from "./folderRange.js";
 import {
   LIST_HIDDEN_SOURCES,
+  parseHashSearchToken,
   parseTagSearchToken,
   searchTokenTerms,
   splitSearchTokens,
@@ -70,11 +71,19 @@ function buildSearchTerms(q: string): {
   /** Everything else: per token, a MATCH expression and/or LIKE terms, ORed. */
   anyOf: { match: string | null; likes: string[] }[];
   tagTokens: string[];
+  /** `hash:` prefixes, lower-case hex. */
+  hashPrefixes: string[];
 } {
   const matchTokens: string[] = [];
   const anyOf: { match: string | null; likes: string[] }[] = [];
   const tagTokens: string[] = [];
+  const hashPrefixes: string[] = [];
   for (const raw of splitSearchTokens(q)) {
+    const hash = parseHashSearchToken(raw);
+    if (hash) {
+      hashPrefixes.push(hash);
+      continue;
+    }
     const tag = parseTagSearchToken(raw);
     if (tag) {
       tagTokens.push(tag);
@@ -93,6 +102,7 @@ function buildSearchTerms(q: string): {
     match: matchTokens.length ? matchTokens.join(" ") : null,
     anyOf,
     tagTokens,
+    hashPrefixes,
   };
 }
 
@@ -188,7 +198,7 @@ export function appendSearchConditions(
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : { match: null, anyOf: [], tagTokens: [] };
+    : { match: null, anyOf: [], tagTokens: [], hashPrefixes: [] };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
@@ -226,6 +236,13 @@ export function appendSearchConditions(
       }
     }
     sql += ` AND (${parts.join(" OR ")})`;
+  }
+  // A range on the hash rather than LIKE, so idx_files_content_hash serves it:
+  // every hex digit sorts before "g", so the prefix followed by "g" is past
+  // every hash that starts with it. Files without a hash never match.
+  for (const prefix of terms.hashPrefixes) {
+    sql += " AND f.content_hash >= ? AND f.content_hash < ?";
+    args.push(prefix, `${prefix}g`);
   }
   for (const value of terms.tagTokens) {
     const ids = resolveSearchTagIds(db, value);

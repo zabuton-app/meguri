@@ -1,7 +1,7 @@
 import {
   TAG_SEARCH_PREFIX,
   hasOpenQuote,
-  isTagDirective,
+  isSearchDirective,
   joinSearchTokens,
   splitSearchTokens,
 } from "@shared/tags";
@@ -9,8 +9,8 @@ import { ALL_ID, COLLECTION_ID_PREFIX } from "@shared/workspaceIds";
 import type { TagSummary } from "@/ipc/types";
 
 /**
- * Split a query into the exact-tag directives the search box shows as chips and
- * the free text it leaves editable.
+ * Split a query into the directives (`tag:`, `hash:`) the search box shows as
+ * chips and the free text it leaves editable.
  *
  * Only the initial read of an incoming query goes through here — while the user
  * types, the box tracks the two parts itself, because a half-typed `tag:bea`
@@ -19,8 +19,8 @@ import type { TagSummary } from "@/ipc/types";
 export function splitQueryChips(q: string): { chips: string[]; text: string } {
   const tokens = splitSearchTokens(q);
   return {
-    chips: tokens.filter(isTagDirective),
-    text: joinSearchTokens(tokens.filter((token) => !isTagDirective(token))),
+    chips: tokens.filter(isSearchDirective),
+    text: joinSearchTokens(tokens.filter((token) => !isSearchDirective(token))),
   };
 }
 

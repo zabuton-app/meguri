@@ -14,7 +14,11 @@ import {
   WS_ID,
 } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import { applyTagFilter, showFolderInLibrary } from "@/lib/ui-events";
+import {
+  applyTagFilter,
+  showFolderInLibrary,
+  showMatchingFiles,
+} from "@/lib/ui-events";
 import {
   DEFAULT_SMART_COLLECTION_KEY,
   SMART_COLLECTIONS_KEY,
@@ -663,6 +667,24 @@ describe("Home folder view", () => {
     expect(
       screen.getByRole("navigation", { name: "Folder path" }),
     ).toBeTruthy();
+  });
+
+  it("shows matching files from the root, the other conditions cleared (#302)", async () => {
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("folder-card");
+    fireEvent.click(
+      screen.getByRole("button", { name: 'Open folder "Movie"' }),
+    );
+    await waitFor(() =>
+      expect(lastSearch().folder).toEqual({ path: "Movie", recursive: false }),
+    );
+    applyTagFilter(["tag:beach"]);
+    await waitFor(() => expect(lastSearch().q).toBe("tag:beach"));
+
+    showMatchingFiles(["hash:3fa9c1d2"]);
+
+    await waitFor(() => expect(lastSearch().q).toBe("hash:3fa9c1d2"));
+    expect(lastSearch().folder).toEqual({ path: "", recursive: true });
   });
 
   it("moves up when the folder shown has gone away", async () => {

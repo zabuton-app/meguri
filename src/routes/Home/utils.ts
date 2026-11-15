@@ -1,7 +1,7 @@
 import {
   joinSearchTokens,
   splitSearchTokens,
-  tagSearchKey,
+  searchDirectiveKey,
 } from "@shared/tags";
 import { isActivityMetric, type ActivityMetric } from "@shared/ipc/activity";
 import {
@@ -128,14 +128,14 @@ export function addSearchTokens(
   // while `current` holds them unquoted — normalize both sides before comparing,
   // or a second click on a multi-word tag would append a duplicate.
   const incoming = tokens.flatMap((token) => splitSearchTokens(token));
-  // A directive is compared on tagSearchKey rather than on the token, so a tag
-  // clicked while `tag:4K` is already in the box is recognised as the condition
-  // it resolves to — the same key the search box applies to a typed one. Free
-  // text has no such resolution and stays an exact comparison.
-  const keys = new Set(current.map(tagSearchKey));
+  // A directive is compared on searchDirectiveKey rather than on the token, so
+  // a tag clicked while `tag:4K` is already in the box is recognised as the
+  // condition it resolves to — the same key the search box applies to a typed
+  // one. Free text has no such resolution and stays an exact comparison.
+  const keys = new Set(current.map(searchDirectiveKey));
   const added = incoming.filter((token) => {
     if (!token) return false;
-    const key = tagSearchKey(token);
+    const key = searchDirectiveKey(token);
     if (key === null) return !current.includes(token);
     if (keys.has(key)) return false;
     keys.add(key);

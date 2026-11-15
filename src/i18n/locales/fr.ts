@@ -245,6 +245,7 @@ export const fr: Catalog = {
     one: "Autres critères ({count} actif)",
     other: "Autres critères ({count} actifs)",
   },
+  "filter.hashChip": "Empreinte du contenu",
   "filter.kindFilter": "Filtrer par type",
   "filter.playState": "État de lecture",
   "filter.sortSection": "Tri",
@@ -760,6 +761,10 @@ export const fr: Catalog = {
   "duplicates.loadFailed":
     "Impossible de charger les fichiers en double. Veuillez réessayer.",
   "duplicates.retry": "Réessayer",
+  "duplicates.copyHash": "Copier l’empreinte",
+  "duplicates.hashCopied": "Empreinte copiée",
+  "duplicates.hashCopyFailed": "Impossible de copier l’empreinte",
+  "duplicates.showInList": "Afficher dans la liste",
   "duplicates.fileCount": {
     one: "{count} fichier",
     other: "{count} fichiers",

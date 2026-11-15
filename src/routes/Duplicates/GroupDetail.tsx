@@ -1,10 +1,11 @@
 // Right pane of the duplicates view: one group's copies side by side, with the
 // parts of each path that set it apart highlighted, so the user can tell which
-// copy to keep. Read-only: the actions open, reveal or copy a copy's path.
+// copy to keep. Read-only: the actions open, reveal or copy a copy's path, and
+// copy the group's hash or show its copies in the list.
 import { memo, useMemo } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Copy, FolderOpen, Play, Star } from "lucide-react";
+import { Copy, FolderOpen, Play, Search, Star } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { DuplicateGroup, FileRow } from "@/ipc/types";
 import { fileHref } from "@/lib/fileHref";
@@ -15,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
 import { useI18n } from "@/i18n/I18nProvider";
+import { showMatchingFiles } from "@/lib/ui-events";
+import { hashSearchToken } from "@shared/tags";
 import { groupName, oldestCopy, reclaimableBytes } from "./groupView";
 import { diffPaths, type PathPart } from "./pathDiff";
 
@@ -43,6 +46,7 @@ export const GroupDetail = memo(function GroupDetail({
   className,
 }: Props) {
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const parts = useMemo(
     () => diffPaths(group.files.map((f) => f.relPath)),
     [group.files],
@@ -74,6 +78,21 @@ export const GroupDetail = memo(function GroupDetail({
     );
   };
 
+  const copyHash = () => {
+    void navigator.clipboard.writeText(group.contentHash).then(
+      () => toast.success(t("duplicates.hashCopied"), { id: "hash-copied" }),
+      (e: unknown) =>
+        toast.error(t("duplicates.hashCopyFailed"), {
+          description: errorText(e),
+        }),
+    );
+  };
+  // Every copy of the group, whatever the list was narrowed to.
+  const showInList = () => {
+    showMatchingFiles([hashSearchToken(group.contentHash)]);
+    void navigate("/");
+  };
+
   return (
     <section
       aria-label={t("duplicates.groupDetail")}
@@ -90,6 +109,27 @@ export const GroupDetail = memo(function GroupDetail({
             ))}
             <span className="font-mono">{group.contentHash.slice(0, 8)}</span>
           </p>
+          {/* The hash is what a `hash:` search finds the copies by (#302). */}
+          <div className="mt-1 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2"
+              onClick={copyHash}
+            >
+              <Copy />
+              {t("duplicates.copyHash")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2"
+              onClick={showInList}
+            >
+              <Search />
+              {t("duplicates.showInList")}
+            </Button>
+          </div>
         </div>
         <dl className="flex gap-4 text-right">
           <div>

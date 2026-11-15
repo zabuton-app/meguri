@@ -59,6 +59,25 @@ export function onSearchLibrary(listener: (tokens: string[]) => void) {
   return () => window.removeEventListener(SEARCH_LIBRARY, handler);
 }
 
+const SHOW_MATCHING_FILES = "meguri:show-matching-files";
+
+/**
+ * Ask the library to show every file these tokens find (`hash:…`): like
+ * {@link searchLibrary}, but the other filters and the folder browsed are
+ * cleared too, as the files asked for may sit outside them. The sort stays.
+ */
+export function showMatchingFiles(tokens: string[]) {
+  window.dispatchEvent(
+    new CustomEvent<string[]>(SHOW_MATCHING_FILES, { detail: tokens }),
+  );
+}
+
+export function onShowMatchingFiles(listener: (tokens: string[]) => void) {
+  const handler = (e: Event) => listener((e as CustomEvent<string[]>).detail);
+  window.addEventListener(SHOW_MATCHING_FILES, handler);
+  return () => window.removeEventListener(SHOW_MATCHING_FILES, handler);
+}
+
 /**
  * Point at the chip a token already occupies in the search box.
  *

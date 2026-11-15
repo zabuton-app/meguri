@@ -233,6 +233,7 @@ export const en: Catalog = {
   "filter.dateTo": "To",
   "filter.more": "More conditions",
   "filter.moreActive": "More conditions ({count} active)",
+  "filter.hashChip": "Content hash",
   "filter.kindFilter": "Filter by kind",
   "filter.playState": "Play state",
   "filter.sortSection": "Sort order",
@@ -719,6 +720,10 @@ export const en: Catalog = {
     "Files with identical content (matching hash and size) will appear here.",
   "duplicates.loadFailed": "Could not load duplicate files. Please try again.",
   "duplicates.retry": "Try again",
+  "duplicates.copyHash": "Copy hash",
+  "duplicates.hashCopied": "Hash copied",
+  "duplicates.hashCopyFailed": "Could not copy the hash",
+  "duplicates.showInList": "Show in the list",
   "duplicates.fileCount": {
     one: "{count} file",
     other: "{count} files",
