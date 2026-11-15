@@ -1,16 +1,6 @@
-// Routing. List / detail / settings.
-import { createHashRouter } from "react-router";
+// The app shell: the workspace rail, the router (src/appRouter.tsx) and what
+// sits beside it.
 import { RouterProvider } from "react-router/dom";
-import Home from "@/routes/Home";
-import MediaDetail from "@/routes/MediaDetail";
-import Discover from "@/routes/Discover";
-import Player from "@/routes/Player";
-import History from "@/routes/History";
-import Duplicates from "@/routes/Duplicates";
-import Missing from "@/routes/Missing";
-import Tags from "@/routes/Tags";
-import AutoTag from "@/routes/AutoTag";
-import Settings from "@/routes/Settings";
 import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
@@ -25,33 +15,9 @@ import { useUpdateNotifier } from "@/hooks/useUpdateNotifier";
 import { useMutationErrorNotifier } from "@/hooks/useMutationErrorNotifier";
 import { useLibraryRestoreNotifier } from "@/hooks/useLibraryRestoreNotifier";
 import { useConfigProblemNotifier } from "@/hooks/useConfigProblemNotifier";
-import { registerRouterNavigate } from "@/lib/routerBridge";
+import type { AppRouter } from "@/appRouter";
 
-// In a webview, a hash router is more stable than a file-path-style history.
-// /file/:id, /play and /settings are child routes of Home so a modal overlays on top while the list stays mounted
-// (the player also inherits the list order through MediaNavContext).
-const router = createHashRouter([
-  {
-    path: "/",
-    element: <Home />,
-    children: [
-      { path: "file/:id", element: <MediaDetail /> },
-      { path: "discover", element: <Discover /> },
-      { path: "play", element: <Player /> },
-      { path: "history", element: <History /> },
-      { path: "duplicates", element: <Duplicates /> },
-      { path: "missing", element: <Missing /> },
-      { path: "tags", element: <Tags /> },
-      { path: "auto-tag", element: <AutoTag /> },
-      { path: "settings", element: <Settings /> },
-    ],
-  },
-]);
-// Lets the player bar (mounted beside the router below) navigate through the
-// router rather than by rewriting the hash behind its back.
-registerRouterNavigate((to, opts) => void router.navigate(to, opts));
-
-export default function App() {
+export default function App({ router }: { router: AppRouter }) {
   useContentZoom();
   useSelectAllGuard();
   useUpdateNotifier();
