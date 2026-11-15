@@ -244,14 +244,19 @@ function codeLabel(code: string): string {
   return code;
 }
 
-/** Formats a single chord, e.g. "Ctrl+f", "[", "h". */
-export function formatChord(c: KeyChord): string {
-  if (!isKeyPress(c)) return c;
+/** The keys of a chord, one per keycap, e.g. ["Ctrl", "f"], ["["], ["h"]. */
+export function chordCaps(c: KeyChord): string[] {
+  if (!isKeyPress(c)) return [c];
   const mods: string[] = [];
   if (c.ctrl) mods.push("Ctrl");
   if (c.alt) mods.push("Alt");
   if (c.shift) mods.push("Shift");
-  return [...mods, codeLabel(c.code)].join("+");
+  return [...mods, codeLabel(c.code)];
+}
+
+/** Formats a single chord, e.g. "Ctrl+f", "[", "h". */
+export function formatChord(c: KeyChord): string {
+  return chordCaps(c).join("+");
 }
 
 /** Formats a list of chords joined by " / ", e.g. "Ctrl+f / PgDn". */
