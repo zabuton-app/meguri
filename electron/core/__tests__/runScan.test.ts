@@ -174,6 +174,10 @@ describe("runScan", () => {
 
     expect(stats).toMatchObject({ moved: 1, inserted: 0, deleted: 0 });
     expect(rows()).toMatchObject([{ id, rel_path: "renamed.mp4" }]);
+    // The name sort's key goes with the name (#292).
+    expect(
+      db.prepare("SELECT name_key FROM files WHERE id = ?").pluck().get(id),
+    ).toBe("renamed.mp114");
     expect(
       db
         .prepare("SELECT rel_path FROM files_fts WHERE rowid = ?")

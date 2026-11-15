@@ -1,6 +1,7 @@
 // Regression tests for search/filter/sort and durable-metadata operations in queries.ts.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DB } from "../db.js";
+import type { SearchQuery } from "../types.js";
 import { addFileTag, addManualTag, syncFts, upsertTag } from "../tags.js";
 import {
   addBookmark,
@@ -227,6 +228,46 @@ describe("searchFiles", () => {
     expect(
       searchFiles(db, { sort: "btime", sortDir: "asc" }).items.map((f) => f.id),
     ).toEqual([old, mid, none]);
+  });
+
+  it("sorts names in natural order, through every page (#292)", () => {
+    for (const name of [
+      "Ep10.mp4",
+      "ep2.mp4",
+      "Ep1.mp4",
+      "ep11.mp4",
+      "Ep3.mp4",
+    ])
+      insertFile(db, rootId, { relPath: name });
+    const names = (sortDir: "asc" | "desc") => {
+      const out: string[] = [];
+      let cursor: SearchQuery["cursor"];
+      do {
+        const page = searchFiles(db, {
+          sort: "name",
+          sortDir,
+          limit: 2,
+          cursor,
+        });
+        out.push(...page.items.map((f) => f.relPath));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor != null);
+      return out;
+    };
+    expect(names("asc")).toEqual([
+      "Ep1.mp4",
+      "ep2.mp4",
+      "Ep3.mp4",
+      "Ep10.mp4",
+      "ep11.mp4",
+    ]);
+    expect(names("desc")).toEqual([
+      "ep11.mp4",
+      "Ep10.mp4",
+      "Ep3.mp4",
+      "ep2.mp4",
+      "Ep1.mp4",
+    ]);
   });
 
   it("matches the full-text query against rel_path after FTS sync", () => {
