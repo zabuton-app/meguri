@@ -1,7 +1,7 @@
 // 简体中文目录。必须覆盖与 ja.ts 完全相同的键集合（由类型强制）。
-import type { TranslationKey } from "./ja";
+import type { Catalog } from "../message";
 
-export const zhCN: Record<TranslationKey, string> = {
+export const zhCN: Catalog = {
   // common
   "common.close": "关闭",
   "common.cancel": "取消",

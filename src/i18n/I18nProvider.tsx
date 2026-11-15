@@ -15,6 +15,7 @@ import { ko } from "./locales/ko";
 import { es } from "./locales/es";
 import { fr } from "./locales/fr";
 import { appName } from "@/lib/appName";
+import { pickMessage, type Catalog } from "./message";
 
 const LS_KEY = "meguri.lang";
 
@@ -29,7 +30,7 @@ export const LANGUAGES: { id: Lang; label: string }[] = [
   { id: "fr", label: "Français" },
 ];
 
-const CATALOGS: Record<Lang, Record<TranslationKey, string>> = {
+const CATALOGS: Record<Lang, Catalog> = {
   ja,
   en,
   "zh-CN": zhCN,
@@ -60,10 +61,18 @@ function detectLang(): Lang {
   return "en";
 }
 
-/** Replace {name} with values from params; {app} is always the app's name. */
-function interpolate(template: string, params?: TParams): string {
+/** Replace {name} with values from params, numbers written for the app's
+ *  language rather than the OS's (#285); {app} is always the app's name. */
+function interpolate(
+  template: string,
+  numbers: Intl.NumberFormat,
+  params?: TParams,
+): string {
   return template.replace(/\{(\w+)\}/g, (_, k: string) => {
-    if (params && k in params) return String(params[k]);
+    if (params && k in params) {
+      const value = params[k];
+      return typeof value === "number" ? numbers.format(value) : value;
+    }
     return k === "app" ? appName() : `{${k}}`;
   });
 }
@@ -83,8 +92,14 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<I18nCtx>(() => {
     const catalog = CATALOGS[lang];
+    const rules = new Intl.PluralRules(lang);
+    const numbers = new Intl.NumberFormat(lang);
     const t: TFunc = (key, params) =>
-      interpolate(catalog[key] ?? ja[key] ?? key, params);
+      interpolate(
+        pickMessage(catalog[key] ?? ja[key] ?? key, rules, params?.count),
+        numbers,
+        params,
+      );
     return { lang, setLang: setLangState, t };
   }, [lang]);
 

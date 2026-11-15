@@ -85,8 +85,8 @@ describe("TimelineView", () => {
     ].map((h) => h.textContent);
     expect(headers).toEqual([
       "October 15, 20262 files",
-      "August 15, 20261 files",
-      "No date1 files",
+      "August 15, 20261 file",
+      "No date1 file",
     ]);
     // Every file is drawn, and in the list's order.
     const names = screen
@@ -122,9 +122,9 @@ describe("TimelineView", () => {
       ...document.querySelectorAll('[data-slot="timeline-header"]'),
     ].map((h) => h.textContent);
     expect(headers).toEqual([
-      "October 20, 20261 files",
-      "October 3, 20261 files",
-      "August 9, 20261 files",
+      "October 20, 20261 file",
+      "October 3, 20261 file",
+      "August 9, 20261 file",
     ]);
     // The rail gathers the days of a month.
     expect(

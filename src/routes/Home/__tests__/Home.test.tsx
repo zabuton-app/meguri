@@ -259,7 +259,7 @@ describe("Home + MediaDetail integration", () => {
       fireSkipped(WS_ID, 3);
       await waitFor(() =>
         expect(toasts.warning).toHaveBeenCalledWith(
-          'Skipped 3 folder(s) or file(s) in "Media" that could not be read',
+          'Skipped 3 folders or files in "Media" that could not be read',
           expect.objectContaining({ id: `scan-skipped:${WS_ID}` }),
         ),
       );
@@ -271,7 +271,7 @@ describe("Home + MediaDetail integration", () => {
       fireSkipped("ws-gone", 1);
       await waitFor(() =>
         expect(toasts.warning).toHaveBeenCalledWith(
-          "Skipped 1 folder(s) or file(s) that could not be read",
+          "Skipped 1 folder or file that could not be read",
           expect.anything(),
         ),
       );
@@ -1820,7 +1820,7 @@ describe("Home timeline view", () => {
     await screen.findAllByText("October 15, 2026");
     const headers = document.querySelectorAll('[data-slot="timeline-header"]');
     expect([...headers].map((h) => h.textContent)).toEqual([
-      "October 15, 20261 files",
+      "October 15, 20261 file",
       "No date2 files",
     ]);
     // The rail names the tail like a year.

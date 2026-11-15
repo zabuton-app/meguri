@@ -216,8 +216,8 @@ export default function Missing() {
             {total > items.length && (
               <p>
                 {t("missing.truncated", {
-                  shown: items.length.toLocaleString(lang),
-                  total: total.toLocaleString(lang),
+                  shown: items.length,
+                  total,
                 })}
               </p>
             )}

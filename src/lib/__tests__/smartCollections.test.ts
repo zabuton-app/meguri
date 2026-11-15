@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/locales/en";
+import { pickMessage } from "@/i18n/message";
 import {
   cleanSearchQuery,
   DEFAULT_SMART_COLLECTION_KEY,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/smartCollections";
 
 const t = (key: keyof typeof en, params?: Record<string, string | number>) => {
-  let s: string = en[key];
+  let s = pickMessage(en[key], new Intl.PluralRules("en"), params?.count);
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       s = s.replace(`{${k}}`, String(v));

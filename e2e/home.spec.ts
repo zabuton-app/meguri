@@ -15,7 +15,7 @@ test.describe("Home", () => {
     await expect(window.getByText(FIXTURE_FILE)).toBeVisible({
       timeout: 60_000,
     });
-    await expect(statusBar(window)).toContainText("1 files");
+    await expect(statusBar(window)).toContainText("1 file in total");
     await expect(statusBar(window)).toContainText("Idle");
   });
 

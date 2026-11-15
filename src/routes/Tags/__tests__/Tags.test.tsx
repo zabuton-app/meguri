@@ -445,6 +445,6 @@ describe("Tags screen", () => {
   it("warns when the catalog was truncated", async () => {
     mocks.tagsListAll.mockResolvedValue({ ...CATALOG, truncated: true });
     render();
-    expect(await screen.findByText(/showing the top 2000/)).toBeTruthy();
+    expect(await screen.findByText(/showing the top 2,000/)).toBeTruthy();
   });
 });

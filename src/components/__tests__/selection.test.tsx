@@ -494,7 +494,7 @@ describe("selection", () => {
 
       it("says why, on each of them", () => {
         renderOverCap();
-        const limit = `Up to ${MAX_BULK_FILES} files per edit. Narrow the selection.`;
+        const limit = `Up to ${MAX_BULK_FILES.toLocaleString("en")} files per edit. Narrow the selection.`;
         expect(screen.getAllByTitle(limit).length).toBeGreaterThanOrEqual(3);
       });
     });
@@ -1062,7 +1062,7 @@ describe("folder selection", () => {
       await Promise.resolve();
     });
     expect(selectedCount()).toBe(3);
-    expect(within(bar()!).getByText("including 1 folders")).toBeTruthy();
+    expect(within(bar()!).getByText("including 1 folder")).toBeTruthy();
     expect(
       within(bar()!).getByRole("button", { name: /Edit tags/ }),
     ).toHaveProperty("disabled", false);
