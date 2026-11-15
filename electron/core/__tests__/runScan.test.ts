@@ -138,6 +138,32 @@ describe("runScan", () => {
     expect(events.at(-1)).toMatchObject({ type: "done", stats });
   });
 
+  it("indexes files in chunks, each keeping its search entry through the thumbnail pass", async () => {
+    // One past a chunk of 256 (#276).
+    for (let i = 0; i < 257; i++) write(`f${i}.mp4`, `content ${i}`);
+
+    await scan();
+
+    const all = rows();
+    expect(all).toHaveLength(257);
+    expect(db.prepare("SELECT count(*) FROM files_fts").pluck().get()).toBe(
+      257,
+    );
+    const index = events.filter(
+      (e) => e.type === "progress" && e.phase === "index",
+    );
+    expect(index.at(-1)).toMatchObject({ done: 257, total: 257 });
+    // The thumbnail pass adds derived tags but leaves the entry as it was:
+    // namespaced tags are not in tags_text.
+    const { id } = all[0];
+    expect(fileTags(db, id).some((t) => t.namespace === "res")).toBe(true);
+    expect(
+      db
+        .prepare("SELECT rel_path, tags_text FROM files_fts WHERE rowid = ?")
+        .get(id),
+    ).toEqual({ rel_path: all[0].rel_path, tags_text: "" });
+  });
+
   it("follows a rename: same id, search entry under the new name", async () => {
     write("a.mp4", "AAAAAAAAAA");
     await scan();

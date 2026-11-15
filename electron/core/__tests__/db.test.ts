@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openDb, resyncFtsForKeys } from "../db.js";
+import { openDb, resyncFtsForIds, resyncFtsForKeys } from "../db.js";
 import { LEGACY_METADATA_DDL } from "./helpers.js";
 
 function tableColumns(db: Database.Database, table: string): string[] {
@@ -498,5 +498,58 @@ describe("resyncFtsForKeys", () => {
         .get() as { n: number }
     ).n;
     expect(n).toBe(0);
+  });
+});
+
+describe("resyncFtsForIds", () => {
+  let db: ReturnType<typeof openDb>;
+  beforeEach(() => {
+    db = openDb(":memory:", ":memory:");
+    db.exec(`
+      INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
+      INSERT INTO files (id, root_id, rel_path, abs_path, kind, created_at)
+        VALUES (1, 1, 'a.mp4', '/r/a.mp4', 'video', 0),
+               (2, 1, 'b.mp4', '/r/b.mp4', 'video', 0),
+               (3, 1, 'c.mp4', '/r/c.mp4', 'video', 0);
+      INSERT INTO tags (id, name, namespace) VALUES (10, 'beach', ''), (11, '4k', 'res');
+      INSERT INTO meta_tags (meta_key, tag_id, source)
+        VALUES ('p:/r/a.mp4', 10, 'manual'), ('p:/r/a.mp4', 11, 'auto-meta');
+      INSERT INTO files_fts (rowid, rel_path, tags_text)
+        VALUES (1, 'old/a.mp4', 'stale'), (2, 'b.mp4', 'stale');
+    `);
+  });
+  afterEach(() => db.close());
+
+  function rowOf(
+    rowid: number,
+  ): { rel_path: string; tags_text: string } | undefined {
+    return db
+      .prepare("SELECT rel_path, tags_text FROM files_fts WHERE rowid = ?")
+      .get(rowid) as { rel_path: string; tags_text: string } | undefined;
+  }
+
+  it("re-indexes only the given files, adding missing rows", () => {
+    resyncFtsForIds(db, [1, 3]);
+    // The user's own tag only; the namespaced one is left out as in syncFts.
+    expect(rowOf(1)).toEqual({ rel_path: "a.mp4", tags_text: "beach" });
+    expect(rowOf(2)).toEqual({ rel_path: "b.mp4", tags_text: "stale" });
+    expect(rowOf(3)).toEqual({ rel_path: "c.mp4", tags_text: "" });
+  });
+
+  it("does not give a file removed from the index a row (#266)", () => {
+    db.exec("UPDATE files SET excluded_at = 100 WHERE id = 3");
+    resyncFtsForIds(db, [3]);
+    expect(rowOf(3)).toBeUndefined();
+  });
+
+  it("drops the row of a soft-deleted file", () => {
+    db.exec("UPDATE files SET deleted_at = 100 WHERE id = 1");
+    resyncFtsForIds(db, [1]);
+    expect(rowOf(1)).toBeUndefined();
+  });
+
+  it("is a no-op for an empty id list", () => {
+    resyncFtsForIds(db, []);
+    expect(rowOf(1)?.tags_text).toBe("stale");
   });
 });

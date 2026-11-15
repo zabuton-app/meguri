@@ -556,6 +556,27 @@ export function resyncFtsForKeys(db: DB, metaKeys: string[]): void {
   }
 }
 
+/**
+ * Re-index the given file ids, for the scan's index phase. Same single-JSON-
+ * array binding as resyncFtsForKeys. A file removed from the index
+ * (excluded_at) keeps having no FTS row (#266), and a soft-deleted one loses
+ * its row as in resyncFtsForKeys. Caller supplies the transaction and the
+ * chunking (the scan yields between chunks).
+ */
+export function resyncFtsForIds(db: DB, ids: readonly number[]): void {
+  if (ids.length === 0) return;
+  const chunk = JSON.stringify(ids);
+  db.prepare(
+    "DELETE FROM files_fts WHERE rowid IN (SELECT value FROM json_each(?))",
+  ).run(chunk);
+  db.prepare(
+    `INSERT INTO files_fts (rowid, rel_path, tags_text)
+     ${FTS_ROW_SELECT}
+       AND f.excluded_at IS NULL
+       AND f.id IN (SELECT value FROM json_each(?))`,
+  ).run(chunk);
+}
+
 /** Versionless idempotent migration: DBs created before the trigram switch still carry
  *  a unicode61 files_fts (CREATE VIRTUAL TABLE IF NOT EXISTS leaves it alone), so the
  *  tokenizer is detected from the stored DDL and the table rebuilt once. files_fts is
