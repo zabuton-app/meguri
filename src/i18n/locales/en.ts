@@ -364,7 +364,7 @@ export const en: Record<TranslationKey, string> = {
   "player.subtitleUnavailable": "This subtitle track could not be loaded.",
   "player.subtitleTrackNumber": "Track {number}",
   "player.audioSubtitles": "Audio and subtitles",
-  "player.subtitleAutoMatch": "{audio} audio → {track}",
+  "player.subtitleAutoMatch": "With {audio} audio, picks {track}",
   "player.subtitleAutoNone": "No matching subtitles (turns off)",
   "player.subtitleAutoUnknown": "Audio language unknown (turns off)",
   "player.play": "Play",

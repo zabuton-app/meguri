@@ -364,7 +364,7 @@ export const ja = {
   "player.subtitleUnavailable": "字幕トラックを読み込めませんでした。",
   "player.subtitleTrackNumber": "トラック {number}",
   "player.audioSubtitles": "音声と字幕",
-  "player.subtitleAutoMatch": "{audio}の音声 → {track}",
+  "player.subtitleAutoMatch": "{audio}の音声なら{track}を選択",
   "player.subtitleAutoNone": "一致する字幕なし（オフ）",
   "player.subtitleAutoUnknown": "音声の言語が不明（オフ）",
   "player.play": "再生",

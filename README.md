@@ -416,9 +416,9 @@ Open **Audio and subtitles** in the clip player or fullscreen and choose an
 embedded text track under **Subtitle track**, or turn captions off. The button
 is underlined while subtitles are on. Meguri remembers the choice per clip.
 When the audio language is known, **Match audio language** chooses the
-corresponding subtitle and shows which one it picked. Meguri loads text near
-the playhead as you watch or seek; a mark on the button shows loading or a
-track that could not be loaded.
+corresponding subtitle and shows which one it picks for the current audio.
+Meguri loads text near the playhead as you watch or seek; a mark on the button
+shows loading or a track that could not be loaded.
 
 Supported tracks include SRT, ASS/SSA as plain text, WebVTT, and MP4 timed text.
 

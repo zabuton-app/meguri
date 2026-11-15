@@ -351,7 +351,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "player.subtitleUnavailable": "无法加载此字幕轨。",
   "player.subtitleTrackNumber": "字幕轨 {number}",
   "player.audioSubtitles": "音轨和字幕",
-  "player.subtitleAutoMatch": "{audio}音频 → {track}",
+  "player.subtitleAutoMatch": "{audio}音频时选择{track}",
   "player.subtitleAutoNone": "没有匹配的字幕（关闭）",
   "player.subtitleAutoUnknown": "音频语言未知（关闭）",
   "player.play": "播放",

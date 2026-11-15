@@ -372,7 +372,7 @@ export const es: Record<TranslationKey, string> = {
   "player.subtitleUnavailable": "No se pudo cargar esta pista de subtítulos.",
   "player.subtitleTrackNumber": "Pista {number}",
   "player.audioSubtitles": "Audio y subtítulos",
-  "player.subtitleAutoMatch": "Audio en {audio} → {track}",
+  "player.subtitleAutoMatch": "Con audio en {audio}, elige {track}",
   "player.subtitleAutoNone": "No hay subtítulos que coincidan (desactivados)",
   "player.subtitleAutoUnknown": "Idioma del audio desconocido (desactivados)",
   "player.play": "Reproducir",
