@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { openDb, nowUnix, type DB } from "../db.js";
 import { upsertScanRoot } from "../queries.js";
+import { naturalNameKey } from "../nameKey.js";
 
 export interface FileSeed {
   relPath: string;
@@ -107,13 +108,14 @@ export function insertFile(db: DB, rootId: number, seed: FileSeed): number {
   const info = db
     .prepare(
       `INSERT INTO files
-        (root_id, rel_path, abs_path, kind, ext, size, mtime, btime, content_hash,
+        (root_id, rel_path, name_key, abs_path, kind, ext, size, mtime, btime, content_hash,
          width, height, duration, codec, captured_at, thumb_status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     )
     .run(
       rootId,
       seed.relPath,
+      naturalNameKey(seed.relPath),
       `${seed.root ?? "/fake/root"}/${seed.relPath}`,
       seed.kind ?? "video",
       ext,

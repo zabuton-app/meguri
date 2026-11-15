@@ -202,7 +202,7 @@ export const GraphSettingsPanel = memo(function GraphSettingsPanel({
           <p role="status" className="text-xs text-muted empty:hidden">
             {overLimit
               ? t("graph.settings.thumbnailsOverLimit", {
-                  count: visibleFiles.toLocaleString(),
+                  count: visibleFiles,
                 })
               : ""}
           </p>

@@ -23,6 +23,12 @@ export interface IpcContext {
   /** Live values, read on each call: they change after registration. */
   mainWindow: () => BrowserWindow | null;
   mediaBase: () => string | null;
+  /**
+   * The media server's X-Api-Token, for main-process code that fetches from
+   * mediaBase(). Unlike mediaBase(), it is fixed for the app's lifetime.
+   * Never hand it to the renderer: the session injects it there.
+   */
+  mediaToken: () => string;
   isDevMode: () => boolean;
   /** Send an event to the renderer (no-op when the window is gone). */
   emit: (channel: string, payload: unknown) => void;

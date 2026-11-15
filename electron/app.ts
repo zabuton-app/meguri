@@ -36,6 +36,10 @@ import {
   type UpdateRepo,
 } from "./core/updater.js";
 import {
+  scheduleUpdateChecks,
+  type UpdateChecks,
+} from "./core/updateSchedule.js";
+import {
   needsWaylandVideoWorkaround,
   WAYLAND_VIDEO_WORKAROUND_SWITCH,
 } from "./core/waylandVideoWorkaround.js";
@@ -48,7 +52,8 @@ import {
 } from "./core/libraryBackup.js";
 import { libraryBackupDir, libraryDbPath } from "./core/paths.js";
 import { PositionWriter } from "./core/positionWriter.js";
-import { registerIpc } from "./ipc/index.js";
+import { registerIpc, type IpcContext } from "./ipc/index.js";
+import { handleExtraFor, type HandleExtra } from "./core/ipcHandler.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
@@ -58,6 +63,8 @@ import {
   APP_GLYPH_ARG,
   APP_NAME_ARG,
   MEDIA_ORIGIN_ARG,
+  extraChannelArgs,
+  type ExtraChannels,
 } from "../shared/ipc/channelNames.js";
 import type {
   LibraryMergeFailure,
@@ -110,6 +117,42 @@ export interface AppOptions {
    * Settings: the tray, the window / dock icon and the logo inside the app.
    */
   logos: LogoImages;
+  /**
+   * The app's own main-process setup, run once right after Meguri's IPC
+   * handlers are registered and before the tray and window appear. It gets the
+   * same `IpcContext` those handlers use, so it can register handlers with
+   * `handle()` and read the workspaces, the query worker and the media
+   * server's base URL and token. `handle()` only takes channels declared in
+   * `shared/ipc/`; the preload lets those through, plus `extraChannels`, whose
+   * invoke channels get their handlers through `ctx.handleExtra()`.
+   * Nothing is on screen until it settles, so it should return quickly and
+   * leave long work running in the background. A throw (or rejection) fails
+   * startup like any other startup error.
+   *
+   * There is no quit hook. Work that writes to the workspaces, here or later,
+   * goes through `ctx.passes.forEachWorkspace()` (or `ctx.scans`), which every
+   * quit path aborts before the databases close. An `app.on("before-quit")`
+   * listener is not enough: it runs after Meguri's teardown on macOS and on an
+   * OS shutdown, and not at all on a Windows log-off.
+   */
+  setup?: (ctx: SetupContext) => void | Promise<void>;
+  /**
+   * The app's own channels, added to the preload's whitelist so the renderer
+   * can invoke them (`invoke`) or subscribe to them (`events`). Only main
+   * passes them, so the renderer still cannot add a channel. A name must not
+   * be empty or hold a comma.
+   */
+  extraChannels?: ExtraChannels;
+}
+
+// For an app's `setup`: what Meguri's own handler groups are built from.
+export type { IpcContext, HandleExtra };
+export { handle } from "./core/ipcHandler.js";
+
+/** What an app's `setup` gets: Meguri's IpcContext, plus `handleExtra`. */
+export interface SetupContext extends IpcContext {
+  /** Registers the handler for a channel in `extraChannels.invoke`. */
+  handleExtra: HandleExtra;
 }
 
 /** Start the app. Call once, from the entry point, before anything else runs. */
@@ -127,6 +170,10 @@ export function startApp(options: AppOptions): void {
 
   // Set up logging before anything else so early failures land in the log file.
   setupLogger();
+
+  // Checked up front so a bad name fails startup, not the first window.
+  const extraChannels = options.extraChannels ?? { invoke: [], events: [] };
+  const extraArgs = extraChannelArgs(extraChannels);
 
   // Chromium reads its switches at start-up, so this has to run before `ready`.
   if (
@@ -308,6 +355,8 @@ export function startApp(options: AppOptions): void {
   // Delay before the n-th reload within the window; its length is the bound.
   const RENDERER_RELOAD_BACKOFF_MS = [0, 2_000, 5_000];
   let rendererReloadTimes: number[] = [];
+  /** Background update checks, once started (scheduleBackgroundUpdateChecks). */
+  let updateChecks: UpdateChecks | null = null;
 
   app.on("render-process-gone", (_e, wc, details) => {
     log.error("renderer process gone:", details);
@@ -480,20 +529,18 @@ export function startApp(options: AppOptions): void {
   }
 
   /**
-   * On startup, check GitHub for a newer stable release (when auto-check is on)
-   * and push an event to the renderer if one is available. Deferred so it never
-   * competes with the initial scan/render, and failures are swallowed (it's a
-   * best-effort convenience, not a critical path).
+   * While auto-check is on, check GitHub for a newer stable release after
+   * launch and then periodically (see updateSchedule.ts), and push an event to
+   * the renderer for a release not announced yet. Failures are swallowed: it
+   * is a best-effort convenience, not a critical path.
    */
-  function scheduleStartupUpdateCheck(): void {
-    if (!isAutoCheckEnabled()) return;
-    setTimeout(() => {
-      void checkForUpdates()
-        .then((info) => {
-          if (info?.available) emit("update:available", info);
-        })
-        .catch((e) => log.warn("startup update check failed", e));
-    }, 8_000);
+  function scheduleBackgroundUpdateChecks(): void {
+    updateChecks = scheduleUpdateChecks({
+      check: () => checkForUpdates(),
+      isEnabled: isAutoCheckEnabled,
+      announce: (info) => emit("update:available", info),
+      onError: (e) => log.warn("background update check failed", e),
+    });
   }
 
   function createWindow(): void {
@@ -519,6 +566,7 @@ export function startApp(options: AppOptions): void {
           `${APP_GLYPH_ARG}${options.glyph}`,
           // The media server starts before the first window and keeps its port.
           `${MEDIA_ORIGIN_ARG}${mediaOrigin() ?? ""}`,
+          ...extraArgs,
         ],
         sandbox: true,
         contextIsolation: true,
@@ -531,6 +579,9 @@ export function startApp(options: AppOptions): void {
     // Window-open / will-navigate are governed globally via app.on("web-contents-created").
 
     // Closing the window hides it to the tray unless tray support is disabled.
+    // A page loaded anew (a reload after a crash, or a new window) shows no
+    // update notice, so the next check announces the release again.
+    mainWindow.webContents.on("did-finish-load", () => updateChecks?.forget());
     mainWindow.on("close", (e) => {
       if (isTrayEnabled() && !isQuitting()) {
         e.preventDefault();
@@ -800,12 +851,13 @@ export function startApp(options: AppOptions): void {
       app.quit();
     });
 
-    registerIpc({
+    const ipcContext: IpcContext = {
       ws,
       queryClient,
       positions,
       mainWindow: () => mainWindow,
       mediaBase: mediaOrigin,
+      mediaToken: () => mediaToken,
       isDevMode,
       emit,
       scans,
@@ -815,7 +867,14 @@ export function startApp(options: AppOptions): void {
       passes,
       retryLibraryMerge,
       libraryRestoredFrom: () => libraryRestoredFrom,
+    };
+    registerIpc(ipcContext);
+    await options.setup?.({
+      ...ipcContext,
+      handleExtra: handleExtraFor(extraChannels.invoke),
     });
+    // Quit while the app's setup was running: open nothing more.
+    if (isQuitting()) return;
     createTray();
     // Dock icon override on macOS (BrowserWindow icons are ignored there).
     // Skipped for the default logo so the packaged .icns keeps its full
@@ -835,7 +894,7 @@ export function startApp(options: AppOptions): void {
     // Quit while merging: the teardown has run, so nothing more starts.
     if (isQuitting()) return;
     scans.start();
-    scheduleStartupUpdateCheck();
+    scheduleBackgroundUpdateChecks();
   });
   startup.catch((e: unknown) => {
     startupFailed = true;

@@ -245,17 +245,62 @@ export function isTagDirective(token: string): boolean {
 }
 
 /**
- * The key two directives are compared on when deciding whether they are the same
- * condition — null for ordinary free text.
- *
- * Both routes into the query (typing one, clicking a tag) go through here, so
- * neither can append a condition the other would have called a repeat. The
- * fold is tagIdentityKey, the one the SQL that finally resolves the tag uses:
- * a looser one here would silently drop a condition the user typed.
+ * A `tag:` directive's value folded by tagIdentityKey, the fold the SQL that
+ * finally resolves the tag uses (see {@link searchDirectiveKey}); null for
+ * anything else.
  */
 export function tagSearchKey(token: string): string | null {
   const value = parseTagSearchToken(token);
   return value === null ? null : tagIdentityKey(value);
+}
+
+/**
+ * The search-box directive for a content hash (#302): `hash:3fa9c1d2` finds the
+ * files whose content hash starts with it, such as the copies of a duplicate
+ * group. Hashes are hex; anything else after the prefix, or fewer than
+ * {@link MIN_HASH_SEARCH_LENGTH} characters, leaves the token ordinary text.
+ */
+export const HASH_SEARCH_PREFIX = "hash";
+export const MIN_HASH_SEARCH_LENGTH = 4;
+/** sha256 in hex: no hash is longer, so a longer value can match nothing. */
+const MAX_HASH_SEARCH_LENGTH = 64;
+
+/** The hash prefix of a `hash:` token, lower-cased as the scan writes hashes,
+ *  or null when the token is ordinary text. */
+export function parseHashSearchToken(token: string): string | null {
+  const head = `${HASH_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return null;
+  const value = token.slice(head.length).trim().toLowerCase();
+  if (value.length < MIN_HASH_SEARCH_LENGTH) return null;
+  if (value.length > MAX_HASH_SEARCH_LENGTH) return null;
+  return /^[0-9a-f]+$/.test(value) ? value : null;
+}
+
+/** The search-box token that finds the files with this content hash. */
+export function hashSearchToken(hash: string): string {
+  return `${HASH_SEARCH_PREFIX}:${hash.toLowerCase()}`;
+}
+
+/** True for a token the search box shows as a chip: a `tag:` or `hash:`
+ *  directive rather than free text. */
+export function isSearchDirective(token: string): boolean {
+  return isTagDirective(token) || parseHashSearchToken(token) !== null;
+}
+
+/**
+ * The key two directives are compared on when deciding whether they are the
+ * same condition — null for ordinary free text.
+ *
+ * Both routes into the query (typing one, clicking a tag) go through here, so
+ * neither can append a condition the other would have called a repeat. Each
+ * kind is folded the way its SQL reads it: a looser fold would silently drop a
+ * condition the user typed. The prefix keeps `tag:3fa9` and `hash:3fa9` apart.
+ */
+export function searchDirectiveKey(token: string): string | null {
+  const hash = parseHashSearchToken(token);
+  if (hash !== null) return `${HASH_SEARCH_PREFIX}:${hash}`;
+  const tag = tagSearchKey(token);
+  return tag === null ? null : `${TAG_SEARCH_PREFIX}:${tag}`;
 }
 
 function needsQuoting(value: string): boolean {
@@ -280,18 +325,18 @@ export function tagSearchToken(name: string): string {
 }
 
 /**
- * Fold a directive typed with a space after the colon (`tag: beach`) back into
- * one token.
+ * Fold a directive typed with a space after the colon (`tag: beach`,
+ * `hash: 3fa9c1d2`) back into one token.
  *
  * A bare `tag:` is never a useful search term on its own, and leaving the value
  * behind as free text would quietly give the substring match over file names
  * that the directive exists to avoid — the one failure the user cannot see.
  */
 function foldSpacedDirectives(tokens: string[]): string[] {
-  const bare = `${TAG_SEARCH_PREFIX}:`;
+  const bare = [`${TAG_SEARCH_PREFIX}:`, `${HASH_SEARCH_PREFIX}:`];
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i].toLowerCase() === bare && i + 1 < tokens.length) {
+    if (bare.includes(tokens[i].toLowerCase()) && i + 1 < tokens.length) {
       out.push(tokens[i] + tokens[i + 1]);
       i++;
       continue;

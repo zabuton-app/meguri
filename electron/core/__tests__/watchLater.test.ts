@@ -440,3 +440,33 @@ describe("updateCollectionMembership", () => {
     expect(idsOf(ws, WATCH_LATER_ID)).toEqual(["wsA:1"]);
   });
 });
+
+describe("removeFilesFromAllCollections (missing files removed, #277)", () => {
+  const itemsOf = (ws: InstanceType<typeof Workspaces>, id: string) =>
+    ws.collections().find((c) => c.id === id)?.items ?? [];
+
+  it("drops the given files of one workspace from every collection", () => {
+    const ws = new Workspaces();
+    const mine = ws.addCollection("Mine");
+    ws.addToCollection(WATCH_LATER_ID, "wsA", 1);
+    ws.addToCollection(WATCH_LATER_ID, "wsA", 2);
+    ws.addToCollection(mine.id, "wsA", 2);
+    ws.addToCollection(mine.id, "wsA", 3);
+    ws.addToCollection(mine.id, "wsB", 2);
+
+    expect(ws.removeFilesFromAllCollections("wsA", [1, 2])).toBe(true);
+    const reloaded = new Workspaces();
+    expect(itemsOf(reloaded, WATCH_LATER_ID)).toEqual([]);
+    expect(itemsOf(reloaded, mine.id)).toEqual([
+      expect.objectContaining({ workspaceId: "wsA", fileId: 3 }),
+      expect.objectContaining({ workspaceId: "wsB", fileId: 2 }),
+    ]);
+  });
+
+  it("reports false when none of the files was in a collection", () => {
+    const ws = new Workspaces();
+    ws.addToCollection(WATCH_LATER_ID, "wsA", 1);
+    expect(ws.removeFilesFromAllCollections("wsA", [5, 6])).toBe(false);
+    expect(ws.removeFilesFromAllCollections("wsA", [])).toBe(false);
+  });
+});

@@ -1,7 +1,7 @@
 // Catálogo en español. Debe cubrir exactamente el mismo conjunto de claves que ja.ts (forzado por el tipo).
-import type { TranslationKey } from "./ja";
+import type { Catalog } from "../message";
 
-export const es: Record<TranslationKey, string> = {
+export const es: Catalog = {
   // common
   "common.close": "Cerrar",
   "common.cancel": "Cancelar",
@@ -96,7 +96,7 @@ export const es: Record<TranslationKey, string> = {
   "settings.updateDesc":
     "Comprueba si hay una versión más reciente disponible.",
   "settings.updateCheckNow": "Comprobar ahora",
-  "settings.updateAuto": "Comprobar automáticamente al iniciar",
+  "settings.updateAuto": "Comprobar automáticamente",
   "update.available": "La versión {version} está disponible",
   "update.availableDesc": "Versión actual: {current}",
   "update.view": "Abrir versión",
@@ -175,10 +175,15 @@ export const es: Record<TranslationKey, string> = {
   "home.scanRootUnreadableNamed": "No se pudo acceder a la carpeta de «{name}»",
   "home.scanRootUnreadableDesc":
     "Comprueba que la carpeta no se haya movido ni eliminado, que su unidad o recurso compartido de red esté conectado y que {app} pueda leerla, y vuelve a escanear. La lista de archivos se ha dejado como estaba.",
-  "home.scanSkipped":
-    "Se omitieron {count} carpeta(s) o archivo(s) que no se pudieron leer",
-  "home.scanSkippedNamed":
-    "Se omitieron {count} carpeta(s) o archivo(s) de «{name}» que no se pudieron leer",
+  "home.scanSkipped": {
+    one: "Se omitió {count} carpeta o archivo que no se pudo leer",
+    other: "Se omitieron {count} carpetas o archivos que no se pudieron leer",
+  },
+  "home.scanSkippedNamed": {
+    one: "Se omitió {count} carpeta o archivo de «{name}» que no se pudo leer",
+    other:
+      "Se omitieron {count} carpetas o archivos de «{name}» que no se pudieron leer",
+  },
   "home.scanSkippedDesc":
     "Puede que {app} no tenga permiso para leerlos o que otro programa los esté usando. Esa parte de la lista de archivos se ha dejado como estaba y el próximo escaneo lo volverá a intentar.",
   "home.scanStartFailed": "No se pudo iniciar el escaneo",
@@ -195,7 +200,10 @@ export const es: Record<TranslationKey, string> = {
   "command.openDevTools": "Abrir consola de desarrollador",
   "command.shortcutHint": "Abrir con {shortcut}",
   "command.groupFile": "Archivo",
-  "command.selectedFiles": "{count} seleccionados",
+  "command.selectedFiles": {
+    one: "{count} seleccionado",
+    other: "{count} seleccionados",
+  },
   "command.rating": "Cambiar valoración…",
   "command.ratingStars": "{rating} estrellas",
   "command.ratingNone": "Sin valoración",
@@ -208,6 +216,14 @@ export const es: Record<TranslationKey, string> = {
   "command.pageCollections": "Colecciones",
   "command.ratingPlaceholder": "Escribe 0–5 para elegir...",
   "command.collectionPlaceholder": "Buscar colecciones...",
+  "command.tagPlaceholder": "Buscar etiquetas para añadir...",
+  "command.workspacePlaceholder": "Cambiar a un espacio de trabajo...",
+  "command.collectionOpenPlaceholder": "Abrir una colección...",
+  "command.searchInPlaceholder":
+    "Escribe una búsqueda para {name}, o pulsa Intro para abrirlo",
+  "command.openItem": "Abrir {name}",
+  "command.searchIn": "Buscar «{q}» en {name}",
+  "command.clearFilters": "Borrar todos los filtros",
   "command.groupRecent": "Búsquedas recientes",
   "command.clearRecent": "Borrar búsquedas recientes",
   "command.more": "{count} más · escribe para filtrar",
@@ -232,7 +248,11 @@ export const es: Record<TranslationKey, string> = {
   "filter.dateFrom": "Desde",
   "filter.dateTo": "Hasta",
   "filter.more": "Más filtros",
-  "filter.moreActive": "Más filtros ({count} activos)",
+  "filter.moreActive": {
+    one: "Más filtros ({count} activo)",
+    other: "Más filtros ({count} activos)",
+  },
+  "filter.hashChip": "Hash del contenido",
   "filter.kindFilter": "Filtrar por tipo",
   "filter.playState": "Estado de reproducción",
   "filter.sortSection": "Orden",
@@ -294,7 +314,7 @@ export const es: Record<TranslationKey, string> = {
   "media.next": "Archivo siguiente",
   "shortcuts.title": "Atajos de teclado",
   "shortcuts.sectionList": "Lista",
-  "shortcuts.sectionDetail": "Detalle y reproductor",
+  "shortcuts.sectionDetail": "Detalle",
   "shortcuts.commandMenu":
     "Abrir menú de comandos (acciones de archivo, búsquedas recientes, colecciones inteligentes)",
   "shortcuts.search": "Enfocar búsqueda",
@@ -318,10 +338,43 @@ export const es: Record<TranslationKey, string> = {
   "shortcuts.skip10": "Retroceder / avanzar 10 s",
   "shortcuts.volume": "Subir / bajar volumen",
   "shortcuts.mute": "Alternar silencio",
+  "shortcuts.speed": "Más lento / más rápido",
   "shortcuts.fullscreen": "Alternar pantalla completa",
   "shortcuts.seekStart": "Ir al inicio",
   "shortcuts.spectrumPattern":
     "Patrón del espectro siguiente / anterior (audio en el reproductor de lista)",
+  "shortcuts.sectionGeneral": "General",
+  "shortcuts.sectionPlayback": "Reproducción",
+  "shortcuts.sectionPlayer": "Reproductor",
+  "shortcuts.sectionDiscover": "Descubrir",
+  "shortcuts.hintGeneral": "En cualquier pantalla",
+  "shortcuts.hintList": "Biblioteca",
+  "shortcuts.hintDetail": "Un archivo abierto",
+  "shortcuts.hintPlayback": "Vídeo y audio",
+  "shortcuts.hintPlayer": "Lista de reproducción",
+  "shortcuts.hintDiscover": "Tarjetas al azar",
+  "shortcuts.zoom": "Acercar / alejar",
+  "shortcuts.zoomReset": "Restablecer zoom",
+  "shortcuts.imagePaging": "Archivo anterior / siguiente (imágenes)",
+  "shortcuts.playerPrevNext": "Anterior / siguiente",
+  "shortcuts.playerArrows": "Anterior / siguiente (imágenes y audio)",
+  "shortcuts.shuffle": "Activar o desactivar el orden aleatorio",
+  "shortcuts.playerDetail": "Abrir los detalles del archivo actual",
+  "shortcuts.playerExit": "Salir del reproductor",
+  "shortcuts.discoverPaging": "Tarjeta anterior / siguiente",
+  "shortcuts.discoverReshuffle": "Barajar de nuevo",
+  "shortcuts.preset": "Preajuste",
+  "shortcuts.presetNote": "Las teclas marcadas con un punto lo siguen.",
+  "shortcuts.presetChange": "Cambiar en Ajustes",
+  "shortcuts.filterLabel": "Filtrar atajos",
+  "shortcuts.filterPlaceholder": "Filtrar por acción o tecla",
+  "shortcuts.noMatch": "Ningún atajo coincide con «{query}»",
+  "shortcuts.noMatchHint":
+    "Prueba con una acción («volumen») o una tecla («ctrl»).",
+  "shortcuts.sectionsLabel": "Secciones",
+  "shortcuts.or": "o",
+  "shortcuts.toClose": "para cerrar",
+  "shortcuts.macNote": "En macOS, Ctrl es ⌘.",
   "media.rating": "Valoración",
   "media.tags": "Etiquetas",
   "media.nameTags.hint":
@@ -384,6 +437,8 @@ export const es: Record<TranslationKey, string> = {
   "player.unmute": "Activar sonido (M)",
   "player.fullscreen": "Pantalla completa (F)",
   "player.volume": "Volumen",
+  "player.speed": "Velocidad de reproducción",
+  "player.speedValue": "{speed}×",
   "player.audioTrack": "Pista de audio",
   "player.audioTrackNumber": "Pista {number}",
   "player.audioTrackDefault": "Predeterminada",
@@ -462,15 +517,36 @@ export const es: Record<TranslationKey, string> = {
   "select.watchLaterOff": "Quitar de Ver después",
   "select.rating": "Poner una valoración",
   "select.ratingMixed": "La selección tiene valoraciones distintas",
-  "select.favoriteAdded": "{count} archivos marcados como favoritos",
-  "select.favoriteRemoved": "{count} archivos quitados de favoritos",
-  "select.watchLaterAdded": "{count} archivos añadidos a Ver después",
-  "select.watchLaterRemoved": "{count} archivos quitados de Ver después",
-  "select.ratingApplied": "{count} archivos valorados con {rating}",
-  "select.ratingCleared": "Valoración borrada en {count} archivos",
+  "select.favoriteAdded": {
+    one: "{count} archivo marcado como favorito",
+    other: "{count} archivos marcados como favoritos",
+  },
+  "select.favoriteRemoved": {
+    one: "{count} archivo quitado de favoritos",
+    other: "{count} archivos quitados de favoritos",
+  },
+  "select.watchLaterAdded": {
+    one: "{count} archivo añadido a Ver después",
+    other: "{count} archivos añadidos a Ver después",
+  },
+  "select.watchLaterRemoved": {
+    one: "{count} archivo quitado de Ver después",
+    other: "{count} archivos quitados de Ver después",
+  },
+  "select.ratingApplied": {
+    one: "{count} archivo valorado con {rating}",
+    other: "{count} archivos valorados con {rating}",
+  },
+  "select.ratingCleared": {
+    one: "Valoración borrada en {count} archivo",
+    other: "Valoración borrada en {count} archivos",
+  },
   "select.bulkFailed": "No se pudo aplicar la edición en lote: {msg}",
   "select.bulkTagTitle": "Editar etiquetas en lote",
-  "select.bulkTagSubtitle": "Se aplica a los {count} archivos seleccionados",
+  "select.bulkTagSubtitle": {
+    one: "Se aplica al {count} archivo seleccionado",
+    other: "Se aplica a los {count} archivos seleccionados",
+  },
   "select.bulkTagAddLabel": "Añadir una etiqueta",
   "select.bulkTagPending": "Pendientes",
   "select.bulkTagExisting": "Etiquetas de la selección",
@@ -485,14 +561,16 @@ export const es: Record<TranslationKey, string> = {
   "select.bulkTagNameLimit": "Hasta {max} etiquetas por edición.",
   "select.tagsApplied":
     "Se actualizaron {files} archivos ({added} añadidas, {removed} quitadas)",
-  "select.tagsSkipped":
-    "Se omitieron {count} archivos: ya no están en el índice.",
+  "select.tagsSkipped": {
+    one: "Se omitió {count} archivo: ya no está en el índice.",
+    other: "Se omitieron {count} archivos: ya no están en el índice.",
+  },
   "select.tagsFailed": "No se pudieron aplicar las etiquetas: {msg}",
 
   // media grid
   "grid.empty": "No hay medios que mostrar.",
   "grid.emptyHint":
-    "Ejecuta «Escanear» para listar aquí los vídeos e imágenes.",
+    "Ejecuta «Escanear» para listar aquí los vídeos, imágenes y audios.",
   "grid.searchByTag": "Filtrar por «{name}»",
   "view.grid": "Vista de cuadrícula",
   "view.list": "Vista de lista",
@@ -505,10 +583,22 @@ export const es: Record<TranslationKey, string> = {
   "heatmap.metric.captured": "Capturados",
   "heatmap.metric.created": "Creados",
   "heatmap.metric.added": "Añadidos",
-  "heatmap.cell.played": "{date}: {count} reproducidos",
-  "heatmap.cell.captured": "{date}: {count} capturados",
-  "heatmap.cell.created": "{date}: {count} creados",
-  "heatmap.cell.added": "{date}: {count} añadidos",
+  "heatmap.cell.played": {
+    one: "{date}: {count} reproducido",
+    other: "{date}: {count} reproducidos",
+  },
+  "heatmap.cell.captured": {
+    one: "{date}: {count} capturado",
+    other: "{date}: {count} capturados",
+  },
+  "heatmap.cell.created": {
+    one: "{date}: {count} creado",
+    other: "{date}: {count} creados",
+  },
+  "heatmap.cell.added": {
+    one: "{date}: {count} añadido",
+    other: "{date}: {count} añadidos",
+  },
   "heatmap.range.last": "Últimos 12 meses",
   "heatmap.range.prev": "Año anterior",
   "heatmap.range.next": "Año siguiente",
@@ -528,10 +618,19 @@ export const es: Record<TranslationKey, string> = {
   "timeline.axis.btime": "Creación",
   "timeline.axis.added": "Añadido",
   "timeline.undated": "Sin fecha",
-  "timeline.count": "{count} archivos",
+  "timeline.count": {
+    one: "{count} archivo",
+    other: "{count} archivos",
+  },
   "timeline.scrubber": "Ir a un mes",
-  "timeline.month": "{month}: {count} archivos",
-  "timeline.day": "{day}: {count} archivos",
+  "timeline.month": {
+    one: "{month}: {count} archivo",
+    other: "{month}: {count} archivos",
+  },
+  "timeline.day": {
+    one: "{day}: {count} archivo",
+    other: "{day}: {count} archivos",
+  },
   "timeline.sortLocked":
     "La vista de cronología ordena los archivos por fecha, del más reciente al más antiguo",
   "timeline.error": "No se pudo cargar la cronología",
@@ -596,7 +695,10 @@ export const es: Record<TranslationKey, string> = {
   "folder.back": "Atrás",
   "folder.up": "Subir un nivel",
   "folder.more": "Mostrar niveles ocultos",
-  "folder.itemCount": "{count} elementos",
+  "folder.itemCount": {
+    one: "{count} elemento",
+    other: "{count} elementos",
+  },
   "folder.subfolders": "Subcarpetas: {count}",
   "folder.summary": "Carpetas: {folders} · Archivos: {files}",
   "folder.openInFileManager": "Abrir en el gestor de archivos",
@@ -621,7 +723,10 @@ export const es: Record<TranslationKey, string> = {
   "shortcuts.folderBack":
     "Volver a la carpeta anterior (al mostrar por carpetas)",
   "shortcuts.folderUp": "Subir un nivel (al mostrar por carpetas)",
-  "select.folderCount": "incluye {count} carpetas",
+  "select.folderCount": {
+    one: "incluye {count} carpeta",
+    other: "incluye {count} carpetas",
+  },
   "select.folderLoading": "Cargando el contenido de la carpeta",
   "select.selectFolder": "Seleccionar todo en esta carpeta",
   "select.deselectFolder": "Deseleccionar esta carpeta",
@@ -635,23 +740,54 @@ export const es: Record<TranslationKey, string> = {
   "discover.inFolder": "Eligiendo de «{path}»",
   "discover.empty": "No hay medios para recomendar.",
   "discover.emptyHint":
-    "Ejecuta «Escanear» para importar vídeos e imágenes y se recomendarán aquí al azar.",
+    "Ejecuta «Escanear» para importar vídeos, imágenes y audios y se recomendarán aquí al azar.",
   "discover.sceneHint": "Haz clic en una escena para saltar a ese punto",
   "discover.moreScenes": "+{count}",
 
   // Historial de reproducción
   "history.title": "Historial de reproducción",
   "history.empty": "Aún no hay historial de reproducción.",
-  "history.emptyHint": "Reproduce vídeos o imágenes y aparecerán aquí.",
+  "history.emptyHint": "Reproduce vídeos, imágenes o audios y aparecerán aquí.",
   "history.clear": "Borrar historial",
   "history.clearAction": "Borrar",
   "history.clearConfirm":
     "¿Eliminar el historial de reproducción y los puntos de reanudación de todos los espacios de trabajo? Esta acción no se puede deshacer.",
-  "history.playCount": "{count} reproducciones",
+  "history.playCount": {
+    one: "{count} reproducción",
+    other: "{count} reproducciones",
+  },
   "history.viaBrowser": "En la aplicación",
   "history.viaExternal": "Reproductor externo",
   "history.today": "Hoy",
   "history.yesterday": "Ayer",
+
+  // Missing files
+  "missing.title": "Archivos no encontrados",
+  "missing.empty": "No hay archivos no encontrados.",
+  "missing.hint":
+    "Archivos que un escaneo no encontró en el disco. Si un archivo vuelve, regresa a sus colecciones como antes. Selecciona solo los que no van a volver y elimínalos.",
+  "missing.scanning":
+    "Los espacios de trabajo que se están escaneando no aparecen hasta que termine el escaneo.",
+  "missing.truncated":
+    "Se muestran los {shown} no encontrados más recientes de {total}. Elimínalos para ver el resto.",
+  "missing.selectAll": "Seleccionar todo",
+  "missing.goneAt": "No encontrado desde {date}",
+  "missing.remove": "Eliminar archivos no encontrados",
+  "missing.removeSelected": {
+    one: "Eliminar {count} seleccionado",
+    other: "Eliminar {count} seleccionados",
+  },
+  "missing.removeConfirm": {
+    one: "¿Eliminar el {count} archivo seleccionado de la lista y de las colecciones, y borrar su miniatura? Las etiquetas, valoraciones y demás metadatos se conservan. Esta acción no se puede deshacer.",
+    other:
+      "¿Eliminar los {count} archivos seleccionados de la lista y de las colecciones, y borrar sus miniaturas? Las etiquetas, valoraciones y demás metadatos se conservan. Esta acción no se puede deshacer.",
+  },
+  "missing.removeAction": "Eliminar",
+  "missing.removedToast": {
+    one: "Se eliminó {count} archivo",
+    other: "Se eliminaron {count} archivos",
+  },
+  "missing.removeFailed": "No se pudieron eliminar los archivos",
 
   "duplicates.title": "Archivos duplicados",
   "duplicates.empty": "No se encontraron archivos duplicados.",
@@ -660,12 +796,22 @@ export const es: Record<TranslationKey, string> = {
   "duplicates.loadFailed":
     "No se pudieron cargar los archivos duplicados. Inténtalo de nuevo.",
   "duplicates.retry": "Reintentar",
-  "duplicates.fileCount": "{count} archivos",
+  "duplicates.copyHash": "Copiar hash",
+  "duplicates.hashCopied": "Hash copiado",
+  "duplicates.hashCopyFailed": "No se pudo copiar el hash",
+  "duplicates.showInList": "Mostrar en la lista",
+  "duplicates.fileCount": {
+    one: "{count} archivo",
+    other: "{count} archivos",
+  },
   "duplicates.truncated":
     "Demasiados grupos; solo se muestran los {max} primeros.",
   "duplicates.filter": "Mostrar solo archivos duplicados",
   "duplicates.chip": "Duplicados",
-  "duplicates.groupCount": "{count} grupos",
+  "duplicates.groupCount": {
+    one: "{count} grupo",
+    other: "{count} grupos",
+  },
   "duplicates.reclaimable": "Recuperable",
   "duplicates.search": "Filtrar por nombre o ruta",
   "duplicates.sortLabel": "Ordenar por",
@@ -701,7 +847,10 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.page.prev": "Anterior",
   "autoTag.page.next": "Siguiente",
   "autoTag.page.range": "{from}–{to} de {total}",
-  "autoTag.fileCount": "{count} archivos",
+  "autoTag.fileCount": {
+    one: "{count} archivo",
+    other: "{count} archivos",
+  },
   "autoTag.tab.regex": "Regex",
   "autoTag.tab.keywords": "Palabras clave",
   "autoTag.tab.folders": "Carpetas",
@@ -711,8 +860,11 @@ export const es: Record<TranslationKey, string> = {
     "Ejecuta las reglas activas y las palabras clave en los archivos que un escaneo añade o cambia.",
   "autoTag.reapply": "Aplicar a los archivos existentes",
   "autoTag.reapplying": "Aplicando…",
-  "autoTag.reapplyConfirm":
-    "Ejecutar las reglas, las palabras clave y las reglas de carpeta sobre los {count} archivos y añadir las etiquetas resultantes. Esta adición masiva no se puede deshacer.",
+  "autoTag.reapplyConfirm": {
+    one: "Ejecutar las reglas, las palabras clave y las reglas de carpeta sobre el {count} archivo y añadir las etiquetas resultantes. Esta adición masiva no se puede deshacer.",
+    other:
+      "Ejecutar las reglas, las palabras clave y las reglas de carpeta sobre los {count} archivos y añadir las etiquetas resultantes. Esta adición masiva no se puede deshacer.",
+  },
   "autoTag.reapplyDone": "Se añadieron {added} etiquetas a {files} archivos",
   "autoTag.patternRules": "Reglas de patrón",
   "autoTag.evaluatedInOrder": "se evalúan de arriba abajo",
@@ -736,7 +888,10 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.excludeNone": "Aún no se excluye nada.",
   "autoTag.excludeNoMatch": "Ningún valor lo contiene.",
   "autoTag.excludeFull": "La lista está llena.",
-  "autoTag.excludeCount": "{count} valores",
+  "autoTag.excludeCount": {
+    one: "{count} valor",
+    other: "{count} valores",
+  },
   "autoTag.excluded": "Excluido",
   "autoTag.letterCase": "Mayúsculas y minúsculas",
   "autoTag.case.keep": "Conservar",
@@ -812,13 +967,22 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.keyword.noTagsShort": "sin etiquetas",
   "autoTag.renameTag": "Cambiar el nombre de la etiqueta «{tag}»",
   "autoTag.migrate.title": "¿Pasar los archivos a «{to}»?",
-  "autoTag.migrate.message":
-    "{count} archivos que alcanza esta condición llevan «{from}». ¿Sustituirla por «{to}» en ellos? Sus copias cambian con ellos. Si no, solo cambia el ajuste y los archivos conservan «{from}».",
+  "autoTag.migrate.message": {
+    one: "{count} archivo que alcanza esta condición lleva «{from}». ¿Sustituirla por «{to}» en él? Sus copias cambian con él. Si no, solo cambia el ajuste y el archivo conserva «{from}».",
+    other:
+      "{count} archivos que alcanza esta condición llevan «{from}». ¿Sustituirla por «{to}» en ellos? Sus copias cambian con ellos. Si no, solo cambia el ajuste y los archivos conservan «{from}».",
+  },
   "autoTag.migrate.sampled":
     " Solo se revisan los primeros {count} archivos, los cargados aquí.",
-  "autoTag.migrate.confirm": "Sustituir en {count} archivos",
+  "autoTag.migrate.confirm": {
+    one: "Sustituir en {count} archivo",
+    other: "Sustituir en {count} archivos",
+  },
   "autoTag.migrate.cancel": "Solo el ajuste",
-  "autoTag.migrate.done": "«{from}» sustituida por «{to}» en {count} archivos.",
+  "autoTag.migrate.done": {
+    one: "«{from}» sustituida por «{to}» en {count} archivo.",
+    other: "«{from}» sustituida por «{to}» en {count} archivos.",
+  },
   "autoTag.matchMode": "Coincidencia",
   "autoTag.mode.word": "Palabra completa",
   "autoTag.mode.contains": "Contiene",
@@ -856,15 +1020,26 @@ export const es: Record<TranslationKey, string> = {
   "autoTag.appliedOne": "Se aplicó «{tag}» a {files} archivos.",
   "autoTag.appliedMany": "Se aplicaron {tags} etiquetas a {files} archivos.",
   "autoTag.appliedDictSuffix": " Los próximos escaneos también las aplicarán.",
-  "autoTag.addedKeywords": "{count} añadidas a las palabras clave.",
-  "autoTag.keywordsFullSuffix":
-    " {count} no cupieron: las palabras clave están llenas.",
-  "autoTag.removeFromFiles": "Quitar de {count} archivos",
+  "autoTag.addedKeywords": {
+    one: "{count} añadida a las palabras clave.",
+    other: "{count} añadidas a las palabras clave.",
+  },
+  "autoTag.keywordsFullSuffix": {
+    one: " {count} no cupo: las palabras clave están llenas.",
+    other: " {count} no cupieron: las palabras clave están llenas.",
+  },
+  "autoTag.removeFromFiles": {
+    one: "Quitar de {count} archivo",
+    other: "Quitar de {count} archivos",
+  },
   "autoTag.removeHint":
     "Quita esta etiqueta de los archivos que la tienen, sin importar cómo llegó",
   "autoTag.removeTitle": "¿Quitar «{tag}»?",
-  "autoTag.removeMessage":
-    "«{tag}» se quitará de {count} archivos y de sus copias, incluso donde se añadió a mano. No se puede deshacer desde aquí.",
+  "autoTag.removeMessage": {
+    one: "«{tag}» se quitará de {count} archivo y de sus copias, incluso donde se añadió a mano. No se puede deshacer desde aquí.",
+    other:
+      "«{tag}» se quitará de {count} archivos y de sus copias, incluso donde se añadió a mano. No se puede deshacer desde aquí.",
+  },
   "autoTag.removeConfirm": "Quitar",
   "autoTag.removedOne": "«{tag}» quitada de {files} archivos.",
   "autoTag.removeSelected": "Quitar de {files} archivos",
@@ -880,7 +1055,10 @@ export const es: Record<TranslationKey, string> = {
     "Muestra los archivos que contienen las palabras de este candidato con la búsqueda de la biblioteca",
   "autoTag.noCandidates": "No hay candidatos para este filtro.",
   "autoTag.selection": "{count} seleccionadas · etiqueta {files} archivos",
-  "autoTag.selectionIgnored": "{count} seleccionadas",
+  "autoTag.selectionIgnored": {
+    one: "{count} seleccionada",
+    other: "{count} seleccionadas",
+  },
   "autoTag.applySelected": "Aplicar selección",
   "autoTag.applySelectedDict": "Añadir a palabras clave y aplicar",
   "autoTag.clearSelection": "Quitar selección",
@@ -900,7 +1078,10 @@ export const es: Record<TranslationKey, string> = {
   "tags.searchPlaceholder": "Filtrar etiquetas",
   "tags.noMatch": "No hay etiquetas coincidentes.",
   "tags.truncated": "Demasiadas etiquetas: se muestran las {max} primeras.",
-  "tags.fileCount": "{count} archivos",
+  "tags.fileCount": {
+    one: "{count} archivo",
+    other: "{count} archivos",
+  },
   "tags.sortByName": "Por nombre",
   "tags.sortByCount": "Por cantidad",
   "tags.groupManual": "Etiquetas manuales",
@@ -910,7 +1091,10 @@ export const es: Record<TranslationKey, string> = {
   "tags.filterByTag": "Filtrar por esta etiqueta",
   "tags.source.manual": "Manual",
   "tags.source.autoMeta": "Automática",
-  "tags.selected": "{count} seleccionadas",
+  "tags.selected": {
+    one: "{count} seleccionada",
+    other: "{count} seleccionadas",
+  },
   "tags.clearSelection": "Quitar selección",
   "tags.rename": "Cambiar nombre",
   "tags.renameTitle": "Cambiar nombre de la etiqueta",
@@ -925,12 +1109,18 @@ export const es: Record<TranslationKey, string> = {
     "Las {count} etiquetas seleccionadas se combinan en la de destino en todos los espacios de trabajo. Las demás se eliminan.",
   "tags.mergeTarget": "Combinar en",
   "tags.mergeAction": "Combinar",
-  "tags.merged": "Se combinaron {count} etiquetas",
+  "tags.merged": {
+    one: "Se combinó {count} etiqueta",
+    other: "Se combinaron {count} etiquetas",
+  },
   "tags.mergeFailed": "No se pudieron combinar las etiquetas",
   "tags.delete": "Eliminar",
   "tags.deleteAction": "Eliminar",
-  "tags.deleteConfirm":
-    "Se quitará la etiqueta «{name}» de {count} archivos en todos los espacios de trabajo. ¿Continuar?",
+  "tags.deleteConfirm": {
+    one: "Se quitará la etiqueta «{name}» de {count} archivo en todos los espacios de trabajo. ¿Continuar?",
+    other:
+      "Se quitará la etiqueta «{name}» de {count} archivos en todos los espacios de trabajo. ¿Continuar?",
+  },
   "tags.deleteConfirmMany":
     "Se eliminarán las {count} etiquetas seleccionadas de todos los espacios de trabajo. ¿Continuar?",
   "tags.deleted": "Etiqueta eliminada",
@@ -975,12 +1165,18 @@ export const es: Record<TranslationKey, string> = {
   "drop.addAction": "Añadir",
   "drop.notDirectory": "«{name}» no es una carpeta, así que no se añadió",
   "drop.addFailed": "No se pudo añadir «{name}»",
-  "drop.addedToCollection": "Se añadieron {count} archivos a «{name}»",
+  "drop.addedToCollection": {
+    one: "Se añadió {count} archivo a «{name}»",
+    other: "Se añadieron {count} archivos a «{name}»",
+  },
   "drop.addedOneToCollection": "Se añadió 1 archivo a «{name}»",
   "drop.alreadyInCollection": "Ya están en «{name}»",
   "drop.alreadyOneInCollection": "Ya está en «{name}»",
   "drop.addToCollectionFailed": "No se pudo añadir a la colección",
-  "drag.fileCount": "{count} archivos",
+  "drag.fileCount": {
+    one: "{count} archivo",
+    other: "{count} archivos",
+  },
   "drag.external": "Arrastrar a otra aplicación",
   "drag.externalFailed":
     "No se pudo iniciar el arrastre. Comprueba que los archivos sigan disponibles.",
@@ -1006,8 +1202,14 @@ export const es: Record<TranslationKey, string> = {
   "collection.removeFrom": "Quitar de «{name}»",
   "collection.addedToast": "Añadido a «{name}»",
   "collection.removedFromToast": "Quitado de «{name}»",
-  "collection.addedCountToast": "Se añadieron {count} archivos a «{name}»",
-  "collection.removedCountToast": "Se quitaron {count} archivos de «{name}»",
+  "collection.addedCountToast": {
+    one: "Se añadió {count} archivo a «{name}»",
+    other: "Se añadieron {count} archivos a «{name}»",
+  },
+  "collection.removedCountToast": {
+    one: "Se quitó {count} archivo de «{name}»",
+    other: "Se quitaron {count} archivos de «{name}»",
+  },
   "collection.actionFailed": "No se pudo actualizar la colección",
 
   // Ver más tarde (colección integrada)
@@ -1041,9 +1243,18 @@ export const es: Record<TranslationKey, string> = {
   "statusbar.label": "Barra de estado",
   "statusbar.lastScan": "Último escaneo",
   "statusbar.lastScanNever": "Nunca",
-  "statusbar.total": "{count} archivos en total",
-  "statusbar.folders": "{count} carpetas",
-  "statusbar.shown": "{count} mostrados",
+  "statusbar.total": {
+    one: "{count} archivo en total",
+    other: "{count} archivos en total",
+  },
+  "statusbar.folders": {
+    one: "{count} carpeta",
+    other: "{count} carpetas",
+  },
+  "statusbar.shown": {
+    one: "{count} mostrado",
+    other: "{count} mostrados",
+  },
   "statusbar.status": "Estado",
   "statusbar.scanning": "Escaneando",
   "statusbar.idle": "Inactivo",
@@ -1066,7 +1277,7 @@ export const es: Record<TranslationKey, string> = {
   "playlist.loading": "Cargando…",
   "playlist.empty": "No hay nada que se pueda reproducir aquí.",
   "playlist.emptyHint":
-    "Abre una lista que contenga vídeos o imágenes y luego inicia la reproducción.",
+    "Abre una lista que contenga vídeos, imágenes o audios y luego inicia la reproducción.",
   "playlist.unplayable": "No se pudo reproducir ninguno de estos elementos.",
   "playlist.reorderNeedsManual":
     "Cambia al orden manual para reorganizar los elementos.",
@@ -1144,7 +1355,7 @@ export const es: Record<TranslationKey, string> = {
     "Te enseño cómo funciona. Pulsa Esc para saltarlo cuando quieras.",
   "tour.addWorkspaceTitle": "Añadir una carpeta",
   "tour.addWorkspaceBody":
-    "Empieza añadiendo una carpeta con tus vídeos e imágenes. La escanearé y crearé las miniaturas. Puedes añadir todas las que quieras.",
+    "Empieza añadiendo una carpeta con tus vídeos, imágenes o audios. La escanearé y crearé las miniaturas. Puedes añadir todas las que quieras.",
   "tour.collectionsTitle": "Colecciones",
   "tour.collectionsBody":
     "Reúne archivos de cualquier carpeta en una colección. Arrastra archivos aquí para añadirlos.",

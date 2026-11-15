@@ -37,7 +37,7 @@ function formatLastScan(t: number | null | undefined): string | null {
 }
 
 export function StatusBar() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   // Mounted in App (below the audio player bar, outside the router), so the
   // inputs Home used to pass as props are read from their shared sources.
   const workspaceId = useAppStatus().data?.workspaceId;
@@ -79,13 +79,15 @@ export function StatusBar() {
   const counts = useListCounts();
   const total = stats.data?.fileCount ?? 0;
   const shown = counts?.files ?? total;
-  const totalLabel = t("statusbar.total", { count: total.toLocaleString() });
+  // Numbers, so t() writes them for the app's language and picks the plural.
+  const totalLabel = t("statusbar.total", { count: total });
+  // "1,000+" is many, whatever the number: a string takes the `other` form.
   const shownLabel = t("statusbar.shown", {
-    count: `${shown.toLocaleString()}${counts?.more ? "+" : ""}`,
+    count: counts?.more ? `${shown.toLocaleString(lang)}+` : shown,
   });
   const foldersLabel =
     counts?.folders != null
-      ? t("statusbar.folders", { count: counts.folders.toLocaleString() })
+      ? t("statusbar.folders", { count: counts.folders })
       : null;
 
   let processing: string;

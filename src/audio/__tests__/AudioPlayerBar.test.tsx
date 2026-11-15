@@ -282,8 +282,8 @@ describe("AudioPlayerBar", () => {
     setDuration(240);
     const region = bar()!;
     const controls = region.querySelectorAll("button, input");
-    // title (opens the detail view), play/pause, seek, mute, volume, close.
-    expect(controls.length).toBe(6);
+    // title (opens the detail view), play/pause, seek, speed, mute, volume, close.
+    expect(controls.length).toBe(7);
     for (const c of controls) {
       // Real elements, natively focusable, never removed from the tab order.
       expect(["BUTTON", "INPUT"]).toContain(c.tagName);

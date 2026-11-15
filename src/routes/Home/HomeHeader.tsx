@@ -3,6 +3,7 @@ import {
   ChevronDown,
   CopyCheck,
   DatabaseBackup,
+  FileX,
   FolderOpen,
   FolderTree,
   History,
@@ -293,6 +294,16 @@ export function HomeHeader({
                 >
                   <DatabaseBackup />
                   {t("home.rebuildIndex")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="mx-0 my-0 bg-muted/35" />
+                <DropdownMenuItem
+                  asChild
+                  className="rounded-none px-3 py-2 text-xs"
+                >
+                  <Link to="/missing">
+                    <FileX />
+                    {t("missing.title")}
+                  </Link>
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>

@@ -50,8 +50,9 @@ In the workspace database (`CORE_DDL`):
   and `mountpoint` (whether the root was a mountpoint at the last scan).
 - `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image` |
   `audio`), size/mtime/inode, `content_hash`, media metadata (`width`, `height`,
-  `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`, and
-  `deleted_at` / `excluded_at` markers. For audio, `width` / `height` / `fps`
+  `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`,
+  `deleted_at` / `excluded_at` markers, and `name_key`, the name sort's key
+  (see [Name sort](#name-sort)). For audio, `width` / `height` / `fps`
   stay NULL even when the file embeds cover art — the artwork's dimensions
   describe the jacket, not the track. Images keep `fps` NULL too, except
   animated ones (a GIF with more than one frame, or an APNG): ffprobe reports a
@@ -297,14 +298,39 @@ an event two workspaces share once.
 Metadata is never collected: the library keeps rows for files no workspace
 holds any more, so a removed workspace added again gets its metadata back.
 
+## Name sort
+
+Sorting by name follows a file manager's order (#292): case folded, and digit
+runs compared as numbers, so `Ep2` comes before `Ep10`. SQLite's collations
+cannot compare digits numerically, and the list pages with a keyset on the sort
+value, so the order comes from a stored key: `files.name_key`, which
+`naturalNameKey()` (`electron/core/nameKey.ts`) builds from the whole `rel_path`.
+Files stay grouped by folder, as before. Each digit run, leading zeros dropped,
+becomes its length (itself prefixed by how many digits it has) followed by the
+digits (`Ep10` → `ep1210`), so the key compares as a plain string at any length;
+the id breaks ties (`Ep02` and `Ep2`).
+
+The scan writes the key with `rel_path` (insert and move). `backfillNameKeys()`
+in `db.ts` adds the column to an older DB and, on every open, computes again
+every key when `NAME_KEY_VERSION` changes (recorded in `settings`), or else the
+keys that no longer match their path: an older app version inserts rows
+without one and moves rows without updating it. Nothing in the schema calls the
+key function, so an older version can still open and write the database.
+`idx_files_alive_name_key` serves the sort in both directions; inside a folder
+the folder's own files are found on `idx_files_alive_rel_path` and sorted. The
+`All` merge compares the same key.
+
 ## Full-text search
 
 `files_fts(rel_path, tags_text)` is an FTS5 virtual table whose `rowid` matches
 `files.id`. It is kept in sync by `syncFts()` in `electron/core/tags.ts`; call it
-after any tag change so the searchable `tags_text` stays current. For a batch of
+after a change to the user's own tags so the searchable `tags_text` stays
+current. Derived (namespaced) tags never reach `tags_text`, so writing them needs
+no re-sync. For a batch of
 files — a tag rename, a merge, the derived-tag backfill — use
 `resyncFtsForKeys()` in `db.ts` instead, which re-indexes a whole set of
-`meta_key`s in one pair of statements.
+`meta_key`s in one pair of statements. The scan's index phase does the same by
+file id with `resyncFtsForIds()`, one transaction per chunk of 256 files.
 
 A soft-deleted file has no `files_fts` row once it is removed from the index, or
 once the index is re-synced or rebuilt while it is gone (both skip deleted
@@ -315,9 +341,10 @@ and `runScan()` re-syncs its row along with the new, moved and changed files;
 those files are not auto-tagged again.
 
 `tags_text` holds the **user's own** tag names, joined by spaces and
-deduplicated across sources. Three places produce it — `syncFts()`,
-`resyncFtsForKeys()` and the trigram rebuild — and they must never drift, so the
-projection lives in a single `FTS_ROW_SELECT` constant in `db.ts`.
+deduplicated across sources. Four places produce it — `syncFts()`,
+`resyncFtsForKeys()`, `resyncFtsForIds()` and the trigram rebuild — and they
+must never drift, so the projection lives in a single `FTS_ROW_SELECT` constant
+in `db.ts`.
 
 Each workspace keeps its own `files_fts`, while the tags live in the library,
 so a tag changed through one workspace has to reach the others' indexes.
@@ -379,6 +406,15 @@ chip the box draws and the SQL the query produces can never disagree about it.
 `tag` is a reserved manual-tag prefix, so the directive cannot be shadowed by a
 tag the user creates. The structured `SearchQuery.tags[]` field still works and
 is what saved searches and Discover URLs carry.
+
+The **`hash:` directive** finds files by content hash (#302): `hash:3fa9c1d2`
+matches every file whose `content_hash` starts with those hex digits, at least
+four of them (`MIN_HASH_SEARCH_LENGTH`), in any case. It becomes a range on the
+indexed column (`>= prefix AND < prefix || 'g'`, every hex digit sorting before
+`g`), so a file without a hash never matches. Shorter or non-hex values stay
+free text. The Duplicates view copies a group's full hash and opens the list on
+`hash:<hash>`, which is how a group's copies are found from the list. It is a
+chip like `tag:`, and the condition row names it.
 
 The box itself (`SearchTokenInput`) renders a directive as a **chip** rather than
 as raw text, so it is added and removed as one unit: a directive only means

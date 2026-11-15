@@ -1,7 +1,7 @@
 // 한국어 카탈로그. ja.ts 와 완전히 동일한 키 집합을 다뤄야 함 (타입으로 강제).
-import type { TranslationKey } from "./ja";
+import type { Catalog } from "../message";
 
-export const ko: Record<TranslationKey, string> = {
+export const ko: Catalog = {
   // common
   "common.close": "닫기",
   "common.cancel": "취소",
@@ -91,7 +91,7 @@ export const ko: Record<TranslationKey, string> = {
   "settings.update": "업데이트",
   "settings.updateDesc": "새 버전이 있는지 확인합니다.",
   "settings.updateCheckNow": "지금 확인",
-  "settings.updateAuto": "시작할 때 자동으로 확인",
+  "settings.updateAuto": "자동으로 확인",
   "update.available": "버전 {version}을(를) 사용할 수 있습니다",
   "update.availableDesc": "현재 버전: {current}",
   "update.view": "릴리스 열기",
@@ -199,6 +199,14 @@ export const ko: Record<TranslationKey, string> = {
   "command.pageCollections": "컬렉션",
   "command.ratingPlaceholder": "0~5를 입력해 선택...",
   "command.collectionPlaceholder": "컬렉션 검색...",
+  "command.tagPlaceholder": "추가할 태그 검색...",
+  "command.workspacePlaceholder": "전환할 워크스페이스 검색...",
+  "command.collectionOpenPlaceholder": "열 컬렉션 검색...",
+  "command.searchInPlaceholder":
+    "{name}에서 검색할 내용을 입력 (Enter만 누르면 열기)",
+  "command.openItem": "{name} 열기",
+  "command.searchIn": "{name}에서 “{q}” 검색",
+  "command.clearFilters": "모든 필터 지우기",
   "command.groupRecent": "최근 검색",
   "command.clearRecent": "최근 검색 지우기",
   "command.more": "{count}개 더 · 입력해서 좁히기",
@@ -224,6 +232,7 @@ export const ko: Record<TranslationKey, string> = {
   "filter.dateTo": "종료일",
   "filter.more": "기타 조건",
   "filter.moreActive": "기타 조건 ({count}개 적용 중)",
+  "filter.hashChip": "콘텐츠 해시",
   "filter.kindFilter": "종류로 필터링",
   "filter.playState": "시청 상태",
   "filter.sortSection": "정렬 순서",
@@ -285,7 +294,7 @@ export const ko: Record<TranslationKey, string> = {
   "media.next": "다음 파일",
   "shortcuts.title": "키보드 단축키",
   "shortcuts.sectionList": "목록",
-  "shortcuts.sectionDetail": "상세·플레이어",
+  "shortcuts.sectionDetail": "상세",
   "shortcuts.commandMenu":
     "명령 메뉴 열기 (파일 작업, 최근 검색, 스마트 컬렉션)",
   "shortcuts.search": "검색에 포커스",
@@ -308,10 +317,42 @@ export const ko: Record<TranslationKey, string> = {
   "shortcuts.skip10": "10초 뒤로 / 앞으로",
   "shortcuts.volume": "볼륨 올리기 / 내리기",
   "shortcuts.mute": "음소거 전환",
+  "shortcuts.speed": "느리게 / 빠르게",
   "shortcuts.fullscreen": "전체 화면 전환",
   "shortcuts.seekStart": "처음으로 이동",
   "shortcuts.spectrumPattern":
     "스펙트럼 패턴 다음 / 이전 (플레이리스트 재생의 오디오)",
+  "shortcuts.sectionGeneral": "일반",
+  "shortcuts.sectionPlayback": "재생",
+  "shortcuts.sectionPlayer": "플레이어",
+  "shortcuts.sectionDiscover": "디스커버",
+  "shortcuts.hintGeneral": "모든 화면",
+  "shortcuts.hintList": "라이브러리",
+  "shortcuts.hintDetail": "파일을 연 상태",
+  "shortcuts.hintPlayback": "동영상과 오디오",
+  "shortcuts.hintPlayer": "플레이리스트",
+  "shortcuts.hintDiscover": "카드 셔플",
+  "shortcuts.zoom": "확대 / 축소",
+  "shortcuts.zoomReset": "배율 초기화",
+  "shortcuts.imagePaging": "이전 / 다음 파일 (이미지)",
+  "shortcuts.playerPrevNext": "이전 / 다음",
+  "shortcuts.playerArrows": "이전 / 다음 (이미지와 오디오)",
+  "shortcuts.shuffle": "셔플 전환",
+  "shortcuts.playerDetail": "재생 중인 파일의 상세 열기",
+  "shortcuts.playerExit": "플레이어 닫기",
+  "shortcuts.discoverPaging": "이전 / 다음 카드",
+  "shortcuts.discoverReshuffle": "다시 섞기",
+  "shortcuts.preset": "프리셋",
+  "shortcuts.presetNote": "점이 표시된 키는 프리셋을 따릅니다.",
+  "shortcuts.presetChange": "설정에서 변경",
+  "shortcuts.filterLabel": "단축키 필터",
+  "shortcuts.filterPlaceholder": "동작이나 키로 필터",
+  "shortcuts.noMatch": "“{query}”와 일치하는 단축키가 없습니다",
+  "shortcuts.noMatchHint": "동작(“볼륨”)이나 키(“ctrl”)로 찾아 보세요.",
+  "shortcuts.sectionsLabel": "섹션",
+  "shortcuts.or": "또는",
+  "shortcuts.toClose": "로 닫기",
+  "shortcuts.macNote": "macOS에서는 Ctrl이 ⌘입니다.",
   "media.rating": "평가",
   "media.tags": "태그",
   "media.nameTags.hint": "파일 이름에서 — 클릭한 부분을 태그로 추가",
@@ -372,6 +413,8 @@ export const ko: Record<TranslationKey, string> = {
   "player.unmute": "음소거 해제 (M)",
   "player.fullscreen": "전체화면 (F)",
   "player.volume": "음량",
+  "player.speed": "재생 속도",
+  "player.speedValue": "{speed}×",
   "player.audioTrack": "오디오 트랙",
   "player.audioTrackNumber": "트랙 {number}",
   "player.audioTrackDefault": "기본값",
@@ -479,7 +522,7 @@ export const ko: Record<TranslationKey, string> = {
   // media grid
   "grid.empty": "표시할 미디어가 없습니다.",
   "grid.emptyHint":
-    "「스캔」을 실행하면 하위의 동영상·이미지가 여기에 표시됩니다.",
+    "「스캔」을 실행하면 하위의 동영상·이미지·오디오가 여기에 표시됩니다.",
   "grid.searchByTag": "「{name}」(으)로 필터링",
   "view.grid": "그리드 보기",
   "view.list": "리스트 보기",
@@ -617,14 +660,15 @@ export const ko: Record<TranslationKey, string> = {
   "discover.inFolder": "“{path}” 안에서 고르는 중",
   "discover.empty": "추천할 미디어가 없습니다.",
   "discover.emptyHint":
-    "「스캔」으로 동영상과 이미지를 가져오면 여기에서 무작위로 추천됩니다.",
+    "「스캔」으로 동영상, 이미지, 오디오를 가져오면 여기에서 무작위로 추천됩니다.",
   "discover.sceneHint": "장면을 클릭하면 해당 위치로 이동합니다",
   "discover.moreScenes": "+{count}",
 
   // 재생 기록
   "history.title": "재생 기록",
   "history.empty": "재생 기록이 아직 없습니다.",
-  "history.emptyHint": "동영상이나 이미지를 재생하면 여기에 기록이 표시됩니다.",
+  "history.emptyHint":
+    "동영상이나 이미지, 오디오를 재생하면 여기에 기록이 표시됩니다.",
   "history.clear": "기록 지우기",
   "history.clearAction": "지우기",
   "history.clearConfirm":
@@ -635,6 +679,25 @@ export const ko: Record<TranslationKey, string> = {
   "history.today": "오늘",
   "history.yesterday": "어제",
 
+  // Missing files
+  "missing.title": "찾을 수 없는 파일",
+  "missing.empty": "찾을 수 없는 파일이 없습니다.",
+  "missing.hint":
+    "스캔에서 디스크에 없던 파일입니다. 파일이 돌아오면 컬렉션 등은 그대로 복원됩니다. 다시 돌아오지 않을 파일만 선택해서 삭제하세요.",
+  "missing.scanning":
+    "스캔 중인 워크스페이스는 스캔이 끝날 때까지 표시되지 않습니다.",
+  "missing.truncated":
+    "전체 {total}개 중 최근에 없어진 {shown}개를 표시합니다. 삭제하면 나머지가 표시됩니다.",
+  "missing.selectAll": "모두 선택",
+  "missing.goneAt": "{date}부터 없음",
+  "missing.remove": "찾을 수 없는 파일 삭제",
+  "missing.removeSelected": "선택한 {count}개 삭제",
+  "missing.removeConfirm":
+    "선택한 {count}개 파일을 파일 목록과 컬렉션에서 삭제하고 썸네일도 지울까요? 태그, 평점 등 메타데이터는 유지됩니다. 이 작업은 되돌릴 수 없습니다.",
+  "missing.removeAction": "삭제",
+  "missing.removedToast": "{count}개 파일을 삭제했습니다",
+  "missing.removeFailed": "파일을 삭제할 수 없습니다",
+
   "duplicates.title": "중복 파일",
   "duplicates.empty": "중복 파일을 찾을 수 없습니다.",
   "duplicates.emptyHint":
@@ -642,6 +705,10 @@ export const ko: Record<TranslationKey, string> = {
   "duplicates.loadFailed":
     "중복 파일을 불러오지 못했습니다. 다시 시도해 주세요.",
   "duplicates.retry": "다시 시도",
+  "duplicates.copyHash": "해시 복사",
+  "duplicates.hashCopied": "해시를 복사했습니다",
+  "duplicates.hashCopyFailed": "해시를 복사할 수 없습니다",
+  "duplicates.showInList": "목록에서 보기",
   "duplicates.fileCount": "{count}개",
   "duplicates.truncated": "그룹이 많아 상위 {max}개만 표시합니다.",
   "duplicates.filter": "중복 파일만 표시",
@@ -1042,7 +1109,7 @@ export const ko: Record<TranslationKey, string> = {
   "playlist.loading": "불러오는 중…",
   "playlist.empty": "재생할 수 있는 미디어가 없습니다.",
   "playlist.emptyHint":
-    "동영상이나 이미지가 있는 목록을 연 뒤 재생을 시작하세요.",
+    "동영상이나 이미지, 오디오가 있는 목록을 연 뒤 재생을 시작하세요.",
   "playlist.unplayable": "재생할 수 있는 항목이 없었습니다.",
   "playlist.reorderNeedsManual": "순서를 바꾸려면 수동 순서로 전환하세요.",
   "settings.resumePlayback": "이어서 재생",
@@ -1117,7 +1184,7 @@ export const ko: Record<TranslationKey, string> = {
     "사용법을 간단히 안내할게. Esc를 누르면 언제든 건너뛸 수 있어",
   "tour.addWorkspaceTitle": "폴더 추가",
   "tour.addWorkspaceBody":
-    "먼저 동영상이나 이미지가 든 폴더를 추가해 줘. 내용을 읽어서 썸네일을 만들게. 몇 개든 추가할 수 있어",
+    "먼저 동영상이나 이미지, 오디오가 든 폴더를 추가해 줘. 내용을 읽어서 썸네일을 만들게. 몇 개든 추가할 수 있어",
   "tour.collectionsTitle": "컬렉션",
   "tour.collectionsBody":
     "여러 폴더의 파일을 하나의 컬렉션으로 모을 수 있어. 파일을 여기로 끌어 오면 추가돼",

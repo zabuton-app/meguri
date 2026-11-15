@@ -58,6 +58,13 @@ import {
 } from "@/video/VideoGradeOverlay";
 import { isSameSource } from "@/video/videoHandOff";
 import { TrackPanel, type SubtitleStatus } from "./TrackPanel";
+import { SpeedMenu } from "@/components/SpeedMenu";
+import {
+  NORMAL_SPEED,
+  PLAYBACK_SPEEDS,
+  speedKeyStep,
+  stepSpeed,
+} from "@/lib/playbackSpeed";
 import { CTRL_BUTTON_CLASS } from "./controlBar";
 import {
   previewAudioTrackOf,
@@ -377,6 +384,17 @@ export const VideoPlayer = forwardRef<
     totalRef.current = total;
   });
 
+  // Playback speed, for this file only (#280): it goes back to normal when the
+  // file changes. Assigned on every load too, as a new source (a stream
+  // reopened at another second) starts the element at normal speed again.
+  const [speed, setSpeed] = useState(NORMAL_SPEED);
+  const speedRef = useRef(speed);
+  useEffect(() => {
+    speedRef.current = speed;
+    const v = ref.current;
+    if (v && v.playbackRate !== speed) v.playbackRate = speed;
+  }, [speed]);
+
   // Push the shared volume onto the element. Assigning only when the value
   // actually differs is what stops this from ping-ponging with the
   // `volumechange` handler below, which feeds the element's value back in.
@@ -634,6 +652,10 @@ export const VideoPlayer = forwardRef<
     const attached = attachedRef.current;
     if (!v || attached?.el !== v || !attached.adopted) return;
     if (!isSameSource(v, src)) return;
+    // The same file playing on: at the speed it was playing at.
+    setSpeed(
+      PLAYBACK_SPEEDS.includes(v.playbackRate) ? v.playbackRate : NORMAL_SPEED,
+    );
     const firstTime =
       adoptedOnceRef.current?.el !== v || adoptedOnceRef.current.src !== src;
     adoptedOnceRef.current = { el: v, src };
@@ -687,6 +709,7 @@ export const VideoPlayer = forwardRef<
     // eslint-disable-next-line react-hooks/set-state-in-effect
     resetPlaybackState();
     playedRef.current = false;
+    setSpeed(NORMAL_SPEED);
     adoptLoadedElement();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, src, subtitleKey]);
@@ -975,6 +998,11 @@ export const VideoPlayer = forwardRef<
           seekRef.current(0);
           break;
       }
+      const speedStep = speedKeyStep(e);
+      if (speedStep) {
+        e.preventDefault();
+        setSpeed((s) => stepSpeed(s, speedStep));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1202,6 +1230,7 @@ export const VideoPlayer = forwardRef<
           // covers an element that is new rather than a value that is new.
           v.volume = volume;
           v.muted = muted;
+          v.playbackRate = speedRef.current;
           if (isFinite(v.duration)) {
             setNativeDur(v.duration);
             onNativeDuration(v.duration);
@@ -1451,6 +1480,15 @@ export const VideoPlayer = forwardRef<
                   t={t}
                 />
               )}
+              <SpeedMenu
+                speed={speed}
+                onChange={setSpeed}
+                className={CTRL_BUTTON_CLASS}
+                look="dark"
+                portalTarget={() =>
+                  fullscreenTargetRef?.current ?? wrapRef.current
+                }
+              />
               <div className="group/vol flex items-center">
                 <CtrlButton
                   onClick={toggleMuted}

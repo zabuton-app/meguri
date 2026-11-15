@@ -1,7 +1,7 @@
 // English catalog. Must cover exactly the same keys as ja.ts (enforced by the type).
-import type { TranslationKey } from "./ja";
+import type { Catalog } from "../message";
 
-export const en: Record<TranslationKey, string> = {
+export const en: Catalog = {
   // common
   "common.close": "Close",
   "common.cancel": "Cancel",
@@ -94,7 +94,7 @@ export const en: Record<TranslationKey, string> = {
   "settings.update": "Updates",
   "settings.updateDesc": "Check whether a newer version is available.",
   "settings.updateCheckNow": "Check now",
-  "settings.updateAuto": "Check automatically on startup",
+  "settings.updateAuto": "Check automatically",
   "update.available": "Version {version} is available",
   "update.availableDesc": "Current version: {current}",
   "update.view": "Open release",
@@ -170,10 +170,15 @@ export const en: Record<TranslationKey, string> = {
   "home.scanRootUnreadableNamed": 'The folder of "{name}" could not be reached',
   "home.scanRootUnreadableDesc":
     "Check that the folder has not been moved or deleted, that its drive or network share is connected, and that {app} can read it, then scan again. The file list has been left as it was.",
-  "home.scanSkipped":
-    "Skipped {count} folder(s) or file(s) that could not be read",
-  "home.scanSkippedNamed":
-    'Skipped {count} folder(s) or file(s) in "{name}" that could not be read',
+  "home.scanSkipped": {
+    one: "Skipped {count} folder or file that could not be read",
+    other: "Skipped {count} folders or files that could not be read",
+  },
+  "home.scanSkippedNamed": {
+    one: 'Skipped {count} folder or file in "{name}" that could not be read',
+    other:
+      'Skipped {count} folders or files in "{name}" that could not be read',
+  },
   "home.scanSkippedDesc":
     "{app} may not have permission to read them, or another program may be using them. That part of the file list has been left as it was, and the next scan will try again.",
   "home.scanStartFailed": "Could not start scan",
@@ -203,6 +208,14 @@ export const en: Record<TranslationKey, string> = {
   "command.pageCollections": "Collections",
   "command.ratingPlaceholder": "Type 0–5 to pick...",
   "command.collectionPlaceholder": "Search collections...",
+  "command.tagPlaceholder": "Search tags to add...",
+  "command.workspacePlaceholder": "Switch to a workspace...",
+  "command.collectionOpenPlaceholder": "Open a collection...",
+  "command.searchInPlaceholder":
+    "Type a search to run in {name}, or press Enter to open it",
+  "command.openItem": "Open {name}",
+  "command.searchIn": "Search for “{q}” in {name}",
+  "command.clearFilters": "Clear all filters",
   "command.groupRecent": "Recent searches",
   "command.clearRecent": "Clear recent searches",
   "command.more": "{count} more · type to filter",
@@ -228,6 +241,7 @@ export const en: Record<TranslationKey, string> = {
   "filter.dateTo": "To",
   "filter.more": "More conditions",
   "filter.moreActive": "More conditions ({count} active)",
+  "filter.hashChip": "Content hash",
   "filter.kindFilter": "Filter by kind",
   "filter.playState": "Play state",
   "filter.sortSection": "Sort order",
@@ -289,7 +303,7 @@ export const en: Record<TranslationKey, string> = {
   "media.next": "Next file",
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.sectionList": "List",
-  "shortcuts.sectionDetail": "Detail & player",
+  "shortcuts.sectionDetail": "Detail",
   "shortcuts.commandMenu":
     "Open command menu (file actions, recent searches, smart collections)",
   "shortcuts.search": "Focus search",
@@ -312,10 +326,42 @@ export const en: Record<TranslationKey, string> = {
   "shortcuts.skip10": "Back / forward 10s",
   "shortcuts.volume": "Volume up / down",
   "shortcuts.mute": "Toggle mute",
+  "shortcuts.speed": "Slower / faster",
   "shortcuts.fullscreen": "Toggle fullscreen",
   "shortcuts.seekStart": "Jump to start",
   "shortcuts.spectrumPattern":
     "Next / previous spectrum pattern (audio in the playlist player)",
+  "shortcuts.sectionGeneral": "General",
+  "shortcuts.sectionPlayback": "Playback",
+  "shortcuts.sectionPlayer": "Player",
+  "shortcuts.sectionDiscover": "Discover",
+  "shortcuts.hintGeneral": "Anywhere",
+  "shortcuts.hintList": "Library",
+  "shortcuts.hintDetail": "One file open",
+  "shortcuts.hintPlayback": "Video and audio",
+  "shortcuts.hintPlayer": "Playlist",
+  "shortcuts.hintDiscover": "Card shuffle",
+  "shortcuts.zoom": "Zoom in / out",
+  "shortcuts.zoomReset": "Reset zoom",
+  "shortcuts.imagePaging": "Previous / next file (images)",
+  "shortcuts.playerPrevNext": "Previous / next",
+  "shortcuts.playerArrows": "Previous / next (images and audio)",
+  "shortcuts.shuffle": "Toggle shuffle",
+  "shortcuts.playerDetail": "Open the current file's details",
+  "shortcuts.playerExit": "Leave the player",
+  "shortcuts.discoverPaging": "Previous / next card",
+  "shortcuts.discoverReshuffle": "Shuffle again",
+  "shortcuts.preset": "Preset",
+  "shortcuts.presetNote": "Keys marked with a dot follow it.",
+  "shortcuts.presetChange": "Change in Settings",
+  "shortcuts.filterLabel": "Filter shortcuts",
+  "shortcuts.filterPlaceholder": "Filter by action or key",
+  "shortcuts.noMatch": "No shortcuts match “{query}”",
+  "shortcuts.noMatchHint": "Try an action (“volume”) or a key (“ctrl”).",
+  "shortcuts.sectionsLabel": "Sections",
+  "shortcuts.or": "or",
+  "shortcuts.toClose": "to close",
+  "shortcuts.macNote": "On macOS, Ctrl is ⌘.",
   "media.rating": "Rating",
   "media.tags": "Tags",
   "media.nameTags.hint": "From the file name — click a part to add it as a tag",
@@ -376,6 +422,8 @@ export const en: Record<TranslationKey, string> = {
   "player.unmute": "Unmute (M)",
   "player.fullscreen": "Fullscreen (F)",
   "player.volume": "Volume",
+  "player.speed": "Playback speed",
+  "player.speedValue": "{speed}×",
   "player.audioTrack": "Audio track",
   "player.audioTrackNumber": "Track {number}",
   "player.audioTrackDefault": "Default",
@@ -453,15 +501,36 @@ export const en: Record<TranslationKey, string> = {
   "select.watchLaterOff": "Remove from Watch Later",
   "select.rating": "Set a rating",
   "select.ratingMixed": "The selection has mixed ratings",
-  "select.favoriteAdded": "Favorited {count} files",
-  "select.favoriteRemoved": "Unfavorited {count} files",
-  "select.watchLaterAdded": "Queued {count} files for later",
-  "select.watchLaterRemoved": "Removed {count} files from Watch Later",
-  "select.ratingApplied": "Rated {count} files {rating}",
-  "select.ratingCleared": "Cleared the rating on {count} files",
+  "select.favoriteAdded": {
+    one: "Favorited {count} file",
+    other: "Favorited {count} files",
+  },
+  "select.favoriteRemoved": {
+    one: "Unfavorited {count} file",
+    other: "Unfavorited {count} files",
+  },
+  "select.watchLaterAdded": {
+    one: "Queued {count} file for later",
+    other: "Queued {count} files for later",
+  },
+  "select.watchLaterRemoved": {
+    one: "Removed {count} file from Watch Later",
+    other: "Removed {count} files from Watch Later",
+  },
+  "select.ratingApplied": {
+    one: "Rated {count} file {rating}",
+    other: "Rated {count} files {rating}",
+  },
+  "select.ratingCleared": {
+    one: "Cleared the rating on {count} file",
+    other: "Cleared the rating on {count} files",
+  },
   "select.bulkFailed": "The bulk edit did not apply: {msg}",
   "select.bulkTagTitle": "Edit tags in bulk",
-  "select.bulkTagSubtitle": "Applies to all {count} selected files",
+  "select.bulkTagSubtitle": {
+    one: "Applies to the {count} selected file",
+    other: "Applies to all {count} selected files",
+  },
   "select.bulkTagAddLabel": "Add a tag",
   "select.bulkTagPending": "Staged",
   "select.bulkTagExisting": "Tags in the selection",
@@ -476,12 +545,15 @@ export const en: Record<TranslationKey, string> = {
   "select.bulkTagNameLimit": "Up to {max} tags per edit.",
   "select.tagsApplied":
     "Updated {files} files ({added} added, {removed} removed)",
-  "select.tagsSkipped": "{count} files were skipped: no longer in the index.",
+  "select.tagsSkipped": {
+    one: "{count} file was skipped: no longer in the index.",
+    other: "{count} files were skipped: no longer in the index.",
+  },
   "select.tagsFailed": "Could not apply the tags: {msg}",
 
   // media grid
   "grid.empty": "No media to display.",
-  "grid.emptyHint": 'Run "Scan" to list videos and images here.',
+  "grid.emptyHint": 'Run "Scan" to list videos, images, and audio here.',
   "grid.searchByTag": 'Filter by "{name}"',
   "view.grid": "Grid view",
   "view.list": "List view",
@@ -516,10 +588,19 @@ export const en: Record<TranslationKey, string> = {
   "timeline.axis.btime": "Created",
   "timeline.axis.added": "Added",
   "timeline.undated": "No date",
-  "timeline.count": "{count} files",
+  "timeline.count": {
+    one: "{count} file",
+    other: "{count} files",
+  },
   "timeline.scrubber": "Jump to a month",
-  "timeline.month": "{month}: {count} files",
-  "timeline.day": "{day}: {count} files",
+  "timeline.month": {
+    one: "{month}: {count} file",
+    other: "{month}: {count} files",
+  },
+  "timeline.day": {
+    one: "{day}: {count} file",
+    other: "{day}: {count} files",
+  },
   "timeline.sortLocked": "The timeline view lists files newest first by date",
   "timeline.error": "Could not load the timeline",
 
@@ -583,7 +664,10 @@ export const en: Record<TranslationKey, string> = {
   "folder.back": "Back",
   "folder.up": "Up one level",
   "folder.more": "Show hidden levels",
-  "folder.itemCount": "{count} items",
+  "folder.itemCount": {
+    one: "{count} item",
+    other: "{count} items",
+  },
   "folder.subfolders": "Subfolders: {count}",
   "folder.summary": "Folders: {folders} · Files: {files}",
   "folder.openInFileManager": "Open in file manager",
@@ -606,7 +690,10 @@ export const en: Record<TranslationKey, string> = {
   "folder.workspaceGone": "The workspace is no longer available",
   "shortcuts.folderBack": "Back to the previous folder (showing by folder)",
   "shortcuts.folderUp": "Up one level (showing by folder)",
-  "select.folderCount": "including {count} folders",
+  "select.folderCount": {
+    one: "including {count} folder",
+    other: "including {count} folders",
+  },
   "select.folderLoading": "Loading folder contents",
   "select.selectFolder": "Select everything in this folder",
   "select.deselectFolder": "Deselect this folder",
@@ -620,23 +707,52 @@ export const en: Record<TranslationKey, string> = {
   "discover.inFolder": "Picking from “{path}”",
   "discover.empty": "No media to recommend.",
   "discover.emptyHint":
-    'Run "Scan" to import videos and images, and they\'ll be recommended here at random.',
+    'Run "Scan" to import videos, images, and audio, and they\'ll be recommended here at random.',
   "discover.sceneHint": "Click a scene to jump to it",
   "discover.moreScenes": "+{count}",
 
   // Play history
   "history.title": "Play history",
   "history.empty": "No play history yet.",
-  "history.emptyHint": "Play videos or images and they will show up here.",
+  "history.emptyHint":
+    "Play videos, images, or audio and they will show up here.",
   "history.clear": "Clear history",
   "history.clearAction": "Clear",
   "history.clearConfirm":
     "Delete the play history and resume points of every workspace? This cannot be undone.",
-  "history.playCount": "{count} plays",
+  "history.playCount": {
+    one: "{count} play",
+    other: "{count} plays",
+  },
   "history.viaBrowser": "In-app",
   "history.viaExternal": "External player",
   "history.today": "Today",
   "history.yesterday": "Yesterday",
+
+  // Missing files
+  "missing.title": "Missing files",
+  "missing.empty": "No missing files.",
+  "missing.hint":
+    "Files a scan did not find on disk. If a file comes back, it returns to its collections as before. Select only the files that are gone for good and remove them.",
+  "missing.scanning":
+    "Workspaces being scanned are not listed until their scan is done.",
+  "missing.truncated":
+    "Showing the {shown} most recently missing of {total}. Remove them to see the rest.",
+  "missing.selectAll": "Select all",
+  "missing.goneAt": "Missing since {date}",
+  "missing.remove": "Remove missing files",
+  "missing.removeSelected": "Remove {count} selected",
+  "missing.removeConfirm": {
+    one: "Remove the {count} selected file from the file list and collections, and delete its thumbnail? Tags, ratings and other metadata are kept. This cannot be undone.",
+    other:
+      "Remove the {count} selected files from the file list and collections, and delete their thumbnails? Tags, ratings and other metadata are kept. This cannot be undone.",
+  },
+  "missing.removeAction": "Remove",
+  "missing.removedToast": {
+    one: "Removed {count} file",
+    other: "Removed {count} files",
+  },
+  "missing.removeFailed": "Could not remove the files",
 
   "duplicates.title": "Duplicate Files",
   "duplicates.empty": "No duplicate files found.",
@@ -644,11 +760,21 @@ export const en: Record<TranslationKey, string> = {
     "Files with identical content (matching hash and size) will appear here.",
   "duplicates.loadFailed": "Could not load duplicate files. Please try again.",
   "duplicates.retry": "Try again",
-  "duplicates.fileCount": "{count} files",
+  "duplicates.copyHash": "Copy hash",
+  "duplicates.hashCopied": "Hash copied",
+  "duplicates.hashCopyFailed": "Could not copy the hash",
+  "duplicates.showInList": "Show in the list",
+  "duplicates.fileCount": {
+    one: "{count} file",
+    other: "{count} files",
+  },
   "duplicates.truncated": "Too many groups; showing only the top {max}.",
   "duplicates.filter": "Show only duplicate files",
   "duplicates.chip": "Duplicates",
-  "duplicates.groupCount": "{count} groups",
+  "duplicates.groupCount": {
+    one: "{count} group",
+    other: "{count} groups",
+  },
   "duplicates.reclaimable": "Reclaimable",
   "duplicates.search": "Filter by file name or path",
   "duplicates.sortLabel": "Sort by",
@@ -683,7 +809,10 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.page.prev": "Previous",
   "autoTag.page.next": "Next",
   "autoTag.page.range": "{from}–{to} of {total}",
-  "autoTag.fileCount": "{count} files",
+  "autoTag.fileCount": {
+    one: "{count} file",
+    other: "{count} files",
+  },
   "autoTag.tab.regex": "Regex",
   "autoTag.tab.keywords": "Keywords",
   "autoTag.tab.folders": "Folders",
@@ -693,8 +822,11 @@ export const en: Record<TranslationKey, string> = {
     "Runs the active rules, the keywords and the folder rules on files a scan adds or changes.",
   "autoTag.reapply": "Apply to existing files",
   "autoTag.reapplying": "Applying…",
-  "autoTag.reapplyConfirm":
-    "Run the rules, the keywords and the folder rules over all {count} files and add the tags they produce. This bulk addition cannot be undone.",
+  "autoTag.reapplyConfirm": {
+    one: "Run the rules, the keywords and the folder rules over the {count} file and add the tags they produce. This bulk addition cannot be undone.",
+    other:
+      "Run the rules, the keywords and the folder rules over all {count} files and add the tags they produce. This bulk addition cannot be undone.",
+  },
   "autoTag.reapplyDone": "Added {added} tags to {files} files",
   "autoTag.patternRules": "Pattern rules",
   "autoTag.evaluatedInOrder": "evaluated top to bottom",
@@ -717,7 +849,10 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.excludeNone": "Nothing is excluded yet.",
   "autoTag.excludeNoMatch": "No value contains this.",
   "autoTag.excludeFull": "The list is full.",
-  "autoTag.excludeCount": "{count} values",
+  "autoTag.excludeCount": {
+    one: "{count} value",
+    other: "{count} values",
+  },
   "autoTag.excluded": "Excluded",
   "autoTag.letterCase": "Letter case",
   "autoTag.case.keep": "Keep",
@@ -788,13 +923,22 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.keyword.noTagsShort": "no tags yet",
   "autoTag.renameTag": "Rename tag “{tag}”",
   "autoTag.migrate.title": "Move files to “{to}”?",
-  "autoTag.migrate.message":
-    "{count} files this condition reaches carry “{from}”. Replace it with “{to}” on them? Their copies change with them. Otherwise only the setting changes and the files keep “{from}”.",
+  "autoTag.migrate.message": {
+    one: "{count} file this condition reaches carries “{from}”. Replace it with “{to}” on it? Its copies change with it. Otherwise only the setting changes and the file keeps “{from}”.",
+    other:
+      "{count} files this condition reaches carry “{from}”. Replace it with “{to}” on them? Their copies change with them. Otherwise only the setting changes and the files keep “{from}”.",
+  },
   "autoTag.migrate.sampled":
     " Only the first {count} files, the ones loaded here, are looked at.",
-  "autoTag.migrate.confirm": "Replace on {count} files",
+  "autoTag.migrate.confirm": {
+    one: "Replace on {count} file",
+    other: "Replace on {count} files",
+  },
   "autoTag.migrate.cancel": "Setting only",
-  "autoTag.migrate.done": "Replaced “{from}” with “{to}” on {count} files.",
+  "autoTag.migrate.done": {
+    one: "Replaced “{from}” with “{to}” on {count} file.",
+    other: "Replaced “{from}” with “{to}” on {count} files.",
+  },
   "autoTag.matchMode": "Matching",
   "autoTag.mode.word": "Whole word",
   "autoTag.mode.contains": "Contains",
@@ -834,12 +978,18 @@ export const en: Record<TranslationKey, string> = {
   "autoTag.appliedDictSuffix": " Future scans will apply them too.",
   "autoTag.addedKeywords": "Added {count} to keywords.",
   "autoTag.keywordsFullSuffix": " {count} did not fit: the keywords are full.",
-  "autoTag.removeFromFiles": "Remove from {count} files",
+  "autoTag.removeFromFiles": {
+    one: "Remove from {count} file",
+    other: "Remove from {count} files",
+  },
   "autoTag.removeHint":
     "Take this tag off the files that carry it, however it got there",
   "autoTag.removeTitle": "Remove “{tag}”?",
-  "autoTag.removeMessage":
-    "“{tag}” will be taken off {count} files and their copies, including where it was added by hand. This cannot be undone here.",
+  "autoTag.removeMessage": {
+    one: "“{tag}” will be taken off {count} file and its copies, including where it was added by hand. This cannot be undone here.",
+    other:
+      "“{tag}” will be taken off {count} files and their copies, including where it was added by hand. This cannot be undone here.",
+  },
   "autoTag.removeConfirm": "Remove",
   "autoTag.removedOne": "Removed “{tag}” from {files} files.",
   "autoTag.removeSelected": "Remove from {files} files",
@@ -875,7 +1025,10 @@ export const en: Record<TranslationKey, string> = {
   "tags.searchPlaceholder": "Filter tags",
   "tags.noMatch": "No matching tags.",
   "tags.truncated": "Too many tags — showing the top {max}.",
-  "tags.fileCount": "{count} files",
+  "tags.fileCount": {
+    one: "{count} file",
+    other: "{count} files",
+  },
   "tags.sortByName": "By name",
   "tags.sortByCount": "By count",
   "tags.groupManual": "Manual tags",
@@ -901,12 +1054,18 @@ export const en: Record<TranslationKey, string> = {
     "The {count} selected tags are combined into the target in every workspace. The others are removed.",
   "tags.mergeTarget": "Merge into",
   "tags.mergeAction": "Merge",
-  "tags.merged": "Merged {count} tags",
+  "tags.merged": {
+    one: "Merged {count} tag",
+    other: "Merged {count} tags",
+  },
   "tags.mergeFailed": "Could not merge the tags",
   "tags.delete": "Delete",
   "tags.deleteAction": "Delete",
-  "tags.deleteConfirm":
-    'Remove the tag "{name}" from {count} files across all workspaces. Continue?',
+  "tags.deleteConfirm": {
+    one: 'Remove the tag "{name}" from {count} file across all workspaces. Continue?',
+    other:
+      'Remove the tag "{name}" from {count} files across all workspaces. Continue?',
+  },
   "tags.deleteConfirmMany":
     "Delete the {count} selected tags from all workspaces. Continue?",
   "tags.deleted": "Tag deleted",
@@ -949,12 +1108,18 @@ export const en: Record<TranslationKey, string> = {
   "drop.addAction": "Add",
   "drop.notDirectory": '"{name}" is not a folder, so it was not added',
   "drop.addFailed": 'Could not add "{name}"',
-  "drop.addedToCollection": 'Added {count} files to "{name}"',
+  "drop.addedToCollection": {
+    one: 'Added {count} file to "{name}"',
+    other: 'Added {count} files to "{name}"',
+  },
   "drop.addedOneToCollection": 'Added 1 file to "{name}"',
   "drop.alreadyInCollection": 'Already in "{name}"',
   "drop.alreadyOneInCollection": 'Already in "{name}"',
   "drop.addToCollectionFailed": "Could not add to the collection",
-  "drag.fileCount": "{count} files",
+  "drag.fileCount": {
+    one: "{count} file",
+    other: "{count} files",
+  },
   "drag.external": "Drag to another app",
   "drag.externalFailed":
     "Could not start dragging. Check that the files are still available.",
@@ -980,8 +1145,14 @@ export const en: Record<TranslationKey, string> = {
   "collection.removeFrom": 'Remove from "{name}"',
   "collection.addedToast": 'Added to "{name}"',
   "collection.removedFromToast": 'Removed from "{name}"',
-  "collection.addedCountToast": 'Added {count} files to "{name}"',
-  "collection.removedCountToast": 'Removed {count} files from "{name}"',
+  "collection.addedCountToast": {
+    one: 'Added {count} file to "{name}"',
+    other: 'Added {count} files to "{name}"',
+  },
+  "collection.removedCountToast": {
+    one: 'Removed {count} file from "{name}"',
+    other: 'Removed {count} files from "{name}"',
+  },
   "collection.actionFailed": "Could not update collection",
 
   // Watch Later (built-in collection)
@@ -1015,8 +1186,14 @@ export const en: Record<TranslationKey, string> = {
   "statusbar.label": "Status bar",
   "statusbar.lastScan": "Last scan",
   "statusbar.lastScanNever": "Never",
-  "statusbar.total": "{count} files in total",
-  "statusbar.folders": "{count} folders",
+  "statusbar.total": {
+    one: "{count} file in total",
+    other: "{count} files in total",
+  },
+  "statusbar.folders": {
+    one: "{count} folder",
+    other: "{count} folders",
+  },
   "statusbar.shown": "{count} shown",
   "statusbar.status": "Status",
   "statusbar.scanning": "Scanning",
@@ -1040,7 +1217,7 @@ export const en: Record<TranslationKey, string> = {
   "playlist.loading": "Loading…",
   "playlist.empty": "Nothing here can be played.",
   "playlist.emptyHint":
-    "Open a list that contains videos or images, then start playback.",
+    "Open a list that contains videos, images, or audio, then start playback.",
   "playlist.unplayable": "None of these items could be played.",
   "playlist.reorderNeedsManual": "Switch to manual order to rearrange items.",
   "settings.resumePlayback": "Resume where you left off",
@@ -1114,7 +1291,7 @@ export const en: Record<TranslationKey, string> = {
   "tour.welcomeBody": "Let me show you around. Press Esc to skip at any time.",
   "tour.addWorkspaceTitle": "Add a folder",
   "tour.addWorkspaceBody":
-    "Start by adding a folder with your videos and images. I'll scan it and make thumbnails. Add as many as you like.",
+    "Start by adding a folder with your videos, images, or audio. I'll scan it and make thumbnails. Add as many as you like.",
   "tour.collectionsTitle": "Collections",
   "tour.collectionsBody":
     "Gather files from any folder into a collection. Drag files here to add them.",

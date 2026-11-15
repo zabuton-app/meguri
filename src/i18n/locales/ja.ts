@@ -92,7 +92,7 @@ export const ja = {
   "settings.update": "アップデート",
   "settings.updateDesc": "新しいバージョンが公開されていないか確認します。",
   "settings.updateCheckNow": "今すぐ確認",
-  "settings.updateAuto": "起動時に自動で確認する",
+  "settings.updateAuto": "自動で確認する",
   "update.available": "新しいバージョン {version} が利用可能です",
   "update.availableDesc": "現在のバージョン: {current}",
   "update.view": "リリースを開く",
@@ -202,6 +202,14 @@ export const ja = {
   "command.pageCollections": "コレクション",
   "command.ratingPlaceholder": "0〜5 を入力して選ぶ...",
   "command.collectionPlaceholder": "コレクションを検索...",
+  "command.tagPlaceholder": "追加するタグを検索...",
+  "command.workspacePlaceholder": "切り替えるワークスペースを検索...",
+  "command.collectionOpenPlaceholder": "開くコレクションを検索...",
+  "command.searchInPlaceholder":
+    "「{name}」で検索する語を入力（Enterだけで開く）",
+  "command.openItem": "「{name}」を開く",
+  "command.searchIn": "「{name}」で「{q}」を検索",
+  "command.clearFilters": "フィルターをすべてクリア",
   "command.groupRecent": "最近の検索",
   "command.clearRecent": "最近の検索を消去",
   "command.more": "他 {count} 件 · 入力して絞り込む",
@@ -227,6 +235,7 @@ export const ja = {
   "filter.dateTo": "終了日",
   "filter.more": "他の条件",
   "filter.moreActive": "他の条件（{count}件適用中）",
+  "filter.hashChip": "内容ハッシュ",
   "filter.kindFilter": "種別で絞り込み",
   "filter.playState": "視聴状態",
   "filter.sortSection": "並び順",
@@ -288,7 +297,7 @@ export const ja = {
   "media.next": "次のファイル",
   "shortcuts.title": "キーボードショートカット",
   "shortcuts.sectionList": "一覧",
-  "shortcuts.sectionDetail": "詳細・プレイヤー",
+  "shortcuts.sectionDetail": "詳細",
   "shortcuts.commandMenu":
     "コマンドメニューを開く（ファイル操作・最近の検索・スマートコレクション）",
   "shortcuts.search": "検索にフォーカス",
@@ -311,10 +320,43 @@ export const ja = {
   "shortcuts.skip10": "10秒 戻る / 進む",
   "shortcuts.volume": "音量 上げ / 下げ",
   "shortcuts.mute": "ミュート切替",
+  "shortcuts.speed": "再生速度を下げる / 上げる",
   "shortcuts.fullscreen": "全画面切替",
   "shortcuts.seekStart": "先頭へ移動",
   "shortcuts.spectrumPattern":
     "スペクトラムのパターンを 次 / 前 へ（プレイリスト再生のオーディオ）",
+  "shortcuts.sectionGeneral": "全般",
+  "shortcuts.sectionPlayback": "再生",
+  "shortcuts.sectionPlayer": "プレイヤー",
+  "shortcuts.sectionDiscover": "ディスカバー",
+  "shortcuts.hintGeneral": "どの画面でも",
+  "shortcuts.hintList": "ライブラリ",
+  "shortcuts.hintDetail": "ファイルを開いているとき",
+  "shortcuts.hintPlayback": "動画とオーディオ",
+  "shortcuts.hintPlayer": "プレイリスト",
+  "shortcuts.hintDiscover": "カードのシャッフル",
+  "shortcuts.zoom": "拡大 / 縮小",
+  "shortcuts.zoomReset": "拡大率をリセット",
+  "shortcuts.imagePaging": "前 / 次のファイル（画像）",
+  "shortcuts.playerPrevNext": "前 / 次",
+  "shortcuts.playerArrows": "前 / 次（画像とオーディオ）",
+  "shortcuts.shuffle": "シャッフルを切り替え",
+  "shortcuts.playerDetail": "再生中のファイルの詳細を開く",
+  "shortcuts.playerExit": "プレイヤーを閉じる",
+  "shortcuts.discoverPaging": "前 / 次のカード",
+  "shortcuts.discoverReshuffle": "シャッフルし直す",
+  "shortcuts.preset": "プリセット",
+  "shortcuts.presetNote": "点の付いたキーはプリセットに従う。",
+  "shortcuts.presetChange": "設定で変更",
+  "shortcuts.filterLabel": "ショートカットを絞り込む",
+  "shortcuts.filterPlaceholder": "操作名やキーで絞り込み",
+  "shortcuts.noMatch": "「{query}」に一致するショートカットはありません",
+  "shortcuts.noMatchHint":
+    "操作名（「音量」）やキー（「ctrl」）で探してください。",
+  "shortcuts.sectionsLabel": "セクション",
+  "shortcuts.or": "または",
+  "shortcuts.toClose": "で閉じる",
+  "shortcuts.macNote": "macOSではCtrlは⌘です。",
   "media.rating": "評価",
   "media.tags": "タグ",
   "media.nameTags.hint": "ファイル名から — クリックした部分をタグとして追加",
@@ -376,6 +418,8 @@ export const ja = {
   "player.unmute": "ミュート解除 (M)",
   "player.fullscreen": "全画面 (F)",
   "player.volume": "音量",
+  "player.speed": "再生速度",
+  "player.speedValue": "{speed}×",
   "player.audioTrack": "音声トラック",
   "player.audioTrackNumber": "トラック {number}",
   "player.audioTrackDefault": "既定",
@@ -483,7 +527,7 @@ export const ja = {
   // メディアグリッド
   "grid.empty": "表示できるメディアがありません。",
   "grid.emptyHint":
-    "「スキャン」を実行すると、配下の動画・画像がここに並びます。",
+    "「スキャン」を実行すると、配下の動画・画像・音声がここに並びます。",
   "grid.searchByTag": "「{name}」で絞り込み",
   "view.grid": "グリッド表示",
   "view.list": "リスト表示",
@@ -621,14 +665,15 @@ export const ja = {
   "discover.inFolder": "「{path}」の中から選んでいます",
   "discover.empty": "おすすめできるメディアがありません。",
   "discover.emptyHint":
-    "「スキャン」で動画や画像を取り込むと、ここでランダムにおすすめされます。",
+    "「スキャン」で動画や画像、音声を取り込むと、ここでランダムにおすすめされます。",
   "discover.sceneHint": "シーンをクリックするとその位置に移動します",
   "discover.moreScenes": "+{count}",
 
   // 再生履歴
   "history.title": "再生履歴",
   "history.empty": "再生履歴はまだありません。",
-  "history.emptyHint": "動画や画像を再生すると、ここに履歴が表示されます。",
+  "history.emptyHint":
+    "動画や画像、音声を再生すると、ここに履歴が表示されます。",
   "history.clear": "履歴をクリア",
   "history.clearAction": "クリア",
   "history.clearConfirm":
@@ -639,6 +684,25 @@ export const ja = {
   "history.today": "今日",
   "history.yesterday": "昨日",
 
+  // Missing files
+  "missing.title": "見つからないファイル",
+  "missing.empty": "見つからないファイルはありません。",
+  "missing.hint":
+    "スキャンでディスクに見つからなかったファイルです。ファイルが戻ってくれば、コレクションなどはそのまま復活します。もう戻らないファイルだけを選んで削除してください。",
+  "missing.scanning":
+    "スキャン中のワークスペースは、スキャンが終わるまでここに表示されません。",
+  "missing.truncated":
+    "{total}件のうち、最近見つからなくなった{shown}件を表示しています。削除すると残りが表示されます。",
+  "missing.selectAll": "すべて選択",
+  "missing.goneAt": "{date}から見つかりません",
+  "missing.remove": "見つからないファイルを削除",
+  "missing.removeSelected": "選択した{count}件を削除",
+  "missing.removeConfirm":
+    "選択した{count}件をファイル一覧とコレクションから削除し、サムネイルも消去します。タグや評価などはそのまま残ります。この操作は取り消せません。",
+  "missing.removeAction": "削除",
+  "missing.removedToast": "{count}件を削除しました",
+  "missing.removeFailed": "削除できませんでした",
+
   "duplicates.title": "重複ファイル",
   "duplicates.empty": "重複ファイルは見つかりませんでした。",
   "duplicates.emptyHint":
@@ -646,6 +710,10 @@ export const ja = {
   "duplicates.loadFailed":
     "重複ファイルを読み込めませんでした。もう一度お試しください。",
   "duplicates.retry": "もう一度読み込む",
+  "duplicates.copyHash": "ハッシュをコピー",
+  "duplicates.hashCopied": "ハッシュをコピーしました",
+  "duplicates.hashCopyFailed": "ハッシュをコピーできませんでした",
+  "duplicates.showInList": "一覧で表示",
   "duplicates.fileCount": "{count} 件",
   "duplicates.truncated":
     "グループ数が多いため上位 {max} 件のみ表示しています。",
@@ -1045,7 +1113,7 @@ export const ja = {
   "playlist.loading": "読み込み中…",
   "playlist.empty": "再生できるメディアがありません。",
   "playlist.emptyHint":
-    "動画や画像を含む一覧を開いてから再生を始めてください。",
+    "動画や画像、音声を含む一覧を開いてから再生を始めてください。",
   "playlist.unplayable": "再生できるメディアがありませんでした。",
   "playlist.reorderNeedsManual": "並び替えるには手動順に切り替えます。",
   "settings.resumePlayback": "続きから再生",
@@ -1117,7 +1185,7 @@ export const ja = {
   "tour.welcomeBody": "使い方をざっと案内するね。Escでいつでも飛ばせるよ",
   "tour.addWorkspaceTitle": "フォルダを追加",
   "tour.addWorkspaceBody":
-    "まずは動画や画像が入ったフォルダを追加してね。中身を読み込んでサムネイルを作るよ。いくつでも追加できるよ",
+    "まずは動画や画像、音声が入ったフォルダを追加してね。中身を読み込んでサムネイルを作るよ。いくつでも追加できるよ",
   "tour.collectionsTitle": "コレクション",
   "tour.collectionsBody":
     "フォルダをまたいで好きなファイルをまとめられるよ。ファイルをここにドラッグすると追加できるよ",

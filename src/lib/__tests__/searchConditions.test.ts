@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/locales/en";
+import { pickMessage } from "@/i18n/message";
 import type { SearchQuery } from "@/ipc/types";
 import { formatDate } from "@/lib/dates";
 import {
@@ -10,7 +11,7 @@ import {
 } from "@/lib/searchConditions";
 
 const t = (key: keyof typeof en, params?: Record<string, string | number>) => {
-  let s: string = en[key];
+  let s = pickMessage(en[key], new Intl.PluralRules("en"), params?.count);
   if (params) {
     for (const [k, v] of Object.entries(params))
       s = s.replace(`{${k}}`, String(v));
@@ -116,7 +117,14 @@ describe("describeConditions", () => {
     expect(keys({ q: "sunset tag:beach" })).toEqual(["q", "directive-1"]);
     expect(find({ q: "sunset tag:beach" }, "q").label).toBe('"sunset"');
     expect(find({ q: "sunset tag:beach" }, "directive-1").label).toBe(
-      `${en["media.tags"]}: beach`,
+      `${t("media.tags")}: beach`,
+    );
+  });
+
+  it("names a hash: directive, apart from the free text (#302)", () => {
+    expect(keys({ q: "trip hash:3fa9c1d2" })).toEqual(["q", "directive-1"]);
+    expect(find({ q: "trip hash:3fa9c1d2" }, "directive-1").label).toBe(
+      `${t("filter.hashChip")}: 3fa9c1d2`,
     );
   });
 
@@ -126,7 +134,7 @@ describe("describeConditions", () => {
 
   it("keeps a quoted multi-word directive in one chip", () => {
     expect(find({ q: 'tag:"beach house"' }, "directive-0").label).toBe(
-      `${en["media.tags"]}: beach house`,
+      `${t("media.tags")}: beach house`,
     );
   });
 
@@ -161,7 +169,7 @@ describe("sort", () => {
 
   it("names itself in the chip so it does not read as a narrowing filter", () => {
     expect(find({ sort: "name", sortDir: "asc" }, "sort").label).toBe(
-      `${en["filter.sortSection"]}: ${en["sort.name"]} / ${en["sort.asc"]}`,
+      `${t("filter.sortSection")}: ${t("sort.name")} / ${t("sort.asc")}`,
     );
   });
 });

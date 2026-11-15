@@ -1,6 +1,7 @@
 // Regression tests for search/filter/sort and durable-metadata operations in queries.ts.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DB } from "../db.js";
+import type { SearchQuery } from "../types.js";
 import { addFileTag, addManualTag, syncFts, upsertTag } from "../tags.js";
 import {
   addBookmark,
@@ -229,12 +230,76 @@ describe("searchFiles", () => {
     ).toEqual([old, mid, none]);
   });
 
+  it("sorts names in natural order, through every page (#292)", () => {
+    for (const name of [
+      "Ep10.mp4",
+      "ep2.mp4",
+      "Ep1.mp4",
+      "ep11.mp4",
+      "Ep3.mp4",
+    ])
+      insertFile(db, rootId, { relPath: name });
+    const names = (sortDir: "asc" | "desc") => {
+      const out: string[] = [];
+      let cursor: SearchQuery["cursor"];
+      do {
+        const page = searchFiles(db, {
+          sort: "name",
+          sortDir,
+          limit: 2,
+          cursor,
+        });
+        out.push(...page.items.map((f) => f.relPath));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor != null);
+      return out;
+    };
+    expect(names("asc")).toEqual([
+      "Ep1.mp4",
+      "ep2.mp4",
+      "Ep3.mp4",
+      "Ep10.mp4",
+      "ep11.mp4",
+    ]);
+    expect(names("desc")).toEqual([
+      "ep11.mp4",
+      "Ep10.mp4",
+      "Ep3.mp4",
+      "ep2.mp4",
+      "Ep1.mp4",
+    ]);
+  });
+
   it("matches the full-text query against rel_path after FTS sync", () => {
     const hit = insertFile(db, rootId, { relPath: "holiday/beach.mp4" });
     insertFile(db, rootId, { relPath: "work/report.mp4" });
     syncFts(db, hit);
     const res = searchFiles(db, { q: "beach" });
     expect(res.items.map((f) => f.id)).toEqual([hit]);
+  });
+
+  it("finds files by a content hash prefix with hash: (#302)", () => {
+    const a = insertFile(db, rootId, {
+      relPath: "a.mp4",
+      contentHash: "3fa9c1d2" + "0".repeat(56),
+    });
+    const b = insertFile(db, rootId, {
+      relPath: "b.mp4",
+      contentHash: "3fa9c1d2" + "1".repeat(56),
+    });
+    insertFile(db, rootId, {
+      relPath: "c.mp4",
+      contentHash: "3fa9ffff" + "0".repeat(56),
+    });
+    // No hash yet: never matches.
+    insertFile(db, rootId, { relPath: "d.mp4", contentHash: null });
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids("hash:3FA9C1D2")).toEqual([a, b]);
+    expect(ids(`hash:3fa9c1d2${"0".repeat(56)}`)).toEqual([a]);
+    expect(ids("hash:ffff")).toEqual([]);
   });
 
   it("matches a substring in the middle of a word (trigram)", () => {

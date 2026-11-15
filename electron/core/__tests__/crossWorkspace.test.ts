@@ -1,4 +1,5 @@
 // Regression tests for cross-workspace merge pagination (k-way merge).
+import { naturalNameKey } from "../nameKey.js";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Core } from "../index.js";
 import type { DB } from "../db.js";
@@ -68,7 +69,11 @@ function comparatorFor(
       return (a, b) => cmpNum(a.rating, b.rating, direction) || tiebreak(a, b);
     case "name":
       return (a, b) =>
-        cmpStr(a.relPath, b.relPath, direction) || tiebreak(a, b);
+        cmpStr(
+          naturalNameKey(a.relPath),
+          naturalNameKey(b.relPath),
+          direction,
+        ) || tiebreak(a, b);
     default:
       return (a, b) =>
         cmpStr(a.workspaceId, b.workspaceId) || cmpNum(a.id, b.id, direction);
@@ -259,6 +264,42 @@ describe("keyset pagination equivalence", () => {
     }
   });
 
+  // SQLite compares TEXT as UTF-8 bytes; a JS `<` compares UTF-16 code units.
+  // The two disagree between U+E000–U+FFFF (full-width `（`) and astral
+  // characters (emoji), so a merge on `<` could step past a row the next
+  // page's seek then leaves behind (#485).
+  it("walking a name sort keeps full-width and astral names in SQLite's order", () => {
+    const seed = (wsId: string, relPaths: string[]) => {
+      const { db, rootId } = newDb();
+      for (const relPath of relPaths) insertFile(db, rootId, { relPath });
+      dbs.push(db);
+      return coreTarget(wsId, db);
+    };
+    const cores = [
+      seed("ws-a", ["（1）.mp4", "～2.mp4"]),
+      seed("ws-b", ["😀.mp4", "a.mp4"]),
+    ];
+    for (const sortDir of ["asc", "desc"] as const) {
+      const walked: string[] = [];
+      let cursor: SearchQuery["cursor"] = undefined;
+      for (;;) {
+        const page = searchWorkspaces(cores, {
+          sort: "name",
+          sortDir,
+          limit: 1,
+          cursor,
+        });
+        walked.push(...page.items.map((f) => f.relPath));
+        if (page.nextCursor == null) break;
+        cursor = page.nextCursor;
+      }
+      const want = ["a.mp4", "（1）.mp4", "～2.mp4", "😀.mp4"];
+      expect(walked, sortDir).toEqual(
+        sortDir === "asc" ? want : [...want].reverse(),
+      );
+    }
+  });
+
   it("collection keyset walk matches one big collection page", () => {
     const a = seedTies("ws-a", 30);
     const b = seedTies("ws-b", 30);
@@ -398,7 +439,11 @@ describe("searchCollection k-way merge", () => {
       [...merged]
         .sort(
           (x, y) =>
-            x.relPath.localeCompare(y.relPath) ||
+            cmpStr(
+              naturalNameKey(x.relPath),
+              naturalNameKey(y.relPath),
+              "asc",
+            ) ||
             x.workspaceId.localeCompare(y.workspaceId) ||
             x.id - y.id,
         )

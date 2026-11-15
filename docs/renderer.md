@@ -6,11 +6,12 @@ fetching, internationalization, theming, and content zoom.
 
 ## Routing
 
-Routing uses `createHashRouter` (`src/App.tsx`); a hash router is the stable
+Routing uses `createHashRouter` (`src/appRouter.tsx`); a hash router is the stable
 choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`),
 `play` (`src/routes/Player/`), `history` (`src/routes/History/`),
-`duplicates` (`src/routes/Duplicates/`), `tags` (`src/routes/Tags/`),
+`duplicates` (`src/routes/Duplicates/`), `missing` (`src/routes/Missing/`),
+`tags` (`src/routes/Tags/`),
 `auto-tag` (`src/routes/AutoTag/`), and `settings` (`src/routes/Settings/`)
 are its **children**. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
@@ -38,10 +39,49 @@ mechanics in such hooks and components; `index.tsx` should stay a composition.
 
 ## Provider hierarchy
 
-The provider stack is set up in `src/main.tsx`:
+The provider stack is set up in `renderApp()` (`src/renderApp.tsx`):
 
 ```text
 QueryClientProvider → ThemeProvider → I18nProvider → PreferencesProvider → TourProvider → ConfirmProvider
+```
+
+## Starting the renderer
+
+`renderApp()` (`src/renderApp.tsx`) starts the renderer: the window error
+logging, the query client, the router and the provider stack. Nothing in it
+runs on import. `src/main.tsx` is only Meguri's entry point, which calls it
+with no options; it is the renderer-side counterpart of `startApp()` (see
+[architecture.md](architecture.md)).
+
+An app built on Meguri calls `renderApp()` from its own entry point (built with
+`appBuildConfig()`'s `rendererEntry`, see
+[Building from another project](build-and-ci.md#building-from-another-project))
+and passes what it adds:
+
+- `settingsSections`: settings tabs shown after Meguri's own, in order. Each
+  has an `id`, a `label(lang)` (the app's strings are not in Meguri's
+  catalogs, so it is called with the current language) and a `Component`
+  rendered as the tab's panel. Their DOM ids are prefixed with `extra-`, so
+  they cannot collide with Meguri's tabs.
+- `routes`: React Router routes added after Meguri's as children of `/`. Like
+  `/settings`, they mount over the list, so a page renders itself as a modal.
+
+```tsx
+// The app's renderer entry
+import { renderApp } from "../vendor/meguri/src/renderApp";
+import { SyncSettings } from "./SyncSettings";
+import { SyncLog } from "./SyncLog";
+
+renderApp({
+  settingsSections: [
+    {
+      id: "sync",
+      label: (lang) => (lang === "ja" ? "同期" : "Sync"),
+      Component: SyncSettings,
+    },
+  ],
+  routes: [{ path: "sync-log", element: <SyncLog /> }],
+});
 ```
 
 ## Audio playback
@@ -439,7 +479,9 @@ stay in sync without a refetch. Discover pulls videos with `randomFiles`
 (`ORDER BY RANDOM()`) and presents them one at a time as a full-bleed immersive
 modal driven by embla-carousel, with a horizontal `SceneRail` of seekable scene
 previews. The History route lists `history_list` pages (day-grouped, infinite
-scroll) across the active or all workspaces.
+scroll) across the active or all workspaces. The Missing route (opened from
+the scan menu) lists `missing_files_list` (on the query worker, virtualized)
+and removes the files the user selects with `missing_files_purge`.
 
 Hovering a video thumbnail scrubs through frames fetched from the `frame`
 endpoint (`src/hooks/useHoverFramePreview.ts`, shared by `MediaThumbnail` and
@@ -461,6 +503,20 @@ fills in with `appName()` (`src/lib/appName.ts`), the name the main process
 was started with. Because it needs no param, a locale may use `{app}` where
 `ja` does not. The About section names the app by its one-character mark
 instead, `appGlyph()` from the same file (Meguri's is 巡).
+
+A string with a `{count}` can have plural forms: instead of a string, the locale
+gives an object keyed by `Intl.PluralRules` category, with at least `other`
+(`{ one: "{count} file", other: "{count} files" }`; `src/i18n/message.ts`).
+`t()` picks the form for the `count` param, so pass the number itself; a count
+that is not a number, such as `"1,000+"`, takes `other`. `ja.ts` has no forms,
+and only the categories of the locale's language are allowed (a test checks).
+Forms are given where the words around the number change with it and the
+count can be one (in French, also zero), not where it never can (an action on
+several selected tags, a list past its limit). Only `count` picks a form: a
+string whose other number params (`{files}`, `{tags}`) decide the noun keeps
+one wording, or is split into keys such as `…One` / `…Many` by its caller.
+Number params are written with `Intl.NumberFormat` for the app's language, not
+the OS's, so do not format them before passing them in.
 
 ## UI primitives and dialogs
 

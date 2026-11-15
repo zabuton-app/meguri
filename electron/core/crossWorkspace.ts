@@ -1,6 +1,7 @@
 // Cross-workspace aggregation. Runs the per-DB queries against a set of Cores and
 // merges/sorts/paginates in memory so the virtual "All" workspace can list every root.
 // A single-element set is the fast path (no merge), so callers use this uniformly.
+import { naturalNameKey } from "./nameKey.js";
 import { MAX_DUPLICATE_GROUPS } from "../../shared/duplicates.js";
 import { MAX_TAG_LIST, qualifiedTagName } from "../../shared/tags.js";
 import { resolveSortDir } from "../../shared/sortDir.js";
@@ -16,6 +17,8 @@ import {
   filesByIds,
   folderFiles,
   listFolders,
+  countMissingFiles,
+  listMissingFiles,
   listPlayHistory,
   numericCursor,
   randomFiles,
@@ -34,6 +37,8 @@ import type {
   HistoryEntryRow,
   HistoryPage,
   HistoryQuery,
+  MissingFileRow,
+  MissingFilesResult,
   SearchCursor,
   SearchQuery,
   SearchResult,
@@ -850,6 +855,27 @@ function takeAcrossNamespaces(tags: TagSummary[], limit: number): TagSummary[] {
  * tuples into one map, pass 2 fetches full rows only for keys whose combined
  * count exceeds one, and only from the DBs that hold them.
  */
+/** Missing files across workspaces, the most recently gone first, at most
+ *  `limit` in all. `scanning` is the caller's to set. */
+export function listMissingWorkspaces(
+  cores: CoreTarget[],
+  limit: number,
+): Omit<MissingFilesResult, "scanning"> {
+  const items: MissingFileRow[] = [];
+  let total = 0;
+  for (const { id, core } of cores) {
+    items.push(...inject(listMissingFiles(core.db, limit), id));
+    total += countMissingFiles(core.db);
+  }
+  items.sort(
+    (a, b) =>
+      b.deletedAt - a.deletedAt ||
+      cmpStr(a.workspaceId, b.workspaceId) ||
+      b.id - a.id,
+  );
+  return { items: items.slice(0, limit), total };
+}
+
 export function listDuplicatesWorkspaces(
   cores: CoreTarget[],
 ): DuplicatesResult {
@@ -1069,13 +1095,24 @@ export function comparatorFor(
       // Never NULL (see sortSpecFor).
       return (a, b) =>
         cmpNullableNum(a.addedAt, b.addedAt, direction) || tiebreak(a, b);
-    case "name":
+    case "name": {
       // orderByFor()'s name sort tiebreaks on id following the sort direction
-      // (so the index can serve the DESC scan); mirror that here.
+      // (so the index can serve the DESC scan); mirror that here. Keys are
+      // computed once per path: the graph sorts tens of thousands of rows.
+      const keys = new Map<string, string>();
+      const keyOf = (relPath: string) => {
+        let key = keys.get(relPath);
+        if (key === undefined) {
+          key = naturalNameKey(relPath);
+          keys.set(relPath, key);
+        }
+        return key;
+      };
       return (a, b) =>
-        cmpStr(a.relPath, b.relPath, direction) ||
+        cmpStr(keyOf(a.relPath), keyOf(b.relPath), direction) ||
         cmpStr(a.workspaceId, b.workspaceId) ||
         cmpNum(a.id, b.id, direction);
+    }
     case "accessed":
       return (a, b) =>
         cmpNullableNum(a.lastAccessedAt, b.lastAccessedAt, direction) ||
@@ -1102,8 +1139,35 @@ function cmpNum(a: number, b: number, dir: "asc" | "desc"): number {
 }
 
 function cmpStr(a: string, b: string, dir: "asc" | "desc" = "asc"): number {
-  const result = a < b ? -1 : a > b ? 1 : 0;
+  const result = cmpCodePoints(a, b);
   return dir === "asc" ? result : -result;
+}
+
+/**
+ * Strings in SQLite's BINARY order (UTF-8 bytes), which is code point order.
+ * A plain `<` compares UTF-16 code units, which puts a surrogate pair (an
+ * emoji) before U+E000–U+FFFF (full-width `（`), where each database puts it
+ * after — and the merge must agree with the order its streams arrive in (#485).
+ */
+function cmpCodePoints(a: string, b: string): number {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a.charCodeAt(i);
+    const y = b.charCodeAt(i);
+    if (x !== y) return codePointRank(x) - codePointRank(y);
+  }
+  return a.length - b.length;
+}
+
+/**
+ * At the first differing code unit, move the surrogates (0xD800–0xDFFF) above
+ * U+E000–U+FFFF. Everything else is already in code point order, and two
+ * surrogate pairs that differ compare correctly on their first differing unit.
+ */
+function codePointRank(unit: number): number {
+  if (unit >= 0xe000) return unit - 0x800;
+  if (unit >= 0xd800) return unit + 0x2000;
+  return unit;
 }
 
 /** Sort NULLs last in both directions, matching the SQL ORDER BY expressions. */

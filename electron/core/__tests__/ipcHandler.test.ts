@@ -1,4 +1,5 @@
-// handle() answers the app's own page only (#272).
+// handle() answers the app's own page only (#272), and so does an app's
+// handler for its extra channels (#495).
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -12,7 +13,7 @@ vi.mock("electron", () => ({
   },
 }));
 
-const { handle } = await import("../ipcHandler.js");
+const { handle, handleExtraFor } = await import("../ipcHandler.js");
 const { setRendererIndex } = await import("../appUrl.js");
 
 const index = path.join(os.tmpdir(), "meguri-app", "renderer", "index.html");
@@ -39,5 +40,44 @@ describe("handle", () => {
     );
     await expect(call(null)).rejects.toThrow(/rejected/);
     expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleExtraFor", () => {
+  const handleExtra = handleExtraFor(["my_app_ping"]);
+  const extraFn = vi.fn((raw: unknown) => ({ echoed: raw }));
+  handleExtra("my_app_ping", extraFn);
+  const callExtra = (senderFrame: { url: string } | null, raw: unknown) =>
+    handlers.get("my_app_ping")!({ senderFrame }, raw);
+
+  it("passes the raw payload through for the bundled renderer", async () => {
+    const payload = { anything: [1, "two"] };
+    await expect(
+      callExtra({ url: `${pathToFileURL(index).href}#/` }, payload),
+    ).resolves.toEqual({ echoed: payload });
+    expect(extraFn).toHaveBeenCalledWith(payload, expect.anything());
+  });
+
+  it("rejects a call from any other page, or a frame that is gone", async () => {
+    extraFn.mockClear();
+    const other = pathToFileURL(path.join(os.tmpdir(), "evil.html")).href;
+    await expect(callExtra({ url: other }, 1)).rejects.toThrow(/rejected/);
+    await expect(callExtra({ url: "https://example.com/" }, 1)).rejects.toThrow(
+      /rejected/,
+    );
+    await expect(callExtra(null, 1)).rejects.toThrow(/rejected/);
+    expect(extraFn).not.toHaveBeenCalled();
+  });
+
+  it("throws for a channel not in extraChannels, registering nothing", () => {
+    const meguriHandler = handlers.get("app_status");
+    expect(() => handleExtra("not_listed", () => "x")).toThrow(
+      /not in extraChannels/,
+    );
+    expect(() => handleExtra("app_status", () => "x")).toThrow(
+      /not in extraChannels/,
+    );
+    expect(handlers.has("not_listed")).toBe(false);
+    expect(handlers.get("app_status")).toBe(meguriHandler);
   });
 });

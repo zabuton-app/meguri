@@ -6,8 +6,8 @@
 
 **Redefining what a media manager is supposed to be.**
 
-A local-first media library for your videos and photos — scan, browse,
-search, and play, all offline.
+A local-first media library for your videos, photos, and audio — scan,
+browse, search, and play, all offline.
 
 [![Test](https://github.com/zabuton-app/meguri/actions/workflows/test.yml/badge.svg)](https://github.com/zabuton-app/meguri/actions/workflows/test.yml)
 [![Build](https://github.com/zabuton-app/meguri/actions/workflows/build.yml/badge.svg)](https://github.com/zabuton-app/meguri/actions/workflows/build.yml)
@@ -19,9 +19,9 @@ search, and play, all offline.
 </div>
 
 Meguri is a personal desktop app for browsing, searching, and playing local
-videos and images with thumbnails. It recursively scans any folder you point it at,
-generates thumbnails, tags, and metadata, and lets you browse the collection in
-a native window.
+videos, images, and audio with thumbnails. It recursively scans any folder you
+point it at, generates thumbnails, tags, and metadata, and lets you browse the
+collection in a native window.
 
 The name **Meguri** comes from the Japanese word _巡り_ — "going around,
 coming back around" — with the sentiment of wandering back through your
@@ -556,10 +556,10 @@ Meguri is **privacy-first**: everything stays on your machine.
   (`api.github.com/repos/zabuton-app/meguri/releases/latest`). The request
   carries nothing but the app name and version in its `User-Agent`, though
   GitHub sees your IP address, as with any request. It runs shortly after
-  startup, at most once every six hours, and when you click **Check now** in
-  the settings or **Check for Updates…** in the tray menu. To turn the
-  automatic check off, open **Settings → App → Updates** and turn off
-  **Check automatically on startup**.
+  startup and then while the app keeps running, every six hours (hourly
+  while GitHub cannot be reached), and when you click **Check now** in the settings or **Check for
+  Updates…** in the tray menu. To turn the automatic check off, open
+  **Settings → App → Updates** and turn off **Check automatically**.
 - **Fully offline.** All features work without an internet connection.
 
 ## Architecture
@@ -581,6 +581,8 @@ Meguri/
 │     ├─ jobs.ts            # scan pipeline
 │     └─ server.ts          # local HTTP media server (Range)
 ├─ src/                     # renderer (React + TypeScript)
+│  ├─ main.tsx              # entry point: calls renderApp()
+│  ├─ renderApp.tsx         # startup: providers, router
 │  ├─ ipc/                  # typed client for window.api
 │  ├─ components/  routes/  themes/  hooks/
 ├─ electron.vite.config.ts  # unified build of main/preload/renderer

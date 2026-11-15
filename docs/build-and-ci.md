@@ -70,7 +70,10 @@ import { resolve } from "node:path";
 import { appBuildConfig } from "./vendor/meguri/electron.vite.shared";
 
 export default defineConfig(
-  appBuildConfig({ mainEntry: resolve("app/main.ts") }),
+  appBuildConfig({
+    mainEntry: resolve("app/main.ts"),
+    rendererEntry: resolve("app/renderer/main.tsx"),
+  }),
 );
 ```
 
@@ -78,6 +81,15 @@ export default defineConfig(
   from this repository's `electron/app.ts`. Everything else (the workers, the
   preload, the renderer) is built from this repository's sources, wherever the
   build runs.
+- `rendererEntry` (optional) is the project's own renderer entry point, which
+  imports `renderApp()` from this repository's `src/renderApp.tsx` to add
+  settings sections and routes (see
+  [Starting the renderer](renderer.md#starting-the-renderer)). Without it the
+  renderer starts from this repository's `src/main.tsx`. `index.html` loads
+  the given file in place of `src/main.tsx`, in `dev` as well as in the build;
+  the dev server may then serve files from the project's workspace root too.
+  Tailwind also generates the classes used in the entry's directory and below,
+  so keep the project's renderer files there.
 - `out/` is created in the working directory, so the project's package.json
   uses `"main": "out/main/main.js"`.
 - Import the shared file by a relative path. electron-vite bundles relative

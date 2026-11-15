@@ -1,4 +1,5 @@
 // File search, listing and detail queries. Dynamic SQL is built safely with placeholders.
+import { naturalNameKey } from "../nameKey.js";
 import type { DB } from "../db.js";
 import { fileTags } from "../tags.js";
 import { listBookmarksByMetaKey } from "./bookmarks.js";
@@ -11,6 +12,7 @@ import {
 } from "./folderRange.js";
 import {
   LIST_HIDDEN_SOURCES,
+  parseHashSearchToken,
   parseTagSearchToken,
   searchTokenTerms,
   splitSearchTokens,
@@ -70,11 +72,19 @@ function buildSearchTerms(q: string): {
   /** Everything else: per token, a MATCH expression and/or LIKE terms, ORed. */
   anyOf: { match: string | null; likes: string[] }[];
   tagTokens: string[];
+  /** `hash:` prefixes, lower-case hex. */
+  hashPrefixes: string[];
 } {
   const matchTokens: string[] = [];
   const anyOf: { match: string | null; likes: string[] }[] = [];
   const tagTokens: string[] = [];
+  const hashPrefixes: string[] = [];
   for (const raw of splitSearchTokens(q)) {
+    const hash = parseHashSearchToken(raw);
+    if (hash) {
+      hashPrefixes.push(hash);
+      continue;
+    }
     const tag = parseTagSearchToken(raw);
     if (tag) {
       tagTokens.push(tag);
@@ -93,6 +103,7 @@ function buildSearchTerms(q: string): {
     match: matchTokens.length ? matchTokens.join(" ") : null,
     anyOf,
     tagTokens,
+    hashPrefixes,
   };
 }
 
@@ -188,7 +199,7 @@ export function appendSearchConditions(
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : { match: null, anyOf: [], tagTokens: [] };
+    : { match: null, anyOf: [], tagTokens: [], hashPrefixes: [] };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
@@ -226,6 +237,13 @@ export function appendSearchConditions(
       }
     }
     sql += ` AND (${parts.join(" OR ")})`;
+  }
+  // A range on the hash rather than LIKE, so idx_files_content_hash serves it:
+  // every hex digit sorts before "g", so the prefix followed by "g" is past
+  // every hash that starts with it. Files without a hash never match.
+  for (const prefix of terms.hashPrefixes) {
+    sql += " AND f.content_hash >= ? AND f.content_hash < ?";
+    args.push(prefix, `${prefix}g`);
   }
   for (const value of terms.tagTokens) {
     const ids = resolveSearchTagIds(db, value);
@@ -386,7 +404,7 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
       // picker ("added" there is the id order): the timeline's "added" axis.
       return { expr: "f.created_at", nullable: false, cmp, idCmp: ">" };
     case "name":
-      return { expr: "f.rel_path", nullable: false, cmp, idCmp: cmp };
+      return { expr: "f.name_key", nullable: false, cmp, idCmp: cmp };
     case "accessed":
       return { expr: "m.last_accessed_at", nullable: true, cmp, idCmp: ">" };
     case "hash":
@@ -412,7 +430,8 @@ export function sortValueOf(
     case "addedAt":
       return row.addedAt;
     case "name":
-      return row.relPath;
+      // The stored key is this function of the path (see backfillNameKeys).
+      return naturalNameKey(row.relPath);
     case "accessed":
       return row.lastAccessedAt;
     case "hash":
@@ -534,10 +553,11 @@ export function orderByFor(sort?: string, dir?: string): string {
     case "addedAt":
       return `f.created_at ${direction}, f.id ASC`;
     case "name":
-      // The id tiebreak follows the main direction so both directions map onto
-      // a single scan of idx_files_alive_rel_path (forward/backward); a fixed
-      // "id ASC" would force a temp b-tree for the DESC case.
-      return `f.rel_path ${direction}, f.id ${direction}`;
+      // Natural order (#292). The id tiebreak follows the main direction so
+      // both directions map onto a single scan of idx_files_alive_name_key
+      // (forward/backward); a fixed "id ASC" would force a temp b-tree for the
+      // DESC case.
+      return `f.name_key ${direction}, f.id ${direction}`;
     case "accessed":
       return `m.last_accessed_at IS NULL ASC, m.last_accessed_at ${direction}, f.id ASC`;
     case "hash":

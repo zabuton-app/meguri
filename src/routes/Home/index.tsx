@@ -54,6 +54,7 @@ import {
   onOpenCommandMenu,
   onOpenShortcuts,
   onSearchLibrary,
+  onShowMatchingFiles,
 } from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -62,6 +63,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
+import { patchCollectionItemOrder } from "@/lib/queryCache";
 import { TimelineView } from "@/timeline/TimelineView";
 import { useTimelineView } from "./useTimelineView";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
@@ -236,6 +238,11 @@ export default function Home() {
       setByFolder: showByFolder,
     });
   const heatmap = useHeatmapFilter({ filterValue, onFilterChange });
+  // For listeners registered once (see onShowMatchingFiles below).
+  const onFilterChangeRef = useRef(onFilterChange);
+  useEffect(() => {
+    onFilterChangeRef.current = onFilterChange;
+  }, [onFilterChange]);
   // What the heatmap counts over: the filter, within the folder shown and
   // everything below it — what the list becomes once a day narrows it (a
   // condition turns a folder's own files into a search of its subtree).
@@ -411,17 +418,19 @@ export default function Home() {
                   return { ...prev, pages };
                 },
               );
+              const order = next.map((f) => ({
+                workspaceId: f.workspaceId,
+                fileId: f.id,
+              }));
+              patchCollectionItemOrder(qc, reorderCollectionId, order);
               void api
-                .collectionReorderItems(
-                  reorderCollectionId,
-                  next.map((f) => ({
-                    workspaceId: f.workspaceId,
-                    fileId: f.id,
-                  })),
-                )
+                .collectionReorderItems(reorderCollectionId, order)
                 .catch(() => {
                   // Fall back to the stored order if the write did not land.
                   void qc.invalidateQueries({ queryKey: ["files_search"] });
+                  void qc.invalidateQueries({
+                    queryKey: ["workspaces_list"],
+                  });
                 });
             },
           }
@@ -549,6 +558,9 @@ export default function Home() {
       // A scan can add tags (new files, the derived-tag backfill), so a tag
       // screen left open would otherwise show a stale catalog.
       void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+      // Files go missing and come back with a scan, and a workspace is left
+      // out of the missing list while it is being scanned.
+      void qc.invalidateQueries({ queryKey: ["missing_files"] });
       const mode = manualScanJobs.current.get(done.jobId);
       manualScanJobs.current.delete(done.jobId);
       notifyScanDone(done, mode);
@@ -779,11 +791,18 @@ export default function Home() {
     const unSearch = onSearchLibrary((tokens) =>
       setFilter((f) => replaceSearchTokens(f, tokens)),
     );
+    // Through onFilterChange, which leaves the folder browsed for the root
+    // when the folder is not part of what it is handed.
+    const unShow = onShowMatchingFiles((tokens) => {
+      const { sort, sortDir } = filterRef.current;
+      onFilterChangeRef.current(replaceSearchTokens({ sort, sortDir }, tokens));
+    });
     return () => {
       unCommand();
       unShortcuts();
       unApplyTags();
       unSearch();
+      unShow();
     };
   }, []);
 
@@ -1118,12 +1137,18 @@ export default function Home() {
           onDiscover={openDiscover}
           canDiscover={hasPool}
           onTags={openTags}
+          onHistory={() => void navigate("/history")}
+          onDuplicates={() => void navigate("/duplicates")}
+          onAutoTag={() => void navigate("/auto-tag")}
           onSettings={openSettings}
           onHelp={() => setHelpOpen(true)}
           onOpenDevTools={openDevTools}
           onApplySearch={onApplyRecent}
           onApplySaved={onApplySaved}
           onQuickSearch={(text) => onFilterChange({ ...filterValue, q: text })}
+          onAddSearchToken={onTagClick}
+          filter={filterValue}
+          onFilterChange={onFilterChange}
           fileActionsAvailable={location.pathname === "/"}
         />
       </SelectionProvider>
@@ -1181,7 +1206,12 @@ export default function Home() {
         onDiscover={openDiscover}
       />
 
-      {helpOpen && <ShortcutsOverlay onClose={() => setHelpOpen(false)} />}
+      {helpOpen && (
+        <ShortcutsOverlay
+          onClose={() => setHelpOpen(false)}
+          onOpenSettings={openSettings}
+        />
+      )}
 
       <CollectionEditDialog
         open={!!editCollection}

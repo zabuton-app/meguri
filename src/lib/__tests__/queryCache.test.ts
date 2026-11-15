@@ -6,6 +6,7 @@ import type {
   FileRow,
   SearchQuery,
   SearchResult,
+  WorkspacesList,
 } from "@/ipc/types";
 import {
   dropFromWatchLaterCache,
@@ -15,6 +16,7 @@ import {
   invalidateInProgressSearches,
   invalidatePlayedSearches,
   invalidateTagSearches,
+  patchCollectionItemOrder,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
 
@@ -342,10 +344,27 @@ describe("dropFromWatchLaterCache", () => {
     expect(fetches).toBe(1);
   });
 
+  it("preserves a pending invalidation after removing an entry", async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(
+      ["workspaces_list"],
+      listWith([{ workspaceId: "ws", fileId: 1 }]),
+    );
+    await qc.invalidateQueries({
+      queryKey: ["workspaces_list"],
+      refetchType: "none",
+    });
+
+    dropFromWatchLaterCache(qc, "ws", 1);
+
+    expect(itemsOf(qc)).toEqual([]);
+    expect(qc.getQueryState(["workspaces_list"])?.isInvalidated).toBe(true);
+  });
+
   it("survives an in-flight refetch landing afterwards", async () => {
-    // The detail view mounts its own observer for this key, so a refetch is
-    // routinely in the air when a play is recorded. Without the cancel, its
-    // response restores the entry the main process has already consumed.
+    // A refetch started by some other invalidation can be in the air when a
+    // play is recorded. Without the cancel, its response restores the entry
+    // the main process has already consumed.
     const qc = new QueryClient();
     await qc.fetchQuery({
       queryKey: ["workspaces_list"],
@@ -365,6 +384,8 @@ describe("dropFromWatchLaterCache", () => {
     });
     dropFromWatchLaterCache(qc, "ws", 1);
     await refetch.catch(() => {});
+    // A cancelled fetch settles at once; let its response actually arrive.
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(itemsOf(qc)).toEqual([]);
   });
@@ -390,6 +411,101 @@ describe("dropFromWatchLaterCache", () => {
 
     expect(itemsOf(qc)).toEqual([{ workspaceId: "ws", fileId: 1, addedAt: 0 }]);
     expect(qc.getQueryState(["workspaces_list"])?.status).toBe("success");
+  });
+});
+
+describe("patchCollectionItemOrder", () => {
+  const item = (fileId: number, addedAt = 0) => ({
+    workspaceId: "ws",
+    fileId,
+    addedAt,
+  });
+  const listWith = (items: ReturnType<typeof item>[]): WorkspacesList => ({
+    workspaces: [],
+    activeId: "ws",
+    collections: [
+      {
+        id: "collection:test",
+        name: "Test",
+        active: true,
+        items,
+        createdAt: 0,
+        updatedAt: 0,
+        locked: false,
+      },
+    ],
+  });
+
+  it("preserves a pending invalidation after patching item order", async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(["workspaces_list"], listWith([item(1, 10), item(2, 20)]));
+    await qc.invalidateQueries({
+      queryKey: ["workspaces_list"],
+      refetchType: "none",
+    });
+
+    patchCollectionItemOrder(qc, "collection:test", [
+      { workspaceId: "ws", fileId: 2 },
+      { workspaceId: "ws", fileId: 1 },
+    ]);
+
+    expect(
+      qc
+        .getQueryData<WorkspacesList>(["workspaces_list"])
+        ?.collections[0].items.map((item) => item.fileId),
+    ).toEqual([2, 1]);
+    expect(qc.getQueryState(["workspaces_list"])?.isInvalidated).toBe(true);
+  });
+
+  it("moves the loaded items within their existing collection slots", () => {
+    const qc = new QueryClient();
+    qc.setQueryData(
+      ["workspaces_list"],
+      listWith([item(1, 10), item(2, 20), item(3, 30)]),
+    );
+
+    patchCollectionItemOrder(qc, "collection:test", [
+      { workspaceId: "ws", fileId: 3 },
+      { workspaceId: "ws", fileId: 1 },
+    ]);
+
+    expect(
+      qc.getQueryData<WorkspacesList>(["workspaces_list"])?.collections[0]
+        .items,
+    ).toEqual([item(3, 30), item(2, 20), item(1, 10)]);
+  });
+
+  it("survives an in-flight refetch landing afterwards", async () => {
+    // Main answers a workspaces_list call made before the reorder with the old
+    // order. Without the cancel, that response lands after this patch, and
+    // nothing re-reads the list: a reorder is not broadcast.
+    const qc = new QueryClient();
+    await qc.fetchQuery({
+      queryKey: ["workspaces_list"],
+      queryFn: () => listWith([item(1), item(2)]),
+    });
+
+    const refetch = qc.fetchQuery({
+      queryKey: ["workspaces_list"],
+      staleTime: 0,
+      queryFn: () =>
+        new Promise<WorkspacesList>((resolve) =>
+          setTimeout(() => resolve(listWith([item(1), item(2)])), 0),
+        ),
+    });
+    patchCollectionItemOrder(qc, "collection:test", [
+      { workspaceId: "ws", fileId: 2 },
+      { workspaceId: "ws", fileId: 1 },
+    ]);
+    await refetch.catch(() => {});
+    // A cancelled fetch settles at once; let its response actually arrive.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(
+      qc
+        .getQueryData<WorkspacesList>(["workspaces_list"])
+        ?.collections[0].items.map((item) => item.fileId),
+    ).toEqual([2, 1]);
   });
 });
 

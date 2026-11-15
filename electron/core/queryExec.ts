@@ -26,6 +26,7 @@ import type {
   FolderListing,
   HistoryPage,
   HistoryQuery,
+  MissingFilesResult,
   SearchQuery,
   SearchResult,
   TagList,
@@ -55,6 +56,7 @@ export type QueryRequest =
     }
   | { kind: "history"; targets: QueryTarget[]; query: HistoryQuery }
   | { kind: "duplicates"; targets: QueryTarget[] }
+  | { kind: "missing"; targets: QueryTarget[]; limit: number }
   // prefer: the workspaces in view, whose tags are kept first at the cap.
   | { kind: "tagsList"; targets: QueryTarget[]; prefer?: string[] }
   | { kind: "stats"; targets: QueryTarget[] }
@@ -104,6 +106,7 @@ export type QueryResponse =
   | FileRow[]
   | HistoryPage
   | DuplicatesResult
+  | Omit<MissingFilesResult, "scanning">
   | TagList
   | WorkspaceStats
   | FolderListing
@@ -281,6 +284,8 @@ export class QueryExecutor {
         return cw.listHistoryWorkspaces(cores, req.query);
       case "duplicates":
         return cw.listDuplicatesWorkspaces(cores);
+      case "missing":
+        return cw.listMissingWorkspaces(cores, req.limit);
       case "tagsList":
         return cw.listTagsWorkspaces(cores, req.prefer);
       case "stats": {

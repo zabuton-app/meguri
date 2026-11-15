@@ -32,6 +32,33 @@ GitHub repository the update check looks at, the Microsoft Store product ID
 environment variables it reads (`MEGURI`, for `MEGURI_ROOT`,
 `MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`) and the logo bitmaps. Another
 app built on this code can call `startApp()` from its own entry point with its own values.
+Its renderer is started the same way, by `renderApp()` (see
+[Starting the renderer](renderer.md#starting-the-renderer)).
+It can also pass `setup`, which runs once right after `registerIpc()` and
+before the tray and window appear, with the same `IpcContext` the handler
+groups get (both `IpcContext` and `handle()` are exported from
+`electron/app.ts`). That is where such an app registers its own IPC handlers
+and reaches the workspaces, the query worker and the media server: `mediaBase()`
+gives its base URL and `mediaToken()` the `X-Api-Token` its requests need.
+`handle()` only knows the channels in `shared/ipc/`, which follow steps 1 to 3 of
+[Adding a new IPC channel](#adding-a-new-ipc-channel). The preload whitelist
+knows those too, plus the app's `extraChannels` (`invoke` and `events` lists),
+which main passes to the preload as process arguments
+(`EXTRA_INVOKE_CHANNELS_ARG` and `EXTRA_EVENT_CHANNELS_ARG` in
+`shared/ipc/channelNames.ts`), so the renderer still cannot add a channel. A
+name that is empty, holds a comma or is a preload-only channel fails startup.
+`setup` registers the handlers for its `extraChannels.invoke` with
+`ctx.handleExtra(channel, fn)` (`SetupContext` in `electron/app.ts`), which
+checks the caller is the app's own page just as `handle()` does and then calls
+`fn(raw, event)` with the payload as is: those channels have no schema in
+`shared/ipc/`, so the app validates its own input. A channel that is not in
+`extraChannels.invoke` throws.
+Nothing is on
+screen until `setup` settles, so long work belongs in the background. There is
+no quit hook: work that writes to the workspaces runs through `ctx.passes` (or
+`ctx.scans`), which every quit path stops before the databases close, while a
+`before-quit` listener runs after Meguri's teardown on macOS and on an OS
+shutdown, and not at all on a Windows log-off.
 The `userData` directory is not part of these options: it is `<appData>/` plus the top-level `productName`, or
 else `name`, of the package.json Electron loads. Meguri has no top-level
 `productName` (`build.productName` does not count), so its data is in
@@ -147,7 +174,8 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
    them up in `registerIpc()`. Each group but `updates.ts` receives an
    `IpcContext` (`electron/ipc/context.ts`) with what it needs from the main
    process — the `Workspaces`, the query worker client, `emit()`, the
-   `ScanManager`, and live getters for the window and media server.
+   `ScanManager`, and live getters for the window and media server (its base
+   URL and token).
    Shared helpers (`coreById`, `queryTargets`, `scopedCores`,
    `ensureFileInsideRoot`) are in `electron/ipc/helpers.ts`; a handler that
    hands a file path to the OS must resolve it through `ensureFileInsideRoot`

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { naturalNameKey } from "./nameKey.js";
 import type { DB } from "./db.js";
 import { nowUnix, pathMetaKey } from "./db.js";
 import { copyMetaKey, migrateMetaKey } from "./queries.js";
@@ -507,12 +508,13 @@ export async function syncFiles(
   const updateChanged = db.prepare(
     "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL WHERE id = ?",
   );
+  // name_key goes with rel_path (see naturalNameKey in nameKey.ts).
   const moveStmt = db.prepare(
-    "UPDATE files SET rel_path = ?, abs_path = ?, inode = ?, mtime = ?, btime = ?, size = ?, deleted_at = NULL WHERE id = ?",
+    "UPDATE files SET rel_path = ?, name_key = ?, abs_path = ?, inode = ?, mtime = ?, btime = ?, size = ?, deleted_at = NULL WHERE id = ?",
   );
   const insertStmt = db.prepare(
-    `INSERT INTO files (root_id, rel_path, abs_path, kind, ext, size, mtime, btime, inode, content_hash, thumb_status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+    `INSERT INTO files (root_id, rel_path, name_key, abs_path, kind, ext, size, mtime, btime, inode, content_hash, thumb_status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   );
   const moveCandidates = db.prepare(
     "SELECT id, rel_path, kind, ext, deleted_at FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL",
@@ -765,6 +767,7 @@ export async function syncFiles(
       if (moved) {
         moveStmt.run(
           d.relPath,
+          naturalNameKey(d.relPath),
           d.absPath,
           d.inode,
           d.mtime,
@@ -784,6 +787,7 @@ export async function syncFiles(
         const info = insertStmt.run(
           rootId,
           d.relPath,
+          naturalNameKey(d.relPath),
           d.absPath,
           d.kind,
           d.ext,

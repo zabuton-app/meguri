@@ -28,6 +28,21 @@ follows through the shared hash. A file whose content changes at the same path
 keeps its metadata too: it is copied to the new hash (see
 [`meta_key`](data-model.md#metadata-and-meta_key)).
 
+A file that is gone from disk is only soft-deleted (`deleted_at`), so one that
+comes back, at the same path or (by move detection) another, is revived with
+its `files.id`, collections and thumbnail. Nothing removes these rows on its
+own: whether a file is gone for good, or only in the trash or moved out for a
+while, only the user knows. The "Missing files" screen (`/missing`, from the
+scan menu) lists them, the most recently gone first and at most
+`MAX_BULK_FILES` at a time, and removes the ones the user selects
+(`purgeMissingFiles()` in `queries/missing.ts`): their rows, search entries,
+thumbnails and collection entries. A removed file's id can be given to a new
+file, which is why its collection entries go too. Metadata keyed by
+`meta_key` stays. Files the user removed from the index (`excluded_at`) are
+the exclusion list and are not listed. A workspace being scanned is left out
+of both the list and the removal: until the scan is through, files it has not
+reached yet read as missing, and during a rebuild every file does.
+
 A root that cannot be read (an unplugged drive, a share that is down) fails the
 scan before the index is touched, so its files are not soft-deleted, and the
 user is told which workspace's folder could not be reached. The root is
@@ -223,7 +238,10 @@ previews.
 ### Authorization
 
 Requests must carry an `X-Api-Token` header. The Electron session injects it for
-in-app media loads, so renderer code does not handle it directly.
+in-app media loads, so renderer code does not handle it directly. Main-process
+code that fetches from the server itself (an app's `setup`, for example) gets
+the token from `IpcContext.mediaToken()` and sends it with each request; the
+token never reaches the renderer or the preload.
 
 ### ffmpeg/ffprobe path resolution
 

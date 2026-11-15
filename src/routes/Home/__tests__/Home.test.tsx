@@ -14,7 +14,11 @@ import {
   WS_ID,
 } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import { applyTagFilter, showFolderInLibrary } from "@/lib/ui-events";
+import {
+  applyTagFilter,
+  showFolderInLibrary,
+  showMatchingFiles,
+} from "@/lib/ui-events";
 import {
   DEFAULT_SMART_COLLECTION_KEY,
   SMART_COLLECTIONS_KEY,
@@ -259,7 +263,7 @@ describe("Home + MediaDetail integration", () => {
       fireSkipped(WS_ID, 3);
       await waitFor(() =>
         expect(toasts.warning).toHaveBeenCalledWith(
-          'Skipped 3 folder(s) or file(s) in "Media" that could not be read',
+          'Skipped 3 folders or files in "Media" that could not be read',
           expect.objectContaining({ id: `scan-skipped:${WS_ID}` }),
         ),
       );
@@ -271,7 +275,7 @@ describe("Home + MediaDetail integration", () => {
       fireSkipped("ws-gone", 1);
       await waitFor(() =>
         expect(toasts.warning).toHaveBeenCalledWith(
-          "Skipped 1 folder(s) or file(s) that could not be read",
+          "Skipped 1 folder or file that could not be read",
           expect.anything(),
         ),
       );
@@ -663,6 +667,24 @@ describe("Home folder view", () => {
     expect(
       screen.getByRole("navigation", { name: "Folder path" }),
     ).toBeTruthy();
+  });
+
+  it("shows matching files from the root, the other conditions cleared (#302)", async () => {
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("folder-card");
+    fireEvent.click(
+      screen.getByRole("button", { name: 'Open folder "Movie"' }),
+    );
+    await waitFor(() =>
+      expect(lastSearch().folder).toEqual({ path: "Movie", recursive: false }),
+    );
+    applyTagFilter(["tag:beach"]);
+    await waitFor(() => expect(lastSearch().q).toBe("tag:beach"));
+
+    showMatchingFiles(["hash:3fa9c1d2"]);
+
+    await waitFor(() => expect(lastSearch().q).toBe("hash:3fa9c1d2"));
+    expect(lastSearch().folder).toEqual({ path: "", recursive: true });
   });
 
   it("moves up when the folder shown has gone away", async () => {
@@ -1820,7 +1842,7 @@ describe("Home timeline view", () => {
     await screen.findAllByText("October 15, 2026");
     const headers = document.querySelectorAll('[data-slot="timeline-header"]');
     expect([...headers].map((h) => h.textContent)).toEqual([
-      "October 15, 20261 files",
+      "October 15, 20261 file",
       "No date2 files",
     ]);
     // The rail names the tail like a year.

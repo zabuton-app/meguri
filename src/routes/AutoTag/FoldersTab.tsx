@@ -45,7 +45,6 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
   const workspacesList = useQuery({
     queryKey: ["workspaces_list"],
     queryFn: api.workspacesList,
-    staleTime: 30_000,
   });
   const workspaceLabels = useMemo(
     () =>

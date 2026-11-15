@@ -7,6 +7,7 @@ import type {
   FileRow,
   SearchQuery,
   SearchResult,
+  UserCollectionItem,
   WorkspacesList,
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
@@ -343,27 +344,31 @@ export function syncFileRowAcrossCaches(
  * for the rest of the visit.
  *
  * So patch the cache in place rather than invalidating it: `setQueryData` keeps
- * the refetch (and with it the navigation order) from happening at all.
+ * the refetch (and with it the navigation order) from happening at all. If a
+ * refetch had already invalidated the key, preserve that invalidation so its
+ * newer data can be picked up on the next mount.
  */
 export function dropFromWatchLaterCache(
   qc: QueryClient,
   workspaceId: string,
   fileId: number,
 ): void {
+  const queryKey = ["workspaces_list"] as const;
+  const wasInvalidated = qc.getQueryState(queryKey)?.isInvalidated ?? false;
   // Cancel first: a workspaces_list fetch already in flight would land after
-  // this patch and restore the entry the main process has just consumed. The
-  // detail view mounts its own observer for that key, so such a fetch is
-  // routinely in the air when the play is recorded.
+  // this patch and restore the entry the main process has just consumed. A
+  // refetch started by some other invalidation (the detail view's flush on
+  // close, a collection edit) can be in the air when the play is recorded.
   //
   // Only when there is data to protect, though. Cancelling reverts the query to
   // its previous value, so cancelling a first-ever load strands this app-wide
   // key at undefined with nothing to re-run it (refetchOnWindowFocus is off) —
   // which would empty the workspace rail and freeze every Watch Later toggle in
   // its disabled state. With no data the patch below is a no-op anyway.
-  if (qc.getQueryData(["workspaces_list"]) !== undefined) {
-    void qc.cancelQueries({ queryKey: ["workspaces_list"] });
+  if (qc.getQueryData(queryKey) !== undefined) {
+    void qc.cancelQueries({ queryKey });
   }
-  qc.setQueryData<WorkspacesList>(["workspaces_list"], (prev) => {
+  qc.setQueryData<WorkspacesList>(queryKey, (prev) => {
     if (!prev) return prev;
     const watchLater = prev.collections.find((c) => c.id === WATCH_LATER_ID);
     if (!watchLater) return prev;
@@ -379,4 +384,59 @@ export function dropFromWatchLaterCache(
       ),
     };
   });
+  if (wasInvalidated) {
+    void qc.invalidateQueries({ queryKey, refetchType: "none" });
+  }
+}
+
+/** Optimistically mirror a manual reorder into the cached collection order. */
+export function patchCollectionItemOrder(
+  qc: QueryClient,
+  collectionId: string,
+  order: { workspaceId: string; fileId: number }[],
+): void {
+  const queryKey = ["workspaces_list"] as const;
+  const wasInvalidated = qc.getQueryState(queryKey)?.isInvalidated ?? false;
+  const key = (item: { workspaceId: string; fileId: number }) =>
+    `${item.workspaceId}:${item.fileId}`;
+
+  // Cancel first, as in dropFromWatchLaterCache: a fetch already in flight
+  // carries the old order, and a reorder is not broadcast to correct it.
+  if (qc.getQueryData(queryKey) !== undefined) {
+    void qc.cancelQueries({ queryKey });
+  }
+  qc.setQueryData<WorkspacesList>(queryKey, (prev) => {
+    if (!prev) return prev;
+    const collection = prev.collections.find(
+      (item) => item.id === collectionId,
+    );
+    if (!collection || order.length === 0) return prev;
+
+    const byKey = new Map(collection.items.map((item) => [key(item), item]));
+    const moving: UserCollectionItem[] = [];
+    const movedKeys = new Set<string>();
+    for (const ref of order) {
+      const itemKey = key(ref);
+      if (movedKeys.has(itemKey)) continue;
+      const item = byKey.get(itemKey);
+      if (!item) continue;
+      movedKeys.add(itemKey);
+      moving.push(item);
+    }
+    if (moving.length === 0) return prev;
+
+    let at = 0;
+    const items = collection.items.map((item) =>
+      movedKeys.has(key(item)) ? moving[at++] : item,
+    );
+    return {
+      ...prev,
+      collections: prev.collections.map((item) =>
+        item.id === collectionId ? { ...item, items } : item,
+      ),
+    };
+  });
+  if (wasInvalidated) {
+    void qc.invalidateQueries({ queryKey, refetchType: "none" });
+  }
 }

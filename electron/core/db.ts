@@ -1,6 +1,12 @@
 // SQLite (better-sqlite3). Schema definition and connection.
 import Database from "better-sqlite3";
 import { tagIdentityKey } from "../../shared/tags.js";
+import {
+  NAME_KEY_VERSION,
+  NAME_KEY_VERSION_SETTING,
+  naturalNameKey,
+} from "./nameKey.js";
+import { getSetting, setSetting } from "./queries/settings.js";
 
 export type DB = Database.Database;
 
@@ -14,6 +20,12 @@ export type DB = Database.Database;
 function registerFunctions(db: DB): void {
   db.function("tag_key", { deterministic: true }, (name: unknown) =>
     typeof name === "string" ? tagIdentityKey(name) : name,
+  );
+  // Only for filling files.name_key in bulk (backfillColumns): the scan binds
+  // the key it computes, so nothing in the schema depends on this function and
+  // an older app version can still open and write the database.
+  db.function("natural_name_key", { deterministic: true }, (path: unknown) =>
+    typeof path === "string" ? naturalNameKey(path) : null,
   );
 }
 
@@ -81,6 +93,9 @@ CREATE TABLE IF NOT EXISTS files (
   thumb_path TEXT, thumb_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (thumb_status IN ('pending','done','error')),
   deleted_at INTEGER, excluded_at INTEGER, created_at INTEGER NOT NULL, meta TEXT,
+  -- The name sort's key, naturalNameKey(rel_path) (nameKey.ts),
+  -- written with rel_path by the scan.
+  name_key TEXT,
   -- Stable identity for metadata, independent of the autoincrement id: content_hash
   -- when available (survives move/rename), else the absolute path. The fallback
   -- has to be unique across workspaces, not just within this database, and a
@@ -118,6 +133,9 @@ CREATE INDEX IF NOT EXISTS idx_files_alive_rel_path ON files(rel_path, id) WHERE
 -- matches the "captured_at IS NULL ASC" NULLs-last term exactly. The ASC
 -- direction still filesorts (a reversed scan would put NULLs first).
 CREATE INDEX IF NOT EXISTS idx_files_alive_captured ON files((captured_at IS NULL), captured_at DESC, id) WHERE deleted_at IS NULL;
+-- The missing-files list (queries/missing.ts): its WHERE and ORDER BY exactly,
+-- so the planner takes it without statistics and does not sort.
+CREATE INDEX IF NOT EXISTS idx_files_missing ON files(deleted_at DESC, id DESC) WHERE deleted_at IS NOT NULL AND excluded_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
@@ -365,7 +383,8 @@ function hasColumn(db: DB, table: string, column: string): boolean {
 
 /** Idempotent column additions for tables that pre-date the new column. CREATE TABLE
  *  IF NOT EXISTS leaves existing tables alone, so columns added after first release must
- *  be added explicitly with ALTER. Each step must be safe to run repeatedly. */
+ *  be added explicitly with ALTER. Each step must be safe to run repeatedly.
+ *  backfillNameKeys also keeps the derived name keys in step with their paths. */
 function backfillColumns(db: DB): void {
   // A workspace's own file_meta exists only until its metadata is merged into
   // the library (whose LIB_DDL already has these columns and the index). Until
@@ -403,6 +422,39 @@ function backfillColumns(db: DB): void {
   // direction; created_at is never NULL, so no NULLs-last term.
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_files_alive_added ON files(created_at DESC, id) WHERE deleted_at IS NULL",
+  );
+  backfillNameKeys(db);
+}
+
+/**
+ * The name sort's key (#292): added to DBs from before it and kept equal to
+ * naturalNameKey(rel_path). Every key is computed again when the function
+ * changes (NAME_KEY_VERSION); otherwise the keys that no longer match their
+ * path are, which an older app version leaves behind (it inserts rows without
+ * one and moves rows without updating it). Checking every row costs about 55ms
+ * per 100,000 files, once per open. Drives sort=name in both directions, like
+ * idx_files_alive_rel_path did.
+ */
+function backfillNameKeys(db: DB): void {
+  if (!hasColumn(db, "files", "name_key")) {
+    db.exec("ALTER TABLE files ADD COLUMN name_key TEXT");
+  }
+  const current =
+    getSetting(db, NAME_KEY_VERSION_SETTING) === String(NAME_KEY_VERSION);
+  db.transaction(() => {
+    db.exec(
+      current
+        ? "UPDATE files SET name_key = natural_name_key(rel_path) WHERE name_key IS NOT natural_name_key(rel_path)"
+        : "UPDATE files SET name_key = natural_name_key(rel_path)",
+    );
+    if (!current) {
+      setSetting(db, NAME_KEY_VERSION_SETTING, String(NAME_KEY_VERSION));
+    }
+  })();
+  // After the fill: building the index over filled keys is cheaper than
+  // moving every entry of one built over empty ones.
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_alive_name_key ON files(name_key, id) WHERE deleted_at IS NULL",
   );
 }
 
@@ -554,6 +606,27 @@ export function resyncFtsForKeys(db: DB, metaKeys: string[]): void {
     del.run(chunk);
     ins.run(chunk);
   }
+}
+
+/**
+ * Re-index the given file ids, for the scan's index phase. Same single-JSON-
+ * array binding as resyncFtsForKeys. A file removed from the index
+ * (excluded_at) keeps having no FTS row (#266), and a soft-deleted one loses
+ * its row as in resyncFtsForKeys. Caller supplies the transaction and the
+ * chunking (the scan yields between chunks).
+ */
+export function resyncFtsForIds(db: DB, ids: readonly number[]): void {
+  if (ids.length === 0) return;
+  const chunk = JSON.stringify(ids);
+  db.prepare(
+    "DELETE FROM files_fts WHERE rowid IN (SELECT value FROM json_each(?))",
+  ).run(chunk);
+  db.prepare(
+    `INSERT INTO files_fts (rowid, rel_path, tags_text)
+     ${FTS_ROW_SELECT}
+       AND f.excluded_at IS NULL
+       AND f.id IN (SELECT value FROM json_each(?))`,
+  ).run(chunk);
 }
 
 /** Versionless idempotent migration: DBs created before the trigram switch still carry

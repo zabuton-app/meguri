@@ -44,9 +44,9 @@ test.describe("Auto tagging", () => {
     await rename.press("Enter");
     const question = ready.getByRole("alertdialog");
     await expect(question.getByText("Move files to “Sample”?")).toBeVisible();
-    await question.getByRole("button", { name: "Replace on 1 files" }).click();
+    await question.getByRole("button", { name: "Replace on 1 file" }).click();
     await expect(
-      ready.getByText("Replaced “Test” with “Sample” on 1 files."),
+      ready.getByText("Replaced “Test” with “Sample” on 1 file."),
     ).toBeVisible();
 
     // The tag is the user's own: the tag screen lists it like any other, and
