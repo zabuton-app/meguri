@@ -479,7 +479,7 @@ export const ko: Record<TranslationKey, string> = {
   // media grid
   "grid.empty": "표시할 미디어가 없습니다.",
   "grid.emptyHint":
-    "「스캔」을 실행하면 하위의 동영상·이미지가 여기에 표시됩니다.",
+    "「스캔」을 실행하면 하위의 동영상·이미지·오디오가 여기에 표시됩니다.",
   "grid.searchByTag": "「{name}」(으)로 필터링",
   "view.grid": "그리드 보기",
   "view.list": "리스트 보기",
@@ -617,14 +617,15 @@ export const ko: Record<TranslationKey, string> = {
   "discover.inFolder": "“{path}” 안에서 고르는 중",
   "discover.empty": "추천할 미디어가 없습니다.",
   "discover.emptyHint":
-    "「스캔」으로 동영상과 이미지를 가져오면 여기에서 무작위로 추천됩니다.",
+    "「스캔」으로 동영상, 이미지, 오디오를 가져오면 여기에서 무작위로 추천됩니다.",
   "discover.sceneHint": "장면을 클릭하면 해당 위치로 이동합니다",
   "discover.moreScenes": "+{count}",
 
   // 재생 기록
   "history.title": "재생 기록",
   "history.empty": "재생 기록이 아직 없습니다.",
-  "history.emptyHint": "동영상이나 이미지를 재생하면 여기에 기록이 표시됩니다.",
+  "history.emptyHint":
+    "동영상이나 이미지, 오디오를 재생하면 여기에 기록이 표시됩니다.",
   "history.clear": "기록 지우기",
   "history.clearAction": "지우기",
   "history.clearConfirm":
@@ -1042,7 +1043,7 @@ export const ko: Record<TranslationKey, string> = {
   "playlist.loading": "불러오는 중…",
   "playlist.empty": "재생할 수 있는 미디어가 없습니다.",
   "playlist.emptyHint":
-    "동영상이나 이미지가 있는 목록을 연 뒤 재생을 시작하세요.",
+    "동영상이나 이미지, 오디오가 있는 목록을 연 뒤 재생을 시작하세요.",
   "playlist.unplayable": "재생할 수 있는 항목이 없었습니다.",
   "playlist.reorderNeedsManual": "순서를 바꾸려면 수동 순서로 전환하세요.",
   "settings.resumePlayback": "이어서 재생",
@@ -1117,7 +1118,7 @@ export const ko: Record<TranslationKey, string> = {
     "사용법을 간단히 안내할게. Esc를 누르면 언제든 건너뛸 수 있어",
   "tour.addWorkspaceTitle": "폴더 추가",
   "tour.addWorkspaceBody":
-    "먼저 동영상이나 이미지가 든 폴더를 추가해 줘. 내용을 읽어서 썸네일을 만들게. 몇 개든 추가할 수 있어",
+    "먼저 동영상이나 이미지, 오디오가 든 폴더를 추가해 줘. 내용을 읽어서 썸네일을 만들게. 몇 개든 추가할 수 있어",
   "tour.collectionsTitle": "컬렉션",
   "tour.collectionsBody":
     "여러 폴더의 파일을 하나의 컬렉션으로 모을 수 있어. 파일을 여기로 끌어 오면 추가돼",

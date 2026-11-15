@@ -495,7 +495,7 @@ export const fr: Record<TranslationKey, string> = {
   // media grid
   "grid.empty": "Aucun média à afficher.",
   "grid.emptyHint":
-    "Lancez « Analyser » pour lister ici les vidéos et les images.",
+    "Lancez « Analyser » pour lister ici les vidéos, les images et les fichiers audio.",
   "grid.searchByTag": "Filtrer par « {name} »",
   "view.grid": "Vue en grille",
   "view.list": "Vue en liste",
@@ -638,7 +638,7 @@ export const fr: Record<TranslationKey, string> = {
   "discover.inFolder": "Choisis dans « {path} »",
   "discover.empty": "Aucun média à recommander.",
   "discover.emptyHint":
-    "Lancez « Analyser » pour importer des vidéos et des images ; elles seront recommandées ici au hasard.",
+    "Lancez « Analyser » pour importer des vidéos, des images et des fichiers audio ; ils seront recommandés ici au hasard.",
   "discover.sceneHint": "Cliquez sur une scène pour y accéder",
   "discover.moreScenes": "+{count}",
 
@@ -646,7 +646,7 @@ export const fr: Record<TranslationKey, string> = {
   "history.title": "Historique de lecture",
   "history.empty": "Aucun historique de lecture pour l'instant.",
   "history.emptyHint":
-    "Lisez des vidéos ou des images et elles apparaîtront ici.",
+    "Lisez des vidéos, des images ou des fichiers audio et ils apparaîtront ici.",
   "history.clear": "Effacer l'historique",
   "history.clearAction": "Effacer",
   "history.clearConfirm":
@@ -1072,7 +1072,7 @@ export const fr: Record<TranslationKey, string> = {
   "playlist.loading": "Chargement…",
   "playlist.empty": "Rien ici ne peut être lu.",
   "playlist.emptyHint":
-    "Ouvrez une liste contenant des vidéos ou des images, puis démarrez la lecture.",
+    "Ouvrez une liste contenant des vidéos, des images ou des fichiers audio, puis démarrez la lecture.",
   "playlist.unplayable": "Aucun de ces éléments n’a pu être lu.",
   "playlist.reorderNeedsManual":
     "Passez à l’ordre manuel pour réorganiser les éléments.",
@@ -1150,7 +1150,7 @@ export const fr: Record<TranslationKey, string> = {
     "Je te fais faire le tour. Appuie sur Échap pour passer à tout moment.",
   "tour.addWorkspaceTitle": "Ajouter un dossier",
   "tour.addWorkspaceBody":
-    "Commence par ajouter un dossier contenant tes vidéos et images. Je l'analyse et crée les miniatures. Tu peux en ajouter autant que tu veux.",
+    "Commence par ajouter un dossier contenant tes vidéos, images ou fichiers audio. Je l'analyse et crée les miniatures. Tu peux en ajouter autant que tu veux.",
   "tour.collectionsTitle": "Collections",
   "tour.collectionsBody":
     "Regroupe des fichiers de n'importe quel dossier dans une collection. Glisse des fichiers ici pour les ajouter.",

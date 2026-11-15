@@ -483,7 +483,7 @@ export const ja = {
   // メディアグリッド
   "grid.empty": "表示できるメディアがありません。",
   "grid.emptyHint":
-    "「スキャン」を実行すると、配下の動画・画像がここに並びます。",
+    "「スキャン」を実行すると、配下の動画・画像・音声がここに並びます。",
   "grid.searchByTag": "「{name}」で絞り込み",
   "view.grid": "グリッド表示",
   "view.list": "リスト表示",
@@ -621,14 +621,15 @@ export const ja = {
   "discover.inFolder": "「{path}」の中から選んでいます",
   "discover.empty": "おすすめできるメディアがありません。",
   "discover.emptyHint":
-    "「スキャン」で動画や画像を取り込むと、ここでランダムにおすすめされます。",
+    "「スキャン」で動画や画像、音声を取り込むと、ここでランダムにおすすめされます。",
   "discover.sceneHint": "シーンをクリックするとその位置に移動します",
   "discover.moreScenes": "+{count}",
 
   // 再生履歴
   "history.title": "再生履歴",
   "history.empty": "再生履歴はまだありません。",
-  "history.emptyHint": "動画や画像を再生すると、ここに履歴が表示されます。",
+  "history.emptyHint":
+    "動画や画像、音声を再生すると、ここに履歴が表示されます。",
   "history.clear": "履歴をクリア",
   "history.clearAction": "クリア",
   "history.clearConfirm":
@@ -1045,7 +1046,7 @@ export const ja = {
   "playlist.loading": "読み込み中…",
   "playlist.empty": "再生できるメディアがありません。",
   "playlist.emptyHint":
-    "動画や画像を含む一覧を開いてから再生を始めてください。",
+    "動画や画像、音声を含む一覧を開いてから再生を始めてください。",
   "playlist.unplayable": "再生できるメディアがありませんでした。",
   "playlist.reorderNeedsManual": "並び替えるには手動順に切り替えます。",
   "settings.resumePlayback": "続きから再生",
@@ -1117,7 +1118,7 @@ export const ja = {
   "tour.welcomeBody": "使い方をざっと案内するね。Escでいつでも飛ばせるよ",
   "tour.addWorkspaceTitle": "フォルダを追加",
   "tour.addWorkspaceBody":
-    "まずは動画や画像が入ったフォルダを追加してね。中身を読み込んでサムネイルを作るよ。いくつでも追加できるよ",
+    "まずは動画や画像、音声が入ったフォルダを追加してね。中身を読み込んでサムネイルを作るよ。いくつでも追加できるよ",
   "tour.collectionsTitle": "コレクション",
   "tour.collectionsBody":
     "フォルダをまたいで好きなファイルをまとめられるよ。ファイルをここにドラッグすると追加できるよ",
