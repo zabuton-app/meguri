@@ -1137,12 +1137,18 @@ export default function Home() {
           onDiscover={openDiscover}
           canDiscover={hasPool}
           onTags={openTags}
+          onHistory={() => void navigate("/history")}
+          onDuplicates={() => void navigate("/duplicates")}
+          onAutoTag={() => void navigate("/auto-tag")}
           onSettings={openSettings}
           onHelp={() => setHelpOpen(true)}
           onOpenDevTools={openDevTools}
           onApplySearch={onApplyRecent}
           onApplySaved={onApplySaved}
           onQuickSearch={(text) => onFilterChange({ ...filterValue, q: text })}
+          onAddSearchToken={onTagClick}
+          filter={filterValue}
+          onFilterChange={onFilterChange}
           fileActionsAvailable={location.pathname === "/"}
         />
       </SelectionProvider>
