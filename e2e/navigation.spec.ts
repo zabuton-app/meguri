@@ -31,7 +31,9 @@ test.describe("Navigation", () => {
   test("opens keyboard shortcuts overlay", async ({ ready }) => {
     await ready.getByRole("button", { name: "Keyboard shortcuts" }).click();
     await expect(ready.getByText("Keyboard shortcuts")).toBeVisible();
-    await expect(ready.getByText("Detail & player")).toBeVisible();
+    await expect(
+      ready.getByRole("heading", { level: 3, name: /^Player/ }),
+    ).toBeVisible();
     await closeTopDialog(ready);
     await expect(ready.getByText("Keyboard shortcuts")).toHaveCount(0);
   });
