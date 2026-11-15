@@ -4,7 +4,7 @@
 // startApp() in electron/app.ts.
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import type { RouteObject } from "react-router";
 import { ThemeProvider } from "@/themes/ThemeProvider";
 import { I18nProvider } from "@/i18n/I18nProvider";
@@ -20,6 +20,7 @@ import {
   type SettingsSection,
 } from "@/settings/extraSections";
 import { logoImagesQuery } from "@/hooks/useLogo";
+import { createRendererQueryClient } from "@/lib/queryClient";
 import { Toaster } from "sonner";
 import "@/styles.css";
 
@@ -52,9 +53,7 @@ export function renderApp(options: RenderAppOptions = {}): void {
   // every active query on each toggle and doubled work with per-mutation handlers.
   // A failed mutation gets a generic toast from useMutationErrorNotifier; one
   // that shows its own error sets `meta: { reportsOwnError: true }`.
-  const queryClient: QueryClient = new QueryClient({
-    defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
-  });
+  const queryClient = createRendererQueryClient();
   // The rail's logo comes from main; ask before the first render so it is
   // there as early as it can be.
   void queryClient.prefetchQuery(logoImagesQuery);

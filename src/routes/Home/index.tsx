@@ -63,6 +63,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
+import { patchCollectionItemOrder } from "@/lib/queryCache";
 import { TimelineView } from "@/timeline/TimelineView";
 import { useTimelineView } from "./useTimelineView";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
@@ -417,17 +418,19 @@ export default function Home() {
                   return { ...prev, pages };
                 },
               );
+              const order = next.map((f) => ({
+                workspaceId: f.workspaceId,
+                fileId: f.id,
+              }));
+              patchCollectionItemOrder(qc, reorderCollectionId, order);
               void api
-                .collectionReorderItems(
-                  reorderCollectionId,
-                  next.map((f) => ({
-                    workspaceId: f.workspaceId,
-                    fileId: f.id,
-                  })),
-                )
+                .collectionReorderItems(reorderCollectionId, order)
                 .catch(() => {
                   // Fall back to the stored order if the write did not land.
                   void qc.invalidateQueries({ queryKey: ["files_search"] });
+                  void qc.invalidateQueries({
+                    queryKey: ["workspaces_list"],
+                  });
                 });
             },
           }

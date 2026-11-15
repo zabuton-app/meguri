@@ -7,6 +7,7 @@ import type {
   FileRow,
   SearchQuery,
   SearchResult,
+  UserCollectionItem,
   WorkspacesList,
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
@@ -376,6 +377,48 @@ export function dropFromWatchLaterCache(
       ...prev,
       collections: prev.collections.map((c) =>
         c.id === WATCH_LATER_ID ? { ...c, items } : c,
+      ),
+    };
+  });
+}
+
+/** Keep the cached collection order in step with a successful manual reorder. */
+export function patchCollectionItemOrder(
+  qc: QueryClient,
+  collectionId: string,
+  order: { workspaceId: string; fileId: number }[],
+): void {
+  const key = (item: { workspaceId: string; fileId: number }) =>
+    `${item.workspaceId}:${item.fileId}`;
+
+  qc.setQueryData<WorkspacesList>(["workspaces_list"], (prev) => {
+    if (!prev) return prev;
+    const collection = prev.collections.find(
+      (item) => item.id === collectionId,
+    );
+    if (!collection || order.length === 0) return prev;
+
+    const byKey = new Map(collection.items.map((item) => [key(item), item]));
+    const moving: UserCollectionItem[] = [];
+    const movedKeys = new Set<string>();
+    for (const ref of order) {
+      const itemKey = key(ref);
+      if (movedKeys.has(itemKey)) continue;
+      const item = byKey.get(itemKey);
+      if (!item) continue;
+      movedKeys.add(itemKey);
+      moving.push(item);
+    }
+    if (moving.length === 0) return prev;
+
+    let at = 0;
+    const items = collection.items.map((item) =>
+      movedKeys.has(key(item)) ? moving[at++] : item,
+    );
+    return {
+      ...prev,
+      collections: prev.collections.map((item) =>
+        item.id === collectionId ? { ...item, items } : item,
       ),
     };
   });
