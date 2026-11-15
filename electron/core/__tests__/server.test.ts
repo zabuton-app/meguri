@@ -14,6 +14,7 @@ import type { Server } from "node:http";
 import { openDb, nowUnix, type DB } from "../db.js";
 import { upsertScanRoot } from "../queries.js";
 import { startServer } from "../server.js";
+import { CAN_SYMLINK } from "./symlink.js";
 import type { Core } from "../index.js";
 
 // Shorten any wall-clock limit passed to spawn for the backpressure test.
@@ -79,6 +80,33 @@ function authHeaders(): RequestInit {
   return { headers: authHeader() };
 }
 
+/**
+ * The lines of an ffprobe report. Windows ends them with CRLF, which a plain
+ * split on "\n" would leave on every line but the last (#297).
+ */
+const probeLines = (out: string): string[] => out.trim().split(/\r?\n/);
+
+/**
+ * Remove a fixture clip once ffmpeg has let go of it. Windows refuses to
+ * unlink a file a child process still holds open, which an unlink right after
+ * the requests are destroyed can race. The clip is in a temp directory, so a
+ * handle that never clears is left to the OS rather than failing the test this
+ * was cleaning up after (#297).
+ */
+async function removeClip(clip: string): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    try {
+      fs.unlinkSync(clip);
+      return;
+    } catch (err) {
+      const { code } = err as NodeJS.ErrnoException;
+      if (code === "ENOENT") return;
+      if (code !== "EBUSY" && code !== "EPERM") throw err;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+}
+
 beforeAll(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-srv-root-"));
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-srv-data-"));
@@ -94,7 +122,9 @@ beforeAll(async () => {
   const outsideMedia = path.join(outside, "evil.mp4");
   fs.writeFileSync(outsideMedia, "EVIL");
   const symlinkMedia = path.join(root, "symlink.mp4");
-  fs.symlinkSync(outsideMedia, symlinkMedia);
+  // Without the privilege there is no link to serve, so the row is left out
+  // and the one case needing it is skipped below (#297).
+  if (CAN_SYMLINK) fs.symlinkSync(outsideMedia, symlinkMedia);
 
   // A real (tiny) Matroska file so the remux path actually transcodes to fMP4,
   // and a bogus one so the immediate-failure branch (0-byte output ⇒ 500) is
@@ -145,7 +175,8 @@ beforeAll(async () => {
   thumbId = mediaId;
   badThumbId = insert("b.mp4", path.join(root, "b.mp4"), outsideThumb, "done");
   outsideMediaId = insert("c.mp4", outsideMedia, null, "pending");
-  symlinkMediaId = insert("symlink.mp4", symlinkMedia, null, "pending");
+  if (CAN_SYMLINK)
+    symlinkMediaId = insert("symlink.mp4", symlinkMedia, null, "pending");
   remuxId = insert("real.mkv", remuxFile, null, "pending");
   brokenRemuxId = insert("broken.mkv", brokenFile, null, "pending");
 
@@ -169,8 +200,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  db.close();
+  // Guarded so a failure in beforeAll reports itself rather than being buried
+  // under a TypeError from closing what was never opened.
+  if (server)
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  db?.close();
 });
 
 describe("routing", () => {
@@ -395,12 +429,15 @@ describe("media serving and Range", () => {
     ).toBe(403);
   });
 
-  it("refuses a symlink under the root that points outside with 403", async () => {
-    expect(
-      (await fetch(`${base}/ws/${WS}/media/${symlinkMediaId}`, authHeaders()))
-        .status,
-    ).toBe(403);
-  });
+  it.skipIf(!CAN_SYMLINK)(
+    "refuses a symlink under the root that points outside with 403",
+    async () => {
+      expect(
+        (await fetch(`${base}/ws/${WS}/media/${symlinkMediaId}`, authHeaders()))
+          .status,
+      ).toBe(403);
+    },
+  );
 
   // A synchronous realpath on a root on a network share would block the main
   // process on every thumbnail, media and frame request (#275).
@@ -832,7 +869,7 @@ describe("ProRes preview capacity", () => {
       vi.useRealTimers();
       server.off("request", observe);
       for (const request of stalled) request.destroy();
-      fs.unlinkSync(clip);
+      await removeClip(clip);
     }
   }, 15_000);
 });
@@ -948,7 +985,7 @@ describe("media remux (ffmpeg path)", () => {
             encoding: "utf8",
           },
         );
-        expect(streams.trim().split("\n")).toEqual(["h264", "aac|6"]);
+        expect(probeLines(streams)).toEqual(["h264", "aac|6"]);
       }
       expect(fs.readFileSync(clip)).toEqual(original);
 
@@ -1193,7 +1230,7 @@ describe("media remux (ffmpeg path)", () => {
       expect(Number(packets.trim())).toBe(90 * 24);
     } finally {
       wallClockLimit.ms = 0;
-      fs.unlinkSync(clip);
+      await removeClip(clip);
     }
   }, 15_000);
 
@@ -1364,7 +1401,7 @@ describe("codecs the player cannot decode", () => {
   async function served(url: string): Promise<string[]> {
     const response = await fetch(url, authHeaders());
     expect(response.status).toBe(200);
-    return execFileSync(
+    const report = execFileSync(
       FFPROBE,
       [
         "-v",
@@ -1376,9 +1413,8 @@ describe("codecs the player cannot decode", () => {
         "pipe:0",
       ],
       { input: Buffer.from(await response.arrayBuffer()), encoding: "utf8" },
-    )
-      .trim()
-      .split("\n");
+    );
+    return probeLines(report);
   }
 
   it.each([
@@ -1498,7 +1534,7 @@ describe("codecs the player cannot decode", () => {
           encoding: "utf8",
         },
       );
-      expect(streams.trim().split("\n")).toEqual(["h264", "aac|2"]);
+      expect(probeLines(streams)).toEqual(["h264", "aac|2"]);
     },
   );
 

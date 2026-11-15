@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { CAN_SYMLINK, linkDirSync } from "./symlink.js";
 
 // paths.ts pulls the base dir from Electron's `app`; stub it for the test.
 vi.mock("electron", () => ({ app: { getPath: () => "/base/userData" } }));
@@ -30,24 +31,29 @@ describe("pathHash", () => {
   });
 });
 
+// These derive paths with path.join, so the expected spelling is the running
+// OS's: "\" on Windows, where a "/"-spelled literal would never match (#297).
+const under = (...segments: string[]) =>
+  path.join("/base/userData", ...segments);
+
 describe("dataDirForRoot", () => {
   it("places artifacts under <userData>/roots/<hash>", () => {
     expect(dataDirForRoot("/media/movies")).toBe(
-      `/base/userData/roots/${pathHash("/media/movies")}`,
+      under("roots", pathHash("/media/movies")),
     );
   });
 });
 
 describe("libraryDbPath", () => {
   it("places the shared library directly under <userData>", () => {
-    expect(libraryDbPath()).toBe("/base/userData/library.sqlite");
+    expect(libraryDbPath()).toBe(under("library.sqlite"));
   });
 });
 
 describe("backupDbPathForDataDir", () => {
   it("places the pre-merge copy next to the workspace DB", () => {
-    expect(backupDbPathForDataDir("/base/userData/roots/abc")).toBe(
-      "/base/userData/roots/abc/db.pre-shared-metadata.sqlite",
+    expect(backupDbPathForDataDir(under("roots", "abc"))).toBe(
+      under("roots", "abc", "db.pre-shared-metadata.sqlite"),
     );
   });
 });
@@ -104,33 +110,39 @@ describe("isInsideRoot", () => {
     }
   });
 
-  it("rejects symlinks whose target lies outside the root", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-out-"));
-    const target = path.join(outside, "secret.txt");
-    const link = path.join(root, "link.txt");
-    fs.writeFileSync(target, "secret");
-    fs.symlinkSync(target, link);
-    try {
-      expect(isInsideRoot(link, root)).toBe(false);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-      fs.rmSync(outside, { recursive: true, force: true });
-    }
-  });
+  it.skipIf(!CAN_SYMLINK)(
+    "rejects symlinks whose target lies outside the root",
+    () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-out-"));
+      const target = path.join(outside, "secret.txt");
+      const link = path.join(root, "link.txt");
+      fs.writeFileSync(target, "secret");
+      fs.symlinkSync(target, link);
+      try {
+        expect(isInsideRoot(link, root)).toBe(false);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+        fs.rmSync(outside, { recursive: true, force: true });
+      }
+    },
+  );
 
-  it("accepts symlinks whose target stays inside the root", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
-    const target = path.join(root, "real.txt");
-    const link = path.join(root, "link.txt");
-    fs.writeFileSync(target, "ok");
-    fs.symlinkSync(target, link);
-    try {
-      expect(isInsideRoot(link, root)).toBe(true);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
-  });
+  it.skipIf(!CAN_SYMLINK)(
+    "accepts symlinks whose target stays inside the root",
+    () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
+      const target = path.join(root, "real.txt");
+      const link = path.join(root, "link.txt");
+      fs.writeFileSync(target, "ok");
+      fs.symlinkSync(target, link);
+      try {
+        expect(isInsideRoot(link, root)).toBe(true);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("returns false when the path does not exist", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
@@ -158,14 +170,23 @@ describe("folderDirInsideRoot", () => {
     }
   });
 
-  it("refuses what is missing, not a directory, or leads outside", () => {
+  it("refuses what is missing or is not a directory", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-out-"));
     fs.writeFileSync(path.join(root, "a.mp4"), "x");
-    fs.symlinkSync(outside, path.join(root, "escape"));
     try {
       expect(folderDirInsideRoot(root, "Gone")).toBeNull();
       expect(folderDirInsideRoot(root, "a.mp4")).toBeNull();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // A directory link, so no symlink privilege is needed anywhere (linkDirSync).
+  it("refuses a link that leads outside", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-out-"));
+    linkDirSync(outside, path.join(root, "escape"));
+    try {
       expect(folderDirInsideRoot(root, "escape")).toBeNull();
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -176,7 +197,7 @@ describe("folderDirInsideRoot", () => {
   it("returns the link's target for a link that stays inside", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-root-"));
     fs.mkdirSync(path.join(root, "real"));
-    fs.symlinkSync(path.join(root, "real"), path.join(root, "alias"));
+    linkDirSync(path.join(root, "real"), path.join(root, "alias"));
     try {
       expect(folderDirInsideRoot(root, "alias")).toBe(
         path.join(fs.realpathSync(root), "real"),

@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CAN_SYMLINK } from "./symlink.js";
 
 const { watchDirectory } = await import("../watchDirectory.js");
 
@@ -95,13 +96,17 @@ describe("watchDirectory startup check", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("still sees other files when one cannot be read", () => {
-    fs.symlinkSync("loop.css", path.join(dir, "loop.css"));
-    const onChange = vi.fn();
-    const stop = watchDirectory(dir, isCss, onChange);
-    fs.writeFileSync(path.join(dir, "a.css"), "a{}");
-    pastCheck();
-    expect(onChange).toHaveBeenCalledTimes(1);
-    stop();
-  });
+  // The unreadable file is a symlink loop, so this needs the privilege.
+  it.skipIf(!CAN_SYMLINK)(
+    "still sees other files when one cannot be read",
+    () => {
+      fs.symlinkSync("loop.css", path.join(dir, "loop.css"));
+      const onChange = vi.fn();
+      const stop = watchDirectory(dir, isCss, onChange);
+      fs.writeFileSync(path.join(dir, "a.css"), "a{}");
+      pastCheck();
+      expect(onChange).toHaveBeenCalledTimes(1);
+      stop();
+    },
+  );
 });

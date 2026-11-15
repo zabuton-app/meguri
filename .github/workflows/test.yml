@@ -27,10 +27,12 @@ concurrency:
 # binary dynamically links GUI libs (libnss3 / gtk / gbm / asound …) that the
 # GitHub ubuntu runner already provides via its preinstalled browsers. The
 # renderer and lint jobs do not need Electron but use the same image to keep
-# the jobs alike. `core-macos` is the one job off Ubuntu.
+# the jobs alike. `core-macos` and `core-windows` are the jobs off Ubuntu.
 #
 # Keep node-version the same in every job and in build.yml (see engines.node in
 # package.json), and the macOS runner the same as the mac build in build.yml.
+# build.yml builds Windows on windows-latest, which windows-2025 is today;
+# pinned here so a runner rollover cannot change what the tests ran on.
 jobs:
   core:
     name: Type check and core tests
@@ -62,6 +64,28 @@ jobs:
   core-macos:
     name: Core tests (macOS)
     runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run core tests
+        run: npm run test:core
+
+  # The one Windows job. The core suite is where the platform shows through —
+  # rel_path separators, CRLF from ffprobe, file locking, the symlink privilege
+  # (#297) — and a Windows installer is built, so it is worth a check that the
+  # build matrix alone would not give. The runner is an administrator, so the
+  # symlink cases CAN_SYMLINK skips on an ordinary local machine run here.
+  core-windows:
+    name: Core tests (Windows)
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
