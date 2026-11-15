@@ -50,8 +50,9 @@ In the workspace database (`CORE_DDL`):
   and `mountpoint` (whether the root was a mountpoint at the last scan).
 - `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image` |
   `audio`), size/mtime/inode, `content_hash`, media metadata (`width`, `height`,
-  `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`, and
-  `deleted_at` / `excluded_at` markers. For audio, `width` / `height` / `fps`
+  `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`,
+  `deleted_at` / `excluded_at` markers, and `name_key`, the name sort's key
+  (see [Name sort](#name-sort)). For audio, `width` / `height` / `fps`
   stay NULL even when the file embeds cover art — the artwork's dimensions
   describe the jacket, not the track. Images keep `fps` NULL too, except
   animated ones (a GIF with more than one frame, or an APNG): ffprobe reports a
@@ -296,6 +297,28 @@ an event two workspaces share once.
 
 Metadata is never collected: the library keeps rows for files no workspace
 holds any more, so a removed workspace added again gets its metadata back.
+
+## Name sort
+
+Sorting by name follows a file manager's order (#292): case folded, and digit
+runs compared as numbers, so `Ep2` comes before `Ep10`. SQLite's collations
+cannot compare digits numerically, and the list pages with a keyset on the sort
+value, so the order comes from a stored key: `files.name_key`, which
+`naturalNameKey()` (`electron/core/nameKey.ts`) builds from the whole `rel_path`.
+Files stay grouped by folder, as before. Each digit run, leading zeros dropped,
+becomes its length (itself prefixed by how many digits it has) followed by the
+digits (`Ep10` → `ep1210`), so the key compares as a plain string at any length;
+the id breaks ties (`Ep02` and `Ep2`).
+
+The scan writes the key with `rel_path` (insert and move). `backfillNameKeys()`
+in `db.ts` adds the column to an older DB and, on every open, computes again
+every key when `NAME_KEY_VERSION` changes (recorded in `settings`), or else the
+keys that no longer match their path: an older app version inserts rows
+without one and moves rows without updating it. Nothing in the schema calls the
+key function, so an older version can still open and write the database.
+`idx_files_alive_name_key` serves the sort in both directions; inside a folder
+the folder's own files are found on `idx_files_alive_rel_path` and sorted. The
+`All` merge compares the same key.
 
 ## Full-text search
 

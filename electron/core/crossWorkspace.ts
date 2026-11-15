@@ -1,6 +1,7 @@
 // Cross-workspace aggregation. Runs the per-DB queries against a set of Cores and
 // merges/sorts/paginates in memory so the virtual "All" workspace can list every root.
 // A single-element set is the fast path (no merge), so callers use this uniformly.
+import { naturalNameKey } from "./nameKey.js";
 import { MAX_DUPLICATE_GROUPS } from "../../shared/duplicates.js";
 import { MAX_TAG_LIST, qualifiedTagName } from "../../shared/tags.js";
 import { resolveSortDir } from "../../shared/sortDir.js";
@@ -1094,13 +1095,24 @@ export function comparatorFor(
       // Never NULL (see sortSpecFor).
       return (a, b) =>
         cmpNullableNum(a.addedAt, b.addedAt, direction) || tiebreak(a, b);
-    case "name":
+    case "name": {
       // orderByFor()'s name sort tiebreaks on id following the sort direction
-      // (so the index can serve the DESC scan); mirror that here.
+      // (so the index can serve the DESC scan); mirror that here. Keys are
+      // computed once per path: the graph sorts tens of thousands of rows.
+      const keys = new Map<string, string>();
+      const keyOf = (relPath: string) => {
+        let key = keys.get(relPath);
+        if (key === undefined) {
+          key = naturalNameKey(relPath);
+          keys.set(relPath, key);
+        }
+        return key;
+      };
       return (a, b) =>
-        cmpStr(a.relPath, b.relPath, direction) ||
+        cmpStr(keyOf(a.relPath), keyOf(b.relPath), direction) ||
         cmpStr(a.workspaceId, b.workspaceId) ||
         cmpNum(a.id, b.id, direction);
+    }
     case "accessed":
       return (a, b) =>
         cmpNullableNum(a.lastAccessedAt, b.lastAccessedAt, direction) ||

@@ -1,4 +1,5 @@
 // File search, listing and detail queries. Dynamic SQL is built safely with placeholders.
+import { naturalNameKey } from "../nameKey.js";
 import type { DB } from "../db.js";
 import { fileTags } from "../tags.js";
 import { listBookmarksByMetaKey } from "./bookmarks.js";
@@ -403,7 +404,7 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
       // picker ("added" there is the id order): the timeline's "added" axis.
       return { expr: "f.created_at", nullable: false, cmp, idCmp: ">" };
     case "name":
-      return { expr: "f.rel_path", nullable: false, cmp, idCmp: cmp };
+      return { expr: "f.name_key", nullable: false, cmp, idCmp: cmp };
     case "accessed":
       return { expr: "m.last_accessed_at", nullable: true, cmp, idCmp: ">" };
     case "hash":
@@ -429,7 +430,8 @@ export function sortValueOf(
     case "addedAt":
       return row.addedAt;
     case "name":
-      return row.relPath;
+      // The stored key is this function of the path (see backfillNameKeys).
+      return naturalNameKey(row.relPath);
     case "accessed":
       return row.lastAccessedAt;
     case "hash":
@@ -551,10 +553,11 @@ export function orderByFor(sort?: string, dir?: string): string {
     case "addedAt":
       return `f.created_at ${direction}, f.id ASC`;
     case "name":
-      // The id tiebreak follows the main direction so both directions map onto
-      // a single scan of idx_files_alive_rel_path (forward/backward); a fixed
-      // "id ASC" would force a temp b-tree for the DESC case.
-      return `f.rel_path ${direction}, f.id ${direction}`;
+      // Natural order (#292). The id tiebreak follows the main direction so
+      // both directions map onto a single scan of idx_files_alive_name_key
+      // (forward/backward); a fixed "id ASC" would force a temp b-tree for the
+      // DESC case.
+      return `f.name_key ${direction}, f.id ${direction}`;
     case "accessed":
       return `m.last_accessed_at IS NULL ASC, m.last_accessed_at ${direction}, f.id ASC`;
     case "hash":

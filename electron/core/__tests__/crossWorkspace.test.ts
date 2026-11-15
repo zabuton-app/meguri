@@ -1,4 +1,5 @@
 // Regression tests for cross-workspace merge pagination (k-way merge).
+import { naturalNameKey } from "../nameKey.js";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Core } from "../index.js";
 import type { DB } from "../db.js";
@@ -68,7 +69,11 @@ function comparatorFor(
       return (a, b) => cmpNum(a.rating, b.rating, direction) || tiebreak(a, b);
     case "name":
       return (a, b) =>
-        cmpStr(a.relPath, b.relPath, direction) || tiebreak(a, b);
+        cmpStr(
+          naturalNameKey(a.relPath),
+          naturalNameKey(b.relPath),
+          direction,
+        ) || tiebreak(a, b);
     default:
       return (a, b) =>
         cmpStr(a.workspaceId, b.workspaceId) || cmpNum(a.id, b.id, direction);
@@ -398,7 +403,11 @@ describe("searchCollection k-way merge", () => {
       [...merged]
         .sort(
           (x, y) =>
-            x.relPath.localeCompare(y.relPath) ||
+            cmpStr(
+              naturalNameKey(x.relPath),
+              naturalNameKey(y.relPath),
+              "asc",
+            ) ||
             x.workspaceId.localeCompare(y.workspaceId) ||
             x.id - y.id,
         )

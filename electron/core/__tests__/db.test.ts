@@ -187,6 +187,7 @@ describe("migrateFilesTable", () => {
       "idx_files_alive_captured",
       "idx_files_btime",
       "idx_files_alive_btime",
+      "idx_files_alive_name_key",
     ]) {
       expect(names).toContain(idx);
     }
@@ -551,5 +552,80 @@ describe("resyncFtsForIds", () => {
   it("is a no-op for an empty id list", () => {
     resyncFtsForIds(db, []);
     expect(rowOf(1)?.tags_text).toBe("stale");
+  });
+});
+
+describe("files.name_key (#292)", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-namekey-"));
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  const keys = (db: ReturnType<typeof openDb>) =>
+    db.prepare("SELECT rel_path, name_key FROM files ORDER BY id").all();
+
+  it("fills the key of every row on a DB from before it", () => {
+    const file = path.join(dir, "old.sqlite");
+    const seed = openDb(file, ":memory:");
+    seed.exec(`
+      INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
+      INSERT INTO files (root_id, rel_path, abs_path, kind, created_at)
+        VALUES (1, 'Ep10.mp4', '/r/Ep10.mp4', 'video', 0);
+      UPDATE files SET name_key = NULL;
+      DELETE FROM settings WHERE key = 'name_key_version';
+    `);
+    seed.close();
+
+    const db = openDb(file, ":memory:");
+    expect(keys(db)).toEqual([
+      { rel_path: "Ep10.mp4", name_key: "ep1210.mp114" },
+    ]);
+    db.close();
+  });
+
+  it("fills a row an older app version inserted without one", () => {
+    const file = path.join(dir, "mixed.sqlite");
+    const seed = openDb(file, ":memory:");
+    seed.exec(`
+      INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
+      INSERT INTO files (root_id, rel_path, abs_path, kind, created_at)
+        VALUES (1, 'b2.mp4', '/r/b2.mp4', 'video', 0);
+    `);
+    seed.close();
+    const db = openDb(file, ":memory:");
+    expect(keys(db)).toEqual([{ rel_path: "b2.mp4", name_key: "b112.mp114" }]);
+    db.close();
+  });
+
+  it("fixes a key an older app version left behind when it moved the file", () => {
+    const file = path.join(dir, "moved.sqlite");
+    const seed = openDb(file, ":memory:");
+    seed.exec(`
+      INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
+      INSERT INTO files (root_id, rel_path, name_key, abs_path, kind, created_at)
+        VALUES (1, 'new2.mp4', 'old1.mp114', '/r/new2.mp4', 'video', 0);
+    `);
+    seed.close();
+    const db = openDb(file, ":memory:");
+    expect(keys(db)).toEqual([
+      { rel_path: "new2.mp4", name_key: "new112.mp114" },
+    ]);
+    db.close();
+  });
+
+  it("computes every key again when the key's definition changes", () => {
+    const file = path.join(dir, "stale.sqlite");
+    const seed = openDb(file, ":memory:");
+    seed.exec(`
+      INSERT INTO scan_roots (id, path, path_hash, created_at) VALUES (1, '/r', 'h', 0);
+      INSERT INTO files (root_id, rel_path, name_key, abs_path, kind, created_at)
+        VALUES (1, 'a1.mp4', 'stale', '/r/a1.mp4', 'video', 0);
+      UPDATE settings SET value = '0' WHERE key = 'name_key_version';
+    `);
+    seed.close();
+    const db = openDb(file, ":memory:");
+    expect(keys(db)).toEqual([{ rel_path: "a1.mp4", name_key: "a111.mp114" }]);
+    db.close();
   });
 });

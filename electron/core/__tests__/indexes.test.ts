@@ -59,10 +59,10 @@ describe("index query plans", () => {
     expect(p).toContain("idx_file_meta_resume");
   });
 
-  it("sort=name uses idx_files_alive_rel_path in both directions", () => {
+  it("sort=name uses idx_files_alive_name_key in both directions", () => {
     for (const dir of ["asc", "desc"]) {
       const p = plan(db, searchSql("name", dir));
-      expect(p).toContain("idx_files_alive_rel_path");
+      expect(p).toContain("idx_files_alive_name_key");
       expect(p).not.toContain("TEMP B-TREE");
     }
   });
@@ -85,7 +85,10 @@ describe("index query plans", () => {
         .replace("f.rel_path < ?", "f.rel_path < 'dir0'")
         .replace("substr(f.rel_path, ?), ?", "substr(f.rel_path, 5), '/'");
 
-    it("a folder-scoped sort=name walks idx_files_alive_rel_path without sorting", () => {
+    // The folder is found on rel_path, the order is name_key's (#292), so the
+    // folder's own files are sorted: the folder bounds the work, the index on
+    // rel_path keeps the rest of the library out of it.
+    it("a folder-scoped sort=name ranges over idx_files_alive_rel_path and sorts that folder", () => {
       const direct = folderCondition(folderRange("dir", "/"), false);
       const p = plan(
         db,
@@ -93,8 +96,9 @@ describe("index query plans", () => {
           `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL AND ${direct.sql} ORDER BY ${orderByFor("name", "asc")} LIMIT 101 OFFSET 0`,
         ),
       );
-      expect(p).toContain("idx_files_alive_rel_path");
-      expect(p).not.toContain("TEMP B-TREE");
+      expect(p).toContain(
+        "idx_files_alive_rel_path (rel_path>? AND rel_path<?)",
+      );
     });
 
     it("counting a folder's children is a range search on idx_files_alive_rel_path", () => {
