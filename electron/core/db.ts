@@ -118,6 +118,9 @@ CREATE INDEX IF NOT EXISTS idx_files_alive_rel_path ON files(rel_path, id) WHERE
 -- matches the "captured_at IS NULL ASC" NULLs-last term exactly. The ASC
 -- direction still filesorts (a reversed scan would put NULLs first).
 CREATE INDEX IF NOT EXISTS idx_files_alive_captured ON files((captured_at IS NULL), captured_at DESC, id) WHERE deleted_at IS NULL;
+-- The missing-files list (queries/missing.ts): its WHERE and ORDER BY exactly,
+-- so the planner takes it without statistics and does not sort.
+CREATE INDEX IF NOT EXISTS idx_files_missing ON files(deleted_at DESC, id DESC) WHERE deleted_at IS NOT NULL AND excluded_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 

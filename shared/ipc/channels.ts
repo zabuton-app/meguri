@@ -15,6 +15,7 @@ import type {
   FolderListing,
   HistoryPage,
   LogoId,
+  MissingFilesResult,
   SceneBookmark,
   SearchResult,
   TagList,
@@ -422,6 +423,8 @@ export const ChannelInputs = {
   }),
   history_list: z.object({ query: HistoryQuerySchema.optional() }).default({}),
   duplicates_list: z.void(),
+  missing_files_list: z.void(),
+  missing_files_purge: z.object({ targets: BulkTargets }),
   history_clear: z.void(),
   // A name being created, so it is capped at MAX_TAG_NAME — same as
   // tag_rename's `to`, and unlike TagRefSchema, which only addresses one.
@@ -658,6 +661,10 @@ export interface ChannelOutputs {
   file_save_position: void;
   history_list: HistoryPage;
   duplicates_list: DuplicatesResult;
+  missing_files_list: MissingFilesResult;
+  /** How many files were removed: ones that came back, and every file of a
+   *  workspace being scanned, are skipped. */
+  missing_files_purge: { removed: number };
   history_clear: void;
   file_add_tag: number;
   file_remove_tag: void;

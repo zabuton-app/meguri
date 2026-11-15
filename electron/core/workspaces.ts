@@ -676,11 +676,21 @@ export class Workspaces {
    * needless workspace:changed broadcast when the file was in no collection).
    */
   removeFileFromAllCollections(workspaceId: string, fileId: number): boolean {
+    return this.removeFilesFromAllCollections(workspaceId, [fileId]);
+  }
+
+  /** removeFileFromAllCollections for many files of one workspace, with one
+   *  config write. */
+  removeFilesFromAllCollections(
+    workspaceId: string,
+    fileIds: readonly number[],
+  ): boolean {
+    const ids = new Set(fileIds);
     const now = nowUnix();
     let changed = false;
     for (const collection of this.config.collections) {
       const next = collection.items.filter(
-        (item) => item.workspaceId !== workspaceId || item.fileId !== fileId,
+        (item) => item.workspaceId !== workspaceId || !ids.has(item.fileId),
       );
       if (next.length !== collection.items.length) {
         collection.items = next;

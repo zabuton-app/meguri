@@ -1,7 +1,9 @@
 import { execFile } from "node:child_process";
+import fsp from "node:fs/promises";
+import path from "node:path";
 import { promisify } from "node:util";
 import { FFMPEG } from "../core/ffmpeg-paths.js";
-import { Semaphore } from "../core/concurrency.js";
+import { Semaphore, pool } from "../core/concurrency.js";
 import {
   SUBTITLE_WINDOW_SECONDS,
   isTextSubtitle,
@@ -19,8 +21,10 @@ import type {
   DuplicatesResult,
   FileRow,
   HistoryPage,
+  MissingFilesResult,
   SearchResult,
 } from "../core/types.js";
+import { MAX_BULK_FILES } from "../../shared/tags.js";
 import type { IpcContext } from "./context.js";
 import {
   bulkTargetCores,
@@ -36,7 +40,7 @@ const subtitleSlots = new Semaphore(2);
 const SUBTITLE_OVERLAP_SECONDS = 30;
 
 export function registerFileHandlers(ctx: IpcContext): void {
-  const { ws, queryClient, positions, emit } = ctx;
+  const { ws, queryClient, positions, emit, scans } = ctx;
 
   // List queries can be invalidated by the renderer just as the active workspace
   // disappears (e.g. removing the last workspace). Return empty instead of throwing
@@ -220,6 +224,56 @@ export function registerFileHandlers(ctx: IpcContext): void {
       targets: queryTargets(scopedCores(ws)),
     }),
   );
+  // Missing files follow the catalog scope rule too (#277). A workspace being
+  // scanned is left out of both: until its scan is through, the files it has
+  // not reached yet read as missing (every one of them during a rebuild), and
+  // removing one would drop a file the scan is about to find again.
+  handle("missing_files_list", async () => {
+    const cores = scopedCores(ws);
+    const idle = cores.filter(({ id }) => !scans.isScanning(id));
+    const result = await queryClient.run<Omit<MissingFilesResult, "scanning">>({
+      kind: "missing",
+      targets: queryTargets(idle),
+      limit: MAX_BULK_FILES,
+    });
+    return { ...result, scanning: idle.length < cores.length };
+  });
+  handle("missing_files_purge", async ({ targets }) => {
+    let removed = 0;
+    let collectionsChanged = false;
+    const thumbs: string[] = [];
+    try {
+      // Every row and collection entry goes before the first await: a removed
+      // id can be handed to a new file (rowids are reused from the top), so
+      // nothing may point at it by then (#262), and a workspace removed
+      // meanwhile cannot leave the rest half done.
+      for (const { workspaceId, core, fileIds } of bulkTargetCores(
+        ws,
+        targets,
+      )) {
+        if (scans.isScanning(workspaceId)) continue;
+        const gone = q.purgeMissingFiles(core.db, fileIds);
+        removed += gone.length;
+        if (ws.removeFilesFromAllCollections(workspaceId, gone)) {
+          collectionsChanged = true;
+        }
+        const dir = core.thumbsDir();
+        for (const id of gone) thumbs.push(path.join(dir, `${id}.webp`));
+      }
+    } finally {
+      // Also when a later workspace failed: the earlier ones are done.
+      if (collectionsChanged) {
+        emit("workspace:changed", { activeId: ws.activeId });
+      }
+      if (removed > 0) await queryClient.invalidateCaches();
+    }
+    await pool(thumbs, 8, (file) =>
+      fsp.rm(file, { force: true }).catch(() => {
+        // Best-effort: a leftover is overwritten if the id is used again.
+      }),
+    );
+    return { removed };
+  });
   // Clears every workspace's history, whichever view asked: the play history
   // lives in the library they all share.
   handle("history_clear", () => {

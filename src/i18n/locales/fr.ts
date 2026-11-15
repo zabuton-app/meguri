@@ -657,6 +657,25 @@ export const fr: Record<TranslationKey, string> = {
   "history.today": "Aujourd'hui",
   "history.yesterday": "Hier",
 
+  // Missing files
+  "missing.title": "Fichiers introuvables",
+  "missing.empty": "Aucun fichier introuvable.",
+  "missing.hint":
+    "Fichiers qu’un scan n’a pas trouvés sur le disque. Si un fichier revient, il retrouve ses collections comme avant. Sélectionnez uniquement ceux qui ne reviendront pas, puis supprimez-les.",
+  "missing.scanning":
+    "Les espaces de travail en cours de scan n’apparaissent qu’une fois leur scan terminé.",
+  "missing.truncated":
+    "Affichage des {shown} fichiers introuvables les plus récents sur {total}. Supprimez-les pour voir les suivants.",
+  "missing.selectAll": "Tout sélectionner",
+  "missing.goneAt": "Introuvable depuis le {date}",
+  "missing.remove": "Supprimer les fichiers introuvables",
+  "missing.removeSelected": "Supprimer {count} sélectionné(s)",
+  "missing.removeConfirm":
+    "Retirer les {count} fichier(s) sélectionné(s) de la liste et des collections, et supprimer leurs miniatures ? Les tags, notes et autres métadonnées sont conservés. Cette action est irréversible.",
+  "missing.removeAction": "Supprimer",
+  "missing.removedToast": "{count} fichier(s) supprimé(s)",
+  "missing.removeFailed": "Impossible de supprimer les fichiers",
+
   "duplicates.title": "Fichiers en double",
   "duplicates.empty": "Aucun fichier en double trouvé.",
   "duplicates.emptyHint":

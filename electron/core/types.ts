@@ -15,6 +15,8 @@ export type {
   HistoryPage,
   HistoryQuery,
   Kind,
+  MissingFileRow,
+  MissingFilesResult,
   PlayEntry,
   ScanDone,
   ScanProgress,

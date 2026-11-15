@@ -10,7 +10,8 @@ Routing uses `createHashRouter` (`src/App.tsx`); a hash router is the stable
 choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`),
 `play` (`src/routes/Player/`), `history` (`src/routes/History/`),
-`duplicates` (`src/routes/Duplicates/`), `tags` (`src/routes/Tags/`),
+`duplicates` (`src/routes/Duplicates/`), `missing` (`src/routes/Missing/`),
+`tags` (`src/routes/Tags/`),
 `auto-tag` (`src/routes/AutoTag/`), and `settings` (`src/routes/Settings/`)
 are its **children**. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
@@ -439,7 +440,9 @@ stay in sync without a refetch. Discover pulls videos with `randomFiles`
 (`ORDER BY RANDOM()`) and presents them one at a time as a full-bleed immersive
 modal driven by embla-carousel, with a horizontal `SceneRail` of seekable scene
 previews. The History route lists `history_list` pages (day-grouped, infinite
-scroll) across the active or all workspaces.
+scroll) across the active or all workspaces. The Missing route (opened from
+the scan menu) lists `missing_files_list` (on the query worker, virtualized)
+and removes the files the user selects with `missing_files_purge`.
 
 Hovering a video thumbnail scrubs through frames fetched from the `frame`
 endpoint (`src/hooks/useHoverFramePreview.ts`, shared by `MediaThumbnail` and

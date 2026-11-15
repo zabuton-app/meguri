@@ -62,6 +62,8 @@ export const INVOKE_CHANNELS = [
   "file_save_position",
   "history_list",
   "duplicates_list",
+  "missing_files_list",
+  "missing_files_purge",
   "history_clear",
   "file_add_tag",
   "files_bulk_tag",

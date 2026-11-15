@@ -549,6 +549,9 @@ export default function Home() {
       // A scan can add tags (new files, the derived-tag backfill), so a tag
       // screen left open would otherwise show a stale catalog.
       void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
+      // Files go missing and come back with a scan, and a workspace is left
+      // out of the missing list while it is being scanned.
+      void qc.invalidateQueries({ queryKey: ["missing_files"] });
       const mode = manualScanJobs.current.get(done.jobId);
       manualScanJobs.current.delete(done.jobId);
       notifyScanDone(done, mode);

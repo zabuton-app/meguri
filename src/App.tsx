@@ -7,6 +7,7 @@ import Discover from "@/routes/Discover";
 import Player from "@/routes/Player";
 import History from "@/routes/History";
 import Duplicates from "@/routes/Duplicates";
+import Missing from "@/routes/Missing";
 import Tags from "@/routes/Tags";
 import AutoTag from "@/routes/AutoTag";
 import Settings from "@/routes/Settings";
@@ -39,6 +40,7 @@ const router = createHashRouter([
       { path: "play", element: <Player /> },
       { path: "history", element: <History /> },
       { path: "duplicates", element: <Duplicates /> },
+      { path: "missing", element: <Missing /> },
       { path: "tags", element: <Tags /> },
       { path: "auto-tag", element: <AutoTag /> },
       { path: "settings", element: <Settings /> },

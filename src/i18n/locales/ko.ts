@@ -635,6 +635,25 @@ export const ko: Record<TranslationKey, string> = {
   "history.today": "오늘",
   "history.yesterday": "어제",
 
+  // Missing files
+  "missing.title": "찾을 수 없는 파일",
+  "missing.empty": "찾을 수 없는 파일이 없습니다.",
+  "missing.hint":
+    "스캔에서 디스크에 없던 파일입니다. 파일이 돌아오면 컬렉션 등은 그대로 복원됩니다. 다시 돌아오지 않을 파일만 선택해서 삭제하세요.",
+  "missing.scanning":
+    "스캔 중인 워크스페이스는 스캔이 끝날 때까지 표시되지 않습니다.",
+  "missing.truncated":
+    "전체 {total}개 중 최근에 없어진 {shown}개를 표시합니다. 삭제하면 나머지가 표시됩니다.",
+  "missing.selectAll": "모두 선택",
+  "missing.goneAt": "{date}부터 없음",
+  "missing.remove": "찾을 수 없는 파일 삭제",
+  "missing.removeSelected": "선택한 {count}개 삭제",
+  "missing.removeConfirm":
+    "선택한 {count}개 파일을 파일 목록과 컬렉션에서 삭제하고 썸네일도 지울까요? 태그, 평점 등 메타데이터는 유지됩니다. 이 작업은 되돌릴 수 없습니다.",
+  "missing.removeAction": "삭제",
+  "missing.removedToast": "{count}개 파일을 삭제했습니다",
+  "missing.removeFailed": "파일을 삭제할 수 없습니다",
+
   "duplicates.title": "중복 파일",
   "duplicates.empty": "중복 파일을 찾을 수 없습니다.",
   "duplicates.emptyHint":

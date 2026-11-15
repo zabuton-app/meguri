@@ -68,6 +68,11 @@ export class ScanManager {
     return this.scanCore(core, ws.activeId, opts);
   }
 
+  /** Whether a scan of this workspace is in progress. */
+  isScanning(wsId: string): boolean {
+    return this.scanning.has(wsId);
+  }
+
   /** Workspaces whose last scan could not read their folder. */
   unreadableWorkspaces(): string[] {
     return [...this.unreadable];

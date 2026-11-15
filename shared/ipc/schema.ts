@@ -235,6 +235,25 @@ export const HistoryPageSchema = z.object({
 });
 export type HistoryPage = z.infer<typeof HistoryPageSchema>;
 
+/** A file the last scan of its workspace did not find on disk (#277). */
+export const MissingFileSchema = FileRowSchema.extend({
+  /** When the scan found the file gone (Unix seconds). */
+  deletedAt: z.number(),
+});
+export type MissingFileRow = z.infer<typeof MissingFileSchema>;
+
+export const MissingFilesResultSchema = z.object({
+  /** The most recently gone first, at most MAX_BULK_FILES of them, so that
+   *  selecting all of them is one removal. */
+  items: z.array(MissingFileSchema),
+  /** All missing files of the workspaces listed. */
+  total: z.number(),
+  /** Some workspace in scope is being scanned and was left out: mid-scan,
+   *  and through a whole rebuild, its files on disk read as missing. */
+  scanning: z.boolean(),
+});
+export type MissingFilesResult = z.infer<typeof MissingFilesResultSchema>;
+
 /** Files sharing the same (content_hash, size) pair — treated as identical content. */
 export const DuplicateGroupSchema = z.object({
   contentHash: z.string(),

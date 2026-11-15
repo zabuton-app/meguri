@@ -203,6 +203,11 @@ export const api = {
   historyClear: () => invoke("history_clear"),
   /** Duplicate groups by (content_hash, size) — same scope rule as historyList. */
   duplicatesList: () => invoke("duplicates_list"),
+  /** Files a scan no longer found on disk — same scope rule as historyList. */
+  missingFilesList: () => invoke("missing_files_list"),
+  missingFilesPurge: (
+    targets: ChannelInput<"missing_files_purge">["targets"],
+  ) => invoke("missing_files_purge", { targets }),
   bookmarkAdd: (id: number, workspaceId: string, sec: number) =>
     invoke("bookmark_add", { id, workspaceId, sec }),
   bookmarkRemove: (id: number, workspaceId: string, bookmarkId: number) =>
