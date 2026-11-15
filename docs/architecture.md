@@ -47,6 +47,12 @@ which main passes to the preload as process arguments
 (`EXTRA_INVOKE_CHANNELS_ARG` and `EXTRA_EVENT_CHANNELS_ARG` in
 `shared/ipc/channelNames.ts`), so the renderer still cannot add a channel. A
 name that is empty, holds a comma or is a preload-only channel fails startup.
+`setup` registers the handlers for its `extraChannels.invoke` with
+`ctx.handleExtra(channel, fn)` (`SetupContext` in `electron/app.ts`), which
+checks the caller is the app's own page just as `handle()` does and then calls
+`fn(raw, event)` with the payload as is: those channels have no schema in
+`shared/ipc/`, so the app validates its own input. A channel that is not in
+`extraChannels.invoke` throws.
 Nothing is on
 screen until `setup` settles, so long work belongs in the background. There is
 no quit hook: work that writes to the workspaces runs through `ctx.passes` (or
