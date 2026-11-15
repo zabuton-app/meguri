@@ -102,6 +102,11 @@ export default function MediaDetail() {
 
   // Total duration for scenes/history. Falls back to the natively obtained value when the DB duration is empty.
   const [nativeDur, setNativeDur] = useState<number | null>(null);
+  // The video adjustments side panel. Kept open across files; its element is
+  // where the player's adjustment controls render.
+  const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
+  const [adjustmentsContainer, setAdjustmentsContainer] =
+    useState<HTMLDivElement | null>(null);
   const [imageBgInverted, setImageBgInverted] = useLocalStorage<boolean>(
     IMAGE_BG_INVERTED_KEY,
     false,
@@ -351,6 +356,7 @@ export default function MediaDetail() {
   const dir = slash >= 0 ? d.relPath.slice(0, slash) : "";
   // A file of a collection is still in a real workspace: the one named by wsId.
   const folderPath = folderPathOf(d.relPath);
+  const showsAdjustments = d.kind === "video" && !hasHdrTransfer(d.meta);
 
   return (
     <MediaModal
@@ -383,208 +389,230 @@ export default function MediaDetail() {
         />
       )}
 
-      <ScrollArea className="page-scroll min-h-0 flex-1">
-        <div className="flex w-full flex-col gap-4 px-4 py-4">
-          {/* Player / viewer */}
-          {d.kind === "video" ? (
-            // In fullscreen, cancel the surrounding padding so the video is
-            // edge-to-edge for the first screenful (the rest scrolls below).
-            <div className={isFullscreen ? "-mx-4 -mt-4" : "contents"}>
-              <VideoPlayer
-                ref={playerRef}
-                id={fileId}
-                src={mediaSrc}
-                audioTracks={
-                  isRemuxedVideo(d.codec, d.ext) ? audioTracks : undefined
-                }
-                subtitleTracks={readEmbeddedTracks(d.meta, "subtitle")}
-                subtitleAudioLanguage={
-                  needsVideoPreview(d.codec) || audioTracks.length === 1
-                    ? audioTracks[0]?.language
-                    : undefined
-                }
-                subtitleKey={subtitlePreferenceKey(wsId, d.relPath)}
-                videoAdjustments={!hasHdrTransfer(d.meta)}
-                duration={d.duration}
-                width={d.width}
-                height={d.height}
-                mediaBase={mediaBase}
-                wsId={wsId}
-                startAt={startAt}
-                autoplay={autoplay}
-                // The server can end a video preview that stops reading.
-                reopenOnNetworkError={needsVideoPreview(d.codec)}
-                navKeys={navBinding}
-                fullscreenTargetRef={modalRef}
-                bookmarks={d.bookmarks}
-                bookmarkPending={actions.pending.bookmark}
-                onAddBookmark={actions.addBookmark}
-                onRemoveBookmark={actions.removeBookmark}
-                exportPending={actions.pending.export}
-                onExportFrame={actions.exportFrame}
-                onNativeDuration={setNativeDur}
-                onPlayed={() => {
-                  invalidatePlayedSearches(qc);
-                  dropFromWatchLaterCache(qc, wsId, fileId);
-                }}
-                onOpenExternal={() => {
-                  dropFromWatchLaterCache(qc, wsId, fileId);
-                  invalidatePlayedSearches(qc);
-                }}
-                // Video demands attention, background audio yields. Pause rather
-                // than close, so the bar stays visible and the user can resume.
-                onPlaybackStart={claimPlayback}
-                t={t}
-              />
-            </div>
-          ) : d.kind === "audio" ? (
-            // In the peek the bottom bar stays on screen as the transport, so
-            // the sheet shows the track as a tile rather than a second stage.
-            isPeek ? (
-              <AudioCompact
-                file={d}
-                wsId={wsId}
-                mediaBase={mediaBase}
-                coverSrc={coverSrc}
-              />
+      {/* The adjustments panel sits beside the content, the way the peek sits
+          beside the list, so it never covers the picture being judged. */}
+      <div className="flex min-h-0 flex-1">
+        <ScrollArea className="page-scroll min-h-0 min-w-0 flex-1">
+          <div className="flex w-full flex-col gap-4 px-4 py-4">
+            {/* Player / viewer */}
+            {d.kind === "video" ? (
+              // In fullscreen, cancel the surrounding padding so the video is
+              // edge-to-edge for the first screenful (the rest scrolls below).
+              <div className={isFullscreen ? "-mx-4 -mt-4" : "contents"}>
+                <VideoPlayer
+                  ref={playerRef}
+                  id={fileId}
+                  src={mediaSrc}
+                  audioTracks={
+                    isRemuxedVideo(d.codec, d.ext) ? audioTracks : undefined
+                  }
+                  subtitleTracks={readEmbeddedTracks(d.meta, "subtitle")}
+                  subtitleAudioLanguage={
+                    needsVideoPreview(d.codec) || audioTracks.length === 1
+                      ? audioTracks[0]?.language
+                      : undefined
+                  }
+                  subtitleKey={subtitlePreferenceKey(wsId, d.relPath)}
+                  videoAdjustments={
+                    showsAdjustments
+                      ? {
+                          open: adjustmentsOpen,
+                          onOpenChange: setAdjustmentsOpen,
+                          container: adjustmentsContainer,
+                        }
+                      : undefined
+                  }
+                  duration={d.duration}
+                  width={d.width}
+                  height={d.height}
+                  mediaBase={mediaBase}
+                  wsId={wsId}
+                  startAt={startAt}
+                  autoplay={autoplay}
+                  // The server can end a video preview that stops reading.
+                  reopenOnNetworkError={needsVideoPreview(d.codec)}
+                  navKeys={navBinding}
+                  fullscreenTargetRef={modalRef}
+                  bookmarks={d.bookmarks}
+                  bookmarkPending={actions.pending.bookmark}
+                  onAddBookmark={actions.addBookmark}
+                  onRemoveBookmark={actions.removeBookmark}
+                  exportPending={actions.pending.export}
+                  onExportFrame={actions.exportFrame}
+                  onNativeDuration={setNativeDur}
+                  onPlayed={() => {
+                    invalidatePlayedSearches(qc);
+                    dropFromWatchLaterCache(qc, wsId, fileId);
+                  }}
+                  onOpenExternal={() => {
+                    dropFromWatchLaterCache(qc, wsId, fileId);
+                    invalidatePlayedSearches(qc);
+                  }}
+                  // Video demands attention, background audio yields. Pause rather
+                  // than close, so the bar stays visible and the user can resume.
+                  onPlaybackStart={claimPlayback}
+                  t={t}
+                />
+              </div>
+            ) : d.kind === "audio" ? (
+              // In the peek the bottom bar stays on screen as the transport, so
+              // the sheet shows the track as a tile rather than a second stage.
+              isPeek ? (
+                <AudioCompact
+                  file={d}
+                  wsId={wsId}
+                  mediaBase={mediaBase}
+                  coverSrc={coverSrc}
+                />
+              ) : (
+                <AudioStage
+                  file={d}
+                  wsId={wsId}
+                  mediaBase={mediaBase}
+                  coverSrc={coverSrc}
+                />
+              )
             ) : (
-              <AudioStage
-                file={d}
-                wsId={wsId}
-                mediaBase={mediaBase}
-                coverSrc={coverSrc}
-              />
-            )
-          ) : (
-            <div
-              className={`flex justify-center overflow-hidden rounded-xl ${
-                imageBgInverted ? "bg-white" : "bg-black"
-              }`}
-            >
-              <img
-                src={mediaSrc}
-                alt={d.relPath}
-                className="max-h-[78vh] max-w-full object-contain"
-              />
-            </div>
-          )}
+              <div
+                className={`flex justify-center overflow-hidden rounded-xl ${
+                  imageBgInverted ? "bg-white" : "bg-black"
+                }`}
+              >
+                <img
+                  src={mediaSrc}
+                  alt={d.relPath}
+                  className="max-h-[78vh] max-w-full object-contain"
+                />
+              </div>
+            )}
 
-          {/* Resumed where it was left: say so, and offer the way back to
+            {/* Resumed where it was left: say so, and offer the way back to
               zero. Audio only when this view started the track itself —
               opened without autoplay nothing has started, and a track found
               already playing in the bar was left where it was. */}
-          {resumeStart.resumed &&
-            (d.kind === "video" ||
-              (d.kind === "audio" && audioStartedHere)) && (
-              <ResumeNotice
-                sec={resumeStart.startAt}
-                onStartOver={() => {
-                  if (d.kind === "video") playerRef.current?.seek(0);
-                  else if (isCurrentAudio(fileId, wsId)) seekAudio(0);
-                  resumeStart.dismiss();
-                }}
+            {resumeStart.resumed &&
+              (d.kind === "video" ||
+                (d.kind === "audio" && audioStartedHere)) && (
+                <ResumeNotice
+                  sec={resumeStart.startAt}
+                  onStartOver={() => {
+                    if (d.kind === "video") playerRef.current?.seek(0);
+                    else if (isCurrentAudio(fileId, wsId)) seekAudio(0);
+                    resumeStart.dismiss();
+                  }}
+                  t={t}
+                />
+              )}
+
+            {/* Title + controls */}
+            <DetailActions
+              detail={d}
+              basename={basename}
+              dir={dir}
+              fileId={fileId}
+              wsId={wsId}
+              mediaSrc={mediaSrc}
+              collections={collections}
+              imageBgInverted={imageBgInverted}
+              onToggleImageBg={toggleImageBgInverted}
+              onOpenExternal={actions.openExternal}
+              onDeleteFromIndex={() => void actions.deleteFromIndex()}
+              onAddToCollection={actions.addToCollection}
+              onRemoveFromCollection={actions.removeFromCollection}
+              onShowFolder={
+                wsId && isNormalizedFolderPath(folderPath)
+                  ? () => onShowFolder(folderPath)
+                  : undefined
+              }
+              t={t}
+            />
+
+            {/* Scenes: evenly spaced thumbnails. Click to seek to that position. */}
+            {d.kind === "video" && total && (
+              <Scenes
+                id={fileId}
+                total={total}
+                mediaBase={mediaBase}
+                wsId={wsId}
+                thumbOffsetSec={d.thumbOffsetSec}
+                pendingThumbSec={actions.pendingThumbSec}
+                // Status alone, not hasThumbFile: a video marked done always has
+                // a frame behind it, and the scene picker shows the slot itself.
+                mainThumbUrl={
+                  d.thumbStatus === "done"
+                    ? thumbUrl(mediaBase, wsId, fileId, thumbVersion)
+                    : null
+                }
+                mainThumbPending={actions.pending.mainThumb}
+                onSeek={(sec) => playerRef.current?.seek(sec)}
+                onSetMainThumb={actions.setMainThumb}
                 t={t}
               />
             )}
 
-          {/* Title + controls */}
-          <DetailActions
-            detail={d}
-            basename={basename}
-            dir={dir}
-            fileId={fileId}
-            wsId={wsId}
-            mediaSrc={mediaSrc}
-            collections={collections}
-            imageBgInverted={imageBgInverted}
-            onToggleImageBg={toggleImageBgInverted}
-            onOpenExternal={actions.openExternal}
-            onDeleteFromIndex={() => void actions.deleteFromIndex()}
-            onAddToCollection={actions.addToCollection}
-            onRemoveFromCollection={actions.removeFromCollection}
-            onShowFolder={
-              wsId && isNormalizedFolderPath(folderPath)
-                ? () => onShowFolder(folderPath)
-                : undefined
-            }
-            t={t}
-          />
+            {/* User-curated scene bookmarks. Hidden when empty (the player has a button to add one). */}
+            {d.kind === "video" && d.bookmarks.length > 0 && (
+              <SceneBookmarks
+                id={fileId}
+                bookmarks={d.bookmarks}
+                mediaBase={mediaBase}
+                wsId={wsId}
+                thumbOffsetSec={d.thumbOffsetSec}
+                pendingThumbSec={actions.pendingThumbSec}
+                onSeek={(sec) => playerRef.current?.seek(sec)}
+                onRemove={actions.removeBookmark}
+                onSetMainThumb={actions.setMainThumb}
+                t={t}
+              />
+            )}
 
-          {/* Scenes: evenly spaced thumbnails. Click to seek to that position. */}
-          {d.kind === "video" && total && (
-            <Scenes
-              id={fileId}
+            {/* Rating + tags */}
+            <RatingTagsCard
+              detail={d}
+              // Whichever separator the path was stored with: a folder must
+              // never be offered as part of the name.
+              basename={fileNameOf(d.relPath)}
+              fileId={fileId}
+              wsId={wsId}
+              watchLater={watchLater}
+              watchLaterRef={watchLaterRef}
+              onRate={actions.setRating}
+              onAddTag={actions.addTag}
+              onRemoveTag={actions.removeTag}
+              onTagClick={onTagFilter}
+              t={t}
+            />
+
+            {/* Metadata chips */}
+            <MetaChips
+              detail={d}
+              wsId={wsId}
+              workspaceLabel={owningWorkspace?.label ?? null}
+              workspacePath={owningWorkspace?.path ?? null}
               total={total}
-              mediaBase={mediaBase}
-              wsId={wsId}
-              thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={actions.pendingThumbSec}
-              // Status alone, not hasThumbFile: a video marked done always has
-              // a frame behind it, and the scene picker shows the slot itself.
-              mainThumbUrl={
-                d.thumbStatus === "done"
-                  ? thumbUrl(mediaBase, wsId, fileId, thumbVersion)
-                  : null
-              }
-              mainThumbPending={actions.pending.mainThumb}
-              onSeek={(sec) => playerRef.current?.seek(sec)}
-              onSetMainThumb={actions.setMainThumb}
               t={t}
             />
-          )}
 
-          {/* User-curated scene bookmarks. Hidden when empty (the player has a button to add one). */}
-          {d.kind === "video" && d.bookmarks.length > 0 && (
-            <SceneBookmarks
+            <DownloadOriginCard
+              key={`${wsId}:${fileId}`}
               id={fileId}
-              bookmarks={d.bookmarks}
-              mediaBase={mediaBase}
-              wsId={wsId}
-              thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={actions.pendingThumbSec}
-              onSeek={(sec) => playerRef.current?.seek(sec)}
-              onRemove={actions.removeBookmark}
-              onSetMainThumb={actions.setMainThumb}
-              t={t}
+              workspaceId={wsId}
             />
-          )}
 
-          {/* Rating + tags */}
-          <RatingTagsCard
-            detail={d}
-            // Whichever separator the path was stored with: a folder must
-            // never be offered as part of the name.
-            basename={fileNameOf(d.relPath)}
-            fileId={fileId}
-            wsId={wsId}
-            watchLater={watchLater}
-            watchLaterRef={watchLaterRef}
-            onRate={actions.setRating}
-            onAddTag={actions.addTag}
-            onRemoveTag={actions.removeTag}
-            onTagClick={onTagFilter}
-            t={t}
+            <PlayHistory history={d.playHistory} t={t} lang={lang} />
+          </div>
+        </ScrollArea>
+        {showsAdjustments && adjustmentsOpen && (
+          <div
+            ref={setAdjustmentsContainer}
+            data-slot="video-adjustments-panel"
+            // A bare slot: the panel draws its own frame (see
+            // VideoAdjustmentsPanel), so a player on its error screen,
+            // which renders no controls, leaves nothing beside the content.
+            className="contents"
           />
-
-          {/* Metadata chips */}
-          <MetaChips
-            detail={d}
-            wsId={wsId}
-            workspaceLabel={owningWorkspace?.label ?? null}
-            workspacePath={owningWorkspace?.path ?? null}
-            total={total}
-            t={t}
-          />
-
-          <DownloadOriginCard
-            key={`${wsId}:${fileId}`}
-            id={fileId}
-            workspaceId={wsId}
-          />
-
-          <PlayHistory history={d.playHistory} t={t} lang={lang} />
-        </div>
-      </ScrollArea>
+        )}
+      </div>
     </MediaModal>
   );
 }
