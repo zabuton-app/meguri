@@ -90,6 +90,7 @@ function renderPlayer(
     video,
     ref,
     view,
+    props,
     onAddBookmark,
     onRemoveBookmark,
     onExportFrame,
@@ -414,6 +415,22 @@ describe("VideoPlayer", () => {
       expect(fileRecordPlay).not.toHaveBeenCalled();
     });
 
+    it("plays on at the speed the element had", () => {
+      const first = renderPlayer();
+      loadVideo(first.video);
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      markPlaying(first.video, 10);
+      announceVideoHandOff("http://127.0.0.1:17345/ws/ws1/media/1");
+      cleanup();
+
+      const second = renderPlayer();
+      expect(second.video).toBe(first.video);
+      expect(second.video.playbackRate).toBe(1.25);
+      expect(
+        screen.getByRole("button", { name: /Playback speed/ }).textContent,
+      ).toBe("1.25×");
+    });
+
     it("advances on an element that ended while nobody was listening", () => {
       const first = renderPlayer();
       loadVideo(first.video);
@@ -669,6 +686,58 @@ describe("VideoPlayer", () => {
       expect(video.getAttribute("src")).toContain("?t=30");
       expect(video.autoplay).toBe(false);
       expect(play).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("playback speed", () => {
+    it("steps with Shift+< and Shift+>, and the menu sets it", () => {
+      const { video } = renderPlayer();
+      loadVideo(video);
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      expect(video.playbackRate).toBe(1.5);
+      fireEvent.keyDown(window, { code: "Comma", key: "<", shiftKey: true });
+      expect(video.playbackRate).toBe(1.25);
+      // Without Shift the keys type "." and "," and do nothing.
+      fireEvent.keyDown(window, { code: "Period", key: "." });
+      expect(video.playbackRate).toBe(1.25);
+
+      fireEvent.click(screen.getByRole("button", { name: /Playback speed/ }));
+      fireEvent.click(screen.getByRole("radio", { name: "2×" }));
+      expect(video.playbackRate).toBe(2);
+    });
+
+    it("keeps the speed through a reload of the same file", () => {
+      const { video } = renderPlayer();
+      loadVideo(video);
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      // A new source (a stream reopened at another second) starts the element
+      // at normal speed again.
+      video.playbackRate = 1;
+      loadVideo(video);
+      expect(video.playbackRate).toBe(1.25);
+    });
+
+    it("starts the next file at normal speed", () => {
+      const { video, view, ref, props } = renderPlayer();
+      loadVideo(video);
+      fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+      expect(video.playbackRate).toBe(1.25);
+      view.rerender(
+        <Providers>
+          <VideoPlayer
+            ref={ref}
+            {...props}
+            id={2}
+            src="http://127.0.0.1:17345/ws/ws1/media/2"
+          />
+        </Providers>,
+      );
+      expect(
+        screen.getByRole("button", { name: /Playback speed/ }),
+      ).toHaveProperty("textContent", "1×");
+      loadVideo(document.querySelector("video")!);
+      expect(document.querySelector("video")!.playbackRate).toBe(1);
     });
   });
 

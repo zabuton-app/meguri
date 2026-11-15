@@ -329,6 +329,7 @@ export const es: Catalog = {
   "shortcuts.skip10": "Retroceder / avanzar 10 s",
   "shortcuts.volume": "Subir / bajar volumen",
   "shortcuts.mute": "Alternar silencio",
+  "shortcuts.speed": "Más lento / más rápido",
   "shortcuts.fullscreen": "Alternar pantalla completa",
   "shortcuts.seekStart": "Ir al inicio",
   "shortcuts.spectrumPattern":
@@ -395,6 +396,8 @@ export const es: Catalog = {
   "player.unmute": "Activar sonido (M)",
   "player.fullscreen": "Pantalla completa (F)",
   "player.volume": "Volumen",
+  "player.speed": "Velocidad de reproducción",
+  "player.speedValue": "{speed}×",
   "player.audioTrack": "Pista de audio",
   "player.audioTrackNumber": "Pista {number}",
   "player.audioTrackDefault": "Predeterminada",

@@ -65,6 +65,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
     { label: t("shortcuts.skip10"), keys: "J / L" },
     { label: t("shortcuts.volume"), keys: "↑ / ↓" },
     { label: t("shortcuts.mute"), keys: "M" },
+    { label: t("shortcuts.speed"), keys: "< / >" },
     { label: t("shortcuts.fullscreen"), keys: "F" },
     { label: t("shortcuts.seekStart"), keys: "Home / 0" },
     { label: t("shortcuts.spectrumPattern"), keys: "V / Shift+V" },

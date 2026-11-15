@@ -36,6 +36,7 @@ import {
 import { resolveStartAt } from "@shared/resume";
 import { useOptionalPreferences } from "@/settings/PreferencesProvider";
 import { attachAnalyser } from "./analyser";
+import { NORMAL_SPEED } from "@/lib/playbackSpeed";
 import {
   AudioActionsContext,
   AudioPlayerContext,
@@ -44,6 +45,7 @@ import {
   type AudioPlayerState,
   type AudioTrack,
   type PlayOpts,
+  type SpeedUpdate,
 } from "./context";
 
 /** The media URL of a track (see play()). */
@@ -64,6 +66,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // after a restart.
   const { volume, muted } = useVolume();
   const [error, setError] = useState<TranslationKey | null>(null);
+  // Playback speed, for the loaded track only (#280). The ref is what a load
+  // reapplies: a new source starts the element at normal speed.
+  const [playbackRate, setRateState] = useState(NORMAL_SPEED);
+  const rateRef = useRef(NORMAL_SPEED);
 
   const status = useAppStatus();
   const mediaBase = status.data?.mediaBase ?? "";
@@ -207,6 +213,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const el = ensureEl();
     const onLoaded = () => {
+      el.playbackRate = rateRef.current;
       setDuration(
         Number.isFinite(el.duration) && el.duration > 0 ? el.duration : null,
       );
@@ -316,6 +323,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       setPosition(startAt);
       setEnded(false);
       setCurrent({ file, workspaceId });
+      rateRef.current = NORMAL_SPEED;
+      setRateState(NORMAL_SPEED);
       el.src = src;
       // Assigned before any data has arrived, which the element honours as the
       // position to begin at once it can (it is not a seek that could be lost).
@@ -395,6 +404,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // Dragging the slider is an explicit request to hear something, so the store
   // also unmutes — matching what the video player does on the same interaction.
   const setVolume = useCallback((v: number) => setSharedVolume(v), []);
+  const setPlaybackRate = useCallback((next: SpeedUpdate) => {
+    const rate = typeof next === "function" ? next(rateRef.current) : next;
+    rateRef.current = rate;
+    setRateState(rate);
+    const el = audioRef.current;
+    if (el) el.playbackRate = rate;
+  }, []);
   const toggleMuted = useCallback(() => toggleSharedMuted(), []);
 
   const close = useCallback(() => {
@@ -464,6 +480,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       pause,
       seek,
       setVolume,
+      setPlaybackRate,
       toggleMuted,
       close,
       dismissError,
@@ -480,6 +497,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       pause,
       seek,
       setVolume,
+      setPlaybackRate,
       toggleMuted,
       close,
       dismissError,
@@ -497,12 +515,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       duration,
       volume,
       muted,
+      playbackRate,
       error,
       play,
       toggle,
       pause,
       seek,
       setVolume,
+      setPlaybackRate,
       toggleMuted,
       close,
       dismissError,
@@ -514,12 +534,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       duration,
       volume,
       muted,
+      playbackRate,
       error,
       play,
       toggle,
       pause,
       seek,
       setVolume,
+      setPlaybackRate,
       toggleMuted,
       close,
       dismissError,
