@@ -468,7 +468,7 @@ export const zhCN: Catalog = {
 
   // media grid
   "grid.empty": "没有可显示的媒体。",
-  "grid.emptyHint": "执行“扫描”后，其下的视频和图片会显示在这里。",
+  "grid.emptyHint": "执行“扫描”后，其下的视频、图片和音频会显示在这里。",
   "grid.searchByTag": "按“{name}”筛选",
   "view.grid": "网格视图",
   "view.list": "列表视图",
@@ -600,14 +600,14 @@ export const zhCN: Catalog = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "正在从“{path}”中挑选",
   "discover.empty": "没有可推荐的媒体。",
-  "discover.emptyHint": "执行“扫描”导入视频和图片后，这里会随机推荐。",
+  "discover.emptyHint": "执行“扫描”导入视频、图片和音频后，这里会随机推荐。",
   "discover.sceneHint": "点击场景即可跳转",
   "discover.moreScenes": "+{count}",
 
   // 播放历史
   "history.title": "播放历史",
   "history.empty": "暂无播放历史。",
-  "history.emptyHint": "播放视频或图片后，历史记录会显示在这里。",
+  "history.emptyHint": "播放视频、图片或音频后，历史记录会显示在这里。",
   "history.clear": "清除历史",
   "history.clearAction": "清除",
   "history.clearConfirm":
@@ -1023,7 +1023,7 @@ export const zhCN: Catalog = {
   "playlist.progress": "{current} / {total}",
   "playlist.loading": "加载中…",
   "playlist.empty": "这里没有可播放的媒体。",
-  "playlist.emptyHint": "请打开包含视频或图片的列表后再开始播放。",
+  "playlist.emptyHint": "请打开包含视频、图片或音频的列表后再开始播放。",
   "playlist.unplayable": "这些项目都无法播放。",
   "playlist.reorderNeedsManual": "切换到手动排序即可重新排列。",
   "settings.resumePlayback": "从上次位置继续",
@@ -1094,7 +1094,7 @@ export const zhCN: Catalog = {
   "tour.welcomeBody": "我来带你快速了解一下。随时按 Esc 可以跳过",
   "tour.addWorkspaceTitle": "添加文件夹",
   "tour.addWorkspaceBody":
-    "先添加一个存放视频和图片的文件夹吧。我会扫描并生成缩略图。可以添加任意多个",
+    "先添加一个存放视频、图片或音频的文件夹吧。我会扫描并生成缩略图。可以添加任意多个",
   "tour.collectionsTitle": "收藏集",
   "tour.collectionsBody":
     "把不同文件夹里的文件汇集到一个收藏集中。把文件拖到这里即可添加",

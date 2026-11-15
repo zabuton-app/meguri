@@ -530,7 +530,7 @@ export const es: Catalog = {
   // media grid
   "grid.empty": "No hay medios que mostrar.",
   "grid.emptyHint":
-    "Ejecuta «Escanear» para listar aquí los vídeos e imágenes.",
+    "Ejecuta «Escanear» para listar aquí los vídeos, imágenes y audios.",
   "grid.searchByTag": "Filtrar por «{name}»",
   "view.grid": "Vista de cuadrícula",
   "view.list": "Vista de lista",
@@ -700,14 +700,14 @@ export const es: Catalog = {
   "discover.inFolder": "Eligiendo de «{path}»",
   "discover.empty": "No hay medios para recomendar.",
   "discover.emptyHint":
-    "Ejecuta «Escanear» para importar vídeos e imágenes y se recomendarán aquí al azar.",
+    "Ejecuta «Escanear» para importar vídeos, imágenes y audios y se recomendarán aquí al azar.",
   "discover.sceneHint": "Haz clic en una escena para saltar a ese punto",
   "discover.moreScenes": "+{count}",
 
   // Historial de reproducción
   "history.title": "Historial de reproducción",
   "history.empty": "Aún no hay historial de reproducción.",
-  "history.emptyHint": "Reproduce vídeos o imágenes y aparecerán aquí.",
+  "history.emptyHint": "Reproduce vídeos, imágenes o audios y aparecerán aquí.",
   "history.clear": "Borrar historial",
   "history.clearAction": "Borrar",
   "history.clearConfirm":
@@ -1237,7 +1237,7 @@ export const es: Catalog = {
   "playlist.loading": "Cargando…",
   "playlist.empty": "No hay nada que se pueda reproducir aquí.",
   "playlist.emptyHint":
-    "Abre una lista que contenga vídeos o imágenes y luego inicia la reproducción.",
+    "Abre una lista que contenga vídeos, imágenes o audios y luego inicia la reproducción.",
   "playlist.unplayable": "No se pudo reproducir ninguno de estos elementos.",
   "playlist.reorderNeedsManual":
     "Cambia al orden manual para reorganizar los elementos.",
@@ -1315,7 +1315,7 @@ export const es: Catalog = {
     "Te enseño cómo funciona. Pulsa Esc para saltarlo cuando quieras.",
   "tour.addWorkspaceTitle": "Añadir una carpeta",
   "tour.addWorkspaceBody":
-    "Empieza añadiendo una carpeta con tus vídeos e imágenes. La escanearé y crearé las miniaturas. Puedes añadir todas las que quieras.",
+    "Empieza añadiendo una carpeta con tus vídeos, imágenes o audios. La escanearé y crearé las miniaturas. Puedes añadir todas las que quieras.",
   "tour.collectionsTitle": "Colecciones",
   "tour.collectionsBody":
     "Reúne archivos de cualquier carpeta en una colección. Arrastra archivos aquí para añadirlos.",

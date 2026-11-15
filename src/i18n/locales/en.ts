@@ -514,7 +514,7 @@ export const en: Catalog = {
 
   // media grid
   "grid.empty": "No media to display.",
-  "grid.emptyHint": 'Run "Scan" to list videos and images here.',
+  "grid.emptyHint": 'Run "Scan" to list videos, images, and audio here.',
   "grid.searchByTag": 'Filter by "{name}"',
   "view.grid": "Grid view",
   "view.list": "List view",
@@ -668,14 +668,15 @@ export const en: Catalog = {
   "discover.inFolder": "Picking from “{path}”",
   "discover.empty": "No media to recommend.",
   "discover.emptyHint":
-    'Run "Scan" to import videos and images, and they\'ll be recommended here at random.',
+    'Run "Scan" to import videos, images, and audio, and they\'ll be recommended here at random.',
   "discover.sceneHint": "Click a scene to jump to it",
   "discover.moreScenes": "+{count}",
 
   // Play history
   "history.title": "Play history",
   "history.empty": "No play history yet.",
-  "history.emptyHint": "Play videos or images and they will show up here.",
+  "history.emptyHint":
+    "Play videos, images, or audio and they will show up here.",
   "history.clear": "Clear history",
   "history.clearAction": "Clear",
   "history.clearConfirm":
@@ -1177,7 +1178,7 @@ export const en: Catalog = {
   "playlist.loading": "Loading…",
   "playlist.empty": "Nothing here can be played.",
   "playlist.emptyHint":
-    "Open a list that contains videos or images, then start playback.",
+    "Open a list that contains videos, images, or audio, then start playback.",
   "playlist.unplayable": "None of these items could be played.",
   "playlist.reorderNeedsManual": "Switch to manual order to rearrange items.",
   "settings.resumePlayback": "Resume where you left off",
@@ -1251,7 +1252,7 @@ export const en: Catalog = {
   "tour.welcomeBody": "Let me show you around. Press Esc to skip at any time.",
   "tour.addWorkspaceTitle": "Add a folder",
   "tour.addWorkspaceBody":
-    "Start by adding a folder with your videos and images. I'll scan it and make thumbnails. Add as many as you like.",
+    "Start by adding a folder with your videos, images, or audio. I'll scan it and make thumbnails. Add as many as you like.",
   "tour.collectionsTitle": "Collections",
   "tour.collectionsBody":
     "Gather files from any folder into a collection. Drag files here to add them.",

@@ -6,8 +6,8 @@
 
 **Redefining what a media manager is supposed to be.**
 
-A local-first media library for your videos and photos — scan, browse,
-search, and play, all offline.
+A local-first media library for your videos, photos, and audio — scan,
+browse, search, and play, all offline.
 
 [![Test](https://github.com/zabuton-app/meguri/actions/workflows/test.yml/badge.svg)](https://github.com/zabuton-app/meguri/actions/workflows/test.yml)
 [![Build](https://github.com/zabuton-app/meguri/actions/workflows/build.yml/badge.svg)](https://github.com/zabuton-app/meguri/actions/workflows/build.yml)
@@ -19,9 +19,9 @@ search, and play, all offline.
 </div>
 
 Meguri is a personal desktop app for browsing, searching, and playing local
-videos and images with thumbnails. It recursively scans any folder you point it at,
-generates thumbnails, tags, and metadata, and lets you browse the collection in
-a native window.
+videos, images, and audio with thumbnails. It recursively scans any folder you
+point it at, generates thumbnails, tags, and metadata, and lets you browse the
+collection in a native window.
 
 The name **Meguri** comes from the Japanese word _巡り_ — "going around,
 coming back around" — with the sentiment of wandering back through your
