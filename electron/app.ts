@@ -53,6 +53,7 @@ import {
 import { libraryBackupDir, libraryDbPath } from "./core/paths.js";
 import { PositionWriter } from "./core/positionWriter.js";
 import { registerIpc, type IpcContext } from "./ipc/index.js";
+import { handleExtraFor, type HandleExtra } from "./core/ipcHandler.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
@@ -122,7 +123,8 @@ export interface AppOptions {
    * same `IpcContext` those handlers use, so it can register handlers with
    * `handle()` and read the workspaces, the query worker and the media
    * server's base URL and token. `handle()` only takes channels declared in
-   * `shared/ipc/`; the preload lets those through, plus `extraChannels`.
+   * `shared/ipc/`; the preload lets those through, plus `extraChannels`, whose
+   * invoke channels get their handlers through `ctx.handleExtra()`.
    * Nothing is on screen until it settles, so it should return quickly and
    * leave long work running in the background. A throw (or rejection) fails
    * startup like any other startup error.
@@ -133,7 +135,7 @@ export interface AppOptions {
    * listener is not enough: it runs after Meguri's teardown on macOS and on an
    * OS shutdown, and not at all on a Windows log-off.
    */
-  setup?: (ctx: IpcContext) => void | Promise<void>;
+  setup?: (ctx: SetupContext) => void | Promise<void>;
   /**
    * The app's own channels, added to the preload's whitelist so the renderer
    * can invoke them (`invoke`) or subscribe to them (`events`). Only main
@@ -144,8 +146,14 @@ export interface AppOptions {
 }
 
 // For an app's `setup`: what Meguri's own handler groups are built from.
-export type { IpcContext };
+export type { IpcContext, HandleExtra };
 export { handle } from "./core/ipcHandler.js";
+
+/** What an app's `setup` gets: Meguri's IpcContext, plus `handleExtra`. */
+export interface SetupContext extends IpcContext {
+  /** Registers the handler for a channel in `extraChannels.invoke`. */
+  handleExtra: HandleExtra;
+}
 
 /** Start the app. Call once, from the entry point, before anything else runs. */
 export function startApp(options: AppOptions): void {
@@ -164,9 +172,8 @@ export function startApp(options: AppOptions): void {
   setupLogger();
 
   // Checked up front so a bad name fails startup, not the first window.
-  const extraArgs = extraChannelArgs(
-    options.extraChannels ?? { invoke: [], events: [] },
-  );
+  const extraChannels = options.extraChannels ?? { invoke: [], events: [] };
+  const extraArgs = extraChannelArgs(extraChannels);
 
   // Chromium reads its switches at start-up, so this has to run before `ready`.
   if (
@@ -862,7 +869,10 @@ export function startApp(options: AppOptions): void {
       libraryRestoredFrom: () => libraryRestoredFrom,
     };
     registerIpc(ipcContext);
-    await options.setup?.(ipcContext);
+    await options.setup?.({
+      ...ipcContext,
+      handleExtra: handleExtraFor(extraChannels.invoke),
+    });
     // Quit while the app's setup was running: open nothing more.
     if (isQuitting()) return;
     createTray();
