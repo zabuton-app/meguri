@@ -103,7 +103,9 @@ export function VideoGradeOverlay({ videoRef, loaded, panel, t }: Props) {
         createPortal(
           <aside
             aria-label={t("grade.title")}
-            className="flex min-h-0 w-72 shrink-0 flex-col border-l border-border bg-bg"
+            // A sidebar beside the video: it stretches to the video's height
+            // and grows past it when the controls need more.
+            className="flex w-72 max-w-[45%] shrink-0 flex-col border-l border-border bg-bg"
             onKeyDown={(event) => {
               event.stopPropagation();
               if (event.key === "Escape") close();

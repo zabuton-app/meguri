@@ -389,8 +389,6 @@ export default function MediaDetail() {
         />
       )}
 
-      {/* The adjustments panel sits beside the content, the way the peek sits
-          beside the list, so it never covers the picture being judged. */}
       <div className="flex min-h-0 flex-1">
         <ScrollArea className="page-scroll min-h-0 min-w-0 flex-1">
           <div className="flex w-full flex-col gap-4 px-4 py-4">
@@ -398,61 +396,72 @@ export default function MediaDetail() {
             {d.kind === "video" ? (
               // In fullscreen, cancel the surrounding padding so the video is
               // edge-to-edge for the first screenful (the rest scrolls below).
-              <div className={isFullscreen ? "-mx-4 -mt-4" : "contents"}>
-                <VideoPlayer
-                  ref={playerRef}
-                  id={fileId}
-                  src={mediaSrc}
-                  audioTracks={
-                    isRemuxedVideo(d.codec, d.ext) ? audioTracks : undefined
-                  }
-                  subtitleTracks={readEmbeddedTracks(d.meta, "subtitle")}
-                  subtitleAudioLanguage={
-                    needsVideoPreview(d.codec) || audioTracks.length === 1
-                      ? audioTracks[0]?.language
-                      : undefined
-                  }
-                  subtitleKey={subtitlePreferenceKey(wsId, d.relPath)}
-                  videoAdjustments={
-                    showsAdjustments
-                      ? {
-                          open: adjustmentsOpen,
-                          onOpenChange: setAdjustmentsOpen,
-                          container: adjustmentsContainer,
-                        }
-                      : undefined
-                  }
-                  duration={d.duration}
-                  width={d.width}
-                  height={d.height}
-                  mediaBase={mediaBase}
-                  wsId={wsId}
-                  startAt={startAt}
-                  autoplay={autoplay}
-                  // The server can end a video preview that stops reading.
-                  reopenOnNetworkError={needsVideoPreview(d.codec)}
-                  navKeys={navBinding}
-                  fullscreenTargetRef={modalRef}
-                  bookmarks={d.bookmarks}
-                  bookmarkPending={actions.pending.bookmark}
-                  onAddBookmark={actions.addBookmark}
-                  onRemoveBookmark={actions.removeBookmark}
-                  exportPending={actions.pending.export}
-                  onExportFrame={actions.exportFrame}
-                  onNativeDuration={setNativeDur}
-                  onPlayed={() => {
-                    invalidatePlayedSearches(qc);
-                    dropFromWatchLaterCache(qc, wsId, fileId);
-                  }}
-                  onOpenExternal={() => {
-                    dropFromWatchLaterCache(qc, wsId, fileId);
-                    invalidatePlayedSearches(qc);
-                  }}
-                  // Video demands attention, background audio yields. Pause rather
-                  // than close, so the bar stays visible and the user can resume.
-                  onPlaybackStart={claimPlayback}
-                  t={t}
-                />
+              <div className={`flex ${isFullscreen ? "-mx-4 -mt-4" : "gap-4"}`}>
+                <div className="min-w-0 flex-1">
+                  <VideoPlayer
+                    ref={playerRef}
+                    id={fileId}
+                    src={mediaSrc}
+                    audioTracks={
+                      isRemuxedVideo(d.codec, d.ext) ? audioTracks : undefined
+                    }
+                    subtitleTracks={readEmbeddedTracks(d.meta, "subtitle")}
+                    subtitleAudioLanguage={
+                      needsVideoPreview(d.codec) || audioTracks.length === 1
+                        ? audioTracks[0]?.language
+                        : undefined
+                    }
+                    subtitleKey={subtitlePreferenceKey(wsId, d.relPath)}
+                    videoAdjustments={
+                      showsAdjustments
+                        ? {
+                            open: adjustmentsOpen,
+                            onOpenChange: setAdjustmentsOpen,
+                            container: adjustmentsContainer,
+                          }
+                        : undefined
+                    }
+                    duration={d.duration}
+                    width={d.width}
+                    height={d.height}
+                    mediaBase={mediaBase}
+                    wsId={wsId}
+                    startAt={startAt}
+                    autoplay={autoplay}
+                    // The server can end a video preview that stops reading.
+                    reopenOnNetworkError={needsVideoPreview(d.codec)}
+                    navKeys={navBinding}
+                    fullscreenTargetRef={modalRef}
+                    bookmarks={d.bookmarks}
+                    bookmarkPending={actions.pending.bookmark}
+                    onAddBookmark={actions.addBookmark}
+                    onRemoveBookmark={actions.removeBookmark}
+                    exportPending={actions.pending.export}
+                    onExportFrame={actions.exportFrame}
+                    onNativeDuration={setNativeDur}
+                    onPlayed={() => {
+                      invalidatePlayedSearches(qc);
+                      dropFromWatchLaterCache(qc, wsId, fileId);
+                    }}
+                    onOpenExternal={() => {
+                      dropFromWatchLaterCache(qc, wsId, fileId);
+                      invalidatePlayedSearches(qc);
+                    }}
+                    // Video demands attention, background audio yields. Pause rather
+                    // than close, so the bar stays visible and the user can resume.
+                    onPlaybackStart={claimPlayback}
+                    t={t}
+                  />
+                </div>
+                {showsAdjustments && adjustmentsOpen && (
+                  <div
+                    ref={setAdjustmentsContainer}
+                    data-slot="video-adjustments-panel"
+                    // A sidebar as tall as the video beside it, so the scene
+                    // strip and the rest of the detail view span the full width.
+                    className="contents"
+                  />
+                )}
               </div>
             ) : d.kind === "audio" ? (
               // In the peek the bottom bar stays on screen as the transport, so
@@ -602,16 +611,6 @@ export default function MediaDetail() {
             <PlayHistory history={d.playHistory} t={t} lang={lang} />
           </div>
         </ScrollArea>
-        {showsAdjustments && adjustmentsOpen && (
-          <div
-            ref={setAdjustmentsContainer}
-            data-slot="video-adjustments-panel"
-            // A bare slot: the panel draws its own frame (see
-            // VideoAdjustmentsPanel), so a player on its error screen,
-            // which renders no controls, leaves nothing beside the content.
-            className="contents"
-          />
-        )}
       </div>
     </MediaModal>
   );
