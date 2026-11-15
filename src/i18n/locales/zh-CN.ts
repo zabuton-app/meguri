@@ -614,6 +614,24 @@ export const zhCN: Record<TranslationKey, string> = {
   "history.today": "今天",
   "history.yesterday": "昨天",
 
+  // Missing files
+  "missing.title": "找不到的文件",
+  "missing.empty": "没有找不到的文件。",
+  "missing.hint":
+    "扫描时在磁盘上找不到的文件。文件回来后，会照常回到所在的合集。请只选择不会再回来的文件并删除。",
+  "missing.scanning": "正在扫描的工作区在扫描完成前不会显示在这里。",
+  "missing.truncated":
+    "显示 {total} 个中最近找不到的 {shown} 个。删除后会显示其余的。",
+  "missing.selectAll": "全选",
+  "missing.goneAt": "自 {date} 起找不到",
+  "missing.remove": "删除找不到的文件",
+  "missing.removeSelected": "删除所选 {count} 个",
+  "missing.removeConfirm":
+    "要将所选的 {count} 个文件从文件列表和合集中删除，并删除其缩略图吗？标签、评分等元数据会保留。此操作无法撤销。",
+  "missing.removeAction": "删除",
+  "missing.removedToast": "已删除 {count} 个文件",
+  "missing.removeFailed": "无法删除文件",
+
   "duplicates.title": "重复文件",
   "duplicates.empty": "未找到重复文件。",
   "duplicates.emptyHint": "内容相同（哈希和大小一致）的文件会显示在这里。",

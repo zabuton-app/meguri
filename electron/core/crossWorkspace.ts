@@ -16,6 +16,8 @@ import {
   filesByIds,
   folderFiles,
   listFolders,
+  countMissingFiles,
+  listMissingFiles,
   listPlayHistory,
   numericCursor,
   randomFiles,
@@ -34,6 +36,8 @@ import type {
   HistoryEntryRow,
   HistoryPage,
   HistoryQuery,
+  MissingFileRow,
+  MissingFilesResult,
   SearchCursor,
   SearchQuery,
   SearchResult,
@@ -850,6 +854,27 @@ function takeAcrossNamespaces(tags: TagSummary[], limit: number): TagSummary[] {
  * tuples into one map, pass 2 fetches full rows only for keys whose combined
  * count exceeds one, and only from the DBs that hold them.
  */
+/** Missing files across workspaces, the most recently gone first, at most
+ *  `limit` in all. `scanning` is the caller's to set. */
+export function listMissingWorkspaces(
+  cores: CoreTarget[],
+  limit: number,
+): Omit<MissingFilesResult, "scanning"> {
+  const items: MissingFileRow[] = [];
+  let total = 0;
+  for (const { id, core } of cores) {
+    items.push(...inject(listMissingFiles(core.db, limit), id));
+    total += countMissingFiles(core.db);
+  }
+  items.sort(
+    (a, b) =>
+      b.deletedAt - a.deletedAt ||
+      cmpStr(a.workspaceId, b.workspaceId) ||
+      b.id - a.id,
+  );
+  return { items: items.slice(0, limit), total };
+}
+
 export function listDuplicatesWorkspaces(
   cores: CoreTarget[],
 ): DuplicatesResult {

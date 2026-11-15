@@ -653,6 +653,25 @@ export const es: Record<TranslationKey, string> = {
   "history.today": "Hoy",
   "history.yesterday": "Ayer",
 
+  // Missing files
+  "missing.title": "Archivos no encontrados",
+  "missing.empty": "No hay archivos no encontrados.",
+  "missing.hint":
+    "Archivos que un escaneo no encontró en el disco. Si un archivo vuelve, regresa a sus colecciones como antes. Selecciona solo los que no van a volver y elimínalos.",
+  "missing.scanning":
+    "Los espacios de trabajo que se están escaneando no aparecen hasta que termine el escaneo.",
+  "missing.truncated":
+    "Se muestran los {shown} no encontrados más recientes de {total}. Elimínalos para ver el resto.",
+  "missing.selectAll": "Seleccionar todo",
+  "missing.goneAt": "No encontrado desde {date}",
+  "missing.remove": "Eliminar archivos no encontrados",
+  "missing.removeSelected": "Eliminar {count} seleccionados",
+  "missing.removeConfirm":
+    "¿Eliminar los {count} archivos seleccionados de la lista y de las colecciones, y borrar sus miniaturas? Las etiquetas, valoraciones y demás metadatos se conservan. Esta acción no se puede deshacer.",
+  "missing.removeAction": "Eliminar",
+  "missing.removedToast": "Se eliminaron {count} archivos",
+  "missing.removeFailed": "No se pudieron eliminar los archivos",
+
   "duplicates.title": "Archivos duplicados",
   "duplicates.empty": "No se encontraron archivos duplicados.",
   "duplicates.emptyHint":

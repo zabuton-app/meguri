@@ -638,6 +638,25 @@ export const en: Record<TranslationKey, string> = {
   "history.today": "Today",
   "history.yesterday": "Yesterday",
 
+  // Missing files
+  "missing.title": "Missing files",
+  "missing.empty": "No missing files.",
+  "missing.hint":
+    "Files a scan did not find on disk. If a file comes back, it returns to its collections as before. Select only the files that are gone for good and remove them.",
+  "missing.scanning":
+    "Workspaces being scanned are not listed until their scan is done.",
+  "missing.truncated":
+    "Showing the {shown} most recently missing of {total}. Remove them to see the rest.",
+  "missing.selectAll": "Select all",
+  "missing.goneAt": "Missing since {date}",
+  "missing.remove": "Remove missing files",
+  "missing.removeSelected": "Remove {count} selected",
+  "missing.removeConfirm":
+    "Remove the {count} selected file(s) from the file list and collections, and delete their thumbnails? Tags, ratings and other metadata are kept. This cannot be undone.",
+  "missing.removeAction": "Remove",
+  "missing.removedToast": "Removed {count} file(s)",
+  "missing.removeFailed": "Could not remove the files",
+
   "duplicates.title": "Duplicate Files",
   "duplicates.empty": "No duplicate files found.",
   "duplicates.emptyHint":

@@ -639,6 +639,25 @@ export const ja = {
   "history.today": "今日",
   "history.yesterday": "昨日",
 
+  // Missing files
+  "missing.title": "見つからないファイル",
+  "missing.empty": "見つからないファイルはありません。",
+  "missing.hint":
+    "スキャンでディスクに見つからなかったファイルです。ファイルが戻ってくれば、コレクションなどはそのまま復活します。もう戻らないファイルだけを選んで削除してください。",
+  "missing.scanning":
+    "スキャン中のワークスペースは、スキャンが終わるまでここに表示されません。",
+  "missing.truncated":
+    "{total}件のうち、最近見つからなくなった{shown}件を表示しています。削除すると残りが表示されます。",
+  "missing.selectAll": "すべて選択",
+  "missing.goneAt": "{date}から見つかりません",
+  "missing.remove": "見つからないファイルを削除",
+  "missing.removeSelected": "選択した{count}件を削除",
+  "missing.removeConfirm":
+    "選択した{count}件をファイル一覧とコレクションから削除し、サムネイルも消去します。タグや評価などはそのまま残ります。この操作は取り消せません。",
+  "missing.removeAction": "削除",
+  "missing.removedToast": "{count}件を削除しました",
+  "missing.removeFailed": "削除できませんでした",
+
   "duplicates.title": "重複ファイル",
   "duplicates.empty": "重複ファイルは見つかりませんでした。",
   "duplicates.emptyHint":
