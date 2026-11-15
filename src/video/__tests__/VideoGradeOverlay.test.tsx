@@ -46,7 +46,12 @@ describe("VideoGradeOverlay side panel", () => {
     const aside = screen.getByRole("complementary", { name: "grade.title" });
     expect(sidePanel()?.contains(aside)).toBe(true);
     expect(screen.getByTestId("player").contains(aside)).toBe(false);
-    expect(screen.getByRole("slider", { name: "grade.exposure" })).toBeTruthy();
+    const color = screen.getByRole("region", { name: "grade.color" });
+    expect(aside.contains(color)).toBe(true);
+    expect(
+      screen.getAllByRole("slider").every((slider) => color.contains(slider)),
+    ).toBe(true);
+    expect(screen.getAllByRole("slider")).toHaveLength(6);
   });
 
   it("stays open on the next file, with that file's grade back at neutral", () => {

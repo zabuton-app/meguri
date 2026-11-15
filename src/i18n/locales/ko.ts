@@ -380,6 +380,7 @@ export const ko: Catalog = {
   "grade.green": "녹색",
   "grade.magenta": "마젠타",
   "grade.title": "영상 조정",
+  "grade.color": "색상",
   "grade.exposure": "노출",
   "grade.contrast": "대비",
   "grade.pivot": "피벗",
