@@ -7,6 +7,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { StrictMode, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -112,6 +113,19 @@ function loadVideo(video: HTMLVideoElement) {
   fireEvent.loadedMetadata(video);
 }
 
+/** The radios of one column of the audio and subtitles panel, opening the
+ *  panel first. Subtitles: Off, Match audio language, then the text tracks;
+ *  audio: Default, then the tracks. */
+function trackRadios(column: "player.audioTrack" | "player.subtitles") {
+  if (!screen.queryByRole("dialog", { name: "player.audioSubtitles" }))
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.audioSubtitles" }),
+    );
+  return within(
+    screen.getByRole("group", { name: column }),
+  ).getAllByRole<HTMLInputElement>("radio");
+}
+
 function fireVideoError(video: HTMLVideoElement, code: number) {
   Object.defineProperty(video, "error", {
     configurable: true,
@@ -143,8 +157,7 @@ describe("embedded subtitles", () => {
       subtitleTracks: [{ title: "English", language: "eng", codec: "subrip" }],
     });
     loadVideo(video);
-    const select = screen.getByRole("combobox", { name: "player.subtitles" });
-    fireEvent.change(select, { target: { value: "0" } });
+    fireEvent.click(trackRadios("player.subtitles")[2]);
     expect(await screen.findByText("player.subtitleLoading")).toBeTruthy();
     finishFirstWindow();
     await waitFor(() =>
@@ -180,12 +193,11 @@ describe("embedded subtitles", () => {
     loadVideo(video);
     video.currentTime = 5;
     fireEvent.timeUpdate(video);
-    const select = screen.getByRole("combobox", { name: "player.subtitles" });
-    fireEvent.change(select, { target: { value: "0" } });
+    fireEvent.click(trackRadios("player.subtitles")[2]);
     expect(await screen.findByText("Hello")).toBeTruthy();
     expect(fileSubtitles).toHaveBeenCalledWith(1, "ws1", 0, 0);
 
-    fireEvent.change(select, { target: { value: "1" } });
+    fireEvent.click(trackRadios("player.subtitles")[3]);
     expect(screen.queryByText("Hello")).toBeNull();
     expect(await screen.findByText("Bonjour")).toBeTruthy();
     video.currentTime = 125;
@@ -193,7 +205,7 @@ describe("embedded subtitles", () => {
     expect(await screen.findByText("Bonjour")).toBeTruthy();
     expect(fileSubtitles).toHaveBeenCalledWith(1, "ws1", 1, 120);
 
-    fireEvent.change(select, { target: { value: "-1" } });
+    fireEvent.click(trackRadios("player.subtitles")[0]);
     expect(screen.queryByText("Bonjour")).toBeNull();
   });
 
@@ -224,12 +236,48 @@ describe("embedded subtitles", () => {
     loadVideo(video);
     expect(await screen.findByText("こんにちは")).toBeTruthy();
 
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "player.audioTrack" }),
-      { target: { value: "1" } },
-    );
+    fireEvent.click(trackRadios("player.audioTrack")[2]);
     expect(await screen.findByText("Hello")).toBeTruthy();
     expect(fileSubtitles).toHaveBeenLastCalledWith(1, "ws1", 1, 0);
+  });
+});
+
+describe("audio and subtitles panel", () => {
+  const tracks = [{ title: "English", language: "eng", codec: "subrip" }];
+
+  it("opens inside the element that goes fullscreen", () => {
+    const target = document.createElement("div");
+    document.body.append(target);
+    const { video } = renderPlayer({
+      subtitleTracks: tracks,
+      fullscreenTargetRef: { current: target },
+    });
+    loadVideo(video);
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.audioSubtitles" }),
+    );
+    expect(
+      target.contains(
+        screen.getByRole("dialog", { name: "player.audioSubtitles" }),
+      ),
+    ).toBe(true);
+    target.remove();
+  });
+
+  it("keeps Space on its button from playing or pausing", () => {
+    const { video } = renderPlayer({ subtitleTracks: tracks });
+    loadVideo(video);
+    const play = vi
+      .spyOn(video, "play")
+      .mockImplementation(() => Promise.resolve());
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "player.audioSubtitles" }),
+      { code: "Space", key: " " },
+    );
+    expect(play).not.toHaveBeenCalled();
+    // The same key anywhere else in the player still plays.
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    expect(play).toHaveBeenCalled();
   });
 });
 
@@ -307,10 +355,7 @@ describe("VideoPlayer", () => {
     const first = renderPlayer({ audioTracks, autoplay: false });
     loadVideo(first.video);
     first.video.currentTime = 12.75;
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "player.audioTrack" }),
-      { target: { value: "1" } },
-    );
+    fireEvent.click(trackRadios("player.audioTrack")[2]);
     const search = new URL(first.video.src).searchParams;
     expect(search.get("audioTrack")).toBe("1");
     expect(search.get("t")).toBe("12.75");
@@ -322,11 +367,7 @@ describe("VideoPlayer", () => {
     expect(
       new URL(reopened.video.src).searchParams.get("audioTrack"),
     ).toBeNull();
-    expect(
-      screen.getByRole<HTMLSelectElement>("combobox", {
-        name: "player.audioTrack",
-      }).value,
-    ).toBe("-1");
+    expect(trackRadios("player.audioTrack")[0].checked).toBe(true);
   });
 
   describe("adopting a handed-over element", () => {
