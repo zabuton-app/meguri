@@ -52,6 +52,16 @@ test("video adjustments sit above a full-width scene strip", async () => {
     const picture = (await detail.locator("video").boundingBox())!;
 
     expect(picture.x + picture.width).toBeLessThanOrEqual(controls.x);
+    // A sidebar beside the video, at least as tall as the picture. On a wide
+    // clip it keeps the height its controls need, so none is scrolled away.
+    expect(Math.abs(controls.y - picture.y)).toBeLessThanOrEqual(1);
+    expect(controls.height).toBeGreaterThan(picture.height);
+    const tint = (await panel
+      .getByRole("slider", { name: "Tint" })
+      .boundingBox())!;
+    expect(tint.y + tint.height).toBeLessThanOrEqual(
+      controls.y + controls.height,
+    );
     expect(controls.y + controls.height).toBeLessThan(opened.y);
     expect(opened.width).toBeCloseTo(closed.width, 0);
     expect(opened.x + opened.width).toBeGreaterThanOrEqual(

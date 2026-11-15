@@ -396,9 +396,7 @@ export default function MediaDetail() {
             {d.kind === "video" ? (
               // In fullscreen, cancel the surrounding padding so the video is
               // edge-to-edge for the first screenful (the rest scrolls below).
-              <div
-                className={`flex items-start ${isFullscreen ? "-mx-4 -mt-4" : "gap-4"}`}
-              >
+              <div className={`flex ${isFullscreen ? "-mx-4 -mt-4" : "gap-4"}`}>
                 <div className="min-w-0 flex-1">
                   <VideoPlayer
                     ref={playerRef}
@@ -459,8 +457,8 @@ export default function MediaDetail() {
                   <div
                     ref={setAdjustmentsContainer}
                     data-slot="video-adjustments-panel"
-                    // The panel draws its own frame beside the video. The
-                    // scene strip and the rest of the detail view span both.
+                    // A sidebar as tall as the video beside it, so the scene
+                    // strip and the rest of the detail view span the full width.
                     className="contents"
                   />
                 )}
