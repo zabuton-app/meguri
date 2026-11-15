@@ -465,6 +465,20 @@ was started with. Because it needs no param, a locale may use `{app}` where
 `ja` does not. The About section names the app by its one-character mark
 instead, `appGlyph()` from the same file (Meguri's is 巡).
 
+A string with a `{count}` can have plural forms: instead of a string, the locale
+gives an object keyed by `Intl.PluralRules` category, with at least `other`
+(`{ one: "{count} file", other: "{count} files" }`; `src/i18n/message.ts`).
+`t()` picks the form for the `count` param, so pass the number itself; a count
+that is not a number, such as `"1,000+"`, takes `other`. `ja.ts` has no forms,
+and only the categories of the locale's language are allowed (a test checks).
+Forms are given where the words around the number change with it and the
+count can be one (in French, also zero), not where it never can (an action on
+several selected tags, a list past its limit). Only `count` picks a form: a
+string whose other number params (`{files}`, `{tags}`) decide the noun keeps
+one wording, or is split into keys such as `…One` / `…Many` by its caller.
+Number params are written with `Intl.NumberFormat` for the app's language, not
+the OS's, so do not format them before passing them in.
+
 ## UI primitives and dialogs
 
 UI primitives are in `src/components/ui/` (Radix plus class-variance-authority,

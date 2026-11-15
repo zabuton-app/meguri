@@ -20,8 +20,11 @@ describe("I18nProvider", () => {
 
   it("interpolates {param} placeholders", () => {
     const { result } = renderHook(() => useI18n(), { wrapper });
-    const expected = en["home.initError"].replace("{msg}", "boom");
-    expect(result.current.t("home.initError", { msg: "boom" })).toBe(expected);
+    const template = en["home.initError"];
+    if (typeof template !== "string") throw new Error("expected one form");
+    expect(result.current.t("home.initError", { msg: "boom" })).toBe(
+      template.replace("{msg}", "boom"),
+    );
   });
 
   it("leaves a placeholder intact when its param is missing", () => {
@@ -42,5 +45,31 @@ describe("I18nProvider", () => {
     expect(result.current.lang).toBe("ja");
     expect(result.current.t("common.ok")).toBe(ja["common.ok"]);
     expect(localStorage.getItem("meguri.lang")).toBe("ja");
+  });
+
+  it("picks the plural form for {count} and writes it for the language", () => {
+    const { result } = renderHook(() => useI18n(), { wrapper });
+    expect(result.current.t("tags.merged", { count: 1 })).toBe("Merged 1 tag");
+    expect(result.current.t("tags.merged", { count: 1200 })).toBe(
+      "Merged 1,200 tags",
+    );
+    act(() => result.current.setLang("fr"));
+    // French counts 0 as one, and groups thousands with a narrow space.
+    expect(result.current.t("tags.merged", { count: 0 })).toBe(
+      "0 tag fusionné",
+    );
+    expect(result.current.t("tags.merged", { count: 1200 })).toBe(
+      `${new Intl.NumberFormat("fr").format(1200)} tags fusionnés`,
+    );
+  });
+
+  it("takes the other form when the count is not a number", () => {
+    const { result } = renderHook(() => useI18n(), { wrapper });
+    expect(result.current.t("statusbar.shown", { count: "1,000+" })).toBe(
+      "1,000+ shown",
+    );
+    expect(result.current.t("timeline.count", { count: "many" })).toBe(
+      "many files",
+    );
   });
 });

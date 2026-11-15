@@ -1,7 +1,7 @@
 // 한국어 카탈로그. ja.ts 와 완전히 동일한 키 집합을 다뤄야 함 (타입으로 강제).
-import type { TranslationKey } from "./ja";
+import type { Catalog } from "../message";
 
-export const ko: Record<TranslationKey, string> = {
+export const ko: Catalog = {
   // common
   "common.close": "닫기",
   "common.cancel": "취소",

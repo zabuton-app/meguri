@@ -58,7 +58,7 @@ test("lists a file gone from disk and removes it on request", async () => {
       .getByRole("alertdialog")
       .getByRole("button", { name: "Remove" })
       .click();
-    await expect(page.getByText("Removed 1 file(s)")).toBeVisible();
+    await expect(page.getByText("Removed 1 file")).toBeVisible();
     await expect(dialog.getByText("No missing files.")).toBeVisible();
   } finally {
     try {

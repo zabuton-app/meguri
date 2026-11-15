@@ -1,7 +1,7 @@
 // Catalogue français. Doit couvrir exactement le même ensemble de clés que ja.ts (imposé par le type).
-import type { TranslationKey } from "./ja";
+import type { Catalog } from "../message";
 
-export const fr: Record<TranslationKey, string> = {
+export const fr: Catalog = {
   // common
   "common.close": "Fermer",
   "common.cancel": "Annuler",
@@ -176,9 +176,14 @@ export const fr: Record<TranslationKey, string> = {
   "home.scanRootUnreadableNamed": "Le dossier de « {name} » est inaccessible",
   "home.scanRootUnreadableDesc":
     "Vérifiez que le dossier n’a pas été déplacé ou supprimé, que son disque ou partage réseau est connecté et que {app} peut le lire, puis relancez le scan. La liste des fichiers a été laissée telle quelle.",
-  "home.scanSkipped": "{count} dossier(s) ou fichier(s) illisible(s) ignoré(s)",
-  "home.scanSkippedNamed":
-    "{count} dossier(s) ou fichier(s) illisible(s) ignoré(s) dans « {name} »",
+  "home.scanSkipped": {
+    one: "{count} dossier ou fichier illisible ignoré",
+    other: "{count} dossiers ou fichiers illisibles ignorés",
+  },
+  "home.scanSkippedNamed": {
+    one: "{count} dossier ou fichier illisible ignoré dans « {name} »",
+    other: "{count} dossiers ou fichiers illisibles ignorés dans « {name} »",
+  },
   "home.scanSkippedDesc":
     "{app} n’a peut-être pas l’autorisation de les lire, ou un autre programme les utilise. Cette partie de la liste des fichiers a été laissée telle quelle, et le prochain scan réessaiera.",
   "home.scanStartFailed": "Impossible de démarrer le scan",
@@ -195,7 +200,10 @@ export const fr: Record<TranslationKey, string> = {
   "command.openDevTools": "Ouvrir la console développeur",
   "command.shortcutHint": "Ouvrir avec {shortcut}",
   "command.groupFile": "Fichier",
-  "command.selectedFiles": "{count} sélectionnés",
+  "command.selectedFiles": {
+    one: "{count} sélectionné",
+    other: "{count} sélectionnés",
+  },
   "command.rating": "Changer la note…",
   "command.ratingStars": "{rating} étoiles",
   "command.ratingNone": "Aucune note",
@@ -233,7 +241,10 @@ export const fr: Record<TranslationKey, string> = {
   "filter.dateFrom": "Du",
   "filter.dateTo": "Au",
   "filter.more": "Autres critères",
-  "filter.moreActive": "Autres critères ({count} actifs)",
+  "filter.moreActive": {
+    one: "Autres critères ({count} actif)",
+    other: "Autres critères ({count} actifs)",
+  },
   "filter.kindFilter": "Filtrer par type",
   "filter.playState": "État de lecture",
   "filter.sortSection": "Tri",
@@ -465,15 +476,36 @@ export const fr: Record<TranslationKey, string> = {
   "select.watchLaterOff": "Retirer de À voir plus tard",
   "select.rating": "Attribuer une note",
   "select.ratingMixed": "La sélection a des notes différentes",
-  "select.favoriteAdded": "{count} fichiers ajoutés aux favoris",
-  "select.favoriteRemoved": "{count} fichiers retirés des favoris",
-  "select.watchLaterAdded": "{count} fichiers ajoutés à À voir plus tard",
-  "select.watchLaterRemoved": "{count} fichiers retirés de À voir plus tard",
-  "select.ratingApplied": "{count} fichiers notés {rating}",
-  "select.ratingCleared": "Note effacée sur {count} fichiers",
+  "select.favoriteAdded": {
+    one: "{count} fichier ajouté aux favoris",
+    other: "{count} fichiers ajoutés aux favoris",
+  },
+  "select.favoriteRemoved": {
+    one: "{count} fichier retiré des favoris",
+    other: "{count} fichiers retirés des favoris",
+  },
+  "select.watchLaterAdded": {
+    one: "{count} fichier ajouté à À voir plus tard",
+    other: "{count} fichiers ajoutés à À voir plus tard",
+  },
+  "select.watchLaterRemoved": {
+    one: "{count} fichier retiré de À voir plus tard",
+    other: "{count} fichiers retirés de À voir plus tard",
+  },
+  "select.ratingApplied": {
+    one: "{count} fichier noté {rating}",
+    other: "{count} fichiers notés {rating}",
+  },
+  "select.ratingCleared": {
+    one: "Note effacée sur {count} fichier",
+    other: "Note effacée sur {count} fichiers",
+  },
   "select.bulkFailed": "La modification groupée n’a pas été appliquée : {msg}",
   "select.bulkTagTitle": "Modifier les tags en lot",
-  "select.bulkTagSubtitle": "S’applique aux {count} fichiers sélectionnés",
+  "select.bulkTagSubtitle": {
+    one: "S’applique à {count} fichier sélectionné",
+    other: "S’applique aux {count} fichiers sélectionnés",
+  },
   "select.bulkTagAddLabel": "Ajouter un tag",
   "select.bulkTagPending": "En attente",
   "select.bulkTagExisting": "Tags présents dans la sélection",
@@ -489,7 +521,10 @@ export const fr: Record<TranslationKey, string> = {
   "select.bulkTagNameLimit": "Jusqu’à {max} tags par modification.",
   "select.tagsApplied":
     "{files} fichiers mis à jour ({added} ajoutés, {removed} retirés)",
-  "select.tagsSkipped": "{count} fichiers ignorés : absents de l’index.",
+  "select.tagsSkipped": {
+    one: "{count} fichier ignoré : absent de l’index.",
+    other: "{count} fichiers ignorés : absents de l’index.",
+  },
   "select.tagsFailed": "Impossible d’appliquer les tags : {msg}",
 
   // media grid
@@ -508,10 +543,22 @@ export const fr: Record<TranslationKey, string> = {
   "heatmap.metric.captured": "Capturés",
   "heatmap.metric.created": "Créés",
   "heatmap.metric.added": "Ajoutés",
-  "heatmap.cell.played": "{date} : {count} lus",
-  "heatmap.cell.captured": "{date} : {count} capturés",
-  "heatmap.cell.created": "{date} : {count} créés",
-  "heatmap.cell.added": "{date} : {count} ajoutés",
+  "heatmap.cell.played": {
+    one: "{date} : {count} lu",
+    other: "{date} : {count} lus",
+  },
+  "heatmap.cell.captured": {
+    one: "{date} : {count} capturé",
+    other: "{date} : {count} capturés",
+  },
+  "heatmap.cell.created": {
+    one: "{date} : {count} créé",
+    other: "{date} : {count} créés",
+  },
+  "heatmap.cell.added": {
+    one: "{date} : {count} ajouté",
+    other: "{date} : {count} ajoutés",
+  },
   "heatmap.range.last": "12 derniers mois",
   "heatmap.range.prev": "Année précédente",
   "heatmap.range.next": "Année suivante",
@@ -531,10 +578,19 @@ export const fr: Record<TranslationKey, string> = {
   "timeline.axis.btime": "Création",
   "timeline.axis.added": "Ajout",
   "timeline.undated": "Sans date",
-  "timeline.count": "{count} fichiers",
+  "timeline.count": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "timeline.scrubber": "Aller à un mois",
-  "timeline.month": "{month} : {count} fichiers",
-  "timeline.day": "{day} : {count} fichiers",
+  "timeline.month": {
+    one: "{month} : {count} fichier",
+    other: "{month} : {count} fichiers",
+  },
+  "timeline.day": {
+    one: "{day} : {count} fichier",
+    other: "{day} : {count} fichiers",
+  },
   "timeline.sortLocked":
     "La vue chronologique classe les fichiers par date, du plus récent au plus ancien",
   "timeline.error": "Impossible de charger la chronologie",
@@ -599,7 +655,10 @@ export const fr: Record<TranslationKey, string> = {
   "folder.back": "Retour",
   "folder.up": "Remonter d'un niveau",
   "folder.more": "Afficher les niveaux masqués",
-  "folder.itemCount": "{count} éléments",
+  "folder.itemCount": {
+    one: "{count} élément",
+    other: "{count} éléments",
+  },
   "folder.subfolders": "Sous-dossiers : {count}",
   "folder.summary": "Dossiers : {folders} · Fichiers : {files}",
   "folder.openInFileManager": "Ouvrir dans le gestionnaire de fichiers",
@@ -624,7 +683,10 @@ export const fr: Record<TranslationKey, string> = {
   "shortcuts.folderBack":
     "Revenir au dossier précédent (affichage par dossier)",
   "shortcuts.folderUp": "Remonter d'un niveau (affichage par dossier)",
-  "select.folderCount": "dont {count} dossiers",
+  "select.folderCount": {
+    one: "dont {count} dossier",
+    other: "dont {count} dossiers",
+  },
   "select.folderLoading": "Chargement du contenu du dossier",
   "select.selectFolder": "Sélectionner tout le contenu du dossier",
   "select.deselectFolder": "Désélectionner ce dossier",
@@ -651,7 +713,10 @@ export const fr: Record<TranslationKey, string> = {
   "history.clearAction": "Effacer",
   "history.clearConfirm":
     "Supprimer l'historique de lecture et les points de reprise de tous les espaces de travail ? Cette action est irréversible.",
-  "history.playCount": "{count} lectures",
+  "history.playCount": {
+    one: "{count} lecture",
+    other: "{count} lectures",
+  },
   "history.viaBrowser": "Dans l'application",
   "history.viaExternal": "Lecteur externe",
   "history.today": "Aujourd'hui",
@@ -669,11 +734,20 @@ export const fr: Record<TranslationKey, string> = {
   "missing.selectAll": "Tout sélectionner",
   "missing.goneAt": "Introuvable depuis le {date}",
   "missing.remove": "Supprimer les fichiers introuvables",
-  "missing.removeSelected": "Supprimer {count} sélectionné(s)",
-  "missing.removeConfirm":
-    "Retirer les {count} fichier(s) sélectionné(s) de la liste et des collections, et supprimer leurs miniatures ? Les tags, notes et autres métadonnées sont conservés. Cette action est irréversible.",
+  "missing.removeSelected": {
+    one: "Supprimer {count} sélectionné",
+    other: "Supprimer {count} sélectionnés",
+  },
+  "missing.removeConfirm": {
+    one: "Retirer {count} fichier sélectionné de la liste et des collections, et supprimer sa miniature ? Les tags, notes et autres métadonnées sont conservés. Cette action est irréversible.",
+    other:
+      "Retirer les {count} fichiers sélectionnés de la liste et des collections, et supprimer leurs miniatures ? Les tags, notes et autres métadonnées sont conservés. Cette action est irréversible.",
+  },
   "missing.removeAction": "Supprimer",
-  "missing.removedToast": "{count} fichier(s) supprimé(s)",
+  "missing.removedToast": {
+    one: "{count} fichier supprimé",
+    other: "{count} fichiers supprimés",
+  },
   "missing.removeFailed": "Impossible de supprimer les fichiers",
 
   "duplicates.title": "Fichiers en double",
@@ -683,12 +757,18 @@ export const fr: Record<TranslationKey, string> = {
   "duplicates.loadFailed":
     "Impossible de charger les fichiers en double. Veuillez réessayer.",
   "duplicates.retry": "Réessayer",
-  "duplicates.fileCount": "{count} fichiers",
+  "duplicates.fileCount": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "duplicates.truncated":
     "Trop de groupes ; seuls les {max} premiers sont affichés.",
   "duplicates.filter": "Afficher uniquement les fichiers en double",
   "duplicates.chip": "Doublons",
-  "duplicates.groupCount": "{count} groupes",
+  "duplicates.groupCount": {
+    one: "{count} groupe",
+    other: "{count} groupes",
+  },
   "duplicates.reclaimable": "Récupérable",
   "duplicates.search": "Filtrer par nom ou chemin",
   "duplicates.sortLabel": "Trier par",
@@ -724,7 +804,10 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.page.prev": "Précédent",
   "autoTag.page.next": "Suivant",
   "autoTag.page.range": "{from}–{to} sur {total}",
-  "autoTag.fileCount": "{count} fichiers",
+  "autoTag.fileCount": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "autoTag.tab.regex": "Regex",
   "autoTag.tab.keywords": "Mots-clés",
   "autoTag.tab.folders": "Dossiers",
@@ -734,8 +817,11 @@ export const fr: Record<TranslationKey, string> = {
     "Exécute les règles actives et les mots-clés sur les fichiers ajoutés ou modifiés par une analyse.",
   "autoTag.reapply": "Appliquer aux fichiers existants",
   "autoTag.reapplying": "Application…",
-  "autoTag.reapplyConfirm":
-    "Exécuter les règles, les mots-clés et les règles de dossier sur les {count} fichiers et ajouter les étiquettes obtenues. Cet ajout en masse ne peut pas être annulé.",
+  "autoTag.reapplyConfirm": {
+    one: "Exécuter les règles, les mots-clés et les règles de dossier sur {count} fichier et ajouter les étiquettes obtenues. Cet ajout en masse ne peut pas être annulé.",
+    other:
+      "Exécuter les règles, les mots-clés et les règles de dossier sur les {count} fichiers et ajouter les étiquettes obtenues. Cet ajout en masse ne peut pas être annulé.",
+  },
   "autoTag.reapplyDone": "{added} étiquettes ajoutées à {files} fichiers",
   "autoTag.patternRules": "Règles de motif",
   "autoTag.evaluatedInOrder": "évaluées de haut en bas",
@@ -759,7 +845,10 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.excludeNone": "Rien n'est encore exclu.",
   "autoTag.excludeNoMatch": "Aucune valeur ne le contient.",
   "autoTag.excludeFull": "La liste est pleine.",
-  "autoTag.excludeCount": "{count} valeurs",
+  "autoTag.excludeCount": {
+    one: "{count} valeur",
+    other: "{count} valeurs",
+  },
   "autoTag.excluded": "Exclu",
   "autoTag.letterCase": "Casse",
   "autoTag.case.keep": "Conserver",
@@ -835,14 +924,22 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.keyword.noTagsShort": "aucun tag",
   "autoTag.renameTag": "Renommer le tag « {tag} »",
   "autoTag.migrate.title": "Passer les fichiers à « {to} » ?",
-  "autoTag.migrate.message":
-    "{count} fichiers atteints par cette condition portent « {from} ». Le remplacer par « {to} » sur ceux-ci ? Leurs copies changent avec eux. Sinon, seul le réglage change et les fichiers gardent « {from} ».",
+  "autoTag.migrate.message": {
+    one: "{count} fichier atteint par cette condition porte « {from} ». Le remplacer par « {to} » sur celui-ci ? Ses copies changent avec lui. Sinon, seul le réglage change et le fichier garde « {from} ».",
+    other:
+      "{count} fichiers atteints par cette condition portent « {from} ». Le remplacer par « {to} » sur ceux-ci ? Leurs copies changent avec eux. Sinon, seul le réglage change et les fichiers gardent « {from} ».",
+  },
   "autoTag.migrate.sampled":
     " Seuls les {count} premiers fichiers, ceux chargés ici, sont examinés.",
-  "autoTag.migrate.confirm": "Remplacer sur {count} fichiers",
+  "autoTag.migrate.confirm": {
+    one: "Remplacer sur {count} fichier",
+    other: "Remplacer sur {count} fichiers",
+  },
   "autoTag.migrate.cancel": "Réglage seulement",
-  "autoTag.migrate.done":
-    "« {from} » remplacé par « {to} » sur {count} fichiers.",
+  "autoTag.migrate.done": {
+    one: "« {from} » remplacé par « {to} » sur {count} fichier.",
+    other: "« {from} » remplacé par « {to} » sur {count} fichiers.",
+  },
   "autoTag.matchMode": "Correspondance",
   "autoTag.mode.word": "Mot entier",
   "autoTag.mode.contains": "Contient",
@@ -881,15 +978,26 @@ export const fr: Record<TranslationKey, string> = {
   "autoTag.appliedMany": "{tags} étiquettes appliquées à {files} fichiers.",
   "autoTag.appliedDictSuffix":
     " Les prochaines analyses les appliqueront aussi.",
-  "autoTag.addedKeywords": "{count} ajoutés aux mots-clés.",
-  "autoTag.keywordsFullSuffix":
-    " {count} n'ont pas pu être ajoutés : les mots-clés sont pleins.",
-  "autoTag.removeFromFiles": "Retirer de {count} fichiers",
+  "autoTag.addedKeywords": {
+    one: "{count} ajouté aux mots-clés.",
+    other: "{count} ajoutés aux mots-clés.",
+  },
+  "autoTag.keywordsFullSuffix": {
+    one: " {count} n'a pas pu être ajouté : les mots-clés sont pleins.",
+    other: " {count} n'ont pas pu être ajoutés : les mots-clés sont pleins.",
+  },
+  "autoTag.removeFromFiles": {
+    one: "Retirer de {count} fichier",
+    other: "Retirer de {count} fichiers",
+  },
   "autoTag.removeHint":
     "Retire ce tag des fichiers qui le portent, quelle que soit son origine",
   "autoTag.removeTitle": "Retirer « {tag} » ?",
-  "autoTag.removeMessage":
-    "« {tag} » sera retiré de {count} fichiers et de leurs copies, y compris là où il a été ajouté à la main. Impossible d'annuler ici.",
+  "autoTag.removeMessage": {
+    one: "« {tag} » sera retiré de {count} fichier et de ses copies, y compris là où il a été ajouté à la main. Impossible d'annuler ici.",
+    other:
+      "« {tag} » sera retiré de {count} fichiers et de leurs copies, y compris là où il a été ajouté à la main. Impossible d'annuler ici.",
+  },
   "autoTag.removeConfirm": "Retirer",
   "autoTag.removedOne": "« {tag} » retiré de {files} fichiers.",
   "autoTag.removeSelected": "Retirer de {files} fichiers",
@@ -905,7 +1013,10 @@ export const fr: Record<TranslationKey, string> = {
     "Affiche les fichiers contenant les mots de ce candidat avec la recherche de la bibliothèque",
   "autoTag.noCandidates": "Aucun candidat pour ce filtre.",
   "autoTag.selection": "{count} sélectionnées · étiquette {files} fichiers",
-  "autoTag.selectionIgnored": "{count} sélectionnées",
+  "autoTag.selectionIgnored": {
+    one: "{count} sélectionnée",
+    other: "{count} sélectionnées",
+  },
   "autoTag.applySelected": "Appliquer la sélection",
   "autoTag.applySelectedDict": "Ajouter aux mots-clés et appliquer",
   "autoTag.clearSelection": "Effacer la sélection",
@@ -925,7 +1036,10 @@ export const fr: Record<TranslationKey, string> = {
   "tags.searchPlaceholder": "Filtrer les tags",
   "tags.noMatch": "Aucun tag correspondant.",
   "tags.truncated": "Trop de tags : affichage des {max} premiers.",
-  "tags.fileCount": "{count} fichiers",
+  "tags.fileCount": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "tags.sortByName": "Par nom",
   "tags.sortByCount": "Par nombre",
   "tags.groupManual": "Tags manuels",
@@ -935,7 +1049,10 @@ export const fr: Record<TranslationKey, string> = {
   "tags.filterByTag": "Filtrer par ce tag",
   "tags.source.manual": "Manuel",
   "tags.source.autoMeta": "Automatique",
-  "tags.selected": "{count} sélectionnés",
+  "tags.selected": {
+    one: "{count} sélectionné",
+    other: "{count} sélectionnés",
+  },
   "tags.clearSelection": "Annuler la sélection",
   "tags.rename": "Renommer",
   "tags.renameTitle": "Renommer le tag",
@@ -950,12 +1067,18 @@ export const fr: Record<TranslationKey, string> = {
     "Les {count} tags sélectionnés sont regroupés dans la cible dans tous les espaces de travail. Les autres sont supprimés.",
   "tags.mergeTarget": "Fusionner dans",
   "tags.mergeAction": "Fusionner",
-  "tags.merged": "{count} tags fusionnés",
+  "tags.merged": {
+    one: "{count} tag fusionné",
+    other: "{count} tags fusionnés",
+  },
   "tags.mergeFailed": "Impossible de fusionner les tags",
   "tags.delete": "Supprimer",
   "tags.deleteAction": "Supprimer",
-  "tags.deleteConfirm":
-    "Le tag « {name} » sera retiré de {count} fichiers dans tous les espaces de travail. Continuer ?",
+  "tags.deleteConfirm": {
+    one: "Le tag « {name} » sera retiré de {count} fichier dans tous les espaces de travail. Continuer ?",
+    other:
+      "Le tag « {name} » sera retiré de {count} fichiers dans tous les espaces de travail. Continuer ?",
+  },
   "tags.deleteConfirmMany":
     "Les {count} tags sélectionnés seront supprimés de tous les espaces de travail. Continuer ?",
   "tags.deleted": "Tag supprimé",
@@ -1000,12 +1123,18 @@ export const fr: Record<TranslationKey, string> = {
   "drop.addAction": "Ajouter",
   "drop.notDirectory": "« {name} » n’est pas un dossier et n’a pas été ajouté",
   "drop.addFailed": "Impossible d’ajouter « {name} »",
-  "drop.addedToCollection": "{count} fichiers ajoutés à « {name} »",
+  "drop.addedToCollection": {
+    one: "{count} fichier ajouté à « {name} »",
+    other: "{count} fichiers ajoutés à « {name} »",
+  },
   "drop.addedOneToCollection": "1 fichier ajouté à « {name} »",
   "drop.alreadyInCollection": "Déjà dans « {name} »",
   "drop.alreadyOneInCollection": "Déjà dans « {name} »",
   "drop.addToCollectionFailed": "Impossible d’ajouter à la collection",
-  "drag.fileCount": "{count} fichiers",
+  "drag.fileCount": {
+    one: "{count} fichier",
+    other: "{count} fichiers",
+  },
   "drag.external": "Glisser vers une autre application",
   "drag.externalFailed":
     "Impossible de démarrer le glissement. Vérifiez que les fichiers sont toujours disponibles.",
@@ -1031,8 +1160,14 @@ export const fr: Record<TranslationKey, string> = {
   "collection.removeFrom": "Retirer de « {name} »",
   "collection.addedToast": "Ajouté à « {name} »",
   "collection.removedFromToast": "Retiré de « {name} »",
-  "collection.addedCountToast": "{count} fichiers ajoutés à « {name} »",
-  "collection.removedCountToast": "{count} fichiers retirés de « {name} »",
+  "collection.addedCountToast": {
+    one: "{count} fichier ajouté à « {name} »",
+    other: "{count} fichiers ajoutés à « {name} »",
+  },
+  "collection.removedCountToast": {
+    one: "{count} fichier retiré de « {name} »",
+    other: "{count} fichiers retirés de « {name} »",
+  },
   "collection.actionFailed": "Impossible de mettre à jour la collection",
 
   // À regarder plus tard (collection intégrée)
@@ -1066,9 +1201,18 @@ export const fr: Record<TranslationKey, string> = {
   "statusbar.label": "Barre d'état",
   "statusbar.lastScan": "Dernier scan",
   "statusbar.lastScanNever": "Jamais",
-  "statusbar.total": "{count} fichiers au total",
-  "statusbar.folders": "{count} dossiers",
-  "statusbar.shown": "{count} affichés",
+  "statusbar.total": {
+    one: "{count} fichier au total",
+    other: "{count} fichiers au total",
+  },
+  "statusbar.folders": {
+    one: "{count} dossier",
+    other: "{count} dossiers",
+  },
+  "statusbar.shown": {
+    one: "{count} affiché",
+    other: "{count} affichés",
+  },
   "statusbar.status": "État",
   "statusbar.scanning": "Analyse en cours",
   "statusbar.idle": "Inactif",

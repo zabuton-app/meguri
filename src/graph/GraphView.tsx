@@ -592,8 +592,8 @@ function GraphScene({
             className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-border bg-surface/90 px-3 py-1 text-xs text-secondary-fg shadow"
           >
             {t("graph.truncated", {
-              shown: payload.files.id.length.toLocaleString(),
-              total: payload.totalFiles.toLocaleString(),
+              shown: payload.files.id.length,
+              total: payload.totalFiles,
             })}
           </p>
         )}
