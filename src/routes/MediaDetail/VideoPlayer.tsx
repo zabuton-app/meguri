@@ -1288,6 +1288,8 @@ export const VideoPlayer = forwardRef<
         <VideoGradeOverlay
           key={`${wsId}:${id}`}
           videoRef={ref}
+          playerRef={wrapRef}
+          playing={playing}
           loaded={loaded}
           panel={videoAdjustments}
           t={t}

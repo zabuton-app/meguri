@@ -1,27 +1,45 @@
 // The adjustment controls render into the detail view's side panel, which the
 // view opens and closes; the trigger stays on the picture.
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { useRef, useState } from "react";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { VideoGradeOverlay } from "@/video/VideoGradeOverlay";
 
 const t = ((key: string) => key) as TFunc;
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 /** The detail view's part: the open state and the panel element. `file`
  *  stands for the file shown (the player keys the overlay by it). */
-function View({ file = "a" }: { file?: string }) {
+function View({
+  file = "a",
+  playing = false,
+}: {
+  file?: string;
+  playing?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const playerRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState<HTMLDivElement | null>(null);
   return (
     <>
-      <div data-testid="player">
+      <div data-testid="player" ref={playerRef}>
         <VideoGradeOverlay
           key={file}
           videoRef={videoRef}
+          playerRef={playerRef}
+          playing={playing}
           loaded
           panel={{ open, onOpenChange: setOpen, container: panel }}
           t={t}
@@ -81,5 +99,44 @@ describe("VideoGradeOverlay side panel", () => {
     });
     expect(sidePanel()).toBeNull();
     expect(document.activeElement).toBe(trigger());
+  });
+
+  it("reveals the trigger over the picture and fades it on leave", () => {
+    render(<View />);
+    const player = screen.getByTestId("player");
+    expect(trigger().classList.contains("opacity-0")).toBe(true);
+    fireEvent.pointerMove(player);
+    expect(trigger().classList.contains("opacity-100")).toBe(true);
+    fireEvent.click(trigger());
+    fireEvent.pointerLeave(player);
+    expect(trigger().classList.contains("opacity-0")).toBe(true);
+    expect(sidePanel()).not.toBeNull();
+  });
+
+  it("fades during idle playback and reveals the trigger when the pointer moves", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<View />);
+    const player = screen.getByTestId("player");
+    fireEvent.pointerMove(player);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(trigger().classList.contains("opacity-100")).toBe(true);
+
+    rerender(<View playing />);
+    act(() => {
+      vi.advanceTimersByTime(1200);
+    });
+    fireEvent.pointerMove(player);
+    act(() => {
+      vi.advanceTimersByTime(1200);
+    });
+    expect(trigger().classList.contains("opacity-100")).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(trigger().classList.contains("opacity-0")).toBe(true);
+    fireEvent.pointerMove(player);
+    expect(trigger().classList.contains("opacity-100")).toBe(true);
   });
 });
