@@ -356,9 +356,9 @@ export function dropFromWatchLaterCache(
   const queryKey = ["workspaces_list"] as const;
   const wasInvalidated = qc.getQueryState(queryKey)?.isInvalidated ?? false;
   // Cancel first: a workspaces_list fetch already in flight would land after
-  // this patch and restore the entry the main process has just consumed. The
-  // detail view mounts its own observer for that key, so such a fetch is
-  // routinely in the air when the play is recorded.
+  // this patch and restore the entry the main process has just consumed. A
+  // refetch started by some other invalidation (the detail view's flush on
+  // close, a collection edit) can be in the air when the play is recorded.
   //
   // Only when there is data to protect, though. Cancelling reverts the query to
   // its previous value, so cancelling a first-ever load strands this app-wide
@@ -400,6 +400,8 @@ export function patchCollectionItemOrder(
   const key = (item: { workspaceId: string; fileId: number }) =>
     `${item.workspaceId}:${item.fileId}`;
 
+  // Cancel first, as in dropFromWatchLaterCache: a fetch already in flight
+  // carries the old order, and a reorder is not broadcast to correct it.
   if (qc.getQueryData(queryKey) !== undefined) {
     void qc.cancelQueries({ queryKey });
   }
