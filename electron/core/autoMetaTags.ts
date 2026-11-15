@@ -133,8 +133,8 @@ export function autoMetaTagsFor(input: AutoMetaInput): DerivedTag[] {
  *
  * Implemented as a diff so the steady state writes nothing: a rescan of an
  * unchanged library becomes one indexed read per file and no WAL growth.
- * Returns true only when meta_tags actually changed, which is the caller's
- * signal to re-sync FTS.
+ * Returns true only when meta_tags actually changed. FTS needs no re-sync
+ * either way: derived tags are namespaced, which tags_text leaves out.
  */
 export function applyDerivedTagsByKey(
   db: DB,

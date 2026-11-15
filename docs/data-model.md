@@ -301,10 +301,13 @@ holds any more, so a removed workspace added again gets its metadata back.
 
 `files_fts(rel_path, tags_text)` is an FTS5 virtual table whose `rowid` matches
 `files.id`. It is kept in sync by `syncFts()` in `electron/core/tags.ts`; call it
-after any tag change so the searchable `tags_text` stays current. For a batch of
+after a change to the user's own tags so the searchable `tags_text` stays
+current. Derived (namespaced) tags never reach `tags_text`, so writing them needs
+no re-sync. For a batch of
 files — a tag rename, a merge, the derived-tag backfill — use
 `resyncFtsForKeys()` in `db.ts` instead, which re-indexes a whole set of
-`meta_key`s in one pair of statements.
+`meta_key`s in one pair of statements. The scan's index phase does the same by
+file id with `resyncFtsForIds()`, one transaction per chunk of 256 files.
 
 A soft-deleted file has no `files_fts` row once it is removed from the index, or
 once the index is re-synced or rebuilt while it is gone (both skip deleted
@@ -315,9 +318,10 @@ and `runScan()` re-syncs its row along with the new, moved and changed files;
 those files are not auto-tagged again.
 
 `tags_text` holds the **user's own** tag names, joined by spaces and
-deduplicated across sources. Three places produce it — `syncFts()`,
-`resyncFtsForKeys()` and the trigram rebuild — and they must never drift, so the
-projection lives in a single `FTS_ROW_SELECT` constant in `db.ts`.
+deduplicated across sources. Four places produce it — `syncFts()`,
+`resyncFtsForKeys()`, `resyncFtsForIds()` and the trigram rebuild — and they
+must never drift, so the projection lives in a single `FTS_ROW_SELECT` constant
+in `db.ts`.
 
 Each workspace keeps its own `files_fts`, while the tags live in the library,
 so a tag changed through one workspace has to reach the others' indexes.

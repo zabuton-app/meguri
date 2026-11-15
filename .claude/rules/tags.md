@@ -20,5 +20,5 @@ paths:
 See the tag and Auto tagging sections of [docs/data-model.md](../../docs/data-model.md).
 
 - **Compare tag names with `tagIdentityKey()`** (`shared/tags.ts`; `tag_key()` in SQL), in the main process and the renderer alike. Case, whitespace and invisible characters do not make a different tag. `UNIQUE(namespace, name)` tells spellings apart, so never look up a manual tag with `name = ?` or compare names with `===`.
-- **Call `syncFts()` after changing a file's tags.**
+- **Call `syncFts()` after changing a file's own tags** (namespace `''`), or `resyncFtsForKeys()` / `resyncFtsForIds()` for a batch. Derived tags are namespaced and never reach `tags_text`, so they need no re-sync.
 - **User regexes never run on a main thread**, in either process: the main process uses `electron/autoTagWorker.ts`, the renderer `src/routes/AutoTag/rules.worker.ts`. A runaway pattern would freeze the app.

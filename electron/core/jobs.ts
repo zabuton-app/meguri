@@ -3,7 +3,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
-import { nowUnix } from "./db.js";
+import { nowUnix, resyncFtsForIds } from "./db.js";
 import {
   assertScanRootReadable,
   emptyScanStats,
@@ -16,7 +16,6 @@ import {
 } from "./scan.js";
 import { coverArtStreamIndex, extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
-import { syncFts } from "./tags.js";
 import {
   applyAutoMetaTags,
   backfillAutoMetaTags,
@@ -296,23 +295,22 @@ export async function runScan(
   // Sync FTS for new/moved/updated entries and for unchanged rows that have no
   // FTS row (see syncFiles), less those auto tagging re-synced as it tagged them.
   const ftsIds = [...ftsTargets, ...ftsMissing].filter((id) => !tagged.has(id));
+  // One transaction per chunk rather than an autocommitted delete and insert
+  // per file (#276); the loop yields to the event loop between chunks.
   const ftsTotal = ftsIds.length;
-  let done = 0;
-  for (const id of ftsIds) {
-    if (signal?.aborted) break;
-    syncFts(db, id);
-    done++;
-    if (done % 64 === 0 || done === ftsTotal) {
-      onEvent({
-        type: "progress",
-        jobId,
-        phase: "index",
-        done,
-        total: ftsTotal,
-      });
-      // Yield to the event loop every 256 entries.
-      if (done % 256 === 0) await new Promise((r) => setImmediate(r));
-    }
+  const FTS_CHUNK = 256;
+  for (let done = 0; done < ftsTotal && !signal?.aborted;) {
+    const chunk = ftsIds.slice(done, done + FTS_CHUNK);
+    db.transaction(() => resyncFtsForIds(db, chunk))();
+    done += chunk.length;
+    onEvent({
+      type: "progress",
+      jobId,
+      phase: "index",
+      done,
+      total: ftsTotal,
+    });
+    await new Promise((r) => setImmediate(r));
   }
 
   if (signal?.aborted) {
@@ -363,15 +361,13 @@ export async function runScan(
     } else {
       q.setThumb(db, r.id, r.ok ? r.dest : null, r.ok ? "done" : "error");
     }
-    // Derive from what was just written, and before syncFts — which rebuilds
-    // tags_text by re-reading meta_tags.
+    // No FTS re-sync: derived tags are namespaced, and tags_text carries only
+    // the user's own (as in backfillDerivedTags).
     applyAutoMetaTags(db, r.id, { kind: r.kind, ...r.meta });
-    syncFts(db, r.id);
   };
-  // Per-file transaction for the retry path: persistOne spans several writes
-  // (incl. the FTS delete+insert), so a mid-way failure must roll back the
-  // whole file rather than leave partial state (e.g. an FTS row deleted but
-  // never re-inserted).
+  // Per-file transaction for the retry path: persistOne spans several writes,
+  // so a mid-way failure must roll back the whole file rather than leave
+  // partial state (e.g. metadata written but its derived tags not).
   const persistOneTx = db.transaction(persistOne);
 
   const flush = (): void => {
