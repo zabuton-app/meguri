@@ -189,6 +189,44 @@ export function startApp(options: AppOptions): void {
   const rendererIndex = path.join(__dirname, "../renderer/index.html");
   setRendererIndex(rendererIndex, { allowDevServer: !app.isPackaged });
 
+  app.setName(options.name);
+
+  // Only one running instance. Multiple processes would race on the same
+  // SQLite WAL under userData/roots/<hash>/db.sqlite and confuse the user
+  // (the app is tray-resident, so it's easy to launch twice by accident).
+  // Before anything opens the library: a second instance must not check,
+  // copy or put back the one the first is using.
+  if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    process.exit(0);
+  }
+
+  // Before anything reads the settings (Workspaces), which live in the
+  // library, or a workspace opens it: put a copy back if it is damaged, and
+  // keep the copies current otherwise.
+  /** When the library copy put back at startup was taken (libraryBackup.ts). */
+  const libraryRestoredFrom = maintainLibrary(
+    libraryDbPath(),
+    libraryBackupDir(),
+  );
+  // Still gone though copies of it exist: putting one back failed (a full
+  // disk, say). Reading the settings or opening a workspace now would start an
+  // empty library in its place, with every workspace's metadata out of sight
+  // and the copies aged out by empty ones. Stop before that, and leave the
+  // copies as they are. The dialog waits for `ready`: before it, Linux only
+  // prints it to stderr.
+  if (isLibraryLost(libraryDbPath(), libraryBackupDir())) {
+    log.error("the library is missing and no copy of it could be put back");
+    void app.whenReady().then(() => {
+      dialog.showErrorBox(
+        options.name,
+        `Your library (${libraryDbPath()}) is missing, and ${options.name} could not put back a copy of it from ${libraryBackupDir()}.\n\n${options.name} will quit without opening it, so the copies stay as they are. Free some disk space and start ${options.name} again, or copy the newest file in that folder to the library's place yourself. To start over with an empty library instead, move that folder somewhere else first.`,
+      );
+      app.exit(1);
+    });
+    return;
+  }
+
   const ws = new Workspaces();
   // Heavy read-only list/search queries run on a worker thread so a slow query
   // can't stall the main event loop (UI, IPC, media serving). Writes stay here.
@@ -222,16 +260,6 @@ export function startApp(options: AppOptions): void {
   let mediaServer: http.Server | null = null;
   let controlServer: http.Server | null = null;
   let relaunchAfterQuit = false;
-
-  app.setName(options.name);
-
-  // Only one running instance. Multiple processes would race on the same
-  // SQLite WAL under userData/roots/<hash>/db.sqlite and confuse the user
-  // (the app is tray-resident, so it's easy to launch twice by accident).
-  if (!app.requestSingleInstanceLock()) {
-    app.quit();
-    process.exit(0);
-  }
 
   // Custom URL scheme (meguri://): opening a meguri:// URL while the app is
   // tray-resident brings the window to the front.
@@ -723,9 +751,6 @@ export function startApp(options: AppOptions): void {
     await runLibraryMerge((onProgress) => ws.mergePending(onProgress));
   }
 
-  /** When the library copy put back at startup was taken (libraryBackup.ts). */
-  let libraryRestoredFrom: number | null = null;
-
   /**
    * The "Try again" of the merge failure notice (library_merge_retry). Each
    * workspace is closed and opened again to merge, so, as for its removal,
@@ -810,22 +835,6 @@ export function startApp(options: AppOptions): void {
     session.defaultSession.setSpellCheckerLanguages([]);
     restrictPermissions(session.defaultSession);
 
-    // Before any workspace opens the library: put a copy back if it is damaged,
-    // and keep the copies current otherwise.
-    libraryRestoredFrom = maintainLibrary(libraryDbPath(), libraryBackupDir());
-    // Still gone though copies of it exist: putting one back failed (a full
-    // disk, say). Opening a workspace now would start an empty library in its
-    // place, with every workspace's metadata out of sight and the copies aged
-    // out by empty ones. Stop before that, and leave the copies as they are.
-    if (isLibraryLost(libraryDbPath(), libraryBackupDir())) {
-      log.error("the library is missing and no copy of it could be put back");
-      dialog.showErrorBox(
-        options.name,
-        `Your library (${libraryDbPath()}) is missing, and ${options.name} could not put back a copy of it from ${libraryBackupDir()}.\n\n${options.name} will quit without opening it, so the copies stay as they are. Free some disk space and start ${options.name} again, or copy the newest file in that folder to the library's place yourself. To start over with an empty library instead, move that folder somewhere else first.`,
-      );
-      app.exit(1);
-      return;
-    }
     ws.bootstrap(resolveCliRoot());
     // Workspaces that merged outside the startup merge (a tag rename reaching
     // every workspace, a removal) kept their own copies until now. Not when the

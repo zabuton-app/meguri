@@ -38,8 +38,8 @@ export type Kind = z.infer<typeof KindSchema>;
 // App logo variants (window/tray/in-app icon). "dark" is the original
 // vermilion kanji icon, "light" the inverted unbleached-cotton one, and
 // "enso" a pictorial brush-circle-with-media-card mark on navy. Persisted in
-// main's config.json (the tray exists before any renderer), so the ids are a
-// stable API shared by config.json, IPC, and the bundled assets — do not
+// main's settings (the tray exists before any renderer), so the ids are a
+// stable API shared by the stored settings, IPC, and the bundled assets — do not
 // rename.
 export const LOGO_IDS = ["dark", "light", "enso"] as const;
 export const LogoIdSchema = z.enum(LOGO_IDS);
@@ -444,7 +444,7 @@ export const LibraryMergeEventSchema = z.discriminatedUnion("state", [
 ]);
 export type LibraryMergeEvent = z.infer<typeof LibraryMergeEventSchema>;
 
-/** What went wrong reading config.json at startup (see appConfig.ts). */
+/** What went wrong reading the settings at startup (see appConfig.ts). */
 export const ConfigProblemSchema = z.enum(["moved-aside", "unreadable"]);
 export type ConfigProblem = z.infer<typeof ConfigProblemSchema>;
 
@@ -466,9 +466,10 @@ export const AppStatusSchema = z.object({
   /** Set when the library was found damaged at startup and restored from
    *  its backup copy: when that copy was taken (Unix seconds). */
   libraryRestoredFrom: z.number().optional(),
-  /** Set when config.json could not be used at startup: "moved-aside" when it
-   *  could not be parsed and was renamed to config.json.corrupt-<time>,
-   *  "unreadable" when it could not be read and is not written over. */
+  /** Set when the settings could not be used at startup: "moved-aside" when
+   *  config.json, being imported, could not be parsed and was renamed to
+   *  config.json.corrupt-<time>; "unreadable" when the library or config.json
+   *  could not be read, and no setting is written until the next launch. */
   configProblem: ConfigProblemSchema.optional(),
 });
 export type AppStatus = z.infer<typeof AppStatusSchema>;

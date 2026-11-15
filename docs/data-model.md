@@ -29,7 +29,7 @@ be merged into the library yet keeps its directory instead, metadata and all.
 
 `electron/core/paths.ts` resolves these paths. The top-level
 [README](../README.md#where-data-is-stored) is the canonical description of the
-full storage tree, including `config.json`.
+full storage tree.
 
 ## Schema
 
@@ -96,6 +96,9 @@ In the library (`LIB_DDL`):
 - `migrated_workspaces` — the workspaces found on the library: merged into it,
   or created after it, and whether their own tables are gone yet (`complete`;
   see [The shared library](#the-shared-library)).
+- `app_settings` — the app's settings (see [App settings](#app-settings)).
+  Created by `openSettingsDb()`, not `LIB_DDL`: the settings are read before
+  any workspace attaches the library.
 
 ## Versionless migrations
 
@@ -297,6 +300,23 @@ an event two workspaces share once.
 
 Metadata is never collected: the library keeps rows for files no workspace
 holds any more, so a removed workspace added again gets its metadata back.
+
+### App settings
+
+The app's settings (`AppConfig` in `electron/core/appConfig.ts`: workspaces,
+collections and preferences) are rows of `app_settings (key, value)`, one per
+field, the value as JSON. Every read parses each field on its own, so a value
+that does not validate falls back to its default without taking the others
+with it. `updateConfig()` writes only the fields a change touched, in one
+transaction.
+
+They used to live in `<userData>/config.json`. The first launch with an empty
+`app_settings` imports it and records the import (`_config_json_imported_at`)
+in the same transaction; the file is then left alone. A library put back from
+a copy taken before the import imports it again.
+
+Being in the library, the settings share its backups and are rolled back with
+it when a damaged library is put back from a copy.
 
 ## Name sort
 
@@ -545,7 +565,7 @@ the screen reads the files again. Each call is split to fit the file count, the
 (file, tag) pairs and the places' total length (`MAX_AUTO_TAG_PLACE_CHARS`).
 
 The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed
-suggestions and excluded terms) is app-wide, in `config.json` under `autoTag`.
+suggestions and excluded terms) is app-wide, in the `autoTag` setting (`app_settings`).
 With `applyOnScan` on, `runScan()` runs the engine over the files the scan
 inserted, updated or moved, ahead of the FTS sync and the thumbnail pool. The
 ids still owed are kept in `settings` under `auto_tag_pending` until the pass

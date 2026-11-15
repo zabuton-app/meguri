@@ -5,18 +5,16 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// workspaces.ts reads/writes <userData>/config.json via appConfig.ts; point that
-// at a throwaway directory so each test gets a pristine config.
+// workspaces.ts reads/writes its settings in <userData>/library.sqlite via
+// appConfig.ts; point that at a throwaway directory so each test gets a
+// pristine config.
 let userData = "";
 vi.mock("electron", () => ({ app: { getPath: () => userData } }));
 
 const { Workspaces } = await import("../workspaces.js");
 const { WATCH_LATER_ID } = await import("../../../shared/workspaceIds.js");
 const { loadConfig, saveConfig } = await import("../appConfig.js");
-
-function configFile(): string {
-  return path.join(userData, "config.json");
-}
+const { openLibraryReadonlyOrThrow } = await import("../db.js");
 
 beforeEach(() => {
   userData = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-watchlater-"));
@@ -124,11 +122,20 @@ describe("Watch Later seeding", () => {
     expect(reloaded?.locked).toBe(false);
   });
 
-  it("does not rewrite config.json when the collection already exists", () => {
+  it("does not write the settings when the collection already exists", () => {
     new Workspaces();
-    const before = fs.readFileSync(configFile(), "utf8");
-    new Workspaces();
-    expect(fs.readFileSync(configFile(), "utf8")).toBe(before);
+    // data_version moves when another connection commits a change.
+    const reader = openLibraryReadonlyOrThrow(
+      path.join(userData, "library.sqlite"),
+    );
+    try {
+      const version = () => reader.pragma("data_version", { simple: true });
+      const before = version();
+      new Workspaces();
+      expect(version()).toBe(before);
+    } finally {
+      reader.close();
+    }
   });
 });
 

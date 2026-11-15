@@ -14,8 +14,10 @@ const { loadAutoTag, loadConfig, saveAutoTag } =
 const { defaultAutoTagConfig, defaultRules } =
   await import("../../../shared/autoTag.js");
 
-const write = (config: unknown) =>
-  fs.writeFileSync(path.join(userData, "config.json"), JSON.stringify(config));
+const { writeStoredSettings } = await import("./storedSettings.js");
+
+const write = (config: Record<string, unknown>) =>
+  writeStoredSettings(userData, config);
 
 beforeEach(() => {
   userData = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-autotag-config-"));

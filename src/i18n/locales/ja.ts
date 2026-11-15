@@ -124,10 +124,9 @@ export const ja = {
     "設定ファイル（config.json）が壊れていたため、初期設定で起動しました",
   "config.movedAsideDesc":
     "登録していたワークスペースやコレクションは、壊れたファイルと一緒に config.json.corrupt-<日時> として同じフォルダに残してあります。",
-  "config.unreadable":
-    "設定ファイル（config.json）を読み込めなかったため、初期設定で起動しています",
+  "config.unreadable": "設定を読み込めなかったため、初期設定で起動しています",
   "config.unreadableDesc":
-    "ファイルは変更していません。ほかのアプリが使っていないか確認して、{app}を再起動してください。",
+    "設定は変更していません。ほかのアプリが使っていないか確認して、{app}を再起動してください。",
   "settings.about": "このアプリについて",
   "about.version": "{name} バージョン {version}",
   "about.appLicense": "{name}は MIT License の下で公開されています。",

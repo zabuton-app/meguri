@@ -17,6 +17,7 @@ const {
   watchCssThemes,
 } = await import("../cssThemes.js");
 const { loadConfig } = await import("../appConfig.js");
+const { writeStoredSettings } = await import("./storedSettings.js");
 const { ChannelInputs } = await import("../../../shared/ipc/channels.js");
 
 let dir = "";
@@ -155,11 +156,8 @@ describe("watchCssThemes", () => {
 });
 
 describe("the stored pick", () => {
-  const write = (config: unknown) =>
-    fs.writeFileSync(
-      path.join(userData, "config.json"),
-      JSON.stringify(config),
-    );
+  const write = (config: Record<string, unknown>) =>
+    writeStoredSettings(userData, config);
 
   it("is none for a config that never held it", () => {
     write({});

@@ -1,5 +1,9 @@
-// Application-wide config (list of registered workspaces = scan roots, and the active root).
-// Each root's artifacts are separated into per-root directories, so the cross-cutting list is kept here.
+// Application-wide settings: the registered workspaces (scan roots) and the
+// active one, collections, and the app's own preferences. Each root's artifacts
+// are separated into per-root directories, so what crosses them is kept here.
+// Stored in the shared library (`app_settings`, db.ts), which gives them its
+// backups, check and restore (libraryBackup.ts); `config.json`, where they
+// used to live, is imported once and then left alone.
 import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
@@ -24,7 +28,9 @@ import { MAX_TAG_NAME } from "../../shared/tags.js";
 import { autoTagSettingsChanged, autoTagSettingsVersion } from "./autoTag.js";
 import { isThemeFileName } from "./cssThemes.js";
 import type { AutoTagEngine } from "./autoTagDeriver.js";
+import { errorCode, openSettingsDb, type DB } from "./db.js";
 import log from "./logger.js";
+import { libraryDbPath } from "./paths.js";
 
 export interface AppConfig {
   /** Registered roots (absolute paths, normalized). */
@@ -109,30 +115,50 @@ export interface UserCollectionConfig {
   locked?: boolean;
 }
 
+/** Where the settings lived before they moved into the library. */
 function configPath(): string {
   return path.join(app.getPath("userData"), "config.json");
 }
 
+// Every field of AppConfig, each one row of app_settings (db.ts). A Record so
+// a field AppConfig gains has to be named here too.
+const FIELD_SET: Record<keyof AppConfig, true> = {
+  roots: true,
+  activePath: true,
+  collections: true,
+  workspaceEmojis: true,
+  update: true,
+  logo: true,
+  autoTag: true,
+  customCss: true,
+  cssTheme: true,
+};
+const FIELDS = Object.keys(FIELD_SET) as (keyof AppConfig)[];
+
+/** The row that records config.json as imported (see openStore); never a field. */
+export const IMPORTED_KEY = "_config_json_imported_at";
+
 /**
- * What went wrong reading config.json at startup, for the renderer to tell the
- * user (app_status.configProblem):
- * - "moved-aside": it could not be parsed, so it was renamed to
+ * What went wrong reading the settings at startup, for the renderer to tell
+ * the user (app_status.configProblem):
+ * - "moved-aside": config.json, imported on the first launch after the
+ *   settings moved into the library, could not be parsed, so it was renamed to
  *   `config.json.corrupt-<time>` and the app started from defaults.
- * - "unreadable": it exists but could not be read (locked, no permission), or
- *   could not be moved aside, so the app runs on defaults and does not write
- *   over it until the next launch.
+ * - "unreadable": the library could not be opened, or config.json exists but
+ *   could not be read (locked, no permission) or moved aside, so the app runs
+ *   on defaults and writes no setting until the next launch.
  */
 let configProblem: ConfigProblem | null = null;
-// Whether config.json has been read since launch. Until it has, a file that
-// cannot be read blocks writes for the session: the in-memory state (e.g. the
-// workspaces) started from defaults, and saving it would replace the real file.
-// After it has, a read that fails is a passing lock, and only that save is
-// skipped (see updateConfig).
-let loadedOnce = false;
-// The last config read or saved successfully, served while a later read fails.
+// The last settings read or saved successfully, served while a later read
+// fails (an update check would otherwise lose its throttle, and so on).
 let lastGood: AppConfig | null = null;
+// The connection to the library the settings are read from; `db` is null when
+// they could not be read at startup, and nothing is written for the session.
+// Opened again when the library's path changes, which only tests do.
+let store: { file: string; db: DB | null } | null = null;
 
 export function configLoadProblem(): ConfigProblem | null {
+  settingsDb();
   return configProblem;
 }
 
@@ -150,58 +176,99 @@ function defaultConfig(): AppConfig {
   };
 }
 
-export function loadConfig(): AppConfig {
-  // While a read fails mid-session, readers get what was last read rather than
-  // defaults (an update check would otherwise lose its throttle, and so on).
-  return (
-    readConfig() ?? (lastGood ? structuredClone(lastGood) : defaultConfig())
-  );
+function settingsDb(): DB | null {
+  const file = libraryDbPath();
+  if (store?.file !== file) {
+    store?.db?.close();
+    configProblem = null;
+    lastGood = null;
+    store = { file, db: openStore(file) };
+  }
+  return store.db;
 }
 
-/** The config, or null when config.json exists but could not be read now. */
-function readConfig(): AppConfig | null {
-  // Blocked for the session: keep to the defaults the app started from.
-  if (configProblem === "unreadable") return defaultConfig();
+/**
+ * Open the settings in the library, importing config.json the first time.
+ * Null when they cannot be read, with configProblem set: the app then runs on
+ * defaults rather than write them over what it could not read.
+ */
+function openStore(file: string): DB | null {
+  let db: DB;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    db = openSettingsDb(file);
+  } catch (e) {
+    log.error("the settings could not be read from the library", e);
+    configProblem = "unreadable";
+    return null;
+  }
+  try {
+    const imported =
+      db
+        .prepare("SELECT 1 FROM app_settings WHERE key = ?")
+        .get(IMPORTED_KEY) !== undefined;
+    if (imported || importConfigJson(db)) return db;
+  } catch (e) {
+    log.error("the settings could not be imported into the library", e);
+    configProblem = "unreadable";
+  }
+  db.close();
+  return null;
+}
+
+/**
+ * Bring config.json's settings into the library, once: recorded in the same
+ * transaction, after which config.json is never read again. The file is left
+ * where it is, for an older version of the app to start from. False when it
+ * exists but cannot be read now: tried again on the next launch.
+ *
+ * A library put back from a copy taken before the import has no record of it,
+ * and imports config.json again, which has not changed since.
+ */
+function importConfigJson(db: DB): boolean {
+  const config = readConfigJson();
+  if (config === null) return false;
+  db.transaction(() => {
+    writeFields(db, config, FIELDS);
+    db.prepare("INSERT INTO app_settings (key, value) VALUES (?, ?)").run(
+      IMPORTED_KEY,
+      JSON.stringify(Date.now()),
+    );
+  })();
+  if (fs.existsSync(configPath())) {
+    log.info("moved the settings from config.json into the library");
+  }
+  return true;
+}
+
+/**
+ * config.json's settings, defaults when there is none (a first launch) or it
+ * could not be parsed and was moved aside, or null when it cannot be read or
+ * moved aside (configProblem says which).
+ */
+function readConfigJson(): AppConfig | null {
   const file = configPath();
   let text: string;
   try {
     text = fs.readFileSync(file, "utf8");
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") {
-      // First launch, or moved aside: a known state, and an empty config.
-      loadedOnce = true;
-      lastGood = defaultConfig();
-      return defaultConfig();
-    }
-    if (loadedOnce) {
-      log.warn(`config.json could not be read (${code ?? "unknown"})`);
-      return null;
-    }
+    if (code === "ENOENT") return defaultConfig();
     log.error(
-      `config.json could not be read (${code ?? "unknown"}); not writing over it`,
+      `config.json could not be read (${code ?? "unknown"}); not importing it`,
     );
     configProblem = "unreadable";
-    return defaultConfig();
+    return null;
   }
-  let c: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(text);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("not a JSON object");
     }
-    c = parsed as Record<string, unknown>;
+    return parseConfig(parsed as Record<string, unknown>);
   } catch {
-    // Unparsable mid-session: caught half-written by something else (a hand
-    // edit, a sync tool). The state in memory came from a good read, so treat
-    // it like a read that failed rather than as damage.
-    if (loadedOnce) {
-      log.warn("config.json could not be parsed");
-      return null;
-    }
-    // Unparsable at startup: keep it for recovery, out of the way of the saves
-    // to come. The parse error is not logged: its message quotes the file's
-    // text, and that holds folder names.
+    // Kept for recovery, out of the way. The parse error is not logged: its
+    // message quotes the file's text, and that holds folder names.
     const aside = `${file}.corrupt-${fileTimestamp(new Date())}`;
     try {
       fs.renameSync(file, aside);
@@ -209,19 +276,22 @@ function readConfig(): AppConfig | null {
         `config.json could not be parsed; moved it to ${path.basename(aside)}`,
       );
       configProblem = "moved-aside";
+      return defaultConfig();
     } catch (moveErr) {
       const code = (moveErr as NodeJS.ErrnoException).code;
       log.error(
-        `config.json could not be parsed or moved aside (${code ?? "unknown"}); not writing over it`,
+        `config.json could not be parsed or moved aside (${code ?? "unknown"}); not importing it`,
       );
       configProblem = "unreadable";
+      return null;
     }
-    loadedOnce = true;
-    lastGood = defaultConfig();
-    return defaultConfig();
   }
-  loadedOnce = true;
-  const config: AppConfig = {
+}
+
+/** The settings as stored: field by field, so one that does not validate
+ *  falls back to its default without taking the others with it. */
+function parseConfig(c: Record<string, unknown>): AppConfig {
+  return {
     roots: Array.isArray(c.roots)
       ? c.roots.filter((x: unknown) => typeof x === "string")
       : [],
@@ -234,8 +304,51 @@ function readConfig(): AppConfig | null {
     customCss: parseCustomCss(c.customCss),
     cssTheme: parseCssTheme(c.cssTheme),
   };
-  lastGood = structuredClone(config);
-  return config;
+}
+
+function readStored(db: DB): AppConfig {
+  const values: Record<string, unknown> = {};
+  const rows = db.prepare("SELECT key, value FROM app_settings").all() as {
+    key: string;
+    value: string;
+  }[];
+  for (const { key, value } of rows) {
+    try {
+      values[key] = JSON.parse(value);
+    } catch {
+      log.warn(`the setting ${key} could not be parsed; using its default`);
+    }
+  }
+  return parseConfig(values);
+}
+
+function writeFields(
+  db: DB,
+  config: AppConfig,
+  keys: readonly (keyof AppConfig)[],
+): void {
+  const put = db.prepare(
+    "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+  );
+  for (const key of keys) put.run(key, JSON.stringify(config[key]));
+}
+
+/** An error from SQLite (locked, disk full, …), as opposed to a bug. */
+const isSqliteError = (e: unknown) =>
+  errorCode(e)?.startsWith("SQLITE_") === true;
+
+export function loadConfig(): AppConfig {
+  const db = settingsDb();
+  if (db === null) return defaultConfig();
+  try {
+    const config = readStored(db);
+    lastGood = structuredClone(config);
+    return config;
+  } catch (e) {
+    if (!isSqliteError(e)) throw e;
+    log.warn("the settings could not be read", e);
+    return lastGood ? structuredClone(lastGood) : defaultConfig();
+  }
 }
 
 /** 2026-11-10T12:00:00.000Z → 20261110-120000, safe in a file name. */
@@ -340,9 +453,10 @@ function parseUpdateConfig(value: unknown): UpdateConfig {
 }
 
 /**
- * Remove any leftover `config.json.<pid>.tmp` files from a previous run that
- * crashed between writeFileSync and renameSync. Safe to call at startup; the
- * single-instance lock means no other process is mid-write.
+ * Remove any leftover `config.json.<pid>.tmp` files from a run of a version
+ * that still wrote config.json and crashed between writeFileSync and
+ * renameSync. Safe to call at startup; the single-instance lock means no other
+ * process is mid-write.
  */
 export function cleanupStaleTemp(): void {
   try {
@@ -358,48 +472,56 @@ export function cleanupStaleTemp(): void {
   }
 }
 
+/**
+ * Replace every setting with `c`. Only for a whole configuration: a change
+ * goes through updateConfig, so it cannot revert what another owner wrote.
+ */
 export function saveConfig(c: AppConfig): void {
-  if (configProblem === "unreadable") return; // see readConfig
+  const db = settingsDb();
+  if (db === null) return; // see openStore
   try {
-    const dest = configPath();
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    // Write to a sibling temp file then rename so a crash mid-write can't leave a
-    // truncated config.json (which would drop all workspaces and collections).
-    // fsync the temp file before renaming: rename is atomic for the directory
-    // entry, but without fsync a power loss can land the rename while the temp's
-    // data blocks are still unflushed, leaving a 0-byte/partial config.json.
-    const tmp = `${dest}.${process.pid}.tmp`;
-    const fd = fs.openSync(tmp, "w");
-    try {
-      fs.writeFileSync(fd, JSON.stringify(c, null, 2));
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-    fs.renameSync(tmp, dest);
-    lastGood = structuredClone(c); // what the file now holds
+    db.transaction(() => writeFields(db, c, FIELDS))();
+    lastGood = structuredClone(c);
   } catch (e) {
+    if (!isSqliteError(e)) throw e;
     log.error("saveConfig failed", e);
   }
 }
 
 /**
- * Atomic read-modify-write of the config. Re-reads the current file, applies
- * `mutator`, and saves — all synchronously, so callers that hold a stale
- * snapshot across an `await` (e.g. the update checker fetching over the network)
- * can't clobber concurrent changes to unrelated fields (roots, collections, …).
- * Pass an `update`-only mutation here rather than spreading an old `loadConfig()`
- * result into `saveConfig`.
+ * Read-modify-write of the settings, in one transaction: `mutator` gets the
+ * settings as stored, and only the fields it changed are written. A caller
+ * that holds a stale snapshot across an `await` (the update checker fetching
+ * over the network) cannot revert concurrent changes to unrelated fields
+ * (roots, collections, …), as long as it changes only its own fields here
+ * rather than spreading an old loadConfig() result into saveConfig.
+ *
+ * A write that fails (a full disk) is logged rather than thrown, so a caller
+ * that must know reads the setting back (saveAutoTag).
  */
 export function updateConfig(mutator: (c: AppConfig) => AppConfig): void {
-  const current = readConfig();
-  // A read that failed mid-session (a passing lock): saving the change over
-  // defaults would drop everything else, so this one change is not saved.
-  if (current === null) {
-    log.warn("a settings change was not saved: config.json could not be read");
-    return;
+  const db = settingsDb();
+  if (db === null) return; // see openStore
+  try {
+    const next = db
+      .transaction(() => {
+        const current = readStored(db);
+        // Taken before the mutator runs, which may change `current` in place.
+        const before = FIELDS.map((k) => JSON.stringify(current[k]));
+        const changed = mutator(current);
+        writeFields(
+          db,
+          changed,
+          FIELDS.filter((k, i) => JSON.stringify(changed[k]) !== before[i]),
+        );
+        return changed;
+      })
+      .immediate();
+    lastGood = structuredClone(next);
+  } catch (e) {
+    if (!isSqliteError(e)) throw e;
+    log.error("a settings change was not saved", e);
   }
-  saveConfig(mutator(current));
 }
 
 /**

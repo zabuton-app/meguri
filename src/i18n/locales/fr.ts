@@ -129,9 +129,9 @@ export const fr: Catalog = {
   "config.movedAsideDesc":
     "Vos espaces de travail et collections sont conservés dans le fichier endommagé, enregistré sous config.json.corrupt-<date> dans le même dossier.",
   "config.unreadable":
-    "{app} n’a pas pu lire le fichier de réglages (config.json) et fonctionne avec les réglages par défaut",
+    "{app} n’a pas pu lire vos réglages et fonctionne avec les réglages par défaut",
   "config.unreadableDesc":
-    "Le fichier n’a pas été modifié. Vérifiez qu’aucune autre application ne l’utilise, puis redémarrez {app}.",
+    "Vos réglages n’ont pas été modifiés. Vérifiez qu’aucune autre application ne les utilise, puis redémarrez {app}.",
   "settings.about": "À propos",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} est publié sous licence MIT.",

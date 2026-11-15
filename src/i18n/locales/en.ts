@@ -126,9 +126,9 @@ export const en: Catalog = {
   "config.movedAsideDesc":
     "Your workspaces and collections are kept in the damaged file, saved as config.json.corrupt-<date> in the same folder.",
   "config.unreadable":
-    "{app} could not read your settings file (config.json) and is running with the default settings",
+    "{app} could not read your settings and is running with the default settings",
   "config.unreadableDesc":
-    "The file has not been changed. Make sure no other app is using it, then restart {app}.",
+    "Your settings have not been changed. Make sure no other app is using them, then restart {app}.",
   "settings.about": "About",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} is released under the MIT License.",

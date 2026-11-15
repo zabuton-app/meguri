@@ -1,5 +1,5 @@
-// Says, once a window, that config.json could not be used at startup (main's
-// loadConfig, app_status.configProblem): the app runs on default settings.
+// Says, once a window, that the settings could not be used at startup (main's
+// appConfig.ts, app_status.configProblem): the app runs on default settings.
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useAppStatus } from "@/hooks/useAppStatus";

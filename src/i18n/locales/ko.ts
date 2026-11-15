@@ -122,10 +122,9 @@ export const ko: Catalog = {
     "설정 파일(config.json)이 손상되어 기본 설정으로 시작했습니다",
   "config.movedAsideDesc":
     "등록한 워크스페이스와 컬렉션은 손상된 파일에 남아 있으며, 같은 폴더에 config.json.corrupt-<날짜>로 저장해 두었습니다.",
-  "config.unreadable":
-    "설정 파일(config.json)을 읽을 수 없어 기본 설정으로 실행 중입니다",
+  "config.unreadable": "설정을 읽을 수 없어 기본 설정으로 실행 중입니다",
   "config.unreadableDesc":
-    "파일은 변경하지 않았습니다. 다른 앱이 사용 중인지 확인한 뒤 {app}를 다시 시작하세요.",
+    "설정은 변경하지 않았습니다. 다른 앱이 사용 중인지 확인한 뒤 {app}를 다시 시작하세요.",
   "settings.about": "정보",
   "about.version": "{name} 버전 {version}",
   "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
