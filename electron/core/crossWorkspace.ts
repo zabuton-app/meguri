@@ -212,7 +212,7 @@ export function searchCollection(
 
 /**
  * The collection's own item order ("manual" sort, see shared/sortDir.ts). This
- * order lives in config.json, not in any SQL column, so it cannot ride
+ * order lives in the collection setting, not in any SQL column, so it cannot ride
  * orderByFor()/the k-way merge: the refs array *is* the ordering. Paging slices
  * that array and pulls the matching rows by id, then puts them back in refs order.
  */

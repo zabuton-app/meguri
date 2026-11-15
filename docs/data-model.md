@@ -316,7 +316,11 @@ in the same transaction; the file is then left alone. A library put back from
 a copy taken before the import imports it again.
 
 Being in the library, the settings share its backups and are rolled back with
-it when a damaged library is put back from a copy.
+it when a damaged library is put back from a copy. The settings create the
+library before any workspace attaches it; until one has, it holds no metadata
+and is not copied, since a copy without `tag_changes` could not be put back.
+Each read or write opens its own connection and closes it, so nothing holds
+the library open between them, and commits sync (`synchronous = FULL`).
 
 ## Name sort
 

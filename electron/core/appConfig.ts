@@ -152,13 +152,13 @@ let configProblem: ConfigProblem | null = null;
 // The last settings read or saved successfully, served while a later read
 // fails (an update check would otherwise lose its throttle, and so on).
 let lastGood: AppConfig | null = null;
-// The connection to the library the settings are read from; `db` is null when
-// they could not be read at startup, and nothing is written for the session.
-// Opened again when the library's path changes, which only tests do.
-let store: { file: string; db: DB | null } | null = null;
+// The library the settings were opened in at startup (openStore), and whether
+// they could not be read there, in which case nothing is written for the
+// session. Opened again when the library's path changes, which only tests do.
+let store: { file: string; blocked: boolean } | null = null;
 
 export function configLoadProblem(): ConfigProblem | null {
-  settingsDb();
+  ensureStore();
   return configProblem;
 }
 
@@ -176,23 +176,40 @@ function defaultConfig(): AppConfig {
   };
 }
 
-function settingsDb(): DB | null {
+function ensureStore(): { file: string; blocked: boolean } {
   const file = libraryDbPath();
   if (store?.file !== file) {
-    store?.db?.close();
     configProblem = null;
     lastGood = null;
-    store = { file, db: openStore(file) };
+    store = { file, blocked: !openStore(file) };
   }
-  return store.db;
+  return store;
 }
 
 /**
- * Open the settings in the library, importing config.json the first time.
- * Null when they cannot be read, with configProblem set: the app then runs on
- * defaults rather than write them over what it could not read.
+ * Run `fn` on a connection to the settings, opened for it and closed after:
+ * nothing holds the library open between reads (Windows could not delete or
+ * move it aside, and every close checkpoints the WAL). Settings are read and
+ * written rarely enough for the open on each. Null when they are blocked for
+ * the session (see openStore); a connection that fails to open throws.
  */
-function openStore(file: string): DB | null {
+function withSettings<T>(fn: (db: DB) => T): { value: T } | null {
+  const { file, blocked } = ensureStore();
+  if (blocked) return null;
+  const db = openSettingsDb(file);
+  try {
+    return { value: fn(db) };
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Check the settings in the library at startup, importing config.json the
+ * first time. False when they cannot be read, with configProblem set: the app
+ * then runs on defaults rather than write them over what it could not read.
+ */
+function openStore(file: string): boolean {
   let db: DB;
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -200,20 +217,21 @@ function openStore(file: string): DB | null {
   } catch (e) {
     log.error("the settings could not be read from the library", e);
     configProblem = "unreadable";
-    return null;
+    return false;
   }
   try {
     const imported =
       db
         .prepare("SELECT 1 FROM app_settings WHERE key = ?")
         .get(IMPORTED_KEY) !== undefined;
-    if (imported || importConfigJson(db)) return db;
+    return imported || importConfigJson(db);
   } catch (e) {
     log.error("the settings could not be imported into the library", e);
     configProblem = "unreadable";
+    return false;
+  } finally {
+    db.close();
   }
-  db.close();
-  return null;
 }
 
 /**
@@ -338,12 +356,11 @@ const isSqliteError = (e: unknown) =>
   errorCode(e)?.startsWith("SQLITE_") === true;
 
 export function loadConfig(): AppConfig {
-  const db = settingsDb();
-  if (db === null) return defaultConfig();
   try {
-    const config = readStored(db);
-    lastGood = structuredClone(config);
-    return config;
+    const read = withSettings(readStored);
+    if (read === null) return defaultConfig(); // see openStore
+    lastGood = structuredClone(read.value);
+    return read.value;
   } catch (e) {
     if (!isSqliteError(e)) throw e;
     log.warn("the settings could not be read", e);
@@ -477,11 +494,11 @@ export function cleanupStaleTemp(): void {
  * goes through updateConfig, so it cannot revert what another owner wrote.
  */
 export function saveConfig(c: AppConfig): void {
-  const db = settingsDb();
-  if (db === null) return; // see openStore
   try {
-    db.transaction(() => writeFields(db, c, FIELDS))();
-    lastGood = structuredClone(c);
+    const saved = withSettings((db) =>
+      db.transaction(() => writeFields(db, c, FIELDS))(),
+    );
+    if (saved !== null) lastGood = structuredClone(c);
   } catch (e) {
     if (!isSqliteError(e)) throw e;
     log.error("saveConfig failed", e);
@@ -500,24 +517,24 @@ export function saveConfig(c: AppConfig): void {
  * that must know reads the setting back (saveAutoTag).
  */
 export function updateConfig(mutator: (c: AppConfig) => AppConfig): void {
-  const db = settingsDb();
-  if (db === null) return; // see openStore
   try {
-    const next = db
-      .transaction(() => {
-        const current = readStored(db);
-        // Taken before the mutator runs, which may change `current` in place.
-        const before = FIELDS.map((k) => JSON.stringify(current[k]));
-        const changed = mutator(current);
-        writeFields(
-          db,
-          changed,
-          FIELDS.filter((k, i) => JSON.stringify(changed[k]) !== before[i]),
-        );
-        return changed;
-      })
-      .immediate();
-    lastGood = structuredClone(next);
+    const saved = withSettings((db) =>
+      db
+        .transaction(() => {
+          const current = readStored(db);
+          // Taken before the mutator runs, which may change `current` in place.
+          const before = FIELDS.map((k) => JSON.stringify(current[k]));
+          const changed = mutator(current);
+          writeFields(
+            db,
+            changed,
+            FIELDS.filter((k, i) => JSON.stringify(changed[k]) !== before[i]),
+          );
+          return changed;
+        })
+        .immediate(),
+    );
+    if (saved !== null) lastGood = structuredClone(saved.value);
   } catch (e) {
     if (!isSqliteError(e)) throw e;
     log.error("a settings change was not saved", e);

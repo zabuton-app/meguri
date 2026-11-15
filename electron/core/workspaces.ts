@@ -103,8 +103,8 @@ export class Workspaces {
   }
 
   /**
-   * Persist only the fields this class owns, merged over what is on disk.
-   * Everything else in config.json (`update`, `autoTag`, `logo`, `customCss`,
+   * Persist only the fields this class owns, merged over what is stored.
+   * Every other setting (`update`, `autoTag`, `logo`, `customCss`,
    * `cssTheme`, ...) is written independently via `updateConfig()`, so writing
    * our startup snapshot back wholesale would silently revert those settings.
    * Every write below goes through here rather than calling saveConfig directly.
@@ -589,8 +589,9 @@ export class Workspaces {
    * given are left as they are. Named for that: setCollectionMembers would read
    * as "make this the membership", which it is not.
    *
-   * Collections live in config.json, which persist() rewrites whole, so driving
-   * a selection through addToCollection would mean one disk write per file.
+   * Collections are one setting, which persist() writes whole on any change,
+   * so driving a selection through addToCollection would mean one write per
+   * file.
    * Returns how many files actually changed membership: adding a file already on
    * the collection is not a change, and neither is removing one that is not.
    */

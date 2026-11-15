@@ -1,6 +1,6 @@
 // Drag-to-reorder for the media views, used only while a collection is shown in
 // its manual order. The order being edited is the collection's stored item
-// order (config.json), so a drop reports the loaded window's new order and the
+// order (main's settings), so a drop reports the loaded window's new order and the
 // main process rearranges just those slots — items outside the window never move.
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {

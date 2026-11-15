@@ -720,7 +720,10 @@ export function openSettingsDb(libraryFile: string): DB {
   try {
     db.pragma("busy_timeout = 5000");
     db.pragma("journal_mode = WAL");
-    db.pragma("synchronous = NORMAL");
+    // FULL, not the NORMAL the workspaces use: a setting saved is meant to
+    // stay saved through a power loss, as the fsync of config.json made it, and
+    // settings are written rarely enough for the sync on each commit.
+    db.pragma("synchronous = FULL");
     db.exec(APP_SETTINGS_DDL);
   } catch (e) {
     db.close();

@@ -259,17 +259,17 @@ export const api = {
   ) => invoke("auto_tag_edit", { targets, add, remove }),
   autoTagUndo: (undoIds: string[]) => invoke("auto_tag_undo", { undoIds }),
   autoTagReapply: () => invoke("auto_tag_reapply"),
-  /** App logo variant (window + tray icon), persisted in main's config.json. */
+  /** App logo variant (window + tray icon), persisted in main's settings. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
   /** The in-app logo of each variant, as a data URL. */
   logoImages: () => invoke("logo_images"),
-  /** User stylesheet (<userData>/custom.css); the switch is persisted in main's config.json. */
+  /** User stylesheet (<userData>/custom.css); the switch is persisted in main's settings. */
   customCssGet: () => invoke("custom_css_get"),
   customCssSetEnabled: (enabled: boolean) =>
     invoke("custom_css_set_enabled", { enabled }),
   customCssOpen: () => invoke("custom_css_open"),
-  /** CSS theme files in <userData>/themes; the pick is persisted in main's config.json. */
+  /** CSS theme files in <userData>/themes; the pick is persisted in main's settings. */
   cssThemesGet: () => invoke("css_themes_get"),
   cssThemeSelect: (file: string | null) => invoke("css_theme_select", { file }),
   cssThemesOpenFolder: () => invoke("css_themes_open_folder"),

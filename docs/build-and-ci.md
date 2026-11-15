@@ -219,4 +219,5 @@ docker compose up
 set the GPU groups via `.env` (`Dockerfile` / `docker-compose.yml`). The dev
 container seeds its initial workspace list from `samples/config.json` via
 `scripts/seed-sample-config.mjs`; set `MEGURI_SEED_SAMPLE_CONFIG=force` to reset
-to the sample state.
+the settings to the sample state (the next launch imports the sample again; the
+metadata in the library stays).
