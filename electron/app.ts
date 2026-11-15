@@ -220,7 +220,7 @@ export function startApp(options: AppOptions): void {
     void app.whenReady().then(() => {
       dialog.showErrorBox(
         options.name,
-        `Your library (${libraryDbPath()}) is missing, and ${options.name} could not put back a copy of it from ${libraryBackupDir()}.\n\n${options.name} will quit without opening it, so the copies stay as they are. Free some disk space and start ${options.name} again, or copy the newest file in that folder to the library's place yourself. To start over with an empty library instead, move that folder somewhere else first.`,
+        `Your library (${libraryDbPath()}) is missing, and ${options.name} could not put back a copy of it from ${libraryBackupDir()}.\n\n${options.name} will quit without opening it, so the copies stay as they are. Free some disk space and start ${options.name} again, or copy the newest file in that folder to the library's place yourself. It also holds your workspaces, collections and settings. To start over with an empty library instead, move that folder somewhere else first.`,
       );
       app.exit(1);
     });

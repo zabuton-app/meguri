@@ -123,7 +123,7 @@ export const fr: Catalog = {
   "library.restored":
     "Votre bibliothèque était endommagée : {app} a restauré la copie du {date}",
   "library.restoredDesc":
-    "Les favoris, notes, tags et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
+    "Les favoris, notes, tags, espaces de travail, collections, réglages et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
   "config.movedAside":
     "Le fichier de réglages (config.json) était endommagé : {app} a démarré avec les réglages par défaut",
   "config.movedAsideDesc":

@@ -110,7 +110,7 @@ export const zhCN: Catalog = {
   "libraryMerge.retry": "重试",
   "library.restored": "资料库已损坏，已从 {date} 的副本恢复",
   "library.restoredDesc":
-    "此后对收藏、评分、标签等所做的更改已丢失。损坏的文件保留在资料库所在的文件夹中。",
+    "此后对收藏、评分、标签、工作区、收藏集、设置等所做的更改已丢失。损坏的文件保留在资料库所在的文件夹中。",
   "config.movedAside":
     "设置文件（config.json）已损坏，{app} 已使用默认设置启动",
   "config.movedAsideDesc":

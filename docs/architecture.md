@@ -264,8 +264,8 @@ holding the workspace's generated files.
   - Startup runs `maintainLibrary()` before `Workspaces` reads the settings, and
     after the single-instance lock, so a second instance never touches the
     library.
-  - On the first launch with an empty `app_settings`, `<userData>/config.json`
-    (where the settings used to live) is imported once and recorded as
+  - On a launch that finds no import record in `app_settings`,
+    `<userData>/config.json` (where the settings used to live) is imported once and recorded as
     imported; it is then left in place and never read again, for an older
     version of the app to start from. A `config.json` that cannot be parsed is
     renamed to `config.json.corrupt-<time>` and the app starts from defaults;

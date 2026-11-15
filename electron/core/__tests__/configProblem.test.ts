@@ -137,6 +137,24 @@ describe("after config.json is imported", () => {
   });
 });
 
+describe("settings that cannot be opened mid-session", () => {
+  it("serves the last read and does not throw when the folder is gone", async () => {
+    const c = await freshConfig();
+    c.updateConfig((cfg) => ({ ...cfg, roots: ["/media"] }));
+    expect(c.loadConfig().roots).toEqual(["/media"]);
+
+    fs.rmSync(userData, { recursive: true, force: true }); // unmounted, say
+    try {
+      expect(c.loadConfig().roots).toEqual(["/media"]);
+      expect(() =>
+        c.updateConfig((cfg) => ({ ...cfg, activePath: "/media" })),
+      ).not.toThrow();
+    } finally {
+      fs.mkdirSync(userData, { recursive: true }); // for afterEach
+    }
+  });
+});
+
 describe("a library that cannot be opened", () => {
   it("runs on the defaults and writes nothing", async () => {
     fs.writeFileSync(configFile(), JSON.stringify({ roots: ["/media"] }));

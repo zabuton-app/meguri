@@ -196,7 +196,14 @@ function ensureStore(): { file: string; blocked: boolean } {
 function withSettings<T>(fn: (db: DB) => T): { value: T } | null {
   const { file, blocked } = ensureStore();
   if (blocked) return null;
-  const db = openSettingsDb(file);
+  let db: DB;
+  try {
+    db = openSettingsDb(file);
+  } catch (e) {
+    // better-sqlite3 throws a plain TypeError, with no SQLite code, when the
+    // folder is gone (userData removed or unmounted mid-session).
+    throw new SettingsUnavailableError(e);
+  }
   try {
     return { value: fn(db) };
   } finally {
@@ -351,8 +358,16 @@ function writeFields(
   for (const key of keys) put.run(key, JSON.stringify(config[key]));
 }
 
-/** An error from SQLite (locked, disk full, …), as opposed to a bug. */
-const isSqliteError = (e: unknown) =>
+/** The settings could not be opened at all (see withSettings). */
+class SettingsUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super("the settings could not be opened", { cause });
+  }
+}
+
+/** An error from storage (locked, disk full, gone, …), as opposed to a bug. */
+const isStorageError = (e: unknown) =>
+  e instanceof SettingsUnavailableError ||
   errorCode(e)?.startsWith("SQLITE_") === true;
 
 export function loadConfig(): AppConfig {
@@ -362,7 +377,7 @@ export function loadConfig(): AppConfig {
     lastGood = structuredClone(read.value);
     return read.value;
   } catch (e) {
-    if (!isSqliteError(e)) throw e;
+    if (!isStorageError(e)) throw e;
     log.warn("the settings could not be read", e);
     return lastGood ? structuredClone(lastGood) : defaultConfig();
   }
@@ -500,7 +515,7 @@ export function saveConfig(c: AppConfig): void {
     );
     if (saved !== null) lastGood = structuredClone(c);
   } catch (e) {
-    if (!isSqliteError(e)) throw e;
+    if (!isStorageError(e)) throw e;
     log.error("saveConfig failed", e);
   }
 }
@@ -536,7 +551,7 @@ export function updateConfig(mutator: (c: AppConfig) => AppConfig): void {
     );
     if (saved !== null) lastGood = structuredClone(saved.value);
   } catch (e) {
-    if (!isSqliteError(e)) throw e;
+    if (!isStorageError(e)) throw e;
     log.error("a settings change was not saved", e);
   }
 }

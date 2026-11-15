@@ -218,6 +218,6 @@ docker compose up
 `HOST_MEDIA_DIR` selects the directory to scan, and `RENDER_GID` / `VIDEO_GID`
 set the GPU groups via `.env` (`Dockerfile` / `docker-compose.yml`). The dev
 container seeds its initial workspace list from `samples/config.json` via
-`scripts/seed-sample-config.mjs`; set `MEGURI_SEED_SAMPLE_CONFIG=force` to reset
-the settings to the sample state (the next launch imports the sample again; the
-metadata in the library stays).
+`scripts/seed-sample-config.mjs`, which also drops the import record from the
+library so the next launch imports it; set `MEGURI_SEED_SAMPLE_CONFIG=force` to
+reset the settings to the sample state (the metadata in the library stays).

@@ -310,9 +310,10 @@ that does not validate falls back to its default without taking the others
 with it. `updateConfig()` writes only the fields a change touched, in one
 transaction.
 
-They used to live in `<userData>/config.json`. The first launch with an empty
-`app_settings` imports it and records the import (`_config_json_imported_at`)
-in the same transaction; the file is then left alone. A library put back from
+They used to live in `<userData>/config.json`. A launch that finds no import
+record (`_config_json_imported_at`) imports it, over whatever `app_settings`
+holds, and records the import in the same transaction; the file is then left
+alone. A library put back from
 a copy taken before the import imports it again.
 
 Being in the library, the settings share its backups and are rolled back with

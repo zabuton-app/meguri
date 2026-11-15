@@ -122,7 +122,7 @@ export const es: Catalog = {
   "library.restored":
     "Tu biblioteca estaba dañada, así que {app} restauró la copia del {date}",
   "library.restoredDesc":
-    "Se han perdido los favoritos, las valoraciones, las etiquetas y demás cambios posteriores. El archivo dañado se conserva en la misma carpeta que la biblioteca.",
+    "Se han perdido los favoritos, las valoraciones, las etiquetas, los espacios de trabajo, las colecciones, la configuración y demás cambios posteriores. El archivo dañado se conserva en la misma carpeta que la biblioteca.",
   "config.movedAside":
     "El archivo de configuración (config.json) estaba dañado, así que {app} se ha iniciado con la configuración predeterminada",
   "config.movedAsideDesc":

@@ -117,7 +117,7 @@ export const ko: Catalog = {
   "library.restored":
     "라이브러리가 손상되어 {date} 시점의 사본으로 복원했습니다",
   "library.restoredDesc":
-    "그 이후에 바꾼 즐겨찾기, 평점, 태그 등은 사라졌습니다. 손상된 파일은 라이브러리와 같은 폴더에 남겨 두었습니다.",
+    "그 이후에 바꾼 즐겨찾기, 평점, 태그, 워크스페이스, 컬렉션, 설정 등은 사라졌습니다. 손상된 파일은 라이브러리와 같은 폴더에 남겨 두었습니다.",
   "config.movedAside":
     "설정 파일(config.json)이 손상되어 기본 설정으로 시작했습니다",
   "config.movedAsideDesc":
