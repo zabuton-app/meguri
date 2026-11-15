@@ -238,7 +238,10 @@ previews.
 ### Authorization
 
 Requests must carry an `X-Api-Token` header. The Electron session injects it for
-in-app media loads, so renderer code does not handle it directly.
+in-app media loads, so renderer code does not handle it directly. Main-process
+code that fetches from the server itself (an app's `setup`, for example) gets
+the token from `IpcContext.mediaToken()` and sends it with each request; the
+token never reaches the renderer or the preload.
 
 ### ffmpeg/ffprobe path resolution
 

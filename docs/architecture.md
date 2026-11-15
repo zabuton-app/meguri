@@ -36,7 +36,8 @@ It can also pass `setup`, which runs once right after `registerIpc()` and
 before the tray and window appear, with the same `IpcContext` the handler
 groups get (both `IpcContext` and `handle()` are exported from
 `electron/app.ts`). That is where such an app registers its own IPC handlers
-and reaches the workspaces, the query worker and the media server's base URL.
+and reaches the workspaces, the query worker and the media server: `mediaBase()`
+gives its base URL and `mediaToken()` the `X-Api-Token` its requests need.
 Its channels still follow steps 1 to 3 of
 [Adding a new IPC channel](#adding-a-new-ipc-channel): `handle()` and the
 preload whitelist only know the channels in `shared/ipc/`. Nothing is on
@@ -160,7 +161,8 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
    them up in `registerIpc()`. Each group but `updates.ts` receives an
    `IpcContext` (`electron/ipc/context.ts`) with what it needs from the main
    process — the `Workspaces`, the query worker client, `emit()`, the
-   `ScanManager`, and live getters for the window and media server.
+   `ScanManager`, and live getters for the window and media server (its base
+   URL and token).
    Shared helpers (`coreById`, `queryTargets`, `scopedCores`,
    `ensureFileInsideRoot`) are in `electron/ipc/helpers.ts`; a handler that
    hands a file path to the OS must resolve it through `ensureFileInsideRoot`

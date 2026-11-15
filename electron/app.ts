@@ -119,7 +119,7 @@ export interface AppOptions {
    * handlers are registered and before the tray and window appear. It gets the
    * same `IpcContext` those handlers use, so it can register handlers with
    * `handle()` and read the workspaces, the query worker and the media
-   * server's base URL. `handle()` only takes channels declared in
+   * server's base URL and token. `handle()` only takes channels declared in
    * `shared/ipc/`, which is also what the preload lets through.
    * Nothing is on screen until it settles, so it should return quickly and
    * leave long work running in the background. A throw (or rejection) fails
@@ -835,6 +835,7 @@ export function startApp(options: AppOptions): void {
       positions,
       mainWindow: () => mainWindow,
       mediaBase: mediaOrigin,
+      mediaToken: () => mediaToken,
       isDevMode,
       emit,
       scans,
