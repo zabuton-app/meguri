@@ -4,15 +4,7 @@
 // exact match into a substring search that also hits file names, with nothing
 // on screen to say so.
 // While one is being typed the box completes it from the tag catalog.
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import {
   HASH_SEARCH_PREFIX,
@@ -26,19 +18,14 @@ import {
   splitSearchTokens,
   tagSearchToken,
 } from "@shared/tags";
-import { api } from "@/ipc/client";
 import type { TagSummary } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/i18n/I18nProvider";
-import { useAppStatus } from "@/hooks/useAppStatus";
-import { searchTokenLabel, tagHumanLabel } from "@/lib/tagLabel";
-import {
-  pendingDirective,
-  splitQueryChips,
-  tagSuggestions,
-  viewIsOneWorkspace,
-} from "@/lib/searchTokens";
+import { useTagCompletions } from "@/hooks/useTagCompletions";
+import { TagSuggestionLabel } from "@/components/TagSuggestionLabel";
+import { searchTokenLabel } from "@/lib/tagLabel";
+import { pendingDirective, splitQueryChips } from "@/lib/searchTokens";
 import { onHighlightSearchToken } from "@/lib/ui-events";
 
 interface Props {
@@ -104,36 +91,7 @@ export function SearchTokenInput({
   );
 
   const pending = focused && picked === null ? pendingDirective(draft) : null;
-  const status = useAppStatus();
-  // The catalog of the whole library, not of the view: a tag held in another
-  // workspace is still a tag to look for. Under the tag management screen's
-  // key, so every tag mutation invalidates it as it does that screen's;
-  // `enabled` keeps it unfetched until a directive is actually being typed.
-  // Filtering client-side beats a round trip per keystroke — the catalog is
-  // capped at MAX_TAG_LIST. Past the cap the view's own tags are kept first,
-  // so the key carries the view and a switch fetches the catalog again.
-  const viewId = status.data?.workspaceId ?? null;
-  const catalog = useQuery({
-    queryKey: ["tags_list_all", "library", viewId],
-    queryFn: () => api.tagsListAll({ allWorkspaces: true }),
-    enabled: (status.data?.ready ?? false) && pending !== null,
-  });
-  // Whether a tag is on view: in the workspace shown, or anywhere when all of
-  // them (or a collection, which spans them) is.
-  const held = useCallback(
-    (tag: TagSummary) =>
-      viewId === null ||
-      !viewIsOneWorkspace(viewId) ||
-      tag.workspaceIds.includes(viewId),
-    [viewId],
-  );
-  const suggestions = useMemo(
-    () =>
-      pending
-        ? tagSuggestions(catalog.data?.tags ?? [], pending, undefined, held)
-        : [],
-    [catalog.data, pending, held],
-  );
+  const { suggestions, held } = useTagCompletions(pending);
   const open = !dismissed && suggestions.length > 0;
   const activeIndex = Math.min(active, suggestions.length - 1);
 
@@ -429,23 +387,7 @@ export function SearchTokenInput({
                     !held(tag) && "text-muted",
                   )}
                 >
-                  <span className="truncate">
-                    <span className="text-muted">{TAG_SEARCH_PREFIX}:</span>
-                    {tag.name}
-                  </span>
-                  {tag.namespace && (
-                    <span className="truncate text-xs text-muted">
-                      {tagHumanLabel(t, tag.namespace, tag.name)}
-                    </span>
-                  )}
-                  {!held(tag) && (
-                    <span className="truncate text-xs text-muted">
-                      {t("filter.tagElsewhere")}
-                    </span>
-                  )}
-                  <span className="ml-auto shrink-0 text-xs tabular-nums text-muted">
-                    {tag.fileCount}
-                  </span>
+                  <TagSuggestionLabel t={t} tag={tag} held={held(tag)} />
                 </li>
               ))}
             </ul>

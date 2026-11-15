@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
   CalendarDays,
@@ -6,7 +6,10 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  CopyCheck,
   DatabaseBackup,
+  ExternalLink,
+  Folder,
   FolderOpen,
   FolderPlus,
   FolderTree,
@@ -14,18 +17,26 @@ import {
   Heart,
   HelpCircle,
   History,
+  Info,
+  Layers,
   List,
+  Moon,
+  Play,
   RefreshCw,
   Search,
   Settings,
   Sparkles,
   Star,
+  Sun,
+  Tag,
   Tags as TagsIcon,
   Terminal,
   Trash2,
+  Wand2,
   Waypoints,
   X,
 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { defaultFilter } from "cmdk";
 import {
   Command,
@@ -39,6 +50,9 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { useSelection } from "@/components/SelectionContext";
+import { BulkTagDialog } from "@/components/BulkTagDialog";
+import { TagSuggestionLabel } from "@/components/TagSuggestionLabel";
+import { useActivateFile } from "@/audio/useActivateFile";
 import {
   useCollectionMembership,
   useFileActions,
@@ -50,19 +64,30 @@ import {
   useRecentSearches,
 } from "@/hooks/useRecentSearches";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
+import { useTagCompletions } from "@/hooks/useTagCompletions";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useI18n, type Lang, type TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
+import { api, ALL_ID, collectionTarget } from "@/ipc/client";
 import type { FileRow, SearchQuery } from "@/ipc/types";
 import { fileNameOf } from "@/lib/relPath";
 import { recentSearchKey } from "@/lib/recentSearches";
-import { describeConditions } from "@/lib/searchConditions";
+import { clearAllTarget, describeConditions } from "@/lib/searchConditions";
+import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import {
   describeSearchQuery,
   type SmartCollection,
 } from "@/lib/smartCollections";
 import type { ViewMode } from "@/routes/Home/utils";
-import { MAX_BULK_FILES } from "@shared/tags";
+import { formatChords, GRID_BINDINGS } from "@/settings/keybindings";
+import { usePreferences } from "@/settings/PreferencesProvider";
+import { useTheme } from "@/themes/ThemeProvider";
+import {
+  MAX_BULK_FILES,
+  TAG_SEARCH_PREFIX,
+  tagSearchToken,
+} from "@shared/tags";
+import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
 interface CommandMenuProps {
   open: boolean;
@@ -88,6 +113,9 @@ interface CommandMenuProps {
   /** Discovery has something to pick from (the same rule as its button). */
   canDiscover?: boolean;
   onTags: () => void;
+  onHistory: () => void;
+  onDuplicates: () => void;
+  onAutoTag: () => void;
   onSettings: () => void;
   onHelp: () => void;
   onOpenDevTools: () => void;
@@ -97,6 +125,11 @@ interface CommandMenuProps {
   onApplySaved: (collection: SmartCollection) => void;
   /** Sets the full-text query to what was typed. */
   onQuickSearch: (text: string) => void;
+  /** Adds a search token (`tag:beach`) to the search, as clicking a tag does. */
+  onAddSearchToken: (token: string) => void;
+  /** The conditions on screen, which "Clear all filters" resets. */
+  filter: SearchQuery;
+  onFilterChange: (query: SearchQuery) => void;
   /**
    * The list is what is on screen. Every other screen sits over it (the
    * detail view, the player, Discovery, History, …), and the list's focus
@@ -116,8 +149,44 @@ interface CommandAction {
   run: () => void;
 }
 
-/** A sub-page the file actions open: picking a rating or a collection. */
-type Page = "rating" | "collections" | null;
+/**
+ * A sub-page: picking a rating or a collection for the file actions, the
+ * candidates for a prefix typed at the root (`tag:`, `ws:`, `col:`), or the
+ * search to run in the workspace or collection picked from the last two.
+ */
+type Page = "rating" | "collections" | PrefixPage | "searchIn" | null;
+
+type PrefixPage = "tag" | "ws" | "col";
+
+/**
+ * The page a prefix at the very start of the text opens, and what follows it.
+ * Any other text, an unknown prefix included, stays a search of the menu.
+ */
+function prefixPage(text: string): { page: PrefixPage; rest: string } | null {
+  const m = /^(tag|ws|col):/i.exec(text);
+  if (!m) return null;
+  return {
+    page: m[1].toLowerCase() as PrefixPage,
+    rest: text.slice(m[0].length),
+  };
+}
+
+/**
+ * The page shown and the text its field starts with: what followed a prefix.
+ * The search-in page also carries the workspace or collection it searches in.
+ */
+type PageState =
+  | { page: Exclude<Page, "searchIn">; initialSearch: string }
+  | { page: "searchIn"; initialSearch: string; item: SwitchItem };
+
+const ROOT_PAGE: PageState = { page: null, initialSearch: "" };
+
+/** Where Esc, or Backspace on an empty field, steps back to. */
+function parentPage(state: PageState): PageState {
+  return state.page === "searchIn"
+    ? { page: state.item.kind, initialSearch: "" }
+    : ROOT_PAGE;
+}
 
 /** Recent searches and saved searches show this many until the user types. */
 export const COMMAND_GROUP_CAP = 5;
@@ -157,9 +226,30 @@ function action(
 }
 
 export function CommandMenu(props: CommandMenuProps) {
-  const { open, onOpenChange } = props;
+  const { open, onOpenChange, onQuickSearch } = props;
   const { t } = useI18n();
-  const [page, setPage] = useState<Page>(null);
+  const { refresh } = useSelection();
+  const qc = useQueryClient();
+  const [pageState, setPageState] = useState<PageState>(ROOT_PAGE);
+  const { page } = pageState;
+  // The tag dialog and the workspace switch outlive the menu, which closes
+  // as they start.
+  const [tagRows, setTagRows] = useState<FileRow[] | null>(null);
+  // As the rail's switch does.
+  const switchTo = useMutation({
+    mutationFn: (id: string) => api.workspaceSwitch(id),
+    onSuccess: () => invalidateWorkspaceScoped(qc),
+  });
+  const openIn = (item: SwitchItem, text: string) => {
+    // The search first, while the filter still belongs to the view it was
+    // set in: set after the switch, it would carry the old view's folder into
+    // the new one. It replaces the text, as "Search for" does.
+    if (text) onQuickSearch(text);
+    if (!item.active) switchTo.mutate(item.switchId);
+    // Back to the list even when nothing switches: the menu may have been
+    // opened over another screen.
+    if (window.location.hash !== "#/") window.location.hash = "/";
+  };
   // The focused file is taken as the menu opens and kept until it closes:
   // the focus follows a position in the list, and a list refetched while the
   // menu is up (a scan landing) could put another file there.
@@ -170,37 +260,53 @@ export function CommandMenu(props: CommandMenuProps) {
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (!open) setPage(null);
+    if (!open) setPageState(ROOT_PAGE);
     setFocused(open ? getFocusedFile() : null);
   }
 
   return (
-    <CommandDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t("command.title")}
-      description={t("command.placeholder")}
-      className="max-w-xl border-muted/35 bg-bg shadow-2xl"
-      onEscapeKeyDown={(e) => {
-        // Esc on a sub-page steps back rather than closing the menu.
-        if (page) {
-          e.preventDefault();
-          setPage(null);
-        }
-      }}
-    >
-      {/* The body mounts only while the dialog is open, so the selection,
+    <>
+      <CommandDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title={t("command.title")}
+        description={t("command.placeholder")}
+        className="max-w-xl border-muted/35 bg-bg shadow-2xl"
+        onEscapeKeyDown={(e) => {
+          // Esc on a sub-page steps back rather than closing the menu.
+          if (page) {
+            e.preventDefault();
+            setPageState(parentPage(pageState));
+          }
+        }}
+      >
+        {/* The body mounts only while the dialog is open, so the selection,
           recent and saved searches are read when the menu opens rather than
           on every change behind it. Keyed by page so a page starts with an
           empty field and the first row highlighted. */}
-      <CommandMenuBody
-        key={page ?? "root"}
-        {...props}
-        focused={focused}
-        page={page}
-        setPage={setPage}
-      />
-    </CommandDialog>
+        <CommandMenuBody
+          key={page ?? "root"}
+          {...props}
+          focused={focused}
+          pageState={pageState}
+          setPageState={setPageState}
+          onEditTags={setTagRows}
+          onOpenIn={openIn}
+        />
+      </CommandDialog>
+      {/* Mounted only while open so each pass starts from a clean staged edit,
+        as the selection layer's does. */}
+      {tagRows && (
+        <BulkTagDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setTagRows(null);
+          }}
+          rows={tagRows}
+          onApplied={refresh}
+        />
+      )}
+    </>
   );
 }
 
@@ -241,23 +347,48 @@ function CommandMenuBody({
   onDiscover,
   canDiscover = ready,
   onTags,
+  onHistory,
+  onDuplicates,
+  onAutoTag,
   onSettings,
   onHelp,
   onOpenDevTools,
   onApplySearch,
   onApplySaved,
   onQuickSearch,
+  onAddSearchToken,
+  filter,
+  onFilterChange,
   fileActionsAvailable = true,
   focused,
-  page,
-  setPage,
+  pageState,
+  setPageState,
+  onEditTags,
+  onOpenIn,
 }: CommandMenuProps & {
   focused: FileRow | null;
-  page: Page;
-  setPage: (page: Page) => void;
+  pageState: PageState;
+  setPageState: (state: PageState) => void;
+  onEditTags: (rows: FileRow[]) => void;
+  onOpenIn: (item: SwitchItem, text: string) => void;
 }) {
   const { t, lang } = useI18n();
-  const [search, setSearch] = useState("");
+  const { page } = pageState;
+  const searchIn = pageState.page === "searchIn" ? pageState.item : null;
+  const setPage = (next: Exclude<Page, "searchIn">, search = "") =>
+    setPageState({ page: next, initialSearch: search });
+  const [search, setSearch] = useState(pageState.initialSearch);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // The body remounts for each page, taking the field the user was typing in
+  // with it: give focus back to the new one (the root's too, on the way
+  // back), caret after what carried over. On opening, the dialog focuses the
+  // same field anyway.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
   const typed = search.trim();
   const targets = useCommandTargets(focused, fileActionsAvailable);
   const watchLater = useWatchLater();
@@ -271,7 +402,7 @@ function CommandMenuBody({
     if (!page) return;
     if (e.key === "Backspace" && search === "") {
       e.preventDefault();
-      setPage(null);
+      setPageState(parentPage(pageState));
       return;
     }
     // A digit picks the rating outright.
@@ -288,31 +419,57 @@ function CommandMenuBody({
     }
   };
 
-  const badge =
+  const onSearchChange = (value: string) => {
+    const prefix = page === null ? prefixPage(value) : null;
+    if (prefix) setPage(prefix.page, prefix.rest);
+    else setSearch(value);
+  };
+
+  const filePageBadge =
     page === "rating"
       ? t("command.pageRating")
       : page === "collections"
         ? t("command.pageCollections")
         : null;
+  // A prefix page shows the prefix itself: it is what was typed to get there.
+  const badge =
+    page === "tag" || page === "ws" || page === "col"
+      ? `${page}:`
+      : searchIn
+        ? `${searchIn.kind}:${searchIn.name}`
+        : filePageBadge &&
+          (targets.length > 1
+            ? `${filePageBadge} (${t("command.selectedFiles", { count: targets.length })})`
+            : filePageBadge);
   const placeholder =
     page === "rating"
       ? t("command.ratingPlaceholder")
       : page === "collections"
         ? t("command.collectionPlaceholder")
-        : t("command.placeholder");
+        : page === "tag"
+          ? t("command.tagPlaceholder")
+          : page === "ws"
+            ? t("command.workspacePlaceholder")
+            : page === "col"
+              ? t("command.collectionOpenPlaceholder")
+              : searchIn
+                ? t("command.searchInPlaceholder", { name: searchIn.name })
+                : t("command.placeholder");
 
   return (
-    <Command onKeyDown={onKeyDown} filter={matchKeywords}>
+    <Command
+      onKeyDown={onKeyDown}
+      filter={matchKeywords}
+      // The tag page is ranked by the search box's own matcher; the
+      // search-in page's one row is whatever was typed.
+      shouldFilter={page !== "tag" && page !== "searchIn"}
+    >
       <CommandInput
+        ref={inputRef}
         placeholder={placeholder}
         value={search}
-        onValueChange={setSearch}
-        badge={
-          badge &&
-          (targets.length > 1
-            ? `${badge} (${t("command.selectedFiles", { count: targets.length })})`
-            : badge)
-        }
+        onValueChange={onSearchChange}
+        badge={badge}
       />
       <CommandList>
         {/* Not while the quick search row is up: cmdk does not count a
@@ -330,6 +487,28 @@ function CommandMenuBody({
             files={files}
             closeThen={closeThen}
           />
+        ) : page === "tag" ? (
+          <TagPage
+            t={t}
+            search={search}
+            onPick={(token) => closeThen(() => onAddSearchToken(token))}
+            onSearch={(text) => closeThen(() => onQuickSearch(text))}
+          />
+        ) : page === "ws" || page === "col" ? (
+          <SwitchPage
+            t={t}
+            kind={page}
+            onPick={(item) =>
+              setPageState({ page: "searchIn", initialSearch: "", item })
+            }
+          />
+        ) : searchIn ? (
+          <SearchInPage
+            t={t}
+            item={searchIn}
+            typed={typed}
+            onSelect={() => closeThen(() => onOpenIn(searchIn, typed))}
+          />
         ) : (
           <>
             {targets.length > 0 && (
@@ -339,6 +518,7 @@ function CommandMenuBody({
                 files={files}
                 closeThen={closeThen}
                 openPage={setPage}
+                onEditTags={() => closeThen(() => onEditTags(targets))}
               />
             )}
             <RecentSearchesGroup
@@ -363,6 +543,8 @@ function CommandMenuBody({
               heatmapOpen={heatmapOpen}
               canDiscover={canDiscover}
               closeThen={closeThen}
+              filter={filter}
+              onFilterChange={onFilterChange}
               onFocusSearch={onFocusSearch}
               onScan={onScan}
               onRebuild={onRebuild}
@@ -371,6 +553,9 @@ function CommandMenuBody({
               onToggleHeatmap={onToggleHeatmap}
               onDiscover={onDiscover}
               onTags={onTags}
+              onHistory={onHistory}
+              onDuplicates={onDuplicates}
+              onAutoTag={onAutoTag}
               onSettings={onSettings}
               onHelp={onHelp}
               onOpenDevTools={onOpenDevTools}
@@ -429,14 +614,20 @@ function FileActionsGroup({
   files,
   closeThen,
   openPage,
+  onEditTags,
 }: {
   t: TFunc;
   targets: FileRow[];
   files: FileActions;
   closeThen: (fn: () => void) => void;
-  openPage: (page: Page) => void;
+  openPage: (page: "rating" | "collections") => void;
+  onEditTags: () => void;
 }) {
   const single = files.single;
+  const { activate } = useActivateFile();
+  const { keybindingPreset } = usePreferences();
+  const keys = GRID_BINDINGS[keybindingPreset];
+  const editTagsLabel = t("select.editTags");
   const name =
     targets.length === 1
       ? fileNameOf(targets[0].relPath)
@@ -461,6 +652,35 @@ function FileActionsGroup({
           </span>
         }
       >
+        {single && (
+          <>
+            <CommandItem
+              value={t("fileMenu.open")}
+              onSelect={() => closeThen(() => activate(targets[0]))}
+            >
+              <Play />
+              <span>{t("fileMenu.open")}</span>
+              <CommandShortcut>{formatChords(keys.open)}</CommandShortcut>
+            </CommandItem>
+            <CommandItem
+              value={t("fileMenu.inspect")}
+              onSelect={() =>
+                closeThen(() => activate(targets[0], { autoplay: false }))
+              }
+            >
+              <Info />
+              <span>{t("fileMenu.inspect")}</span>
+              <CommandShortcut>{formatChords(keys.inspect)}</CommandShortcut>
+            </CommandItem>
+            <CommandItem
+              value={t("media.openExternal")}
+              onSelect={() => closeThen(single.openExternal)}
+            >
+              <ExternalLink />
+              <span>{t("media.openExternal")}</span>
+            </CommandItem>
+          </>
+        )}
         <CommandItem
           value={favoriteLabel}
           onSelect={() => closeThen(toggleFavorite)}
@@ -497,6 +717,10 @@ function FileActionsGroup({
           <FolderPlus />
           <span className="flex-1">{collectionsLabel}</span>
           <ChevronRight className="text-muted" />
+        </CommandItem>
+        <CommandItem value={editTagsLabel} onSelect={onEditTags}>
+          <TagsIcon />
+          <span>{editTagsLabel}</span>
         </CommandItem>
         {single && (
           <>
@@ -614,6 +838,163 @@ function CollectionsPage({
         </CommandItem>
       ))}
       <MoreHint t={t} count={hidden} />
+    </CommandGroup>
+  );
+}
+
+function TagPage({
+  t,
+  search,
+  onPick,
+  onSearch,
+}: {
+  t: TFunc;
+  search: string;
+  onPick: (token: string) => void;
+  /** Searches for the directive as typed, as the root's "Search for" did. */
+  onSearch: (text: string) => void;
+}) {
+  const typed = search.trim();
+  const pending = useMemo(() => ({ value: search }), [search]);
+  const { suggestions, held } = useTagCompletions(pending);
+  return (
+    <CommandGroup heading={t("filter.tagSuggestions")}>
+      {suggestions.map((tag) => (
+        <CommandItem
+          key={tag.qualified}
+          value={`tag:${tag.qualified}`}
+          className={held(tag) ? undefined : "text-muted"}
+          // The token the search box makes of the same pick.
+          onSelect={() => onPick(tagSearchToken(tag.name))}
+        >
+          <Tag />
+          <TagSuggestionLabel t={t} tag={tag} held={held(tag)} />
+        </CommandItem>
+      ))}
+      {/* Last, as at the root: a tag the catalog leaves out, or a directive
+          followed by words (`tag:beach sunset`), can still be searched for. */}
+      {typed !== "" && (
+        <CommandItem
+          value="search-for"
+          onSelect={() => onSearch(`${TAG_SEARCH_PREFIX}:${typed}`)}
+        >
+          <Search />
+          <span className="truncate">
+            {t("command.searchFor", { q: `${TAG_SEARCH_PREFIX}:${typed}` })}
+          </span>
+        </CommandItem>
+      )}
+    </CommandGroup>
+  );
+}
+
+/** A row of the `ws:` and `col:` pages: something the rail switches to. */
+interface SwitchItem {
+  kind: "ws" | "col";
+  /** What api.workspaceSwitch takes. */
+  switchId: string;
+  name: string;
+  emoji?: string;
+  active: boolean;
+}
+
+/**
+ * The workspaces (`ws:`) or the collections (`col:`). Picking one moves on to
+ * the search-in page, where a search can be typed to run there.
+ */
+function SwitchPage({
+  t,
+  kind,
+  onPick,
+}: {
+  t: TFunc;
+  kind: "ws" | "col";
+  onPick: (item: SwitchItem) => void;
+}) {
+  const list = useQuery({
+    queryKey: ["workspaces_list"],
+    queryFn: api.workspacesList,
+  });
+  const items: SwitchItem[] =
+    kind === "ws"
+      ? (list.data?.workspaces ?? []).map((w) => ({
+          kind,
+          switchId: w.id,
+          name: w.id === ALL_ID ? t("workspace.all") : w.label,
+          emoji: w.emoji,
+          active: w.active,
+        }))
+      : (list.data?.collections ?? []).map((c) => ({
+          kind,
+          switchId: collectionTarget(c.id),
+          name: c.id === WATCH_LATER_ID ? t("watchLater.name") : c.name,
+          emoji: c.emoji,
+          active: c.active,
+        }));
+
+  return (
+    <CommandGroup
+      heading={t(
+        kind === "ws" ? "command.groupWorkspace" : "command.pageCollections",
+      )}
+    >
+      {items.map((item) => (
+        <CommandItem
+          key={item.switchId}
+          value={`switch:${item.switchId}`}
+          keywords={[item.name]}
+          onSelect={() => onPick(item)}
+        >
+          <SwitchItemIcon item={item} />
+          <span className="flex-1 truncate">{item.name}</span>
+          {item.active && (
+            <span className="text-xs text-primary">{t("command.current")}</span>
+          )}
+          <ChevronRight className="text-muted" />
+        </CommandItem>
+      ))}
+    </CommandGroup>
+  );
+}
+
+function SwitchItemIcon({ item }: { item: SwitchItem }) {
+  if (item.emoji) {
+    return (
+      <span className="w-4 shrink-0 text-center" aria-hidden>
+        {item.emoji}
+      </span>
+    );
+  }
+  if (item.switchId === ALL_ID) return <Layers />;
+  if (item.switchId === collectionTarget(WATCH_LATER_ID)) return <Clock />;
+  return item.kind === "ws" ? <FolderOpen /> : <Folder />;
+}
+
+/**
+ * One row: open the picked workspace or collection, searching for what was
+ * typed there. With nothing typed it only opens it, as the rail does.
+ */
+function SearchInPage({
+  t,
+  item,
+  typed,
+  onSelect,
+}: {
+  t: TFunc;
+  item: SwitchItem;
+  typed: string;
+  onSelect: () => void;
+}) {
+  const label = typed
+    ? t("command.searchIn", { q: typed, name: item.name })
+    : t("command.openItem", { name: item.name });
+  return (
+    <CommandGroup>
+      <CommandItem value="search-in" onSelect={onSelect}>
+        {typed ? <Search /> : <SwitchItemIcon item={item} />}
+        <span className="truncate">{label}</span>
+        <CommandShortcut>↵</CommandShortcut>
+      </CommandItem>
     </CommandGroup>
   );
 }
@@ -758,6 +1139,8 @@ function FixedGroups({
   heatmapOpen,
   canDiscover,
   closeThen,
+  filter,
+  onFilterChange,
   onFocusSearch,
   onScan,
   onRebuild,
@@ -766,6 +1149,9 @@ function FixedGroups({
   onToggleHeatmap,
   onDiscover,
   onTags,
+  onHistory,
+  onDuplicates,
+  onAutoTag,
   onSettings,
   onHelp,
   onOpenDevTools,
@@ -779,6 +1165,8 @@ function FixedGroups({
   heatmapOpen: boolean;
   canDiscover: boolean;
   closeThen: (fn: () => void) => void;
+  filter: SearchQuery;
+  onFilterChange: (query: SearchQuery) => void;
   onFocusSearch: () => void;
   onScan: (includeExcluded?: boolean) => void;
   onRebuild: () => void;
@@ -787,16 +1175,35 @@ function FixedGroups({
   onToggleHeatmap: () => void;
   onDiscover: () => void;
   onTags: () => void;
+  onHistory: () => void;
+  onDuplicates: () => void;
+  onAutoTag: () => void;
   onSettings: () => void;
   onHelp: () => void;
   onOpenDevTools: () => void;
 }) {
+  const { lang } = useI18n();
+  const { mode, setMode } = useTheme();
+  const nextMode = mode === "dark" ? "light" : "dark";
+  // The filter bar's "Clear all", enabled on the same rule as the one in its
+  // popover: something is narrowing (or sorting) the list.
+  const { defaultQuery } = useSmartCollections();
+  const canClearFilters =
+    describeConditions(filter, t, lang, defaultQuery).length > 0;
+
   const navigation: CommandAction[] = [
     action(t, "command.focusSearch", {
       id: "focus-search",
       icon: Search,
       shortcut: "/",
       run: () => closeThen(onFocusSearch),
+    }),
+    action(t, "command.clearFilters", {
+      id: "clear-filters",
+      icon: X,
+      disabled: !canClearFilters,
+      run: () =>
+        closeThen(() => onFilterChange(clearAllTarget(filter, defaultQuery))),
     }),
     action(t, "discover.title", {
       id: "discover",
@@ -809,6 +1216,22 @@ function FixedGroups({
       icon: TagsIcon,
       disabled: !ready,
       run: () => closeThen(onTags),
+    }),
+    // Never disabled, like their buttons in the header.
+    action(t, "history.title", {
+      id: "history",
+      icon: History,
+      run: () => closeThen(onHistory),
+    }),
+    action(t, "duplicates.title", {
+      id: "duplicates",
+      icon: CopyCheck,
+      run: () => closeThen(onDuplicates),
+    }),
+    action(t, "autoTag.title", {
+      id: "auto-tag",
+      icon: Wand2,
+      run: () => closeThen(onAutoTag),
     }),
     action(t, "settings.title", {
       id: "settings",
@@ -888,6 +1311,16 @@ function FixedGroups({
       icon: CalendarDays,
       run: () => closeThen(onToggleHeatmap),
     }),
+    // The header's toggle: the counterpart in the current theme family.
+    action(
+      t,
+      nextMode === "dark" ? "theme.switchToDark" : "theme.switchToLight",
+      {
+        id: "theme-toggle",
+        icon: nextMode === "dark" ? Moon : Sun,
+        run: () => closeThen(() => setMode(nextMode)),
+      },
+    ),
   ];
 
   return (
