@@ -42,6 +42,9 @@ test("video adjustments sit above a full-width scene strip", async () => {
     await expect(scenes).toBeVisible();
     const closed = (await scenes.boundingBox())!;
 
+    const video = detail.locator("video");
+    const before = (await video.boundingBox())!;
+    await page.mouse.move(before.x + before.width / 2, before.y + 24);
     await detail.getByRole("button", { name: "Video adjustments" }).click();
     const panel = detail.getByRole("complementary", {
       name: "Video adjustments",
@@ -49,7 +52,7 @@ test("video adjustments sit above a full-width scene strip", async () => {
     await expect(panel.getByRole("slider", { name: "Tint" })).toBeVisible();
     const opened = (await scenes.boundingBox())!;
     const controls = (await panel.boundingBox())!;
-    const picture = (await detail.locator("video").boundingBox())!;
+    const picture = (await video.boundingBox())!;
 
     expect(picture.x + picture.width).toBeLessThanOrEqual(controls.x);
     // A sidebar beside the video, at least as tall as the picture. On a wide
