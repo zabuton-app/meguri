@@ -37,6 +37,7 @@ import { useResumeStart } from "@/hooks/useResumeStart";
 import { ResumeNotice } from "@/components/ResumeNotice";
 import { MediaModal, TopBar } from "./MediaModal";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
+import { hasHdrTransfer } from "@/video/colorGrade";
 import { needsVideoPreview, isRemuxedVideo } from "@shared/playbackTracks";
 import { useAudioActions } from "@/audio/useAudioPlayer";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
@@ -403,6 +404,7 @@ export default function MediaDetail() {
                     : undefined
                 }
                 subtitleKey={subtitlePreferenceKey(wsId, d.relPath)}
+                videoAdjustments={!hasHdrTransfer(d.meta)}
                 duration={d.duration}
                 width={d.width}
                 height={d.height}
