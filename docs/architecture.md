@@ -32,6 +32,19 @@ GitHub repository the update check looks at, the Microsoft Store product ID
 environment variables it reads (`MEGURI`, for `MEGURI_ROOT`,
 `MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`) and the logo bitmaps. Another
 app built on this code can call `startApp()` from its own entry point with its own values.
+It can also pass `setup`, which runs once right after `registerIpc()` and
+before the tray and window appear, with the same `IpcContext` the handler
+groups get (both `IpcContext` and `handle()` are exported from
+`electron/app.ts`). That is where such an app registers its own IPC handlers
+and reaches the workspaces, the query worker and the media server's base URL.
+Its channels still follow steps 1 to 3 of
+[Adding a new IPC channel](#adding-a-new-ipc-channel): `handle()` and the
+preload whitelist only know the channels in `shared/ipc/`. Nothing is on
+screen until `setup` settles, so long work belongs in the background. There is
+no quit hook: work that writes to the workspaces runs through `ctx.passes` (or
+`ctx.scans`), which every quit path stops before the databases close, while a
+`before-quit` listener runs after Meguri's teardown on macOS and on an OS
+shutdown, and not at all on a Windows log-off.
 The `userData` directory is not part of these options: it is `<appData>/` plus the top-level `productName`, or
 else `name`, of the package.json Electron loads. Meguri has no top-level
 `productName` (`build.productName` does not count), so its data is in

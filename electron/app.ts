@@ -48,7 +48,7 @@ import {
 } from "./core/libraryBackup.js";
 import { libraryBackupDir, libraryDbPath } from "./core/paths.js";
 import { PositionWriter } from "./core/positionWriter.js";
-import { registerIpc } from "./ipc/index.js";
+import { registerIpc, type IpcContext } from "./ipc/index.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
 import { WorkspacePasses } from "./core/workspacePasses.js";
@@ -110,7 +110,29 @@ export interface AppOptions {
    * Settings: the tray, the window / dock icon and the logo inside the app.
    */
   logos: LogoImages;
+  /**
+   * The app's own main-process setup, run once right after Meguri's IPC
+   * handlers are registered and before the tray and window appear. It gets the
+   * same `IpcContext` those handlers use, so it can register handlers with
+   * `handle()` and read the workspaces, the query worker and the media
+   * server's base URL. `handle()` only takes channels declared in
+   * `shared/ipc/`, which is also what the preload lets through.
+   * Nothing is on screen until it settles, so it should return quickly and
+   * leave long work running in the background. A throw (or rejection) fails
+   * startup like any other startup error.
+   *
+   * There is no quit hook. Work that writes to the workspaces, here or later,
+   * goes through `ctx.passes.forEachWorkspace()` (or `ctx.scans`), which every
+   * quit path aborts before the databases close. An `app.on("before-quit")`
+   * listener is not enough: it runs after Meguri's teardown on macOS and on an
+   * OS shutdown, and not at all on a Windows log-off.
+   */
+  setup?: (ctx: IpcContext) => void | Promise<void>;
 }
+
+// For an app's `setup`: what Meguri's own handler groups are built from.
+export type { IpcContext };
+export { handle } from "./core/ipcHandler.js";
 
 /** Start the app. Call once, from the entry point, before anything else runs. */
 export function startApp(options: AppOptions): void {
@@ -800,7 +822,7 @@ export function startApp(options: AppOptions): void {
       app.quit();
     });
 
-    registerIpc({
+    const ipcContext: IpcContext = {
       ws,
       queryClient,
       positions,
@@ -815,7 +837,11 @@ export function startApp(options: AppOptions): void {
       passes,
       retryLibraryMerge,
       libraryRestoredFrom: () => libraryRestoredFrom,
-    });
+    };
+    registerIpc(ipcContext);
+    await options.setup?.(ipcContext);
+    // Quit while the app's setup was running: open nothing more.
+    if (isQuitting()) return;
     createTray();
     // Dock icon override on macOS (BrowserWindow icons are ignored there).
     // Skipped for the default logo so the packaged .icns keeps its full
