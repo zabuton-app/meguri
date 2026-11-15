@@ -92,7 +92,7 @@ export const ja = {
   "settings.update": "アップデート",
   "settings.updateDesc": "新しいバージョンが公開されていないか確認します。",
   "settings.updateCheckNow": "今すぐ確認",
-  "settings.updateAuto": "起動時に自動で確認する",
+  "settings.updateAuto": "自動で確認する",
   "update.available": "新しいバージョン {version} が利用可能です",
   "update.availableDesc": "現在のバージョン: {current}",
   "update.view": "リリースを開く",

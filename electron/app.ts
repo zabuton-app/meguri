@@ -36,6 +36,10 @@ import {
   type UpdateRepo,
 } from "./core/updater.js";
 import {
+  scheduleUpdateChecks,
+  type UpdateChecks,
+} from "./core/updateSchedule.js";
+import {
   needsWaylandVideoWorkaround,
   WAYLAND_VIDEO_WORKAROUND_SWITCH,
 } from "./core/waylandVideoWorkaround.js";
@@ -330,6 +334,8 @@ export function startApp(options: AppOptions): void {
   // Delay before the n-th reload within the window; its length is the bound.
   const RENDERER_RELOAD_BACKOFF_MS = [0, 2_000, 5_000];
   let rendererReloadTimes: number[] = [];
+  /** Background update checks, once started (scheduleBackgroundUpdateChecks). */
+  let updateChecks: UpdateChecks | null = null;
 
   app.on("render-process-gone", (_e, wc, details) => {
     log.error("renderer process gone:", details);
@@ -502,20 +508,18 @@ export function startApp(options: AppOptions): void {
   }
 
   /**
-   * On startup, check GitHub for a newer stable release (when auto-check is on)
-   * and push an event to the renderer if one is available. Deferred so it never
-   * competes with the initial scan/render, and failures are swallowed (it's a
-   * best-effort convenience, not a critical path).
+   * While auto-check is on, check GitHub for a newer stable release after
+   * launch and then periodically (see updateSchedule.ts), and push an event to
+   * the renderer for a release not announced yet. Failures are swallowed: it
+   * is a best-effort convenience, not a critical path.
    */
-  function scheduleStartupUpdateCheck(): void {
-    if (!isAutoCheckEnabled()) return;
-    setTimeout(() => {
-      void checkForUpdates()
-        .then((info) => {
-          if (info?.available) emit("update:available", info);
-        })
-        .catch((e) => log.warn("startup update check failed", e));
-    }, 8_000);
+  function scheduleBackgroundUpdateChecks(): void {
+    updateChecks = scheduleUpdateChecks({
+      check: () => checkForUpdates(),
+      isEnabled: isAutoCheckEnabled,
+      announce: (info) => emit("update:available", info),
+      onError: (e) => log.warn("background update check failed", e),
+    });
   }
 
   function createWindow(): void {
@@ -553,6 +557,9 @@ export function startApp(options: AppOptions): void {
     // Window-open / will-navigate are governed globally via app.on("web-contents-created").
 
     // Closing the window hides it to the tray unless tray support is disabled.
+    // A page loaded anew (a reload after a crash, or a new window) shows no
+    // update notice, so the next check announces the release again.
+    mainWindow.webContents.on("did-finish-load", () => updateChecks?.forget());
     mainWindow.on("close", (e) => {
       if (isTrayEnabled() && !isQuitting()) {
         e.preventDefault();
@@ -861,7 +868,7 @@ export function startApp(options: AppOptions): void {
     // Quit while merging: the teardown has run, so nothing more starts.
     if (isQuitting()) return;
     scans.start();
-    scheduleStartupUpdateCheck();
+    scheduleBackgroundUpdateChecks();
   });
   startup.catch((e: unknown) => {
     startupFailed = true;

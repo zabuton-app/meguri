@@ -91,7 +91,7 @@ export const ko: Catalog = {
   "settings.update": "업데이트",
   "settings.updateDesc": "새 버전이 있는지 확인합니다.",
   "settings.updateCheckNow": "지금 확인",
-  "settings.updateAuto": "시작할 때 자동으로 확인",
+  "settings.updateAuto": "자동으로 확인",
   "update.available": "버전 {version}을(를) 사용할 수 있습니다",
   "update.availableDesc": "현재 버전: {current}",
   "update.view": "릴리스 열기",

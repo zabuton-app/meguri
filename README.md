@@ -556,10 +556,10 @@ Meguri is **privacy-first**: everything stays on your machine.
   (`api.github.com/repos/zabuton-app/meguri/releases/latest`). The request
   carries nothing but the app name and version in its `User-Agent`, though
   GitHub sees your IP address, as with any request. It runs shortly after
-  startup, at most once every six hours, and when you click **Check now** in
-  the settings or **Check for Updates…** in the tray menu. To turn the
-  automatic check off, open **Settings → App → Updates** and turn off
-  **Check automatically on startup**.
+  startup and then while the app keeps running, every six hours (hourly
+  while GitHub cannot be reached), and when you click **Check now** in the settings or **Check for
+  Updates…** in the tray menu. To turn the automatic check off, open
+  **Settings → App → Updates** and turn off **Check automatically**.
 - **Fully offline.** All features work without an internet connection.
 
 ## Architecture
