@@ -396,7 +396,8 @@ stream when the player can decode it and preserves the surround channel count.
 The original file stays untouched.
 
 For previewed clips and MKV, AVI, WMV, FLV, or TS clips with multiple audio
-tracks, use **Audio track** beside the volume control in the full player.
+tracks, open **Audio and subtitles** beside the volume control in the full
+player and choose under **Audio track**.
 **Default** uses the usual playback selection when you open a clip. Switching
 tracks keeps the playhead and play or pause state.
 
@@ -411,10 +412,13 @@ catalogue. A link opens in your browser only when you choose **Open**.
 
 ### Embedded subtitles
 
-Use **Subtitle track** in the clip player or fullscreen to choose an embedded
-text track or turn captions off. Meguri remembers the choice per clip. When the
-audio language is known, **Match audio language** can choose the corresponding
-subtitle. Meguri loads text near the playhead as you watch or seek.
+Open **Audio and subtitles** in the clip player or fullscreen and choose an
+embedded text track under **Subtitle track**, or turn captions off. The button
+is underlined while subtitles are on. Meguri remembers the choice per clip.
+When the audio language is known, **Match audio language** chooses the
+corresponding subtitle and shows which one it picks for the current audio.
+Meguri loads text near the playhead as you watch or seek; a mark on the button
+shows loading or a track that could not be loaded.
 
 Supported tracks include SRT, ASS/SSA as plain text, WebVTT, and MP4 timed text.
 

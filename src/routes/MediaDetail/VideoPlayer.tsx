@@ -57,6 +57,8 @@ import {
   type VideoAdjustmentsPanel,
 } from "@/video/VideoGradeOverlay";
 import { isSameSource } from "@/video/videoHandOff";
+import { TrackPanel, type SubtitleStatus } from "./TrackPanel";
+import { CTRL_BUTTON_CLASS } from "./controlBar";
 import {
   previewAudioTrackOf,
   streamOffsetOf,
@@ -289,25 +291,26 @@ export const VideoPlayer = forwardRef<
     audioTrack === DEFAULT_AUDIO_TRACK
       ? subtitleAudioLanguage
       : (audioTracks?.[audioTrack]?.language ?? "");
-  const chosenSubtitle =
-    subtitle === AUTO_SUBTITLE
-      ? (subtitleTracks?.findIndex(
-          (track) =>
-            isTextSubtitle(track.codec) &&
-            sameSubtitleLanguage(audioLanguage, track.language),
-        ) ?? SUBTITLES_OFF)
-      : subtitle;
+  const autoSubtitle =
+    subtitleTracks?.findIndex(
+      (track) =>
+        isTextSubtitle(track.codec) &&
+        sameSubtitleLanguage(audioLanguage, track.language),
+    ) ?? SUBTITLES_OFF;
+  const chosenSubtitle = subtitle === AUTO_SUBTITLE ? autoSubtitle : subtitle;
   const showSubtitles = !chromeless;
+  // Only a text track can be shown; a saved bitmap track counts as off.
+  const subtitlesOn =
+    showSubtitles &&
+    chosenSubtitle >= 0 &&
+    isTextSubtitle(subtitleTracks?.[chosenSubtitle]?.codec ?? "");
   const subtitleWindow =
     Math.floor(Math.max(0, position) / SUBTITLE_WINDOW_SECONDS) *
     SUBTITLE_WINDOW_SECONDS;
   const subtitleQuery = useQuery({
     queryKey: ["file_subtitles", wsId, id, chosenSubtitle, subtitleWindow],
     queryFn: () => api.fileSubtitles(id, wsId, chosenSubtitle, subtitleWindow),
-    enabled:
-      showSubtitles &&
-      chosenSubtitle >= 0 &&
-      isTextSubtitle(subtitleTracks?.[chosenSubtitle]?.codec ?? ""),
+    enabled: subtitlesOn,
     staleTime: Infinity,
     retry: false,
     placeholderData: (previous, query) =>
@@ -324,6 +327,15 @@ export const VideoPlayer = forwardRef<
           .map((cue) => cue.text)
           .join("\n")
       : undefined;
+  // Shown on the audio and subtitles button. Loading only while there is
+  // nothing to show yet: not between cue windows, where the last cues stay.
+  const subtitleStatus: SubtitleStatus = !showSubtitles
+    ? "idle"
+    : subtitleQuery.isError
+      ? "error"
+      : subtitleQuery.isFetching && !subtitleQuery.isPlaceholderData && !caption
+        ? "loading"
+        : "idle";
   // Volume lives outside this component so the playlist chrome and the detail
   // view stay in step (see hooks/useVolume.ts).
   const { volume, muted } = useVolume();
@@ -1072,6 +1084,12 @@ export const VideoPlayer = forwardRef<
 
   const pct = total ? `${Math.min(100, (displayPos / total) * 100)}%` : "0%";
   const controlsVisible = !chromeless && loaded && (!playing || hover != null);
+  // The audio and subtitles panel has a column per kind of track with
+  // something to choose between.
+  const hasAudioChoice = (audioTracks?.length ?? 0) > 1;
+  const hasSubtitleChoice =
+    showSubtitles &&
+    !!subtitleTracks?.some((track) => isTextSubtitle(track.codec));
   const aspectRatio =
     width && height && width > 0 && height > 0
       ? `${width} / ${height}`
@@ -1267,22 +1285,6 @@ export const VideoPlayer = forwardRef<
           </span>
         </div>
       )}
-      {showSubtitles &&
-        (subtitleQuery.isError ||
-          (subtitleQuery.isFetching &&
-            !subtitleQuery.isPlaceholderData &&
-            !caption)) && (
-          <div
-            role="status"
-            className="pointer-events-none absolute inset-x-0 top-10 mx-auto w-fit rounded bg-black/80 px-2 py-1 text-xs text-white"
-          >
-            {t(
-              subtitleQuery.isError
-                ? "player.subtitleUnavailable"
-                : "player.subtitleLoading",
-            )}
-          </div>
-        )}
       {/* Center play/pause indicator (shown large while paused). */}
       {!chromeless && loaded && !playing && (
         <button
@@ -1301,10 +1303,12 @@ export const VideoPlayer = forwardRef<
         Custom controls (with a frame preview at the hover position).
         Not rendered at all when chromeless: leaving it in the tree at
         opacity 0 would keep its buttons clickable and tab-reachable.
+        It stays shown while a popover from it is open (`aria-expanded`):
+        the panel renders elsewhere, so hovering it leaves the bar.
       */}
       {!chromeless && (
         <div
-          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity has-[select:focus]:opacity-100 ${
+          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity has-[[aria-expanded=true]]:opacity-100 ${
             controlsVisible ? "opacity-100" : "opacity-0"
           } group-hover:opacity-100`}
         >
@@ -1413,79 +1417,40 @@ export const VideoPlayer = forwardRef<
               {total ? fmtTime(total) : "--:--"}
             </span>
             <div className="ml-auto flex items-center gap-1">
-              {audioTracks && audioTracks.length > 1 && (
-                <label className="flex min-w-0 flex-col gap-0.5 text-xs font-medium">
-                  <span>{t("player.audioTrack")}</span>
-                  <select
-                    title={t("player.audioTrack")}
-                    className="min-w-0 max-w-32 rounded border border-white/30 bg-black/75 px-1 py-1 text-xs text-white"
-                    disabled={!loaded}
-                    value={audioTrack}
-                    onChange={(e) => chooseAudioTrack(Number(e.target.value))}
-                  >
-                    <option value={DEFAULT_AUDIO_TRACK}>
-                      {t("player.audioTrackDefault")}
-                    </option>
-                    {audioTracks.map(({ title, language }, index) => (
-                      <option key={index} value={index}>
-                        {[
-                          t("player.audioTrackNumber", { number: index + 1 }),
-                          title,
-                          language,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              {(hasAudioChoice || hasSubtitleChoice) && (
+                <TrackPanel
+                  audio={
+                    hasAudioChoice && audioTracks
+                      ? {
+                          tracks: audioTracks,
+                          value: audioTrack,
+                          disabled: !loaded,
+                          onChange: chooseAudioTrack,
+                        }
+                      : undefined
+                  }
+                  subtitles={
+                    hasSubtitleChoice && subtitleTracks
+                      ? {
+                          tracks: subtitleTracks,
+                          value: subtitle,
+                          onChange: (choice) => {
+                            setSubtitle(choice);
+                            saveSubtitlePreference(subtitleKey, choice);
+                          },
+                          audioLanguage,
+                          autoTrack: autoSubtitle,
+                          shown: subtitlesOn,
+                          status: subtitleStatus,
+                        }
+                      : undefined
+                  }
+                  portalTarget={() =>
+                    fullscreenTargetRef?.current ?? wrapRef.current
+                  }
+                  t={t}
+                />
               )}
-              {showSubtitles &&
-                subtitleTracks?.some((track) =>
-                  isTextSubtitle(track.codec),
-                ) && (
-                  <label className="flex min-w-0 flex-col gap-0.5 text-xs font-medium">
-                    <span>{t("player.subtitles")}</span>
-                    <select
-                      title={t("player.subtitles")}
-                      className="min-w-0 max-w-32 rounded border border-white/30 bg-black/75 px-1 py-1 text-xs text-white"
-                      value={
-                        subtitle >= 0 &&
-                        !isTextSubtitle(subtitleTracks[subtitle]?.codec ?? "")
-                          ? SUBTITLES_OFF
-                          : subtitle
-                      }
-                      onChange={(e) => {
-                        const choice = Number(e.target.value);
-                        setSubtitle(choice);
-                        saveSubtitlePreference(subtitleKey, choice);
-                      }}
-                    >
-                      <option value={AUTO_SUBTITLE}>
-                        {t("player.subtitleAuto")}
-                      </option>
-                      <option value={SUBTITLES_OFF}>
-                        {t("player.subtitleOff")}
-                      </option>
-                      {subtitleTracks.map(
-                        ({ title, language, codec }, index) =>
-                          isTextSubtitle(codec) && (
-                            <option key={index} value={index}>
-                              {[
-                                t("player.subtitleTrackNumber", {
-                                  number: index + 1,
-                                }),
-                                title,
-                                language,
-                              ]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </option>
-                          ),
-                      )}
-                    </select>
-                  </label>
-                )}
               <div className="group/vol flex items-center">
                 <CtrlButton
                   onClick={toggleMuted}
@@ -1539,7 +1504,7 @@ function CtrlButton({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="flex items-center justify-center rounded-full p-1.5 text-white/90 transition hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-white/90"
+      className={CTRL_BUTTON_CLASS}
     >
       {children}
     </button>
