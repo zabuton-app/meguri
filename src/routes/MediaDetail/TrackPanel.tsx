@@ -1,7 +1,7 @@
 // The control bar's audio and subtitles button and the panel it opens: one
 // column per kind of track the clip offers to choose between.
 import { useId, useState, type ReactNode } from "react";
-import { Captions, Check } from "lucide-react";
+import { AudioLines, Captions, Check, type LucideIcon } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -112,7 +112,11 @@ export function TrackPanel({ audio, subtitles, portalTarget, t }: Props) {
         }`}
       >
         {audio && (
-          <Column legend={t("player.audioTrack")} divided={!!subtitles}>
+          <Column
+            icon={AudioLines}
+            legend={t("player.audioTrack")}
+            divided={!!subtitles}
+          >
             <Option
               name={audioName}
               checked={audio.value === DEFAULT_AUDIO_TRACK}
@@ -137,7 +141,7 @@ export function TrackPanel({ audio, subtitles, portalTarget, t }: Props) {
           </Column>
         )}
         {subtitles && (
-          <Column legend={t("player.subtitles")}>
+          <Column icon={Captions} legend={t("player.subtitles")}>
             <Option
               name={subtitleName}
               checked={selectedSubtitle(subtitles) === SUBTITLES_OFF}
@@ -209,10 +213,13 @@ function autoDetail(
 }
 
 function Column({
+  icon: Icon,
   legend,
   divided = false,
   children,
 }: {
+  /** Tells the two columns apart at a glance. */
+  icon: LucideIcon;
   legend: string;
   /** Draw the rule between this column and the next. */
   divided?: boolean;
@@ -224,7 +231,8 @@ function Column({
         divided ? "border-r border-white/10 pr-1.5" : ""
       }`}
     >
-      <legend className="px-2.5 pb-1.5 pt-2 text-[13px] font-bold">
+      <legend className="flex items-center gap-2 px-2.5 pb-1.5 pt-2 text-[13px] font-bold">
+        <Icon size={16} aria-hidden="true" className="shrink-0" />
         {legend}
       </legend>
       {children}
