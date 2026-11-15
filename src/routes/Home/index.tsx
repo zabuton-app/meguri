@@ -1200,7 +1200,12 @@ export default function Home() {
         onDiscover={openDiscover}
       />
 
-      {helpOpen && <ShortcutsOverlay onClose={() => setHelpOpen(false)} />}
+      {helpOpen && (
+        <ShortcutsOverlay
+          onClose={() => setHelpOpen(false)}
+          onOpenSettings={openSettings}
+        />
+      )}
 
       <CollectionEditDialog
         open={!!editCollection}
