@@ -52,7 +52,10 @@ import {
 import { matchAny, type NavBinding } from "@/settings/keybindings";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { VideoElement } from "@/video/VideoElement";
-import { VideoGradeOverlay } from "@/video/VideoGradeOverlay";
+import {
+  VideoGradeOverlay,
+  type VideoAdjustmentsPanel,
+} from "@/video/VideoGradeOverlay";
 import { isSameSource } from "@/video/videoHandOff";
 import {
   previewAudioTrackOf,
@@ -155,8 +158,9 @@ export const VideoPlayer = forwardRef<
     subtitleTracks?: EmbeddedTrack[];
     subtitleAudioLanguage?: string;
     subtitleKey?: string;
-    /** Enable the SDR adjustment controls for the detail viewer. */
-    videoAdjustments?: boolean;
+    /** The detail view's side panel for the SDR adjustment controls; absent
+     *  where adjustments are not offered. */
+    videoAdjustments?: VideoAdjustmentsPanel;
     /**
      * Active paging chords; the player yields these keys so they don't also
      * seek. Unused while `shortcuts` is false.
@@ -1238,6 +1242,7 @@ export const VideoPlayer = forwardRef<
           key={`${wsId}:${id}`}
           videoRef={ref}
           loaded={loaded}
+          panel={videoAdjustments}
           t={t}
         />
       )}
