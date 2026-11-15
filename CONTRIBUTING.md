@@ -116,8 +116,10 @@ these at a time, and a pull request nobody has reviewed yet has neither.
 ### Other
 
 - `good first issue`: small and well scoped, with the files to change named in
-  the issue. A good place to start. Please comment before you start, so two
-  people don't work on the same issue.
+  the issue. A good place to start. Please leave a short comment when you pick
+  one up so two people don't work on the same issue; there's no need to wait
+  for a reply before you start. If an issue was claimed but has seen no
+  activity for two weeks, feel free to take it over.
 - `help wanted`: the maintainers would welcome help with this one.
 - `performance`: about speed, memory or resource use. Can be combined with any
   area.
