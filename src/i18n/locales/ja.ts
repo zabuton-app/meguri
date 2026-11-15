@@ -311,6 +311,7 @@ export const ja = {
   "shortcuts.skip10": "10秒 戻る / 進む",
   "shortcuts.volume": "音量 上げ / 下げ",
   "shortcuts.mute": "ミュート切替",
+  "shortcuts.speed": "再生速度を下げる / 上げる",
   "shortcuts.fullscreen": "全画面切替",
   "shortcuts.seekStart": "先頭へ移動",
   "shortcuts.spectrumPattern":
@@ -376,6 +377,8 @@ export const ja = {
   "player.unmute": "ミュート解除 (M)",
   "player.fullscreen": "全画面 (F)",
   "player.volume": "音量",
+  "player.speed": "再生速度",
+  "player.speedValue": "{speed}×",
   "player.audioTrack": "音声トラック",
   "player.audioTrackNumber": "トラック {number}",
   "player.audioTrackDefault": "既定",

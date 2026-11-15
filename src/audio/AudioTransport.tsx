@@ -6,6 +6,8 @@
 import { Pause, Play, Volume2, VolumeX, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 import { fmtTime } from "@/routes/MediaDetail/utils";
+import { SpeedMenu } from "@/components/SpeedMenu";
+import { NORMAL_SPEED } from "@/lib/playbackSpeed";
 import { useAudioPlayer, useAudioPosition } from "./useAudioPlayer";
 
 export const CTRL_CLASS =
@@ -102,6 +104,15 @@ export function AudioTransport({
       )}
 
       <TimeReadout live={live} duration={duration} className={dim} />
+
+      <SpeedMenu
+        // The speed belongs to the loaded track: another one shows normal.
+        speed={live ? player.playbackRate : NORMAL_SPEED}
+        onChange={player.setPlaybackRate}
+        disabled={!live}
+        className={ctrl}
+        look={size === "stage" ? "dark" : "theme"}
+      />
 
       <div className="flex shrink-0 items-center">
         <button

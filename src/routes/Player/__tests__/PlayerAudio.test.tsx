@@ -203,6 +203,27 @@ describe("Player audio items", () => {
       audioSpectrumPattern?: string;
     };
 
+  it("Shift+< and Shift+> step the audio's speed, and the next item starts at normal", async () => {
+    renderPlayer([audioRow(2), audioRow(4)]);
+    await waitFor(() => expect(el?.src ?? "").toContain("/media/2"));
+    fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+    fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+    fireEvent.keyDown(window, { code: "Comma", key: "<", shiftKey: true });
+    expect(el!.playbackRate).toBe(1.25);
+    fireEvent.keyDown(window, { code: "KeyN" });
+    await waitFor(() => expect(el?.src ?? "").toContain("/media/4"));
+    fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+    expect(el!.playbackRate).toBe(1.25);
+  });
+
+  it("leaves the speed keys to the video player while a video is on screen", async () => {
+    renderPlayer([videoRow(3)]);
+    await screen.findByText("1 / 1");
+    fireEvent.keyDown(window, { code: "Period", key: ">", shiftKey: true });
+    // One step from the video player; the playlist would make it two.
+    expect(document.querySelector("video")!.playbackRate).toBe(1.25);
+  });
+
   it("V does nothing while a video is on screen", async () => {
     localStorage.setItem(
       "meguri.prefs",

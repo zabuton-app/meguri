@@ -299,6 +299,7 @@ export const zhCN: Catalog = {
   "shortcuts.skip10": "后退 / 前进 10 秒",
   "shortcuts.volume": "音量增大 / 减小",
   "shortcuts.mute": "切换静音",
+  "shortcuts.speed": "减速 / 加速",
   "shortcuts.fullscreen": "切换全屏",
   "shortcuts.seekStart": "跳到开头",
   "shortcuts.spectrumPattern":
@@ -363,6 +364,8 @@ export const zhCN: Catalog = {
   "player.unmute": "取消静音 (M)",
   "player.fullscreen": "全屏 (F)",
   "player.volume": "音量",
+  "player.speed": "播放速度",
+  "player.speedValue": "{speed}×",
   "player.audioTrack": "音轨",
   "player.audioTrackNumber": "音轨 {number}",
   "player.audioTrackDefault": "默认",

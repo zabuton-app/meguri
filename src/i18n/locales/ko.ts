@@ -308,6 +308,7 @@ export const ko: Catalog = {
   "shortcuts.skip10": "10초 뒤로 / 앞으로",
   "shortcuts.volume": "볼륨 올리기 / 내리기",
   "shortcuts.mute": "음소거 전환",
+  "shortcuts.speed": "느리게 / 빠르게",
   "shortcuts.fullscreen": "전체 화면 전환",
   "shortcuts.seekStart": "처음으로 이동",
   "shortcuts.spectrumPattern":
@@ -372,6 +373,8 @@ export const ko: Catalog = {
   "player.unmute": "음소거 해제 (M)",
   "player.fullscreen": "전체화면 (F)",
   "player.volume": "음량",
+  "player.speed": "재생 속도",
+  "player.speedValue": "{speed}×",
   "player.audioTrack": "오디오 트랙",
   "player.audioTrackNumber": "트랙 {number}",
   "player.audioTrackDefault": "기본값",
