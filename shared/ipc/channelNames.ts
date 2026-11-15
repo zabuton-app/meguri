@@ -136,3 +136,39 @@ export type PreloadInvokeChannel = (typeof PRELOAD_INVOKE_CHANNELS)[number];
 export type InvokeChannel =
   (typeof INVOKE_CHANNELS)[number] | PreloadInvokeChannel;
 export type EventChannel = (typeof EVENT_CHANNELS)[number];
+
+/**
+ * Prefixes of the renderer process arguments that carry an app's own channels
+ * (`extraChannels` in startApp()) to the preload, which adds them to its
+ * whitelist. Comma-separated, so main builds them with extraChannelArgs().
+ */
+export const EXTRA_INVOKE_CHANNELS_ARG = "--extra-invoke-channels=";
+export const EXTRA_EVENT_CHANNELS_ARG = "--extra-event-channels=";
+
+/** Channels an app adds to the preload's whitelist (see startApp()). */
+export interface ExtraChannels {
+  invoke: string[];
+  events: string[];
+}
+
+/**
+ * The renderer process arguments for `extra`. Throws on a name that is empty
+ * or holds a comma (it would reach the preload as other names), and on a
+ * preload-only channel, which would let the renderer forge its input.
+ */
+export function extraChannelArgs(extra: ExtraChannels): string[] {
+  for (const name of [...extra.invoke, ...extra.events]) {
+    if (!name || name.includes(",")) {
+      throw new Error(`Invalid extra IPC channel name: "${name}"`);
+    }
+  }
+  for (const name of extra.invoke) {
+    if ((PRELOAD_INVOKE_CHANNELS as readonly string[]).includes(name)) {
+      throw new Error(`Preload-only IPC channel cannot be extra: "${name}"`);
+    }
+  }
+  return [
+    `${EXTRA_INVOKE_CHANNELS_ARG}${extra.invoke.join(",")}`,
+    `${EXTRA_EVENT_CHANNELS_ARG}${extra.events.join(",")}`,
+  ];
+}
