@@ -227,6 +227,7 @@ export const ja = {
   "filter.dateTo": "終了日",
   "filter.more": "他の条件",
   "filter.moreActive": "他の条件（{count}件適用中）",
+  "filter.hashChip": "内容ハッシュ",
   "filter.kindFilter": "種別で絞り込み",
   "filter.playState": "視聴状態",
   "filter.sortSection": "並び順",
@@ -665,6 +666,10 @@ export const ja = {
   "duplicates.loadFailed":
     "重複ファイルを読み込めませんでした。もう一度お試しください。",
   "duplicates.retry": "もう一度読み込む",
+  "duplicates.copyHash": "ハッシュをコピー",
+  "duplicates.hashCopied": "ハッシュをコピーしました",
+  "duplicates.hashCopyFailed": "ハッシュをコピーできませんでした",
+  "duplicates.showInList": "一覧で表示",
   "duplicates.fileCount": "{count} 件",
   "duplicates.truncated":
     "グループ数が多いため上位 {max} 件のみ表示しています。",

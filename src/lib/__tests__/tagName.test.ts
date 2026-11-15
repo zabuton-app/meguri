@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  hashSearchToken,
   isEditableTag,
   isReservedTagName,
+  isSearchDirective,
+  parseHashSearchToken,
+  searchDirectiveKey,
   hasOpenQuote,
   joinSearchTokens,
   parseQualifiedTagName,
@@ -333,5 +337,55 @@ describe("isReservedTagName", () => {
   it("honours a caller-supplied reserved set", () => {
     expect(isReservedTagName("studio:a24", ["studio"])).toBe(true);
     expect(isReservedTagName("res:4k", ["studio"])).toBe(false);
+  });
+});
+
+describe("parseHashSearchToken", () => {
+  it("reads a hex prefix of four characters or more, lower-cased", () => {
+    expect(parseHashSearchToken("hash:3FA9")).toBe("3fa9");
+    expect(parseHashSearchToken("HASH:3fa9c1d2")).toBe("3fa9c1d2");
+    expect(parseHashSearchToken("hash:" + "a".repeat(64))).toBe("a".repeat(64));
+  });
+
+  it("leaves short, non-hex and over-long values as free text", () => {
+    expect(parseHashSearchToken("hash:3fa")).toBeNull();
+    expect(parseHashSearchToken("hash:3fag")).toBeNull();
+    expect(parseHashSearchToken("hash:")).toBeNull();
+    expect(parseHashSearchToken("hash:" + "a".repeat(65))).toBeNull();
+    expect(parseHashSearchToken("3fa9c1d2")).toBeNull();
+  });
+
+  it("folds a value typed after a space, as tag: does", () => {
+    expect(splitSearchTokens("hash: 3fa9c1d2 trip")).toEqual([
+      "hash:3fa9c1d2",
+      "trip",
+    ]);
+  });
+
+  it("round-trips through hashSearchToken", () => {
+    expect(parseHashSearchToken(hashSearchToken("3FA9C1D2"))).toBe("3fa9c1d2");
+  });
+});
+
+describe("searchDirectiveKey / isSearchDirective", () => {
+  it("keys tag and hash directives apart, and folds each as its kind does", () => {
+    expect(searchDirectiveKey("hash:3FA9")).toBe(
+      searchDirectiveKey("hash:3fa9"),
+    );
+    expect(searchDirectiveKey("tag:Beach")).toBe(
+      searchDirectiveKey("tag:beach"),
+    );
+    // A tag named like a hash is a different condition.
+    expect(searchDirectiveKey("tag:3fa9")).not.toBe(
+      searchDirectiveKey("hash:3fa9"),
+    );
+    expect(searchDirectiveKey("3fa9")).toBeNull();
+  });
+
+  it("calls both kinds directives, and nothing else", () => {
+    expect(isSearchDirective("tag:beach")).toBe(true);
+    expect(isSearchDirective("hash:3fa9")).toBe(true);
+    expect(isSearchDirective("hash:3f")).toBe(false);
+    expect(isSearchDirective("beach")).toBe(false);
   });
 });

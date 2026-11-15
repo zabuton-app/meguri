@@ -237,6 +237,30 @@ describe("searchFiles", () => {
     expect(res.items.map((f) => f.id)).toEqual([hit]);
   });
 
+  it("finds files by a content hash prefix with hash: (#302)", () => {
+    const a = insertFile(db, rootId, {
+      relPath: "a.mp4",
+      contentHash: "3fa9c1d2" + "0".repeat(56),
+    });
+    const b = insertFile(db, rootId, {
+      relPath: "b.mp4",
+      contentHash: "3fa9c1d2" + "1".repeat(56),
+    });
+    insertFile(db, rootId, {
+      relPath: "c.mp4",
+      contentHash: "3fa9ffff" + "0".repeat(56),
+    });
+    // No hash yet: never matches.
+    insertFile(db, rootId, { relPath: "d.mp4", contentHash: null });
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids("hash:3FA9C1D2")).toEqual([a, b]);
+    expect(ids(`hash:3fa9c1d2${"0".repeat(56)}`)).toEqual([a]);
+    expect(ids("hash:ffff")).toEqual([]);
+  });
+
   it("matches a substring in the middle of a word (trigram)", () => {
     const hit = insertFile(db, rootId, { relPath: "summer_beachvideo.mp4" });
     insertFile(db, rootId, { relPath: "work/report.mp4" });

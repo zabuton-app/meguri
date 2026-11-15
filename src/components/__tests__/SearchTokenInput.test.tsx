@@ -130,6 +130,14 @@ describe("SearchTokenInput", () => {
     expect(input.value).toBe("");
   });
 
+  it("chips a hash: directive, and leaves a short one as text (#302)", () => {
+    const { input, last } = setup();
+    type(input, "hash:3FA9c1d2 hash:3f ");
+    expect(chips().map((c) => c.textContent)).toEqual(["hash:3fa9c1d2"]);
+    expect(input.value).toBe("hash:3f ");
+    expect(last()).toBe("hash:3FA9c1d2 hash:3f");
+  });
+
   it("keeps a half-typed directive editable until a space closes it", () => {
     const { input, last } = setup();
     fireEvent.change(input, { target: { value: "tag:bea" } });

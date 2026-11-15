@@ -54,6 +54,7 @@ import {
   onOpenCommandMenu,
   onOpenShortcuts,
   onSearchLibrary,
+  onShowMatchingFiles,
 } from "@/lib/ui-events";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -236,6 +237,11 @@ export default function Home() {
       setByFolder: showByFolder,
     });
   const heatmap = useHeatmapFilter({ filterValue, onFilterChange });
+  // For listeners registered once (see onShowMatchingFiles below).
+  const onFilterChangeRef = useRef(onFilterChange);
+  useEffect(() => {
+    onFilterChangeRef.current = onFilterChange;
+  }, [onFilterChange]);
   // What the heatmap counts over: the filter, within the folder shown and
   // everything below it — what the list becomes once a day narrows it (a
   // condition turns a folder's own files into a search of its subtree).
@@ -782,11 +788,18 @@ export default function Home() {
     const unSearch = onSearchLibrary((tokens) =>
       setFilter((f) => replaceSearchTokens(f, tokens)),
     );
+    // Through onFilterChange, which leaves the folder browsed for the root
+    // when the folder is not part of what it is handed.
+    const unShow = onShowMatchingFiles((tokens) => {
+      const { sort, sortDir } = filterRef.current;
+      onFilterChangeRef.current(replaceSearchTokens({ sort, sortDir }, tokens));
+    });
     return () => {
       unCommand();
       unShortcuts();
       unApplyTags();
       unSearch();
+      unShow();
     };
   }, []);
 

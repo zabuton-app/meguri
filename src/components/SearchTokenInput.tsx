@@ -1,7 +1,8 @@
-// The library search box. Free text stays editable text; an exact-tag directive
-// (`tag:beach`, `tag:long`) becomes a chip, because it only means anything as a
-// whole: backspacing through the middle of one turns an exact tag match into a
-// substring search that also hits file names, with nothing on screen to say so.
+// The library search box. Free text stays editable text; a directive
+// (`tag:beach`, `tag:long`, `hash:3fa9c1d2`) becomes a chip, because it only
+// means anything as a whole: backspacing through the middle of one turns an
+// exact match into a substring search that also hits file names, with nothing
+// on screen to say so.
 // While one is being typed the box completes it from the tag catalog.
 import {
   useCallback,
@@ -14,13 +15,15 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
 import {
+  HASH_SEARCH_PREFIX,
   TAG_SEARCH_PREFIX,
   hasOpenQuote,
-  isTagDirective,
+  isSearchDirective,
   joinSearchTokens,
+  parseHashSearchToken,
   parseTagSearchToken,
+  searchDirectiveKey,
   splitSearchTokens,
-  tagSearchKey,
   tagSearchToken,
 } from "@shared/tags";
 import { api } from "@/ipc/client";
@@ -170,7 +173,7 @@ export function SearchTokenInput({
     const closed = force || (/\s$/.test(raw) && !hasOpenQuote(raw));
     const tokens = splitSearchTokens(raw);
     const typing = closed ? undefined : tokens.pop();
-    const directives = tokens.filter(isTagDirective);
+    const directives = tokens.filter(isSearchDirective);
     if (directives.length === 0) {
       commit(chips, raw);
       return null;
@@ -182,13 +185,13 @@ export function SearchTokenInput({
     // already carries it, the way a redundant click does.
     const taken = new Map<string, number>();
     chips.forEach((chip, i) => {
-      const key = tagSearchKey(chip);
+      const key = searchDirectiveKey(chip);
       if (key !== null) taken.set(key, i);
     });
     const promoted: string[] = [];
     let repeated: number | null = null;
     for (const token of directives) {
-      const key = tagSearchKey(token);
+      const key = searchDirectiveKey(token);
       if (key === null) continue;
       const at = taken.get(key);
       if (at !== undefined) {
@@ -198,7 +201,7 @@ export function SearchTokenInput({
       taken.set(key, chips.length + promoted.length);
       promoted.push(token);
     }
-    const rest = tokens.filter((token) => !isTagDirective(token));
+    const rest = tokens.filter((token) => !isSearchDirective(token));
     if (typing !== undefined) rest.push(typing);
     let next = joinSearchTokens(rest);
     // Give back the space the user just typed, or the next word runs into the
@@ -230,8 +233,10 @@ export function SearchTokenInput({
       onHighlightSearchToken((token) => {
         // Through the tokenizer first: the sender quotes a value with spaces,
         // the chips hold it unquoted.
-        const wanted = tagSearchKey(splitSearchTokens(token)[0] ?? "");
-        const at = chips.findIndex((chip) => tagSearchKey(chip) === wanted);
+        const wanted = searchDirectiveKey(splitSearchTokens(token)[0] ?? "");
+        const at = chips.findIndex(
+          (chip) => searchDirectiveKey(chip) === wanted,
+        );
         if (wanted !== null && at >= 0) highlight(at);
       }),
     [chips, highlight],
@@ -266,7 +271,9 @@ export function SearchTokenInput({
           icon still lands on the box and focuses the field. */}
       <Search className="pointer-events-none size-3.5 shrink-0 text-muted" />
       {chips.map((token, i) => {
-        const body = parseTagSearchToken(token) ?? "";
+        const hash = parseHashSearchToken(token);
+        const prefix = hash === null ? TAG_SEARCH_PREFIX : HASH_SEARCH_PREFIX;
+        const body = hash ?? parseTagSearchToken(token) ?? "";
         return (
           <span
             key={`${token}-${i}`}
@@ -282,7 +289,7 @@ export function SearchTokenInput({
             )}
           >
             <span className="truncate">
-              <span className="text-muted">{TAG_SEARCH_PREFIX}:</span>
+              <span className="text-muted">{prefix}:</span>
               {body}
             </span>
             <button

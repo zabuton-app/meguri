@@ -121,6 +121,13 @@ describe("describeConditions", () => {
     );
   });
 
+  it("names a hash: directive, apart from the free text (#302)", () => {
+    expect(keys({ q: "trip hash:3fa9c1d2" })).toEqual(["q", "directive-1"]);
+    expect(find({ q: "trip hash:3fa9c1d2" }, "directive-1").label).toBe(
+      `${t("filter.hashChip")}: 3fa9c1d2`,
+    );
+  });
+
   it("describes a directive-only query without a free-text chip", () => {
     expect(keys({ q: "tag:beach" })).toEqual(["directive-0"]);
   });

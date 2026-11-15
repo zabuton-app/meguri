@@ -224,6 +224,7 @@ export const ko: Catalog = {
   "filter.dateTo": "종료일",
   "filter.more": "기타 조건",
   "filter.moreActive": "기타 조건 ({count}개 적용 중)",
+  "filter.hashChip": "콘텐츠 해시",
   "filter.kindFilter": "종류로 필터링",
   "filter.playState": "시청 상태",
   "filter.sortSection": "정렬 순서",
@@ -661,6 +662,10 @@ export const ko: Catalog = {
   "duplicates.loadFailed":
     "중복 파일을 불러오지 못했습니다. 다시 시도해 주세요.",
   "duplicates.retry": "다시 시도",
+  "duplicates.copyHash": "해시 복사",
+  "duplicates.hashCopied": "해시를 복사했습니다",
+  "duplicates.hashCopyFailed": "해시를 복사할 수 없습니다",
+  "duplicates.showInList": "목록에서 보기",
   "duplicates.fileCount": "{count}개",
   "duplicates.truncated": "그룹이 많아 상위 {max}개만 표시합니다.",
   "duplicates.filter": "중복 파일만 표시",
