@@ -344,6 +344,23 @@ describe("dropFromWatchLaterCache", () => {
     expect(fetches).toBe(1);
   });
 
+  it("preserves a pending invalidation after removing an entry", async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(
+      ["workspaces_list"],
+      listWith([{ workspaceId: "ws", fileId: 1 }]),
+    );
+    await qc.invalidateQueries({
+      queryKey: ["workspaces_list"],
+      refetchType: "none",
+    });
+
+    dropFromWatchLaterCache(qc, "ws", 1);
+
+    expect(itemsOf(qc)).toEqual([]);
+    expect(qc.getQueryState(["workspaces_list"])?.isInvalidated).toBe(true);
+  });
+
   it("survives an in-flight refetch landing afterwards", async () => {
     // The detail view mounts its own observer for this key, so a refetch is
     // routinely in the air when a play is recorded. Without the cancel, its
@@ -396,6 +413,45 @@ describe("dropFromWatchLaterCache", () => {
 });
 
 describe("patchCollectionItemOrder", () => {
+  it("preserves a pending invalidation after patching item order", async () => {
+    const qc = new QueryClient();
+    const list: WorkspacesList = {
+      workspaces: [],
+      activeId: "ws",
+      collections: [
+        {
+          id: "collection:test",
+          name: "Test",
+          active: true,
+          items: [
+            { workspaceId: "ws", fileId: 1, addedAt: 10 },
+            { workspaceId: "ws", fileId: 2, addedAt: 20 },
+          ],
+          createdAt: 0,
+          updatedAt: 0,
+          locked: false,
+        },
+      ],
+    };
+    qc.setQueryData(["workspaces_list"], list);
+    await qc.invalidateQueries({
+      queryKey: ["workspaces_list"],
+      refetchType: "none",
+    });
+
+    patchCollectionItemOrder(qc, "collection:test", [
+      { workspaceId: "ws", fileId: 2 },
+      { workspaceId: "ws", fileId: 1 },
+    ]);
+
+    expect(
+      qc
+        .getQueryData<WorkspacesList>(["workspaces_list"])
+        ?.collections[0].items.map((item) => item.fileId),
+    ).toEqual([2, 1]);
+    expect(qc.getQueryState(["workspaces_list"])?.isInvalidated).toBe(true);
+  });
+
   it("moves the loaded items within their existing collection slots", () => {
     const qc = new QueryClient();
     const item = (fileId: number, addedAt: number) => ({

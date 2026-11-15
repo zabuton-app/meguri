@@ -344,13 +344,17 @@ export function syncFileRowAcrossCaches(
  * for the rest of the visit.
  *
  * So patch the cache in place rather than invalidating it: `setQueryData` keeps
- * the refetch (and with it the navigation order) from happening at all.
+ * the refetch (and with it the navigation order) from happening at all. If a
+ * refetch had already invalidated the key, preserve that invalidation so its
+ * newer data can be picked up on the next mount.
  */
 export function dropFromWatchLaterCache(
   qc: QueryClient,
   workspaceId: string,
   fileId: number,
 ): void {
+  const queryKey = ["workspaces_list"] as const;
+  const wasInvalidated = qc.getQueryState(queryKey)?.isInvalidated ?? false;
   // Cancel first: a workspaces_list fetch already in flight would land after
   // this patch and restore the entry the main process has just consumed. The
   // detail view mounts its own observer for that key, so such a fetch is
@@ -361,10 +365,10 @@ export function dropFromWatchLaterCache(
   // key at undefined with nothing to re-run it (refetchOnWindowFocus is off) —
   // which would empty the workspace rail and freeze every Watch Later toggle in
   // its disabled state. With no data the patch below is a no-op anyway.
-  if (qc.getQueryData(["workspaces_list"]) !== undefined) {
-    void qc.cancelQueries({ queryKey: ["workspaces_list"] });
+  if (qc.getQueryData(queryKey) !== undefined) {
+    void qc.cancelQueries({ queryKey });
   }
-  qc.setQueryData<WorkspacesList>(["workspaces_list"], (prev) => {
+  qc.setQueryData<WorkspacesList>(queryKey, (prev) => {
     if (!prev) return prev;
     const watchLater = prev.collections.find((c) => c.id === WATCH_LATER_ID);
     if (!watchLater) return prev;
@@ -380,18 +384,26 @@ export function dropFromWatchLaterCache(
       ),
     };
   });
+  if (wasInvalidated) {
+    void qc.invalidateQueries({ queryKey, refetchType: "none" });
+  }
 }
 
-/** Keep the cached collection order in step with a successful manual reorder. */
+/** Optimistically mirror a manual reorder into the cached collection order. */
 export function patchCollectionItemOrder(
   qc: QueryClient,
   collectionId: string,
   order: { workspaceId: string; fileId: number }[],
 ): void {
+  const queryKey = ["workspaces_list"] as const;
+  const wasInvalidated = qc.getQueryState(queryKey)?.isInvalidated ?? false;
   const key = (item: { workspaceId: string; fileId: number }) =>
     `${item.workspaceId}:${item.fileId}`;
 
-  qc.setQueryData<WorkspacesList>(["workspaces_list"], (prev) => {
+  if (qc.getQueryData(queryKey) !== undefined) {
+    void qc.cancelQueries({ queryKey });
+  }
+  qc.setQueryData<WorkspacesList>(queryKey, (prev) => {
     if (!prev) return prev;
     const collection = prev.collections.find(
       (item) => item.id === collectionId,
@@ -422,4 +434,7 @@ export function patchCollectionItemOrder(
       ),
     };
   });
+  if (wasInvalidated) {
+    void qc.invalidateQueries({ queryKey, refetchType: "none" });
+  }
 }
