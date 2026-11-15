@@ -1139,8 +1139,35 @@ function cmpNum(a: number, b: number, dir: "asc" | "desc"): number {
 }
 
 function cmpStr(a: string, b: string, dir: "asc" | "desc" = "asc"): number {
-  const result = a < b ? -1 : a > b ? 1 : 0;
+  const result = cmpCodePoints(a, b);
   return dir === "asc" ? result : -result;
+}
+
+/**
+ * Strings in SQLite's BINARY order (UTF-8 bytes), which is code point order.
+ * A plain `<` compares UTF-16 code units, which puts a surrogate pair (an
+ * emoji) before U+E000–U+FFFF (full-width `（`), where each database puts it
+ * after — and the merge must agree with the order its streams arrive in (#485).
+ */
+function cmpCodePoints(a: string, b: string): number {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a.charCodeAt(i);
+    const y = b.charCodeAt(i);
+    if (x !== y) return codePointRank(x) - codePointRank(y);
+  }
+  return a.length - b.length;
+}
+
+/**
+ * At the first differing code unit, move the surrogates (0xD800–0xDFFF) above
+ * U+E000–U+FFFF. Everything else is already in code point order, and two
+ * surrogate pairs that differ compare correctly on their first differing unit.
+ */
+function codePointRank(unit: number): number {
+  if (unit >= 0xe000) return unit - 0x800;
+  if (unit >= 0xd800) return unit + 0x2000;
+  return unit;
 }
 
 /** Sort NULLs last in both directions, matching the SQL ORDER BY expressions. */
