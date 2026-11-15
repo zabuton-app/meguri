@@ -95,7 +95,7 @@ export const fr: Catalog = {
   "settings.update": "Mises à jour",
   "settings.updateDesc": "Vérifier si une version plus récente est disponible.",
   "settings.updateCheckNow": "Vérifier maintenant",
-  "settings.updateAuto": "Vérifier automatiquement au démarrage",
+  "settings.updateAuto": "Vérifier automatiquement",
   "update.available": "La version {version} est disponible",
   "update.availableDesc": "Version actuelle : {current}",
   "update.view": "Ouvrir la version",

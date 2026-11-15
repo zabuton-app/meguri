@@ -87,7 +87,7 @@ export const zhCN: Catalog = {
   "settings.update": "更新",
   "settings.updateDesc": "检查是否有新版本可用。",
   "settings.updateCheckNow": "立即检查",
-  "settings.updateAuto": "启动时自动检查",
+  "settings.updateAuto": "自动检查",
   "update.available": "版本 {version} 可用",
   "update.availableDesc": "当前版本：{current}",
   "update.view": "打开发布页",
