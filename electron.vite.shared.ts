@@ -2,9 +2,9 @@ import type { UserConfig } from "electron-vite";
 import { externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import type { Plugin } from "vite";
+import { normalizePath, searchForWorkspaceRoot, type Plugin } from "vite";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // This repository's root. Its sources are found from here, not from the
@@ -44,9 +44,73 @@ function devServerCsp(): Plugin {
   };
 }
 
+// index.html's module script. A build with its own renderer entry loads that
+// file in its place.
+const DEFAULT_RENDERER_ENTRY = "/src/main.tsx";
+
+/**
+ * Loads `entry` in place of index.html's script. The build resolves the
+ * script's src through the plugins; the dev server serves it by URL instead,
+ * so there the src itself is rewritten to the file, and the workspace root of
+ * the building project is opened to it (by default it serves only this
+ * repository).
+ *
+ * Tailwind scans the Vite root (this repository) for class names, so the
+ * entry's directory is added to the stylesheet as a source too; otherwise
+ * classes used only in the app's own files would not be generated. This has
+ * to run before Tailwind's transform, so it goes before tailwindcss() in the
+ * plugin list.
+ */
+function rendererEntry(entry: string): Plugin {
+  // Vite's module ids use forward slashes on every platform.
+  const entryId = normalizePath(entry);
+  const stylesheet = normalizePath(fromRepo("src/styles.css"));
+  const source = normalizePath(relative(dirname(stylesheet), dirname(entry)));
+  return {
+    name: "renderer-entry",
+    enforce: "pre",
+    config: () => ({
+      server: {
+        fs: {
+          allow: [
+            searchForWorkspaceRoot(repoRoot),
+            searchForWorkspaceRoot(process.cwd()),
+          ],
+        },
+      },
+    }),
+    resolveId(id) {
+      return id === DEFAULT_RENDERER_ENTRY ? entryId : null;
+    },
+    transformIndexHtml: {
+      order: "pre",
+      handler(html, { server }) {
+        if (!server) return html;
+        const src = `src="${DEFAULT_RENDERER_ENTRY}"`;
+        if (!html.includes(src)) {
+          throw new Error(
+            "index.html's entry script changed; update rendererEntry",
+          );
+        }
+        // /@fs/ + an absolute path: /@fs/home/… on POSIX, /@fs/C:/… on Windows.
+        return html.replace(src, `src="/@fs/${entryId.replace(/^\//, "")}"`);
+      },
+    },
+    transform(code, id) {
+      if (id.split("?", 1)[0] !== stylesheet) return null;
+      return `${code}\n@source ${JSON.stringify(source)};\n`;
+    },
+  };
+}
+
 export interface AppBuildOptions {
   /** The entry point that calls startApp(); becomes out/main/main.js. */
   mainEntry: string;
+  /**
+   * The renderer's entry point, which calls renderApp(). Defaults to
+   * Meguri's src/main.tsx.
+   */
+  rendererEntry?: string;
 }
 
 /**
@@ -94,7 +158,14 @@ export function appBuildConfig(options: AppBuildOptions): UserConfig {
     renderer: {
       root: repoRoot,
       base: "./",
-      plugins: [react(), tailwindcss(), devServerCsp()],
+      plugins: [
+        ...(options.rendererEntry
+          ? [rendererEntry(options.rendererEntry)]
+          : []),
+        react(),
+        tailwindcss(),
+        devServerCsp(),
+      ],
       resolve: {
         alias: { "@": fromRepo("src"), "@shared": fromRepo("shared") },
       },

@@ -32,6 +32,8 @@ GitHub repository the update check looks at, the Microsoft Store product ID
 environment variables it reads (`MEGURI`, for `MEGURI_ROOT`,
 `MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`) and the logo bitmaps. Another
 app built on this code can call `startApp()` from its own entry point with its own values.
+Its renderer is started the same way, by `renderApp()` (see
+[Starting the renderer](renderer.md#starting-the-renderer)).
 It can also pass `setup`, which runs once right after `registerIpc()` and
 before the tray and window appear, with the same `IpcContext` the handler
 groups get (both `IpcContext` and `handle()` are exported from

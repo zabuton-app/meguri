@@ -581,6 +581,8 @@ Meguri/
 │     ├─ jobs.ts            # scan pipeline
 │     └─ server.ts          # local HTTP media server (Range)
 ├─ src/                     # renderer (React + TypeScript)
+│  ├─ main.tsx              # entry point: calls renderApp()
+│  ├─ renderApp.tsx         # startup: providers, router
 │  ├─ ipc/                  # typed client for window.api
 │  ├─ components/  routes/  themes/  hooks/
 ├─ electron.vite.config.ts  # unified build of main/preload/renderer

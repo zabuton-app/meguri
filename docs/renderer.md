@@ -6,7 +6,7 @@ fetching, internationalization, theming, and content zoom.
 
 ## Routing
 
-Routing uses `createHashRouter` (`src/App.tsx`); a hash router is the stable
+Routing uses `createHashRouter` (`src/appRouter.tsx`); a hash router is the stable
 choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`),
 `play` (`src/routes/Player/`), `history` (`src/routes/History/`),
@@ -39,10 +39,49 @@ mechanics in such hooks and components; `index.tsx` should stay a composition.
 
 ## Provider hierarchy
 
-The provider stack is set up in `src/main.tsx`:
+The provider stack is set up in `renderApp()` (`src/renderApp.tsx`):
 
 ```text
 QueryClientProvider → ThemeProvider → I18nProvider → PreferencesProvider → TourProvider → ConfirmProvider
+```
+
+## Starting the renderer
+
+`renderApp()` (`src/renderApp.tsx`) starts the renderer: the window error
+logging, the query client, the router and the provider stack. Nothing in it
+runs on import. `src/main.tsx` is only Meguri's entry point, which calls it
+with no options; it is the renderer-side counterpart of `startApp()` (see
+[architecture.md](architecture.md)).
+
+An app built on Meguri calls `renderApp()` from its own entry point (built with
+`appBuildConfig()`'s `rendererEntry`, see
+[Building from another project](build-and-ci.md#building-from-another-project))
+and passes what it adds:
+
+- `settingsSections`: settings tabs shown after Meguri's own, in order. Each
+  has an `id`, a `label(lang)` (the app's strings are not in Meguri's
+  catalogs, so it is called with the current language) and a `Component`
+  rendered as the tab's panel. Their DOM ids are prefixed with `extra-`, so
+  they cannot collide with Meguri's tabs.
+- `routes`: React Router routes added after Meguri's as children of `/`. Like
+  `/settings`, they mount over the list, so a page renders itself as a modal.
+
+```tsx
+// The app's renderer entry
+import { renderApp } from "../vendor/meguri/src/renderApp";
+import { SyncSettings } from "./SyncSettings";
+import { SyncLog } from "./SyncLog";
+
+renderApp({
+  settingsSections: [
+    {
+      id: "sync",
+      label: (lang) => (lang === "ja" ? "同期" : "Sync"),
+      Component: SyncSettings,
+    },
+  ],
+  routes: [{ path: "sync-log", element: <SyncLog /> }],
+});
 ```
 
 ## Audio playback

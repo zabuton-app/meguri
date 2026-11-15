@@ -50,6 +50,7 @@ import { CssThemeSection } from "./CssThemeSection";
 import { ThemeSection } from "./ThemeSection";
 import { CustomCssSection } from "./CustomCssSection";
 import { useTour } from "@/tour/TourProvider";
+import { useExtraSettingsSections } from "@/settings/extraSections";
 import {
   isSpectrumPattern,
   SPECTRUM_PATTERN_OPTIONS,
@@ -116,12 +117,18 @@ const LOGO_LABELS: Record<LogoId, TranslationKey> = {
   enso: "logo.enso",
 };
 
-/** Tab ids. The tab bar's order comes from the `tabs` array below. */
-type TabId = "general" | "library" | "playback" | "audio" | "app";
+/**
+ * Tab ids. The tab bar's order comes from the `tabs` array below. An app's
+ * own sections (renderApp's `settingsSections`) follow under a prefix, so
+ * their ids cannot collide with Meguri's.
+ */
+type TabId =
+  "general" | "library" | "playback" | "audio" | "app" | `extra-${string}`;
 
 export default function Settings() {
   const { mode, setMode } = useTheme();
   const { lang, setLang, t } = useI18n();
+  const extraSections = useExtraSettingsSections();
   const tabs = useMemo<readonly SettingsTab<TabId>[]>(
     () => [
       { id: "general", label: t("settings.tabGeneral") },
@@ -129,8 +136,12 @@ export default function Settings() {
       { id: "playback", label: t("settings.tabPlayback") },
       { id: "audio", label: t("settings.tabAudio") },
       { id: "app", label: t("settings.tabApp") },
+      ...extraSections.map((section) => ({
+        id: `extra-${section.id}` as const,
+        label: section.label(lang),
+      })),
     ],
-    [t],
+    [t, lang, extraSections],
   );
   const {
     sceneCount,
@@ -789,6 +800,11 @@ export default function Settings() {
               {/* About / license attributions */}
               <AboutSection />
             </>
+          )}
+
+          {extraSections.map(
+            ({ id, Component }) =>
+              tab === `extra-${id}` && <Component key={id} />,
           )}
         </div>
       </ScrollArea>
