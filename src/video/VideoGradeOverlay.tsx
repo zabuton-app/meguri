@@ -103,7 +103,7 @@ export function VideoGradeOverlay({ videoRef, loaded, panel, t }: Props) {
         createPortal(
           <aside
             aria-label={t("grade.title")}
-            className="flex min-h-0 w-72 shrink-0 flex-col border-l border-border bg-bg"
+            className="flex max-h-[min(100dvh,38rem)] w-72 max-w-[45%] shrink-0 flex-col rounded-lg border border-border bg-bg"
             onKeyDown={(event) => {
               event.stopPropagation();
               if (event.key === "Escape") close();
