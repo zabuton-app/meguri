@@ -38,9 +38,14 @@ groups get (both `IpcContext` and `handle()` are exported from
 `electron/app.ts`). That is where such an app registers its own IPC handlers
 and reaches the workspaces, the query worker and the media server: `mediaBase()`
 gives its base URL and `mediaToken()` the `X-Api-Token` its requests need.
-Its channels still follow steps 1 to 3 of
-[Adding a new IPC channel](#adding-a-new-ipc-channel): `handle()` and the
-preload whitelist only know the channels in `shared/ipc/`. Nothing is on
+`handle()` only knows the channels in `shared/ipc/`, which follow steps 1 to 3 of
+[Adding a new IPC channel](#adding-a-new-ipc-channel). The preload whitelist
+knows those too, plus the app's `extraChannels` (`invoke` and `events` lists),
+which main passes to the preload as process arguments
+(`EXTRA_INVOKE_CHANNELS_ARG` and `EXTRA_EVENT_CHANNELS_ARG` in
+`shared/ipc/channelNames.ts`), so the renderer still cannot add a channel. A
+name that is empty, holds a comma or is a preload-only channel fails startup.
+Nothing is on
 screen until `setup` settles, so long work belongs in the background. There is
 no quit hook: work that writes to the workspaces runs through `ctx.passes` (or
 `ctx.scans`), which every quit path stops before the databases close, while a

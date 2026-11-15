@@ -62,6 +62,8 @@ import {
   APP_GLYPH_ARG,
   APP_NAME_ARG,
   MEDIA_ORIGIN_ARG,
+  extraChannelArgs,
+  type ExtraChannels,
 } from "../shared/ipc/channelNames.js";
 import type {
   LibraryMergeFailure,
@@ -120,7 +122,7 @@ export interface AppOptions {
    * same `IpcContext` those handlers use, so it can register handlers with
    * `handle()` and read the workspaces, the query worker and the media
    * server's base URL and token. `handle()` only takes channels declared in
-   * `shared/ipc/`, which is also what the preload lets through.
+   * `shared/ipc/`; the preload lets those through, plus `extraChannels`.
    * Nothing is on screen until it settles, so it should return quickly and
    * leave long work running in the background. A throw (or rejection) fails
    * startup like any other startup error.
@@ -132,6 +134,13 @@ export interface AppOptions {
    * OS shutdown, and not at all on a Windows log-off.
    */
   setup?: (ctx: IpcContext) => void | Promise<void>;
+  /**
+   * The app's own channels, added to the preload's whitelist so the renderer
+   * can invoke them (`invoke`) or subscribe to them (`events`). Only main
+   * passes them, so the renderer still cannot add a channel. A name must not
+   * be empty or hold a comma.
+   */
+  extraChannels?: ExtraChannels;
 }
 
 // For an app's `setup`: what Meguri's own handler groups are built from.
@@ -153,6 +162,11 @@ export function startApp(options: AppOptions): void {
 
   // Set up logging before anything else so early failures land in the log file.
   setupLogger();
+
+  // Checked up front so a bad name fails startup, not the first window.
+  const extraArgs = extraChannelArgs(
+    options.extraChannels ?? { invoke: [], events: [] },
+  );
 
   // Chromium reads its switches at start-up, so this has to run before `ready`.
   if (
@@ -545,6 +559,7 @@ export function startApp(options: AppOptions): void {
           `${APP_GLYPH_ARG}${options.glyph}`,
           // The media server starts before the first window and keeps its port.
           `${MEDIA_ORIGIN_ARG}${mediaOrigin() ?? ""}`,
+          ...extraArgs,
         ],
         sandbox: true,
         contextIsolation: true,

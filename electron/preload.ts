@@ -7,6 +7,8 @@ import "electron-log/preload";
 import {
   APP_GLYPH_ARG,
   APP_NAME_ARG,
+  EXTRA_EVENT_CHANNELS_ARG,
+  EXTRA_INVOKE_CHANNELS_ARG,
   MEDIA_ORIGIN_ARG,
   EVENT_CHANNELS as EVENT_CHANNEL_NAMES,
   INVOKE_CHANNELS as INVOKE_CHANNEL_NAMES,
@@ -16,9 +18,16 @@ import {
 // Whitelist of allowed IPC channel names. The preload is the security boundary
 // between the renderer and the main process; without this check, a renderer-side
 // XSS (or a compromised dependency) could call any ipcMain.handle channel.
-// Lists are sourced from shared/ipc/channelNames.ts (same as channels.ts).
-const INVOKE_CHANNELS = new Set<string>(INVOKE_CHANNEL_NAMES);
-const EVENT_CHANNELS = new Set<string>(EVENT_CHANNEL_NAMES);
+// Lists are sourced from shared/ipc/channelNames.ts (same as channels.ts), plus
+// the app's own `extraChannels`, which only main can pass (startApp()).
+const INVOKE_CHANNELS = new Set<string>([
+  ...INVOKE_CHANNEL_NAMES,
+  ...argList(EXTRA_INVOKE_CHANNELS_ARG),
+]);
+const EVENT_CHANNELS = new Set<string>([
+  ...EVENT_CHANNEL_NAMES,
+  ...argList(EXTRA_EVENT_CHANNELS_ARG),
+]);
 
 /** The value main passed as `<prefix><value>` (additionalArguments). */
 function argValue(prefix: string): string {
@@ -26,6 +35,11 @@ function argValue(prefix: string): string {
     process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) ??
     ""
   );
+}
+
+/** A comma-separated argument (extraChannelArgs()) as a list. */
+function argList(prefix: string): string[] {
+  return argValue(prefix).split(",").filter(Boolean);
 }
 
 contextBridge.exposeInMainWorld("api", {
