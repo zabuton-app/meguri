@@ -281,10 +281,35 @@ export function hashSearchToken(hash: string): string {
   return `${HASH_SEARCH_PREFIX}:${hash.toLowerCase()}`;
 }
 
-/** True for a token the search box shows as a chip: a `tag:` or `hash:`
- *  directive rather than free text. */
+/**
+ * The search-box directive for a file extension (#522): `ext:mp4` matches the
+ * files whose `ext` is exactly `mp4`, in any case and with or without the dot.
+ * Exact, unlike free text: `mp4` would also match `mp4_backup/clip.mov`, and
+ * could not tell `.mp4` from `.m4v`.
+ */
+export const EXT_SEARCH_PREFIX = "ext";
+
+/** The extension of an `ext:` token, lower-cased without its dot, or null when
+ *  the token is ordinary text. */
+export function parseExtSearchToken(token: string): string | null {
+  const head = `${EXT_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return null;
+  const value = token
+    .slice(head.length)
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, "");
+  return value || null;
+}
+
+/** True for a token the search box shows as a chip: a `tag:`, `hash:` or
+ *  `ext:` directive rather than free text. */
 export function isSearchDirective(token: string): boolean {
-  return isTagDirective(token) || parseHashSearchToken(token) !== null;
+  return (
+    isTagDirective(token) ||
+    parseHashSearchToken(token) !== null ||
+    parseExtSearchToken(token) !== null
+  );
 }
 
 /**
@@ -299,6 +324,8 @@ export function isSearchDirective(token: string): boolean {
 export function searchDirectiveKey(token: string): string | null {
   const hash = parseHashSearchToken(token);
   if (hash !== null) return `${HASH_SEARCH_PREFIX}:${hash}`;
+  const ext = parseExtSearchToken(token);
+  if (ext !== null) return `${EXT_SEARCH_PREFIX}:${ext}`;
   const tag = tagSearchKey(token);
   return tag === null ? null : `${TAG_SEARCH_PREFIX}:${tag}`;
 }
@@ -333,7 +360,11 @@ export function tagSearchToken(name: string): string {
  * that the directive exists to avoid — the one failure the user cannot see.
  */
 function foldSpacedDirectives(tokens: string[]): string[] {
-  const bare = [`${TAG_SEARCH_PREFIX}:`, `${HASH_SEARCH_PREFIX}:`];
+  const bare = [
+    `${TAG_SEARCH_PREFIX}:`,
+    `${HASH_SEARCH_PREFIX}:`,
+    `${EXT_SEARCH_PREFIX}:`,
+  ];
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
     if (bare.includes(tokens[i].toLowerCase()) && i + 1 < tokens.length) {

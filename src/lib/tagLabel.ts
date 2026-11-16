@@ -2,6 +2,7 @@ import {
   AUTO_META_SOURCE,
   namespaceOfAutoMetaValue,
   parseQualifiedTagName,
+  parseExtSearchToken,
   parseHashSearchToken,
   parseTagSearchToken,
 } from "@shared/tags";
@@ -62,7 +63,7 @@ export function tagHumanLabel(
 }
 
 /**
- * Human-readable description of a `tag:` or `hash:` search token, or null when
+ * Human-readable description of a `tag:`, `hash:` or `ext:` search token, or null when
  * the token is ordinary free text. Used for the tooltip on the chips the search
  * box renders, where the chip itself shows the raw token.
  *
@@ -73,6 +74,8 @@ export function tagHumanLabel(
 export function searchTokenLabel(t: TFunc, token: string): string | null {
   const hash = parseHashSearchToken(token);
   if (hash !== null) return `${t("filter.hashChip")}: ${hash}`;
+  const ext = parseExtSearchToken(token);
+  if (ext !== null) return `${t("filter.extChip")}: ${ext}`;
   const raw = parseTagSearchToken(token);
   if (raw === null) return null;
   const parsed = parseQualifiedTagName(raw);

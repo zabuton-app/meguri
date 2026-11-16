@@ -7,11 +7,13 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import {
+  EXT_SEARCH_PREFIX,
   HASH_SEARCH_PREFIX,
   TAG_SEARCH_PREFIX,
   hasOpenQuote,
   isSearchDirective,
   joinSearchTokens,
+  parseExtSearchToken,
   parseHashSearchToken,
   parseTagSearchToken,
   searchDirectiveKey,
@@ -230,8 +232,14 @@ export function SearchTokenInput({
       <Search className="pointer-events-none size-3.5 shrink-0 text-muted" />
       {chips.map((token, i) => {
         const hash = parseHashSearchToken(token);
-        const prefix = hash === null ? TAG_SEARCH_PREFIX : HASH_SEARCH_PREFIX;
-        const body = hash ?? parseTagSearchToken(token) ?? "";
+        const ext = parseExtSearchToken(token);
+        const prefix =
+          hash !== null
+            ? HASH_SEARCH_PREFIX
+            : ext !== null
+              ? EXT_SEARCH_PREFIX
+              : TAG_SEARCH_PREFIX;
+        const body = hash ?? ext ?? parseTagSearchToken(token) ?? "";
         return (
           <span
             key={`${token}-${i}`}

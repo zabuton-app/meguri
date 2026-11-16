@@ -142,6 +142,24 @@ describe("searchWorkspaces", () => {
       direct.items.map((f) => ["solo", f.relPath]),
     );
   });
+
+  it("applies an ext: directive in the All view across workspaces (#522)", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    insertFile(a.db, a.rootId, { relPath: "a/clip.mp4" });
+    insertFile(a.db, a.rootId, { relPath: "a/clip.mov" });
+    insertFile(b.db, b.rootId, { relPath: "b/clip.mp4" });
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { q: "ext:mp4", limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.relPath])).toEqual([
+      ["ws-a", "a/clip.mp4"],
+      ["ws-b", "b/clip.mp4"],
+    ]);
+  });
 });
 
 describe("searchWorkspaces k-way merge", () => {
