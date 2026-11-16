@@ -11,6 +11,7 @@ import { AudioLines, ExternalLink, Pause, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import { fileHref } from "@/lib/fileHref";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import { toast } from "sonner";
 import {
   useAudioActions,
@@ -254,7 +255,7 @@ export function DiscoverCard({
           <VideoPlayer
             ref={videoRef}
             id={file.id}
-            src={`${mediaBase}/ws/${wsId}/media/${file.id}`}
+            src={mediaSrcOf(mediaBase, wsId, file.id)}
             duration={file.duration}
             width={file.width}
             height={file.height}

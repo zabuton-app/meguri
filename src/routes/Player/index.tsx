@@ -34,6 +34,7 @@ import {
 import { fileHref } from "@/lib/fileHref";
 import { announceVideoHandOff } from "@/video/videoHandOff";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import { queueKey } from "@/lib/playbackQueue";
 import { fileNameOf } from "@/lib/relPath";
 import {
@@ -193,7 +194,7 @@ export default function Player() {
     // the fallback for when the hand-off does not happen.
     if (current.kind === "video" && mediaBase)
       announceVideoHandOff(
-        `${mediaBase}/ws/${current.workspaceId}/media/${current.fileId}`,
+        mediaSrcOf(mediaBase, current.workspaceId, current.fileId),
       );
     void navigate(
       fileHref(current.fileId, current.workspaceId, {
@@ -279,7 +280,7 @@ export default function Player() {
     : undefined;
   const mediaSrc =
     mediaBase && current
-      ? `${mediaBase}/ws/${wsId}/media/${current.fileId}`
+      ? mediaSrcOf(mediaBase, wsId, current.fileId)
       : "";
 
   const { leaving, transitionTo } = useStageTransition({

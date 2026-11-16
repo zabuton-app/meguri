@@ -41,6 +41,7 @@ import { hasHdrTransfer } from "@/video/colorGrade";
 import { needsVideoPreview, isRemuxedVideo } from "@shared/playbackTracks";
 import { useAudioActions } from "@/audio/useAudioPlayer";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import { AudioCompact, AudioStage } from "./AudioStage";
 import { DetailActions } from "./DetailActions";
 import { PlayHistory } from "./PlayHistory";
@@ -219,7 +220,7 @@ export default function MediaDetail() {
   const mediaBase = status.data?.mediaBase ?? "";
   // Include the workspace ID in the URL path (/ws/<id>/...) to avoid collisions with another DB after switching.
   const mediaSrc =
-    mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
+    mediaBase && wsId ? mediaSrcOf(mediaBase, wsId, fileId) : "";
   const { onClose, openPlaylist } = useCloseTarget({
     fileId,
     wsId,

@@ -51,6 +51,7 @@ import { useWatchLater } from "@/hooks/useWatchLater";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
 import { mediaSortId } from "@/lib/mediaSortId";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import { folderPathOf } from "@/lib/relPath";
 import { showFolderInLibrary } from "@/lib/ui-events";
 import { copyImageToClipboard } from "@/routes/MediaDetail/utils";
@@ -191,7 +192,7 @@ function FileMenuBody({
   const folderPath = folderPathOf(file.relPath);
   const imageSrc =
     file.kind === "image" && mediaBase
-      ? `${mediaBase}/ws/${file.workspaceId}/media/${file.id}`
+      ? mediaSrcOf(mediaBase, file.workspaceId, file.id)
       : "";
 
   return (
