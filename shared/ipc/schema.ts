@@ -547,8 +547,9 @@ export const ScanDoneSchema = z.object({
   error: z.boolean().optional(),
   /** Why the scan failed, when it is a known case: "root-unreadable" when
    *  the workspace's folder could not be read (an unplugged drive, a share
-   *  that is down). */
-  errorReason: z.enum(["root-unreadable"]).optional(),
+   *  that is down); "exclusion-stuck" when a scan exclusion pattern did not
+   *  finish, so nothing was scanned (#282). */
+  errorReason: z.enum(["root-unreadable", "exclusion-stuck"]).optional(),
   /** The workspace scanned (absent for a scan not tied to one). */
   workspaceId: z.string().optional(),
 });

@@ -6,7 +6,11 @@
 // The patterns are user regexes, so they only ever run in a worker
 // (electron/core/scanExclusionFilter.ts); here they are only compiled, to tell
 // the user one is wrong while it is typed.
-import { compilePattern, type TagRule } from "./autoTag.js";
+import {
+  compilePattern,
+  MAX_AUTO_TAG_PATTERN,
+  type TagRule,
+} from "./autoTag.js";
 
 export interface ScanExclusions {
   /** Regular expressions, matched case-insensitively anywhere in the path. */
@@ -22,10 +26,27 @@ export function emptyScanExclusions(): ScanExclusions {
   return { patterns: [], folders: {} };
 }
 
+/**
+ * How a pattern is run: a match anywhere, even an empty one (a lookahead such
+ * as `^(?!.*\.mp4$)` matches nothing but still says yes), becomes a match of
+ * the first character. The auto-tag engine skips empty matches, and the path
+ * a pattern is run over is never empty.
+ */
+const wrapPattern = (pattern: string) => `^(?=[^]*?(?:${pattern}))[^]`;
+
+/** Longest pattern kept: what the engine takes, less the wrapping. */
+export const MAX_EXCLUSION_PATTERN =
+  MAX_AUTO_TAG_PATTERN - wrapPattern("").length;
+
 /** Why a pattern cannot be used, or null when it compiles. */
 export function patternError(pattern: string): string | null {
-  const compiled = compilePattern(pattern, true);
-  return "error" in compiled ? compiled.error || "empty" : null;
+  if (pattern.length > MAX_EXCLUSION_PATTERN) return "too long";
+  // Wrapped too, since that is what runs.
+  for (const p of [pattern, wrapPattern(pattern)]) {
+    const compiled = compilePattern(p, true);
+    if ("error" in compiled) return compiled.error || "empty";
+  }
+  return null;
 }
 
 /**
@@ -38,7 +59,7 @@ export function exclusionRule(pattern: string): TagRule {
     id: `scan-exclusion:${pattern}`,
     name: pattern,
     kind: "regex",
-    pattern,
+    pattern: wrapPattern(pattern),
     template: "excluded",
     exclude: "",
     ci: true,

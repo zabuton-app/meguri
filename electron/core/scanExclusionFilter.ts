@@ -4,7 +4,7 @@
 // instead of freezing the app. The excluded folders are plain paths and are
 // compared here.
 //
-// Indexed files a rule covers are hidden, not deleted (applyScanExclusions):
+// Indexed files a rule covers are hidden, not deleted (hideFiles):
 // deleted_at keeps them out of every list, and scan_excluded_at keeps them out
 // of Missing and the move detection, so the row (and its id, which collections
 // and Watch Later refer to) is there again when no rule covers it any more.
@@ -38,8 +38,10 @@ export type PathFilter = (paths: readonly PathQuery[]) => Promise<boolean[]>;
  * The filter for one workspace, or null when nothing is excluded there. A
  * pattern that does not compile is left out with a warning: a save checks
  * them, so only a hand-edited one gets here, and it must not stop the scan.
- * Fails when the worker cannot run the patterns: what they would have left
- * out must not be indexed (or brought back) in their place.
+ * Fails when the worker cannot run the patterns, or has left one out because
+ * it did not finish (AutoTagRuleDroppedError, for the life of the app): what
+ * they would have left out must not be indexed (or brought back) in their
+ * place.
  */
 export function scanExclusionFilter(
   exclusions: ScanExclusions,
@@ -57,7 +59,8 @@ export function scanExclusionFilter(
   if (rules.length === 0 && folders.size === 0) return null;
   // One object for the filter's life: the worker client holds an engine by
   // identity and sends it once.
-  const engine: AutoTagEngine = { rules, keywords: [] };
+  // Whole: a pattern the worker gives up on must not let what it covers in.
+  const engine: AutoTagEngine = { rules, keywords: [], whole: true };
   return async (paths) => {
     const out = paths.map((p) => inExcludedFolder(folders, p.relPath, p.isDir));
     if (rules.length === 0) return out;
@@ -117,39 +120,58 @@ export async function coveredFiles(
 const slashed = (relPath: string) =>
   path.sep === "/" ? relPath : relPath.split(path.sep).join("/");
 
+/** Rows written per transaction, yielding to the event loop in between. */
+const WRITE_CHUNK = 500;
+
+/** Run `write` over `ids` a chunk at a time; stops once `signal` aborts. */
+async function inChunks(
+  db: DB,
+  ids: readonly number[],
+  signal: AbortSignal | undefined,
+  write: (json: string) => number,
+): Promise<number> {
+  let done = 0;
+  const chunk = db.transaction(write);
+  for (let at = 0; at < ids.length; at += WRITE_CHUNK) {
+    if (signal?.aborted) break;
+    done += chunk(JSON.stringify(ids.slice(at, at + WRITE_CHUNK)));
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  return done;
+}
+
 /**
- * Hide the files `filter` covers. With `release`, also take the mark off the
- * hidden files it no longer covers (all of them when `filter` is null). Those
- * keep deleted_at: the scan that follows brings back the ones still there,
- * and the rest are then missing like any file that is gone. Files removed
- * from the index by hand (excluded_at) are left as they are.
- *
- * The rows are read, then the patterns run (in the worker), then the rows are
- * written: a row is only changed if it is still in the state it was read in.
- * Nothing is written once `signal` is aborted.
+ * What `filter` changes in the index, without changing it: the files it
+ * covers that are not hidden yet, and with `release`, the hidden files it no
+ * longer covers (all of them when `filter` is null), less those `keep` holds.
+ * Files removed from the index by hand (excluded_at) are left as they are.
  */
-export async function applyScanExclusions(
+export async function scanExclusionChanges(
   db: DB,
   rootId: number,
   filter: PathFilter | null,
   {
     release,
     keep,
-    signal,
   }: {
     release: boolean;
     /** Hidden rows to keep hidden even when no rule covers them any more. */
     keep?: (relPath: string) => boolean;
-    signal?: AbortSignal;
   },
-): Promise<{ hidden: number; released: number }> {
+): Promise<{ hide: number[]; release: { id: number; relPath: string }[] }> {
+  if (!filter && !release) return { hide: [], release: [] };
+  // Only the rows that can change: with nothing excluded, the hidden ones.
+  const which = !filter
+    ? "scan_excluded_at IS NOT NULL"
+    : release
+      ? "1"
+      : "scan_excluded_at IS NULL";
   const rows = db
     .prepare(
       `SELECT id, rel_path, scan_excluded_at FROM files
-       WHERE root_id = ? AND excluded_at IS NULL
-         AND (scan_excluded_at IS NULL OR ?)`,
+       WHERE root_id = ? AND excluded_at IS NULL AND ${which}`,
     )
-    .all(rootId, release ? 1 : 0) as {
+    .all(rootId) as {
     id: number;
     rel_path: string;
     scan_excluded_at: number | null;
@@ -160,36 +182,80 @@ export async function applyScanExclusions(
         rows.map((r) => slashed(r.rel_path)),
       )
     : rows.map(() => false);
-  const hide: number[] = [];
-  const unmark: number[] = [];
+  const out: Awaited<ReturnType<typeof scanExclusionChanges>> = {
+    hide: [],
+    release: [],
+  };
   rows.forEach((r, i) => {
-    if (covered[i] && r.scan_excluded_at === null) hide.push(r.id);
-    else if (!covered[i] && r.scan_excluded_at !== null && !keep?.(r.rel_path))
-      unmark.push(r.id);
+    if (covered[i] && r.scan_excluded_at === null) out.hide.push(r.id);
+    else if (
+      release &&
+      !covered[i] &&
+      r.scan_excluded_at !== null &&
+      !keep?.(r.rel_path)
+    )
+      out.release.push({ id: r.id, relPath: r.rel_path });
   });
-  if (signal?.aborted || (hide.length === 0 && unmark.length === 0))
-    return { hidden: 0, released: 0 };
+  return out;
+}
+
+/**
+ * Hide these files: deleted_at keeps them out of every list, scan_excluded_at
+ * out of Missing. Only rows still neither hidden nor removed from the index
+ * are changed, since they were read before the patterns ran. Returns how many
+ * were hidden; stops between chunks once `signal` aborts.
+ */
+export function hideFiles(
+  db: DB,
+  ids: readonly number[],
+  signal?: AbortSignal,
+): Promise<number> {
   const now = nowUnix();
-  return db.transaction(() => {
-    const hidden = db
-      .prepare(
-        `UPDATE files SET deleted_at = COALESCE(deleted_at, ?), scan_excluded_at = ?
-         WHERE id IN (SELECT value FROM json_each(?))
-           AND excluded_at IS NULL AND scan_excluded_at IS NULL
-         RETURNING id`,
-      )
-      .pluck()
-      .all(now, now, JSON.stringify(hide)) as number[];
-    // As when a file is removed from the index: search finds no hidden file.
-    db.prepare(
-      "DELETE FROM files_fts WHERE rowid IN (SELECT value FROM json_each(?))",
-    ).run(JSON.stringify(hidden));
-    const released = db
-      .prepare(
-        `UPDATE files SET scan_excluded_at = NULL
-         WHERE id IN (SELECT value FROM json_each(?)) AND scan_excluded_at IS NOT NULL`,
-      )
-      .run(JSON.stringify(unmark)).changes;
-    return { hidden: hidden.length, released };
-  })();
+  const hide = db
+    .prepare(
+      `UPDATE files SET deleted_at = COALESCE(deleted_at, ?), scan_excluded_at = ?
+       WHERE id IN (SELECT value FROM json_each(?))
+         AND excluded_at IS NULL AND scan_excluded_at IS NULL
+       RETURNING id`,
+    )
+    .pluck();
+  // As when a file is removed from the index: search finds no hidden file.
+  const dropFts = db.prepare(
+    "DELETE FROM files_fts WHERE rowid IN (SELECT value FROM json_each(?))",
+  );
+  return inChunks(db, ids, signal, (json) => {
+    const hidden = hide.all(now, now, json) as number[];
+    dropFts.run(JSON.stringify(hidden));
+    return hidden.length;
+  });
+}
+
+/**
+ * Take the mark off these hidden files. They keep deleted_at: a file a scan
+ * found was brought back by it already, so what is left is missing like any
+ * file that is gone.
+ */
+export function releaseFiles(
+  db: DB,
+  ids: readonly number[],
+  signal?: AbortSignal,
+): Promise<number> {
+  const release = db.prepare(
+    `UPDATE files SET scan_excluded_at = NULL
+     WHERE id IN (SELECT value FROM json_each(?)) AND scan_excluded_at IS NOT NULL`,
+  );
+  return inChunks(db, ids, signal, (json) => release.run(json).changes);
+}
+
+/** Hide what `filter` covers now (and let nothing back). */
+export async function applyScanExclusions(
+  db: DB,
+  rootId: number,
+  filter: PathFilter | null,
+  signal?: AbortSignal,
+): Promise<number> {
+  const { hide } = await scanExclusionChanges(db, rootId, filter, {
+    release: false,
+  });
+  return hideFiles(db, hide, signal);
 }

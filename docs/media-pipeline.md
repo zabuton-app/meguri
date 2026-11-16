@@ -110,26 +110,36 @@ to the auto-tag worker as auto-tagging rules (`exclusionRule()` in
 `shared/scanExclusions.ts`), which brings its time budget and its leaving out
 of a pattern that never finishes. The engine matches a name without its
 extension, so each path is sent with a suffix it takes off
-(`exclusionSubject()`). When the worker cannot run, the scan fails before
-the index is touched. `electron/core/scanExclusionFilter.ts` builds the filter
-for one workspace.
+(`exclusionSubject()`), and it skips empty matches, so each pattern is wrapped
+to match the path's first character wherever it matches (a pattern of
+lookaheads alone still excludes). The patterns are sent as a `whole` engine:
+when the worker cannot run, or has left a pattern out because it did not
+finish (for the rest of the session), the scan fails before the index is
+touched rather than letting in what the pattern covers, and the user is told
+to change the pattern. `electron/core/scanExclusionFilter.ts` builds the
+filter for one workspace.
 
 - **The walk** asks the filter once per level of the tree, for everything
   found there. An excluded folder is not read, so nothing under it is hashed,
   indexed or reported as unreadable.
-- **Indexed files a rule covers** are hidden, not deleted
-  (`applyScanExclusions()`): `deleted_at` keeps them out of every list, and
-  `scan_excluded_at` keeps them out of Missing and of the move detection. The
-  row and its `files.id` (which collections and Watch Later refer to) stay.
-  This runs when the patterns are saved (in every workspace, without reading
-  the disk, through `WorkspacePasses`), after a scan's walk, and once more as
-  the scan ends, for a rule saved while it ran.
-- **A rule taken out** lets its files go at the next scan, before its sync:
-  the mark is cleared, and the sync brings back each file still there with
-  its id. A file that is gone by then is missing like any other. The mark is
-  not cleared at once, since the files would read as missing until a scan
-  found them.
-- **A rebuild** keeps the hidden rows as they are, with their thumbnails.
+- **Indexed files a rule covers** are hidden, not deleted (`hideFiles()`):
+  `deleted_at` keeps them out of every list, and `scan_excluded_at` keeps
+  them out of Missing and of the move detection. The row and its `files.id`
+  (which collections and Watch Later refer to) stay. This runs when the
+  patterns are saved (in every workspace, without reading the disk, through
+  `WorkspacePasses`), after a scan's walk, and once more as the scan ends,
+  for a rule saved while it ran. The rows are written a chunk at a time,
+  yielding in between. A save is reported as saved once it is written, even
+  when hiding fails: the next scan applies it.
+- **A rule taken out** lets its files go at the next scan: its sync treats
+  them as any other row, bringing back each file still there (also when it
+  was moved) with its id and clearing the mark. Once the scan is through,
+  the mark is cleared on the rest, which are then missing like any file that
+  is gone. A scan cut short leaves them hidden, not missing. The mark is not
+  cleared when the rule goes, since the files would read as missing until a
+  scan found them.
+- **A rebuild** keeps the hidden rows as they are, with their thumbnails,
+  except those no rule covers any more, which it resets like any other row.
   Resync clears only the files removed from the index by hand.
 - Excluded folders follow paths: when one is renamed, its files are scanned
   again under the new path as new rows, and the old rows stay hidden.

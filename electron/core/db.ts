@@ -406,9 +406,7 @@ function backfillColumns(db: DB): void {
   if (!hasColumn(db, "scan_roots", "mountpoint")) {
     db.exec("ALTER TABLE scan_roots ADD COLUMN mountpoint INTEGER");
   }
-  // Filesystem creation time (birthtime), NULL where the filesystem doesn't
-  // provide it. The index lives here (not in CORE_DDL) because on pre-existing
-  // DBs the column only exists after this ALTER runs.
+  // Set while a scan exclusion hides the file (#282).
   if (!hasColumn(db, "files", "scan_excluded_at")) {
     db.exec("ALTER TABLE files ADD COLUMN scan_excluded_at INTEGER");
   }
@@ -420,6 +418,9 @@ function backfillColumns(db: DB): void {
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_files_missing_list ON files(deleted_at DESC, id DESC) WHERE deleted_at IS NOT NULL AND excluded_at IS NULL AND scan_excluded_at IS NULL",
   );
+  // Filesystem creation time (birthtime), NULL where the filesystem doesn't
+  // provide it. The index lives here (not in CORE_DDL) because on pre-existing
+  // DBs the column only exists after this ALTER runs.
   if (!hasColumn(db, "files", "btime")) {
     db.exec("ALTER TABLE files ADD COLUMN btime INTEGER");
   }

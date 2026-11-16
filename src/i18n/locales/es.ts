@@ -88,6 +88,8 @@ export const es: Catalog = {
   "settings.scanExclusionsSaved": "Exclusiones de escaneo guardadas.",
   "settings.scanExclusionsSaveError":
     "No se pudieron guardar las exclusiones de escaneo.",
+  "settings.scanExclusionsLoadError":
+    "No se pudieron leer las exclusiones del escaneo.",
   "settings.logo": "Logotipo de la aplicación",
   "settings.logoDesc":
     "Se aplica a los iconos de la ventana, de la bandeja y de la aplicación.",
@@ -180,6 +182,10 @@ export const es: Catalog = {
   "home.scanCanceled": "Escaneo cancelado",
   "home.escCloseHint": "Pulsa Esc de nuevo para cerrar la ventana",
   "home.scanError": "Se produjo un error durante el escaneo",
+  "home.scanExclusionStuck":
+    "Un patrón de exclusión del escaneo tardó demasiado en ejecutarse",
+  "home.scanExclusionStuckDesc":
+    "No se escaneó nada. Cámbialo o elimínalo en Ajustes → Escaneo.",
   "home.scanRootUnreadable":
     "No se pudo acceder a la carpeta del espacio de trabajo",
   "home.scanRootUnreadableNamed": "No se pudo acceder a la carpeta de «{name}»",

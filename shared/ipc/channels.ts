@@ -39,7 +39,6 @@ import {
   TagRefSchema,
 } from "./schema.js";
 import {
-  MAX_AUTO_TAG_PATTERN,
   MAX_AUTO_TAGS_PER_FILE,
   MAX_AUTO_TAG_PAIRS,
   MAX_AUTO_TAG_PLACE,
@@ -71,7 +70,10 @@ import type { TimelineCounts } from "./timeline.js";
 import { daySpan, parseDay } from "../day.js";
 import { MAX_FOLDER_FILES_PATHS } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
-import { MAX_EXCLUSION_PATTERNS } from "../scanExclusions.js";
+import {
+  MAX_EXCLUSION_PATTERN,
+  MAX_EXCLUSION_PATTERNS,
+} from "../scanExclusions.js";
 
 export { EVENT_CHANNELS, INVOKE_CHANNELS };
 export type { EventChannel, InvokeChannel };
@@ -561,7 +563,7 @@ export const ChannelInputs = {
   // Each pattern must compile (patternError); main checks again on save.
   scan_exclusions_set_patterns: z.object({
     patterns: z
-      .array(z.string().min(1).max(MAX_AUTO_TAG_PATTERN))
+      .array(z.string().min(1).max(MAX_EXCLUSION_PATTERN))
       .max(MAX_EXCLUSION_PATTERNS),
   }),
   custom_css_get: z.void(),

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ScanExclusionsState } from "@shared/ipc/channels";
 import { I18nProvider } from "@/i18n/I18nProvider";
+import { MAX_EXCLUSION_PATTERN } from "@shared/scanExclusions";
 
 const scanExclusionsGet = vi.fn<() => Promise<ScanExclusionsState>>();
 const scanExclusionsSetPatterns =
@@ -68,6 +69,27 @@ describe("ScanExclusionsSection", () => {
 
     expect(screen.getByText("(")).toBeTruthy();
     expect(saveButton().disabled).toBe(true);
+  });
+
+  it("names a pattern too long to run, and the same wrong line twice", async () => {
+    renderSection();
+    await waitFor(() => expect(field().disabled).toBe(false));
+    const long = "a".repeat(MAX_EXCLUSION_PATTERN + 1);
+    fireEvent.change(field(), { target: { value: `${long}\n(\n(` } });
+
+    expect(screen.getByText(long)).toBeTruthy();
+    expect(screen.getAllByText("(")).toHaveLength(2);
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  it("says so when the patterns cannot be read", async () => {
+    scanExclusionsGet.mockRejectedValue(new Error("down"));
+    renderSection();
+
+    expect(
+      await screen.findByText("Could not read the scan exclusions."),
+    ).toBeTruthy();
+    expect(field().disabled).toBe(true);
   });
 
   it("saves the lines that hold a pattern and refreshes the file views", async () => {

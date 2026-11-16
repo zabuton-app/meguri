@@ -85,6 +85,7 @@ export const ja = {
   "settings.scanExclusionsSave": "保存",
   "settings.scanExclusionsSaved": "スキャンの除外を保存しました。",
   "settings.scanExclusionsSaveError": "スキャンの除外を保存できませんでした。",
+  "settings.scanExclusionsLoadError": "スキャン除外を読み込めませんでした。",
   "settings.logo": "アプリのロゴ",
   "settings.logoDesc": "ウィンドウ・トレイ・画面内のアイコンに反映されます。",
   "logo.dark": "濃色",
@@ -173,6 +174,10 @@ export const ja = {
   "home.scanCanceled": "スキャンをキャンセルしました",
   "home.escCloseHint": "もう一度 Esc を押すとウィンドウを閉じます",
   "home.scanError": "スキャン中にエラーが発生しました",
+  "home.scanExclusionStuck":
+    "スキャン除外のパターンの実行に時間がかかりすぎました",
+  "home.scanExclusionStuckDesc":
+    "スキャンは行われていません。設定 → スキャンでパターンを修正するか削除してください。",
   "home.scanRootUnreadable": "ワークスペースのフォルダにアクセスできません",
   "home.scanRootUnreadableNamed": "「{name}」のフォルダにアクセスできません",
   "home.scanRootUnreadableDesc":

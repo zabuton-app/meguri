@@ -201,6 +201,24 @@ describe("Home + MediaDetail integration", () => {
     });
   };
 
+  it("names a scan exclusion pattern that did not finish as the cause", async () => {
+    await renderReady();
+    fireScanDone({
+      error: true,
+      errorReason: "exclusion-stuck",
+      workspaceId: WS_ID,
+    });
+    await waitFor(() =>
+      expect(toasts.error).toHaveBeenCalledWith(
+        "A scan exclusion pattern took too long to run",
+        expect.objectContaining({
+          description:
+            "Nothing was scanned. Change or remove it in Settings → Scan.",
+        }),
+      ),
+    );
+  });
+
   describe("a workspace folder that could not be read", () => {
     const fireUnreadable = (workspaceId: string) =>
       fireScanDone({

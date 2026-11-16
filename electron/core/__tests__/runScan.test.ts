@@ -63,6 +63,7 @@ import { fileTags } from "../tags.js";
 import { runScan, type JobEvent } from "../jobs.js";
 import { ScanRootUnreadableError } from "../scan.js";
 import {
+  AutoTagRuleDroppedError,
   AutoTagUnavailableError,
   deriveAutoTagsInProcess,
   type DeriveAutoTags,
@@ -648,15 +649,98 @@ describe("runScan", () => {
         deriveAutoTagsInProcess,
       );
 
-      expect(
-        await applyScanExclusions(db, rootId, filter, { release: false }),
-      ).toEqual({ hidden: 1, released: 0 });
+      expect(await applyScanExclusions(db, rootId, filter)).toBe(1);
       expect(state("old/a.mp4").hidden).toBe(true);
       // Taken out again, but not released: only a scan finds the file.
-      expect(
-        await applyScanExclusions(db, rootId, null, { release: false }),
-      ).toEqual({ hidden: 0, released: 0 });
+      expect(await applyScanExclusions(db, rootId, null)).toBe(0);
       expect(state("old/a.mp4").hidden).toBe(true);
+    });
+
+    it("keeps a file hidden when the scan that would bring it back is cut short", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+      // New, so the scan hashes it; it is stopped there.
+      write("new.mp4", "NNNNNNNNNN");
+      const ac = new AbortController();
+
+      await runScan(
+        core,
+        "job",
+        (e) => {
+          if (e.type === "progress" && e.phase === "hash") ac.abort();
+        },
+        { ...withExclusions([]), signal: ac.signal },
+      );
+
+      // Not missing (where it could be purged), though it is there.
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+      expect(countMissingFiles(db)).toBe(0);
+      await scan(withExclusions([]));
+      expect(state("old/a.mp4")).toEqual({ id, listed: true, hidden: false });
+    });
+
+    it("brings back a hidden file moved out of the excluded folder with its id", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+      fs.renameSync(path.join(root, "old", "a.mp4"), path.join(root, "a.mp4"));
+
+      await scan(withExclusions([]));
+
+      expect(state("a.mp4")).toEqual({ id, listed: true, hidden: false });
+      expect(countMissingFiles(db)).toBe(0);
+    });
+
+    it("excludes what a pattern of lookaheads alone covers", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      write("b.jpg", "BBBBBBBBBB");
+
+      await scan(withExclusions(["(?=.*\\.jpg$)"]));
+
+      expect(rows().map((r) => r.rel_path)).toEqual(["a.mp4"]);
+    });
+
+    it("fails without touching the index when a pattern was given up on", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const before = rows();
+      write("b.mp4", "BBBBBBBBBB");
+
+      await expect(
+        scan(
+          withExclusions(["^old/$"], {}, () =>
+            Promise.reject(new AutoTagRuleDroppedError()),
+          ),
+        ),
+      ).rejects.toThrow(AutoTagRuleDroppedError);
+      expect(rows()).toEqual(before);
+    });
+
+    it("finishes the scan when a rule saved during it cannot be applied", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      let reads = 0;
+      // The second read, once the files are synced, has a pattern the worker
+      // cannot run.
+      const opts = {
+        ...withExclusions([], {}, (engine, names) =>
+          engine.rules.some((r) => r.name === "^late$")
+            ? Promise.reject(new AutoTagRuleDroppedError())
+            : deriveAutoTagsInProcess(engine, names),
+        ),
+        exclusions: () => ({
+          patterns: reads++ === 0 ? [] : ["^late$"],
+          folders: {},
+        }),
+      };
+
+      await expect(scan(opts)).resolves.toMatchObject({ inserted: 1 });
+      expect(rows()[0]).toMatchObject({
+        deleted_at: null,
+        thumb_status: "done",
+      });
     });
 
     it("leaves files removed from the index by hand as they are", async () => {

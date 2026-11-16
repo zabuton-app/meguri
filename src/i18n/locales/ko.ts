@@ -85,6 +85,7 @@ export const ko: Catalog = {
   "settings.scanExclusionsSave": "저장",
   "settings.scanExclusionsSaved": "스캔 제외 설정을 저장했습니다.",
   "settings.scanExclusionsSaveError": "스캔 제외 설정을 저장할 수 없습니다.",
+  "settings.scanExclusionsLoadError": "스캔 제외 설정을 읽지 못했습니다.",
   "settings.logo": "앱 로고",
   "settings.logoDesc": "창, 트레이, 앱 내 아이콘에 적용됩니다.",
   "logo.dark": "진한 색",
@@ -171,6 +172,10 @@ export const ko: Catalog = {
   "home.scanCanceled": "스캔을 취소했습니다",
   "home.escCloseHint": "Esc 키를 한 번 더 누르면 창이 닫힙니다",
   "home.scanError": "스캔 중 오류가 발생했습니다",
+  "home.scanExclusionStuck":
+    "스캔 제외 패턴을 실행하는 데 시간이 너무 오래 걸렸습니다",
+  "home.scanExclusionStuckDesc":
+    "스캔하지 않았습니다. 설정 → 스캔에서 패턴을 수정하거나 삭제하세요.",
   "home.scanRootUnreadable": "워크스페이스 폴더에 접근할 수 없습니다",
   "home.scanRootUnreadableNamed": '"{name}" 폴더에 접근할 수 없습니다',
   "home.scanRootUnreadableDesc":

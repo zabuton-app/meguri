@@ -84,10 +84,16 @@ export function ScanExclusionsSection() {
         aria-invalid={errors.length > 0}
         className="w-full resize-y rounded-md border border-border-strong bg-bg px-2 py-1.5 font-mono text-xs text-fg outline-none placeholder:text-muted focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
       />
+      {state.isError && (
+        <p className="text-xs text-error">
+          {t("settings.scanExclusionsLoadError")}
+        </p>
+      )}
       {errors.length > 0 && (
         <ul className="flex flex-col gap-0.5 text-xs text-error">
-          {errors.map(({ pattern, error }) => (
-            <li key={pattern} className="break-all">
+          {errors.map(({ pattern, error }, i) => (
+            // By position: the same wrong line can be there twice.
+            <li key={i} className="break-all">
               <code className="font-mono">{pattern}</code>: {error}
             </li>
           ))}

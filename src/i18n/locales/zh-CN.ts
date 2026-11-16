@@ -81,6 +81,7 @@ export const zhCN: Catalog = {
   "settings.scanExclusionsSave": "保存",
   "settings.scanExclusionsSaved": "已保存扫描排除设置。",
   "settings.scanExclusionsSaveError": "无法保存扫描排除设置。",
+  "settings.scanExclusionsLoadError": "无法读取扫描排除设置。",
   "settings.logo": "应用图标",
   "settings.logoDesc": "应用于窗口、托盘和应用内图标。",
   "logo.dark": "深色",
@@ -164,6 +165,9 @@ export const zhCN: Catalog = {
   "home.scanCanceled": "已取消扫描",
   "home.escCloseHint": "再按一次 Esc 关闭窗口",
   "home.scanError": "扫描过程中发生错误",
+  "home.scanExclusionStuck": "某个扫描排除规则运行时间过长",
+  "home.scanExclusionStuckDesc":
+    "未进行扫描。请在 设置 → 扫描 中修改或删除该规则。",
   "home.scanRootUnreadable": "无法访问工作区文件夹",
   "home.scanRootUnreadableNamed": "无法访问“{name}”的文件夹",
   "home.scanRootUnreadableDesc":

@@ -583,8 +583,13 @@ export function saveAutoTag(config: AutoTagConfig): void {
 
 /** The settings a pass applies, as one comparable value. */
 function engineOf({ rules, keywords, folders }: AutoTagConfig): string {
-  // Typed as the engine, so a field it gains has to be named here too.
-  const engine: Required<AutoTagEngine> = { rules, keywords, folders };
+  // Typed as the engine, so a field it gains has to be named here too. Not
+  // `whole`: how a caller has it run, not a setting.
+  const engine: Required<Omit<AutoTagEngine, "whole">> = {
+    rules,
+    keywords,
+    folders,
+  };
   return JSON.stringify(engine);
 }
 
@@ -622,9 +627,13 @@ function parseScanExclusions(value: unknown): ScanExclusions {
   if (!value || typeof value !== "object") return emptyScanExclusions();
   const c = value as Record<string, unknown>;
   const patterns = Array.isArray(c.patterns)
-    ? c.patterns
-        .filter((p): p is string => typeof p === "string" && p !== "")
-        .slice(0, MAX_EXCLUSION_PATTERNS)
+    ? [
+        ...new Set(
+          c.patterns.filter(
+            (p): p is string => typeof p === "string" && p !== "",
+          ),
+        ),
+      ].slice(0, MAX_EXCLUSION_PATTERNS)
     : [];
   const folders: Record<string, string[]> = {};
   if (c.folders && typeof c.folders === "object") {

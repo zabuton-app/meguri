@@ -39,18 +39,15 @@ import type { AutoTagConfig } from "../../shared/autoTag.js";
 import type { ScanExclusions } from "../../shared/scanExclusions.js";
 import {
   applyScanExclusions,
+  hideFiles,
+  releaseFiles,
+  scanExclusionChanges,
   scanExclusionFilter,
 } from "./scanExclusionFilter.js";
 
 const log = scopedLog("scan");
 
-function logExclusions({
-  hidden,
-  released,
-}: {
-  hidden: number;
-  released: number;
-}): void {
+function logExclusions(hidden: number, released = 0): void {
   if (hidden > 0 || released > 0)
     log.info(
       `scan exclusions: hid ${hidden} file(s), let ${released} come back`,
@@ -85,11 +82,13 @@ export type JobEvent =
  * Rows for which `keep` is true (paths the walk could not read) are left as they are, with
  * their thumbnails: they could not be scanned again now. So are rows hidden by a scan
  * exclusion (#282), which the scan does not read: they stay hidden, ready to come back
- * when no rule covers them.
+ * when no rule covers them. Not those in `releasing`, which no rule covers any more:
+ * this scan reads them again.
  */
 export async function resetIndex(
   core: Pick<Core, "db" | "rootId" | "thumbsDir">,
   keep: (relPath: string) => boolean,
+  releasing: ReadonlySet<number> = new Set(),
 ): Promise<void> {
   const { db } = core;
   const now = nowUnix();
@@ -105,7 +104,11 @@ export async function resetIndex(
       scan_excluded_at: number | null;
     }[];
     for (const r of rows)
-      if (keep(r.rel_path) || r.scan_excluded_at !== null) kept.add(r.id);
+      if (
+        keep(r.rel_path) ||
+        (r.scan_excluded_at !== null && !releasing.has(r.id))
+      )
+        kept.add(r.id);
     // Set-based, with the kept ids as a JSON array: one statement each instead
     // of one per row.
     const notKept = "id NOT IN (SELECT value FROM json_each(?))";
@@ -250,20 +253,21 @@ export async function runScan(
   const isUnreadable = unreadableMatcher(unreadablePaths);
 
   // What the rules cover now is hidden, so that the sync below does not take
-  // it for gone; what no rule covers any more is let go, for the sync to bring
-  // back what the walk found. Not what the walk could not read: it would be
-  // missing, though only out of reach.
-  logExclusions(
-    await applyScanExclusions(db, core.rootId, exclude, {
-      release: true,
-      keep: isUnreadable,
-      signal,
-    }),
-  );
+  // it for gone. What no rule covers any more is synced like any other row:
+  // what the walk found comes back, and the rest is let go once the sync is
+  // through. Not before: a scan cut short would leave it missing (and open to
+  // a purge) though it is there. Not what the walk could not read either: it
+  // would be missing, though only out of reach.
+  const changes = await scanExclusionChanges(db, core.rootId, exclude, {
+    release: true,
+    keep: isUnreadable,
+  });
+  const hidden = await hideFiles(db, changes.hide, signal);
+  const releasing = new Set(changes.release.map((r) => r.id));
   // A rebuild resets the derived file index (keeping file ids and durable
   // metadata) before syncing. Only after the walk, so an unreachable root keeps
   // its index.
-  if (opts.rebuild) await resetIndex(core, isUnreadable);
+  if (opts.rebuild) await resetIndex(core, isUnreadable, releasing);
 
   const { stats, ftsTargets, ftsMissing, unreadable } = await syncFiles(
     db,
@@ -276,8 +280,24 @@ export async function runScan(
       unreadablePaths,
       // A rebuild starts over, hashes included.
       rehash: opts.rebuild,
+      releasing,
     },
   );
+  // Not found by a scan that went through: gone, so missing like any file
+  // that is gone. Not one whose content could not be read: it is there.
+  if (!signal?.aborted) {
+    const unhashed = new Set(unreadable.map((u) => u.relPath));
+    logExclusions(
+      hidden,
+      await releaseFiles(
+        db,
+        changes.release
+          .filter((r) => !unhashed.has(r.relPath))
+          .map((r) => r.id),
+        signal,
+      ),
+    );
+  }
   // Told to the user (counts only) so a folder or file that never shows up
   // does not go unnoticed (#314).
   stats.skipped = unreadablePaths.length + unreadable.length;
@@ -299,14 +319,21 @@ export async function runScan(
     );
   }
   // A rule saved during the walk and the sync hid what was indexed then, but
-  // not what this scan has added or brought back since.
-  if (!signal?.aborted && opts.exclusions)
-    logExclusions(
-      await applyScanExclusions(db, core.rootId, filterNow(), {
-        release: false,
-        signal,
-      }),
-    );
+  // not what this scan has added or brought back since. The scan's own work
+  // is done by now, so a failure here is only logged: the next scan, or the
+  // next save, hides what this one could not.
+  if (!signal?.aborted && opts.exclusions) {
+    try {
+      logExclusions(
+        await applyScanExclusions(db, core.rootId, filterNow(), signal),
+      );
+    } catch (err) {
+      log.warn(
+        "could not apply the scan exclusions saved during the scan",
+        err,
+      );
+    }
+  }
   q.touchScanRoot(db, core.rootId);
   if (mountpoint !== null) q.setScanRootMountpoint(db, core.rootId, mountpoint);
 

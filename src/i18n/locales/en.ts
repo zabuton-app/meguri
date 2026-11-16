@@ -87,6 +87,7 @@ export const en: Catalog = {
   "settings.scanExclusionsSave": "Save",
   "settings.scanExclusionsSaved": "Scan exclusions saved.",
   "settings.scanExclusionsSaveError": "Could not save the scan exclusions.",
+  "settings.scanExclusionsLoadError": "Could not read the scan exclusions.",
   "settings.logo": "App logo",
   "settings.logoDesc": "Applies to the window, tray, and in-app icons.",
   "logo.dark": "Dark",
@@ -175,6 +176,9 @@ export const en: Catalog = {
   "home.scanCanceled": "Scan canceled",
   "home.escCloseHint": "Press Esc again to close the window",
   "home.scanError": "An error occurred during the scan",
+  "home.scanExclusionStuck": "A scan exclusion pattern took too long to run",
+  "home.scanExclusionStuckDesc":
+    "Nothing was scanned. Change or remove it in Settings → Scan.",
   "home.scanRootUnreadable": "The workspace folder could not be reached",
   "home.scanRootUnreadableNamed": 'The folder of "{name}" could not be reached',
   "home.scanRootUnreadableDesc":

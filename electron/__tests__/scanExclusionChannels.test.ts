@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let userData = "";
@@ -117,10 +118,50 @@ describe("scan exclusion channels", () => {
     ]);
   });
 
+  it("fail a save that was not written, hiding nothing", async () => {
+    loadConfig();
+    // The settings table refuses every write.
+    const raw = new Database(path.join(userData, "library.sqlite"));
+    for (const op of ["INSERT", "UPDATE"])
+      raw.exec(
+        `CREATE TRIGGER refuse_${op} BEFORE ${op} ON app_settings BEGIN SELECT RAISE(ABORT, 'refused'); END`,
+      );
+    raw.close();
+
+    await expect(
+      invoke("scan_exclusions_set_patterns", { patterns: ["^cache/$"] }),
+    ).rejects.toThrow(/could not be saved/);
+    expect(visible()).toEqual([
+      ["cache/a.mp4", "keep/b.mp4"],
+      ["cache/a.mp4", "keep/b.mp4"],
+    ]);
+  });
+
+  it("report a save that went through when what it covers cannot be hidden yet", async () => {
+    registerScanHandlers({
+      ws,
+      queryClient: { invalidateCaches: invalidated },
+      passes: new WorkspacePasses(),
+      deriveAutoTags: () => Promise.reject(new Error("worker down")),
+      scans: {},
+    } as unknown as IpcContext);
+
+    await expect(
+      invoke("scan_exclusions_set_patterns", { patterns: ["^cache/$"] }),
+    ).resolves.toEqual({ patterns: ["^cache/$"] });
+
+    // The next scan applies it.
+    expect(loadConfig().scanExclusions.patterns).toEqual(["^cache/$"]);
+    expect(visible()).toEqual([
+      ["cache/a.mp4", "keep/b.mp4"],
+      ["cache/a.mp4", "keep/b.mp4"],
+    ]);
+  });
+
   it("read back what is stored, entry by entry", async () => {
     writeStoredSettings(userData, {
       scanExclusions: {
-        patterns: ["^a/$", 3, ""],
+        patterns: ["^a/$", 3, "", "^a/$"],
         folders: { w: ["ok/dir", "../up", 5], other: "nope" },
       },
     });

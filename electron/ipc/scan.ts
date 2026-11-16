@@ -41,22 +41,28 @@ export function registerScanHandlers(ctx: IpcContext): void {
       ...c,
       scanExclusions: { ...c.scanExclusions, patterns: unique },
     }));
-    // From what was saved: a write that failed was logged, not thrown.
+    // A write that failed was logged, not thrown: tell the user it did not
+    // save rather than show what is stored as their edit.
     const saved = loadConfig().scanExclusions;
+    if (JSON.stringify(saved.patterns) !== JSON.stringify(unique))
+      throw new Error("the scan exclusions could not be saved");
+    // Saved either way, so a failure from here on is not the save's: it is
+    // logged, and the next scan applies the patterns (or fails, telling why).
     let hidden = 0;
     try {
       await ctx.passes.forEachWorkspace(
         () => ctx.ws.allCores(),
         async ({ id, core }, signal) => {
-          const result = await applyScanExclusions(
+          hidden += await applyScanExclusions(
             core.db,
             core.rootId,
             scanExclusionFilter(saved, id, ctx.deriveAutoTags),
-            { release: false, signal },
+            signal,
           );
-          hidden += result.hidden;
         },
       );
+    } catch (err) {
+      log.warn("could not hide what the scan exclusions cover", err);
     } finally {
       if (hidden > 0) {
         log.info(`scan exclusions: hid ${hidden} file(s)`);

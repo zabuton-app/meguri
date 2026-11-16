@@ -88,6 +88,8 @@ export const fr: Catalog = {
   "settings.scanExclusionsSaved": "Exclusions d'analyse enregistrées.",
   "settings.scanExclusionsSaveError":
     "Impossible d'enregistrer les exclusions d'analyse.",
+  "settings.scanExclusionsLoadError":
+    "Impossible de lire les exclusions de l'analyse.",
   "settings.logo": "Logo de l'application",
   "settings.logoDesc":
     "S'applique aux icônes de la fenêtre, de la barre d'état et de l'application.",
@@ -181,6 +183,10 @@ export const fr: Catalog = {
   "home.scanCanceled": "Scan annulé",
   "home.escCloseHint": "Appuyez à nouveau sur Échap pour fermer la fenêtre",
   "home.scanError": "Une erreur s'est produite pendant le scan",
+  "home.scanExclusionStuck":
+    "Un motif d'exclusion de l'analyse a mis trop de temps à s'exécuter",
+  "home.scanExclusionStuckDesc":
+    "Rien n'a été analysé. Modifiez-le ou supprimez-le dans Paramètres → Analyse.",
   "home.scanRootUnreadable":
     "Le dossier de l’espace de travail est inaccessible",
   "home.scanRootUnreadableNamed": "Le dossier de « {name} » est inaccessible",
