@@ -13,7 +13,7 @@ import {
 export function mediaSrcOf(
   mediaBase: string,
   workspaceId: string,
-  fileId: string | number,
+  fileId: number,
 ): string {
   return `${mediaBase}/ws/${workspaceId}/media/${fileId}`;
 }

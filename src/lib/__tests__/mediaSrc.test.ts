@@ -11,14 +11,13 @@ const SRC = "http://127.0.0.1:1/ws/ws1/media/7";
 
 describe("mediaSrc", () => {
   it("builds the media URL of a file from the base, workspace and file", () => {
-    expect(mediaSrcOf("http://127.0.0.1:1", "ws1", "7")).toBe(SRC);
-    // File ids arrive as numbers from the IPC layer and as strings elsewhere.
     expect(mediaSrcOf("http://127.0.0.1:1", "ws1", 7)).toBe(SRC);
-    // The builder is the one place the URL shape is written down, so it has to
-    // stay the string withStreamSeek/isSameMediaSource already expect.
-    expect(mediaSrcOf("http://127.0.0.1:1", "ws1", "8")).toBe(
-      "http://127.0.0.1:1/ws/ws1/media/8",
-    );
+    expect(
+      isSameMediaSource(
+        withStreamSeek(mediaSrcOf("http://127.0.0.1:1", "ws1", 7), 90),
+        SRC,
+      ),
+    ).toBe(true);
   });
 
   it("re-serves from a whole second", () => {
