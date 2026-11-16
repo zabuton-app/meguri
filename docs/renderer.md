@@ -189,6 +189,18 @@ Data fetching uses `@tanstack/react-query`. The file list is an
 plus virtualization (`src/components/MediaGrid.tsx`). Four view modes — grid,
 list, timeline and graph — are switchable.
 
+A list that can grow without bound — loaded page by page, or not capped — is
+virtualized: only the rows in view are mounted. Use `useVirtualizer` from
+`@tanstack/react-virtual` directly, with `useInfiniteScrollTrigger` to load the
+next page and `useScrollToRow` / `useGridKeyboardNav` where it has keyboard
+navigation. Each list lays out its own rows; there is no shared list component.
+Rows placed by transform cannot use `position: sticky`, so a pinned section
+header is drawn over the list (the timeline, History). A list with a fixed cap
+need not be virtualized: Duplicates (`MAX_DUPLICATE_GROUPS`, 500) and Tags
+(`MAX_TAG_LIST`, 2,000) open in under 0.3 s at the cap and scroll at 60 fps,
+while History, before it was virtualized, took 3.5 s to add its 100th page of
+50 rows (#519).
+
 A mutation that fails is reported by a generic toast
 (`src/hooks/useMutationErrorNotifier.ts`), so an action never fails silently.
 A mutation that shows its own error message sets
@@ -479,7 +491,7 @@ stay in sync without a refetch. Discover pulls videos with `randomFiles`
 (`ORDER BY RANDOM()`) and presents them one at a time as a full-bleed immersive
 modal driven by embla-carousel, with a horizontal `SceneRail` of seekable scene
 previews. The History route lists `history_list` pages (day-grouped, infinite
-scroll) across the active or all workspaces. The Missing route (opened from
+scroll, virtualized) across the active or all workspaces. The Missing route (opened from
 the scan menu) lists `missing_files_list` (on the query worker, virtualized)
 and removes the files the user selects with `missing_files_purge`.
 
