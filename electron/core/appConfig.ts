@@ -29,6 +29,7 @@ import { MAX_TAG_NAME } from "../../shared/tags.js";
 import { isNormalizedFolderPath } from "../../shared/folderPath.js";
 import {
   emptyScanExclusions,
+  MAX_EXCLUDED_FOLDERS,
   MAX_EXCLUSION_PATTERNS,
   type ScanExclusions,
 } from "../../shared/scanExclusions.js";
@@ -643,7 +644,8 @@ function parseScanExclusions(value: unknown): ScanExclusions {
         (f): f is string =>
           typeof f === "string" && f !== "" && isNormalizedFolderPath(f),
       );
-      if (kept.length > 0) folders[id] = [...new Set(kept)];
+      if (kept.length > 0)
+        folders[id] = [...new Set(kept)].slice(0, MAX_EXCLUDED_FOLDERS);
     }
   }
   return { patterns, folders };

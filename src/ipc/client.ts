@@ -273,6 +273,12 @@ export const api = {
   scanExclusionsGet: () => invoke("scan_exclusions_get"),
   scanExclusionsSetPatterns: (patterns: string[]) =>
     invoke("scan_exclusions_set_patterns", { patterns }),
+  scanExclusionsFolders: (workspaceId: string) =>
+    invoke("scan_exclusions_folders", { workspaceId }),
+  scanExclusionsAddFolder: (workspaceId: string, path: string) =>
+    invoke("scan_exclusions_add_folder", { workspaceId, path }),
+  scanExclusionsRemoveFolders: (workspaceId: string, paths: string[]) =>
+    invoke("scan_exclusions_remove_folders", { workspaceId, paths }),
   /** CSS theme files in <userData>/themes; the pick is persisted in main's settings. */
   cssThemesGet: () => invoke("css_themes_get"),
   cssThemeSelect: (file: string | null) => invoke("css_theme_select", { file }),

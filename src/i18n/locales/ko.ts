@@ -651,6 +651,12 @@ export const ko: Catalog = {
   "folder.moved": "보고 있던 폴더를 찾을 수 없어 상위 폴더로 이동했습니다",
   "folder.chip": "폴더",
   "folder.showInLibrary": "라이브러리에서 폴더 보기",
+  "folder.excludeFromScans": "스캔에서 제외",
+  "folder.excludeConfirm":
+    "“{name}”의 파일을 바로 숨기고 이 워크스페이스의 스캔에서 제외합니다. 워크스페이스 편집 대화 상자에서 다시 포함할 수 있습니다.",
+  "folder.excludeAction": "제외",
+  "folder.excluded": "“{name}”을(를) 스캔에서 제외했습니다",
+  "folder.excludeFailed": "폴더를 제외하지 못했습니다",
   "folder.showFailed": "폴더를 표시할 수 없습니다",
   "folder.subfolderMenu": '"{name}"의 하위 폴더',
   "folder.loading": "불러오는 중…",
@@ -1012,6 +1018,15 @@ export const ko: Catalog = {
   "workspace.edit": "워크스페이스 편집",
   "workspace.editAction": "저장",
   "workspace.pathReadonly": "경로는 변경할 수 없습니다.",
+  "workspace.excludedFolders": "스캔에서 제외",
+  "workspace.excludedFoldersEmpty":
+    "폴더가 없습니다. 폴더 보기에서 폴더를 마우스 오른쪽 버튼으로 클릭하면 제외할 수 있습니다.",
+  "workspace.excludedFolderNotFound": "찾을 수 없음",
+  "workspace.excludedFolderInclude": "{path}을(를) 다시 스캔에 포함",
+  "workspace.excludedFoldersNextScan":
+    "목록에서 뺀 폴더는 다음 스캔부터 다시 스캔합니다.",
+  "workspace.excludedFoldersLoadError": "제외한 폴더를 읽지 못했습니다.",
+  "workspace.excludedFoldersSaveError": "제외한 폴더를 업데이트하지 못했습니다",
   "workspace.addDirectory": "동영상 디렉터리 추가",
   "workspace.removeFromSidebar": "워크스페이스 삭제",
   "workspace.removeTitle": "워크스페이스 삭제",

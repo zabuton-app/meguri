@@ -656,6 +656,12 @@ export const ja = {
   "folder.moved": "表示中のフォルダが見つからないため、上の階層へ移動しました",
   "folder.chip": "フォルダ",
   "folder.showInLibrary": "ライブラリでフォルダを表示",
+  "folder.excludeFromScans": "スキャンから除外",
+  "folder.excludeConfirm":
+    "「{name}」のファイルをすぐに非表示にし、このワークスペースのスキャンから外します。ワークスペースの編集ダイアログから元に戻せます。",
+  "folder.excludeAction": "除外",
+  "folder.excluded": "「{name}」をスキャンから除外しました",
+  "folder.excludeFailed": "フォルダを除外できませんでした",
   "folder.showFailed": "フォルダを表示できませんでした",
   "folder.subfolderMenu": "「{name}」のサブフォルダ",
   "folder.loading": "読み込み中…",
@@ -1016,6 +1022,17 @@ export const ja = {
   "workspace.edit": "ワークスペースを編集",
   "workspace.editAction": "保存",
   "workspace.pathReadonly": "パスは変更できません",
+  "workspace.excludedFolders": "スキャンから除外",
+  "workspace.excludedFoldersEmpty":
+    "フォルダはありません。フォルダ表示でフォルダを右クリックすると除外できます。",
+  "workspace.excludedFolderNotFound": "見つかりません",
+  "workspace.excludedFolderInclude": "{path}をスキャンの対象に戻す",
+  "workspace.excludedFoldersNextScan":
+    "一覧から外したフォルダは、次のスキャンから再び読み込まれます。",
+  "workspace.excludedFoldersLoadError":
+    "除外したフォルダを読み込めませんでした。",
+  "workspace.excludedFoldersSaveError":
+    "除外したフォルダを更新できませんでした",
   "workspace.addDirectory": "動画ディレクトリを追加",
   "workspace.removeFromSidebar": "ワークスペースを削除",
   "workspace.removeTitle": "ワークスペースを削除",

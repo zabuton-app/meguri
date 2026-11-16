@@ -83,3 +83,70 @@ test("hides what a scan exclusion covers and brings it back when it goes", async
     }
   }
 });
+
+// A folder excluded from the folder view (#282): hidden at once, listed in
+// the workspace's edit dialog, and back at the next scan once taken off.
+test("excludes a folder from its card and includes it again from the workspace", async () => {
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-e2e-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-e2e-media-"));
+  const fixture = fs.readFileSync(
+    path.join(process.cwd(), "e2e/fixtures/media/test.png"),
+  );
+  fs.mkdirSync(path.join(root, "keep"));
+  fs.mkdirSync(path.join(root, "cache"));
+  fs.writeFileSync(path.join(root, "keep", "kept.png"), fixture);
+  fs.writeFileSync(
+    path.join(root, "cache", "cached.png"),
+    Buffer.concat([fixture, Buffer.from("cached")]),
+  );
+  const app = await _electron.launch(
+    electronLaunchOptions({
+      args: [`--user-data-dir=${userDataDir}`],
+      env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: root },
+    }),
+  );
+  try {
+    const page = await app.firstWindow();
+    await skipFirstLaunchTour(page);
+    await waitForIndexedMedia(page, "cached.png");
+    await waitForIdle(page);
+
+    await page.getByRole("button", { name: "Show by folder" }).click();
+    const cacheCard = page.locator('[data-folder-path="cache"]');
+    await cacheCard.getByRole("button", { name: 'Open folder "cache"' }).click({
+      button: "right",
+    });
+    await page.getByRole("menuitem", { name: "Exclude from scans" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Exclude" })
+      .click();
+    await expect(
+      page.getByText("“cache” is excluded from scans"),
+    ).toBeVisible();
+    await expect(cacheCard).toHaveCount(0);
+    await expect(page.locator('[data-folder-path="keep"]')).toBeVisible();
+
+    await page.getByRole("button", { name: "Edit workspace" }).click();
+    const dialog = page.getByRole("dialog", { name: "Edit workspace" });
+    await dialog
+      .getByRole("button", { name: "Include cache in scans again" })
+      .click();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await page
+      .getByRole("button", { name: "Scan", exact: true })
+      .filter({ hasText: "Scan" })
+      .click();
+    await waitForIdle(page);
+    await expect(cacheCard).toBeVisible();
+  } finally {
+    try {
+      await app.close();
+    } finally {
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }
+});

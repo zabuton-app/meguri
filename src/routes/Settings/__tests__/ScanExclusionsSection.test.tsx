@@ -109,6 +109,7 @@ describe("ScanExclusionsSection", () => {
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["files_search"] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["missing_files"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["folders_list"] });
     expect(saveButton().disabled).toBe(true);
   });
 

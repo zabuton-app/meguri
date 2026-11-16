@@ -171,4 +171,94 @@ describe("scan exclusion channels", () => {
     });
     expect(loadConfig().scanExclusions.folders).toEqual({ w: ["ok/dir"] });
   });
+
+  describe("excluded folders", () => {
+    const ids = () => ws.allCores().map(({ id }) => id);
+
+    it("save a folder and hide what it holds in that workspace only", async () => {
+      const [first] = ids();
+      fs.mkdirSync(path.join(roots[0], "cache"));
+
+      await expect(
+        invoke("scan_exclusions_add_folder", {
+          workspaceId: first,
+          path: "cache",
+        }),
+      ).resolves.toEqual({ folders: [{ path: "cache", found: true }] });
+      // Again: kept once.
+      await invoke("scan_exclusions_add_folder", {
+        workspaceId: first,
+        path: "cache",
+      });
+
+      expect(loadConfig().scanExclusions.folders).toEqual({
+        [first]: ["cache"],
+      });
+      expect(visible()).toEqual([
+        ["keep/b.mp4"],
+        ["cache/a.mp4", "keep/b.mp4"],
+      ]);
+      for (const { core } of ws.allCores())
+        expect(countMissingFiles(core.db)).toBe(0);
+      expect(invalidated).toHaveBeenCalled();
+    });
+
+    it("say which folders are not on disk any more", async () => {
+      const [first] = ids();
+      fs.mkdirSync(path.join(roots[0], "keep"));
+      for (const folder of ["keep", "cache"])
+        await invoke("scan_exclusions_add_folder", {
+          workspaceId: first,
+          path: folder,
+        });
+
+      await expect(
+        invoke("scan_exclusions_folders", { workspaceId: first }),
+      ).resolves.toEqual({
+        folders: [
+          { path: "keep", found: true },
+          { path: "cache", found: false },
+        ],
+      });
+    });
+
+    it("take folders off the list, leaving their files hidden until a scan", async () => {
+      const [first] = ids();
+      for (const folder of ["cache", "keep"])
+        await invoke("scan_exclusions_add_folder", {
+          workspaceId: first,
+          path: folder,
+        });
+
+      await expect(
+        invoke("scan_exclusions_remove_folders", {
+          workspaceId: first,
+          paths: ["cache"],
+        }),
+      ).resolves.toEqual({ folders: [{ path: "keep", found: false }] });
+      expect(visible()[0]).toEqual([]);
+
+      await invoke("scan_exclusions_remove_folders", {
+        workspaceId: first,
+        paths: ["keep"],
+      });
+      expect(loadConfig().scanExclusions.folders).toEqual({});
+    });
+
+    it("refuse the workspace root and an unknown workspace", async () => {
+      await expect(
+        invoke("scan_exclusions_add_folder", {
+          workspaceId: ids()[0],
+          path: "",
+        }),
+      ).rejects.toThrow();
+      await expect(
+        invoke("scan_exclusions_add_folder", {
+          workspaceId: "nope",
+          path: "cache",
+        }),
+      ).rejects.toThrow();
+      expect(loadConfig().scanExclusions.folders).toEqual({});
+    });
+  });
 });

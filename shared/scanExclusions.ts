@@ -22,6 +22,9 @@ export interface ScanExclusions {
 /** Most patterns kept. */
 export const MAX_EXCLUSION_PATTERNS = 200;
 
+/** Most folders kept per workspace. */
+export const MAX_EXCLUDED_FOLDERS = 200;
+
 export function emptyScanExclusions(): ScanExclusions {
   return { patterns: [], folders: {} };
 }

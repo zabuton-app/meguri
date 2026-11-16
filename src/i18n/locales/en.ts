@@ -695,6 +695,12 @@ export const en: Catalog = {
   "folder.moved": "The folder you were viewing is gone, so you were moved up.",
   "folder.chip": "Folder",
   "folder.showInLibrary": "Show folder in library",
+  "folder.excludeFromScans": "Exclude from scans",
+  "folder.excludeConfirm":
+    "The files in “{name}” are hidden now and left out of this workspace's scans. You can include the folder again in the workspace's edit dialog.",
+  "folder.excludeAction": "Exclude",
+  "folder.excluded": "“{name}” is excluded from scans",
+  "folder.excludeFailed": "Couldn't exclude the folder",
   "folder.showFailed": "Couldn't show the folder",
   "folder.subfolderMenu": 'Subfolders of "{name}"',
   "folder.loading": "Loading…",
@@ -1103,6 +1109,15 @@ export const en: Catalog = {
   "workspace.edit": "Edit workspace",
   "workspace.editAction": "Save",
   "workspace.pathReadonly": "The path cannot be changed.",
+  "workspace.excludedFolders": "Excluded from scans",
+  "workspace.excludedFoldersEmpty":
+    "No folders. Right-click a folder in the folder view to exclude it.",
+  "workspace.excludedFolderNotFound": "Not found",
+  "workspace.excludedFolderInclude": "Include {path} in scans again",
+  "workspace.excludedFoldersNextScan":
+    "Folders taken off the list are scanned again from the next scan.",
+  "workspace.excludedFoldersLoadError": "Couldn't read the excluded folders.",
+  "workspace.excludedFoldersSaveError": "Couldn't update the excluded folders",
   "workspace.addDirectory": "Add video directory",
   "workspace.removeFromSidebar": "Delete workspace",
   "workspace.removeTitle": "Delete workspace",
