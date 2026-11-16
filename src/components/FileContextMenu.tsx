@@ -73,6 +73,8 @@ import { isTyping } from "@/lib/keyTarget";
 const FILE_KEY_ATTR = "data-file-key";
 /** The attribute a folder card or row carries (FolderCard, FolderRow). */
 const FOLDER_PATH_ATTR = "data-folder-path";
+/** The files under that folder, which excluding it hides. */
+const FOLDER_COUNT_ATTR = "data-folder-count";
 
 const NO_FILES: FileRow[] = [];
 const RATINGS = [0, 1, 2, 3, 4, 5];
@@ -83,7 +85,7 @@ function cardOf(target: EventTarget | null): Element | null {
     : null;
 }
 
-type MenuTarget = { file: FileRow } | { folder: string };
+type MenuTarget = { file: FileRow } | { folder: string; count: number };
 
 export function FileContextMenu({
   items,
@@ -148,7 +150,8 @@ export function FileContextMenu({
             const card = cardOf(e.target);
             const folder = card?.getAttribute(FOLDER_PATH_ATTR);
             if (folder && workspaceId) {
-              setTarget({ folder });
+              const count = Number(card?.getAttribute(FOLDER_COUNT_ATTR));
+              setTarget({ folder, count: Number.isFinite(count) ? count : 0 });
               return;
             }
             const key = card?.getAttribute(FILE_KEY_ATTR);
@@ -179,6 +182,7 @@ export function FileContextMenu({
               <FolderMenuBody
                 workspaceId={workspaceId}
                 folder={target.folder}
+                count={target.count}
               />
             )
           )}
@@ -343,9 +347,11 @@ function FileMenuBody({
 function FolderMenuBody({
   workspaceId,
   folder,
+  count,
 }: {
   workspaceId: string;
   folder: string;
+  count: number;
 }) {
   const { t } = useI18n();
   const exclude = useExcludeFolder();
@@ -354,7 +360,7 @@ function FolderMenuBody({
       // After the menu has closed and handed focus back, so the confirmation
       // keeps it (as the file menu's delete does).
       onSelect={() =>
-        window.setTimeout(() => void exclude(workspaceId, folder), 0)
+        window.setTimeout(() => void exclude(workspaceId, folder, count), 0)
       }
     >
       <FolderX />

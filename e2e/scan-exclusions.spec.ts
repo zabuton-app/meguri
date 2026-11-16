@@ -44,10 +44,22 @@ test("hides what a scan exclusion covers and brings it back when it goes", async
     await waitForIndexedMedia(page, "cached.png");
     await waitForIdle(page);
 
-    const setPatterns = async (text: string) => {
+    // Adds the pattern, or with null removes the one there is.
+    const setPatterns = async (pattern: string | null) => {
       const dialog = await openSettingsTab(page, "Scan");
-      const field = dialog.getByLabel("Exclude from scans");
-      await field.fill(text);
+      if (pattern === null) {
+        await dialog.getByRole("button", { name: "Remove pattern 1" }).click();
+      } else {
+        // The files it would hide are listed first, found by main in the
+        // auto-tag worker as a scan would; then it is added to the list.
+        await dialog.getByLabel("Pattern to add").fill(pattern);
+        await expect(
+          dialog
+            .getByRole("list", { name: "Matching files" })
+            .getByText("cache/cached.png"),
+        ).toBeVisible();
+        await dialog.getByRole("button", { name: "Add", exact: true }).click();
+      }
       await dialog.getByRole("button", { name: "Save" }).click();
       await expect(page.getByText("Scan exclusions saved.")).toBeVisible();
       await closeTopDialog(page);
@@ -58,7 +70,8 @@ test("hides what a scan exclusion covers and brings it back when it goes", async
       await waitForIdle(page);
     };
 
-    await setPatterns("^cache/$");
+    // By name, the default kind.
+    await setPatterns("cache");
     await expect(page.getByText("cached.png")).toHaveCount(0);
     await expect(page.getByText("kept.png")).toBeVisible();
 
@@ -71,7 +84,7 @@ test("hides what a scan exclusion covers and brings it back when it goes", async
     await expect(missing.getByText("No missing files.")).toBeVisible();
     await closeTopDialog(page);
 
-    await setPatterns("");
+    await setPatterns(null);
     await scan();
     await expect(page.getByText("cached.png")).toBeVisible();
   } finally {

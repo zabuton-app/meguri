@@ -74,6 +74,7 @@ import {
 } from "../scanExclusionFilter.js";
 import { autoTagSettingsVersion } from "../autoTag.js";
 import { defaultAutoTagConfig, defaultRules } from "../../../shared/autoTag.js";
+import type { ExclusionPattern } from "../../../shared/scanExclusions.js";
 
 describe("runScan", () => {
   let db: DB;
@@ -491,6 +492,10 @@ describe("runScan", () => {
 
   describe("scan exclusions (#282)", () => {
     const WS = "ws-1";
+    const regex = (value: string): ExclusionPattern => ({
+      kind: "regex",
+      value,
+    });
     const withExclusions = (
       patterns: string[],
       folders: Record<string, string[]> = {},
@@ -502,7 +507,7 @@ describe("runScan", () => {
       }),
       deriveAutoTags: derive,
       workspaceId: WS,
-      exclusions: () => ({ patterns, folders }),
+      exclusions: () => ({ patterns: patterns.map(regex), folders }),
     });
     const rel = (p: string) => p.split("/").join(path.sep);
     const row = (p: string) =>
@@ -639,12 +644,27 @@ describe("runScan", () => {
       expect(countMissingFiles(db)).toBe(0);
     });
 
+    it("leaves out a folder by its name, at any depth (#529)", async () => {
+      write("work/Private/a.mp4", "AAAAAAAAAA");
+      write("work/private-old/b.mp4", "BBBBBBBBBB");
+      await scan({
+        ...withExclusions([]),
+        exclusions: () => ({
+          patterns: [{ kind: "name", value: "private" }],
+          folders: {},
+        }),
+      });
+      expect(rows().map((r) => r.rel_path)).toEqual(
+        ["work/private-old/b.mp4"].map(rel),
+      );
+    });
+
     it("hides what a rule covers without a scan, and lets nothing back", async () => {
       write("old/a.mp4", "AAAAAAAAAA");
       write("b.mp4", "BBBBBBBBBB");
       await scan(withExclusions([]));
       const filter = scanExclusionFilter(
-        { patterns: ["^old/$"], folders: {} },
+        { patterns: [regex("^old/$")], folders: {} },
         WS,
         deriveAutoTagsInProcess,
       );
@@ -731,7 +751,7 @@ describe("runScan", () => {
             : deriveAutoTagsInProcess(engine, names),
         ),
         exclusions: () => ({
-          patterns: reads++ === 0 ? [] : ["^late$"],
+          patterns: reads++ === 0 ? [] : [regex("^late$")],
           folders: {},
         }),
       };

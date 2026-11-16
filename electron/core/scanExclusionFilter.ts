@@ -1,5 +1,5 @@
-// Which paths the user's scan exclusions cover (#282). The patterns are user
-// regexes, so they run in the auto-tag worker (as auto-tagging rules, see
+// Which paths the user's scan exclusions cover (#282). The patterns become
+// regexes (patternRegex), some written by the user, so they run in the auto-tag worker (as auto-tagging rules, see
 // exclusionRule): one that never finishes on some path is left out there
 // instead of freezing the app. The excluded folders are plain paths and are
 // compared here.
@@ -16,6 +16,7 @@ import {
   exclusionSubject,
   inExcludedFolder,
   patternError,
+  patternRegex,
   type ScanExclusions,
 } from "../../shared/scanExclusions.js";
 import type { AutoTagEngine, DeriveAutoTags } from "./autoTagDeriver.js";
@@ -52,7 +53,7 @@ export function scanExclusionFilter(
     workspaceId ? (exclusions.folders[workspaceId] ?? []) : [],
   );
   const rules = exclusions.patterns.flatMap((p) => {
-    if (patternError(p) === null) return [exclusionRule(p)];
+    if (patternError(p) === null) return [exclusionRule(patternRegex(p))];
     log.warn("skipping a scan exclusion pattern that does not compile");
     return [];
   });
@@ -245,6 +246,38 @@ export function releaseFiles(
      WHERE id IN (SELECT value FROM json_each(?)) AND scan_excluded_at IS NOT NULL`,
   );
   return inChunks(db, ids, signal, (json) => release.run(json).changes);
+}
+
+/**
+ * The listed files `filter` covers in one workspace, as hiding would find
+ * them: how many, and the first `limit` of them ("/"-separated, in path
+ * order). For trying a pattern before it is saved.
+ */
+export async function coveredListedFiles(
+  db: DB,
+  rootId: number,
+  filter: PathFilter,
+  limit: number,
+): Promise<{ total: number; paths: string[] }> {
+  const rows = (
+    db
+      .prepare(
+        `SELECT rel_path FROM files
+         WHERE root_id = ? AND deleted_at IS NULL
+         ORDER BY rel_path`,
+      )
+      .pluck()
+      .all(rootId) as string[]
+  ).map(slashed);
+  const covered = await coveredFiles(filter, rows);
+  const paths: string[] = [];
+  let total = 0;
+  covered.forEach((hit, i) => {
+    if (!hit) return;
+    total++;
+    if (paths.length < limit) paths.push(rows[i]);
+  });
+  return { total, paths };
 }
 
 /** Hide what `filter` covers now (and let nothing back). */

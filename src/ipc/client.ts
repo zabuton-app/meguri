@@ -3,6 +3,7 @@
 // Channel signatures (input + output types) come from shared/ipc/channels.ts,
 // which is also what main validates against — so the renderer wrapper and the
 // main handler cannot drift apart.
+import type { ExclusionPattern } from "@shared/scanExclusions";
 import type {
   AboutInfo,
   ChannelInput,
@@ -271,14 +272,20 @@ export const api = {
   customCssOpen: () => invoke("custom_css_open"),
   /** Scan exclusions (#282); saving hides what the patterns cover at once. */
   scanExclusionsGet: () => invoke("scan_exclusions_get"),
-  scanExclusionsSetPatterns: (patterns: string[]) =>
+  scanExclusionsSetPatterns: (patterns: ExclusionPattern[]) =>
     invoke("scan_exclusions_set_patterns", { patterns }),
   scanExclusionsFolders: (workspaceId: string) =>
     invoke("scan_exclusions_folders", { workspaceId }),
   scanExclusionsAddFolder: (workspaceId: string, path: string) =>
     invoke("scan_exclusions_add_folder", { workspaceId, path }),
-  scanExclusionsRemoveFolders: (workspaceId: string, paths: string[]) =>
-    invoke("scan_exclusions_remove_folders", { workspaceId, paths }),
+  scanExclusionsUpdateFolders: (
+    workspaceId: string,
+    change: { add: string[]; remove: string[] },
+  ) => invoke("scan_exclusions_update_folders", { workspaceId, ...change }),
+  scanExclusionsPickFolder: (workspaceId: string) =>
+    invoke("scan_exclusions_pick_folder", { workspaceId }),
+  scanExclusionsPreview: (pattern: ExclusionPattern) =>
+    invoke("scan_exclusions_preview", { pattern }),
   /** CSS theme files in <userData>/themes; the pick is persisted in main's settings. */
   cssThemesGet: () => invoke("css_themes_get"),
   cssThemeSelect: (file: string | null) => invoke("css_theme_select", { file }),

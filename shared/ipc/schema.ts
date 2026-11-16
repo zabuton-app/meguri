@@ -27,6 +27,7 @@ import {
 } from "../autoTag.js";
 import { MAX_FOLDER_PATH, isNormalizedFolderPath } from "../folderPath.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
+import { MAX_EXCLUSION_PATTERN, PATTERN_KINDS } from "../scanExclusions.js";
 import { GRAPH_NODE_KEY_MAX } from "./graph.js";
 import { ACTIVITY_METRICS } from "./activity.js";
 import { TIMELINE_AXES } from "./timeline.js";
@@ -594,3 +595,13 @@ export const GraphNodeKeySchema = z.string().min(3).max(GRAPH_NODE_KEY_MAX);
 
 /** The graph view's layout dimensions (the flat view or the 3D one). */
 export const GraphDimsSchema = z.union([z.literal(2), z.literal(3)]);
+
+/**
+ * A scan exclusion pattern (#529): how it is written and what is written.
+ * Main checks that it can be used (patternError in shared/scanExclusions.ts).
+ */
+export const ExclusionPatternSchema = z.object({
+  kind: z.enum(PATTERN_KINDS),
+  value: z.string().min(1).max(MAX_EXCLUSION_PATTERN),
+});
+export type ExclusionPattern = z.infer<typeof ExclusionPatternSchema>;

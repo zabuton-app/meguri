@@ -36,6 +36,7 @@ import {
   LogoIdSchema,
   SearchQuerySchema,
   AutoTagConfigSchema,
+  ExclusionPatternSchema,
   TagRefSchema,
 } from "./schema.js";
 import {
@@ -72,8 +73,8 @@ import { MAX_FOLDER_FILES_PATHS, ROOT_FOLDER } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
 import {
   MAX_EXCLUDED_FOLDERS,
-  MAX_EXCLUSION_PATTERN,
   MAX_EXCLUSION_PATTERNS,
+  type ExclusionPattern,
 } from "../scanExclusions.js";
 
 export { EVENT_CHANNELS, INVOKE_CHANNELS };
@@ -563,9 +564,7 @@ export const ChannelInputs = {
   scan_exclusions_get: z.void(),
   // Each pattern must compile (patternError); main checks again on save.
   scan_exclusions_set_patterns: z.object({
-    patterns: z
-      .array(z.string().min(1).max(MAX_EXCLUSION_PATTERN))
-      .max(MAX_EXCLUSION_PATTERNS),
+    patterns: z.array(ExclusionPatternSchema).max(MAX_EXCLUSION_PATTERNS),
   }),
   scan_exclusions_folders: z.object({
     workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
@@ -577,10 +576,23 @@ export const ChannelInputs = {
       message: "the workspace root cannot be excluded",
     }),
   }),
-  scan_exclusions_remove_folders: z.object({
+  // Both in one save: the edit dialog's staged changes all go, or none do.
+  scan_exclusions_update_folders: z.object({
     workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
-    paths: z.array(FolderPathSchema).max(MAX_EXCLUDED_FOLDERS),
+    add: z
+      .array(
+        FolderPathSchema.refine((p) => p !== ROOT_FOLDER, {
+          message: "the workspace root cannot be excluded",
+        }),
+      )
+      .max(MAX_EXCLUDED_FOLDERS),
+    remove: z.array(FolderPathSchema).max(MAX_EXCLUDED_FOLDERS),
   }),
+  scan_exclusions_pick_folder: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  }),
+  // Must compile (patternError); main checks.
+  scan_exclusions_preview: z.object({ pattern: ExclusionPatternSchema }),
   custom_css_get: z.void(),
   custom_css_set_enabled: z.object({ enabled: z.boolean() }),
   custom_css_open: z.void(),
@@ -776,8 +788,13 @@ export interface ChannelOutputs {
   // Returns the folders saved; the files the new one holds are hidden by the
   // time it does.
   scan_exclusions_add_folder: ExcludedFolders;
-  // Returns the folders saved; their files come back at the next scan.
-  scan_exclusions_remove_folders: ExcludedFolders;
+  // Returns the folders saved. What the added ones hold is hidden by the time
+  // it does; the files of the removed ones come back at the next scan.
+  scan_exclusions_update_folders: ExcludedFolders;
+  // Only picks: the folder is excluded when the renderer adds it.
+  scan_exclusions_pick_folder: PickedFolder;
+  // What a pattern would hide, before it is saved; nothing is written.
+  scan_exclusions_preview: PatternPreview;
   custom_css_get: CustomCssState;
   // Returns the state after the switch, so the renderer applies (or drops)
   // the stylesheet without a second round trip.
@@ -824,9 +841,39 @@ export interface UpdateSettings {
 }
 /** The scan exclusions (#282) the settings screen edits. */
 export interface ScanExclusionsState {
-  /** Regular expressions for every workspace. */
-  patterns: string[];
+  /** The patterns for every workspace. */
+  patterns: ExclusionPattern[];
 }
+
+/**
+ * A folder the user picked to exclude: one inside the workspace, or why
+ * there is none. "outside" is also the workspace root itself.
+ */
+export type PickedFolder =
+  | { status: "picked"; path: string; absPath: string }
+  | { status: "canceled" }
+  | { status: "outside" };
+
+/**
+ * The listed files a pattern covers in every workspace: how many, and the
+ * first of them. "timedOut" when the pattern did not finish in the worker.
+ * Two workspaces where one holds the other count a file in both twice.
+ */
+export type PatternPreview =
+  | {
+      status: "done";
+      total: number;
+      files: {
+        /** The workspace's folder name. */
+        workspace: string;
+        /** Relative to the workspace root, "/"-separated. */
+        path: string;
+        absPath: string;
+      }[];
+    }
+  | { status: "timedOut" }
+  /** A newer preview was asked for before this one was through. */
+  | { status: "superseded" };
 
 /** The folders a workspace's scans leave out. */
 export interface ExcludedFolders {
