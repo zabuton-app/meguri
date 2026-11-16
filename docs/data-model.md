@@ -327,7 +327,10 @@ files the collections hold, and rearranging a collection updates the
 writes each change through. Collections kept as one JSON row of
 `app_settings` (`collections`, which is also where config.json's are imported)
 are moved into the tables, and the row dropped, in one transaction on the next
-load.
+load; a row that is not a list is dropped and the tables kept. An import always
+writes the row, so a `config.json` without collections replaces them with none,
+as it replaces every setting. Collections that cannot be read at startup are
+served empty and not written for the session.
 
 Being in the library, the settings share its backups and are rolled back with
 it when a damaged library is put back from a copy. The settings create the

@@ -9,6 +9,13 @@
 import { COLLECTIONS_KEY, isStorageError, withSettings } from "./appConfig.js";
 import type { DB } from "./db.js";
 import log from "./logger.js";
+import { libraryDbPath } from "./paths.js";
+
+// The library whose collections could not be read at startup: nothing is
+// written to it for the session, since writes made on the empty list served
+// instead (Watch Later seeded again, a new order) would land among the
+// collections it could not show.
+let unreadable: string | null = null;
 
 export interface UserCollectionItemConfig {
   workspaceId: string;
@@ -42,6 +49,7 @@ export interface FileRef {
 
 /** Run a write; a storage error is logged, anything else is a bug. */
 function write(what: string, fn: (db: DB) => void): void {
+  if (unreadable === libraryDbPath()) return; // see loadCollections
   try {
     withSettings((db) => db.transaction(() => fn(db)).immediate());
   } catch (e) {
@@ -56,17 +64,27 @@ function write(what: string, fn: (db: DB) => void): void {
  * Empty when the settings cannot be read (see appConfig.ts).
  */
 export function loadCollections(): UserCollectionConfig[] {
+  const file = libraryDbPath();
   try {
-    return withSettings(read)?.value ?? [];
+    const collections = withSettings(read)?.value ?? [];
+    if (unreadable === file) unreadable = null;
+    return collections;
   } catch (e) {
     if (!isStorageError(e)) throw e;
-    log.warn("the collections could not be read", e);
+    log.error("the collections could not be read; not writing them", e);
+    unreadable = file;
     return [];
   }
 }
 
 function read(db: DB): UserCollectionConfig[] {
-  db.transaction(() => migrateRow(db)).immediate();
+  // The write lock only when there is something to move: otherwise a launch
+  // would wait on any other writer just to read.
+  if (
+    db.prepare("SELECT 1 FROM app_settings WHERE key = ?").get(COLLECTIONS_KEY)
+  ) {
+    db.transaction(() => migrateRow(db)).immediate();
+  }
   const rows = db
     .prepare(
       "SELECT id, name, emoji, locked, created_at, updated_at FROM collections ORDER BY position, rowid",
@@ -84,7 +102,7 @@ function read(db: DB): UserCollectionConfig[] {
   );
   const itemRows = db
     .prepare(
-      "SELECT collection_id, workspace_id, file_id, added_at FROM collection_items ORDER BY collection_id, position",
+      "SELECT collection_id, workspace_id, file_id, added_at FROM collection_items ORDER BY collection_id, position, rowid",
     )
     .all() as {
     collection_id: string;
@@ -116,23 +134,32 @@ function read(db: DB): UserCollectionConfig[] {
  * into the tables, and drop the row: in the caller's transaction, so it runs
  * once. The row replaces what the tables hold: it is only there when they
  * have not been written since (a fresh import, or a library put back from a
- * copy taken before the tables).
+ * copy taken before the tables). A row that is not a list is dropped and the
+ * tables kept.
  */
 function migrateRow(db: DB): void {
   const row = db
     .prepare("SELECT value FROM app_settings WHERE key = ?")
     .get(COLLECTIONS_KEY) as { value: string } | undefined;
   if (!row) return;
+  const drop = db.prepare("DELETE FROM app_settings WHERE key = ?");
   let parsed: unknown;
   try {
     parsed = JSON.parse(row.value);
   } catch {
-    log.warn("the stored collections could not be parsed; dropping them");
+    parsed = undefined;
+  }
+  // Not a list (a hand edit, a damaged value): nothing to move, and nothing to
+  // replace the stored collections with.
+  if (!Array.isArray(parsed)) {
+    log.warn("the collections to move are not a list; keeping those stored");
+    drop.run(COLLECTIONS_KEY);
+    return;
   }
   const collections = parseCollections(parsed);
   db.prepare("DELETE FROM collections").run();
   insertCollections(db, collections);
-  db.prepare("DELETE FROM app_settings WHERE key = ?").run(COLLECTIONS_KEY);
+  drop.run(COLLECTIONS_KEY);
   log.info(`moved ${collections.length} collections into their tables`);
 }
 

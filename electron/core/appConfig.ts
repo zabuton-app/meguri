@@ -1,6 +1,7 @@
 // Application-wide settings: the registered workspaces (scan roots) and the
-// active one, collections, and the app's own preferences. Each root's artifacts
-// are separated into per-root directories, so what crosses them is kept here.
+// active one, and the app's own preferences; collections are kept apart, in
+// collectionStore.ts. Each root's artifacts are separated into per-root
+// directories, so what crosses them is kept here.
 // Stored in the shared library (`app_settings`, db.ts), which gives them its
 // backups, check and restore (libraryBackup.ts); `config.json`, where they
 // used to live, is imported once and then left alone.
@@ -238,9 +239,9 @@ function importConfigJson(db: DB): boolean {
     const put = db.prepare(
       "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
     );
-    if (read.collections !== undefined) {
-      put.run(COLLECTIONS_KEY, JSON.stringify(read.collections));
-    }
+    // Always, as every field is: an import replaces what is stored, and a
+    // config.json without collections (or none at all) has none.
+    put.run(COLLECTIONS_KEY, JSON.stringify(read.collections ?? []));
     put.run(IMPORTED_KEY, JSON.stringify(Date.now()));
   })();
   if (fs.existsSync(configPath())) {
@@ -514,7 +515,7 @@ export function saveConfig(c: AppConfig): void {
  * settings as stored, and only the fields it changed are written. A caller
  * that holds a stale snapshot across an `await` (the update checker fetching
  * over the network) cannot revert concurrent changes to unrelated fields
- * (roots, collections, …), as long as it changes only its own fields here
+ * (roots, autoTag, …), as long as it changes only its own fields here
  * rather than spreading an old loadConfig() result into saveConfig.
  *
  * A write that fails (a full disk) is logged rather than thrown, so a caller

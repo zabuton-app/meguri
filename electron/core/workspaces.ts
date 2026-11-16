@@ -704,20 +704,25 @@ export class Workspaces {
   ): boolean {
     const ids = new Set(fileIds);
     const now = nowUnix();
-    let changed = false;
+    // Only the ids some collection held go to the store: a purge of thousands
+    // of missing files usually touches a few, if any.
+    const removed = new Set<number>();
     for (const collection of this.userCollections) {
-      const next = collection.items.filter(
-        (item) => item.workspaceId !== workspaceId || !ids.has(item.fileId),
-      );
+      const next = collection.items.filter((item) => {
+        if (item.workspaceId !== workspaceId || !ids.has(item.fileId)) {
+          return true;
+        }
+        removed.add(item.fileId);
+        return false;
+      });
       if (next.length !== collection.items.length) {
         collection.items = next;
         collection.updatedAt = now;
-        changed = true;
       }
     }
-    if (changed)
-      collectionStore.removeWorkspaceItems(workspaceId, fileIds, now);
-    return changed;
+    if (removed.size === 0) return false;
+    collectionStore.removeWorkspaceItems(workspaceId, [...removed], now);
+    return true;
   }
 
   /**

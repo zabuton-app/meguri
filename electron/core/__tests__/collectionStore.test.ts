@@ -1,6 +1,7 @@
 // Collections in their own tables (collectionStore.ts): what is stored matches
 // what Workspaces holds, each change writes only its rows, and collections kept
 // as one JSON row (config.json's import, or an earlier build) move in once.
+import Database from "better-sqlite3";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -11,12 +12,22 @@ vi.mock("electron", () => ({ app: { getPath: () => userData } }));
 
 const { Workspaces } = await import("../workspaces.js");
 const { WATCH_LATER_ID } = await import("../../../shared/workspaceIds.js");
-const { COLLECTIONS_KEY } = await import("../appConfig.js");
+const { COLLECTIONS_KEY, IMPORTED_KEY } = await import("../appConfig.js");
 const { loadCollections } = await import("../collectionStore.js");
 const { openSettingsDb } = await import("../db.js");
 const { writeStoredSettings } = await import("./storedSettings.js");
+const { default: log } = await import("../logger.js");
 
 const libraryFile = () => path.join(userData, "library.sqlite");
+
+function exec(sql: string, ...params: unknown[]): void {
+  const db = openSettingsDb(libraryFile());
+  try {
+    db.prepare(sql).run(...params);
+  } finally {
+    db.close();
+  }
+}
 
 function query<T>(sql: string, ...params: unknown[]): T[] {
   const db = openSettingsDb(libraryFile());
@@ -189,5 +200,69 @@ describe("collections kept as one JSON row", () => {
       "Mine",
     ]);
     expect(reloaded()).toEqual(ws.collections());
+  });
+
+  it("leave the stored ones alone when the row is not a list", () => {
+    const ws = new Workspaces();
+    const mine = ws.addCollection("Mine");
+    ws.addToCollection(mine.id, "w", 1);
+    exec(
+      "INSERT INTO app_settings (key, value) VALUES (?, ?)",
+      COLLECTIONS_KEY,
+      '{"not": "a list"}',
+    );
+
+    expect(reloaded()).toEqual(ws.collections());
+    expect(
+      query("SELECT 1 FROM app_settings WHERE key = ?", COLLECTIONS_KEY),
+    ).toEqual([]);
+  });
+
+  it("are replaced by a config.json imported again, even one without any", async () => {
+    const ws = new Workspaces();
+    ws.addCollection("Stale");
+    // The library lost its import record (deleted, or put back from a copy
+    // taken before the import), and config.json holds no collections.
+    exec("DELETE FROM app_settings WHERE key = ?", IMPORTED_KEY);
+    fs.writeFileSync(
+      path.join(userData, "config.json"),
+      JSON.stringify({ roots: [] }),
+    );
+
+    // The import runs when the settings are first opened: a new launch.
+    vi.resetModules();
+    const { Workspaces: Relaunched } = await import("../workspaces.js");
+    expect(new Relaunched().collections().map((c) => c.id)).toEqual([
+      WATCH_LATER_ID,
+    ]);
+  });
+});
+
+describe("collections that cannot be read at startup", () => {
+  it("are not written over for the session", () => {
+    new Workspaces();
+    // Unreadable: the table is no longer what the query expects.
+    // On a plain connection: openSettingsDb would make the table again.
+    const db = new Database(libraryFile());
+    db.exec("ALTER TABLE collections RENAME TO collections_kept");
+    db.exec("CREATE VIEW collections AS SELECT 1 AS x");
+    db.close();
+    const error = vi.spyOn(log, "error");
+    try {
+      const ws = new Workspaces();
+      // Served the empty list read, with Watch Later seeded in memory only.
+      expect(ws.collections().map((c) => c.id)).toEqual([WATCH_LATER_ID]);
+      ws.addCollection("New");
+      ws.reorderCollections([]);
+      const notSaved = error.mock.calls.filter((c) =>
+        String(c[0]).includes("was not saved"),
+      );
+      expect(notSaved).toEqual([]);
+      expect(query("SELECT id FROM collections_kept")).toEqual([
+        { id: WATCH_LATER_ID },
+      ]);
+    } finally {
+      error.mockRestore();
+    }
   });
 });
