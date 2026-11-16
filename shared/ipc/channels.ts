@@ -307,8 +307,8 @@ export const ChannelInputs = {
   collection_rename: z.object({ id: z.string(), name: z.string().min(1) }),
   collection_add_file: FileTarget.extend({ collectionId: z.string() }),
   collection_remove_file: FileTarget.extend({ collectionId: z.string() }),
-  // Membership for many files at once. Collections are one setting, which is
-  // rewritten on every change, so adding a selection one file at a time would
+  // Membership for many files at once. Each collection change is its own
+  // transaction, synced to disk, so adding a selection one file at a time would
   // mean one disk write per file. `op` names the direction rather than a boolean
   // flag, matching the collection_add_file / collection_remove_file vocabulary
   // this is the bulk form of.

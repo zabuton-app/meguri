@@ -97,8 +97,11 @@ In the library (`LIB_DDL`):
   or created after it, and whether their own tables are gone yet (`complete`;
   see [The shared library](#the-shared-library)).
 - `app_settings` — the app's settings (see [App settings](#app-settings)).
-  Created by `openSettingsDb()`, not `LIB_DDL`: the settings are read before
-  any workspace attaches the library.
+- `collections`, `collection_items` — user collections and their files, in
+  order (`position`; see [App settings](#app-settings)).
+
+The last three are created by `openSettingsDb()`, not `LIB_DDL`: they are read
+before any workspace attaches the library.
 
 ## Versionless migrations
 
@@ -303,9 +306,9 @@ holds any more, so a removed workspace added again gets its metadata back.
 
 ### App settings
 
-The app's settings (`AppConfig` in `electron/core/appConfig.ts`: workspaces,
-collections and preferences) are rows of `app_settings (key, value)`, one per
-field, the value as JSON. Every read parses each field on its own, so a value
+The app's settings (`AppConfig` in `electron/core/appConfig.ts`: workspaces
+and preferences) are rows of `app_settings (key, value)`, one per field, the
+value as JSON. Every read parses each field on its own, so a value
 that does not validate falls back to its default without taking the others
 with it. `updateConfig()` writes only the fields a change touched, in one
 transaction.
@@ -315,6 +318,19 @@ record (`_config_json_imported_at`) imports it, over whatever `app_settings`
 holds, and records the import in the same transaction; the file is then left
 alone. A library put back from
 a copy taken before the import imports it again.
+
+User collections have tables of their own (`electron/core/collectionStore.ts`),
+so a change writes only its rows: adding a file is one insert, however many
+files the collections hold, and rearranging a collection updates the
+`position` of the files moved. An item still refers to a file by
+`workspace_id + file_id`. `Workspaces` keeps the collections in memory and
+writes each change through. Collections kept as one JSON row of
+`app_settings` (`collections`, which is also where config.json's are imported)
+are moved into the tables, and the row dropped, in one transaction on the next
+load; a row that is not a list is dropped and the tables kept. An import always
+writes the row, so a `config.json` without collections replaces them with none,
+as it replaces every setting. Collections that cannot be read at startup are
+served empty and not written for the session.
 
 Being in the library, the settings share its backups and are rolled back with
 it when a damaged library is put back from a copy. The settings create the
