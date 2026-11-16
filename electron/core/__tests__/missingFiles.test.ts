@@ -65,13 +65,14 @@ describe("missing files", () => {
     expect(listMissingFiles(db, 1).map((r) => r.id)).toEqual([goneNew]);
     const plan = db
       .prepare(
-        `EXPLAIN QUERY PLAN SELECT f.id FROM files f INDEXED BY idx_files_missing
+        `EXPLAIN QUERY PLAN SELECT f.id FROM files f INDEXED BY idx_files_missing_list
          WHERE f.deleted_at IS NOT NULL AND f.excluded_at IS NULL
+           AND f.scan_excluded_at IS NULL
          ORDER BY f.deleted_at DESC, f.id DESC LIMIT 1`,
       )
       .all() as { detail: string }[];
     const details = plan.map((p) => p.detail).join("; ");
-    expect(details).toContain("idx_files_missing");
+    expect(details).toContain("idx_files_missing_list");
     expect(details).not.toContain("TEMP B-TREE");
   });
 

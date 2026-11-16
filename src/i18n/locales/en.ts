@@ -78,6 +78,16 @@ export const en: Catalog = {
     "Applies custom.css on top of the theme. Changes take effect as soon as you save the file.",
   "settings.customCssOpen": "Open file",
   "settings.customCssOpenError": "Could not open custom.css.",
+  "settings.tabScan": "Scan",
+  "settings.scanExclusions": "Exclude from scans",
+  "settings.scanExclusionsDesc":
+    "Regular expressions, one per line, matched against each path inside the workspace folder, ignoring case. A folder's path ends with /. They apply to every workspace.",
+  "settings.scanExclusionsNextScan":
+    "Saving hides the indexed files a pattern covers. Files a removed pattern covered come back at the next scan.",
+  "settings.scanExclusionsSave": "Save",
+  "settings.scanExclusionsSaved": "Scan exclusions saved.",
+  "settings.scanExclusionsSaveError": "Could not save the scan exclusions.",
+  "settings.scanExclusionsLoadError": "Could not read the scan exclusions.",
   "settings.logo": "App logo",
   "settings.logoDesc": "Applies to the window, tray, and in-app icons.",
   "logo.dark": "Dark",
@@ -166,6 +176,9 @@ export const en: Catalog = {
   "home.scanCanceled": "Scan canceled",
   "home.escCloseHint": "Press Esc again to close the window",
   "home.scanError": "An error occurred during the scan",
+  "home.scanExclusionStuck": "A scan exclusion pattern took too long to run",
+  "home.scanExclusionStuckDesc":
+    "Nothing was scanned. Change or remove it in Settings → Scan.",
   "home.scanRootUnreadable": "The workspace folder could not be reached",
   "home.scanRootUnreadableNamed": 'The folder of "{name}" could not be reached',
   "home.scanRootUnreadableDesc":

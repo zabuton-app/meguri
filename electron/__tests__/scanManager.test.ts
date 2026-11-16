@@ -1,15 +1,18 @@
 import { defaultAutoTagConfig } from "../../shared/autoTag.js";
+import { emptyScanExclusions } from "../../shared/scanExclusions.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runScan = vi.hoisted(() => vi.fn());
 vi.mock("../core/jobs.js", () => ({ runScan }));
 vi.mock("../core/queries.js", () => ({ clearExcludedFiles: vi.fn() }));
-vi.mock("../core/logger.js", () => ({
-  default: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
-}));
+vi.mock("../core/logger.js", () => {
+  const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+  return { default: log, scopedLog: () => log };
+});
 
 import { ScanManager } from "../scanManager.js";
 import { ScanRootUnreadableError } from "../core/scan.js";
+import { AutoTagRuleDroppedError } from "../core/autoTagDeriver.js";
 
 type Deps = ConstructorParameters<typeof ScanManager>[0];
 
@@ -65,6 +68,7 @@ function makeDeps(
     isQuitting: () => false,
     autoTag: () => ({ config: defaultAutoTagConfig(), version: 0 }),
     deriveAutoTags: () => Promise.resolve([]),
+    exclusions: () => emptyScanExclusions(),
     ...overrides,
   };
 }
@@ -158,6 +162,22 @@ describe("ScanManager", () => {
       expect.objectContaining({
         error: true,
         errorReason: "root-unreadable",
+        workspaceId: "a",
+      }),
+    );
+  });
+
+  it("says why a scan failed when a scan exclusion pattern did not finish", async () => {
+    runScan.mockRejectedValue(new AutoTagRuleDroppedError());
+    const deps = makeDeps();
+    const scans = new ScanManager(deps);
+    scans.start();
+    await scans.abort("a");
+    expect(deps.emit).toHaveBeenCalledWith(
+      "scan:done",
+      expect.objectContaining({
+        error: true,
+        errorReason: "exclusion-stuck",
         workspaceId: "a",
       }),
     );

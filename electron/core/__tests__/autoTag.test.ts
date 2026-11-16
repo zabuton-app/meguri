@@ -18,6 +18,7 @@ import {
   keepStillAt,
 } from "../autoTag.js";
 import {
+  AutoTagRuleDroppedError,
   AutoTagTimeoutError,
   AutoTagUnavailableError,
   AutoTagWorkerClient,
@@ -1215,6 +1216,39 @@ ${body}`,
       await client.derive({ rules: [edited], keywords: [] }, ["d.mp4"]),
     ).toEqual([[]]);
     expect(client.droppedRules()).toEqual(["Slow", "Slow"]);
+    client.dispose();
+  });
+
+  it("fails a whole engine's requests once one of its rules is left out", async () => {
+    const client = new AutoTagWorkerClient(workerFile(naming), 500);
+    const whole = {
+      rules: [slow, ...activeRules()],
+      keywords: [],
+      whole: true,
+    };
+    // The one waiting behind it fails too, instead of going on without it.
+    const results = await Promise.allSettled([
+      client.derive(whole, ["a.mp4"]),
+      client.derive(whole, ["b.mp4"]),
+    ]);
+    for (const r of results) {
+      expect(r).toMatchObject({ status: "rejected" });
+      if (r.status === "rejected")
+        expect(r.reason).toBeInstanceOf(AutoTagRuleDroppedError);
+    }
+    // And every one after it, without waiting on the rule again.
+    const started = Date.now();
+    await expect(client.derive(whole, ["c.mp4"])).rejects.toBeInstanceOf(
+      AutoTagRuleDroppedError,
+    );
+    expect(Date.now() - started).toBeLessThan(500);
+    // An engine without it is run as before.
+    const ids = activeRules().map((r) => r.id);
+    expect(
+      await client.derive({ rules: activeRules(), keywords: [], whole: true }, [
+        "d.mp4",
+      ]),
+    ).toEqual([ids]);
     client.dispose();
   });
 

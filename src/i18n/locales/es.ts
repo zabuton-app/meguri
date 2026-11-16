@@ -78,6 +78,18 @@ export const es: Catalog = {
     "Aplica custom.css sobre el tema. Los cambios se aplican en cuanto guardas el archivo.",
   "settings.customCssOpen": "Abrir archivo",
   "settings.customCssOpenError": "No se pudo abrir custom.css.",
+  "settings.tabScan": "Escaneo",
+  "settings.scanExclusions": "Excluir de los escaneos",
+  "settings.scanExclusionsDesc":
+    "Expresiones regulares, una por línea, comparadas con cada ruta dentro de la carpeta del espacio de trabajo, sin distinguir mayúsculas. La ruta de una carpeta termina en /. Se aplican a todos los espacios de trabajo.",
+  "settings.scanExclusionsNextScan":
+    "Al guardar se ocultan los archivos indexados que cubre un patrón. Los archivos de un patrón quitado vuelven en el siguiente escaneo.",
+  "settings.scanExclusionsSave": "Guardar",
+  "settings.scanExclusionsSaved": "Exclusiones de escaneo guardadas.",
+  "settings.scanExclusionsSaveError":
+    "No se pudieron guardar las exclusiones de escaneo.",
+  "settings.scanExclusionsLoadError":
+    "No se pudieron leer las exclusiones del escaneo.",
   "settings.logo": "Logotipo de la aplicación",
   "settings.logoDesc":
     "Se aplica a los iconos de la ventana, de la bandeja y de la aplicación.",
@@ -170,6 +182,10 @@ export const es: Catalog = {
   "home.scanCanceled": "Escaneo cancelado",
   "home.escCloseHint": "Pulsa Esc de nuevo para cerrar la ventana",
   "home.scanError": "Se produjo un error durante el escaneo",
+  "home.scanExclusionStuck":
+    "Un patrón de exclusión del escaneo tardó demasiado en ejecutarse",
+  "home.scanExclusionStuckDesc":
+    "No se escaneó nada. Cámbialo o elimínalo en Ajustes → Escaneo.",
   "home.scanRootUnreadable":
     "No se pudo acceder a la carpeta del espacio de trabajo",
   "home.scanRootUnreadableNamed": "No se pudo acceder a la carpeta de «{name}»",

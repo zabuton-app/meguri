@@ -54,6 +54,7 @@ import { openDb, type DB } from "../db.js";
 import type { Core } from "../index.js";
 import {
   clearExcludedFiles,
+  countMissingFiles,
   deleteFromIndex,
   scanRootWasMountpoint,
   upsertScanRoot,
@@ -61,7 +62,16 @@ import {
 import { fileTags } from "../tags.js";
 import { runScan, type JobEvent } from "../jobs.js";
 import { ScanRootUnreadableError } from "../scan.js";
-import { deriveAutoTagsInProcess } from "../autoTagDeriver.js";
+import {
+  AutoTagRuleDroppedError,
+  AutoTagUnavailableError,
+  deriveAutoTagsInProcess,
+  type DeriveAutoTags,
+} from "../autoTagDeriver.js";
+import {
+  applyScanExclusions,
+  scanExclusionFilter,
+} from "../scanExclusionFilter.js";
 import { autoTagSettingsVersion } from "../autoTag.js";
 import { defaultAutoTagConfig, defaultRules } from "../../../shared/autoTag.js";
 
@@ -478,4 +488,293 @@ describe("runScan", () => {
       }
     },
   );
+
+  describe("scan exclusions (#282)", () => {
+    const WS = "ws-1";
+    const withExclusions = (
+      patterns: string[],
+      folders: Record<string, string[]> = {},
+      derive: DeriveAutoTags = deriveAutoTagsInProcess,
+    ) => ({
+      autoTag: () => ({
+        config: { ...defaultAutoTagConfig(), applyOnScan: false },
+        version: autoTagSettingsVersion(),
+      }),
+      deriveAutoTags: derive,
+      workspaceId: WS,
+      exclusions: () => ({ patterns, folders }),
+    });
+    const rel = (p: string) => p.split("/").join(path.sep);
+    const row = (p: string) =>
+      db
+        .prepare(
+          "SELECT id, deleted_at, scan_excluded_at FROM files WHERE rel_path = ?",
+        )
+        .get(rel(p)) as
+        | {
+            id: number;
+            deleted_at: number | null;
+            scan_excluded_at: number | null;
+          }
+        | undefined;
+    /** Whether the file is listed, and whether a rule hides it. */
+    const state = (p: string) => {
+      const r = row(p)!;
+      return {
+        id: r.id,
+        listed: r.deleted_at === null,
+        hidden: r.scan_excluded_at !== null,
+      };
+    };
+
+    it("leaves out what a pattern or an excluded folder covers", async () => {
+      write("keep/a.mp4", "AAAAAAAAAA");
+      write("@eaDir/b.jpg", "BBBBBBBBBB");
+      // Case-insensitive, and anywhere in the path.
+      write("deep/@EADIR/c.jpg", "CCCCCCCCCC");
+      write("d.tmp.mp4", "DDDDDDDDDD");
+      write("renders/old/e.mp4", "EEEEEEEEEE");
+      write("renders/older/f.mp4", "FFFFFFFFFF");
+
+      await scan(
+        withExclusions(["(^|/)@eaDir/", "\\.tmp\\.mp4$"], {
+          [WS]: ["renders/old"],
+        }),
+      );
+
+      expect(rows().map((r) => r.rel_path)).toEqual(
+        ["keep/a.mp4", "renders/older/f.mp4"].map(rel),
+      );
+    });
+
+    it("does not report what an excluded folder holds as unreadable", async () => {
+      write("cache/a.mp4", "AAAAAAAAAA");
+      await fsp.chmod(path.join(root, "cache"), 0o000);
+      try {
+        expect(await scan(withExclusions(["^cache/$"]))).toMatchObject({
+          skipped: 0,
+        });
+      } finally {
+        await fsp.chmod(path.join(root, "cache"), 0o755);
+      }
+    });
+
+    it("hides files indexed before, out of Missing, and brings them back with their ids", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      write("b.mp4", "BBBBBBBBBB");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+
+      await scan(withExclusions(["^old/$"]));
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+      expect(hasFts(id)).toBe(false);
+      expect(countMissingFiles(db)).toBe(0);
+      expect(row("b.mp4")).toMatchObject({ deleted_at: null });
+
+      await scan(withExclusions([]));
+      expect(state("old/a.mp4")).toEqual({ id, listed: true, hidden: false });
+      expect(hasFts(id)).toBe(true);
+    });
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "keeps a hidden file hidden while its folder cannot be read",
+      async () => {
+        write("old/a.mp4", "AAAAAAAAAA");
+        await scan(withExclusions([]));
+        await scan(withExclusions(["^old/$"]));
+        await fsp.chmod(path.join(root, "old"), 0o000);
+        try {
+          await scan(withExclusions([]));
+          expect(state("old/a.mp4").hidden).toBe(true);
+          expect(countMissingFiles(db)).toBe(0);
+        } finally {
+          await fsp.chmod(path.join(root, "old"), 0o755);
+        }
+        await scan(withExclusions([]));
+        expect(state("old/a.mp4")).toMatchObject({
+          listed: true,
+          hidden: false,
+        });
+      },
+    );
+
+    it("lists a hidden file that is gone by the time the rule is taken out as missing", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      await scan(withExclusions(["^old/$"]));
+      fs.rmSync(path.join(root, "old"), { recursive: true });
+
+      await scan(withExclusions([]));
+
+      expect(state("old/a.mp4")).toMatchObject({
+        listed: false,
+        hidden: false,
+      });
+      expect(countMissingFiles(db)).toBe(1);
+    });
+
+    it("does not take a hidden file for the source of a move", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+      write("copy.mp4", "AAAAAAAAAA");
+
+      await scan(withExclusions(["^old/$"]));
+
+      expect(row("copy.mp4")!.id).not.toBe(id);
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+    });
+
+    it("keeps hidden files and their thumbnails through a rebuild", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+
+      await scan({ ...withExclusions(["^old/$"]), rebuild: true });
+
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+      expect(fs.existsSync(path.join(thumbs, `${id}.webp`))).toBe(true);
+      expect(countMissingFiles(db)).toBe(0);
+    });
+
+    it("hides what a rule covers without a scan, and lets nothing back", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      write("b.mp4", "BBBBBBBBBB");
+      await scan(withExclusions([]));
+      const filter = scanExclusionFilter(
+        { patterns: ["^old/$"], folders: {} },
+        WS,
+        deriveAutoTagsInProcess,
+      );
+
+      expect(await applyScanExclusions(db, rootId, filter)).toBe(1);
+      expect(state("old/a.mp4").hidden).toBe(true);
+      // Taken out again, but not released: only a scan finds the file.
+      expect(await applyScanExclusions(db, rootId, null)).toBe(0);
+      expect(state("old/a.mp4").hidden).toBe(true);
+    });
+
+    it("keeps a file hidden when the scan that would bring it back is cut short", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+      // New, so the scan hashes it; it is stopped there.
+      write("new.mp4", "NNNNNNNNNN");
+      const ac = new AbortController();
+
+      await runScan(
+        core,
+        "job",
+        (e) => {
+          if (e.type === "progress" && e.phase === "hash") ac.abort();
+        },
+        { ...withExclusions([]), signal: ac.signal },
+      );
+
+      // Not missing (where it could be purged), though it is there.
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+      expect(countMissingFiles(db)).toBe(0);
+      await scan(withExclusions([]));
+      expect(state("old/a.mp4")).toEqual({ id, listed: true, hidden: false });
+    });
+
+    it("brings back a hidden file moved out of the excluded folder with its id", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+      fs.renameSync(path.join(root, "old", "a.mp4"), path.join(root, "a.mp4"));
+
+      await scan(withExclusions([]));
+
+      expect(state("a.mp4")).toEqual({ id, listed: true, hidden: false });
+      expect(countMissingFiles(db)).toBe(0);
+    });
+
+    it("excludes what a pattern of lookaheads alone covers", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      write("b.jpg", "BBBBBBBBBB");
+
+      await scan(withExclusions(["(?=.*\\.jpg$)"]));
+
+      expect(rows().map((r) => r.rel_path)).toEqual(["a.mp4"]);
+    });
+
+    it("fails without touching the index when a pattern was given up on", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const before = rows();
+      write("b.mp4", "BBBBBBBBBB");
+
+      await expect(
+        scan(
+          withExclusions(["^old/$"], {}, () =>
+            Promise.reject(new AutoTagRuleDroppedError()),
+          ),
+        ),
+      ).rejects.toThrow(AutoTagRuleDroppedError);
+      expect(rows()).toEqual(before);
+    });
+
+    it("finishes the scan when a rule saved during it cannot be applied", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      let reads = 0;
+      // The second read, once the files are synced, has a pattern the worker
+      // cannot run.
+      const opts = {
+        ...withExclusions([], {}, (engine, names) =>
+          engine.rules.some((r) => r.name === "^late$")
+            ? Promise.reject(new AutoTagRuleDroppedError())
+            : deriveAutoTagsInProcess(engine, names),
+        ),
+        exclusions: () => ({
+          patterns: reads++ === 0 ? [] : ["^late$"],
+          folders: {},
+        }),
+      };
+
+      await expect(scan(opts)).resolves.toMatchObject({ inserted: 1 });
+      expect(rows()[0]).toMatchObject({
+        deleted_at: null,
+        thumb_status: "done",
+      });
+    });
+
+    it("leaves files removed from the index by hand as they are", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      deleteFromIndex(db, row("old/a.mp4")!.id);
+
+      await scan(withExclusions(["^old/$"]));
+
+      expect(row("old/a.mp4")).toMatchObject({ scan_excluded_at: null });
+    });
+
+    it("skips a pattern that does not compile and applies the others", async () => {
+      write("a/x.mp4", "AAAAAAAAAA");
+      write("b/y.mp4", "BBBBBBBBBB");
+
+      await scan(withExclusions(["(", "^a/$"]));
+
+      expect(rows().map((r) => r.rel_path)).toEqual([rel("b/y.mp4")]);
+    });
+
+    it("fails without touching the index when the patterns cannot be run", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const before = rows();
+
+      await expect(
+        scan(
+          withExclusions(["^old/$"], {}, () =>
+            Promise.reject(new AutoTagUnavailableError("down")),
+          ),
+        ),
+      ).rejects.toThrow(AutoTagUnavailableError);
+      expect(rows()).toEqual(before);
+    });
+  });
 });

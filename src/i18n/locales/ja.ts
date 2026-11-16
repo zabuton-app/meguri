@@ -76,6 +76,16 @@ export const ja = {
     "custom.cssをテーマの上に重ねて適用します。保存するとすぐに反映されます。",
   "settings.customCssOpen": "ファイルを開く",
   "settings.customCssOpenError": "custom.cssを開けませんでした。",
+  "settings.tabScan": "スキャン",
+  "settings.scanExclusions": "スキャンから除外",
+  "settings.scanExclusionsDesc":
+    "1行に1つの正規表現。ワークスペースのフォルダ内のパスに、大文字・小文字を区別せずに当てます。フォルダのパスは末尾が/になります。すべてのワークスペースに適用されます。",
+  "settings.scanExclusionsNextScan":
+    "保存すると、パターンに一致する取り込み済みのファイルが非表示になります。外したパターンのファイルは次のスキャンで戻ります。",
+  "settings.scanExclusionsSave": "保存",
+  "settings.scanExclusionsSaved": "スキャンの除外を保存しました。",
+  "settings.scanExclusionsSaveError": "スキャンの除外を保存できませんでした。",
+  "settings.scanExclusionsLoadError": "スキャン除外を読み込めませんでした。",
   "settings.logo": "アプリのロゴ",
   "settings.logoDesc": "ウィンドウ・トレイ・画面内のアイコンに反映されます。",
   "logo.dark": "濃色",
@@ -164,6 +174,10 @@ export const ja = {
   "home.scanCanceled": "スキャンをキャンセルしました",
   "home.escCloseHint": "もう一度 Esc を押すとウィンドウを閉じます",
   "home.scanError": "スキャン中にエラーが発生しました",
+  "home.scanExclusionStuck":
+    "スキャン除外のパターンの実行に時間がかかりすぎました",
+  "home.scanExclusionStuckDesc":
+    "スキャンは行われていません。設定 → スキャンでパターンを修正するか削除してください。",
   "home.scanRootUnreadable": "ワークスペースのフォルダにアクセスできません",
   "home.scanRootUnreadableNamed": "「{name}」のフォルダにアクセスできません",
   "home.scanRootUnreadableDesc":

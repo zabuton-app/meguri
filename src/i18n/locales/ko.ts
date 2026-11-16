@@ -76,6 +76,16 @@ export const ko: Catalog = {
     "custom.css를 테마 위에 덧씌워 적용합니다. 파일을 저장하면 바로 반영됩니다.",
   "settings.customCssOpen": "파일 열기",
   "settings.customCssOpenError": "custom.css를 열 수 없습니다.",
+  "settings.tabScan": "스캔",
+  "settings.scanExclusions": "스캔에서 제외",
+  "settings.scanExclusionsDesc":
+    "한 줄에 하나씩 쓰는 정규 표현식으로, 워크스페이스 폴더 안의 각 경로에 대소문자 구분 없이 적용됩니다. 폴더 경로는 /로 끝납니다. 모든 워크스페이스에 적용됩니다.",
+  "settings.scanExclusionsNextScan":
+    "저장하면 패턴에 해당하는 색인된 파일이 숨겨집니다. 제거한 패턴의 파일은 다음 스캔에서 돌아옵니다.",
+  "settings.scanExclusionsSave": "저장",
+  "settings.scanExclusionsSaved": "스캔 제외 설정을 저장했습니다.",
+  "settings.scanExclusionsSaveError": "스캔 제외 설정을 저장할 수 없습니다.",
+  "settings.scanExclusionsLoadError": "스캔 제외 설정을 읽지 못했습니다.",
   "settings.logo": "앱 로고",
   "settings.logoDesc": "창, 트레이, 앱 내 아이콘에 적용됩니다.",
   "logo.dark": "진한 색",
@@ -162,6 +172,10 @@ export const ko: Catalog = {
   "home.scanCanceled": "스캔을 취소했습니다",
   "home.escCloseHint": "Esc 키를 한 번 더 누르면 창이 닫힙니다",
   "home.scanError": "스캔 중 오류가 발생했습니다",
+  "home.scanExclusionStuck":
+    "스캔 제외 패턴을 실행하는 데 시간이 너무 오래 걸렸습니다",
+  "home.scanExclusionStuckDesc":
+    "스캔하지 않았습니다. 설정 → 스캔에서 패턴을 수정하거나 삭제하세요.",
   "home.scanRootUnreadable": "워크스페이스 폴더에 접근할 수 없습니다",
   "home.scanRootUnreadableNamed": '"{name}" 폴더에 접근할 수 없습니다',
   "home.scanRootUnreadableDesc":

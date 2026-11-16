@@ -51,7 +51,10 @@ In the workspace database (`CORE_DDL`):
 - `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image` |
   `audio`), size/mtime/inode, `content_hash`, media metadata (`width`, `height`,
   `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`,
-  `deleted_at` / `excluded_at` markers, and `name_key`, the name sort's key
+  `deleted_at` / `excluded_at` / `scan_excluded_at` markers (the last set
+  with `deleted_at` on a file a scan exclusion hides; see
+  [Scan exclusions](media-pipeline.md#scan-exclusions)), and `name_key`, the
+  name sort's key
   (see [Name sort](#name-sort)). For audio, `width` / `height` / `fps`
   stay NULL even when the file embeds cover art — the artwork's dimensions
   describe the jacket, not the track. Images keep `fps` NULL too, except

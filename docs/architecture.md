@@ -254,8 +254,9 @@ holding the workspace's generated files.
 
 - `electron/core/appConfig.ts` is the lone layer that persists the app's
   settings: `roots`, `activePath` and `workspaceEmojis` (owned by
-  `Workspaces`), plus `update`, `logo`, `autoTag`, `customCss` and
-  `cssTheme`. They live in the library's `app_settings` table (see
+  `Workspaces`), plus `update`, `logo`, `autoTag`, `customCss`,
+  `cssTheme` and `scanExclusions`. They live in the library's `app_settings`
+  table (see
   [Data Model](data-model.md#app-settings)), one row per field, so they share
   its daily backup, check and restore. Each owner writes only its own fields
   through `updateConfig()`, which reads the stored settings, applies the change

@@ -269,6 +269,10 @@ export const api = {
   customCssSetEnabled: (enabled: boolean) =>
     invoke("custom_css_set_enabled", { enabled }),
   customCssOpen: () => invoke("custom_css_open"),
+  /** Scan exclusions (#282); saving hides what the patterns cover at once. */
+  scanExclusionsGet: () => invoke("scan_exclusions_get"),
+  scanExclusionsSetPatterns: (patterns: string[]) =>
+    invoke("scan_exclusions_set_patterns", { patterns }),
   /** CSS theme files in <userData>/themes; the pick is persisted in main's settings. */
   cssThemesGet: () => invoke("css_themes_get"),
   cssThemeSelect: (file: string | null) => invoke("css_theme_select", { file }),

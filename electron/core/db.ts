@@ -93,6 +93,9 @@ CREATE TABLE IF NOT EXISTS files (
   thumb_path TEXT, thumb_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (thumb_status IN ('pending','done','error')),
   deleted_at INTEGER, excluded_at INTEGER, created_at INTEGER NOT NULL, meta TEXT,
+  -- Set with deleted_at when a scan exclusion (#282) covers the file: hidden,
+  -- not missing, and back with the same id once no rule covers it.
+  scan_excluded_at INTEGER,
   -- The name sort's key, naturalNameKey(rel_path) (nameKey.ts),
   -- written with rel_path by the scan.
   name_key TEXT,
@@ -133,9 +136,6 @@ CREATE INDEX IF NOT EXISTS idx_files_alive_rel_path ON files(rel_path, id) WHERE
 -- matches the "captured_at IS NULL ASC" NULLs-last term exactly. The ASC
 -- direction still filesorts (a reversed scan would put NULLs first).
 CREATE INDEX IF NOT EXISTS idx_files_alive_captured ON files((captured_at IS NULL), captured_at DESC, id) WHERE deleted_at IS NULL;
--- The missing-files list (queries/missing.ts): its WHERE and ORDER BY exactly,
--- so the planner takes it without statistics and does not sort.
-CREATE INDEX IF NOT EXISTS idx_files_missing ON files(deleted_at DESC, id DESC) WHERE deleted_at IS NOT NULL AND excluded_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
@@ -406,6 +406,18 @@ function backfillColumns(db: DB): void {
   if (!hasColumn(db, "scan_roots", "mountpoint")) {
     db.exec("ALTER TABLE scan_roots ADD COLUMN mountpoint INTEGER");
   }
+  // Set while a scan exclusion hides the file (#282).
+  if (!hasColumn(db, "files", "scan_excluded_at")) {
+    db.exec("ALTER TABLE files ADD COLUMN scan_excluded_at INTEGER");
+  }
+  // The missing-files list (queries/missing.ts): its WHERE and ORDER BY
+  // exactly, so the planner takes it without statistics and does not sort.
+  // Here rather than in CORE_DDL because it reads scan_excluded_at; it
+  // replaces idx_files_missing, from before files hidden by a scan exclusion.
+  db.exec("DROP INDEX IF EXISTS idx_files_missing");
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_missing_list ON files(deleted_at DESC, id DESC) WHERE deleted_at IS NOT NULL AND excluded_at IS NULL AND scan_excluded_at IS NULL",
+  );
   // Filesystem creation time (birthtime), NULL where the filesystem doesn't
   // provide it. The index lives here (not in CORE_DDL) because on pre-existing
   // DBs the column only exists after this ALTER runs.

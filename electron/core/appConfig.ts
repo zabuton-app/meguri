@@ -26,6 +26,12 @@ import {
   type AutoTagConfig,
 } from "../../shared/autoTag.js";
 import { MAX_TAG_NAME } from "../../shared/tags.js";
+import { isNormalizedFolderPath } from "../../shared/folderPath.js";
+import {
+  emptyScanExclusions,
+  MAX_EXCLUSION_PATTERNS,
+  type ScanExclusions,
+} from "../../shared/scanExclusions.js";
 import { autoTagSettingsChanged, autoTagSettingsVersion } from "./autoTag.js";
 import { isThemeFileName } from "./cssThemes.js";
 import type { AutoTagEngine } from "./autoTagDeriver.js";
@@ -61,6 +67,8 @@ export interface AppConfig {
    * none. Main reads it to send the theme's contents with the list.
    */
   cssTheme: string | null;
+  /** What scans leave out: patterns for every workspace, folders per workspace (#282). */
+  scanExclusions: ScanExclusions;
 }
 
 export interface CustomCssConfig {
@@ -107,6 +115,7 @@ const FIELD_SET: Record<keyof AppConfig, true> = {
   autoTag: true,
   customCss: true,
   cssTheme: true,
+  scanExclusions: true,
 };
 const FIELDS = Object.keys(FIELD_SET) as (keyof AppConfig)[];
 
@@ -154,6 +163,7 @@ function defaultConfig(): AppConfig {
     autoTag: defaultAutoTagConfig(),
     customCss: { ...DEFAULT_CUSTOM_CSS_CONFIG },
     cssTheme: null,
+    scanExclusions: emptyScanExclusions(),
   };
 }
 
@@ -318,6 +328,7 @@ function parseConfig(c: Record<string, unknown>): AppConfig {
     autoTag: parseAutoTag(c.autoTag),
     customCss: parseCustomCss(c.customCss),
     cssTheme: parseCssTheme(c.cssTheme),
+    scanExclusions: parseScanExclusions(c.scanExclusions),
   };
 }
 
@@ -572,8 +583,13 @@ export function saveAutoTag(config: AutoTagConfig): void {
 
 /** The settings a pass applies, as one comparable value. */
 function engineOf({ rules, keywords, folders }: AutoTagConfig): string {
-  // Typed as the engine, so a field it gains has to be named here too.
-  const engine: Required<AutoTagEngine> = { rules, keywords, folders };
+  // Typed as the engine, so a field it gains has to be named here too. Not
+  // `whole`: how a caller has it run, not a setting.
+  const engine: Required<Omit<AutoTagEngine, "whole">> = {
+    rules,
+    keywords,
+    folders,
+  };
   return JSON.stringify(engine);
 }
 
@@ -601,4 +617,34 @@ function parseEmojiMap(value: unknown): Record<string, string> {
     if (typeof v === "string" && v) out[k] = v;
   }
   return out;
+}
+
+/**
+ * Entry by entry. A pattern that no longer compiles is kept: it is what the
+ * user wrote, the settings show it with its error, and the scan skips it.
+ */
+function parseScanExclusions(value: unknown): ScanExclusions {
+  if (!value || typeof value !== "object") return emptyScanExclusions();
+  const c = value as Record<string, unknown>;
+  const patterns = Array.isArray(c.patterns)
+    ? [
+        ...new Set(
+          c.patterns.filter(
+            (p): p is string => typeof p === "string" && p !== "",
+          ),
+        ),
+      ].slice(0, MAX_EXCLUSION_PATTERNS)
+    : [];
+  const folders: Record<string, string[]> = {};
+  if (c.folders && typeof c.folders === "object") {
+    for (const [id, list] of Object.entries(c.folders)) {
+      if (!Array.isArray(list)) continue;
+      const kept = list.filter(
+        (f): f is string =>
+          typeof f === "string" && f !== "" && isNormalizedFolderPath(f),
+      );
+      if (kept.length > 0) folders[id] = [...new Set(kept)];
+    }
+  }
+  return { patterns, folders };
 }
