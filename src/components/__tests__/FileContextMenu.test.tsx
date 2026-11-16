@@ -189,7 +189,8 @@ describe("FileContextMenu", () => {
 
     fireEvent.click(item("Exclude from scans"));
     const dialog = await screen.findByRole("alertdialog");
-    expect(dialog.textContent).toContain("“old”");
+    // By its path: no other folder named "old" is excluded.
+    expect(dialog.textContent).toContain("“videos/old”");
     expect(mocks.scanExclusionsAddFolder).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Exclude" }));
 

@@ -95,7 +95,11 @@ export function registerScanHandlers(ctx: IpcContext): void {
     return exclusionsState();
   });
 
-  /** The workspace's excluded folders, and whether each is on disk now. */
+  /**
+   * The workspace's excluded folders, where each is on disk (to show: the
+   * relative path alone reads like any folder of that name) and whether it is
+   * there now.
+   */
   const excludedFolders = async (
     workspaceId: string,
   ): Promise<ExcludedFolders> => {
@@ -103,7 +107,11 @@ export function registerScanHandlers(ctx: IpcContext): void {
     const paths = loadConfig().scanExclusions.folders[workspaceId] ?? [];
     return {
       folders: await Promise.all(
-        paths.map(async (p) => ({ path: p, found: await isFolder(root, p) })),
+        paths.map(async (p) => ({
+          path: p,
+          absPath: path.join(root, ...p.split("/")),
+          found: await isFolder(root, p),
+        })),
       ),
     };
   };

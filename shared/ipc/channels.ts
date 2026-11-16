@@ -833,6 +833,11 @@ export interface ExcludedFolders {
   folders: {
     /** Relative to the workspace root, "/"-separated. */
     path: string;
+    /**
+     * The folder on disk, in the OS's form: what is shown, since the path
+     * alone reads like any folder of that name, which it does not cover.
+     */
+    absPath: string;
     /** Whether it is a folder on disk now: false once it is renamed or gone. */
     found: boolean;
   }[];

@@ -658,7 +658,7 @@ export const ja = {
   "folder.showInLibrary": "ライブラリでフォルダを表示",
   "folder.excludeFromScans": "スキャンから除外",
   "folder.excludeConfirm":
-    "「{name}」のファイルをすぐに非表示にし、このワークスペースのスキャンから外します。ワークスペースの編集ダイアログから元に戻せます。",
+    "「{path}」のファイルをすぐに非表示にし、このワークスペースのスキャンから外します。別の場所にある同じ名前のフォルダは対象外です。ワークスペースの編集ダイアログから元に戻せます。",
   "folder.excludeAction": "除外",
   "folder.excluded": "「{name}」をスキャンから除外しました",
   "folder.excludeFailed": "フォルダを除外できませんでした",

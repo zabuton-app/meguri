@@ -165,10 +165,11 @@ export function WorkspaceEditDialog({
                     className="flex items-center gap-2 rounded-md border border-border px-2 py-1"
                   >
                     <span
-                      className="min-w-0 flex-1 truncate font-mono text-xs text-fg"
-                      title={f.path}
+                      // Wrapped, not cut short: the end of the path is the
+                      // folder, and its start says which one.
+                      className="min-w-0 flex-1 break-all font-mono text-xs text-fg"
                     >
-                      {f.path}
+                      {f.absPath}
                     </span>
                     {!f.found && (
                       <span className="shrink-0 rounded-full border border-border-strong px-1.5 text-[10px] leading-4 text-muted">
@@ -181,10 +182,10 @@ export function WorkspaceEditDialog({
                       size="icon"
                       className="h-6 w-6 shrink-0"
                       aria-label={t("workspace.excludedFolderInclude", {
-                        path: f.path,
+                        path: f.absPath,
                       })}
                       title={t("workspace.excludedFolderInclude", {
-                        path: f.path,
+                        path: f.absPath,
                       })}
                       onClick={() =>
                         setIncluded((prev) => new Set(prev).add(f.path))

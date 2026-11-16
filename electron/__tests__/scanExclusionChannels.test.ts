@@ -184,7 +184,15 @@ describe("scan exclusion channels", () => {
           workspaceId: first,
           path: "cache",
         }),
-      ).resolves.toEqual({ folders: [{ path: "cache", found: true }] });
+      ).resolves.toEqual({
+        folders: [
+          {
+            path: "cache",
+            absPath: path.join(roots[0], "cache"),
+            found: true,
+          },
+        ],
+      });
       // Again: kept once.
       await invoke("scan_exclusions_add_folder", {
         workspaceId: first,
@@ -216,8 +224,12 @@ describe("scan exclusion channels", () => {
         invoke("scan_exclusions_folders", { workspaceId: first }),
       ).resolves.toEqual({
         folders: [
-          { path: "keep", found: true },
-          { path: "cache", found: false },
+          { path: "keep", absPath: path.join(roots[0], "keep"), found: true },
+          {
+            path: "cache",
+            absPath: path.join(roots[0], "cache"),
+            found: false,
+          },
         ],
       });
     });
@@ -235,7 +247,11 @@ describe("scan exclusion channels", () => {
           workspaceId: first,
           paths: ["cache"],
         }),
-      ).resolves.toEqual({ folders: [{ path: "keep", found: false }] });
+      ).resolves.toEqual({
+        folders: [
+          { path: "keep", absPath: path.join(roots[0], "keep"), found: false },
+        ],
+      });
       expect(visible()[0]).toEqual([]);
 
       await invoke("scan_exclusions_remove_folders", {

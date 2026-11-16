@@ -130,7 +130,9 @@ test("excludes a folder from its card and includes it again from the workspace",
     await page.getByRole("button", { name: "Edit workspace" }).click();
     const dialog = page.getByRole("dialog", { name: "Edit workspace" });
     await dialog
-      .getByRole("button", { name: "Include cache in scans again" })
+      .getByRole("button", {
+        name: `Include ${path.join(root, "cache")} in scans again`,
+      })
       .click();
     await dialog.getByRole("button", { name: "Save" }).click();
     await expect(dialog).toHaveCount(0);

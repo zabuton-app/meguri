@@ -697,7 +697,7 @@ export const en: Catalog = {
   "folder.showInLibrary": "Show folder in library",
   "folder.excludeFromScans": "Exclude from scans",
   "folder.excludeConfirm":
-    "The files in “{name}” are hidden now and left out of this workspace's scans. You can include the folder again in the workspace's edit dialog.",
+    "The files in “{path}” are hidden now and left out of this workspace's scans. Folders of the same name elsewhere are still scanned. You can include the folder again in the workspace's edit dialog.",
   "folder.excludeAction": "Exclude",
   "folder.excluded": "“{name}” is excluded from scans",
   "folder.excludeFailed": "Couldn't exclude the folder",

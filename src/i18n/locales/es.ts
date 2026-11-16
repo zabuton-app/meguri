@@ -732,7 +732,7 @@ export const es: Catalog = {
   "folder.showInLibrary": "Mostrar la carpeta en la biblioteca",
   "folder.excludeFromScans": "Excluir de los escaneos",
   "folder.excludeConfirm":
-    "Los archivos de «{name}» se ocultan ahora y quedan fuera de los escaneos de este espacio de trabajo. Puedes volver a incluir la carpeta desde el diálogo de edición del espacio de trabajo.",
+    "Los archivos de «{path}» se ocultan ahora y quedan fuera de los escaneos de este espacio de trabajo. Las carpetas con el mismo nombre en otros lugares se siguen escaneando. Puedes volver a incluir la carpeta desde el diálogo de edición del espacio de trabajo.",
   "folder.excludeAction": "Excluir",
   "folder.excluded": "«{name}» se excluyó de los escaneos",
   "folder.excludeFailed": "No se pudo excluir la carpeta",

@@ -653,7 +653,7 @@ export const ko: Catalog = {
   "folder.showInLibrary": "라이브러리에서 폴더 보기",
   "folder.excludeFromScans": "스캔에서 제외",
   "folder.excludeConfirm":
-    "“{name}”의 파일을 바로 숨기고 이 워크스페이스의 스캔에서 제외합니다. 워크스페이스 편집 대화 상자에서 다시 포함할 수 있습니다.",
+    "“{path}”의 파일을 바로 숨기고 이 워크스페이스의 스캔에서 제외합니다. 다른 위치에 있는 같은 이름의 폴더는 계속 스캔합니다. 워크스페이스 편집 대화 상자에서 다시 포함할 수 있습니다.",
   "folder.excludeAction": "제외",
   "folder.excluded": "“{name}”을(를) 스캔에서 제외했습니다",
   "folder.excludeFailed": "폴더를 제외하지 못했습니다",

@@ -21,8 +21,10 @@ export function useExcludeFolder(): (
       const name = folder.slice(folder.lastIndexOf("/") + 1);
       const ok = await confirm({
         title: t("folder.excludeFromScans"),
-        // Named: the menu that asked is closed by now.
-        message: t("folder.excludeConfirm", { name }),
+        // Named by its path from the workspace root, not its name: it is
+        // this folder alone, not every folder of that name. The menu that
+        // asked is closed by now.
+        message: t("folder.excludeConfirm", { path: folder }),
         confirmText: t("folder.excludeAction"),
       });
       if (!ok) return;

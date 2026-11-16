@@ -105,7 +105,8 @@ The user can keep folders and files out of scans (#282), in the
 - `folders`: per workspace ID, root-relative folders, each covering
   everything below it. Added from a folder card's context menu in the folder
   view ("Exclude from scans", after a confirmation), which hides its files at
-  once. Listed in the workspace's edit dialog, marked "Not found" when the
+  once. Listed in the workspace's edit dialog by where they are on disk (a bare
+  relative path would read like every folder of that name), marked "Not found" when the
   folder is no longer on disk (renamed or gone), and taken off the list there
   when the dialog is saved.
 

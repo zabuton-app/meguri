@@ -632,7 +632,7 @@ export const zhCN: Catalog = {
   "folder.showInLibrary": "在媒体库中显示文件夹",
   "folder.excludeFromScans": "从扫描中排除",
   "folder.excludeConfirm":
-    "“{name}”中的文件将立即隐藏，并不再参与此工作区的扫描。可在工作区的编辑对话框中重新包含该文件夹。",
+    "“{path}”中的文件将立即隐藏，并不再参与此工作区的扫描。其他位置的同名文件夹仍会被扫描。可在工作区的编辑对话框中重新包含该文件夹。",
   "folder.excludeAction": "排除",
   "folder.excluded": "已将“{name}”从扫描中排除",
   "folder.excludeFailed": "无法排除该文件夹",

@@ -44,28 +44,33 @@ function renderDialog(onOpenChange = vi.fn()) {
 }
 
 const list = () => screen.getByRole("list");
-const includeButton = (path: string) =>
-  screen.getByRole("button", { name: `Include ${path} in scans again` });
+const includeButton = (absPath: string) =>
+  screen.getByRole("button", { name: `Include ${absPath} in scans again` });
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.scanExclusionsFolders.mockResolvedValue({
     folders: [
-      { path: "cache", found: true },
-      { path: "old/renders", found: false },
+      { path: "cache", absPath: "/media/cache", found: true },
+      { path: "old/renders", absPath: "/media/old/renders", found: false },
     ],
   });
   mocks.scanExclusionsRemoveFolders.mockResolvedValue({
-    folders: [{ path: "old/renders", found: false }],
+    folders: [
+      { path: "old/renders", absPath: "/media/old/renders", found: false },
+    ],
   });
 });
 
 describe("WorkspaceEditDialog excluded folders", () => {
-  it("lists them, marking the ones not found", async () => {
+  it("lists them where they are on disk, marking the ones not found", async () => {
     renderDialog();
     await waitFor(() => expect(list().children).toHaveLength(2));
 
     const [cache, renders] = within(list()).getAllByRole("listitem");
+    // Where, not only the name: no other folder of that name is excluded.
+    expect(cache.textContent).toContain("/media/cache");
+    expect(renders.textContent).toContain("/media/old/renders");
     expect(cache.textContent).not.toContain("Not found");
     expect(renders.textContent).toContain("Not found");
     expect(mocks.scanExclusionsFolders).toHaveBeenCalledWith("ws-1");
@@ -75,7 +80,7 @@ describe("WorkspaceEditDialog excluded folders", () => {
     const { onOpenChange } = renderDialog();
     await waitFor(() => expect(list().children).toHaveLength(2));
 
-    fireEvent.click(includeButton("cache"));
+    fireEvent.click(includeButton("/media/cache"));
     expect(within(list()).getAllByRole("listitem")).toHaveLength(1);
     expect(mocks.scanExclusionsRemoveFolders).not.toHaveBeenCalled();
     expect(
@@ -97,7 +102,7 @@ describe("WorkspaceEditDialog excluded folders", () => {
     renderDialog();
     await waitFor(() => expect(list().children).toHaveLength(2));
 
-    fireEvent.click(includeButton("cache"));
+    fireEvent.click(includeButton("/media/cache"));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(mocks.scanExclusionsRemoveFolders).not.toHaveBeenCalled();
@@ -126,7 +131,7 @@ describe("WorkspaceEditDialog excluded folders", () => {
     renderDialog();
     await waitFor(() => expect(list().children).toHaveLength(2));
 
-    fireEvent.click(includeButton("cache"));
+    fireEvent.click(includeButton("/media/cache"));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>

@@ -736,7 +736,7 @@ export const fr: Catalog = {
   "folder.showInLibrary": "Afficher le dossier dans la bibliothèque",
   "folder.excludeFromScans": "Exclure des analyses",
   "folder.excludeConfirm":
-    "Les fichiers de « {name} » sont masqués dès maintenant et exclus des analyses de cet espace de travail. Vous pouvez réinclure le dossier depuis la fenêtre de modification de l'espace de travail.",
+    "Les fichiers de « {path} » sont masqués dès maintenant et exclus des analyses de cet espace de travail. Les dossiers du même nom situés ailleurs sont toujours analysés. Vous pouvez réinclure le dossier depuis la fenêtre de modification de l'espace de travail.",
   "folder.excludeAction": "Exclure",
   "folder.excluded": "« {name} » est exclu des analyses",
   "folder.excludeFailed": "Impossible d'exclure le dossier",
