@@ -31,6 +31,10 @@ import {
   emptyScanExclusions,
   MAX_EXCLUDED_FOLDERS,
   MAX_EXCLUSION_PATTERNS,
+  PATTERN_KINDS,
+  samePattern,
+  type ExclusionPattern,
+  type PatternKind,
   type ScanExclusions,
 } from "../../shared/scanExclusions.js";
 import { autoTagSettingsChanged, autoTagSettingsVersion } from "./autoTag.js";
@@ -623,19 +627,18 @@ function parseEmojiMap(value: unknown): Record<string, string> {
 /**
  * Entry by entry. A pattern that no longer compiles is kept: it is what the
  * user wrote, the settings show it with its error, and the scan skips it.
+ * A bare string is a regular expression, as patterns were stored before they
+ * had a kind (#529).
  */
 function parseScanExclusions(value: unknown): ScanExclusions {
   if (!value || typeof value !== "object") return emptyScanExclusions();
   const c = value as Record<string, unknown>;
-  const patterns = Array.isArray(c.patterns)
-    ? [
-        ...new Set(
-          c.patterns.filter(
-            (p): p is string => typeof p === "string" && p !== "",
-          ),
-        ),
-      ].slice(0, MAX_EXCLUSION_PATTERNS)
-    : [];
+  const patterns: ExclusionPattern[] = [];
+  for (const raw of Array.isArray(c.patterns) ? c.patterns : []) {
+    const p = parseExclusionPattern(raw);
+    if (p && !patterns.some((q) => samePattern(p, q))) patterns.push(p);
+    if (patterns.length >= MAX_EXCLUSION_PATTERNS) break;
+  }
   const folders: Record<string, string[]> = {};
   if (c.folders && typeof c.folders === "object") {
     for (const [id, list] of Object.entries(c.folders)) {
@@ -649,4 +652,18 @@ function parseScanExclusions(value: unknown): ScanExclusions {
     }
   }
   return { patterns, folders };
+}
+
+function parseExclusionPattern(raw: unknown): ExclusionPattern | null {
+  if (typeof raw === "string")
+    return raw === "" ? null : { kind: "regex", value: raw };
+  if (!raw || typeof raw !== "object") return null;
+  const { kind, value } = raw as Record<string, unknown>;
+  if (
+    typeof value !== "string" ||
+    value === "" ||
+    !PATTERN_KINDS.includes(kind as PatternKind)
+  )
+    return null;
+  return { kind: kind as PatternKind, value };
 }

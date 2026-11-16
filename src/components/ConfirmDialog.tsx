@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useModalFocus } from "@/hooks/useModalFocus";
 import { useI18n } from "@/i18n/I18nProvider";
+import { cn } from "@/lib/utils";
 
 export interface ConfirmCheckbox {
   label: string;
@@ -24,6 +25,8 @@ export interface ConfirmCheckbox {
 export interface ConfirmOptions {
   title?: string;
   message: string;
+  /** Shown under the message: what the action will do, in more detail. */
+  details?: ReactNode;
   confirmText?: string;
   cancelText?: string;
   destructive?: boolean;
@@ -150,7 +153,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             // Named by its title, or by the question itself when it has none.
             aria-labelledby={state.title ? titleId : messageId}
             aria-describedby={state.title ? messageId : undefined}
-            className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 shadow-xl outline-none"
+            className={cn(
+              "w-full rounded-lg border border-border bg-surface p-4 shadow-xl outline-none",
+              state.details ? "max-w-md" : "max-w-sm",
+            )}
             onClick={(e) => e.stopPropagation()}
           >
             {state.title && (
@@ -164,6 +170,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             <p id={messageId} className="whitespace-pre-line text-sm text-fg">
               {state.message}
             </p>
+            {state.details && <div className="mt-3">{state.details}</div>}
             {state.checkbox && (
               <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-fg">
                 <input

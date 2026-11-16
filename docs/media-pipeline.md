@@ -97,18 +97,42 @@ the folders a file system keeps at a drive's root (`lost+found`,
 The user can keep folders and files out of scans (#282), in the
 `scanExclusions` setting:
 
-- `patterns`: regular expressions for every workspace, matched
+- `patterns`: for every workspace, each of a kind (#529), matched
   case-insensitively against the path relative to the workspace root, with
-  `/` as the separator on every platform. A folder is matched with a trailing
-  `/`, so a pattern ending in `/` targets folders only. Edited in Settings →
-  Scan.
+  `/` as the separator on every platform. A folder is matched with a
+  trailing `/`. Each kind becomes a regular expression (`patternRegex()` in
+  `shared/scanExclusions.ts`):
+  - `name` (the default in Settings): a file or folder name at any depth,
+    with `*` as the only wildcard (`private`, `*.tmp`); a folder covers what
+    is in it. With a `/` before its end it is a path from the workspace root
+    (`work/private`, `/private`); with a trailing `/` it takes folders only
+    (`private/`). Only a name is trimmed.
+  - `contains`: the text anywhere in the path.
+  - `regex`: a regular expression, as written. A bare string stored before
+    patterns had a kind is read as one.
+
+  Edited in Settings → Scan, one field per pattern. A new pattern shows,
+  before it is added, the listed files it would hide in every workspace
+  (`scan_exclusions_preview`: a count and the first 50, read only). Main
+  runs it in the auto-tag worker as a scan does, over each file and the
+  folders above it (`coveredListedFiles()`); a newer preview stops the one
+  running at its next chunk. A pattern whose preview did not finish cannot
+  be added: the worker leaves it out for the session, and every scan would
+  fail with it saved. Common patterns fill the field in one click.
+
 - `folders`: per workspace ID, root-relative folders, each covering
   everything below it. Added from a folder card's context menu in the folder
-  view ("Exclude from scans", after a confirmation), which hides its files at
-  once. Listed in the workspace's edit dialog by where they are on disk (a bare
-  relative path would read like every folder of that name), marked "Not found" when the
-  folder is no longer on disk (renamed or gone), and taken off the list there
-  when the dialog is saved.
+  view ("Exclude from scans"), which hides its files at once after a
+  confirmation that shows the folder on disk and how many files it hides.
+  Listed in the workspace's edit dialog by where they are on disk (a bare
+  relative path would read like every folder of that name), marked "Not
+  found" when the folder is no longer on disk (renamed or gone). The dialog
+  can also add one through the OS folder picker (`scan_exclusions_pick_folder`,
+  which only picks, and refuses a folder outside the workspace). Taking a
+  folder off and adding one are both staged: the row stays, marked, until the
+  dialog is saved, and can be undone until then. Saving sends them together
+  (`scan_exclusions_update_folders`), so they all go or none do. Settings →
+  Scan counts each workspace's folders and opens its edit dialog.
 
 The patterns are user regexes, so they never run on the main thread: they go
 to the auto-tag worker as auto-tagging rules (`exclusionRule()` in

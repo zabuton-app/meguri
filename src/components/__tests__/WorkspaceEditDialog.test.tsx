@@ -2,22 +2,32 @@
 // not on disk marked, taken off the list only when the dialog is saved.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import type { ExcludedFolders } from "@shared/ipc/channels";
+import type { ExcludedFolders, PickedFolder } from "@shared/ipc/channels";
 import { WorkspaceEditDialog } from "@/components/WorkspaceEditDialog";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
 const mocks = vi.hoisted(() => ({
   scanExclusionsFolders: vi.fn<(id: string) => Promise<ExcludedFolders>>(),
-  scanExclusionsRemoveFolders:
-    vi.fn<(id: string, paths: string[]) => Promise<ExcludedFolders>>(),
+  scanExclusionsUpdateFolders:
+    vi.fn<
+      (
+        id: string,
+        change: { add: string[]; remove: string[] },
+      ) => Promise<ExcludedFolders>
+    >(),
+  scanExclusionsPickFolder: vi.fn<(id: string) => Promise<PickedFolder>>(),
   toastError: vi.fn<(message: string) => void>(),
 }));
 
 vi.mock("@/ipc/client", () => ({
   api: {
     scanExclusionsFolders: (id: string) => mocks.scanExclusionsFolders(id),
-    scanExclusionsRemoveFolders: (id: string, paths: string[]) =>
-      mocks.scanExclusionsRemoveFolders(id, paths),
+    scanExclusionsUpdateFolders: (
+      id: string,
+      change: { add: string[]; remove: string[] },
+    ) => mocks.scanExclusionsUpdateFolders(id, change),
+    scanExclusionsPickFolder: (id: string) =>
+      mocks.scanExclusionsPickFolder(id),
     workspaceSetEmoji: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -46,6 +56,9 @@ function renderDialog(onOpenChange = vi.fn()) {
 const list = () => screen.getByRole("list");
 const includeButton = (absPath: string) =>
   screen.getByRole("button", { name: `Include ${absPath} in scans again` });
+const undoButton = (absPath: string) =>
+  screen.getByRole("button", { name: `Undo the change to ${absPath}` });
+const items = () => within(list()).getAllByRole("listitem");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -55,7 +68,8 @@ beforeEach(() => {
       { path: "old/renders", absPath: "/media/old/renders", found: false },
     ],
   });
-  mocks.scanExclusionsRemoveFolders.mockResolvedValue({
+  mocks.scanExclusionsPickFolder.mockResolvedValue({ status: "canceled" });
+  mocks.scanExclusionsUpdateFolders.mockResolvedValue({
     folders: [
       { path: "old/renders", absPath: "/media/old/renders", found: false },
     ],
@@ -81,8 +95,11 @@ describe("WorkspaceEditDialog excluded folders", () => {
     await waitFor(() => expect(list().children).toHaveLength(2));
 
     fireEvent.click(includeButton("/media/cache"));
-    expect(within(list()).getAllByRole("listitem")).toHaveLength(1);
-    expect(mocks.scanExclusionsRemoveFolders).not.toHaveBeenCalled();
+    // Still listed, marked, until the dialog is saved.
+    expect(items()).toHaveLength(2);
+    expect(items()[0].textContent).toContain("Included on save");
+    expect(screen.getByTestId("excluded-folder-count").textContent).toBe("1");
+    expect(mocks.scanExclusionsUpdateFolders).not.toHaveBeenCalled();
     expect(
       screen.getByText(
         "Folders taken off the list are scanned again from the next scan.",
@@ -91,11 +108,74 @@ describe("WorkspaceEditDialog excluded folders", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
-      expect(mocks.scanExclusionsRemoveFolders).toHaveBeenCalledWith("ws-1", [
-        "cache",
-      ]),
+      expect(mocks.scanExclusionsUpdateFolders).toHaveBeenCalledWith("ws-1", {
+        add: [],
+        remove: ["cache"],
+      }),
     );
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("undoes taking a folder off before the dialog is saved", async () => {
+    renderDialog();
+    await waitFor(() => expect(list().children).toHaveLength(2));
+
+    fireEvent.click(includeButton("/media/cache"));
+    fireEvent.click(undoButton("/media/cache"));
+    expect(items()[0].textContent).not.toContain("Included on save");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(mocks.scanExclusionsUpdateFolders).not.toHaveBeenCalled();
+  });
+
+  it("offers taking a folder not on disk off the list", async () => {
+    renderDialog();
+    await waitFor(() => expect(list().children).toHaveLength(2));
+    expect(
+      screen.getByRole("button", {
+        name: "Remove /media/old/renders from the list",
+      }).textContent,
+    ).toBe("Remove");
+  });
+
+  it("adds a picked folder when the dialog is saved", async () => {
+    mocks.scanExclusionsPickFolder.mockResolvedValueOnce({
+      status: "picked",
+      path: "work/proxy",
+      absPath: "/media/work/proxy",
+    });
+    renderDialog();
+    await waitFor(() => expect(list().children).toHaveLength(2));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    await waitFor(() => expect(items()).toHaveLength(3));
+    expect(items()[2].textContent).toContain("Excluded on save");
+    expect(mocks.scanExclusionsPickFolder).toHaveBeenCalledWith("ws-1");
+    expect(mocks.scanExclusionsUpdateFolders).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.scanExclusionsUpdateFolders).toHaveBeenCalledWith("ws-1", {
+        add: ["work/proxy"],
+        remove: [],
+      }),
+    );
+  });
+
+  it("refuses a picked folder outside the workspace", async () => {
+    mocks.scanExclusionsPickFolder.mockResolvedValueOnce({
+      status: "outside",
+    });
+    renderDialog();
+    await waitFor(() => expect(list().children).toHaveLength(2));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Pick a folder inside the workspace",
+      ),
+    );
+    expect(items()).toHaveLength(2);
   });
 
   it("keeps every folder when the dialog is canceled", async () => {
@@ -105,7 +185,7 @@ describe("WorkspaceEditDialog excluded folders", () => {
     fireEvent.click(includeButton("/media/cache"));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(mocks.scanExclusionsRemoveFolders).not.toHaveBeenCalled();
+    expect(mocks.scanExclusionsUpdateFolders).not.toHaveBeenCalled();
   });
 
   it("says when there are none", async () => {
@@ -113,7 +193,7 @@ describe("WorkspaceEditDialog excluded folders", () => {
     renderDialog();
     expect(
       await screen.findByText(
-        "No folders. Right-click a folder in the folder view to exclude it.",
+        "No folders. Right-click a folder in the folder view, or use “Add folder”.",
       ),
     ).toBeTruthy();
   });
@@ -124,10 +204,13 @@ describe("WorkspaceEditDialog excluded folders", () => {
     expect(
       await screen.findByText("Couldn't read the excluded folders."),
     ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(list().children).toHaveLength(2));
   });
 
   it("tells the user when taking them off fails", async () => {
-    mocks.scanExclusionsRemoveFolders.mockRejectedValueOnce(new Error("down"));
+    mocks.scanExclusionsUpdateFolders.mockRejectedValueOnce(new Error("down"));
     renderDialog();
     await waitFor(() => expect(list().children).toHaveLength(2));
 

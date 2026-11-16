@@ -79,15 +79,72 @@ export const es: Catalog = {
   "settings.customCssOpen": "Abrir archivo",
   "settings.customCssOpenError": "No se pudo abrir custom.css.",
   "settings.tabScan": "Escaneo",
-  "settings.scanExclusions": "Excluir de los escaneos",
+  "settings.scanExclusions": "Excluir por patrón",
   "settings.scanExclusionsDesc":
-    "Expresiones regulares, una por línea, comparadas con cada ruta dentro de la carpeta del espacio de trabajo, sin distinguir mayúsculas. La ruta de una carpeta termina en /. Se aplican a todos los espacios de trabajo.",
+    "Archivos y carpetas que se excluyen de los escaneos en todos los espacios de trabajo. No distingue mayúsculas.",
   "settings.scanExclusionsNextScan":
     "Al guardar se ocultan los archivos indexados que cubre un patrón. Los archivos de un patrón quitado vuelven en el siguiente escaneo.",
   "settings.scanExclusionsSave": "Guardar",
   "settings.scanExclusionsSaved": "Exclusiones de escaneo guardadas.",
   "settings.scanExclusionsSaveError":
     "No se pudieron guardar las exclusiones de escaneo.",
+  "settings.scanExclusionsPattern": "Patrón {n}",
+  "settings.scanExclusionsRemove": "Quitar el patrón {n}",
+  "settings.scanExclusionsAdd": "Patrón que añadir",
+  "settings.scanExclusionsNone": "No hay patrones.",
+  "settings.scanExclusionsPresets": "Habituales:",
+  "settings.scanExclusionsPresetAdd": "Usar {pattern}",
+  "settings.scanExclusionsKind": "Coincidir por",
+  "settings.scanExclusionsKindName": "Nombre",
+  "settings.scanExclusionsKindContains": "Contiene",
+  "settings.scanExclusionsKindRegex": "Expresión regular",
+  "settings.scanExclusionsKindNameHint":
+    "Excluye archivos y carpetas con este nombre, a cualquier profundidad; una carpeta incluye su contenido. * representa cualquier texto (*.tmp). Con una / (work/private, /private), es una ruta desde la carpeta del espacio de trabajo; terminado en / (private/), solo carpetas.",
+  "settings.scanExclusionsKindContainsHint":
+    "Excluye todo lo que tenga este texto en su ruta, incluso dentro de un nombre (temp también coincide con attempt.mp4).",
+  "settings.scanExclusionsKindRegexHint":
+    "Una expresión regular, comparada con la ruta desde la carpeta del espacio de trabajo. La ruta de una carpeta termina en /.",
+  "settings.scanExclusionsAddAction": "Añadir",
+  "settings.scanExclusionsDuplicate": "Este patrón ya está en la lista.",
+  "settings.scanExclusionsPreviewHint":
+    "Escribe un patrón para ver los archivos ya listados que coinciden.",
+  "settings.scanExclusionsPreviewLoading": "Buscando archivos que coincidan…",
+  "settings.scanExclusionsPreviewError":
+    "No se pudieron buscar archivos que coincidan.",
+  "settings.scanExclusionsPreviewNone":
+    "No coincide con ninguno de los archivos listados.",
+  "settings.scanExclusionsPreviewCount": {
+    one: "Coincide {count} archivo. Se oculta al añadir el patrón y guardar.",
+    other:
+      "Coinciden {count} archivos. Se ocultan al añadir el patrón y guardar.",
+  },
+  "settings.scanExclusionsPreviewList": "Archivos que coinciden",
+  "settings.scanExclusionsPreviewMore": {
+    one: "y {count} más",
+    other: "y {count} más",
+  },
+  "settings.scanExclusionsTestTimedOut":
+    "Este patrón no terminó a tiempo. Detendría los escaneos, así que no se puede añadir.",
+  "settings.folderExclusions": "Excluir por carpeta",
+  "settings.folderExclusionsDesc":
+    "Por espacio de trabajo, solo las carpetas indicadas. Añade una haciendo clic derecho en una carpeta en la vista de carpetas.",
+  "settings.folderExclusionsCount": {
+    one: "{count} carpeta",
+    other: "{count} carpetas",
+  },
+  "settings.folderExclusionsNone": "Ninguna",
+  "settings.folderExclusionsNotFound": {
+    one: "{count} no encontrada",
+    other: "{count} no encontradas",
+  },
+  "settings.folderExclusionsManage": "Gestionar",
+  "settings.folderExclusionsManageLabel":
+    "Gestionar las carpetas excluidas de {name}",
+  "settings.folderExclusionsLoadError":
+    "No se pudieron leer las carpetas excluidas.",
+  "settings.folderExclusionsNoWorkspaces": "No hay espacios de trabajo.",
+  "settings.scanExclusionsGlobal": "Global",
+  "settings.folderExclusionsPerWorkspace": "Por espacio de trabajo",
   "settings.scanExclusionsLoadError":
     "No se pudieron leer las exclusiones del escaneo.",
   "settings.logo": "Logotipo de la aplicación",
@@ -732,9 +789,20 @@ export const es: Catalog = {
   "folder.showInLibrary": "Mostrar la carpeta en la biblioteca",
   "folder.excludeFromScans": "Excluir de los escaneos",
   "folder.excludeConfirm":
-    "Los archivos de «{path}» se ocultan ahora y quedan fuera de los escaneos de este espacio de trabajo. Las carpetas con el mismo nombre en otros lugares se siguen escaneando. Puedes volver a incluir la carpeta desde el diálogo de edición del espacio de trabajo.",
+    "Esta carpeta queda fuera de los escaneos de este espacio de trabajo.",
   "folder.excludeAction": "Excluir",
   "folder.excluded": "«{name}» se excluyó de los escaneos",
+  "folder.excludeTitle": "Excluir «{name}» de los escaneos",
+  "folder.excludeTarget": "Carpeta",
+  "folder.excludeHides": {
+    one: "El {count} archivo que contiene se oculta ahora. No se borra nada del disco.",
+    other:
+      "Los {count} archivos que contiene se ocultan ahora. No se borra nada del disco.",
+  },
+  "folder.excludeOnlyThis":
+    "Solo se excluye esta carpeta. Las carpetas llamadas «{name}» en otros lugares se siguen escaneando.",
+  "folder.excludeUndoHint":
+    "Para volver a incluirla, edita el espacio de trabajo y ve a «Excluir de los escaneos».",
   "folder.excludeFailed": "No se pudo excluir la carpeta",
   "folder.showFailed": "No se pudo mostrar la carpeta",
   "folder.subfolderMenu": 'Subcarpetas de "{name}"',
@@ -1170,11 +1238,26 @@ export const es: Catalog = {
   "workspace.pathReadonly": "La ruta no se puede cambiar.",
   "workspace.excludedFolders": "Excluidas de los escaneos",
   "workspace.excludedFoldersEmpty":
-    "No hay carpetas. Haz clic derecho en una carpeta en la vista de carpetas para excluirla.",
+    "No hay carpetas. Haz clic derecho en una carpeta en la vista de carpetas o usa «Añadir carpeta».",
   "workspace.excludedFolderNotFound": "No encontrada",
   "workspace.excludedFolderInclude": "Volver a incluir {path} en los escaneos",
   "workspace.excludedFoldersNextScan":
     "Las carpetas que quites de la lista se escanean de nuevo a partir del próximo escaneo.",
+  "workspace.excludedFoldersDesc":
+    "Solo estas carpetas y su contenido. Las carpetas con el mismo nombre en otros lugares se siguen escaneando.",
+  "workspace.excludedFolderIncludeAction": "Incluir",
+  "workspace.excludedFolderRemoveAction": "Quitar",
+  "workspace.excludedFolderRemove": "Quitar {path} de la lista",
+  "workspace.excludedFolderUndo": "Deshacer",
+  "workspace.excludedFolderUndoLabel": "Deshacer el cambio en {path}",
+  "workspace.excludedFolderIncluding": "Se incluye al guardar",
+  "workspace.excludedFolderAdding": "Se excluye al guardar",
+  "workspace.excludedFoldersAdd": "Añadir carpeta",
+  "workspace.excludedFolderOutside":
+    "Elige una carpeta dentro del espacio de trabajo",
+  "workspace.excludedFolderPickFailed":
+    "No se pudo abrir el selector de carpetas",
+  "workspace.excludedFoldersRetry": "Reintentar",
   "workspace.excludedFoldersLoadError":
     "No se pudieron leer las carpetas excluidas.",
   "workspace.excludedFoldersSaveError":

@@ -49,6 +49,7 @@ import { AboutSection } from "./AboutSection";
 import { CssThemeSection } from "./CssThemeSection";
 import { ThemeSection } from "./ThemeSection";
 import { CustomCssSection } from "./CustomCssSection";
+import { FolderExclusionsSection } from "./FolderExclusionsSection";
 import { ScanExclusionsSection } from "./ScanExclusionsSection";
 import { useTour } from "@/tour/TourProvider";
 import { useExtraSettingsSections } from "@/settings/extraSections";
@@ -575,7 +576,12 @@ export default function Settings() {
             </>
           )}
 
-          {tab === "scan" && <ScanExclusionsSection />}
+          {tab === "scan" && (
+            <>
+              <ScanExclusionsSection />
+              <FolderExclusionsSection />
+            </>
+          )}
 
           {tab === "playback" && (
             <>

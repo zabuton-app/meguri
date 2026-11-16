@@ -10,7 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let userData = "";
 const handlers = new Map<string, (event: unknown, raw: unknown) => unknown>();
+const showOpenDialog = vi.hoisted(() =>
+  vi.fn<() => Promise<{ canceled: boolean; filePaths: string[] }>>(),
+);
 vi.mock("electron", () => ({
+  dialog: { showOpenDialog },
   app: { getPath: () => userData },
   ipcMain: {
     handle: (channel: string, fn: (event: unknown, raw: unknown) => unknown) =>
@@ -27,6 +31,7 @@ const { insertFile } = await import("../core/__tests__/helpers.js");
 const { setRendererIndex } = await import("../core/appUrl.js");
 const { loadConfig } = await import("../core/appConfig.js");
 const { countMissingFiles } = await import("../core/queries.js");
+const { MAX_EXCLUDED_FOLDERS } = await import("../../shared/scanExclusions.js");
 const { writeStoredSettings } =
   await import("../core/__tests__/storedSettings.js");
 type IpcContext = import("../ipc/context.js").IpcContext;
@@ -64,6 +69,7 @@ beforeEach(() => {
   }
   registerScanHandlers({
     ws,
+    mainWindow: () => null,
     queryClient: { invalidateCaches: invalidated },
     passes: new WorkspacePasses(),
     deriveAutoTags: deriveAutoTagsInProcess,
@@ -92,13 +98,16 @@ const visible = () =>
       ).map((p) => p.split(path.sep).join("/")),
     );
 
+const rx = (value: string) => ({ kind: "regex", value });
+const cache = rx("^cache/$");
+
 describe("scan exclusion channels", () => {
   it("save the patterns and hide what they cover in every workspace", async () => {
     await expect(
-      invoke("scan_exclusions_set_patterns", { patterns: ["^cache/$"] }),
-    ).resolves.toEqual({ patterns: ["^cache/$"] });
+      invoke("scan_exclusions_set_patterns", { patterns: [cache] }),
+    ).resolves.toEqual({ patterns: [cache] });
 
-    expect(loadConfig().scanExclusions.patterns).toEqual(["^cache/$"]);
+    expect(loadConfig().scanExclusions.patterns).toEqual([cache]);
     expect(visible()).toEqual([["keep/b.mp4"], ["keep/b.mp4"]]);
     // Hidden, not gone.
     for (const { core } of ws.allCores())
@@ -108,7 +117,9 @@ describe("scan exclusion channels", () => {
 
   it("refuse a pattern that does not compile, saving nothing", async () => {
     await expect(
-      invoke("scan_exclusions_set_patterns", { patterns: ["^ok$", "("] }),
+      invoke("scan_exclusions_set_patterns", {
+        patterns: [rx("^ok$"), rx("(")],
+      }),
     ).rejects.toThrow();
 
     expect(loadConfig().scanExclusions.patterns).toEqual([]);
@@ -129,7 +140,7 @@ describe("scan exclusion channels", () => {
     raw.close();
 
     await expect(
-      invoke("scan_exclusions_set_patterns", { patterns: ["^cache/$"] }),
+      invoke("scan_exclusions_set_patterns", { patterns: [cache] }),
     ).rejects.toThrow(/could not be saved/);
     expect(visible()).toEqual([
       ["cache/a.mp4", "keep/b.mp4"],
@@ -147,29 +158,103 @@ describe("scan exclusion channels", () => {
     } as unknown as IpcContext);
 
     await expect(
-      invoke("scan_exclusions_set_patterns", { patterns: ["^cache/$"] }),
-    ).resolves.toEqual({ patterns: ["^cache/$"] });
+      invoke("scan_exclusions_set_patterns", { patterns: [cache] }),
+    ).resolves.toEqual({ patterns: [cache] });
 
     // The next scan applies it.
-    expect(loadConfig().scanExclusions.patterns).toEqual(["^cache/$"]);
+    expect(loadConfig().scanExclusions.patterns).toEqual([cache]);
     expect(visible()).toEqual([
       ["cache/a.mp4", "keep/b.mp4"],
       ["cache/a.mp4", "keep/b.mp4"],
     ]);
   });
 
-  it("read back what is stored, entry by entry", async () => {
+  it("read back what is stored, entry by entry, bare strings as regexes", async () => {
     writeStoredSettings(userData, {
       scanExclusions: {
-        patterns: ["^a/$", 3, "", "^a/$"],
+        patterns: [
+          "^a/$",
+          3,
+          "",
+          "^a/$",
+          { kind: "name", value: "tmp" },
+          { kind: "glob", value: "x" },
+          { kind: "name", value: "tmp" },
+          { kind: "contains", value: "" },
+        ],
         folders: { w: ["ok/dir", "../up", 5], other: "nope" },
       },
     });
 
     await expect(invoke("scan_exclusions_get")).resolves.toEqual({
-      patterns: ["^a/$"],
+      patterns: [rx("^a/$"), { kind: "name", value: "tmp" }],
     });
     expect(loadConfig().scanExclusions.folders).toEqual({ w: ["ok/dir"] });
+  });
+
+  describe("pattern preview", () => {
+    it("count and list what a pattern would hide in every workspace, hiding nothing", async () => {
+      await expect(
+        invoke("scan_exclusions_preview", { pattern: cache }),
+      ).resolves.toEqual({
+        status: "done",
+        total: 2,
+        files: roots.map((root) => ({
+          workspace: path.basename(root),
+          path: "cache/a.mp4",
+          absPath: path.join(root, "cache", "a.mp4"),
+        })),
+      });
+      expect(visible()).toEqual([
+        ["cache/a.mp4", "keep/b.mp4"],
+        ["cache/a.mp4", "keep/b.mp4"],
+      ]);
+      expect(loadConfig().scanExclusions.patterns).toEqual([]);
+    });
+
+    it("leave out files hidden already, and refuse a pattern that does not compile", async () => {
+      await invoke("scan_exclusions_set_patterns", {
+        patterns: [rx("^keep/")],
+      });
+      await expect(
+        invoke("scan_exclusions_preview", {
+          pattern: { kind: "name", value: "*.mp4" },
+        }),
+      ).resolves.toMatchObject({ status: "done", total: 2 });
+      await expect(
+        invoke("scan_exclusions_preview", { pattern: rx("(") }),
+      ).rejects.toThrow();
+    });
+
+    it("stop a preview once a newer one is asked for", async () => {
+      let release = () => {};
+      const gate = new Promise<void>((r) => (release = r));
+      let calls = 0;
+      registerScanHandlers({
+        ws,
+        queryClient: { invalidateCaches: invalidated },
+        passes: new WorkspacePasses(),
+        deriveAutoTags: async (
+          ...args: Parameters<typeof deriveAutoTagsInProcess>
+        ) => {
+          // The first preview waits in the worker for its first workspace.
+          if (calls++ === 0) await gate;
+          return deriveAutoTagsInProcess(...args);
+        },
+        scans: {},
+      } as unknown as IpcContext);
+
+      const first = invoke("scan_exclusions_preview", { pattern: cache });
+      const second = invoke("scan_exclusions_preview", {
+        pattern: rx("^keep/$"),
+      });
+      await expect(second).resolves.toMatchObject({
+        status: "done",
+        total: 2,
+      });
+      release();
+      await expect(first).resolves.toEqual({ status: "superseded" });
+    });
   });
 
   describe("excluded folders", () => {
@@ -243,9 +328,10 @@ describe("scan exclusion channels", () => {
         });
 
       await expect(
-        invoke("scan_exclusions_remove_folders", {
+        invoke("scan_exclusions_update_folders", {
           workspaceId: first,
-          paths: ["cache"],
+          add: [],
+          remove: ["cache"],
         }),
       ).resolves.toEqual({
         folders: [
@@ -254,11 +340,55 @@ describe("scan exclusion channels", () => {
       });
       expect(visible()[0]).toEqual([]);
 
-      await invoke("scan_exclusions_remove_folders", {
+      await invoke("scan_exclusions_update_folders", {
         workspaceId: first,
-        paths: ["keep"],
+        add: [],
+        remove: ["keep"],
       });
       expect(loadConfig().scanExclusions.folders).toEqual({});
+    });
+
+    it("add and take off folders in one save, hiding what is added", async () => {
+      const [first] = ids();
+      await invoke("scan_exclusions_add_folder", {
+        workspaceId: first,
+        path: "keep",
+      });
+
+      await invoke("scan_exclusions_update_folders", {
+        workspaceId: first,
+        add: ["cache", "cache"],
+        remove: ["keep"],
+      });
+      expect(loadConfig().scanExclusions.folders).toEqual({
+        [first]: ["cache"],
+      });
+      // keep/b.mp4 stays hidden until a scan finds it.
+      expect(visible()[0]).toEqual([]);
+    });
+
+    it("save none of the changes when they would be too many", async () => {
+      const [first] = ids();
+      await invoke("scan_exclusions_add_folder", {
+        workspaceId: first,
+        path: "keep",
+      });
+      const many = Array.from(
+        { length: MAX_EXCLUDED_FOLDERS },
+        (_, i) => `f${i}`,
+      );
+
+      await expect(
+        invoke("scan_exclusions_update_folders", {
+          workspaceId: first,
+          add: many,
+          remove: [],
+        }),
+      ).rejects.toThrow();
+      expect(loadConfig().scanExclusions.folders).toEqual({
+        [first]: ["keep"],
+      });
+      expect(visible()[0]).toEqual(["cache/a.mp4"]);
     });
 
     it("refuse the workspace root and an unknown workspace", async () => {
@@ -275,6 +405,45 @@ describe("scan exclusion channels", () => {
         }),
       ).rejects.toThrow();
       expect(loadConfig().scanExclusions.folders).toEqual({});
+    });
+
+    it("pick a folder inside the workspace, saving nothing", async () => {
+      const [first] = ids();
+      const picked = path.join(roots[0], "work", "renders");
+      showOpenDialog.mockResolvedValueOnce({
+        canceled: false,
+        filePaths: [picked],
+      });
+
+      await expect(
+        invoke("scan_exclusions_pick_folder", { workspaceId: first }),
+      ).resolves.toEqual({
+        status: "picked",
+        path: "work/renders",
+        absPath: picked,
+      });
+      expect(showOpenDialog).toHaveBeenLastCalledWith(
+        undefined,
+        expect.objectContaining({ defaultPath: roots[0] }),
+      );
+      expect(loadConfig().scanExclusions.folders).toEqual({});
+    });
+
+    it("refuse a picked folder that is not inside the workspace", async () => {
+      const [first] = ids();
+      for (const picked of [roots[0], roots[1], path.dirname(roots[0])]) {
+        showOpenDialog.mockResolvedValueOnce({
+          canceled: false,
+          filePaths: [picked],
+        });
+        await expect(
+          invoke("scan_exclusions_pick_folder", { workspaceId: first }),
+        ).resolves.toEqual({ status: "outside" });
+      }
+      showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
+      await expect(
+        invoke("scan_exclusions_pick_folder", { workspaceId: first }),
+      ).resolves.toEqual({ status: "canceled" });
     });
   });
 });

@@ -79,14 +79,68 @@ export const en: Catalog = {
   "settings.customCssOpen": "Open file",
   "settings.customCssOpenError": "Could not open custom.css.",
   "settings.tabScan": "Scan",
-  "settings.scanExclusions": "Exclude from scans",
+  "settings.scanExclusions": "Exclude by pattern",
   "settings.scanExclusionsDesc":
-    "Regular expressions, one per line, matched against each path inside the workspace folder, ignoring case. A folder's path ends with /. They apply to every workspace.",
+    "Files and folders left out of scans in every workspace. Case is ignored.",
   "settings.scanExclusionsNextScan":
     "Saving hides the indexed files a pattern covers. Files a removed pattern covered come back at the next scan.",
   "settings.scanExclusionsSave": "Save",
   "settings.scanExclusionsSaved": "Scan exclusions saved.",
   "settings.scanExclusionsSaveError": "Could not save the scan exclusions.",
+  "settings.scanExclusionsPattern": "Pattern {n}",
+  "settings.scanExclusionsRemove": "Remove pattern {n}",
+  "settings.scanExclusionsAdd": "Pattern to add",
+  "settings.scanExclusionsNone": "No patterns.",
+  "settings.scanExclusionsPresets": "Common:",
+  "settings.scanExclusionsPresetAdd": "Use {pattern}",
+  "settings.scanExclusionsKind": "Match by",
+  "settings.scanExclusionsKindName": "Name",
+  "settings.scanExclusionsKindContains": "Contains",
+  "settings.scanExclusionsKindRegex": "Regex",
+  "settings.scanExclusionsKindNameHint":
+    "Leaves out files and folders with this name, at any depth; a folder takes what is in it. * stands for any text (*.tmp). With a / (work/private, /private), it is a path from the workspace folder; ending with / (private/), folders only.",
+  "settings.scanExclusionsKindContainsHint":
+    "Leaves out anything whose path contains this text, even within a name (temp also matches attempt.mp4).",
+  "settings.scanExclusionsKindRegexHint":
+    "A regular expression, matched against the path from the workspace folder. A folder's path ends with /.",
+  "settings.scanExclusionsAddAction": "Add",
+  "settings.scanExclusionsDuplicate": "This pattern is already in the list.",
+  "settings.scanExclusionsPreviewHint":
+    "Type a pattern to see the files it matches among those already listed.",
+  "settings.scanExclusionsPreviewLoading": "Looking for matching files…",
+  "settings.scanExclusionsPreviewError": "Couldn't look for matching files.",
+  "settings.scanExclusionsPreviewNone": "It matches none of the listed files.",
+  "settings.scanExclusionsPreviewCount": {
+    one: "{count} file matches. It is hidden once the pattern is added and saved.",
+    other:
+      "{count} files match. They are hidden once the pattern is added and saved.",
+  },
+  "settings.scanExclusionsPreviewList": "Matching files",
+  "settings.scanExclusionsPreviewMore": {
+    one: "and {count} more",
+    other: "and {count} more",
+  },
+  "settings.scanExclusionsTestTimedOut":
+    "This pattern did not finish in time. It would stop scans, so it cannot be added.",
+  "settings.folderExclusions": "Exclude by folder",
+  "settings.folderExclusionsDesc":
+    "Per workspace, only the folders listed. Add one by right-clicking a folder in the folder view.",
+  "settings.folderExclusionsCount": {
+    one: "{count} folder",
+    other: "{count} folders",
+  },
+  "settings.folderExclusionsNone": "None",
+  "settings.folderExclusionsNotFound": {
+    one: "{count} not found",
+    other: "{count} not found",
+  },
+  "settings.folderExclusionsManage": "Manage",
+  "settings.folderExclusionsManageLabel":
+    "Manage the excluded folders of {name}",
+  "settings.folderExclusionsLoadError": "Couldn't read the excluded folders.",
+  "settings.folderExclusionsNoWorkspaces": "No workspaces.",
+  "settings.scanExclusionsGlobal": "Global",
+  "settings.folderExclusionsPerWorkspace": "Per workspace",
   "settings.scanExclusionsLoadError": "Could not read the scan exclusions.",
   "settings.logo": "App logo",
   "settings.logoDesc": "Applies to the window, tray, and in-app icons.",
@@ -696,10 +750,20 @@ export const en: Catalog = {
   "folder.chip": "Folder",
   "folder.showInLibrary": "Show folder in library",
   "folder.excludeFromScans": "Exclude from scans",
-  "folder.excludeConfirm":
-    "The files in “{path}” are hidden now and left out of this workspace's scans. Folders of the same name elsewhere are still scanned. You can include the folder again in the workspace's edit dialog.",
+  "folder.excludeConfirm": "This folder is left out of this workspace's scans.",
   "folder.excludeAction": "Exclude",
   "folder.excluded": "“{name}” is excluded from scans",
+  "folder.excludeTitle": "Exclude “{name}” from scans",
+  "folder.excludeTarget": "Folder",
+  "folder.excludeHides": {
+    one: "The {count} file in it is hidden now. Nothing is deleted from the disk.",
+    other:
+      "The {count} files in it are hidden now. Nothing is deleted from the disk.",
+  },
+  "folder.excludeOnlyThis":
+    "Only this folder is excluded. Folders named “{name}” elsewhere are still scanned.",
+  "folder.excludeUndoHint":
+    "To include it again, edit the workspace and see “Exclude from scans”.",
   "folder.excludeFailed": "Couldn't exclude the folder",
   "folder.showFailed": "Couldn't show the folder",
   "folder.subfolderMenu": 'Subfolders of "{name}"',
@@ -1111,11 +1175,24 @@ export const en: Catalog = {
   "workspace.pathReadonly": "The path cannot be changed.",
   "workspace.excludedFolders": "Excluded from scans",
   "workspace.excludedFoldersEmpty":
-    "No folders. Right-click a folder in the folder view to exclude it.",
+    "No folders. Right-click a folder in the folder view, or use “Add folder”.",
   "workspace.excludedFolderNotFound": "Not found",
   "workspace.excludedFolderInclude": "Include {path} in scans again",
   "workspace.excludedFoldersNextScan":
     "Folders taken off the list are scanned again from the next scan.",
+  "workspace.excludedFoldersDesc":
+    "Only these folders and what is in them. Folders of the same name elsewhere are still scanned.",
+  "workspace.excludedFolderIncludeAction": "Include",
+  "workspace.excludedFolderRemoveAction": "Remove",
+  "workspace.excludedFolderRemove": "Remove {path} from the list",
+  "workspace.excludedFolderUndo": "Undo",
+  "workspace.excludedFolderUndoLabel": "Undo the change to {path}",
+  "workspace.excludedFolderIncluding": "Included on save",
+  "workspace.excludedFolderAdding": "Excluded on save",
+  "workspace.excludedFoldersAdd": "Add folder",
+  "workspace.excludedFolderOutside": "Pick a folder inside the workspace",
+  "workspace.excludedFolderPickFailed": "Couldn't open the folder picker",
+  "workspace.excludedFoldersRetry": "Retry",
   "workspace.excludedFoldersLoadError": "Couldn't read the excluded folders.",
   "workspace.excludedFoldersSaveError": "Couldn't update the excluded folders",
   "workspace.addDirectory": "Add video directory",

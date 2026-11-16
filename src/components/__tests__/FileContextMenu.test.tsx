@@ -129,7 +129,11 @@ function renderView(
               {f.relPath}
             </div>
           ))}
-          <div data-folder-path="videos/old" data-testid="folder">
+          <div
+            data-folder-path="videos/old"
+            data-folder-count="12"
+            data-testid="folder"
+          >
             <span data-testid="folder-name">old</span>
           </div>
           <div data-testid="gap" />
@@ -190,7 +194,10 @@ describe("FileContextMenu", () => {
     fireEvent.click(item("Exclude from scans"));
     const dialog = await screen.findByRole("alertdialog");
     // By its path: no other folder named "old" is excluded.
-    expect(dialog.textContent).toContain("“videos/old”");
+    expect(dialog.textContent).toContain("videos/old");
+    expect(within(dialog).getByText("old", { selector: "mark" })).toBeTruthy();
+    // How much it hides, from the card's count.
+    expect(dialog.textContent).toContain("The 12 files in it are hidden now.");
     expect(mocks.scanExclusionsAddFolder).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Exclude" }));
 

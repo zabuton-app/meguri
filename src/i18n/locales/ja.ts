@@ -77,14 +77,57 @@ export const ja = {
   "settings.customCssOpen": "ファイルを開く",
   "settings.customCssOpenError": "custom.cssを開けませんでした。",
   "settings.tabScan": "スキャン",
-  "settings.scanExclusions": "スキャンから除外",
+  "settings.scanExclusions": "パターンで除外",
   "settings.scanExclusionsDesc":
-    "1行に1つの正規表現。ワークスペースのフォルダ内のパスに、大文字・小文字を区別せずに当てます。フォルダのパスは末尾が/になります。すべてのワークスペースに適用されます。",
+    "すべてのワークスペースで、スキャンから外すファイルやフォルダ。大文字・小文字は区別しません。",
   "settings.scanExclusionsNextScan":
     "保存すると、パターンに一致する取り込み済みのファイルが非表示になります。外したパターンのファイルは次のスキャンで戻ります。",
   "settings.scanExclusionsSave": "保存",
   "settings.scanExclusionsSaved": "スキャンの除外を保存しました。",
   "settings.scanExclusionsSaveError": "スキャンの除外を保存できませんでした。",
+  "settings.scanExclusionsPattern": "パターン{n}",
+  "settings.scanExclusionsRemove": "パターン{n}を削除",
+  "settings.scanExclusionsAdd": "追加するパターン",
+  "settings.scanExclusionsNone": "パターンはありません。",
+  "settings.scanExclusionsPresets": "よく使うもの:",
+  "settings.scanExclusionsPresetAdd": "{pattern}を入れる",
+  "settings.scanExclusionsKind": "方式",
+  "settings.scanExclusionsKindName": "名前",
+  "settings.scanExclusionsKindContains": "含む",
+  "settings.scanExclusionsKindRegex": "正規表現",
+  "settings.scanExclusionsKindNameHint":
+    "名前が一致するファイルやフォルダを、どの階層でも除外します。フォルダなら中身もまとめて除外されます。*は任意の文字列（*.tmpなど）。/を含めると（work/private、/private）ワークスペースのフォルダからのパスに、末尾に/を付けると（private/）フォルダだけになります。",
+  "settings.scanExclusionsKindContainsHint":
+    "パスのどこかにこの文字列を含むものを除外します。名前の一部にも当たります（tempならattempt.mp4も）。",
+  "settings.scanExclusionsKindRegexHint":
+    "正規表現。ワークスペースのフォルダからのパスに当てます。フォルダのパスは末尾が/になります。",
+  "settings.scanExclusionsAddAction": "追加",
+  "settings.scanExclusionsDuplicate": "一覧にあるパターンです。",
+  "settings.scanExclusionsPreviewHint":
+    "パターンを入れると、取り込み済みのファイルのうち一致するものを表示します。",
+  "settings.scanExclusionsPreviewLoading": "一致するファイルを探しています…",
+  "settings.scanExclusionsPreviewError":
+    "一致するファイルを調べられませんでした。",
+  "settings.scanExclusionsPreviewNone":
+    "取り込み済みのファイルには一致しません。",
+  "settings.scanExclusionsPreviewCount":
+    "{count}件のファイルが一致します。追加して保存すると非表示になります。",
+  "settings.scanExclusionsPreviewList": "一致するファイル",
+  "settings.scanExclusionsPreviewMore": "ほか{count}件",
+  "settings.scanExclusionsTestTimedOut":
+    "このパターンは時間内に終わりませんでした。スキャンを止めてしまうので追加できません。",
+  "settings.folderExclusions": "フォルダで除外",
+  "settings.folderExclusionsDesc":
+    "ワークスペースごとに、特定のフォルダだけを除外します。フォルダ表示でフォルダを右クリックして追加できます。",
+  "settings.folderExclusionsCount": "{count}フォルダ",
+  "settings.folderExclusionsNone": "なし",
+  "settings.folderExclusionsNotFound": "{count}件見つかりません",
+  "settings.folderExclusionsManage": "管理",
+  "settings.folderExclusionsManageLabel": "{name}の除外フォルダを管理",
+  "settings.folderExclusionsLoadError": "除外フォルダを読み込めませんでした。",
+  "settings.folderExclusionsNoWorkspaces": "ワークスペースがありません。",
+  "settings.scanExclusionsGlobal": "グローバル",
+  "settings.folderExclusionsPerWorkspace": "ワークスペースごと",
   "settings.scanExclusionsLoadError": "スキャン除外を読み込めませんでした。",
   "settings.logo": "アプリのロゴ",
   "settings.logoDesc": "ウィンドウ・トレイ・画面内のアイコンに反映されます。",
@@ -658,9 +701,17 @@ export const ja = {
   "folder.showInLibrary": "ライブラリでフォルダを表示",
   "folder.excludeFromScans": "スキャンから除外",
   "folder.excludeConfirm":
-    "「{path}」のファイルをすぐに非表示にし、このワークスペースのスキャンから外します。別の場所にある同じ名前のフォルダは対象外です。ワークスペースの編集ダイアログから元に戻せます。",
+    "このフォルダを、このワークスペースのスキャンから外します。",
   "folder.excludeAction": "除外",
   "folder.excluded": "「{name}」をスキャンから除外しました",
+  "folder.excludeTitle": "「{name}」をスキャンから除外",
+  "folder.excludeTarget": "対象のフォルダ",
+  "folder.excludeHides":
+    "中のファイル{count}件がすぐに非表示になります。ディスク上のファイルは消えません。",
+  "folder.excludeOnlyThis":
+    "このフォルダだけが対象です。別の場所にある「{name}」はスキャンされます。",
+  "folder.excludeUndoHint":
+    "戻すときは、ワークスペースの編集 →「スキャンから除外」から。",
   "folder.excludeFailed": "フォルダを除外できませんでした",
   "folder.showFailed": "フォルダを表示できませんでした",
   "folder.subfolderMenu": "「{name}」のサブフォルダ",
@@ -1024,11 +1075,25 @@ export const ja = {
   "workspace.pathReadonly": "パスは変更できません",
   "workspace.excludedFolders": "スキャンから除外",
   "workspace.excludedFoldersEmpty":
-    "フォルダはありません。フォルダ表示でフォルダを右クリックすると除外できます。",
+    "除外しているフォルダはありません。フォルダ表示でフォルダを右クリックするか、「フォルダを追加」から選べます。",
   "workspace.excludedFolderNotFound": "見つかりません",
   "workspace.excludedFolderInclude": "{path}をスキャンの対象に戻す",
   "workspace.excludedFoldersNextScan":
     "一覧から外したフォルダは、次のスキャンから再び読み込まれます。",
+  "workspace.excludedFoldersDesc":
+    "このフォルダとその中身だけが対象です。別の場所にある同じ名前のフォルダはスキャンされます。",
+  "workspace.excludedFolderIncludeAction": "スキャンに戻す",
+  "workspace.excludedFolderRemoveAction": "一覧から外す",
+  "workspace.excludedFolderRemove": "{path}を一覧から外す",
+  "workspace.excludedFolderUndo": "取り消す",
+  "workspace.excludedFolderUndoLabel": "{path}の変更を取り消す",
+  "workspace.excludedFolderIncluding": "保存するとスキャンに戻ります",
+  "workspace.excludedFolderAdding": "保存すると除外されます",
+  "workspace.excludedFoldersAdd": "フォルダを追加",
+  "workspace.excludedFolderOutside":
+    "ワークスペースの中にあるフォルダを選んでください",
+  "workspace.excludedFolderPickFailed": "フォルダを選べませんでした",
+  "workspace.excludedFoldersRetry": "再読み込み",
   "workspace.excludedFoldersLoadError":
     "除外したフォルダを読み込めませんでした。",
   "workspace.excludedFoldersSaveError":
