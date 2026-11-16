@@ -730,6 +730,12 @@ export const es: Catalog = {
     "La carpeta que estabas viendo ya no existe; se ha subido de nivel.",
   "folder.chip": "Carpeta",
   "folder.showInLibrary": "Mostrar la carpeta en la biblioteca",
+  "folder.excludeFromScans": "Excluir de los escaneos",
+  "folder.excludeConfirm":
+    "Los archivos de «{path}» se ocultan ahora y quedan fuera de los escaneos de este espacio de trabajo. Las carpetas con el mismo nombre en otros lugares se siguen escaneando. Puedes volver a incluir la carpeta desde el diálogo de edición del espacio de trabajo.",
+  "folder.excludeAction": "Excluir",
+  "folder.excluded": "«{name}» se excluyó de los escaneos",
+  "folder.excludeFailed": "No se pudo excluir la carpeta",
   "folder.showFailed": "No se pudo mostrar la carpeta",
   "folder.subfolderMenu": 'Subcarpetas de "{name}"',
   "folder.loading": "Cargando…",
@@ -1162,6 +1168,17 @@ export const es: Catalog = {
   "workspace.edit": "Editar espacio de trabajo",
   "workspace.editAction": "Guardar",
   "workspace.pathReadonly": "La ruta no se puede cambiar.",
+  "workspace.excludedFolders": "Excluidas de los escaneos",
+  "workspace.excludedFoldersEmpty":
+    "No hay carpetas. Haz clic derecho en una carpeta en la vista de carpetas para excluirla.",
+  "workspace.excludedFolderNotFound": "No encontrada",
+  "workspace.excludedFolderInclude": "Volver a incluir {path} en los escaneos",
+  "workspace.excludedFoldersNextScan":
+    "Las carpetas que quites de la lista se escanean de nuevo a partir del próximo escaneo.",
+  "workspace.excludedFoldersLoadError":
+    "No se pudieron leer las carpetas excluidas.",
+  "workspace.excludedFoldersSaveError":
+    "No se pudieron actualizar las carpetas excluidas",
   "workspace.addDirectory": "Añadir directorio de vídeo",
   "workspace.removeFromSidebar": "Eliminar espacio de trabajo",
   "workspace.removeTitle": "Eliminar espacio de trabajo",

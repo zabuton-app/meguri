@@ -103,7 +103,12 @@ The user can keep folders and files out of scans (#282), in the
   `/`, so a pattern ending in `/` targets folders only. Edited in Settings →
   Scan.
 - `folders`: per workspace ID, root-relative folders, each covering
-  everything below it.
+  everything below it. Added from a folder card's context menu in the folder
+  view ("Exclude from scans", after a confirmation), which hides its files at
+  once. Listed in the workspace's edit dialog by where they are on disk (a bare
+  relative path would read like every folder of that name), marked "Not found" when the
+  folder is no longer on disk (renamed or gone), and taken off the list there
+  when the dialog is saved.
 
 The patterns are user regexes, so they never run on the main thread: they go
 to the auto-tag worker as auto-tagging rules (`exclusionRule()` in

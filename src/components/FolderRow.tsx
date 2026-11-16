@@ -48,6 +48,7 @@ export const FolderRow = memo(function FolderRow({
     <div
       data-testid="folder-row"
       data-slot="folder-row"
+      data-folder-path={entry.path}
       aria-current={focused ? "true" : undefined}
       className={cn(
         "folder-art group relative flex items-center gap-4 rounded-lg p-2 pr-4 transition-colors hover:bg-overlay/50",

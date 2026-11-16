@@ -68,9 +68,10 @@ import {
 import { ACTIVITY_MAX_DAYS, type ActivityDays } from "./activity.js";
 import type { TimelineCounts } from "./timeline.js";
 import { daySpan, parseDay } from "../day.js";
-import { MAX_FOLDER_FILES_PATHS } from "../folderPath.js";
+import { MAX_FOLDER_FILES_PATHS, ROOT_FOLDER } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
 import {
+  MAX_EXCLUDED_FOLDERS,
   MAX_EXCLUSION_PATTERN,
   MAX_EXCLUSION_PATTERNS,
 } from "../scanExclusions.js";
@@ -566,6 +567,20 @@ export const ChannelInputs = {
       .array(z.string().min(1).max(MAX_EXCLUSION_PATTERN))
       .max(MAX_EXCLUSION_PATTERNS),
   }),
+  scan_exclusions_folders: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  }),
+  // Not the root: that would leave nothing to scan.
+  scan_exclusions_add_folder: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+    path: FolderPathSchema.refine((p) => p !== ROOT_FOLDER, {
+      message: "the workspace root cannot be excluded",
+    }),
+  }),
+  scan_exclusions_remove_folders: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+    paths: z.array(FolderPathSchema).max(MAX_EXCLUDED_FOLDERS),
+  }),
   custom_css_get: z.void(),
   custom_css_set_enabled: z.object({ enabled: z.boolean() }),
   custom_css_open: z.void(),
@@ -757,6 +772,12 @@ export interface ChannelOutputs {
   // Returns the state saved; the files the new patterns cover are hidden by
   // the time it does.
   scan_exclusions_set_patterns: ScanExclusionsState;
+  scan_exclusions_folders: ExcludedFolders;
+  // Returns the folders saved; the files the new one holds are hidden by the
+  // time it does.
+  scan_exclusions_add_folder: ExcludedFolders;
+  // Returns the folders saved; their files come back at the next scan.
+  scan_exclusions_remove_folders: ExcludedFolders;
   custom_css_get: CustomCssState;
   // Returns the state after the switch, so the renderer applies (or drops)
   // the stylesheet without a second round trip.
@@ -805,6 +826,21 @@ export interface UpdateSettings {
 export interface ScanExclusionsState {
   /** Regular expressions for every workspace. */
   patterns: string[];
+}
+
+/** The folders a workspace's scans leave out. */
+export interface ExcludedFolders {
+  folders: {
+    /** Relative to the workspace root, "/"-separated. */
+    path: string;
+    /**
+     * The folder on disk, in the OS's form: what is shown, since the path
+     * alone reads like any folder of that name, which it does not cover.
+     */
+    absPath: string;
+    /** Whether it is a folder on disk now: false once it is renamed or gone. */
+    found: boolean;
+  }[];
 }
 
 /** The user stylesheet: whether it is on, where it lives, and what it holds. */

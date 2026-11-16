@@ -1,10 +1,12 @@
 // Edit dialog for a workspace (scan root). Mirrors CollectionEditDialog's flow,
 // but a workspace's path is its stable identity (hash of the path drives its DB
 // and thumbnails), so only the emoji is editable here — the path is shown in a
-// disabled field to make clear it can't be changed.
+// disabled field to make clear it can't be changed. It also lists the folders
+// the workspace's scans leave out (#282), to take them off the list.
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FolderOpen } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { FolderOpen, X } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { WorkspaceInfo } from "@/ipc/types";
 import { EmojiPicker } from "@/components/EmojiPicker";
@@ -33,6 +35,17 @@ export function WorkspaceEditDialog({
   const { t } = useI18n();
   const [emoji, setEmoji] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Excluded folders taken off the list, applied on save.
+  const [included, setIncluded] = useState<ReadonlySet<string>>(new Set());
+  const wsId = workspace?.id ?? "";
+  const excluded = useQuery({
+    queryKey: ["scan_exclusion_folders", wsId],
+    queryFn: () => api.scanExclusionsFolders(wsId),
+    enabled: open && wsId !== "",
+  });
+  const folders = (excluded.data?.folders ?? []).filter(
+    (f) => !included.has(f.path),
+  );
 
   // Seed the emoji whenever the dialog opens.
   useEffect(() => {
@@ -41,6 +54,7 @@ export function WorkspaceEditDialog({
     /* eslint-disable react-hooks/set-state-in-effect */
     setEmoji(workspace?.emoji ?? null);
     setPickerOpen(false);
+    setIncluded(new Set());
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open, workspace]);
 
@@ -51,6 +65,18 @@ export function WorkspaceEditDialog({
     mutationFn: ({ id, emoji }: { id: string; emoji: string | null }) =>
       api.workspaceSetEmoji(id, emoji),
     onSettled: invalidateList,
+  });
+
+  const includeFolders = useMutation({
+    mutationFn: ({ id, paths }: { id: string; paths: string[] }) =>
+      api.scanExclusionsRemoveFolders(id, paths),
+    meta: { reportsOwnError: true },
+    onSuccess: (next, { id }) =>
+      qc.setQueryData(["scan_exclusion_folders", id], next),
+    onError: () => {
+      toast.error(t("workspace.excludedFoldersSaveError"));
+      void qc.invalidateQueries({ queryKey: ["scan_exclusion_folders"] });
+    },
   });
 
   const setVisible = (next: boolean) => {
@@ -73,6 +99,9 @@ export function WorkspaceEditDialog({
       const nextEmoji = emoji ?? null;
       if ((workspace.emoji ?? null) !== nextEmoji) {
         setWorkspaceEmoji.mutate({ id: workspace.id, emoji: nextEmoji });
+      }
+      if (included.size > 0) {
+        includeFolders.mutate({ id: workspace.id, paths: [...included] });
       }
     }
     setVisible(false);
@@ -116,6 +145,64 @@ export function WorkspaceEditDialog({
           <p className="px-5 pb-5 text-xs text-muted">
             {t("workspace.pathReadonly")}
           </p>
+          <section className="flex flex-col gap-2 px-5 pb-5">
+            <h3 className="text-sm font-semibold text-bright-fg">
+              {t("workspace.excludedFolders")}
+            </h3>
+            {excluded.isError ? (
+              <p className="text-xs text-error">
+                {t("workspace.excludedFoldersLoadError")}
+              </p>
+            ) : excluded.data && folders.length === 0 ? (
+              <p className="text-xs text-muted">
+                {t("workspace.excludedFoldersEmpty")}
+              </p>
+            ) : (
+              <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+                {folders.map((f) => (
+                  <li
+                    key={f.path}
+                    className="flex items-center gap-2 rounded-md border border-border px-2 py-1"
+                  >
+                    <span
+                      // Wrapped, not cut short: the end of the path is the
+                      // folder, and its start says which one.
+                      className="min-w-0 flex-1 break-all font-mono text-xs text-fg"
+                    >
+                      {f.absPath}
+                    </span>
+                    {!f.found && (
+                      <span className="shrink-0 rounded-full border border-border-strong px-1.5 text-[10px] leading-4 text-muted">
+                        {t("workspace.excludedFolderNotFound")}
+                      </span>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0"
+                      aria-label={t("workspace.excludedFolderInclude", {
+                        path: f.absPath,
+                      })}
+                      title={t("workspace.excludedFolderInclude", {
+                        path: f.absPath,
+                      })}
+                      onClick={() =>
+                        setIncluded((prev) => new Set(prev).add(f.path))
+                      }
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {included.size > 0 && (
+              <p className="text-xs text-muted">
+                {t("workspace.excludedFoldersNextScan")}
+              </p>
+            )}
+          </section>
           <DialogFooter className="border-t border-border p-4">
             <Button
               type="button"

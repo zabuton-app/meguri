@@ -630,6 +630,12 @@ export const zhCN: Catalog = {
   "folder.moved": "正在查看的文件夹已不存在，已移至上一级。",
   "folder.chip": "文件夹",
   "folder.showInLibrary": "在媒体库中显示文件夹",
+  "folder.excludeFromScans": "从扫描中排除",
+  "folder.excludeConfirm":
+    "“{path}”中的文件将立即隐藏，并不再参与此工作区的扫描。其他位置的同名文件夹仍会被扫描。可在工作区的编辑对话框中重新包含该文件夹。",
+  "folder.excludeAction": "排除",
+  "folder.excluded": "已将“{name}”从扫描中排除",
+  "folder.excludeFailed": "无法排除该文件夹",
   "folder.showFailed": "无法显示该文件夹",
   "folder.subfolderMenu": "“{name}”的子文件夹",
   "folder.loading": "正在加载…",
@@ -970,6 +976,15 @@ export const zhCN: Catalog = {
   "workspace.edit": "编辑工作区",
   "workspace.editAction": "保存",
   "workspace.pathReadonly": "路径无法更改。",
+  "workspace.excludedFolders": "已从扫描中排除",
+  "workspace.excludedFoldersEmpty":
+    "没有文件夹。在文件夹视图中右键点击文件夹即可将其排除。",
+  "workspace.excludedFolderNotFound": "未找到",
+  "workspace.excludedFolderInclude": "重新扫描 {path}",
+  "workspace.excludedFoldersNextScan":
+    "从列表中移除的文件夹将在下次扫描时重新扫描。",
+  "workspace.excludedFoldersLoadError": "无法读取已排除的文件夹。",
+  "workspace.excludedFoldersSaveError": "无法更新已排除的文件夹",
   "workspace.addDirectory": "添加视频目录",
   "workspace.removeFromSidebar": "删除工作区",
   "workspace.removeTitle": "删除工作区",

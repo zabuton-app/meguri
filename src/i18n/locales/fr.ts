@@ -734,6 +734,12 @@ export const fr: Catalog = {
     "Le dossier affiché n'existe plus ; vous avez été ramené au niveau supérieur.",
   "folder.chip": "Dossier",
   "folder.showInLibrary": "Afficher le dossier dans la bibliothèque",
+  "folder.excludeFromScans": "Exclure des analyses",
+  "folder.excludeConfirm":
+    "Les fichiers de « {path} » sont masqués dès maintenant et exclus des analyses de cet espace de travail. Les dossiers du même nom situés ailleurs sont toujours analysés. Vous pouvez réinclure le dossier depuis la fenêtre de modification de l'espace de travail.",
+  "folder.excludeAction": "Exclure",
+  "folder.excluded": "« {name} » est exclu des analyses",
+  "folder.excludeFailed": "Impossible d'exclure le dossier",
   "folder.showFailed": "Impossible d'afficher le dossier",
   "folder.subfolderMenu": "Sous-dossiers de « {name} »",
   "folder.loading": "Chargement…",
@@ -1167,6 +1173,17 @@ export const fr: Catalog = {
   "workspace.edit": "Modifier l'espace de travail",
   "workspace.editAction": "Enregistrer",
   "workspace.pathReadonly": "Le chemin ne peut pas être modifié.",
+  "workspace.excludedFolders": "Exclus des analyses",
+  "workspace.excludedFoldersEmpty":
+    "Aucun dossier. Faites un clic droit sur un dossier dans la vue par dossiers pour l'exclure.",
+  "workspace.excludedFolderNotFound": "Introuvable",
+  "workspace.excludedFolderInclude": "Réinclure {path} dans les analyses",
+  "workspace.excludedFoldersNextScan":
+    "Les dossiers retirés de la liste sont de nouveau analysés à partir de la prochaine analyse.",
+  "workspace.excludedFoldersLoadError":
+    "Impossible de lire les dossiers exclus.",
+  "workspace.excludedFoldersSaveError":
+    "Impossible de mettre à jour les dossiers exclus",
   "workspace.addDirectory": "Ajouter un dossier vidéo",
   "workspace.removeFromSidebar": "Supprimer l'espace de travail",
   "workspace.removeTitle": "Supprimer l'espace de travail",

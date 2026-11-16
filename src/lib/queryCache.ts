@@ -275,6 +275,18 @@ export function invalidateFileCaches(qc: QueryClient): void {
 }
 
 /**
+ * After a scan exclusion hid files (#282): they leave the lists as a file
+ * removed from the index does, from the folder cards (their counts and
+ * mosaics), the history and Missing too.
+ */
+export function invalidateHiddenFiles(qc: QueryClient): void {
+  invalidateFileCaches(qc);
+  void qc.invalidateQueries({ queryKey: ["folders_list"] });
+  void qc.invalidateQueries({ queryKey: ["history_list"] });
+  void qc.invalidateQueries({ queryKey: ["missing_files"] });
+}
+
+/**
  * Invalidate only the searches scoped to a user collection (membership changes
  * on add/remove-from-collection); regular workspace lists are unaffected.
  */

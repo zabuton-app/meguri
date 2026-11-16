@@ -363,7 +363,12 @@ export const MediaGrid = memo(function MediaGrid({
   // display:table to block so absolutely positioned rows track the width correctly.
   return (
     <MediaReorderProvider items={items} reorder={reorder}>
-      <FileContextMenu items={items} mediaBase={mediaBase} active={navActive}>
+      <FileContextMenu
+        items={items}
+        mediaBase={mediaBase}
+        workspaceId={wsId}
+        active={navActive}
+      >
         <ScrollArea
           className="page-scroll h-full"
           viewportClassName="pt-4"

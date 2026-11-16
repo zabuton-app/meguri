@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/ipc/client";
-import { invalidateFileCaches } from "@/lib/queryCache";
+import { invalidateHiddenFiles } from "@/lib/queryCache";
 import { useI18n } from "@/i18n/I18nProvider";
 import { patternError } from "@shared/scanExclusions";
 
@@ -52,9 +52,8 @@ export function ScanExclusionsSection() {
     onSuccess: (next) => {
       qc.setQueryData(["scan_exclusions"], next);
       setDraft(null);
-      // Files the patterns cover are hidden now, from the lists and Missing.
-      invalidateFileCaches(qc);
-      void qc.invalidateQueries({ queryKey: ["missing_files"] });
+      // Files the patterns cover are hidden now.
+      invalidateHiddenFiles(qc);
       toast.success(t("settings.scanExclusionsSaved"));
     },
     onError: () => toast.error(t("settings.scanExclusionsSaveError")),

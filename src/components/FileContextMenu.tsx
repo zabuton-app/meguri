@@ -1,4 +1,5 @@
-// The right-click menu on the files of a list view (grid, list, timeline).
+// The right-click menu on the files of a list view (grid, list, timeline),
+// and on the folder cards of the folder view.
 //
 // One menu per view, not one per card: the view's cards are virtualized and
 // memoized, and a menu root on each would add to every card's mount for a menu
@@ -8,7 +9,8 @@
 //
 // What it acts on follows the command menu: the selection when the clicked
 // card is part of it, otherwise that one file. The actions come from
-// useFileActions, which the command menu shares.
+// useFileActions, which the command menu shares. A folder card's menu acts on
+// that folder alone (FolderMenuBody).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Check,
@@ -19,6 +21,7 @@ import {
   FolderOpen,
   FolderPlus,
   FolderSearch,
+  FolderX,
   Heart,
   ImageDown,
   Info,
@@ -47,6 +50,7 @@ import {
   useFileActions,
   type FileActions,
 } from "@/hooks/useFileActions";
+import { useExcludeFolder } from "@/hooks/useExcludeFolder";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
@@ -66,31 +70,38 @@ import { isTyping } from "@/lib/keyTarget";
 
 /** The attribute a file's card or row carries, so the menu can tell which was clicked. */
 const FILE_KEY_ATTR = "data-file-key";
+/** The attribute a folder card or row carries (FolderCard, FolderRow). */
+const FOLDER_PATH_ATTR = "data-folder-path";
 
 const NO_FILES: FileRow[] = [];
 const RATINGS = [0, 1, 2, 3, 4, 5];
 
 function cardOf(target: EventTarget | null): Element | null {
   return target instanceof Element
-    ? target.closest(`[${FILE_KEY_ATTR}]`)
+    ? target.closest(`[${FILE_KEY_ATTR}], [${FOLDER_PATH_ATTR}]`)
     : null;
 }
+
+type MenuTarget = { file: FileRow } | { folder: string };
 
 export function FileContextMenu({
   items,
   mediaBase,
+  workspaceId,
   active,
   children,
 }: {
   /** The files the view shows; a right-clicked card is looked up among them. */
   items: FileRow[];
+  /** The workspace the folder cards are in (the active one). */
+  workspaceId?: string;
   /** Base URL of the local media server, for copying an image. */
   mediaBase: string;
   /** The view is in the foreground: the menu key opens the menu on the focused file. */
   active: boolean;
   children: ReactNode;
 }) {
-  const [file, setFile] = useState<FileRow | null>(null);
+  const [target, setTarget] = useState<MenuTarget | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -125,7 +136,7 @@ export function FileContextMenu({
   return (
     <ContextMenu
       onOpenChange={(open) => {
-        if (!open) setFile(null);
+        if (!open) setTarget(null);
       }}
     >
       <ContextMenuTrigger asChild>
@@ -133,20 +144,26 @@ export function FileContextMenu({
           ref={rootRef}
           className="contents"
           onContextMenu={(e) => {
-            const key = cardOf(e.target)?.getAttribute(FILE_KEY_ATTR);
+            const card = cardOf(e.target);
+            const folder = card?.getAttribute(FOLDER_PATH_ATTR);
+            if (folder && workspaceId) {
+              setTarget({ folder });
+              return;
+            }
+            const key = card?.getAttribute(FILE_KEY_ATTR);
             const hit = key ? items.find((f) => mediaSortId(f) === key) : null;
-            // Not on a file (a folder card, the gaps between cards): no menu.
+            // Not on a card (the gaps between cards): no menu.
             if (!hit) {
               e.preventDefault();
               return;
             }
-            setFile(hit);
+            setTarget({ file: hit });
           }}
         >
           {children}
         </div>
       </ContextMenuTrigger>
-      {file && (
+      {target && (
         <ContextMenuContent
           className="min-w-56"
           // The menu's keys are its own: the views' window listeners (focus
@@ -154,7 +171,16 @@ export function FileContextMenu({
           onKeyDown={(e) => e.stopPropagation()}
           onEscapeKeyDown={stopEscape}
         >
-          <FileMenuBody file={file} mediaBase={mediaBase} />
+          {"file" in target ? (
+            <FileMenuBody file={target.file} mediaBase={mediaBase} />
+          ) : (
+            workspaceId && (
+              <FolderMenuBody
+                workspaceId={workspaceId}
+                folder={target.folder}
+              />
+            )
+          )}
         </ContextMenuContent>
       )}
     </ContextMenu>
@@ -310,6 +336,29 @@ function FileMenuBody({
         </>
       )}
     </>
+  );
+}
+
+function FolderMenuBody({
+  workspaceId,
+  folder,
+}: {
+  workspaceId: string;
+  folder: string;
+}) {
+  const { t } = useI18n();
+  const exclude = useExcludeFolder();
+  return (
+    <ContextMenuItem
+      // After the menu has closed and handed focus back, so the confirmation
+      // keeps it (as the file menu's delete does).
+      onSelect={() =>
+        window.setTimeout(() => void exclude(workspaceId, folder), 0)
+      }
+    >
+      <FolderX />
+      {t("folder.excludeFromScans")}
+    </ContextMenuItem>
   );
 }
 
