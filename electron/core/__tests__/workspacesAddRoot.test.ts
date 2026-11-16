@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// workspaces.ts reads/writes <userData>/config.json via appConfig.ts; point that
+// workspaces.ts reads/writes its settings under <userData> via appConfig.ts; point that
 // at a throwaway directory so each test gets a pristine config.
 let userData = "";
 vi.mock("electron", () => ({ app: { getPath: () => userData } }));
@@ -150,7 +150,7 @@ describe("Workspaces persistence", () => {
   // Settings written through updateConfig() after the Workspaces snapshot was
   // taken must survive a workspace write (regression: switching workspaces
   // reverted custom CSS, the CSS theme and the logo to their startup values).
-  it("keeps settings it does not own when it writes config.json", async () => {
+  it("keeps settings it does not own when it writes its own", async () => {
     const { loadConfig, updateConfig } = await import("../appConfig.js");
     const ws = new Workspaces();
     updateConfig((c) => ({

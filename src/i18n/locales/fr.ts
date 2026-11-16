@@ -123,15 +123,15 @@ export const fr: Catalog = {
   "library.restored":
     "Votre bibliothèque était endommagée : {app} a restauré la copie du {date}",
   "library.restoredDesc":
-    "Les favoris, notes, tags et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
+    "Les favoris, notes, tags, espaces de travail, collections, réglages et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
   "config.movedAside":
     "Le fichier de réglages (config.json) était endommagé : {app} a démarré avec les réglages par défaut",
   "config.movedAsideDesc":
     "Vos espaces de travail et collections sont conservés dans le fichier endommagé, enregistré sous config.json.corrupt-<date> dans le même dossier.",
   "config.unreadable":
-    "{app} n’a pas pu lire le fichier de réglages (config.json) et fonctionne avec les réglages par défaut",
+    "{app} n’a pas pu lire vos réglages et fonctionne avec les réglages par défaut",
   "config.unreadableDesc":
-    "Le fichier n’a pas été modifié. Vérifiez qu’aucune autre application ne l’utilise, puis redémarrez {app}.",
+    "Vos réglages n’ont pas été modifiés. Vérifiez qu’aucune autre application ne les utilise, puis redémarrez {app}.",
   "settings.about": "À propos",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} est publié sous licence MIT.",

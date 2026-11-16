@@ -1,6 +1,6 @@
 // App logo variant, shared app-wide through the react-query cache.
 //
-// The value lives in main's config.json (the tray and window icons need it
+// The value lives in main's settings (the tray and window icons need it
 // before any renderer exists), so unlike other UI preferences it is fetched
 // and stored over IPC instead of PreferencesProvider/localStorage. Reading it
 // through a query keys every consumer (Settings picker, workspace rail logo)

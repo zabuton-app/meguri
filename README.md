@@ -507,8 +507,8 @@ Electron's userData.
 
 ```text
 <userData>/                 # e.g. ~/.config/Meguri
-├─ config.json              # registered workspaces and the active root
-├─ library.sqlite           # favorites, ratings, tags, bookmarks, history (WAL)
+├─ library.sqlite           # settings, workspaces and shared metadata (WAL)
+├─ config.json              # older versions' settings, imported once
 ├─ library-backups/         # daily copies of library.sqlite (the 5 newest)
 ├─ custom.css               # optional user stylesheet (see "Custom CSS")
 ├─ themes/                  # optional CSS theme files (see "Custom CSS")

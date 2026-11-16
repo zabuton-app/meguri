@@ -1,5 +1,6 @@
 // A config.json that cannot be used is never replaced by the defaults (#261):
-// an unparsable one is moved aside, an unreadable one is not written over.
+// an unparsable one is moved aside, an unreadable one is not imported. Once
+// imported into the library (#325), it is left alone.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -49,7 +50,7 @@ describe("loading config.json", () => {
     expect(aside).toMatch(/^config\.json\.corrupt-\d{8}-\d{6}$/);
     expect(fs.readFileSync(path.join(userData, aside), "utf8")).toBe(broken);
 
-    // Saving goes on, to a fresh config.json; the copy is left alone.
+    // Saving goes on, in the library; the copy is left alone.
     c.updateConfig((cfg) => ({ ...cfg, roots: ["/other"] }));
     expect(c.loadConfig().roots).toEqual(["/other"]);
     expect(asides()).toEqual([aside]);
@@ -101,59 +102,68 @@ describe("loading config.json", () => {
   );
 
   it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
-    "skips only the save that meets a passing lock once the file was read",
+    "imports a file it could not read on a later launch, once it can",
     async () => {
       fs.writeFileSync(configFile(), JSON.stringify({ roots: ["/media"] }));
+      fs.chmodSync(configFile(), 0o000);
+      (await freshConfig()).loadConfig();
+      fs.chmodSync(configFile(), 0o644);
+
       const c = await freshConfig();
       expect(c.loadConfig().roots).toEqual(["/media"]);
-
-      fs.chmodSync(configFile(), 0o000);
-      c.updateConfig((cfg) => ({ ...cfg, activePath: "/lost" }));
-      fs.chmodSync(configFile(), 0o644);
-
-      // Nothing written over, no session-wide block, nothing to tell.
-      expect(c.loadConfig()).toMatchObject({
-        roots: ["/media"],
-        activePath: null,
-      });
       expect(c.configLoadProblem()).toBeNull();
-      c.updateConfig((cfg) => ({ ...cfg, activePath: "/media" }));
-      expect(c.loadConfig().activePath).toBe("/media");
     },
   );
+});
 
-  it("leaves a file caught half-written mid-session in place and keeps serving the last read", async () => {
-    const good = JSON.stringify({ roots: ["/media"], logo: "default" });
-    fs.writeFileSync(configFile(), good);
+describe("after config.json is imported", () => {
+  it("keeps the file as it was and never reads or writes it again", async () => {
+    const stored = JSON.stringify({ roots: ["/media"], logo: "default" });
+    fs.writeFileSync(configFile(), stored);
     const c = await freshConfig();
     expect(c.loadConfig().roots).toEqual(["/media"]);
+    c.updateConfig((cfg) => ({ ...cfg, activePath: "/media" }));
+    expect(fs.readFileSync(configFile(), "utf8")).toBe(stored);
 
-    fs.writeFileSync(configFile(), '{"roots": ['); // mid-write by something else
-    expect(c.loadConfig().roots).toEqual(["/media"]);
-    c.updateConfig((cfg) => ({ ...cfg, activePath: "/lost" }));
-
+    // Changed by an older version of the app, or caught half-written.
+    fs.writeFileSync(configFile(), '{"roots": [');
+    const again = await freshConfig();
+    expect(again.loadConfig()).toMatchObject({
+      roots: ["/media"],
+      activePath: "/media",
+    });
+    expect(again.configLoadProblem()).toBeNull();
     expect(asides()).toEqual([]);
-    expect(c.configLoadProblem()).toBeNull();
-    expect(fs.readFileSync(configFile(), "utf8")).toBe('{"roots": [');
   });
+});
 
-  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
-    "counts a first launch as read, so a later lock does not block the session",
-    async () => {
-      const c = await freshConfig();
-      c.loadConfig(); // ENOENT
-      c.updateConfig((cfg) => ({ ...cfg, roots: ["/media"] }));
+describe("settings that cannot be opened mid-session", () => {
+  it("serves the last read and does not throw when the folder is gone", async () => {
+    const c = await freshConfig();
+    c.updateConfig((cfg) => ({ ...cfg, roots: ["/media"] }));
+    expect(c.loadConfig().roots).toEqual(["/media"]);
 
-      fs.chmodSync(configFile(), 0o000);
-      expect(c.loadConfig().roots).toEqual(["/media"]); // the last read
-      fs.chmodSync(configFile(), 0o644);
+    fs.rmSync(userData, { recursive: true, force: true }); // unmounted, say
+    try {
+      expect(c.loadConfig().roots).toEqual(["/media"]);
+      expect(() =>
+        c.updateConfig((cfg) => ({ ...cfg, activePath: "/media" })),
+      ).not.toThrow();
+    } finally {
+      fs.mkdirSync(userData, { recursive: true }); // for afterEach
+    }
+  });
+});
 
-      expect(c.configLoadProblem()).toBeNull();
-      c.updateConfig((cfg) => ({ ...cfg, activePath: "/media" }));
-      expect(c.loadConfig()).toMatchObject({
-        roots: ["/media"],
-        activePath: "/media",
-      });
-    },
-  );
+describe("a library that cannot be opened", () => {
+  it("runs on the defaults and writes nothing", async () => {
+    fs.writeFileSync(configFile(), JSON.stringify({ roots: ["/media"] }));
+    fs.mkdirSync(path.join(userData, "library.sqlite")); // not a database
+    const c = await freshConfig();
+
+    expect(c.loadConfig().roots).toEqual([]);
+    expect(c.configLoadProblem()).toBe("unreadable");
+    c.updateConfig((cfg) => ({ ...cfg, roots: ["/other"] }));
+    expect(c.loadConfig().roots).toEqual([]);
+  });
 });

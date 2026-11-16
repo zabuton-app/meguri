@@ -120,15 +120,15 @@ export const en: Catalog = {
   "library.restored":
     "Your library was damaged, so {app} restored the copy from {date}",
   "library.restoredDesc":
-    "Favorites, ratings, tags and other changes made after that are lost. The damaged file is kept in the same folder as the library.",
+    "Favorites, ratings, tags, workspaces, collections, settings and other changes made after that are lost. The damaged file is kept in the same folder as the library.",
   "config.movedAside":
     "Your settings file (config.json) was damaged, so {app} started with the default settings",
   "config.movedAsideDesc":
     "Your workspaces and collections are kept in the damaged file, saved as config.json.corrupt-<date> in the same folder.",
   "config.unreadable":
-    "{app} could not read your settings file (config.json) and is running with the default settings",
+    "{app} could not read your settings and is running with the default settings",
   "config.unreadableDesc":
-    "The file has not been changed. Make sure no other app is using it, then restart {app}.",
+    "Your settings have not been changed. Make sure no other app is using them, then restart {app}.",
   "settings.about": "About",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} is released under the MIT License.",

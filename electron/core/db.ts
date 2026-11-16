@@ -701,6 +701,38 @@ export function openLibraryReadonly(libraryFile: string): DB | null {
 }
 
 /**
+ * The app's settings, in the library so they share its backups, check and
+ * restore (libraryBackup.ts): one row per AppConfig field, the value as JSON
+ * (appConfig.ts). Not `settings`: workspace databases have a `main.settings`,
+ * which an unqualified name on their connections would resolve to first.
+ */
+const APP_SETTINGS_DDL = `
+CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+`;
+
+/**
+ * The shared library on its own, writable, for the app's settings: opened
+ * before any workspace, so it creates the library on a first launch. Throws
+ * when it cannot be opened.
+ */
+export function openSettingsDb(libraryFile: string): DB {
+  const db = new Database(libraryFile);
+  try {
+    db.pragma("busy_timeout = 5000");
+    db.pragma("journal_mode = WAL");
+    // FULL, not the NORMAL the workspaces use: a setting saved is meant to
+    // stay saved through a power loss, as the fsync of config.json made it, and
+    // settings are written rarely enough for the sync on each commit.
+    db.pragma("synchronous = FULL");
+    db.exec(APP_SETTINGS_DDL);
+  } catch (e) {
+    db.close();
+    throw e;
+  }
+  return db;
+}
+
+/**
  * Whether the workspace database at `dbFile` still holds its own metadata
  * tables, read without attaching or preparing anything. Null when it cannot
  * be opened: nobody can tell.

@@ -307,7 +307,7 @@ export const ChannelInputs = {
   collection_rename: z.object({ id: z.string(), name: z.string().min(1) }),
   collection_add_file: FileTarget.extend({ collectionId: z.string() }),
   collection_remove_file: FileTarget.extend({ collectionId: z.string() }),
-  // Membership for many files at once. Collections live in config.json, which is
+  // Membership for many files at once. Collections are one setting, which is
   // rewritten on every change, so adding a selection one file at a time would
   // mean one disk write per file. `op` names the direction rather than a boolean
   // flag, matching the collection_add_file / collection_remove_file vocabulary
@@ -779,7 +779,7 @@ export interface AboutInfo {
   node: string;
 }
 
-/** User-facing update preferences (persisted in main's config.json). */
+/** User-facing update preferences (persisted in main's settings). */
 export interface UpdateSettings {
   /** Whether the app checks for updates on startup. */
   autoCheck: boolean;

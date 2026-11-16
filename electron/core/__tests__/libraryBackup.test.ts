@@ -11,6 +11,7 @@ import {
   maintainLibrary,
   newestBackupTime,
 } from "../libraryBackup.js";
+import { openSettingsDb } from "../db.js";
 
 let dir: string;
 let library: string;
@@ -59,6 +60,14 @@ const favorites = () => {
 describe("maintainLibrary", () => {
   it("does nothing before the library exists", () => {
     expect(maintainLibrary(library, backups, T0)).toBeNull();
+    expect(copies()).toEqual([]);
+  });
+
+  it("takes no copy of a library holding only the settings", () => {
+    // What the settings make on a first launch before any workspace (db.ts).
+    openSettingsDb(library).close();
+    maintainLibrary(library, backups, T0);
+    expect(backupLibraryNow(library, backups, T0 + 1)).toBeNull();
     expect(copies()).toEqual([]);
   });
 
