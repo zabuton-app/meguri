@@ -8,11 +8,19 @@ import { VideoGradeOverlay } from "@/video/VideoGradeOverlay";
 
 const t = ((key: string) => key) as TFunc;
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+});
 
 /** The detail view's part: the open state and the panel element. `file`
  *  stands for the file shown (the player keys the overlay by it). */
-function View({ file = "a" }: { file?: string }) {
+function View({
+  file = "a",
+  playing = false,
+}: {
+  file?: string;
+  playing?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState<HTMLDivElement | null>(null);
@@ -22,6 +30,7 @@ function View({ file = "a" }: { file?: string }) {
         <VideoGradeOverlay
           key={file}
           videoRef={videoRef}
+          playing={playing}
           loaded
           panel={{ open, onOpenChange: setOpen, container: panel }}
           t={t}
@@ -81,5 +90,18 @@ describe("VideoGradeOverlay side panel", () => {
     });
     expect(sidePanel()).toBeNull();
     expect(document.activeElement).toBe(trigger());
+  });
+
+  it("uses the player hover state during playback and is visible when paused", () => {
+    const { rerender } = render(<View playing />);
+    expect(trigger().classList.contains("opacity-0")).toBe(true);
+    expect(trigger().classList.contains("group-hover:opacity-100")).toBe(true);
+    expect(
+      trigger().classList.contains("group-hover:pointer-events-auto"),
+    ).toBe(true);
+
+    rerender(<View />);
+    expect(trigger().classList.contains("opacity-100")).toBe(true);
+    expect(trigger().classList.contains("pointer-events-none")).toBe(false);
   });
 });

@@ -29,7 +29,7 @@ be merged into the library yet keeps its directory instead, metadata and all.
 
 `electron/core/paths.ts` resolves these paths. The top-level
 [README](../README.md#where-data-is-stored) is the canonical description of the
-full storage tree, including `config.json`.
+full storage tree.
 
 ## Schema
 
@@ -51,7 +51,10 @@ In the workspace database (`CORE_DDL`):
 - `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image` |
   `audio`), size/mtime/inode, `content_hash`, media metadata (`width`, `height`,
   `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`,
-  `deleted_at` / `excluded_at` markers, and `name_key`, the name sort's key
+  `deleted_at` / `excluded_at` / `scan_excluded_at` markers (the last set
+  with `deleted_at` on a file a scan exclusion hides; see
+  [Scan exclusions](media-pipeline.md#scan-exclusions)), and `name_key`, the
+  name sort's key
   (see [Name sort](#name-sort)). For audio, `width` / `height` / `fps`
   stay NULL even when the file embeds cover art — the artwork's dimensions
   describe the jacket, not the track. Images keep `fps` NULL too, except
@@ -96,6 +99,12 @@ In the library (`LIB_DDL`):
 - `migrated_workspaces` — the workspaces found on the library: merged into it,
   or created after it, and whether their own tables are gone yet (`complete`;
   see [The shared library](#the-shared-library)).
+- `app_settings` — the app's settings (see [App settings](#app-settings)).
+- `collections`, `collection_items` — user collections and their files, in
+  order (`position`; see [App settings](#app-settings)).
+
+The last three are created by `openSettingsDb()`, not `LIB_DDL`: they are read
+before any workspace attaches the library.
 
 ## Versionless migrations
 
@@ -297,6 +306,41 @@ an event two workspaces share once.
 
 Metadata is never collected: the library keeps rows for files no workspace
 holds any more, so a removed workspace added again gets its metadata back.
+
+### App settings
+
+The app's settings (`AppConfig` in `electron/core/appConfig.ts`: workspaces
+and preferences) are rows of `app_settings (key, value)`, one per field, the
+value as JSON. Every read parses each field on its own, so a value
+that does not validate falls back to its default without taking the others
+with it. `updateConfig()` writes only the fields a change touched, in one
+transaction.
+
+They used to live in `<userData>/config.json`. A launch that finds no import
+record (`_config_json_imported_at`) imports it, over whatever `app_settings`
+holds, and records the import in the same transaction; the file is then left
+alone. A library put back from
+a copy taken before the import imports it again.
+
+User collections have tables of their own (`electron/core/collectionStore.ts`),
+so a change writes only its rows: adding a file is one insert, however many
+files the collections hold, and rearranging a collection updates the
+`position` of the files moved. An item still refers to a file by
+`workspace_id + file_id`. `Workspaces` keeps the collections in memory and
+writes each change through. Collections kept as one JSON row of
+`app_settings` (`collections`, which is also where config.json's are imported)
+are moved into the tables, and the row dropped, in one transaction on the next
+load; a row that is not a list is dropped and the tables kept. An import always
+writes the row, so a `config.json` without collections replaces them with none,
+as it replaces every setting. Collections that cannot be read at startup are
+served empty and not written for the session.
+
+Being in the library, the settings share its backups and are rolled back with
+it when a damaged library is put back from a copy. The settings create the
+library before any workspace attaches it; until one has, it holds no metadata
+and is not copied, since a copy without `tag_changes` could not be put back.
+Each read or write opens its own connection and closes it, so nothing holds
+the library open between them, and commits sync (`synchronous = FULL`).
 
 ## Name sort
 
@@ -545,7 +589,7 @@ the screen reads the files again. Each call is split to fit the file count, the
 (file, tag) pairs and the places' total length (`MAX_AUTO_TAG_PLACE_CHARS`).
 
 The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed
-suggestions and excluded terms) is app-wide, in `config.json` under `autoTag`.
+suggestions and excluded terms) is app-wide, in the `autoTag` setting (`app_settings`).
 With `applyOnScan` on, `runScan()` runs the engine over the files the scan
 inserted, updated or moved, ahead of the FTS sync and the thumbnail pool. The
 ids still owed are kept in `settings` under `auto_tag_pending` until the pass

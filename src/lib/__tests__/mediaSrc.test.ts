@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isSameMediaSource,
+  mediaSrcOf,
   streamOffsetOf,
   withoutPlaybackOptions,
   withStreamSeek,
@@ -9,6 +10,16 @@ import {
 const SRC = "http://127.0.0.1:1/ws/ws1/media/7";
 
 describe("mediaSrc", () => {
+  it("builds the media URL of a file from the base, workspace and file", () => {
+    expect(mediaSrcOf("http://127.0.0.1:1", "ws1", 7)).toBe(SRC);
+    expect(
+      isSameMediaSource(
+        withStreamSeek(mediaSrcOf("http://127.0.0.1:1", "ws1", 7), 90),
+        SRC,
+      ),
+    ).toBe(true);
+  });
+
   it("re-serves from a whole second", () => {
     expect(withStreamSeek(SRC, 90.7)).toBe(`${SRC}?t=90`);
     // Replaces an earlier seek rather than stacking a second parameter.

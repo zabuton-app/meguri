@@ -11,6 +11,7 @@ import {
   maintainLibrary,
   newestBackupTime,
 } from "../libraryBackup.js";
+import { openSettingsDb } from "../db.js";
 
 let dir: string;
 let library: string;
@@ -59,6 +60,14 @@ const favorites = () => {
 describe("maintainLibrary", () => {
   it("does nothing before the library exists", () => {
     expect(maintainLibrary(library, backups, T0)).toBeNull();
+    expect(copies()).toEqual([]);
+  });
+
+  it("takes no copy of a library holding only the settings", () => {
+    // What the settings make on a first launch before any workspace (db.ts).
+    openSettingsDb(library).close();
+    maintainLibrary(library, backups, T0);
+    expect(backupLibraryNow(library, backups, T0 + 1)).toBeNull();
     expect(copies()).toEqual([]);
   });
 
@@ -179,16 +188,19 @@ describe("maintainLibrary", () => {
     maintainLibrary(library, backups, base);
     // A clock that jumped ahead when that copy was taken.
     dateCopies(base + 10 * DAY);
+    expect(copies()).toHaveLength(1);
+    const [aheadCopy] = copies();
     expect(newestBackupTime(backups, base + 1000)).toBeNull();
     const at = (i: number) => base + 1000 + i;
     for (let i = 1; i <= BACKUPS_KEPT; i++) {
       backupLibraryNow(library, backups, at(i));
     }
-    // The copies taken since stay; the one dated ahead goes first.
+    // The copies taken since stay; the one dated ahead goes first. Checked by
+    // name: their mtimes are the real clock's, which runs past at() by however
+    // long the copies took (over a second on a slow runner).
     expect(copies()).toHaveLength(BACKUPS_KEPT);
-    const newest = newestBackupTime(backups, at(BACKUPS_KEPT));
-    expect(newest).not.toBeNull();
-    expect(newest!).toBeLessThanOrEqual(at(BACKUPS_KEPT));
+    expect(copies()).not.toContain(aheadCopy);
+    expect(newestBackupTime(backups, at(BACKUPS_KEPT))).not.toBeNull();
   });
 
   it("keeps the copy just taken when its mtime is a moment past now", () => {

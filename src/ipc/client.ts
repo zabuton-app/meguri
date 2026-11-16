@@ -3,6 +3,7 @@
 // Channel signatures (input + output types) come from shared/ipc/channels.ts,
 // which is also what main validates against — so the renderer wrapper and the
 // main handler cannot drift apart.
+import type { ExclusionPattern } from "@shared/scanExclusions";
 import type {
   AboutInfo,
   ChannelInput,
@@ -259,17 +260,33 @@ export const api = {
   ) => invoke("auto_tag_edit", { targets, add, remove }),
   autoTagUndo: (undoIds: string[]) => invoke("auto_tag_undo", { undoIds }),
   autoTagReapply: () => invoke("auto_tag_reapply"),
-  /** App logo variant (window + tray icon), persisted in main's config.json. */
+  /** App logo variant (window + tray icon), persisted in main's settings. */
   logoGet: () => invoke("logo_get"),
   logoSet: (logo: LogoId) => invoke("logo_set", { logo }),
   /** The in-app logo of each variant, as a data URL. */
   logoImages: () => invoke("logo_images"),
-  /** User stylesheet (<userData>/custom.css); the switch is persisted in main's config.json. */
+  /** User stylesheet (<userData>/custom.css); the switch is persisted in main's settings. */
   customCssGet: () => invoke("custom_css_get"),
   customCssSetEnabled: (enabled: boolean) =>
     invoke("custom_css_set_enabled", { enabled }),
   customCssOpen: () => invoke("custom_css_open"),
-  /** CSS theme files in <userData>/themes; the pick is persisted in main's config.json. */
+  /** Scan exclusions (#282); saving hides what the patterns cover at once. */
+  scanExclusionsGet: () => invoke("scan_exclusions_get"),
+  scanExclusionsSetPatterns: (patterns: ExclusionPattern[]) =>
+    invoke("scan_exclusions_set_patterns", { patterns }),
+  scanExclusionsFolders: (workspaceId: string) =>
+    invoke("scan_exclusions_folders", { workspaceId }),
+  scanExclusionsAddFolder: (workspaceId: string, path: string) =>
+    invoke("scan_exclusions_add_folder", { workspaceId, path }),
+  scanExclusionsUpdateFolders: (
+    workspaceId: string,
+    change: { add: string[]; remove: string[] },
+  ) => invoke("scan_exclusions_update_folders", { workspaceId, ...change }),
+  scanExclusionsPickFolder: (workspaceId: string) =>
+    invoke("scan_exclusions_pick_folder", { workspaceId }),
+  scanExclusionsPreview: (pattern: ExclusionPattern) =>
+    invoke("scan_exclusions_preview", { pattern }),
+  /** CSS theme files in <userData>/themes; the pick is persisted in main's settings. */
   cssThemesGet: () => invoke("css_themes_get"),
   cssThemeSelect: (file: string | null) => invoke("css_theme_select", { file }),
   cssThemesOpenFolder: () => invoke("css_themes_open_folder"),

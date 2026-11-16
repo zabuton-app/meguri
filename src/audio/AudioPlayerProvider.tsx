@@ -17,6 +17,7 @@ import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import log from "@/lib/logger";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import {
   dropFromWatchLaterCache,
   invalidatePlayedSearches,
@@ -50,7 +51,7 @@ import {
 
 /** The media URL of a track (see play()). */
 function srcOf(mediaBase: string, { file, workspaceId }: AudioTrack): string {
-  return `${mediaBase}/ws/${workspaceId}/media/${file.id}`;
+  return mediaSrcOf(mediaBase, workspaceId, file.id);
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {

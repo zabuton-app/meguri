@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   collectionSetMembership: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   copyFilePath: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   openExternal: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  scanExclusionsAddFolder: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -58,6 +59,8 @@ vi.mock("@/ipc/client", () => ({
       mocks.collectionSetMembership(...args),
     copyFilePath: (...args: unknown[]) => mocks.copyFilePath(...args),
     openExternal: (...args: unknown[]) => mocks.openExternal(...args),
+    scanExclusionsAddFolder: (...args: unknown[]) =>
+      mocks.scanExclusionsAddFolder(...args),
     openFolder: vi.fn().mockResolvedValue(undefined),
   },
   ALL_ID: "__all__",
@@ -69,6 +72,7 @@ beforeEach(() => {
   mocks.collectionSetMembership.mockResolvedValue({ changed: 1 });
   mocks.copyFilePath.mockResolvedValue(undefined);
   mocks.openExternal.mockResolvedValue(undefined);
+  mocks.scanExclusionsAddFolder.mockResolvedValue({ folders: [] });
 });
 
 afterEach(() => {
@@ -109,7 +113,12 @@ function renderView(
   return renderWithProviders(
     <>
       <Select rows={selected} />
-      <FileContextMenu items={items} mediaBase="http://media" active={active}>
+      <FileContextMenu
+        items={items}
+        mediaBase="http://media"
+        workspaceId="ws-1"
+        active={active}
+      >
         <div data-testid="view">
           {items.map((f) => (
             <div
@@ -120,6 +129,13 @@ function renderView(
               {f.relPath}
             </div>
           ))}
+          <div
+            data-folder-path="videos/old"
+            data-folder-count="12"
+            data-testid="folder"
+          >
+            <span data-testid="folder-name">old</span>
+          </div>
           <div data-testid="gap" />
         </div>
       </FileContextMenu>
@@ -164,6 +180,44 @@ describe("FileContextMenu", () => {
     renderView([file(1)]);
     fireEvent.contextMenu(screen.getByTestId("gap"));
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("offers excluding a right-clicked folder from scans, after asking", async () => {
+    renderView([file(1)]);
+    fireEvent.contextMenu(screen.getByTestId("folder-name"));
+    expect(
+      within(menu())
+        .getAllByRole("menuitem")
+        .map((el) => el.textContent),
+    ).toEqual(["Exclude from scans"]);
+
+    fireEvent.click(item("Exclude from scans"));
+    const dialog = await screen.findByRole("alertdialog");
+    // By its path: no other folder named "old" is excluded.
+    expect(dialog.textContent).toContain("videos/old");
+    expect(within(dialog).getByText("old", { selector: "mark" })).toBeTruthy();
+    // How much it hides, from the card's count.
+    expect(dialog.textContent).toContain("The 12 files in it are hidden now.");
+    expect(mocks.scanExclusionsAddFolder).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Exclude" }));
+
+    await waitFor(() =>
+      expect(mocks.scanExclusionsAddFolder).toHaveBeenCalledWith(
+        "ws-1",
+        "videos/old",
+      ),
+    );
+  });
+
+  it("excludes nothing when the folder's exclusion is not confirmed", async () => {
+    renderView([file(1)]);
+    fireEvent.contextMenu(screen.getByTestId("folder"));
+    fireEvent.click(item("Exclude from scans"));
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(mocks.scanExclusionsAddFolder).not.toHaveBeenCalled();
   });
 
   it("writes through the same channels as the command menu", async () => {

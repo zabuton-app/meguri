@@ -39,7 +39,8 @@ scan menu) lists them, the most recently gone first and at most
 thumbnails and collection entries. A removed file's id can be given to a new
 file, which is why its collection entries go too. Metadata keyed by
 `meta_key` stays. Files the user removed from the index (`excluded_at`) are
-the exclusion list and are not listed. A workspace being scanned is left out
+the exclusion list and are not listed, nor are files a scan exclusion hides
+(see [Scan exclusions](#scan-exclusions)). A workspace being scanned is left out
 of both the list and the removal: until the scan is through, files it has not
 reached yet read as missing, and during a rebuild every file does.
 
@@ -90,6 +91,87 @@ window listens is not reported, and the next scan reports the same items. It
 does not list the paths. The walk does not descend into `node_modules` or into
 the folders a file system keeps at a drive's root (`lost+found`,
 `System Volume Information`, `$RECYCLE.BIN`).
+
+### Scan exclusions
+
+The user can keep folders and files out of scans (#282), in the
+`scanExclusions` setting:
+
+- `patterns`: for every workspace, each of a kind (#529), matched
+  case-insensitively against the path relative to the workspace root, with
+  `/` as the separator on every platform. A folder is matched with a
+  trailing `/`. Each kind becomes a regular expression (`patternRegex()` in
+  `shared/scanExclusions.ts`):
+  - `name` (the default in Settings): a file or folder name at any depth,
+    with `*` as the only wildcard (`private`, `*.tmp`); a folder covers what
+    is in it. With a `/` before its end it is a path from the workspace root
+    (`work/private`, `/private`); with a trailing `/` it takes folders only
+    (`private/`). Only a name is trimmed.
+  - `contains`: the text anywhere in the path.
+  - `regex`: a regular expression, as written. A bare string stored before
+    patterns had a kind is read as one.
+
+  Edited in Settings → Scan, one field per pattern. A new pattern shows,
+  before it is added, the listed files it would hide in every workspace
+  (`scan_exclusions_preview`: a count and the first 50, read only). Main
+  runs it in the auto-tag worker as a scan does, over each file and the
+  folders above it (`coveredListedFiles()`); a newer preview stops the one
+  running at its next chunk. A pattern whose preview did not finish cannot
+  be added: the worker leaves it out for the session, and every scan would
+  fail with it saved. Common patterns fill the field in one click.
+
+- `folders`: per workspace ID, root-relative folders, each covering
+  everything below it. Added from a folder card's context menu in the folder
+  view ("Exclude from scans"), which hides its files at once after a
+  confirmation that shows the folder on disk and how many files it hides.
+  Listed in the workspace's edit dialog by where they are on disk (a bare
+  relative path would read like every folder of that name), marked "Not
+  found" when the folder is no longer on disk (renamed or gone). The dialog
+  can also add one through the OS folder picker (`scan_exclusions_pick_folder`,
+  which only picks, and refuses a folder outside the workspace). Taking a
+  folder off and adding one are both staged: the row stays, marked, until the
+  dialog is saved, and can be undone until then. Saving sends them together
+  (`scan_exclusions_update_folders`), so they all go or none do. Settings →
+  Scan counts each workspace's folders and opens its edit dialog.
+
+The patterns are user regexes, so they never run on the main thread: they go
+to the auto-tag worker as auto-tagging rules (`exclusionRule()` in
+`shared/scanExclusions.ts`), which brings its time budget and its leaving out
+of a pattern that never finishes. The engine matches a name without its
+extension, so each path is sent with a suffix it takes off
+(`exclusionSubject()`), and it skips empty matches, so each pattern is wrapped
+to match the path's first character wherever it matches (a pattern of
+lookaheads alone still excludes). The patterns are sent as a `whole` engine:
+when the worker cannot run, or has left a pattern out because it did not
+finish (for the rest of the session), the scan fails before the index is
+touched rather than letting in what the pattern covers, and the user is told
+to change the pattern. `electron/core/scanExclusionFilter.ts` builds the
+filter for one workspace.
+
+- **The walk** asks the filter once per level of the tree, for everything
+  found there. An excluded folder is not read, so nothing under it is hashed,
+  indexed or reported as unreadable.
+- **Indexed files a rule covers** are hidden, not deleted (`hideFiles()`):
+  `deleted_at` keeps them out of every list, and `scan_excluded_at` keeps
+  them out of Missing and of the move detection. The row and its `files.id`
+  (which collections and Watch Later refer to) stay. This runs when the
+  patterns are saved (in every workspace, without reading the disk, through
+  `WorkspacePasses`), after a scan's walk, and once more as the scan ends,
+  for a rule saved while it ran. The rows are written a chunk at a time,
+  yielding in between. A save is reported as saved once it is written, even
+  when hiding fails: the next scan applies it.
+- **A rule taken out** lets its files go at the next scan: its sync treats
+  them as any other row, bringing back each file still there (also when it
+  was moved) with its id and clearing the mark. Once the scan is through,
+  the mark is cleared on the rest, which are then missing like any file that
+  is gone. A scan cut short leaves them hidden, not missing. The mark is not
+  cleared when the rule goes, since the files would read as missing until a
+  scan found them.
+- **A rebuild** keeps the hidden rows as they are, with their thumbnails,
+  except those no rule covers any more, which it resets like any other row.
+  Resync clears only the files removed from the index by hand.
+- Excluded folders follow paths: when one is renamed, its files are scanned
+  again under the new path as new rows, and the old rows stay hidden.
 
 ### Metadata and thumbnails
 

@@ -233,7 +233,7 @@ lifecycle behavior:
   Three logo variants exist (`dark` = vermilion kanji, `light` = inverted,
   `enso` = pictorial brush circle with a media card, raster-sourced — no SVG
   master); the choice is persisted as `logo` in
-  main's `config.json` and switched from Settings via the `logo_get` /
+  main's settings (`appConfig.ts`) and switched from Settings via the `logo_get` /
   `logo_set` IPC channels. The renderer mirrors the same choice through
   `useLogo()` (react-query cache), which drives the Settings picker and the
   in-app logo in the workspace rail. The renderer does not bundle the
@@ -252,19 +252,28 @@ ratings, tags, bookmarks, play history — lives in one library,
 `Workspaces.idFor()` / `pathHash()`; that ID is also the name of the directory
 holding the workspace's generated files.
 
-- `electron/core/appConfig.ts` is the lone layer that persists
-  `<userData>/config.json`: `roots`, `activePath`, `collections` and
-  `workspaceEmojis` (owned by `Workspaces`), plus `update`, `logo`, `autoTag`,
-  `customCss` and `cssTheme`. Each owner writes only its own fields through
-  `updateConfig()`, which merges over what is on disk; writing a snapshot back
-  wholesale would revert the fields another owner changed since. A
-  `config.json` that cannot be parsed is renamed to
-  `config.json.corrupt-<time>` before anything saves, and one that cannot be
-  read at startup (locked, no permission) is not written over for the rest of
-  the session; either way the app runs on defaults and tells the user
-  (`app_status.configProblem`). A read or parse that fails later, once the
-  file was read, only skips the save that met it, and readers get the last
-  config read or saved meanwhile.
+- `electron/core/appConfig.ts` is the lone layer that persists the app's
+  settings: `roots`, `activePath` and `workspaceEmojis` (owned by
+  `Workspaces`), plus `update`, `logo`, `autoTag`, `customCss`,
+  `cssTheme` and `scanExclusions`. They live in the library's `app_settings`
+  table (see
+  [Data Model](data-model.md#app-settings)), one row per field, so they share
+  its daily backup, check and restore. Each owner writes only its own fields
+  through `updateConfig()`, which reads the stored settings, applies the change
+  and writes the fields that changed in one transaction; writing a snapshot
+  back wholesale would revert the fields another owner changed since.
+  - Startup runs `maintainLibrary()` before `Workspaces` reads the settings, and
+    after the single-instance lock, so a second instance never touches the
+    library.
+  - On a launch that finds no import record in `app_settings`,
+    `<userData>/config.json` (where the settings used to live) is imported once and recorded as
+    imported; it is then left in place and never read again, for an older
+    version of the app to start from. A `config.json` that cannot be parsed is
+    renamed to `config.json.corrupt-<time>` and the app starts from defaults;
+    one that cannot be read (locked, no permission), or a library that cannot
+    be opened, leaves the app on defaults without writing any setting until
+    the next launch. Either way the user is told (`app_status.configProblem`).
+    A read that fails later serves the last settings read or saved.
 - `electron/core/workspaces.ts` reads the config and caches a `Core` per ID. It
   distinguishes `active()` (the active workspace) from `byId()` (any workspace by
   ID). Code that opens files should be deliberate about which it needs — the
@@ -448,8 +457,9 @@ owns them, so keep them distinct.
 ### User collections
 
 Manually curated virtual folders that span workspaces. They are stored in the
-`collections` array of `<userData>/config.json` (see `UserCollectionConfig` in
-`electron/core/appConfig.ts`), and each item references a file by
+library's `collections` and `collection_items` tables (see
+`electron/core/collectionStore.ts` and
+[Data Model](data-model.md#app-settings)), and each item references a file by
 `workspaceId + fileId`. A file keeps its id across moves, renames and index
 rebuilds (a rebuild soft-deletes the rows and the rescan revives them in place),
 so these references stay valid. The exception is identical copies moved at
@@ -503,7 +513,7 @@ injects what it is given.
   A watch that is already running is not checked again, though macOS rebuilds
   its event stream whenever any watch starts or stops (such as when custom CSS
   is switched): a save at that moment shows only after the next save.
-- The switch is persisted as `customCss.enabled` in `config.json` (off by
+- The switch is persisted as the `customCss.enabled` setting (off by
   default) and works whether or not the file exists. The watcher runs only while
   it is on.
 - `electron/ipc/customCss.ts` handles `custom_css_get`,
@@ -532,7 +542,7 @@ theme file picked from `<userData>/themes/*.css`.
   `electron/core/watchDirectory.ts` with `custom.css`; it runs for the whole
   session, since a file added while nothing is picked must still reach the
   list.
-- The pick is `cssTheme` in `config.json` (null for none). A picked file that
+- The pick is the `cssTheme` setting (null for none). A picked file that
   disappears reads as none without clearing the stored pick, so it comes back
   with the file.
 - `electron/ipc/cssThemes.ts` handles `css_themes_get`, `css_theme_select`

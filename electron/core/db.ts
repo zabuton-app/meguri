@@ -93,6 +93,9 @@ CREATE TABLE IF NOT EXISTS files (
   thumb_path TEXT, thumb_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (thumb_status IN ('pending','done','error')),
   deleted_at INTEGER, excluded_at INTEGER, created_at INTEGER NOT NULL, meta TEXT,
+  -- Set with deleted_at when a scan exclusion (#282) covers the file: hidden,
+  -- not missing, and back with the same id once no rule covers it.
+  scan_excluded_at INTEGER,
   -- The name sort's key, naturalNameKey(rel_path) (nameKey.ts),
   -- written with rel_path by the scan.
   name_key TEXT,
@@ -133,9 +136,6 @@ CREATE INDEX IF NOT EXISTS idx_files_alive_rel_path ON files(rel_path, id) WHERE
 -- matches the "captured_at IS NULL ASC" NULLs-last term exactly. The ASC
 -- direction still filesorts (a reversed scan would put NULLs first).
 CREATE INDEX IF NOT EXISTS idx_files_alive_captured ON files((captured_at IS NULL), captured_at DESC, id) WHERE deleted_at IS NULL;
--- The missing-files list (queries/missing.ts): its WHERE and ORDER BY exactly,
--- so the planner takes it without statistics and does not sort.
-CREATE INDEX IF NOT EXISTS idx_files_missing ON files(deleted_at DESC, id DESC) WHERE deleted_at IS NOT NULL AND excluded_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
@@ -406,6 +406,18 @@ function backfillColumns(db: DB): void {
   if (!hasColumn(db, "scan_roots", "mountpoint")) {
     db.exec("ALTER TABLE scan_roots ADD COLUMN mountpoint INTEGER");
   }
+  // Set while a scan exclusion hides the file (#282).
+  if (!hasColumn(db, "files", "scan_excluded_at")) {
+    db.exec("ALTER TABLE files ADD COLUMN scan_excluded_at INTEGER");
+  }
+  // The missing-files list (queries/missing.ts): its WHERE and ORDER BY
+  // exactly, so the planner takes it without statistics and does not sort.
+  // Here rather than in CORE_DDL because it reads scan_excluded_at; it
+  // replaces idx_files_missing, from before files hidden by a scan exclusion.
+  db.exec("DROP INDEX IF EXISTS idx_files_missing");
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_missing_list ON files(deleted_at DESC, id DESC) WHERE deleted_at IS NOT NULL AND excluded_at IS NULL AND scan_excluded_at IS NULL",
+  );
   // Filesystem creation time (birthtime), NULL where the filesystem doesn't
   // provide it. The index lives here (not in CORE_DDL) because on pre-existing
   // DBs the column only exists after this ALTER runs.
@@ -698,6 +710,64 @@ export function openLibraryReadonly(libraryFile: string): DB | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * The app's settings, in the library so they share its backups, check and
+ * restore (libraryBackup.ts): one row per AppConfig field, the value as JSON
+ * (appConfig.ts). Not `settings`: workspace databases have a `main.settings`,
+ * which an unqualified name on their connections would resolve to first.
+ */
+const APP_SETTINGS_DDL = `
+CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+-- User collections (collectionStore.ts). position orders the collections, and
+-- the items within one: gaps are fine, only the order counts. An item refers
+-- to a file by its workspace and its id there (files.id).
+CREATE TABLE IF NOT EXISTS collections (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  emoji TEXT,
+  locked INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0, 1)),
+  position INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collection_items (
+  collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL,
+  file_id INTEGER NOT NULL,
+  position INTEGER NOT NULL,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (collection_id, workspace_id, file_id)
+);
+CREATE INDEX IF NOT EXISTS idx_collection_items_order ON collection_items(collection_id, position);
+-- Removing a workspace, or files from one, drops their items everywhere.
+CREATE INDEX IF NOT EXISTS idx_collection_items_file ON collection_items(workspace_id, file_id);
+`;
+
+/**
+ * The shared library on its own, writable, for the app's settings: opened
+ * before any workspace, so it creates the library on a first launch. Throws
+ * when it cannot be opened.
+ */
+export function openSettingsDb(libraryFile: string): DB {
+  const db = new Database(libraryFile);
+  try {
+    db.pragma("busy_timeout = 5000");
+    db.pragma("journal_mode = WAL");
+    // FULL, not the NORMAL the workspaces use: a setting saved is meant to
+    // stay saved through a power loss, as the fsync of config.json made it, and
+    // settings are written rarely enough for the sync on each commit.
+    db.pragma("synchronous = FULL");
+    // Removing a collection takes its items with it (ON DELETE CASCADE).
+    db.pragma("foreign_keys = ON");
+    db.exec(APP_SETTINGS_DDL);
+  } catch (e) {
+    db.close();
+    throw e;
+  }
+  return db;
 }
 
 /**

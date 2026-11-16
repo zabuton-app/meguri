@@ -9,6 +9,7 @@ import { nowUnix, pathMetaKey } from "./db.js";
 import { copyMetaKey, migrateMetaKey } from "./queries.js";
 import { pool } from "./concurrency.js";
 import type { Kind } from "./types.js";
+import type { PathFilter } from "./scanExclusionFilter.js";
 
 // Concurrency for parallelizing IO waits on network FS such as SMB.
 // Kept modest because too high would hit the server's connection limit.
@@ -234,13 +235,36 @@ export function unreadableMatcher(
  * cannot be read (permission denied, a share dropping mid-walk) is reported
  * through onUnreadablePath (relative to the root) and skipped; one that is gone
  * (ENOENT / ENOTDIR) is simply not found.
+ *
+ * `exclude` (the user's scan exclusions, #282) leaves a folder unread and a
+ * file unlisted, so neither is hashed, indexed or reported as unreadable. It
+ * is asked once per level of the tree, for everything found at that level.
  */
 export async function walk(
   root: string,
   onProgress?: (count: number) => void,
   signal?: AbortSignal,
   onUnreadablePath?: (relPath: string) => void,
+  exclude?: PathFilter | null,
 ): Promise<Discovered[]> {
+  // What the rules leave out of what was found, keeping the rest in order.
+  const withoutExcluded = async <T>(
+    found: T[],
+    fullOf: (item: T) => string,
+    isDir: boolean,
+  ): Promise<T[]> => {
+    if (!exclude || found.length === 0) return found;
+    const excluded = await exclude(
+      found.map((item) => {
+        const rel = path.relative(root, fullOf(item));
+        return {
+          relPath: path.sep === "/" ? rel : rel.split(path.sep).join("/"),
+          isDir,
+        };
+      }),
+    );
+    return found.filter((_, i) => !excluded[i]);
+  };
   const assertRootReadable = () => assertScanRootReadable(root);
   const reportUnreadable = async (full: string, code: string | undefined) => {
     if (code === "ENOENT" || code === "ENOTDIR") {
@@ -256,8 +280,8 @@ export async function walk(
   let level: string[] = [root];
   while (level.length) {
     if (signal?.aborted) break;
-    const next: string[] = [];
-    const statTargets: { full: string; ext: string; kind: Kind }[] = [];
+    let next: string[] = [];
+    let statTargets: { full: string; ext: string; kind: Kind }[] = [];
 
     // readdir this level's directories concurrently.
     await pool(
@@ -292,6 +316,9 @@ export async function walk(
       },
       signal,
     );
+    if (signal?.aborted) break;
+    next = await withoutExcluded(next, (dir) => dir, true);
+    statTargets = await withoutExcluded(statTargets, (t) => t.full, false);
 
     // stat the files found at this level concurrently.
     await pool(
@@ -450,6 +477,10 @@ export function emptyScanStats(): ScanStats {
  * unreadable lists the files whose content could not be read for hashing
  * (permission denied, locked by another process, gone since the walk). They
  * are left as they are for this scan and retried on the next one.
+ * releasing are rows hidden by a scan exclusion that no rule covers any more:
+ * they are synced like any other row, and a file found for one comes back
+ * with the mark taken off. The rest keep it, so a scan cut short leaves them
+ * hidden rather than missing; runScan takes it off once the scan is through.
  */
 export async function syncFiles(
   db: DB,
@@ -462,6 +493,7 @@ export async function syncFiles(
     /** Hash every file, not only new and changed ones (a rebuild): a file whose
      *  content changed with its size and mtime kept is then caught too. */
     rehash?: boolean;
+    releasing?: ReadonlySet<number>;
   } = {},
 ): Promise<{
   stats: ScanStats;
@@ -470,7 +502,19 @@ export async function syncFiles(
   ftsMissing: number[];
   unreadable: UnreadableFile[];
 }> {
-  const { onHashProgress, signal, unreadablePaths = [], rehash = false } = opts;
+  const {
+    onHashProgress,
+    signal,
+    unreadablePaths = [],
+    rehash = false,
+    releasing = new Set<number>(),
+  } = opts;
+  // Removed from the index by hand, or hidden by a rule that still covers it.
+  const isExcluded = (r: {
+    id: number;
+    removed: number;
+    hidden: number;
+  }): boolean => r.removed === 1 || (r.hidden === 1 && !releasing.has(r.id));
   const stats: ScanStats = {
     inserted: 0,
     updated: 0,
@@ -489,10 +533,20 @@ export async function syncFiles(
     (
       db
         .prepare(
-          "SELECT rel_path FROM files WHERE root_id = ? AND excluded_at IS NOT NULL",
+          // Hidden by a scan exclusion too: the walk skips what one covers,
+          // but a rule added while this scan ran has hidden rows since.
+          `SELECT id, rel_path, excluded_at IS NOT NULL AS removed, scan_excluded_at IS NOT NULL AS hidden
+           FROM files WHERE root_id = ? AND (excluded_at IS NOT NULL OR scan_excluded_at IS NOT NULL)`,
         )
-        .all(rootId) as { rel_path: string }[]
-    ).map((r) => r.rel_path),
+        .all(rootId) as {
+        id: number;
+        rel_path: string;
+        removed: number;
+        hidden: number;
+      }[]
+    )
+      .filter(isExcluded)
+      .map((r) => r.rel_path),
   );
   const scannable = discovered.filter((d) => !excluded.has(d.relPath));
   const seen = new Set(scannable.map((d) => d.relPath));
@@ -501,23 +555,24 @@ export async function syncFiles(
   // btime is refreshed here too so rows scanned before the column existed get
   // backfilled on the next scan without a content change.
   const touchUnchanged = db.prepare(
-    "UPDATE files SET deleted_at = NULL, abs_path = ?, inode = ?, btime = ? WHERE id = ?",
+    "UPDATE files SET deleted_at = NULL, scan_excluded_at = NULL, abs_path = ?, inode = ?, btime = ? WHERE id = ?",
   );
   // Recompute content_hash for changed files so meta_key stays anchored to the hash
   // (rather than dropping to the path fallback) and metadata keeps linking.
   const updateChanged = db.prepare(
-    "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL WHERE id = ?",
+    "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL, scan_excluded_at = NULL WHERE id = ?",
   );
   // name_key goes with rel_path (see naturalNameKey in nameKey.ts).
   const moveStmt = db.prepare(
-    "UPDATE files SET rel_path = ?, name_key = ?, abs_path = ?, inode = ?, mtime = ?, btime = ?, size = ?, deleted_at = NULL WHERE id = ?",
+    "UPDATE files SET rel_path = ?, name_key = ?, abs_path = ?, inode = ?, mtime = ?, btime = ?, size = ?, deleted_at = NULL, scan_excluded_at = NULL WHERE id = ?",
   );
   const insertStmt = db.prepare(
     `INSERT INTO files (root_id, rel_path, name_key, abs_path, kind, ext, size, mtime, btime, inode, content_hash, thumb_status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   );
   const moveCandidates = db.prepare(
-    "SELECT id, rel_path, kind, ext, deleted_at FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL",
+    `SELECT id, rel_path, kind, ext, deleted_at, 0 AS removed, scan_excluded_at IS NOT NULL AS hidden
+     FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL`,
   );
   // A move can change the extension, and with it the kind (the same MPEG-4 bytes
   // are video as .mp4 and audio as .m4a). The row would otherwise keep the old
@@ -643,16 +698,23 @@ export async function syncFiles(
   // re-reads it, so such a row is left removed instead of being restored (#266).
   // Looked up by primary key for the chunk's rows only: excluded rows pile up
   // until a rebuild, so reading all of them per chunk would grow with them.
-  const excludedAmong = db
-    .prepare(
-      "SELECT id FROM files WHERE id IN (SELECT value FROM json_each(?)) AND excluded_at IS NOT NULL",
-    )
-    .pluck();
+  const excludedAmong = db.prepare(
+    `SELECT id, excluded_at IS NOT NULL AS removed, scan_excluded_at IS NOT NULL AS hidden
+       FROM files WHERE id IN (SELECT value FROM json_each(?)) AND (excluded_at IS NOT NULL OR scan_excluded_at IS NOT NULL)`,
+  );
   const applyChunk = db.transaction((idxs: number[]) => {
     const ids = idxs.flatMap((i) => existingOf[i]?.id ?? []);
     const excludedNow = new Set(
       ids.length > 0
-        ? (excludedAmong.all(JSON.stringify(ids)) as number[])
+        ? (
+            excludedAmong.all(JSON.stringify(ids)) as {
+              id: number;
+              removed: number;
+              hidden: number;
+            }[]
+          )
+            .filter(isExcluded)
+            .map((r) => r.id)
         : [],
     );
     for (const i of idxs) {
@@ -748,12 +810,15 @@ export async function syncFiles(
               kind: string;
               ext: string | null;
               deleted_at: number | null;
+              removed: number;
+              hidden: number;
             }[])
           : [];
       // A candidate walk() could not reach is probably still in place: this
       // is a copy, not a move.
       const unseen = cands.filter(
-        (c) => !seen.has(c.rel_path) && !isUnreadable(c.rel_path),
+        (c) =>
+          !isExcluded(c) && !seen.has(c.rel_path) && !isUnreadable(c.rel_path),
       );
       // Only an unambiguous match is a move: with identical copies gone at
       // once, picking one would hand a file's id (which collections refer to)

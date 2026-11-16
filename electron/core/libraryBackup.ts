@@ -83,6 +83,17 @@ function listBackups(
     });
 }
 
+/** Whether a workspace has attached the library and made its tables (LIB_DDL). */
+function holdsMetadata(db: DB): boolean {
+  return (
+    db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tag_changes'",
+      )
+      .get() !== undefined
+  );
+}
+
 /** `library-20261108T123456789.sqlite`, in UTC, to the millisecond. */
 function backupName(now: number): string {
   const stamp = new Date(now)
@@ -103,6 +114,10 @@ function takeBackup(file: string, dir: string, now: number): number | null {
   let db: DB | undefined;
   try {
     db = openLibraryReadonlyOrThrow(file);
+    // The settings (app_settings) create the library before any workspace
+    // attaches it. Until one has, it holds no metadata, and a copy of it could
+    // not be put back (forgetTagChanges needs tag_changes): none is taken.
+    if (!holdsMetadata(db)) return null;
     db.prepare("VACUUM INTO ?").run(target);
   } catch (e) {
     fs.rmSync(target, { force: true });

@@ -78,6 +78,75 @@ export const fr: Catalog = {
     "Applique custom.css par-dessus le thème. Les modifications prennent effet dès l'enregistrement du fichier.",
   "settings.customCssOpen": "Ouvrir le fichier",
   "settings.customCssOpenError": "Impossible d'ouvrir custom.css.",
+  "settings.tabScan": "Analyse",
+  "settings.scanExclusions": "Exclure par motif",
+  "settings.scanExclusionsDesc":
+    "Fichiers et dossiers exclus des analyses dans tous les espaces de travail. La casse est ignorée.",
+  "settings.scanExclusionsNextScan":
+    "L'enregistrement masque les fichiers indexés couverts par un motif. Les fichiers d'un motif retiré reviennent à la prochaine analyse.",
+  "settings.scanExclusionsSave": "Enregistrer",
+  "settings.scanExclusionsSaved": "Exclusions d'analyse enregistrées.",
+  "settings.scanExclusionsSaveError":
+    "Impossible d'enregistrer les exclusions d'analyse.",
+  "settings.scanExclusionsPattern": "Motif {n}",
+  "settings.scanExclusionsRemove": "Supprimer le motif {n}",
+  "settings.scanExclusionsAdd": "Motif à ajouter",
+  "settings.scanExclusionsNone": "Aucun motif.",
+  "settings.scanExclusionsPresets": "Courants :",
+  "settings.scanExclusionsPresetAdd": "Utiliser {pattern}",
+  "settings.scanExclusionsKind": "Correspondance par",
+  "settings.scanExclusionsKindName": "Nom",
+  "settings.scanExclusionsKindContains": "Contient",
+  "settings.scanExclusionsKindRegex": "Expression régulière",
+  "settings.scanExclusionsKindNameHint":
+    "Exclut les fichiers et dossiers portant ce nom, à toute profondeur ; un dossier inclut son contenu. * remplace n'importe quel texte (*.tmp). Avec un / (work/private, /private), c'est un chemin depuis le dossier de l'espace de travail ; terminé par / (private/), seulement des dossiers.",
+  "settings.scanExclusionsKindContainsHint":
+    "Exclut tout ce dont le chemin contient ce texte, même au sein d'un nom (temp correspond aussi à attempt.mp4).",
+  "settings.scanExclusionsKindRegexHint":
+    "Une expression régulière, comparée au chemin depuis le dossier de l'espace de travail. Le chemin d'un dossier se termine par /.",
+  "settings.scanExclusionsAddAction": "Ajouter",
+  "settings.scanExclusionsDuplicate": "Ce motif est déjà dans la liste.",
+  "settings.scanExclusionsPreviewHint":
+    "Saisissez un motif pour voir les fichiers déjà listés qui correspondent.",
+  "settings.scanExclusionsPreviewLoading":
+    "Recherche des fichiers correspondants…",
+  "settings.scanExclusionsPreviewError":
+    "Impossible de rechercher les fichiers correspondants.",
+  "settings.scanExclusionsPreviewNone":
+    "Il ne correspond à aucun fichier listé.",
+  "settings.scanExclusionsPreviewCount": {
+    one: "{count} fichier correspond. Il est masqué une fois le motif ajouté et enregistré.",
+    other:
+      "{count} fichiers correspondent. Ils sont masqués une fois le motif ajouté et enregistré.",
+  },
+  "settings.scanExclusionsPreviewList": "Fichiers correspondants",
+  "settings.scanExclusionsPreviewMore": {
+    one: "et {count} autre",
+    other: "et {count} autres",
+  },
+  "settings.scanExclusionsTestTimedOut":
+    "Ce motif n'a pas abouti à temps. Il bloquerait les analyses : il ne peut pas être ajouté.",
+  "settings.folderExclusions": "Exclure par dossier",
+  "settings.folderExclusionsDesc":
+    "Par espace de travail, seulement les dossiers listés. Ajoutez-en un par un clic droit sur un dossier dans la vue par dossiers.",
+  "settings.folderExclusionsCount": {
+    one: "{count} dossier",
+    other: "{count} dossiers",
+  },
+  "settings.folderExclusionsNone": "Aucun",
+  "settings.folderExclusionsNotFound": {
+    one: "{count} introuvable",
+    other: "{count} introuvables",
+  },
+  "settings.folderExclusionsManage": "Gérer",
+  "settings.folderExclusionsManageLabel": "Gérer les dossiers exclus de {name}",
+  "settings.folderExclusionsLoadError":
+    "Impossible de lire les dossiers exclus.",
+  "settings.folderExclusionsNoWorkspaces": "Aucun espace de travail.",
+  "settings.scanExclusionsGlobal": "Global",
+  "settings.folderExclusionsPerWorkspace": "Par espace de travail",
+  "settings.scanExclusionsLoadError":
+    "Impossible de lire les exclusions de l'analyse.",
   "settings.logo": "Logo de l'application",
   "settings.logoDesc":
     "S'applique aux icônes de la fenêtre, de la barre d'état et de l'application.",
@@ -123,15 +192,15 @@ export const fr: Catalog = {
   "library.restored":
     "Votre bibliothèque était endommagée : {app} a restauré la copie du {date}",
   "library.restoredDesc":
-    "Les favoris, notes, tags et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
+    "Les favoris, notes, tags, espaces de travail, collections, réglages et autres modifications faits ensuite sont perdus. Le fichier endommagé est conservé dans le même dossier que la bibliothèque.",
   "config.movedAside":
     "Le fichier de réglages (config.json) était endommagé : {app} a démarré avec les réglages par défaut",
   "config.movedAsideDesc":
     "Vos espaces de travail et collections sont conservés dans le fichier endommagé, enregistré sous config.json.corrupt-<date> dans le même dossier.",
   "config.unreadable":
-    "{app} n’a pas pu lire le fichier de réglages (config.json) et fonctionne avec les réglages par défaut",
+    "{app} n’a pas pu lire vos réglages et fonctionne avec les réglages par défaut",
   "config.unreadableDesc":
-    "Le fichier n’a pas été modifié. Vérifiez qu’aucune autre application ne l’utilise, puis redémarrez {app}.",
+    "Vos réglages n’ont pas été modifiés. Vérifiez qu’aucune autre application ne les utilise, puis redémarrez {app}.",
   "settings.about": "À propos",
   "about.version": "{name} version {version}",
   "about.appLicense": "{name} est publié sous licence MIT.",
@@ -171,6 +240,10 @@ export const fr: Catalog = {
   "home.scanCanceled": "Scan annulé",
   "home.escCloseHint": "Appuyez à nouveau sur Échap pour fermer la fenêtre",
   "home.scanError": "Une erreur s'est produite pendant le scan",
+  "home.scanExclusionStuck":
+    "Un motif d'exclusion de l'analyse a mis trop de temps à s'exécuter",
+  "home.scanExclusionStuckDesc":
+    "Rien n'a été analysé. Modifiez-le ou supprimez-le dans Paramètres → Analyse.",
   "home.scanRootUnreadable":
     "Le dossier de l’espace de travail est inaccessible",
   "home.scanRootUnreadableNamed": "Le dossier de « {name} » est inaccessible",
@@ -718,6 +791,23 @@ export const fr: Catalog = {
     "Le dossier affiché n'existe plus ; vous avez été ramené au niveau supérieur.",
   "folder.chip": "Dossier",
   "folder.showInLibrary": "Afficher le dossier dans la bibliothèque",
+  "folder.excludeFromScans": "Exclure des analyses",
+  "folder.excludeConfirm":
+    "Ce dossier est exclu des analyses de cet espace de travail.",
+  "folder.excludeAction": "Exclure",
+  "folder.excluded": "« {name} » est exclu des analyses",
+  "folder.excludeTitle": "Exclure « {name} » des analyses",
+  "folder.excludeTarget": "Dossier",
+  "folder.excludeHides": {
+    one: "Le {count} fichier qu'il contient est masqué dès maintenant. Rien n'est supprimé du disque.",
+    other:
+      "Les {count} fichiers qu'il contient sont masqués dès maintenant. Rien n'est supprimé du disque.",
+  },
+  "folder.excludeOnlyThis":
+    "Seul ce dossier est exclu. Les dossiers nommés « {name} » ailleurs sont toujours analysés.",
+  "folder.excludeUndoHint":
+    "Pour le réinclure, modifiez l'espace de travail, section « Exclus des analyses ».",
+  "folder.excludeFailed": "Impossible d'exclure le dossier",
   "folder.showFailed": "Impossible d'afficher le dossier",
   "folder.subfolderMenu": "Sous-dossiers de « {name} »",
   "folder.loading": "Chargement…",
@@ -1151,6 +1241,32 @@ export const fr: Catalog = {
   "workspace.edit": "Modifier l'espace de travail",
   "workspace.editAction": "Enregistrer",
   "workspace.pathReadonly": "Le chemin ne peut pas être modifié.",
+  "workspace.excludedFolders": "Exclus des analyses",
+  "workspace.excludedFoldersEmpty":
+    "Aucun dossier. Faites un clic droit sur un dossier dans la vue par dossiers, ou utilisez « Ajouter un dossier ».",
+  "workspace.excludedFolderNotFound": "Introuvable",
+  "workspace.excludedFolderInclude": "Réinclure {path} dans les analyses",
+  "workspace.excludedFoldersNextScan":
+    "Les dossiers retirés de la liste sont de nouveau analysés à partir de la prochaine analyse.",
+  "workspace.excludedFoldersDesc":
+    "Seulement ces dossiers et leur contenu. Les dossiers du même nom situés ailleurs sont toujours analysés.",
+  "workspace.excludedFolderIncludeAction": "Inclure",
+  "workspace.excludedFolderRemoveAction": "Retirer",
+  "workspace.excludedFolderRemove": "Retirer {path} de la liste",
+  "workspace.excludedFolderUndo": "Annuler",
+  "workspace.excludedFolderUndoLabel": "Annuler la modification de {path}",
+  "workspace.excludedFolderIncluding": "Inclus à l'enregistrement",
+  "workspace.excludedFolderAdding": "Exclu à l'enregistrement",
+  "workspace.excludedFoldersAdd": "Ajouter un dossier",
+  "workspace.excludedFolderOutside":
+    "Choisissez un dossier dans l'espace de travail",
+  "workspace.excludedFolderPickFailed":
+    "Impossible d'ouvrir le sélecteur de dossiers",
+  "workspace.excludedFoldersRetry": "Réessayer",
+  "workspace.excludedFoldersLoadError":
+    "Impossible de lire les dossiers exclus.",
+  "workspace.excludedFoldersSaveError":
+    "Impossible de mettre à jour les dossiers exclus",
   "workspace.addDirectory": "Ajouter un dossier vidéo",
   "workspace.removeFromSidebar": "Supprimer l'espace de travail",
   "workspace.removeTitle": "Supprimer l'espace de travail",

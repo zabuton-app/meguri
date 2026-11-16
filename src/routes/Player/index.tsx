@@ -34,6 +34,7 @@ import {
 import { fileHref } from "@/lib/fileHref";
 import { announceVideoHandOff } from "@/video/videoHandOff";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import { queueKey } from "@/lib/playbackQueue";
 import { fileNameOf } from "@/lib/relPath";
 import {
@@ -193,7 +194,7 @@ export default function Player() {
     // the fallback for when the hand-off does not happen.
     if (current.kind === "video" && mediaBase)
       announceVideoHandOff(
-        `${mediaBase}/ws/${current.workspaceId}/media/${current.fileId}`,
+        mediaSrcOf(mediaBase, current.workspaceId, current.fileId),
       );
     void navigate(
       fileHref(current.fileId, current.workspaceId, {
@@ -264,9 +265,11 @@ export default function Player() {
     // Audio may have no thumbnail at all (no embedded cover art), and the queue
     // item cannot tell; a guaranteed 404 is not worth warming.
     if (upcoming.kind === "audio") return;
-    const kind = upcoming.kind === "image" ? "media" : "thumb";
     const img = new Image();
-    img.src = `${mediaBase}/ws/${upcoming.workspaceId}/${kind}/${upcoming.fileId}`;
+    img.src =
+      upcoming.kind === "image"
+        ? mediaSrcOf(mediaBase, upcoming.workspaceId, upcoming.fileId)
+        : (thumbUrl(mediaBase, upcoming.workspaceId, upcoming.fileId) ?? "");
   }, [upcoming, mediaBase]);
 
   const wsId = current?.workspaceId ?? "";
@@ -278,9 +281,7 @@ export default function Player() {
     ? (thumbUrl(mediaBase, wsId, current.fileId) ?? undefined)
     : undefined;
   const mediaSrc =
-    mediaBase && current
-      ? `${mediaBase}/ws/${wsId}/media/${current.fileId}`
-      : "";
+    mediaBase && current ? mediaSrcOf(mediaBase, wsId, current.fileId) : "";
 
   const { leaving, transitionTo } = useStageTransition({
     rootRef,

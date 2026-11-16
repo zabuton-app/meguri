@@ -253,7 +253,12 @@ export const MediaList = memo(function MediaList({
 
   return (
     <MediaReorderProvider items={items} reorder={reorder}>
-      <FileContextMenu items={items} mediaBase={mediaBase} active={navActive}>
+      <FileContextMenu
+        items={items}
+        mediaBase={mediaBase}
+        workspaceId={wsId}
+        active={navActive}
+      >
         <ScrollArea
           className="page-scroll h-full"
           viewportClassName="pt-4"

@@ -9,6 +9,15 @@ import {
 // routes must see through it, and a player adopting such an element has to
 // read it back as its position offset — one place for all three.
 
+/** The media server URL of a file, the one form every route has to agree on. */
+export function mediaSrcOf(
+  mediaBase: string,
+  workspaceId: string,
+  fileId: number,
+): string {
+  return `${mediaBase}/ws/${workspaceId}/media/${fileId}`;
+}
+
 /** `src` re-served from `sec` seconds in. */
 export function withStreamSeek(
   src: string,

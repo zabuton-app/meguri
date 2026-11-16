@@ -35,14 +35,14 @@ function renderSettings(sections: readonly SettingsSection[]) {
 describe("Settings with an app's own sections", () => {
   it("shows only Meguri's tabs when the app adds none", () => {
     renderSettings([]);
-    expect(screen.getAllByRole("tab")).toHaveLength(5);
+    expect(screen.getAllByRole("tab")).toHaveLength(6);
   });
 
   it("adds the app's tab after Meguri's, labelled for the current language", () => {
     renderSettings([SECTION]);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(6);
-    expect(tabs[5].textContent).toBe(
+    expect(tabs).toHaveLength(7);
+    expect(tabs[6].textContent).toBe(
       document.documentElement.lang === "ja" ? "同期" : "Sync",
     );
   });
@@ -51,7 +51,7 @@ describe("Settings with an app's own sections", () => {
     renderSettings([SECTION]);
     expect(screen.queryByText("sync settings")).toBeNull();
 
-    fireEvent.click(screen.getAllByRole("tab")[5]);
+    fireEvent.click(screen.getAllByRole("tab")[6]);
 
     const panel = screen.getByRole("tabpanel");
     expect(panel.id).toBe("settings-panel-extra-sync");

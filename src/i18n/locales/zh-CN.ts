@@ -72,6 +72,57 @@ export const zhCN: Catalog = {
   "settings.customCssDesc": "在主题之上应用 custom.css。保存文件后立即生效。",
   "settings.customCssOpen": "打开文件",
   "settings.customCssOpenError": "无法打开 custom.css。",
+  "settings.tabScan": "扫描",
+  "settings.scanExclusions": "按模式排除",
+  "settings.scanExclusionsDesc":
+    "在所有工作区中从扫描排除的文件和文件夹。不区分大小写。",
+  "settings.scanExclusionsNextScan":
+    "保存后，模式匹配的已索引文件会被隐藏。已移除模式对应的文件会在下次扫描时恢复。",
+  "settings.scanExclusionsSave": "保存",
+  "settings.scanExclusionsSaved": "已保存扫描排除设置。",
+  "settings.scanExclusionsSaveError": "无法保存扫描排除设置。",
+  "settings.scanExclusionsPattern": "模式 {n}",
+  "settings.scanExclusionsRemove": "删除模式 {n}",
+  "settings.scanExclusionsAdd": "要添加的模式",
+  "settings.scanExclusionsNone": "没有模式。",
+  "settings.scanExclusionsPresets": "常用：",
+  "settings.scanExclusionsPresetAdd": "使用 {pattern}",
+  "settings.scanExclusionsKind": "匹配方式",
+  "settings.scanExclusionsKindName": "名称",
+  "settings.scanExclusionsKindContains": "包含",
+  "settings.scanExclusionsKindRegex": "正则表达式",
+  "settings.scanExclusionsKindNameHint":
+    "排除任意层级中名称相符的文件和文件夹；文件夹会连同其内容一起排除。* 表示任意文本（如 *.tmp）。包含 / 时（如 work/private、/private）表示相对于工作区文件夹的路径；以 / 结尾时（如 private/）只匹配文件夹。",
+  "settings.scanExclusionsKindContainsHint":
+    "排除路径中任意位置包含此文本的项，名称的一部分也会匹配（temp 也会匹配 attempt.mp4）。",
+  "settings.scanExclusionsKindRegexHint":
+    "正则表达式，用于匹配相对于工作区文件夹的路径。文件夹路径以 / 结尾。",
+  "settings.scanExclusionsAddAction": "添加",
+  "settings.scanExclusionsDuplicate": "此模式已在列表中。",
+  "settings.scanExclusionsPreviewHint":
+    "输入模式后，将显示已导入文件中与之匹配的文件。",
+  "settings.scanExclusionsPreviewLoading": "正在查找匹配的文件…",
+  "settings.scanExclusionsPreviewError": "无法查找匹配的文件。",
+  "settings.scanExclusionsPreviewNone": "没有匹配的已导入文件。",
+  "settings.scanExclusionsPreviewCount":
+    "有 {count} 个文件匹配。添加并保存后将被隐藏。",
+  "settings.scanExclusionsPreviewList": "匹配的文件",
+  "settings.scanExclusionsPreviewMore": "还有 {count} 个",
+  "settings.scanExclusionsTestTimedOut":
+    "此模式未能在限定时间内完成。它会使扫描停止，因此无法添加。",
+  "settings.folderExclusions": "按文件夹排除",
+  "settings.folderExclusionsDesc":
+    "按工作区仅排除列出的文件夹。在文件夹视图中右键点击文件夹即可添加。",
+  "settings.folderExclusionsCount": "{count} 个文件夹",
+  "settings.folderExclusionsNone": "无",
+  "settings.folderExclusionsNotFound": "{count} 个未找到",
+  "settings.folderExclusionsManage": "管理",
+  "settings.folderExclusionsManageLabel": "管理 {name} 的排除文件夹",
+  "settings.folderExclusionsLoadError": "无法读取排除的文件夹。",
+  "settings.folderExclusionsNoWorkspaces": "没有工作区。",
+  "settings.scanExclusionsGlobal": "全局",
+  "settings.folderExclusionsPerWorkspace": "按工作区",
+  "settings.scanExclusionsLoadError": "无法读取扫描排除设置。",
   "settings.logo": "应用图标",
   "settings.logoDesc": "应用于窗口、托盘和应用内图标。",
   "logo.dark": "深色",
@@ -110,15 +161,14 @@ export const zhCN: Catalog = {
   "libraryMerge.retry": "重试",
   "library.restored": "资料库已损坏，已从 {date} 的副本恢复",
   "library.restoredDesc":
-    "此后对收藏、评分、标签等所做的更改已丢失。损坏的文件保留在资料库所在的文件夹中。",
+    "此后对收藏、评分、标签、工作区、收藏集、设置等所做的更改已丢失。损坏的文件保留在资料库所在的文件夹中。",
   "config.movedAside":
     "设置文件（config.json）已损坏，{app} 已使用默认设置启动",
   "config.movedAsideDesc":
     "已登记的工作区和收藏集保留在损坏的文件中，该文件已另存为同一文件夹中的 config.json.corrupt-<日期>。",
-  "config.unreadable":
-    "无法读取设置文件（config.json），{app} 正以默认设置运行",
+  "config.unreadable": "无法读取设置，{app} 正以默认设置运行",
   "config.unreadableDesc":
-    "该文件未被修改。请确认没有其他应用正在使用它，然后重新启动 {app}。",
+    "设置未被修改。请确认没有其他应用正在使用它们，然后重新启动 {app}。",
   "settings.about": "关于",
   "about.version": "{name} 版本 {version}",
   "about.appLicense": "{name} 基于 MIT License 发布。",
@@ -156,6 +206,9 @@ export const zhCN: Catalog = {
   "home.scanCanceled": "已取消扫描",
   "home.escCloseHint": "再按一次 Esc 关闭窗口",
   "home.scanError": "扫描过程中发生错误",
+  "home.scanExclusionStuck": "某个扫描排除规则运行时间过长",
+  "home.scanExclusionStuckDesc":
+    "未进行扫描。请在 设置 → 扫描 中修改或删除该规则。",
   "home.scanRootUnreadable": "无法访问工作区文件夹",
   "home.scanRootUnreadableNamed": "无法访问“{name}”的文件夹",
   "home.scanRootUnreadableDesc":
@@ -618,6 +671,19 @@ export const zhCN: Catalog = {
   "folder.moved": "正在查看的文件夹已不存在，已移至上一级。",
   "folder.chip": "文件夹",
   "folder.showInLibrary": "在媒体库中显示文件夹",
+  "folder.excludeFromScans": "从扫描中排除",
+  "folder.excludeConfirm": "此文件夹将不再参与此工作区的扫描。",
+  "folder.excludeAction": "排除",
+  "folder.excluded": "已将“{name}”从扫描中排除",
+  "folder.excludeTitle": "从扫描中排除“{name}”",
+  "folder.excludeTarget": "目标文件夹",
+  "folder.excludeHides":
+    "其中的 {count} 个文件将立即隐藏。磁盘上的文件不会被删除。",
+  "folder.excludeOnlyThis":
+    "只排除此文件夹。其他位置名为“{name}”的文件夹仍会被扫描。",
+  "folder.excludeUndoHint":
+    "如需重新包含，请在编辑工作区的“已从扫描中排除”中操作。",
+  "folder.excludeFailed": "无法排除该文件夹",
   "folder.showFailed": "无法显示该文件夹",
   "folder.subfolderMenu": "“{name}”的子文件夹",
   "folder.loading": "正在加载…",
@@ -958,6 +1024,28 @@ export const zhCN: Catalog = {
   "workspace.edit": "编辑工作区",
   "workspace.editAction": "保存",
   "workspace.pathReadonly": "路径无法更改。",
+  "workspace.excludedFolders": "已从扫描中排除",
+  "workspace.excludedFoldersEmpty":
+    "没有排除的文件夹。在文件夹视图中右键点击文件夹，或使用“添加文件夹”。",
+  "workspace.excludedFolderNotFound": "未找到",
+  "workspace.excludedFolderInclude": "重新扫描 {path}",
+  "workspace.excludedFoldersNextScan":
+    "从列表中移除的文件夹将在下次扫描时重新扫描。",
+  "workspace.excludedFoldersDesc":
+    "仅排除这些文件夹及其内容。其他位置的同名文件夹仍会被扫描。",
+  "workspace.excludedFolderIncludeAction": "重新包含",
+  "workspace.excludedFolderRemoveAction": "从列表移除",
+  "workspace.excludedFolderRemove": "从列表中移除 {path}",
+  "workspace.excludedFolderUndo": "撤销",
+  "workspace.excludedFolderUndoLabel": "撤销对 {path} 的更改",
+  "workspace.excludedFolderIncluding": "保存后重新包含",
+  "workspace.excludedFolderAdding": "保存后排除",
+  "workspace.excludedFoldersAdd": "添加文件夹",
+  "workspace.excludedFolderOutside": "请选择工作区内的文件夹",
+  "workspace.excludedFolderPickFailed": "无法打开文件夹选择器",
+  "workspace.excludedFoldersRetry": "重试",
+  "workspace.excludedFoldersLoadError": "无法读取已排除的文件夹。",
+  "workspace.excludedFoldersSaveError": "无法更新已排除的文件夹",
   "workspace.addDirectory": "添加视频目录",
   "workspace.removeFromSidebar": "删除工作区",
   "workspace.removeTitle": "删除工作区",

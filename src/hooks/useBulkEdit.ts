@@ -4,8 +4,8 @@
 // Each of these has a per-file control elsewhere (FavoriteButton, RatingButton,
 // WatchLaterButton) that owns its own mutation. The bulk equivalents cannot just
 // call those in a loop — favorite and rating would be one IPC round trip per
-// file, and Watch Later lives in config.json, which is rewritten whole on every
-// change — so each has a channel that takes the whole selection at once.
+// file, and each Watch Later change is its own write to disk in main — so
+// each has a channel that takes the whole selection at once.
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/ipc/client";

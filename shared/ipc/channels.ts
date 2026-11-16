@@ -36,6 +36,7 @@ import {
   LogoIdSchema,
   SearchQuerySchema,
   AutoTagConfigSchema,
+  ExclusionPatternSchema,
   TagRefSchema,
 } from "./schema.js";
 import {
@@ -68,8 +69,13 @@ import {
 import { ACTIVITY_MAX_DAYS, type ActivityDays } from "./activity.js";
 import type { TimelineCounts } from "./timeline.js";
 import { daySpan, parseDay } from "../day.js";
-import { MAX_FOLDER_FILES_PATHS } from "../folderPath.js";
+import { MAX_FOLDER_FILES_PATHS, ROOT_FOLDER } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
+import {
+  MAX_EXCLUDED_FOLDERS,
+  MAX_EXCLUSION_PATTERNS,
+  type ExclusionPattern,
+} from "../scanExclusions.js";
 
 export { EVENT_CHANNELS, INVOKE_CHANNELS };
 export type { EventChannel, InvokeChannel };
@@ -307,8 +313,8 @@ export const ChannelInputs = {
   collection_rename: z.object({ id: z.string(), name: z.string().min(1) }),
   collection_add_file: FileTarget.extend({ collectionId: z.string() }),
   collection_remove_file: FileTarget.extend({ collectionId: z.string() }),
-  // Membership for many files at once. Collections live in config.json, which is
-  // rewritten on every change, so adding a selection one file at a time would
+  // Membership for many files at once. Each collection change is its own
+  // transaction, synced to disk, so adding a selection one file at a time would
   // mean one disk write per file. `op` names the direction rather than a boolean
   // flag, matching the collection_add_file / collection_remove_file vocabulary
   // this is the bulk form of.
@@ -555,6 +561,38 @@ export const ChannelInputs = {
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
   logo_images: z.void(),
+  scan_exclusions_get: z.void(),
+  // Each pattern must compile (patternError); main checks again on save.
+  scan_exclusions_set_patterns: z.object({
+    patterns: z.array(ExclusionPatternSchema).max(MAX_EXCLUSION_PATTERNS),
+  }),
+  scan_exclusions_folders: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  }),
+  // Not the root: that would leave nothing to scan.
+  scan_exclusions_add_folder: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+    path: FolderPathSchema.refine((p) => p !== ROOT_FOLDER, {
+      message: "the workspace root cannot be excluded",
+    }),
+  }),
+  // Both in one save: the edit dialog's staged changes all go, or none do.
+  scan_exclusions_update_folders: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+    add: z
+      .array(
+        FolderPathSchema.refine((p) => p !== ROOT_FOLDER, {
+          message: "the workspace root cannot be excluded",
+        }),
+      )
+      .max(MAX_EXCLUDED_FOLDERS),
+    remove: z.array(FolderPathSchema).max(MAX_EXCLUDED_FOLDERS),
+  }),
+  scan_exclusions_pick_folder: z.object({
+    workspaceId: z.string().min(1).max(MAX_WORKSPACE_ID),
+  }),
+  // Must compile (patternError); main checks.
+  scan_exclusions_preview: z.object({ pattern: ExclusionPatternSchema }),
   custom_css_get: z.void(),
   custom_css_set_enabled: z.object({ enabled: z.boolean() }),
   custom_css_open: z.void(),
@@ -742,6 +780,21 @@ export interface ChannelOutputs {
   // The in-app logo of each variant, as a data URL. The bitmaps come from
   // startApp()'s options, so the renderer cannot bundle them.
   logo_images: Record<LogoId, string>;
+  scan_exclusions_get: ScanExclusionsState;
+  // Returns the state saved; the files the new patterns cover are hidden by
+  // the time it does.
+  scan_exclusions_set_patterns: ScanExclusionsState;
+  scan_exclusions_folders: ExcludedFolders;
+  // Returns the folders saved; the files the new one holds are hidden by the
+  // time it does.
+  scan_exclusions_add_folder: ExcludedFolders;
+  // Returns the folders saved. What the added ones hold is hidden by the time
+  // it does; the files of the removed ones come back at the next scan.
+  scan_exclusions_update_folders: ExcludedFolders;
+  // Only picks: the folder is excluded when the renderer adds it.
+  scan_exclusions_pick_folder: PickedFolder;
+  // What a pattern would hide, before it is saved; nothing is written.
+  scan_exclusions_preview: PatternPreview;
   custom_css_get: CustomCssState;
   // Returns the state after the switch, so the renderer applies (or drops)
   // the stylesheet without a second round trip.
@@ -779,13 +832,64 @@ export interface AboutInfo {
   node: string;
 }
 
-/** User-facing update preferences (persisted in main's config.json). */
+/** User-facing update preferences (persisted in main's settings). */
 export interface UpdateSettings {
   /** Whether the app checks for updates on startup. */
   autoCheck: boolean;
   /** Version the user chose to skip ("don't notify me about this one"), if any. */
   ignoredVersion: string | null;
 }
+/** The scan exclusions (#282) the settings screen edits. */
+export interface ScanExclusionsState {
+  /** The patterns for every workspace. */
+  patterns: ExclusionPattern[];
+}
+
+/**
+ * A folder the user picked to exclude: one inside the workspace, or why
+ * there is none. "outside" is also the workspace root itself.
+ */
+export type PickedFolder =
+  | { status: "picked"; path: string; absPath: string }
+  | { status: "canceled" }
+  | { status: "outside" };
+
+/**
+ * The listed files a pattern covers in every workspace: how many, and the
+ * first of them. "timedOut" when the pattern did not finish in the worker.
+ * Two workspaces where one holds the other count a file in both twice.
+ */
+export type PatternPreview =
+  | {
+      status: "done";
+      total: number;
+      files: {
+        /** The workspace's folder name. */
+        workspace: string;
+        /** Relative to the workspace root, "/"-separated. */
+        path: string;
+        absPath: string;
+      }[];
+    }
+  | { status: "timedOut" }
+  /** A newer preview was asked for before this one was through. */
+  | { status: "superseded" };
+
+/** The folders a workspace's scans leave out. */
+export interface ExcludedFolders {
+  folders: {
+    /** Relative to the workspace root, "/"-separated. */
+    path: string;
+    /**
+     * The folder on disk, in the OS's form: what is shown, since the path
+     * alone reads like any folder of that name, which it does not cover.
+     */
+    absPath: string;
+    /** Whether it is a folder on disk now: false once it is renamed or gone. */
+    found: boolean;
+  }[];
+}
+
 /** The user stylesheet: whether it is on, where it lives, and what it holds. */
 export interface CustomCssState {
   enabled: boolean;

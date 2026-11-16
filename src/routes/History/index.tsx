@@ -1,7 +1,7 @@
 // Cross-file play-history timeline. /history. Lists play events newest-first
 // (consecutive re-plays of the same file are collapsed main-process-side),
 // grouped by day, with a clear-all action. Overlays the list as a modal.
-import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { useCallback, useId, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   useInfiniteQuery,
@@ -9,6 +9,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   History as HistoryIcon,
   Maximize2,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { api } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
+import { useInfiniteScrollTrigger } from "@/hooks/useInfiniteScrollTrigger";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 import { fileHref } from "@/lib/fileHref";
@@ -37,6 +39,16 @@ import { HistoryModal } from "./HistoryModal";
 
 const PAGE_SIZE = 50;
 const MODAL_SIZE_KEY = "meguri.history.modalSize";
+/** Estimates until a row is measured: a day header, and an entry with its gap. */
+const HEADER_H = 28;
+const ENTRY_H = 70;
+/** The list's padding, top and bottom (p-3). */
+const LIST_PAD = 12;
+
+/** One row of the virtualized list: a day's header or a play event. */
+type ListRow =
+  | { kind: "header"; label: string; key: string }
+  | { kind: "entry"; entry: HistoryEntryRow; key: string };
 
 /** Day bucket label: today / yesterday / locale date. Calendar-day comparison
  *  (not ms arithmetic) so DST transitions can't shift the bucket boundaries. */
@@ -111,21 +123,6 @@ export default function History() {
     [history.data],
   );
 
-  // Fetch the next page when the sentinel at the bottom of the list scrolls into view.
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = history;
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !hasNextPage) return;
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting) && !isFetchingNextPage) {
-        void fetchNextPage();
-      }
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, items.length]);
-
   const clear = useMutation({
     mutationFn: () => api.historyClear(),
     onSuccess: () => {
@@ -150,17 +147,66 @@ export default function History() {
     if (ok) clear.mutate();
   }, [clear, confirm, t]);
 
-  // Day groups, preserving the newest-first order within and across groups.
-  const groups = useMemo(() => {
-    const out: { label: string; rows: HistoryEntryRow[] }[] = [];
-    for (const row of items) {
-      const label = dayLabel(row.playedAt, t, lang);
-      const last = out[out.length - 1];
-      if (last && last.label === label) last.rows.push(row);
-      else out.push({ label, rows: [row] });
+  // Day headers between the entries, newest first. Flat, so the list only
+  // mounts the rows in view: history grows without bound as pages load.
+  const rows = useMemo(() => {
+    const out: ListRow[] = [];
+    let label = "";
+    for (const entry of items) {
+      const day = dayLabel(entry.playedAt, t, lang);
+      if (day !== label) {
+        label = day;
+        out.push({ kind: "header", label: day, key: `day:${day}` });
+      }
+      out.push({
+        kind: "entry",
+        entry,
+        key: `${entry.workspaceId}:${entry.historyId}`,
+      });
     }
     return out;
   }, [items, t, lang]);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const setScrollRef = useCallback((node: HTMLDivElement | null) => {
+    scrollRef.current = node;
+  }, []);
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (i) => (rows[i]?.kind === "header" ? HEADER_H : ENTRY_H),
+    getItemKey: (i) => rows[i]?.key ?? i,
+    paddingStart: LIST_PAD,
+    paddingEnd: LIST_PAD,
+    overscan: 8,
+  });
+  const virtualRows = virtualizer.getVirtualItems();
+  const { hasNextPage, isFetchingNextPage } = history;
+  const fetchNext = history.fetchNextPage;
+  const fetchNextPage = useCallback(() => void fetchNext(), [fetchNext]);
+  useInfiniteScrollTrigger({
+    virtualRows,
+    totalRows: rows.length,
+    threshold: 10,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  });
+
+  // The header of the day at the top, once its own header has scrolled out.
+  // Rows are placed by transform, where `position: sticky` has nothing to
+  // hold on to, so it is drawn over the list instead (as in the timeline).
+  const scrollOffset = virtualizer.scrollOffset ?? 0;
+  const pinnedHeader = useMemo(() => {
+    const top = virtualRows.find((vr) => vr.end > scrollOffset);
+    if (!top) return null;
+    for (let i = top.index; i >= 0; i--) {
+      const row = rows[i];
+      if (row?.kind !== "header") continue;
+      return i === top.index && top.start >= scrollOffset ? null : row.label;
+    }
+    return null;
+  }, [virtualRows, rows, scrollOffset]);
 
   const loading = ready && history.isLoading;
 
@@ -218,88 +264,129 @@ export default function History() {
           <p className="text-xs">{t("history.emptyHint")}</p>
         </div>
       ) : (
-        <ScrollArea className="page-scroll min-h-0 flex-1">
-          {loading ? (
-            <div className="flex flex-col gap-2 p-4">
-              {Array.from({ length: 6 }, (_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col p-3">
-              {groups.map((g) => (
-                <section key={g.label}>
-                  <h3 className="sticky top-0 z-10 bg-bg px-1 py-1.5 text-xs font-semibold uppercase text-muted">
-                    {g.label}
-                  </h3>
-                  <ul className="flex flex-col gap-1">
-                    {g.rows.map((row) => (
-                      <li key={`${row.workspaceId}:${row.historyId}`}>
-                        <Link
-                          to={fileHref(row.id, row.workspaceId, {
-                            autoplay: false,
-                          })}
-                          className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
-                        >
-                          <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
-                            <MediaThumbnail
-                              file={row}
-                              mediaBase={mediaBase}
-                              version={0}
-                              fallbackIconSize="size-5"
-                              playOverlaySize="size-7"
-                              playIconSize="size-3.5"
-                            />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span
-                              className="block truncate text-sm text-fg"
-                              title={row.relPath}
-                            >
-                              {fileNameOf(row.relPath)}
-                            </span>
-                            <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
-                              <span className="tabular-nums">
-                                {formatDateTime(
-                                  new Date(row.playedAt * 1000),
-                                  lang,
-                                )}
-                              </span>
-                              <Badge variant="outline" className="font-normal">
-                                {row.via === "external"
-                                  ? t("history.viaExternal")
-                                  : t("history.viaBrowser")}
-                              </Badge>
-                              {row.playCount > 1 && (
-                                <span>
-                                  {t("history.playCount", {
-                                    count: row.playCount,
-                                  })}
-                                </span>
-                              )}
-                              {showWsLabel && wsLabels.get(row.workspaceId) && (
-                                <span className="truncate">
-                                  {wsLabels.get(row.workspaceId)}
-                                </span>
-                              )}
-                            </span>
-                          </span>
-                          {row.duration ? (
-                            <span className="shrink-0 text-xs tabular-nums text-muted">
-                              {formatDuration(row.duration)}
-                            </span>
-                          ) : null}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-              {hasNextPage && <div ref={sentinelRef} className="h-8" />}
+        <div className="relative min-h-0 flex-1">
+          <ScrollArea className="page-scroll h-full" viewportRef={setScrollRef}>
+            {loading ? (
+              <div className="flex flex-col gap-2 p-4">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              <div
+                className="relative mx-3"
+                style={{ height: virtualizer.getTotalSize() }}
+              >
+                {virtualRows.map((vr) => {
+                  const row = rows[vr.index];
+                  if (!row) return null;
+                  return (
+                    <div
+                      key={vr.key}
+                      data-index={vr.index}
+                      ref={virtualizer.measureElement}
+                      className="absolute left-0 top-0 w-full"
+                      style={{ transform: `translateY(${vr.start}px)` }}
+                    >
+                      {row.kind === "header" ? (
+                        <DayHeader label={row.label} />
+                      ) : (
+                        <div className="pb-1">
+                          <HistoryEntry
+                            row={row.entry}
+                            mediaBase={mediaBase}
+                            wsLabel={
+                              showWsLabel
+                                ? wsLabels.get(row.entry.workspaceId)
+                                : undefined
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+          {pinnedHeader && (
+            <div
+              className="pointer-events-none absolute inset-x-3 top-0 z-10"
+              aria-hidden
+            >
+              <DayHeader label={pinnedHeader} />
             </div>
           )}
-        </ScrollArea>
+        </div>
       )}
     </HistoryModal>
+  );
+}
+
+function DayHeader({ label }: { label: string }) {
+  return (
+    <h3 className="bg-bg px-1 py-1.5 text-xs font-semibold uppercase text-muted">
+      {label}
+    </h3>
+  );
+}
+
+function HistoryEntry({
+  row,
+  mediaBase,
+  wsLabel,
+}: {
+  row: HistoryEntryRow;
+  mediaBase: string;
+  /** The workspace's name, when there are several to tell apart. */
+  wsLabel?: string;
+}) {
+  const { t, lang } = useI18n();
+  return (
+    <Link
+      to={fileHref(row.id, row.workspaceId, {
+        autoplay: false,
+      })}
+      className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
+    >
+      <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
+        <MediaThumbnail
+          file={row}
+          mediaBase={mediaBase}
+          version={0}
+          fallbackIconSize="size-5"
+          playOverlaySize="size-7"
+          playIconSize="size-3.5"
+        />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-fg" title={row.relPath}>
+          {fileNameOf(row.relPath)}
+        </span>
+        <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
+          <span className="tabular-nums">
+            {formatDateTime(new Date(row.playedAt * 1000), lang)}
+          </span>
+          <Badge variant="outline" className="font-normal">
+            {row.via === "external"
+              ? t("history.viaExternal")
+              : t("history.viaBrowser")}
+          </Badge>
+          {row.playCount > 1 && (
+            <span>
+              {t("history.playCount", {
+                count: row.playCount,
+              })}
+            </span>
+          )}
+          {wsLabel && <span className="truncate">{wsLabel}</span>}
+        </span>
+      </span>
+      {row.duration ? (
+        <span className="shrink-0 text-xs tabular-nums text-muted">
+          {formatDuration(row.duration)}
+        </span>
+      ) : null}
+    </Link>
   );
 }

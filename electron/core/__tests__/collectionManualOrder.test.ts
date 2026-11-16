@@ -1,4 +1,4 @@
-// The "manual" sort: a collection's own item order, which lives in config.json
+// The "manual" sort: a collection's own item order, which lives in the app settings
 // rather than in any SQL column. Covers both halves — persisting the order
 // (Workspaces.reorderCollectionItems) and reading it back (searchCollectionManual).
 import fs from "node:fs";
@@ -16,7 +16,7 @@ import {
 import type { SearchQuery, SearchResult } from "../types.js";
 import { insertFile, newDb } from "./helpers.js";
 
-// workspaces.ts reads/writes <userData>/config.json; point it at a throwaway dir.
+// workspaces.ts reads/writes its settings under <userData>; point it at a throwaway dir.
 let userData = "";
 vi.mock("electron", () => ({ app: { getPath: () => userData } }));
 

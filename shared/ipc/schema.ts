@@ -27,6 +27,7 @@ import {
 } from "../autoTag.js";
 import { MAX_FOLDER_PATH, isNormalizedFolderPath } from "../folderPath.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
+import { MAX_EXCLUSION_PATTERN, PATTERN_KINDS } from "../scanExclusions.js";
 import { GRAPH_NODE_KEY_MAX } from "./graph.js";
 import { ACTIVITY_METRICS } from "./activity.js";
 import { TIMELINE_AXES } from "./timeline.js";
@@ -38,8 +39,8 @@ export type Kind = z.infer<typeof KindSchema>;
 // App logo variants (window/tray/in-app icon). "dark" is the original
 // vermilion kanji icon, "light" the inverted unbleached-cotton one, and
 // "enso" a pictorial brush-circle-with-media-card mark on navy. Persisted in
-// main's config.json (the tray exists before any renderer), so the ids are a
-// stable API shared by config.json, IPC, and the bundled assets — do not
+// main's settings (the tray exists before any renderer), so the ids are a
+// stable API shared by the stored settings, IPC, and the bundled assets — do not
 // rename.
 export const LOGO_IDS = ["dark", "light", "enso"] as const;
 export const LogoIdSchema = z.enum(LOGO_IDS);
@@ -444,7 +445,7 @@ export const LibraryMergeEventSchema = z.discriminatedUnion("state", [
 ]);
 export type LibraryMergeEvent = z.infer<typeof LibraryMergeEventSchema>;
 
-/** What went wrong reading config.json at startup (see appConfig.ts). */
+/** What went wrong reading the settings at startup (see appConfig.ts). */
 export const ConfigProblemSchema = z.enum(["moved-aside", "unreadable"]);
 export type ConfigProblem = z.infer<typeof ConfigProblemSchema>;
 
@@ -466,9 +467,10 @@ export const AppStatusSchema = z.object({
   /** Set when the library was found damaged at startup and restored from
    *  its backup copy: when that copy was taken (Unix seconds). */
   libraryRestoredFrom: z.number().optional(),
-  /** Set when config.json could not be used at startup: "moved-aside" when it
-   *  could not be parsed and was renamed to config.json.corrupt-<time>,
-   *  "unreadable" when it could not be read and is not written over. */
+  /** Set when the settings could not be used at startup: "moved-aside" when
+   *  config.json, being imported, could not be parsed and was renamed to
+   *  config.json.corrupt-<time>; "unreadable" when the library or config.json
+   *  could not be read, and no setting is written until the next launch. */
   configProblem: ConfigProblemSchema.optional(),
 });
 export type AppStatus = z.infer<typeof AppStatusSchema>;
@@ -546,8 +548,9 @@ export const ScanDoneSchema = z.object({
   error: z.boolean().optional(),
   /** Why the scan failed, when it is a known case: "root-unreadable" when
    *  the workspace's folder could not be read (an unplugged drive, a share
-   *  that is down). */
-  errorReason: z.enum(["root-unreadable"]).optional(),
+   *  that is down); "exclusion-stuck" when a scan exclusion pattern did not
+   *  finish, so nothing was scanned (#282). */
+  errorReason: z.enum(["root-unreadable", "exclusion-stuck"]).optional(),
   /** The workspace scanned (absent for a scan not tied to one). */
   workspaceId: z.string().optional(),
 });
@@ -592,3 +595,13 @@ export const GraphNodeKeySchema = z.string().min(3).max(GRAPH_NODE_KEY_MAX);
 
 /** The graph view's layout dimensions (the flat view or the 3D one). */
 export const GraphDimsSchema = z.union([z.literal(2), z.literal(3)]);
+
+/**
+ * A scan exclusion pattern (#529): how it is written and what is written.
+ * Main checks that it can be used (patternError in shared/scanExclusions.ts).
+ */
+export const ExclusionPatternSchema = z.object({
+  kind: z.enum(PATTERN_KINDS),
+  value: z.string().min(1).max(MAX_EXCLUSION_PATTERN),
+});
+export type ExclusionPattern = z.infer<typeof ExclusionPatternSchema>;

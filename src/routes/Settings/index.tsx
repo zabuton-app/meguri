@@ -49,6 +49,8 @@ import { AboutSection } from "./AboutSection";
 import { CssThemeSection } from "./CssThemeSection";
 import { ThemeSection } from "./ThemeSection";
 import { CustomCssSection } from "./CustomCssSection";
+import { FolderExclusionsSection } from "./FolderExclusionsSection";
+import { ScanExclusionsSection } from "./ScanExclusionsSection";
 import { useTour } from "@/tour/TourProvider";
 import { useExtraSettingsSections } from "@/settings/extraSections";
 import {
@@ -123,7 +125,13 @@ const LOGO_LABELS: Record<LogoId, TranslationKey> = {
  * their ids cannot collide with Meguri's.
  */
 type TabId =
-  "general" | "library" | "playback" | "audio" | "app" | `extra-${string}`;
+  | "general"
+  | "library"
+  | "scan"
+  | "playback"
+  | "audio"
+  | "app"
+  | `extra-${string}`;
 
 export default function Settings() {
   const { mode, setMode } = useTheme();
@@ -133,6 +141,7 @@ export default function Settings() {
     () => [
       { id: "general", label: t("settings.tabGeneral") },
       { id: "library", label: t("settings.tabLibrary") },
+      { id: "scan", label: t("settings.tabScan") },
       { id: "playback", label: t("settings.tabPlayback") },
       { id: "audio", label: t("settings.tabAudio") },
       { id: "app", label: t("settings.tabApp") },
@@ -564,6 +573,13 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </section>
+            </>
+          )}
+
+          {tab === "scan" && (
+            <>
+              <ScanExclusionsSection />
+              <FolderExclusionsSection />
             </>
           )}
 

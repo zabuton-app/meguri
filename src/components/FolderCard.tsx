@@ -59,6 +59,8 @@ export const FolderCard = memo(function FolderCard({
     <div
       data-testid="folder-card"
       data-slot="folder-card"
+      data-folder-path={entry.path}
+      data-folder-count={entry.count}
       aria-current={focused ? "true" : undefined}
       className={cn(
         "folder-art group relative flex flex-col rounded-lg border border-transparent",

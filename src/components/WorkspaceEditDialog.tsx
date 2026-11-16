@@ -1,13 +1,19 @@
 // Edit dialog for a workspace (scan root). Mirrors CollectionEditDialog's flow,
 // but a workspace's path is its stable identity (hash of the path drives its DB
 // and thumbnails), so only the emoji is editable here — the path is shown in a
-// disabled field to make clear it can't be changed.
+// disabled field to make clear it can't be changed. It also lists the folders
+// the workspace's scans leave out (#282), to take them off the list.
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { FolderOpen } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { WorkspaceInfo } from "@/ipc/types";
 import { EmojiPicker } from "@/components/EmojiPicker";
+import {
+  ExcludedFoldersSection,
+  type StagedFolder,
+} from "@/components/ExcludedFoldersSection";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nProvider";
+import { invalidateHiddenFiles } from "@/lib/queryCache";
 
 export function WorkspaceEditDialog({
   open,
@@ -33,6 +40,16 @@ export function WorkspaceEditDialog({
   const { t } = useI18n();
   const [emoji, setEmoji] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Excluded folders taken off the list, applied on save.
+  const [included, setIncluded] = useState<ReadonlySet<string>>(new Set());
+  // Folders picked to exclude, added on save.
+  const [added, setAdded] = useState<StagedFolder[]>([]);
+  const wsId = workspace?.id ?? "";
+  const excluded = useQuery({
+    queryKey: ["scan_exclusion_folders", wsId],
+    queryFn: () => api.scanExclusionsFolders(wsId),
+    enabled: open && wsId !== "",
+  });
 
   // Seed the emoji whenever the dialog opens.
   useEffect(() => {
@@ -41,6 +58,8 @@ export function WorkspaceEditDialog({
     /* eslint-disable react-hooks/set-state-in-effect */
     setEmoji(workspace?.emoji ?? null);
     setPickerOpen(false);
+    setIncluded(new Set());
+    setAdded([]);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open, workspace]);
 
@@ -51,6 +70,29 @@ export function WorkspaceEditDialog({
     mutationFn: ({ id, emoji }: { id: string; emoji: string | null }) =>
       api.workspaceSetEmoji(id, emoji),
     onSettled: invalidateList,
+  });
+
+  // One save for both, so the staged changes all go or none do.
+  const saveFolders = useMutation({
+    mutationFn: ({
+      id,
+      include,
+      add,
+    }: {
+      id: string;
+      include: string[];
+      add: string[];
+    }) => api.scanExclusionsUpdateFolders(id, { add, remove: include }),
+    meta: { reportsOwnError: true },
+    onSuccess: (next, { id, add }) => {
+      qc.setQueryData(["scan_exclusion_folders", id], next);
+      // What the added folders hold is hidden now.
+      if (add.length > 0) invalidateHiddenFiles(qc);
+    },
+    onError: () => {
+      toast.error(t("workspace.excludedFoldersSaveError"));
+      void qc.invalidateQueries({ queryKey: ["scan_exclusion_folders"] });
+    },
   });
 
   const setVisible = (next: boolean) => {
@@ -73,6 +115,13 @@ export function WorkspaceEditDialog({
       const nextEmoji = emoji ?? null;
       if ((workspace.emoji ?? null) !== nextEmoji) {
         setWorkspaceEmoji.mutate({ id: workspace.id, emoji: nextEmoji });
+      }
+      if (included.size > 0 || added.length > 0) {
+        saveFolders.mutate({
+          id: workspace.id,
+          include: [...included],
+          add: added.map((f) => f.path),
+        });
       }
     }
     setVisible(false);
@@ -116,6 +165,17 @@ export function WorkspaceEditDialog({
           <p className="px-5 pb-5 text-xs text-muted">
             {t("workspace.pathReadonly")}
           </p>
+          {workspace && (
+            <ExcludedFoldersSection
+              workspaceId={workspace.id}
+              root={workspace.path}
+              excluded={excluded}
+              included={included}
+              onIncludedChange={setIncluded}
+              added={added}
+              onAddedChange={setAdded}
+            />
+          )}
           <DialogFooter className="border-t border-border p-4">
             <Button
               type="button"

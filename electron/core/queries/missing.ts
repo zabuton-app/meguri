@@ -7,19 +7,21 @@ import type { DB } from "../db.js";
 import type { MissingFileRow } from "../types.js";
 import { FILE_COLS } from "./files.js";
 
-/** Gone, and not removed from the index by the user (those rows are the
- *  exclusion list, which must survive the file being away). Written as in
- *  idx_files_missing, which the list names: workspace databases are never
- *  ANALYZEd, and without statistics the planner takes idx_files_excluded,
- *  reading every row and sorting. */
-const MISSING = "f.deleted_at IS NOT NULL AND f.excluded_at IS NULL";
+/** Gone, and neither removed from the index by the user (those rows are the
+ *  exclusion list, which must survive the file being away) nor hidden by a
+ *  scan exclusion (not gone, only left out). Written as in
+ *  idx_files_missing_list, which the list names: workspace databases are
+ *  never ANALYZEd, and without statistics the planner takes
+ *  idx_files_excluded, reading every row and sorting. */
+const MISSING =
+  "f.deleted_at IS NOT NULL AND f.excluded_at IS NULL AND f.scan_excluded_at IS NULL";
 
 /** The most recently gone files first, at most `limit` of them. */
 export function listMissingFiles(db: DB, limit: number): MissingFileRow[] {
   return db
     .prepare(
       `SELECT ${FILE_COLS}, f.deleted_at AS deletedAt
-       FROM files f INDEXED BY idx_files_missing
+       FROM files f INDEXED BY idx_files_missing_list
        LEFT JOIN file_meta m ON m.meta_key = f.meta_key
        WHERE ${MISSING}
        ORDER BY f.deleted_at DESC, f.id DESC

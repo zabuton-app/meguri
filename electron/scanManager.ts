@@ -10,9 +10,13 @@ import log from "./core/logger.js";
 import * as q from "./core/queries.js";
 import { emptyScanStats, ScanRootUnreadableError } from "./core/scan.js";
 import type { QueryWorkerClient } from "./core/queryWorkerClient.js";
-import type { DeriveAutoTags } from "./core/autoTagDeriver.js";
+import {
+  AutoTagRuleDroppedError,
+  type DeriveAutoTags,
+} from "./core/autoTagDeriver.js";
 import type { Workspaces } from "./core/workspaces.js";
 import type { AutoTagConfig } from "../shared/autoTag.js";
+import type { ScanExclusions } from "../shared/scanExclusions.js";
 
 export interface ScanOptions {
   includeExcluded?: boolean;
@@ -30,6 +34,8 @@ export interface ScanManagerDeps {
   autoTag: () => { config: AutoTagConfig; version: number };
   /** Evaluates it off the main thread (AutoTagWorkerClient). */
   deriveAutoTags: DeriveAutoTags;
+  /** The scan exclusions (#282), read when a scan starts and as it ends. */
+  exclusions: () => ScanExclusions;
 }
 
 export class ScanManager {
@@ -134,6 +140,7 @@ export class ScanManager {
             autoTag: this.deps.autoTag,
             workspaceId: wsId ?? undefined,
             deriveAutoTags: this.deps.deriveAutoTags,
+            exclusions: this.deps.exclusions,
           },
         );
       } catch (err) {
@@ -149,7 +156,9 @@ export class ScanManager {
           errorReason:
             err instanceof ScanRootUnreadableError
               ? "root-unreadable"
-              : undefined,
+              : err instanceof AutoTagRuleDroppedError
+                ? "exclusion-stuck"
+                : undefined,
           workspaceId: wsId ?? undefined,
         });
       } finally {

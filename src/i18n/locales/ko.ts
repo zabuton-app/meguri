@@ -76,6 +76,58 @@ export const ko: Catalog = {
     "custom.css를 테마 위에 덧씌워 적용합니다. 파일을 저장하면 바로 반영됩니다.",
   "settings.customCssOpen": "파일 열기",
   "settings.customCssOpenError": "custom.css를 열 수 없습니다.",
+  "settings.tabScan": "스캔",
+  "settings.scanExclusions": "패턴으로 제외",
+  "settings.scanExclusionsDesc":
+    "모든 워크스페이스에서 스캔에서 제외할 파일과 폴더입니다. 대소문자는 구분하지 않습니다.",
+  "settings.scanExclusionsNextScan":
+    "저장하면 패턴에 해당하는 색인된 파일이 숨겨집니다. 제거한 패턴의 파일은 다음 스캔에서 돌아옵니다.",
+  "settings.scanExclusionsSave": "저장",
+  "settings.scanExclusionsSaved": "스캔 제외 설정을 저장했습니다.",
+  "settings.scanExclusionsSaveError": "스캔 제외 설정을 저장할 수 없습니다.",
+  "settings.scanExclusionsPattern": "패턴 {n}",
+  "settings.scanExclusionsRemove": "패턴 {n} 삭제",
+  "settings.scanExclusionsAdd": "추가할 패턴",
+  "settings.scanExclusionsNone": "패턴이 없습니다.",
+  "settings.scanExclusionsPresets": "자주 쓰는 패턴:",
+  "settings.scanExclusionsPresetAdd": "{pattern} 사용",
+  "settings.scanExclusionsKind": "방식",
+  "settings.scanExclusionsKindName": "이름",
+  "settings.scanExclusionsKindContains": "포함",
+  "settings.scanExclusionsKindRegex": "정규식",
+  "settings.scanExclusionsKindNameHint":
+    "이 이름의 파일과 폴더를 어느 깊이에서든 제외합니다. 폴더는 안의 항목도 함께 제외됩니다. *는 임의의 문자열입니다(*.tmp 등). /를 넣으면(work/private, /private) 워크스페이스 폴더 기준 경로가 되고, 끝에 /를 붙이면(private/) 폴더만 제외합니다.",
+  "settings.scanExclusionsKindContainsHint":
+    "경로 어딘가에 이 문자열이 있는 항목을 제외합니다. 이름의 일부에도 일치합니다(temp는 attempt.mp4에도 일치).",
+  "settings.scanExclusionsKindRegexHint":
+    "정규식입니다. 워크스페이스 폴더 기준 경로에 적용합니다. 폴더 경로는 끝이 /입니다.",
+  "settings.scanExclusionsAddAction": "추가",
+  "settings.scanExclusionsDuplicate": "이미 목록에 있는 패턴입니다.",
+  "settings.scanExclusionsPreviewHint":
+    "패턴을 입력하면 이미 가져온 파일 중 일치하는 파일을 표시합니다.",
+  "settings.scanExclusionsPreviewLoading": "일치하는 파일을 찾는 중…",
+  "settings.scanExclusionsPreviewError": "일치하는 파일을 찾지 못했습니다.",
+  "settings.scanExclusionsPreviewNone":
+    "가져온 파일 중 일치하는 파일이 없습니다.",
+  "settings.scanExclusionsPreviewCount":
+    "파일 {count}개가 일치합니다. 추가하고 저장하면 숨겨집니다.",
+  "settings.scanExclusionsPreviewList": "일치하는 파일",
+  "settings.scanExclusionsPreviewMore": "외 {count}개",
+  "settings.scanExclusionsTestTimedOut":
+    "이 패턴은 시간 안에 끝나지 않았습니다. 스캔을 멈추게 하므로 추가할 수 없습니다.",
+  "settings.folderExclusions": "폴더로 제외",
+  "settings.folderExclusionsDesc":
+    "워크스페이스마다 지정한 폴더만 제외합니다. 폴더 보기에서 폴더를 마우스 오른쪽 버튼으로 클릭해 추가할 수 있습니다.",
+  "settings.folderExclusionsCount": "폴더 {count}개",
+  "settings.folderExclusionsNone": "없음",
+  "settings.folderExclusionsNotFound": "{count}개 찾을 수 없음",
+  "settings.folderExclusionsManage": "관리",
+  "settings.folderExclusionsManageLabel": "{name}의 제외 폴더 관리",
+  "settings.folderExclusionsLoadError": "제외 폴더를 읽지 못했습니다.",
+  "settings.folderExclusionsNoWorkspaces": "워크스페이스가 없습니다.",
+  "settings.scanExclusionsGlobal": "전역",
+  "settings.folderExclusionsPerWorkspace": "워크스페이스별",
+  "settings.scanExclusionsLoadError": "스캔 제외 설정을 읽지 못했습니다.",
   "settings.logo": "앱 로고",
   "settings.logoDesc": "창, 트레이, 앱 내 아이콘에 적용됩니다.",
   "logo.dark": "진한 색",
@@ -117,15 +169,14 @@ export const ko: Catalog = {
   "library.restored":
     "라이브러리가 손상되어 {date} 시점의 사본으로 복원했습니다",
   "library.restoredDesc":
-    "그 이후에 바꾼 즐겨찾기, 평점, 태그 등은 사라졌습니다. 손상된 파일은 라이브러리와 같은 폴더에 남겨 두었습니다.",
+    "그 이후에 바꾼 즐겨찾기, 평점, 태그, 워크스페이스, 컬렉션, 설정 등은 사라졌습니다. 손상된 파일은 라이브러리와 같은 폴더에 남겨 두었습니다.",
   "config.movedAside":
     "설정 파일(config.json)이 손상되어 기본 설정으로 시작했습니다",
   "config.movedAsideDesc":
     "등록한 워크스페이스와 컬렉션은 손상된 파일에 남아 있으며, 같은 폴더에 config.json.corrupt-<날짜>로 저장해 두었습니다.",
-  "config.unreadable":
-    "설정 파일(config.json)을 읽을 수 없어 기본 설정으로 실행 중입니다",
+  "config.unreadable": "설정을 읽을 수 없어 기본 설정으로 실행 중입니다",
   "config.unreadableDesc":
-    "파일은 변경하지 않았습니다. 다른 앱이 사용 중인지 확인한 뒤 {app}를 다시 시작하세요.",
+    "설정은 변경하지 않았습니다. 다른 앱이 사용 중인지 확인한 뒤 {app}를 다시 시작하세요.",
   "settings.about": "정보",
   "about.version": "{name} 버전 {version}",
   "about.appLicense": "{name}는 MIT License로 공개되어 있습니다.",
@@ -163,6 +214,10 @@ export const ko: Catalog = {
   "home.scanCanceled": "스캔을 취소했습니다",
   "home.escCloseHint": "Esc 키를 한 번 더 누르면 창이 닫힙니다",
   "home.scanError": "스캔 중 오류가 발생했습니다",
+  "home.scanExclusionStuck":
+    "스캔 제외 패턴을 실행하는 데 시간이 너무 오래 걸렸습니다",
+  "home.scanExclusionStuckDesc":
+    "스캔하지 않았습니다. 설정 → 스캔에서 패턴을 수정하거나 삭제하세요.",
   "home.scanRootUnreadable": "워크스페이스 폴더에 접근할 수 없습니다",
   "home.scanRootUnreadableNamed": '"{name}" 폴더에 접근할 수 없습니다',
   "home.scanRootUnreadableDesc":
@@ -638,6 +693,19 @@ export const ko: Catalog = {
   "folder.moved": "보고 있던 폴더를 찾을 수 없어 상위 폴더로 이동했습니다",
   "folder.chip": "폴더",
   "folder.showInLibrary": "라이브러리에서 폴더 보기",
+  "folder.excludeFromScans": "스캔에서 제외",
+  "folder.excludeConfirm": "이 폴더를 이 워크스페이스의 스캔에서 제외합니다.",
+  "folder.excludeAction": "제외",
+  "folder.excluded": "“{name}”을(를) 스캔에서 제외했습니다",
+  "folder.excludeTitle": "“{name}”을(를) 스캔에서 제외",
+  "folder.excludeTarget": "대상 폴더",
+  "folder.excludeHides":
+    "안에 있는 파일 {count}개가 바로 숨겨집니다. 디스크의 파일은 삭제되지 않습니다.",
+  "folder.excludeOnlyThis":
+    "이 폴더만 제외됩니다. 다른 위치에 있는 “{name}” 폴더는 계속 스캔합니다.",
+  "folder.excludeUndoHint":
+    "다시 포함하려면 워크스페이스 편집의 “스캔에서 제외”에서 할 수 있습니다.",
+  "folder.excludeFailed": "폴더를 제외하지 못했습니다",
   "folder.showFailed": "폴더를 표시할 수 없습니다",
   "folder.subfolderMenu": '"{name}"의 하위 폴더',
   "folder.loading": "불러오는 중…",
@@ -999,6 +1067,28 @@ export const ko: Catalog = {
   "workspace.edit": "워크스페이스 편집",
   "workspace.editAction": "저장",
   "workspace.pathReadonly": "경로는 변경할 수 없습니다.",
+  "workspace.excludedFolders": "스캔에서 제외",
+  "workspace.excludedFoldersEmpty":
+    "제외한 폴더가 없습니다. 폴더 보기에서 폴더를 마우스 오른쪽 버튼으로 클릭하거나 “폴더 추가”를 사용하세요.",
+  "workspace.excludedFolderNotFound": "찾을 수 없음",
+  "workspace.excludedFolderInclude": "{path}을(를) 다시 스캔에 포함",
+  "workspace.excludedFoldersNextScan":
+    "목록에서 뺀 폴더는 다음 스캔부터 다시 스캔합니다.",
+  "workspace.excludedFoldersDesc":
+    "이 폴더와 그 안의 항목만 제외됩니다. 다른 위치에 있는 같은 이름의 폴더는 계속 스캔합니다.",
+  "workspace.excludedFolderIncludeAction": "다시 포함",
+  "workspace.excludedFolderRemoveAction": "목록에서 제거",
+  "workspace.excludedFolderRemove": "{path}을(를) 목록에서 제거",
+  "workspace.excludedFolderUndo": "취소",
+  "workspace.excludedFolderUndoLabel": "{path}의 변경 취소",
+  "workspace.excludedFolderIncluding": "저장하면 다시 포함됩니다",
+  "workspace.excludedFolderAdding": "저장하면 제외됩니다",
+  "workspace.excludedFoldersAdd": "폴더 추가",
+  "workspace.excludedFolderOutside": "워크스페이스 안에 있는 폴더를 선택하세요",
+  "workspace.excludedFolderPickFailed": "폴더 선택 창을 열지 못했습니다",
+  "workspace.excludedFoldersRetry": "다시 시도",
+  "workspace.excludedFoldersLoadError": "제외한 폴더를 읽지 못했습니다.",
+  "workspace.excludedFoldersSaveError": "제외한 폴더를 업데이트하지 못했습니다",
   "workspace.addDirectory": "동영상 디렉터리 추가",
   "workspace.removeFromSidebar": "워크스페이스 삭제",
   "workspace.removeTitle": "워크스페이스 삭제",

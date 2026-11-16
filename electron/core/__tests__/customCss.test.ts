@@ -17,6 +17,7 @@ const {
   watchCustomCss,
 } = await import("../customCss.js");
 const { loadConfig, updateConfig } = await import("../appConfig.js");
+const { writeStoredSettings } = await import("./storedSettings.js");
 
 let file = "";
 
@@ -113,7 +114,7 @@ describe("watchCustomCss", () => {
 
 describe("the stored switch", () => {
   it("is off for a config that never held it", () => {
-    fs.writeFileSync(path.join(userData, "config.json"), "{}");
+    writeStoredSettings(userData, {});
     expect(loadConfig().customCss).toEqual({ enabled: false });
   });
 
@@ -123,10 +124,7 @@ describe("the stored switch", () => {
   });
 
   it("treats anything but true as off", () => {
-    fs.writeFileSync(
-      path.join(userData, "config.json"),
-      JSON.stringify({ customCss: { enabled: "yes" } }),
-    );
+    writeStoredSettings(userData, { customCss: { enabled: "yes" } });
     expect(loadConfig().customCss).toEqual({ enabled: false });
   });
 });
