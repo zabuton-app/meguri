@@ -43,6 +43,7 @@ export function VideoGradeOverlay({ videoRef, loaded, panel, t }: Props) {
   const [failed, setFailed] = useState(false);
   const [previewStarted, setPreviewStarted] = useState(false);
   const hintId = useId();
+  const colorId = useId();
   const previewGrade = held ? { ...grade, [held]: neutralGrade[held] } : grade;
   const active =
     enabled && !failed && loaded && gradeChangesPicture(previewGrade);
@@ -125,13 +126,13 @@ export function VideoGradeOverlay({ videoRef, loaded, panel, t }: Props) {
                 <X />
               </Button>
             </header>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-2">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
               <section
-                aria-labelledby={`${hintId}-color`}
+                aria-labelledby={colorId}
                 className="space-y-2 rounded-md border border-border bg-surface p-2"
               >
                 <h3
-                  id={`${hintId}-color`}
+                  id={colorId}
                   className="-mx-2 -mt-2 border-b border-border px-2 py-1.5 text-xs font-medium"
                 >
                   {t("grade.color")}

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef, useState } from "react";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { gradeKeys } from "@/video/colorGrade";
 import { VideoGradeOverlay } from "@/video/VideoGradeOverlay";
 
 const t = ((key: string) => key) as TFunc;
@@ -51,7 +52,7 @@ describe("VideoGradeOverlay side panel", () => {
     expect(
       screen.getAllByRole("slider").every((slider) => color.contains(slider)),
     ).toBe(true);
-    expect(screen.getAllByRole("slider")).toHaveLength(6);
+    expect(screen.getAllByRole("slider")).toHaveLength(gradeKeys.length);
   });
 
   it("stays open on the next file, with that file's grade back at neutral", () => {
