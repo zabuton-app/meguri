@@ -30,12 +30,19 @@ export interface VideoAdjustmentsPanel {
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  playing: boolean;
   loaded: boolean;
   panel: VideoAdjustmentsPanel;
   t: TFunc;
 }
 
-export function VideoGradeOverlay({ videoRef, loaded, panel, t }: Props) {
+export function VideoGradeOverlay({
+  videoRef,
+  playing,
+  loaded,
+  panel,
+  t,
+}: Props) {
   const { open, onOpenChange, container } = panel;
   const [grade, setGrade] = useState(neutralGrade);
   const [enabled, setEnabled] = useState(true);
@@ -82,7 +89,11 @@ export function VideoGradeOverlay({ videoRef, loaded, panel, t }: Props) {
           aria-label={t("grade.title")}
           title={t("grade.title")}
           aria-expanded={open}
-          className={`absolute right-2 top-2 z-10 rounded-md border p-1.5 shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
+          className={`absolute right-2 top-2 z-10 rounded-md border p-1.5 shadow-sm transition-[color,background-color,border-color,opacity] duration-200 motion-reduce:transition-none focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 ${
+            playing
+              ? "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
+              : "opacity-100"
+          } ${
             open || active
               ? "border-primary bg-bg text-primary"
               : "border-white/30 bg-black/70 text-white hover:bg-black/90"
