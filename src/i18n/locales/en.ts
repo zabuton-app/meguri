@@ -763,7 +763,7 @@ export const en: Catalog = {
   "folder.excludeOnlyThis":
     "Only this folder is excluded. Folders named “{name}” elsewhere are still scanned.",
   "folder.excludeUndoHint":
-    "To include it again, edit the workspace and see “Exclude from scans”.",
+    "To include it again, edit the workspace and see “Excluded from scans”.",
   "folder.excludeFailed": "Couldn't exclude the folder",
   "folder.showFailed": "Couldn't show the folder",
   "folder.subfolderMenu": 'Subfolders of "{name}"',

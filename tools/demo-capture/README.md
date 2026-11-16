@@ -33,6 +33,7 @@ node tools/demo-capture/shoot-spectrum.mjs   # spectrum*.png — audio spectrum
 node tools/demo-capture/shoot-auto-tag.mjs   # auto-tag*.png, tags-cloud.png — auto tagging and the tag cloud
 node tools/demo-capture/shoot-css-themes.mjs # css-theme-*.png — the sample CSS themes, dark and light
 node tools/demo-capture/shoot-tour.mjs        # tour.png — the first-launch tour
+node tools/demo-capture/shoot-scan-exclusions.mjs # scan-exclusions-*.png — scan exclusions
 ```
 
 `record-graph.mjs`, `record-folders.mjs`, `record-bulk-edit.mjs` and
@@ -43,6 +44,9 @@ three also cut their stills from the same run, at the frame worth keeping.
 `shoot-auto-tag.mjs` needs no sample library: it generates a dozen images
 under names with codes and brackets in a temporary directory, and shoots
 those.
+`shoot-scan-exclusions.mjs` builds its own library too, with the clutter
+exclusions are for (`@eaDir` thumbnail folders, render caches, a private
+folder), under `/tmp/Pictures` so the path in the captures stays plain.
 
 To use your own media instead of the sample library (not for the graph,
 folder and bulk-edit captures, which act on the sample's folders, file names

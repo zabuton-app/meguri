@@ -682,7 +682,7 @@ export const zhCN: Catalog = {
   "folder.excludeOnlyThis":
     "只排除此文件夹。其他位置名为“{name}”的文件夹仍会被扫描。",
   "folder.excludeUndoHint":
-    "如需重新包含，请在编辑工作区的“从扫描中排除”中操作。",
+    "如需重新包含，请在编辑工作区的“已从扫描中排除”中操作。",
   "folder.excludeFailed": "无法排除该文件夹",
   "folder.showFailed": "无法显示该文件夹",
   "folder.subfolderMenu": "“{name}”的子文件夹",
