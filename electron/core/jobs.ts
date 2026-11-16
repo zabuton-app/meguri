@@ -36,8 +36,26 @@ import {
 import { scopedLog } from "./logger.js";
 import type { Kind } from "./types.js";
 import type { AutoTagConfig } from "../../shared/autoTag.js";
+import type { ScanExclusions } from "../../shared/scanExclusions.js";
+import {
+  applyScanExclusions,
+  scanExclusionFilter,
+} from "./scanExclusionFilter.js";
 
 const log = scopedLog("scan");
+
+function logExclusions({
+  hidden,
+  released,
+}: {
+  hidden: number;
+  released: number;
+}): void {
+  if (hidden > 0 || released > 0)
+    log.info(
+      `scan exclusions: hid ${hidden} file(s), let ${released} come back`,
+    );
+}
 
 export type JobEvent =
   | {
@@ -65,7 +83,9 @@ export type JobEvent =
  * is spelled out in the rebuild confirmation dialog.
  *
  * Rows for which `keep` is true (paths the walk could not read) are left as they are, with
- * their thumbnails: they could not be scanned again now.
+ * their thumbnails: they could not be scanned again now. So are rows hidden by a scan
+ * exclusion (#282), which the scan does not read: they stay hidden, ready to come back
+ * when no rule covers them.
  */
 export async function resetIndex(
   core: Pick<Core, "db" | "rootId" | "thumbsDir">,
@@ -76,9 +96,16 @@ export async function resetIndex(
   const kept = new Set<number>();
   db.transaction(() => {
     const rows = db
-      .prepare("SELECT id, rel_path FROM files WHERE root_id = ?")
-      .all(core.rootId) as { id: number; rel_path: string }[];
-    for (const r of rows) if (keep(r.rel_path)) kept.add(r.id);
+      .prepare(
+        "SELECT id, rel_path, scan_excluded_at FROM files WHERE root_id = ?",
+      )
+      .all(core.rootId) as {
+      id: number;
+      rel_path: string;
+      scan_excluded_at: number | null;
+    }[];
+    for (const r of rows)
+      if (keep(r.rel_path) || r.scan_excluded_at !== null) kept.add(r.id);
     // Set-based, with the kept ids as a JSON array: one statement each instead
     // of one per row.
     const notKept = "id NOT IN (SELECT value FROM json_each(?))";
@@ -132,6 +159,12 @@ export async function runScan(
     signal?: AbortSignal;
     /** The workspace being scanned, for the configuration's folder rules. */
     workspaceId?: string;
+    /**
+     * Reads the scan exclusions (#282) from the app config; nothing is
+     * excluded when omitted. Read when the scan starts, and again once the
+     * files are synced, to hide what a rule saved meanwhile covers.
+     */
+    exclusions?: () => ScanExclusions;
   } & (
     | { autoTag?: undefined; deriveAutoTags?: undefined }
     | {
@@ -155,6 +188,17 @@ export async function runScan(
   // walk() throws when the root cannot be read, before anything below touches
   // the index.
   const unreadablePaths: string[] = [];
+  // The patterns run in the auto-tag worker; without one (tests), nothing is
+  // excluded.
+  const filterNow = () =>
+    opts.exclusions && opts.deriveAutoTags
+      ? scanExclusionFilter(
+          opts.exclusions(),
+          opts.workspaceId ?? null,
+          opts.deriveAutoTags,
+        )
+      : null;
+  const exclude = filterNow();
   const mountpointBefore = await isMountpoint(core.root);
   const discovered = await walk(
     core.root,
@@ -168,6 +212,7 @@ export async function runScan(
       }),
     signal,
     (relPath) => unreadablePaths.push(relPath),
+    exclude,
   );
 
   if (signal?.aborted) {
@@ -204,6 +249,17 @@ export async function runScan(
   // read) are kept as they are by the rebuild, the sync and the thumbnails.
   const isUnreadable = unreadableMatcher(unreadablePaths);
 
+  // What the rules cover now is hidden, so that the sync below does not take
+  // it for gone; what no rule covers any more is let go, for the sync to bring
+  // back what the walk found. Not what the walk could not read: it would be
+  // missing, though only out of reach.
+  logExclusions(
+    await applyScanExclusions(db, core.rootId, exclude, {
+      release: true,
+      keep: isUnreadable,
+      signal,
+    }),
+  );
   // A rebuild resets the derived file index (keeping file ids and durable
   // metadata) before syncing. Only after the walk, so an unreachable root keeps
   // its index.
@@ -242,6 +298,15 @@ export async function runScan(
       byCode,
     );
   }
+  // A rule saved during the walk and the sync hid what was indexed then, but
+  // not what this scan has added or brought back since.
+  if (!signal?.aborted && opts.exclusions)
+    logExclusions(
+      await applyScanExclusions(db, core.rootId, filterNow(), {
+        release: false,
+        signal,
+      }),
+    );
   q.touchScanRoot(db, core.rootId);
   if (mountpoint !== null) q.setScanRootMountpoint(db, core.rootId, mountpoint);
 

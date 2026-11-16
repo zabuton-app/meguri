@@ -78,6 +78,16 @@ export const fr: Catalog = {
     "Applique custom.css par-dessus le thème. Les modifications prennent effet dès l'enregistrement du fichier.",
   "settings.customCssOpen": "Ouvrir le fichier",
   "settings.customCssOpenError": "Impossible d'ouvrir custom.css.",
+  "settings.tabScan": "Analyse",
+  "settings.scanExclusions": "Exclure des analyses",
+  "settings.scanExclusionsDesc":
+    "Expressions régulières, une par ligne, comparées à chaque chemin dans le dossier de l'espace de travail, sans tenir compte de la casse. Le chemin d'un dossier se termine par /. Elles s'appliquent à tous les espaces de travail.",
+  "settings.scanExclusionsNextScan":
+    "L'enregistrement masque les fichiers indexés couverts par un motif. Les fichiers d'un motif retiré reviennent à la prochaine analyse.",
+  "settings.scanExclusionsSave": "Enregistrer",
+  "settings.scanExclusionsSaved": "Exclusions d'analyse enregistrées.",
+  "settings.scanExclusionsSaveError":
+    "Impossible d'enregistrer les exclusions d'analyse.",
   "settings.logo": "Logo de l'application",
   "settings.logoDesc":
     "S'applique aux icônes de la fenêtre, de la barre d'état et de l'application.",

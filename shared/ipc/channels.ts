@@ -39,6 +39,7 @@ import {
   TagRefSchema,
 } from "./schema.js";
 import {
+  MAX_AUTO_TAG_PATTERN,
   MAX_AUTO_TAGS_PER_FILE,
   MAX_AUTO_TAG_PAIRS,
   MAX_AUTO_TAG_PLACE,
@@ -70,6 +71,7 @@ import type { TimelineCounts } from "./timeline.js";
 import { daySpan, parseDay } from "../day.js";
 import { MAX_FOLDER_FILES_PATHS } from "../folderPath.js";
 import { MAX_MEDIA_SEC } from "../resume.js";
+import { MAX_EXCLUSION_PATTERNS } from "../scanExclusions.js";
 
 export { EVENT_CHANNELS, INVOKE_CHANNELS };
 export type { EventChannel, InvokeChannel };
@@ -555,6 +557,13 @@ export const ChannelInputs = {
   logo_get: z.void(),
   logo_set: z.object({ logo: LogoIdSchema }),
   logo_images: z.void(),
+  scan_exclusions_get: z.void(),
+  // Each pattern must compile (patternError); main checks again on save.
+  scan_exclusions_set_patterns: z.object({
+    patterns: z
+      .array(z.string().min(1).max(MAX_AUTO_TAG_PATTERN))
+      .max(MAX_EXCLUSION_PATTERNS),
+  }),
   custom_css_get: z.void(),
   custom_css_set_enabled: z.object({ enabled: z.boolean() }),
   custom_css_open: z.void(),
@@ -742,6 +751,10 @@ export interface ChannelOutputs {
   // The in-app logo of each variant, as a data URL. The bitmaps come from
   // startApp()'s options, so the renderer cannot bundle them.
   logo_images: Record<LogoId, string>;
+  scan_exclusions_get: ScanExclusionsState;
+  // Returns the state saved; the files the new patterns cover are hidden by
+  // the time it does.
+  scan_exclusions_set_patterns: ScanExclusionsState;
   custom_css_get: CustomCssState;
   // Returns the state after the switch, so the renderer applies (or drops)
   // the stylesheet without a second round trip.
@@ -786,6 +799,12 @@ export interface UpdateSettings {
   /** Version the user chose to skip ("don't notify me about this one"), if any. */
   ignoredVersion: string | null;
 }
+/** The scan exclusions (#282) the settings screen edits. */
+export interface ScanExclusionsState {
+  /** Regular expressions for every workspace. */
+  patterns: string[];
+}
+
 /** The user stylesheet: whether it is on, where it lives, and what it holds. */
 export interface CustomCssState {
   enabled: boolean;

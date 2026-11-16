@@ -9,6 +9,7 @@ import { nowUnix, pathMetaKey } from "./db.js";
 import { copyMetaKey, migrateMetaKey } from "./queries.js";
 import { pool } from "./concurrency.js";
 import type { Kind } from "./types.js";
+import type { PathFilter } from "./scanExclusionFilter.js";
 
 // Concurrency for parallelizing IO waits on network FS such as SMB.
 // Kept modest because too high would hit the server's connection limit.
@@ -234,13 +235,36 @@ export function unreadableMatcher(
  * cannot be read (permission denied, a share dropping mid-walk) is reported
  * through onUnreadablePath (relative to the root) and skipped; one that is gone
  * (ENOENT / ENOTDIR) is simply not found.
+ *
+ * `exclude` (the user's scan exclusions, #282) leaves a folder unread and a
+ * file unlisted, so neither is hashed, indexed or reported as unreadable. It
+ * is asked once per level of the tree, for everything found at that level.
  */
 export async function walk(
   root: string,
   onProgress?: (count: number) => void,
   signal?: AbortSignal,
   onUnreadablePath?: (relPath: string) => void,
+  exclude?: PathFilter | null,
 ): Promise<Discovered[]> {
+  // What the rules leave out of what was found, keeping the rest in order.
+  const withoutExcluded = async <T>(
+    found: T[],
+    fullOf: (item: T) => string,
+    isDir: boolean,
+  ): Promise<T[]> => {
+    if (!exclude || found.length === 0) return found;
+    const excluded = await exclude(
+      found.map((item) => {
+        const rel = path.relative(root, fullOf(item));
+        return {
+          relPath: path.sep === "/" ? rel : rel.split(path.sep).join("/"),
+          isDir,
+        };
+      }),
+    );
+    return found.filter((_, i) => !excluded[i]);
+  };
   const assertRootReadable = () => assertScanRootReadable(root);
   const reportUnreadable = async (full: string, code: string | undefined) => {
     if (code === "ENOENT" || code === "ENOTDIR") {
@@ -256,8 +280,8 @@ export async function walk(
   let level: string[] = [root];
   while (level.length) {
     if (signal?.aborted) break;
-    const next: string[] = [];
-    const statTargets: { full: string; ext: string; kind: Kind }[] = [];
+    let next: string[] = [];
+    let statTargets: { full: string; ext: string; kind: Kind }[] = [];
 
     // readdir this level's directories concurrently.
     await pool(
@@ -292,6 +316,9 @@ export async function walk(
       },
       signal,
     );
+    if (signal?.aborted) break;
+    next = await withoutExcluded(next, (dir) => dir, true);
+    statTargets = await withoutExcluded(statTargets, (t) => t.full, false);
 
     // stat the files found at this level concurrently.
     await pool(
@@ -489,7 +516,9 @@ export async function syncFiles(
     (
       db
         .prepare(
-          "SELECT rel_path FROM files WHERE root_id = ? AND excluded_at IS NOT NULL",
+          // Hidden by a scan exclusion too: the walk skips what one covers,
+          // but a rule added while this scan ran has hidden rows since.
+          "SELECT rel_path FROM files WHERE root_id = ? AND (excluded_at IS NOT NULL OR scan_excluded_at IS NOT NULL)",
         )
         .all(rootId) as { rel_path: string }[]
     ).map((r) => r.rel_path),
@@ -517,7 +546,7 @@ export async function syncFiles(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   );
   const moveCandidates = db.prepare(
-    "SELECT id, rel_path, kind, ext, deleted_at FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL",
+    "SELECT id, rel_path, kind, ext, deleted_at FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL AND scan_excluded_at IS NULL",
   );
   // A move can change the extension, and with it the kind (the same MPEG-4 bytes
   // are video as .mp4 and audio as .m4a). The row would otherwise keep the old
@@ -645,7 +674,7 @@ export async function syncFiles(
   // until a rebuild, so reading all of them per chunk would grow with them.
   const excludedAmong = db
     .prepare(
-      "SELECT id FROM files WHERE id IN (SELECT value FROM json_each(?)) AND excluded_at IS NOT NULL",
+      "SELECT id FROM files WHERE id IN (SELECT value FROM json_each(?)) AND (excluded_at IS NOT NULL OR scan_excluded_at IS NOT NULL)",
     )
     .pluck();
   const applyChunk = db.transaction((idxs: number[]) => {

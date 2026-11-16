@@ -39,7 +39,8 @@ scan menu) lists them, the most recently gone first and at most
 thumbnails and collection entries. A removed file's id can be given to a new
 file, which is why its collection entries go too. Metadata keyed by
 `meta_key` stays. Files the user removed from the index (`excluded_at`) are
-the exclusion list and are not listed. A workspace being scanned is left out
+the exclusion list and are not listed, nor are files a scan exclusion hides
+(see [Scan exclusions](#scan-exclusions)). A workspace being scanned is left out
 of both the list and the removal: until the scan is through, files it has not
 reached yet read as missing, and during a rebuild every file does.
 
@@ -90,6 +91,48 @@ window listens is not reported, and the next scan reports the same items. It
 does not list the paths. The walk does not descend into `node_modules` or into
 the folders a file system keeps at a drive's root (`lost+found`,
 `System Volume Information`, `$RECYCLE.BIN`).
+
+### Scan exclusions
+
+The user can keep folders and files out of scans (#282), in the
+`scanExclusions` setting:
+
+- `patterns`: regular expressions for every workspace, matched
+  case-insensitively against the path relative to the workspace root, with
+  `/` as the separator on every platform. A folder is matched with a trailing
+  `/`, so a pattern ending in `/` targets folders only. Edited in Settings →
+  Scan.
+- `folders`: per workspace ID, root-relative folders, each covering
+  everything below it.
+
+The patterns are user regexes, so they never run on the main thread: they go
+to the auto-tag worker as auto-tagging rules (`exclusionRule()` in
+`shared/scanExclusions.ts`), which brings its time budget and its leaving out
+of a pattern that never finishes. The engine matches a name without its
+extension, so each path is sent with a suffix it takes off
+(`exclusionSubject()`). When the worker cannot run, the scan fails before
+the index is touched. `electron/core/scanExclusionFilter.ts` builds the filter
+for one workspace.
+
+- **The walk** asks the filter once per level of the tree, for everything
+  found there. An excluded folder is not read, so nothing under it is hashed,
+  indexed or reported as unreadable.
+- **Indexed files a rule covers** are hidden, not deleted
+  (`applyScanExclusions()`): `deleted_at` keeps them out of every list, and
+  `scan_excluded_at` keeps them out of Missing and of the move detection. The
+  row and its `files.id` (which collections and Watch Later refer to) stay.
+  This runs when the patterns are saved (in every workspace, without reading
+  the disk, through `WorkspacePasses`), after a scan's walk, and once more as
+  the scan ends, for a rule saved while it ran.
+- **A rule taken out** lets its files go at the next scan, before its sync:
+  the mark is cleared, and the sync brings back each file still there with
+  its id. A file that is gone by then is missing like any other. The mark is
+  not cleared at once, since the files would read as missing until a scan
+  found them.
+- **A rebuild** keeps the hidden rows as they are, with their thumbnails.
+  Resync clears only the files removed from the index by hand.
+- Excluded folders follow paths: when one is renamed, its files are scanned
+  again under the new path as new rows, and the old rows stay hidden.
 
 ### Metadata and thumbnails
 

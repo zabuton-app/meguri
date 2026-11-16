@@ -72,6 +72,15 @@ export const zhCN: Catalog = {
   "settings.customCssDesc": "在主题之上应用 custom.css。保存文件后立即生效。",
   "settings.customCssOpen": "打开文件",
   "settings.customCssOpenError": "无法打开 custom.css。",
+  "settings.tabScan": "扫描",
+  "settings.scanExclusions": "从扫描中排除",
+  "settings.scanExclusionsDesc":
+    "正则表达式，每行一个，不区分大小写地匹配工作区文件夹内的每个路径。文件夹路径以 / 结尾。适用于所有工作区。",
+  "settings.scanExclusionsNextScan":
+    "保存后，模式匹配的已索引文件会被隐藏。已移除模式对应的文件会在下次扫描时恢复。",
+  "settings.scanExclusionsSave": "保存",
+  "settings.scanExclusionsSaved": "已保存扫描排除设置。",
+  "settings.scanExclusionsSaveError": "无法保存扫描排除设置。",
   "settings.logo": "应用图标",
   "settings.logoDesc": "应用于窗口、托盘和应用内图标。",
   "logo.dark": "深色",

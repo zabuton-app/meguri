@@ -1,4 +1,5 @@
 import { defaultAutoTagConfig } from "../../shared/autoTag.js";
+import { emptyScanExclusions } from "../../shared/scanExclusions.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runScan = vi.hoisted(() => vi.fn());
@@ -65,6 +66,7 @@ function makeDeps(
     isQuitting: () => false,
     autoTag: () => ({ config: defaultAutoTagConfig(), version: 0 }),
     deriveAutoTags: () => Promise.resolve([]),
+    exclusions: () => emptyScanExclusions(),
     ...overrides,
   };
 }

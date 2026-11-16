@@ -78,6 +78,16 @@ export const es: Catalog = {
     "Aplica custom.css sobre el tema. Los cambios se aplican en cuanto guardas el archivo.",
   "settings.customCssOpen": "Abrir archivo",
   "settings.customCssOpenError": "No se pudo abrir custom.css.",
+  "settings.tabScan": "Escaneo",
+  "settings.scanExclusions": "Excluir de los escaneos",
+  "settings.scanExclusionsDesc":
+    "Expresiones regulares, una por línea, comparadas con cada ruta dentro de la carpeta del espacio de trabajo, sin distinguir mayúsculas. La ruta de una carpeta termina en /. Se aplican a todos los espacios de trabajo.",
+  "settings.scanExclusionsNextScan":
+    "Al guardar se ocultan los archivos indexados que cubre un patrón. Los archivos de un patrón quitado vuelven en el siguiente escaneo.",
+  "settings.scanExclusionsSave": "Guardar",
+  "settings.scanExclusionsSaved": "Exclusiones de escaneo guardadas.",
+  "settings.scanExclusionsSaveError":
+    "No se pudieron guardar las exclusiones de escaneo.",
   "settings.logo": "Logotipo de la aplicación",
   "settings.logoDesc":
     "Se aplica a los iconos de la ventana, de la bandeja y de la aplicación.",

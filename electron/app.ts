@@ -523,6 +523,7 @@ export function startApp(options: AppOptions): void {
     isQuitting,
     autoTag: loadAutoTag,
     deriveAutoTags: autoTagWorker.derive,
+    exclusions: () => loadConfig().scanExclusions,
   });
 
   function trayImage(logo: LogoId): Electron.NativeImage {
