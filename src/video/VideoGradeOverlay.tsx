@@ -16,8 +16,6 @@ import {
 } from "./colorGrade";
 import { createGradeRenderer } from "./colorGradeRenderer";
 
-const ADJUSTMENTS_IDLE_MS = 1800;
-
 /** The detail view's side panel the controls render into, and whether it is
  *  open. The view owns both, so the panel stays open across files while each
  *  file's grade starts neutral (this component is keyed by file). */
@@ -32,7 +30,6 @@ export interface VideoAdjustmentsPanel {
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement | null>;
-  playerRef: React.RefObject<HTMLDivElement | null>;
   playing: boolean;
   loaded: boolean;
   panel: VideoAdjustmentsPanel;
@@ -41,14 +38,12 @@ interface Props {
 
 export function VideoGradeOverlay({
   videoRef,
-  playerRef,
   playing,
   loaded,
   panel,
   t,
 }: Props) {
   const { open, onOpenChange, container } = panel;
-  const [pointerActive, setPointerActive] = useState(false);
   const [grade, setGrade] = useState(neutralGrade);
   const [enabled, setEnabled] = useState(true);
   const [held, setHeld] = useState<GradeControl | null>(null);
@@ -59,29 +54,6 @@ export function VideoGradeOverlay({
   const active =
     enabled && !failed && loaded && gradeChangesPicture(previewGrade);
   const trigger = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player) return;
-    let timeout: number | undefined;
-    const hide = () => {
-      window.clearTimeout(timeout);
-      setPointerActive(false);
-    };
-    const reveal = () => {
-      setPointerActive(true);
-      window.clearTimeout(timeout);
-      if (playing) timeout = window.setTimeout(hide, ADJUSTMENTS_IDLE_MS);
-    };
-    if (playing) timeout = window.setTimeout(hide, ADJUSTMENTS_IDLE_MS);
-    player.addEventListener("pointermove", reveal);
-    player.addEventListener("pointerleave", hide);
-    return () => {
-      window.clearTimeout(timeout);
-      player.removeEventListener("pointermove", reveal);
-      player.removeEventListener("pointerleave", hide);
-    };
-  }, [playerRef, playing]);
 
   useEffect(() => {
     const release = () => setHeld(null);
@@ -118,7 +90,9 @@ export function VideoGradeOverlay({
           title={t("grade.title")}
           aria-expanded={open}
           className={`absolute right-2 top-2 z-10 rounded-md border p-1.5 shadow-sm transition-[color,background-color,border-color,opacity] duration-200 motion-reduce:transition-none focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 ${
-            pointerActive ? "opacity-100" : "pointer-events-none opacity-0"
+            playing
+              ? "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
+              : "opacity-100"
           } ${
             open || active
               ? "border-primary bg-bg text-primary"
