@@ -97,6 +97,7 @@
     <li><a href="#bookmarks">Scene bookmarks and history</a></li>
     <li><a href="#pet">The pet</a></li>
     <li><a href="#workspaces">Workspaces</a></li>
+    <li><a href="#scan-exclusions">Keeping files and folders out of scans</a></li>
     <li><a href="#tray">The tray icon and quitting</a></li>
     <li><a href="#appearance">Themes, language, and zoom</a></li>
     <li><a href="#data">Where your data lives</a></li>
@@ -571,6 +572,91 @@
     new or changed files are processed, and moved or renamed files are
     recognized by content so their metadata is preserved.</li>
   </ul>
+
+  <h2 id="scan-exclusions">Keeping files and folders out of scans</h2>
+  <p>Some folders are not worth listing: thumbnail caches a NAS writes,
+  proxies, private folders. Excluding them hides their files from the
+  library at once and leaves them out of every later scan. Nothing is
+  deleted from your disk, and if you take an exclusion away, the files come
+  back at the next scan with their tags, ratings and history.</p>
+  <p>There are two ways to exclude something.</p>
+  <h3>A folder, in one workspace</h3>
+  <img class="shot" src="./assets/scan-exclusions-confirm.png" alt="The confirmation for excluding the cache folder, showing where it is on disk and that its three files will be hidden">
+  <ul>
+    <li>In the folder view, right-click a folder and choose <strong>Exclude
+    from scans</strong>. Meguri shows where the folder is on disk and how
+    many files it will hide before it asks you to confirm.</li>
+    <li>Or click the pencil beside the workspace's folder in the header
+    (<strong>Edit workspace</strong>) and use <strong>Add folder</strong>
+    under <strong>Excluded from scans</strong>, which opens your system's
+    folder picker.</li>
+    <li>Only that folder is excluded. A folder with the same name somewhere
+    else is still scanned.</li>
+    <li>To include it again, open <strong>Edit workspace</strong> and click
+    <strong>Include</strong> next to it. The change, like an added folder,
+    takes effect when you click <strong>Save</strong>; until then
+    <strong>Undo</strong> takes it back.</li>
+  </ul>
+  <img class="shot" src="./assets/scan-exclusions-workspace.png" alt="The Edit workspace dialog listing two excluded folders, one marked to be included again on save">
+  <h3>A pattern, in every workspace</h3>
+  <p>Patterns live in <strong>Settings → Scan</strong>, under
+  <strong>Exclude by pattern</strong> (marked <strong>Global</strong>), and
+  apply to every workspace. Pick how a pattern is written, then type it:</p>
+  <img class="shot" src="./assets/scan-exclusions-patterns.png" alt="Settings, Scan tab: the name pattern private being typed, with the two files it would hide listed below">
+  <table>
+    <tr><th>Kind</th><th>Example</th><th>What it excludes</th></tr>
+    <tr>
+      <td><strong>Name</strong> (the default)</td>
+      <td><code>private</code>, <code>*.tmp</code>, <code>Thumbs.db</code></td>
+      <td>Files and folders with that name, at any depth. A folder takes
+      everything inside it. <code>*</code> stands for any text within a
+      name; every other character, such as <code>.</code> or
+      <code>(</code>, means itself.</td>
+    </tr>
+    <tr>
+      <td>Name with a <code>/</code></td>
+      <td><code>work/private</code>, <code>/private</code></td>
+      <td>That path, counted from the workspace folder. <code>/private</code>
+      is only the <code>private</code> folder at the top, not one deeper
+      down.</td>
+    </tr>
+    <tr>
+      <td>Name ending in <code>/</code></td>
+      <td><code>private/</code></td>
+      <td>Folders with that name only, not files.</td>
+    </tr>
+    <tr>
+      <td><strong>Contains</strong></td>
+      <td><code>temp</code></td>
+      <td>Anything whose path contains the text, even in the middle of a
+      name: <code>temp</code> also excludes <code>attempt.mp4</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Regex</strong></td>
+      <td><code>(^|/)private/</code></td>
+      <td>A regular expression, for when the others are not enough. It is
+      matched against the path from the workspace folder, where a folder's
+      path ends with <code>/</code>.</td>
+    </tr>
+  </table>
+  <ul>
+    <li>Letter case does not matter: <code>private</code> also excludes
+    <code>Private</code>.</li>
+    <li>While you type, Meguri lists the files the pattern would hide, so
+    you can check it before you click <strong>Add</strong>. Nothing changes
+    until you click <strong>Save</strong>. A pattern that takes too long to
+    run cannot be added, since it would stop every scan.</li>
+    <li>The buttons under the field fill in common exclusions:
+    <strong>Synology @eaDir</strong> (the thumbnail folders a Synology NAS
+    writes everywhere), <strong>#recycle</strong> (the recycle bin folder on
+    some NAS shares), <strong>.DS_Store</strong> (the files macOS leaves in
+    every folder it opens) and <strong>Thumbs.db</strong> (the thumbnail
+    caches Windows writes).</li>
+    <li>To stop excluding something, delete its pattern and save.</li>
+  </ul>
+  <p>Below the patterns, <strong>Exclude by folder</strong> lists each
+  workspace with how many folders it excludes; <strong>Manage</strong>
+  opens that workspace's list.</p>
 
   <h2 id="tray">The tray icon and quitting</h2>
   <p>Meguri lives in your system tray. <strong>Closing the window hides it to

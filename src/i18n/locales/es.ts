@@ -802,7 +802,7 @@ export const es: Catalog = {
   "folder.excludeOnlyThis":
     "Solo se excluye esta carpeta. Las carpetas llamadas «{name}» en otros lugares se siguen escaneando.",
   "folder.excludeUndoHint":
-    "Para volver a incluirla, edita el espacio de trabajo y ve a «Excluir de los escaneos».",
+    "Para volver a incluirla, edita el espacio de trabajo y ve a «Excluidas de los escaneos».",
   "folder.excludeFailed": "No se pudo excluir la carpeta",
   "folder.showFailed": "No se pudo mostrar la carpeta",
   "folder.subfolderMenu": 'Subcarpetas de "{name}"',

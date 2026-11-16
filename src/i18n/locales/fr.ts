@@ -806,7 +806,7 @@ export const fr: Catalog = {
   "folder.excludeOnlyThis":
     "Seul ce dossier est exclu. Les dossiers nommés « {name} » ailleurs sont toujours analysés.",
   "folder.excludeUndoHint":
-    "Pour le réinclure, modifiez l'espace de travail, section « Exclure des analyses ».",
+    "Pour le réinclure, modifiez l'espace de travail, section « Exclus des analyses ».",
   "folder.excludeFailed": "Impossible d'exclure le dossier",
   "folder.showFailed": "Impossible d'afficher le dossier",
   "folder.subfolderMenu": "Sous-dossiers de « {name} »",
