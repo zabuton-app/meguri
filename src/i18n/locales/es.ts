@@ -476,6 +476,7 @@ export const es: Catalog = {
   "grade.green": "Verde",
   "grade.magenta": "Magenta",
   "grade.title": "Ajustes de vídeo",
+  "grade.color": "Color",
   "grade.exposure": "Exposición",
   "grade.contrast": "Contraste",
   "grade.pivot": "Pivote",

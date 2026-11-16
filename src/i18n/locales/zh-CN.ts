@@ -424,6 +424,7 @@ export const zhCN: Catalog = {
   "grade.green": "绿色",
   "grade.magenta": "洋红",
   "grade.title": "视频调整",
+  "grade.color": "色彩",
   "grade.exposure": "曝光",
   "grade.contrast": "对比度",
   "grade.pivot": "枢轴",

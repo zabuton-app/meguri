@@ -50,6 +50,7 @@ export function VideoGradeOverlay({
   const [failed, setFailed] = useState(false);
   const [previewStarted, setPreviewStarted] = useState(false);
   const hintId = useId();
+  const colorId = useId();
   const previewGrade = held ? { ...grade, [held]: neutralGrade[held] } : grade;
   const active =
     enabled && !failed && loaded && gradeChangesPicture(previewGrade);
@@ -138,148 +139,161 @@ export function VideoGradeOverlay({
                 <X />
               </Button>
             </header>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3">
-              <div className="flex flex-wrap gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={enabled ? "default" : "outline"}
-                  aria-label={t("grade.toggle")}
-                  aria-pressed={enabled}
-                  disabled={failed}
-                  title={t("grade.toggle")}
-                  onClick={() => {
-                    setHeld(null);
-                    setEnabled(!enabled);
-                  }}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+              <section
+                aria-labelledby={colorId}
+                className="space-y-2 rounded-md border border-border bg-surface p-2"
+              >
+                <h3
+                  id={colorId}
+                  className="-mx-2 -mt-2 border-b border-border px-2 py-1.5 text-xs font-medium"
                 >
-                  <Power aria-hidden="true" />
-                  {t(enabled ? "grade.on" : "grade.off")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    update(neutralGrade);
-                    setHeld(null);
-                    setFailed(false);
-                  }}
-                >
-                  {t("grade.resetAll")}
-                </Button>
-              </div>
-              <ToneCurve
-                grade={enabled && !failed ? previewGrade : neutralGrade}
-              />
-              <p id={hintId} className="text-xs text-muted">
-                {t("grade.holdHint")}
-              </p>
-              {gradeKeys.map((key) => {
-                const { min, max, step, neutral } = gradeControls[key];
-                const value = grade[key];
-                const directions =
-                  key === "temperature"
-                    ? ({
-                        low: "grade.cool",
-                        high: "grade.warm",
-                        colors: ["text-blue-400", "text-orange-400"],
-                      } as const)
-                    : key === "tint"
+                  {t("grade.color")}
+                </h3>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={enabled ? "default" : "outline"}
+                    aria-label={t("grade.toggle")}
+                    aria-pressed={enabled}
+                    disabled={failed}
+                    title={t("grade.toggle")}
+                    onClick={() => {
+                      setHeld(null);
+                      setEnabled(!enabled);
+                    }}
+                  >
+                    <Power aria-hidden="true" />
+                    {t(enabled ? "grade.on" : "grade.off")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      update(neutralGrade);
+                      setHeld(null);
+                      setFailed(false);
+                    }}
+                  >
+                    {t("grade.resetAll")}
+                  </Button>
+                </div>
+                <ToneCurve
+                  grade={enabled && !failed ? previewGrade : neutralGrade}
+                />
+                <p id={hintId} className="text-xs text-muted">
+                  {t("grade.holdHint")}
+                </p>
+                {gradeKeys.map((key) => {
+                  const { min, max, step, neutral } = gradeControls[key];
+                  const value = grade[key];
+                  const directions =
+                    key === "temperature"
                       ? ({
-                          low: "grade.green",
-                          high: "grade.magenta",
-                          colors: ["text-green-400", "text-fuchsia-400"],
+                          low: "grade.cool",
+                          high: "grade.warm",
+                          colors: ["text-blue-400", "text-orange-400"],
                         } as const)
-                      : null;
-                const display =
-                  key === "exposure"
-                    ? `${value > 0 ? "+" : ""}${value.toFixed(2)} EV`
-                    : key === "pivot"
-                      ? `${Math.round(value * 100)}%`
-                      : key === "contrast" || key === "saturation"
-                        ? `${value.toFixed(2)}×`
-                        : String(value);
-                return (
-                  <div key={key} className="text-xs">
-                    <div className="flex justify-between gap-2">
-                      <button
-                        type="button"
-                        aria-pressed={held === key}
-                        aria-describedby={hintId}
-                        title={t("grade.holdHint")}
-                        disabled={!enabled || failed || value === neutral}
-                        className="touch-none select-none rounded text-left enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary aria-pressed:text-primary"
-                        onPointerDown={(event) => {
-                          if (!event.isPrimary || event.button !== 0) return;
-                          event.currentTarget.setPointerCapture(
-                            event.pointerId,
-                          );
-                          setHeld(key);
-                        }}
-                        onPointerUp={() => setHeld(null)}
-                        onPointerCancel={() => setHeld(null)}
-                        onLostPointerCapture={() => setHeld(null)}
-                        onBlur={() => setHeld(null)}
-                        onKeyDown={(event) => {
-                          if (event.key !== " " && event.key !== "Enter")
-                            return;
-                          event.preventDefault();
-                          if (!event.repeat) setHeld(key);
-                        }}
-                        onKeyUp={(event) => {
-                          if (event.key !== " " && event.key !== "Enter")
-                            return;
-                          event.preventDefault();
-                          setHeld(null);
-                        }}
-                      >
-                        {t(`grade.${key}`)}
-                      </button>
-                      <span className="tabular-nums" aria-hidden="true">
-                        {display}
-                      </span>
+                      : key === "tint"
+                        ? ({
+                            low: "grade.green",
+                            high: "grade.magenta",
+                            colors: ["text-green-400", "text-fuchsia-400"],
+                          } as const)
+                        : null;
+                  const display =
+                    key === "exposure"
+                      ? `${value > 0 ? "+" : ""}${value.toFixed(2)} EV`
+                      : key === "pivot"
+                        ? `${Math.round(value * 100)}%`
+                        : key === "contrast" || key === "saturation"
+                          ? `${value.toFixed(2)}×`
+                          : String(value);
+                  return (
+                    <div key={key} className="text-xs">
+                      <div className="flex justify-between gap-2">
+                        <button
+                          type="button"
+                          aria-pressed={held === key}
+                          aria-describedby={hintId}
+                          title={t("grade.holdHint")}
+                          disabled={!enabled || failed || value === neutral}
+                          className="touch-none select-none rounded text-left enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary aria-pressed:text-primary"
+                          onPointerDown={(event) => {
+                            if (!event.isPrimary || event.button !== 0) return;
+                            event.currentTarget.setPointerCapture(
+                              event.pointerId,
+                            );
+                            setHeld(key);
+                          }}
+                          onPointerUp={() => setHeld(null)}
+                          onPointerCancel={() => setHeld(null)}
+                          onLostPointerCapture={() => setHeld(null)}
+                          onBlur={() => setHeld(null)}
+                          onKeyDown={(event) => {
+                            if (event.key !== " " && event.key !== "Enter")
+                              return;
+                            event.preventDefault();
+                            if (!event.repeat) setHeld(key);
+                          }}
+                          onKeyUp={(event) => {
+                            if (event.key !== " " && event.key !== "Enter")
+                              return;
+                            event.preventDefault();
+                            setHeld(null);
+                          }}
+                        >
+                          {t(`grade.${key}`)}
+                        </button>
+                        <span className="tabular-nums" aria-hidden="true">
+                          {display}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        className="w-full accent-primary"
+                        min={min}
+                        max={max}
+                        step={step}
+                        value={value}
+                        aria-label={t(`grade.${key}`)}
+                        aria-valuetext={
+                          directions && value !== 0
+                            ? `${display} ${t(value < 0 ? directions.low : directions.high)}`
+                            : display
+                        }
+                        onChange={(event) =>
+                          update({
+                            ...grade,
+                            [key]: Number(event.currentTarget.value),
+                          })
+                        }
+                        onDoubleClick={() =>
+                          update({ ...grade, [key]: neutral })
+                        }
+                      />
+                      {directions && (
+                        <span
+                          aria-hidden="true"
+                          className="flex justify-between text-[11px]"
+                        >
+                          <span className={directions.colors[0]}>
+                            {t(directions.low)}
+                          </span>
+                          <span className={directions.colors[1]}>
+                            {t(directions.high)}
+                          </span>
+                        </span>
+                      )}
                     </div>
-                    <input
-                      type="range"
-                      className="w-full accent-primary"
-                      min={min}
-                      max={max}
-                      step={step}
-                      value={value}
-                      aria-label={t(`grade.${key}`)}
-                      aria-valuetext={
-                        directions && value !== 0
-                          ? `${display} ${t(value < 0 ? directions.low : directions.high)}`
-                          : display
-                      }
-                      onChange={(event) =>
-                        update({
-                          ...grade,
-                          [key]: Number(event.currentTarget.value),
-                        })
-                      }
-                      onDoubleClick={() => update({ ...grade, [key]: neutral })}
-                    />
-                    {directions && (
-                      <span
-                        aria-hidden="true"
-                        className="flex justify-between text-[11px]"
-                      >
-                        <span className={directions.colors[0]}>
-                          {t(directions.low)}
-                        </span>
-                        <span className={directions.colors[1]}>
-                          {t(directions.high)}
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-              <p className="text-xs text-muted">
-                {t(failed ? "grade.unavailable" : "grade.preview")}
-              </p>
+                  );
+                })}
+                <p className="text-xs text-muted">
+                  {t(failed ? "grade.unavailable" : "grade.preview")}
+                </p>
+              </section>
             </div>
           </aside>,
           container,

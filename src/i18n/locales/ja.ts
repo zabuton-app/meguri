@@ -440,6 +440,7 @@ export const ja = {
   "grade.green": "緑",
   "grade.magenta": "マゼンタ",
   "grade.title": "映像調整",
+  "grade.color": "カラー",
   "grade.exposure": "露出",
   "grade.contrast": "コントラスト",
   "grade.pivot": "ピボット",
