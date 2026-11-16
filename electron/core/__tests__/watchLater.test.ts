@@ -14,7 +14,18 @@ vi.mock("electron", () => ({ app: { getPath: () => userData } }));
 const { Workspaces } = await import("../workspaces.js");
 const { WATCH_LATER_ID } = await import("../../../shared/workspaceIds.js");
 const { loadConfig, saveConfig } = await import("../appConfig.js");
-const { openLibraryReadonlyOrThrow } = await import("../db.js");
+const { loadCollections } = await import("../collectionStore.js");
+const { openLibraryReadonlyOrThrow, openSettingsDb } = await import("../db.js");
+
+/** Change the stored collections behind the app's back (a hand edit). */
+function editStored(sql: string, ...params: unknown[]): void {
+  const db = openSettingsDb(path.join(userData, "library.sqlite"));
+  try {
+    db.prepare(sql).run(...params);
+  } finally {
+    db.close();
+  }
+}
 
 beforeEach(() => {
   userData = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-watchlater-"));
@@ -35,7 +46,7 @@ describe("Watch Later seeding", () => {
 
   it("persists the seeded collection to disk", () => {
     new Workspaces();
-    const onDisk = loadConfig().collections;
+    const onDisk = loadCollections();
     expect(onDisk.filter((c) => c.id === WATCH_LATER_ID)).toHaveLength(1);
   });
 
@@ -52,13 +63,9 @@ describe("Watch Later seeding", () => {
     const first = new Workspaces();
     first.addToCollection(WATCH_LATER_ID, "wsA", 1);
 
-    // Simulate a hand-edited / older-build config with no Watch Later entry.
-    const config = loadConfig();
-    config.collections = config.collections.filter(
-      (c) => c.id !== WATCH_LATER_ID,
-    );
-    saveConfig(config);
-    expect(loadConfig().collections).toHaveLength(0);
+    // Simulate a hand edit that removed the Watch Later entry.
+    editStored("DELETE FROM collections WHERE id = ?", WATCH_LATER_ID);
+    expect(loadCollections()).toHaveLength(0);
 
     const ws = new Workspaces();
     const watchLater = ws.collections().find((c) => c.id === WATCH_LATER_ID);
@@ -72,13 +79,13 @@ describe("Watch Later seeding", () => {
     const first = new Workspaces();
     first.addToCollection(WATCH_LATER_ID, "wsA", 1);
 
-    // Simulate a hand-edited config where `locked` was stripped. Without repair
+    // Simulate a hand edit where `locked` was stripped. Without repair
     // the entry passes the "already exists" check while isLocked() reports
     // false, leaving it renamable/removable.
-    const config = loadConfig();
-    const watchLater = config.collections.find((c) => c.id === WATCH_LATER_ID)!;
-    delete watchLater.locked;
-    saveConfig(config);
+    editStored(
+      "UPDATE collections SET locked = 0 WHERE id = ?",
+      WATCH_LATER_ID,
+    );
 
     const ws = new Workspaces();
     const repaired = ws.collections().find((c) => c.id === WATCH_LATER_ID);
@@ -96,16 +103,16 @@ describe("Watch Later seeding", () => {
 
   it("persists the repaired lock so it survives a reload", () => {
     new Workspaces();
-    const config = loadConfig();
-    const watchLater = config.collections.find((c) => c.id === WATCH_LATER_ID)!;
-    delete watchLater.locked;
-    saveConfig(config);
+    editStored(
+      "UPDATE collections SET locked = 0 WHERE id = ?",
+      WATCH_LATER_ID,
+    );
 
     new Workspaces();
 
-    expect(
-      loadConfig().collections.find((c) => c.id === WATCH_LATER_ID)?.locked,
-    ).toBe(true);
+    expect(loadCollections().find((c) => c.id === WATCH_LATER_ID)?.locked).toBe(
+      true,
+    );
   });
 
   it("keeps existing user collections and their contents untouched", () => {

@@ -708,6 +708,30 @@ export function openLibraryReadonly(libraryFile: string): DB | null {
  */
 const APP_SETTINGS_DDL = `
 CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+-- User collections (collectionStore.ts). position orders the collections, and
+-- the items within one: gaps are fine, only the order counts. An item refers
+-- to a file by its workspace and its id there (files.id).
+CREATE TABLE IF NOT EXISTS collections (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  emoji TEXT,
+  locked INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0, 1)),
+  position INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collection_items (
+  collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL,
+  file_id INTEGER NOT NULL,
+  position INTEGER NOT NULL,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (collection_id, workspace_id, file_id)
+);
+CREATE INDEX IF NOT EXISTS idx_collection_items_order ON collection_items(collection_id, position);
+-- Removing a workspace, or files from one, drops their items everywhere.
+CREATE INDEX IF NOT EXISTS idx_collection_items_file ON collection_items(workspace_id, file_id);
 `;
 
 /**
@@ -724,6 +748,8 @@ export function openSettingsDb(libraryFile: string): DB {
     // stay saved through a power loss, as the fsync of config.json made it, and
     // settings are written rarely enough for the sync on each commit.
     db.pragma("synchronous = FULL");
+    // Removing a collection takes its items with it (ON DELETE CASCADE).
+    db.pragma("foreign_keys = ON");
     db.exec(APP_SETTINGS_DDL);
   } catch (e) {
     db.close();

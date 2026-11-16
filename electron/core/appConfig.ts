@@ -37,8 +37,6 @@ export interface AppConfig {
   roots: string[];
   /** Currently active root. null if none is selected. */
   activePath: string | null;
-  /** User-curated virtual folders. Items reference files by workspace ID + file ID. */
-  collections: UserCollectionConfig[];
   /** Optional per-workspace emoji icon, keyed by workspace ID (hash of root path). */
   workspaceEmojis: Record<string, string>;
   /** Update-check preferences (GitHub Releases). */
@@ -92,29 +90,6 @@ const DEFAULT_UPDATE_CONFIG: UpdateConfig = {
   lastCheckAt: null,
 };
 
-export interface UserCollectionItemConfig {
-  workspaceId: string;
-  fileId: number;
-  addedAt: number;
-}
-
-export interface UserCollectionConfig {
-  id: string;
-  name: string;
-  /** Optional emoji icon; falls back to the folder icon when unset. */
-  emoji?: string;
-  items: UserCollectionItemConfig[];
-  createdAt: number;
-  updatedAt: number;
-  /**
-   * Built-in collections (currently only "Watch Later") set this. Locked
-   * collections can still gain and lose files, and their files can still be
-   * rearranged, but the collection itself cannot be removed, renamed, re-iconed
-   * or repositioned among the collections. Absent/false on every user-created one.
-   */
-  locked?: boolean;
-}
-
 /** Where the settings lived before they moved into the library. */
 function configPath(): string {
   return path.join(app.getPath("userData"), "config.json");
@@ -125,7 +100,6 @@ function configPath(): string {
 const FIELD_SET: Record<keyof AppConfig, true> = {
   roots: true,
   activePath: true,
-  collections: true,
   workspaceEmojis: true,
   update: true,
   logo: true,
@@ -137,6 +111,13 @@ const FIELDS = Object.keys(FIELD_SET) as (keyof AppConfig)[];
 
 /** The row that records config.json as imported (see openStore); never a field. */
 export const IMPORTED_KEY = "_config_json_imported_at";
+
+/**
+ * The row config.json's collections are imported into, as they were there,
+ * for collectionStore.ts to move into its tables: what was there before the
+ * collections had tables of their own. Never a field.
+ */
+export const COLLECTIONS_KEY = "collections";
 
 /**
  * What went wrong reading the settings at startup, for the renderer to tell
@@ -166,7 +147,6 @@ function defaultConfig(): AppConfig {
   return {
     roots: [],
     activePath: null,
-    collections: [],
     workspaceEmojis: {},
     update: { ...DEFAULT_UPDATE_CONFIG },
     logo: DEFAULT_LOGO,
@@ -193,7 +173,7 @@ function ensureStore(): { file: string; blocked: boolean } {
  * written rarely enough for the open on each. Null when they are blocked for
  * the session (see openStore); a connection that fails to open throws.
  */
-function withSettings<T>(fn: (db: DB) => T): { value: T } | null {
+export function withSettings<T>(fn: (db: DB) => T): { value: T } | null {
   const { file, blocked } = ensureStore();
   if (blocked) return null;
   let db: DB;
@@ -251,14 +231,17 @@ function openStore(file: string): boolean {
  * and imports config.json again, which has not changed since.
  */
 function importConfigJson(db: DB): boolean {
-  const config = readConfigJson();
-  if (config === null) return false;
+  const read = readConfigJson();
+  if (read === null) return false;
   db.transaction(() => {
-    writeFields(db, config, FIELDS);
-    db.prepare("INSERT INTO app_settings (key, value) VALUES (?, ?)").run(
-      IMPORTED_KEY,
-      JSON.stringify(Date.now()),
+    writeFields(db, read.config, FIELDS);
+    const put = db.prepare(
+      "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
     );
+    if (read.collections !== undefined) {
+      put.run(COLLECTIONS_KEY, JSON.stringify(read.collections));
+    }
+    put.run(IMPORTED_KEY, JSON.stringify(Date.now()));
   })();
   if (fs.existsSync(configPath())) {
     log.info("moved the settings from config.json into the library");
@@ -266,19 +249,25 @@ function importConfigJson(db: DB): boolean {
   return true;
 }
 
+/** config.json's settings, and its collections as they were there. */
+interface ImportedConfig {
+  config: AppConfig;
+  collections?: unknown;
+}
+
 /**
  * config.json's settings, defaults when there is none (a first launch) or it
  * could not be parsed and was moved aside, or null when it cannot be read or
  * moved aside (configProblem says which).
  */
-function readConfigJson(): AppConfig | null {
+function readConfigJson(): ImportedConfig | null {
   const file = configPath();
   let text: string;
   try {
     text = fs.readFileSync(file, "utf8");
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") return defaultConfig();
+    if (code === "ENOENT") return { config: defaultConfig() };
     log.error(
       `config.json could not be read (${code ?? "unknown"}); not importing it`,
     );
@@ -290,7 +279,8 @@ function readConfigJson(): AppConfig | null {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("not a JSON object");
     }
-    return parseConfig(parsed as Record<string, unknown>);
+    const c = parsed as Record<string, unknown>;
+    return { config: parseConfig(c), collections: c.collections };
   } catch {
     // Kept for recovery, out of the way. The parse error is not logged: its
     // message quotes the file's text, and that holds folder names.
@@ -301,7 +291,7 @@ function readConfigJson(): AppConfig | null {
         `config.json could not be parsed; moved it to ${path.basename(aside)}`,
       );
       configProblem = "moved-aside";
-      return defaultConfig();
+      return { config: defaultConfig() };
     } catch (moveErr) {
       const code = (moveErr as NodeJS.ErrnoException).code;
       log.error(
@@ -321,7 +311,6 @@ function parseConfig(c: Record<string, unknown>): AppConfig {
       ? c.roots.filter((x: unknown) => typeof x === "string")
       : [],
     activePath: typeof c.activePath === "string" ? c.activePath : null,
-    collections: parseCollections(c.collections),
     workspaceEmojis: parseEmojiMap(c.workspaceEmojis),
     update: parseUpdateConfig(c.update),
     logo: parseLogo(c.logo),
@@ -366,7 +355,7 @@ class SettingsUnavailableError extends Error {
 }
 
 /** An error from storage (locked, disk full, gone, …), as opposed to a bug. */
-const isStorageError = (e: unknown) =>
+export const isStorageError = (e: unknown) =>
   e instanceof SettingsUnavailableError ||
   errorCode(e)?.startsWith("SQLITE_") === true;
 
@@ -602,43 +591,6 @@ export function normalizeDir(p: string): string {
     normalized = normalized.replace(/^[a-z]:/, (drive) => drive.toUpperCase());
   }
   return normalized;
-}
-
-function parseCollections(value: unknown): UserCollectionConfig[] {
-  if (!Array.isArray(value)) return [];
-  const out: UserCollectionConfig[] = [];
-  for (const raw of value) {
-    if (!raw || typeof raw !== "object") continue;
-    const c = raw as Record<string, unknown>;
-    if (typeof c.id !== "string" || typeof c.name !== "string") continue;
-    const items: UserCollectionItemConfig[] = [];
-    if (Array.isArray(c.items)) {
-      for (const itemRaw of c.items) {
-        if (!itemRaw || typeof itemRaw !== "object") continue;
-        const item = itemRaw as Record<string, unknown>;
-        if (
-          typeof item.workspaceId !== "string" ||
-          typeof item.fileId !== "number"
-        )
-          continue;
-        items.push({
-          workspaceId: item.workspaceId,
-          fileId: item.fileId,
-          addedAt: typeof item.addedAt === "number" ? item.addedAt : 0,
-        });
-      }
-    }
-    out.push({
-      id: c.id,
-      name: c.name,
-      emoji: typeof c.emoji === "string" && c.emoji ? c.emoji : undefined,
-      items,
-      createdAt: typeof c.createdAt === "number" ? c.createdAt : 0,
-      updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : 0,
-      ...(c.locked === true ? { locked: true } : {}),
-    });
-  }
-  return out;
 }
 
 function parseEmojiMap(value: unknown): Record<string, string> {

@@ -253,8 +253,8 @@ ratings, tags, bookmarks, play history — lives in one library,
 holding the workspace's generated files.
 
 - `electron/core/appConfig.ts` is the lone layer that persists the app's
-  settings: `roots`, `activePath`, `collections` and `workspaceEmojis` (owned
-  by `Workspaces`), plus `update`, `logo`, `autoTag`, `customCss` and
+  settings: `roots`, `activePath` and `workspaceEmojis` (owned by
+  `Workspaces`), plus `update`, `logo`, `autoTag`, `customCss` and
   `cssTheme`. They live in the library's `app_settings` table (see
   [Data Model](data-model.md#app-settings)), one row per field, so they share
   its daily backup, check and restore. Each owner writes only its own fields
@@ -456,8 +456,9 @@ owns them, so keep them distinct.
 ### User collections
 
 Manually curated virtual folders that span workspaces. They are stored in the
-`collections` setting (see `UserCollectionConfig` in
-`electron/core/appConfig.ts`), and each item references a file by
+library's `collections` and `collection_items` tables (see
+`electron/core/collectionStore.ts` and
+[Data Model](data-model.md#app-settings)), and each item references a file by
 `workspaceId + fileId`. A file keeps its id across moves, renames and index
 rebuilds (a rebuild soft-deletes the rows and the rescan revives them in place),
 so these references stay valid. The exception is identical copies moved at

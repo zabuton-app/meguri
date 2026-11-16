@@ -16,9 +16,13 @@ import {
   cleanupStaleTemp,
   normalizeDir,
   type AppConfig,
-  type UserCollectionConfig,
-  type UserCollectionItemConfig,
 } from "./appConfig.js";
+import * as collectionStore from "./collectionStore.js";
+import type {
+  FileRef,
+  UserCollectionConfig,
+  UserCollectionItemConfig,
+} from "./collectionStore.js";
 import {
   backupDbPathForDataDir,
   dataDirForRoot,
@@ -76,6 +80,8 @@ interface PendingFailure {
 
 export class Workspaces {
   private config: AppConfig;
+  /** The collections, in order (collectionStore.ts keeps them stored). */
+  private userCollections: UserCollectionConfig[];
   private cores = new Map<string, Core>();
   private errors = new Map<string, WorkspaceInitError>();
   /** Set by closeAll(): no Core may be (re)opened afterwards. */
@@ -99,6 +105,7 @@ export class Workspaces {
 
   constructor() {
     this.config = loadConfig();
+    this.userCollections = collectionStore.loadCollections();
     this.seedWatchLater();
   }
 
@@ -110,20 +117,19 @@ export class Workspaces {
    * Every write below goes through here rather than calling saveConfig directly.
    */
   private persist(): void {
-    const { roots, activePath, collections, workspaceEmojis } = this.config;
+    const { roots, activePath, workspaceEmojis } = this.config;
     updateConfig((c) => ({
       ...c,
       roots,
       activePath,
-      collections,
       workspaceEmojis,
     }));
   }
 
   /**
    * Ensure the built-in "Watch Later" collection exists *and is locked*. Runs on
-   * every load rather than behind a one-time migration flag, so a config that
-   * was hand-edited self-heals on the next launch.
+   * every load rather than behind a one-time migration flag, so stored
+   * collections that lost it (a hand edit) self-heal on the next launch.
    *
    * The lock is repaired rather than assumed: an entry that kept its id but lost
    * `locked` would pass the "already exists" check while `isLocked()` reported
@@ -131,19 +137,17 @@ export class Workspaces {
    * guarantee this collection is supposed to carry.
    */
   private seedWatchLater(): void {
-    const existing = this.config.collections.find(
-      (c) => c.id === WATCH_LATER_ID,
-    );
+    const existing = this.userCollections.find((c) => c.id === WATCH_LATER_ID);
     if (existing) {
       if (existing.locked !== true) {
         existing.locked = true;
         existing.updatedAt = nowUnix();
-        this.persist();
+        collectionStore.updateCollection(existing);
       }
       return;
     }
     const now = nowUnix();
-    this.config.collections.unshift({
+    const watchLater: UserCollectionConfig = {
       id: WATCH_LATER_ID,
       // Display name comes from the renderer's i18n ("watchLater.name"); this is
       // only a fallback for any surface that reads the stored name directly.
@@ -153,8 +157,12 @@ export class Workspaces {
       createdAt: now,
       updatedAt: now,
       locked: true,
-    });
-    this.persist();
+    };
+    this.userCollections.unshift(watchLater);
+    collectionStore.insertCollection(
+      watchLater,
+      this.userCollections.map((c) => c.id),
+    );
   }
 
   /** Root path → stable workspace ID (matches Core's data directory name). */
@@ -186,7 +194,7 @@ export class Workspaces {
   }
 
   collections() {
-    return this.config.collections.map((collection) => ({
+    return this.userCollections.map((collection) => ({
       ...collection,
       active: this.config.activePath === collectionTarget(collection.id),
       locked: collection.locked === true,
@@ -217,9 +225,7 @@ export class Workspaces {
 
   activeCollection() {
     const id = activeCollectionId(this.config.activePath);
-    return id
-      ? (this.config.collections.find((c) => c.id === id) ?? null)
-      : null;
+    return id ? (this.userCollections.find((c) => c.id === id) ?? null) : null;
   }
 
   /** How many roots are registered, including any whose DB fails to open. */
@@ -437,11 +443,12 @@ export class Workspaces {
     this.errors.delete(id);
     this.config.roots = this.config.roots.filter((r) => r !== p);
     delete this.config.workspaceEmojis[id];
-    for (const collection of this.config.collections) {
+    for (const collection of this.userCollections) {
       collection.items = collection.items.filter(
         (item) => item.workspaceId !== id,
       );
     }
+    collectionStore.removeWorkspaceItems(id, null, null);
     if (this.config.activePath === p) {
       this.config.activePath = this.config.roots[0] ?? null;
     } else if (
@@ -474,7 +481,11 @@ export class Workspaces {
       createdAt: now,
       updatedAt: now,
     };
-    this.config.collections.unshift(collection);
+    this.userCollections.unshift(collection);
+    collectionStore.insertCollection(
+      collection,
+      this.userCollections.map((c) => c.id),
+    );
     this.config.activePath = collectionTarget(collection.id);
     this.persist();
     return collection;
@@ -487,48 +498,47 @@ export class Workspaces {
    * or reposition Watch Later.
    */
   private isLocked(id: string): boolean {
-    return this.config.collections.find((c) => c.id === id)?.locked === true;
+    return this.userCollections.find((c) => c.id === id)?.locked === true;
   }
 
   /** Whether the collection was removed: false for a locked or unknown one. */
   removeCollection(id: string): boolean {
     if (this.isLocked(id)) return false;
-    const before = this.config.collections.length;
-    this.config.collections = this.config.collections.filter(
-      (c) => c.id !== id,
-    );
-    if (this.config.collections.length === before) return false;
+    const before = this.userCollections.length;
+    this.userCollections = this.userCollections.filter((c) => c.id !== id);
+    if (this.userCollections.length === before) return false;
+    collectionStore.deleteCollection(id);
     if (this.config.activePath === collectionTarget(id)) {
       // "All" is only valid with at least one registered workspace (same invariant
       // bootstrap() enforces); fall back to null when nothing is registered.
       this.config.activePath = this.config.roots.length > 0 ? ALL_ID : null;
+      this.persist();
     }
-    this.persist();
     return true;
   }
 
   /** Set (or clear, when emoji is null/empty) a collection's emoji icon. */
   setCollectionEmoji(id: string, emoji: string | null): void {
     if (this.isLocked(id)) return;
-    const collection = this.config.collections.find((c) => c.id === id);
+    const collection = this.userCollections.find((c) => c.id === id);
     if (!collection) return;
     const next = emoji?.trim() || undefined;
     if (collection.emoji === next) return;
     collection.emoji = next;
     collection.updatedAt = nowUnix();
-    this.persist();
+    collectionStore.updateCollection(collection);
   }
 
   /** Rename a collection. No-op when the collection is missing or the name is unchanged/empty. */
   renameCollection(id: string, name: string): void {
     if (this.isLocked(id)) return;
-    const collection = this.config.collections.find((c) => c.id === id);
+    const collection = this.userCollections.find((c) => c.id === id);
     if (!collection) return;
     const next = name.trim();
     if (!next || collection.name === next) return;
     collection.name = next;
     collection.updatedAt = nowUnix();
-    this.persist();
+    collectionStore.updateCollection(collection);
   }
 
   /** Set (or clear, when emoji is null/empty) a registered workspace's emoji icon. */
@@ -545,9 +555,7 @@ export class Workspaces {
     workspaceId: string,
     fileId: number,
   ): void {
-    const collection = this.config.collections.find(
-      (c) => c.id === collectionId,
-    );
+    const collection = this.userCollections.find((c) => c.id === collectionId);
     if (!collection) return;
     if (
       collection.items.some(
@@ -559,9 +567,10 @@ export class Workspaces {
     const now = nowUnix();
     // Appended, not prepended: items[] is the collection's manual play order, so
     // a new file has to land in a spot that leaves the existing order untouched.
-    collection.items.push({ workspaceId, fileId, addedAt: now });
+    const item = { workspaceId, fileId, addedAt: now };
+    collection.items.push(item);
     collection.updatedAt = now;
-    this.persist();
+    collectionStore.addItems(collectionId, [item], now);
   }
 
   removeFromCollection(
@@ -569,9 +578,7 @@ export class Workspaces {
     workspaceId: string,
     fileId: number,
   ): void {
-    const collection = this.config.collections.find(
-      (c) => c.id === collectionId,
-    );
+    const collection = this.userCollections.find((c) => c.id === collectionId);
     if (!collection) return;
     const next = collection.items.filter(
       (item) => item.workspaceId !== workspaceId || item.fileId !== fileId,
@@ -579,7 +586,11 @@ export class Workspaces {
     if (next.length === collection.items.length) return;
     collection.items = next;
     collection.updatedAt = nowUnix();
-    this.persist();
+    collectionStore.removeItems(
+      collectionId,
+      [{ workspaceId, fileId }],
+      collection.updatedAt,
+    );
   }
 
   /**
@@ -589,9 +600,8 @@ export class Workspaces {
    * given are left as they are. Named for that: setCollectionMembers would read
    * as "make this the membership", which it is not.
    *
-   * Collections are one setting, which persist() writes whole on any change,
-   * so driving a selection through addToCollection would mean one write per
-   * file.
+   * Driving a selection through addToCollection would mean one transaction,
+   * and one sync to disk, per file.
    * Returns how many files actually changed membership: adding a file already on
    * the collection is not a change, and neither is removing one that is not.
    */
@@ -600,9 +610,7 @@ export class Workspaces {
     files: { workspaceId: string; fileId: number }[],
     op: "add" | "remove",
   ): number {
-    const collection = this.config.collections.find(
-      (c) => c.id === collectionId,
-    );
+    const collection = this.userCollections.find((c) => c.id === collectionId);
     if (!collection) return 0;
     const key = (workspaceId: string, fileId: number) =>
       `${workspaceId}:${fileId}`;
@@ -610,33 +618,37 @@ export class Workspaces {
       collection.items.map((item) => key(item.workspaceId, item.fileId)),
     );
     const now = nowUnix();
-    let changed = 0;
 
     if (op === "add") {
       // Appended in the order given, for the same reason addToCollection
       // appends: items[] is the collection's manual play order.
+      const added: UserCollectionItemConfig[] = [];
       for (const { workspaceId, fileId } of files) {
         const k = key(workspaceId, fileId);
         if (present.has(k)) continue;
         present.add(k);
-        collection.items.push({ workspaceId, fileId, addedAt: now });
-        changed++;
+        added.push({ workspaceId, fileId, addedAt: now });
       }
-    } else {
-      const drop = new Set(
-        files.map(({ workspaceId, fileId }) => key(workspaceId, fileId)),
-      );
-      const next = collection.items.filter(
-        (item) => !drop.has(key(item.workspaceId, item.fileId)),
-      );
-      changed = collection.items.length - next.length;
-      collection.items = next;
+      if (added.length === 0) return 0;
+      collection.items.push(...added);
+      collection.updatedAt = now;
+      collectionStore.addItems(collectionId, added, now);
+      return added.length;
     }
-
-    if (changed === 0) return 0;
+    const drop = new Set(
+      files.map(({ workspaceId, fileId }) => key(workspaceId, fileId)),
+    );
+    const removed: FileRef[] = [];
+    const next = collection.items.filter((item) => {
+      if (!drop.has(key(item.workspaceId, item.fileId))) return true;
+      removed.push({ workspaceId: item.workspaceId, fileId: item.fileId });
+      return false;
+    });
+    if (removed.length === 0) return 0;
+    collection.items = next;
     collection.updatedAt = now;
-    this.persist();
-    return changed;
+    collectionStore.removeItems(collectionId, removed, now);
+    return removed.length;
   }
 
   /**
@@ -656,7 +668,7 @@ export class Workspaces {
    * return reports whether the file was actually listed (used by tests).
    */
   removeFromWatchLater(workspaceId: string, fileId: number): boolean {
-    const watchLater = this.config.collections.find(
+    const watchLater = this.userCollections.find(
       (c) => c.id === WATCH_LATER_ID,
     );
     if (!watchLater) return false;
@@ -666,7 +678,11 @@ export class Workspaces {
     if (next.length === watchLater.items.length) return false;
     watchLater.items = next;
     watchLater.updatedAt = nowUnix();
-    this.persist();
+    collectionStore.removeItems(
+      WATCH_LATER_ID,
+      [{ workspaceId, fileId }],
+      watchLater.updatedAt,
+    );
     return true;
   }
 
@@ -680,8 +696,8 @@ export class Workspaces {
     return this.removeFilesFromAllCollections(workspaceId, [fileId]);
   }
 
-  /** removeFileFromAllCollections for many files of one workspace, with one
-   *  config write. */
+  /** removeFileFromAllCollections for many files of one workspace, in one
+   *  write. */
   removeFilesFromAllCollections(
     workspaceId: string,
     fileIds: readonly number[],
@@ -689,7 +705,7 @@ export class Workspaces {
     const ids = new Set(fileIds);
     const now = nowUnix();
     let changed = false;
-    for (const collection of this.config.collections) {
+    for (const collection of this.userCollections) {
       const next = collection.items.filter(
         (item) => item.workspaceId !== workspaceId || !ids.has(item.fileId),
       );
@@ -699,7 +715,8 @@ export class Workspaces {
         changed = true;
       }
     }
-    if (changed) this.persist();
+    if (changed)
+      collectionStore.removeWorkspaceItems(workspaceId, fileIds, now);
     return changed;
   }
 
@@ -736,9 +753,9 @@ export class Workspaces {
   reorderCollections(ids: string[]): void {
     // Locked collections keep their pinned position at the front and never take
     // part in reordering, so a stale/hostile id list can't displace them.
-    const locked = this.config.collections.filter((c) => c.locked);
+    const locked = this.userCollections.filter((c) => c.locked);
     const byId = new Map(
-      this.config.collections.filter((c) => !c.locked).map((c) => [c.id, c]),
+      this.userCollections.filter((c) => !c.locked).map((c) => [c.id, c]),
     );
     const ordered: UserCollectionConfig[] = [];
     for (const id of ids) {
@@ -748,11 +765,11 @@ export class Workspaces {
         byId.delete(id);
       }
     }
-    for (const c of this.config.collections) {
+    for (const c of this.userCollections) {
       if (byId.has(c.id)) ordered.push(c);
     }
-    this.config.collections = [...locked, ...ordered];
-    this.persist();
+    this.userCollections = [...locked, ...ordered];
+    collectionStore.setCollectionOrder(this.userCollections.map((c) => c.id));
   }
 
   /**
@@ -774,9 +791,7 @@ export class Workspaces {
     collectionId: string,
     order: { workspaceId: string; fileId: number }[],
   ): void {
-    const collection = this.config.collections.find(
-      (c) => c.id === collectionId,
-    );
+    const collection = this.userCollections.find((c) => c.id === collectionId);
     if (!collection) return;
     const key = (i: { workspaceId: string; fileId: number }) =>
       `${i.workspaceId}:${i.fileId}`;
@@ -803,7 +818,7 @@ export class Workspaces {
     }
     collection.items = next;
     collection.updatedAt = nowUnix();
-    this.persist();
+    collectionStore.moveItems(collectionId, moving, collection.updatedAt);
   }
 
   /** Switch the active workspace (accepts the "All" sentinel). */
@@ -815,7 +830,7 @@ export class Workspaces {
     }
     const collectionId = activeCollectionId(p);
     if (collectionId) {
-      if (!this.config.collections.some((c) => c.id === collectionId)) return;
+      if (!this.userCollections.some((c) => c.id === collectionId)) return;
       this.config.activePath = p;
       this.persist();
       return;
