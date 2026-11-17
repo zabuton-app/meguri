@@ -349,16 +349,28 @@ async function runFfmpegFrameExport(
     return true;
   } catch (err) {
     if (!signal?.aborted) {
-      const stderr =
+      const stderr = withoutPaths(
         (err as { stderr?: string }).stderr ??
-        (err as Error).message ??
-        String(err);
+          (err as Error).message ??
+          String(err),
+        src,
+        dest,
+      );
       log.warn(
         `ffmpeg frame export failed (offset=${offsetSec}, format=${format}, mode=${keyframeOnly ? "keyframe" : "hybrid"}): ${stderr}`,
       );
     }
     return false;
   }
+}
+
+/**
+ * ffmpeg's error text with the files it was given replaced by name. The input
+ * names the media file, and an exported frame is named after it; the log must
+ * not carry either, wherever they are saved.
+ */
+function withoutPaths(text: string, src: string, dest: string): string {
+  return text.replaceAll(src, "<input>").replaceAll(dest, "<output>");
 }
 
 async function runFfmpegThumb(
@@ -432,7 +444,7 @@ async function runFfmpegThumb(
       const st = await fsPromises.stat(output).catch(() => null);
       if (!st || st.size === 0) {
         if (st && !useOffset) await fsPromises.unlink(output).catch(() => {});
-        log.warn(`ffmpeg thumbnail extraction produced no output for ${src}`);
+        log.warn("ffmpeg thumbnail extraction produced no output");
         return false;
       }
     }
@@ -468,7 +480,7 @@ async function runFfmpegThumb(
         );
       }
       log.warn(
-        `ffmpeg thumb failed (offset=${offsetSec ?? "auto"}, mode=${keyframeOnly ? "keyframe" : "hybrid"}): ${stderr}`,
+        `ffmpeg thumb failed (offset=${offsetSec ?? "auto"}, mode=${keyframeOnly ? "keyframe" : "hybrid"}): ${withoutPaths(stderr, src, output)}`,
       );
     }
     return false;
