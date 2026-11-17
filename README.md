@@ -568,7 +568,9 @@ Meguri is **privacy-first**: everything stays on your machine.
 - **Crash reports stay local.** When Meguri crashes or does not exit
   normally, the next launch offers a plain-text report you can read, copy and,
   if you want, paste into a GitHub issue. Nothing is sent automatically, and
-  the crash dumps are never part of the report.
+  the crash dumps are never part of the report: it only summarizes them
+  (where the crash happened and the names and versions of the loaded
+  libraries), without their memory contents.
 - **Fully offline.** All features work without an internet connection.
 
 ## Architecture
