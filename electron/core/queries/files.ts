@@ -209,7 +209,13 @@ export function appendSearchConditions(
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : { match: null, anyOf: [], tagTokens: [], hashPrefixes: [], extValues: [] };
+    : {
+        match: null,
+        anyOf: [],
+        tagTokens: [],
+        hashPrefixes: [],
+        extValues: [],
+      };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
