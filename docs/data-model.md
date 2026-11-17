@@ -460,6 +460,12 @@ free text. The Duplicates view copies a group's full hash and opens the list on
 `hash:<hash>`, which is how a group's copies are found from the list. It is a
 chip like `tag:`, and the condition row names it.
 
+The **`ext:` directive** finds files by extension (#522): `ext:mp4` matches
+the files whose `ext` is exactly `mp4`, in any case and with or without the dot
+(`ext:.MP4`). It is an exact match on the column, so `mp4_backup/clip.mov` and
+`.m4v` files do not match. It is a chip like `hash:`, and it is ANDed with the
+other directives, so `ext:mp4 ext:mkv` matches nothing.
+
 The box itself (`SearchTokenInput`) renders a directive as a **chip** rather than
 as raw text, so it is added and removed as one unit: a directive only means
 anything whole, and backspacing through the middle of one silently turns an exact

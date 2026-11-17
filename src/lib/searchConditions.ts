@@ -14,6 +14,7 @@ import {
   isSearchDirective,
   isTagDirective,
   joinSearchTokens,
+  parseExtSearchToken,
   parseQualifiedTagName,
   parseHashSearchToken,
   parseTagSearchToken,
@@ -107,9 +108,11 @@ export function describeConditions(
 
   splitSearchTokens(query.q ?? "").forEach((token, i) => {
     const hash = parseHashSearchToken(token);
+    const ext = parseExtSearchToken(token);
     const tag = isTagDirective(token) ? parseTagSearchToken(token) : null;
     let label: string;
     if (hash != null) label = `${t("filter.hashChip")}: ${hash}`;
+    else if (ext != null) label = `${t("filter.extChip")}: ${ext}`;
     else if (tag != null) label = tagLabel(t, tag);
     else return;
     out.push({

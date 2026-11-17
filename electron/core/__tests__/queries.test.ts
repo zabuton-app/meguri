@@ -302,6 +302,22 @@ describe("searchFiles", () => {
     expect(ids("hash:ffff")).toEqual([]);
   });
 
+  it("finds files by extension with ext: (#522)", () => {
+    const mp4 = insertFile(db, rootId, { relPath: "clip.mp4" });
+    insertFile(db, rootId, { relPath: "clip.m4v" });
+    // A folder name containing the text is not an extension match.
+    insertFile(db, rootId, { relPath: "mp4_backup/clip.mov" });
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids("ext:mp4")).toEqual([mp4]);
+    expect(ids("ext:MP4")).toEqual([mp4]);
+    expect(ids("ext:.mp4")).toEqual([mp4]);
+    expect(ids("ext: mp4")).toEqual([mp4]);
+    expect(ids("ext:mkv")).toEqual([]);
+  });
+
   it("matches a substring in the middle of a word (trigram)", () => {
     const hit = insertFile(db, rootId, { relPath: "summer_beachvideo.mp4" });
     insertFile(db, rootId, { relPath: "work/report.mp4" });

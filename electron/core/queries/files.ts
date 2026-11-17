@@ -12,6 +12,7 @@ import {
 } from "./folderRange.js";
 import {
   LIST_HIDDEN_SOURCES,
+  parseExtSearchToken,
   parseHashSearchToken,
   parseTagSearchToken,
   searchTokenTerms,
@@ -74,15 +75,23 @@ function buildSearchTerms(q: string): {
   tagTokens: string[];
   /** `hash:` prefixes, lower-case hex. */
   hashPrefixes: string[];
+  /** `ext:` values, lower-case, without the dot. */
+  extValues: string[];
 } {
   const matchTokens: string[] = [];
   const anyOf: { match: string | null; likes: string[] }[] = [];
   const tagTokens: string[] = [];
   const hashPrefixes: string[] = [];
+  const extValues: string[] = [];
   for (const raw of splitSearchTokens(q)) {
     const hash = parseHashSearchToken(raw);
     if (hash) {
       hashPrefixes.push(hash);
+      continue;
+    }
+    const ext = parseExtSearchToken(raw);
+    if (ext) {
+      extValues.push(ext);
       continue;
     }
     const tag = parseTagSearchToken(raw);
@@ -104,6 +113,7 @@ function buildSearchTerms(q: string): {
     anyOf,
     tagTokens,
     hashPrefixes,
+    extValues,
   };
 }
 
@@ -199,7 +209,13 @@ export function appendSearchConditions(
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : { match: null, anyOf: [], tagTokens: [], hashPrefixes: [] };
+    : {
+        match: null,
+        anyOf: [],
+        tagTokens: [],
+        hashPrefixes: [],
+        extValues: [],
+      };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
@@ -244,6 +260,12 @@ export function appendSearchConditions(
   for (const prefix of terms.hashPrefixes) {
     sql += " AND f.content_hash >= ? AND f.content_hash < ?";
     args.push(prefix, `${prefix}g`);
+  }
+  // Exact, on the lower-cased value the scan stores; no index, as the filter
+  // only ever sees rows the other conditions have already narrowed.
+  for (const ext of terms.extValues) {
+    sql += " AND f.ext = ?";
+    args.push(ext);
   }
   for (const value of terms.tagTokens) {
     const ids = resolveSearchTagIds(db, value);

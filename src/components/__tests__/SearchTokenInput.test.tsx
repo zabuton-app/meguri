@@ -138,6 +138,14 @@ describe("SearchTokenInput", () => {
     expect(last()).toBe("hash:3FA9c1d2 hash:3f");
   });
 
+  it("chips an ext: directive once closed, and repeats are added once (#522)", () => {
+    const { input, last } = setup();
+    type(input, "ext:MP4 ext:mp4 ");
+    expect(chips().map((c) => c.textContent)).toEqual(["ext:mp4"]);
+    expect(input.value).toBe("");
+    expect(last()).toBe("ext:MP4");
+  });
+
   it("keeps a half-typed directive editable until a space closes it", () => {
     const { input, last } = setup();
     fireEvent.change(input, { target: { value: "tag:bea" } });

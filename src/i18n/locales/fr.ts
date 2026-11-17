@@ -327,6 +327,7 @@ export const fr: Catalog = {
     other: "Autres critères ({count} actifs)",
   },
   "filter.hashChip": "Empreinte du contenu",
+  "filter.extChip": "Extension",
   "filter.kindFilter": "Filtrer par type",
   "filter.playState": "État de lecture",
   "filter.sortSection": "Tri",
