@@ -84,6 +84,18 @@ export function Scenes({
       </div>
       <ScrollArea className="w-full" viewportClassName="pb-3">
         <div className="flex gap-2">
+          {!framesDue &&
+            // Hold each thumb's box while waiting, so the rail and the sections
+            // below it do not jump on every prev/next.
+            scenes.map((_, i) => (
+              <div
+                key={i}
+                data-testid="scene-placeholder"
+                className="shrink-0 overflow-hidden rounded-lg border border-border"
+              >
+                <Skeleton className="h-24 w-40 rounded-none" />
+              </div>
+            ))}
           {framesDue &&
             scenes.map((sec, i) => {
               const isMain = isSameThumbSource(thumbOffsetSec, sec);
