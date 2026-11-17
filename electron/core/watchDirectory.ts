@@ -64,7 +64,7 @@ export function watchDirectory(
     }
   } catch (e) {
     if (check) clearTimeout(check);
-    log.warn("[watchDirectory] failed to watch", dir, e);
+    log.warn("[watchDirectory] failed to watch", e);
     return () => {};
   }
   watcher.on("error", (e) => log.warn("[watchDirectory] watcher error", e));
@@ -90,7 +90,7 @@ function snapshot(
   try {
     names = fs.readdirSync(dir).filter(accept);
   } catch (e) {
-    log.warn("[watchDirectory] failed to list", dir, e);
+    log.warn("[watchDirectory] failed to list", e);
     return null;
   }
   const stamps = new Map<string, string>();

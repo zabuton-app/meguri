@@ -17,6 +17,7 @@ const { insertFile, LEGACY_METADATA_DDL } = await import("./helpers.js");
 const { openDb } = await import("../db.js");
 const paths = await import("../paths.js");
 const { Core } = await import("../index.js");
+const { redactString } = await import("../logger.js");
 
 let root = "";
 
@@ -42,6 +43,14 @@ describe("Workspaces.addRoot", () => {
     const first = ws.addRoot(root);
     expect(ws.addRoot(root)).toEqual({ path: first.path, added: false });
     expect(ws.list().filter((w) => w.path === first.path)).toHaveLength(1);
+  });
+
+  it("has the logger redact paths under the new root", () => {
+    const ws = new Workspaces();
+    const { path: p } = ws.addRoot(root);
+    expect(redactString(path.join(p, "My Clips", "a b.mp4"))).toBe(
+      "<media-path>",
+    );
   });
 
   it("keeps add() returning the stored path", () => {

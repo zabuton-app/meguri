@@ -848,7 +848,7 @@ function startRemuxSession(
       const clients = [...session.clients];
       session.clients.clear();
       endRemuxSession(key, session);
-      log.warn("remux produced no output, retrying as a preview:", file);
+      log.warn("remux produced no output, retrying as a preview");
       for (const client of clients)
         if (!client.destroyed && !client.headersSent)
           serveRemux(

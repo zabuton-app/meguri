@@ -30,7 +30,7 @@ import {
   libraryDbPath,
   pathHash,
 } from "./paths.js";
-import log from "./logger.js";
+import log, { redactRoots } from "./logger.js";
 import {
   errorCode,
   fileUsesOwnMetadata,
@@ -105,6 +105,7 @@ export class Workspaces {
 
   constructor() {
     this.config = loadConfig();
+    redactRoots(this.config.roots);
     this.userCollections = collectionStore.loadCollections();
     this.seedWatchLater();
   }
@@ -410,6 +411,7 @@ export class Workspaces {
         : this.config.roots.find((r) => r === np);
     if (existing !== undefined) return { path: existing, added: false };
     this.config.roots.push(np);
+    redactRoots(this.config.roots);
     this.persist();
     return { path: np, added: true };
   }
@@ -1053,6 +1055,10 @@ export class Workspaces {
     // that cannot be opened is.
     if (!merging && this.merge?.pending.includes(p)) return null;
     try {
+      // Core resolves the root again on each open; if that differs from the
+      // stored one (a drive offline when it was added, a moved symlink), the
+      // paths it logs, from the open on, start with this one.
+      redactRoots([Core.resolveRoot(p)]);
       const core = Core.init(p, libraryDbPath());
       this.cores.set(id, core);
       this.errors.delete(id);
