@@ -244,9 +244,17 @@ lifecycle behavior:
   once, and Settings → About lists the kept reports. The newest five reports
   and dumps are kept. "Report on GitHub" opens the app's crash report issue
   form (`crashReportForm` in `startApp()`'s options; without one, a report
-  can only be copied). The minidumps are not parsed, so a main process crash
-  within 10 s of a recorded child crash is reported as that child's only
-  (the report still says the run did not exit normally).
+  can only be copied). The report summarizes each of the run's dumps as text
+  (`electron/core/minidump.ts`): the process type, the exception and its
+  thread, the module and offset it crashed at, and the `globalExtra`
+  annotations (the newest 20 dumps); the newest
+  readable dump's module list (file names, versions, build or debug IDs; on macOS
+  without the system libraries) closes the report. No memory contents or
+  directories go in, and a dump it cannot read gets a one-line note. A dump
+  whose process type is `browser` is the main process's crash; one that
+  cannot be read is taken for it only if it is more than 10 s after the last
+  recorded child crash. The test fixtures are made with
+  `scripts/dev/crash-fixture.mjs`.
 - The tray and window icons are base64 images the entry point passes to
   `startApp()` (`logos`; Meguri's are in `electron/core/logoAssets.ts`),
   embedded to avoid bundle path-resolution issues.

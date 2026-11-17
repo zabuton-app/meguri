@@ -69,7 +69,12 @@
     <li>Application settings are saved in a local configuration file.</li>
     <li>When Meguri crashes or does not exit normally, a crash report and
     crash dumps are kept locally. They are never sent automatically: you can
-    read the report and choose to copy it into a GitHub issue yourself.</li>
+    read the report and choose to copy it into a GitHub issue yourself. The
+    report summarizes the dumps (which process crashed, the exception, its
+    address and thread, the library and offset it happened in, the app's
+    name, version and install channel, and the names, versions and build IDs
+    of the loaded libraries) but holds none of their memory contents and no
+    folder paths.</li>
   </ul>
   <p>None of this data ever leaves your machine, and the developer has no
   access to it. Your media files themselves are only read, never modified.</p>

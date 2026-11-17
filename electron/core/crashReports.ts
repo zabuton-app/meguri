@@ -15,11 +15,14 @@
 //     after a clean exit
 // startCrashReports() wires it up at startup. The report is stored as JSON in
 // <userData>/crash-reports. The dumps stay where Crashpad put them and are
-// never part of the report: they hold part of the process memory.
+// never part of the report: they hold part of the process memory. The report
+// has a text summary of each (minidump.ts, #545): where it crashed, and the
+// modules, without memory contents.
 import { app, crashReporter } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { logFilePath, scopedLog } from "./logger.js";
+import { summarizeMinidump } from "./minidump.js";
 import type { CrashReport } from "../../shared/ipc/schema.js";
 
 const log = scopedLog("crash");
@@ -32,10 +35,27 @@ export const LOG_TAIL_LINES = 100;
 const LOG_TAIL_BYTES = 64 * 1024;
 /**
  * A child process's dump can land a little after its crash is recorded
- * (Crashpad writes it from its own process). A dump later than the last
- * recorded crash by more than this is taken for the main process's.
+ * (Crashpad writes it from its own process). A dump that does not say which
+ * process it is, later than the last recorded crash by more than this, is
+ * taken for the main process's.
  */
 export const DUMP_GRACE_MS = 10_000;
+/**
+ * The globalExtra crashReporter.start() sets (Electron adds the underscored
+ * ones): the only process annotations a dump summary quotes. Others may hold
+ * anything a crash key was given.
+ */
+const GLOBAL_EXTRA_KEYS = [
+  "_productName",
+  "_companyName",
+  "_version",
+  "channel",
+];
+/**
+ * Dumps of one run summarized in its report, newest first: a renderer that
+ * crashes over and over leaves a dump each time, and the launch reads them.
+ */
+export const DUMPS_SUMMARIZED = 20;
 /** A renderer that crashes over and over must not grow the marker forever. */
 export const MAX_RECORDED_CRASHES = 20;
 
@@ -307,7 +327,7 @@ export function detectPreviousSession(opts: {
 
 function buildReport(
   marker: SessionMarker,
-  opts: { dumps: Dump[]; logFile: string; appName: string },
+  opts: { dumps: Dump[]; dumpsDir: string; logFile: string; appName: string },
   now: number,
 ): StoredCrashReport | null {
   // A clean exit leaves a marker only for the child crashes it recorded.
@@ -315,18 +335,31 @@ function buildReport(
   const dumps = opts.dumps.filter(
     (d) => d.mtimeMs >= marker.startedAt && d.mtimeMs <= now,
   );
+  const summarized = [...dumps]
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, DUMPS_SUMMARIZED)
+    .map((d) => ({
+      dump: d,
+      file: path.basename(d.name),
+      summary: summarizeMinidump(
+        path.join(opts.dumpsDir, d.name),
+        GLOBAL_EXTRA_KEYS,
+      ),
+    }));
+  // A dump says which process it is. One it does not tell: the dumps of the
+  // recorded child crashes land near them, so one after the last of them can
+  // only be the main process's.
   const lastRecorded = Math.max(...marker.crashes.map((c) => c.at));
-  // Dumps of the recorded child crashes land near them; one after the last
-  // of them can only be the main process's.
+  const isMain = ({ dump, summary }: (typeof summarized)[number]) =>
+    summary.processType === null
+      ? marker.crashes.length === 0 ||
+        dump.mtimeMs > lastRecorded + DUMP_GRACE_MS
+      : summary.processType === "browser";
+  // Newest first, and the main process's crash ends the run: its dump is
+  // among the newest.
   const mainDump = marker.exitedCleanly
     ? undefined
-    : dumps
-        .filter((d) =>
-          marker.crashes.length === 0
-            ? true
-            : d.mtimeMs > lastRecorded + DUMP_GRACE_MS,
-        )
-        .sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+    : summarized.find(isMain)?.dump;
   const crashes: RecordedCrash[] = [...marker.crashes];
   if (mainDump) {
     crashes.push({ process: "main", reason: "crashed", at: mainDump.mtimeMs });
@@ -357,12 +390,28 @@ function buildReport(
   if (!marker.exitedCleanly) {
     lines.push("", "The session did not exit normally.");
   }
+  if (summarized.length > 0) {
+    lines.push("", "Dumps:");
+    for (const { dump, file, summary } of summarized) {
+      lines.push(`- ${iso(dump.mtimeMs)} ${file}`);
+      lines.push(...summary.lines.map((l) => `  ${l}`));
+    }
+    if (dumps.length > summarized.length) {
+      lines.push(`(${dumps.length - summarized.length} older not summarized)`);
+    }
+  }
   const tail = logTail(opts.logFile);
   lines.push(
     "",
     `Last ${LOG_TAIL_LINES} lines of main.log:`,
     tail || "(empty)",
   );
+  // The newest readable dump's only, and last: a module list runs to a
+  // hundred lines or more, and a GitHub issue body holds 65,536 characters.
+  const newest = summarized.find((s) => s.summary.modules.length > 0);
+  if (newest) {
+    lines.push("", `Modules in ${newest.file}:`, ...newest.summary.modules);
+  }
 
   return {
     id: String(now),
@@ -536,6 +585,7 @@ export function startCrashReports(opts: {
   // process still reaches the OS (and the Store's reports).
   crashReporter.start({
     uploadToServer: false,
+    // Keys in GLOBAL_EXTRA_KEYS.
     globalExtra: { channel: opts.run.channel },
   });
   let newReportId: string | null = null;

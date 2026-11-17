@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   CRASH_REPORTS_KEPT,
   CrashSession,
+  DUMPS_SUMMARIZED,
   DUMP_GRACE_MS,
   LOG_TAIL_LINES,
   MAX_RECORDED_CRASHES,
@@ -43,6 +44,25 @@ function writeDump(name: string, at: number): void {
   const file = path.join(dumps, name);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, "MDMP");
+  fs.utimesSync(file, at / 1000, at / 1000);
+}
+
+/** The Linux fixture dump (#545), a main process crash unless told otherwise. */
+function writeFixtureDump(name: string, at: number, ptype = "browser"): void {
+  const fixture = fs.readFileSync(
+    path.join(import.meta.dirname, "fixtures", "minidump", "linux-x64.dmp"),
+  );
+  // Same length, so the dump stays valid.
+  expect(ptype).toHaveLength("browser".length);
+  const file = path.join(dumps, name);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    Buffer.from(
+      fixture.toString("latin1").replaceAll("browser", ptype),
+      "latin1",
+    ),
+  );
   fs.utimesSync(file, at / 1000, at / 1000);
 }
 
@@ -115,6 +135,62 @@ describe("detectPreviousSession", () => {
     expect(report?.dumps).toEqual([path.join("completed", "a.dmp")]);
   });
 
+  it("summarizes the dump, with its modules after the log", () => {
+    new CrashSession(marker, versions).start(T0);
+    writeFixtureDump(path.join("completed", "a.dmp"), T0 + 5000);
+    const text = detect()?.text ?? "";
+    expect(text).toContain(
+      [
+        "Dumps:",
+        `- ${new Date(T0 + 5000).toISOString()} a.dmp`,
+        "  Process: browser",
+        "  Exception: SIGSEGV (code 1) at 0x0, thread 1574028 (electron)",
+        "  Crashed at: electron + 0x64908b4",
+        "  Annotations: _productName=Meguri, _version=0.0, channel=Other",
+        "",
+        `Last ${LOG_TAIL_LINES} lines of main.log:`,
+      ].join("\n"),
+    );
+    expect(text).toContain(
+      "\n\nModules in a.dmp:\nelectron  build ID d05648a05ca33a5438fc35b405ef0f4a3a73ee8f\n",
+    );
+    // Not the other process annotations, nor the dump's directories.
+    expect(text).not.toContain("lsb-release");
+    expect(text).not.toContain("node_modules");
+  });
+
+  it("notes a dump it cannot read, and lists the newest dump's modules only", () => {
+    new CrashSession(marker, versions).start(T0);
+    writeFixtureDump("old.dmp", T0 + 1000);
+    writeFixtureDump("new.dmp", T0 + 2000);
+    writeDump("bad.dmp", T0 + 1500);
+    const text = detect()?.text ?? "";
+    // Newest first.
+    expect(text.indexOf(" new.dmp\n")).toBeLessThan(text.indexOf(" bad.dmp\n"));
+    expect(text.indexOf(" bad.dmp\n")).toBeLessThan(text.indexOf(" old.dmp\n"));
+    expect(text).toContain(" bad.dmp\n  Could not be read (truncated).\n");
+    expect(text).toContain("Modules in new.dmp:");
+    expect(text).not.toContain("Modules in old.dmp:");
+  });
+
+  it("lists the modules of the newest dump it can read", () => {
+    new CrashSession(marker, versions).start(T0);
+    writeFixtureDump("good.dmp", T0 + 1000);
+    writeDump("bad.dmp", T0 + 2000);
+    expect(detect()?.text).toContain("Modules in good.dmp:");
+  });
+
+  it("summarizes only the newest dumps of a run", () => {
+    new CrashSession(marker, versions).start(T0);
+    const n = DUMPS_SUMMARIZED + 2;
+    for (let i = 0; i < n; i++) writeDump(`d${i}.dmp`, T0 + 1000 * (i + 1));
+    const text = detect(T0 + 1000 * (n + 1))?.text ?? "";
+    expect(text).toContain(` d${n - 1}.dmp\n`);
+    expect(text).toContain(` d2.dmp\n`);
+    expect(text).not.toContain(` d1.dmp\n`);
+    expect(text).toContain("(2 older not summarized)");
+  });
+
   it("does not take a recorded child crash's dump for the main process's", () => {
     const s = new CrashSession(marker, versions);
     s.start(T0);
@@ -130,6 +206,22 @@ describe("detectPreviousSession", () => {
     writeDump("a.dmp", T0 + 2000);
     writeDump("b.dmp", T0 + 1000 + DUMP_GRACE_MS + 1);
     expect(detect()?.text).toContain("Result: Crashed (GPU, main)");
+  });
+
+  it("takes a dump that says it is the main process's, however close to a child crash", () => {
+    const s = new CrashSession(marker, versions);
+    s.start(T0);
+    s.recordChildCrash({ process: "GPU", reason: "crashed", at: T0 + 1000 });
+    writeFixtureDump("a.dmp", T0 + 2000);
+    expect(detect()?.text).toContain("Result: Crashed (GPU, main)");
+  });
+
+  it("does not take a dump that says it is a child's for the main process's", () => {
+    new CrashSession(marker, versions).start(T0);
+    writeFixtureDump("a.dmp", T0 + 5000, "utility");
+    const report = detect();
+    expect(report?.kind).toBe("unclean-exit");
+    expect(report?.text).toContain("  Process: utility\n");
   });
 
   it("quotes the last lines of the log", () => {
