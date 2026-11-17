@@ -128,6 +128,14 @@ describe("describeConditions", () => {
     );
   });
 
+  it("names an ext: directive, apart from the free text (#538)", () => {
+    expect(keys({ q: "trip ext:MP4" })).toEqual(["q", "directive-1"]);
+    expect(find({ q: "trip ext:MP4" }, "q").label).toBe('"trip"');
+    expect(find({ q: "trip ext:MP4" }, "directive-1").label).toBe(
+      `${t("filter.extChip")}: mp4`,
+    );
+  });
+
   it("describes a directive-only query without a free-text chip", () => {
     expect(keys({ q: "tag:beach" })).toEqual(["directive-0"]);
   });
