@@ -511,6 +511,35 @@ function appendSeekCondition(
 }
 
 /**
+ * The index searchFiles pins with INDEXED BY for an unfiltered list in this
+ * order, or null to leave the plan to SQLite (#363). Workspace DBs are never
+ * ANALYZEd, and without statistics the planner takes idx_files_alive for
+ * "deleted_at IS NULL" and sorts every live row in a temp b-tree for each
+ * page. Walking the sort index instead reads only as far as a page needs.
+ *
+ * Only where the index yields the ORDER BY as it is. captured, btime and
+ * created_at are indexed newest first, so their ascending orders would still
+ * be sorted (for created_at, within each second, and a scan adds many files in
+ * the same second).
+ *
+ * Keep in step with orderByFor().
+ */
+function pinnedSortIndex(sort?: string, dir?: string): string | null {
+  if (sort === "name") return "idx_files_alive_name_key";
+  if (resolveSortDir(sort, dir) !== "desc") return null;
+  switch (sort) {
+    case "addedAt":
+      return "idx_files_alive_added";
+    case "captured":
+      return "idx_files_alive_captured";
+    case "btime":
+      return "idx_files_alive_btime";
+    default:
+      return null;
+  }
+}
+
+/**
  * Search one workspace DB. With `seek`, the page starts right after that sort
  * position (keyset pagination — no OFFSET scan) and `nextCursor` is null: the
  * caller (crossWorkspace) tracks continuation itself. Without it, the legacy
@@ -528,11 +557,28 @@ export function searchFiles(
   const cap = seek ? MAX_LIMIT + 1 : MAX_LIMIT;
   const limit = Math.max(1, Math.min(cap, query.limit ?? DEFAULT_LIMIT));
   const args: unknown[] = [];
-  let sql = `SELECT ${FILE_COLS} ${fromFor(query)} WHERE f.deleted_at IS NULL`;
-  sql = appendSearchConditions(db, sql, args, query, opts?.sep);
+  const filters = appendSearchConditions(db, "", args, query, opts?.sep);
+  // Only an unfiltered list is pinned: without statistics nothing tells how
+  // few rows a filter leaves, and for a rare one, walking the sort order to
+  // fill a page reads every live row in index order (#363). Nor is a page in
+  // the NULL tail of captured or btime (a seek key without a value): the index
+  // cannot reach that tail by the key, so it would walk every dated row first.
+  const sortIndex =
+    filters === "" && seek?.v !== null
+      ? pinnedSortIndex(query.sort, query.sortDir)
+      : null;
+  const from = sortIndex
+    ? `FROM files f INDEXED BY ${sortIndex} LEFT JOIN file_meta m ON m.meta_key = f.meta_key`
+    : fromFor(query);
+  let sql = `SELECT ${FILE_COLS} ${from} WHERE f.deleted_at IS NULL${filters}`;
   if (seek) {
     const seekArgs: unknown[] = [];
-    sql += ` AND (${appendSeekCondition(seekArgs, seek, query.sort, query.sortDir)})`;
+    const cond = appendSeekCondition(seekArgs, seek, query.sort, query.sortDir);
+    // Nothing follows the key. Not sent as "AND (0)": SQLite rejects a WHERE
+    // it can prove false under INDEXED BY ("no query solution"). The filters
+    // can write "AND 0" too, but a filtered list is never pinned.
+    if (cond === "0") return { items: [], nextCursor: null };
+    sql += ` AND (${cond})`;
     args.push(...seekArgs);
   }
 
@@ -569,6 +615,8 @@ export function numericCursor(cursor: SearchQuery["cursor"]): number {
  * ORDER BY clause for a sort key/direction. Exported for the index-plan tests.
  * Kept in lockstep with comparatorFor() in crossWorkspace.ts — the All view's
  * k-way merge re-implements this ordering in JS and breaks if they diverge.
+ * pinnedSortIndex() pins an index only for an order that index yields as it
+ * is; changing an order here can leave its pinned index sorting again.
  */
 export function orderByFor(sort?: string, dir?: string): string {
   const direction = resolveSortDir(sort, dir).toUpperCase();

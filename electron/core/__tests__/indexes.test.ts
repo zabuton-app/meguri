@@ -3,8 +3,9 @@
 // silently reintroduces a full scan / temp b-tree sort fails loudly. All of
 // these run synchronously on the main process (better-sqlite3), so plan
 // regressions translate directly into UI/IPC stalls.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DB } from "../db.js";
+import type { SearchQuery } from "../types.js";
 import {
   FILE_COLS,
   FILE_FROM,
@@ -12,6 +13,7 @@ import {
   folderRange,
   orderByFor,
   searchFiles,
+  type SeekPosition,
 } from "../queries.js";
 import { insertFile, newDb } from "./helpers.js";
 
@@ -22,7 +24,11 @@ function plan(db: DB, sql: string): string {
   return rows.map((r) => r.detail).join("\n");
 }
 
-/** The exact SQL shape searchFiles() emits for a bare (unfiltered) sort. */
+/**
+ * An unfiltered sort without searchFiles' INDEXED BY: what these tests check
+ * is that the index can serve the order once the planner has statistics. The
+ * pinned plans the app runs are covered by the describe at the end (#363).
+ */
 function searchSql(sort: string | undefined, dir: string | undefined): string {
   return `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL ORDER BY ${orderByFor(sort, dir)} LIMIT 101 OFFSET 0`;
 }
@@ -171,5 +177,134 @@ describe("index query plans", () => {
     expect(desc.items.map((f) => f.id)).toEqual(
       asc.items.map((f) => f.id).reverse(),
     );
+  });
+});
+
+// Workspace DBs are never ANALYZEd, so these are the plans the app runs. The
+// tests above run ANALYZE first, which hides a plan that only holds with
+// statistics; dropping sqlite_stat1 afterwards is not enough, as the loaded
+// statistics stay in effect on the connection.
+describe("searchFiles plans without statistics (#363)", () => {
+  let db: DB;
+  beforeEach(() => {
+    let rootId: number;
+    ({ db, rootId } = newDb());
+    for (let i = 0; i < 100; i++) {
+      insertFile(db, rootId, {
+        relPath: `dir/v${String(i).padStart(3, "0")}.mp4`,
+        capturedAt: i % 3 ? 1_700_000_000 + i : null,
+        btime: i % 4 ? 1_690_000_000 + i : null,
+      });
+    }
+  });
+  afterEach(() => db.close());
+
+  /** The plan of the statement searchFiles runs, with its bound values. */
+  function searchPlan(query: SearchQuery, seek?: SeekPosition): string {
+    let captured: { sql: string; args: unknown[] } | undefined;
+    const prepare = db.prepare.bind(db);
+    const spy = vi.spyOn(db, "prepare").mockImplementation((sql: string) => {
+      const stmt = prepare(sql);
+      if (captured || !sql.includes("FROM files f")) return stmt;
+      const all = stmt.all.bind(stmt);
+      return Object.assign(stmt, {
+        all: (...args: unknown[]) => {
+          captured = { sql, args };
+          return all(...args);
+        },
+      });
+    });
+    try {
+      searchFiles(db, query, seek, { skipTags: true });
+    } finally {
+      spy.mockRestore();
+    }
+    if (!captured) throw new Error("searchFiles ran no query");
+    const rows = db
+      .prepare(`EXPLAIN QUERY PLAN ${captured.sql}`)
+      .all(...captured.args) as { detail: string }[];
+    return rows.map((r) => r.detail).join("\n");
+  }
+
+  // A seek key of the sort's own type: a string for name, a number otherwise.
+  const seekFor = (sort: string): SeekPosition => ({
+    v: sort === "name" ? "dir/v050.mp4" : 1_700_000_050,
+    id: 50,
+    tie: "after-id",
+  });
+
+  it.each<[string, "asc" | "desc" | undefined, string]>([
+    ["name", "asc", "idx_files_alive_name_key"],
+    ["name", "desc", "idx_files_alive_name_key"],
+    ["captured", "desc", "idx_files_alive_captured"],
+    ["captured", undefined, "idx_files_alive_captured"],
+    ["btime", "desc", "idx_files_alive_btime"],
+    ["addedAt", "desc", "idx_files_alive_added"],
+  ])(
+    "sort=%s %s walks %s, first page and after a seek",
+    (sort, sortDir, index) => {
+      for (const seek of [undefined, seekFor(sort)]) {
+        const p = searchPlan({ sort, sortDir }, seek);
+        expect(p).toContain(index);
+        expect(p).not.toContain("TEMP B-TREE");
+      }
+    },
+  );
+
+  it("leaves every filtered list to the planner", () => {
+    // Without statistics, nothing tells how few rows a filter leaves; for a
+    // rare one, walking the sort order reads every live row.
+    for (const query of [
+      { kind: "image" },
+      { q: "ab" },
+      { q: "abc" },
+      { q: "hash:ab" },
+      { q: "ext:gif" },
+      { q: "tag:t" },
+      { tags: ["t"] },
+      { favorite: true },
+      { played: true },
+      { fileIds: [1, 2, 3] },
+      { capturedFrom: 0, capturedTo: 1 },
+      { playedFrom: 0, playedTo: 1 },
+    ]) {
+      const p = searchPlan({ ...query, sort: "name", sortDir: "asc" });
+      expect(p, JSON.stringify(query)).not.toContain(
+        "idx_files_alive_name_key",
+      );
+    }
+  });
+
+  it("leaves the ascending date orders to the planner (their indexes are newest first)", () => {
+    const indexes = {
+      captured: "idx_files_alive_captured",
+      btime: "idx_files_alive_btime",
+      addedAt: "idx_files_alive_added",
+    };
+    for (const [sort, index] of Object.entries(indexes)) {
+      const p = searchPlan({ sort, sortDir: "asc" });
+      expect(p, sort).not.toContain(index);
+    }
+  });
+
+  it("leaves a page in the NULL tail to the planner", () => {
+    for (const sort of ["captured", "btime"]) {
+      const p = searchPlan(
+        { sort, sortDir: "desc" },
+        { v: null, id: 50, tie: "after-id" },
+      );
+      expect(p, sort).not.toContain(`idx_files_alive_${sort}`);
+    }
+  });
+
+  it("returns an empty page for a seek with nothing after it, under the pinned index", () => {
+    // The key sits in the NULL tail of an earlier workspace, so every row
+    // after it was already returned. "AND (0)" under INDEXED BY would throw.
+    const res = searchFiles(
+      db,
+      { sort: "captured", sortDir: "desc" },
+      { v: null, id: 1, tie: "none" },
+    );
+    expect(res).toEqual({ items: [], nextCursor: null });
   });
 });
