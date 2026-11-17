@@ -1099,8 +1099,8 @@ function SmartCollectionsGroup({
   typing: boolean;
   onApply: (collection: SmartCollection) => void;
 }) {
-  // Read when the menu opens: the dropdown keeps its own copy, and saving
-  // there while the menu is closed is the only way the list changes.
+  // The same cache entry the filter bar's menu reads, so a search saved
+  // there shows here.
   const { collections } = useSmartCollections();
   if (collections.length === 0) return null;
   const { shown, hidden } = capped(collections, typing);

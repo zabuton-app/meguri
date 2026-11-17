@@ -1,7 +1,7 @@
 // The bar's job is that no condition is ever applied invisibly: what is on the
 // primary row shows in its own control, and what is folded into the panel shows
 // as a count on the trigger.
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fireEvent,
   render,
@@ -12,22 +12,51 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import type { SearchQuery } from "@/ipc/types";
+import type { SmartCollection } from "@/lib/smartCollections";
+
+// The saved searches main holds: every change answers with what it stored.
+const main = vi.hoisted(() => ({
+  collections: [] as SmartCollection[],
+  defaultId: null as string | null,
+}));
+const stored = () =>
+  Promise.resolve({ collections: main.collections, defaultId: main.defaultId });
 
 vi.mock("@/ipc/client", () => ({
   api: {
     appStatus: () =>
       Promise.resolve({ ready: true, workspaceId: "ws-test", root: "/m" }),
     tagsListAll: () => Promise.resolve({ tags: [], truncated: false }),
+    smartCollectionRemove: (id: string) => {
+      main.collections = main.collections.filter((c) => c.id !== id);
+      if (main.defaultId === id) main.defaultId = null;
+      return stored();
+    },
+    smartCollectionSetDefault: (id: string | null) => {
+      main.defaultId = id;
+      return stored();
+    },
   },
   ALL_ID: "__all__",
 }));
 
+beforeEach(() => {
+  main.collections = [];
+  main.defaultId = null;
+});
+
 const { FilterBar } = await import("@/components/FilterBar");
 const { I18nProvider } = await import("@/i18n/I18nProvider");
+const { smartCollectionsQuery } = await import("@/hooks/useSmartCollections");
 
 function setup(initial: SearchQuery = {}) {
   const seen = vi.fn();
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // Loaded before the first render, as renderApp does.
+  qc.setQueryData(smartCollectionsQuery.queryKey, {
+    collections: main.collections,
+    defaultId: main.defaultId,
+  });
   function Harness() {
     const [q, setQ] = useState<SearchQuery>(initial);
     return (
@@ -219,18 +248,15 @@ describe("the panel", () => {
 
 describe("saved searches", () => {
   it("applies a saved query and updates the chips and the badge together", async () => {
-    localStorage.setItem(
-      "meguri.smartCollections.v1",
-      JSON.stringify([
-        {
-          id: "sc-1",
-          name: "Unplayed videos",
-          query: { kind: "video", played: false },
-          createdAt: 0,
-          updatedAt: 0,
-        },
-      ]),
-    );
+    main.collections = [
+      {
+        id: "sc-1",
+        name: "Unplayed videos",
+        query: { kind: "video", played: false },
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ];
     const { latest } = setup({});
 
     fireEvent.pointerDown(
@@ -327,20 +353,16 @@ describe("the chip row", () => {
 
 describe("the default saved search", () => {
   const store = (defaultId?: string) => {
-    localStorage.setItem(
-      "meguri.smartCollections.v1",
-      JSON.stringify([
-        {
-          id: "sc-1",
-          name: "Rated videos",
-          query: { kind: "video", sort: "rating" },
-          createdAt: 0,
-          updatedAt: 0,
-        },
-      ]),
-    );
-    if (defaultId)
-      localStorage.setItem("meguri.smartCollections.default", defaultId);
+    main.collections = [
+      {
+        id: "sc-1",
+        name: "Rated videos",
+        query: { kind: "video", sort: "rating" },
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ];
+    main.defaultId = defaultId ?? null;
   };
   const openMenu = () =>
     fireEvent.pointerDown(
@@ -357,9 +379,7 @@ describe("the default saved search", () => {
     });
     fireEvent.click(star);
 
-    expect(localStorage.getItem("meguri.smartCollections.default")).toBe(
-      "sc-1",
-    );
+    await waitFor(() => expect(main.defaultId).toBe("sc-1"));
     expect(seen).not.toHaveBeenCalled();
   });
 
@@ -377,13 +397,11 @@ describe("the default saved search", () => {
     await waitFor(() => expect(document.activeElement).toBe(star));
 
     fireEvent.keyDown(star, { key: "Enter" });
-    expect(localStorage.getItem("meguri.smartCollections.default")).toBe(
-      "sc-1",
-    );
+    await waitFor(() => expect(main.defaultId).toBe("sc-1"));
     // Toggling neither opens the search nor closes the menu.
     expect(seen).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("menuitem", {
+      await screen.findByRole("menuitem", {
         name: "Remove default: Rated videos",
       }),
     ).toBeTruthy();
@@ -399,25 +417,20 @@ describe("the default saved search", () => {
       }),
     );
 
+    expect(await screen.findByText("No saved searches yet.")).toBeTruthy();
     expect(screen.queryByRole("menuitem", { name: /Rated videos/ })).toBeNull();
-    expect(screen.getByText("No saved searches yet.")).toBeTruthy();
     expect(seen).not.toHaveBeenCalled();
-    expect(localStorage.getItem("meguri.smartCollections.default")).toBeNull();
+    expect(main.defaultId).toBeNull();
   });
 
   it("hands focus to the next row after a delete", async () => {
-    localStorage.setItem(
-      "meguri.smartCollections.v1",
-      JSON.stringify(
-        ["First", "Second"].map((name, i) => ({
-          id: `sc-${i}`,
-          name,
-          query: { kind: "video" },
-          createdAt: 0,
-          updatedAt: 0,
-        })),
-      ),
-    );
+    main.collections = ["First", "Second"].map((name, i) => ({
+      id: `sc-${i}`,
+      name,
+      query: { kind: "video" },
+      createdAt: 0,
+      updatedAt: 0,
+    }));
     setup({});
     openMenu();
     const del = await screen.findByRole("menuitem", {

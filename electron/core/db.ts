@@ -744,6 +744,21 @@ CREATE TABLE IF NOT EXISTS collection_items (
 CREATE INDEX IF NOT EXISTS idx_collection_items_order ON collection_items(collection_id, position);
 -- Removing a workspace, or files from one, drops their items everywhere.
 CREATE INDEX IF NOT EXISTS idx_collection_items_file ON collection_items(workspace_id, file_id);
+
+-- Smart collections, the saved searches (smartCollectionStore.ts). query is the
+-- SearchQuery as JSON. position orders them, newest first: a new one takes one
+-- below the lowest. At most one is the default, the one the list opens with.
+CREATE TABLE IF NOT EXISTS smart_collections (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  query TEXT NOT NULL,
+  workspace_id TEXT,
+  is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+  position INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_smart_collections_default ON smart_collections(is_default) WHERE is_default = 1;
 `;
 
 /**

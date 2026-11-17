@@ -476,21 +476,27 @@ what the `manual` sort reads. The UI lives in
 
 ### Smart collections
 
-Saved searches: a named `SearchQuery`. These never touch the main process —
-they persist in the renderer's `localStorage` (`SMART_COLLECTIONS_KEY`). The
-schema and normalization live in `src/lib/smartCollections.ts`, the hook in
-`src/hooks/useSmartCollections.ts`, and the UI in
-`src/components/SmartCollectionsMenu.tsx`. A query is passed through
+Saved searches: a named `SearchQuery`. They are stored in the library's
+`smart_collections` table (`electron/core/smartCollectionStore.ts`; see
+[Data Model](data-model.md#app-settings)) and changed through the
+`smart_collections_list` / `smart_collections_import` / `smart_collection_add` /
+`smart_collection_remove` / `smart_collection_set_default` IPC channels, each
+of which answers with what is stored. The schema is `SmartCollectionSchema` in
+`shared/ipc/schema.ts`, the normalization in `src/lib/smartCollections.ts`, the
+hook in `src/hooks/useSmartCollections.ts` (one React Query cache entry, so
+every user of the hook reads the same state), and the UI in
+`src/components/SmartCollectionsMenu.tsx`. `renderApp()` loads them before the
+first render, so the list opens on the default one and the menu never shows
+empty while they load. A query is passed through
 `cleanSearchQuery()` to drop empty fields before it is stored. A folder below
 the root is kept as `folder: { path, recursive: true }` and saved together with
 the collection's `workspaceId`, since a folder path means nothing outside its
 own workspace; a folder with no workspace to place it in is dropped. Opening
 such a search switches to that workspace and browses the folder by folder.
 
-One saved search can be marked as the default (the star in the menu; its id is
-stored under `DEFAULT_SMART_COLLECTION_KEY`, apart from the collections). Its
-conditions and sort become Home's initial filter at launch
-(`loadInitialFilter()`), and "Clear all" returns to them — or empties the
+One saved search can be marked as the default (the star in the menu; stored as
+`is_default` on its row). Its conditions and sort become Home's initial filter
+at launch (`initialFilter()`), and "Clear all" returns to them — or empties the
 filter once it already shows exactly them (`clearAllTarget()` in
 `src/lib/searchConditions.ts`); removing the sort chip restores its sort. The
 default applies in every workspace, so its folder and a manual sort, both

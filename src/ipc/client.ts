@@ -108,6 +108,18 @@ export const api = {
     targets: ChannelInput<"collection_set_membership">["targets"],
     op: ChannelInput<"collection_set_membership">["op"],
   ) => invoke("collection_set_membership", { collectionId, targets, op }),
+  smartCollectionsList: () => invoke("smart_collections_list"),
+  smartCollectionsImport: (
+    collections: ChannelInput<"smart_collections_import">["collections"],
+    defaultId: string | null,
+  ) => invoke("smart_collections_import", { collections, defaultId }),
+  smartCollectionAdd: (
+    collection: ChannelInput<"smart_collection_add">["collection"],
+  ) => invoke("smart_collection_add", { collection }),
+  smartCollectionRemove: (id: string) =>
+    invoke("smart_collection_remove", { id }),
+  smartCollectionSetDefault: (id: string | null) =>
+    invoke("smart_collection_set_default", { id }),
   scanStart: (includeExcluded?: boolean, rebuild?: boolean) =>
     invoke("scan_start", { includeExcluded, rebuild }),
   scanCancel: (wsId?: string) => invoke("scan_cancel", { wsId }),

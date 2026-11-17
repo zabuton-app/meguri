@@ -1,6 +1,9 @@
 import { DATE_RANGES } from "@/lib/dateRanges";
-import { z } from "zod";
-import { SearchQuerySchema, type SearchQuery } from "@shared/ipc/schema";
+import {
+  SmartCollectionSchema,
+  type SearchQuery,
+  type SmartCollection,
+} from "@shared/ipc/schema";
 import { ROOT_FOLDER } from "@shared/folderPath";
 import { MANUAL_SORT, resolveSortDir } from "@shared/sortDir";
 import { parseQualifiedTagName } from "@shared/tags";
@@ -10,23 +13,14 @@ import { kindLabelKey } from "@/lib/mediaKind";
 import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
 
+export type { SmartCollection } from "@shared/ipc/schema";
+
+/**
+ * Where an earlier version kept the saved searches, and the default one.
+ * Read once, to move them into the library (useSmartCollections).
+ */
 export const SMART_COLLECTIONS_KEY = "meguri.smartCollections.v1";
-
-export const SmartCollectionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  query: SearchQuerySchema,
-  /**
-   * The workspace `query.folder` lies in. A folder path means nothing outside
-   * its own workspace, so it is saved only together with one.
-   */
-  workspaceId: z.string().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-});
-export type SmartCollection = z.infer<typeof SmartCollectionSchema>;
-
-const SmartCollectionsSchema = z.array(SmartCollectionSchema);
+export const DEFAULT_SMART_COLLECTION_KEY = "meguri.smartCollections.default";
 
 /**
  * The folder a query is scoped to, when that narrows anything: a folder below
@@ -87,45 +81,42 @@ export function hasFilterConditions(query: SearchQuery): boolean {
   return Object.keys(rest).length > 0;
 }
 
+/**
+ * The saved searches as an earlier version stored them, entry by entry: one
+ * that does not validate is left out, not the whole list.
+ */
 export function parseSmartCollections(raw: string | null): SmartCollection[] {
   if (!raw) return [];
+  let parsed: unknown;
   try {
-    const parsed = SmartCollectionsSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success) return [];
-    return parsed.data;
+    parsed = JSON.parse(raw);
   } catch {
     return [];
   }
-}
-
-export function saveSmartCollections(collections: SmartCollection[]): void {
-  try {
-    localStorage.setItem(SMART_COLLECTIONS_KEY, JSON.stringify(collections));
-  } catch {
-    // Storage can be unavailable; keep the in-memory UI responsive.
-  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.flatMap((item) => {
+    const entry = SmartCollectionSchema.safeParse(item);
+    return entry.success ? [entry.data] : [];
+  });
 }
 
 /**
- * The saved search the list opens with (and "Clear all" returns to). Kept
- * apart from the collections so their stored shape does not change.
+ * What localStorage holds from an earlier version, or null when it cannot be
+ * read: nothing is moved in then, so the move is tried again next launch.
  */
-export const DEFAULT_SMART_COLLECTION_KEY = "meguri.smartCollections.default";
-
-export function loadDefaultSmartCollectionId(): string | null {
+export function readLegacySmartCollections(): {
+  collections: SmartCollection[];
+  defaultId: string | null;
+} | null {
   try {
-    return localStorage.getItem(DEFAULT_SMART_COLLECTION_KEY) || null;
+    return {
+      collections: parseSmartCollections(
+        localStorage.getItem(SMART_COLLECTIONS_KEY),
+      ),
+      defaultId: localStorage.getItem(DEFAULT_SMART_COLLECTION_KEY) || null,
+    };
   } catch {
     return null;
-  }
-}
-
-export function saveDefaultSmartCollectionId(id: string | null): void {
-  try {
-    if (id) localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, id);
-    else localStorage.removeItem(DEFAULT_SMART_COLLECTION_KEY);
-  } catch {
-    // Storage can be unavailable; keep the in-memory UI responsive.
   }
 }
 
@@ -150,20 +141,6 @@ export function defaultQueryOf(
     delete query.sortDir;
   }
   return query;
-}
-
-/** The filter the list starts with: the default saved search, or nothing. */
-export function loadInitialFilter(): SearchQuery {
-  try {
-    return (
-      defaultQueryOf(
-        parseSmartCollections(localStorage.getItem(SMART_COLLECTIONS_KEY)),
-        loadDefaultSmartCollectionId(),
-      ) ?? {}
-    );
-  } catch {
-    return {};
-  }
 }
 
 /**

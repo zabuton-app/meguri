@@ -72,7 +72,11 @@ import { SelectionProvider } from "@/components/SelectionContext";
 import { walksPlaybackOrder } from "@/lib/playbackOrder";
 import { readInBulkBatches } from "@/lib/bulkEdit";
 import { FolderHeader } from "@/components/FolderHeader";
-import { hasFilterConditions, loadInitialFilter } from "@/lib/smartCollections";
+import { defaultQueryOf, hasFilterConditions } from "@/lib/smartCollections";
+import {
+  initialFilter,
+  smartCollectionsQuery,
+} from "@/hooks/useSmartCollections";
 import { useFolderNav } from "./useFolderNav";
 import { useFolderFilter } from "./useFolderFilter";
 import { useSettledFilter } from "./useSettledFilter";
@@ -127,10 +131,28 @@ export default function Home() {
   const scanning = useScanning();
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  // Opens on the default saved search, if one is set (see loadInitialFilter).
-  const [filter, setFilter] = useState<SearchQuery>(loadInitialFilter);
+  // Opens on the default saved search, if one is set (see initialFilter).
+  const [filter, setFilter] = useState<SearchQuery>(() => initialFilter(qc));
   // Compared by identity below: every later filter is a new object.
-  const openedWith = useRef(filter);
+  const [openedWith, setOpenedWith] = useState(filter);
+  // The saved searches normally load before the first render (renderApp).
+  // When that failed, the default is applied once they arrive, unless the
+  // filter was changed in the meantime.
+  const smartCollections = useQuery(smartCollectionsQuery).data;
+  const [awaitingDefault, setAwaitingDefault] = useState(
+    () => qc.getQueryData(smartCollectionsQuery.queryKey) === undefined,
+  );
+  if (awaitingDefault && smartCollections) {
+    setAwaitingDefault(false);
+    const query = defaultQueryOf(
+      smartCollections.collections,
+      smartCollections.defaultId,
+    );
+    if (query && filter === openedWith) {
+      setFilter(query);
+      setOpenedWith(query);
+    }
+  }
   // What the list queries run on: `filter` with its free text held back while
   // it is being typed (see useSettledFilter). The filter bar shows `filter`.
   const queryFilter = useSettledFilter(filter);
@@ -516,13 +538,13 @@ export default function Home() {
   // with: the default saved search was not searched for, and would otherwise
   // head the recents after every launch.
   useEffect(() => {
-    if (filter === openedWith.current) return;
+    if (filter === openedWith) return;
     const timer = window.setTimeout(
       () => recordRecentSearch(filter),
       RECENT_SEARCH_SETTLE_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [filter]);
+  }, [filter, openedWith]);
 
   // Stabilize the reference so MediaCard's memo stays effective.
   // A click AND-appends an exact tag condition rather than overwriting the
