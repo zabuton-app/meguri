@@ -68,6 +68,18 @@ export const AUTO_META_VALUES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
+ * Every generated namespace whose values are a closed set, with its values:
+ * the bare-searched ones above and the `audio_` ones (#468). Completion
+ * offers each of them even before any file carries it.
+ */
+export const CLOSED_TAG_VALUES: Readonly<Record<string, readonly string[]>> = {
+  ...AUTO_META_VALUES,
+  audio_quality: ["lossless", "lossy", "hires"],
+  audio_ch: ["mono", "stereo", "surround"],
+  audio_tempo: ["slow", "moderate", "fast"],
+};
+
+/**
  * Which category a bare generated value belongs to, or null when it is a codec
  * (open set) or simply unknown. Presentation only — matching resolves against
  * the `tags` table.

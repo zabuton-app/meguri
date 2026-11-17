@@ -661,3 +661,28 @@ describe("SearchTokenInput completion", () => {
     expect(options()).toHaveLength(0);
   });
 });
+
+describe("SearchTokenInput closed value sets (#468)", () => {
+  it("offers every value of a closed set, those no file carries yet after", async () => {
+    const { input } = setup("", [...CATALOG, tag("lossy", 5, "audio_quality")]);
+    type(input, "tag:audio_quality:");
+    // Once the catalog is in, the one held comes first with its count.
+    await waitFor(() =>
+      expect(options()[0]?.textContent).toMatch(/^tag:lossy.*5$/),
+    );
+    expect(options().map((o) => o.textContent)).toEqual([
+      expect.stringMatching(/^tag:lossy.*5$/),
+      // The rest by name.
+      expect.stringMatching(/^tag:hires.*0$/),
+      expect.stringMatching(/^tag:lossless.*0$/),
+    ]);
+  });
+
+  it("searches for a value picked though no file carries it", async () => {
+    const { input, last } = setup();
+    type(input, "tag:audio_ch:ster");
+    await waitFor(() => expect(options()).toHaveLength(1));
+    fireEvent.click(options()[0]);
+    expect(last()).toBe("tag:audio_ch:stereo");
+  });
+});

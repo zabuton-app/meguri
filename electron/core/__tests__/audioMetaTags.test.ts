@@ -18,7 +18,7 @@ import { FFMPEG } from "../ffmpeg-paths.js";
 import { extractMeta } from "../media.js";
 import { fileTags } from "../tags.js";
 import type { DB } from "../db.js";
-import { AUTO_META_VALUES } from "../../../shared/tags.js";
+import { CLOSED_TAG_VALUES } from "../../../shared/tags.js";
 import { insertFile, newDb } from "./helpers.js";
 
 /** Qualified names, sorted. */
@@ -299,11 +299,21 @@ describe("audioMetaTagsFor", () => {
       { codec_name: "mp3", channels: 2 },
       { codec_name: "ac3", channels: 6 },
     ];
+    const checked = new Set<string>();
     for (const stream of streams)
-      for (const tag of audioMetaTagsFor(probe(stream), 30)) {
-        const declared = AUTO_META_VALUES[tag.namespace];
-        if (declared) expect(declared).toContain(tag.name);
+      for (const tag of audioMetaTagsFor(probe(stream, { TBPM: "128" }), 30)) {
+        const declared = CLOSED_TAG_VALUES[tag.namespace];
+        if (!declared) continue;
+        expect(declared).toContain(tag.name);
+        checked.add(tag.namespace);
       }
+    // The audio sets were checked, not only the shared ones.
+    expect([...checked].sort()).toEqual([
+      "audio_ch",
+      "audio_quality",
+      "audio_tempo",
+      "dur",
+    ]);
   });
 
   it("is what autoMetaTagsFor gives an audio file", () => {

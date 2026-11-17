@@ -1,4 +1,5 @@
 import {
+  CLOSED_TAG_VALUES,
   TAG_SEARCH_PREFIX,
   hasOpenQuote,
   isSearchDirective,
@@ -45,6 +46,37 @@ export function pendingDirective(draft: string): PendingDirective | null {
   const head = `${TAG_SEARCH_PREFIX}:`;
   if (!tail.toLowerCase().startsWith(head)) return null;
   return { value: tail.slice(head.length) };
+}
+
+/**
+ * The catalog with every value of a closed set it lacks added, as a tag no
+ * file carries yet, once the namespace has been typed (`audio_quality:`, or
+ * `audio_quality:hi`), so completion can offer it (`audio_quality:hires` in a
+ * library with no hi-res file). Added after the catalog's own entries; a
+ * bare value or a namespace not typed yet adds nothing.
+ */
+export function withClosedValues(
+  tags: readonly TagSummary[],
+  typed: string,
+): TagSummary[] {
+  const lower = typed.trim().toLowerCase();
+  const at = lower.indexOf(":");
+  const values = at > 0 ? CLOSED_TAG_VALUES[lower.slice(0, at)] : undefined;
+  if (!values) return [...tags];
+  const namespace = lower.slice(0, at);
+  const have = new Set(tags.map((tag) => tag.qualified));
+  const missing: TagSummary[] = values
+    .filter((name) => !have.has(`${namespace}:${name}`))
+    .map((name) => ({
+      namespace,
+      name,
+      qualified: `${namespace}:${name}`,
+      fileCount: 0,
+      bySource: [],
+      pipelineOwned: true,
+      workspaceIds: [],
+    }));
+  return [...tags, ...missing];
 }
 
 /** How many completions the search box offers at once. */

@@ -541,7 +541,9 @@ tags and `res`, `dur`, `codec` and `orient` only (`BARE_SEARCH_NAMESPACES` in
 `shared/tags.ts`); the `audio_` ones are searched with their namespace
 (`tag:audio_tempo:fast`), since their values are everyday words or whatever a
 file's tags say, which a manual tag can be named too. The search box shows a
-generated tag's chip as its category and value (`Tempo: Fast`).
+generated tag's chip as its category and value (`Tempo: Fast`). Completion
+offers every value of a closed set (`CLOSED_TAG_VALUES`) once its namespace is
+typed, `tag:audio_quality:` for one, even when no file carries it yet.
 
 An audio file's embedded tags (`TBPM` / `TKEY` in ID3, `BPM` / `INITIALKEY` in
 Vorbis comments, `tmpo` in MP4, and `genre`) are read from the container's and

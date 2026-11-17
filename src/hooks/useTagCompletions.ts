@@ -8,6 +8,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import {
   tagSuggestions,
   viewIsOneWorkspace,
+  withClosedValues,
   type PendingDirective,
 } from "@/lib/searchTokens";
 
@@ -44,12 +45,19 @@ export function useTagCompletions(
       tag.workspaceIds.includes(viewId),
     [viewId],
   );
-  const suggestions = useMemo(
-    () =>
-      pending
-        ? tagSuggestions(catalog.data?.tags ?? [], pending, undefined, held)
-        : [],
-    [catalog.data, pending, held],
+  // Once a closed set's namespace is typed, its values are offered even when
+  // no file carries one yet (`tag:audio_quality:` lists all three).
+  const tags = useMemo(
+    () => withClosedValues(catalog.data?.tags ?? [], pending?.value ?? ""),
+    [catalog.data, pending?.value],
   );
-  return { suggestions, held };
+  const offered = useCallback(
+    (tag: TagSummary) => tag.fileCount === 0 || held(tag),
+    [held],
+  );
+  const suggestions = useMemo(
+    () => (pending ? tagSuggestions(tags, pending, undefined, offered) : []),
+    [tags, pending, offered],
+  );
+  return { suggestions, held: offered };
 }
