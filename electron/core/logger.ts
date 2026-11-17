@@ -44,6 +44,11 @@ function redactForLog(value: unknown): string {
   return redactString(str);
 }
 
+/** Where the log file is written: <userData>/logs/main.log by default. */
+export function logFilePath(fileName = "main.log"): string {
+  return path.join(app.getPath("userData"), "logs", fileName);
+}
+
 let initialized = false;
 
 /**
@@ -57,8 +62,7 @@ export function setupLogger(): void {
   // Resolve to <userData>/logs/<fileName>. electron-log's default puts it under
   // libraryDefaultDir which differs by OS; pinning to userData keeps the path
   // predictable for support requests.
-  log.transports.file.resolvePathFn = (vars) =>
-    path.join(app.getPath("userData"), "logs", vars.fileName ?? "main.log");
+  log.transports.file.resolvePathFn = (vars) => logFilePath(vars.fileName);
   log.transports.file.maxSize = MAX_FILE_BYTES;
   log.transports.file.format =
     "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}]{scope} {text}";

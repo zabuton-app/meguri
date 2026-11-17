@@ -8,6 +8,7 @@ import type { DownloadOriginEntry } from "../downloadOrigin.js";
 import type { SubtitleCue } from "../embeddedSubtitles.js";
 import type {
   AppStatus,
+  CrashReport,
   DuplicatesResult,
   FileDetail,
   FileRow,
@@ -532,6 +533,10 @@ export const ChannelInputs = {
   update_get_settings: z.void(),
   update_set_auto_check: z.object({ enabled: z.boolean() }),
   update_ignore: z.object({ version: z.string() }),
+  crash_reports_list: z.void(),
+  // Report ids are the detection time in ms (crashReports.ts).
+  crash_report_delete: z.object({ id: z.string().regex(/^\d+$/) }),
+  crash_reports_open_folder: z.void(),
   auto_tag_get: z.void(),
   auto_tag_set: z.object({ config: AutoTagConfigSchema }),
   auto_tag_files: z.void(),
@@ -755,6 +760,9 @@ export interface ChannelOutputs {
   update_get_settings: UpdateSettings;
   update_set_auto_check: void;
   update_ignore: void;
+  crash_reports_list: CrashReport[];
+  crash_report_delete: void;
+  crash_reports_open_folder: void;
   auto_tag_get: AutoTagConfig;
   auto_tag_set: void;
   // Files of every workspace (a sample when there are more than the cap).

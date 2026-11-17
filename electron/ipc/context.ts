@@ -12,6 +12,7 @@ import type { Workspaces } from "../core/workspaces.js";
 import type { ScanManager } from "../scanManager.js";
 import type { LogoId } from "../../shared/ipc/schema.js";
 import type { LogoImages } from "../app.js";
+import type { CrashIssueForm } from "../core/crashReports.js";
 
 export interface IpcContext {
   ws: Workspaces;
@@ -52,4 +53,13 @@ export interface IpcContext {
   /** When the library copy put back at startup was taken (Unix seconds), or
    *  null when the library was sound. */
   libraryRestoredFrom: () => number | null;
+  /** Where crash reports and dumps are kept (crashReports.ts), the issue
+   *  form they are filed with (null: the app has none), and the report found
+   *  at this launch, if any. */
+  crashReports: {
+    reportsDir: string;
+    dumpsDir: string;
+    issueForm: CrashIssueForm | null;
+    newReportId: string | null;
+  };
 }
