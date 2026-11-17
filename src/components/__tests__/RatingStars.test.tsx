@@ -107,14 +107,15 @@ describe("RatingStars", () => {
   });
 
   it("suppresses all decorative effects under prefers-reduced-motion while still changing state", () => {
-    const orig = window.matchMedia;
-    window.matchMedia = (query: string) =>
-      ({
-        matches: query.includes("prefers-reduced-motion"),
-        media: query,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      }) as unknown as MediaQueryList;
+    const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes("prefers-reduced-motion"),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
     try {
       const onChange = vi.fn();
       setup(0, onChange);
@@ -126,7 +127,7 @@ describe("RatingStars", () => {
       expect(settles().length).toBe(0);
       expect(burst().length).toBe(0);
     } finally {
-      window.matchMedia = orig;
+      matchMedia.mockRestore();
     }
   });
 

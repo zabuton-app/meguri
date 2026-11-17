@@ -521,18 +521,21 @@ describe("Player transitions", () => {
   });
 
   it("swaps instantly when the OS asks for reduced motion", async () => {
-    const original = window.matchMedia;
-    window.matchMedia = (query: string): MediaQueryList =>
-      ({
-        matches: query.includes("prefers-reduced-motion"),
-        media: query,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as MediaQueryList;
+    // jsdom has no matchMedia to spy on.
+    vi.stubGlobal(
+      "matchMedia",
+      (query: string): MediaQueryList =>
+        ({
+          matches: query.includes("prefers-reduced-motion"),
+          media: query,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
     try {
       renderPlayer([row(1, "video"), row(3, "video")]);
       await screen.findByText("1 / 2");
@@ -540,7 +543,7 @@ describe("Player transitions", () => {
       expect(screen.getByText("2 / 2")).toBeTruthy();
       expect(outgoing()).toBeNull();
     } finally {
-      window.matchMedia = original;
+      vi.unstubAllGlobals();
     }
   });
 });

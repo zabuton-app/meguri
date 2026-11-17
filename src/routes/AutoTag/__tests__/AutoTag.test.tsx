@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 // happy-dom does not reflect aria-* attributes to element properties (ariaSelected and so on).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { onSearchLibrary } from "@/lib/ui-events";
@@ -151,6 +157,17 @@ async function lastSaved(): Promise<AutoTagConfig> {
     timeout: 2000,
   });
   return mocks.autoTagSet.mock.calls.at(-1)![0];
+}
+
+/**
+ * Waits until the file list has been read `times` times and drawn again.
+ * Until the rules have run over the names it brings, the suggestions are
+ * empty, so a test that looks for a row as soon as the call is made finds
+ * either the old list or none, depending on timing.
+ */
+async function reloaded(times: number) {
+  await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(times));
+  await act(() => mocks.autoTagFiles.mock.results[times - 1].value);
 }
 
 describe("AutoTag", () => {
@@ -958,8 +975,8 @@ describe("AutoTag", () => {
     );
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     // The list is read again rather than guessed at, and nothing is claimed.
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
-    await within(row()).findByRole("button", { name: "Remove from 1 file" });
+    await reloaded(2);
+    within(row()).getByRole("button", { name: "Remove from 1 file" });
     expect(screen.queryByText(/^Removed/)).toBeNull();
   });
 
@@ -1005,7 +1022,7 @@ describe("AutoTag", () => {
     fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
     await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalled());
     // The list is loaded again to show what the files really carry.
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+    await reloaded(2);
     // Still the one file that carried the tag before, not two.
     expect(
       screen.getByRole("button", { name: "Remove from 1 file" }),
@@ -1033,11 +1050,9 @@ describe("AutoTag", () => {
     const row = () =>
       screen.getByRole("checkbox", { name: "Harbor" }).closest("div")!;
     fireEvent.click(within(row()).getByRole("button", { name: "Apply" }));
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+    await reloaded(2);
 
-    fireEvent.click(
-      await within(row()).findByRole("button", { name: /Remove from/ }),
-    );
+    fireEvent.click(within(row()).getByRole("button", { name: /Remove from/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     await waitFor(() => expect(mocks.autoTagEdit).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(3));
