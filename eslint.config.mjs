@@ -4,6 +4,42 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import prettier from "eslint-config-prettier";
 import globals from "globals";
+import { builtinModules } from "node:module";
+
+// Modules only the main process can load: Electron's main-process API, the
+// native SQLite binding, the bundled ffmpeg/ffprobe binaries and the main-side
+// logger (the renderer uses electron-log/renderer).
+const MAIN_ONLY_MODULES = [
+  "electron",
+  "better-sqlite3",
+  "@zabuton-app/ffmpeg-binaries",
+  "electron-log/main",
+];
+// Bare names (fs, path, fs/promises, ...); node:-prefixed ones are matched by
+// a pattern below. The list follows the Node version running ESLint.
+const NODE_BUILTINS = builtinModules.filter((m) => !m.startsWith("node:"));
+
+// no-restricted-imports options that keep code out of the main process: its
+// folder, main-only packages (and their subpaths) and, unless allowNode is set,
+// Node built-ins, plus any extra patterns in `also`. Only static imports and
+// re-exports are checked; a dynamic import() is not.
+function mainProcessOff(message, { allowNode = false, also = [] } = {}) {
+  const mainOnly = [
+    ...MAIN_ONLY_MODULES.flatMap((m) => [m, `${m}/**`]),
+    "**/electron/**",
+    ...also,
+  ];
+  return {
+    paths: allowNode ? [] : NODE_BUILTINS.map((name) => ({ name, message })),
+    patterns: [
+      { group: allowNode ? mainOnly : ["node:*", ...mainOnly], message },
+    ],
+  };
+}
+const RENDERER_MESSAGE =
+  "The renderer reaches the main process only through window.api (preload) and the typed IPC in shared/ipc/. See docs/architecture.md#process-model.";
+const SHARED_MESSAGE =
+  "shared/ is bundled into both the main process and the renderer, so it must not import from src/, electron/, Node built-ins or main-only packages.";
 
 export default tseslint.config(
   // Build artifacts and generated output are out of scope, and assembly/ is
@@ -79,6 +115,53 @@ export default tseslint.config(
     files: ["electron/**/*.ts", "shared/**/*.ts"],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+
+  // Process boundaries: the renderer reaches the main process only through
+  // preload (window.api) and the typed IPC in shared/ipc/, and shared/ stays
+  // importable from both sides. See docs/architecture.md#process-model.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", mainProcessOff(RENDERER_MESSAGE)],
+    },
+  },
+  // Renderer tests run under Node in Vitest, so a test may read fixtures from
+  // disk; the main process is still off limits.
+  {
+    files: ["src/**/__tests__/**/*.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        mainProcessOff(RENDERER_MESSAGE, { allowNode: true }),
+      ],
+    },
+  },
+  {
+    files: ["shared/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        mainProcessOff(SHARED_MESSAGE, { also: ["@/**", "**/src/**"] }),
+      ],
+    },
+  },
+  {
+    files: ["electron/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/**", "**/src/**"],
+              message:
+                "The main process must not import renderer code from src/. Move what both sides need to shared/.",
+            },
+          ],
+        },
+      ],
     },
   },
 

@@ -17,6 +17,12 @@ server that lives inside the main process (see [Media Pipeline](media-pipeline.m
 
 This separation is strict: the renderer never touches the filesystem, the
 database, or ffmpeg directly. Everything goes over IPC or the media server.
+ESLint enforces the folder boundaries with `no-restricted-imports` in
+`eslint.config.mjs`: `src/` imports nothing from `electron/`, Electron, Node
+built-ins or main-only packages (renderer tests may use Node built-ins),
+`shared/` follows the same rule and also imports nothing from `src/`, and
+`electron/` imports nothing from `src/`. Only static imports are checked, not
+`import()`.
 
 Web permissions are denied unless listed in `ALLOWED` in
 `electron/core/permissions.ts` (clipboard write and fullscreen today), and so
