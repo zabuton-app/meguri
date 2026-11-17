@@ -6,12 +6,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {
-  audioMetaTagsFor,
-  bpmBand,
-  genreNames,
-  parseKey,
-} from "../audioMetaTags.js";
+import { audioMetaTagsFor, bpmBand } from "../audioMetaTags.js";
+import { genreNames, parseBpm, parseKey } from "../../../shared/audioInfo.js";
 import { autoMetaTagsFor, backfillAutoMetaTags } from "../autoMetaTags.js";
 import { FFMPEG } from "../ffmpeg-paths.js";
 import { extractMeta } from "../media.js";
@@ -33,17 +29,19 @@ const probe = (
   format: formatTags ? { tags: formatTags } : {},
 });
 
-describe("bpmBand", () => {
-  it("puts a BPM in its band of ten, rounding a decimal", () => {
-    expect(bpmBand("128")).toBe("120-129");
-    expect(bpmBand("129.6")).toBe("130-139");
-    expect(bpmBand(" 96.5 ")).toBe("90-99");
-    expect(bpmBand("5")).toBe("0-9");
+describe("parseBpm and bpmBand", () => {
+  it("reads a BPM to a tenth, and puts it in its band of ten", () => {
+    expect(parseBpm("128")).toBe(128);
+    expect(parseBpm(" 96.55 ")).toBe(96.6);
+    expect(bpmBand(128)).toBe("120-129");
+    expect(bpmBand(129.6)).toBe("130-139");
+    expect(bpmBand(96.5)).toBe("90-99");
+    expect(bpmBand(5)).toBe("0-9");
   });
 
   it("gives nothing for what is not a BPM", () => {
     for (const raw of ["", "0", "-120", "401", "fast", "120bpm", "1e3"])
-      expect(bpmBand(raw)).toBeNull();
+      expect(parseBpm(raw)).toBeNull();
   });
 });
 

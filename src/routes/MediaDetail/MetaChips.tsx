@@ -3,6 +3,7 @@ import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { hasTimeline, kindLabel } from "@/lib/mediaKind";
+import { audioInfo, type AudioInfo } from "@shared/audioInfo";
 
 interface Props {
   detail: FileDetail;
@@ -14,7 +15,11 @@ interface Props {
   t: TFunc;
 }
 
-/** Metadata badges shown under the player (workspace, kind, resolution, size, duration, codec, fps). */
+/**
+ * Metadata badges shown under the player (workspace, kind, resolution, size,
+ * duration, codec, fps), and for audio what its stored probe output says
+ * (#468): format, channels, and the BPM, key and genre written in the file.
+ */
 export function MetaChips({
   detail,
   wsId,
@@ -55,7 +60,57 @@ export function MetaChips({
           value={detail.fps ? detail.fps.toFixed(2) : "—"}
         />
       )}
+      {detail.kind === "audio" && <AudioChips meta={detail.meta} t={t} />}
     </div>
+  );
+}
+
+/** A number without a trailing `.0`: 44.1, 48, 128, 96.5. */
+const plain = (n: number) => String(Math.round(n * 10) / 10);
+
+function channelsLabel(t: TFunc, channels: number): string {
+  if (channels === 1) return t("tags.value.chMono");
+  if (channels === 2) return t("tags.value.chStereo");
+  return `${t("tags.value.chSurround")} (${channels})`;
+}
+
+/** What an audio file's probe output says; a value it does not give is left out. */
+function AudioChips({ meta, t }: { meta: unknown; t: TFunc }) {
+  const info: AudioInfo | null = audioInfo(meta);
+  if (!info) return null;
+  // A float sample's size says nothing of the source's depth, and lossy
+  // codecs report none.
+  const bits = info.codec.startsWith("pcm_f") ? null : info.bits;
+  return (
+    <>
+      {info.sampleRate !== null && (
+        <Chip
+          label={t("media.metaSampleRate")}
+          value={`${plain(info.sampleRate / 1000)} kHz`}
+        />
+      )}
+      {bits !== null && (
+        <Chip label={t("media.metaBitDepth")} value={`${bits}-bit`} />
+      )}
+      {info.channels !== null && (
+        <Chip
+          label={t("media.metaChannels")}
+          value={channelsLabel(t, info.channels)}
+        />
+      )}
+      {info.bpm !== null && (
+        <Chip label={t("media.metaBpm")} value={plain(info.bpm)} />
+      )}
+      {info.key && (
+        <Chip
+          label={t("media.metaKey")}
+          value={`${info.key.name} (${info.key.camelot})`}
+        />
+      )}
+      {info.genres.length > 0 && (
+        <Chip label={t("media.metaGenre")} value={info.genres.join(", ")} />
+      )}
+    </>
   );
 }
 
