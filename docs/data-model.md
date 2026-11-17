@@ -374,9 +374,10 @@ every key when `NAME_KEY_VERSION` changes (recorded in `settings`), or else the
 keys that no longer match their path: an older app version inserts rows
 without one and moves rows without updating it. Nothing in the schema calls the
 key function, so an older version can still open and write the database.
-`idx_files_alive_name_key` serves the sort in both directions; inside a folder
-the folder's own files are found on `idx_files_alive_rel_path` and sorted. The
-`All` merge compares the same key.
+`idx_files_alive_name_key` serves the sort in both directions (see
+[Query layer](#query-layer)); inside a folder the folder's own files are found
+on `idx_files_alive_rel_path` and sorted. The `All` merge compares the same
+key.
 
 ## Full-text search
 
@@ -733,3 +734,15 @@ across `electron/core/queries/`:
 - `bookmarks.ts` — scene bookmark operations.
 - `thumbs.ts` — thumbnail-related queries.
 - `scanRoots.ts` — scan-root bookkeeping.
+
+Workspace databases are never `ANALYZE`d. Without statistics, SQLite reads
+`deleted_at IS NULL` off `idx_files_alive` and sorts every live row for each
+page. For an unfiltered list, `searchFiles` therefore names the sort index with
+`INDEXED BY` (`pinnedSortIndex()`): `idx_files_alive_name_key` for the name
+sort, and `idx_files_alive_captured`, `idx_files_alive_btime` and
+`idx_files_alive_added` for those orders newest first. Their oldest-first
+orders are left to the planner, as the indexes are newest first. So is any
+filtered list: without statistics nothing tells how few rows a filter leaves,
+and for a rare one, walking the sort order to fill a page reads every live row.
+The plan tests in `electron/core/__tests__/indexes.test.ts` that check these
+run without statistics.
