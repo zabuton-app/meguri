@@ -1,5 +1,6 @@
 // The app shell: the workspace rail, the router (src/appRouter.tsx) and what
 // sits beside it.
+import { useEffect } from "react";
 import { RouterProvider } from "react-router/dom";
 import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
@@ -17,6 +18,7 @@ import { useMutationErrorNotifier } from "@/hooks/useMutationErrorNotifier";
 import { useLibraryRestoreNotifier } from "@/hooks/useLibraryRestoreNotifier";
 import { useConfigProblemNotifier } from "@/hooks/useConfigProblemNotifier";
 import type { AppRouter } from "@/appRouter";
+import { markStartup } from "@/lib/startupTiming";
 
 export default function App({ router }: { router: AppRouter }) {
   useContentZoom();
@@ -28,6 +30,7 @@ export default function App({ router }: { router: AppRouter }) {
   useAppearanceAttribute();
   useCssThemeStyle();
   useCustomCssStyle();
+  useEffect(() => markStartup("first render"), []);
   return (
     <div className="flex h-full">
       <WorkspaceRail />

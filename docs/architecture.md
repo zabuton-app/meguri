@@ -80,6 +80,20 @@ locale strings (see [Renderer](renderer.md#internationalization)). The media
 server's origin travels the same way too, as `window.api.mediaOrigin`, for the
 Content Security Policy below.
 
+Each launch writes how long its startup steps took to `main.log`, as two
+`[startup]` lines. Main's (the main script, `ready`, opening the workspaces,
+the media server, IPC, the app's `setup`, the window, the library merge when
+one runs) is written however startup ends, and says whether it was `ok`,
+`failed` or ended by a `quit`. The renderer's (its script, the first render,
+the first list) is written when the first list settles, and says how: `list
+shown`, `list failed`, `no workspace` or `workspace error`. Each line lists
+only the steps reached. Both count milliseconds from main's process start:
+main passes its `performance.timeOrigin` the same way, as
+`window.api.startupOrigin` (`STARTUP_ORIGIN_ARG`), to the window startup makes
+only, and the renderer keeps a flag in session storage so a reload of that
+page writes nothing. The steps are marked with `performance.mark()` and
+formatted by `shared/startupTiming.ts`.
+
 The renderer's Content Security Policy is in three places:
 
 - `index.html` holds the packaged app's policy.
