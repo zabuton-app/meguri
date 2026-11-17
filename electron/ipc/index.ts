@@ -13,6 +13,7 @@ import { registerGraphHandlers } from "./graph.js";
 import { registerLogoHandlers } from "./logo.js";
 import { registerScanHandlers } from "./scan.js";
 import { registerShellHandlers } from "./shell.js";
+import { registerSmartCollectionHandlers } from "./smartCollections.js";
 import { registerStatusHandlers } from "./status.js";
 import { registerTagHandlers } from "./tags.js";
 import { registerThumbHandlers } from "./thumbs.js";
@@ -40,4 +41,5 @@ export function registerIpc(ctx: IpcContext): void {
   registerLogoHandlers(ctx);
   registerCustomCssHandlers(ctx);
   registerCssThemeHandlers(ctx);
+  registerSmartCollectionHandlers();
 }

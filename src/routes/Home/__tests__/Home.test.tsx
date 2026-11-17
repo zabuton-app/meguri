@@ -19,10 +19,9 @@ import {
   showFolderInLibrary,
   showMatchingFiles,
 } from "@/lib/ui-events";
-import {
-  DEFAULT_SMART_COLLECTION_KEY,
-  SMART_COLLECTIONS_KEY,
-} from "@/lib/smartCollections";
+import { smartCollectionsQuery } from "@/hooks/useSmartCollections";
+import type { SmartCollection } from "@/lib/smartCollections";
+import { createTestQueryClient } from "@/test/renderWithProviders";
 import { useMediaNav, usePlaylistNav } from "@/components/MediaNavContext";
 import { getListCounts } from "@/hooks/useListCounts";
 import {
@@ -60,6 +59,16 @@ const mocks = vi.hoisted(() => ({
   workspaceSwitch: vi.fn<(id: string) => Promise<unknown>>(),
   scanUnreadableWorkspaces: vi.fn<() => Promise<string[]>>(),
 }));
+
+// The saved searches main holds; reset before each test.
+const smart = vi.hoisted(() => {
+  const state = {
+    collections: [] as SmartCollection[],
+    defaultId: null as string | null,
+    list: vi.fn(),
+  };
+  return state;
+});
 
 // The scan:done listeners Home subscribes, for a test to fire.
 const scanDone = vi.hoisted(() => ({
@@ -99,6 +108,7 @@ vi.mock("@/ipc/client", () => ({
     folderCopyPath: (ws: string, path: string) =>
       mocks.folderCopyPath(ws, path),
     workspaceSwitch: (id: string) => mocks.workspaceSwitch(id),
+    smartCollectionsList: () => smart.list(),
     tagsList: vi.fn().mockResolvedValue([]),
     openExternal: vi.fn().mockResolvedValue(undefined),
     openFolder: vi.fn().mockResolvedValue(undefined),
@@ -137,6 +147,25 @@ vi.mock("@/graph/GraphView", () => ({
     return <div data-testid="graph-view" />;
   },
 }));
+
+beforeEach(() => {
+  smart.collections = [];
+  smart.defaultId = null;
+  smart.list.mockImplementation(() =>
+    Promise.resolve({
+      collections: smart.collections,
+      defaultId: smart.defaultId,
+      needsImport: false,
+    }),
+  );
+});
+
+/** Renders once the saved searches are loaded, as renderApp does. */
+async function renderAfterSmartCollections() {
+  const queryClient = createTestQueryClient();
+  await queryClient.prefetchQuery({ ...smartCollectionsQuery, retry: false });
+  return renderWithProviders(<AppRoutes />, { queryClient });
+}
 
 function AppRoutes() {
   return (
@@ -1173,114 +1202,97 @@ describe("Home folder view", () => {
           }),
     );
     toasts.error.mockClear();
-    localStorage.setItem(
-      SMART_COLLECTIONS_KEY,
-      JSON.stringify([
-        {
-          id: "1",
-          name: "Old videos",
-          query: {
-            kind: "video",
-            folder: { path: "Movie/Old", recursive: true },
-          },
-          workspaceId: WS_ID,
-          createdAt: 1,
-          updatedAt: 1,
+    smart.collections = [
+      {
+        id: "1",
+        name: "Old videos",
+        query: {
+          kind: "video",
+          folder: { path: "Movie/Old", recursive: true },
         },
-      ]),
+        workspaceId: WS_ID,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("folder-card");
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Smart collections" }),
+      { button: 0, ctrlKey: false },
     );
-    try {
-      renderWithProviders(<AppRoutes />);
-      await screen.findByTestId("folder-card");
-      fireEvent.pointerDown(
-        screen.getByRole("button", { name: "Smart collections" }),
-        { button: 0, ctrlKey: false },
-      );
-      fireEvent.click(
-        await screen.findByRole("menuitem", { name: /^Old videos/ }),
-      );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: /^Old videos/ }),
+    );
 
-      // With a condition on, the view would only search the missing folder
-      // and never list it — so it is not gone to at all.
-      await waitFor(() =>
-        expect(toasts.error).toHaveBeenCalledWith(
-          "Couldn't show the folder",
-          expect.objectContaining({ description: "worker down" }),
-        ),
-      );
-      expect(
-        mocks.filesSearch.mock.calls.some(
-          ([q]) =>
-            (q as { folder?: { path: string } }).folder?.path === "Movie/Old",
-        ),
-      ).toBe(false);
-      expect(screen.queryByText("Folder: Movie/Old")).toBeNull();
-    } finally {
-      localStorage.removeItem(SMART_COLLECTIONS_KEY);
-    }
+    // With a condition on, the view would only search the missing folder
+    // and never list it — so it is not gone to at all.
+    await waitFor(() =>
+      expect(toasts.error).toHaveBeenCalledWith(
+        "Couldn't show the folder",
+        expect.objectContaining({ description: "worker down" }),
+      ),
+    );
+    expect(
+      mocks.filesSearch.mock.calls.some(
+        ([q]) =>
+          (q as { folder?: { path: string } }).folder?.path === "Movie/Old",
+      ),
+    ).toBe(false);
+    expect(screen.queryByText("Folder: Movie/Old")).toBeNull();
   });
 
   it("returns to the root for a saved search without a folder, even with the option off", async () => {
-    localStorage.setItem(
-      SMART_COLLECTIONS_KEY,
-      JSON.stringify([
-        {
-          id: "1",
-          name: "Videos",
-          query: { kind: "video" },
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ]),
+    smart.collections = [
+      {
+        id: "1",
+        name: "Videos",
+        query: { kind: "video" },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("folder-card");
+    fireEvent.click(
+      screen.getByRole("button", { name: 'Open folder "Movie"' }),
     );
-    try {
-      renderWithProviders(<AppRoutes />);
-      await screen.findByTestId("folder-card");
-      fireEvent.click(
-        screen.getByRole("button", { name: 'Open folder "Movie"' }),
-      );
-      await screen.findByText("Folder: Movie");
-      fireEvent.click(screen.getByRole("button", { name: "Show by folder" }));
-      await waitFor(() => expect(lastSearch().folder).toBeUndefined());
+    await screen.findByText("Folder: Movie");
+    fireEvent.click(screen.getByRole("button", { name: "Show by folder" }));
+    await waitFor(() => expect(lastSearch().folder).toBeUndefined());
 
-      fireEvent.pointerDown(
-        screen.getByRole("button", { name: "Smart collections" }),
-        { button: 0, ctrlKey: false },
-      );
-      fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
-      await waitFor(() => expect(lastSearch().kind).toBe("video"));
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Smart collections" }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
+    await waitFor(() => expect(lastSearch().kind).toBe("video"));
 
-      // Turning the option back on opens at the root, not at Movie.
-      fireEvent.click(screen.getByRole("button", { name: "Show by folder" }));
-      await waitFor(() =>
-        expect(lastSearch().folder).toEqual({ path: "", recursive: true }),
-      );
-      expect(screen.queryByText("Folder: Movie")).toBeNull();
-    } finally {
-      localStorage.removeItem(SMART_COLLECTIONS_KEY);
-    }
+    // Turning the option back on opens at the root, not at Movie.
+    fireEvent.click(screen.getByRole("button", { name: "Show by folder" }));
+    await waitFor(() =>
+      expect(lastSearch().folder).toEqual({ path: "", recursive: true }),
+    );
+    expect(screen.queryByText("Folder: Movie")).toBeNull();
   });
 
   it("opens on the default saved search, without its folder", async () => {
-    localStorage.setItem(
-      SMART_COLLECTIONS_KEY,
-      JSON.stringify([
-        {
-          id: "1",
-          name: "Rated old videos",
-          query: {
-            kind: "video",
-            sort: "rating",
-            folder: { path: "Movie/Old", recursive: true },
-          },
-          workspaceId: WS_ID,
-          createdAt: 1,
-          updatedAt: 1,
+    smart.collections = [
+      {
+        id: "1",
+        name: "Rated old videos",
+        query: {
+          kind: "video",
+          sort: "rating",
+          folder: { path: "Movie/Old", recursive: true },
         },
-      ]),
-    );
-    localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, "1");
-    renderWithProviders(<AppRoutes />);
+        workspaceId: WS_ID,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    smart.defaultId = "1";
+    await renderAfterSmartCollections();
     await waitFor(() =>
       expect(lastSearch()).toMatchObject({ kind: "video", sort: "rating" }),
     );
@@ -1292,24 +1304,37 @@ describe("Home folder view", () => {
     ).toBe(false);
   });
 
+  it("applies the default once it loads, when it failed before the first render", async () => {
+    smart.collections = [
+      {
+        id: "1",
+        name: "Videos",
+        query: { kind: "video" },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    smart.defaultId = "1";
+    smart.list.mockRejectedValueOnce(new Error("library busy"));
+    await renderAfterSmartCollections();
+    await waitFor(() => expect(lastSearch()).toMatchObject({ kind: "video" }));
+  });
+
   it("does not count the search it opens on as a recent one", async () => {
-    localStorage.setItem(
-      SMART_COLLECTIONS_KEY,
-      JSON.stringify([
-        {
-          id: "1",
-          name: "Videos",
-          query: { kind: "video" },
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ]),
-    );
-    localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, "1");
+    smart.collections = [
+      {
+        id: "1",
+        name: "Videos",
+        query: { kind: "video" },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    smart.defaultId = "1";
     resetRecentSearchesForTest();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      renderWithProviders(<AppRoutes />);
+      await renderAfterSmartCollections();
       await waitFor(() =>
         expect(lastSearch()).toMatchObject({ kind: "video" }),
       );
@@ -1318,8 +1343,6 @@ describe("Home folder view", () => {
       expect(getRecentSearches()).toEqual([]);
     } finally {
       vi.useRealTimers();
-      localStorage.removeItem(SMART_COLLECTIONS_KEY);
-      localStorage.removeItem(DEFAULT_SMART_COLLECTION_KEY);
       localStorage.removeItem(RECENT_SEARCHES_KEY);
       resetRecentSearchesForTest();
     }
@@ -1336,52 +1359,45 @@ describe("Home folder view", () => {
       }),
     );
     toasts.info.mockClear();
-    localStorage.setItem(
-      SMART_COLLECTIONS_KEY,
-      JSON.stringify([
-        {
-          id: "1",
-          name: "Old videos",
-          query: {
-            kind: "video",
-            folder: { path: "Movie/Old", recursive: true },
-          },
-          workspaceId: WS_ID,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ]),
-    );
-    try {
-      renderWithProviders(<AppRoutes />);
-      await screen.findByTestId("folder-card");
-      fireEvent.pointerDown(
-        screen.getByRole("button", { name: "Smart collections" }),
-        { button: 0, ctrlKey: false },
-      );
-      fireEvent.click(
-        await screen.findByRole("menuitem", { name: /^Old videos/ }),
-      );
-
-      await waitFor(() =>
-        expect(lastSearch()).toMatchObject({
+    smart.collections = [
+      {
+        id: "1",
+        name: "Old videos",
+        query: {
           kind: "video",
-          folder: { path: "Movie", recursive: true },
-        }),
-      );
-      expect(toasts.info).toHaveBeenCalledWith(
-        "The folder you were viewing is gone, so you were moved up.",
-        expect.anything(),
-      );
-      expect(
-        mocks.filesSearch.mock.calls.some(
-          ([q]) =>
-            (q as { folder?: { path: string } }).folder?.path === "Movie/Old",
-        ),
-      ).toBe(false);
-    } finally {
-      localStorage.removeItem(SMART_COLLECTIONS_KEY);
-    }
+          folder: { path: "Movie/Old", recursive: true },
+        },
+        workspaceId: WS_ID,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("folder-card");
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Smart collections" }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: /^Old videos/ }),
+    );
+
+    await waitFor(() =>
+      expect(lastSearch()).toMatchObject({
+        kind: "video",
+        folder: { path: "Movie", recursive: true },
+      }),
+    );
+    expect(toasts.info).toHaveBeenCalledWith(
+      "The folder you were viewing is gone, so you were moved up.",
+      expect.anything(),
+    );
+    expect(
+      mocks.filesSearch.mock.calls.some(
+        ([q]) =>
+          (q as { folder?: { path: string } }).folder?.path === "Movie/Old",
+      ),
+    ).toBe(false);
   });
 
   it("lets only the latest of two folder requests land", async () => {
@@ -1419,81 +1435,67 @@ describe("Home folder view", () => {
   });
 
   it("opens a saved search without a folder at the root", async () => {
-    localStorage.setItem(
-      SMART_COLLECTIONS_KEY,
-      JSON.stringify([
-        {
-          id: "1",
-          name: "Videos",
-          query: { kind: "video" },
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ]),
+    smart.collections = [
+      {
+        id: "1",
+        name: "Videos",
+        query: { kind: "video" },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("folder-card");
+    fireEvent.click(
+      screen.getByRole("button", { name: 'Open folder "Movie"' }),
     );
-    try {
-      renderWithProviders(<AppRoutes />);
-      await screen.findByTestId("folder-card");
-      fireEvent.click(
-        screen.getByRole("button", { name: 'Open folder "Movie"' }),
-      );
-      await screen.findByText("Folder: Movie");
+    await screen.findByText("Folder: Movie");
 
-      fireEvent.pointerDown(
-        screen.getByRole("button", { name: "Smart collections" }),
-        { button: 0, ctrlKey: false },
-      );
-      fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Smart collections" }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
 
-      // Every condition is replaced, the folder included.
-      await waitFor(() =>
-        expect(lastSearch()).toMatchObject({
-          kind: "video",
-          folder: { path: "", recursive: true },
-        }),
-      );
-      expect(screen.queryByText("Folder: Movie")).toBeNull();
-    } finally {
-      localStorage.removeItem(SMART_COLLECTIONS_KEY);
-    }
+    // Every condition is replaced, the folder included.
+    await waitFor(() =>
+      expect(lastSearch()).toMatchObject({
+        kind: "video",
+        folder: { path: "", recursive: true },
+      }),
+    );
+    expect(screen.queryByText("Folder: Movie")).toBeNull();
   });
 
   it("opens a saved search at its folder", async () => {
-    localStorage.setItem(
-      SMART_COLLECTIONS_KEY,
-      JSON.stringify([
-        {
-          id: "1",
-          name: "Movie videos",
-          query: { kind: "video", folder: { path: "Movie", recursive: true } },
-          workspaceId: WS_ID,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ]),
+    smart.collections = [
+      {
+        id: "1",
+        name: "Movie videos",
+        query: { kind: "video", folder: { path: "Movie", recursive: true } },
+        workspaceId: WS_ID,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("folder-card");
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Smart collections" }),
+      { button: 0, ctrlKey: false },
     );
-    try {
-      renderWithProviders(<AppRoutes />);
-      await screen.findByTestId("folder-card");
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: /^Movie videos/ }),
+    );
 
-      fireEvent.pointerDown(
-        screen.getByRole("button", { name: "Smart collections" }),
-        { button: 0, ctrlKey: false },
-      );
-      fireEvent.click(
-        await screen.findByRole("menuitem", { name: /^Movie videos/ }),
-      );
-
-      await waitFor(() =>
-        expect(lastSearch()).toMatchObject({
-          kind: "video",
-          folder: { path: "Movie", recursive: true },
-        }),
-      );
-      expect(await screen.findByText("Folder: Movie")).toBeTruthy();
-    } finally {
-      localStorage.removeItem(SMART_COLLECTIONS_KEY);
-    }
+    await waitFor(() =>
+      expect(lastSearch()).toMatchObject({
+        kind: "video",
+        folder: { path: "Movie", recursive: true },
+      }),
+    );
+    expect(await screen.findByText("Folder: Movie")).toBeTruthy();
   });
 
   it("opens Discovery scoped to the folder shown", async () => {
@@ -1638,47 +1640,38 @@ describe("Home graph view", () => {
     // The graph has no folder form: applied there, the folder would be dropped
     // and the graph would show the whole workspace under the search's name.
     localStorage.setItem(VIEW_KEY, "graph");
-    localStorage.setItem(
-      SMART_COLLECTIONS_KEY,
-      JSON.stringify([
-        {
-          id: "1",
-          name: "Movie videos",
-          query: { kind: "video", folder: { path: "Movie", recursive: true } },
-          workspaceId: WS_ID,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ]),
-    );
+    smart.collections = [
+      {
+        id: "1",
+        name: "Movie videos",
+        query: { kind: "video", folder: { path: "Movie", recursive: true } },
+        workspaceId: WS_ID,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
     mocks.foldersList.mockResolvedValue({
       path: "Movie",
       folders: [],
       fileCount: 1,
     });
-    try {
-      renderWithProviders(<AppRoutes />);
-      await screen.findByTestId("graph-view");
-      fireEvent.pointerDown(
-        screen.getByRole("button", { name: "Smart collections" }),
-        { button: 0, ctrlKey: false },
-      );
-      fireEvent.click(
-        await screen.findByRole("menuitem", { name: /^Movie videos/ }),
-      );
-      await waitFor(() =>
-        expect(screen.queryByTestId("graph-view")).toBeNull(),
-      );
-      expect(localStorage.getItem(VIEW_KEY)).toBe("grid");
-      await waitFor(() =>
-        expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).toMatchObject({
-          kind: "video",
-          folder: { path: "Movie", recursive: true },
-        }),
-      );
-    } finally {
-      localStorage.removeItem(SMART_COLLECTIONS_KEY);
-    }
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("graph-view");
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Smart collections" }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: /^Movie videos/ }),
+    );
+    await waitFor(() => expect(screen.queryByTestId("graph-view")).toBeNull());
+    expect(localStorage.getItem(VIEW_KEY)).toBe("grid");
+    await waitFor(() =>
+      expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).toMatchObject({
+        kind: "video",
+        folder: { path: "Movie", recursive: true },
+      }),
+    );
   });
 
   it("swaps the list for the graph, off the folder view, and back", async () => {

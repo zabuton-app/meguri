@@ -4,7 +4,7 @@
 // startApp() in electron/app.ts.
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { RouteObject } from "react-router";
 import { ThemeProvider } from "@/themes/ThemeProvider";
 import { I18nProvider } from "@/i18n/I18nProvider";
@@ -14,12 +14,13 @@ import { TourProvider } from "@/tour/TourProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import log from "@/lib/logger";
 import App from "@/App";
-import { createAppRouter } from "@/appRouter";
+import { createAppRouter, type AppRouter } from "@/appRouter";
 import {
   ExtraSettingsSectionsProvider,
   type SettingsSection,
 } from "@/settings/extraSections";
 import { logoImagesQuery } from "@/hooks/useLogo";
+import { smartCollectionsQuery } from "@/hooks/useSmartCollections";
 import { createRendererQueryClient } from "@/lib/queryClient";
 import { Toaster } from "sonner";
 import "@/styles.css";
@@ -61,7 +62,23 @@ export function renderApp(options: RenderAppOptions = {}): void {
   const router = createAppRouter(options.routes);
   const settingsSections = options.settingsSections ?? [];
 
-  ReactDOM.createRoot(document.getElementById("root")!).render(
+  const root = ReactDOM.createRoot(document.getElementById("root")!);
+  // The saved searches come from main: the list opens on the default one
+  // (initialFilter), so they are loaded before the first render. Asked once:
+  // when that fails, the window opens anyway, and Home asks again and applies
+  // the default when it arrives.
+  void queryClient
+    .prefetchQuery({ ...smartCollectionsQuery, retry: false })
+    .finally(() => render(root, queryClient, router, settingsSections));
+}
+
+function render(
+  root: ReactDOM.Root,
+  queryClient: QueryClient,
+  router: AppRouter,
+  settingsSections: readonly SettingsSection[],
+): void {
+  root.render(
     <React.StrictMode>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>

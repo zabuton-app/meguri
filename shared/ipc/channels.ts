@@ -18,6 +18,7 @@ import type {
   MissingFilesResult,
   SceneBookmark,
   SearchResult,
+  StoredSmartCollections,
   TagList,
   UpdateInfo,
   UserCollection,
@@ -35,6 +36,7 @@ import {
   HistoryQuerySchema,
   LogoIdSchema,
   SearchQuerySchema,
+  SmartCollectionSchema,
   AutoTagConfigSchema,
   ExclusionPatternSchema,
   TagRefSchema,
@@ -323,6 +325,16 @@ export const ChannelInputs = {
     targets: BulkTargets,
     op: z.enum(["add", "remove"]),
   }),
+  smart_collections_list: z.void(),
+  // What an earlier version kept in the renderer's localStorage, moved in
+  // once (see smartCollectionStore.ts).
+  smart_collections_import: z.object({
+    collections: z.array(SmartCollectionSchema),
+    defaultId: z.string().nullable(),
+  }),
+  smart_collection_add: z.object({ collection: SmartCollectionSchema }),
+  smart_collection_remove: z.object({ id: z.string() }),
+  smart_collection_set_default: z.object({ id: z.string().nullable() }),
   // Renderer always sends an object; default-{} makes the schema tolerant of
   // future call sites that omit the arg entirely.
   scan_start: z
@@ -675,6 +687,12 @@ export interface ChannelOutputs {
   collection_remove_file: void;
   /** Files whose membership actually changed (already-members are not counted). */
   collection_set_membership: { changed: number };
+  /** `needsImport` until localStorage's have been moved in (smart_collections_import). */
+  smart_collections_list: StoredSmartCollections & { needsImport: boolean };
+  smart_collections_import: StoredSmartCollections;
+  smart_collection_add: StoredSmartCollections;
+  smart_collection_remove: StoredSmartCollections;
+  smart_collection_set_default: StoredSmartCollections;
   scan_start: string;
   scan_cancel: void;
   /** Workspaces whose last scan could not read their folder (#313). */

@@ -210,6 +210,30 @@ export const SearchQuerySchema = z.object({
 });
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 
+/**
+ * A saved search (smart collection), stored in the library's
+ * `smart_collections` table (electron/core/smartCollectionStore.ts).
+ */
+export const SmartCollectionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  query: SearchQuerySchema,
+  /**
+   * The workspace `query.folder` lies in. A folder path means nothing outside
+   * its own workspace, so it is saved only together with one.
+   */
+  workspaceId: z.string().optional(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+export type SmartCollection = z.infer<typeof SmartCollectionSchema>;
+
+/** The saved searches, newest first, and the one the list opens with. */
+export interface StoredSmartCollections {
+  collections: SmartCollection[];
+  defaultId: string | null;
+}
+
 export const HistoryQuerySchema = z.object({
   via: z.enum(["browser", "external"]).optional(),
   cursor: z.number().int().min(0).optional(),

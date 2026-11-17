@@ -1,18 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/locales/en";
 import { pickMessage } from "@/i18n/message";
 import {
   cleanSearchQuery,
   DEFAULT_SMART_COLLECTION_KEY,
   defaultQueryOf,
-  loadInitialFilter,
   type SmartCollection,
   describeSearchQuery,
   hasFilterConditions,
   hasSearchConditions,
   makeSmartCollection,
   parseSmartCollections,
-  saveSmartCollections,
+  readLegacySmartCollections,
   SMART_COLLECTIONS_KEY,
 } from "@/lib/smartCollections";
 
@@ -57,22 +56,48 @@ describe("smartCollections", () => {
     expect(parseSmartCollections(JSON.stringify([{ id: 1 }]))).toEqual([]);
   });
 
-  it("saveSmartCollections round-trips through localStorage", () => {
+  it("parseSmartCollections keeps the entries that validate", () => {
     const collection = makeSmartCollection("Favorites", { favorite: true });
-    saveSmartCollections([collection]);
-    const raw = localStorage.getItem(SMART_COLLECTIONS_KEY);
-    expect(raw).toBeTruthy();
-    expect(parseSmartCollections(raw)).toEqual([collection]);
+    expect(
+      parseSmartCollections(JSON.stringify([{ id: 1 }, collection])),
+    ).toEqual([collection]);
+  });
+
+  it("reads what an earlier version left in localStorage", () => {
+    const collection = makeSmartCollection("Favorites", { favorite: true });
+    try {
+      localStorage.setItem(SMART_COLLECTIONS_KEY, JSON.stringify([collection]));
+      localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, collection.id);
+      expect(readLegacySmartCollections()).toEqual({
+        collections: [collection],
+        defaultId: collection.id,
+      });
+    } finally {
+      localStorage.removeItem(SMART_COLLECTIONS_KEY);
+      localStorage.removeItem(DEFAULT_SMART_COLLECTION_KEY);
+    }
+    expect(readLegacySmartCollections()).toEqual({
+      collections: [],
+      defaultId: null,
+    });
+  });
+
+  it("reads nothing from localStorage that cannot be read", () => {
+    const getItem = vi.spyOn(localStorage, "getItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    try {
+      expect(readLegacySmartCollections()).toBeNull();
+    } finally {
+      getItem.mockRestore();
+    }
   });
 
   it("keeps an ext: directive through saving and reopening (#538)", () => {
     // The directive lives in `q`, so a saved search must hand it back intact
     // for the main process to apply.
     const collection = makeSmartCollection("MP4", { q: "ext:mp4" });
-    saveSmartCollections([collection]);
-    const [saved] = parseSmartCollections(
-      localStorage.getItem(SMART_COLLECTIONS_KEY),
-    );
+    const [saved] = parseSmartCollections(JSON.stringify([collection]));
     expect(saved.query.q).toBe("ext:mp4");
   });
 
@@ -224,13 +249,6 @@ describe("the default saved search", () => {
   it("is absent with no default or a deleted one", () => {
     expect(defaultQueryOf([saved], null)).toBeNull();
     expect(defaultQueryOf([saved], "gone")).toBeNull();
-  });
-
-  it("is what the list starts with", () => {
-    expect(loadInitialFilter()).toEqual({});
-    saveSmartCollections([saved]);
-    localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, "d1");
-    expect(loadInitialFilter()).toEqual({ kind: "video", sort: "btime" });
   });
 
   it("drops a manual sort, which exists only inside a collection", () => {

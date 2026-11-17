@@ -102,8 +102,10 @@ In the library (`LIB_DDL`):
 - `app_settings` — the app's settings (see [App settings](#app-settings)).
 - `collections`, `collection_items` — user collections and their files, in
   order (`position`; see [App settings](#app-settings)).
+- `smart_collections` — saved searches, newest first (`position`), and which
+  one is the default (see [App settings](#app-settings)).
 
-The last three are created by `openSettingsDb()`, not `LIB_DDL`: they are read
+The last four are created by `openSettingsDb()`, not `LIB_DDL`: they are read
 before any workspace attaches the library.
 
 ## Versionless migrations
@@ -334,6 +336,18 @@ load; a row that is not a list is dropped and the tables kept. An import always
 writes the row, so a `config.json` without collections replaces them with none,
 as it replaces every setting. Collections that cannot be read at startup are
 served empty and not written for the session.
+
+Smart collections (saved searches) have a table of their own too
+(`electron/core/smartCollectionStore.ts`): one row each, the `SearchQuery` as
+JSON in `query`, and `is_default` on the one the list opens with (a partial
+unique index keeps it to one). Each row is validated with
+`SmartCollectionSchema` when it is read, so one that does not leaves the rest.
+An earlier version kept them in the renderer's `localStorage`; the first launch
+with no record of the move (`_smart_collections_imported_at` in
+`app_settings`) moves them in and records it in the same transaction, unless
+the table already holds some, which are kept. `localStorage` is not read again
+after that, nor cleared, for an older version to start from. Unlike a setting,
+a write that fails throws, and the renderer reports it.
 
 Being in the library, the settings share its backups and are rolled back with
 it when a damaged library is put back from a copy. The settings create the
