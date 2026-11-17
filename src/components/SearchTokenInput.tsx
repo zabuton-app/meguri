@@ -3,8 +3,18 @@
 // means anything as a whole: backspacing through the middle of one turns an
 // exact match into a substring search that also hits file names, with nothing
 // on screen to say so.
-// While one is being typed the box completes it from the tag catalog.
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+// While one is being typed the box completes it from the tag catalog. An
+// ordinary word at the end of the text is offered the tags it matches too
+// (#542), below a first row that searches for the word itself, so Enter still
+// does what it does without the list, and which row it takes is on screen.
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Search, X } from "lucide-react";
 import {
   EXT_SEARCH_PREFIX,
@@ -26,8 +36,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useTagCompletions } from "@/hooks/useTagCompletions";
 import { TagSuggestionLabel } from "@/components/TagSuggestionLabel";
-import { generatedTagChipLabel, searchTokenLabel } from "@/lib/tagLabel";
-import { pendingDirective, splitQueryChips } from "@/lib/searchTokens";
+import {
+  generatedTagChipLabel,
+  searchTokenLabel,
+  tagNamespaceLabel,
+} from "@/lib/tagLabel";
+import {
+  namespaceSuggestions,
+  pendingDirective,
+  plainWordAtCaret,
+  splitQueryChips,
+} from "@/lib/searchTokens";
 import { onHighlightSearchToken } from "@/lib/ui-events";
 
 interface Props {
@@ -57,6 +76,10 @@ export function SearchTokenInput({
     splitQueryChips(value),
   );
   const [seen, setSeen] = useState(value);
+  // Whether the caret is at the end of the text: completion runs only there,
+  // since a pick replaces the last token and not one being edited earlier.
+  // Text set from elsewhere leaves the caret at its end.
+  const [caretAtEnd, setCaretAtEnd] = useState(true);
   if (value !== seen) {
     // React's sanctioned "adjust state when a prop changes" pattern, not a
     // mistake: setting state during render of the *same* component restarts
@@ -65,11 +88,19 @@ export function SearchTokenInput({
     // the user is typing into.
     setSeen(value);
     setState(splitQueryChips(value));
+    setCaretAtEnd(true);
   }
 
   const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [active, setActive] = useState(0);
+  // The highlighted option, with the list it was highlighted in. A list that
+  // closes drops it, and one that opens or changes starts from its first row
+  // again (the word's own search, over a word), so no highlight is ever left
+  // over from another list.
+  const [active, setActiveFor] = useState<{
+    list: string;
+    index: number;
+  } | null>(null);
   // Index of the chip the arrow keys have walked back onto, or null while the
   // caret is in the text. Focus stays in the input throughout: the chips are a
   // rendering of the query string, not widgets of their own.
@@ -92,10 +123,62 @@ export function SearchTokenInput({
     [],
   );
 
-  const pending = focused && picked === null ? pendingDirective(draft) : null;
+  // Completion runs only with the caret at the end of the text (caretAtEnd),
+  // and not while an input method composes: the text is not final yet, and
+  // its own candidate window opens where the list would.
+  const [composing, setComposing] = useState(false);
+  const completing = focused && picked === null && caretAtEnd && !composing;
+  const directiveValue = completing
+    ? (pendingDirective(draft)?.value ?? null)
+    : null;
+  const word =
+    completing && directiveValue === null ? plainWordAtCaret(draft) : null;
+  // One object per value, so the completions are not filtered again on every
+  // render. A word matches tag names only: the namespaces it would also hit
+  // (`au` in `audio_genre`) are not what the list shows.
+  const pending = useMemo(
+    () =>
+      directiveValue !== null
+        ? { value: directiveValue }
+        : word !== null
+          ? { value: word, namesOnly: true }
+          : null,
+    [directiveValue, word],
+  );
   const { suggestions, held } = useTagCompletions(pending);
-  const open = !dismissed && suggestions.length > 0;
-  const activeIndex = Math.min(active, suggestions.length - 1);
+  // A word that begins a generated namespace's name or label (`tempo`,
+  // `テンポ`) is offered the namespace's directive (`tag:audio_tempo:`), the
+  // first of two steps: once it is picked, its values are offered.
+  const namespaces = useMemo(
+    () =>
+      word === null
+        ? []
+        : namespaceSuggestions(word, (ns) => tagNamespaceLabel(t, ns)),
+    [word, t],
+  );
+  const open = !dismissed && (suggestions.length > 0 || namespaces.length > 0);
+  // Over a word, row 0 searches for the word; namespaces and tags follow.
+  const searchRow = word !== null;
+  const offset = searchRow ? 1 : 0;
+  const tagStart = offset + namespaces.length;
+  const count = tagStart + suggestions.length;
+  // Which list is open: its kind, what it completes and what it holds, so a
+  // catalog fetched again in another order is another list.
+  const list =
+    open && pending
+      ? `${offset}:${pending.value}:${[
+          ...namespaces,
+          ...suggestions.map((s) => s.qualified),
+        ].join("\n")}`
+      : null;
+  if (active !== null && active.list !== list) setActiveFor(null);
+  const activeIndex =
+    active !== null && active.list === list
+      ? Math.min(active.index, count - 1)
+      : 0;
+  const setActive = (index: number) => {
+    if (list !== null) setActiveFor({ list, index });
+  };
 
   const commit = (nextChips: string[], nextDraft: string) => {
     // Chips arrive unquoted (splitSearchTokens strips them), so re-quote them
@@ -109,7 +192,7 @@ export function SearchTokenInput({
     setState({ chips: nextChips, text: nextDraft });
     setSeen(q);
     onChange(q);
-    setActive(0);
+    setActiveFor(null);
     setDismissed(false);
     aim(null);
   };
@@ -202,6 +285,56 @@ export function SearchTokenInput({
     [chips, highlight],
   );
 
+  /** Note whether the caret is at the end of the field's text. */
+  const trackCaret = (field: HTMLInputElement) =>
+    setCaretAtEnd(
+      field.selectionStart === field.value.length &&
+        field.selectionEnd === field.value.length,
+    );
+
+  // The row Enter takes is always on screen: one moved to below the list's
+  // height (the word's own row makes eleven) is scrolled into view, within
+  // the list alone (scrollIntoView would scroll the page around it too).
+  const viewport = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = viewport.current;
+    const row = open
+      ? document.getElementById(`${listId}-${activeIndex}`)
+      : null;
+    if (!box || !row) return;
+    const shown = box.getBoundingClientRect();
+    const at = row.getBoundingClientRect();
+    if (at.top < shown.top) box.scrollTop -= shown.top - at.top;
+    else if (at.bottom > shown.bottom)
+      box.scrollTop += at.bottom - shown.bottom;
+  }, [open, activeIndex, listId]);
+
+  /** What Enter does without a list: close the text, keeping focus on a repeat. */
+  const searchText = () => {
+    // Leaving the field clears the highlight, so a repeat keeps focus: Enter
+    // on a condition already on would otherwise look like the box ate it —
+    // the one failure the user cannot see.
+    if (apply(draft, true) === null) inputRef.current?.blur();
+  };
+
+  /** Take the option at `index`: the word's own search, a namespace, or a tag. */
+  const take = (index: number) => {
+    if (index < offset) searchText();
+    else if (index < tagStart) startNamespace(namespaces[index - offset]);
+    else accept(suggestions[index - tagStart]);
+  };
+
+  /**
+   * Swap the word for the start of a directive on `ns`, left open so that
+   * its values are offered next.
+   */
+  const startNamespace = (ns: string) => {
+    const tokens = splitSearchTokens(draft);
+    tokens[tokens.length - 1] = `${TAG_SEARCH_PREFIX}:${ns}:`;
+    apply(joinSearchTokens(tokens));
+    inputRef.current?.focus();
+  };
+
   /** Swap the directive under the caret for the chosen tag and chip it. */
   const accept = (tag: TagSummary) => {
     const tokens = splitSearchTokens(draft);
@@ -291,12 +424,26 @@ export function SearchTokenInput({
         ref={inputRef}
         value={draft}
         onChange={(e) => apply(e.target.value)}
-        onFocus={() => setFocused(true)}
+        onSelect={(e) => trackCaret(e.currentTarget)}
+        onCompositionStart={() => setComposing(true)}
+        onCompositionEnd={() => setComposing(false)}
+        onFocus={(e) => {
+          setFocused(true);
+          trackCaret(e.currentTarget);
+        }}
         onBlur={() => {
           setFocused(false);
           aim(null);
         }}
         onKeyDown={(e) => {
+          // Keys that pick a conversion in an input method are the IME's.
+          // Chromium marks them isComposing, the one that confirms it too
+          // (keyCode 229 is not checked: some Linux input methods send every
+          // key as 229). An Esc that cancels a conversion stays in the field.
+          if (e.nativeEvent.isComposing) {
+            if (e.key === "Escape") e.stopPropagation();
+            return;
+          }
           // The caret is at the very start with nothing selected, so Left and
           // Backspace have nothing left to act on in the text — that is the
           // moment they start walking back over the chips instead.
@@ -335,21 +482,17 @@ export function SearchTokenInput({
           } else if (open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
             e.preventDefault();
             const step = e.key === "ArrowDown" ? 1 : -1;
-            setActive(
-              (activeIndex + step + suggestions.length) % suggestions.length,
-            );
-          } else if (open && e.key === "Tab" && !e.shiftKey) {
-            // Tab completes, as it does in a shell. preventDefault keeps the
-            // caret here so the next condition can be typed straight away;
-            // Shift+Tab still means "leave", and blurring closes the list.
+            setActive((activeIndex + step + count) % count);
+          } else if (open && !searchRow && e.key === "Tab" && !e.shiftKey) {
+            // After `tag:`, Tab completes, as it does in a shell.
+            // preventDefault keeps the caret here so the next condition can be
+            // typed straight away; Shift+Tab still means "leave", and blurring
+            // closes the list. Over a word Tab leaves, as in any field.
             e.preventDefault();
             accept(suggestions[activeIndex]);
           } else if (e.key === "Enter") {
-            if (open) accept(suggestions[activeIndex]);
-            // Leaving the field clears the highlight, so a repeat keeps focus:
-            // Enter on a condition already on would otherwise look like the box
-            // ate it — the one failure the user cannot see.
-            else if (apply(draft, true) === null) e.currentTarget.blur();
+            if (open) take(activeIndex);
+            else searchText();
           } else if (e.key === "Backspace" && atStart && chips.length > 0) {
             // Highlight rather than delete: the chip is about to disappear with
             // no undo, and one more Backspace confirms it.
@@ -383,23 +526,73 @@ export function SearchTokenInput({
             type="auto"
             className="page-scroll flex min-h-0 flex-1 flex-col"
             viewportClassName="min-h-0 flex-1 py-1"
+            viewportRef={viewport}
           >
             <ul
               id={listId}
               role="listbox"
               aria-label={t("filter.tagSuggestions")}
             >
+              {searchRow && (
+                <li
+                  id={`${listId}-0`}
+                  role="option"
+                  aria-selected={activeIndex === 0}
+                  onMouseMove={() => {
+                    if (activeIndex !== 0) setActive(0);
+                  }}
+                  onClick={searchText}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 px-2 py-1 text-sm",
+                    activeIndex === 0 && "bg-fg/10",
+                  )}
+                >
+                  <Search className="size-3.5 shrink-0 text-muted" />
+                  <span className="truncate">
+                    {/* The whole text, which is what it searches for. */}
+                    {t("command.searchFor", { q: draft.trim() })}
+                  </span>
+                </li>
+              )}
+              {namespaces.map((ns, i) => (
+                <li
+                  key={ns}
+                  id={`${listId}-${i + offset}`}
+                  role="option"
+                  aria-selected={i + offset === activeIndex}
+                  onMouseMove={() => {
+                    if (activeIndex !== i + offset) setActive(i + offset);
+                  }}
+                  onClick={() => startNamespace(ns)}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 px-2 py-1 text-sm",
+                    i + offset === activeIndex && "bg-fg/10",
+                  )}
+                >
+                  <span className="truncate">
+                    <span className="text-muted">{TAG_SEARCH_PREFIX}:</span>
+                    {ns}:
+                  </span>
+                  <span className="truncate text-xs text-muted">
+                    {tagNamespaceLabel(t, ns)}
+                  </span>
+                </li>
+              ))}
               {suggestions.map((tag, i) => (
                 <li
                   key={tag.qualified}
-                  id={`${listId}-${i}`}
+                  id={`${listId}-${i + tagStart}`}
                   role="option"
-                  aria-selected={i === activeIndex}
-                  onMouseEnter={() => setActive(i)}
+                  aria-selected={i + tagStart === activeIndex}
+                  // Moved, not entered: a list opening under a still pointer
+                  // must not take the highlight from its first row.
+                  onMouseMove={() => {
+                    if (activeIndex !== i + tagStart) setActive(i + tagStart);
+                  }}
                   onClick={() => accept(tag)}
                   className={cn(
                     "flex cursor-pointer items-center gap-2 px-2 py-1 text-sm",
-                    i === activeIndex && "bg-fg/10",
+                    i + tagStart === activeIndex && "bg-fg/10",
                     // Offered, but with a word of warning: nothing here carries it.
                     !held(tag) && "text-muted",
                   )}

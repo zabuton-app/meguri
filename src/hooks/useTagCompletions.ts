@@ -25,8 +25,12 @@ export function useTagCompletions(
   const status = useAppStatus();
   // The catalog of the whole library, not of the view: a tag held in another
   // workspace is still a tag to look for. Under the tag management screen's
-  // key, so every tag mutation invalidates it as it does that screen's;
-  // `enabled` keeps it unfetched until a directive is actually being typed.
+  // key, so every tag mutation (and the end of a scan) invalidates it as it
+  // does that screen's; `enabled` keeps it unfetched until something is being
+  // completed. Kept for a minute: an ordinary word asks for it (#542), and
+  // every new word would otherwise query every workspace again. Removing a
+  // workspace or purging missing files invalidates it as well; the minute
+  // bounds what other changes leave stale (deleting one file, for one).
   // Filtering client-side beats a round trip per keystroke — the catalog is
   // capped at MAX_TAG_LIST. Past the cap the view's own tags are kept first,
   // so the key carries the view and a switch fetches the catalog again.
@@ -35,6 +39,7 @@ export function useTagCompletions(
     queryKey: ["tags_list_all", "library", viewId],
     queryFn: () => api.tagsListAll({ allWorkspaces: true }),
     enabled: (status.data?.ready ?? false) && pending !== null,
+    staleTime: 60_000,
   });
   // Whether a tag is on view: in the workspace shown, or anywhere when all of
   // them (or a collection, which spans them) is.

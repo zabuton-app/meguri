@@ -204,6 +204,9 @@ export function WorkspaceRail() {
       toast.success(t("workspace.removedToast"), {
         description: t("workspace.removedToastDetail", { label }),
       });
+      // Tags held only by the workspace that went are no longer there to
+      // complete (a switch leaves the catalog as it is).
+      void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
       void refreshAll();
     },
   });

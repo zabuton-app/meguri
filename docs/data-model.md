@@ -491,10 +491,33 @@ both. The match is a case-insensitive substring — a tag is as often remembered
 a word in the middle of it — ranked prefix-first then by file count, and capped
 at `MAX_TAG_SUGGESTIONS`. Tab or Enter accepts the highlighted candidate and
 chips it; Tab preventDefaults so the caret stays put for the next condition,
-while Shift+Tab still leaves the field. The candidates come from a
-`tags_list_all` catalog fetched once (under the tag screen's query-key prefix,
-so every tag mutation invalidates it too) and filtered in the renderer: one
-query instead of one per keystroke, and correct in the `All` view and in
+while Shift+Tab still leaves the field.
+
+An ordinary word at the end of the text (two characters, or one in Han, kana
+or Hangul; not one with `|` alternatives) is offered the tags whose **names**
+contain it too (#542), compared as tag names are (`tagIdentityKey`), below a
+first row that searches for the whole text. That row is the one highlighted to
+begin with, so Enter does what it does with no list, and the row it takes is
+always the one on screen: the arrow keys and a moving pointer move the
+highlight, the highlighted row is scrolled into view, and picking a tag
+replaces the word with that tag's chip. The highlight belongs to the list it
+was made in: a list that closes drops it, and one that opens or changes starts
+from its first row. Over a word Tab leaves the field, as in any field; after
+`tag:` it completes. Completion waits while an input method composes (its keys
+are left to it, but an Esc stays in the field) and runs only with the caret at
+the end of the text, since a pick replaces the last token.
+
+A word that begins a generated namespace's name (without `audio_`, or in full
+once a `_` is typed) or its label in the app's language is also offered that
+namespace's directive (`tempo` → `tag:audio_tempo:`), between the first row and
+the tags. Picking it leaves the directive open, so its values are offered next:
+the whole set for a closed one. Only a beginning counts, so `au` does not list
+every `audio_` namespace.
+
+The candidates come from a `tags_list_all` catalog (under the tag screen's
+query-key prefix, so every tag mutation and the end of a scan invalidate it
+too), kept for a minute, and filtered in the renderer: one query instead of
+one per keystroke, and correct in the `All` view and in
 collections, where a workspace-scoped `tags_list` cannot resolve a database at
 all. The box asks for the catalog of **every** workspace
 (`tags_list_all` with `allWorkspaces`), so a tag kept in another workspace is

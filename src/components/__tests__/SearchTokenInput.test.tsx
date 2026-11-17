@@ -662,6 +662,20 @@ describe("SearchTokenInput completion", () => {
   });
 });
 
+describe("SearchTokenInput pointer after tag:", () => {
+  it("moves the one highlight with the pointer, as before (#542)", async () => {
+    const { input } = setup();
+    type(input, "tag:");
+    await waitFor(() => expect(options().length).toBeGreaterThan(2));
+    fireEvent.mouseMove(options()[2]);
+    const selected = options().filter(
+      (o) => o.getAttribute("aria-selected") === "true",
+    );
+    expect(selected).toEqual([options()[2]]);
+    expect(options()[0].className).not.toContain("hover:");
+  });
+});
+
 describe("SearchTokenInput closed value sets (#468)", () => {
   it("offers every value of a closed set, those no file carries yet after", async () => {
     const { input } = setup("", [...CATALOG, tag("lossy", 5, "audio_quality")]);
@@ -684,5 +698,268 @@ describe("SearchTokenInput closed value sets (#468)", () => {
     await waitFor(() => expect(options()).toHaveLength(1));
     fireEvent.click(options()[0]);
     expect(last()).toBe("tag:audio_ch:stereo");
+  });
+});
+
+describe("SearchTokenInput tag suggestions for an ordinary word (#542)", () => {
+  const catalog = [...CATALOG, tag("jazz", 12, "audio_genre"), tag("jazz", 3)];
+  const texts = () => options().map((o) => o.textContent);
+  const selected = () =>
+    options().findIndex((o) => o.getAttribute("aria-selected") === "true");
+  /** Type `word` once the catalog is in, so an empty list means something. */
+  async function ready(input: HTMLInputElement) {
+    type(input, "jazz");
+    await waitFor(() => expect(options()).toHaveLength(3));
+  }
+
+  it("offers the word's own search first, chosen, then the tags it matches", async () => {
+    const { input } = setup("", catalog);
+    await ready(input);
+    expect(texts()[0]).toBe("Search for “jazz”");
+    expect(texts()[1]).toContain("Genre: jazz");
+    expect(texts()[2]).toMatch(/^tag:jazz/);
+    expect(selected()).toBe(0);
+  });
+
+  it("searches for the word on Enter, as without the list", async () => {
+    const { input, last } = setup("", catalog);
+    await ready(input);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips()).toHaveLength(0);
+    expect(last()).toBe("jazz");
+  });
+
+  it("takes the tag the arrow keys went to, in place of the word", async () => {
+    const { input, last } = setup("", catalog);
+    type(input, "sunset jazz");
+    await waitFor(() => expect(options()).toHaveLength(3));
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(selected()).toBe(1);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips().map((c) => c.textContent)).toEqual(["Genre: jazz"]);
+    expect(last()).toBe("tag:audio_genre:jazz sunset");
+  });
+
+  it("moves the choice with the pointer, which is always the row Enter takes", async () => {
+    const { input } = setup("", catalog);
+    await ready(input);
+    // A list opening under a still pointer: entered, not moved over.
+    fireEvent.mouseEnter(options()[2]);
+    expect(selected()).toBe(0);
+    fireEvent.mouseMove(options()[2]);
+    expect(selected()).toBe(2);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips().map((c) => c.textContent)).toEqual(["tag:jazz"]);
+  });
+
+  it("names the whole text in the first row, which is what it searches for", async () => {
+    const { input } = setup("", catalog);
+    type(input, "sunset jazz");
+    await waitFor(() => expect(options()).toHaveLength(3));
+    expect(texts()[0]).toBe("Search for “sunset jazz”");
+  });
+
+  it("starts again from the first row when the list comes back", async () => {
+    const { input, last } = setup("", catalog);
+    type(input, "sunset jazz");
+    await waitFor(() => expect(options()).toHaveLength(3));
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    // Off to an earlier word, which closes the list, and back.
+    input.setSelectionRange(3, 3);
+    fireEvent.select(input);
+    input.setSelectionRange(11, 11);
+    fireEvent.select(input);
+    expect(selected()).toBe(0);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chips()).toHaveLength(0);
+    expect(last()).toBe("sunset jazz");
+  });
+
+  it("compares a word as tag names are, invisible characters and all", async () => {
+    const { input } = setup("", catalog);
+    await ready(input);
+    type(input, "ja\u200bzz");
+    expect(options()).toHaveLength(3);
+  });
+
+  it("searches for the word from its own row too", async () => {
+    const { input, last } = setup("", catalog);
+    await ready(input);
+    fireEvent.click(options()[0]);
+    expect(chips()).toHaveLength(0);
+    expect(last()).toBe("jazz");
+  });
+
+  it("leaves Tab to move on over a word", async () => {
+    const { input } = setup("", catalog);
+    await ready(input);
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    // Not prevented: the browser moves focus on as usual.
+    expect(fireEvent.keyDown(input, { key: "Tab" })).toBe(true);
+    expect(chips()).toHaveLength(0);
+  });
+
+  it("leaves an input method alone while it composes", async () => {
+    const { input, last } = setup("", catalog);
+    await ready(input);
+    // Picking and confirming a conversion.
+    fireEvent.keyDown(input, { key: "ArrowDown", isComposing: true });
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(chips()).toHaveLength(0);
+    // No list over text that is not final yet.
+    fireEvent.compositionStart(input);
+    expect(options()).toHaveLength(0);
+    fireEvent.compositionEnd(input);
+    expect(options()).toHaveLength(3);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(last()).toBe("jazz");
+  });
+
+  it("takes keys sent as 229 outside a composition, as Linux input methods send them", async () => {
+    const { input } = setup("", catalog);
+    await ready(input);
+    fireEvent.keyDown(input, { key: "ArrowDown", keyCode: 229 });
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+    expect(chips()).toHaveLength(1);
+  });
+
+  it("scrolls the list, and only the list, to the row it highlights", async () => {
+    // The list shows 288px; each row is 28px, the last one below the fold.
+    const rect = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: Element) {
+        const box = (top: number, bottom: number) =>
+          ({ top, bottom }) as DOMRect;
+        if (this.getAttribute("data-slot") === "scroll-area-viewport")
+          return box(0, 288);
+        if (this.getAttribute("role") === "option")
+          return /^tag:jazz/.test(this.textContent ?? "")
+            ? box(300, 328)
+            : box(0, 28);
+        return box(0, 0);
+      });
+    const page = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    try {
+      const { input } = setup("", catalog);
+      await ready(input);
+      // Up from the first row wraps to the last.
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      const viewport = document.querySelector<HTMLElement>(
+        '[data-slot="scroll-area-viewport"]',
+      );
+      expect(viewport?.scrollTop).toBe(40);
+      expect(page).not.toHaveBeenCalled();
+    } finally {
+      rect.mockRestore();
+      page.mockRestore();
+    }
+  });
+
+  it("starts again from the first row when the list is fetched again in another order", async () => {
+    const { input, qc } = setup("", catalog);
+    await ready(input);
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(selected()).toBe(1);
+    // The same word, its tags in another order (a count changed, say).
+    qc.setQueryData(["tags_list_all", "library", "ws-test"], {
+      tags: [...CATALOG, tag("jazz", 3), tag("jazz", 1, "audio_genre")],
+      truncated: false,
+    });
+    await waitFor(() => expect(texts()[1]).toMatch(/^tag:jazz/));
+    expect(selected()).toBe(0);
+  });
+
+  it("offers a namespace a word begins, then that namespace's values", async () => {
+    const { input } = setup("", CATALOG);
+    type(input, "tempo");
+    await waitFor(() => expect(options()).toHaveLength(2));
+    expect(options()[1].textContent).toMatch(/^tag:audio_tempo:/);
+    // The first step: ArrowDown and Enter start the directive, not a chip.
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(input.value).toBe("tag:audio_tempo:");
+    expect(chips()).toHaveLength(0);
+    // The second: the closed set's values, held or not.
+    await waitFor(() =>
+      expect(options().map((o) => o.textContent)).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/slow/),
+          expect.stringMatching(/moderate/),
+          expect.stringMatching(/fast/),
+        ]),
+      ),
+    );
+  });
+
+  it("offers a namespace by its full name once a _ is typed", async () => {
+    const { input } = setup("", CATALOG);
+    type(input, "audio_te");
+    await waitFor(() => expect(options()).toHaveLength(2));
+    expect(options()[1].textContent).toMatch(/^tag:audio_tempo:/);
+  });
+
+  it("does not offer every audio namespace for a part of their prefix", async () => {
+    const { input } = setup("", [...CATALOG, tag("autumn", 2)]);
+    type(input, "au");
+    await waitFor(() => expect(options()).toHaveLength(2));
+    expect(options()[1].textContent).toMatch(/^tag:autumn/);
+  });
+
+  it("keeps an Esc that cancels a conversion in the field", async () => {
+    const { input } = setup("", catalog);
+    await ready(input);
+    const outside = vi.fn();
+    window.addEventListener("keydown", outside);
+    try {
+      fireEvent.keyDown(input, { key: "Escape", isComposing: true });
+      expect(outside).not.toHaveBeenCalled();
+      expect(options()).toHaveLength(3);
+    } finally {
+      window.removeEventListener("keydown", outside);
+    }
+  });
+
+  it("ranks a tag the word begins, compared as names are, first", async () => {
+    const { input } = setup("", [
+      tag("my beach", 50),
+      tag("beach", 1),
+      ...CATALOG,
+    ]);
+    type(input, "be\u200bach");
+    await waitFor(() => expect(options().length).toBeGreaterThan(2));
+    // Row 0 is the word's own search; the prefix hit outranks the busier one.
+    expect(options()[1].textContent).toMatch(/^tag:beach/);
+  });
+
+  it("matches tag names, not the namespaces a word would hit", async () => {
+    const { input } = setup("", catalog);
+    await ready(input);
+    // `au` is in `audio_genre`, not in any name.
+    type(input, "au");
+    expect(options()).toHaveLength(0);
+  });
+
+  it("offers nothing for one Latin letter, an accented one or alternatives, but does for one CJK character", async () => {
+    const { input } = setup("", [...catalog, tag("猫", 4), tag("été", 2)]);
+    await ready(input);
+    for (const word of ["j", "é", "e\u0301", "rock|jazz"]) {
+      type(input, word);
+      expect(options()).toHaveLength(0);
+    }
+    type(input, "猫");
+    expect(options()).toHaveLength(2);
+  });
+
+  it("offers nothing while the caret is back in an earlier word", async () => {
+    const { input } = setup("", catalog);
+    type(input, "sunset jazz");
+    await waitFor(() => expect(options()).toHaveLength(3));
+    // A pick replaces the last word, so none is offered for an earlier one.
+    input.setSelectionRange(3, 3);
+    fireEvent.select(input);
+    expect(options()).toHaveLength(0);
+    input.setSelectionRange(11, 11);
+    fireEvent.select(input);
+    expect(options()).toHaveLength(3);
   });
 });
