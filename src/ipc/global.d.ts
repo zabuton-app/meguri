@@ -10,6 +10,8 @@ declare global {
       appGlyph: string;
       /** The media server's origin (http://127.0.0.1:<port>), or "" if it failed to start. */
       mediaOrigin: string;
+      /** When the main process started (its performance.timeOrigin, epoch ms); 0 if not passed. */
+      startupOrigin: number;
       invoke<T = unknown>(channel: string, args?: unknown): Promise<T>;
       on(channel: string, cb: (payload: unknown) => void): () => void;
       setZoomFactor(factor: number): void;

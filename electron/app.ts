@@ -66,6 +66,7 @@ import {
   APP_GLYPH_ARG,
   APP_NAME_ARG,
   MEDIA_ORIGIN_ARG,
+  STARTUP_ORIGIN_ARG,
   extraChannelArgs,
   type ExtraChannels,
 } from "../shared/ipc/channelNames.js";
@@ -74,6 +75,11 @@ import type {
   LibraryMergeProgress,
   LogoId,
 } from "../shared/ipc/schema.js";
+import {
+  STARTUP_MARK_PREFIX,
+  formatStartupLine,
+  startupMarks,
+} from "../shared/startupTiming.js";
 
 /** What sets one app apart from another built on this main process. */
 /**
@@ -168,6 +174,8 @@ export interface SetupContext extends IpcContext {
 
 /** Start the app. Call once, from the entry point, before anything else runs. */
 export function startApp(options: AppOptions): void {
+  // Startup timing (#558): the time until here is loading the main script.
+  markStartup("script");
   // userData follows the app name at the moment it is first resolved, so
   // resolve and pin it before anything can rename the app: it stays
   // <appData>/ plus package.json's name (~/.config/meguri for Meguri) and no
@@ -627,6 +635,8 @@ export function startApp(options: AppOptions): void {
   }
 
   function createWindow(): void {
+    // The window startup makes, not one made after it failed (showWindow()).
+    const firstWindow = mainWindow === null && !startupFailed;
     const { logo } = loadConfig();
     rendererReloadTimes = []; // a fresh window gets a fresh crash budget
     mainWindow = new BrowserWindow({
@@ -649,6 +659,8 @@ export function startApp(options: AppOptions): void {
           `${APP_GLYPH_ARG}${options.glyph}`,
           // The media server starts before the first window and keeps its port.
           `${MEDIA_ORIGIN_ARG}${mediaOrigin() ?? ""}`,
+          // Only the first window's page is part of startup (#558).
+          `${STARTUP_ORIGIN_ARG}${firstWindow ? performance.timeOrigin : 0}`,
           ...extraArgs,
         ],
         sandbox: true,
@@ -804,6 +816,7 @@ export function startApp(options: AppOptions): void {
       });
     }
     await runLibraryMerge((onProgress) => ws.mergePending(onProgress));
+    markStartup("library merge");
   }
 
   /**
@@ -879,6 +892,7 @@ export function startApp(options: AppOptions): void {
   }
 
   const startup = app.whenReady().then(async () => {
+    markStartup("ready");
     // Completely remove the native app menu (File/Edit/View…).
     Menu.setApplicationMenu(null);
     // On Windows and Linux the spell checker downloads Hunspell dictionaries
@@ -897,6 +911,7 @@ export function startApp(options: AppOptions): void {
     if (libraryRestoredFrom === null) {
       ws.dropCoveredBackups(newestBackupTime(libraryBackupDir()));
     }
+    markStartup("workspaces");
 
     // The media server resolves the DB by workspace ID to serve (independent of the active one).
     ({ port: mediaPort, server: mediaServer } = await startServer(
@@ -905,6 +920,7 @@ export function startApp(options: AppOptions): void {
     ));
     installMediaAuthHeader();
     log.info(`media server on http://127.0.0.1:${mediaPort}`);
+    markStartup("media server");
 
     controlServer = await startControlServer();
 
@@ -941,10 +957,14 @@ export function startApp(options: AppOptions): void {
       },
     };
     registerIpc(ipcContext);
-    await options.setup?.({
-      ...ipcContext,
-      handleExtra: handleExtraFor(extraChannels.invoke),
-    });
+    markStartup("ipc");
+    if (options.setup) {
+      await options.setup({
+        ...ipcContext,
+        handleExtra: handleExtraFor(extraChannels.invoke),
+      });
+      markStartup("setup");
+    }
     // Quit while the app's setup was running: open nothing more.
     if (isQuitting()) return;
     createTray();
@@ -956,6 +976,7 @@ export function startApp(options: AppOptions): void {
     }
     await installReactDevTools();
     createWindow();
+    markStartup("window");
     if (isDevMode()) {
       globalShortcut.register("CommandOrControl+Shift+I", () => {
         mainWindow?.webContents.openDevTools({ mode: "right" });
@@ -968,10 +989,16 @@ export function startApp(options: AppOptions): void {
     scans.start();
     scheduleBackgroundUpdateChecks();
   });
-  startup.catch((e: unknown) => {
-    startupFailed = true;
-    log.error("startup failed:", e);
-  });
+  // The startup line is written however startup ends; the renderer writes
+  // its own when the first list settles.
+  startup.then(
+    () => logStartup(isQuitting() ? "quit" : "ok"),
+    (e: unknown) => {
+      startupFailed = true;
+      log.error("startup failed:", e);
+      logStartup("failed");
+    },
+  );
 
   // Async teardown before quit: leave no live better-sqlite3 handle behind
   // (worker read-only handles, the main-thread fallback, and the per-workspace
@@ -1089,4 +1116,20 @@ export function startApp(options: AppOptions): void {
     if (!isTrayEnabled()) app.quit();
     /* keep running in tray */
   });
+}
+
+/** Mark a main-process startup step (shared/startupTiming.ts). */
+function markStartup(step: string): void {
+  performance.mark(STARTUP_MARK_PREFIX + step);
+}
+
+/** Write main's startup line: the steps it reached, and how it ended. */
+function logStartup(outcome: "ok" | "quit" | "failed"): void {
+  log.info(
+    formatStartupLine(
+      "main",
+      outcome,
+      startupMarks(performance, performance.timeOrigin),
+    ),
+  );
 }

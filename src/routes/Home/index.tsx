@@ -63,6 +63,7 @@ import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
 import { filesSearchListOffset } from "@/lib/filesSearch";
+import { useStartupTimings } from "@/hooks/useStartupTimings";
 import { patchCollectionItemOrder } from "@/lib/queryCache";
 import { TimelineView } from "@/timeline/TimelineView";
 import { useTimelineView } from "./useTimelineView";
@@ -310,6 +311,10 @@ export default function Home() {
     (search.isLoading ||
       (folderView && !folderSearching && folderListing.isLoading)) &&
     (status.data?.ready ?? false);
+  useStartupTimings(status.data, {
+    shown: search.isSuccess && !listLoading,
+    failed: search.isError,
+  });
   // Picking a folder selects every file below it (see SelectionContext).
   const expandFolders = useCallback(
     (paths: string[]) => api.folderFiles(workspaceId ?? "", paths),

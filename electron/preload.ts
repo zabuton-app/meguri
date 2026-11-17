@@ -10,6 +10,7 @@ import {
   EXTRA_EVENT_CHANNELS_ARG,
   EXTRA_INVOKE_CHANNELS_ARG,
   MEDIA_ORIGIN_ARG,
+  STARTUP_ORIGIN_ARG,
   EVENT_CHANNELS as EVENT_CHANNEL_NAMES,
   INVOKE_CHANNELS as INVOKE_CHANNEL_NAMES,
   type PreloadInvokeChannel,
@@ -48,6 +49,8 @@ contextBridge.exposeInMainWorld("api", {
   appGlyph: argValue(APP_GLYPH_ARG),
   /** The media server's origin, for the renderer's CSP (public/media-csp.js). */
   mediaOrigin: argValue(MEDIA_ORIGIN_ARG),
+  /** When the main process started (epoch ms), for the startup timings. */
+  startupOrigin: Number(argValue(STARTUP_ORIGIN_ARG)),
   /** Command invocation (maps to ipcMain.handle). */
   invoke: (channel: string, args?: unknown) => {
     if (!INVOKE_CHANNELS.has(channel)) {

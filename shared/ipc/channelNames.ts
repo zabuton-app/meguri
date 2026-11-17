@@ -18,6 +18,12 @@ export const APP_GLYPH_ARG = "--app-glyph=";
  * all of them (public/media-csp.js).
  */
 export const MEDIA_ORIGIN_ARG = "--media-origin=";
+/**
+ * When the main process started (its performance.timeOrigin, epoch ms), so
+ * the renderer's startup timings count from the same point as main's
+ * (window.api.startupOrigin, shared/startupTiming.ts).
+ */
+export const STARTUP_ORIGIN_ARG = "--startup-origin=";
 
 /** Renderer → main invoke channels (ipcMain.handle). */
 export const INVOKE_CHANNELS = [

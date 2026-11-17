@@ -13,6 +13,7 @@ import { ConfirmProvider } from "@/components/ConfirmDialog";
 import { TourProvider } from "@/tour/TourProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import log from "@/lib/logger";
+import { markStartup } from "@/lib/startupTiming";
 import App from "@/App";
 import { createAppRouter, type AppRouter } from "@/appRouter";
 import {
@@ -39,6 +40,7 @@ export interface RenderAppOptions {
 }
 
 export function renderApp(options: RenderAppOptions = {}): void {
+  markStartup("script");
   // Catch errors that ErrorBoundary can't: synchronous errors outside the React
   // tree and unhandled promise rejections from event handlers / async callbacks.
   // Both get forwarded to the main log file via electron-log/renderer.
