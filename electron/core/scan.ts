@@ -18,6 +18,21 @@ const SCAN_IO_CONCURRENCY = 8;
 const DB_CHUNK = 500;
 const YIELD_EVERY = 256;
 
+/**
+ * The rows a new file may have moved from: same content and size. Run once
+ * per new file inside the sync's chunk transactions, on the main thread.
+ *
+ * Pinned to the content hash index. Workspace DBs are never ANALYZEd, and
+ * without statistics SQLite takes idx_files_root for "root_id = ?" instead,
+ * which narrows nothing (each workspace DB holds one root): every new file
+ * then walked the whole table, so a first scan grew with the square of the
+ * library and held the event loop for seconds at a time (#559).
+ */
+export const MOVE_CANDIDATES_SQL = `
+  SELECT id, rel_path, kind, ext, deleted_at, 0 AS removed, scan_excluded_at IS NOT NULL AS hidden
+  FROM files INDEXED BY idx_files_content_hash
+  WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL`;
+
 /** Return control to the event loop (keeps the UI responsive). */
 function yieldToLoop(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
@@ -574,10 +589,7 @@ export async function syncFiles(
     `INSERT INTO files (root_id, rel_path, name_key, abs_path, kind, ext, size, mtime, btime, inode, content_hash, thumb_status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   );
-  const moveCandidates = db.prepare(
-    `SELECT id, rel_path, kind, ext, deleted_at, 0 AS removed, scan_excluded_at IS NOT NULL AS hidden
-     FROM files WHERE root_id = ? AND content_hash = ? AND size = ? AND excluded_at IS NULL`,
-  );
+  const moveCandidates = db.prepare(MOVE_CANDIDATES_SQL);
   // A move can change the extension, and with it the kind (the same MPEG-4 bytes
   // are video as .mp4 and audio as .m4a). The row would otherwise keep the old
   // kind forever, since later scans see it as unchanged.

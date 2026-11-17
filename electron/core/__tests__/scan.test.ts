@@ -13,11 +13,13 @@ import {
 } from "../queries.js";
 import { addManualTag, fileTags, syncFts } from "../tags.js";
 import { AUTO_META_SOURCE } from "../autoMetaTags.js";
+import { insertFile, newDb } from "./helpers.js";
 import {
   contentHash,
   isMountpoint,
   kindForExt,
   looksLikeMpegTs,
+  MOVE_CANDIDATES_SQL,
   ScanRootUnreadableError,
   syncFiles,
   unreadableMatcher,
@@ -1088,6 +1090,26 @@ describe("syncFiles lifecycle", () => {
     ).id;
     expect(sameId).toBe(id);
     expect(restored.stats.inserted).toBe(0);
+  });
+});
+
+describe("move detection's lookup (#559)", () => {
+  // Without statistics, as in the app (workspace DBs are never ANALYZEd), the
+  // planner took idx_files_root, a walk over the whole table per new file.
+  it("finds candidates through the content hash index", () => {
+    const { db, rootId } = newDb();
+    for (let i = 0; i < 100; i++) {
+      insertFile(db, rootId, { relPath: `v${i}.mp4`, contentHash: `h${i}` });
+    }
+    const detail = (
+      db
+        .prepare(`EXPLAIN QUERY PLAN ${MOVE_CANDIDATES_SQL}`)
+        .all(rootId, "h1", 1000) as { detail: string }[]
+    )
+      .map((r) => r.detail)
+      .join("\n");
+    db.close();
+    expect(detail).toContain("idx_files_content_hash");
   });
 });
 
