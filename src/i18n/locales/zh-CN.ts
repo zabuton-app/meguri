@@ -1021,6 +1021,7 @@ export const zhCN: Catalog = {
   "tags.ns.orient": "方向",
   "tags.ns.quality": "音质",
   "tags.ns.ch": "声道",
+  "tags.ns.tempo": "速度",
   "tags.ns.bpm": "BPM",
   "tags.ns.key": "调性",
   "tags.ns.camelot": "Camelot",
@@ -1037,6 +1038,9 @@ export const zhCN: Catalog = {
   "tags.value.chMono": "单声道",
   "tags.value.chStereo": "立体声",
   "tags.value.chSurround": "环绕声",
+  "tags.value.tempoSlow": "慢",
+  "tags.value.tempoModerate": "中速",
+  "tags.value.tempoFast": "快",
 
   // workspace rail
   "workspace.all": "全部",

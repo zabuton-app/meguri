@@ -1070,6 +1070,7 @@ export const ja = {
   "tags.ns.orient": "向き",
   "tags.ns.quality": "音質",
   "tags.ns.ch": "チャンネル",
+  "tags.ns.tempo": "テンポ",
   "tags.ns.bpm": "BPM",
   "tags.ns.key": "キー",
   "tags.ns.camelot": "Camelot",
@@ -1086,6 +1087,9 @@ export const ja = {
   "tags.value.chMono": "モノラル",
   "tags.value.chStereo": "ステレオ",
   "tags.value.chSurround": "サラウンド",
+  "tags.value.tempoSlow": "ゆっくり",
+  "tags.value.tempoModerate": "ふつう",
+  "tags.value.tempoFast": "速い",
 
   // ワークスペースレール
   "workspace.all": "すべて",

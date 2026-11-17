@@ -3,7 +3,7 @@ import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { hasTimeline, kindLabel } from "@/lib/mediaKind";
-import { audioInfo, type AudioInfo } from "@shared/audioInfo";
+import { audioInfo, tempoClass, type AudioInfo } from "@shared/audioInfo";
 
 interface Props {
   detail: FileDetail;
@@ -65,6 +65,12 @@ export function MetaChips({
   );
 }
 
+const TEMPO_LABELS = {
+  slow: "tags.value.tempoSlow",
+  moderate: "tags.value.tempoModerate",
+  fast: "tags.value.tempoFast",
+} as const;
+
 /** A number without a trailing `.0`: 44.1, 48, 128, 96.5. */
 const plain = (n: number) => String(Math.round(n * 10) / 10);
 
@@ -99,7 +105,10 @@ function AudioChips({ meta, t }: { meta: unknown; t: TFunc }) {
         />
       )}
       {info.bpm !== null && (
-        <Chip label={t("media.metaBpm")} value={plain(info.bpm)} />
+        <Chip
+          label={t("media.metaBpm")}
+          value={`${plain(info.bpm)} (${t(TEMPO_LABELS[tempoClass(info.bpm)])})`}
+        />
       )}
       {info.key && (
         <Chip

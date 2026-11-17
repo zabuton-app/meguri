@@ -1170,6 +1170,7 @@ export const en: Catalog = {
   "tags.ns.orient": "Orientation",
   "tags.ns.quality": "Quality",
   "tags.ns.ch": "Channels",
+  "tags.ns.tempo": "Tempo",
   "tags.ns.bpm": "BPM",
   "tags.ns.key": "Key",
   "tags.ns.camelot": "Camelot",
@@ -1186,6 +1187,9 @@ export const en: Catalog = {
   "tags.value.chMono": "Mono",
   "tags.value.chStereo": "Stereo",
   "tags.value.chSurround": "Surround",
+  "tags.value.tempoSlow": "Slow",
+  "tags.value.tempoModerate": "Moderate",
+  "tags.value.tempoFast": "Fast",
 
   // workspace rail
   "workspace.all": "All",

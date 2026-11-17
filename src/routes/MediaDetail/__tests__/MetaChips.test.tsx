@@ -56,7 +56,7 @@ describe("MetaChips for audio", () => {
     expect(chip("media.metaSampleRate")).toBe("96 kHz");
     expect(chip("media.metaBitDepth")).toBe("24-bit");
     expect(chip("media.metaChannels")).toBe("tags.value.chStereo");
-    expect(chip("media.metaBpm")).toBe("96.5");
+    expect(chip("media.metaBpm")).toBe("96.5 (tags.value.tempoModerate)");
     expect(chip("media.metaKey")).toBe("A minor (8A)");
     expect(chip("media.metaGenre")).toBe("jazz, soul");
   });

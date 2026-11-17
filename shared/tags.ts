@@ -29,6 +29,7 @@ export const AUTO_META_NAMESPACES = [
   "orient",
   "audio_quality",
   "audio_ch",
+  "audio_tempo",
   "audio_bpm",
   "audio_key",
   "audio_camelot",
@@ -52,6 +53,7 @@ export const AUTO_META_VALUES: Readonly<Record<string, readonly string[]>> = {
   orient: ["horizontal", "vertical", "square"],
   audio_quality: ["lossless", "lossy", "hires"],
   audio_ch: ["mono", "stereo", "surround"],
+  audio_tempo: ["slow", "moderate", "fast"],
 };
 
 /**

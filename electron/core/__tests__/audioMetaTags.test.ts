@@ -7,7 +7,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { audioMetaTagsFor, bpmBand } from "../audioMetaTags.js";
-import { genreNames, parseBpm, parseKey } from "../../../shared/audioInfo.js";
+import {
+  genreNames,
+  parseBpm,
+  parseKey,
+  tempoClass,
+} from "../../../shared/audioInfo.js";
 import { autoMetaTagsFor, backfillAutoMetaTags } from "../autoMetaTags.js";
 import { FFMPEG } from "../ffmpeg-paths.js";
 import { extractMeta } from "../media.js";
@@ -42,6 +47,23 @@ describe("parseBpm and bpmBand", () => {
   it("gives nothing for what is not a BPM", () => {
     for (const raw of ["", "0", "-120", "401", "fast", "120bpm", "1e3"])
       expect(parseBpm(raw)).toBeNull();
+  });
+});
+
+describe("tempoClass", () => {
+  it("calls a BPM slow under 90 and fast from 120", () => {
+    expect(tempoClass(89.9)).toBe("slow");
+    expect(tempoClass(90)).toBe("moderate");
+    expect(tempoClass(119.9)).toBe("moderate");
+    expect(tempoClass(120)).toBe("fast");
+  });
+
+  it("gives a file its tempo beside its band", () => {
+    expect(
+      names(
+        audioMetaTagsFor(probe({ codec_name: "mp3" }, { TBPM: "85" }), null),
+      ).filter((t) => t.startsWith("audio_tempo") || t.startsWith("audio_bpm")),
+    ).toEqual(["audio_bpm:80-89", "audio_tempo:slow"]);
   });
 });
 
@@ -223,6 +245,7 @@ describe("audioMetaTagsFor", () => {
       "audio_bpm:120-129",
       "audio_genre:house",
       "audio_quality:lossy",
+      "audio_tempo:fast",
       "codec:aac",
     ]);
     expect(
@@ -410,6 +433,7 @@ describe("the backfill reads files.meta for audio rows", () => {
       "audio_ch:stereo",
       "audio_genre:drum & bass",
       "audio_quality:lossless",
+      "audio_tempo:fast",
       "codec:flac",
     ]);
     expect(fileTags(db, broken)).toEqual([]);

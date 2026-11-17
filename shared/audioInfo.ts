@@ -85,6 +85,17 @@ export function parseBpm(raw: string): number | null {
   return Math.round(bpm) > 0 && bpm <= 400 ? bpm : null;
 }
 
+/**
+ * How fast a BPM is, for a search that does not want a number: under 90 is
+ * slow, from 120 fast, as Andante and Allegro roughly go. The `audio_tempo`
+ * tag and the detail view both class a BPM by this.
+ */
+export function tempoClass(bpm: number): "slow" | "moderate" | "fast" {
+  if (bpm < 90) return "slow";
+  if (bpm < 120) return "moderate";
+  return "fast";
+}
+
 /** Camelot wheel names, minor (A) and major (B), by number. */
 const MINOR_NAMES = [
   "G# minor",

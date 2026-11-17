@@ -1064,6 +1064,7 @@ export const ko: Catalog = {
   "tags.ns.orient": "방향",
   "tags.ns.quality": "음질",
   "tags.ns.ch": "채널",
+  "tags.ns.tempo": "템포",
   "tags.ns.bpm": "BPM",
   "tags.ns.key": "키",
   "tags.ns.camelot": "Camelot",
@@ -1080,6 +1081,9 @@ export const ko: Catalog = {
   "tags.value.chMono": "모노",
   "tags.value.chStereo": "스테레오",
   "tags.value.chSurround": "서라운드",
+  "tags.value.tempoSlow": "느림",
+  "tags.value.tempoModerate": "보통",
+  "tags.value.tempoFast": "빠름",
 
   // workspace rail
   "workspace.all": "전체",

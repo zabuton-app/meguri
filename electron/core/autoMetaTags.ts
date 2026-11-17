@@ -19,7 +19,7 @@ export { AUTO_META_SOURCE };
  * The next scan of each workspace re-derives every file; classifications that
  * did not move diff out and cost one indexed read each.
  */
-export const AUTO_META_RULESET_VERSION = 2;
+export const AUTO_META_RULESET_VERSION = 3;
 export const AUTO_META_VERSION_KEY = "auto_meta_ruleset_version";
 
 export interface DerivedTag {

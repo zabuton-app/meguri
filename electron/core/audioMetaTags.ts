@@ -5,7 +5,7 @@
 //
 // Pure, like autoMetaTagsFor: a value that cannot be read gives no tag, never
 // a guessed one.
-import { audioInfo } from "../../shared/audioInfo.js";
+import { audioInfo, tempoClass } from "../../shared/audioInfo.js";
 import type { DerivedTag } from "./autoMetaTags.js";
 import { codecTagName, durationClass } from "./derivedTagClasses.js";
 
@@ -111,8 +111,10 @@ export function audioMetaTagsFor(
             : "surround",
     });
 
-  if (info.bpm !== null)
+  if (info.bpm !== null) {
     out.push({ namespace: "audio_bpm", name: bpmBand(info.bpm) });
+    out.push({ namespace: "audio_tempo", name: tempoClass(info.bpm) });
+  }
   if (info.key) {
     out.push({ namespace: "audio_key", name: info.key.name });
     out.push({ namespace: "audio_camelot", name: info.key.camelot });

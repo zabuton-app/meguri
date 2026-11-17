@@ -27,6 +27,7 @@ const NAMESPACE_KEYS: Record<string, TranslationKey> = {
   orient: "tags.ns.orient",
   audio_quality: "tags.ns.quality",
   audio_ch: "tags.ns.ch",
+  audio_tempo: "tags.ns.tempo",
   audio_bpm: "tags.ns.bpm",
   audio_key: "tags.ns.key",
   audio_camelot: "tags.ns.camelot",
@@ -46,6 +47,9 @@ const VALUE_KEYS: Record<string, TranslationKey> = {
   "audio_ch:mono": "tags.value.chMono",
   "audio_ch:stereo": "tags.value.chStereo",
   "audio_ch:surround": "tags.value.chSurround",
+  "audio_tempo:slow": "tags.value.tempoSlow",
+  "audio_tempo:moderate": "tags.value.tempoModerate",
+  "audio_tempo:fast": "tags.value.tempoFast",
 };
 
 /** Translated category name, or the raw namespace when it is not a known one. */

@@ -526,6 +526,7 @@ from the probe output stored in `files.meta`:
 | `orient`        | video + image | `vertical` / `horizontal` / `square`                 |
 | `audio_quality` | audio         | `lossless` / `lossy`, plus `hires`                   |
 | `audio_ch`      | audio         | `mono` / `stereo` / `surround`                       |
+| `audio_tempo`   | audio         | `slow` (<90 BPM) / `moderate` / `fast` (≥120 BPM)    |
 | `audio_bpm`     | audio         | a band of ten (`120-129`), from an embedded BPM      |
 | `audio_key`     | audio         | a key name (`A minor`), from an embedded key         |
 | `audio_camelot` | audio         | the same key in Camelot notation (`8A`)              |
