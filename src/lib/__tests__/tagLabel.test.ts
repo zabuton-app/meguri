@@ -70,6 +70,10 @@ describe("searchTokenLabel", () => {
     expect(searchTokenLabel(t, "tag:beach")).toBe("Tags: beach");
   });
 
+  it("names an ext: directive by its folded extension (#538)", () => {
+    expect(searchTokenLabel(t, "ext:.MP4")).toBe("Extension: mp4");
+  });
+
   it("returns null for free text", () => {
     expect(searchTokenLabel(t, "beach")).toBeNull();
   });

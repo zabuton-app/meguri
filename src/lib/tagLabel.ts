@@ -63,9 +63,9 @@ export function tagHumanLabel(
 }
 
 /**
- * Human-readable description of a `tag:`, `hash:` or `ext:` search token, or null when
- * the token is ordinary free text. Used for the tooltip on the chips the search
- * box renders, where the chip itself shows the raw token.
+ * Human-readable description of a `tag:`, `hash:` or `ext:` search token, or
+ * null when the token is ordinary free text. Used for the tooltip on the chips
+ * the search box renders, where the chip itself shows the raw token.
  *
  * A generated tag is usually written as its bare value ("long"), so the category
  * is recovered from the vocabulary; the qualified form is accepted too. A value

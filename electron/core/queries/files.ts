@@ -261,8 +261,9 @@ export function appendSearchConditions(
     sql += " AND f.content_hash >= ? AND f.content_hash < ?";
     args.push(prefix, `${prefix}g`);
   }
-  // Exact, on the lower-cased value the scan stores; no index, as the filter
-  // only ever sees rows the other conditions have already narrowed.
+  // Exact, on the lower-cased value the scan stores. No index: with nothing
+  // else narrowing, a rare extension makes the list walk its sort order until
+  // a page fills, up to every live row.
   for (const ext of terms.extValues) {
     sql += " AND f.ext = ?";
     args.push(ext);

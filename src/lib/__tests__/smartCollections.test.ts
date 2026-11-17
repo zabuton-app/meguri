@@ -65,6 +65,17 @@ describe("smartCollections", () => {
     expect(parseSmartCollections(raw)).toEqual([collection]);
   });
 
+  it("keeps an ext: directive through saving and reopening (#538)", () => {
+    // The directive lives in `q`, so a saved search must hand it back intact
+    // for the main process to apply.
+    const collection = makeSmartCollection("MP4", { q: "ext:mp4" });
+    saveSmartCollections([collection]);
+    const [saved] = parseSmartCollections(
+      localStorage.getItem(SMART_COLLECTIONS_KEY),
+    );
+    expect(saved.query.q).toBe("ext:mp4");
+  });
+
   it("describeSearchQuery builds a human-readable summary", () => {
     expect(
       describeSearchQuery(t, "en", {
