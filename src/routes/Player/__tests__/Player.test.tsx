@@ -522,27 +522,65 @@ describe("Player transitions", () => {
     expect(await screen.findByText("3 / 3")).toBeTruthy();
   });
 
-  it("swaps instantly when the OS asks for reduced motion", async () => {
-    // jsdom has no matchMedia to spy on.
-    vi.stubGlobal(
-      "matchMedia",
-      (query: string): MediaQueryList =>
-        ({
-          matches: query.includes("prefers-reduced-motion"),
-          media: query,
-          onchange: null,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          addListener: () => {},
-          removeListener: () => {},
-          dispatchEvent: () => false,
-        }) as MediaQueryList,
-    );
-    renderPlayer([row(1, "video"), row(3, "video")]);
-    await screen.findByText("1 / 2");
-    fireEvent.click(screen.getByLabelText("Next (N)"));
-    expect(screen.getByText("2 / 2")).toBeTruthy();
-    expect(outgoing()).toBeNull();
+  describe("with a still to animate against", () => {
+    // jsdom loads no images, so an <img> never reports a currentSrc and there
+    // is nothing to freeze. Report its src as loaded, so a switch has a still
+    // and the outgoing layer appears whenever the switch is animated.
+    beforeEach(() => {
+      vi.spyOn(
+        HTMLImageElement.prototype,
+        "currentSrc",
+        "get",
+      ).mockImplementation(function (this: HTMLImageElement) {
+        return this.src;
+      });
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    function stubReducedMotion(reduce: boolean) {
+      // jsdom has no matchMedia to spy on.
+      vi.stubGlobal(
+        "matchMedia",
+        (query: string): MediaQueryList =>
+          ({
+            matches: reduce && query.includes("prefers-reduced-motion"),
+            media: query,
+            onchange: null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+            dispatchEvent: () => false,
+          }) as MediaQueryList,
+      );
+    }
+
+    async function renderAndPressNext() {
+      renderPlayer([row(2, "image"), row(4, "image")]);
+      await screen.findByText("1 / 2");
+      // The image gets its URL once the media server's address arrives.
+      await waitFor(() =>
+        expect(
+          document.querySelector<HTMLImageElement>('[data-slot="player-media"]')
+            ?.src,
+        ).toBeTruthy(),
+      );
+      fireEvent.click(screen.getByLabelText("Next (N)"));
+      expect(screen.getByText("2 / 2")).toBeTruthy();
+    }
+
+    it("holds the outgoing item while it animates out", async () => {
+      // The control for the case below: same setup, reduced motion off.
+      stubReducedMotion(false);
+      await renderAndPressNext();
+      expect(outgoing()).not.toBeNull();
+    });
+
+    it("swaps instantly when the OS asks for reduced motion", async () => {
+      stubReducedMotion(true);
+      await renderAndPressNext();
+      expect(outgoing()).toBeNull();
+    });
   });
 });
 
