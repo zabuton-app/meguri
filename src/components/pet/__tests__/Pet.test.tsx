@@ -477,8 +477,13 @@ describe("Pet", () => {
           action: expect.objectContaining({ label: "Settings" }) as unknown,
         }),
       );
-      expect(localStorage.getItem("meguri.prefs")).toContain(
-        '"petVisible":false',
+      // The pet hides when the change commits, but the preference is written by
+      // a passive effect that can run a tick later (the change comes from the
+      // sprite's timer, outside act).
+      await waitFor(() =>
+        expect(localStorage.getItem("meguri.prefs")).toContain(
+          '"petVisible":false',
+        ),
       );
     });
   });
