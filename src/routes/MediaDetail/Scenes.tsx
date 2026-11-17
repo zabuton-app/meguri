@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,6 +6,9 @@ import { usePreferences } from "@/settings/PreferencesProvider";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { MainThumbStar } from "./MainThumbStar";
 import { fmtTime, isSameThumbSource, isThumbPendingFor } from "./utils";
+
+/** How long a file must stay on screen before its scene frames are requested. */
+const SCENE_FRAME_DELAY_MS = 400;
 
 export function Scenes({
   id,
@@ -41,6 +44,19 @@ export function Scenes({
   const scenes = Array.from({ length: sceneCount }, (_, i) =>
     Math.floor((total * (i + 0.5)) / sceneCount),
   );
+  // Frames are extracted by ffmpeg on the media server and an unmounted <img> does not
+  // cancel its request, so skimming past a file would queue frames for every file passed.
+  // Only request them once the user has stayed on the file for a moment.
+  const [framesDueId, setFramesDueId] = useState<number | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => setFramesDueId(id), SCENE_FRAME_DELAY_MS);
+    // Drop the grant when the file changes, so returning to an earlier file waits again.
+    return () => {
+      clearTimeout(timer);
+      setFramesDueId(null);
+    };
+  }, [id]);
+  const framesDue = framesDueId === id;
   return (
     <section className="rounded-xl border border-border bg-surface p-3">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
@@ -68,24 +84,25 @@ export function Scenes({
       </div>
       <ScrollArea className="w-full" viewportClassName="pb-3">
         <div className="flex gap-2">
-          {scenes.map((sec, i) => {
-            const isMain = isSameThumbSource(thumbOffsetSec, sec);
-            const pending = isThumbPendingFor(pendingThumbSec, sec, isMain);
-            return (
-              <SceneThumb
-                key={i}
-                id={id}
-                sec={sec}
-                mediaBase={mediaBase}
-                wsId={wsId}
-                isMainThumb={isMain}
-                thumbPending={pending}
-                onSeek={onSeek}
-                onSetMainThumb={onSetMainThumb}
-                t={t}
-              />
-            );
-          })}
+          {framesDue &&
+            scenes.map((sec, i) => {
+              const isMain = isSameThumbSource(thumbOffsetSec, sec);
+              const pending = isThumbPendingFor(pendingThumbSec, sec, isMain);
+              return (
+                <SceneThumb
+                  key={i}
+                  id={id}
+                  sec={sec}
+                  mediaBase={mediaBase}
+                  wsId={wsId}
+                  isMainThumb={isMain}
+                  thumbPending={pending}
+                  onSeek={onSeek}
+                  onSetMainThumb={onSetMainThumb}
+                  t={t}
+                />
+              );
+            })}
         </div>
       </ScrollArea>
     </section>
