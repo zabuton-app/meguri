@@ -175,8 +175,8 @@ function listDumps(dumpsDir: string): Dump[] {
 }
 
 /**
- * The last lines of the log. The logger redacts paths under the home
- * directory; others (a library on another drive) are left until #543.
+ * The last lines of the log. Read as written: the logger has already
+ * redacted paths under the home directory and every workspace root.
  */
 function logTail(logFile: string): string {
   let fd: number;
