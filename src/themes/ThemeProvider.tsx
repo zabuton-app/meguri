@@ -121,7 +121,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
-    // TODO(Phase 1): also persist to SQLite settings via a Tauri command.
   }, [theme]);
 
   const setTheme = (id: string) => {
