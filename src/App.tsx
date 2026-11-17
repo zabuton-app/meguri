@@ -6,6 +6,7 @@ import { AudioPlayerProvider } from "@/audio/AudioPlayerProvider";
 import { AudioPlayerBar } from "@/audio/AudioPlayerBar";
 import { StatusBar } from "@/components/StatusBar";
 import { LibraryMergeModal } from "@/components/LibraryMergeModal";
+import { CrashReportNotice } from "@/components/CrashReportNotice";
 import { useAppearanceAttribute } from "@/hooks/useAppearanceAttribute";
 import { useContentZoom } from "@/hooks/useContentZoom";
 import { useCssThemeStyle } from "@/hooks/useCssThemes";
@@ -45,6 +46,7 @@ export default function App({ router }: { router: AppRouter }) {
         </div>
       </AudioPlayerProvider>
       <LibraryMergeModal />
+      <CrashReportNotice />
     </div>
   );
 }

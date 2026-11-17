@@ -608,6 +608,27 @@ export const UpdateInfoSchema = z.object({
 });
 export type UpdateInfo = z.infer<typeof UpdateInfoSchema>;
 
+// --- Crash reports (#544) ---
+
+/** A crash report kept from an earlier run (electron/core/crashReports.ts). */
+export const CrashReportSchema = z.object({
+  id: z.string(),
+  /** When the next launch found it (Unix ms). */
+  detectedAt: z.number(),
+  /** "crashed": a process crashed. "unclean-exit": the run ended without a
+   *  clean exit and without a crash dump (forced quit, power loss). */
+  kind: z.enum(["crashed", "unclean-exit"]),
+  /** The report, as the user copies it. */
+  text: z.string(),
+  /** A new crash report issue on GitHub, with the version, OS and channel
+   *  filled in (the report itself is pasted). Null for an app without a
+   *  crash report issue form: the report can only be copied. */
+  issueUrl: z.url().nullable(),
+  /** Found at this launch: the window tells the user about it. */
+  isNew: z.boolean(),
+});
+export type CrashReport = z.infer<typeof CrashReportSchema>;
+
 /** Scope a graph layout is cached under: the active target string (a
  *  workspace id, "__all__" or "collection:<id>"). Main resolves it against the
  *  targets it holds; the cap only bounds what an id-shaped string can carry. */

@@ -8,6 +8,7 @@ startApp({
   urlScheme: "meguri",
   updateRepo: { owner: "zabuton-app", name: "meguri" },
   msStoreProductId: "9NRSM11RRH8Z",
+  crashReportForm: "crash_report.yml",
   envPrefix: "MEGURI",
   logos: MEGURI_LOGOS,
 });

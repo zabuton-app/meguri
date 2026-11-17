@@ -255,6 +255,11 @@ export const api = {
   updateSetAutoCheck: (enabled: boolean) =>
     invoke("update_set_auto_check", { enabled }),
   updateIgnore: (version: string) => invoke("update_ignore", { version }),
+  crashReportsList: () => invoke("crash_reports_list"),
+  /** Delete a crash report and the crash dumps of its run. */
+  crashReportDelete: (id: string) => invoke("crash_report_delete", { id }),
+  /** Open the folder the crash dumps are kept in. */
+  crashReportsOpenFolder: () => invoke("crash_reports_open_folder"),
   /** Auto-tagging (rules, dictionary, applying), configured app-wide. */
   autoTagGet: () => invoke("auto_tag_get"),
   autoTagSet: (config: AutoTagConfig) => invoke("auto_tag_set", { config }),

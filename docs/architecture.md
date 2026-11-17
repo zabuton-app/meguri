@@ -227,6 +227,20 @@ lifecycle behavior:
   delay, bounded per minute; past that (or on a launch / integrity failure) the
   user is asked to reload or quit instead of being left with a blank window.
 - A single-instance lock prevents a second copy from launching.
+- Crash reports (`electron/core/crashReports.ts`, packaged builds only, or
+  `<PREFIX>_CRASH_REPORTS=1` in development): `crashReporter` writes minidumps
+  of every process under `app.getPath("crashDumps")` and uploads nothing. Each
+  run writes `<userData>/session.json`, records child process crashes in it,
+  and removes it on a clean exit (`will-quit` and `teardownSync()`). The next
+  launch turns a marker left behind into a report in
+  `<userData>/crash-reports/`: crashed (a dump after the last recorded crash
+  is the main process's), or did not exit normally. The window announces it
+  once, and Settings → About lists the kept reports. The newest five reports
+  and dumps are kept. "Report on GitHub" opens the app's crash report issue
+  form (`crashReportForm` in `startApp()`'s options; without one, a report
+  can only be copied). The minidumps are not parsed, so a main process crash
+  within 10 s of a recorded child crash is reported as that child's only
+  (the report still says the run did not exit normally).
 - The tray and window icons are base64 images the entry point passes to
   `startApp()` (`logos`; Meguri's are in `electron/core/logoAssets.ts`),
   embedded to avoid bundle path-resolution issues.

@@ -18,9 +18,12 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DEFAULT_LOGO, loadAutoTag, loadConfig } from "./core/appConfig.js";
+import { startCrashReports } from "./core/crashReports.js";
+import { installChannel } from "./core/installChannel.js";
 import log, { setupLogger } from "./core/logger.js";
 import { withTimeout } from "./core/concurrency.js";
 import {
@@ -100,6 +103,14 @@ export interface AppOptions {
   urlScheme: string;
   /** GitHub repository the update check looks at. */
   updateRepo: UpdateRepo;
+  /**
+   * The crash report issue form in `updateRepo`, as its file name under
+   * `.github/ISSUE_TEMPLATE/` ("crash_report.yml"). A crash report's "Report
+   * on GitHub" opens it with the version, OS and install channel filled in;
+   * leave it out for an app whose repository has no such form, and reports
+   * can only be copied.
+   */
+  crashReportForm?: string;
   /**
    * Microsoft Store product ID. Store installs are sent to its product page
    * for updates; leave it out for an app that is not on the Store.
@@ -201,6 +212,32 @@ export function startApp(options: AppOptions): void {
     process.exit(0);
   }
 
+  // Crash reports (#544). After the lock, so a second instance cannot take the
+  // marker of the one running, and before anything else: a native crash in
+  // what follows (opening the library) is one to report. Off in development,
+  // where a restart kills the app, unless <prefix>_CRASH_REPORTS=1.
+  const crash = startCrashReports({
+    enabled:
+      app.isPackaged ||
+      process.env[`${options.envPrefix}_CRASH_REPORTS`] === "1",
+    appName: options.name,
+    run: {
+      version: app.getVersion(),
+      electron: process.versions.electron ?? "",
+      platform: process.platform,
+      osRelease: os.release(),
+      arch: process.arch,
+      channel: installChannel({
+        isPackaged: app.isPackaged,
+        platform: process.platform,
+        windowsStore: process.windowsStore === true,
+        execPath: process.execPath,
+        env: process.env,
+      }),
+    },
+  });
+  const crashSession = crash.session;
+
   // Before anything reads the settings (Workspaces), which live in the
   // library, or a workspace opens it: put a copy back if it is damaged, and
   // keep the copies current otherwise.
@@ -222,6 +259,8 @@ export function startApp(options: AppOptions): void {
         options.name,
         `Your library (${libraryDbPath()}) is missing, and ${options.name} could not put back a copy of it from ${libraryBackupDir()}.\n\n${options.name} will quit without opening it, so the copies stay as they are. Free some disk space and start ${options.name} again, or copy the newest file in that folder to the library's place yourself. It also holds your workspaces, collections and settings. To start over with an empty library instead, move that folder somewhere else first.`,
       );
+      // Quitting on purpose: not a run to report at the next launch.
+      crashSession.end();
       app.exit(1);
     });
     return;
@@ -291,6 +330,7 @@ export function startApp(options: AppOptions): void {
     relaunchAfterQuit = true;
   }
   app.on("will-quit", () => {
+    crashSession.end();
     if (!relaunchAfterQuit) return;
     relaunchAfterQuit = false;
     app.relaunch();
@@ -389,6 +429,12 @@ export function startApp(options: AppOptions): void {
   app.on("render-process-gone", (_e, wc, details) => {
     log.error("renderer process gone:", details);
     if (details.reason === "clean-exit" || details.reason === "killed") return;
+    // Reported at the next launch even if the reload below recovers it.
+    crashSession.recordChildCrash({
+      process: "renderer",
+      reason: `${details.reason} (exit code ${details.exitCode})`,
+      at: Date.now(),
+    });
     if (isQuitting() || !mainWindow || mainWindow.isDestroyed()) return;
     if (wc !== mainWindow.webContents) return;
     // A renderer that could not even launch, or that failed Chromium's code
@@ -456,6 +502,14 @@ export function startApp(options: AppOptions): void {
   }
   app.on("child-process-gone", (_e, details) => {
     log.error("child process gone:", details);
+    if (details.reason === "clean-exit" || details.reason === "killed") return;
+    crashSession.recordChildCrash({
+      process: details.name
+        ? `${details.type} (${details.name})`
+        : details.type,
+      reason: `${details.reason} (exit code ${details.exitCode})`,
+      at: Date.now(),
+    });
   });
 
   // Restrict in-window navigation to the app (see isAppUrl). Other http(s) URLs
@@ -877,6 +931,14 @@ export function startApp(options: AppOptions): void {
       passes,
       retryLibraryMerge,
       libraryRestoredFrom: () => libraryRestoredFrom,
+      crashReports: {
+        reportsDir: crash.reportsDir,
+        dumpsDir: crash.dumpsDir,
+        issueForm: options.crashReportForm
+          ? { repo: options.updateRepo, template: options.crashReportForm }
+          : null,
+        newReportId: crash.newReportId,
+      },
     };
     registerIpc(ipcContext);
     await options.setup?.({
@@ -988,6 +1050,9 @@ export function startApp(options: AppOptions): void {
     autoTagWorker.dispose();
     queryClient.terminateNow();
     finalizeQuit();
+    // The OS may end the process before will-quit (a Windows log-off never
+    // gets there): this run exited as cleanly as it could.
+    crashSession.end();
   }
 
   // Quit gate. Electron does not await async listeners, so the first pass

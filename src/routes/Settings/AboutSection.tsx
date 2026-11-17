@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { api, type AboutInfo } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
 import { appGlyph } from "@/lib/appName";
+import { CrashReportsSection } from "./CrashReportsSection";
 
 const GITHUB_URL = "https://github.com/zabuton-app/meguri";
 
@@ -142,6 +143,8 @@ export function AboutSection() {
           MIT License
         </button>
       </p>
+
+      <CrashReportsSection />
 
       {/* Third-party licenses */}
       <div className="flex flex-col gap-2 border-t border-border pt-3">

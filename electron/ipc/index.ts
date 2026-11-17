@@ -5,6 +5,7 @@ import type { IpcContext } from "./context.js";
 import { registerActivityHandlers } from "./activity.js";
 import { registerAutoTagHandlers } from "./autoTag.js";
 import { registerBookmarkHandlers } from "./bookmarks.js";
+import { registerCrashReportHandlers } from "./crashReports.js";
 import { registerCssThemeHandlers } from "./cssThemes.js";
 import { registerCustomCssHandlers } from "./customCss.js";
 import { registerFileHandlers } from "./files.js";
@@ -38,6 +39,7 @@ export function registerIpc(ctx: IpcContext): void {
   registerThumbHandlers(ctx);
   registerShellHandlers(ctx);
   registerUpdateHandlers();
+  registerCrashReportHandlers(ctx);
   registerLogoHandlers(ctx);
   registerCustomCssHandlers(ctx);
   registerCssThemeHandlers(ctx);
