@@ -168,6 +168,12 @@ async function lastSaved(): Promise<AutoTagConfig> {
 async function reloaded(times: number) {
   await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(times));
   await act(() => mocks.autoTagFiles.mock.results[times - 1].value);
+  // The rules run again over the new names; the fake worker answers at once,
+  // the real one would not, so wait for them rather than count on it.
+  await waitFor(() => {
+    expect(screen.queryAllByText("testing…")).toHaveLength(0);
+    expect(screen.queryAllByText("Analyzing file names…")).toHaveLength(0);
+  });
 }
 
 describe("AutoTag", () => {
@@ -358,7 +364,7 @@ describe("AutoTag", () => {
       }),
     );
     // What was written before the failure is read back rather than lost.
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+    await reloaded(2);
     expect(screen.queryByText(/^Added /)).toBeNull();
   });
 
@@ -525,7 +531,7 @@ describe("AutoTag", () => {
         await screen.findByRole("button", { name: "Replace on 1 file" }),
       );
       // Read again rather than guessed at; the setting stays renamed.
-      await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+      await reloaded(2);
       expect((await lastSaved()).keywords).toMatchObject([{ tags: ["Port"] }]);
     });
 
@@ -976,7 +982,7 @@ describe("AutoTag", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     // The list is read again rather than guessed at, and nothing is claimed.
     await reloaded(2);
-    within(row()).getByRole("button", { name: "Remove from 1 file" });
+    await within(row()).findByRole("button", { name: "Remove from 1 file" });
     expect(screen.queryByText(/^Removed/)).toBeNull();
   });
 
@@ -1025,7 +1031,7 @@ describe("AutoTag", () => {
     await reloaded(2);
     // Still the one file that carried the tag before, not two.
     expect(
-      screen.getByRole("button", { name: "Remove from 1 file" }),
+      await screen.findByRole("button", { name: "Remove from 1 file" }),
     ).toBeTruthy();
     expect(screen.queryByRole("status")).toBeNull();
   });
@@ -1052,10 +1058,12 @@ describe("AutoTag", () => {
     fireEvent.click(within(row()).getByRole("button", { name: "Apply" }));
     await reloaded(2);
 
-    fireEvent.click(within(row()).getByRole("button", { name: /Remove from/ }));
+    fireEvent.click(
+      await within(row()).findByRole("button", { name: /Remove from/ }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     await waitFor(() => expect(mocks.autoTagEdit).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(3));
+    await reloaded(3);
   });
 
   it("splits a write by how long its places run together", async () => {
