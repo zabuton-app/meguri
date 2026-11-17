@@ -40,8 +40,11 @@ export default defineConfig({
           // database takes around 100 ms, and the settings are opened for each
           // read and write (withSettings in appConfig.ts). A test that drives
           // Workspaces there takes 1-5 s, against milliseconds elsewhere, and
-          // ran into the default 5 s (#334). #533 looks into that cost.
+          // ran into the default 5 s (#334); a beforeEach that sets up
+          // workspaces pays the same cost against the default 10 s hook
+          // timeout. #533 looks into that cost.
           testTimeout: process.platform === "win32" ? 30_000 : undefined,
+          hookTimeout: process.platform === "win32" ? 30_000 : undefined,
         },
       },
       {
