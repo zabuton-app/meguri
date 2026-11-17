@@ -25,6 +25,12 @@ const NAMESPACE_KEYS: Record<string, TranslationKey> = {
   dur: "tags.ns.dur",
   codec: "tags.ns.codec",
   orient: "tags.ns.orient",
+  audio_quality: "tags.ns.quality",
+  audio_ch: "tags.ns.ch",
+  audio_bpm: "tags.ns.bpm",
+  audio_key: "tags.ns.key",
+  audio_camelot: "tags.ns.camelot",
+  audio_genre: "tags.ns.genre",
 };
 
 const VALUE_KEYS: Record<string, TranslationKey> = {
@@ -34,6 +40,12 @@ const VALUE_KEYS: Record<string, TranslationKey> = {
   "orient:vertical": "tags.value.orientVertical",
   "orient:horizontal": "tags.value.orientHorizontal",
   "orient:square": "tags.value.orientSquare",
+  "audio_quality:lossless": "tags.value.qualityLossless",
+  "audio_quality:lossy": "tags.value.qualityLossy",
+  "audio_quality:hires": "tags.value.qualityHires",
+  "audio_ch:mono": "tags.value.chMono",
+  "audio_ch:stereo": "tags.value.chStereo",
+  "audio_ch:surround": "tags.value.chSurround",
 };
 
 /** Translated category name, or the raw namespace when it is not a known one. */

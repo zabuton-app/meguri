@@ -170,6 +170,21 @@ describe("tagSearchToken", () => {
     expect(tagSearchToken("long")).toBe("tag:long");
   });
 
+  it("keeps the namespace of a tag whose values are free text", () => {
+    // `jazz` can be a manual tag too: the genre alone must not find it.
+    expect(tagSearchToken("jazz", "audio_genre")).toBe("tag:audio_genre:jazz");
+    expect(tagSearchToken("A minor", "audio_key")).toBe(
+      'tag:"audio_key:A minor"',
+    );
+    expect(tagSearchToken("long", "dur")).toBe("tag:long");
+    expect(tagSearchToken("beach", "")).toBe("tag:beach");
+    expect(
+      parseTagSearchToken(
+        splitSearchTokens(tagSearchToken("A minor", "audio_key"))[0],
+      ),
+    ).toBe("audio_key:A minor");
+  });
+
   it("quotes a value with whitespace, doubling an inner quote", () => {
     expect(tagSearchToken("beach house")).toBe('tag:"beach house"');
     expect(tagSearchToken('a "b" c')).toBe('tag:"a ""b"" c"');

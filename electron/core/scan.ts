@@ -559,8 +559,10 @@ export async function syncFiles(
   );
   // Recompute content_hash for changed files so meta_key stays anchored to the hash
   // (rather than dropping to the path fallback) and metadata keeps linking.
+  // The stored probe output goes: it describes the old content, and derived
+  // tags are read from it (#468), so a probe that then fails must not leave it.
   const updateChanged = db.prepare(
-    "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', deleted_at = NULL, scan_excluded_at = NULL WHERE id = ?",
+    "UPDATE files SET size = ?, mtime = ?, btime = ?, abs_path = ?, inode = ?, content_hash = ?, thumb_status = 'pending', meta = NULL, deleted_at = NULL, scan_excluded_at = NULL WHERE id = ?",
   );
   // name_key goes with rel_path (see naturalNameKey in nameKey.ts).
   const moveStmt = db.prepare(
@@ -578,7 +580,7 @@ export async function syncFiles(
   // are video as .mp4 and audio as .m4a). The row would otherwise keep the old
   // kind forever, since later scans see it as unchanged.
   const reclassifyMoved = db.prepare(
-    "UPDATE files SET kind = ?, ext = ?, thumb_path = NULL, thumb_status = 'pending' WHERE id = ?",
+    "UPDATE files SET kind = ?, ext = ?, thumb_path = NULL, thumb_status = 'pending', meta = NULL WHERE id = ?",
   );
   // A rebuild's re-hash gives a row that had none its first hash, without
   // treating the unchanged file as changed.

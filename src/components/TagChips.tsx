@@ -44,7 +44,7 @@ export function TagChips({ tags, onTagClick }: Props) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onTagClick?.(tagSearchToken(tag.name));
+            onTagClick?.(tagSearchToken(tag.name, tag.namespace));
           }}
           className={cn(
             "shrink-0 rounded px-1 text-[10px] leading-4 transition hover:ring-1 hover:ring-primary",

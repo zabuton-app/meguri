@@ -205,7 +205,7 @@ export function SearchTokenInput({
   /** Swap the directive under the caret for the chosen tag and chip it. */
   const accept = (tag: TagSummary) => {
     const tokens = splitSearchTokens(draft);
-    tokens[tokens.length - 1] = tagSearchToken(tag.name);
+    tokens[tokens.length - 1] = tagSearchToken(tag.name, tag.namespace);
     apply(`${joinSearchTokens(tokens)} `);
     inputRef.current?.focus();
   };

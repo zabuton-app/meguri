@@ -515,14 +515,37 @@ Tags whose `source` is not `manual` are owned by a pipeline and are read-only to
 the user: rename, merge and delete reject them, and the tag management screen
 offers no affordance for them. Today the only such source is `auto-meta`, which
 `electron/core/autoMetaTags.ts` derives during the scan from the ffprobe columns
-already stored on `files`:
+already stored on `files`, and for audio files (`electron/core/audioMetaTags.ts`)
+from the probe output stored in `files.meta`:
 
-| Namespace | Applies to    | Values                                               |
-| --------- | ------------- | ---------------------------------------------------- |
-| `res`     | video + image | `4k` / `1080p` / `720p` / `sd`, from the longer edge |
-| `dur`     | video         | `short` (<1 min) / `medium` / `long` (>30 min)       |
-| `codec`   | video         | normalized `codec_name` (`h264`, `hevc`, `av1`, …)   |
-| `orient`  | video + image | `vertical` / `horizontal` / `square`                 |
+| Namespace       | Applies to    | Values                                               |
+| --------------- | ------------- | ---------------------------------------------------- |
+| `res`           | video + image | `4k` / `1080p` / `720p` / `sd`, from the longer edge |
+| `dur`           | video + audio | `short` (<1 min) / `medium` / `long` (>30 min)       |
+| `codec`         | video + audio | normalized `codec_name` (`h264`, `flac`, `mp3`, …)   |
+| `orient`        | video + image | `vertical` / `horizontal` / `square`                 |
+| `audio_quality` | audio         | `lossless` / `lossy`, plus `hires`                   |
+| `audio_ch`      | audio         | `mono` / `stereo` / `surround`                       |
+| `audio_bpm`     | audio         | a band of ten (`120-129`), from an embedded BPM      |
+| `audio_key`     | audio         | a key name (`A minor`), from an embedded key         |
+| `audio_camelot` | audio         | the same key in Camelot notation (`8A`)              |
+| `audio_genre`   | audio         | each embedded genre, lowercased                      |
+
+`audio_quality:hires` is lossless audio above 48 kHz or above 16 bit (not
+counting floating-point PCM's bit depth); telephone PCM (`pcm_mulaw`,
+`pcm_alaw`) gets no quality. The namespaces only audio files get start with
+`audio_`, so they read apart from the video ones. `dur` and `codec` are
+shared, with the same thresholds for both. A search for a tag whose values
+come from a file's own tags keeps its namespace (`tag:audio_genre:jazz`), since
+a manual tag can have the same name.
+
+An audio file's embedded tags (`TBPM` / `TKEY` in ID3, `BPM` / `INITIALKEY` in
+Vorbis comments, `tmpo` in MP4, and `genre`) are read from the container's and
+the audio stream's tags, whatever their case; the first value that can be read
+wins, and one that cannot gives no tag. A key is understood as a name (`Am`,
+`F#m`, `Bb`), in Camelot (`8A`) or in Open Key (`1m`), or as several of these
+that agree (`8A - Am`). The backfill reads `files.meta` for audio rows only,
+and a changed file's stored output is dropped until it is probed again.
 
 Application is a diff against the current `(meta_key, source)` rows, so
 re-scanning an unchanged library writes nothing. Files that the scan classifies

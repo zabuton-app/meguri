@@ -865,7 +865,7 @@ function TagPage({
           value={`tag:${tag.qualified}`}
           className={held(tag) ? undefined : "text-muted"}
           // The token the search box makes of the same pick.
-          onSelect={() => onPick(tagSearchToken(tag.name))}
+          onSelect={() => onPick(tagSearchToken(tag.name, tag.namespace))}
         >
           <Tag />
           <TagSuggestionLabel t={t} tag={tag} held={held(tag)} />

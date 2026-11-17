@@ -1,6 +1,7 @@
 // Tags derived from metadata the scan already stored on `files` — resolution,
-// duration, codec and orientation. No media file is re-read: every input is a
-// column, which is what makes the backfill affordable.
+// duration, codec and orientation, and for audio files what the stored probe
+// output says (audioMetaTags.ts). No media file is re-read: every input is
+// stored already, which is what makes the backfill affordable.
 //
 // The classifier is pure and the applier/backfill are generic over the source,
 // so a second derived-tag source only has to supply its own `derive` callback.
@@ -8,6 +9,8 @@ import type { DB } from "./db.js";
 import { getSetting, setSetting } from "./queries/settings.js";
 import { metaKeyOf, upsertTag } from "./tags.js";
 import { AUTO_META_SOURCE } from "../../shared/tags.js";
+import { audioMetaTagsFor } from "./audioMetaTags.js";
+import { codecTagName, durationClass } from "./derivedTagClasses.js";
 
 export { AUTO_META_SOURCE };
 
@@ -16,7 +19,7 @@ export { AUTO_META_SOURCE };
  * The next scan of each workspace re-derives every file; classifications that
  * did not move diff out and cost one indexed read each.
  */
-export const AUTO_META_RULESET_VERSION = 1;
+export const AUTO_META_RULESET_VERSION = 2;
 export const AUTO_META_VERSION_KEY = "auto_meta_ruleset_version";
 
 export interface DerivedTag {
@@ -30,6 +33,8 @@ export interface AutoMetaInput {
   height: number | null;
   duration: number | null;
   codec: string | null;
+  /** The stored ffprobe output; read for audio files only. */
+  raw?: unknown;
 }
 
 /** ffprobe reports several spellings per codec; fold them onto one tag name. */
@@ -56,9 +61,6 @@ const CODEC_ALIASES: Record<string, string> = {
   prores: "prores",
 };
 
-/** Unknown but plausible codec names are kept as-is; the space is small enough. */
-const CODEC_SHAPE = /^[a-z0-9]{2,16}$/;
-
 function positive(n: number | null): n is number {
   return n != null && n > 0;
 }
@@ -76,19 +78,6 @@ function resolutionClass(width: number, height: number): string {
   return "sd";
 }
 
-function durationClass(duration: number): string {
-  if (duration < 60) return "short";
-  if (duration <= 1800) return "medium";
-  return "long";
-}
-
-function codecName(raw: string): string | null {
-  const lower = raw.trim().toLowerCase();
-  const known = CODEC_ALIASES[lower];
-  if (known) return known;
-  return CODEC_SHAPE.test(lower) ? lower : null;
-}
-
 /** 2% tolerance so a 1998x2000 image is square rather than vertical. */
 function orientationClass(width: number, height: number): string {
   const ratio = width / height;
@@ -103,6 +92,9 @@ function orientationClass(width: number, height: number): string {
  * is a valid result.
  */
 export function autoMetaTagsFor(input: AutoMetaInput): DerivedTag[] {
+  // Audio has no size; its own rules read the probe output.
+  if (input.kind === "audio")
+    return audioMetaTagsFor(input.raw ?? null, input.duration);
   const out: DerivedTag[] = [];
   const isVideo = input.kind === "video";
   const size =
@@ -119,7 +111,7 @@ export function autoMetaTagsFor(input: AutoMetaInput): DerivedTag[] {
     out.push({ namespace: "dur", name: durationClass(input.duration) });
   }
   if (isVideo && input.codec) {
-    const name = codecName(input.codec);
+    const name = codecTagName(input.codec, CODEC_ALIASES);
     if (name) out.push({ namespace: "codec", name });
   }
   if (size) {
@@ -204,6 +196,8 @@ export interface DerivedTagRow {
   height: number | null;
   duration: number | null;
   codec: string | null;
+  /** The stored ffprobe output (JSON), for audio rows only; null otherwise. */
+  meta: string | null;
 }
 
 const BACKFILL_CHUNK = 512;
@@ -267,7 +261,8 @@ export async function backfillDerivedTags(
   // memory at one chunk while leaving the connection free between pages — which
   // also lets a concurrent tag mutation through during the yield.
   const page = db.prepare(
-    `SELECT id, meta_key, kind, rel_path, width, height, duration, codec
+    `SELECT id, meta_key, kind, rel_path, width, height, duration, codec,
+            CASE WHEN kind = 'audio' THEN meta END AS meta
        FROM files WHERE deleted_at IS NULL AND id > ? ORDER BY id LIMIT ?`,
   );
 
@@ -304,7 +299,17 @@ export function backfillAutoMetaTags(
     source: AUTO_META_SOURCE,
     versionKey: AUTO_META_VERSION_KEY,
     version: String(AUTO_META_RULESET_VERSION),
-    derive: (row) => autoMetaTagsFor(row),
+    derive: (row) => autoMetaTagsFor({ ...row, raw: parseProbe(row.meta) }),
     ...opts,
   });
+}
+
+/** The stored probe output, or null when there is none or it is not JSON. */
+function parseProbe(meta: string | null): unknown {
+  if (meta == null) return null;
+  try {
+    return JSON.parse(meta) as unknown;
+  } catch {
+    return null;
+  }
 }
