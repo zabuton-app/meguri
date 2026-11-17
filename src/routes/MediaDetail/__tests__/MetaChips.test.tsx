@@ -96,4 +96,12 @@ describe("MetaChips for audio", () => {
     );
     expect(chip("media.metaSampleRate")).toBeNull();
   });
+  it("states a sample rate to the hertz", () => {
+    renderChips(
+      detail("audio", {
+        streams: [{ codec_type: "audio", sample_rate: "22050" }],
+      }),
+    );
+    expect(chip("media.metaSampleRate")).toBe("22.05 kHz");
+  });
 });

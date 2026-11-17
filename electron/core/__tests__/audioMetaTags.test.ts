@@ -51,11 +51,13 @@ describe("parseBpm and bpmBand", () => {
 });
 
 describe("tempoClass", () => {
-  it("calls a BPM slow under 90 and fast from 120", () => {
-    expect(tempoClass(89.9)).toBe("slow");
-    expect(tempoClass(90)).toBe("moderate");
-    expect(tempoClass(119.9)).toBe("moderate");
-    expect(tempoClass(120)).toBe("fast");
+  it("calls a BPM slow under 90 and fast from 120, rounded as its band is", () => {
+    expect(tempoClass(89.4)).toBe("slow");
+    expect(tempoClass(89.5)).toBe("moderate");
+    expect(tempoClass(119.4)).toBe("moderate");
+    expect(tempoClass(119.6)).toBe("fast");
+    // The band and the tempo agree: 119.6 is in 120-129, and fast.
+    expect(bpmBand(119.6)).toBe("120-129");
   });
 
   it("gives a file its tempo beside its band", () => {
@@ -118,6 +120,7 @@ describe("genreNames", () => {
     expect(genreNames("(17)")).toEqual([]);
     expect(genreNames("17")).toEqual([]);
     expect(genreNames("(17)Rock")).toEqual(["rock"]);
+    expect(genreNames("Pop; (17)Rock")).toEqual(["pop", "rock"]);
   });
 
   it("keeps at most four", () => {
@@ -173,6 +176,23 @@ describe("audioMetaTagsFor", () => {
     expect(tags({ codec_name: "dts", sample_rate: "48000" })).toEqual([
       "codec:dts",
     ]);
+  });
+
+  it("takes no bit depth from float samples, whatever the codec", () => {
+    // Float WavPack at CD rate: its 32 bits are the float's, not the source's.
+    expect(
+      names(
+        audioMetaTagsFor(
+          probe({
+            codec_name: "wavpack",
+            sample_rate: "44100",
+            sample_fmt: "fltp",
+            bits_per_raw_sample: "32",
+          }),
+          null,
+        ),
+      ),
+    ).toEqual(["audio_quality:lossless", "codec:wavpack"]);
   });
 
   it("gives telephone PCM no quality, and floating-point PCM no hi-res by bit depth", () => {

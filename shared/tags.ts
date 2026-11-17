@@ -38,10 +38,24 @@ export const AUTO_META_NAMESPACES = [
 export type AutoMetaNamespace = (typeof AUTO_META_NAMESPACES)[number];
 
 /**
- * The closed value sets of the classifier, declared once so a bare value can be
- * traced back to its category. `codec` is deliberately absent: its values come
- * from ffprobe and form an open set, as do `audio_bpm`, `audio_key`,
- * `audio_camelot` and `audio_genre`, which come from what a file's tags say.
+ * The generated namespaces a bare `tag:` value searches (`tag:long`,
+ * `tag:h264`, not `tag:dur:long`). Their values are technical names nobody
+ * gives a tag of their own. Every other generated namespace (the `audio_`
+ * ones, #468) is searched with its namespace only (`tag:audio_tempo:fast`):
+ * its values are everyday words (`slow`, `stereo`) or whatever a file's own
+ * tags say (`jazz`), which can be the name of a manual tag too.
+ */
+export const BARE_SEARCH_NAMESPACES: readonly string[] = [
+  "res",
+  "dur",
+  "codec",
+  "orient",
+];
+
+/**
+ * The closed value sets of the bare-searched classifier namespaces, declared
+ * once so a bare value can be traced back to its category. `codec` is
+ * deliberately absent: its values come from ffprobe and form an open set.
  *
  * These sets must stay disjoint — that is what lets the search box accept
  * `tag:long` instead of `tag:dur:long`. A ruleset test asserts both that they
@@ -51,9 +65,6 @@ export const AUTO_META_VALUES: Readonly<Record<string, readonly string[]>> = {
   res: ["4k", "1080p", "720p", "sd"],
   dur: ["short", "medium", "long"],
   orient: ["horizontal", "vertical", "square"],
-  audio_quality: ["lossless", "lossy", "hires"],
-  audio_ch: ["mono", "stereo", "surround"],
-  audio_tempo: ["slow", "moderate", "fast"],
 };
 
 /**
@@ -351,35 +362,25 @@ function needsQuoting(value: string): boolean {
 }
 
 /**
- * Generated namespaces whose values are whatever a file's own tags say (#468):
- * free text that can be the name of a manual tag too (`jazz`), so a search
- * for one keeps its namespace.
- */
-const FREE_TEXT_NAMESPACES: readonly string[] = [
-  "audio_bpm",
-  "audio_key",
-  "audio_camelot",
-  "audio_genre",
-];
-
-/**
  * The search-box token that reproduces this tag as an exact filter.
  *
- * A generated tag carries its **bare** value (`tag:long`, not `tag:dur:long`):
- * the category vocabularies are disjoint, so the value alone identifies the
- * category, and it is far easier to read and type. The qualified form stays
- * accepted on input for the rare case where a manual tag shares the name — a
- * bare value matches both, which is usually what was wanted anyway. A tag of
- * a namespace whose values are free text (FREE_TEXT_NAMESPACES) keeps its
- * namespace: `tag:audio_genre:jazz`, not every file tagged `jazz`.
+ * A tag of a bare-searched namespace (BARE_SEARCH_NAMESPACES) carries its
+ * **bare** value (`tag:long`, not `tag:dur:long`): the category vocabularies
+ * are disjoint, so the value alone identifies the category, and it is far
+ * easier to read and type. The qualified form stays accepted on input for the
+ * rare case where a manual tag shares the name — a bare value matches both,
+ * which is usually what was wanted anyway. A tag of any other generated
+ * namespace keeps its namespace (`tag:audio_genre:jazz`), since a bare value
+ * does not search it.
  *
  * Values containing whitespace or a quote are quoted, doubling any inner quote —
  * the same convention {@link splitSearchTokens} reads back.
  */
 export function tagSearchToken(name: string, namespace = ""): string {
-  const value = FREE_TEXT_NAMESPACES.includes(namespace)
-    ? qualifiedTagName(namespace, name)
-    : name;
+  const value =
+    namespace && !BARE_SEARCH_NAMESPACES.includes(namespace)
+      ? qualifiedTagName(namespace, name)
+      : name;
   const body = needsQuoting(value) ? `"${value.replace(/"/g, '""')}"` : value;
   return `${TAG_SEARCH_PREFIX}:${body}`;
 }

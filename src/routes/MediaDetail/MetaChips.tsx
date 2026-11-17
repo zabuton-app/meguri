@@ -3,7 +3,13 @@ import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { hasTimeline, kindLabel } from "@/lib/mediaKind";
-import { audioInfo, tempoClass, type AudioInfo } from "@shared/audioInfo";
+import {
+  audioInfo,
+  channelClass,
+  tempoClass,
+  type AudioInfo,
+} from "@shared/audioInfo";
+import { tagValueLabel } from "@/lib/tagLabel";
 
 interface Props {
   detail: FileDetail;
@@ -65,35 +71,26 @@ export function MetaChips({
   );
 }
 
-const TEMPO_LABELS = {
-  slow: "tags.value.tempoSlow",
-  moderate: "tags.value.tempoModerate",
-  fast: "tags.value.tempoFast",
-} as const;
-
 /** A number without a trailing `.0`: 44.1, 48, 128, 96.5. */
 const plain = (n: number) => String(Math.round(n * 10) / 10);
 
 function channelsLabel(t: TFunc, channels: number): string {
-  if (channels === 1) return t("tags.value.chMono");
-  if (channels === 2) return t("tags.value.chStereo");
-  return `${t("tags.value.chSurround")} (${channels})`;
+  const label = tagValueLabel(t, "audio_ch", channelClass(channels));
+  return channels > 2 ? `${label} (${channels})` : label;
 }
+
+/** A sample rate in kHz, to the hertz: 44.1, 48, 22.05, 11.025. */
+const kHz = (rate: number) => `${Number((rate / 1000).toFixed(3))} kHz`;
 
 /** What an audio file's probe output says; a value it does not give is left out. */
 function AudioChips({ meta, t }: { meta: unknown; t: TFunc }) {
   const info: AudioInfo | null = audioInfo(meta);
   if (!info) return null;
-  // A float sample's size says nothing of the source's depth, and lossy
-  // codecs report none.
-  const bits = info.codec.startsWith("pcm_f") ? null : info.bits;
+  const { bits } = info;
   return (
     <>
       {info.sampleRate !== null && (
-        <Chip
-          label={t("media.metaSampleRate")}
-          value={`${plain(info.sampleRate / 1000)} kHz`}
-        />
+        <Chip label={t("media.metaSampleRate")} value={kHz(info.sampleRate)} />
       )}
       {bits !== null && (
         <Chip label={t("media.metaBitDepth")} value={`${bits}-bit`} />
@@ -107,7 +104,7 @@ function AudioChips({ meta, t }: { meta: unknown; t: TFunc }) {
       {info.bpm !== null && (
         <Chip
           label={t("media.metaBpm")}
-          value={`${plain(info.bpm)} (${t(TEMPO_LABELS[tempoClass(info.bpm)])})`}
+          value={`${plain(info.bpm)} (${tagValueLabel(t, "audio_tempo", tempoClass(info.bpm))})`}
         />
       )}
       {info.key && (

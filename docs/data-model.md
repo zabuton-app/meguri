@@ -536,9 +536,12 @@ from the probe output stored in `files.meta`:
 counting floating-point PCM's bit depth); telephone PCM (`pcm_mulaw`,
 `pcm_alaw`) gets no quality. The namespaces only audio files get start with
 `audio_`, so they read apart from the video ones. `dur` and `codec` are
-shared, with the same thresholds for both. A search for a tag whose values
-come from a file's own tags keeps its namespace (`tag:audio_genre:jazz`), since
-a manual tag can have the same name.
+shared, with the same thresholds for both. A bare `tag:` value searches manual
+tags and `res`, `dur`, `codec` and `orient` only (`BARE_SEARCH_NAMESPACES` in
+`shared/tags.ts`); the `audio_` ones are searched with their namespace
+(`tag:audio_tempo:fast`), since their values are everyday words or whatever a
+file's tags say, which a manual tag can be named too. The search box shows a
+generated tag's chip as its category and value (`Tempo: Fast`).
 
 An audio file's embedded tags (`TBPM` / `TKEY` in ID3, `BPM` / `INITIALKEY` in
 Vorbis comments, `tmpo` in MP4, and `genre`) are read from the container's and

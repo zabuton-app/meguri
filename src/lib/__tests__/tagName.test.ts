@@ -177,6 +177,8 @@ describe("tagSearchToken", () => {
       'tag:"audio_key:A minor"',
     );
     expect(tagSearchToken("long", "dur")).toBe("tag:long");
+    // Everyday words are no exception: a bare value does not search them.
+    expect(tagSearchToken("fast", "audio_tempo")).toBe("tag:audio_tempo:fast");
     expect(tagSearchToken("beach", "")).toBe("tag:beach");
     expect(
       parseTagSearchToken(

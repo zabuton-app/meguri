@@ -10,6 +10,7 @@ interface ProbeStream {
   codec_type?: string;
   codec_name?: string;
   sample_rate?: string;
+  sample_fmt?: string;
   bits_per_sample?: number;
   bits_per_raw_sample?: string;
   channels?: number;
@@ -32,7 +33,11 @@ export interface AudioInfo {
   /** ffprobe's codec name, lowercased; empty when it gives none. */
   codec: string;
   sampleRate: number | null;
-  /** Bits per sample as ffprobe reports them (the raw ones first). */
+  /**
+   * Bits per sample of the source (the raw ones first). Null for floating
+   * point samples, whose size says nothing of the source's depth, and for
+   * codecs that report none.
+   */
   bits: number | null;
   channels: number | null;
   /** Beats per minute as written, to a tenth. */
@@ -91,9 +96,18 @@ export function parseBpm(raw: string): number | null {
  * tag and the detail view both class a BPM by this.
  */
 export function tempoClass(bpm: number): "slow" | "moderate" | "fast" {
-  if (bpm < 90) return "slow";
-  if (bpm < 120) return "moderate";
+  // Rounded as the band of ten is (bpmBand), so 119.6 is in 120-129 and fast.
+  const whole = Math.round(bpm);
+  if (whole < 90) return "slow";
+  if (whole < 120) return "moderate";
   return "fast";
+}
+
+/** One channel, two, or more. The `audio_ch` tag and the detail view use it. */
+export function channelClass(channels: number): "mono" | "stereo" | "surround" {
+  if (channels === 1) return "mono";
+  if (channels === 2) return "stereo";
+  return "surround";
 }
 
 /** Camelot wheel names, minor (A) and major (B), by number. */
@@ -195,12 +209,32 @@ export const MAX_GENRES = 4;
 export function genreNames(raw: string): string[] {
   const out: string[] = [];
   for (const part of raw.split(/[;/,\0]/)) {
-    const name = cleanTagName(part.replace(/^\(\d+\)/, "").toLowerCase());
+    const name = cleanTagName(
+      part
+        .trim()
+        .replace(/^\(\d+\)/, "")
+        .toLowerCase(),
+    );
     if (!isUsableTagName(name) || /^\(?\d+\)?$/.test(name)) continue;
     if (!out.includes(name)) out.push(name);
     if (out.length === MAX_GENRES) break;
   }
   return out;
+}
+
+/**
+ * Whether the stream's samples are floating point: by its sample format
+ * (`flt`, `fltp`, `dbl`, `dblp`), which covers float WavPack too, or for PCM
+ * by its codec name. A lossy codec decodes to float as well, but reports no
+ * bit depth anyway.
+ */
+function isFloat(stream: ProbeStream): boolean {
+  const fmt = typeof stream.sample_fmt === "string" ? stream.sample_fmt : "";
+  return (
+    /^(flt|dbl)/.test(fmt) ||
+    (typeof stream.codec_name === "string" &&
+      stream.codec_name.toLowerCase().startsWith("pcm_f"))
+  );
 }
 
 /**
@@ -225,9 +259,10 @@ export function audioInfo(raw: unknown): AudioInfo | null {
         ? stream.codec_name.trim().toLowerCase()
         : "",
     sampleRate: positiveInt(stream.sample_rate),
-    bits:
-      positiveInt(stream.bits_per_raw_sample) ??
-      positiveInt(stream.bits_per_sample),
+    bits: isFloat(stream)
+      ? null
+      : (positiveInt(stream.bits_per_raw_sample) ??
+        positiveInt(stream.bits_per_sample)),
     channels: positiveInt(stream.channels),
     bpm: firstParsed(tags, ["tbpm", "bpm", "tmpo"], parseBpm),
     key: firstParsed(

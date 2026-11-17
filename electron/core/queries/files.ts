@@ -17,6 +17,7 @@ import {
   parseTagSearchToken,
   searchTokenTerms,
   splitSearchTokens,
+  BARE_SEARCH_NAMESPACES,
   tagIdentityKey,
 } from "../../../shared/tags.js";
 import type {
@@ -176,14 +177,17 @@ function resolveTagIds(db: DB, token: string): number[] {
  */
 function resolveSearchTagIds(db: DB, value: string): number[] {
   const key = tagIdentityKey(value);
+  // A bare value names a manual tag or one of the bare-searched generated
+  // namespaces' (#468): `tag:jazz` is not every file whose genre is jazz.
   return db
     .prepare(
       `SELECT id FROM tags
-        WHERE tag_key(name) = ?
+        WHERE (tag_key(name) = ?
+               AND (namespace = '' OR namespace IN (SELECT value FROM json_each(?))))
            OR (namespace <> '' AND tag_key(namespace || ':' || name) = ?)`,
     )
     .pluck()
-    .all(key, key) as number[];
+    .all(key, JSON.stringify(BARE_SEARCH_NAMESPACES), key) as number[];
 }
 
 /**

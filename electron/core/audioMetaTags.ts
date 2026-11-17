@@ -5,7 +5,7 @@
 //
 // Pure, like autoMetaTagsFor: a value that cannot be read gives no tag, never
 // a guessed one.
-import { audioInfo, tempoClass } from "../../shared/audioInfo.js";
+import { audioInfo, channelClass, tempoClass } from "../../shared/audioInfo.js";
 import type { DerivedTag } from "./autoMetaTags.js";
 import { codecTagName, durationClass } from "./derivedTagClasses.js";
 
@@ -44,28 +44,20 @@ const TAG_NAMES = Object.fromEntries(
   Object.entries(AUDIO_CODECS).map(([name, { tag }]) => [name, tag]),
 );
 
-/**
- * What a codec is: its tag, whether it keeps every sample, and whether its
- * samples are floating point, whose bit depth says nothing of the source's.
- */
+/** What a codec is: its tag, and whether it keeps every sample. */
 function audioCodec(
   raw: string,
-): { tag: string; lossless: boolean | null; float: boolean } | null {
+): { tag: string; lossless: boolean | null } | null {
   if (raw.startsWith("pcm_")) {
     // G.711 (telephone) PCM is 8-bit companded: not lossless in any useful
     // sense, nor lossy as a codec is, so it gets no quality.
     const companded = raw === "pcm_mulaw" || raw === "pcm_alaw";
-    return {
-      tag: "pcm",
-      lossless: companded ? null : true,
-      float: raw.startsWith("pcm_f"),
-    };
+    return { tag: "pcm", lossless: companded ? null : true };
   }
-  if (raw.startsWith("dsd_"))
-    return { tag: "dsd", lossless: true, float: false };
+  if (raw.startsWith("dsd_")) return { tag: "dsd", lossless: true };
   const tag = codecTagName(raw, TAG_NAMES);
   if (tag === null) return null;
-  return { tag, lossless: AUDIO_CODECS[raw]?.lossless ?? null, float: false };
+  return { tag, lossless: AUDIO_CODECS[raw]?.lossless ?? null };
 }
 
 /** The band of ten (`120-129`) a BPM falls in. */
@@ -95,21 +87,14 @@ export function audioMetaTagsFor(
       namespace: "audio_quality",
       name: codec.lossless ? "lossless" : "lossy",
     });
-    const bits = codec.float ? null : info.bits;
+    // A float sample's size is no depth (audioInfo leaves it out).
+    const bits = info.bits;
     if (codec.lossless && ((info.sampleRate ?? 0) > 48_000 || (bits ?? 0) > 16))
       out.push({ namespace: "audio_quality", name: "hires" });
   }
 
   if (info.channels !== null)
-    out.push({
-      namespace: "audio_ch",
-      name:
-        info.channels === 1
-          ? "mono"
-          : info.channels === 2
-            ? "stereo"
-            : "surround",
-    });
+    out.push({ namespace: "audio_ch", name: channelClass(info.channels) });
 
   if (info.bpm !== null) {
     out.push({ namespace: "audio_bpm", name: bpmBand(info.bpm) });

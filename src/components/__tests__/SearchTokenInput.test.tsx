@@ -130,6 +130,15 @@ describe("SearchTokenInput", () => {
     expect(input.value).toBe("");
   });
 
+  it("shows a generated tag's chip as its category and value (#468)", () => {
+    setup("tag:audio_tempo:fast tag:long tag:beach");
+    expect(chips().map((c) => c.textContent)).toEqual([
+      "Tempo: Fast",
+      "Length: Long",
+      "tag:beach",
+    ]);
+  });
+
   it("chips a hash: directive, and leaves a short one as text (#302)", () => {
     const { input, last } = setup();
     type(input, "hash:3FA9c1d2 hash:3f ");

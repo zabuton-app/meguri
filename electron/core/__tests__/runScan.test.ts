@@ -436,6 +436,27 @@ describe("runScan", () => {
     ).toEqual({ meta: null });
   });
 
+  it("keeps a changed video's stored probe output when probing it again fails", async () => {
+    write("a.mp4", "AAAAAAAAAA");
+    write("b.mp4", "BBBBBBBBBB");
+    await scan();
+    // Its embedded tracks are read from it.
+    const kept = JSON.stringify({ streams: [{ codec_type: "subtitle" }] });
+    db.prepare("UPDATE files SET meta = ? WHERE rel_path = 'a.mp4'").run(kept);
+    media.failProbe = (src) => src.endsWith("a.mp4");
+    try {
+      write("a.mp4", "CCCCCCCCCCCCCCCC");
+      write("b.mp4", "DDDDDDDDDDDDDDDD");
+      await scan();
+    } finally {
+      media.failProbe = () => false;
+    }
+
+    expect(
+      db.prepare("SELECT meta FROM files WHERE rel_path = 'a.mp4'").get(),
+    ).toEqual({ meta: kept });
+  });
+
   it("keeps file ids and rebuilds search entries and thumbnails on a rebuild", async () => {
     write("a.mp4", "AAAAAAAAAA");
     write("b.mp4", "BBBBBBBBBB");

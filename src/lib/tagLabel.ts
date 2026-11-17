@@ -102,6 +102,20 @@ export function searchTokenLabel(t: TFunc, token: string): string | null {
     : `${t("media.tags")}: ${parsed.name}`;
 }
 
+/**
+ * What a search-box chip shows for a generated tag's token: its category and
+ * value (`Tempo: Fast`) rather than `tag:audio_tempo:fast`. Null for anything
+ * else, which shows as typed.
+ */
+export function generatedTagChipLabel(t: TFunc, token: string): string | null {
+  const raw = parseTagSearchToken(token);
+  if (raw === null) return null;
+  const parsed = parseQualifiedTagName(raw);
+  const namespace =
+    parsed.namespace || namespaceOfAutoMetaValue(parsed.name) || "";
+  return namespace ? tagHumanLabel(t, namespace, parsed.name) : null;
+}
+
 /** Origin label for a tag. Unknown sources fall back to their raw name. */
 export function tagSourceLabel(t: TFunc, source: string): string {
   if (source === "manual") return t("tags.source.manual");
