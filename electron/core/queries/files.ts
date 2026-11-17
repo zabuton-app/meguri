@@ -179,6 +179,8 @@ function resolveSearchTagIds(db: DB, value: string): number[] {
   const key = tagIdentityKey(value);
   // A bare value names a manual tag or one of the bare-searched generated
   // namespaces' (#468): `tag:jazz` is not every file whose genre is jazz.
+  // The one place a namespace list decides identity (docs/data-model.md):
+  // a namespace left out still resolves in its qualified form.
   return db
     .prepare(
       `SELECT id FROM tags

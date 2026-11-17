@@ -564,6 +564,11 @@ file on the next scan.
 The set of namespaces is **not closed**. No code that decides tag _identity_ may
 enumerate it: search tokens resolve against the `tags` table itself, and the tag
 screen sorts unknown namespaces after the known ones rather than dropping them.
+One exception is deliberate: a _bare_ `tag:` value reaches only the
+namespaces in `BARE_SEARCH_NAMESPACES` (besides manual tags). A namespace
+missing from it is not lost, since its qualified form (`tag:ns:value`) always
+resolves; it only cannot be reached without its namespace, which is the safe
+side for a namespace whose values can be the names of manual tags.
 
 ## Auto tagging
 
