@@ -2,6 +2,7 @@
 // Translations are retrieved via t("key", { params }) and support {name}-style interpolation.
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -50,13 +51,45 @@ interface I18nCtx {
 
 const Ctx = createContext<I18nCtx | null>(null);
 
-/** Determine the default language from saved preference, otherwise use English. */
+/**
+ * The language one BCP 47 tag maps to, or undefined when Meguri has no translation for it.
+ * An exact match wins (`zh-CN`), then the primary subtag (`es-MX` -> `es`). Traditional
+ * Chinese tags (`zh-TW`, `zh-HK`, `zh-Hant`) stay English: the app ships Simplified only.
+ */
+function matchLang(tag: string | undefined): Lang | undefined {
+  if (!tag) return undefined;
+  const lower = tag.trim().toLowerCase();
+  if (!lower) return undefined;
+  const exact = LANGUAGES.find((l) => l.id.toLowerCase() === lower);
+  if (exact) return exact.id;
+  if (
+    lower === "zh-tw" ||
+    lower === "zh-hk" ||
+    lower === "zh-mo" ||
+    lower.startsWith("zh-hant")
+  ) {
+    return undefined;
+  }
+  const base = lower.split("-")[0];
+  return base
+    ? LANGUAGES.find((l) => l.id.toLowerCase() === base)?.id
+    : undefined;
+}
+
+/** Determine the default language: the saved choice, then the OS language, then English. */
 function detectLang(): Lang {
   try {
     const stored = localStorage.getItem(LS_KEY);
     if (stored && LANGUAGES.some((l) => l.id === stored)) return stored as Lang;
   } catch {
     // ignore
+  }
+  // Read the OS language but do not store it (#505): a user who changes the OS language
+  // gets the new one until they pick a language in Settings, which does persist.
+  const languages = navigator.languages;
+  for (const tag of languages?.length ? languages : [navigator.language]) {
+    const match = matchLang(tag);
+    if (match) return match;
   }
   return "en";
 }
@@ -80,14 +113,19 @@ function interpolate(
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(detectLang);
 
-  // Sync <html lang> + save the LS mirror.
-  useEffect(() => {
-    document.documentElement.lang = lang;
+  // Only a language the user picked is stored, so the OS language is read again on the
+  // next launch until then (#505). Keep <html lang> in sync with the active catalog.
+  const setLang = useCallback((next: Lang) => {
+    setLangState(next);
     try {
-      localStorage.setItem(LS_KEY, lang);
+      localStorage.setItem(LS_KEY, next);
     } catch {
       // ignore
     }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
   }, [lang]);
 
   const value = useMemo<I18nCtx>(() => {
@@ -100,8 +138,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         numbers,
         params,
       );
-    return { lang, setLang: setLangState, t };
-  }, [lang]);
+    return { lang, setLang, t };
+  }, [lang, setLang]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
