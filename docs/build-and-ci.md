@@ -143,9 +143,9 @@ name, the portable build overwrote the installer.
 
 Electron 45 packages require macOS 13 (Ventura) or later. The existing
 Windows x64 and Linux x64 release targets are supported by Electron 45.
-On Linux the bundled ffmpeg and ffprobe need glibc 2.35 or later (Ubuntu
-22.04, Debian 12); on an older system they do not start, so files get no
-metadata or thumbnails.
+On Linux the bundled ffmpeg and ffprobe need glibc 2.28 or later (Debian 10,
+RHEL 8); on an older system they do not start, so files get no metadata or
+thumbnails.
 The Node.js version used to run npm and the build scripts is separate from
 the Node.js version bundled with Electron.
 

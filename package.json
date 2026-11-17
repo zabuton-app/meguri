@@ -66,7 +66,7 @@
     "@radix-ui/react-switch": "^1.4.1",
     "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-virtual": "^3.14.26",
-    "@zabuton-app/ffmpeg-binaries": "https://github.com/zabuton-app/ffmpeg-binaries/releases/download/v1.0.2/zabuton-app-ffmpeg-binaries-1.0.2.tgz",
+    "@zabuton-app/ffmpeg-binaries": "https://github.com/zabuton-app/ffmpeg-binaries/releases/download/v1.0.4/zabuton-app-ffmpeg-binaries-1.0.4.tgz",
     "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -198,7 +198,7 @@
   "allowScripts": {
     "electron-winstaller@5.4.0": true,
     "esbuild@0.25.12": true,
-    "https://github.com/zabuton-app/ffmpeg-binaries/releases/download/v1.0.2/zabuton-app-ffmpeg-binaries-1.0.2.tgz": true,
+    "https://github.com/zabuton-app/ffmpeg-binaries/releases/download/v1.0.4/zabuton-app-ffmpeg-binaries-1.0.4.tgz": true,
     "better-sqlite3": false
   }
 }
