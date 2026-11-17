@@ -103,6 +103,8 @@ export default function Missing() {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["missing_files"] });
+      // Tags carried only by the files removed are no longer to complete.
+      void qc.invalidateQueries({ queryKey: ["tags_list_all"] });
     },
   });
   const onRemove = useCallback(async () => {
