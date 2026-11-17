@@ -73,3 +73,105 @@ describe("I18nProvider", () => {
     );
   });
 });
+
+describe("I18nProvider OS language on first launch (#505)", () => {
+  const originalLanguages = Object.getOwnPropertyDescriptor(
+    navigator,
+    "languages",
+  );
+  const originalLanguage = Object.getOwnPropertyDescriptor(
+    navigator,
+    "language",
+  );
+
+  const setOsLanguages = (languages: string[]): void => {
+    Object.defineProperty(navigator, "languages", {
+      configurable: true,
+      value: languages,
+    });
+    Object.defineProperty(navigator, "language", {
+      configurable: true,
+      value: languages[0] ?? "",
+    });
+  };
+
+  const restoreOsLanguages = (): void => {
+    if (originalLanguages) {
+      Object.defineProperty(navigator, "languages", originalLanguages);
+    } else {
+      delete (navigator as unknown as Record<string, unknown>).languages;
+    }
+    if (originalLanguage) {
+      Object.defineProperty(navigator, "language", originalLanguage);
+    } else {
+      delete (navigator as unknown as Record<string, unknown>).language;
+    }
+  };
+
+  it("starts in a supported OS language when nothing is stored", () => {
+    setOsLanguages(["ja-JP"]);
+    try {
+      const { result } = renderHook(() => useI18n(), { wrapper });
+      expect(result.current.lang).toBe("ja");
+      expect(result.current.t("common.ok")).toBe(ja["common.ok"]);
+    } finally {
+      restoreOsLanguages();
+    }
+  });
+
+  it("maps a regional tag to its base language", () => {
+    setOsLanguages(["fr-CA"]);
+    try {
+      const { result } = renderHook(() => useI18n(), { wrapper });
+      expect(result.current.lang).toBe("fr");
+    } finally {
+      restoreOsLanguages();
+    }
+  });
+
+  it("takes the first supported tag of the OS list", () => {
+    setOsLanguages(["de-DE", "ko-KR"]);
+    try {
+      const { result } = renderHook(() => useI18n(), { wrapper });
+      expect(result.current.lang).toBe("ko");
+    } finally {
+      restoreOsLanguages();
+    }
+  });
+
+  it("keeps a language picked in Settings winning over the OS language", () => {
+    localStorage.setItem("meguri.lang", "es");
+    setOsLanguages(["ja-JP"]);
+    try {
+      const { result } = renderHook(() => useI18n(), { wrapper });
+      expect(result.current.lang).toBe("es");
+    } finally {
+      restoreOsLanguages();
+    }
+  });
+
+  it.each([
+    ["zh-TW", "Traditional Chinese"],
+    ["zh-HK", "Traditional Chinese (Hong Kong)"],
+    ["de-DE", "an unsupported language"],
+  ])("falls back to English for %s (%s)", (tag) => {
+    setOsLanguages([tag]);
+    try {
+      const { result } = renderHook(() => useI18n(), { wrapper });
+      expect(result.current.lang).toBe("en");
+    } finally {
+      restoreOsLanguages();
+    }
+  });
+
+  it("does not store the detected language", () => {
+    setOsLanguages(["es-ES"]);
+    try {
+      const { result } = renderHook(() => useI18n(), { wrapper });
+      expect(result.current.lang).toBe("es");
+      expect(localStorage.getItem("meguri.lang")).toBeNull();
+    } finally {
+      restoreOsLanguages();
+    }
+  });
+});
