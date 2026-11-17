@@ -3,6 +3,13 @@ import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { hasTimeline, kindLabel } from "@/lib/mediaKind";
+import {
+  audioInfo,
+  channelClass,
+  tempoClass,
+  type AudioInfo,
+} from "@shared/audioInfo";
+import { tagValueLabel } from "@/lib/tagLabel";
 
 interface Props {
   detail: FileDetail;
@@ -14,7 +21,11 @@ interface Props {
   t: TFunc;
 }
 
-/** Metadata badges shown under the player (workspace, kind, resolution, size, duration, codec, fps). */
+/**
+ * Metadata badges shown under the player (workspace, kind, resolution, size,
+ * duration, codec, fps), and for audio what its stored probe output says
+ * (#468): format, channels, and the BPM, key and genre written in the file.
+ */
 export function MetaChips({
   detail,
   wsId,
@@ -55,7 +66,57 @@ export function MetaChips({
           value={detail.fps ? detail.fps.toFixed(2) : "—"}
         />
       )}
+      {detail.kind === "audio" && <AudioChips meta={detail.meta} t={t} />}
     </div>
+  );
+}
+
+/** A number without a trailing `.0`: 44.1, 48, 128, 96.5. */
+const plain = (n: number) => String(Math.round(n * 10) / 10);
+
+function channelsLabel(t: TFunc, channels: number): string {
+  const label = tagValueLabel(t, "audio_ch", channelClass(channels));
+  return channels > 2 ? `${label} (${channels})` : label;
+}
+
+/** A sample rate in kHz, to the hertz: 44.1, 48, 22.05, 11.025. */
+const kHz = (rate: number) => `${Number((rate / 1000).toFixed(3))} kHz`;
+
+/** What an audio file's probe output says; a value it does not give is left out. */
+function AudioChips({ meta, t }: { meta: unknown; t: TFunc }) {
+  const info: AudioInfo | null = audioInfo(meta);
+  if (!info) return null;
+  const { bits } = info;
+  return (
+    <>
+      {info.sampleRate !== null && (
+        <Chip label={t("media.metaSampleRate")} value={kHz(info.sampleRate)} />
+      )}
+      {bits !== null && (
+        <Chip label={t("media.metaBitDepth")} value={`${bits}-bit`} />
+      )}
+      {info.channels !== null && (
+        <Chip
+          label={t("media.metaChannels")}
+          value={channelsLabel(t, info.channels)}
+        />
+      )}
+      {info.bpm !== null && (
+        <Chip
+          label={t("media.metaBpm")}
+          value={`${plain(info.bpm)} (${tagValueLabel(t, "audio_tempo", tempoClass(info.bpm))})`}
+        />
+      )}
+      {info.key && (
+        <Chip
+          label={t("media.metaKey")}
+          value={`${info.key.name} (${info.key.camelot})`}
+        />
+      )}
+      {info.genres.length > 0 && (
+        <Chip label={t("media.metaGenre")} value={info.genres.join(", ")} />
+      )}
+    </>
   );
 }
 

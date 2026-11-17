@@ -77,7 +77,9 @@ export function TagEditor({
                 // one button inside another is invalid.
                 <button
                   type="button"
-                  onClick={() => onTagClick(tagSearchToken(tag.name))}
+                  onClick={() =>
+                    onTagClick(tagSearchToken(tag.name, tag.namespace))
+                  }
                   title={t("grid.searchByTag", { name: human })}
                   className="transition hover:opacity-80"
                 >

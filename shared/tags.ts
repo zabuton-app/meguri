@@ -22,13 +22,40 @@ export const AUTO_META_SOURCE = "auto-meta";
  * decides tag *identity* resolves against the `tags` table instead (see
  * queries/files.ts).
  */
-export const AUTO_META_NAMESPACES = ["res", "dur", "codec", "orient"] as const;
+export const AUTO_META_NAMESPACES = [
+  "res",
+  "dur",
+  "codec",
+  "orient",
+  "audio_quality",
+  "audio_ch",
+  "audio_tempo",
+  "audio_bpm",
+  "audio_key",
+  "audio_camelot",
+  "audio_genre",
+] as const;
 export type AutoMetaNamespace = (typeof AUTO_META_NAMESPACES)[number];
 
 /**
- * The closed value sets of the classifier, declared once so a bare value can be
- * traced back to its category. `codec` is deliberately absent: its values come
- * from ffprobe and form an open set.
+ * The generated namespaces a bare `tag:` value searches (`tag:long`,
+ * `tag:h264`, not `tag:dur:long`). Their values are technical names nobody
+ * gives a tag of their own. Every other generated namespace (the `audio_`
+ * ones, #468) is searched with its namespace only (`tag:audio_tempo:fast`):
+ * its values are everyday words (`slow`, `stereo`) or whatever a file's own
+ * tags say (`jazz`), which can be the name of a manual tag too.
+ */
+export const BARE_SEARCH_NAMESPACES: readonly string[] = [
+  "res",
+  "dur",
+  "codec",
+  "orient",
+];
+
+/**
+ * The closed value sets of the bare-searched classifier namespaces, declared
+ * once so a bare value can be traced back to its category. `codec` is
+ * deliberately absent: its values come from ffprobe and form an open set.
  *
  * These sets must stay disjoint — that is what lets the search box accept
  * `tag:long` instead of `tag:dur:long`. A ruleset test asserts both that they
@@ -38,6 +65,18 @@ export const AUTO_META_VALUES: Readonly<Record<string, readonly string[]>> = {
   res: ["4k", "1080p", "720p", "sd"],
   dur: ["short", "medium", "long"],
   orient: ["horizontal", "vertical", "square"],
+};
+
+/**
+ * Every generated namespace whose values are a closed set, with its values:
+ * the bare-searched ones above and the `audio_` ones (#468). Completion
+ * offers each of them even before any file carries it.
+ */
+export const CLOSED_TAG_VALUES: Readonly<Record<string, readonly string[]>> = {
+  ...AUTO_META_VALUES,
+  audio_quality: ["lossless", "lossy", "hires"],
+  audio_ch: ["mono", "stereo", "surround"],
+  audio_tempo: ["slow", "moderate", "fast"],
 };
 
 /**
@@ -337,17 +376,24 @@ function needsQuoting(value: string): boolean {
 /**
  * The search-box token that reproduces this tag as an exact filter.
  *
- * A generated tag carries its **bare** value (`tag:long`, not `tag:dur:long`):
- * the category vocabularies are disjoint, so the value alone identifies the
- * category, and it is far easier to read and type. The qualified form stays
- * accepted on input for the rare case where a manual tag shares the name — a
- * bare value matches both, which is usually what was wanted anyway.
+ * A tag of a bare-searched namespace (BARE_SEARCH_NAMESPACES) carries its
+ * **bare** value (`tag:long`, not `tag:dur:long`): the category vocabularies
+ * are disjoint, so the value alone identifies the category, and it is far
+ * easier to read and type. The qualified form stays accepted on input for the
+ * rare case where a manual tag shares the name — a bare value matches both,
+ * which is usually what was wanted anyway. A tag of any other generated
+ * namespace keeps its namespace (`tag:audio_genre:jazz`), since a bare value
+ * does not search it.
  *
  * Values containing whitespace or a quote are quoted, doubling any inner quote —
  * the same convention {@link splitSearchTokens} reads back.
  */
-export function tagSearchToken(name: string): string {
-  const body = needsQuoting(name) ? `"${name.replace(/"/g, '""')}"` : name;
+export function tagSearchToken(name: string, namespace = ""): string {
+  const value =
+    namespace && !BARE_SEARCH_NAMESPACES.includes(namespace)
+      ? qualifiedTagName(namespace, name)
+      : name;
+  const body = needsQuoting(value) ? `"${value.replace(/"/g, '""')}"` : value;
   return `${TAG_SEARCH_PREFIX}:${body}`;
 }
 

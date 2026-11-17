@@ -26,7 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useTagCompletions } from "@/hooks/useTagCompletions";
 import { TagSuggestionLabel } from "@/components/TagSuggestionLabel";
-import { searchTokenLabel } from "@/lib/tagLabel";
+import { generatedTagChipLabel, searchTokenLabel } from "@/lib/tagLabel";
 import { pendingDirective, splitQueryChips } from "@/lib/searchTokens";
 import { onHighlightSearchToken } from "@/lib/ui-events";
 
@@ -205,7 +205,7 @@ export function SearchTokenInput({
   /** Swap the directive under the caret for the chosen tag and chip it. */
   const accept = (tag: TagSummary) => {
     const tokens = splitSearchTokens(draft);
-    tokens[tokens.length - 1] = tagSearchToken(tag.name);
+    tokens[tokens.length - 1] = tagSearchToken(tag.name, tag.namespace);
     apply(`${joinSearchTokens(tokens)} `);
     inputRef.current?.focus();
   };
@@ -240,6 +240,11 @@ export function SearchTokenInput({
               ? EXT_SEARCH_PREFIX
               : TAG_SEARCH_PREFIX;
         const body = hash ?? ext ?? parseTagSearchToken(token) ?? "";
+        // A generated tag reads as its category and value (`Tempo: Fast`).
+        const human =
+          hash === null && ext === null
+            ? generatedTagChipLabel(t, token)
+            : null;
         return (
           <span
             key={`${token}-${i}`}
@@ -255,8 +260,12 @@ export function SearchTokenInput({
             )}
           >
             <span className="truncate">
-              <span className="text-muted">{prefix}:</span>
-              {body}
+              {human ?? (
+                <>
+                  <span className="text-muted">{prefix}:</span>
+                  {body}
+                </>
+              )}
             </span>
             <button
               type="button"

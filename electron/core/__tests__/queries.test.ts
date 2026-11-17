@@ -606,6 +606,34 @@ describe("structured tag filtering", () => {
       expect(q("tag:res:4k")).not.toContain(plain);
     });
 
+    it("reaches an audio tag only by its namespace, so a manual tag of that name does not bring it (#468)", () => {
+      const song = insertFile(db, rootId, { relPath: "song.mp3" });
+      addFileTag(
+        db,
+        song,
+        upsertTag(db, "audio_genre", "jazz"),
+        "auto-meta",
+        null,
+      );
+      addFileTag(
+        db,
+        song,
+        upsertTag(db, "audio_tempo", "slow"),
+        "auto-meta",
+        null,
+      );
+      const clip = insertFile(db, rootId, { relPath: "clip.mp4" });
+      addManualTag(db, clip, "jazz");
+      addManualTag(db, clip, "slow");
+      syncFts(db, song);
+      syncFts(db, clip);
+
+      expect(q("tag:jazz")).toEqual([clip]);
+      expect(q("tag:slow")).toEqual([clip]);
+      expect(q("tag:audio_genre:jazz")).toEqual([song]);
+      expect(q("tag:audio_tempo:slow")).toEqual([song]);
+    });
+
     it("is case-insensitive on both the prefix and the value", () => {
       // The FTS half of the box is case-insensitive; an arbitrary split here
       // would just look broken.

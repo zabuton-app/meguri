@@ -225,7 +225,7 @@ export default function Tags() {
 
   const onFilterByTag = useCallback(
     (tag: TagSummary) => {
-      applyTagFilter([tagSearchToken(tag.name)]);
+      applyTagFilter([tagSearchToken(tag.name, tag.namespace)]);
       void navigate("/");
     },
     [navigate],

@@ -8,25 +8,41 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-// Which thumbnails fail, by file name: none unless a test says so.
+// Which thumbnails and probes fail, by file name: none unless a test says so.
 const media = vi.hoisted(() => {
-  const state: { failThumb: (src: string) => boolean } = {
+  const state: {
+    failThumb: (src: string) => boolean;
+    failProbe: (src: string) => boolean;
+  } = {
     failThumb: () => false,
+    failProbe: () => false,
   };
   return state;
 });
 vi.mock("../media.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../media.js")>()),
-  extractMeta: () =>
-    Promise.resolve({
-      width: 640,
-      height: 360,
-      duration: 1,
-      codec: "h264",
-      fps: 30,
-      capturedAt: null,
-      raw: { streams: [] },
-    }),
+  extractMeta: (src: string) =>
+    Promise.resolve(
+      media.failProbe(src)
+        ? {
+            width: null,
+            height: null,
+            duration: null,
+            codec: null,
+            fps: null,
+            capturedAt: null,
+            raw: null,
+          }
+        : {
+            width: 640,
+            height: 360,
+            duration: 1,
+            codec: "h264",
+            fps: 30,
+            capturedAt: null,
+            raw: { streams: [] },
+          },
+    ),
   generateThumb: async (src: string, _kind: string, dest: string) => {
     if (media.failThumb(src)) return false;
     await fsp.writeFile(dest, "webp");
@@ -394,6 +410,51 @@ describe("runScan", () => {
       expect(await scan()).toMatchObject({ deleted: 1 });
       expect(scanRootWasMountpoint(db, rootId)).toBe(false);
     });
+  });
+
+  it("drops a changed file's stored probe output, even when probing it again fails (#468)", async () => {
+    write("a.mp3", "AAAAAAAAAA");
+    write("b.mp4", "BBBBBBBBBB");
+    await scan();
+    // What the old content said, which derived tags read.
+    db.prepare("UPDATE files SET meta = ?").run(
+      JSON.stringify({ format: { tags: { genre: "Old" } } }),
+    );
+    media.failProbe = (src) => src.endsWith("a.mp3");
+    try {
+      // b.mp4 changes too and probes fine, so the scan is not taken for one
+      // where ffprobe cannot run at all.
+      write("a.mp3", "CCCCCCCCCCCCCCCC");
+      write("b.mp4", "DDDDDDDDDDDDDDDD");
+      await scan();
+    } finally {
+      media.failProbe = () => false;
+    }
+
+    expect(
+      db.prepare("SELECT meta FROM files WHERE rel_path = 'a.mp3'").get(),
+    ).toEqual({ meta: null });
+  });
+
+  it("keeps a changed video's stored probe output when probing it again fails", async () => {
+    write("a.mp4", "AAAAAAAAAA");
+    write("b.mp4", "BBBBBBBBBB");
+    await scan();
+    // Its embedded tracks are read from it.
+    const kept = JSON.stringify({ streams: [{ codec_type: "subtitle" }] });
+    db.prepare("UPDATE files SET meta = ? WHERE rel_path = 'a.mp4'").run(kept);
+    media.failProbe = (src) => src.endsWith("a.mp4");
+    try {
+      write("a.mp4", "CCCCCCCCCCCCCCCC");
+      write("b.mp4", "DDDDDDDDDDDDDDDD");
+      await scan();
+    } finally {
+      media.failProbe = () => false;
+    }
+
+    expect(
+      db.prepare("SELECT meta FROM files WHERE rel_path = 'a.mp4'").get(),
+    ).toEqual({ meta: kept });
   });
 
   it("keeps file ids and rebuilds search entries and thumbnails on a rebuild", async () => {

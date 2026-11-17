@@ -130,6 +130,15 @@ describe("SearchTokenInput", () => {
     expect(input.value).toBe("");
   });
 
+  it("shows a generated tag's chip as its category and value (#468)", () => {
+    setup("tag:audio_tempo:fast tag:long tag:beach");
+    expect(chips().map((c) => c.textContent)).toEqual([
+      "Tempo: Fast",
+      "Length: Long",
+      "tag:beach",
+    ]);
+  });
+
   it("chips a hash: directive, and leaves a short one as text (#302)", () => {
     const { input, last } = setup();
     type(input, "hash:3FA9c1d2 hash:3f ");
@@ -650,5 +659,30 @@ describe("SearchTokenInput completion", () => {
     await waitFor(() => expect(options()).toHaveLength(2));
     fireEvent.blur(input);
     expect(options()).toHaveLength(0);
+  });
+});
+
+describe("SearchTokenInput closed value sets (#468)", () => {
+  it("offers every value of a closed set, those no file carries yet after", async () => {
+    const { input } = setup("", [...CATALOG, tag("lossy", 5, "audio_quality")]);
+    type(input, "tag:audio_quality:");
+    // Once the catalog is in, the one held comes first with its count.
+    await waitFor(() =>
+      expect(options()[0]?.textContent).toMatch(/^tag:lossy.*5$/),
+    );
+    expect(options().map((o) => o.textContent)).toEqual([
+      expect.stringMatching(/^tag:lossy.*5$/),
+      // The rest by name.
+      expect.stringMatching(/^tag:hires.*0$/),
+      expect.stringMatching(/^tag:lossless.*0$/),
+    ]);
+  });
+
+  it("searches for a value picked though no file carries it", async () => {
+    const { input, last } = setup();
+    type(input, "tag:audio_ch:ster");
+    await waitFor(() => expect(options()).toHaveLength(1));
+    fireEvent.click(options()[0]);
+    expect(last()).toBe("tag:audio_ch:stereo");
   });
 });

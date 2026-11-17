@@ -25,6 +25,13 @@ const NAMESPACE_KEYS: Record<string, TranslationKey> = {
   dur: "tags.ns.dur",
   codec: "tags.ns.codec",
   orient: "tags.ns.orient",
+  audio_quality: "tags.ns.quality",
+  audio_ch: "tags.ns.ch",
+  audio_tempo: "tags.ns.tempo",
+  audio_bpm: "tags.ns.bpm",
+  audio_key: "tags.ns.key",
+  audio_camelot: "tags.ns.camelot",
+  audio_genre: "tags.ns.genre",
 };
 
 const VALUE_KEYS: Record<string, TranslationKey> = {
@@ -34,6 +41,15 @@ const VALUE_KEYS: Record<string, TranslationKey> = {
   "orient:vertical": "tags.value.orientVertical",
   "orient:horizontal": "tags.value.orientHorizontal",
   "orient:square": "tags.value.orientSquare",
+  "audio_quality:lossless": "tags.value.qualityLossless",
+  "audio_quality:lossy": "tags.value.qualityLossy",
+  "audio_quality:hires": "tags.value.qualityHires",
+  "audio_ch:mono": "tags.value.chMono",
+  "audio_ch:stereo": "tags.value.chStereo",
+  "audio_ch:surround": "tags.value.chSurround",
+  "audio_tempo:slow": "tags.value.tempoSlow",
+  "audio_tempo:moderate": "tags.value.tempoModerate",
+  "audio_tempo:fast": "tags.value.tempoFast",
 };
 
 /** Translated category name, or the raw namespace when it is not a known one. */
@@ -84,6 +100,20 @@ export function searchTokenLabel(t: TFunc, token: string): string | null {
   return namespace
     ? tagHumanLabel(t, namespace, parsed.name)
     : `${t("media.tags")}: ${parsed.name}`;
+}
+
+/**
+ * What a search-box chip shows for a generated tag's token: its category and
+ * value (`Tempo: Fast`) rather than `tag:audio_tempo:fast`. Null for anything
+ * else, which shows as typed.
+ */
+export function generatedTagChipLabel(t: TFunc, token: string): string | null {
+  const raw = parseTagSearchToken(token);
+  if (raw === null) return null;
+  const parsed = parseQualifiedTagName(raw);
+  const namespace =
+    parsed.namespace || namespaceOfAutoMetaValue(parsed.name) || "";
+  return namespace ? tagHumanLabel(t, namespace, parsed.name) : null;
 }
 
 /** Origin label for a tag. Unknown sources fall back to their raw name. */
