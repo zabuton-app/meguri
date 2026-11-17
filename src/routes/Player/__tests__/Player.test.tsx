@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // happy-dom's Animation.cancel() leaves its finished promise rejected and unhandled.
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MediaNavProvider, type MediaNav } from "@/components/MediaNavContext";
 import Player from "@/routes/Player";
@@ -486,6 +486,8 @@ describe("Player switching latency", () => {
 });
 
 describe("Player transitions", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   function live(): HTMLElement | null {
     return document.querySelector('[data-slot="player-fade"]');
   }
@@ -521,27 +523,26 @@ describe("Player transitions", () => {
   });
 
   it("swaps instantly when the OS asks for reduced motion", async () => {
-    const original = window.matchMedia;
-    window.matchMedia = (query: string): MediaQueryList =>
-      ({
-        matches: query.includes("prefers-reduced-motion"),
-        media: query,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as MediaQueryList;
-    try {
-      renderPlayer([row(1, "video"), row(3, "video")]);
-      await screen.findByText("1 / 2");
-      fireEvent.click(screen.getByLabelText("Next (N)"));
-      expect(screen.getByText("2 / 2")).toBeTruthy();
-      expect(outgoing()).toBeNull();
-    } finally {
-      window.matchMedia = original;
-    }
+    // jsdom has no matchMedia to spy on.
+    vi.stubGlobal(
+      "matchMedia",
+      (query: string): MediaQueryList =>
+        ({
+          matches: query.includes("prefers-reduced-motion"),
+          media: query,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    renderPlayer([row(1, "video"), row(3, "video")]);
+    await screen.findByText("1 / 2");
+    fireEvent.click(screen.getByLabelText("Next (N)"));
+    expect(screen.getByText("2 / 2")).toBeTruthy();
+    expect(outgoing()).toBeNull();
   });
 });
 

@@ -566,14 +566,15 @@ describe("selection", () => {
       });
 
       it("suppresses the effects under prefers-reduced-motion, still writing", async () => {
-        const orig = window.matchMedia;
-        window.matchMedia = (query: string) =>
-          ({
-            matches: query.includes("prefers-reduced-motion"),
-            media: query,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-          }) as unknown as MediaQueryList;
+        const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(
+          (query: string) =>
+            ({
+              matches: query.includes("prefers-reduced-motion"),
+              media: query,
+              addEventListener: () => {},
+              removeEventListener: () => {},
+            }) as unknown as MediaQueryList,
+        );
         try {
           renderGrid({ first: mixedFavorites });
           selectAll();
@@ -583,7 +584,7 @@ describe("selection", () => {
           expect(settling().length).toBe(0);
           await waitFor(() => expect(mocks.filesBulkMeta).toHaveBeenCalled());
         } finally {
-          window.matchMedia = orig;
+          matchMedia.mockRestore();
         }
       });
     });
