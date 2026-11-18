@@ -31,8 +31,11 @@ import { QueueFullError, Semaphore } from "./concurrency.js";
 import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
 import {
   isTaggedHdr,
+  previewEncoder,
+  previewEncoderArgs,
   videoPreviewFilter,
   supportsToneMapping,
+  type PreviewEncoder,
 } from "./videoPreview.js";
 import { scopedLog } from "./logger.js";
 import {
@@ -717,6 +720,8 @@ function startRemuxSession(
   // The track a preview plays when none was chosen. A copy leaves the choice
   // to FFmpeg; a preview maps its streams itself.
   defaultAudio = 0,
+  // Set for a preview, which serveRemux resolves; unused for a copy.
+  encoder?: PreviewEncoder,
 ) {
   const videoPreview = mode === "preview" || mode === "preview-hdr";
   const args = ["-v", "error"];
@@ -737,6 +742,8 @@ function startRemuxSession(
     args.push("-discard:a", "all", `-discard:a:${audioTrack}`, "none");
   args.push("-i", file);
   if (videoPreview) {
+    // Thrown before the spawn, so serveRemux answers 500 and frees the slot.
+    if (!encoder) throw new Error("preview without an encoder");
     args.push(
       "-map",
       // The picture a direct file's remux picked, else the first that is not
@@ -749,14 +756,9 @@ function startRemuxSession(
       "0",
       "-vf",
       videoPreviewFilter(mode === "preview-hdr"),
-      "-c:v",
-      "libx264",
-      "-preset",
-      "ultrafast",
+      ...previewEncoderArgs(encoder),
       "-pix_fmt",
       "yuv420p",
-      "-threads:v",
-      "2",
       "-force_key_frames",
       "expr:gte(t,n_forced*1)",
       "-c:a",
@@ -988,10 +990,13 @@ function serveRemux(
   }
 
   void (async () => {
+    const videoPreview = mode === "preview" || mode === "preview-hdr";
+    // Every preview starts here, a copy retried as one included, so the
+    // encoder is picked here and not by each caller.
+    const encoder = videoPreview ? await previewEncoder() : undefined;
+    if (res.destroyed || res.writableEnded) return;
     const releaseSlot = await acquireForResponse(
-      mode === "preview" || mode === "preview-hdr"
-        ? videoPreviewSlots
-        : remuxSlots,
+      videoPreview ? videoPreviewSlots : remuxSlots,
       res,
     );
     if (!releaseSlot) return;
@@ -1014,6 +1019,7 @@ function serveRemux(
         audioTrack,
         videoTrack,
         defaultAudio,
+        encoder,
       );
     } catch (e) {
       // spawn() can throw synchronously; the slot would otherwise never be

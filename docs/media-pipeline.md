@@ -273,7 +273,14 @@ instead of playing sound over a black frame.
 A preview of a clip tagged as PQ or HLG HDR is tone mapped to Rec.709 with
 zscale and tonemap (`electron/core/videoPreview.ts`), when the bundled ffmpeg
 has both filters; the server checks that once, with `ffmpeg -filters`, and
-retries after a failed check. Chromium-unsupported still images (`heic` /
+retries after a failed check.
+
+A preview is encoded with libx264. An ffmpeg built without it (libx264 is GPL,
+so an LGPL build lacks it) encodes with `h264_videotoolbox` on macOS instead.
+The server picks the encoder once, with `ffmpeg -encoders`, for every preview
+including a copy retried as one, and asks again after a failed check.
+
+Chromium-unsupported still images (`heic` /
 `heif` / `tiff`, `TRANSCODE_IMAGES`) are transcoded to JPEG.
 
 ### Playback support

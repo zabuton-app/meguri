@@ -53,6 +53,56 @@ export function isTaggedHdr(raw: unknown): boolean {
   );
 }
 
+export type PreviewEncoder = "libx264" | "h264_videotoolbox";
+
+/** Picks the H.264 encoder for previews from `ffmpeg -encoders` output.
+ *  libx264 is GPL, so an FFmpeg built without --enable-gpl (or a system one
+ *  that leaves it out) does not have it; on macOS, VideoToolbox stands in. */
+export function pickPreviewEncoder(encoders: string): PreviewEncoder | null {
+  if (/^ V\S* libx264 /m.test(encoders)) return "libx264";
+  if (/^ V\S* h264_videotoolbox /m.test(encoders)) return "h264_videotoolbox";
+  return null;
+}
+
+export function previewEncoderArgs(encoder: PreviewEncoder): string[] {
+  if (encoder === "h264_videotoolbox")
+    return [
+      "-c:v",
+      "h264_videotoolbox",
+      // The software encoder covers a Mac without the hardware one (a VM).
+      "-allow_sw",
+      "1",
+      // VideoToolbox's default bitrate is low enough to smear a 1080p picture.
+      "-b:v",
+      "8M",
+    ];
+  return ["-c:v", "libx264", "-preset", "ultrafast", "-threads:v", "2"];
+}
+
+let previewEncoderChoice: Promise<PreviewEncoder> | undefined;
+
+export function previewEncoder(): Promise<PreviewEncoder> {
+  // Check once, on the first preview, like supportsToneMapping.
+  return (previewEncoderChoice ??= new Promise((resolve) => {
+    execFile(
+      FFMPEG,
+      ["-hide_banner", "-encoders"],
+      { timeout: 3000 },
+      (error, stdout) => {
+        // A failed check is asked again on the next preview; until then the
+        // preview keeps the encoder it always used.
+        if (error) {
+          previewEncoderChoice = undefined;
+          resolve("libx264");
+          return;
+        }
+        // Neither: keep the encoder previews always used, and fail as before.
+        resolve(pickPreviewEncoder(stdout) ?? "libx264");
+      },
+    );
+  }));
+}
+
 let toneMappingSupport: Promise<boolean> | undefined;
 
 export function supportsToneMapping(): Promise<boolean> {
