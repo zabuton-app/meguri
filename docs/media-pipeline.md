@@ -339,3 +339,11 @@ runtime: `electron/core/ffmpeg-paths.ts` rewrites `app.asar` to
 `app.asar.unpacked` in the binary paths. This is the only place that rewrite
 should happen. The corresponding electron-builder `asarUnpack` configuration is
 covered in [Build and CI](build-and-ci.md#packaging).
+
+When the `MEGURI_FFMPEG_DIR` environment variable is set, the same module runs
+`ffmpeg` and `ffprobe` from that directory instead (for example `/usr/bin`). A
+distribution package that depends on the system FFmpeg sets it in its launcher
+(see [Build and CI](build-and-ci.md#ci)). The switch is explicit, not a
+fallback when the bundled file is missing: a build that lost its bundled FFmpeg
+by mistake still fails with the one-time "ffprobe could not be started"
+warning in `main.log`, and ffmpeg and ffprobe always come from one place.

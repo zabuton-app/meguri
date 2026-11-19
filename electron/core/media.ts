@@ -1,4 +1,5 @@
-// Metadata extraction (ffprobe) and thumbnail generation (ffmpeg). Bundled static binaries, no system dependency.
+// Metadata extraction (ffprobe) and thumbnail generation (ffmpeg), with the
+// bundled binaries or the system ones a package names (see ffmpeg-paths.ts).
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promises as fsPromises } from "node:fs";
@@ -169,7 +170,8 @@ let probeUnavailableWarned = false;
  *  install time, so a missing or wrong-arch binary (an unpinned cross build, or
  *  node_modules shared with a host of another arch) would otherwise leave every
  *  file's metadata null with nothing in the log. Only spawn errors (ENOENT, EACCES,
- *  ENOEXEC) count; a non-zero exit, a timeout or an abort is a per-file outcome. */
+ *  ENOEXEC) count; a non-zero exit, a timeout or an abort is a per-file outcome.
+ *  With MEGURI_FFMPEG_DIR set, it is how a missing system FFmpeg shows up. */
 function warnIfProbeUnavailable(err: unknown): void {
   if (probeUnavailableWarned) return;
   const e = err as NodeJS.ErrnoException | null;
