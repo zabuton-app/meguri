@@ -207,6 +207,15 @@ release there, change the URL in both `dependencies` and `allowScripts` in
 `package.json`, and run `npm install` to update the lockfile. With only one of
 the two changed, npm blocks the install script and the binaries are missing.
 
+A package that depends on the system FFmpeg instead (such as a distribution
+package built from source) installs with `ZABUTON_FFMPEG_SKIP_DOWNLOAD=1`. The
+install script then downloads nothing, and the package's launcher sets
+`MEGURI_FFMPEG_DIR` to the directory of the system `ffmpeg` and `ffprobe` (see
+[ffmpeg/ffprobe path resolution](media-pipeline.md#ffmpegffprobe-path-resolution)).
+The system build needs the libwebp encoder for thumbnails. Previews check it for
+their H.264 encoder and the HDR filters at run time; other features are assumed
+to be there. The release builds keep bundling FFmpeg.
+
 ## Docker development
 
 Development can also run in Docker (Wayland assumed):
