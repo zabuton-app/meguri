@@ -62,8 +62,9 @@ export const FolderCard = memo(function FolderCard({
       data-folder-path={entry.path}
       data-folder-count={entry.count}
       aria-current={focused ? "true" : undefined}
+      onClick={open}
       className={cn(
-        "folder-art group relative flex flex-col rounded-lg border border-transparent",
+        "folder-art group relative flex cursor-pointer flex-col rounded-lg border border-transparent",
         // The media card's state vocabulary, so a mixed row reads as one list.
         focused && "ring-2 ring-primary",
         selected && "ring-1 ring-primary",
@@ -71,11 +72,7 @@ export const FolderCard = memo(function FolderCard({
     >
       {/* The folder body opens the folder too; the name button below is the
           keyboard/screen-reader target, so this region stays out of the tab order. */}
-      <div
-        data-thumb
-        onClick={open}
-        className="group/thumb relative block aspect-video cursor-pointer"
-      >
+      <div data-thumb className="group/thumb relative block aspect-video">
         <FolderArt previews={entry.previews} mediaBase={mediaBase} joined />
       </div>
       <FolderSelectionCheck
@@ -99,8 +96,7 @@ export const FolderCard = memo(function FolderCard({
           />
           <button
             type="button"
-            onClick={open}
-            aria-label={t("folder.open", { name: entry.name })}
+            aria-label={t("folder.open", { name: entry.name })
             title={entry.name}
             className="min-w-0 flex-1 truncate text-left text-[13px] font-bold leading-4 text-bright-fg"
           >

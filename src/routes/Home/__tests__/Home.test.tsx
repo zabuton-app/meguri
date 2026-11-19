@@ -701,6 +701,51 @@ describe("Home folder view", () => {
     );
   });
 
+  it("opens a folder when clicking anywhere in its metadata block", async () => {
+    renderWithProviders(<AppRoutes />);
+    const card = await screen.findByTestId("folder-card");
+    const metadata = card.lastElementChild as HTMLElement;
+    expect(card.className).toContain("cursor-pointer");
+
+    fireEvent.click(metadata);
+
+    await waitFor(() =>
+      expect(mocks.foldersList).toHaveBeenCalledWith(WS_ID, "Movie"),
+    );
+    expect(mocks.foldersList.mock.calls.filter((call) => call[1] === "Movie"))
+      .toHaveLength(1);
+  });
+
+  it("opens a folder exactly once when clicking its name", async () => {
+    renderWithProviders(<AppRoutes />);
+    await screen.findByTestId("folder-card");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: 'Open folder "Movie"' }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.foldersList).toHaveBeenCalledWith(WS_ID, "Movie"),
+    );
+    expect(mocks.foldersList.mock.calls.filter((call) => call[1] === "Movie"))
+      .toHaveLength(1);
+  });
+
+  it("selects a folder when a modified click lands in its metadata block", async () => {
+    renderWithProviders(<AppRoutes />);
+    const card = await screen.findByTestId("folder-card");
+    const metadata = card.lastElementChild as HTMLElement;
+
+    fireEvent.click(metadata, { ctrlKey: true });
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("region", { name: "Selection actions" }),
+      ).toBeTruthy(),
+    );
+    expect(mocks.foldersList).not.toHaveBeenCalledWith(WS_ID, "Movie");
+  });
+
   it("searches everything below the folder, without its folder cards", async () => {
     renderWithProviders(<AppRoutes />);
     await screen.findByTestId("folder-card");
