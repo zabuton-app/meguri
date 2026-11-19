@@ -212,9 +212,20 @@ package built from source) installs with `ZABUTON_FFMPEG_SKIP_DOWNLOAD=1`. The
 install script then downloads nothing, and the package's launcher sets
 `MEGURI_FFMPEG_DIR` to the directory of the system `ffmpeg` and `ffprobe` (see
 [ffmpeg/ffprobe path resolution](media-pipeline.md#ffmpegffprobe-path-resolution)).
-The system build needs the libwebp encoder for thumbnails. Previews check it for
-their H.264 encoder and the HDR filters at run time; other features are assumed
-to be there. The release builds keep bundling FFmpeg.
+The release builds keep bundling FFmpeg. The system build needs:
+
+| Feature                              | Needed for                                                                                                                                                     |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FFmpeg 8.1 or later                  | Tiled HEIF photos (what phone cameras write). 7.1 decodes one tile only, with no error; 6.1 and earlier cannot open them. 8.1 and 9.0 were tried; 8.0 was not. |
+| libwebp encoder                      | Thumbnails                                                                                                                                                     |
+| libx264 encoder                      | Previews of video the player cannot decode. macOS falls back to VideoToolbox; elsewhere they fail without it.                                                  |
+| HEVC decoder                         | HEIC photos and HEVC video                                                                                                                                     |
+| zscale and tonemap filters (libzimg) | Tone mapping HDR previews; without them an HDR preview skips tone mapping and looks washed out                                                                 |
+
+Previews check for the H.264 encoder and the HDR filters at run time; the rest
+is assumed. Fedora's `ffmpeg-free`, for example, has neither libx264 nor an
+HEVC decoder. The other options Meguri passes (remuxing, previews, subtitles,
+frame export) work with FFmpeg 4.4 and later.
 
 ## Docker development
 
