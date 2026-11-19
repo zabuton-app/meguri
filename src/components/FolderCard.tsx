@@ -96,7 +96,7 @@ export const FolderCard = memo(function FolderCard({
           />
           <button
             type="button"
-            aria-label={t("folder.open", { name: entry.name })
+            aria-label={t("folder.open", { name: entry.name })}
             title={entry.name}
             className="min-w-0 flex-1 truncate text-left text-[13px] font-bold leading-4 text-bright-fg"
           >
