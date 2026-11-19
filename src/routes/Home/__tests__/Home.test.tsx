@@ -712,8 +712,9 @@ describe("Home folder view", () => {
     await waitFor(() =>
       expect(mocks.foldersList).toHaveBeenCalledWith(WS_ID, "Movie"),
     );
-    expect(mocks.foldersList.mock.calls.filter((call) => call[1] === "Movie"))
-      .toHaveLength(1);
+    expect(
+      mocks.foldersList.mock.calls.filter((call) => call[1] === "Movie"),
+    ).toHaveLength(1);
   });
 
   it("opens a folder exactly once when clicking its name", async () => {
@@ -727,8 +728,9 @@ describe("Home folder view", () => {
     await waitFor(() =>
       expect(mocks.foldersList).toHaveBeenCalledWith(WS_ID, "Movie"),
     );
-    expect(mocks.foldersList.mock.calls.filter((call) => call[1] === "Movie"))
-      .toHaveLength(1);
+    expect(
+      mocks.foldersList.mock.calls.filter((call) => call[1] === "Movie"),
+    ).toHaveLength(1);
   });
 
   it("selects a folder when a modified click lands in its metadata block", async () => {
