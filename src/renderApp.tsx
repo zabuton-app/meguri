@@ -94,6 +94,10 @@ function render(
                     </ExtraSettingsSectionsProvider>
                     <Toaster
                       position="top-right"
+                      // Below the custom title bar, clear of its window buttons.
+                      offset={{
+                        top: "calc(var(--meguri-title-bar-height) + 24px)",
+                      }}
                       visibleToasts={4}
                       gap={8}
                       closeButton

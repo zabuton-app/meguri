@@ -19,7 +19,9 @@ const primary = (page: Page) =>
 // audio-player-bar need a folder view or playback to appear and are not
 // covered here.
 const SHELL_SLOTS = [
+  "title-bar",
   "workspace-rail",
+  "content-panel",
   "home-header",
   "filter-bar",
   "status-bar",

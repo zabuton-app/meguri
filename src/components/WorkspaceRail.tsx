@@ -58,12 +58,12 @@ import { cn } from "@/lib/utils";
 import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import { openCommandMenu, openShortcuts } from "@/lib/ui-events";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
-import { useLogo, useLogoImages } from "@/hooks/useLogo";
 import { useFileDropTarget } from "@/hooks/useFileDropTarget";
 import { useOsFolderDrop, type DroppedItems } from "@/hooks/useOsFolderDrop";
 import { useAddFilesToCollection } from "@/hooks/useAddFilesToCollection";
 import type { DraggedFile } from "@/lib/fileDrag";
-import { appName } from "@/lib/appName";
+import { AppLogo } from "@/components/AppLogo";
+import { usePreferences } from "@/settings/PreferencesProvider";
 
 /** Never animate sortable layout changes, so items snap to their final position on drop. */
 const animateLayoutChanges: AnimateLayoutChanges = () => false;
@@ -89,9 +89,9 @@ export function WorkspaceRail() {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const { t } = useI18n();
-  // In-app logo mark follows the selected variant (Settings > App logo).
-  const { logo } = useLogo();
-  const logoImages = useLogoImages();
+  // The logo comes down here while the window buttons take the title bar's
+  // left end, where it otherwise sits above the rail (TitleBar.tsx).
+  const logoHere = usePreferences().windowButtons === "left";
   const addedWorkspaceScanJobs = useRef(new Set<string>());
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   // null = create mode; a collection = edit mode for it.
@@ -313,19 +313,9 @@ export function WorkspaceRail() {
     <>
       <nav
         data-slot="workspace-rail"
-        className="flex h-full w-16 shrink-0 flex-col items-center gap-2 border-r border-border bg-bg py-3"
+        className="flex h-full w-16 shrink-0 flex-col items-center gap-2 bg-chrome pb-3 pt-1 text-fg"
       >
-        {/* The bitmaps arrive from main just after the first paint; hold the
-          space meanwhile, without an <img> that would show its alt text. */}
-        {logoImages ? (
-          <img
-            src={logoImages[logo]}
-            alt={appName()}
-            className="size-[50px] shrink-0"
-          />
-        ) : (
-          <div className="size-[50px] shrink-0" />
-        )}
+        {logoHere && <AppLogo className="size-[50px]" />}
 
         {/* Workspace list (scrolls only here when there are many).
           Add padding so the first avatar's selection ring (ring-2) is not clipped at the top edge. */}
@@ -723,7 +713,7 @@ function FolderDropOverlay({ t }: { t: TFunc }) {
   return (
     <div
       data-testid="folder-drop-overlay"
-      className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-bg/70 p-6 backdrop-blur-sm"
+      className="pointer-events-none fixed inset-below-title-bar z-[100] flex items-center justify-center bg-bg/70 p-6 backdrop-blur-sm"
     >
       <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-surface/90 px-10 py-8 text-center">
         <FolderPlus className="size-10 text-primary" />

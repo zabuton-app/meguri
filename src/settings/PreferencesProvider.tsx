@@ -23,6 +23,7 @@ import {
   isPetSize,
   type PetSize,
 } from "@/components/pet/petSize";
+import { platform } from "@/lib/platform";
 
 const LS_KEY = "meguri.prefs";
 
@@ -75,6 +76,20 @@ export const LIST_THUMB_SIZE_OPTIONS = ["small", "medium", "large"] as const;
 export type ListThumbSize = (typeof LIST_THUMB_SIZE_OPTIONS)[number];
 export const DEFAULT_LIST_THUMB_SIZE: ListThumbSize = "medium";
 
+// Which end of the title bar holds the window buttons (#578), or none, for a
+// window manager that handles windows itself (a tiling one). The default
+// follows the OS: macOS keeps its traffic lights on the left, Windows and
+// Linux put theirs on the right.
+export const WINDOW_BUTTONS_OPTIONS = ["left", "right", "none"] as const;
+export type WindowButtons = (typeof WINDOW_BUTTONS_OPTIONS)[number];
+export function defaultWindowButtons(): WindowButtons {
+  return platform() === "darwin" ? "left" : "right";
+}
+
+export function isWindowButtons(v: unknown): v is WindowButtons {
+  return WINDOW_BUTTONS_OPTIONS.includes(v as WindowButtons);
+}
+
 export function isListThumbSize(v: unknown): v is ListThumbSize {
   return LIST_THUMB_SIZE_OPTIONS.includes(v as ListThumbSize);
 }
@@ -121,6 +136,8 @@ interface Prefs {
   petVisible: boolean;
   /** How large the pet is drawn (see src/components/pet/petSize.ts). */
   petSize: PetSize;
+  /** Which end of the title bar holds the window buttons. */
+  windowButtons: WindowButtons;
 }
 
 const DEFAULTS: Prefs = {
@@ -142,6 +159,7 @@ const DEFAULTS: Prefs = {
   resumePlayback: true,
   petVisible: true,
   petSize: DEFAULT_PET_SIZE,
+  windowButtons: defaultWindowButtons(),
 };
 
 function clampSceneCount(n: number): number {
@@ -228,6 +246,9 @@ function loadPrefs(): Prefs {
             ? parsed.petVisible
             : DEFAULTS.petVisible,
         petSize: isPetSize(parsed.petSize) ? parsed.petSize : DEFAULT_PET_SIZE,
+        windowButtons: isWindowButtons(parsed.windowButtons)
+          ? parsed.windowButtons
+          : DEFAULTS.windowButtons,
       };
     }
   } catch {
@@ -255,6 +276,7 @@ interface PrefsCtx extends Prefs {
   setResumePlayback: (enabled: boolean) => void;
   setPetVisible: (visible: boolean) => void;
   setPetSize: (size: PetSize) => void;
+  setWindowButtons: (side: WindowButtons) => void;
 }
 
 const Ctx = createContext<PrefsCtx | null>(null);
@@ -317,6 +339,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setPetVisible: (visible) =>
         setPrefs((p) => ({ ...p, petVisible: visible })),
       setPetSize: (size) => setPrefs((p) => ({ ...p, petSize: size })),
+      setWindowButtons: (side) =>
+        setPrefs((p) => ({ ...p, windowButtons: side })),
     }),
     [prefs],
   );

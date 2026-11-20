@@ -8,6 +8,11 @@ export const es: Catalog = {
   "common.ok": "Aceptar",
   "common.actionFailed": "No se pudo completar la acción",
 
+  // window
+  "window.minimize": "Minimizar",
+  "window.maximize": "Maximizar",
+  "window.restore": "Restaurar",
+
   // kind
   "kind.video": "Vídeo",
   "kind.image": "Imagen",
@@ -61,6 +66,12 @@ export const es: Catalog = {
   "settings.listThumbSizeSmall": "Pequeño",
   "settings.listThumbSizeMedium": "Mediano",
   "settings.listThumbSizeLarge": "Grande",
+  "settings.windowButtons": "Botones de ventana",
+  "settings.windowButtonsDesc":
+    "Dónde van los botones de minimizar, maximizar y cerrar. Ocúltalos si un gestor de ventanas (uno en mosaico, por ejemplo) se encarga de las ventanas",
+  "settings.windowButtonsLeft": "Izquierda",
+  "settings.windowButtonsRight": "Derecha",
+  "settings.windowButtonsNone": "Ninguno",
   "settings.emojiStyle": "Estilo de emojis",
   "settings.emojiStyleDesc":
     "Cambia el aspecto de los iconos de emoji y de los emojis en el texto.",
@@ -242,6 +253,7 @@ export const es: Catalog = {
   // home
   "home.noDirectory": "(Ningún directorio seleccionado)",
   "home.scan": "Escanear",
+  "home.moreTools": "Más",
   "home.initError": "Error de inicialización: {msg}",
   "home.initErrorSchemaMismatchHelp":
     "El formato de la base de datos puede no coincidir con esta versión de la aplicación. Elimina este espacio de trabajo desde la barra lateral izquierda y vuelve a registrarlo.",
@@ -288,12 +300,11 @@ export const es: Catalog = {
 
   // command menu
   "command.title": "Menú de comandos",
-  "command.placeholder": "Buscar comandos...",
+  "command.placeholder": "Buscar archivos o escribir un comando...",
   "command.empty": "No hay comandos coincidentes.",
   "command.groupNavigation": "Navegación",
   "command.groupWorkspace": "Espacio de trabajo",
   "command.groupView": "Vista",
-  "command.focusSearch": "Enfocar búsqueda",
   "command.openDevTools": "Abrir consola de desarrollador",
   "command.shortcutHint": "Abrir con {shortcut}",
   "command.groupFile": "Archivo",
@@ -313,7 +324,6 @@ export const es: Catalog = {
   "command.pageCollections": "Colecciones",
   "command.ratingPlaceholder": "Escribe 0–5 para elegir...",
   "command.collectionPlaceholder": "Buscar colecciones...",
-  "command.tagPlaceholder": "Buscar etiquetas para añadir...",
   "command.workspacePlaceholder": "Cambiar a un espacio de trabajo...",
   "command.collectionOpenPlaceholder": "Abrir una colección...",
   "command.searchInPlaceholder":
@@ -329,6 +339,8 @@ export const es: Catalog = {
   // filter
   "filter.searchHint":
     'Busca en los nombres de archivo y en las etiquetas. Usa tag:playa o tag:4k para coincidir de forma exacta, tanto con las tuyas como con las automáticas. Entrecomilla los valores con espacios: tag:"casa de playa".',
+  "filter.openSearch": "Buscar o ejecutar un comando",
+  "filter.clearSearch": "Borrar la búsqueda",
   "filter.searchPlaceholder": "Buscar nombre de archivo o etiquetas",
   "filter.tagSuggestions": "Sugerencias de etiquetas",
   "filter.tagElsewhere": "solo en otros espacios de trabajo",
@@ -415,7 +427,7 @@ export const es: Catalog = {
   "shortcuts.sectionDetail": "Detalle",
   "shortcuts.commandMenu":
     "Abrir menú de comandos (acciones de archivo, búsquedas recientes, colecciones inteligentes)",
-  "shortcuts.search": "Enfocar búsqueda",
+  "shortcuts.search": "Buscar",
   "shortcuts.scrollDown": "Desplazar abajo",
   "shortcuts.scrollUp": "Desplazar arriba",
   "shortcuts.moveFocus": "Mover el foco (arriba/abajo/izquierda/derecha)",
@@ -1525,7 +1537,7 @@ export const es: Catalog = {
     "Reúne archivos de cualquier carpeta en una colección. Arrastra archivos aquí para añadirlos.",
   "tour.searchTitle": "Buscar y filtrar",
   "tour.searchBody":
-    "Busca por nombre de archivo o etiqueta. Pulsa / en la lista para venir aquí.",
+    "Busca por nombre de archivo o etiqueta. Haz clic aquí o pulsa / en la lista, y escribe en el menú que se abre.",
   "tour.viewTitle": "Cambiar de vista",
   "tour.viewBody":
     "Muestra tus archivos en cuadrícula, lista, línea de tiempo o grafo.",

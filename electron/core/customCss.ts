@@ -28,12 +28,15 @@ export const CUSTOM_CSS_TEMPLATE = `/*
  *   --c-bg, --c-surface, --c-overlay, --c-hover, --c-border, --c-border-strong,
  *   --c-muted, --c-secondary-fg,
  *   --c-fg, --c-bright-fg, --c-highlight, --c-error, --c-warn, --c-accent2,
- *   --c-success, --c-info, --c-primary, --c-secondary-accent, --c-special
+ *   --c-success, --c-info, --c-primary, --c-secondary-accent, --c-special,
+ *   --c-chrome (the frame: the title bar, the rail and the corners around
+ *   the content; optional)
  *
  * Some parts of the UI carry a data-slot attribute to target (the list in
  * docs/theming.md is the source of truth):
+ *   title-bar          title bar across the top
  *   workspace-rail     side rail
- *   home-header        workspace info header
+ *   home-header        workspace info header, inside the title bar
  *   filter-bar         search and filters
  *   status-bar         footer
  *   audio-player-bar   audio player at the bottom
@@ -73,9 +76,16 @@ html[data-theme="gruvbox-dark"] {
 }
 */
 
-/* A part of the UI: the side rail */
+/* The frame: the title bar and the side rail */
 /*
-[data-slot="workspace-rail"] {
+html[data-appearance] {
+  --c-chrome: #1d2021;
+}
+*/
+
+/* A part of the UI: the status bar */
+/*
+[data-slot="status-bar"] {
   background-color: var(--c-surface);
 }
 */

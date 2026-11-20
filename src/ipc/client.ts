@@ -12,6 +12,7 @@ import type {
   CssThemesState,
   CustomCssChanged,
   CustomCssState,
+  WindowState,
 } from "@shared/ipc/channels";
 import type { PreloadInvokeChannel } from "@shared/ipc/channelNames";
 import type {
@@ -249,6 +250,17 @@ export const api = {
   openDevTools: () => invoke("open_devtools"),
   /** Close the main window (hides to tray when tray support is enabled). */
   windowClose: () => invoke("window_close"),
+  windowMinimize: () => invoke("window_minimize"),
+  windowToggleMaximize: () => invoke("window_toggle_maximize"),
+  windowState: () => invoke("window_state"),
+  /** A double click on the title bar (macOS: main applies the system setting). */
+  windowTitleBarDoubleClick: () => invoke("window_title_bar_double_click"),
+  /** Place macOS's traffic lights at (x, y) in the window (macOS only). */
+  windowSetButtonPosition: (x: number, y: number) =>
+    invoke("window_set_button_position", { x, y }),
+  /** Show or hide macOS's traffic lights (macOS only). */
+  windowSetButtonVisibility: (visible: boolean) =>
+    invoke("window_set_button_visibility", visible),
   /** Check GitHub for a newer release. `force` bypasses the throttle. null = check failed. */
   updateCheck: (force?: boolean) => invoke("update_check", { force }),
   updateGetSettings: () => invoke("update_get_settings"),
@@ -350,4 +362,6 @@ export const events = {
     bridge.on("css-themes:changed", (p) => cb(p as CssThemesState)),
   onCustomCssChanged: (cb: (e: CustomCssChanged) => void): Unlisten =>
     bridge.on("custom-css:changed", (p) => cb(p as CustomCssChanged)),
+  onWindowState: (cb: (s: WindowState) => void): Unlisten =>
+    bridge.on("window:state", (p) => cb(p as WindowState)),
 };

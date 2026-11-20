@@ -8,6 +8,11 @@ export const fr: Catalog = {
   "common.ok": "OK",
   "common.actionFailed": "Impossible d'effectuer l'action",
 
+  // window
+  "window.minimize": "Réduire",
+  "window.maximize": "Agrandir",
+  "window.restore": "Restaurer",
+
   // kind
   "kind.video": "Vidéo",
   "kind.image": "Image",
@@ -61,6 +66,12 @@ export const fr: Catalog = {
   "settings.listThumbSizeSmall": "Petite",
   "settings.listThumbSizeMedium": "Moyenne",
   "settings.listThumbSizeLarge": "Grande",
+  "settings.windowButtons": "Boutons de fenêtre",
+  "settings.windowButtonsDesc":
+    "Où placer les boutons réduire, agrandir et fermer. Masquez-les si un gestionnaire de fenêtres (en mosaïque, par exemple) s’en charge",
+  "settings.windowButtonsLeft": "Gauche",
+  "settings.windowButtonsRight": "Droite",
+  "settings.windowButtonsNone": "Aucun",
   "settings.emojiStyle": "Style des émojis",
   "settings.emojiStyleDesc":
     "Change l'apparence des icônes emoji et des émojis dans le texte.",
@@ -243,6 +254,7 @@ export const fr: Catalog = {
   // home
   "home.noDirectory": "(Aucun dossier sélectionné)",
   "home.scan": "Analyser",
+  "home.moreTools": "Plus",
   "home.initError": "Erreur d'initialisation : {msg}",
   "home.initErrorSchemaMismatchHelp":
     "Le format de la base de données ne correspond peut-être pas à cette version de l'application. Supprimez cet espace de travail depuis la barre latérale gauche, puis enregistrez-le à nouveau.",
@@ -288,12 +300,11 @@ export const fr: Catalog = {
 
   // command menu
   "command.title": "Menu de commandes",
-  "command.placeholder": "Rechercher des commandes...",
+  "command.placeholder": "Rechercher des fichiers ou saisir une commande...",
   "command.empty": "Aucune commande correspondante.",
   "command.groupNavigation": "Navigation",
   "command.groupWorkspace": "Espace de travail",
   "command.groupView": "Affichage",
-  "command.focusSearch": "Cibler la recherche",
   "command.openDevTools": "Ouvrir la console développeur",
   "command.shortcutHint": "Ouvrir avec {shortcut}",
   "command.groupFile": "Fichier",
@@ -314,7 +325,6 @@ export const fr: Catalog = {
   "command.pageCollections": "Collections",
   "command.ratingPlaceholder": "Tapez 0–5 pour choisir...",
   "command.collectionPlaceholder": "Rechercher des collections...",
-  "command.tagPlaceholder": "Rechercher des tags à ajouter...",
   "command.workspacePlaceholder": "Passer à un espace de travail...",
   "command.collectionOpenPlaceholder": "Ouvrir une collection...",
   "command.searchInPlaceholder":
@@ -330,6 +340,8 @@ export const fr: Catalog = {
   // filter
   "filter.searchHint":
     'Recherche dans les noms de fichiers et les tags. Utilisez tag:plage ou tag:4k pour une correspondance exacte, sur vos tags comme sur ceux du scan. Mettez les valeurs avec espaces entre guillemets : tag:"maison de plage".',
+  "filter.openSearch": "Rechercher ou lancer une commande",
+  "filter.clearSearch": "Effacer la recherche",
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
   "filter.tagSuggestions": "Suggestions de tags",
   "filter.tagElsewhere": "autres espaces de travail seulement",
@@ -416,7 +428,7 @@ export const fr: Catalog = {
   "shortcuts.sectionDetail": "Détail",
   "shortcuts.commandMenu":
     "Ouvrir le menu de commandes (actions sur le fichier, recherches récentes, collections intelligentes)",
-  "shortcuts.search": "Cibler la recherche",
+  "shortcuts.search": "Rechercher",
   "shortcuts.scrollDown": "Défiler vers le bas",
   "shortcuts.scrollUp": "Défiler vers le haut",
   "shortcuts.moveFocus": "Déplacer le focus (haut/bas/gauche/droite)",
@@ -1531,7 +1543,7 @@ export const fr: Catalog = {
     "Regroupe des fichiers de n'importe quel dossier dans une collection. Glisse des fichiers ici pour les ajouter.",
   "tour.searchTitle": "Rechercher et filtrer",
   "tour.searchBody":
-    "Recherche par nom de fichier ou par tag. Appuie sur / dans la liste pour venir ici.",
+    "Recherche par nom de fichier ou par tag. Clique ici ou appuie sur / dans la liste, puis tape dans le menu qui s'ouvre.",
   "tour.viewTitle": "Changer de vue",
   "tour.viewBody":
     "Affiche tes fichiers en grille, en liste, en chronologie ou en graphe.",

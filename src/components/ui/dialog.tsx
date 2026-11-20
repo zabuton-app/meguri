@@ -18,7 +18,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm",
+        "modal-backdrop z-50 bg-black/70 backdrop-blur-sm",
         className,
       )}
       {...props}
@@ -30,6 +30,7 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onPointerDownOutside,
   ...props
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
@@ -40,10 +41,19 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-bg text-fg shadow-2xl outline-none",
+          "fixed left-1/2 top-[calc(50%+var(--meguri-title-bar-height)/2)] z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-bg text-fg shadow-2xl outline-none",
           className,
         )}
         {...props}
+        // The title bar's window buttons stay usable over a dialog (#578);
+        // pressing one is not a click away from the dialog, so it stays
+        // open with what was typed in it.
+        onPointerDownOutside={(e) => {
+          onPointerDownOutside?.(e);
+          if ((e.target as Element | null)?.closest?.("[data-title-bar]")) {
+            e.preventDefault();
+          }
+        }}
       >
         {children}
         {showCloseButton && (

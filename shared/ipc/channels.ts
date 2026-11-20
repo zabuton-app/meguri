@@ -539,6 +539,21 @@ export const ChannelInputs = {
   open_url: z.object({ url: z.string() }),
   open_devtools: z.void(),
   window_close: z.void(),
+  window_minimize: z.void(),
+  window_toggle_maximize: z.void(),
+  window_state: z.void(),
+  // A double click on the custom title bar, on macOS only: there the drag
+  // region still gets the click, and main applies the system's choice.
+  window_title_bar_double_click: z.void(),
+  // Where the title bar leaves room for macOS's traffic lights, in the
+  // window's coordinates (macOS only; elsewhere the call does nothing).
+  window_set_button_position: z.object({
+    x: z.number().int().min(0).max(100_000),
+    y: z.number().int().min(0).max(100_000),
+  }),
+  // Shows or hides macOS's traffic lights (macOS only; elsewhere the title
+  // bar draws its own buttons, or none).
+  window_set_button_visibility: z.boolean(),
   // Update check (GitHub Releases). `force` bypasses the throttle used by the
   // background/startup check (manual "check now" button always hits the network).
   update_check: z.object({ force: z.boolean().optional() }).default({}),
@@ -773,6 +788,12 @@ export interface ChannelOutputs {
   open_url: void;
   open_devtools: boolean;
   window_close: void;
+  window_minimize: void;
+  window_toggle_maximize: void;
+  window_state: WindowState;
+  window_title_bar_double_click: void;
+  window_set_button_position: void;
+  window_set_button_visibility: void;
   // null when the check could not reach GitHub (offline / rate-limited).
   update_check: UpdateInfo | null;
   update_get_settings: UpdateSettings;
@@ -943,6 +964,13 @@ export interface CssThemesState {
   css: string | null;
   /** Absolute path of the themes folder. */
   dir: string;
+}
+
+/** The main window's state the custom title bar draws from (window_state,
+ *  and the window:state event whenever it changes). */
+export interface WindowState {
+  maximized: boolean;
+  fullScreen: boolean;
 }
 
 /** Payload of the custom-css:changed event. */

@@ -35,12 +35,13 @@ try {
   await sleep(600);
 
   // 2) incremental search
-  const search = page.locator("#list-search-input");
-  await search.click();
+  // The title bar's search opens the command menu, where it is typed.
+  await page.locator('[data-slot="search-trigger"] button').first().click();
+  const search = page.locator('[data-slot="command-input"]');
   await search.pressSequentially("jellyfish", { delay: 90 });
+  await page.keyboard.press("Enter");
   await sleep(1400);
-  await search.fill("");
-  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Clear search" }).click();
   await sleep(700);
 
   // 3) open a video detail and let it play

@@ -121,10 +121,4 @@ export function registerShellHandlers(ctx: IpcContext): void {
     ctx.mainWindow()?.webContents.openDevTools({ mode: "right" });
     return true;
   });
-
-  // Close the window from the renderer (Esc on the bare list screen). Goes
-  // through close() so the tray-hide behavior in the "close" handler applies.
-  handle("window_close", () => {
-    ctx.mainWindow()?.close();
-  });
 }

@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures/app";
-import { closeTopDialog, fileCard, searchInput } from "./fixtures/helpers";
+import { closeTopDialog, fileCard, searchTrigger } from "./fixtures/helpers";
 
 test.describe("Auto tagging", () => {
   test("opens from the header and closes with Escape", async ({ ready }) => {
@@ -69,7 +69,7 @@ test.describe("Auto tagging", () => {
     await dialog.getByRole("button", { name: "Search the library" }).click();
 
     await expect(ready).toHaveURL(/#\/$/);
-    await expect(searchInput(ready)).toHaveValue("Sample|test");
+    await expect(searchTrigger(ready)).toContainText("Sample|test");
     await expect(fileCard(ready)).toBeVisible();
   });
 });

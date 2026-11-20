@@ -106,6 +106,12 @@ export const INVOKE_CHANNELS = [
   "open_url",
   "open_devtools",
   "window_close",
+  "window_minimize",
+  "window_toggle_maximize",
+  "window_state",
+  "window_title_bar_double_click",
+  "window_set_button_position",
+  "window_set_button_visibility",
   "update_check",
   "update_get_settings",
   "update_set_auto_check",
@@ -150,6 +156,7 @@ export const EVENT_CHANNELS = [
   "library:merge",
   "custom-css:changed",
   "css-themes:changed",
+  "window:state",
 ] as const;
 
 export type PreloadInvokeChannel = (typeof PRELOAD_INVOKE_CHANNELS)[number];

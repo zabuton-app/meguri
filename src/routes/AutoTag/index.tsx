@@ -125,7 +125,7 @@ export default function AutoTag() {
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex justify-center bg-black/70 backdrop-blur-sm",
+        "modal-backdrop z-50 flex justify-center bg-black/70 backdrop-blur-sm",
         isSmall ? "items-center p-2 sm:p-6" : "p-2 sm:p-4 md:p-6",
       )}
       onClick={onClose}
@@ -138,7 +138,7 @@ export default function AutoTag() {
         className={cn(
           "relative flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl",
           isSmall &&
-            "h-[min(880px,calc(100vh-48px))] min-h-[min(620px,100%)] max-w-[1160px]",
+            "h-[min(880px,calc(100vh-48px-var(--meguri-title-bar-height)))] min-h-[min(620px,100%)] max-w-[1160px]",
         )}
         onClick={(e) => e.stopPropagation()}
       >

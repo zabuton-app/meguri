@@ -20,6 +20,7 @@ import { registerTagHandlers } from "./tags.js";
 import { registerThumbHandlers } from "./thumbs.js";
 import { registerTimelineHandlers } from "./timeline.js";
 import { registerUpdateHandlers } from "./updates.js";
+import { registerWindowHandlers } from "./window.js";
 import { registerWorkspaceHandlers } from "./workspaces.js";
 
 export type { IpcContext } from "./context.js";
@@ -38,6 +39,7 @@ export function registerIpc(ctx: IpcContext): void {
   registerBookmarkHandlers(ctx);
   registerThumbHandlers(ctx);
   registerShellHandlers(ctx);
+  registerWindowHandlers(ctx);
   registerUpdateHandlers();
   registerCrashReportHandlers(ctx);
   registerLogoHandlers(ctx);

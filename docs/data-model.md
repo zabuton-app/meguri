@@ -433,14 +433,14 @@ and folds case for ASCII only.
 
 The auto-tagging screen uses this to search the library for a dictionary
 entry's terms (`searchLibrary()` in `src/lib/ui-events.ts`, which
-replaces the text query rather than adding to it) — by the search box's rules,
+replaces the text query rather than adding to it) — by the search's rules,
 a substring of the path or of the tags, not by the entry's own word matching.
 
 Generated tags are deliberately **not** indexed. The tokenizer is trigram, so
 indexing `dur:long` would make a plain search for "long" return every long
 video — and likewise for "short", "square", "h264".
 
-Exact tag conditions instead live in the search box as the **`tag:` directive**,
+Exact tag conditions instead live in the search as the **`tag:` directive**,
 which `buildSearchTerms()` in `queries/files.ts` pulls out before the FTS split
 and resolves against the `tags` table:
 
@@ -481,46 +481,50 @@ the files whose `ext` is exactly `mp4`, in any case and with or without the dot
 `.m4v` files do not match. It is a chip like `hash:`, and it is ANDed with the
 other directives, so `ext:mp4 ext:mkv` matches nothing.
 
-The box itself (`SearchTokenInput`) renders a directive as a **chip** rather than
-as raw text, so it is added and removed as one unit: a directive only means
-anything whole, and backspacing through the middle of one silently turns an exact
-tag match into a substring search. A token becomes a chip once the user closes it
-with a space or Enter — never mid-word — and `hasOpenQuote()` keeps a space typed
-inside an unclosed `tag:"…` phrase from counting as that boundary. Free text stays
-ordinary editable text, so the box remains one plain string end to end.
+The search is typed in the command menu, whose field starts from the search on
+screen (`useSearchDraft` in `src/hooks/`, rendered by `CommandMenu`). It shows a
+directive as a **chip** rather than as raw text, so it is added and removed as
+one unit: a directive only means anything whole, and backspacing through the
+middle of one silently turns an exact tag match into a substring search. A token
+becomes a chip once the user closes it with a space — never mid-word — and
+`hasOpenQuote()` keeps a space typed inside an unclosed `tag:"…` phrase from
+counting as that boundary. A condition the field already carries is not chipped
+twice (compared by `searchDirectiveKey()`, as `addSearchTokens()` compares a tag
+click); the chip that carries it is highlighted instead. "Search for" runs the
+whole field, chips and text, as the new search.
 
-Focus never leaves the input — the chips are a rendering of the query string, not
+Focus never leaves the input — the chips are a rendering of the query, not
 widgets of their own. Once the caret runs out of text to its left, Left and
 Backspace start walking back over the chips instead, highlighting one at a time;
 Left/Right move the highlight, Backspace/Delete removes the highlighted chip, and
 Escape, Right past the last chip, or simply typing returns to the text. Backspace
-highlights before it deletes because a chip goes with no undo. Clicking a chip
-highlights it too, and so does clicking a tag that is _already_ a condition:
-`onTagClick` in Home compares the result of `addSearchTokens()` by reference and,
-when nothing changed, sends `highlightSearchToken()` over the event bus rather
-than leaving what looks like a dead click.
+highlights before it deletes because a chip goes with no undo, and a highlight
+the field placed itself (a repeat) takes one press to arm. Clicking a chip
+highlights it too. In the title bar, clicking a tag that is _already_ a condition
+lights its chip there: `onTagClick` in Home compares the result of
+`addSearchTokens()` by reference and, when nothing changed, sends
+`highlightSearchToken()` over the event bus rather than leaving what looks like a
+dead click.
 
-While a directive is being typed the box completes it from the tag catalog — the
-user's own tags and the generated ones in one list, since one directive matches
-both. The match is a case-insensitive substring — a tag is as often remembered by
-a word in the middle of it — ranked prefix-first then by file count, and capped
-at `MAX_TAG_SUGGESTIONS`. Tab or Enter accepts the highlighted candidate and
-chips it; Tab preventDefaults so the caret stays put for the next condition,
-while Shift+Tab still leaves the field.
+The completions are rows of the menu, so cmdk owns the highlight, the arrow keys,
+Enter, the pointer and input methods: one list, one highlighted row, and that row
+is what Enter takes. They run only with the caret at the end of the text, since a
+pick replaces the last token, not while an input method composes, and not until
+the field is edited (opened, it lists every command, as an empty field would).
+Picking one keeps the menu open, so the search can go on being typed.
+
+While a directive is being typed the field completes it from the tag catalog —
+the user's own tags and the generated ones in one list, since one directive
+matches both. The match is a case-insensitive substring — a tag is as often
+remembered by a word in the middle of it — ranked prefix-first then by file
+count, and capped at `MAX_TAG_SUGGESTIONS`. The tags come first, so Enter takes
+the highlighted one and chips it.
 
 An ordinary word at the end of the text (two characters, or one in Han, kana
 or Hangul; not one with `|` alternatives) is offered the tags whose **names**
 contain it too (#542), compared as tag names are (`tagIdentityKey`), below a
-first row that searches for the whole text. That row is the one highlighted to
-begin with, so Enter does what it does with no list, and the row it takes is
-always the one on screen: the arrow keys and a moving pointer move the
-highlight, the highlighted row is scrolled into view, and picking a tag
-replaces the word with that tag's chip. The highlight belongs to the list it
-was made in: a list that closes drops it, and one that opens or changes starts
-from its first row. Over a word Tab leaves the field, as in any field; after
-`tag:` it completes. Completion waits while an input method composes (its keys
-are left to it, but an Esc stays in the field) and runs only with the caret at
-the end of the text, since a pick replaces the last token.
+first row that searches for the whole field, so Enter does what it does with no
+list. Picking a tag replaces the word with that tag's chip.
 
 A word that begins a generated namespace's name (without `audio_`, or in full
 once a `_` is typed) or its label in the app's language is also offered that
@@ -578,7 +582,7 @@ shared, with the same thresholds for both. A bare `tag:` value searches manual
 tags and `res`, `dur`, `codec` and `orient` only (`BARE_SEARCH_NAMESPACES` in
 `shared/tags.ts`); the `audio_` ones are searched with their namespace
 (`tag:audio_tempo:fast`), since their values are everyday words or whatever a
-file's tags say, which a manual tag can be named too. The search box shows a
+file's tags say, which a manual tag can be named too. The search shows a
 generated tag's chip as its category and value (`Tempo: Fast`). Completion
 offers every value of a closed set (`CLOSED_TAG_VALUES`) once its namespace is
 typed, `tag:audio_quality:` for one, even when no file carries it yet.

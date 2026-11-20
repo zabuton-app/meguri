@@ -7,7 +7,7 @@ import { test, expect } from "./fixtures/app";
 import {
   openFileDetail,
   openSettingsTab,
-  searchInput,
+  openCommandMenu,
   waitForIndexedMedia,
   FIXTURE_FILE,
 } from "./fixtures/helpers";
@@ -54,7 +54,8 @@ test.describe("Text selection", () => {
   test("Ctrl+A still selects all inside the search field", async ({
     ready,
   }) => {
-    const search = searchInput(ready);
+    await openCommandMenu(ready);
+    const search = ready.getByPlaceholder("Search files, or type a command...");
     await search.fill("hello");
     await search.press("Control+KeyA");
     const [start, end] = await search.evaluate((el) => [

@@ -142,7 +142,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {state && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="modal-backdrop z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => close(false)}
         >
           <div

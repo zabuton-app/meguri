@@ -43,6 +43,7 @@ import { usePreferences } from "@/settings/PreferencesProvider";
 import { NAV_BINDINGS, isHelpKey, matchAny } from "@/settings/keybindings";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "@/components/FilterBar";
+import { SearchTrigger } from "@/components/SearchTrigger";
 import { ScanProgress } from "@/components/ScanProgress";
 import { CommandMenu } from "@/components/CommandMenu";
 import { Pet } from "@/components/pet/Pet";
@@ -653,14 +654,6 @@ export default function Home() {
     if (ok) void onScan(false, true);
   };
 
-  const focusSearch = useCallback(() => {
-    const input = document.getElementById(
-      "list-search-input",
-    ) as HTMLInputElement | null;
-    input?.focus();
-    input?.select();
-  }, []);
-
   const openDiscover = useCallback(() => {
     void navigate(discoverPath(subtreeFilter));
   }, [subtreeFilter, navigate]);
@@ -773,7 +766,8 @@ export default function Home() {
         // Let the key type normally if a field already has focus.
         if (typing) return;
         e.preventDefault();
-        focusSearch();
+        // The search is typed in the command menu (SearchTrigger).
+        setCommandOpen(true);
         return;
       }
       if (typing) return;
@@ -793,7 +787,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [listShortcutsActive, keybindingPreset, helpOpen, focusSearch]);
+  }, [listShortcutsActive, keybindingPreset, helpOpen]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -918,6 +912,7 @@ export default function Home() {
         onScan={() => void onScan()}
         onScanWithDeleted={() => void onScan(true)}
         onRebuild={() => void onRebuild()}
+        search={<SearchTrigger value={filterValue} onChange={onFilterChange} />}
         t={t}
       />
 
@@ -1152,7 +1147,6 @@ export default function Home() {
           ready={status.data?.ready ?? false}
           scanning={scanning}
           devToolsEnabled={status.data?.devMode ?? false}
-          onFocusSearch={focusSearch}
           onScan={(includeExcluded) => void onScan(includeExcluded)}
           onRebuild={() => void onRebuild()}
           onSetView={setViewMode}
@@ -1172,8 +1166,9 @@ export default function Home() {
           onOpenDevTools={openDevTools}
           onApplySearch={onApplyRecent}
           onApplySaved={onApplySaved}
-          onQuickSearch={(text) => onFilterChange({ ...filterValue, q: text })}
-          onAddSearchToken={onTagClick}
+          onSearch={(q) =>
+            onFilterChange({ ...filterValue, q: q || undefined })
+          }
           filter={filterValue}
           onFilterChange={onFilterChange}
           fileActionsAvailable={location.pathname === "/"}
