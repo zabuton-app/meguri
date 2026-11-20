@@ -107,7 +107,10 @@ export function TitleBar({
       data-slot="title-bar"
       data-testid="title-bar"
       ref={barRef}
-      className="flex h-(--meguri-title-bar-height) shrink-0 select-none items-stretch bg-chrome [-webkit-app-region:drag]"
+      // text-fg: text that sets no color of its own follows a theme that
+      // redefines the palette inside the bar (docs/theming.md); inherited from
+      // <body>, it would keep the page's.
+      className="flex h-(--meguri-title-bar-height) shrink-0 select-none items-stretch bg-chrome text-fg [-webkit-app-region:drag]"
     >
       {side === "left" ? (
         buttons

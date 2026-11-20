@@ -313,7 +313,7 @@ export function WorkspaceRail() {
     <>
       <nav
         data-slot="workspace-rail"
-        className="flex h-full w-16 shrink-0 flex-col items-center gap-2 bg-chrome pb-3 pt-1"
+        className="flex h-full w-16 shrink-0 flex-col items-center gap-2 bg-chrome pb-3 pt-1 text-fg"
       >
         {logoHere && <AppLogo className="size-[50px]" />}
 
