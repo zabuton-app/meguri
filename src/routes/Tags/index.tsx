@@ -341,8 +341,8 @@ export default function Tags() {
           {isCloud ? (
             <Button
               variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+              size="compact"
+              className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
               onClick={() => setCloudIncludeAuto((prev) => !prev)}
               aria-pressed={cloudIncludeAuto}
             >
@@ -352,8 +352,7 @@ export default function Tags() {
             <ButtonGroup>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
+                size="compact"
                 onClick={() => setSort("name")}
                 aria-pressed={sort === "name"}
               >
@@ -361,8 +360,7 @@ export default function Tags() {
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
+                size="compact"
                 onClick={() => setSort("count")}
                 aria-pressed={sort === "count"}
               >
@@ -372,8 +370,7 @@ export default function Tags() {
           )}
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={toggleModalSize}
             aria-label={toggleLabel}
             aria-pressed={isSmall}
@@ -383,8 +380,7 @@ export default function Tags() {
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onClose}
             aria-label={t("common.close")}
             title={`${t("common.close")} (Esc)`}
@@ -401,8 +397,7 @@ export default function Tags() {
           </span>
           <Button
             variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
+            size="compact"
             disabled={selectedTags.length < 2 || mutating}
             onClick={() => setMergeOpen(true)}
           >
@@ -410,8 +405,7 @@ export default function Tags() {
           </Button>
           <Button
             variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
+            size="compact"
             disabled={mutating}
             onClick={() => void onDeleteSelected()}
           >

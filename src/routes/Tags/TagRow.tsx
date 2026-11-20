@@ -99,8 +99,7 @@ export const TagRow = memo(function TagRow({
         <span className="flex shrink-0 items-center">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             disabled={busy}
             onClick={() => onRename(tag)}
             aria-label={t("tags.rename")}
@@ -110,8 +109,7 @@ export const TagRow = memo(function TagRow({
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             disabled={busy}
             onClick={() => onDelete(tag)}
             aria-label={t("tags.delete")}

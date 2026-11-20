@@ -1389,7 +1389,7 @@ export const VideoPlayer = forwardRef<
                   // Prevents the image from being squashed horizontally when the containing block's available width shrinks at later positions.
                   className="h-28 w-auto max-w-none rounded-md border border-white/30 bg-black shadow-lg"
                 />
-                <span className="mt-1 rounded bg-black/75 px-1.5 py-0.5 text-[11px] tabular-nums">
+                <span className="mt-1 rounded bg-black/75 px-1.5 py-0.5 text-2xs tabular-nums">
                   {fmtTime(hover.t)}
                 </span>
               </div>

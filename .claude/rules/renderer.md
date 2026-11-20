@@ -13,4 +13,5 @@ See [docs/renderer.md](../../docs/renderer.md) and [docs/theming.md](../../docs/
 - **Long lists**: a list that can grow without bound (loaded page by page, or uncapped) is virtualized with `useVirtualizer` plus `useInfiniteScrollTrigger` (and `useScrollToRow` / `useGridKeyboardNav` for keyboard navigation). A capped list need not be. See "Data fetching" in docs/renderer.md.
 - **Zoom** uses `webFrame.setZoomFactor` through preload, never CSS `zoom`.
 - **Window-covering overlays**: a modal's backdrop is `modal-backdrop`, any other (the player) is `fixed inset-below-title-bar`, never `fixed inset-0`, so the custom title bar stays usable (see "Title bar" in docs/renderer.md).
+- **Design tokens**: take radii, spacing, control heights, font sizes, borders, tints and shadows from the scales in "Design tokens" in docs/renderer.md. Radii are named by role (`rounded-control`, `rounded-card`, ...), not `rounded-md`.
 - **Theme variables** are declared on `html[data-theme="<id>"]`, so `:root` cannot override them.

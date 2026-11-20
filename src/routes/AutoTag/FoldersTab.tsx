@@ -167,7 +167,7 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
                     {workspaceLabel(rule.workspaceId)}
                     {rule.folder && ` / ${rule.folder}`}
                   </span>
-                  <span className="truncate text-[11px] text-muted">
+                  <span className="truncate text-2xs text-muted">
                     {rule.tags.join(", ") || t("autoTag.folder.noTagsShort")}
                   </span>
                 </span>

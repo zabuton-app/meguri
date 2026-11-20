@@ -368,7 +368,7 @@ const RailMarks = memo(function RailMarks({
           key={y.key}
           data-year={y.text}
           aria-hidden
-          className="absolute right-7 -translate-y-1/2 whitespace-nowrap text-[11px] leading-none text-fg/70"
+          className="absolute right-7 -translate-y-1/2 whitespace-nowrap text-2xs leading-none text-fg/70"
           style={{ top: pct(y.top) }}
         >
           {y.text}

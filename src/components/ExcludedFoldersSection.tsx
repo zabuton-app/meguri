@@ -100,7 +100,7 @@ export function ExcludedFoldersSection({
             {excluded.data && (
               <span
                 data-testid="excluded-folder-count"
-                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-overlay px-1.5 text-[11px] font-semibold"
+                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-overlay px-1.5 text-2xs font-semibold"
               >
                 {active}
               </span>
@@ -233,7 +233,7 @@ function FolderItem({
         <span
           // Wrapped, not cut short: the end of the path is the folder, and
           // its start says which one.
-          className="break-all font-mono text-[11px] leading-snug text-muted"
+          className="break-all font-mono text-2xs leading-snug text-muted"
         >
           {inRoot ? (
             <>
@@ -284,7 +284,7 @@ function Badge({
   return (
     <span
       className={cn(
-        "inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11px] font-medium",
+        "inline-flex h-5 shrink-0 items-center rounded-full px-2 text-2xs font-medium",
         className,
       )}
     >

@@ -135,7 +135,7 @@ export function ScanExclusionsSection() {
         >
           {t("settings.scanExclusions")}
           {/* Every workspace, unlike the folders below: said in words. */}
-          <span className="inline-flex h-5 items-center rounded-full border border-border-strong px-2 text-[11px] font-medium text-muted">
+          <span className="inline-flex h-5 items-center rounded-full border border-border-strong px-2 text-2xs font-medium text-muted">
             {t("settings.scanExclusionsGlobal")}
           </span>
         </h3>
@@ -371,7 +371,7 @@ function Preview({ preview }: { preview: PreviewState }) {
               // By position: a workspace inside another lists a file twice.
               key={i}
               title={f.absPath}
-              className="flex min-w-0 gap-2 px-2 py-0.5 font-mono text-[11px]"
+              className="flex min-w-0 gap-2 px-2 py-0.5 font-mono text-2xs"
             >
               <span className="shrink-0 text-muted">{f.workspace}</span>
               <span className="w-0 min-w-0 flex-1 truncate text-fg">

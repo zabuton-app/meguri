@@ -130,8 +130,8 @@ export function VideoGradeOverlay({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="ml-auto h-7 px-2"
+                size="compact"
+                className="ml-auto"
                 aria-label={t("common.close")}
                 title={`${t("common.close")} (Esc)`}
                 onClick={close}
@@ -277,7 +277,7 @@ export function VideoGradeOverlay({
                       {directions && (
                         <span
                           aria-hidden="true"
-                          className="flex justify-between text-[11px]"
+                          className="flex justify-between text-2xs"
                         >
                           <span className={directions.colors[0]}>
                             {t(directions.low)}

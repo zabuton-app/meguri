@@ -38,7 +38,7 @@ export function NameTags({
   if (!parts.some((part) => part.tag !== null)) return null;
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] text-muted">{t("media.nameTags.hint")}</span>
+      <span className="text-2xs text-muted">{t("media.nameTags.hint")}</span>
       <div className="flex flex-wrap items-center gap-y-1 font-mono text-sm leading-7 text-bright-fg">
         {parts.map((part, i) => {
           const { tag } = part;

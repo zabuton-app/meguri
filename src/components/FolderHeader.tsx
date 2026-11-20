@@ -113,7 +113,7 @@ export function FolderHeader({
       />
       <div className="flex min-w-0 flex-col">
         {shown.length > 0 && (
-          <div className="flex min-w-0 items-center gap-0.5 text-[11px] text-muted">
+          <div className="flex min-w-0 items-center gap-0.5 text-2xs text-muted">
             {shown.map((level, i) => (
               <Fragment key={level.path}>
                 {i === 1 && folded.length > 0 && (

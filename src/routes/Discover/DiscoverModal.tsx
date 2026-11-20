@@ -36,8 +36,8 @@ export function DiscoverModal({
 
   const innerClass =
     size === "small"
-      ? "relative h-[85vh] max-h-[880px] w-full max-w-4xl overflow-hidden rounded-xl border border-border bg-bg shadow-2xl"
-      : "relative h-full w-full overflow-hidden rounded-xl border border-border bg-bg shadow-2xl";
+      ? "relative h-[85vh] max-h-[880px] w-full max-w-4xl overflow-hidden rounded-window border border-border bg-bg shadow-2xl"
+      : "relative h-full w-full overflow-hidden rounded-window border border-border bg-bg shadow-2xl";
 
   return (
     <div

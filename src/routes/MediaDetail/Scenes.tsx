@@ -66,7 +66,7 @@ export function Scenes({
         {/* Live preview of the file's main thumbnail so the user sees the change land,
             instead of having to navigate back to the list to confirm. */}
         {mainThumbUrl && (
-          <div className="flex items-center gap-2 text-[11px] text-muted">
+          <div className="flex items-center gap-2 text-2xs text-muted">
             <span>{t("media.currentMainThumb")}</span>
             <div
               className="relative h-10 overflow-hidden rounded border border-border bg-black"

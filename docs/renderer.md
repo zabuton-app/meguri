@@ -536,6 +536,55 @@ UI primitives are in `src/components/ui/` (Radix plus class-variance-authority,
 in the shadcn style). Confirmation dialogs use `ConfirmProvider` / `useConfirm`
 (`src/components/ConfirmDialog.tsx`).
 
+## Design tokens
+
+The app's scales (#584). A new part takes its values from them; a value
+outside them needs a reason.
+
+Corner radii are named by what they round (`src/styles.css`), and a part
+inside another gets a smaller one than its container:
+
+| Class             | Size | For                                      |
+| ----------------- | ---- | ---------------------------------------- |
+| `rounded-panel`   | 16px | the content panel set in the frame       |
+| `rounded-window`  | 12px | modals, dialogs, the selection bar       |
+| `rounded-card`    | 8px  | cards, panels, list rows, bubbles        |
+| `rounded-control` | 6px  | buttons, fields, menus, popovers, badges |
+| `rounded-item`    | 4px  | menu items, small chips inside a control |
+| `rounded-full`    | pill | pills, switches, round buttons           |
+
+`cn()` (`src/lib/utils.ts`) knows these names, so a radius passed in
+`className` replaces a component's own.
+
+The other scales use Tailwind's classes, limited to these steps:
+
+- **Spacing**: 0.5, 1, 1.5, 2, 3, 4, 6 and 8 (2 to 32px). Layout offsets built
+  on layout variables (`--meguri-title-bar-height` and the like) are positions,
+  not spacing.
+- **Control heights**: 24px (`h-6`, icon buttons on cards and rows), 28px
+  (`h-7`, `Button size="compact"`, controls in a window's dense rows and
+  toolbars) and 32px (`h-8`, `Button size="sm"`, `Input`, `Select`: the bars,
+  dialogs and forms).
+- **Font sizes**: `text-2xs` (11px, badges, counts and secondary lines),
+  `text-xs` (12px, most text), `text-sm` (14px, body text, menu items and
+  fields), `text-base` (16px, window titles), `text-lg` and `text-xl`
+  (headings in empty states and the tour). Unlike the others, `text-2xs` sets
+  no line height. `font-medium` for emphasis,
+  `font-semibold` for titles, `font-bold` for numbers that are the point.
+- **Borders**: 1px; 2px only for focus and selection rings. `border-border`
+  for dividers and containers, `border-border-strong` for the edge of a
+  control; translucent white over video and images.
+- **Tints**: `bg-fg/10` for hover on a bare button or row, `bg-primary/15` for
+  a selected item, `bg-primary/25` for a selected item hovered or active,
+  `bg-black/70` for a modal's backdrop.
+- **Shadows**: `shadow-lg` for menus and popovers, `shadow-2xl` for windows.
+
+So far the shared primitives (`src/components/ui/`), the content panel and
+the modals use the radius names. Elsewhere a raw `rounded-md`, `text-[13px]`
+or 26px control is either a part already at its scale's value that only needs
+the name, or one that has to move; each sub-issue of #579 sorts out its own
+area.
+
 ## Title bar
 
 The app draws the window's title bar (`src/components/TitleBar.tsx`) across the

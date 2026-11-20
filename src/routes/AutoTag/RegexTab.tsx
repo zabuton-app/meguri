@@ -152,9 +152,7 @@ export function RegexTab({ state }: { state: AutoTagState }) {
                       </span>
                       <Badge>{t(KIND_LABELS[rule.kind])}</Badge>
                     </span>
-                    <span
-                      className={cn(MONO, "truncate text-[11px] text-muted")}
-                    >
+                    <span className={cn(MONO, "truncate text-2xs text-muted")}>
                       {rule.pattern}
                     </span>
                   </span>

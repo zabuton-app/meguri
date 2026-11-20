@@ -239,7 +239,7 @@ export function RuleEditor({
                   <Chip key={tag}>{tag}</Chip>
                 ))}
                 {row.hits.length > 0 && row.tags.length === 0 && (
-                  <span className="text-[11px] text-muted">
+                  <span className="text-2xs text-muted">
                     {t("autoTag.excluded")}
                   </span>
                 )}

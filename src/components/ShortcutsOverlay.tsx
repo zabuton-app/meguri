@@ -244,7 +244,7 @@ export function ShortcutsOverlay({
     >
       <div
         data-slot="modal-panel"
-        className="relative flex h-[min(720px,85vh)] w-full max-w-[980px] flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl"
+        className="relative flex h-[min(720px,85vh)] w-full max-w-[980px] flex-col overflow-hidden rounded-window border border-border bg-bg shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex flex-wrap items-center gap-3 px-5 pt-4 pb-3">

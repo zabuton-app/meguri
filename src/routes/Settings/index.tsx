@@ -220,8 +220,8 @@ export default function Settings() {
         </span>
         <Button
           variant="ghost"
-          size="sm"
-          className="ml-auto h-7 px-2"
+          size="compact"
+          className="ml-auto"
           onClick={() => void onClose()}
           title={`${t("common.close")} (Esc)`}
         >
@@ -843,8 +843,7 @@ export default function Settings() {
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="h-7 px-2"
+                      size="compact"
                       onClick={() => setHideSupportLink(true)}
                       aria-label={t("settings.hideSupport")}
                       title={t("settings.hideSupport")}

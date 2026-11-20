@@ -136,7 +136,7 @@ export default function AutoTag() {
       <div
         data-slot="modal-panel"
         className={cn(
-          "relative flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl",
+          "relative flex min-h-0 w-full flex-col overflow-hidden rounded-window border border-border bg-bg shadow-2xl",
           isSmall &&
             "h-[min(880px,calc(100vh-48px-var(--meguri-title-bar-height)))] min-h-[min(620px,100%)] max-w-[1160px]",
         )}
