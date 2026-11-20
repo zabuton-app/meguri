@@ -88,10 +88,18 @@ body:has(
   --color-bg: var(--c-bg);
   --color-surface: var(--c-surface);
   --color-overlay: var(--c-overlay);
-  /* The window's frame around the content: the title bar and the workspace
-     rail (App.tsx). Halfway between bg and surface, so text that reads on
-     both reads on it too. */
-  --color-chrome: color-mix(in oklab, var(--c-bg), var(--c-surface));
+  /* The window's frame around the content: the title bar, the workspace
+     rail and the strips and corners around the content panel (App.tsx). A
+     CSS theme sets it with --c-chrome (docs/theming.md), so all of them
+     change together. Otherwise it is the surface with a touch of the text
+     color, so the frame stands apart from the content in every theme
+     (darker in a light one, lighter in a dark one) and keeps the theme's
+     hue. Much more than this and the muted text on it (the path, some
+     icons) starts to fade. */
+  --color-chrome: var(
+    --c-chrome,
+    color-mix(in oklab, var(--c-surface), var(--c-fg) 12%)
+  );
   --color-border: var(--c-border);
   /* Meaningful UI boundaries (form controls, switch tracks) rather than decorative rules. */
   --color-border-strong: var(--c-border-strong);

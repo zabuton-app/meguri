@@ -93,9 +93,14 @@ the whole app.
 | `--c-warn`             | Warnings                                     |
 | `--c-error`            | Errors and destructive actions               |
 | `--c-special`          | Rarely used accent                           |
+| `--c-chrome`           | The frame: the title bar and the rail        |
 
 Text drawn on a `--c-primary` fill uses `--c-bg`, so keep the two readable
 against each other.
+
+`--c-chrome` is optional, and the built-in themes do not set it: left unset,
+it is `--c-surface` with 12% of `--c-fg`. See
+[Parts of the UI](#parts-of-the-ui) for what it covers.
 
 ## Choosing what to override
 
@@ -147,6 +152,32 @@ These parts carry a `data-slot` attribute.
 | `folder-row`       | A folder in the list                            |
 | `modal-panel`      | Full-size windows (settings, file details, ...) |
 
+The title bar and the rail are one frame, and the content panel is set into
+it with rounded corners. To recolor the frame, set `--c-chrome` rather than
+the background of the title bar or the rail: the frame also fills the corners
+the panel's rounding leaves and the strips right of and below it, which those
+backgrounds do not reach. Left unset, it is `--c-surface` with 12% of
+`--c-fg`.
+
+```css
+html[data-appearance] {
+  --c-chrome: var(--c-bg);
+}
+```
+
+To draw a line between the frame and the content,
+style the panel's border (`border-color`, `border-width`), not a border on the
+title bar or the rail: those are straight, and run past the panel's rounded
+corner as a square. Leave the panel's `background` and `box-shadow` alone: it
+is unpainted so the page shows through, and its shadow paints the frame into
+the corners its rounding leaves.
+
+```css
+[data-slot="content-panel"] {
+  border-color: var(--c-primary);
+}
+```
+
 The focused item in the grid or the list has `aria-current="true"`.
 
 ```css
@@ -163,7 +194,7 @@ Variables cascade, so redefining them on a part recolors everything inside
 it — icons, hover states and the active item included:
 
 ```css
-[data-slot="workspace-rail"] {
+[data-slot="status-bar"] {
   --c-bg: #fcee0a;
   --c-surface: #e8da00;
   --c-fg: #0a0a14;

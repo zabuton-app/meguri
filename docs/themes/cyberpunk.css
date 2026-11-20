@@ -115,7 +115,6 @@ body:has([data-slot="workspace-rail"] [data-state="open"])
 }
 [data-slot="workspace-rail"] {
   background-color: var(--c-bg);
-  border-right: 2px solid #0b0c10;
   box-shadow: 0 0 10px rgb(255 230 0 / 0.45);
 }
 
@@ -132,16 +131,16 @@ body:has([data-slot="workspace-rail"] [data-state="open"])
   box-shadow: 0 0 10px rgb(255 230 0 / 0.45);
 }
 
-/* Workspace info header: cyan → pink gradient underline */
-[data-slot="title-bar"] {
-  background-color: var(--c-surface);
-  border-bottom: 2px solid transparent;
-  border-image: linear-gradient(
-      90deg,
-      var(--c-primary),
-      var(--c-secondary-accent)
-    )
-    1;
+/* The rest of the frame: the title bar and the corners and strips around
+   the content panel. The rail above stands apart from it on purpose, as its
+   own yellow panel. */
+html[data-appearance] {
+  --c-chrome: var(--c-surface);
+}
+/* The content in a cyan frame. Its border follows the panel's rounded
+   corners, which a line on the bars would run straight past. */
+[data-slot="content-panel"] {
+  border-color: var(--c-primary);
 }
 
 /* Search and filters: faint pink haze */

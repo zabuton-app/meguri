@@ -542,7 +542,8 @@ The app draws the window's title bar (`src/components/TitleBar.tsx`) across the
 top of the shell, above the workspace rail. `titleBarOptions()` in
 `electron/ipc/window.ts` hides the native one (`titleBarStyle: "hidden"`).
 The bar and the rail share the `chrome` color (`--color-chrome` in
-`src/styles.css`, halfway between `bg` and `surface`) and read as one frame;
+`src/styles.css`: a CSS theme's `--c-chrome`, or else the `surface` with 12%
+of the text color, so it stands apart from the content in every theme) and read as one frame;
 the content is a bordered panel set into it (`data-slot="content-panel"` in
 `App.tsx`). The bar holds the logo, then the current screen's header, with the
 window buttons at the end the user picks under "Window buttons" in the

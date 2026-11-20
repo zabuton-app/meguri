@@ -127,7 +127,12 @@ html[data-appearance] body::before {
   color: var(--c-bright-fg);
 }
 
-/* Bars: terminal scanlines */
+/* Bars: terminal scanlines. The frame (the title bar and the rail) takes
+   its color from --c-chrome, which also fills the corners around the content
+   panel; the scanlines stay on the bars. */
+html[data-appearance] {
+  --c-chrome: var(--c-bg);
+}
 [data-slot="workspace-rail"],
 [data-slot="title-bar"],
 [data-slot="status-bar"],
@@ -142,12 +147,15 @@ html[data-appearance] body::before {
   );
 }
 [data-slot="workspace-rail"] {
-  border-right: 1px solid var(--c-border-strong);
   box-shadow: var(--mx-glow);
 }
 [data-slot="title-bar"] {
-  border-bottom: 1px solid var(--c-border-strong);
   font-family: var(--mx-mono);
+}
+/* The line between the bars and the content is the content panel's border,
+   which follows its rounded corners. */
+[data-slot="content-panel"] {
+  border-color: var(--c-border-strong);
 }
 
 /* Footer: a console readout */
