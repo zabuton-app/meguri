@@ -17,6 +17,8 @@ export function kindLabelKey(kind: string): TranslationKey | null {
       return "kind.image";
     case "audio":
       return "kind.audio";
+    case "visual":
+      return "kind.visual";
     default:
       return null;
   }

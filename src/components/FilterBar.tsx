@@ -19,6 +19,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
 import type { SmartCollection } from "@/lib/smartCollections";
+import { ResolutionFilter } from "./ResolutionFilter";
 
 interface Props {
   value: SearchQuery;
@@ -99,10 +100,22 @@ export function FilterBar({
             { value: undefined, label: t("filter.all") },
             { value: "video", label: t("kind.video") },
             { value: "image", label: t("kind.image") },
+            { value: "visual", label: t("kind.visual") },
             { value: "audio", label: t("kind.audio") },
           ]}
-          onChange={(kind) => patch({ kind })}
+          onChange={(kind) =>
+            patch({
+              kind,
+              resolution: kind === "audio" ? undefined : value.resolution,
+            })
+          }
         />
+        {value.kind !== "audio" && (
+          <ResolutionFilter
+            value={value.resolution}
+            onChange={(resolution) => patch({ resolution })}
+          />
+        )}
 
         <div
           className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2"
