@@ -4,8 +4,8 @@
  * A sample Meguri CSS theme.
  *
  * Phosphor green on black, like an old terminal: monospace readouts, a faint
- * glow and scanlines on the bars. The light variant is green ink on pale
- * green-bar paper. Picked by the app's light / dark switch through
+ * glow, and scanlines on the bottom bars. The light variant is green ink on
+ * pale green-bar paper. Picked by the app's light / dark switch through
  * html[data-appearance]. Uses only the public API described in
  * docs/theming.md, so it keeps working across updates.
  *
@@ -127,14 +127,16 @@ html[data-appearance] body::before {
   color: var(--c-bright-fg);
 }
 
-/* Bars: terminal scanlines. The frame (the title bar and the rail) takes
-   its color from --c-chrome, which also fills the corners around the content
-   panel; the scanlines stay on the bars. */
+/* The frame (the title bar, the rail and the corners around the content
+   panel) in one flat color, so nothing marks where the bars meet. */
 html[data-appearance] {
   --c-chrome: var(--c-bg);
 }
-[data-slot="workspace-rail"],
-[data-slot="title-bar"],
+[data-slot="title-bar"] {
+  font-family: var(--mx-mono);
+}
+
+/* Footer and player bar: terminal scanlines. */
 [data-slot="status-bar"],
 [data-slot="audio-player-bar"] {
   background-color: var(--c-bg);
@@ -145,12 +147,6 @@ html[data-appearance] {
     transparent 1px,
     transparent 3px
   );
-}
-[data-slot="workspace-rail"] {
-  box-shadow: var(--mx-glow);
-}
-[data-slot="title-bar"] {
-  font-family: var(--mx-mono);
 }
 /* The line between the bars and the content is the content panel's border,
    which follows its rounded corners. */
