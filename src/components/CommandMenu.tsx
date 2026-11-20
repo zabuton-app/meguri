@@ -274,6 +274,14 @@ export function CommandMenu(props: CommandMenuProps) {
       draft.reset(filter.q ?? "");
     }
   }
+  // The search moves with the window's width (and the zoom, which fires a
+  // resize too): the menu follows it while open.
+  useEffect(() => {
+    if (!open) return;
+    const follow = () => setAnchor(searchAnchor());
+    window.addEventListener("resize", follow);
+    return () => window.removeEventListener("resize", follow);
+  }, [open]);
 
   return (
     <>

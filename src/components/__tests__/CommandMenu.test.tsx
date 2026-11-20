@@ -901,3 +901,31 @@ describe("search field", () => {
     );
   });
 });
+
+describe("placement", () => {
+  it("follows the search when the window's width changes", () => {
+    const search = document.createElement("div");
+    search.setAttribute("data-command-menu-anchor", "");
+    document.body.append(search);
+    let left = 400;
+    search.getBoundingClientRect = () =>
+      ({ top: 10, left, width: 200, height: 30 }) as DOMRect;
+    const width = window.innerWidth;
+    window.innerWidth = 1600;
+    try {
+      const { props, rerender } = renderMenu({ open: false });
+      rerender(<CommandMenu {...props} open />);
+      const menu = () => screen.getByRole("dialog");
+      expect(menu().style.left).toBe("500px");
+
+      left = 700;
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+      expect(menu().style.left).toBe("800px");
+    } finally {
+      window.innerWidth = width;
+      search.remove();
+    }
+  });
+});
