@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures/app";
 import { openSettings, searchFor } from "./fixtures/helpers";
 
@@ -92,15 +92,28 @@ test.describe("Title bar", () => {
       "needle",
     );
     await bar.getByRole("button", { name: "Clear search" }).click();
-    const slot = bar.locator("[data-title-bar-slot]");
-    await expect(slot).toHaveCSS("pointer-events", "auto");
+    // Whether a click at the middle of `el` reaches it, or something drawn
+    // over it takes it.
+    const onTop = (el: Locator) =>
+      el.evaluate((node) => {
+        const r = node.getBoundingClientRect();
+        return node.contains(
+          document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2),
+        );
+      });
+    const search = bar.locator('[data-slot="search-trigger"]');
     // A popover is not a modal: Radix gives it role="dialog" too.
     await ready.locator('[data-slot="more-filters-trigger"]').click();
     await expect(ready.getByRole("dialog")).toBeVisible();
-    await expect(slot).toHaveCSS("opacity", "1");
+    expect(await onTop(search)).toBe(true);
     await ready.keyboard.press("Escape");
+    // A modal's backdrop covers the bar with the page; the window buttons stay
+    // above it.
     await openSettings(ready);
-    await expect(slot).toHaveCSS("pointer-events", "none");
+    expect(await onTop(search)).toBe(false);
+    expect(
+      await onTop(bar.getByRole("button", { name: "Close", exact: true })),
+    ).toBe(true);
   });
 
   test("moves the window buttons to the left from the settings", async ({

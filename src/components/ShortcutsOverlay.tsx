@@ -236,7 +236,7 @@ export function ShortcutsOverlay({
 
   return (
     <div
-      className="fixed inset-below-title-bar z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="modal-backdrop z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"

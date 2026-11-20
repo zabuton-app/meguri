@@ -225,8 +225,10 @@ function WindowButtons({
   return (
     // pointer-events-auto: a Radix modal or menu sets pointer-events: none on
     // <body> to block the page behind it, which would take these too. The
-    // header in the slot stays blocked, as the page is.
-    <div className="pointer-events-auto flex shrink-0">
+    // header in the slot stays blocked, as the page is. relative z-[70]:
+    // above a modal's backdrop (modal-backdrop in styles.css), which covers
+    // the rest of the bar, so the window can still be minimized and closed.
+    <div className="pointer-events-auto relative z-[70] flex shrink-0">
       {side === "left"
         ? [close, minimize, maximize]
         : [minimize, maximize, close]}

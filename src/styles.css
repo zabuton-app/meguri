@@ -38,10 +38,12 @@
 /* Layers that can float over the title bar's band: a click there would move
    the window instead, since a drag region ignores what is painted over it.
    A no-drag area later in the document is cut out of the drag region. A new
-   floating layer that can reach the band belongs in this list. */
+   floating layer that can reach the band belongs in this list. A modal's
+   backdrop (modal-backdrop) is left out: it covers the band on purpose, and
+   the bar under it still moves the window. */
 [data-sonner-toaster],
 [data-radix-popper-content-wrapper],
-[role="dialog"],
+[role="dialog"]:not(.modal-backdrop),
 [data-pet] {
   -webkit-app-region: no-drag;
 }
@@ -63,24 +65,21 @@
   -webkit-app-region: no-drag;
 }
 
-/* While a modal is open, the screen's header in the title bar is part of the
-   page behind it: it goes quiet like the rest. The window buttons stay. A
-   modal is one with aria-modal (the app's own; the tour's bubble is not one:
-   it points at the header) or an open Radix dialog's content, which carries
-   no aria-modal. Radix popovers have role="dialog" too, so the role alone
-   would catch them. */
-body:has(
-    [aria-modal="true"]:not([data-tour-bubble]),
-    [data-slot="dialog-content"][data-state="open"]
-  )
-  [data-title-bar-slot] {
-  pointer-events: none;
-  opacity: 0.5;
-}
-
 /* A fixed overlay covering the window below the title bar. */
 @utility inset-below-title-bar {
   inset: var(--meguri-title-bar-height) 0 0 0;
+}
+
+/* A modal's backdrop: it dims and blurs the whole window, title bar
+   included, as one layer (two would show a seam where they meet). Its
+   content still starts below the bar: the bar's band is a transparent
+   border, which the backdrop's own background and blur paint under. The bar
+   stays a drag region under it, since a drag region ignores what is painted
+   over it, and the window buttons sit above it (TitleBar.tsx). */
+@utility modal-backdrop {
+  position: fixed;
+  inset: 0;
+  border-top: var(--meguri-title-bar-height) solid transparent;
 }
 
 /* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */

@@ -589,22 +589,24 @@ buttons take the bar's left end; then it is the rail's first item
 
 The bar is a drag region (`-webkit-app-region: drag`); its links, buttons and
 fields are `no-drag` (`src/styles.css`), and the rest of it, the header's text
-included, moves the window. While a modal is open (`aria-modal`, or an open Radix
-dialog's content; not a popover, nor the tour's bubble), the header in the
-slot goes quiet like the page behind it; the window buttons and the drag stay.
+included, moves the window.
 The slot takes one screen's header at a time: today only Home, the parent of
 every route, renders into it.
 
-An overlay that covers the window (a modal, the player) is
-`fixed inset-below-title-bar`, not `fixed inset-0`, so that the window can still
-be moved, minimized and closed while it is open; ESLint refuses `fixed inset-0`
-in the renderer. The player's full screen covers the bar as any full-screen
-element does.
+A modal's backdrop is `modal-backdrop` (`src/styles.css`): one layer that dims
+and blurs the whole window, title bar included, with its content kept below the
+bar. The bar still moves the window under it (a click on one of its controls
+reaches the backdrop instead, which closes the modal), and the window buttons
+sit above it, so the window can still be moved, minimized and closed while a modal is
+open. Another overlay that covers the window (the player) is
+`fixed inset-below-title-bar`. ESLint refuses `fixed inset-0` in the renderer.
+The player's full screen covers the bar as any full-screen element does.
 
 A drag region ignores what is painted over it, so a click on a toast, a menu or
 a dialog over the bar's band would move the window. `src/styles.css` makes
 those layers `no-drag` (`[data-sonner-toaster]`,
-`[data-radix-popper-content-wrapper]`, `[role="dialog"]`, the pet), and the
+`[data-radix-popper-content-wrapper]`, `[role="dialog"]` other than a
+`modal-backdrop`, the pet), and the
 toasts start below the bar. A new floating layer that can reach the band goes
 in that list. The crash screen (`ErrorBoundary`) replaces the whole app, title
 bar included, so it draws a plain drag strip with a Close button of its own.

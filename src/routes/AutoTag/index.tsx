@@ -125,7 +125,7 @@ export default function AutoTag() {
   return (
     <div
       className={cn(
-        "fixed inset-below-title-bar z-50 flex justify-center bg-black/70 backdrop-blur-sm",
+        "modal-backdrop z-50 flex justify-center bg-black/70 backdrop-blur-sm",
         isSmall ? "items-center p-2 sm:p-6" : "p-2 sm:p-4 md:p-6",
       )}
       onClick={onClose}

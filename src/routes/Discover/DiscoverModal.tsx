@@ -41,7 +41,7 @@ export function DiscoverModal({
 
   return (
     <div
-      className="fixed inset-below-title-bar z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm"
+      className="modal-backdrop z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"

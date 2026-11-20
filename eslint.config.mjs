@@ -103,12 +103,12 @@ export default tseslint.config(
         {
           selector: "Literal[value=/\\bfixed inset-0\\b/]",
           message:
-            "Use `fixed inset-below-title-bar` for a window-covering overlay (see docs/renderer.md#title-bar).",
+            "Use `modal-backdrop` for a modal's backdrop, `fixed inset-below-title-bar` for another window-covering overlay (see docs/renderer.md#title-bar).",
         },
         {
           selector: "TemplateElement[value.raw=/\\bfixed inset-0\\b/]",
           message:
-            "Use `fixed inset-below-title-bar` for a window-covering overlay (see docs/renderer.md#title-bar).",
+            "Use `modal-backdrop` for a modal's backdrop, `fixed inset-below-title-bar` for another window-covering overlay (see docs/renderer.md#title-bar).",
         },
       ],
     },
