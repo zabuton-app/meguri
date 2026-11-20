@@ -2,7 +2,7 @@ import { test, expect } from "./fixtures/app";
 import {
   fileCard,
   openFileDetail,
-  searchInput,
+  searchFor,
   waitForIndexedMedia,
   FIXTURE_FILE,
 } from "./fixtures/helpers";
@@ -49,14 +49,14 @@ test.describe("Collections", () => {
   });
 
   test("saves and applies a smart collection", async ({ ready }) => {
-    await searchInput(ready).fill("test");
+    await searchFor(ready, "test");
     await ready.getByRole("button", { name: "Smart collections" }).click();
     await ready.getByText("Save current filters").click();
     const saveDialog = ready.getByRole("dialog");
     await saveDialog.getByPlaceholder("Collection name").fill("PNG search");
     await saveDialog.getByRole("button", { name: "Save" }).click();
 
-    await searchInput(ready).fill("nomatch");
+    await searchFor(ready, "nomatch");
     await expect(ready.getByText("No media to display.")).toBeVisible();
 
     await ready.getByRole("button", { name: "Smart collections" }).click();

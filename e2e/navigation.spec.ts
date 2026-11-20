@@ -2,21 +2,42 @@ import { test, expect } from "./fixtures/app";
 import {
   closeTopDialog,
   openCommandMenu,
-  searchInput,
+  searchTrigger,
   FIXTURE_FILE,
 } from "./fixtures/helpers";
 
 test.describe("Navigation", () => {
   test("opens command menu with Ctrl+K", async ({ ready }) => {
     await openCommandMenu(ready);
-    await expect(ready.getByText("Focus search")).toBeVisible();
+    await expect(ready.getByText("List view")).toBeVisible();
     await expect(ready.getByText("Discovery")).toBeVisible();
   });
 
-  test("command menu focuses search", async ({ ready }) => {
-    await openCommandMenu(ready);
-    await ready.getByText("Focus search", { exact: true }).click();
-    await expect(searchInput(ready)).toBeFocused();
+  test("the search in the title bar opens the command menu over it", async ({
+    ready,
+  }) => {
+    const trigger = searchTrigger(ready);
+    const at = await trigger.boundingBox();
+    await trigger
+      .getByRole("button", { name: "Search or run a command" })
+      .click();
+    const input = ready.getByPlaceholder("Search files, or type a command...");
+    await expect(input).toBeFocused();
+    // As in VS Code: the menu's field lies where the search was, so one field
+    // is on screen, with the commands under it.
+    const field = await input.boundingBox();
+    if (!at || !field) throw new Error("no layout box");
+    expect(
+      Math.abs(field.y + field.height / 2 - (at.y + at.height / 2)),
+    ).toBeLessThan(4);
+    expect(Math.abs(field.x - at.x)).toBeLessThan(at.width);
+  });
+
+  test("the search shortcut opens the command menu", async ({ ready }) => {
+    await ready.keyboard.press("Control+KeyF");
+    await expect(
+      ready.getByPlaceholder("Search files, or type a command..."),
+    ).toBeFocused();
   });
 
   test("command menu switches to list view", async ({ ready }) => {
@@ -39,7 +60,9 @@ test.describe("Navigation", () => {
     await ready.keyboard.press("Backspace");
     await ready.keyboard.press("Backspace");
     await ready.keyboard.press("Backspace");
-    await expect(ready.getByPlaceholder("Search commands...")).toBeFocused();
+    await expect(
+      ready.getByPlaceholder("Search files, or type a command..."),
+    ).toBeFocused();
   });
 
   test("command menu searches in a workspace picked with ws:", async ({
@@ -52,8 +75,10 @@ test.describe("Navigation", () => {
     await ready.keyboard.press("Enter");
     await ready.keyboard.type("zzqx");
     await ready.keyboard.press("Enter");
-    await expect(ready.getByPlaceholder("Search commands...")).toHaveCount(0);
-    await expect(searchInput(ready)).toHaveValue("zzqx");
+    await expect(
+      ready.getByPlaceholder("Search files, or type a command..."),
+    ).toHaveCount(0);
+    await expect(searchTrigger(ready)).toContainText("zzqx");
   });
 
   test("opens keyboard shortcuts overlay", async ({ ready }) => {

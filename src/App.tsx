@@ -55,7 +55,7 @@ export default function App({ router }: { router: AppRouter }) {
             <div className="flex min-w-0 flex-1 overflow-hidden border-b-6 border-r-6 border-chrome">
               <div
                 data-slot="content-panel"
-                className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border shadow-[0_0_0_8px_var(--color-chrome)]"
+                className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border shadow-[0_0_0_16px_var(--color-chrome)]"
               >
                 <div className="min-h-0 flex-1">
                   <RouterProvider router={router} />

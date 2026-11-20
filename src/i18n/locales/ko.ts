@@ -268,12 +268,11 @@ export const ko: Catalog = {
 
   // command menu
   "command.title": "명령 메뉴",
-  "command.placeholder": "명령 검색...",
+  "command.placeholder": "파일 검색 또는 명령 입력...",
   "command.empty": "일치하는 명령이 없습니다.",
   "command.groupNavigation": "이동",
   "command.groupWorkspace": "워크스페이스",
   "command.groupView": "보기",
-  "command.focusSearch": "검색에 포커스",
   "command.openDevTools": "개발자 콘솔 열기",
   "command.shortcutHint": "{shortcut} 로 열기",
   "command.groupFile": "파일",
@@ -290,7 +289,6 @@ export const ko: Catalog = {
   "command.pageCollections": "컬렉션",
   "command.ratingPlaceholder": "0~5를 입력해 선택...",
   "command.collectionPlaceholder": "컬렉션 검색...",
-  "command.tagPlaceholder": "추가할 태그 검색...",
   "command.workspacePlaceholder": "전환할 워크스페이스 검색...",
   "command.collectionOpenPlaceholder": "열 컬렉션 검색...",
   "command.searchInPlaceholder":
@@ -306,6 +304,8 @@ export const ko: Catalog = {
   // filter
   "filter.searchHint":
     '파일 이름과 태그를 검색합니다. tag:여행 이나 tag:4k 로 직접 붙인 태그와 자동 태그를 모두 정확히 일치시켜 필터링합니다. 공백이 있는 값은 tag:"여름 여행" 처럼 따옴표로 묶습니다.',
+  "filter.openSearch": "검색하거나 명령 실행",
+  "filter.clearSearch": "검색 지우기",
   "filter.searchPlaceholder": "파일 이름·태그 검색",
   "filter.tagSuggestions": "태그 제안",
   "filter.tagElsewhere": "다른 워크스페이스에만 있음",
@@ -389,7 +389,7 @@ export const ko: Catalog = {
   "shortcuts.sectionDetail": "상세",
   "shortcuts.commandMenu":
     "명령 메뉴 열기 (파일 작업, 최근 검색, 스마트 컬렉션)",
-  "shortcuts.search": "검색에 포커스",
+  "shortcuts.search": "검색",
   "shortcuts.scrollDown": "아래로 스크롤",
   "shortcuts.scrollUp": "위로 스크롤",
   "shortcuts.moveFocus": "포커스 이동(상하좌우)",
@@ -1340,7 +1340,7 @@ export const ko: Catalog = {
     "여러 폴더의 파일을 하나의 컬렉션으로 모을 수 있어. 파일을 여기로 끌어 오면 추가돼",
   "tour.searchTitle": "검색과 필터",
   "tour.searchBody":
-    "파일 이름이나 태그로 검색할 수 있어. 목록에서 / 를 누르면 여기로 와",
+    "파일 이름이나 태그로 검색할 수 있어. 여기를 클릭하거나 목록에서 / 를 누르고, 열린 메뉴에 입력해",
   "tour.viewTitle": "보기 전환",
   "tour.viewBody": "그리드, 목록, 타임라인, 그래프로 보기를 바꿀 수 있어",
   "tour.discoverTitle": "디스커버리",

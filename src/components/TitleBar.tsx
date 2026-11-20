@@ -113,7 +113,7 @@ export function TitleBar({
         buttons
       ) : (
         <div className="flex w-16 shrink-0 items-center justify-center">
-          <AppLogo className="size-7" />
+          <AppLogo className="size-9" />
         </div>
       )}
       <div

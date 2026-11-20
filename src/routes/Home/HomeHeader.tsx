@@ -212,14 +212,13 @@ export function HomeHeader({
           )}
         </div>
         {search && (
-          // The box grows downward as it wraps search terms, over the list
-          // rather than pushing the bar taller. All of it takes its clicks
-          // rather than moving the window (data-title-bar-control).
+          // All of it takes its clicks rather than moving the window
+          // (data-title-bar-control).
           <div
             data-title-bar-control=""
-            className="relative h-8 min-w-40 flex-[0_1_480px]"
+            className="flex min-w-40 flex-[0_1_480px] items-center"
           >
-            <div className="absolute inset-x-0 top-0 z-30">{search}</div>
+            {search}
           </div>
         )}
         <div className="flex flex-1 items-center justify-end gap-2">

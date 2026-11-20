@@ -81,7 +81,7 @@ describe("ShortcutsOverlay", () => {
       "←",
       "→",
     ]);
-    expect(rowKeys("Focus search")).toEqual(["/"]);
+    expect(rowKeys("Search")).toEqual(["/"]);
   });
 
   it("narrows the rows by action or key, and says when nothing matches", () => {

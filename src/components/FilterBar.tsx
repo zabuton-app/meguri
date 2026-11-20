@@ -12,7 +12,6 @@ import {
 } from "@/lib/searchConditions";
 import { ActiveFilterChips } from "./ActiveFilterChips";
 import { RatingStars } from "./RatingStars";
-import { SearchTokenInput } from "./SearchTokenInput";
 import { SegmentedControl } from "./SegmentedControl";
 import { MoreFiltersPopover } from "./MoreFiltersPopover";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -41,31 +40,6 @@ interface Props {
    */
   onToggleHeatmap?: () => void;
   heatmapOpen?: boolean;
-  /** Draw the search box in the bar; off where the screen puts it elsewhere
-   *  (Home: in the title bar, as FilterSearch). */
-  withSearch?: boolean;
-}
-
-/** The search box of the filter bar, for a screen that places it itself. */
-export function FilterSearch({
-  value,
-  onChange,
-}: {
-  value: SearchQuery;
-  onChange: (q: SearchQuery) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div data-tour="search" className="flex min-w-0 items-center">
-      <SearchTokenInput
-        id="list-search-input"
-        value={value.q ?? ""}
-        onChange={(q) => onChange({ ...value, q: q || undefined })}
-        placeholder={t("filter.searchPlaceholder")}
-        title={t("filter.searchHint")}
-      />
-    </div>
-  );
 }
 
 export function FilterBar({
@@ -77,7 +51,6 @@ export function FilterBar({
   onApplySaved,
   onToggleHeatmap,
   heatmapOpen = false,
-  withSearch = true,
 }: Props) {
   const { t, lang } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
@@ -99,17 +72,6 @@ export function FilterBar({
       className="flex flex-col gap-2 border-b border-border bg-bg px-4 py-2"
     >
       <div className="flex flex-wrap items-center gap-3">
-        {/* grow + a non-zero basis (flex-1 would zero it): with a 0 basis this box
-          never counts toward a row's width, so the wrapping bar never breaks a
-          line and the fixed-width controls squeeze the input down to nothing.
-          min-w-0 stays so it can still shrink below the basis when one row is
-          all we get. */}
-        {withSearch && (
-          <div className="flex min-w-0 grow basis-48 items-center">
-            <FilterSearch value={value} onChange={onChange} />
-          </div>
-        )}
-
         <SegmentedControl
           slot="kind-group"
           label={t("filter.kindFilter")}

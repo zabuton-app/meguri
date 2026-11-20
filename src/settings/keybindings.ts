@@ -41,7 +41,7 @@ export interface NavBinding {
   /** List view: page scroll (PageUp/PageDown-like). */
   pageUp: KeyChord[];
   pageDown: KeyChord[];
-  /** List view: focus the search field. */
+  /** List view: search (opens the command menu, where the search is typed). */
   focusSearch: KeyChord[];
 }
 

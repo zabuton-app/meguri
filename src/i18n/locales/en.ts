@@ -289,12 +289,11 @@ export const en: Catalog = {
 
   // command menu
   "command.title": "Command menu",
-  "command.placeholder": "Search commands...",
+  "command.placeholder": "Search files, or type a command...",
   "command.empty": "No matching commands.",
   "command.groupNavigation": "Navigation",
   "command.groupWorkspace": "Workspace",
   "command.groupView": "View",
-  "command.focusSearch": "Focus search",
   "command.openDevTools": "Open developer console",
   "command.shortcutHint": "Open with {shortcut}",
   "command.groupFile": "File",
@@ -311,7 +310,6 @@ export const en: Catalog = {
   "command.pageCollections": "Collections",
   "command.ratingPlaceholder": "Type 0–5 to pick...",
   "command.collectionPlaceholder": "Search collections...",
-  "command.tagPlaceholder": "Search tags to add...",
   "command.workspacePlaceholder": "Switch to a workspace...",
   "command.collectionOpenPlaceholder": "Open a collection...",
   "command.searchInPlaceholder":
@@ -327,6 +325,8 @@ export const en: Catalog = {
   // filter
   "filter.searchHint":
     'Searches file names and tags. Use tag:beach or tag:4k to match a tag exactly, whether you added it or the scan did. Quote values with spaces: tag:"beach house".',
+  "filter.openSearch": "Search or run a command",
+  "filter.clearSearch": "Clear search",
   "filter.searchPlaceholder": "Search file name or tags",
   "filter.tagSuggestions": "Tag suggestions",
   "filter.tagElsewhere": "other workspaces only",
@@ -410,7 +410,7 @@ export const en: Catalog = {
   "shortcuts.sectionDetail": "Detail",
   "shortcuts.commandMenu":
     "Open command menu (file actions, recent searches, smart collections)",
-  "shortcuts.search": "Focus search",
+  "shortcuts.search": "Search",
   "shortcuts.scrollDown": "Scroll down",
   "shortcuts.scrollUp": "Scroll up",
   "shortcuts.moveFocus": "Move focus (up/down/left/right)",
@@ -1462,7 +1462,7 @@ export const en: Catalog = {
     "Gather files from any folder into a collection. Drag files here to add them.",
   "tour.searchTitle": "Search and filter",
   "tour.searchBody":
-    "Search by file name or tag. Press / in the list to jump here.",
+    "Search by file name or tag. Click here, or press / in the list, and type in the menu that opens.",
   "tour.viewTitle": "Switch views",
   "tour.viewBody": "Show your files as a grid, a list, a timeline or a graph.",
   "tour.discoverTitle": "Discover",

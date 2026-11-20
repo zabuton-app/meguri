@@ -3,3 +3,8 @@
 export function platform(): string {
   return window.api?.platform ?? "";
 }
+
+/** The shortcut that opens the command menu, as the platform writes it. */
+export function commandMenuShortcut(): string {
+  return platform() === "darwin" ? "⌘K" : "Ctrl+K";
+}

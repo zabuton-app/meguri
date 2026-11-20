@@ -13,8 +13,19 @@ export function statusBar(page: Page): Locator {
   return page.getByRole("contentinfo", { name: "Status bar" });
 }
 
-export function searchInput(page: Page): Locator {
-  return page.locator("#list-search-input");
+/** The search in the title bar: it shows the search and opens the command menu. */
+export function searchTrigger(page: Page): Locator {
+  return page.locator('[data-slot="search-trigger"]');
+}
+
+/** Search the library for `text`, typed in the command menu as a user does. */
+export async function searchFor(page: Page, text: string): Promise<void> {
+  await searchTrigger(page)
+    .getByRole("button", { name: "Search or run a command" })
+    .click();
+  await page.keyboard.type(text);
+  await page.keyboard.press("Enter");
+  await expect(searchTrigger(page)).toContainText(text);
 }
 
 /** The exact-tag directives the search box renders as chips beside the text. */
@@ -92,7 +103,9 @@ export async function openDiscover(page: Page): Promise<Locator> {
 
 export async function openCommandMenu(page: Page): Promise<void> {
   await page.keyboard.press("Control+KeyK");
-  await expect(page.getByPlaceholder("Search commands...")).toBeVisible();
+  await expect(
+    page.getByPlaceholder("Search files, or type a command..."),
+  ).toBeVisible();
 }
 
 /** Assert that a RatingStars control shows the given value (1–5). */

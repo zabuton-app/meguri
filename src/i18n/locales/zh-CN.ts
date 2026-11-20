@@ -258,12 +258,11 @@ export const zhCN: Catalog = {
 
   // command menu
   "command.title": "命令菜单",
-  "command.placeholder": "搜索命令...",
+  "command.placeholder": "搜索文件或输入命令...",
   "command.empty": "没有匹配的命令。",
   "command.groupNavigation": "导航",
   "command.groupWorkspace": "工作区",
   "command.groupView": "视图",
-  "command.focusSearch": "聚焦搜索",
   "command.openDevTools": "打开开发者控制台",
   "command.shortcutHint": "使用 {shortcut} 打开",
   "command.groupFile": "文件",
@@ -280,7 +279,6 @@ export const zhCN: Catalog = {
   "command.pageCollections": "收藏集",
   "command.ratingPlaceholder": "输入 0–5 进行选择...",
   "command.collectionPlaceholder": "搜索收藏集...",
-  "command.tagPlaceholder": "搜索要添加的标签...",
   "command.workspacePlaceholder": "切换到工作区...",
   "command.collectionOpenPlaceholder": "打开收藏集...",
   "command.searchInPlaceholder":
@@ -296,6 +294,8 @@ export const zhCN: Catalog = {
   // filter
   "filter.searchHint":
     '搜索文件名和标签。用 tag:旅行 或 tag:4k 精确匹配标签，手动标签与自动标签通用。含空格的值请加引号：tag:"夏日 旅行"。',
+  "filter.openSearch": "搜索或运行命令",
+  "filter.clearSearch": "清除搜索",
   "filter.searchPlaceholder": "搜索文件名或标签",
   "filter.tagSuggestions": "标签建议",
   "filter.tagElsewhere": "仅在其他工作区",
@@ -378,7 +378,7 @@ export const zhCN: Catalog = {
   "shortcuts.sectionList": "列表",
   "shortcuts.sectionDetail": "详情",
   "shortcuts.commandMenu": "打开命令菜单（文件操作、最近搜索、智能收藏集）",
-  "shortcuts.search": "聚焦搜索",
+  "shortcuts.search": "搜索",
   "shortcuts.scrollDown": "向下滚动",
   "shortcuts.scrollUp": "向上滚动",
   "shortcuts.moveFocus": "移动焦点（上下左右）",
@@ -1286,7 +1286,8 @@ export const zhCN: Catalog = {
   "tour.collectionsBody":
     "把不同文件夹里的文件汇集到一个收藏集中。把文件拖到这里即可添加",
   "tour.searchTitle": "搜索与筛选",
-  "tour.searchBody": "按文件名或标签搜索。在列表中按 / 可以跳到这里",
+  "tour.searchBody":
+    "按文件名或标签搜索。点击这里或在列表中按 /，然后在打开的菜单中输入",
   "tour.viewTitle": "切换视图",
   "tour.viewBody": "以网格、列表、时间线或关系图显示文件",
   "tour.discoverTitle": "发现",

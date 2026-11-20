@@ -454,13 +454,11 @@ describe("Home + MediaDetail integration", () => {
       // named that — and it is visible in the search box, as a chip rather than
       // as raw text the user could break in half.
       await waitFor(() => expect(lastQuery().q).toBe("tag:beach"));
-      const input = document.getElementById(
-        "list-search-input",
-      ) as HTMLInputElement;
-      expect(
-        within(input.parentElement!).getByTitle("Tags: beach"),
-      ).toBeTruthy();
-      expect(input.value).toBe("");
+      const search = document.querySelector<HTMLElement>(
+        '[data-slot="search-trigger"]',
+      )!;
+      const chip = within(search).getByTitle("Tags: beach");
+      expect(chip.dataset.slot).toBe("search-chip");
     });
 
     it("does not duplicate a condition when the same tag is clicked twice", async () => {

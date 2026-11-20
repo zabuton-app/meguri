@@ -272,12 +272,11 @@ export const ja = {
 
   // コマンドメニュー
   "command.title": "コマンドメニュー",
-  "command.placeholder": "コマンドを検索...",
+  "command.placeholder": "ファイルを検索、またはコマンドを入力...",
   "command.empty": "該当するコマンドがありません。",
   "command.groupNavigation": "移動",
   "command.groupWorkspace": "ワークスペース",
   "command.groupView": "表示",
-  "command.focusSearch": "検索にフォーカス",
   "command.openDevTools": "開発者コンソールを開く",
   "command.shortcutHint": "{shortcut} で開けます",
   "command.groupFile": "ファイル操作",
@@ -294,7 +293,6 @@ export const ja = {
   "command.pageCollections": "コレクション",
   "command.ratingPlaceholder": "0〜5 を入力して選ぶ...",
   "command.collectionPlaceholder": "コレクションを検索...",
-  "command.tagPlaceholder": "追加するタグを検索...",
   "command.workspacePlaceholder": "切り替えるワークスペースを検索...",
   "command.collectionOpenPlaceholder": "開くコレクションを検索...",
   "command.searchInPlaceholder":
@@ -310,6 +308,8 @@ export const ja = {
   // フィルタ（FilterBar / 条件バッジ）
   "filter.searchHint":
     'ファイル名とタグを検索します。tag:旅行 や tag:4k で、手動タグも自動タグも完全一致で絞り込めます。空白を含むタグは tag:"夏 旅行" のように引用符で囲みます。',
+  "filter.openSearch": "検索、またはコマンドを実行",
+  "filter.clearSearch": "検索をクリア",
   "filter.searchPlaceholder": "ファイル名・タグを検索",
   "filter.tagSuggestions": "タグの候補",
   "filter.tagElsewhere": "他のワークスペースのみ",
@@ -393,7 +393,7 @@ export const ja = {
   "shortcuts.sectionDetail": "詳細",
   "shortcuts.commandMenu":
     "コマンドメニューを開く（ファイル操作・最近の検索・スマートコレクション）",
-  "shortcuts.search": "検索にフォーカス",
+  "shortcuts.search": "検索",
   "shortcuts.scrollDown": "下へスクロール",
   "shortcuts.scrollUp": "上へスクロール",
   "shortcuts.moveFocus": "フォーカス移動（上下左右）",
@@ -1346,7 +1346,7 @@ export const ja = {
     "フォルダをまたいで好きなファイルをまとめられるよ。ファイルをここにドラッグすると追加できるよ",
   "tour.searchTitle": "検索と絞り込み",
   "tour.searchBody":
-    "ファイル名やタグで検索できるよ。一覧で / を押すとここに飛べるよ",
+    "ファイル名やタグで検索できるよ。ここをクリックするか一覧で / を押して、開いたメニューに入力してね",
   "tour.viewTitle": "表示の切り替え",
   "tour.viewBody":
     "グリッド・リスト・タイムライン・グラフで表示を切り替えられるよ",

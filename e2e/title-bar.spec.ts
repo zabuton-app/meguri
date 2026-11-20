@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures/app";
-import { openSettings } from "./fixtures/helpers";
+import { openSettings, searchFor } from "./fixtures/helpers";
 
 // The custom title bar (#578). E2E runs on Linux, which gets the app's own
 // window buttons; macOS keeps the OS's traffic lights instead.
@@ -86,11 +86,12 @@ test.describe("Title bar", () => {
     await expect(
       bar.getByRole("button", { name: "Scan", exact: true }).first(),
     ).toBeVisible();
-    // The list's search box sits in the middle of the bar and still searches.
-    const search = bar.locator("#list-search-input");
-    await search.fill("needle");
-    await expect(search).toHaveValue("needle");
-    await search.fill("");
+    // The list's search sits in the middle of the bar and still searches.
+    await searchFor(ready, "needle");
+    await expect(bar.locator('[data-slot="search-trigger"]')).toContainText(
+      "needle",
+    );
+    await bar.getByRole("button", { name: "Clear search" }).click();
     const slot = bar.locator("[data-title-bar-slot]");
     await expect(slot).toHaveCSS("pointer-events", "auto");
     // A popover is not a modal: Radix gives it role="dialog" too.

@@ -32,7 +32,7 @@
      below it (inset-below-title-bar), so the window can still be moved,
      minimized and closed while one is open. electron/ipc/window.ts places the
      traffic lights for this height at zoom 1 until the bar moves them. */
-  --meguri-title-bar-height: 2.5rem;
+  --meguri-title-bar-height: 3rem;
 }
 
 /* Layers that can float over the title bar's band: a click there would move

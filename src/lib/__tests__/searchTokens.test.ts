@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_TAG_SUGGESTIONS,
   pendingDirective,
+  splitQueryChips,
   tagSuggestions,
   viewIsOneWorkspace,
 } from "@/lib/searchTokens";
@@ -96,5 +97,21 @@ describe("tagSuggestions", () => {
   it("honours an explicit limit", () => {
     const out = tagSuggestions([tag("a"), tag("b")], { value: "" }, 1);
     expect(out).toHaveLength(1);
+  });
+});
+
+describe("splitQueryChips", () => {
+  it("separates directives from free text", () => {
+    expect(splitQueryChips('sunset tag:"beach house" tag:4k')).toEqual({
+      chips: ["tag:beach house", "tag:4k"],
+      text: "sunset",
+    });
+  });
+
+  it("leaves a plain query alone", () => {
+    expect(splitQueryChips("sunset 2024")).toEqual({
+      chips: [],
+      text: "sunset 2024",
+    });
   });
 });

@@ -182,7 +182,7 @@ describe("titleBarOptions", () => {
     onPlatform("darwin");
     expect(titleBarOptions()).toMatchObject({
       titleBarStyle: "hidden",
-      trafficLightPosition: { x: 14, y: 13 },
+      trafficLightPosition: { x: 14, y: 17 },
     });
   });
 });

@@ -556,11 +556,20 @@ buttons take the bar's left end; then it is the rail's first item
 
 - The screen's header renders into the bar's slot through `<TitleBarPortal>`
   (`src/components/titleBarSlot.tsx`, with the slot in `titleBarSlotContext.ts`). Home's header (`HomeHeader`) is the one
-  there now: the path on the left, the list's search box (`FilterSearch`,
-  taken out of the filter bar) in the middle, the toolbar on the right. The
-  search box grows downward over the list as it wraps terms, rather than
-  making the bar taller. Without the provider, as in a screen's own tests, the
-  header renders in place.
+  there now: the path on the left, the list's search (`SearchTrigger`, taken
+  out of the filter bar) in the middle, the toolbar on the right. As in VS
+  Code, the search is not typed in the bar: it shows the search on screen
+  (conditions as removable chips) and opens the command menu over it, the
+  menu's field laid where the search was (`searchAnchor`), so one field is on
+  screen with the commands under it. The field starts from the search on
+  screen, its conditions as chips (see "Full-text search" in data-model.md), and
+  completes tags as rows of the menu. "Search for" is the first row whenever
+  the field holds a search, so Enter runs the field as the search, and a
+  recent or saved search, or a command, that matches is a pick below it. Until
+  the field is edited its rows are not filtered, so the menu still lists every
+  command.
+  The focus-search keys (`/`, Ctrl+F) open the menu too. Without the
+  provider, as in a screen's own tests, the header renders in place.
 - On Windows and Linux there are no window buttons from the OS, so the bar
   draws minimize, maximize/restore and close: close last on the right, close
   first on the left. They call `window_minimize`, `window_toggle_maximize` and

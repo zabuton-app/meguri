@@ -12,12 +12,13 @@ import { ALL_ID, COLLECTION_ID_PREFIX } from "@shared/workspaceIds";
 import type { TagSummary } from "@/ipc/types";
 
 /**
- * Split a query into the directives (`tag:`, `hash:`) the search box shows as
+ * Split a query into the directives (`tag:`, `hash:`) the search shows as
  * chips and the free text it leaves editable.
  *
  * Only the initial read of an incoming query goes through here — while the user
- * types, the box tracks the two parts itself, because a half-typed `tag:bea`
- * parses as a directive but must stay text until it is closed.
+ * types, the command menu's draft (useSearchDraft) tracks the two parts itself,
+ * because a half-typed `tag:bea` parses as a directive but must stay text until
+ * it is closed.
  */
 export function splitQueryChips(q: string): { chips: string[]; text: string } {
   const tokens = splitSearchTokens(q);
@@ -25,6 +26,13 @@ export function splitQueryChips(q: string): { chips: string[]; text: string } {
     chips: tokens.filter(isSearchDirective),
     text: joinSearchTokens(tokens.filter((token) => !isSearchDirective(token))),
   };
+}
+
+/** The query of `chips` and `text`: what splitQueryChips takes apart. */
+export function joinQueryChips(chips: string[], text: string): string {
+  return [joinSearchTokens(chips), text.trim()]
+    .filter((part) => part !== "")
+    .join(" ");
 }
 
 export interface PendingDirective {

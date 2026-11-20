@@ -1,7 +1,8 @@
 import { test, expect } from "./fixtures/app";
 import {
   fileCard,
-  searchInput,
+  searchFor,
+  searchTrigger,
   statusBar,
   waitForIdle,
   expectStarRating,
@@ -66,14 +67,15 @@ test.describe("Home", () => {
   });
 
   test("filters files by search query", async ({ ready }) => {
-    const input = searchInput(ready);
-    await input.fill("test");
+    await searchFor(ready, "test");
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
 
-    await input.fill("nomatch-xyz");
+    await searchFor(ready, "nomatch-xyz");
     await expect(ready.getByText("No media to display.")).toBeVisible();
 
-    await input.fill("");
+    await searchTrigger(ready)
+      .getByRole("button", { name: "Clear search" })
+      .click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
   });
 

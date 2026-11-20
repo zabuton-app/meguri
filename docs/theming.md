@@ -136,8 +136,9 @@ These parts carry a `data-slot` attribute.
 | `title-bar`        | Title bar across the top                        |
 | `workspace-rail`   | Side rail                                       |
 | `content-panel`    | The panel the screens sit in, beside the rail   |
-| `home-header`      | Path, search box and toolbar, in the title bar  |
-| `filter-bar`       | Filters (on Home, the search is in the bar)     |
+| `home-header`      | Path, search and toolbar, in the title bar      |
+| `filter-bar`       | Filters (the search is in the title bar)        |
+| `search-trigger`   | The search in the title bar                     |
 | `status-bar`       | Footer                                          |
 | `audio-player-bar` | Audio player at the bottom                      |
 | `media-card`       | A file in the grid                              |

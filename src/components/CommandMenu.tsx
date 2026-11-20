@@ -52,6 +52,7 @@ import {
 import { useSelection } from "@/components/SelectionContext";
 import { BulkTagDialog } from "@/components/BulkTagDialog";
 import { TagSuggestionLabel } from "@/components/TagSuggestionLabel";
+import { SearchChipLabel } from "@/components/SearchChipLabel";
 import { useActivateFile } from "@/audio/useActivateFile";
 import {
   useCollectionMembership,
@@ -63,6 +64,7 @@ import {
   clearRecentSearches,
   useRecentSearches,
 } from "@/hooks/useRecentSearches";
+import { useSearchDraft, type SearchDraft } from "@/hooks/useSearchDraft";
 import { useSmartCollections } from "@/hooks/useSmartCollections";
 import { useTagCompletions } from "@/hooks/useTagCompletions";
 import { useWatchLater } from "@/hooks/useWatchLater";
@@ -70,8 +72,17 @@ import { useI18n, type Lang, type TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
 import { api, ALL_ID, collectionTarget } from "@/ipc/client";
 import type { FileRow, SearchQuery } from "@/ipc/types";
+import { commandMenuShortcut } from "@/lib/platform";
 import { fileNameOf } from "@/lib/relPath";
 import { recentSearchKey } from "@/lib/recentSearches";
+import {
+  namespaceSuggestions,
+  pendingDirective,
+  plainWordAtCaret,
+  joinQueryChips,
+} from "@/lib/searchTokens";
+import { searchTokenLabel, tagNamespaceLabel } from "@/lib/tagLabel";
+import { cn } from "@/lib/utils";
 import { clearAllTarget, describeConditions } from "@/lib/searchConditions";
 import { invalidateWorkspaceScoped } from "@/lib/workspaceScope";
 import {
@@ -82,11 +93,7 @@ import type { ViewMode } from "@/routes/Home/utils";
 import { formatChords, GRID_BINDINGS } from "@/settings/keybindings";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { useTheme } from "@/themes/ThemeProvider";
-import {
-  MAX_BULK_FILES,
-  TAG_SEARCH_PREFIX,
-  tagSearchToken,
-} from "@shared/tags";
+import { MAX_BULK_FILES, TAG_SEARCH_PREFIX } from "@shared/tags";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
 interface CommandMenuProps {
@@ -95,7 +102,6 @@ interface CommandMenuProps {
   ready: boolean;
   scanning: boolean;
   devToolsEnabled: boolean;
-  onFocusSearch: () => void;
   onScan: (includeExcluded?: boolean) => void;
   onRebuild: () => void;
   onSetView: (view: ViewMode) => void;
@@ -123,10 +129,8 @@ interface CommandMenuProps {
   onApplySearch: (query: SearchQuery) => void;
   /** Applies a saved search, the way the filter bar's dropdown does. */
   onApplySaved: (collection: SmartCollection) => void;
-  /** Sets the full-text query to what was typed. */
-  onQuickSearch: (text: string) => void;
-  /** Adds a search token (`tag:beach`) to the search, as clicking a tag does. */
-  onAddSearchToken: (token: string) => void;
+  /** Sets the search to `q`: the field's chips and its text. */
+  onSearch: (q: string) => void;
   /** The conditions on screen, which "Clear all filters" resets. */
   filter: SearchQuery;
   onFilterChange: (query: SearchQuery) => void;
@@ -151,19 +155,19 @@ interface CommandAction {
 
 /**
  * A sub-page: picking a rating or a collection for the file actions, the
- * candidates for a prefix typed at the root (`tag:`, `ws:`, `col:`), or the
- * search to run in the workspace or collection picked from the last two.
+ * candidates for a prefix typed at the root (`ws:`, `col:`), or the search to
+ * run in the workspace or collection picked from them.
  */
 type Page = "rating" | "collections" | PrefixPage | "searchIn" | null;
 
-type PrefixPage = "tag" | "ws" | "col";
+type PrefixPage = "ws" | "col";
 
 /**
  * The page a prefix at the very start of the text opens, and what follows it.
  * Any other text, an unknown prefix included, stays a search of the menu.
  */
 function prefixPage(text: string): { page: PrefixPage; rest: string } | null {
-  const m = /^(tag|ws|col):/i.exec(text);
+  const m = /^(ws|col):/i.exec(text);
   if (!m) return null;
   return {
     page: m[1].toLowerCase() as PrefixPage,
@@ -207,10 +211,6 @@ function matchKeywords(value: string, search: string, keywords?: string[]) {
     : defaultFilter(value, search);
 }
 
-function shortcutMeta(): string {
-  return navigator.platform.toLowerCase().includes("mac") ? "⌘K" : "Ctrl+K";
-}
-
 function shortcutDevTools(): string {
   return navigator.platform.toLowerCase().includes("mac")
     ? "⌘⇧I"
@@ -226,7 +226,7 @@ function action(
 }
 
 export function CommandMenu(props: CommandMenuProps) {
-  const { open, onOpenChange, onQuickSearch } = props;
+  const { open, onOpenChange, onSearch, filter } = props;
   const { t } = useI18n();
   const { refresh } = useSelection();
   const qc = useQueryClient();
@@ -240,11 +240,15 @@ export function CommandMenu(props: CommandMenuProps) {
     mutationFn: (id: string) => api.workspaceSwitch(id),
     onSuccess: () => invalidateWorkspaceScoped(qc),
   });
+  // The search being edited, held here rather than in the body: it outlives
+  // the pages, and Esc (handled by the dialog) needs to see its highlight.
+  const draft = useSearchDraft(open ? (filter.q ?? "") : "");
   const openIn = (item: SwitchItem, text: string) => {
     // The search first, while the filter still belongs to the view it was
     // set in: set after the switch, it would carry the old view's folder into
-    // the new one. It replaces the text, as "Search for" does.
-    if (text) onQuickSearch(text);
+    // the new one. The text typed there replaces the field's, as "Search for"
+    // does; the chips go along.
+    if (text) onSearch(joinQueryChips(draft.chips, text));
     if (!item.active) switchTo.mutate(item.switchId);
     // Back to the list even when nothing switches: the menu may have been
     // opened over another screen.
@@ -258,10 +262,17 @@ export function CommandMenu(props: CommandMenuProps) {
   );
   // A menu closed from a sub-page opens again at the top.
   const [wasOpen, setWasOpen] = useState(open);
+  // Where the menu goes, taken as it opens: over the search it opens from.
+  const [anchor, setAnchor] = useState<ReturnType<typeof searchAnchor>>(null);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (!open) setPageState(ROOT_PAGE);
     setFocused(open ? getFocusedFile() : null);
+    if (open) {
+      setAnchor(searchAnchor());
+      // The field starts from the search on screen.
+      draft.reset(filter.q ?? "");
+    }
   }
 
   return (
@@ -271,12 +282,25 @@ export function CommandMenu(props: CommandMenuProps) {
         onOpenChange={onOpenChange}
         title={t("command.title")}
         description={t("command.placeholder")}
-        className="max-w-xl border-muted/35 bg-bg shadow-2xl"
+        // Over the title bar's search, its field where the search was
+        // (searchAnchor); just below the bar without one.
+        style={anchor ?? undefined}
+        className="top-[calc(var(--meguri-title-bar-height)+0.25rem)] max-h-[calc(100vh-1rem)] max-w-xl translate-y-0 border-muted/35 bg-bg shadow-2xl"
         onEscapeKeyDown={(e) => {
-          // Esc on a sub-page steps back rather than closing the menu.
+          // An Esc that cancels an input method's conversion is its own: the
+          // menu stays, and with it what was typed.
+          if (e.isComposing) {
+            e.preventDefault();
+            return;
+          }
+          // Esc on a sub-page steps back rather than closing the menu, and
+          // on a highlighted chip goes back to the text.
           if (page) {
             e.preventDefault();
             setPageState(parentPage(pageState));
+          } else if (draft.picked !== null) {
+            e.preventDefault();
+            draft.aim(null);
           }
         }}
       >
@@ -292,6 +316,7 @@ export function CommandMenu(props: CommandMenuProps) {
           setPageState={setPageState}
           onEditTags={setTagRows}
           onOpenIn={openIn}
+          draft={draft}
         />
       </CommandDialog>
       {/* Mounted only while open so each pass starts from a clean staged edit,
@@ -308,6 +333,38 @@ export function CommandMenu(props: CommandMenuProps) {
       )}
     </>
   );
+}
+
+/** The menu's widest (its max-w-xl: change both together) and the room it
+ * keeps from the window's sides. */
+const MENU_MAX_WIDTH = 576;
+const MENU_MARGIN = 8;
+/** From the menu's top edge to its field's: its border and the field's
+ * wrapper padding (CommandInput's p-1). */
+const FIELD_INSET = 5;
+
+/**
+ * Where the menu goes to lay its field over the title bar's search, as VS
+ * Code's does: one field on screen, the commands under it. Centered on the
+ * search, kept inside the window (centered on it when too narrow to move);
+ * null on a screen without the search.
+ */
+function searchAnchor(): { top: number; left?: number } | null {
+  const box = document
+    .querySelector("[data-command-menu-anchor]")
+    ?.getBoundingClientRect();
+  if (!box) return null;
+  const top = Math.max(0, box.top - FIELD_INSET);
+  if (window.innerWidth < MENU_MAX_WIDTH + 2 * MENU_MARGIN) return { top };
+  const half = MENU_MAX_WIDTH / 2;
+  const x = box.left + box.width / 2;
+  return {
+    top,
+    left: Math.min(
+      Math.max(x, half + MENU_MARGIN),
+      window.innerWidth - half - MENU_MARGIN,
+    ),
+  };
 }
 
 /**
@@ -335,7 +392,6 @@ function CommandMenuBody({
   ready,
   scanning,
   devToolsEnabled,
-  onFocusSearch,
   onScan,
   onRebuild,
   onSetView,
@@ -355,8 +411,7 @@ function CommandMenuBody({
   onOpenDevTools,
   onApplySearch,
   onApplySaved,
-  onQuickSearch,
-  onAddSearchToken,
+  onSearch,
   filter,
   onFilterChange,
   fileActionsAvailable = true,
@@ -365,12 +420,14 @@ function CommandMenuBody({
   setPageState,
   onEditTags,
   onOpenIn,
+  draft,
 }: CommandMenuProps & {
   focused: FileRow | null;
   pageState: PageState;
   setPageState: (state: PageState) => void;
   onEditTags: (rows: FileRow[]) => void;
   onOpenIn: (item: SwitchItem, text: string) => void;
+  draft: SearchDraft;
 }) {
   const { t, lang } = useI18n();
   const { page } = pageState;
@@ -389,7 +446,77 @@ function CommandMenuBody({
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
   }, []);
-  const typed = search.trim();
+  // At the root the field edits the search (the draft); a page's field is
+  // its own.
+  const value = page === null ? draft.text : search;
+  // The field starts from the search on screen. Until it is edited, that is
+  // only the search shown again: the rows are not filtered by it, nothing is
+  // completed and there is no search to run, so the menu opens on every
+  // command as an empty field would.
+  const edited = page !== null || draft.edited;
+  const typed = edited ? value.trim() : "";
+  // Completion runs only with the caret at the end of the text, since a pick
+  // replaces the last token, and not while an input method composes: the
+  // text is not final yet, and its own candidate window opens there.
+  const [caretAtEnd, setCaretAtEnd] = useState(true);
+  const [composing, setComposing] = useState(false);
+  const trackCaret = (field: HTMLInputElement) =>
+    setCaretAtEnd(
+      field.selectionStart === field.value.length &&
+        field.selectionEnd === field.value.length,
+    );
+  const completing =
+    page === null &&
+    edited &&
+    caretAtEnd &&
+    !composing &&
+    draft.picked === null;
+  const directiveValue = completing
+    ? (pendingDirective(draft.text)?.value ?? null)
+    : null;
+  const word =
+    completing && directiveValue === null ? plainWordAtCaret(draft.text) : null;
+  // The search row: first once the field is edited, and while a search is
+  // only shown again too, so Enter on the field as opened (`/` then Enter,
+  // as in a search box) runs that search rather than whichever command
+  // heads the list. An empty field has none, so Enter takes the first row.
+  const searchRow = page === null && (edited || draft.query !== "");
+  const pending = useMemo(
+    () =>
+      directiveValue !== null
+        ? { value: directiveValue }
+        : word !== null
+          ? { value: word, namesOnly: true }
+          : null,
+    [directiveValue, word],
+  );
+  const completions = useTagCompletions(pending);
+  // A word that begins a generated namespace's name or label (`tempo`) is
+  // offered its directive (`tag:audio_tempo:`), whose values come next.
+  const namespaces = useMemo(
+    () =>
+      word === null
+        ? []
+        : namespaceSuggestions(word, (ns) => tagNamespaceLabel(t, ns)),
+    [word, t],
+  );
+  // The row Enter takes. cmdk highlights the first row as the text changes,
+  // but not one that turns up later (the catalog arriving, a chip removed):
+  // the first row is put back on whenever it changes.
+  const firstRow =
+    directiveValue !== null && completions.suggestions.length > 0
+      ? `complete-tag ${completions.suggestions[0].qualified}`
+      : searchRow
+        ? `search-for ${draft.query}`
+        : null;
+  const [highlighted, setHighlighted] = useState("");
+  const [seenFirstRow, setSeenFirstRow] = useState<string | null>(null);
+  if (firstRow !== seenFirstRow) {
+    setSeenFirstRow(firstRow);
+    // Without one, back to cmdk's own first row: the one that went away
+    // would leave nothing highlighted.
+    setHighlighted(firstRow ?? "");
+  }
   const targets = useCommandTargets(focused, fileActionsAvailable);
   const watchLater = useWatchLater();
   const files = useFileActions(targets, watchLater);
@@ -399,7 +526,12 @@ function CommandMenuBody({
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!page) return;
+    if (!page) {
+      // Keys an input method takes are its own.
+      if (!e.nativeEvent.isComposing && inputRef.current)
+        draft.onKey(e, inputRef.current);
+      return;
+    }
     if (e.key === "Backspace" && search === "") {
       e.preventDefault();
       setPageState(parentPage(pageState));
@@ -419,11 +551,19 @@ function CommandMenuBody({
     }
   };
 
-  const onSearchChange = (value: string) => {
-    const prefix = page === null ? prefixPage(value) : null;
-    if (prefix) setPage(prefix.page, prefix.rest);
-    else setSearch(value);
+  const onSearchChange = (next: string) => {
+    if (page !== null) {
+      setSearch(next);
+      return;
+    }
+    const prefix = prefixPage(next);
+    if (prefix) {
+      draft.clearText();
+      setPage(prefix.page, prefix.rest);
+    } else draft.apply(next);
   };
+  /** After a pick that keeps the menu open: back to typing in the field. */
+  const refocus = () => inputRef.current?.focus();
 
   const filePageBadge =
     page === "rating"
@@ -433,7 +573,7 @@ function CommandMenuBody({
         : null;
   // A prefix page shows the prefix itself: it is what was typed to get there.
   const badge =
-    page === "tag" || page === "ws" || page === "col"
+    page === "ws" || page === "col"
       ? `${page}:`
       : searchIn
         ? `${searchIn.kind}:${searchIn.name}`
@@ -446,35 +586,52 @@ function CommandMenuBody({
       ? t("command.ratingPlaceholder")
       : page === "collections"
         ? t("command.collectionPlaceholder")
-        : page === "tag"
-          ? t("command.tagPlaceholder")
-          : page === "ws"
-            ? t("command.workspacePlaceholder")
-            : page === "col"
-              ? t("command.collectionOpenPlaceholder")
-              : searchIn
-                ? t("command.searchInPlaceholder", { name: searchIn.name })
+        : page === "ws"
+          ? t("command.workspacePlaceholder")
+          : page === "col"
+            ? t("command.collectionOpenPlaceholder")
+            : searchIn
+              ? t("command.searchInPlaceholder", { name: searchIn.name })
+              : draft.chips.length > 0
+                ? undefined
                 : t("command.placeholder");
 
   return (
     <Command
       onKeyDown={onKeyDown}
       filter={matchKeywords}
-      // The tag page is ranked by the search box's own matcher; the
-      // search-in page's one row is whatever was typed.
-      shouldFilter={page !== "tag" && page !== "searchIn"}
+      // The search-in page's one row is whatever was typed.
+      shouldFilter={page !== "searchIn" && edited}
+      value={highlighted}
+      onValueChange={setHighlighted}
     >
       <CommandInput
         ref={inputRef}
         placeholder={placeholder}
-        value={search}
+        aria-label={t("command.placeholder")}
+        value={value}
         onValueChange={onSearchChange}
+        onSelect={(e) => trackCaret(e.currentTarget)}
+        onCompositionStart={() => setComposing(true)}
+        onCompositionEnd={() => setComposing(false)}
+        onKeyDown={(e) => {
+          // In the search field Home and End move the caret, as in any
+          // field (back to the chips, say), rather than cmdk's first and
+          // last rows.
+          if (page === null && (e.key === "Home" || e.key === "End"))
+            e.stopPropagation();
+        }}
         badge={badge}
+        leading={
+          page === null && draft.chips.length > 0 ? (
+            <DraftChips t={t} draft={draft} onFocusField={refocus} />
+          ) : undefined
+        }
       />
       <CommandList>
-        {/* Not while the quick search row is up: cmdk does not count a
+        {/* Not while the search row is up: cmdk does not count a
             force-mounted row, and would call a menu holding one empty. */}
-        {(page !== null || typed === "") && (
+        {(page !== null || !searchRow) && (
           <CommandEmpty>{t("command.empty")}</CommandEmpty>
         )}
         {page === "rating" ? (
@@ -486,13 +643,6 @@ function CommandMenuBody({
             targets={targets}
             files={files}
             closeThen={closeThen}
-          />
-        ) : page === "tag" ? (
-          <TagPage
-            t={t}
-            search={search}
-            onPick={(token) => closeThen(() => onAddSearchToken(token))}
-            onSearch={(text) => closeThen(() => onQuickSearch(text))}
           />
         ) : page === "ws" || page === "col" ? (
           <SwitchPage
@@ -511,6 +661,46 @@ function CommandMenuBody({
           />
         ) : (
           <>
+            {/* After `tag:`, Enter takes the highlighted tag, so the tags come
+                first; over a word, the search does (#542). */}
+            {directiveValue !== null && (
+              <TagCompletions
+                t={t}
+                completions={completions}
+                namespaces={[]}
+                draft={draft}
+                onPicked={refocus}
+              />
+            )}
+            {searchRow && (
+              // First while text is typed, so Enter searches for what the
+              // field holds: a recent or saved search, or a command, that
+              // happens to match is a pick away below, not what Enter does.
+              <CommandGroup forceMount>
+                <CommandItem
+                  forceMount
+                  value={`search-for ${draft.query}`}
+                  onSelect={() => closeThen(() => onSearch(draft.query))}
+                >
+                  <Search />
+                  <span className="truncate">
+                    {draft.query === ""
+                      ? t("filter.clearSearch")
+                      : t("command.searchFor", { q: draft.query })}
+                  </span>
+                  <CommandShortcut>↵</CommandShortcut>
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {word !== null && (
+              <TagCompletions
+                t={t}
+                completions={completions}
+                namespaces={namespaces}
+                draft={draft}
+                onPicked={refocus}
+              />
+            )}
             {targets.length > 0 && (
               <FileActionsGroup
                 t={t}
@@ -545,7 +735,6 @@ function CommandMenuBody({
               closeThen={closeThen}
               filter={filter}
               onFilterChange={onFilterChange}
-              onFocusSearch={onFocusSearch}
               onScan={onScan}
               onRebuild={onRebuild}
               onSetView={onSetView}
@@ -560,28 +749,11 @@ function CommandMenuBody({
               onHelp={onHelp}
               onOpenDevTools={onOpenDevTools}
             />
-            {typed !== "" && (
-              // Always offered, and always last: whatever else matched, the
-              // text can still be searched for as typed.
-              <CommandGroup forceMount>
-                <CommandItem
-                  forceMount
-                  value={`search-for ${typed}`}
-                  onSelect={() => closeThen(() => onQuickSearch(typed))}
-                >
-                  <Search />
-                  <span className="truncate">
-                    {t("command.searchFor", { q: typed })}
-                  </span>
-                  <CommandShortcut>↵</CommandShortcut>
-                </CommandItem>
-              </CommandGroup>
-            )}
           </>
         )}
       </CommandList>
       <div className="border-t border-border px-3 py-2 text-xs text-muted">
-        {t("command.shortcutHint", { shortcut: shortcutMeta() })}
+        {t("command.shortcutHint", { shortcut: commandMenuShortcut() })}
       </div>
     </Command>
   );
@@ -842,50 +1014,120 @@ function CollectionsPage({
   );
 }
 
-function TagPage({
+/**
+ * The tags the end of the field completes to: after `tag:`, the whole
+ * catalog's matches; over an ordinary word, the tags whose names hold it, and
+ * the generated namespaces it begins (#542). Picking one keeps the menu open,
+ * the tag a chip in the field, so the search can go on being typed.
+ */
+function TagCompletions({
   t,
-  search,
-  onPick,
-  onSearch,
+  completions: { suggestions, held },
+  namespaces,
+  draft,
+  onPicked,
 }: {
   t: TFunc;
-  search: string;
-  onPick: (token: string) => void;
-  /** Searches for the directive as typed, as the root's "Search for" did. */
-  onSearch: (text: string) => void;
+  completions: ReturnType<typeof useTagCompletions>;
+  namespaces: string[];
+  draft: SearchDraft;
+  onPicked: () => void;
 }) {
-  const typed = search.trim();
-  const pending = useMemo(() => ({ value: search }), [search]);
-  const { suggestions, held } = useTagCompletions(pending);
+  if (suggestions.length === 0 && namespaces.length === 0) return null;
   return (
-    <CommandGroup heading={t("filter.tagSuggestions")}>
+    // Force-mounted: they match the end of the field, not the whole of it,
+    // which is what the menu filters its rows by.
+    <CommandGroup heading={t("filter.tagSuggestions")} forceMount>
+      {namespaces.map((ns) => (
+        <CommandItem
+          key={ns}
+          forceMount
+          value={`complete-namespace ${ns}`}
+          onSelect={() => {
+            // Left open, so its values are offered next.
+            draft.startNamespace(ns);
+            onPicked();
+          }}
+        >
+          <Tag />
+          <span className="truncate">
+            <span className="text-muted">{TAG_SEARCH_PREFIX}:</span>
+            {ns}:
+          </span>
+          <span className="truncate text-xs text-muted">
+            {tagNamespaceLabel(t, ns)}
+          </span>
+        </CommandItem>
+      ))}
       {suggestions.map((tag) => (
         <CommandItem
           key={tag.qualified}
-          value={`tag:${tag.qualified}`}
+          forceMount
+          value={`complete-tag ${tag.qualified}`}
           className={held(tag) ? undefined : "text-muted"}
-          // The token the search box makes of the same pick.
-          onSelect={() => onPick(tagSearchToken(tag.name, tag.namespace))}
+          onSelect={() => {
+            draft.accept(tag);
+            onPicked();
+          }}
         >
           <Tag />
           <TagSuggestionLabel t={t} tag={tag} held={held(tag)} />
         </CommandItem>
       ))}
-      {/* Last, as at the root: a tag the catalog leaves out, or a directive
-          followed by words (`tag:beach sunset`), can still be searched for. */}
-      {typed !== "" && (
-        <CommandItem
-          value="search-for"
-          onSelect={() => onSearch(`${TAG_SEARCH_PREFIX}:${typed}`)}
-        >
-          <Search />
-          <span className="truncate">
-            {t("command.searchFor", { q: `${TAG_SEARCH_PREFIX}:${typed}` })}
-          </span>
-        </CommandItem>
-      )}
     </CommandGroup>
   );
+}
+
+/**
+ * The search's conditions, in the field ahead of its text. They look like
+ * SearchTrigger's chips (the same data-slot, which themes style): change the
+ * two together.
+ */
+function DraftChips({
+  t,
+  draft,
+  onFocusField,
+}: {
+  t: TFunc;
+  draft: SearchDraft;
+  onFocusField: () => void;
+}) {
+  return draft.chips.map((token, i) => (
+    <span
+      key={`${token}-${i}`}
+      data-slot="search-chip"
+      data-selected={i === draft.picked ? "true" : undefined}
+      title={searchTokenLabel(t, token) ?? undefined}
+      // Focus stays in the field: the chips are a rendering of the query.
+      onMouseDown={(e) => e.preventDefault()}
+      // Mouse parity with the arrow keys: a click aims at the chip.
+      onClick={() => {
+        draft.aim(i);
+        onFocusField();
+      }}
+      className={cn(
+        "flex h-5 min-w-0 shrink-0 items-center gap-0.5 rounded py-0 pl-1.5 pr-0.5 text-xs",
+        i === draft.picked ? "bg-primary/25 ring-1 ring-ring" : "bg-fg/10",
+      )}
+    >
+      <SearchChipLabel t={t} token={token} />
+      <button
+        type="button"
+        // Out of the tab order: focus stays in the field, where Backspace
+        // removes a chip, and an Enter here would reach the menu's rows.
+        tabIndex={-1}
+        onClick={(e) => {
+          e.stopPropagation();
+          draft.removeChip(i);
+          onFocusField();
+        }}
+        aria-label={t("home.removeChip")}
+        className="rounded-full p-0.5 transition hover:bg-fg/15"
+      >
+        <X className="size-3" />
+      </button>
+    </span>
+  ));
 }
 
 /** A row of the `ws:` and `col:` pages: something the rail switches to. */
@@ -1141,7 +1383,6 @@ function FixedGroups({
   closeThen,
   filter,
   onFilterChange,
-  onFocusSearch,
   onScan,
   onRebuild,
   onSetView,
@@ -1167,7 +1408,6 @@ function FixedGroups({
   closeThen: (fn: () => void) => void;
   filter: SearchQuery;
   onFilterChange: (query: SearchQuery) => void;
-  onFocusSearch: () => void;
   onScan: (includeExcluded?: boolean) => void;
   onRebuild: () => void;
   onSetView: (view: ViewMode) => void;
@@ -1192,12 +1432,6 @@ function FixedGroups({
     describeConditions(filter, t, lang, defaultQuery).length > 0;
 
   const navigation: CommandAction[] = [
-    action(t, "command.focusSearch", {
-      id: "focus-search",
-      icon: Search,
-      shortcut: "/",
-      run: () => closeThen(onFocusSearch),
-    }),
     action(t, "command.clearFilters", {
       id: "clear-filters",
       icon: X,
