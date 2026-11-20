@@ -8,6 +8,11 @@ export const fr: Catalog = {
   "common.ok": "OK",
   "common.actionFailed": "Impossible d'effectuer l'action",
 
+  // window
+  "window.minimize": "Réduire",
+  "window.maximize": "Agrandir",
+  "window.restore": "Restaurer",
+
   // kind
   "kind.video": "Vidéo",
   "kind.image": "Image",
@@ -61,6 +66,12 @@ export const fr: Catalog = {
   "settings.listThumbSizeSmall": "Petite",
   "settings.listThumbSizeMedium": "Moyenne",
   "settings.listThumbSizeLarge": "Grande",
+  "settings.windowButtons": "Boutons de fenêtre",
+  "settings.windowButtonsDesc":
+    "Où placer les boutons réduire, agrandir et fermer. Masquez-les si un gestionnaire de fenêtres (en mosaïque, par exemple) s’en charge",
+  "settings.windowButtonsLeft": "Gauche",
+  "settings.windowButtonsRight": "Droite",
+  "settings.windowButtonsNone": "Aucun",
   "settings.emojiStyle": "Style des émojis",
   "settings.emojiStyleDesc":
     "Change l'apparence des icônes emoji et des émojis dans le texte.",
@@ -243,6 +254,7 @@ export const fr: Catalog = {
   // home
   "home.noDirectory": "(Aucun dossier sélectionné)",
   "home.scan": "Analyser",
+  "home.moreTools": "Plus",
   "home.initError": "Erreur d'initialisation : {msg}",
   "home.initErrorSchemaMismatchHelp":
     "Le format de la base de données ne correspond peut-être pas à cette version de l'application. Supprimez cet espace de travail depuis la barre latérale gauche, puis enregistrez-le à nouveau.",

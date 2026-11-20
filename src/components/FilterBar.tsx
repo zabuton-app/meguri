@@ -41,6 +41,31 @@ interface Props {
    */
   onToggleHeatmap?: () => void;
   heatmapOpen?: boolean;
+  /** Draw the search box in the bar; off where the screen puts it elsewhere
+   *  (Home: in the title bar, as FilterSearch). */
+  withSearch?: boolean;
+}
+
+/** The search box of the filter bar, for a screen that places it itself. */
+export function FilterSearch({
+  value,
+  onChange,
+}: {
+  value: SearchQuery;
+  onChange: (q: SearchQuery) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div data-tour="search" className="flex min-w-0 items-center">
+      <SearchTokenInput
+        id="list-search-input"
+        value={value.q ?? ""}
+        onChange={(q) => onChange({ ...value, q: q || undefined })}
+        placeholder={t("filter.searchPlaceholder")}
+        title={t("filter.searchHint")}
+      />
+    </div>
+  );
 }
 
 export function FilterBar({
@@ -52,6 +77,7 @@ export function FilterBar({
   onApplySaved,
   onToggleHeatmap,
   heatmapOpen = false,
+  withSearch = true,
 }: Props) {
   const { t, lang } = useI18n();
   const patch = (p: Partial<SearchQuery>) => onChange({ ...value, ...p });
@@ -78,18 +104,11 @@ export function FilterBar({
           line and the fixed-width controls squeeze the input down to nothing.
           min-w-0 stays so it can still shrink below the basis when one row is
           all we get. */}
-        <div
-          data-tour="search"
-          className="flex min-w-0 grow basis-48 items-center"
-        >
-          <SearchTokenInput
-            id="list-search-input"
-            value={value.q ?? ""}
-            onChange={(q) => patch({ q: q || undefined })}
-            placeholder={t("filter.searchPlaceholder")}
-            title={t("filter.searchHint")}
-          />
-        </div>
+        {withSearch && (
+          <div className="flex min-w-0 grow basis-48 items-center">
+            <FilterSearch value={value} onChange={onChange} />
+          </div>
+        )}
 
         <SegmentedControl
           slot="kind-group"

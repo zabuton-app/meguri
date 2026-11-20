@@ -8,6 +8,11 @@ export const zhCN: Catalog = {
   "common.ok": "确定",
   "common.actionFailed": "操作失败",
 
+  // window
+  "window.minimize": "最小化",
+  "window.maximize": "最大化",
+  "window.restore": "向下还原",
+
   // kind
   "kind.video": "视频",
   "kind.image": "图片",
@@ -57,6 +62,12 @@ export const zhCN: Catalog = {
   "settings.listThumbSizeSmall": "小",
   "settings.listThumbSizeMedium": "中",
   "settings.listThumbSizeLarge": "大",
+  "settings.windowButtons": "窗口按钮",
+  "settings.windowButtonsDesc":
+    "最小化、最大化和关闭按钮的位置。如果由窗口管理器（例如平铺式）管理窗口，也可以隐藏",
+  "settings.windowButtonsLeft": "左侧",
+  "settings.windowButtonsRight": "右侧",
+  "settings.windowButtonsNone": "不显示",
   "settings.emojiStyle": "表情符号样式",
   "settings.emojiStyleDesc": "切换表情符号图标及文本中表情符号的显示样式。",
   "settings.emojiStyleNative": "系统默认",
@@ -210,6 +221,7 @@ export const zhCN: Catalog = {
   // home
   "home.noDirectory": "（未选择目录）",
   "home.scan": "扫描",
+  "home.moreTools": "更多",
   "home.initError": "初始化错误：{msg}",
   "home.initErrorSchemaMismatchHelp":
     "数据库格式可能与当前版本的应用不匹配。请在左侧边栏删除该工作区后重新添加。",

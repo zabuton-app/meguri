@@ -8,6 +8,11 @@ export const en: Catalog = {
   "common.ok": "OK",
   "common.actionFailed": "Could not complete the action",
 
+  // window
+  "window.minimize": "Minimize",
+  "window.maximize": "Maximize",
+  "window.restore": "Restore",
+
   // kind
   "kind.video": "Video",
   "kind.image": "Image",
@@ -61,6 +66,12 @@ export const en: Catalog = {
   "settings.listThumbSizeSmall": "Small",
   "settings.listThumbSizeMedium": "Medium",
   "settings.listThumbSizeLarge": "Large",
+  "settings.windowButtons": "Window buttons",
+  "settings.windowButtonsDesc":
+    "Where the minimize, maximize and close buttons go. Hide them when a window manager handles windows (a tiling one, say)",
+  "settings.windowButtonsLeft": "Left",
+  "settings.windowButtonsRight": "Right",
+  "settings.windowButtonsNone": "None",
   "settings.emojiStyle": "Emoji style",
   "settings.emojiStyleDesc":
     "Switches how emoji icons and in-text emoji are drawn.",
@@ -234,6 +245,7 @@ export const en: Catalog = {
   // home
   "home.noDirectory": "(No directory selected)",
   "home.scan": "Scan",
+  "home.moreTools": "More",
   "home.initError": "Initialization error: {msg}",
   "home.initErrorSchemaMismatchHelp":
     "The database format may not match this version of the app. Delete this workspace from the left sidebar, then register it again.",

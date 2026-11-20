@@ -70,7 +70,7 @@ html[data-appearance="light"] {
 
 /* Flat chrome: the bars blend into the page, set apart by a hairline only. */
 [data-slot="workspace-rail"],
-[data-slot="home-header"],
+[data-slot="title-bar"],
 [data-slot="filter-bar"],
 [data-slot="status-bar"],
 [data-slot="audio-player-bar"] {
@@ -79,7 +79,7 @@ html[data-appearance="light"] {
 [data-slot="workspace-rail"] {
   border-right: 1px solid var(--c-border);
 }
-[data-slot="home-header"] {
+[data-slot="title-bar"] {
   border-bottom: 1px solid var(--c-border);
 }
 [data-slot="status-bar"],

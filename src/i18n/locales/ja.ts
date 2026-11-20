@@ -7,6 +7,11 @@ export const ja = {
   "common.ok": "OK",
   "common.actionFailed": "操作に失敗しました",
 
+  // ウィンドウ
+  "window.minimize": "最小化",
+  "window.maximize": "最大化",
+  "window.restore": "元に戻す",
+
   // 種別
   "kind.video": "動画",
   "kind.image": "画像",
@@ -59,6 +64,12 @@ export const ja = {
   "settings.listThumbSizeSmall": "小",
   "settings.listThumbSizeMedium": "中",
   "settings.listThumbSizeLarge": "大",
+  "settings.windowButtons": "ウィンドウボタン",
+  "settings.windowButtonsDesc":
+    "最小化・最大化・閉じるのボタンを置く場所。タイル型などウィンドウマネージャで窓を操作するなら、表示しないこともできる",
+  "settings.windowButtonsLeft": "左",
+  "settings.windowButtonsRight": "右",
+  "settings.windowButtonsNone": "なし",
   "settings.emojiStyle": "絵文字スタイル",
   "settings.emojiStyleDesc":
     "絵文字アイコンや文中の絵文字の見た目を切り替えます。",
@@ -221,6 +232,7 @@ export const ja = {
   // 一覧画面（Home）
   "home.noDirectory": "（ディレクトリ未選択）",
   "home.scan": "スキャン",
+  "home.moreTools": "その他",
   "home.initError": "初期化エラー: {msg}",
   "home.initErrorSchemaMismatchHelp":
     "データベースの形式が現在のアプリと一致しない可能性があります。左のサイドバーからこのワークスペースを削除して、再登録してください。",

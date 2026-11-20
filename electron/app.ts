@@ -56,6 +56,7 @@ import {
 import { libraryBackupDir, libraryDbPath } from "./core/paths.js";
 import { PositionWriter } from "./core/positionWriter.js";
 import { registerIpc, type IpcContext } from "./ipc/index.js";
+import { forwardWindowState, titleBarOptions } from "./ipc/window.js";
 import { handleExtraFor, type HandleExtra } from "./core/ipcHandler.js";
 import { ScanManager } from "./scanManager.js";
 import { AutoTagWorkerClient } from "./core/autoTagDeriver.js";
@@ -651,6 +652,7 @@ export function startApp(options: AppOptions): void {
       // and it carries more sizes than the embedded bitmap.
       ...(logo !== DEFAULT_LOGO ? { icon: windowImage(logo) } : {}),
       autoHideMenuBar: true,
+      ...titleBarOptions(),
       webPreferences: {
         preload: path.join(__dirname, "../preload/preload.js"),
         // The renderer's text names the app (window.api.appName / appGlyph).
@@ -677,6 +679,7 @@ export function startApp(options: AppOptions): void {
     // A page loaded anew (a reload after a crash, or a new window) shows no
     // update notice, so the next check announces the release again.
     mainWindow.webContents.on("did-finish-load", () => updateChecks?.forget());
+    forwardWindowState(mainWindow, emit);
     mainWindow.on("close", (e) => {
       if (isTrayEnabled() && !isQuitting()) {
         e.preventDefault();

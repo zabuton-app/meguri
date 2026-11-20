@@ -124,7 +124,8 @@ export function MediaModal({
       fullscreen ? "" : " border-l border-border"
     }`;
   } else {
-    const outerBase = "fixed inset-0 z-50 flex bg-black/70 backdrop-blur-sm";
+    const outerBase =
+      "fixed inset-below-title-bar z-50 flex bg-black/70 backdrop-blur-sm";
     outerClass =
       size === "small"
         ? `${outerBase} justify-center p-4 sm:p-6 md:p-10`

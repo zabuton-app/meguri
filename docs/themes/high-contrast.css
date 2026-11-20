@@ -83,7 +83,7 @@ html[data-appearance="light"] {
 
 /* Bars: flat, set apart by a solid line instead of a tint. */
 [data-slot="workspace-rail"],
-[data-slot="home-header"],
+[data-slot="title-bar"],
 [data-slot="filter-bar"],
 [data-slot="status-bar"],
 [data-slot="audio-player-bar"] {
@@ -92,7 +92,7 @@ html[data-appearance="light"] {
 [data-slot="workspace-rail"] {
   border-right: 2px solid var(--c-border-strong);
 }
-[data-slot="home-header"] {
+[data-slot="title-bar"] {
   border-bottom: 2px solid var(--c-border-strong);
 }
 [data-slot="status-bar"],

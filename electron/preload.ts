@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld("api", {
   mediaOrigin: argValue(MEDIA_ORIGIN_ARG),
   /** When the main process started (epoch ms), for the startup timings. */
   startupOrigin: Number(argValue(STARTUP_ORIGIN_ARG)),
+  /** The OS, for the custom title bar's layout (TitleBar.tsx). */
+  platform: process.platform,
   /** Command invocation (maps to ipcMain.handle). */
   invoke: (channel: string, args?: unknown) => {
     if (!INVOKE_CHANNELS.has(channel)) {

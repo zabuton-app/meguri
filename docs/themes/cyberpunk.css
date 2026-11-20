@@ -133,7 +133,7 @@ body:has([data-slot="workspace-rail"] [data-state="open"])
 }
 
 /* Workspace info header: cyan → pink gradient underline */
-[data-slot="home-header"] {
+[data-slot="title-bar"] {
   background-color: var(--c-surface);
   border-bottom: 2px solid transparent;
   border-image: linear-gradient(

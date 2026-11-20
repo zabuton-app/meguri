@@ -14,6 +14,7 @@ function clamp(z: number): number {
 
 function apply(z: number) {
   window.api?.setZoomFactor?.(z);
+  document.documentElement.style.setProperty("--meguri-zoom", String(z));
 }
 
 export function useContentZoom() {

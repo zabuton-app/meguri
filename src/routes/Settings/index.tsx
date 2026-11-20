@@ -26,8 +26,10 @@ import {
   isFrameQuality,
   type FrameQuality,
   EMOJI_STYLE_OPTIONS,
+  WINDOW_BUTTONS_OPTIONS,
   isEmojiStyle,
   type EmojiStyle,
+  type WindowButtons,
   LIST_THUMB_SIZE_OPTIONS,
   isListThumbSize,
   type ListThumbSize,
@@ -92,6 +94,12 @@ const SPECTRUM_PATTERN_LABELS: Record<SpectrumPattern, TranslationKey> = {
   ripple: "settings.audioSpectrumPatternRipple",
   orbs: "settings.audioSpectrumPatternOrbs",
   barcode: "settings.audioSpectrumPatternBarcode",
+};
+
+const WINDOW_BUTTONS_LABELS: Record<WindowButtons, TranslationKey> = {
+  left: "settings.windowButtonsLeft",
+  right: "settings.windowButtonsRight",
+  none: "settings.windowButtonsNone",
 };
 
 const EMOJI_STYLE_LABELS: Record<EmojiStyle, TranslationKey> = {
@@ -183,6 +191,8 @@ export default function Settings() {
     setResumePlayback,
     emojiStyle,
     setEmojiStyle,
+    windowButtons,
+    setWindowButtons,
     petVisible,
     setPetVisible,
     petSize,
@@ -325,6 +335,38 @@ export default function Settings() {
                     <Moon className="size-4" />
                     {t("settings.dark")}
                   </button>
+                </div>
+              </section>
+
+              {/* Which end of the title bar holds the window buttons, if any */}
+              <section className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-bright-fg">
+                    {t("settings.windowButtons")}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t("settings.windowButtonsDesc")}
+                  </span>
+                </div>
+                {/* shrink-0: the description wraps instead; overflow-hidden
+                    would otherwise let the group shrink and cut off "None". */}
+                <div className="flex shrink-0 overflow-hidden rounded-md border border-border">
+                  {WINDOW_BUTTONS_OPTIONS.map((side) => (
+                    <button
+                      key={side}
+                      type="button"
+                      aria-pressed={windowButtons === side}
+                      onClick={() => setWindowButtons(side)}
+                      className={
+                        "whitespace-nowrap px-3 py-1.5 text-sm transition " +
+                        (windowButtons === side
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-bg text-muted hover:text-fg")
+                      }
+                    >
+                      {t(WINDOW_BUTTONS_LABELS[side])}
+                    </button>
+                  ))}
                 </div>
               </section>
 

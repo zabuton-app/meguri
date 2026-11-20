@@ -96,6 +96,21 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+      // An overlay covering the window starts below the custom title bar, so
+      // the window can still be moved and closed while it is open (#578).
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/\\bfixed inset-0\\b/]",
+          message:
+            "Use `fixed inset-below-title-bar` for a window-covering overlay (see docs/renderer.md#title-bar).",
+        },
+        {
+          selector: "TemplateElement[value.raw=/\\bfixed inset-0\\b/]",
+          message:
+            "Use `fixed inset-below-title-bar` for a window-covering overlay (see docs/renderer.md#title-bar).",
+        },
+      ],
     },
   },
 

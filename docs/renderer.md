@@ -2,7 +2,7 @@
 
 The renderer is a React + TypeScript app under `src/`, talking to the main
 process over `window.api`. This document covers its routing, provider stack, data
-fetching, internationalization, theming, and content zoom.
+fetching, internationalization, the title bar, theming, and content zoom.
 
 ## Routing
 
@@ -535,6 +535,69 @@ the OS's, so do not format them before passing them in.
 UI primitives are in `src/components/ui/` (Radix plus class-variance-authority,
 in the shadcn style). Confirmation dialogs use `ConfirmProvider` / `useConfirm`
 (`src/components/ConfirmDialog.tsx`).
+
+## Title bar
+
+The app draws the window's title bar (`src/components/TitleBar.tsx`) across the
+top of the shell, above the workspace rail. `titleBarOptions()` in
+`electron/ipc/window.ts` hides the native one (`titleBarStyle: "hidden"`).
+The bar and the rail share the `chrome` color (`--color-chrome` in
+`src/styles.css`, halfway between `bg` and `surface`) and read as one frame;
+the content is a bordered panel set into it (`data-slot="content-panel"` in
+`App.tsx`). The bar holds the logo, then the current screen's header, with the
+window buttons at the end the user picks under "Window buttons" in the
+Appearance settings (the `windowButtons` preference): left by default on macOS
+and right elsewhere. "None" draws no buttons, for a window manager that handles
+windows itself (a tiling one); it is offered on every OS.
+
+The logo heads the rail's column: in the bar, above the rail, unless the
+buttons take the bar's left end; then it is the rail's first item
+(`AppLogo` in both places).
+
+- The screen's header renders into the bar's slot through `<TitleBarPortal>`
+  (`src/components/titleBarSlot.tsx`, with the slot in `titleBarSlotContext.ts`). Home's header (`HomeHeader`) is the one
+  there now: the path on the left, the list's search box (`FilterSearch`,
+  taken out of the filter bar) in the middle, the toolbar on the right. The
+  search box grows downward over the list as it wraps terms, rather than
+  making the bar taller. Without the provider, as in a screen's own tests, the
+  header renders in place.
+- On Windows and Linux there are no window buttons from the OS, so the bar
+  draws minimize, maximize/restore and close: close last on the right, close
+  first on the left. They call `window_minimize`, `window_toggle_maximize` and
+  `window_close`; close goes through the window's `close` handler, so it hides
+  the window to the tray as before. The `window:state` event tells the bar
+  when the window is maximized, for the maximize button's icon. A double click
+  on the bar is the OS's: the drag region is the window's caption there.
+- On macOS the OS keeps its traffic lights. They do not zoom with the page, so
+  the bar leaves them room sized in screen px (divided by `--meguri-zoom`,
+  which `useContentZoom` publishes) and moves them into it with
+  `window_set_button_position` on every resize (a zoom change fires one) and
+  change of side. Full screen hides them, and their room with them; "None"
+  hides them through `window_set_button_visibility`. The page
+  gets a double click on the bar, and `window_title_bar_double_click` applies
+  the system setting (zoom, minimize or nothing).
+
+The bar is a drag region (`-webkit-app-region: drag`); its links, buttons and
+fields are `no-drag` (`src/styles.css`), and the rest of it, the header's text
+included, moves the window. While a modal is open (`aria-modal`, or an open Radix
+dialog's content; not a popover, nor the tour's bubble), the header in the
+slot goes quiet like the page behind it; the window buttons and the drag stay.
+The slot takes one screen's header at a time: today only Home, the parent of
+every route, renders into it.
+
+An overlay that covers the window (a modal, the player) is
+`fixed inset-below-title-bar`, not `fixed inset-0`, so that the window can still
+be moved, minimized and closed while it is open; ESLint refuses `fixed inset-0`
+in the renderer. The player's full screen covers the bar as any full-screen
+element does.
+
+A drag region ignores what is painted over it, so a click on a toast, a menu or
+a dialog over the bar's band would move the window. `src/styles.css` makes
+those layers `no-drag` (`[data-sonner-toaster]`,
+`[data-radix-popper-content-wrapper]`, `[role="dialog"]`, the pet), and the
+toasts start below the bar. A new floating layer that can reach the band goes
+in that list. The crash screen (`ErrorBoundary`) replaces the whole app, title
+bar included, so it draws a plain drag strip with a Close button of its own.
 
 ## Theming
 

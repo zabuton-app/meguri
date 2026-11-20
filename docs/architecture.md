@@ -189,7 +189,7 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
    `register*Handlers()` under `electron/ipc/`. Handlers are grouped by domain,
    one module each (`status.ts`, `workspaces.ts`, `scan.ts`, `files.ts`,
    `folders.ts`, `graph.ts`, `activity.ts`, `timeline.ts`, `tags.ts`,
-   `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`, `updates.ts`,
+   `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`, `window.ts`, `updates.ts`,
    `logo.ts`, `customCss.ts`, `cssThemes.ts`); `electron/ipc/index.ts` wires
    them up in `registerIpc()`. Each group but `updates.ts` receives an
    `IpcContext` (`electron/ipc/context.ts`) with what it needs from the main
@@ -278,7 +278,7 @@ lifecycle behavior:
   main's settings (`appConfig.ts`) and switched from Settings via the `logo_get` /
   `logo_set` IPC channels. The renderer mirrors the same choice through
   `useLogo()` (react-query cache), which drives the Settings picker and the
-  in-app logo in the workspace rail. The renderer does not bundle the
+  in-app logo (in the title bar, or atop the workspace rail). The renderer does not bundle the
   bitmaps: it gets them from main as data URLs (`logo_images`,
   `useLogoImages()`).
 

@@ -12,6 +12,8 @@ declare global {
       mediaOrigin: string;
       /** When the main process started (its performance.timeOrigin, epoch ms); 0 if not passed. */
       startupOrigin: number;
+      /** The OS (process.platform: "darwin", "win32", "linux", …). */
+      platform: string;
       invoke<T = unknown>(channel: string, args?: unknown): Promise<T>;
       on(channel: string, cb: (payload: unknown) => void): () => void;
       setZoomFactor(factor: number): void;

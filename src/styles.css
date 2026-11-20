@@ -25,6 +25,62 @@
      it to their offset so they stay clear of the sheet; this is the value
      they fall back to while it is not docked. */
   --meguri-peek-inset: 0px;
+  /* The content zoom (useContentZoom), published for the room the title bar
+     leaves macOS's traffic lights: they do not zoom with the page. */
+  --meguri-zoom: 1;
+  /* Height of the title bar (TitleBar.tsx). Window-covering overlays start
+     below it (inset-below-title-bar), so the window can still be moved,
+     minimized and closed while one is open. electron/ipc/window.ts places the
+     traffic lights for this height at zoom 1 until the bar moves them. */
+  --meguri-title-bar-height: 2.5rem;
+}
+
+/* Layers that can float over the title bar's band: a click there would move
+   the window instead, since a drag region ignores what is painted over it.
+   A no-drag area later in the document is cut out of the drag region. A new
+   floating layer that can reach the band belongs in this list. */
+[data-sonner-toaster],
+[data-radix-popper-content-wrapper],
+[role="dialog"],
+[data-pet] {
+  -webkit-app-region: no-drag;
+}
+
+/* Controls in the title bar take their clicks; the rest of it moves the
+   window. data-title-bar-control marks a whole area as one (Home's search
+   box, chips included). TitleBar.tsx's CONTROLS lists the same elements. */
+[data-title-bar]
+  :is(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    [role="button"],
+    [role="combobox"],
+    [data-title-bar-control]
+  ) {
+  -webkit-app-region: no-drag;
+}
+
+/* While a modal is open, the screen's header in the title bar is part of the
+   page behind it: it goes quiet like the rest. The window buttons stay. A
+   modal is one with aria-modal (the app's own; the tour's bubble is not one:
+   it points at the header) or an open Radix dialog's content, which carries
+   no aria-modal. Radix popovers have role="dialog" too, so the role alone
+   would catch them. */
+body:has(
+    [aria-modal="true"]:not([data-tour-bubble]),
+    [data-slot="dialog-content"][data-state="open"]
+  )
+  [data-title-bar-slot] {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* A fixed overlay covering the window below the title bar. */
+@utility inset-below-title-bar {
+  inset: var(--meguri-title-bar-height) 0 0 0;
 }
 
 /* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */
@@ -32,6 +88,10 @@
   --color-bg: var(--c-bg);
   --color-surface: var(--c-surface);
   --color-overlay: var(--c-overlay);
+  /* The window's frame around the content: the title bar and the workspace
+     rail (App.tsx). Halfway between bg and surface, so text that reads on
+     both reads on it too. */
+  --color-chrome: color-mix(in oklab, var(--c-bg), var(--c-surface));
   --color-border: var(--c-border);
   /* Meaningful UI boundaries (form controls, switch tracks) rather than decorative rules. */
   --color-border-strong: var(--c-border-strong);

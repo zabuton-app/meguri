@@ -8,6 +8,11 @@ export const es: Catalog = {
   "common.ok": "Aceptar",
   "common.actionFailed": "No se pudo completar la acción",
 
+  // window
+  "window.minimize": "Minimizar",
+  "window.maximize": "Maximizar",
+  "window.restore": "Restaurar",
+
   // kind
   "kind.video": "Vídeo",
   "kind.image": "Imagen",
@@ -61,6 +66,12 @@ export const es: Catalog = {
   "settings.listThumbSizeSmall": "Pequeño",
   "settings.listThumbSizeMedium": "Mediano",
   "settings.listThumbSizeLarge": "Grande",
+  "settings.windowButtons": "Botones de ventana",
+  "settings.windowButtonsDesc":
+    "Dónde van los botones de minimizar, maximizar y cerrar. Ocúltalos si un gestor de ventanas (uno en mosaico, por ejemplo) se encarga de las ventanas",
+  "settings.windowButtonsLeft": "Izquierda",
+  "settings.windowButtonsRight": "Derecha",
+  "settings.windowButtonsNone": "Ninguno",
   "settings.emojiStyle": "Estilo de emojis",
   "settings.emojiStyleDesc":
     "Cambia el aspecto de los iconos de emoji y de los emojis en el texto.",
@@ -242,6 +253,7 @@ export const es: Catalog = {
   // home
   "home.noDirectory": "(Ningún directorio seleccionado)",
   "home.scan": "Escanear",
+  "home.moreTools": "Más",
   "home.initError": "Error de inicialización: {msg}",
   "home.initErrorSchemaMismatchHelp":
     "El formato de la base de datos puede no coincidir con esta versión de la aplicación. Elimina este espacio de trabajo desde la barra lateral izquierda y vuelve a registrarlo.",

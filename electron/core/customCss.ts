@@ -32,8 +32,9 @@ export const CUSTOM_CSS_TEMPLATE = `/*
  *
  * Some parts of the UI carry a data-slot attribute to target (the list in
  * docs/theming.md is the source of truth):
+ *   title-bar          title bar across the top
  *   workspace-rail     side rail
- *   home-header        workspace info header
+ *   home-header        workspace info header, inside the title bar
  *   filter-bar         search and filters
  *   status-bar         footer
  *   audio-player-bar   audio player at the bottom

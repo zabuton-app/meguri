@@ -133,7 +133,7 @@ html[data-appearance] body {
 /* Header and search bar: see-through veils of different strength, so each
    band reads apart from the rail and from the other while the sky still
    runs up to the top. */
-[data-slot="home-header"] {
+[data-slot="title-bar"] {
   background-color: var(--sk-header);
 }
 [data-slot="filter-bar"] {
@@ -141,7 +141,7 @@ html[data-appearance] body {
 }
 
 /* Header: horizon line, from sky to sea */
-[data-slot="home-header"] {
+[data-slot="title-bar"] {
   border-bottom: 2px solid transparent;
   border-image: linear-gradient(
       90deg,
@@ -161,7 +161,7 @@ html[data-appearance] body {
    classes. It may need updating when the app's markup changes. */
 :is(
     [data-slot="workspace-rail"],
-    [data-slot="home-header"],
+    [data-slot="title-bar"],
     [data-slot="filter-bar"]
   )
   :is(button, a, div):is([class~="bg-surface"], [class~="border-border"]):not(
@@ -177,7 +177,7 @@ html[data-appearance] body {
 }
 :is(
     [data-slot="workspace-rail"],
-    [data-slot="home-header"],
+    [data-slot="title-bar"],
     [data-slot="filter-bar"]
   )
   :is(button, a):is([class~="bg-surface"], [class~="border-border"]):not(

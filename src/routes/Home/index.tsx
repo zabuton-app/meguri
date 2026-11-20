@@ -42,7 +42,7 @@ import { ShortcutsOverlay } from "@/components/ShortcutsOverlay";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import { NAV_BINDINGS, isHelpKey, matchAny } from "@/settings/keybindings";
 import { cn } from "@/lib/utils";
-import { FilterBar } from "@/components/FilterBar";
+import { FilterBar, FilterSearch } from "@/components/FilterBar";
 import { ScanProgress } from "@/components/ScanProgress";
 import { CommandMenu } from "@/components/CommandMenu";
 import { Pet } from "@/components/pet/Pet";
@@ -918,6 +918,7 @@ export default function Home() {
         onScan={() => void onScan()}
         onScanWithDeleted={() => void onScan(true)}
         onRebuild={() => void onRebuild()}
+        search={<FilterSearch value={filterValue} onChange={onFilterChange} />}
         t={t}
       />
 
@@ -942,6 +943,7 @@ export default function Home() {
         onApplySaved={onApplySaved}
         onToggleHeatmap={heatmap.toggle}
         heatmapOpen={heatmap.open}
+        withSearch={false}
       />
 
       {/* The heatmap: a panel under the filter bar, over whichever view is

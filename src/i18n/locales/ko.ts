@@ -8,6 +8,11 @@ export const ko: Catalog = {
   "common.ok": "확인",
   "common.actionFailed": "작업에 실패했습니다",
 
+  // window
+  "window.minimize": "최소화",
+  "window.maximize": "최대화",
+  "window.restore": "이전 크기로 복원",
+
   // kind
   "kind.video": "동영상",
   "kind.image": "이미지",
@@ -59,6 +64,12 @@ export const ko: Catalog = {
   "settings.listThumbSizeSmall": "작게",
   "settings.listThumbSizeMedium": "보통",
   "settings.listThumbSizeLarge": "크게",
+  "settings.windowButtons": "창 버튼",
+  "settings.windowButtonsDesc":
+    "최소화·최대화·닫기 버튼을 둘 위치. 타일링 등 창 관리자로 창을 다룬다면 숨길 수도 있음",
+  "settings.windowButtonsLeft": "왼쪽",
+  "settings.windowButtonsRight": "오른쪽",
+  "settings.windowButtonsNone": "없음",
   "settings.emojiStyle": "이모지 스타일",
   "settings.emojiStyleDesc":
     "이모지 아이콘과 텍스트 속 이모지의 모양을 전환합니다.",
@@ -218,6 +229,7 @@ export const ko: Catalog = {
   // home
   "home.noDirectory": "(디렉터리 미선택)",
   "home.scan": "스캔",
+  "home.moreTools": "더 보기",
   "home.initError": "초기화 오류: {msg}",
   "home.initErrorSchemaMismatchHelp":
     "데이터베이스 형식이 현재 앱 버전과 일치하지 않을 수 있습니다. 왼쪽 사이드바에서 이 워크스페이스를 삭제한 후 다시 등록해 주세요.",

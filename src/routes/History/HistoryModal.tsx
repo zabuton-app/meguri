@@ -35,7 +35,7 @@ export function HistoryModal({
   }, [onClose]);
 
   const outerBase =
-    "fixed inset-0 z-50 flex justify-center bg-black/70 backdrop-blur-sm";
+    "fixed inset-below-title-bar z-50 flex justify-center bg-black/70 backdrop-blur-sm";
   const outerClass =
     size === "small"
       ? `${outerBase} items-center p-4`
