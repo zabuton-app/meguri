@@ -22,6 +22,7 @@ import { addFileTag, addManualTag, upsertTag } from "../tags.js";
 import { MAX_TAG_LIST } from "../../../shared/tags.js";
 import type {
   FileRow,
+  HistoryQuery,
   SearchCursor,
   SearchQuery,
   SearchResult,
@@ -851,7 +852,7 @@ describe("listHistoryWorkspaces over a shared library", () => {
       expect(all.items[0].workspaceId).toBe("a");
 
       const paged: number[] = [];
-      let cursor: number | undefined = 0;
+      let cursor: HistoryQuery["cursor"] = 0;
       while (cursor !== undefined) {
         const page = listHistoryWorkspaces(targets, { limit: 2, cursor });
         paged.push(...page.items.map((e) => e.historyId));

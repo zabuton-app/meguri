@@ -2,7 +2,7 @@
 // list events across the whole workspace, newest first, with pagination.
 import type { DB } from "../db.js";
 import { FILE_COLS, FILE_FROM } from "./files.js";
-import type { HistoryEntryRow, HistoryQuery, HistoryPage } from "../types.js";
+import type { HistoryEntryRow, HistoryQuery } from "../types.js";
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -48,6 +48,27 @@ function collectsOwnEvents(db: DB, via: HistoryQuery["via"]): boolean {
   return own <= OWN_SORT_MAX && own * OWN_SHARE < total;
 }
 
+/** listPlayHistory's query: the keyset cursor is resolved by the caller. */
+export type PlayHistoryQuery = Omit<HistoryQuery, "cursor"> & {
+  /** Offset over collapsed rows. */
+  cursor?: number;
+};
+
+export interface PlayHistoryPage {
+  items: HistoryEntryRow[];
+  /** Offset of the next page, or null on the last one. After a seek only
+   *  whether it is null means anything. */
+  nextCursor: number | null;
+}
+
+/** Where a page starts: strictly after the event (at, id) in the timeline's
+ *  order (played_at DESC, id DESC). Ids are integers, so a caller that wants
+ *  the event (at, id) itself passes id + 1. */
+export interface HistorySeek {
+  at: number;
+  id: number;
+}
+
 /**
  * List play events newest-first, collapsing consecutive runs of the same file
  * into one row (re-plays while watching a video would otherwise flood the
@@ -56,12 +77,17 @@ function collectsOwnEvents(db: DB, via: HistoryQuery["via"]): boolean {
  * every page once the history grew. Instead, stream raw events straight off
  * idx_play_history_played (played_at DESC, id DESC) in keyset batches,
  * collapse the runs in JS, and resolve file rows / play counts with small
- * indexed lookups. The numeric offset cursor (over collapsed rows) is
- * unchanged, matching the searchFiles contract and the All view's merge.
+ * indexed lookups. A page starts either at an offset over collapsed rows,
+ * read from the newest event, or at `seek`, which goes straight to its
+ * position in the index so a deep page costs what the first one does.
  */
-export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
+export function listPlayHistory(
+  db: DB,
+  query: PlayHistoryQuery,
+  seek?: HistorySeek,
+): PlayHistoryPage {
   const limit = Math.max(1, Math.min(MAX_LIMIT, query.limit ?? DEFAULT_LIMIT));
-  const offset = Math.max(0, query.cursor ?? 0);
+  const offset = seek ? 0 : Math.max(0, query.cursor ?? 0);
 
   const viaSql = query.via ? "via = ? AND " : "";
   // play_history is shared by every workspace: only events for a file alive in
@@ -73,6 +99,9 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
   // keyset, keeps the planner off idx_play_history_played, which would bring
   // the stream back (a range on played_at searched there reads every
   // workspace's events in it).
+  // The keyset is a row value: written as `a < ? OR (a = ? AND b < ?)` the
+  // planner cannot tell the two ?s are equal and reads from the newest event
+  // instead of seeking.
   const own = collectsOwnEvents(db, query.via);
   const aliveHere = own
     ? "meta_key IN (SELECT meta_key FROM main.files WHERE deleted_at IS NULL)"
@@ -86,7 +115,7 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
   );
   const nextBatch = db.prepare(
     `SELECT id, meta_key, played_at, via, position FROM play_history
-     WHERE ${viaSql}(${at} < ? OR (${at} = ? AND ${id} < ?)) AND ${aliveHere}
+     WHERE ${viaSql}(${at}, ${id}) < (?, ?) AND ${aliveHere}
      ${order} LIMIT ?`,
   );
   // Representative alive file for a run's meta_key (MIN(id) mirrors the old
@@ -103,13 +132,29 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
   const want = limit + 1;
   let skipped = 0;
   let prevKey: string | null = null;
-  let seek: RawEvent | null = null;
+  let after: { played_at: number; id: number } | null = null;
+  if (seek) {
+    after = { played_at: seek.at, id: seek.id };
+    // The run the page starts in, if any: the event just before the seek in
+    // this workspace's stream, so that run's older events stay collapsed
+    // into the row the previous page showed.
+    prevKey =
+      (db
+        .prepare(
+          `SELECT meta_key FROM play_history
+           WHERE ${viaSql}(${at}, ${id}) >= (?, ?) AND ${aliveHere}
+           ORDER BY ${at} ASC, ${id} ASC LIMIT 1`,
+        )
+        .pluck()
+        .get(...(query.via ? [query.via] : []), seek.at, seek.id) as
+        string | undefined) ?? null;
+  }
 
   outer: for (;;) {
     const args: unknown[] = query.via ? [query.via] : [];
-    if (seek) args.push(seek.played_at, seek.played_at, seek.id);
+    if (after) args.push(after.played_at, after.id);
     args.push(RAW_BATCH);
-    const rows = (seek ? nextBatch : firstBatch).all(...args) as RawEvent[];
+    const rows = (after ? nextBatch : firstBatch).all(...args) as RawEvent[];
     if (rows.length === 0) break;
     for (const row of rows) {
       if (prevKey === row.meta_key) continue; // same run, already represented
@@ -132,7 +177,7 @@ export function listPlayHistory(db: DB, query: HistoryQuery): HistoryPage {
       if (kept.length >= want) break outer;
     }
     if (rows.length < RAW_BATCH) break;
-    seek = rows[rows.length - 1];
+    after = rows[rows.length - 1];
   }
 
   const items = kept.slice(0, limit);

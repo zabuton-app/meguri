@@ -11,6 +11,7 @@ export type {
   FolderListing,
   FolderPath,
   FolderScope,
+  HistoryCursor,
   HistoryEntryRow,
   HistoryPage,
   HistoryQuery,

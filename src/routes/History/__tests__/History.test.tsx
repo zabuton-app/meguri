@@ -81,7 +81,7 @@ describe("History", () => {
     const today = entry.playedAt;
     mocks.historyList.mockImplementation((query) =>
       Promise.resolve(
-        (query as { cursor: number }).cursor === 0
+        (query as { cursor: unknown }).cursor === 0
           ? {
               items: [
                 { ...entry, historyId: 1, relPath: "a.mp4", playedAt: today },
@@ -92,7 +92,7 @@ describe("History", () => {
                   playedAt: today - 1,
                 },
               ],
-              nextCursor: 2,
+              nextCursor: { at: today - 1, id: 2, ws: WS_ID },
             }
           : {
               items: [
@@ -115,7 +115,10 @@ describe("History", () => {
     );
     renderWithProviders(<HistoryRoute />, { route: "/history" });
     expect(await screen.findByText("d.mp4")).toBeTruthy();
-    expect(mocks.historyList).toHaveBeenCalledWith({ cursor: 2, limit: 50 });
+    expect(mocks.historyList).toHaveBeenCalledWith({
+      cursor: { at: today - 1, id: 2, ws: WS_ID },
+      limit: 50,
+    });
     expect(mocks.historyList).toHaveBeenCalledTimes(2);
     // A day spread over two pages keeps one header.
     expect(screen.getAllByText("Today")).toHaveLength(1);

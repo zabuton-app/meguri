@@ -25,6 +25,7 @@ import {
   searchFiles,
   sortValueOf,
   type DuplicateFileRow,
+  type HistorySeek,
   type SeekPosition,
 } from "./queries.js";
 import { listTags } from "./tagAdmin.js";
@@ -34,6 +35,7 @@ import type {
   FileRow,
   FolderFilesResult,
   FolderListing,
+  HistoryCursor,
   HistoryEntryRow,
   HistoryPage,
   HistoryQuery,
@@ -317,23 +319,6 @@ export function searchCollectionManual(
   };
 }
 
-interface WsStream<T> {
-  wsId: string;
-  core: Core;
-  nextCursor: number;
-  buffer: T[];
-  bufIdx: number;
-  exhausted: boolean;
-}
-
-/** Per-workspace batched fetch: one page of already-sorted rows plus the next cursor. */
-type FetchBatch<T> = (
-  core: Core,
-  wsId: string,
-  cursor: number,
-  limit: number,
-) => { items: T[]; nextCursor: number | null };
-
 /**
  * k-way merge for the file search. With a keyed cursor every stream seeks
  * straight to its position (no offset re-scan, and no K× deep-OFFSET cost);
@@ -474,79 +459,7 @@ function mergeSearchPages(
   };
 }
 
-/**
- * k-way merge with per-workspace batched fetches — memory stays O(N × batch), not O(N × offset).
- *
- * `same`, when given, names rows that several workspaces return for one thing.
- * `cmp` must order such rows next to each other; each one after the first is
- * dropped before it counts toward `offset` or `limit`, so pages neither repeat
- * nor skip it.
- */
-function mergePages<T>(
-  targets: CoreTarget[],
-  fetchBatch: FetchBatch<T>,
-  cmp: (a: T, b: T) => number,
-  limit: number,
-  offset: number,
-  same?: (a: T, b: T) => boolean,
-): { items: T[]; nextCursor: number | null } {
-  const batchSize = limit + 1;
-
-  const streams: WsStream<T>[] = targets.map(({ id, core }) => ({
-    wsId: id,
-    core,
-    nextCursor: 0,
-    buffer: [],
-    bufIdx: 0,
-    exhausted: false,
-  }));
-
-  for (const stream of streams) {
-    loadStreamBatch(stream, fetchBatch, batchSize);
-  }
-
-  const heap = new StreamHeap(streams, cmp);
-  for (let i = 0; i < streams.length; i++) {
-    if (streamHasItem(streams[i])) heap.push(i);
-  }
-
-  let skipped = 0;
-  const collected: T[] = [];
-  const want = limit + 1;
-  let last: T | undefined;
-  let any = false;
-
-  while (!heap.isEmpty() && (skipped < offset || collected.length < want)) {
-    const si = heap.pop();
-    const stream = streams[si];
-    const item = stream.buffer[stream.bufIdx];
-    stream.bufIdx++;
-
-    const repeat = same !== undefined && any && same(last as T, item);
-    last = item;
-    any = true;
-    if (repeat) {
-      // Counted neither way: the row it repeats already was.
-    } else if (skipped < offset) {
-      skipped++;
-    } else {
-      collected.push(item);
-    }
-
-    if (stream.bufIdx >= stream.buffer.length) {
-      loadStreamBatch(stream, fetchBatch, batchSize);
-    }
-    if (streamHasItem(stream)) {
-      heap.push(si);
-    }
-  }
-
-  const items = collected.slice(0, limit);
-  const nextCursor = collected.length > limit ? offset + limit : null;
-  return { items, nextCursor };
-}
-
-/** Minimal buffered-stream shape shared by the offset and seek merge paths. */
+/** Minimal buffered-stream shape shared by the search and history merges. */
 interface BufferedStream<T> {
   buffer: T[];
   bufIdx: number;
@@ -554,27 +467,6 @@ interface BufferedStream<T> {
 
 function streamHasItem<T>(stream: BufferedStream<T>): boolean {
   return stream.bufIdx < stream.buffer.length;
-}
-
-function loadStreamBatch<T>(
-  stream: WsStream<T>,
-  fetchBatch: FetchBatch<T>,
-  batchSize: number,
-): void {
-  if (stream.exhausted) return;
-  const res = fetchBatch(
-    stream.core,
-    stream.wsId,
-    stream.nextCursor,
-    batchSize,
-  );
-  stream.buffer = res.items;
-  stream.bufIdx = 0;
-  if (res.nextCursor != null) {
-    stream.nextCursor = res.nextCursor;
-  } else {
-    stream.exhausted = true;
-  }
 }
 
 /** Min-heap of stream indices ordered by each stream's current head row. */
@@ -653,45 +545,146 @@ class StreamHeap<T> {
  * each other and the merge keeps the first (the lower workspaceId). A
  * workspace still on its own tables is never deduplicated against. Runs
  * collapsed per workspace are not re-collapsed across workspaces.
+ *
+ * Every page after the first carries the last row's key: each workspace
+ * seeks straight past it, and refills from its own last row, so a deep page
+ * reads about as much as the first one.
  */
 export function listHistoryWorkspaces(
   cores: CoreTarget[],
   query: HistoryQuery,
 ): HistoryPage {
   if (cores.length === 0) return { items: [], nextCursor: null };
+  const limit = Math.max(1, query.limit ?? DEFAULT_LIMIT);
+  const key = typeof query.cursor === "object" ? query.cursor : undefined;
+  const offset = Math.max(
+    0,
+    typeof query.cursor === "number" ? query.cursor : 0,
+  );
+  const base = { via: query.via };
+  const nextCursorOf = (items: HistoryEntryRow[], hasMore: boolean) => {
+    const last = items[items.length - 1];
+    return hasMore && last
+      ? { at: last.playedAt, id: last.historyId, ws: last.workspaceId }
+      : null;
+  };
+
   if (cores.length === 1) {
     const { id, core } = cores[0];
-    const res = listPlayHistory(core.db, query);
-    return { items: inject(res.items, id), nextCursor: res.nextCursor };
+    const res = listPlayHistory(
+      core.db,
+      { ...base, limit, cursor: offset },
+      key ? { at: key.at, id: key.id } : undefined,
+    );
+    const items = inject(res.items, id);
+    return { items, nextCursor: nextCursorOf(items, res.nextCursor != null) };
   }
+
   // A workspace whose merge into the library has not run numbers its own
   // events, so only rows read through the library can be the same event.
   const own = new Set(
     cores.filter(({ core }) => usesOwnMetadata(core.db)).map(({ id }) => id),
   );
-  const shared = (r: HistoryEntryRow) => !own.has(r.workspaceId);
+  const shared = (ws: string) => !own.has(ws);
   // Rows read through the library sort before the others on a tie, so the
   // copies of one event stay next to each other.
+  const cmpWs = (a: string, b: string): number =>
+    Number(shared(b)) - Number(shared(a)) || cmpStr(a, b);
   const cmp = (a: HistoryEntryRow, b: HistoryEntryRow): number =>
     b.playedAt - a.playedAt ||
     b.historyId - a.historyId ||
-    Number(shared(b)) - Number(shared(a)) ||
-    cmpStr(a.workspaceId, b.workspaceId);
-  return mergePages<HistoryEntryRow>(
-    cores,
-    (core, wsId, cursor, limit) => {
-      const res = listPlayHistory(core.db, { ...query, cursor, limit });
-      return { items: inject(res.items, wsId), nextCursor: res.nextCursor };
-    },
-    cmp,
-    Math.max(1, query.limit ?? DEFAULT_LIMIT),
-    Math.max(0, query.cursor ?? 0),
-    (a, b) =>
-      shared(a) &&
-      shared(b) &&
-      a.historyId === b.historyId &&
-      a.playedAt === b.playedAt,
-  );
+    cmpWs(a.workspaceId, b.workspaceId);
+  const same = (a: HistoryEntryRow, b: HistoryEntryRow): boolean =>
+    shared(a.workspaceId) &&
+    shared(b.workspaceId) &&
+    a.historyId === b.historyId &&
+    a.playedAt === b.playedAt;
+
+  /** Where a workspace resumes after the key row. Its event at the key's
+   *  (at, id) was already listed when it is the key row's copy (both read
+   *  through the library) or sorts before the key row. */
+  const historySeekFor = (key: HistoryCursor, ws: string): HistorySeek => {
+    const listed = (shared(ws) && shared(key.ws)) || cmpWs(ws, key.ws) <= 0;
+    // Ids are integers: "after (at, id + 1)" keeps the event (at, id).
+    return { at: key.at, id: listed ? key.id : key.id + 1 };
+  };
+
+  interface HistoryStream {
+    wsId: string;
+    core: Core;
+    buffer: HistoryEntryRow[];
+    bufIdx: number;
+    exhausted: boolean;
+  }
+  const batchSize = limit + 1;
+  const fetchInto = (stream: HistoryStream, seek?: HistorySeek): void => {
+    const res = listPlayHistory(
+      stream.core.db,
+      { ...base, limit: batchSize, cursor: 0 },
+      seek,
+    );
+    stream.buffer = inject(res.items, stream.wsId);
+    stream.bufIdx = 0;
+    stream.exhausted = res.nextCursor == null;
+  };
+
+  const streams: HistoryStream[] = cores.map(({ id, core }) => ({
+    wsId: id,
+    core,
+    buffer: [],
+    bufIdx: 0,
+    exhausted: false,
+  }));
+  for (const stream of streams) {
+    fetchInto(stream, key ? historySeekFor(key, stream.wsId) : undefined);
+  }
+  const heap = new StreamHeap(streams, cmp);
+  for (let i = 0; i < streams.length; i++) {
+    if (streamHasItem(streams[i])) heap.push(i);
+  }
+
+  let toSkip = offset;
+  const collected: HistoryEntryRow[] = [];
+  const want = limit + 1;
+  let last: HistoryEntryRow | undefined;
+
+  while (!heap.isEmpty() && (toSkip > 0 || collected.length < want)) {
+    const si = heap.pop();
+    const stream = streams[si];
+    const item = stream.buffer[stream.bufIdx];
+    stream.bufIdx++;
+
+    const repeat = last !== undefined && same(last, item);
+    last = item;
+    if (repeat) {
+      // Counted neither way: the row it repeats already was. Each copy after
+      // the first is dropped, so pages neither repeat nor skip the event.
+    } else if (toSkip > 0) {
+      toSkip--;
+    } else {
+      collected.push(item);
+    }
+
+    // Refilled only while the page still wants rows: a refill costs a few
+    // queries, and one the page ends on would be thrown away.
+    const wanting = toSkip > 0 || collected.length < want;
+    if (!streamHasItem(stream) && wanting) {
+      if (stream.exhausted) {
+        stream.buffer = [];
+        stream.bufIdx = 0;
+      } else {
+        const tail = stream.buffer[stream.buffer.length - 1];
+        fetchInto(stream, { at: tail.playedAt, id: tail.historyId });
+      }
+    }
+    if (streamHasItem(stream)) heap.push(si);
+  }
+
+  const items = collected.slice(0, limit);
+  return {
+    items,
+    nextCursor: nextCursorOf(items, collected.length > limit),
+  };
 }
 
 /** Bucketing key: hash and size must both match to count as a duplicate. */

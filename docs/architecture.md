@@ -341,6 +341,14 @@ come from its own file index, joined with the shared library. The play history
 is the one list where two workspaces return the same row (an event for content
 both hold); the merge keeps it once.
 
+Both the file search and the play history are paged with a keyset cursor:
+the next page's cursor is the last row's sort key and workspace, and every
+workspace seeks straight past it instead of skipping the rows before it, so a
+deep page reads about as much as the first one. For the play history the key is `(playedAt, historyId,
+workspaceId)`; a page seeks from the event before the key in each workspace,
+so a run of plays collapsed into the previous page's last row stays
+collapsed.
+
 ### Folders
 
 A workspace's subfolders are never stored. The "show by folder" option
