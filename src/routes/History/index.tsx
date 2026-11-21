@@ -4,6 +4,8 @@
 import { useCallback, useId, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import {
+  type InfiniteData,
+  type QueryKey,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -26,7 +28,7 @@ import { fileHref } from "@/lib/fileHref";
 import { invalidateFileCaches } from "@/lib/queryCache";
 import { formatDuration } from "@/lib/format";
 import { fileNameOf } from "@/lib/relPath";
-import type { HistoryEntryRow } from "@/ipc/types";
+import type { HistoryEntryRow, HistoryPage, HistoryQuery } from "@/ipc/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -110,7 +112,13 @@ export default function History() {
   // The list always contains the virtual "All" entry, so > 2 means multiple real roots.
   const showWsLabel = wsLabels.size > 2;
 
-  const history = useInfiniteQuery({
+  const history = useInfiniteQuery<
+    HistoryPage,
+    Error,
+    InfiniteData<HistoryPage>,
+    QueryKey,
+    HistoryQuery["cursor"]
+  >({
     queryKey: ["history_list", wsId],
     queryFn: ({ pageParam }) =>
       api.historyList({ cursor: pageParam, limit: PAGE_SIZE }),

@@ -12,7 +12,13 @@ import {
   listPlayHistory,
 } from "../queries.js";
 import { listHistoryWorkspaces, type CoreTarget } from "../crossWorkspace.js";
-import { insertFile, newDb } from "./helpers.js";
+import type { HistoryQuery } from "../types.js";
+import {
+  insertFile,
+  LEGACY_METADATA_DDL,
+  newDb,
+  newSharedDbs,
+} from "./helpers.js";
 import { upsertScanRoot } from "../queries.js";
 
 /** Insert a play event with an explicit timestamp (recordPlay always uses "now"). */
@@ -183,7 +189,8 @@ describe("listHistoryWorkspaces", () => {
       ["wsB", 4],
       ["wsA", 3],
     ]);
-    expect(p1.nextCursor).toBe(4);
+    // The last row's key, which the next page seeks past.
+    expect(p1.nextCursor).toEqual({ at: 3, id: 2, ws: "wsA" });
     const p2 = listHistoryWorkspaces([wsA.target, wsB.target], {
       limit: 4,
       cursor: p1.nextCursor!,
@@ -287,6 +294,138 @@ describe("listPlayHistory over the shared library", () => {
     } finally {
       a.close();
       b.close();
+    }
+  });
+});
+
+describe("listHistoryWorkspaces keyset paging", () => {
+  /** Every page of `limit`, following nextCursor from the first one. */
+  function pageThrough(
+    targets: CoreTarget[],
+    query: HistoryQuery,
+    limit: number,
+  ): string[] {
+    const rows: string[] = [];
+    let cursor: HistoryQuery["cursor"] = 0;
+    while (cursor !== undefined) {
+      const page = listHistoryWorkspaces(targets, { ...query, limit, cursor });
+      rows.push(
+        ...page.items.map(
+          (r) => `${r.workspaceId}:${r.historyId}@${r.playedAt}`,
+        ),
+      );
+      cursor = page.nextCursor ?? undefined;
+    }
+    return rows;
+  }
+
+  it("pages through ties, runs, shared plays and a workspace on its own tables as one listing does", () => {
+    const { dbs, cleanup } = newSharedDbs(3);
+    try {
+      const [a, b, c] = dbs;
+      // "a" still holds its own metadata: its event ids are its own and can
+      // equal the library's, and it sorts after the others on a tie.
+      a.db.exec(LEGACY_METADATA_DDL);
+      const file = (ws: (typeof dbs)[number], hash: string) =>
+        insertFile(ws.db, ws.rootId, {
+          relPath: `${hash}.mp4`,
+          root: ws.root,
+          contentHash: hash,
+        });
+      file(a, "p");
+      file(a, "q");
+      file(b, "s");
+      file(c, "s");
+      file(b, "x");
+      file(c, "y");
+      let seed = 11;
+      const rnd = (n: number) => {
+        seed = (seed * 16807) % 2147483647;
+        return seed % n;
+      };
+      // A few seconds only, so most events share played_at with others, and
+      // few keys, so runs form and cross page boundaries.
+      const play = (db: DB, keys: string[], count: number) => {
+        const ins = db.prepare(
+          "INSERT INTO play_history (meta_key, played_at, via) VALUES (?, ?, ?)",
+        );
+        for (let i = 0; i < count; i++) {
+          ins.run(
+            keys[rnd(keys.length)],
+            rnd(8),
+            rnd(3) === 0 ? "external" : "browser",
+          );
+        }
+      };
+      play(b.db, ["s", "x", "y"], 80);
+      play(a.db, ["p", "q"], 40);
+      // The same (played_at, id) in the library and in "a"'s own table: two
+      // different plays, both listed, the library's first.
+      for (const [db, key, at] of [
+        [b.db, "x", 7],
+        [a.db, "p", 7],
+        [b.db, "y", 3],
+        [a.db, "q", 3],
+      ] as const) {
+        db.prepare(
+          "INSERT INTO play_history (id, meta_key, played_at, via) VALUES (?, ?, ?, 'external')",
+        ).run(at === 7 ? 1000 : 1001, key, at);
+      }
+      const targets = [
+        coreTarget("a", a.db),
+        coreTarget("b", b.db),
+        coreTarget("c", c.db),
+      ];
+
+      for (const query of [{}, { via: "external" as const }]) {
+        const all = listHistoryWorkspaces(targets, { ...query, limit: 500 });
+        expect(all.nextCursor).toBeNull();
+        expect(all.items.length).toBeGreaterThan(20);
+        const expected = all.items.map(
+          (r) => `${r.workspaceId}:${r.historyId}@${r.playedAt}`,
+        );
+        for (const limit of [1, 2, 3, 5]) {
+          expect(pageThrough(targets, query, limit)).toEqual(expected);
+        }
+        for (const target of targets) {
+          const one = listHistoryWorkspaces([target], { ...query, limit: 500 });
+          const oneExpected = one.items.map(
+            (r) => `${r.workspaceId}:${r.historyId}@${r.playedAt}`,
+          );
+          for (const limit of [1, 2, 3]) {
+            expect(pageThrough([target], query, limit)).toEqual(oneExpected);
+          }
+        }
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("does not show the rest of a run that a page ended on as a new row", () => {
+    const { db, rootId } = newDb();
+    try {
+      const a = insertFile(db, rootId, { relPath: "a.mp4" });
+      const b = insertFile(db, rootId, { relPath: "b.mp4" });
+      // Newest first: A A A (one run, two of them on one second), then B.
+      insertPlay(db, b, 10);
+      insertPlay(db, a, 20);
+      insertPlay(db, a, 30);
+      insertPlay(db, a, 30);
+      const target = coreTarget("w", db);
+
+      const p1 = listHistoryWorkspaces([target], { limit: 1 });
+      expect(p1.items.map((r) => r.relPath)).toEqual(["a.mp4"]);
+      const p2 = listHistoryWorkspaces([target], {
+        limit: 1,
+        cursor: p1.nextCursor!,
+      });
+      expect(p2.items.map((r) => [r.relPath, r.playedAt])).toEqual([
+        ["b.mp4", 10],
+      ]);
+      expect(p2.nextCursor).toBeNull();
+    } finally {
+      db.close();
     }
   });
 });

@@ -256,9 +256,25 @@ export interface StoredSmartCollections {
   defaultId: string | null;
 }
 
+/**
+ * Keyset cursor of the play-history timeline: the last row of the page it
+ * follows, in the timeline's order (played_at DESC, id DESC, then workspace).
+ * Each workspace seeks straight past it instead of re-reading from the start.
+ */
+export const HistoryCursorSchema = z.object({
+  /** playedAt of the last row. */
+  at: z.number(),
+  /** historyId of the last row. */
+  id: z.number().int(),
+  /** workspaceId of the last row (breaks ties between workspaces). */
+  ws: z.string(),
+});
+export type HistoryCursor = z.infer<typeof HistoryCursorSchema>;
+
 export const HistoryQuerySchema = z.object({
   via: z.enum(["browser", "external"]).optional(),
-  cursor: z.number().int().min(0).optional(),
+  // Number = offset over collapsed rows (the first page is 0); object = keyset.
+  cursor: z.union([z.number().int().min(0), HistoryCursorSchema]).optional(),
   limit: z.number().int().min(1).max(500).optional(),
 });
 export type HistoryQuery = z.infer<typeof HistoryQuerySchema>;
@@ -278,7 +294,7 @@ export type HistoryEntryRow = z.infer<typeof HistoryEntrySchema>;
 
 export const HistoryPageSchema = z.object({
   items: z.array(HistoryEntrySchema),
-  nextCursor: z.number().nullable(),
+  nextCursor: HistoryCursorSchema.nullable(),
 });
 export type HistoryPage = z.infer<typeof HistoryPageSchema>;
 
