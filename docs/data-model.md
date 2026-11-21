@@ -743,9 +743,11 @@ Workspace databases are never `ANALYZE`d. Without statistics, SQLite reads
 `deleted_at IS NULL` off `idx_files_alive` and sorts every live row for each
 page. For an unfiltered list, `searchFiles` therefore names the sort index with
 `INDEXED BY` (`pinnedSortIndex()`): `idx_files_alive_name_key` for the name
-sort, and `idx_files_alive_captured`, `idx_files_alive_btime` and
-`idx_files_alive_added` for those orders newest first. Their oldest-first
-orders are left to the planner, as the indexes are newest first. So is any
+sort, `idx_files_alive_captured`, `idx_files_alive_btime` and
+`idx_files_alive_added` for those orders newest first, and
+`idx_files_alive_hash` for the hash order ascending. The opposite direction
+of the date and hash orders is left to the planner, as each of those indexes
+yields only one. So is any
 filtered list: without statistics nothing tells how few rows a filter leaves,
 and for a rare one, walking the sort order to fill a page reads every live row.
 The plan tests in `electron/core/__tests__/indexes.test.ts` that check these

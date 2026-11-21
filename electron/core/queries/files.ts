@@ -523,12 +523,16 @@ function appendSeekCondition(
  * Only where the index yields the ORDER BY as it is. captured, btime and
  * created_at are indexed newest first, so their ascending orders would still
  * be sorted (for created_at, within each second, and a scan adds many files in
- * the same second).
+ * the same second). content_hash is indexed in its default ascending order,
+ * so its descending order would be.
  *
  * Keep in step with orderByFor().
  */
 function pinnedSortIndex(sort?: string, dir?: string): string | null {
   if (sort === "name") return "idx_files_alive_name_key";
+  if (sort === "hash") {
+    return resolveSortDir(sort, dir) === "asc" ? "idx_files_alive_hash" : null;
+  }
   if (resolveSortDir(sort, dir) !== "desc") return null;
   switch (sort) {
     case "addedAt":
@@ -566,8 +570,9 @@ export function searchFiles(
   // Only an unfiltered list is pinned: without statistics nothing tells how
   // few rows a filter leaves, and for a rare one, walking the sort order to
   // fill a page reads every live row in index order (#363). Nor is a page in
-  // the NULL tail of captured or btime (a seek key without a value): the index
-  // cannot reach that tail by the key, so it would walk every dated row first.
+  // the NULL tail of captured, btime or hash (a seek key without a value): the
+  // index cannot reach that tail by the key, so it would walk every row with a
+  // value first.
   const sortIndex =
     filters === "" && seek?.v !== null
       ? pinnedSortIndex(query.sort, query.sortDir)

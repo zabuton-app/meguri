@@ -136,6 +136,9 @@ CREATE INDEX IF NOT EXISTS idx_files_alive_rel_path ON files(rel_path, id) WHERE
 -- matches the "captured_at IS NULL ASC" NULLs-last term exactly. The ASC
 -- direction still filesorts (a reversed scan would put NULLs first).
 CREATE INDEX IF NOT EXISTS idx_files_alive_captured ON files((captured_at IS NULL), captured_at DESC, id) WHERE deleted_at IS NULL;
+-- Drives sort=hash in its default ASC direction, NULLs (files not hashed yet)
+-- last as in the ORDER BY. The DESC direction still filesorts.
+CREATE INDEX IF NOT EXISTS idx_files_alive_hash ON files((content_hash IS NULL), content_hash, id) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
