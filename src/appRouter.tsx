@@ -8,8 +8,6 @@ import History from "@/routes/History";
 import Duplicates from "@/routes/Duplicates";
 import Missing from "@/routes/Missing";
 import Tags from "@/routes/Tags";
-import AutoTag from "@/routes/AutoTag";
-import Settings from "@/routes/Settings";
 import { registerRouterNavigate } from "@/lib/routerBridge";
 
 // In a webview, a hash router is more stable than a file-path-style history.
@@ -30,8 +28,20 @@ export function createAppRouter(extraRoutes: readonly RouteObject[] = []) {
         { path: "duplicates", element: <Duplicates /> },
         { path: "missing", element: <Missing /> },
         { path: "tags", element: <Tags /> },
-        { path: "auto-tag", element: <AutoTag /> },
-        { path: "settings", element: <Settings /> },
+        // Rarely opened, so loaded on first visit rather than at startup (#369).
+        // The router waits for the module before it navigates, so no Suspense.
+        {
+          path: "auto-tag",
+          lazy: async () => ({
+            Component: (await import("@/routes/AutoTag")).default,
+          }),
+        },
+        {
+          path: "settings",
+          lazy: async () => ({
+            Component: (await import("@/routes/Settings")).default,
+          }),
+        },
         ...extraRoutes,
       ],
     },
