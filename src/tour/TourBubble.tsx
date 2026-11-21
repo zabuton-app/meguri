@@ -101,31 +101,16 @@ export function TourBubble({ placement }: { placement: "pet" | "floating" }) {
         </span>
         <div className="ml-auto flex items-center gap-1.5">
           {!isLast && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2"
-              onClick={tour.skip}
-            >
+            <Button variant="ghost" size="compact" onClick={tour.skip}>
               {t("tour.skip")}
             </Button>
           )}
           {!isFirst && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2"
-              onClick={tour.prev}
-            >
+            <Button variant="outline" size="compact" onClick={tour.prev}>
               {t("tour.prev")}
             </Button>
           )}
-          <Button
-            ref={nextRef}
-            size="sm"
-            className="h-7 px-2"
-            onClick={tour.next}
-          >
+          <Button ref={nextRef} size="compact" onClick={tour.next}>
             {isLast ? t("tour.done") : t("tour.next")}
           </Button>
         </div>

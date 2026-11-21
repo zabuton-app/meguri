@@ -97,7 +97,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
       // z-40 puts this above the two FABs (z-30 in Home), which otherwise cover
       // it where they overlap, and below the modals and popovers (z-50) that are
       // meant to cover it — the tag dialog included.
-      className="pointer-events-auto absolute bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-border-strong bg-surface p-2 shadow-lg shadow-black/40"
+      className="pointer-events-auto absolute bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-window border border-border-strong bg-surface p-2 shadow-lg shadow-black/40"
     >
       <span className="flex items-center gap-1.5 whitespace-nowrap pl-0.5 pr-1 text-[13px] font-bold text-fg">
         <span
@@ -112,7 +112,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
         </span>
         {t("select.count")}
         {selection.folderCount > 0 && (
-          <span className="text-[11px] font-normal text-muted">
+          <span className="text-2xs font-normal text-muted">
             {selection.pending
               ? t("select.folderLoading")
               : t("select.folderCount", { count: selection.folderCount })}

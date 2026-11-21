@@ -41,7 +41,7 @@ export function HistoryModal({
       ? `${outerBase} items-center p-4`
       : `${outerBase} p-2 sm:p-4 md:p-6`;
   const innerBase =
-    "relative flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl";
+    "relative flex min-h-0 w-full flex-col overflow-hidden rounded-window border border-border bg-bg shadow-2xl";
   const innerClass =
     size === "small"
       ? `${innerBase} h-[85vh] max-h-[880px] max-w-3xl`

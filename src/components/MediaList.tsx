@@ -412,7 +412,7 @@ const MediaRow = memo(function MediaRow({
         >
           <MediaThumbnail file={file} mediaBase={mediaBase} />
           {duration && (
-            <span className="absolute bottom-1 right-1 rounded bg-bg/80 px-1 text-[11px] leading-4 tabular-nums text-bright-fg">
+            <span className="absolute bottom-1 right-1 rounded bg-bg/80 px-1 text-2xs leading-4 tabular-nums text-bright-fg">
               {duration}
             </span>
           )}

@@ -11,4 +11,14 @@ describe("cn", () => {
   it("keeps a background color beside a gradient", () => {
     expect(cn("bg-bg", "bg-linear-to-t")).toBe("bg-bg bg-linear-to-t");
   });
+
+  it("lets a radius or font size passed in override a token of the same kind", () => {
+    expect(cn("rounded-control", "rounded-full")).toBe("rounded-full");
+    expect(cn("rounded-item", "rounded-none")).toBe("rounded-none");
+    expect(cn("text-xs", "text-2xs")).toBe("text-2xs");
+  });
+
+  it("keeps a text color beside text-2xs", () => {
+    expect(cn("text-2xs", "text-muted")).toBe("text-2xs text-muted");
+  });
 });

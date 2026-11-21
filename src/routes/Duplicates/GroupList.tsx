@@ -152,7 +152,7 @@ export function GroupList({
                       playOverlaySize="size-6"
                       playIconSize="size-3"
                     />
-                    <span className="absolute right-1 bottom-1 rounded bg-bg/85 px-1 text-[11px] font-semibold text-bright-fg tabular-nums">
+                    <span className="absolute right-1 bottom-1 rounded bg-bg/85 px-1 text-2xs font-semibold text-bright-fg tabular-nums">
                       ×{g.files.length}
                     </span>
                   </span>

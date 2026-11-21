@@ -77,7 +77,7 @@ export function SceneRail({
           </button>
         ))}
         {hidden > 0 && (
-          <span className="shrink-0 pb-1 text-[11px] tabular-nums text-muted">
+          <span className="shrink-0 pb-1 text-2xs tabular-nums text-muted">
             {t("discover.moreScenes", { count: hidden })}
           </span>
         )}

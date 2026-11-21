@@ -131,7 +131,7 @@ export function MediaModal({
         : `${outerBase} p-2 sm:p-4 md:p-6`;
     innerClass = fullscreen
       ? `${innerBase} relative w-full overflow-hidden`
-      : `${innerBase} relative w-full overflow-hidden rounded-xl border border-border shadow-2xl${
+      : `${innerBase} relative w-full overflow-hidden rounded-window border border-border shadow-2xl${
           size === "small" ? " max-w-4xl" : ""
         }`;
   }
@@ -245,8 +245,7 @@ export function TopBar({
         <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onPrev}
             disabled={!canPrev}
             aria-label={t("media.prev")}
@@ -258,8 +257,7 @@ export function TopBar({
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onNext}
             disabled={!canNext}
             aria-label={t("media.next")}
@@ -286,8 +284,7 @@ export function TopBar({
         {onOpenPlaylist && (
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onOpenPlaylist}
             disabled={!canOpenPlaylist}
             aria-label={t("media.playAsPlaylist")}
@@ -302,8 +299,7 @@ export function TopBar({
           onSetPresentation && (
             <Button
               variant="ghost"
-              size="sm"
-              className="h-7 px-2"
+              size="compact"
               onClick={() => onSetPresentation("modal")}
               aria-label={t("media.openAsModal")}
               title={t("media.openAsModal")}
@@ -316,8 +312,7 @@ export function TopBar({
             {onToggleSize && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2"
+                size="compact"
                 onClick={onToggleSize}
                 aria-label={toggleLabel}
                 aria-pressed={isSmall}
@@ -329,8 +324,7 @@ export function TopBar({
             {onSetPresentation && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2"
+                size="compact"
                 onClick={() => onSetPresentation("peek")}
                 aria-label={t("media.openAsPeek")}
                 title={t("media.openAsPeek")}
@@ -342,8 +336,7 @@ export function TopBar({
         )}
         <Button
           variant="ghost"
-          size="sm"
-          className="h-7 px-2"
+          size="compact"
           onClick={onClose}
           title={`${t("common.close")} (Esc)`}
         >

@@ -144,8 +144,7 @@ export default function Duplicates() {
         <div className="ml-auto flex items-center gap-2">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={toggleModalSize}
             aria-label={toggleLabel}
             aria-pressed={isSmall}
@@ -155,8 +154,7 @@ export default function Duplicates() {
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onClose}
             aria-label={t("common.close")}
             title={`${t("common.close")} (Esc)`}

@@ -374,7 +374,7 @@ export function SuggestTab({
           <div
             className={cn(
               ROW,
-              "sticky top-0 z-[1] border-b border-border bg-bg px-3 py-1.5 text-[11px] text-muted",
+              "sticky top-0 z-[1] border-b border-border bg-bg px-3 py-1.5 text-2xs text-muted",
             )}
           >
             <input
@@ -428,7 +428,7 @@ export function SuggestTab({
                       <Chip className="text-[13px]">{c.name}</Chip>
                       <span
                         className={cn(
-                          "text-[11px]",
+                          "text-2xs",
                           existing.has(c.key) ? "text-primary" : "text-muted",
                         )}
                       >
@@ -440,14 +440,14 @@ export function SuggestTab({
                       </span>
                     </span>
                     {c.variants.length > 1 && (
-                      <span className="pl-5 text-[11px] text-muted">
+                      <span className="pl-5 text-2xs text-muted">
                         {t("autoTag.variants", {
                           list: c.variants.join(" · "),
                         })}
                       </span>
                     )}
                     {isAutoMetaValue(c.key) && (
-                      <span className="pl-5 text-[11px] text-warn">
+                      <span className="pl-5 text-2xs text-warn">
                         {t("autoTag.autoMetaWarning")}
                       </span>
                     )}

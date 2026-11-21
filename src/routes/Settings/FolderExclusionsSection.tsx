@@ -42,7 +42,7 @@ export function FolderExclusionsSection() {
           className="flex items-center gap-2 text-sm font-semibold text-bright-fg"
         >
           {t("settings.folderExclusions")}
-          <span className="inline-flex h-5 items-center rounded-full border border-border-strong px-2 text-[11px] font-medium text-muted">
+          <span className="inline-flex h-5 items-center rounded-full border border-border-strong px-2 text-2xs font-medium text-muted">
             {t("settings.folderExclusionsPerWorkspace")}
           </span>
         </h3>
@@ -83,7 +83,7 @@ export function FolderExclusionsSection() {
                   </span>
                   <span
                     title={w.path}
-                    className="truncate font-mono text-[11px] text-muted"
+                    className="truncate font-mono text-2xs text-muted"
                   >
                     {w.path}
                   </span>
@@ -105,7 +105,7 @@ export function FolderExclusionsSection() {
                           : t("settings.folderExclusionsNone")}
                       </span>
                       {missing > 0 && (
-                        <span className="inline-flex h-5 items-center rounded-full bg-warn/15 px-2 text-[11px] font-medium text-warn">
+                        <span className="inline-flex h-5 items-center rounded-full bg-warn/15 px-2 text-2xs font-medium text-warn">
                           {t("settings.folderExclusionsNotFound", {
                             count: missing,
                           })}

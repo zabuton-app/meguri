@@ -390,7 +390,7 @@ function copyImage(src: string, t: TFunc) {
 
 function Shortcut({ children }: { children: ReactNode }) {
   return (
-    <span className="ml-auto pl-4 font-mono text-[11px] text-muted">
+    <span className="ml-auto pl-4 font-mono text-2xs text-muted">
       {children}
     </span>
   );

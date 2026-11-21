@@ -147,7 +147,7 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
                 >
                   {entry.terms.join(", ") || t("autoTag.keyword.noTermsShort")}
                 </span>
-                <span className="truncate text-[11px] text-muted">
+                <span className="truncate text-2xs text-muted">
                   {entry.tags.join(", ") || t("autoTag.keyword.noTagsShort")}
                 </span>
               </span>

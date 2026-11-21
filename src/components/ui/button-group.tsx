@@ -10,7 +10,7 @@ function ButtonGroup({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="button-group"
       className={cn(
         "flex w-fit items-stretch",
-        "[&>*]:rounded-none [&>*:first-child]:rounded-l-md [&>*:last-child]:rounded-r-md",
+        "[&>*]:rounded-none [&>*:first-child]:rounded-l-control [&>*:last-child]:rounded-r-control",
         "[&>*:not(:first-child)]:-ml-px",
         "[&>*]:focus-visible:relative [&>*]:focus-visible:z-10",
         className,

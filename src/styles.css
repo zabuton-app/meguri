@@ -140,10 +140,22 @@
   --color-destructive-foreground: var(--c-bg);
   --color-ring: var(--c-primary);
   --color-input: var(--c-border-strong);
+}
 
-  --radius-lg: 0.5rem;
-  --radius-md: 0.375rem;
-  --radius-sm: 0.25rem;
+/* The app's scales (#584; docs/renderer.md#design-tokens). A part takes its
+   corner radius by what it is, not by size, and a part inside another gets
+   a smaller one than its container. A radius added here goes in cn()'s list
+   too (src/lib/utils.ts). */
+@theme {
+  --radius-panel: 1rem; /* the content panel set in the frame */
+  --radius-window: 0.75rem; /* modals and dialogs */
+  --radius-card: 0.5rem; /* cards and panels inside a window or the list */
+  --radius-control: 0.375rem; /* buttons, fields, menus, popovers, badges */
+  --radius-item: 0.25rem; /* menu items, small chips inside a control */
+
+  /* Badges, counts and secondary lines. No line height of its own, as the
+     text-[11px] it replaces had none. */
+  --text-2xs: 0.6875rem;
 }
 
 html,

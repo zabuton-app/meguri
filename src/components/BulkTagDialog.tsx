@@ -341,7 +341,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
                 </div>
               </ScrollArea>
             )}
-            <p className="text-[11px] leading-relaxed text-muted">
+            <p className="text-2xs leading-relaxed text-muted">
               {t("select.bulkTagHint")}
             </p>
           </div>
@@ -350,7 +350,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
         <DialogFooter className="items-center border-t border-border p-4">
           <span
             className={cn(
-              "mr-auto text-[11px]",
+              "mr-auto text-2xs",
               tooManyFiles ? "text-error" : "text-muted",
             )}
           >

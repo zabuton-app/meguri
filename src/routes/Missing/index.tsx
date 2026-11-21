@@ -162,8 +162,7 @@ export default function Missing() {
           {items.length > 0 && (
             <Button
               variant="outline"
-              size="sm"
-              className="h-7 px-2"
+              size="compact"
               onClick={() => void onRemove()}
               disabled={selectedRows.length === 0 || purge.isPending}
             >
@@ -173,8 +172,7 @@ export default function Missing() {
           )}
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={toggleModalSize}
             aria-label={toggleLabel}
             aria-pressed={isSmall}
@@ -184,8 +182,7 @@ export default function Missing() {
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onClose}
             title={`${t("common.close")} (Esc)`}
           >

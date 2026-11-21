@@ -111,21 +111,11 @@ export const GroupDetail = memo(function GroupDetail({
           </p>
           {/* The hash is what a `hash:` search finds the copies by (#302). */}
           <div className="mt-1 flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2"
-              onClick={copyHash}
-            >
+            <Button variant="outline" size="compact" onClick={copyHash}>
               <Copy />
               {t("duplicates.copyHash")}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2"
-              onClick={showInList}
-            >
+            <Button variant="outline" size="compact" onClick={showInList}>
               <Search />
               {t("duplicates.showInList")}
             </Button>
@@ -133,13 +123,13 @@ export const GroupDetail = memo(function GroupDetail({
         </div>
         <dl className="flex gap-4 text-right">
           <div>
-            <dt className="text-[11px] text-muted">{t("duplicates.copies")}</dt>
+            <dt className="text-2xs text-muted">{t("duplicates.copies")}</dt>
             <dd className="text-lg font-semibold text-fg tabular-nums">
               {group.files.length}
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] text-muted">
+            <dt className="text-2xs text-muted">
               {t("duplicates.reclaimable")}
             </dt>
             <dd className="text-lg font-semibold text-warn tabular-nums">
@@ -190,7 +180,7 @@ export const GroupDetail = memo(function GroupDetail({
                 />
                 {oldest === file && (
                   <span
-                    className="absolute top-1 left-1 rounded bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground"
+                    className="absolute top-1 left-1 rounded bg-primary px-1.5 text-2xs font-semibold text-primary-foreground"
                     title={t("duplicates.oldestHint")}
                   >
                     {t("duplicates.oldest")}
