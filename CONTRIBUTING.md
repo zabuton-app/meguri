@@ -39,6 +39,44 @@ or opening an issue is always welcome. Issues labelled
 are a good place to start if you'd like to help but don't have a change in
 mind yet. See [Labels](#labels) for what each label means.
 
+## Network access
+
+Meguri works offline, and that is one of its defining traits (see
+[Privacy](README.md#privacy)). A feature that needs the network is not ruled
+out, but it has to meet all of the following. Please check an idea against
+them before you propose or build it.
+
+- **No user data leaves the machine.** File names, paths, tags, search
+  queries, playback history and anything derived from them are never sent.
+- **Off until the user turns it on.** The feature makes no request until the
+  user enables it, and the setting says what is sent and where.
+- **The renderer stays off the network.** Requests are made by the main
+  process. The renderer's Content Security Policy in
+  [index.html](index.html) limits `connect-src` to the app itself and the
+  local media server on `127.0.0.1`; do not widen it.
+- **A response is untrusted input.** In an Electron app, a single XSS in the
+  renderer can reach the IPC that reads and edits local files. Validate what
+  comes back before it reaches the renderer or the database, and describe
+  this threat model in the issue. It has to be maintained for as long as the
+  feature exists, not just designed once.
+- **An offline alternative comes first.** When a local approach meets the
+  same need, such as reading a sidecar file next to the media instead of
+  querying an online service, use it.
+
+Opening a link in the user's browser, such as **Report on GitHub** in the crash
+report dialog, is not a request made by Meguri and is outside these rules.
+
+### The update check
+
+The update check is the one named exception to "off until the user turns it
+on". It is on by default so that users learn about new releases, including
+security fixes, without having to look. It sends nothing but the app name and
+version, and it can be turned off in **Settings → App → Updates**. The
+[Privacy](README.md#privacy) section describes exactly what it does.
+
+The exception covers the update check only. A new feature does not become on
+by default by pointing at it.
+
 ## Labels
 
 Issues and pull requests are labelled along a few independent axes. An issue
