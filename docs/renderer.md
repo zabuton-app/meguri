@@ -649,9 +649,17 @@ and blurs the whole window, title bar included, with its content kept below the
 bar. The bar still moves the window under it (a click on one of its controls
 reaches the backdrop instead, which closes the modal), and the window buttons
 sit above it, so the window can still be moved, minimized and closed while a modal is
-open. Another overlay that covers the window (the player) is
-`fixed inset-below-title-bar`. ESLint refuses `fixed inset-0` in the renderer.
-The player's full screen covers the bar as any full-screen element does.
+open. The immersive views (Discover, the player and the file details' modal, not
+its side peek) cover the bar instead. They take their backdrop from
+`useImmersiveBackdrop()` (`src/components/immersiveView.ts`): the class
+`modal-backdrop-full`, a no-drag layer over the whole window with their panel set
+into it, and a hold that moves the bar's window buttons aside while it is up.
+The app's own buttons are hidden with their room kept, and macOS's traffic
+lights are hidden. Esc or the view's own close button leaves it, and a click on
+the backdrop around the panel closes it. Another overlay that covers the window without dimming the bar (the
+workspace rail's drop target) is `fixed inset-below-title-bar`. ESLint refuses
+`fixed inset-0` in the renderer. The player's full screen takes its panel to the
+screen's edges, over the bar, as any full-screen element does.
 
 A drag region ignores what is painted over it, so a click on a toast, a menu or
 a dialog over the bar's band would move the window. `src/styles.css` makes

@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { DiscoverModal } from "@/routes/Discover/DiscoverModal";
+import { isImmersiveViewOpen } from "@/components/immersiveView";
 
 const claim = (e: KeyboardEvent) => e.preventDefault();
 
@@ -18,6 +19,21 @@ describe("DiscoverModal", () => {
     );
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("covers the whole window, title bar included, while it is open", () => {
+    const { unmount } = render(
+      <DiscoverModal onClose={vi.fn()} titleId="t">
+        body
+      </DiscoverModal>,
+    );
+    expect(screen.getByRole("dialog").classList).toContain(
+      "modal-backdrop-full",
+    );
+    // The title bar's window buttons step aside meanwhile.
+    expect(isImmersiveViewOpen()).toBe(true);
+    unmount();
+    expect(isImmersiveViewOpen()).toBe(false);
   });
 
   it("stays open when a layer on top claimed the Escape", () => {

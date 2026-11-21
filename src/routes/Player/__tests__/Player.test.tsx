@@ -13,6 +13,7 @@ import {
   WS_ID,
 } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
+import { isImmersiveViewOpen } from "@/components/immersiveView";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
@@ -233,6 +234,27 @@ describe("Player keyboard control", () => {
     expect(await screen.findByText("2 / 3")).toBeTruthy();
   });
 
+  it("closes on a click on the backdrop, not on the panel", async () => {
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const panel = screen.getByTestId("player-panel");
+    fireEvent.click(panel);
+    expect(window.location.hash).toBe("#/play");
+    fireEvent.click(panel.parentElement!);
+    await waitFor(() => expect(window.location.hash).toBe("#/"));
+  });
+
+  it("covers the whole window, title bar included, while it is open", async () => {
+    const { unmount } = renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const backdrop = screen.getByTestId("player-panel").parentElement!;
+    expect(backdrop.classList).toContain("modal-backdrop-full");
+    // The title bar's window buttons step aside meanwhile.
+    expect(isImmersiveViewOpen()).toBe(true);
+    unmount();
+    expect(isImmersiveViewOpen()).toBe(false);
+  });
+
   it("stays open when a layer on top claimed the Escape", async () => {
     renderPlayer([row(1, "video"), row(3, "video")]);
     await screen.findByText("1 / 2");
@@ -402,6 +424,14 @@ describe("Player fullscreen", () => {
     renderPlayer([row(1, "video")]);
     fireEvent.click(await screen.findByLabelText("Fullscreen (F)"));
     expect(request).toHaveBeenCalled();
+  });
+
+  it("takes the panel full screen, not the backdrop around it", async () => {
+    const request = vi.fn().mockResolvedValue(undefined);
+    Element.prototype.requestFullscreen = request;
+    renderPlayer([row(1, "video")]);
+    fireEvent.click(await screen.findByLabelText("Fullscreen (F)"));
+    expect(request.mock.contexts[0]).toBe(screen.getByTestId("player-panel"));
   });
 
   it("toggles full screen on F", async () => {

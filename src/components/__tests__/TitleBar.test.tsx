@@ -45,6 +45,7 @@ vi.mock("@/ipc/client", () => ({
 const { TitleBar } = await import("@/components/TitleBar");
 const { TitleBarPortal } = await import("@/components/titleBarSlot");
 const { TitleBarSlot } = await import("@/components/titleBarSlotContext");
+const { holdImmersiveView } = await import("@/components/immersiveView");
 
 const restored: WindowState = { maximized: false, fullScreen: false };
 
@@ -111,6 +112,20 @@ describe("TitleBar on Windows and Linux", () => {
     screen.getByRole("img");
   });
 
+  it("hides them, keeping their room, while an immersive view covers the bar", async () => {
+    renderWithProviders(<TitleBar />);
+    const group = (await screen.findByRole("button", { name: "Close" }))
+      .parentElement!;
+    expect(group.classList).not.toContain("invisible");
+    let release = () => {};
+    act(() => {
+      release = holdImmersiveView();
+    });
+    expect(group.classList).toContain("invisible");
+    act(() => release());
+    expect(group.classList).not.toContain("invisible");
+  });
+
   it("offers restore while the window is maximized", async () => {
     mocks.state.mockResolvedValue({ maximized: true, fullScreen: false });
     renderWithProviders(<TitleBar />);
@@ -166,6 +181,20 @@ describe("TitleBar on macOS", () => {
     expect(mocks.setButtonVisibility).toHaveBeenLastCalledWith(false);
     expect(screen.queryByTestId("traffic-lights-room")).toBeNull();
     screen.getByRole("img");
+  });
+
+  it("hides the traffic lights while an immersive view covers the bar", async () => {
+    chooseSide("left");
+    renderWithProviders(<TitleBar />);
+    await act(async () => {});
+    expect(mocks.setButtonVisibility).toHaveBeenLastCalledWith(true);
+    let release = () => {};
+    act(() => {
+      release = holdImmersiveView();
+    });
+    expect(mocks.setButtonVisibility).toHaveBeenLastCalledWith(false);
+    act(() => release());
+    expect(mocks.setButtonVisibility).toHaveBeenLastCalledWith(true);
   });
 
   it("moves the traffic lights to the right end when set there", async () => {
@@ -229,5 +258,20 @@ describe("TitleBar on macOS", () => {
     mocks.setButtonVisibility.mockClear();
     act(() => mocks.listener?.(restored));
     expect(mocks.setButtonVisibility).toHaveBeenCalledWith(false);
+  });
+
+  it("keeps them hidden on leaving full screen while an immersive view is open", async () => {
+    chooseSide("left");
+    renderWithProviders(<TitleBar />);
+    await act(async () => {});
+    let release = () => {};
+    act(() => {
+      release = holdImmersiveView();
+    });
+    act(() => mocks.listener?.({ maximized: false, fullScreen: true }));
+    mocks.setButtonVisibility.mockClear();
+    act(() => mocks.listener?.(restored));
+    expect(mocks.setButtonVisibility).toHaveBeenLastCalledWith(false);
+    act(() => release());
   });
 });

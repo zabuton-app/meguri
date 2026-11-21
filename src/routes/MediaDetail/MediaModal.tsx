@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useModalFocus } from "@/hooks/useModalFocus";
 import type { TFunc } from "@/i18n/I18nProvider";
+import { useImmersiveBackdrop } from "@/components/immersiveView";
 import { holdPeekDocked } from "./peekDocked";
 import { LIST_MIN_WIDTH, PEEK_MIN_WIDTH, usePeekResize } from "./usePeekResize";
 
@@ -99,6 +100,10 @@ export function MediaModal({
     if (!docked) return;
     return holdPeekDocked();
   }, [docked]);
+  // The modal covers the whole window, title bar included, as Discover and
+  // the player do: the bar's window buttons step aside meanwhile. The peek
+  // sits beside the list, below the bar.
+  const backdrop = useImmersiveBackdrop(!isPeek);
 
   // One tree shape for both presentations: only classes and ARIA change, so
   // switching modal ↔ peek re-styles the frame without remounting what is
@@ -124,7 +129,7 @@ export function MediaModal({
       fullscreen ? "" : " border-l border-border"
     }`;
   } else {
-    const outerBase = "modal-backdrop z-50 flex bg-black/70 backdrop-blur-sm";
+    const outerBase = `${backdrop} z-50 flex bg-black/70 backdrop-blur-sm`;
     outerClass =
       size === "small"
         ? `${outerBase} justify-center p-4 sm:p-6 md:p-10`
