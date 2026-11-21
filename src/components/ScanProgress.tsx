@@ -71,7 +71,7 @@ export function ScanProgress({
   const pct = indeterminate ? 0 : Math.round((state.done / state.total) * 100);
 
   return (
-    <div className="fixed bottom-[max(2.5rem,calc(1rem+var(--meguri-player-bar-inset)))] left-4 z-30 w-72 rounded-md border border-border bg-surface px-3 py-2 shadow-lg shadow-black/25">
+    <div className="fixed bottom-[max(2.5rem,calc(1rem+var(--meguri-player-bar-inset)))] left-4 z-30 w-72 rounded-control border border-border bg-surface px-3 py-2 shadow-lg shadow-black/25">
       <div className="flex items-center justify-between text-xs text-muted">
         <span className="truncate">
           {PHASE_KEY[state.phase] ? t(PHASE_KEY[state.phase]) : state.phase}{" "}
@@ -86,15 +86,15 @@ export function ScanProgress({
             }
             title={t("scan.cancel")}
             aria-label={t("scan.cancel")}
-            className="rounded p-0.5 text-muted hover:bg-overlay hover:text-foreground"
+            className="rounded-item p-0.5 text-muted hover:bg-fg/10 hover:text-fg"
           >
             <X size={12} />
           </button>
         </div>
       </div>
-      <div className="mt-1 h-1 w-full overflow-hidden rounded bg-overlay">
+      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-overlay">
         {indeterminate ? (
-          <div className="h-full w-1/3 animate-pulse rounded bg-primary" />
+          <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
         ) : (
           <div
             className="h-full bg-primary transition-all"
