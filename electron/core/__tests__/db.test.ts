@@ -185,6 +185,7 @@ describe("migrateFilesTable", () => {
       "idx_files_alive",
       "idx_files_alive_rel_path",
       "idx_files_alive_captured",
+      "idx_files_alive_hash",
       "idx_files_btime",
       "idx_files_alive_btime",
       "idx_files_alive_name_key",

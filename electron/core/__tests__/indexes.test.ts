@@ -13,6 +13,7 @@ import {
   folderRange,
   orderByFor,
   searchFiles,
+  sortValueOf,
   type SeekPosition,
 } from "../queries.js";
 import { insertFile, newDb } from "./helpers.js";
@@ -154,6 +155,12 @@ describe("index query plans", () => {
     expect(p).not.toContain("TEMP B-TREE");
   });
 
+  it("sort=hash (default asc) uses idx_files_alive_hash", () => {
+    const p = plan(db, searchSql("hash", "asc"));
+    expect(p).toContain("idx_files_alive_hash");
+    expect(p).not.toContain("TEMP B-TREE");
+  });
+
   it("tag-name prefix autocomplete is a range search on idx_tags_manual_name", () => {
     // Mirrors listTagNames' SQL: the namespace = '' predicate restricts completion
     // to user-owned tags, and the partial index over the same predicate keeps the
@@ -226,9 +233,15 @@ describe("searchFiles plans without statistics (#363)", () => {
     return rows.map((r) => r.detail).join("\n");
   }
 
-  // A seek key of the sort's own type: a string for name, a number otherwise.
+  // A seek key of the sort's own type: a string for name and hash, a number
+  // otherwise.
   const seekFor = (sort: string): SeekPosition => ({
-    v: sort === "name" ? "dir/v050.mp4" : 1_700_000_050,
+    v:
+      sort === "name"
+        ? "dir/v050.mp4"
+        : sort === "hash"
+          ? "3fa9c1d2"
+          : 1_700_000_050,
     id: 50,
     tie: "after-id",
   });
@@ -240,6 +253,8 @@ describe("searchFiles plans without statistics (#363)", () => {
     ["captured", undefined, "idx_files_alive_captured"],
     ["btime", "desc", "idx_files_alive_btime"],
     ["addedAt", "desc", "idx_files_alive_added"],
+    ["hash", "asc", "idx_files_alive_hash"],
+    ["hash", undefined, "idx_files_alive_hash"],
   ])(
     "sort=%s %s walks %s, first page and after a seek",
     (sort, sortDir, index) => {
@@ -293,14 +308,51 @@ describe("searchFiles plans without statistics (#363)", () => {
     }
   });
 
+  it("leaves the descending hash order to the planner (its index is ascending)", () => {
+    expect(searchPlan({ sort: "hash", sortDir: "desc" })).not.toContain(
+      "idx_files_alive_hash",
+    );
+  });
+
   it("leaves a page in the NULL tail to the planner", () => {
-    for (const sort of ["captured", "btime"]) {
+    for (const [sort, sortDir] of [
+      ["captured", "desc"],
+      ["btime", "desc"],
+      ["hash", "asc"],
+    ] as const) {
       const p = searchPlan(
-        { sort, sortDir: "desc" },
+        { sort, sortDir },
         { v: null, id: 50, tie: "after-id" },
       );
       expect(p, sort).not.toContain(`idx_files_alive_${sort}`);
     }
+  });
+
+  it("pages through the hash order under the pinned index, NULLs last", () => {
+    // The plan tests above see only NULL hashes; give the walk both kinds and
+    // check its rows against the planner's own order.
+    db.exec(
+      "UPDATE files SET content_hash = printf('%08x', (id * 2654435761) % 4294967296) WHERE id % 3 != 0",
+    );
+    const expected = (
+      db
+        .prepare(
+          `SELECT f.id FROM files f NOT INDEXED WHERE f.deleted_at IS NULL ORDER BY ${orderByFor("hash", "asc")}`,
+        )
+        .all() as { id: number }[]
+    ).map((r) => r.id);
+    const seen: number[] = [];
+    let seek: SeekPosition | undefined;
+    for (;;) {
+      const { items } = searchFiles(db, { sort: "hash", limit: 7 }, seek, {
+        skipTags: true,
+      });
+      if (items.length === 0) break;
+      seen.push(...items.map((f) => f.id));
+      const last = items[items.length - 1];
+      seek = { v: sortValueOf("hash", last), id: last.id, tie: "after-id" };
+    }
+    expect(seen).toEqual(expected);
   });
 
   it("returns an empty page for a seek with nothing after it, under the pinned index", () => {
