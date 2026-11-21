@@ -28,10 +28,12 @@
   /* The content zoom (useContentZoom), published for the room the title bar
      leaves macOS's traffic lights: they do not zoom with the page. */
   --meguri-zoom: 1;
-  /* Height of the title bar (TitleBar.tsx). Window-covering overlays start
+  /* Height of the title bar (TitleBar.tsx). A modal's backdrop leaves the
+     bar's band clear (modal-backdrop) and other window-covering overlays start
      below it (inset-below-title-bar), so the window can still be moved,
-     minimized and closed while one is open. electron/ipc/window.ts places the
-     traffic lights for this height at zoom 1 until the bar moves them. */
+     minimized and closed while one is open; only an immersive view covers it
+     (modal-backdrop-full). electron/ipc/window.ts places the traffic lights
+     for this height at zoom 1 until the bar moves them. */
   --meguri-title-bar-height: 3rem;
 }
 
@@ -40,7 +42,8 @@
    A no-drag area later in the document is cut out of the drag region. A new
    floating layer that can reach the band belongs in this list. A modal's
    backdrop (modal-backdrop) is left out: it covers the band on purpose, and
-   the bar under it still moves the window. */
+   the bar under it still moves the window. An immersive view's
+   (modal-backdrop-full) is not: it takes the band as part of the view. */
 [data-sonner-toaster],
 [data-radix-popper-content-wrapper],
 [role="dialog"]:not(.modal-backdrop),
@@ -80,6 +83,17 @@
   position: fixed;
   inset: 0;
   border-top: var(--meguri-title-bar-height) solid transparent;
+}
+
+/* The backdrop of an immersive view (Discover, the player, the file details'
+   modal), whose content takes the title bar's band too. Taken through
+   useImmersiveBackdrop (immersiveView.ts), which also moves the bar's window
+   buttons aside while it is up. No-drag, so a click on the band reaches the
+   view instead of moving the window. */
+@utility modal-backdrop-full {
+  position: fixed;
+  inset: 0;
+  -webkit-app-region: no-drag;
 }
 
 /* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */

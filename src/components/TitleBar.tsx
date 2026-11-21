@@ -9,7 +9,10 @@
 // own buttons. macOS keeps its traffic lights, which the bar leaves room for
 // and moves there (window_set_button_position): they do not zoom with the
 // page, so the room is sized in screen px and they are placed again on every
-// resize. "None" hides them (window_set_button_visibility).
+// resize. "None" hides them (window_set_button_visibility). An immersive
+// view (Discover, the player, the file details' modal) covers the bar, so
+// they step aside while one is open (immersiveView.ts): hidden, their room
+// kept, so the bar does not reflow.
 //
 // The logo heads the rail's column: here, above the rail, unless the buttons
 // take the bar's left end; then it is the rail's first item (WorkspaceRail).
@@ -21,6 +24,7 @@ import type { WindowState } from "@shared/ipc/channels";
 import { TRAFFIC_LIGHTS } from "@shared/titleBar";
 import { useI18n } from "@/i18n/I18nProvider";
 import { AppLogo } from "@/components/AppLogo";
+import { useImmersiveViewOpen } from "@/components/immersiveView";
 import { platform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
@@ -68,6 +72,7 @@ export function TitleBar({
   const { windowButtons: side } = usePreferences();
   const { maximized, fullScreen } = useWindowState();
   const mac = platform() === "darwin";
+  const immersive = useImmersiveViewOpen();
 
   // macOS gives the page the double click (Windows and Linux keep it: the bar
   // is the window's caption there). Not on a control: that is a click on it.
@@ -85,11 +90,15 @@ export function TitleBar({
     return () => bar.removeEventListener("dblclick", onDoubleClick);
   }, [mac]);
 
-  // macOS draws the traffic lights itself: they come and go with the choice,
-  // set again on leaving full screen, which shows them.
+  // macOS draws the traffic lights itself: they come and go with the choice
+  // and with an immersive view, set again on leaving full screen, which shows
+  // them.
   useEffect(() => {
-    if (mac) api.windowSetButtonVisibility(side !== "none").catch(() => {});
-  }, [mac, side, fullScreen]);
+    if (mac)
+      api
+        .windowSetButtonVisibility(side !== "none" && !immersive)
+        .catch(() => {});
+  }, [mac, side, immersive, fullScreen]);
 
   // Full screen hides the traffic lights, so their room goes too.
   const buttons =
@@ -98,7 +107,7 @@ export function TitleBar({
         <TrafficLightsRoom side={side} />
       )
     ) : (
-      <WindowButtons side={side} maximized={maximized} />
+      <WindowButtons side={side} maximized={maximized} hidden={immersive} />
     );
 
   return (
@@ -188,9 +197,12 @@ function TrafficLightsRoom({ side }: { side: Exclude<Side, "none"> }) {
 function WindowButtons({
   side,
   maximized,
+  hidden,
 }: {
   side: Exclude<Side, "none">;
   maximized: boolean;
+  /** Under an immersive view: out of sight, their room kept. */
+  hidden: boolean;
 }) {
   const { t } = useI18n();
   const minimize = (
@@ -231,7 +243,12 @@ function WindowButtons({
     // header in the slot stays blocked, as the page is. relative z-[70]:
     // above a modal's backdrop (modal-backdrop in styles.css), which covers
     // the rest of the bar, so the window can still be minimized and closed.
-    <div className="pointer-events-auto relative z-[70] flex shrink-0">
+    <div
+      className={cn(
+        "pointer-events-auto relative z-[70] flex shrink-0",
+        hidden && "invisible",
+      )}
+    >
       {side === "left"
         ? [close, minimize, maximize]
         : [minimize, maximize, close]}

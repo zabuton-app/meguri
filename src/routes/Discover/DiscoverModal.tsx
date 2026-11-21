@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useModalFocus } from "@/hooks/useModalFocus";
+import { useImmersiveBackdrop } from "@/components/immersiveView";
 import type { ModalSize } from "@/routes/MediaDetail/MediaModal";
 
 // Near-fullscreen modal frame. Close on backdrop click / Esc. `size` toggles
@@ -19,6 +20,8 @@ export function DiscoverModal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   useModalFocus(panelRef);
+  // Over the whole window, title bar included: its buttons step aside.
+  const backdrop = useImmersiveBackdrop();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -41,7 +44,7 @@ export function DiscoverModal({
 
   return (
     <div
-      className="modal-backdrop z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm"
+      className={`${backdrop} z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm`}
       onClick={onClose}
       role="dialog"
       aria-modal="true"

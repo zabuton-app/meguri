@@ -3,8 +3,9 @@ import { cn } from "@/lib/utils";
 
 // Full-bleed stage for one playlist item. The layering follows the discovery
 // view — a blurred cover fills the frame and the sharp media sits on top at its
-// own aspect ratio — but nothing here is transparent to what is behind the
-// player, and there is no panel frame, padding or rounding (spec FR-021).
+// own aspect ratio — but nothing here is transparent to what is behind it
+// (spec FR-021): the stage fills the player's panel, and only the backdrop
+// around the panel lets the app show through, as Discover's does (index.tsx).
 //
 // The ground follows the appearance: black in dark mode, white in light. An
 // image with transparency is composited straight onto it, so a fixed black would
