@@ -453,6 +453,55 @@ describe("Player fullscreen", () => {
   });
 });
 
+describe("Player size", () => {
+  it("toggles between the large and the compact panel, and remembers it", async () => {
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const panel = screen.getByTestId("player-panel");
+    expect(panel.classList).toContain("flex-1");
+    fireEvent.click(screen.getByLabelText("Shrink modal"));
+    expect(panel.classList).toContain("max-w-4xl");
+    expect(panel.classList).not.toContain("flex-1");
+    // The size Discover and the file details share.
+    expect(localStorage.getItem("meguri.media.modalSize")).toBe("small");
+    fireEvent.click(screen.getByLabelText("Enlarge modal"));
+    expect(panel.classList).toContain("flex-1");
+    expect(localStorage.getItem("meguri.media.modalSize")).toBe("large");
+  });
+
+  it("opens at the size Discover and the file details last used", async () => {
+    localStorage.setItem("meguri.media.modalSize", "small");
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    expect(screen.getByTestId("player-panel").classList).toContain("max-w-4xl");
+    expect(screen.getByLabelText("Enlarge modal")).toBeTruthy();
+  });
+
+  it("hides the size toggle in full screen, which takes the screen anyway", async () => {
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const panel = screen.getByTestId("player-panel");
+    expect(screen.getByLabelText("Shrink modal")).toBeTruthy();
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => panel,
+    });
+    try {
+      fireEvent(document, new Event("fullscreenchange"));
+      await waitFor(() =>
+        expect(screen.queryByLabelText("Shrink modal")).toBeNull(),
+      );
+    } finally {
+      // Out of full screen again (and nothing for unmount to exit).
+      delete (document as { fullscreenElement?: unknown }).fullscreenElement;
+    }
+    fireEvent(document, new Event("fullscreenchange"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("Shrink modal")).toBeTruthy(),
+    );
+  });
+});
+
 describe("Player paging keys", () => {
   it("steps with the preset's paging chords", async () => {
     // Default "normal" preset: [ and ] page between files elsewhere in the app.

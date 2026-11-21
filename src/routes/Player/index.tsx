@@ -55,6 +55,11 @@ import { usePlayerKeys } from "./usePlayerKeys";
 import { usePlaylistAudio } from "./usePlaylistAudio";
 import { useStageTransition } from "./useStageTransition";
 import { useFolderScopeLabel } from "@/hooks/useFolderScopeLabel";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import {
+  MODAL_SIZE_KEY,
+  type ModalSize,
+} from "@/routes/MediaDetail/MediaModal";
 import { usePlaybackNav } from "@/components/MediaNavContext";
 import { isRemuxedVideo, needsVideoPreview } from "@shared/playbackTracks";
 
@@ -150,6 +155,18 @@ export default function Player() {
   const rootRef = useRef<HTMLDivElement>(null);
   // Over the whole window, title bar included: its buttons step aside.
   const backdrop = useImmersiveBackdrop();
+  // Large or compact, as Discover: the same stored size, so the immersive
+  // views open alike.
+  const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
+    MODAL_SIZE_KEY,
+    "large",
+    (raw) => (raw === "small" ? "small" : "large"),
+  );
+  const isSmall = modalSize === "small";
+  const toggleModalSize = useCallback(
+    () => setModalSize((prev) => (prev === "small" ? "large" : "small")),
+    [setModalSize],
+  );
   const { isFullscreen, toggleFullscreen, exitFullscreen } =
     useFullscreen(rootRef);
 
@@ -395,7 +412,11 @@ export default function Player() {
       role="dialog"
       aria-modal="true"
       aria-label={t("playlist.start")}
-      className={cn(backdrop, "z-50 flex bg-black/70 p-3 backdrop-blur-sm")}
+      className={cn(
+        backdrop,
+        "z-50 flex bg-black/70 p-3 backdrop-blur-sm",
+        isSmall && "items-center justify-center",
+      )}
       // The backdrop itself, not a click that bubbled up from the panel.
       onClick={(e) => {
         if (e.target === e.currentTarget) exit();
@@ -413,9 +434,12 @@ export default function Player() {
       <div
         ref={rootRef}
         data-testid="player-panel"
-        // Full screen takes the panel to the screen's edges: no frame there.
+        // Full screen takes the panel to the screen's edges, whatever its
+        // size: no frame there (the UA stylesheet lifts the size limits).
         className={cn(
-          "relative min-w-0 flex-1 overflow-hidden rounded-window border border-border shadow-2xl [&:fullscreen]:rounded-none [&:fullscreen]:border-0",
+          "relative min-w-0 overflow-hidden rounded-window border border-border shadow-2xl [&:fullscreen]:rounded-none [&:fullscreen]:border-0",
+          // The compact size is Discover's.
+          isSmall ? "h-[85vh] max-h-[880px] w-full max-w-4xl" : "flex-1",
           ground,
         )}
       >
@@ -546,6 +570,8 @@ export default function Player() {
             shuffle={playlistShuffle}
             repeat={playlistRepeat}
             fullscreen={isFullscreen}
+            small={isSmall}
+            onToggleSize={toggleModalSize}
             canPrev={queue.canPrev}
             visible={chromeVisible}
             volume={volume}

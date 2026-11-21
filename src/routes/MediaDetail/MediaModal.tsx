@@ -31,7 +31,8 @@ export type ModalSize = "large" | "small";
 // list, the toolbar and the bottom player bar visible and usable.
 export type Presentation = "modal" | "peek";
 
-// Shared localStorage key: MediaDetail and Discover persist one common size.
+// Shared localStorage key: MediaDetail, Discover and the playlist player
+// persist one common size.
 export const MODAL_SIZE_KEY = "meguri.media.modalSize";
 // Remembered separately from the size, so switching to the peek and back lands
 // on the modal size that was last chosen.
