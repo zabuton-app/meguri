@@ -61,7 +61,7 @@ export function CrashReportsSection() {
           {reports.map((r) => (
             <li
               key={r.id}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border border-border bg-bg px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-card border border-border bg-bg px-3 py-2"
             >
               <span className="text-xs text-fg">
                 {formatDateTime(new Date(r.detectedAt), lang)}{" "}

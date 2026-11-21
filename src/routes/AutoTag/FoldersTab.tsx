@@ -130,7 +130,7 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
           </div>
           {filterable && (
             <input
-              className="mb-1 h-7 rounded-md border border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
+              className="mb-1 h-7 rounded-control border border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
               value={filter}
               placeholder={t("autoTag.filterFolders")}
               aria-label={t("autoTag.filterFolders")}
@@ -141,7 +141,7 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
             <div
               key={rule.id}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg p-2",
+                "flex items-center gap-2.5 rounded-card p-2",
                 shown?.id === rule.id ? "bg-overlay" : "hover:bg-surface",
               )}
             >
@@ -160,7 +160,7 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
                   <span
                     className={cn(
                       MONO,
-                      "truncate text-[13px]",
+                      "truncate text-xs",
                       rule.enabled ? "text-bright-fg" : "text-muted",
                     )}
                   >
@@ -195,7 +195,7 @@ export function FoldersTab({ state }: { state: AutoTagState }) {
               folderWorkspaces.length === 0 ||
               config.folders.length >= MAX_AUTO_TAG_FOLDER_RULES
             }
-            className="mt-2 h-8 rounded-lg border border-dashed border-border-strong text-xs text-muted transition hover:text-bright-fg disabled:opacity-40"
+            className="mt-2 h-8 rounded-control border border-dashed border-border-strong text-xs text-muted transition hover:text-bright-fg disabled:opacity-40"
           >
             {t("autoTag.addFolder")}
           </button>

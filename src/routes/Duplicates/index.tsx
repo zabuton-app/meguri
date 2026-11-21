@@ -167,7 +167,7 @@ export default function Duplicates() {
       {loading ? (
         <div className="flex flex-col gap-2 p-4">
           {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            <Skeleton key={i} className="h-14 w-full rounded-card" />
           ))}
         </div>
       ) : duplicates.isError && !duplicates.data ? (

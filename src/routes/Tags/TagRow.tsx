@@ -42,7 +42,7 @@ export const TagRow = memo(function TagRow({
     // has no buttons, and its source badge is the tallest thing in it.
     <li
       className={cn(
-        "flex items-center gap-2 rounded-lg px-1.5 py-1 transition hover:bg-fg/5 [content-visibility:auto]",
+        "flex items-center gap-2 rounded-card px-1.5 py-1 transition hover:bg-fg/10 [content-visibility:auto]",
         editable
           ? "[contain-intrinsic-size:auto_1.75rem]"
           : "[contain-intrinsic-size:auto_1.3125rem]",
@@ -71,7 +71,7 @@ export const TagRow = memo(function TagRow({
       >
         <span
           className={cn(
-            "shrink-0 rounded px-1.5 py-0.5 text-xs leading-4",
+            "shrink-0 rounded-item px-1.5 py-0.5 text-xs leading-4",
             tagColorClass(primarySource),
           )}
         >
@@ -86,7 +86,7 @@ export const TagRow = memo(function TagRow({
 
       <span className="flex shrink-0 items-center gap-1">
         {tag.bySource.map((s) => (
-          <Badge key={s.source} variant="outline" className="text-[10px]">
+          <Badge key={s.source} variant="outline" className="text-2xs">
             {tagSourceLabel(t, s.source)}
           </Badge>
         ))}

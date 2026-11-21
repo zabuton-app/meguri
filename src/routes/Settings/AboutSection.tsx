@@ -99,7 +99,7 @@ export function AboutSection() {
   // bug reports, and the attributions below are notices we are obliged to
   // surface. The app has no Edit menu or context menu to copy them any other way.
   return (
-    <section className="flex select-text flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
+    <section className="flex select-text flex-col gap-3 border-b border-border py-3">
       {/* App identity + version */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col">
@@ -157,11 +157,11 @@ export function AboutSection() {
           {THIRD_PARTY.map((entry) => (
             <li
               key={entry.name}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border border-border bg-bg px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-card border border-border bg-bg px-3 py-2"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-xs text-fg">{entry.name}</span>
-                <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted">
+                <span className="shrink-0 rounded-item border border-border px-1.5 py-0.5 text-2xs text-muted">
                   {entry.license}
                 </span>
               </span>

@@ -137,13 +137,13 @@ export function GroupList({
                   onClick={() => onSelect(key)}
                   aria-current={selected ? "true" : undefined}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg border p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                    "flex w-full items-center gap-3 rounded-card border p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                     selected
                       ? "border-primary bg-surface"
-                      : "border-transparent hover:bg-fg/5",
+                      : "border-transparent hover:bg-fg/10",
                   )}
                 >
-                  <span className="relative aspect-video w-20 shrink-0 overflow-hidden rounded-md bg-surface">
+                  <span className="relative aspect-video w-20 shrink-0 overflow-hidden rounded-item bg-surface">
                     <MediaThumbnail
                       file={g.files[0]}
                       mediaBase={mediaBase}
@@ -152,7 +152,7 @@ export function GroupList({
                       playOverlaySize="size-6"
                       playIconSize="size-3"
                     />
-                    <span className="absolute right-1 bottom-1 rounded bg-bg/85 px-1 text-2xs font-semibold text-bright-fg tabular-nums">
+                    <span className="absolute right-1 bottom-1 rounded-item bg-bg/85 px-1 text-2xs font-semibold text-bright-fg tabular-nums">
                       ×{g.files.length}
                     </span>
                   </span>

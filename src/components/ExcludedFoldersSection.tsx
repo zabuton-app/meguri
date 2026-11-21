@@ -126,7 +126,7 @@ export function ExcludedFoldersSection({
       {excluded.isError ? (
         <div
           role="alert"
-          className="flex items-center gap-3 rounded-md bg-error/10 px-3 py-2 text-xs text-error"
+          className="flex items-center gap-3 rounded-card bg-error/10 px-3 py-2 text-xs text-error"
         >
           <span className="flex-1">
             {t("workspace.excludedFoldersLoadError")}
@@ -141,11 +141,11 @@ export function ExcludedFoldersSection({
           </Button>
         </div>
       ) : excluded.data && rows.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border-strong px-4 py-5 text-center text-xs text-muted">
+        <p className="rounded-card border border-dashed border-border-strong px-4 py-5 text-center text-xs text-muted">
           {t("workspace.excludedFoldersEmpty")}
         </p>
       ) : (
-        <ul className="flex max-h-72 flex-col overflow-y-auto rounded-md border border-border">
+        <ul className="flex max-h-72 flex-col overflow-y-auto rounded-card border border-border">
           {rows.map((row) => (
             <FolderItem
               key={`${row.state === "adding" ? "+" : ""}${row.path}`}
@@ -192,7 +192,7 @@ function FolderItem({
       <span
         aria-hidden="true"
         className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-md bg-overlay [&>svg]:size-4",
+          "flex size-7 shrink-0 items-center justify-center rounded-control bg-overlay [&>svg]:size-4",
           row.state === "including"
             ? "text-muted"
             : missing

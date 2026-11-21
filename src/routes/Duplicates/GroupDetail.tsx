@@ -25,7 +25,7 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const PART_CLASS: Record<PathPart["kind"], string> = {
   same: "text-muted",
-  diff: "rounded-sm bg-warn/15 px-0.5 text-warn",
+  diff: "rounded-item bg-warn/15 px-0.5 text-warn",
   name: "text-fg",
 };
 
@@ -143,7 +143,7 @@ export const GroupDetail = memo(function GroupDetail({
         <p className="flex items-center gap-2 bg-surface px-4 py-1.5 text-xs text-muted">
           <span
             aria-hidden
-            className="size-2.5 rounded-sm border border-warn bg-warn/15"
+            className="size-2.5 rounded-item border border-warn bg-warn/15"
           />
           {t("duplicates.diffLegend")}
         </p>
@@ -162,13 +162,13 @@ export const GroupDetail = memo(function GroupDetail({
               // cards out of view skip style, layout and paint. The intrinsic
               // size stands in until a card is laid out once: the w-36
               // aspect-video thumbnail plus the card's p-2.5 and border.
-              className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface/60 p-2.5 [content-visibility:auto] [contain-intrinsic-size:auto_6.5rem]"
+              className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface/60 p-2.5 [content-visibility:auto] [contain-intrinsic-size:auto_6.5rem]"
             >
               <Link
                 to={href}
                 tabIndex={-1}
                 aria-hidden
-                className="group/thumb relative aspect-video w-36 shrink-0 overflow-hidden rounded-md bg-surface"
+                className="group/thumb relative aspect-video w-36 shrink-0 overflow-hidden rounded-item bg-surface"
               >
                 <MediaThumbnail
                   file={file}
@@ -180,7 +180,7 @@ export const GroupDetail = memo(function GroupDetail({
                 />
                 {oldest === file && (
                   <span
-                    className="absolute top-1 left-1 rounded bg-primary px-1.5 text-2xs font-semibold text-primary-foreground"
+                    className="absolute top-1 left-1 rounded-item bg-primary px-1.5 text-2xs font-semibold text-primary-foreground"
                     title={t("duplicates.oldestHint")}
                   >
                     {t("duplicates.oldest")}
@@ -189,7 +189,7 @@ export const GroupDetail = memo(function GroupDetail({
               </Link>
               <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
                 <p
-                  className="font-mono text-[13px] leading-snug break-all select-text"
+                  className="font-mono text-xs leading-snug break-all select-text"
                   title={file.relPath}
                 >
                   {parts[i].map((part, j) => (
@@ -234,7 +234,7 @@ export const GroupDetail = memo(function GroupDetail({
                 </div>
               </div>
               <div className="flex shrink-0 flex-col gap-1">
-                <Button asChild variant="outline" size="sm" className="h-7">
+                <Button asChild variant="outline" size="compact">
                   <Link to={href}>
                     <Play />
                     {t("duplicates.open")}
@@ -242,8 +242,8 @@ export const GroupDetail = memo(function GroupDetail({
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-7 justify-start"
+                  size="compact"
+                  className="justify-start"
                   onClick={() => openFolder(file)}
                 >
                   <FolderOpen />
@@ -251,8 +251,8 @@ export const GroupDetail = memo(function GroupDetail({
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-7 justify-start"
+                  size="compact"
+                  className="justify-start"
                   onClick={() => copyPath(file)}
                 >
                   <Copy />

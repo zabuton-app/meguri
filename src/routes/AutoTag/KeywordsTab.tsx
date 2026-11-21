@@ -110,7 +110,7 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
           </div>
           {filterable && (
             <input
-              className="mb-1 h-7 rounded-md border border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
+              className="mb-1 h-7 rounded-control border border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
               value={filter}
               placeholder={t("autoTag.filterKeywords")}
               aria-label={t("autoTag.filterKeywords")}
@@ -137,14 +137,12 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
               }}
               aria-current={shown?.id === entry.id}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg p-2 text-left",
+                "flex items-center gap-2.5 rounded-card p-2 text-left",
                 shown?.id === entry.id ? "bg-overlay" : "hover:bg-surface",
               )}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span
-                  className={cn(MONO, "truncate text-[13px] text-bright-fg")}
-                >
+                <span className={cn(MONO, "truncate text-xs text-bright-fg")}>
                   {entry.terms.join(", ") || t("autoTag.keyword.noTermsShort")}
                 </span>
                 <span className="truncate text-2xs text-muted">
@@ -170,7 +168,7 @@ export function KeywordsTab({ state }: { state: AutoTagState }) {
             </p>
           )}
           <input
-            className="mt-2 h-8 rounded-lg border border-dashed border-border-strong bg-transparent px-2.5 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
+            className="mt-2 h-8 rounded-control border border-dashed border-border-strong bg-transparent px-2.5 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
             value={draft}
             maxLength={MAX_TAG_NAME * 4}
             placeholder={t("autoTag.addKeywordInline")}

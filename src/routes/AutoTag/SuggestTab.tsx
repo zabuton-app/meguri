@@ -402,7 +402,7 @@ export function SuggestTab({
                 key={c.key}
                 className="col-span-full grid grid-cols-subgrid border-b border-surface"
               >
-                <div className={cn(ROW, "px-3 py-2 hover:bg-fg/5")}>
+                <div className={cn(ROW, "px-3 py-2 hover:bg-fg/10")}>
                   <input
                     type="checkbox"
                     className="size-3.5 accent-primary"
@@ -425,7 +425,7 @@ export function SuggestTab({
                       <span className="inline-block w-3.5 text-center text-xs text-fg">
                         {open ? "▾" : "▸"}
                       </span>
-                      <Chip className="text-[13px]">{c.name}</Chip>
+                      <Chip className="text-xs">{c.name}</Chip>
                       <span
                         className={cn(
                           "text-2xs",
@@ -462,7 +462,7 @@ export function SuggestTab({
                       here. */}
                   <SmallButton
                     variant="ghost"
-                    className="h-[26px] px-2"
+                    className="h-7 px-2"
                     onClick={() => void searchInLibrary(c)}
                     title={t("autoTag.searchCandidateHint")}
                   >
@@ -475,14 +475,14 @@ export function SuggestTab({
                     <button
                       type="button"
                       onClick={() => restore([c])}
-                      className="h-[26px] justify-self-start px-2 text-xs text-muted underline underline-offset-2 hover:text-bright-fg"
+                      className="h-7 justify-self-start px-2 text-xs text-muted underline underline-offset-2 hover:text-bright-fg"
                     >
                       {t("autoTag.revert")}
                     </button>
                   ) : at.tagged > 0 ? (
                     <SmallButton
                       variant="ghost"
-                      className="h-[26px] px-2"
+                      className="h-7 px-2"
                       disabled={busy}
                       title={t("autoTag.removeHint")}
                       onClick={() => void remove(c)}
@@ -498,7 +498,7 @@ export function SuggestTab({
                   {!at.ignored && at.canRegister ? (
                     <SmallButton
                       variant="primary"
-                      className="h-[26px]"
+                      className="h-7"
                       disabled={busy}
                       // The short label fits the row; what it does in full.
                       title={t("autoTag.applySelectedDict")}
@@ -515,7 +515,7 @@ export function SuggestTab({
                     <SmallButton
                       variant={at.canRegister ? "outline" : "primary"}
                       className={cn(
-                        "h-[26px]",
+                        "h-7",
                         at.canRegister && "border-border px-2",
                       )}
                       disabled={busy}
@@ -529,7 +529,7 @@ export function SuggestTab({
                   {at.pending ? (
                     <SmallButton
                       variant="ghost"
-                      className="h-[26px] px-2"
+                      className="h-7 px-2"
                       onClick={() => ignore([c])}
                     >
                       {t("autoTag.ignore")}
@@ -564,7 +564,7 @@ export function SuggestTab({
           })}
         </div>
         {shown.length === 0 && (
-          <p className="p-8 text-center text-[13px] text-muted">
+          <p className="p-8 text-center text-xs text-muted">
             {state.loading || !state.ruleWords
               ? t("autoTag.analyzing")
               : t("autoTag.noCandidates")}

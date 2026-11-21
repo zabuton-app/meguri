@@ -43,7 +43,7 @@ function ThemeCard({
       disabled={disabled}
       onClick={onClick}
       className={
-        "flex items-center justify-between gap-3 rounded-md border bg-surface px-3 py-2 text-left transition disabled:opacity-60 " +
+        "flex items-center justify-between gap-3 rounded-card border bg-surface px-3 py-2 text-left transition disabled:opacity-60 " +
         (active
           ? "border-primary ring-1 ring-primary"
           : "border-border hover:border-primary")
@@ -75,7 +75,7 @@ export function ThemeSection() {
   };
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex flex-col gap-3 border-b border-border py-3">
       <h2 className="text-sm font-semibold text-bright-fg">
         {t("settings.theme")}
       </h2>
@@ -114,7 +114,7 @@ export function ThemeSection() {
             // No palette to preview: the file is arbitrary CSS.
             preview={
               <span
-                className="flex items-center justify-center font-mono text-[10px] text-muted"
+                className="flex items-center justify-center font-mono text-2xs text-muted"
                 style={{
                   width: PREVIEW_TOKENS.length * SWATCH_PX,
                   height: SWATCH_PX,

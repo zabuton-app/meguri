@@ -19,7 +19,7 @@ export function CssThemeSection() {
   }, [t]);
 
   return (
-    <section className="flex flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
+    <section className="flex flex-col gap-3 border-b border-border py-3">
       <div className="flex flex-col">
         <span className="text-sm font-semibold text-bright-fg">
           {t("settings.cssTheme")}

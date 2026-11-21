@@ -35,11 +35,11 @@ export function ExcludeFolderDetails({
   const { parent, name } = onDisk(root, folder);
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1 rounded-md border border-border bg-bg px-3 py-2">
+      <div className="flex flex-col gap-1 rounded-card border border-border bg-bg px-3 py-2">
         <span className="text-xs text-muted">{t("folder.excludeTarget")}</span>
         <p className="break-all font-mono text-xs text-muted">
           {parent}
-          <mark className="rounded-sm bg-primary/20 px-0.5 font-medium text-bright-fg">
+          <mark className="rounded-item bg-primary/20 px-0.5 font-medium text-bright-fg">
             {name}
           </mark>
         </p>

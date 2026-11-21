@@ -77,7 +77,7 @@ export function ExcludeList({
           }}
         />
         <SmallButton
-          className="h-[30px]"
+          className="h-8"
           disabled={adds === 0 || full}
           title={full ? t("autoTag.excludeFull") : undefined}
           onClick={add}
@@ -91,7 +91,7 @@ export function ExcludeList({
         </span>
       )}
       <ScrollArea
-        className="max-h-[188px] rounded-md border border-border"
+        className="max-h-[188px] rounded-card border border-border"
         viewportClassName="max-h-[188px]"
       >
         <ul className="flex flex-col">
@@ -103,7 +103,7 @@ export function ExcludeList({
               <span
                 className={cn(
                   MONO,
-                  "min-w-0 flex-1 truncate text-[13px] text-bright-fg",
+                  "min-w-0 flex-1 truncate text-xs text-bright-fg",
                 )}
               >
                 {value}
@@ -114,7 +114,7 @@ export function ExcludeList({
                 onClick={() =>
                   onChange(formatExclude(values.filter((v) => v !== value)))
                 }
-                className="shrink-0 rounded px-1.5 text-xs text-muted transition hover:bg-fg/10 hover:text-bright-fg"
+                className="shrink-0 rounded-item px-1.5 text-xs text-muted transition hover:bg-fg/10 hover:text-bright-fg"
               >
                 {t("autoTag.excludeRemoveButton")}
               </button>
