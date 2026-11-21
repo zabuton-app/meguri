@@ -126,7 +126,7 @@ export function ScanExclusionsSection() {
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3"
+      className="flex flex-col gap-3 border-b border-border py-3"
     >
       <div className="flex flex-col">
         <h3
@@ -184,7 +184,7 @@ export function ScanExclusionsSection() {
                   aria-label={t("settings.scanExclusionsPattern", { n: i + 1 })}
                   aria-invalid={error !== null}
                   className={cn(
-                    "h-8 min-w-0 flex-1 rounded-md border bg-bg px-2 font-mono text-xs text-fg outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+                    "h-8 min-w-0 flex-1 rounded-control border bg-bg px-2 font-mono text-xs text-fg outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
                     error ? "border-error" : "border-border-strong",
                   )}
                 />
@@ -211,7 +211,7 @@ export function ScanExclusionsSection() {
         })}
       </ul>
 
-      <div className="flex flex-col gap-2 rounded-md border border-border bg-bg px-3 py-2.5">
+      <div className="flex flex-col gap-2 rounded-card border border-border bg-bg px-3 py-2.5">
         <label htmlFor={newId} className="text-xs font-semibold text-fg">
           {t("settings.scanExclusionsAdd")}
         </label>
@@ -260,7 +260,7 @@ export function ScanExclusionsSection() {
             aria-describedby={hintId}
             aria-invalid={candidateError !== null}
             className={cn(
-              "h-8 min-w-0 flex-1 rounded-md border bg-surface px-2 font-mono text-xs text-fg outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+              "h-8 min-w-0 flex-1 rounded-control border bg-surface px-2 font-mono text-xs text-fg outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
               candidateError ? "border-error" : "border-border-strong",
             )}
           />
@@ -364,7 +364,7 @@ function Preview({ preview }: { preview: PreviewState }) {
         </p>
         <ul
           aria-label={t("settings.scanExclusionsPreviewList")}
-          className="flex max-h-48 flex-col overflow-y-auto rounded-md border border-border bg-surface py-1"
+          className="flex max-h-48 flex-col overflow-y-auto rounded-card border border-border bg-surface py-1"
         >
           {preview.files.map((f, i) => (
             <li

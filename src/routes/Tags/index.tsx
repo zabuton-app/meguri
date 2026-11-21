@@ -426,7 +426,7 @@ export default function Tags() {
         <ScrollArea className="page-scroll min-h-0 flex-1">
           <div className="flex flex-col gap-2 p-4">
             {Array.from({ length: 8 }, (_, i) => (
-              <Skeleton key={i} className="h-7 w-full rounded-lg" />
+              <Skeleton key={i} className="h-7 w-full rounded-card" />
             ))}
           </div>
         </ScrollArea>

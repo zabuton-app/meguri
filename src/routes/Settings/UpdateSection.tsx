@@ -48,7 +48,7 @@ export function UpdateSection() {
   // Selectable as a whole, like AboutSection: the version numbers this reports
   // are the same thing users paste into bug reports.
   return (
-    <section className="flex select-text flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
+    <section className="flex select-text flex-col gap-3 border-b border-border py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col">
           <span className="text-sm font-semibold text-bright-fg">
@@ -92,7 +92,7 @@ export function UpdateSection() {
         <p className="text-xs text-muted">{t("update.checkFailed")}</p>
       )}
       {info && info.available && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+        <div className="flex items-center justify-between gap-3 rounded-card border border-primary/40 bg-primary/5 px-3 py-2">
           <span className="text-xs text-fg">
             {t("update.available", { version: info.latest })}
           </span>

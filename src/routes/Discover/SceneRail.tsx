@@ -63,7 +63,7 @@ export function SceneRail({
               time: formatDuration(sec, { hours: true, fallback: "0:00" }),
             })}
             onClick={() => onSeek(sec)}
-            className="group/scene relative block w-[104px] shrink-0 overflow-hidden rounded-md border border-border/60 bg-black shadow-md transition-all duration-150 hover:z-10 hover:w-[132px] hover:-translate-y-1 hover:border-primary hover:shadow-lg"
+            className="group/scene relative block w-[104px] shrink-0 overflow-hidden rounded-item border border-border/60 bg-black shadow-md transition-all duration-150 hover:z-10 hover:w-[132px] hover:-translate-y-1 hover:border-primary hover:shadow-lg"
           >
             <img
               src={`${mediaBase}/ws/${wsId}/frame/${id}?t=${sec}&q=${frameQuality}`}
@@ -71,7 +71,7 @@ export function SceneRail({
               loading="lazy"
               className="aspect-[16/10] w-full object-cover"
             />
-            <span className="absolute bottom-0.5 right-0.5 rounded bg-bg/80 px-1 text-[10px] tabular-nums text-fg">
+            <span className="absolute bottom-0.5 right-0.5 rounded-item bg-bg/80 px-1 text-2xs tabular-nums text-fg">
               {formatDuration(sec, { hours: true, fallback: "0:00" })}
             </span>
           </button>
@@ -82,7 +82,7 @@ export function SceneRail({
           </span>
         )}
       </div>
-      <p className="mt-1.5 font-mono text-[10px] text-muted">
+      <p className="mt-1.5 font-mono text-2xs text-muted">
         {t("discover.sceneHint")}
       </p>
     </div>

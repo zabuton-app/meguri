@@ -60,7 +60,7 @@ import { SceneRail } from "./SceneRail";
 // containers are pointer-events-none so empty overlay space still clicks
 // through, with interactive children opting back in.
 const CENTER_PLAY_CLASS =
-  "absolute left-1/2 top-1/2 z-20 flex size-[76px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-bg/40 text-bright-fg backdrop-blur-md transition hover:scale-105 hover:bg-bg/60";
+  "absolute left-1/2 top-1/2 z-20 flex size-19 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-bg/40 text-bright-fg backdrop-blur-md transition hover:scale-105 hover:bg-bg/60";
 
 export function DiscoverCard({
   file,
@@ -457,7 +457,7 @@ export function DiscoverCard({
             fileId={file.id}
             workspaceId={wsId}
             watchLater={watchLater}
-            className="size-11 shrink-0 rounded-md border border-border/60 bg-bg/50 backdrop-blur-md hover:bg-bg/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+            className="size-11 shrink-0 rounded-control border border-border/60 bg-bg/50 backdrop-blur-md hover:bg-bg/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
           />
           <Button
             variant="outline"
@@ -515,7 +515,7 @@ function Chip({
     <span
       title={title}
       className={cn(
-        "flex items-center rounded-md border border-border/60 bg-bg/50 px-2 py-1 text-xs text-fg backdrop-blur-md",
+        "flex items-center rounded-control border border-border/60 bg-bg/50 px-2 py-1 text-xs text-fg backdrop-blur-md",
         interactive && "pointer-events-auto",
         className,
       )}

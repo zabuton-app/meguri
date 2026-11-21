@@ -228,7 +228,7 @@ export function TagCloud({
                       title={`${name} — ${count}`}
                       aria-label={`${tag.qualified} (${count})`}
                       className={cn(
-                        "block whitespace-nowrap rounded transition hover:text-bright-fg hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary",
+                        "block whitespace-nowrap rounded-item transition hover:text-bright-fg hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary",
                         weightColorClass(word.weight),
                       )}
                       style={{

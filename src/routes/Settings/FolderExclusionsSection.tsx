@@ -34,9 +34,9 @@ export function FolderExclusionsSection() {
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col rounded-md border border-border bg-surface"
+      className="flex flex-col gap-3 border-b border-border py-3"
     >
-      <div className="flex flex-col px-4 py-3">
+      <div className="flex flex-col">
         <h3
           id={headingId}
           className="flex items-center gap-2 text-sm font-semibold text-bright-fg"
@@ -51,27 +51,24 @@ export function FolderExclusionsSection() {
         </span>
       </div>
       {list.isError ? (
-        <p className="px-4 pb-3 text-xs text-error">
+        <p className="text-xs text-error">
           {t("settings.folderExclusionsLoadError")}
         </p>
       ) : list.data && workspaces.length === 0 ? (
-        <p className="px-4 pb-3 text-xs text-muted">
+        <p className="text-xs text-muted">
           {t("settings.folderExclusionsNoWorkspaces")}
         </p>
       ) : (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
           {workspaces.map((w, i) => {
             const q = folders[i];
             const listed = q?.data?.folders ?? [];
             const missing = listed.filter((f) => !f.found).length;
             return (
-              <li
-                key={w.id}
-                className="flex items-center gap-3 border-t border-border px-4 py-2.5"
-              >
+              <li key={w.id} className="flex items-center gap-3 px-3 py-2.5">
                 <span
                   aria-hidden="true"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-md bg-overlay text-base leading-none text-muted [&>svg]:size-4"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-control bg-overlay text-base leading-none text-muted [&>svg]:size-4"
                 >
                   {w.emoji ?? <FolderOpen />}
                 </span>

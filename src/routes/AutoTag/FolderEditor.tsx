@@ -205,7 +205,7 @@ export function FolderEditor({
           >
             <SelectTrigger
               aria-label={t("autoTag.folder.workspace")}
-              className="h-[30px] w-full text-[13px] text-bright-fg"
+              className="h-8 w-full text-xs text-bright-fg"
             >
               <SelectValue />
             </SelectTrigger>
@@ -252,7 +252,7 @@ export function FolderEditor({
           onChange={(e) => setSearch(e.target.value)}
         />
         <ScrollArea
-          className="max-h-[260px] rounded-md border border-border"
+          className="max-h-[260px] rounded-card border border-border"
           viewportClassName="max-h-[260px]"
         >
           <ul role="tree" aria-label={t("autoTag.folder.pick")} className="p-1">
@@ -315,14 +315,14 @@ export function FolderEditor({
       <div className="flex justify-end">
         <SmallButton
           variant="ghost"
-          className="h-[26px] hover:text-error"
+          className="h-7 hover:text-error"
           onClick={onDelete}
         >
           {t("autoTag.deleteRule")}
         </SmallButton>
       </div>
 
-      <div className="flex flex-col overflow-hidden rounded-lg border border-border">
+      <div className="flex flex-col overflow-hidden rounded-card border border-border">
         <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2 text-xs text-fg">
           <span className="font-semibold">{t("autoTag.folder.files")}</span>
           <span className="text-muted">
@@ -389,8 +389,8 @@ function FolderTreeRow({
       aria-expanded={hasChildren ? open : undefined}
       aria-level={depth + 1}
       className={cn(
-        "flex items-center gap-1 rounded",
-        selected ? "bg-overlay text-bright-fg" : "text-fg hover:bg-fg/5",
+        "flex items-center gap-1 rounded-item",
+        selected ? "bg-overlay text-bright-fg" : "text-fg hover:bg-fg/10",
       )}
       style={{ paddingLeft: depth * 16 }}
     >
@@ -401,7 +401,7 @@ function FolderTreeRow({
             open ? "autoTag.folder.collapse" : "autoTag.folder.expand",
           )}
           onClick={onToggle}
-          className="flex size-5 shrink-0 items-center justify-center rounded text-muted hover:text-bright-fg"
+          className="flex size-5 shrink-0 items-center justify-center rounded-item text-muted hover:text-bright-fg"
         >
           {open ? (
             <ChevronDown className="size-3.5" />

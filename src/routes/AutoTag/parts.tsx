@@ -19,7 +19,7 @@ export function Chip({
   return (
     <span
       className={cn(
-        "rounded bg-secondary-accent/25 px-1.5 py-0.5 text-xs leading-4 text-bright-fg",
+        "rounded-item bg-secondary-accent/25 px-1.5 py-0.5 text-xs leading-4 text-bright-fg",
         className,
       )}
     >
@@ -31,7 +31,7 @@ export function Chip({
 /** A small outlined label: a rule kind. */
 export function Badge({ children }: { children: ReactNode }) {
   return (
-    <span className="w-max shrink-0 whitespace-nowrap rounded-md border border-border px-1.5 text-[10px] leading-4 text-muted">
+    <span className="w-max shrink-0 whitespace-nowrap rounded-control border border-border px-1.5 text-2xs leading-4 text-muted">
       {children}
     </span>
   );
@@ -43,13 +43,13 @@ export function Highlighted({ segs }: { segs: readonly Segment[] }) {
     <>
       {segs.map((seg, i) =>
         seg.kind === "hit" ? (
-          <mark key={i} className="rounded-sm bg-accent2/30 text-bright-fg">
+          <mark key={i} className="rounded-item bg-accent2/30 text-bright-fg">
             {seg.text}
           </mark>
         ) : seg.kind === "muted" ? (
           <span
             key={i}
-            className="rounded-sm bg-muted/15 text-muted line-through"
+            className="rounded-item bg-muted/15 text-muted line-through"
           >
             {seg.text}
           </span>
@@ -89,7 +89,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={label}
       className={cn(
-        "no-scrollbar flex w-max max-w-full gap-0.5 overflow-x-auto rounded-md p-0.5",
+        "no-scrollbar flex w-max max-w-full gap-0.5 overflow-x-auto rounded-control p-0.5",
         tone === "surface" ? "bg-surface" : "bg-bg",
       )}
     >
@@ -103,7 +103,7 @@ export function Segmented<T extends string>({
             aria-checked={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "h-[26px] whitespace-nowrap rounded px-2.5 text-xs transition",
+              "h-7 whitespace-nowrap rounded-item px-2.5 text-xs transition",
               active ? "bg-overlay text-bright-fg" : "text-muted hover:text-fg",
             )}
           >
@@ -211,7 +211,7 @@ export function SmallButton({
       type="button"
       {...props}
       className={cn(
-        "h-7 shrink-0 whitespace-nowrap rounded-md px-2.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-40",
+        "h-7 shrink-0 whitespace-nowrap rounded-control px-2.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-40",
         variant === "outline" &&
           "border border-border-strong text-fg hover:bg-fg/10 hover:text-bright-fg",
         variant === "ghost" && "text-muted hover:bg-fg/10 hover:text-bright-fg",
@@ -339,7 +339,7 @@ export function ChipListField({
               type="button"
               aria-label={removeLabel(item)}
               onClick={() => onRemove(item)}
-              className="px-1 text-[13px] text-muted hover:text-bright-fg"
+              className="px-1 text-xs text-muted hover:text-bright-fg"
             >
               ×
             </button>
@@ -349,7 +349,7 @@ export function ChipListField({
               <input
                 key={item}
                 autoFocus
-                className="h-6 w-36 rounded-md border border-ring bg-transparent px-2 text-xs text-bright-fg outline-none"
+                className="h-6 w-36 rounded-control border border-ring bg-transparent px-2 text-xs text-bright-fg outline-none"
                 value={renaming.text}
                 maxLength={MAX_TAG_NAME}
                 aria-label={rename.label(item)}
@@ -397,7 +397,7 @@ export function ChipListField({
               key={item}
               className={cn(
                 MONO,
-                "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border pl-2 pr-1 text-xs text-fg",
+                "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-control border border-border pl-2 pr-1 text-xs text-fg",
               )}
             >
               {name}
@@ -407,7 +407,7 @@ export function ChipListField({
         })}
         {items.length < max && (
           <input
-            className="h-6 w-44 rounded-md border border-dashed border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
+            className="h-6 w-44 rounded-control border border-dashed border-border-strong bg-transparent px-2 text-xs text-bright-fg outline-none placeholder:text-muted focus-visible:border-ring"
             value={draft}
             maxLength={MAX_TAG_NAME * 4}
             placeholder={addLabel}

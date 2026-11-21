@@ -274,7 +274,7 @@ export default function History() {
             {loading ? (
               <div className="flex flex-col gap-2 p-4">
                 {Array.from({ length: 6 }, (_, i) => (
-                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                  <Skeleton key={i} className="h-14 w-full rounded-card" />
                 ))}
               </div>
             ) : (
@@ -352,9 +352,9 @@ function HistoryEntry({
       to={fileHref(row.id, row.workspaceId, {
         autoplay: false,
       })}
-      className="group/thumb flex items-center gap-3 rounded-lg p-1.5 transition hover:bg-fg/5"
+      className="group/thumb flex items-center gap-3 rounded-card p-1.5 transition hover:bg-fg/10"
     >
-      <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-surface">
+      <span className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-item bg-surface">
         <MediaThumbnail
           file={row}
           mediaBase={mediaBase}
