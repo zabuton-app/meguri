@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import {
   Info,
   Maximize,
+  Maximize2,
   Minimize,
+  Minimize2,
   Pause,
   Play,
   AudioLines,
@@ -33,6 +35,8 @@ export function PlayerChrome({
   shuffle,
   repeat,
   fullscreen,
+  small,
+  onToggleSize,
   canPrev,
   visible,
   volume,
@@ -67,6 +71,9 @@ export function PlayerChrome({
   repeat: boolean;
   /** Whether the player currently owns the screen (it does not by default). */
   fullscreen: boolean;
+  /** The panel's size over the window ("small" is the compact one). */
+  small: boolean;
+  onToggleSize: () => void;
   canPrev: boolean;
   /** False once the user has been idle; the chrome fades out of the way. */
   visible: boolean;
@@ -121,7 +128,16 @@ export function PlayerChrome({
           {notice}
         </div>
       )}
-      <div className="absolute right-3 top-3">
+      <div className="absolute right-3 top-3 flex items-center gap-2">
+        {/* Full screen takes the screen whatever the size. */}
+        {!fullscreen && (
+          <ChromeButton
+            onClick={onToggleSize}
+            title={small ? t("media.modalMaximize") : t("media.modalMinimize")}
+          >
+            {small ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
+          </ChromeButton>
+        )}
         <ChromeButton onClick={onExit} title={t("playlist.exit")}>
           <X size={20} />
         </ChromeButton>
