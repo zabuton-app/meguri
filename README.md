@@ -573,6 +573,10 @@ Meguri is **privacy-first**: everything stays on your machine.
   libraries), without their memory contents.
 - **Fully offline.** All features work without an internet connection.
 
+New features are held to the same standard. The criteria a feature that
+needs the network has to meet are in
+[CONTRIBUTING.md](CONTRIBUTING.md#network-access).
+
 ## Architecture
 
 ```text
