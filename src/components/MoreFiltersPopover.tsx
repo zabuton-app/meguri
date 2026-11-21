@@ -168,6 +168,9 @@ export function MoreFiltersPopover({
         <button
           type="button"
           data-slot="more-filters-trigger"
+          // Marks the "on" state for CSS themes: unlike the filter bar's
+          // toggles, this opens a popover, so it carries no aria-pressed.
+          data-active={active || undefined}
           title={t("filter.more")}
           aria-label={
             active
@@ -175,11 +178,9 @@ export function MoreFiltersPopover({
               : t("filter.more")
           }
           className={cn(
-            "group flex h-8 items-center gap-1 rounded-md border px-2 text-sm transition-colors",
-            active
-              ? "border-primary/50 bg-primary/10 text-fg"
-              : "border-border text-muted hover:text-fg",
-            "data-[state=open]:border-primary/50 data-[state=open]:bg-primary/10 data-[state=open]:text-fg",
+            "group flex h-8 items-center gap-1 rounded-control border border-border px-2 text-sm transition-colors",
+            active ? "bg-primary/15 text-fg" : "text-muted hover:text-fg",
+            "data-[state=open]:bg-primary/15 data-[state=open]:text-fg",
           )}
         >
           {/* Icon only — the label lives in the accessible name and the tooltip,
@@ -188,7 +189,7 @@ export function MoreFiltersPopover({
           {active && (
             <span
               data-slot="more-filters-badge"
-              className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[0.6875rem] font-medium text-primary-foreground"
+              className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-medium text-primary-foreground"
             >
               {collapsedCount}
             </span>

@@ -2,8 +2,8 @@
 // selection in one click.
 //
 // Toggle buttons (`aria-pressed`) rather than the radios of SegmentedControl:
-// several kinds can be on at once, which a radio group cannot express. The
-// segments look the same as SegmentedControl's, so the two stay in step.
+// several kinds can be on at once, which a radio group cannot express. A kind
+// that is on is tinted, as the filter bar's other toggles are (#586).
 import { ButtonGroup } from "@/components/ui/button-group";
 import { useI18n } from "@/i18n/I18nProvider";
 import { MEDIA_KINDS, kindLabel, normalizeKinds } from "@/lib/mediaKind";
@@ -34,10 +34,10 @@ function Toggle({
       aria-pressed={pressed}
       onClick={onClick}
       className={cn(
-        "h-8 truncate border px-3 text-sm transition-colors",
+        "h-8 truncate border border-border px-3 text-sm transition-colors",
         pressed
-          ? "border-primary bg-primary font-medium text-primary-foreground"
-          : "border-border text-muted hover:text-fg",
+          ? "bg-primary/15 font-medium text-fg"
+          : "text-muted hover:text-fg",
       )}
     >
       {children}
