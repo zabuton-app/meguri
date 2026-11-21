@@ -294,7 +294,7 @@ export function CommandMenu(props: CommandMenuProps) {
         // (searchAnchor); just below the bar without one. z-[80]: above the
         // window buttons (TitleBar.tsx), which a narrow window puts under it.
         style={anchor ?? undefined}
-        className="z-[80] top-[calc(var(--meguri-title-bar-height)+0.25rem)] max-h-[calc(100vh-1rem)] max-w-xl translate-y-0 border-muted/35 bg-bg shadow-2xl"
+        className="z-[80] top-[calc(var(--meguri-title-bar-height)+0.25rem)] rounded-card max-h-[calc(100vh-1rem)] max-w-xl translate-y-0 border-muted/35 bg-bg shadow-2xl"
         onEscapeKeyDown={(e) => {
           // An Esc that cancels an input method's conversion is its own: the
           // menu stays, and with it what was typed.

@@ -204,7 +204,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
                 }
               }}
               placeholder={t("tag.addPlaceholder")}
-              className="h-9 rounded-md border border-border-strong bg-bg px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+              className="h-9 rounded-control border border-border-strong bg-bg px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
             />
             {tooLong && (
               <p className="text-xs text-error">
@@ -223,7 +223,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
                     key={name}
                     type="button"
                     onClick={() => stageAdd(name, true)}
-                    className="rounded border border-border bg-surface px-2 py-0.5 text-xs text-fg transition hover:border-primary"
+                    className="rounded-item border border-border bg-surface px-2 py-0.5 text-xs text-fg transition hover:border-primary"
                   >
                     {name}
                   </button>
@@ -241,7 +241,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
                 {stagedNew.map((name) => (
                   <span
                     key={name}
-                    className="inline-flex h-[26px] items-center gap-1.5 rounded-md bg-primary pl-2 pr-1.5 text-xs font-bold text-primary-foreground"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-control bg-primary pl-2 pr-1.5 text-xs font-bold text-primary-foreground"
                   >
                     <Plus className="size-3" strokeWidth={3} />
                     {name}
@@ -251,7 +251,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
                         setAdding((prev) => prev.filter((n) => n !== name))
                       }
                       aria-label={t("select.bulkTagCancelAdd", { name })}
-                      className="rounded p-0.5 transition hover:bg-bg/20"
+                      className="rounded-item p-0.5 transition hover:bg-bg/20"
                     >
                       <X className="size-3" strokeWidth={3} />
                     </button>
@@ -284,7 +284,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
                       <span
                         key={name}
                         className={cn(
-                          "inline-flex h-[26px] items-center gap-1.5 rounded-md border pl-2 pr-1 text-xs",
+                          "inline-flex h-7 items-center gap-1.5 rounded-control border pl-2 pr-1 text-xs",
                           staged
                             ? "border-error/60 bg-bg text-muted line-through"
                             : all || raised
@@ -308,7 +308,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
                         )}
                         <span
                           className={cn(
-                            "text-[10px] font-bold tabular-nums",
+                            "text-2xs font-bold tabular-nums",
                             all || raised ? "text-muted" : "text-primary",
                           )}
                         >
@@ -327,7 +327,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
                               ? t("select.bulkTagKeep", { name })
                               : t("select.bulkTagRemove", { name })
                           }
-                          className="rounded p-0.5 text-muted transition hover:text-fg"
+                          className="rounded-item p-0.5 text-muted transition hover:text-fg"
                         >
                           {staged ? (
                             <Undo2 className="size-3" strokeWidth={2.5} />
@@ -364,7 +364,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-9 rounded-md border border-border bg-surface px-4 text-sm text-fg transition hover:bg-overlay"
+            className="h-9 rounded-control border border-border bg-surface px-4 text-sm text-fg transition hover:bg-overlay"
           >
             {t("common.cancel")}
           </button>
@@ -377,7 +377,7 @@ export function BulkTagDialog({ open, onOpenChange, rows, onApplied }: Props) {
               total === 0 ||
               tooManyFiles
             }
-            className="h-9 rounded-md border border-primary bg-primary px-4 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-default disabled:opacity-50"
+            className="h-9 rounded-control border border-primary bg-primary px-4 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-default disabled:opacity-50"
           >
             {t("select.bulkTagApply", { count: total })}
           </button>
