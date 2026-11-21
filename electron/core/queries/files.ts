@@ -295,9 +295,12 @@ export function appendSearchConditions(
       args.push(...cond.args);
     }
   }
-  if (query.kind) {
-    sql += " AND f.kind = ?";
-    args.push(query.kind);
+  if (query.kinds?.length) {
+    // A placeholder per kind, not json_each as for fileIds: the list is short
+    // (the schema caps it), and without statistics the planner cannot size
+    // json_each, so a single kind would lose idx_files_kind and scan every row.
+    sql += ` AND f.kind IN (${query.kinds.map(() => "?").join(", ")})`;
+    args.push(...query.kinds);
   }
   if (query.fileIds?.length) {
     // Pass the IDs as a single JSON array bound to one placeholder rather than

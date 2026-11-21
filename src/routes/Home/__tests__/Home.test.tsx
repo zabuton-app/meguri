@@ -1252,7 +1252,7 @@ describe("Home folder view", () => {
         id: "1",
         name: "Old videos",
         query: {
-          kind: "video",
+          kinds: ["video"],
           folder: { path: "Movie/Old", recursive: true },
         },
         workspaceId: WS_ID,
@@ -1292,7 +1292,7 @@ describe("Home folder view", () => {
       {
         id: "1",
         name: "Videos",
-        query: { kind: "video" },
+        query: { kinds: ["video"] },
         createdAt: 1,
         updatedAt: 1,
       },
@@ -1311,7 +1311,7 @@ describe("Home folder view", () => {
       { button: 0, ctrlKey: false },
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: /^Videos/ }));
-    await waitFor(() => expect(lastSearch().kind).toBe("video"));
+    await waitFor(() => expect(lastSearch().kinds).toEqual(["video"]));
 
     // Turning the option back on opens at the root, not at Movie.
     fireEvent.click(screen.getByRole("button", { name: "Show by folder" }));
@@ -1327,7 +1327,7 @@ describe("Home folder view", () => {
         id: "1",
         name: "Rated old videos",
         query: {
-          kind: "video",
+          kinds: ["video"],
           sort: "rating",
           folder: { path: "Movie/Old", recursive: true },
         },
@@ -1339,7 +1339,7 @@ describe("Home folder view", () => {
     smart.defaultId = "1";
     await renderAfterSmartCollections();
     await waitFor(() =>
-      expect(lastSearch()).toMatchObject({ kind: "video", sort: "rating" }),
+      expect(lastSearch()).toMatchObject({ kinds: ["video"], sort: "rating" }),
     );
     expect(
       mocks.filesSearch.mock.calls.some(
@@ -1354,7 +1354,7 @@ describe("Home folder view", () => {
       {
         id: "1",
         name: "Videos",
-        query: { kind: "video" },
+        query: { kinds: ["video"] },
         createdAt: 1,
         updatedAt: 1,
       },
@@ -1362,7 +1362,9 @@ describe("Home folder view", () => {
     smart.defaultId = "1";
     smart.list.mockRejectedValueOnce(new Error("library busy"));
     await renderAfterSmartCollections();
-    await waitFor(() => expect(lastSearch()).toMatchObject({ kind: "video" }));
+    await waitFor(() =>
+      expect(lastSearch()).toMatchObject({ kinds: ["video"] }),
+    );
   });
 
   it("does not count the search it opens on as a recent one", async () => {
@@ -1370,7 +1372,7 @@ describe("Home folder view", () => {
       {
         id: "1",
         name: "Videos",
-        query: { kind: "video" },
+        query: { kinds: ["video"] },
         createdAt: 1,
         updatedAt: 1,
       },
@@ -1381,7 +1383,7 @@ describe("Home folder view", () => {
     try {
       await renderAfterSmartCollections();
       await waitFor(() =>
-        expect(lastSearch()).toMatchObject({ kind: "video" }),
+        expect(lastSearch()).toMatchObject({ kinds: ["video"] }),
       );
       // Past the time a search takes to count as one.
       await vi.advanceTimersByTimeAsync(5_000);
@@ -1409,7 +1411,7 @@ describe("Home folder view", () => {
         id: "1",
         name: "Old videos",
         query: {
-          kind: "video",
+          kinds: ["video"],
           folder: { path: "Movie/Old", recursive: true },
         },
         workspaceId: WS_ID,
@@ -1429,7 +1431,7 @@ describe("Home folder view", () => {
 
     await waitFor(() =>
       expect(lastSearch()).toMatchObject({
-        kind: "video",
+        kinds: ["video"],
         folder: { path: "Movie", recursive: true },
       }),
     );
@@ -1484,7 +1486,7 @@ describe("Home folder view", () => {
       {
         id: "1",
         name: "Videos",
-        query: { kind: "video" },
+        query: { kinds: ["video"] },
         createdAt: 1,
         updatedAt: 1,
       },
@@ -1505,7 +1507,7 @@ describe("Home folder view", () => {
     // Every condition is replaced, the folder included.
     await waitFor(() =>
       expect(lastSearch()).toMatchObject({
-        kind: "video",
+        kinds: ["video"],
         folder: { path: "", recursive: true },
       }),
     );
@@ -1517,7 +1519,7 @@ describe("Home folder view", () => {
       {
         id: "1",
         name: "Movie videos",
-        query: { kind: "video", folder: { path: "Movie", recursive: true } },
+        query: { kinds: ["video"], folder: { path: "Movie", recursive: true } },
         workspaceId: WS_ID,
         createdAt: 1,
         updatedAt: 1,
@@ -1536,7 +1538,7 @@ describe("Home folder view", () => {
 
     await waitFor(() =>
       expect(lastSearch()).toMatchObject({
-        kind: "video",
+        kinds: ["video"],
         folder: { path: "Movie", recursive: true },
       }),
     );
@@ -1689,7 +1691,7 @@ describe("Home graph view", () => {
       {
         id: "1",
         name: "Movie videos",
-        query: { kind: "video", folder: { path: "Movie", recursive: true } },
+        query: { kinds: ["video"], folder: { path: "Movie", recursive: true } },
         workspaceId: WS_ID,
         createdAt: 1,
         updatedAt: 1,
@@ -1713,7 +1715,7 @@ describe("Home graph view", () => {
     expect(localStorage.getItem(VIEW_KEY)).toBe("grid");
     await waitFor(() =>
       expect(mocks.filesSearch.mock.calls.at(-1)?.[0]).toMatchObject({
-        kind: "video",
+        kinds: ["video"],
         folder: { path: "Movie", recursive: true },
       }),
     );

@@ -33,9 +33,27 @@ describe("smartCollections", () => {
         tags: ["a", ""],
         ratingMin: 0,
         favorite: false,
-        kind: undefined,
+        kinds: [],
       }),
     ).toEqual({ q: "hello", tags: ["a"] });
+  });
+
+  it("cleanSearchQuery puts kinds in one order, so the same selection is one search", () => {
+    expect(cleanSearchQuery({ kinds: ["audio", "video", "audio"] })).toEqual({
+      kinds: ["video", "audio"],
+    });
+  });
+
+  it("cleanSearchQuery treats every kind selected as no kind filter", () => {
+    expect(cleanSearchQuery({ kinds: ["image", "audio", "video"] })).toEqual(
+      {},
+    );
+  });
+
+  it("cleanSearchQuery keeps a kind this build does not know, after the known ones", () => {
+    expect(
+      cleanSearchQuery({ kinds: ["document", "image", "audio", "video"] }),
+    ).toEqual({ kinds: ["video", "image", "audio", "document"] });
   });
 
   it("hasSearchConditions reflects cleaned query", () => {
@@ -105,12 +123,12 @@ describe("smartCollections", () => {
     expect(
       describeSearchQuery(t, "en", {
         q: "cat",
-        kind: "video",
+        kinds: ["video"],
         ratingMin: 3,
         favorite: true,
       }),
     ).toContain("cat");
-    expect(describeSearchQuery(t, "en", { kind: "video" })).toContain(
+    expect(describeSearchQuery(t, "en", { kinds: ["video"] })).toContain(
       en["kind.video"],
     );
   });
@@ -132,7 +150,7 @@ describe("hasFilterConditions", () => {
   it.each([
     { q: "beach" },
     { tags: ["a"] },
-    { kind: "video" },
+    { kinds: ["video"] },
     { ratingMin: 3 },
     { favorite: true },
     { capturedFrom: 1 },
@@ -178,11 +196,11 @@ describe("folder condition", () => {
   it("saves the workspace with a folder, so the folder can be found again", () => {
     const c = makeSmartCollection(
       "Clips",
-      { kind: "video", folder: { path: "a/b", recursive: true } },
+      { kinds: ["video"], folder: { path: "a/b", recursive: true } },
       "ws1",
     );
     expect(c.query).toEqual({
-      kind: "video",
+      kinds: ["video"],
       folder: { path: "a/b", recursive: true },
     });
     expect(c.workspaceId).toBe("ws1");
@@ -192,15 +210,15 @@ describe("folder condition", () => {
 
   it("drops a folder that has no workspace to place it in", () => {
     const c = makeSmartCollection("Clips", {
-      kind: "video",
+      kinds: ["video"],
       folder: { path: "a/b", recursive: true },
     });
-    expect(c.query).toEqual({ kind: "video" });
+    expect(c.query).toEqual({ kinds: ["video"] });
     expect(c.workspaceId).toBeUndefined();
   });
 
   it("keeps no workspace for a search without a folder", () => {
-    const c = makeSmartCollection("Videos", { kind: "video" }, "ws1");
+    const c = makeSmartCollection("Videos", { kinds: ["video"] }, "ws1");
     expect(c.workspaceId).toBeUndefined();
   });
 
@@ -212,14 +230,23 @@ describe("folder condition", () => {
       createdAt: 1,
       updatedAt: 1,
     };
-    expect(parseSmartCollections(JSON.stringify([old]))).toEqual([old]);
+    // The single `kind` of that time reads as a one-kind selection.
+    expect(parseSmartCollections(JSON.stringify([old]))).toEqual([
+      { ...old, query: { kinds: ["video"] } },
+    ]);
+  });
+
+  it("lists every selected kind in the description", () => {
+    expect(describeSearchQuery(t, "en", { kinds: ["video", "audio"] })).toBe(
+      `${t("kind.video")}, ${t("kind.audio")}`,
+    );
   });
 
   it("names the folder in the description", () => {
     expect(
       describeSearchQuery(t, "en", {
         folder: { path: "a/b", recursive: true },
-        kind: "video",
+        kinds: ["video"],
       }),
     ).toBe("Folder: a/b / Video");
   });
@@ -230,7 +257,7 @@ describe("the default saved search", () => {
     id: "d1",
     name: "Recent videos",
     query: {
-      kind: "video",
+      kinds: ["video"],
       sort: "btime",
       folder: { path: "Movies", recursive: true },
     },
@@ -241,7 +268,7 @@ describe("the default saved search", () => {
 
   it("applies its conditions without the workspace-bound folder", () => {
     expect(defaultQueryOf([saved], "d1")).toEqual({
-      kind: "video",
+      kinds: ["video"],
       sort: "btime",
     });
   });
@@ -255,11 +282,11 @@ describe("the default saved search", () => {
     const manual = {
       ...saved,
       query: {
-        kind: "video" as const,
+        kinds: ["video"],
         sort: "manual",
         sortDir: "asc" as const,
       },
     };
-    expect(defaultQueryOf([manual], "d1")).toEqual({ kind: "video" });
+    expect(defaultQueryOf([manual], "d1")).toEqual({ kinds: ["video"] });
   });
 });

@@ -66,7 +66,7 @@ const { api } = await import("@/ipc/client");
 const saved: SmartCollection = {
   id: "c1",
   name: "Saved",
-  query: { kind: "video", folder: { path: "a", recursive: true } },
+  query: { kinds: ["video"], folder: { path: "a", recursive: true } },
   workspaceId: "ws1",
   createdAt: 1,
   updatedAt: 1,
@@ -162,7 +162,7 @@ describe("useSmartCollections", () => {
     await waitFor(() => expect(result.current.collections).toHaveLength(1));
     act(() => result.current.setDefaultId("c1"));
     await waitFor(() => expect(result.current.defaultId).toBe("c1"));
-    expect(result.current.defaultQuery).toEqual({ kind: "video" });
+    expect(result.current.defaultQuery).toEqual({ kinds: ["video"] });
     expect(main.defaultId).toBe("c1");
 
     act(() => result.current.setDefaultId(null));
@@ -208,6 +208,6 @@ describe("initialFilter", () => {
     main.defaultId = "c1";
     await queryClient.prefetchQuery(smartCollectionsQuery);
     // Without the workspace-bound folder (defaultQueryOf).
-    expect(initialFilter(queryClient)).toEqual({ kind: "video" });
+    expect(initialFilter(queryClient)).toEqual({ kinds: ["video"] });
   });
 });

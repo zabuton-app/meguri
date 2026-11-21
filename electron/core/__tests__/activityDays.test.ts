@@ -202,7 +202,7 @@ describe("activityDays", () => {
       activityDays(db, query, "captured", FROM, TO).get("2026-03-10");
     expect(count({})).toBe(2);
     expect(count({ favorite: true })).toBe(1);
-    expect(count({ kind: "video" })).toBe(1);
+    expect(count({ kinds: ["video"] })).toBe(1);
     // Paging and the day picked (the metric's own date range) belong to the
     // list, not the counts.
     expect(

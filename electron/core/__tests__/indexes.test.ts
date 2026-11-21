@@ -251,11 +251,17 @@ describe("searchFiles plans without statistics (#363)", () => {
     },
   );
 
+  it("narrows a single kind through its index", () => {
+    // json_each(?) would hide the list's size from a planner with no
+    // statistics, and it would walk every live row instead.
+    expect(searchPlan({ kinds: ["audio"] })).toContain("idx_files_kind");
+  });
+
   it("leaves every filtered list to the planner", () => {
     // Without statistics, nothing tells how few rows a filter leaves; for a
     // rare one, walking the sort order reads every live row.
     for (const query of [
-      { kind: "image" },
+      { kinds: ["image"] },
       { q: "ab" },
       { q: "abc" },
       { q: "hash:ab" },

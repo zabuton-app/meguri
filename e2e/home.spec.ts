@@ -84,13 +84,18 @@ test.describe("Home", () => {
     // fixture reports ready and its completion re-renders the bar out from
     // under the control being clicked.
     await waitForIdle(ready);
-    await ready.getByRole("radio", { name: "Image" }).click();
-    await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
-
-    await ready.getByRole("radio", { name: "Video" }).click();
+    const kinds = ready.getByRole("group", { name: "Filter by kind" });
+    await kinds.getByRole("button", { name: "Video" }).click();
     await expect(ready.getByText("No media to display.")).toBeVisible();
 
-    await ready.getByRole("radio", { name: "All" }).click();
+    // Kinds add up: the image fixture shows again alongside videos.
+    await kinds.getByRole("button", { name: "Image" }).click();
+    await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
+
+    await kinds.getByRole("button", { name: "Image" }).click();
+    await expect(ready.getByText("No media to display.")).toBeVisible();
+
+    await kinds.getByRole("button", { name: "All" }).click();
     await expect(ready.getByText(FIXTURE_FILE)).toBeVisible();
   });
 

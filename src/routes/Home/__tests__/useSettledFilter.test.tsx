@@ -45,12 +45,12 @@ describe("useSettledFilter", () => {
   });
 
   it("keeps one object while only the text is being typed", () => {
-    const { result, rerender } = render({ q: "a", kind: "video" });
-    rerender({ filter: { q: "ab", kind: "video" } });
+    const { result, rerender } = render({ q: "a", kinds: ["video"] });
+    rerender({ filter: { q: "ab", kinds: ["video"] } });
     const lagging = result.current;
-    rerender({ filter: { q: "abc", kind: "video" } });
+    rerender({ filter: { q: "abc", kinds: ["video"] } });
     expect(result.current).toBe(lagging);
-    expect(lagging).toEqual({ q: "a", kind: "video" });
+    expect(lagging).toEqual({ q: "a", kinds: ["video"] });
   });
 
   it("returns the filter itself once the text has caught up", () => {

@@ -172,42 +172,64 @@ export const SearchCursorSchema = z.object({
 });
 export type SearchCursor = z.infer<typeof SearchCursorSchema>;
 
-export const SearchQuerySchema = z.object({
-  q: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  tagSource: z.string().optional(),
-  kind: z.string().optional(),
-  ratingMin: z.number().optional(),
-  favorite: z.boolean().optional(),
-  /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
-  duplicates: z.boolean().optional(),
-  played: z.boolean().optional(),
-  /** Only files left part-way through (a resume point is stored). */
-  inProgress: z.boolean().optional(),
-  playedVia: z.string().optional(),
-  capturedFrom: z.number().optional(),
-  capturedTo: z.number().optional(),
-  /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
-  btimeFrom: z.number().optional(),
-  btimeTo: z.number().optional(),
-  /** Range of the time the file entered the index (created_at), Unix seconds. */
-  addedFrom: z.number().optional(),
-  addedTo: z.number().optional(),
-  /** Played-at range, Unix seconds: files with a play history row inside it. */
-  playedFrom: z.number().optional(),
-  playedTo: z.number().optional(),
-  sort: z.string().optional(),
-  sortDir: z.enum(["asc", "desc"]).optional(),
-  /** Folder view: only files under this folder (see FolderScopeSchema). */
-  folder: FolderScopeSchema.optional(),
-  fileIds: z.array(z.number()).optional(),
-  // Number = plain offset (legacy / backward paging); object = keyset cursor.
-  cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
-  // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
-  // absurd values at the IPC boundary and double-guards the multi-core cross-
-  // workspace path, where the per-core clamp doesn't bound the merged slice.
-  limit: z.number().int().min(1).max(500).optional(),
-});
+/**
+ * Queries stored before the kind filter took several kinds (smart collections,
+ * recent searches) carry `kind: "video"`. Read that as `kinds: ["video"]` so
+ * they keep their condition instead of quietly losing it to key stripping.
+ * It is for stored data only; nothing sends `kind` over IPC any more.
+ */
+function liftLegacyKind(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || !("kind" in value))
+    return value;
+  const { kind, ...rest } = value as Record<string, unknown>;
+  const hasKinds = Array.isArray(rest.kinds) && rest.kinds.length > 0;
+  if (typeof kind === "string" && kind !== "" && !hasKinds)
+    return { ...rest, kinds: [kind] };
+  return rest;
+}
+
+export const SearchQuerySchema = z.preprocess(
+  liftLegacyKind,
+  z.object({
+    q: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    tagSource: z.string().optional(),
+    /** Any of these kinds; absent or empty means every kind. */
+    // Plain strings, so a kind from a newer build survives; capped because
+    // the query binds one placeholder per kind.
+    kinds: z.array(z.string().max(32)).max(16).optional(),
+    ratingMin: z.number().optional(),
+    favorite: z.boolean().optional(),
+    /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
+    duplicates: z.boolean().optional(),
+    played: z.boolean().optional(),
+    /** Only files left part-way through (a resume point is stored). */
+    inProgress: z.boolean().optional(),
+    playedVia: z.string().optional(),
+    capturedFrom: z.number().optional(),
+    capturedTo: z.number().optional(),
+    /** Filesystem creation date (birthtime) range, Unix seconds. Files with no btime never match. */
+    btimeFrom: z.number().optional(),
+    btimeTo: z.number().optional(),
+    /** Range of the time the file entered the index (created_at), Unix seconds. */
+    addedFrom: z.number().optional(),
+    addedTo: z.number().optional(),
+    /** Played-at range, Unix seconds: files with a play history row inside it. */
+    playedFrom: z.number().optional(),
+    playedTo: z.number().optional(),
+    sort: z.string().optional(),
+    sortDir: z.enum(["asc", "desc"]).optional(),
+    /** Folder view: only files under this folder (see FolderScopeSchema). */
+    folder: FolderScopeSchema.optional(),
+    fileIds: z.array(z.number()).optional(),
+    // Number = plain offset (legacy / backward paging); object = keyset cursor.
+    cursor: z.union([z.number().int().min(0), SearchCursorSchema]).optional(),
+    // Clamped again to MAX_LIMIT (500) in the query layer; bounding it here rejects
+    // absurd values at the IPC boundary and double-guards the multi-core cross-
+    // workspace path, where the per-core clamp doesn't bound the merged slice.
+    limit: z.number().int().min(1).max(500).optional(),
+  }),
+);
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 
 /**

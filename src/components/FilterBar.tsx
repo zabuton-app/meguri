@@ -12,7 +12,7 @@ import {
 } from "@/lib/searchConditions";
 import { ActiveFilterChips } from "./ActiveFilterChips";
 import { RatingStars } from "./RatingStars";
-import { SegmentedControl } from "./SegmentedControl";
+import { KindFilter } from "./KindFilter";
 import { MoreFiltersPopover } from "./MoreFiltersPopover";
 import { useI18n } from "@/i18n/I18nProvider";
 import { SmartCollectionsMenu } from "./SmartCollectionsMenu";
@@ -72,17 +72,9 @@ export function FilterBar({
       className="flex flex-col gap-2 border-b border-border bg-bg px-4 pt-4 pb-2"
     >
       <div className="flex flex-wrap items-center gap-3">
-        <SegmentedControl
-          slot="kind-group"
-          label={t("filter.kindFilter")}
-          value={value.kind || undefined}
-          options={[
-            { value: undefined, label: t("filter.all") },
-            { value: "video", label: t("kind.video") },
-            { value: "image", label: t("kind.image") },
-            { value: "audio", label: t("kind.audio") },
-          ]}
-          onChange={(kind) => patch({ kind })}
+        <KindFilter
+          value={value.kinds}
+          onChange={(kinds) => patch({ kinds })}
         />
 
         <div
