@@ -1,6 +1,6 @@
 // Regression tests for cross-workspace merge pagination (k-way merge).
 import { naturalNameKey } from "../nameKey.js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "../index.js";
 import type { DB } from "../db.js";
 import {
@@ -49,7 +49,12 @@ function searchWorkspacesNaive(
   const perWs = offset + limit + 1;
   const all: FileRow[] = [];
   for (const { id, core } of cores) {
-    const res = searchFiles(core.db, { ...query, cursor: 0, limit: perWs });
+    const res = searchFiles(
+      core.db,
+      { ...query, cursor: 0, limit: perWs },
+      undefined,
+      { uncapped: true },
+    );
     for (const it of res.items) it.workspaceId = id;
     all.push(...res.items);
   }
@@ -204,6 +209,49 @@ describe("searchWorkspaces k-way merge", () => {
     expect(got.items.map((f) => [f.workspaceId, f.id])).toEqual(
       want.items.map((f) => [f.workspaceId, f.id]),
     );
+  });
+
+  it("reads a deep offset with one sorting query per workspace (#362)", () => {
+    const a = seedWorkspace("ws-a", 600, "x/");
+    const z = seedWorkspace("ws-z", 600, "y/");
+    track(a.db);
+    track(z.db);
+    const cores = [a.target, z.target];
+    const spies = [vi.spyOn(a.db, "prepare"), vi.spyOn(z.db, "prepare")];
+    try {
+      // Past MAX_LIMIT (500) per workspace, and far past one batch.
+      const query: SearchQuery = { limit: 15, cursor: 1100, sort: "rating" };
+      const got = searchWorkspaces(cores, query);
+      // The page queries; attachTags reads files too, without a LIMIT.
+      const sorts = spies
+        .flatMap((spy) => spy.mock.calls)
+        .filter(([sql]) => /FROM files\b[\s\S]*\bLIMIT \?/.test(sql));
+      expect(sorts).toHaveLength(2);
+      const want = searchWorkspacesNaive(cores, query);
+      expect(cursorOffset(got.nextCursor)).toBe(want.nextCursor);
+      expect(got.items.map((f) => [f.workspaceId, f.id])).toEqual(
+        want.items.map((f) => [f.workspaceId, f.id]),
+      );
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
+
+  it("reads a deep offset that leaves rows in every workspace (#362)", () => {
+    const a = seedWorkspace("ws-a", 600, "x/");
+    const z = seedWorkspace("ws-z", 600, "y/");
+    track(a.db);
+    track(z.db);
+    const cores = [a.target, z.target];
+    for (const sort of ["rating", "name"] as const) {
+      const query: SearchQuery = { limit: 15, cursor: 300, sort };
+      const got = searchWorkspaces(cores, query);
+      const want = searchWorkspacesNaive(cores, query);
+      expect(cursorOffset(got.nextCursor)).toBe(want.nextCursor);
+      expect(got.items.map((f) => [f.workspaceId, f.id])).toEqual(
+        want.items.map((f) => [f.workspaceId, f.id]),
+      );
+    }
   });
 });
 

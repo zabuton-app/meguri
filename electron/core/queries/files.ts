@@ -548,16 +548,18 @@ function pinnedSortIndex(sort?: string, dir?: string): string | null {
  * caller (crossWorkspace) tracks continuation itself. Without it, the legacy
  * numeric-offset contract applies. `skipTags` defers tag attachment to the
  * caller (the k-way merge discards rows, so batch-level attachment is wasted).
+ * `uncapped` lifts the MAX_LIMIT cap for an internal caller that sizes its own
+ * fetch (the k-way merge reading past a deep offset in one query).
  */
 export function searchFiles(
   db: DB,
   query: SearchQuery,
   seek?: SeekPosition,
-  opts?: { skipTags?: boolean; sep?: string },
+  opts?: { skipTags?: boolean; sep?: string; uncapped?: boolean },
 ): SearchResult {
   // The seek path allows one extra row (internal callers fetch limit+1 for
   // has-more detection); the IPC boundary still caps requests at MAX_LIMIT.
-  const cap = seek ? MAX_LIMIT + 1 : MAX_LIMIT;
+  const cap = opts?.uncapped ? Infinity : seek ? MAX_LIMIT + 1 : MAX_LIMIT;
   const limit = Math.max(1, Math.min(cap, query.limit ?? DEFAULT_LIMIT));
   const args: unknown[] = [];
   const filters = appendSearchConditions(db, "", args, query, opts?.sep);
