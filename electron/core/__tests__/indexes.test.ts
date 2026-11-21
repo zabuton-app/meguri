@@ -12,10 +12,12 @@ import {
   folderCondition,
   folderRange,
   orderByFor,
+  RARE_TAG_ROWS,
   searchFiles,
   sortValueOf,
   type SeekPosition,
 } from "../queries.js";
+import { upsertTag } from "../tags.js";
 import { insertFile, newDb } from "./helpers.js";
 
 function plan(db: DB, sql: string): string {
@@ -294,6 +296,45 @@ describe("searchFiles plans without statistics (#363)", () => {
         "idx_files_alive_name_key",
       );
     }
+  });
+
+  describe("tag filters (#365)", () => {
+    beforeEach(() => {
+      const ids = db.prepare("SELECT id, meta_key FROM files").all() as {
+        id: number;
+        meta_key: string;
+      }[];
+      const add = db.prepare(
+        "INSERT INTO meta_tags (meta_key, tag_id, source) VALUES (?, ?, 'manual')",
+      );
+      const rare = upsertTag(db, "", "rare");
+      const common = upsertTag(db, "", "common");
+      add.run(ids[0].meta_key, rare);
+      for (const { meta_key } of ids) add.run(meta_key, common);
+      // Another workspace's rows count too: past the cap, the tag is common.
+      for (let i = 0; i < RARE_TAG_ROWS; i++) add.run(`elsewhere${i}`, common);
+    });
+
+    it("starts a rare tag from its rows and looks the files up by meta_key", () => {
+      for (const query of [{ tags: ["rare"] }, { q: "tag:rare" }]) {
+        const p = searchPlan({ ...query, sort: "name", sortDir: "asc" });
+        expect(p, JSON.stringify(query)).toContain("idx_meta_tags_tag");
+        expect(p, JSON.stringify(query)).toContain("idx_files_meta_key");
+        expect(p, JSON.stringify(query)).not.toContain(
+          "idx_files_alive (deleted_at=?)",
+        );
+      }
+    });
+
+    it("checks a common tag per file instead of collecting its rows", () => {
+      for (const query of [{ tags: ["common"] }, { q: "tag:common" }]) {
+        const p = searchPlan({ ...query, sort: "name", sortDir: "asc" });
+        expect(p, JSON.stringify(query)).toContain(
+          "sqlite_autoindex_meta_tags_1 (meta_key=? AND tag_id=?)",
+        );
+        expect(p, JSON.stringify(query)).not.toContain("idx_meta_tags_tag");
+      }
+    });
   });
 
   it("leaves the ascending date orders to the planner (their indexes are newest first)", () => {
