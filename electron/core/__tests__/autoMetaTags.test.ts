@@ -455,6 +455,95 @@ describe("backfillAutoMetaTags", () => {
     expect(wroteMidPass).toBe(true);
   });
 
+  it("tags every row as applying each file on its own would", async () => {
+    // Tags are resolved once per chunk rather than per file (#368); the result
+    // must not move. More than one chunk, so the cache is rebuilt at least once.
+    const codecs = ["h264", "hevc", "av1", null];
+    for (let i = 0; i < 700; i++) {
+      const image = i % 3 === 0;
+      insertFile(db, rootId, {
+        relPath: `bulk/${i}.${image ? "jpg" : "mp4"}`,
+        kind: image ? "image" : "video",
+        width: [640, 1280, 1920, 3840][i % 4],
+        height: [480, 720, 1080, 2160, 1920][i % 5],
+        duration: image ? null : (i % 7200) + 1,
+        codec: image ? null : codecs[i % 4],
+      });
+    }
+    const tagsByPath = (target: DB) =>
+      target
+        .prepare(
+          `SELECT f.rel_path || ' ' || t.namespace || ':' || t.name
+             FROM files f
+             JOIN meta_tags mt ON mt.meta_key = f.meta_key AND mt.source = ?
+             JOIN tags t ON t.id = mt.tag_id
+            ORDER BY 1`,
+        )
+        .pluck()
+        .all(AUTO_META_SOURCE) as string[];
+
+    await backfillAutoMetaTags(db);
+
+    const single = newDb();
+    try {
+      const rows = db
+        .prepare(
+          "SELECT rel_path, kind, width, height, duration, codec FROM files ORDER BY id",
+        )
+        .all() as {
+        rel_path: string;
+        kind: "video" | "image" | "audio";
+        width: number | null;
+        height: number | null;
+        duration: number | null;
+        codec: string | null;
+      }[];
+      for (const row of rows) {
+        const fileId = insertFile(single.db, single.rootId, {
+          ...row,
+          relPath: row.rel_path,
+        });
+        applyAutoMetaTags(single.db, fileId, row);
+      }
+      expect(tagsByPath(db).length).toBeGreaterThan(700);
+      expect(tagsByPath(db)).toEqual(tagsByPath(single.db));
+    } finally {
+      single.db.close();
+    }
+  });
+
+  it("resolves a tag again after it is deleted between chunks", async () => {
+    for (let i = 0; i < 600; i++) {
+      insertFile(db, rootId, {
+        relPath: `bulk/${i}.jpg`,
+        kind: "image",
+        width: 800,
+        height: 600,
+      });
+    }
+    await backfillAutoMetaTags(db, {
+      onProgress: (done) => {
+        // As pruneUnusedTags may do from another workspace's scan during the
+        // yield. An id cached across chunks would now point at no tag, and
+        // the next insert would fail its foreign key.
+        if (done === 512)
+          db.prepare(
+            "DELETE FROM tags WHERE namespace = 'res' AND name = 'sd'",
+          ).run();
+      },
+    });
+    const tagged = db
+      .prepare(
+        `SELECT COUNT(*) FROM meta_tags mt JOIN tags t ON t.id = mt.tag_id
+          WHERE mt.source = ? AND t.namespace = 'res' AND t.name = 'sd'`,
+      )
+      .pluck()
+      .get(AUTO_META_SOURCE) as number;
+    // The rows after the deletion are tagged again; the first chunk's are not
+    // until the next pass.
+    expect(tagged).toBe(602 - 512);
+  });
+
   it("reports progress against the alive-row total", async () => {
     const seen: [number, number][] = [];
     await backfillAutoMetaTags(db, {
