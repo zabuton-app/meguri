@@ -127,12 +127,17 @@ export function autoMetaTagsFor(input: AutoMetaInput): DerivedTag[] {
  * unchanged library becomes one indexed read per file and no WAL growth.
  * Returns true only when meta_tags actually changed. FTS needs no re-sync
  * either way: derived tags are namespaced, which tags_text leaves out.
+ *
+ * `tagIdOf` lets a batch resolve each tag once (derivedTagIdResolver); the ids
+ * it returns must name tags that exist now.
  */
 export function applyDerivedTagsByKey(
   db: DB,
   metaKey: string,
   source: string,
   desired: DerivedTag[],
+  tagIdOf: (tag: DerivedTag) => number = (tag) =>
+    upsertTag(db, tag.namespace, tag.name),
 ): boolean {
   for (const tag of desired) {
     // The FTS projection indexes namespace = '' only, which is why the backfill
@@ -143,9 +148,7 @@ export function applyDerivedTagsByKey(
       throw new Error(`derived tag must be namespaced: ${tag.name}`);
     }
   }
-  const wanted = new Set(
-    desired.map((tag) => upsertTag(db, tag.namespace, tag.name)),
-  );
+  const wanted = new Set(desired.map(tagIdOf));
   const current = new Set(
     db
       .prepare("SELECT tag_id FROM meta_tags WHERE meta_key = ? AND source = ?")
@@ -202,6 +205,29 @@ export interface DerivedTagRow {
 
 const BACKFILL_CHUNK = 512;
 
+/**
+ * A derived tag's id, each tag resolved once. A library has only a few dozen
+ * distinct derived tags, yet upsertTag prepares and runs two statements per
+ * call — per tag of every file, that was most of the backfill (#368).
+ *
+ * Build one per transaction, as autoTag.ts does with tagIdResolver: tags live in
+ * the library every workspace shares, so between transactions another
+ * workspace's scan may drop one (pruneUnusedTags), and a cached id would then
+ * name no tag.
+ */
+function derivedTagIdResolver(db: DB): (tag: DerivedTag) => number {
+  const ids = new Map<string, number>();
+  return ({ namespace, name }) => {
+    const key = JSON.stringify([namespace, name]);
+    let id = ids.get(key);
+    if (id === undefined) {
+      id = upsertTag(db, namespace, name);
+      ids.set(key, id);
+    }
+    return id;
+  };
+}
+
 export function needsAutoMetaBackfill(db: DB): boolean {
   return (
     getSetting(db, AUTO_META_VERSION_KEY) !== String(AUTO_META_RULESET_VERSION)
@@ -248,9 +274,11 @@ export async function backfillDerivedTags(
   ).n;
 
   const applyChunk = db.transaction((chunk: DerivedTagRow[]) => {
+    const tagIdOf = derivedTagIdResolver(db);
     let n = 0;
     for (const row of chunk) {
-      if (applyDerivedTagsByKey(db, row.meta_key, source, derive(row))) n++;
+      if (applyDerivedTagsByKey(db, row.meta_key, source, derive(row), tagIdOf))
+        n++;
     }
     return n;
   });
