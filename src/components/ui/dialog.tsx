@@ -41,7 +41,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-[calc(50%+var(--meguri-title-bar-height)/2)] z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-bg text-fg shadow-2xl outline-none",
+          "fixed left-1/2 top-[calc(50%+var(--meguri-title-bar-height)/2)] z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-window border border-border bg-surface text-fg shadow-2xl outline-none",
           className,
         )}
         {...props}

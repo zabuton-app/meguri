@@ -34,7 +34,7 @@ export function CrashReportDialog({
           <DialogTitle>{t("crash.reportTitle")}</DialogTitle>
           <DialogDescription>{t("crash.reportDesc")}</DialogDescription>
         </DialogHeader>
-        <pre className="mx-5 max-h-[50vh] select-text overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-bg p-3 font-mono text-xs text-fg">
+        <pre className="mx-5 max-h-[50vh] select-text overflow-auto whitespace-pre-wrap break-all rounded-card border border-border bg-bg p-3 font-mono text-xs text-fg">
           {report?.text}
         </pre>
         <DialogFooter className="mt-4 border-t border-border p-4">

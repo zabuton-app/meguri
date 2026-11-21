@@ -297,6 +297,8 @@ textarea,
 
 /* Sonner uses its own light/dark palette by default. Bridge it to Meguri themes. */
 [data-sonner-toaster][data-sonner-theme] {
+  /* Rounded as a popover is (rounded-control), not sonner's own 8px. */
+  --border-radius: var(--radius-control) !important;
   --normal-bg: var(--c-surface) !important;
   --normal-bg-hover: var(--c-overlay) !important;
   --normal-border: color-mix(

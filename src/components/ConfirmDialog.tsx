@@ -154,7 +154,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             aria-labelledby={state.title ? titleId : messageId}
             aria-describedby={state.title ? messageId : undefined}
             className={cn(
-              "w-full rounded-lg border border-border bg-surface p-4 shadow-xl outline-none",
+              "w-full rounded-window border border-border bg-surface p-4 shadow-2xl outline-none",
               state.details ? "max-w-md" : "max-w-sm",
             )}
             onClick={(e) => e.stopPropagation()}
@@ -190,7 +190,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               </label>
             )}
             <div className="mt-4 flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onClick={() => close(false)}>
+              <Button size="sm" variant="outline" onClick={() => close(false)}>
                 {state.cancelText ?? t("common.cancel")}
               </Button>
               <Button
