@@ -402,6 +402,7 @@ export default function MediaDetail() {
                     ref={playerRef}
                     id={fileId}
                     src={mediaSrc}
+                    remuxed={isRemuxedVideo(d.codec, d.ext)}
                     audioTracks={
                       isRemuxedVideo(d.codec, d.ext) ? audioTracks : undefined
                     }

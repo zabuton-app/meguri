@@ -147,6 +147,14 @@ export const VideoPlayer = forwardRef<
     wsId: string;
     /** Initial seek position in seconds (0 = start). Applied once on load. */
     startAt: number;
+    /**
+     * Whether the media server remuxes this file (see `isRemuxedVideo`). Such a
+     * file is loaded from `startAt` straight away rather than from the top and
+     * seeked once its metadata is in: that seek re-serves it from `?t=`, a
+     * second ffmpeg run on top of the one already started (#400). Leave it off
+     * when unsure — the file then takes the slower path that works for all.
+     */
+    remuxed?: boolean;
     /** Whether the video should start playing automatically (default true). */
     autoplay?: boolean;
     /** Reopen the stream once at its position after a network error mid-playback. */
@@ -240,6 +248,7 @@ export const VideoPlayer = forwardRef<
     mediaBase,
     wsId,
     startAt,
+    remuxed = false,
     autoplay = true,
     reopenOnNetworkError = false,
     recordPosition = true,
@@ -1068,6 +1077,14 @@ export const VideoPlayer = forwardRef<
     if (error && onFatalError) onFatalError(error);
   }, [error, onFatalError]);
 
+  // A remuxed file is a stream, so the server can start it at `startAt` for
+  // the same one ffmpeg run that starting at the top would cost. The element
+  // keeps whatever `?t=` it was loaded with when `startAt` changes later:
+  // VideoElement sees the same file and leaves it alone. An empty `src` (the
+  // media origin not known yet) has no URL to add it to.
+  const openedAtStart =
+    remuxed && startAt > 0 && src ? withStreamSeek(src, startAt) : null;
+
   if (error && onFatalError) return null;
 
   if (error) {
@@ -1173,7 +1190,7 @@ export const VideoPlayer = forwardRef<
       <VideoElement
         videoRef={ref}
         onAttach={onAttach}
-        src={src}
+        src={openedAtStart ?? src}
         autoPlay={autoplay}
         className={`h-full w-full object-contain transition-opacity ${
           chromeless
@@ -1235,10 +1252,18 @@ export const VideoPlayer = forwardRef<
             setNativeDur(v.duration);
             onNativeDuration(v.duration);
           }
-          // Apply the initial seek (a resume point, a scene, a bookmark) once.
+          // Read the offset off the element: it may have been loaded from a
+          // `?t=` before this host saw it (opened at `startAt`, or handed
+          // over before its metadata arrived).
+          const source = v.getAttribute("src");
+          const streamOffset = streamOffsetOf(source);
+          setOffset(streamOffset);
+          setPosition(streamOffset + v.currentTime);
+          // Apply the initial seek (a resume point, a scene, a bookmark) once,
+          // unless the file was loaded from there already (`openedAtStart`).
           if (startAt > 0 && !appliedStartRef.current) {
             appliedStartRef.current = true;
-            seekRef.current(startAt);
+            if (source !== openedAtStart) seekRef.current(startAt);
           }
           // A seek asked for while there was nothing loaded yet. It comes after
           // the initial seek because it is the newer intent of the two.
