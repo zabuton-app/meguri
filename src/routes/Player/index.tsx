@@ -503,24 +503,25 @@ export default function Player() {
         </>
       )}
 
-      {/* Resumed where it was left: shown with the rest of the chrome. */}
-      {resumeStart.resumed && !isImage && chromeVisible && (
-        <ResumeNotice
-          sec={resumeStart.startAt}
-          onStartOver={() => {
-            if (isAudio) seekAudio(0);
-            else videoRef.current?.seek(0);
-            resumeStart.dismiss();
-          }}
-          className="absolute top-4 left-1/2 z-20 -translate-x-1/2 bg-black/60 text-white/80 backdrop-blur-sm [&_button]:text-white"
-          t={t}
-        />
-      )}
-
       {!empty && !queue.unplayable && (
         <PlayerChrome
           title={title}
           folderLabel={folderLabel}
+          // Resumed where it was left: shown with the rest of the chrome.
+          notice={
+            resumeStart.resumed && !isImage ? (
+              <ResumeNotice
+                sec={resumeStart.startAt}
+                onStartOver={() => {
+                  if (isAudio) seekAudio(0);
+                  else videoRef.current?.seek(0);
+                  resumeStart.dismiss();
+                }}
+                className="bg-black/60 text-white/80 backdrop-blur-sm [&_button]:text-white"
+                t={t}
+              />
+            ) : null
+          }
           position={queue.position}
           total={queue.total}
           playing={playing}

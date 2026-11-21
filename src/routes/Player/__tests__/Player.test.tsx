@@ -372,6 +372,21 @@ describe("Player video chrome", () => {
   });
 });
 
+describe("Player resume notice", () => {
+  it("shows where it resumed as part of the chrome, so it takes clicks", async () => {
+    // The chrome is a layer over the whole stage: a notice beside it, not in
+    // it, sat under it and took no clicks.
+    mocks.fileGet.mockResolvedValue({
+      ...detailFor(1, "video"),
+      duration: 120,
+      resumePosition: 42,
+    });
+    renderPlayer([row(1, "video")]);
+    const startOver = await screen.findByRole("button", { name: /Start over/ });
+    expect(startOver.closest("[data-slot='player-chrome']")).not.toBeNull();
+  });
+});
+
 describe("Player fullscreen", () => {
   it("does not take over the screen on its own", async () => {
     const request = vi.fn();
