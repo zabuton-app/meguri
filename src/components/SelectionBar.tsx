@@ -30,14 +30,14 @@ interface Props {
 }
 
 const ACTION_CLASS =
-  "flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-bg px-2.5 text-xs text-fg transition hover:bg-overlay disabled:cursor-default disabled:opacity-50 disabled:hover:bg-bg";
+  "flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control border border-border bg-bg px-2.5 text-xs text-fg transition hover:bg-overlay disabled:cursor-default disabled:opacity-50 disabled:hover:bg-bg";
 
 // The same button, minus the fade on `disabled`. The toggles below disable
 // themselves while their write is in flight, and fading them out at that exact
 // moment would play the activation effect on a half-transparent button. They dim
 // only when there is nothing to act on, which the caller applies explicitly.
 const TOGGLE_CLASS =
-  "relative flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-bg px-2.5 text-xs text-fg transition hover:bg-overlay disabled:cursor-default disabled:hover:bg-bg";
+  "relative flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control border border-border bg-bg px-2.5 text-xs text-fg transition hover:bg-overlay disabled:cursor-default disabled:hover:bg-bg";
 
 export function SelectionBar({ onEditTags, onExit }: Props) {
   const { t } = useI18n();
@@ -99,10 +99,10 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
       // meant to cover it — the tag dialog included.
       className="pointer-events-auto absolute bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-window border border-border-strong bg-surface p-2 shadow-lg shadow-black/40"
     >
-      <span className="flex items-center gap-1.5 whitespace-nowrap pl-0.5 pr-1 text-[13px] font-bold text-fg">
+      <span className="flex items-center gap-1.5 whitespace-nowrap pl-0.5 pr-1 text-xs font-bold text-fg">
         <span
           className={cn(
-            "flex size-[22px] items-center justify-center rounded-md text-xs font-bold tabular-nums",
+            "flex size-6 items-center justify-center rounded-control text-xs font-bold tabular-nums",
             empty
               ? "bg-overlay text-muted"
               : "bg-primary text-primary-foreground",
@@ -147,11 +147,11 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
         // is a dead end, not a refusal.
         disabled={unavailable}
         title={tooMany ? limitTitle : undefined}
-        className="flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-md border border-primary bg-primary px-3 text-xs font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-default disabled:opacity-50"
+        className="flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control border border-primary bg-primary px-3 text-xs font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-default disabled:opacity-50"
       >
-        <Tag className="size-[15px]" />
+        <Tag className="size-4" />
         {t("select.editTags")}
-        <span className="rounded bg-bg/20 px-1 text-[10px] font-bold">T</span>
+        <span className="rounded-item bg-bg/20 px-1 text-2xs font-bold">T</span>
       </button>
 
       {/* Stars read as the whole selection's rating, or as empty with a "mixed"
@@ -159,7 +159,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
           a rating the selection does not have. Clicking sets every file. */}
       <span
         className={cn(
-          "flex h-[30px] items-center gap-1 rounded-md border border-border bg-bg px-2",
+          "flex h-8 items-center gap-1 rounded-control border border-border bg-bg px-2",
           // RatingStars plays its own staggered pop and burst on click; only a
           // selection it cannot act on greys the group out.
           unavailable && "pointer-events-none opacity-50",
@@ -190,7 +190,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
             title={t("select.ratingClear")}
             className="ml-1 flex items-center text-muted transition hover:text-fg"
           >
-            <StarOff className="size-[13px]" />
+            <StarOff className="size-3.5" />
           </button>
         )}
       </span>
@@ -226,7 +226,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
         >
           <Heart
             className={cn(
-              "size-[15px] text-error",
+              "size-4 text-error",
               // A partly-favorited selection shows an outline, not a fill: the
               // fill would read as "all of these are favorites".
               favorite.flag === "all" && "fill-current",
@@ -244,7 +244,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
         )}
         {t("select.favorite")}
         {favorite.flag === "some" && (
-          <span className="text-[10px] tabular-nums text-muted">
+          <span className="text-2xs tabular-nums text-muted">
             {favorite.on}/{favorite.total}
           </span>
         )}
@@ -280,7 +280,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
         >
           <Clock
             className={cn(
-              "size-[15px]",
+              "size-4",
               queued.flag === "all" ? "text-primary" : "text-muted",
             )}
           />
@@ -294,7 +294,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
         )}
         {t("select.watchLater")}
         {queued.flag === "some" && (
-          <span className="text-[10px] tabular-nums text-muted">
+          <span className="text-2xs tabular-nums text-muted">
             {queued.on}/{queued.total}
           </span>
         )}
@@ -307,9 +307,9 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
         onClick={onExit}
         aria-label={t("select.exit")}
         title={t("select.exit")}
-        className="flex size-[30px] items-center justify-center rounded-md border border-border bg-bg text-muted transition hover:bg-overlay hover:text-fg"
+        className="flex size-8 items-center justify-center rounded-control border border-border bg-bg text-muted transition hover:bg-overlay hover:text-fg"
       >
-        <X className="size-[15px]" />
+        <X className="size-4" />
       </button>
     </div>
   );

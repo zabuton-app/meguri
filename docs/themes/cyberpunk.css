@@ -165,8 +165,8 @@ body:has([data-slot="workspace-rail"] [data-state="open"])
 }
 
 /* Files: sharp corners, glow on hover.
-   The app draws the selected / focused rings with box-shadow, the card's
-   selected state with its border color, and the row's with its background.
+   The app draws the focus ring with box-shadow, the card's selected state
+   with its border color and background, and the row's with its background.
    None of those is set here, so selection stays visible: the glow is a
    drop-shadow filter and the focus marker an outline. */
 [data-slot="media-card"] {
@@ -192,12 +192,14 @@ body:has([data-slot="workspace-rail"] [data-state="open"])
   outline-offset: 2px;
 }
 
-/* Folders: dashed, like warning tape. A folder card shows selection with a
-   ring only, so its border is free; a folder row shows it with its
-   background, so only the row's left edge is marked. */
+/* Folders: dashed, like warning tape. A folder card shows selection with its
+   border color, so the yellow is left off a selected one; a folder row shows
+   it with its background, so only the row's left edge is marked. */
 [data-slot="folder-card"] {
   border-radius: 2px;
   border-style: dashed;
+}
+[data-slot="folder-card"]:not([data-selected]) {
   border-color: var(--c-accent2);
 }
 [data-slot="folder-row"] {

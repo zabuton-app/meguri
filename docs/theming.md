@@ -63,7 +63,8 @@ without notice.
 - The `--c-*` color variables
 - The `data-slot` values listed below
 - `data-appearance` on `<html>`
-- `aria-current="true"` on the focused item of the grid and the list
+- `aria-current="true"` on the focused item of the grid and the list, and
+  `data-selected` on a selected one
 
 A change to any of these is called out in the release notes.
 
@@ -178,7 +179,8 @@ the corners its rounding leaves.
 }
 ```
 
-The focused item in the grid or the list has `aria-current="true"`.
+The focused item in the grid or the list has `aria-current="true"`, and a
+selected one has `data-selected`.
 
 ```css
 [data-slot="media-card"] {
@@ -206,9 +208,13 @@ it — icons, hover states and the active item included:
 Leave the properties that show selection alone, or the selection can become
 invisible:
 
-- Every item draws its selected and focused rings with `box-shadow`.
-- `media-card` also shows selection with its border color.
-- `media-row` and `folder-row` also show selection with their background.
+- Every item draws its focus ring with `box-shadow`.
+- `media-card` shows selection with its border color and its background.
+- `folder-card` shows selection with its border color.
+- `media-row` and `folder-row` show selection with their background.
+
+To change one of them anyway, leave the selected items out with
+`:not([data-selected])`.
 
 Radius, spacing, `outline` and `filter` are free to change.
 

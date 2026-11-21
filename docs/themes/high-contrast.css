@@ -104,8 +104,8 @@ html[data-appearance] {
 }
 
 /* Files and folders: a thicker frame. Only the width changes, so the card's
-   selected border color (--c-primary) and the selection rings (box-shadow)
-   still show. The focused file gets the heavy outline too. */
+   selected border color (--c-primary) and the focus ring (box-shadow) still
+   show. The focused file gets the heavy outline too. */
 [data-slot="media-card"],
 [data-slot="folder-card"] {
   border-width: 2px;

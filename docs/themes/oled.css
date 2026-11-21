@@ -87,8 +87,8 @@ html[data-appearance] {
   border-top: 1px solid var(--c-border);
 }
 
-/* The focus marker is an outline, so the app's own selection rings
-   (box-shadow) and the card's selected border stay as they are. */
+/* The focus marker is an outline, so the app's own focus ring (box-shadow)
+   and the card's selected border and background stay as they are. */
 [data-slot="media-card"][aria-current="true"],
 [data-slot="media-row"][aria-current="true"] {
   outline: 1px solid var(--c-bright-fg);
