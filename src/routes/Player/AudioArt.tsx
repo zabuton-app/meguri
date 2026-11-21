@@ -29,7 +29,7 @@ export function AudioArt({
         <img
           src={thumbSrc}
           alt=""
-          className="max-h-[70%] max-w-[70%] rounded-lg object-contain shadow-2xl"
+          className="max-h-[70%] max-w-[70%] rounded-card object-contain shadow-2xl"
         />
       ) : (
         <Music

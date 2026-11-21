@@ -58,8 +58,8 @@ export function Scenes({
   }, [id]);
   const framesDue = framesDueId === id;
   return (
-    <section className="rounded-xl border border-border bg-surface p-3">
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+    <section className="border-t border-border py-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase text-muted">
           {t("media.scenes")}
         </h3>
@@ -69,7 +69,7 @@ export function Scenes({
           <div className="flex items-center gap-2 text-2xs text-muted">
             <span>{t("media.currentMainThumb")}</span>
             <div
-              className="relative h-10 overflow-hidden rounded border border-border bg-black"
+              className="relative h-10 overflow-hidden rounded-item border border-border bg-black"
               aria-busy={mainThumbPending}
             >
               <img src={mainThumbUrl} alt="" className="h-full w-auto" />
@@ -91,7 +91,7 @@ export function Scenes({
               <div
                 key={i}
                 data-testid="scene-placeholder"
-                className="shrink-0 overflow-hidden rounded-lg border border-border"
+                className="shrink-0 overflow-hidden rounded-item border border-border"
               >
                 <Skeleton className="h-24 w-40 rounded-none" />
               </div>
@@ -150,7 +150,7 @@ function SceneThumb({
       <button
         type="button"
         onClick={() => onSeek(sec)}
-        className={`relative block overflow-hidden rounded-lg border transition hover:border-[var(--c-primary)] ${
+        className={`relative block overflow-hidden rounded-item border transition hover:border-[var(--c-primary)] ${
           isMainThumb ? "border-[var(--c-primary)]" : "border-border"
         }`}
         title={t("scene.seekTo", { time: fmtTime(sec) })}
@@ -166,7 +166,7 @@ function SceneThumb({
             loaded ? "w-auto opacity-100" : "w-40 opacity-0"
           }`}
         />
-        <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1 text-[10px] tabular-nums text-white">
+        <span className="absolute bottom-1 right-1 rounded-item bg-black/75 px-1 text-2xs tabular-nums text-white">
           {fmtTime(sec)}
         </span>
       </button>

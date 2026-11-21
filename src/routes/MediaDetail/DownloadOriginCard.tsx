@@ -27,7 +27,7 @@ export function DownloadOriginCard({
   return (
     <section
       aria-label={t("downloadOrigin.title")}
-      className="space-y-2 rounded-lg border border-border bg-surface p-3 text-sm"
+      className="space-y-2 border-t border-border py-3 text-sm"
     >
       <h2 className="font-semibold text-bright-fg">
         {t("downloadOrigin.title")}

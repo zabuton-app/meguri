@@ -67,7 +67,7 @@ export function AudioCompact({ file, wsId, mediaBase, coverSrc }: Props) {
 
   return (
     <div className="flex items-center gap-4">
-      <div className="group relative size-[120px] shrink-0 overflow-hidden rounded-xl bg-overlay text-muted">
+      <div className="group relative size-30 shrink-0 overflow-hidden rounded-card bg-overlay text-muted">
         {coverSrc ? (
           <img
             src={coverSrc}
@@ -154,7 +154,7 @@ export function AudioStage({ file, wsId, mediaBase, coverSrc }: Props) {
     // Same anatomy as the video player: the artwork is the stage, and the
     // transport is laid over its bottom edge on a gradient, shown while paused
     // and on hover, out of the way while the track plays.
-    <div className="group relative flex aspect-video max-h-[78vh] w-full items-center justify-center overflow-hidden rounded-xl bg-black">
+    <div className="group relative flex aspect-video max-h-[78vh] w-full items-center justify-center overflow-hidden rounded-card bg-black">
       {coverSrc ? (
         <img
           // Scaled up until its width or its height fits the stage (a square
