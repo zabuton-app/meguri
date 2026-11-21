@@ -42,6 +42,7 @@ import { formatDuration, formatSize } from "@/lib/format";
 import { formatDate } from "@/lib/dates";
 import type { Lang } from "@/i18n/I18nProvider";
 import { LIST_HIDDEN_SOURCES } from "@shared/tags";
+import { isRemuxedVideo } from "@shared/playbackTracks";
 import { tagColorClass } from "@/lib/tagColorClass";
 import { tagHumanLabel } from "@/lib/tagLabel";
 import { TagChipLabel } from "@/components/TagChipLabel";
@@ -262,6 +263,9 @@ export function DiscoverCard({
             mediaBase={mediaBase}
             wsId={wsId}
             startAt={activePreview.at}
+            // A list row carries no codec, so only the container can tell;
+            // a codec the server converts takes the slower path.
+            remuxed={isRemuxedVideo(null, file.ext)}
             autoplay={activePreview.autoplay}
             navKeys={NAV_BINDINGS[keybindingPreset]}
             onNativeDuration={() => undefined}

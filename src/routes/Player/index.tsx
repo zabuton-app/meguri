@@ -55,7 +55,7 @@ import { usePlaylistAudio } from "./usePlaylistAudio";
 import { useStageTransition } from "./useStageTransition";
 import { useFolderScopeLabel } from "@/hooks/useFolderScopeLabel";
 import { usePlaybackNav } from "@/components/MediaNavContext";
-import { needsVideoPreview } from "@shared/playbackTracks";
+import { isRemuxedVideo, needsVideoPreview } from "@shared/playbackTracks";
 
 /**
  * Half of one item-to-item transition: the outgoing item fades out over this
@@ -465,6 +465,10 @@ export default function Player() {
                   mediaBase={mediaBase}
                   wsId={wsId}
                   startAt={resumeStart.startAt}
+                  remuxed={isRemuxedVideo(
+                    detailFor?.codec ?? null,
+                    detailFor?.ext ?? null,
+                  )}
                   autoplay
                   // The server can end a video preview that stops reading.
                   reopenOnNetworkError={needsVideoPreview(detailFor?.codec)}

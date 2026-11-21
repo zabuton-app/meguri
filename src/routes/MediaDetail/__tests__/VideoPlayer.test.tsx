@@ -598,11 +598,11 @@ describe("VideoPlayer", () => {
 
   describe("re-serving a stream on a seek", () => {
     /** A stream: nothing is seekable, so every seek re-serves the file. */
-    function streamOf(video: HTMLVideoElement) {
+    function streamOf(video: HTMLVideoElement, load = vi.fn()) {
       const play = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(video, "load", {
         configurable: true,
-        value: vi.fn(),
+        value: load,
       });
       Object.defineProperty(video, "play", { configurable: true, value: play });
       return play;
@@ -672,6 +672,74 @@ describe("VideoPlayer", () => {
 
       expect(video.getAttribute("src")).toContain("?t=30");
       expect(play).toHaveBeenCalledTimes(1);
+    });
+
+    it("loads a remuxed file from the opening position instead of re-serving it", () => {
+      const { video, ref } = renderPlayer({ remuxed: true, startAt: 30 });
+      const load = vi.fn();
+      const play = streamOf(video, load);
+
+      expect(video.getAttribute("src")).toContain("?t=30");
+      metadataIn(video);
+
+      // One load, from the second asked for, and reported as that second.
+      expect(load).not.toHaveBeenCalled();
+      expect(play).not.toHaveBeenCalled();
+      expect(video.getAttribute("src")).toContain("?t=30");
+      expect(ref.current?.currentTime()).toBe(30);
+    });
+
+    it("re-serves a remuxed file whose opening position moved while it loaded", () => {
+      const { video, view, props, ref } = renderPlayer({
+        remuxed: true,
+        startAt: 30,
+      });
+      const load = vi.fn();
+      streamOf(video, load);
+      view.rerender(
+        <Providers>
+          <VideoPlayer ref={ref} {...props} startAt={60} />
+        </Providers>,
+      );
+
+      metadataIn(video);
+
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(video.getAttribute("src")).toContain("?t=60");
+      expect(ref.current?.currentTime()).toBe(60);
+    });
+
+    it("reports the position of a stream loaded from a `?t=` it was not asked for", () => {
+      // An element handed over before its metadata arrived: loaded from 30
+      // by the previous host, adopted by one with no opening position.
+      const { video, view, props, ref } = renderPlayer({
+        remuxed: true,
+        startAt: 30,
+      });
+      const load = vi.fn();
+      streamOf(video, load);
+      view.rerender(
+        <Providers>
+          <VideoPlayer ref={ref} {...props} startAt={0} />
+        </Providers>,
+      );
+
+      metadataIn(video);
+
+      expect(load).not.toHaveBeenCalled();
+      expect(ref.current?.currentTime()).toBe(30);
+    });
+
+    it("waits for the media origin before loading a remuxed file from the opening position", () => {
+      const { video } = renderPlayer({ remuxed: true, startAt: 30, src: "" });
+
+      expect(video.getAttribute("src")).toBeNull();
+    });
+
+    it("loads a file not known to be remuxed from the top", () => {
+      const { video } = renderPlayer({ startAt: 30 });
+
+      expect(video.getAttribute("src")).not.toContain("?t=");
     });
 
     it("keeps a video the user paused paused", () => {
