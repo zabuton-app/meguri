@@ -193,6 +193,47 @@ function resolveSearchTagIds(db: DB, value: string): number[] {
 }
 
 /**
+ * How many meta_tags rows a tag filter may match and still start from them
+ * (#365). The count is library-wide: every one of them is a probe of the
+ * files' meta_key index, whichever workspace it belongs to, so the cap also
+ * bounds what that form costs (about a millisecond on 50,000 files).
+ * Exported for the tests, which put a tag on either side of it.
+ */
+export const RARE_TAG_ROWS = 2000;
+
+/**
+ * The condition that a file carries one of the tags in `ids` (a JSON array),
+ * optionally from one source. For a rare tag, the list starts from the tag's
+ * rows in idx_meta_tags_tag and looks the files up by meta_key. For a common
+ * one, it stays a probe of meta_tags per file: collecting every match then
+ * costs more than checking each file, and a list sorted along an index stops
+ * checking once a page fills.
+ *
+ * Through files.id rather than `f.meta_key IN (...)`: without statistics, the
+ * planner pairs the latter with idx_files_alive and still walks every live
+ * file, while an IN on the rowid is the lookup it prefers.
+ */
+function tagCondition(
+  db: DB,
+  args: unknown[],
+  ids: string,
+  source?: string,
+): string {
+  const rows = db
+    .prepare(
+      "SELECT count(*) FROM (SELECT 1 FROM meta_tags WHERE tag_id IN (SELECT value FROM json_each(?)) LIMIT ?)",
+    )
+    .pluck()
+    .get(ids, RARE_TAG_ROWS + 1) as number;
+  args.push(ids);
+  if (source) args.push(source);
+  const bySource = source ? " AND mt.source = ?" : "";
+  return rows <= RARE_TAG_ROWS
+    ? `f.id IN (SELECT id FROM files WHERE meta_key IN (SELECT mt.meta_key FROM meta_tags mt WHERE mt.tag_id IN (SELECT value FROM json_each(?))${bySource}))`
+    : `EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?))${bySource})`;
+}
+
+/**
  * The FROM clause for a search's rows: inside a folder, that folder's slice of
  * the rel_path index, whatever the query sorts by or picks (see PINNED_FILES).
  * The root has no range to walk. Exported for the index-plan tests.
@@ -281,9 +322,7 @@ export function appendSearchConditions(
       sql += " AND 0";
       break;
     }
-    sql +=
-      " AND EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?)))";
-    args.push(JSON.stringify(ids));
+    sql += ` AND ${tagCondition(db, args, JSON.stringify(ids))}`;
   }
   if (query.folder) {
     const cond = folderCondition(
@@ -358,16 +397,8 @@ export function appendSearchConditions(
       sql += " AND 0";
       break;
     }
-    // Pre-resolving to ids drops the `tags` join, leaving a primary-key probe on
-    // meta_tags(meta_key, tag_id).
-    sql +=
-      " AND EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?))";
-    args.push(JSON.stringify(ids));
-    if (query.tagSource) {
-      sql += " AND mt.source = ?";
-      args.push(query.tagSource);
-    }
-    sql += ")";
+    // Pre-resolving to ids drops the `tags` join.
+    sql += ` AND ${tagCondition(db, args, JSON.stringify(ids), query.tagSource)}`;
   }
   if (query.inProgress) {
     // An IN over the partial index rather than a test on the joined `m`: the

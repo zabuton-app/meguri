@@ -11,6 +11,7 @@ import {
   listBookmarks,
   migrateMetaKey,
   pruneUnusedTags,
+  RARE_TAG_ROWS,
   randomFiles,
   removeBookmark,
   searchFiles,
@@ -578,10 +579,13 @@ describe("structured tag filtering", () => {
   });
 
   it("still honours tagSource across every token", () => {
+    // The same tag from another source, on a file of its own.
+    const manualRes = insertFile(db, rootId, { relPath: "manual-res.mp4" });
+    addFileTag(db, manualRes, upsertTag(db, "res", "4k"), "manual", null);
     expect(ids(["res:4k"], "auto-meta")).toEqual(
       [autoOnly, both].sort((a, b) => a - b),
     );
-    expect(ids(["res:4k"], "manual")).toEqual([]);
+    expect(ids(["res:4k"], "manual")).toEqual([manualRes]);
   });
 
   describe("the tag: free-text directive", () => {
@@ -691,6 +695,59 @@ describe("structured tag filtering", () => {
 
     it("returns nothing for an unknown tag", () => {
       expect(q("tag:nope")).toEqual([]);
+    });
+  });
+
+  it("leaves out a deleted file that carries the tag", () => {
+    db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(both);
+    expect(ids(["beach"])).toEqual([manualOnly]);
+    expect(searchFiles(db, { q: "tag:beach" }).items.map((f) => f.id)).toEqual([
+      manualOnly,
+    ]);
+  });
+
+  // Past RARE_TAG_ROWS rows, a tag is checked per file rather than
+  // collected from its rows (#365). The rows added here belong to no file in
+  // this workspace, as another workspace's would, so the answers stay the same.
+  describe("tags common enough to check per file", () => {
+    beforeEach(() => {
+      const add = db.prepare(
+        "INSERT INTO meta_tags (meta_key, tag_id, source) VALUES (?, ?, ?)",
+      );
+      const beach = db
+        .prepare("SELECT id FROM tags WHERE namespace = '' AND name = 'beach'")
+        .pluck()
+        .get() as number;
+      const res4k = upsertTag(db, "res", "4k");
+      for (let i = 0; i <= RARE_TAG_ROWS; i++) {
+        add.run(`elsewhere${i}`, beach, "manual");
+        add.run(`elsewhere${i}`, res4k, "auto-meta");
+      }
+    });
+
+    it("matches the same files as a rare tag", () => {
+      expect(ids(["beach"])).toEqual([manualOnly, both].sort((a, b) => a - b));
+      expect(ids(["beach", "res:4k"])).toEqual([both]);
+      expect(
+        searchFiles(db, { q: "tag:4k" })
+          .items.map((f) => f.id)
+          .sort((a, b) => a - b),
+      ).toEqual([autoOnly, both].sort((a, b) => a - b));
+    });
+
+    it("still honours tagSource", () => {
+      // The same tag from another source, on a file of its own.
+      const manualRes = insertFile(db, rootId, { relPath: "manual-res.mp4" });
+      addFileTag(db, manualRes, upsertTag(db, "res", "4k"), "manual", null);
+      expect(ids(["res:4k"], "auto-meta")).toEqual(
+        [autoOnly, both].sort((a, b) => a - b),
+      );
+      expect(ids(["res:4k"], "manual")).toEqual([manualRes]);
+    });
+
+    it("leaves out a deleted file that carries the tag", () => {
+      db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(both);
+      expect(ids(["beach"])).toEqual([manualOnly]);
     });
   });
 

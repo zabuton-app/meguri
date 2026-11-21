@@ -750,5 +750,12 @@ of the date and hash orders is left to the planner, as each of those indexes
 yields only one. So is any
 filtered list: without statistics nothing tells how few rows a filter leaves,
 and for a rare one, walking the sort order to fill a page reads every live row.
+Tag filters (`tags[]` and `tag:`) are the exception: they count the tag's
+`meta_tags` rows first, across the whole library and capped at
+`RARE_TAG_ROWS`. Under the cap, the condition is an `IN` on `files.id` that
+starts from `idx_meta_tags_tag` and looks the files up by `meta_key`; written
+as `f.meta_key IN (...)`, the planner would still walk `idx_files_alive`.
+Above it, the tag stays a per-file `EXISTS`, since collecting every match
+costs more than checking each file.
 The plan tests in `electron/core/__tests__/indexes.test.ts` that check these
 run without statistics.
