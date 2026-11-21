@@ -318,10 +318,10 @@ export default function MediaDetail() {
           t={t}
         />
         <div className="flex w-full flex-col gap-4 px-4 py-4">
-          <Skeleton className="aspect-video w-full rounded-xl" />
+          <Skeleton className="aspect-video w-full rounded-card" />
           <Skeleton className="h-6 w-2/3" />
           <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-card" />
         </div>
       </MediaModal>
     );
@@ -483,7 +483,7 @@ export default function MediaDetail() {
               )
             ) : (
               <div
-                className={`flex justify-center overflow-hidden rounded-xl ${
+                className={`flex justify-center overflow-hidden rounded-card ${
                   imageBgInverted ? "bg-white" : "bg-black"
                 }`}
               >

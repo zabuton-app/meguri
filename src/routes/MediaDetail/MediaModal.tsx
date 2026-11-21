@@ -183,7 +183,7 @@ export function MediaModal({
           >
             <span
               aria-hidden
-              className="flex h-6 w-4 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-muted group-hover/handle:border-primary group-hover/handle:text-fg group-focus-visible/handle:border-primary group-focus-visible/handle:text-fg"
+              className="flex h-6 w-4 shrink-0 items-center justify-center rounded-control border border-border bg-bg text-muted group-hover/handle:border-primary group-hover/handle:text-fg group-focus-visible/handle:border-primary group-focus-visible/handle:text-fg"
             >
               <EllipsisVertical className="size-3.5" />
             </span>

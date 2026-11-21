@@ -231,7 +231,7 @@ function Column({
         divided ? "border-r border-white/10 pr-1.5" : ""
       }`}
     >
-      <legend className="flex items-center gap-2 px-2.5 pb-1.5 pt-2 text-[13px] font-bold">
+      <legend className="flex items-center gap-2 px-2.5 pb-1.5 pt-2 text-xs font-bold">
         <Icon size={16} aria-hidden="true" className="shrink-0" />
         {legend}
       </legend>
@@ -256,7 +256,7 @@ function Option({
   detail?: string;
 }) {
   return (
-    <label className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1 hover:bg-white/5 has-checked:bg-white/10 has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:outline-2 has-focus-visible:outline-primary">
+    <label className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-item px-2.5 py-1 hover:bg-white/5 has-checked:bg-white/10 has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:outline-2 has-focus-visible:outline-primary">
       <input
         type="radio"
         name={name}

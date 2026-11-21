@@ -1072,7 +1072,7 @@ export const VideoPlayer = forwardRef<
 
   if (error) {
     return (
-      <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl bg-surface p-8 text-center text-muted">
+      <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-card bg-surface p-8 text-center text-muted">
         <p>{t("player.playFailed")}</p>
         {/* Selectable: the raw codec / MediaError string belongs in bug reports. */}
         <p className="select-text text-xs">{error}</p>
@@ -1157,7 +1157,7 @@ export const VideoPlayer = forwardRef<
       } ${
         fillsParent
           ? `${chromeless ? "h-full" : "h-screen"} rounded-none`
-          : "max-h-[78vh] rounded-xl"
+          : "max-h-[78vh] rounded-card"
       }`}
       style={fillsParent ? undefined : { aspectRatio }}
     >
@@ -1298,7 +1298,7 @@ export const VideoPlayer = forwardRef<
       {trackUnavailable && (
         <div
           role="status"
-          className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded bg-black/80 px-2 py-1 text-xs text-white"
+          className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-item bg-black/80 px-2 py-1 text-xs text-white"
         >
           {t("player.audioTrackUnavailable")}
         </div>
@@ -1309,7 +1309,7 @@ export const VideoPlayer = forwardRef<
           className="pointer-events-none absolute inset-x-5 bottom-20 text-center"
         >
           <span
-            className={`inline-block whitespace-pre-line rounded bg-black/80 px-3 py-1 text-white ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
+            className={`inline-block whitespace-pre-line rounded-item bg-black/80 px-3 py-1 text-white ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
           >
             {caption}
           </span>
@@ -1387,9 +1387,9 @@ export const VideoPlayer = forwardRef<
                   alt=""
                   // max-w-none: cancels Tailwind preflight's img{max-width:100%}.
                   // Prevents the image from being squashed horizontally when the containing block's available width shrinks at later positions.
-                  className="h-28 w-auto max-w-none rounded-md border border-white/30 bg-black shadow-lg"
+                  className="h-28 w-auto max-w-none rounded-control border border-white/30 bg-black shadow-lg"
                 />
-                <span className="mt-1 rounded bg-black/75 px-1.5 py-0.5 text-2xs tabular-nums">
+                <span className="mt-1 rounded-item bg-black/75 px-1.5 py-0.5 text-2xs tabular-nums">
                   {fmtTime(hover.t)}
                 </span>
               </div>

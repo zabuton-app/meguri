@@ -90,7 +90,7 @@ export function VideoGradeOverlay({
           aria-label={t("grade.title")}
           title={t("grade.title")}
           aria-expanded={open}
-          className={`absolute right-2 top-2 z-10 rounded-md border p-1.5 shadow-sm transition-[color,background-color,border-color,opacity] duration-200 motion-reduce:transition-none focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 ${
+          className={`absolute right-2 top-2 z-10 rounded-control border p-1.5 shadow-sm transition-[color,background-color,border-color,opacity] duration-200 motion-reduce:transition-none focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100 ${
             playing
               ? "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
               : "opacity-100"
@@ -142,7 +142,7 @@ export function VideoGradeOverlay({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
               <section
                 aria-labelledby={colorId}
-                className="space-y-2 rounded-md border border-border bg-surface p-2"
+                className="space-y-2 rounded-control border border-border bg-surface p-2"
               >
                 <h3
                   id={colorId}
@@ -220,7 +220,7 @@ export function VideoGradeOverlay({
                           aria-describedby={hintId}
                           title={t("grade.holdHint")}
                           disabled={!enabled || failed || value === neutral}
-                          className="touch-none select-none rounded text-left enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary aria-pressed:text-primary"
+                          className="touch-none select-none rounded-item text-left enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary aria-pressed:text-primary"
                           onPointerDown={(event) => {
                             if (!event.isPrimary || event.button !== 0) return;
                             event.currentTarget.setPointerCapture(
@@ -315,7 +315,7 @@ function ToneCurve({ grade }: { grade: VideoGrade }) {
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
       aria-hidden="true"
-      className="h-16 w-full rounded border border-border bg-bg"
+      className="h-16 w-full rounded-item border border-border bg-bg"
     >
       <path
         d="M 0 100 L 100 0"
