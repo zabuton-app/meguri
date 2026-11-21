@@ -34,6 +34,7 @@ node tools/demo-capture/shoot-auto-tag.mjs   # auto-tag*.png, tags-cloud.png —
 node tools/demo-capture/shoot-css-themes.mjs # css-theme-*.png — the sample CSS themes, dark and light
 node tools/demo-capture/shoot-tour.mjs        # tour.png — the first-launch tour
 node tools/demo-capture/shoot-scan-exclusions.mjs # scan-exclusions-*.png — scan exclusions
+node tools/demo-capture/shoot-social-preview.mjs # social-preview.png — the repository's social preview
 ```
 
 `record-graph.mjs`, `record-folders.mjs`, `record-bulk-edit.mjs` and
@@ -79,13 +80,15 @@ session would bypass Xvfb.
 with a photo embedded as cover art) into `Music/`; `--audio-only` rewrites
 just those.
 
-`shoot-peek.mjs`, `shoot-audio.mjs` and `shoot-spectrum.mjs` need a real
-display: under Xvfb the built-in player fails to decode the sample videos,
-so the sheet would show the fallback notice instead of a playing frame, and
-no audio plays, so the spectrum would have nothing to draw. On a tiling compositor the
-window has to be floated so it keeps the requested 1280×800; on Hyprland,
-`hypr-float.sh` waits for the app window, floats it and sizes it — run it in
-the background right before the script:
+Every script runs under Xvfb. `lib.mjs` launches the app with
+`--enable-unsafe-swiftshader`, so the graph view gets software WebGL there,
+and the player, the side peek and the spectrum draw there too (all checked
+when the captures were retaken for the #579 redesign).
+
+To shoot on a real display instead: on a tiling compositor the window has to
+be floated so it keeps the requested 1280×800. On Hyprland, `hypr-float.sh`
+waits for the app window, floats it and sizes it — run it in the background
+right before the script:
 
 ```bash
 tools/demo-capture/hypr-float.sh & node tools/demo-capture/shoot-peek.mjs
