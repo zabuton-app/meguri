@@ -168,8 +168,8 @@ html[data-appearance] {
   font-family: var(--mx-mono);
 }
 
-/* Files: square corners, glow on hover. The app's selection rings
-   (box-shadow), the card's selected border and the row's selected
+/* Files: square corners, glow on hover. The app's focus ring (box-shadow),
+   the card's selected border and background and the row's selected
    background are left alone, so selection stays visible. */
 [data-slot="media-card"],
 [data-slot="folder-card"] {

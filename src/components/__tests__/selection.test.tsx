@@ -152,6 +152,14 @@ describe("selection", () => {
     expect(checkboxes()[0].getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("marks a selected card with data-selected, for CSS themes", () => {
+    renderGrid();
+    fireEvent.click(checkboxes()[0]);
+    const cards = screen.getAllByTestId("media-card");
+    expect(cards[0].hasAttribute("data-selected")).toBe(true);
+    expect(cards[1].hasAttribute("data-selected")).toBe(false);
+  });
+
   it("toggles the same file back off", () => {
     renderGrid();
     fireEvent.click(checkboxes()[0]);

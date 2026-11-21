@@ -234,7 +234,7 @@ export const MediaList = memo(function MediaList({
         {Array.from({ length: 12 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 p-2">
             <Skeleton
-              className={cn("aspect-video shrink-0 rounded-md", thumbWidth)}
+              className={cn("aspect-video shrink-0 rounded-item", thumbWidth)}
             />
             <div className="flex flex-1 flex-col gap-2">
               <Skeleton className="h-4 w-2/3" />
@@ -387,15 +387,17 @@ const MediaRow = memo(function MediaRow({
       data-slot="media-row"
       data-file-key={mediaSortId(file)}
       aria-current={focused ? "true" : undefined}
+      data-selected={selected || undefined}
       className={cn(
-        "group @container relative flex items-center gap-4 rounded-lg p-2 pr-4 transition-colors hover:bg-overlay/50",
-        selected && "bg-primary/10 ring-1 ring-inset ring-primary/50",
-        focused && "bg-primary/15 ring-2 ring-inset ring-primary",
+        "group @container relative flex items-center gap-4 rounded-card p-2 pr-4 transition-colors hover:bg-fg/10",
+        // The grid's vocabulary: a tint for selected, a ring for focus (#587).
+        selected && "bg-primary/15 hover:bg-primary/25",
+        focused && "ring-2 ring-inset ring-primary",
       )}
     >
       <div
         className={cn(
-          "relative z-10 aspect-video shrink-0 overflow-hidden rounded-md bg-overlay text-muted",
+          "relative z-10 aspect-video shrink-0 overflow-hidden rounded-item bg-overlay text-muted",
           thumbWidth,
         )}
       >
@@ -412,7 +414,7 @@ const MediaRow = memo(function MediaRow({
         >
           <MediaThumbnail file={file} mediaBase={mediaBase} />
           {duration && (
-            <span className="absolute bottom-1 right-1 rounded bg-bg/80 px-1 text-2xs leading-4 tabular-nums text-bright-fg">
+            <span className="absolute bottom-1 right-1 rounded-item bg-bg/80 px-1 text-2xs leading-4 tabular-nums text-bright-fg">
               {duration}
             </span>
           )}
@@ -432,7 +434,7 @@ const MediaRow = memo(function MediaRow({
         <HashLink
           to={fileHref(file.id, file.workspaceId, { autoplay: false })}
           onClick={onSelectableClick}
-          className="h-6 truncate text-[15px] font-medium leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
+          className="h-6 truncate text-sm font-medium leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-card after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
         >
           {/* The path tooltip is on the name only: on the link it would show
               over the whole row its overlay covers. */}
@@ -457,7 +459,7 @@ const MediaRow = memo(function MediaRow({
         </div>
       </div>
 
-      <div className="hidden shrink-0 grid-cols-[9.5rem_4rem_4.75rem] items-center gap-x-4 text-[13px] tabular-nums text-fg @3xl:grid">
+      <div className="hidden shrink-0 grid-cols-[9.5rem_4rem_4.75rem] items-center gap-x-4 text-xs tabular-nums text-fg @3xl:grid">
         <div className="flex min-w-0 items-center justify-end gap-2">
           {file.kind !== "video" && (
             <KindIcon
@@ -466,7 +468,7 @@ const MediaRow = memo(function MediaRow({
             />
           )}
           {badge && (
-            <span className="shrink-0 rounded border border-border-strong px-1 text-[10px] font-semibold leading-4 text-muted">
+            <span className="shrink-0 rounded-item border border-border-strong px-1 text-2xs font-semibold leading-4 text-muted">
               {badge}
             </span>
           )}

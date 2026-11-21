@@ -340,7 +340,7 @@ export const MediaGrid = memo(function MediaGrid({
         {Array.from({ length: 18 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-col overflow-hidden rounded-md border border-border bg-surface"
+            className="flex flex-col overflow-hidden rounded-card border border-border bg-surface"
           >
             <Skeleton className="aspect-video rounded-none" />
             <div className="flex flex-col gap-1.5 px-2 py-1.5">
@@ -508,10 +508,15 @@ export const MediaCard = memo(function MediaCard({
       data-slot="media-card"
       data-file-key={mediaSortId(file)}
       aria-current={focused ? "true" : undefined}
+      data-selected={selected || undefined}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-primary",
-        focused && "border-primary ring-2 ring-primary",
-        selected && "border-primary ring-1 ring-primary",
+        "group relative flex flex-col overflow-hidden rounded-card border border-border bg-surface transition-colors hover:border-border-strong",
+        // A tint marks what is selected and a ring where the focus is, so
+        // the two show together (#587). The tint is mixed into the card's
+        // own color, which a theme may redefine on the card.
+        selected &&
+          "border-primary hover:border-primary bg-[color-mix(in_oklab,var(--c-primary)_15%,var(--c-surface))]",
+        focused && "border-primary hover:border-primary ring-2 ring-primary",
       )}
     >
       {/* The link covers the thumbnail and the toggles sit beside it, not
@@ -537,7 +542,7 @@ export const MediaCard = memo(function MediaCard({
         >
           <MediaThumbnail file={file} mediaBase={mediaBase} />
           {hasTimeline(file.kind) && !!file.duration && (
-            <span className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg">
+            <span className="absolute bottom-1 right-1 rounded-item bg-bg/70 px-1 text-2xs text-fg">
               {formatDuration(file.duration)}
             </span>
           )}
@@ -565,7 +570,7 @@ export const MediaCard = memo(function MediaCard({
             favorite={file.favorite}
             size={16}
             className={cn(
-              "absolute right-1 top-1 z-10 rounded bg-bg/70 p-1 transition-opacity",
+              "absolute right-1 top-1 z-10 rounded-item bg-bg/70 p-1 transition-opacity",
               pinnedFavorite
                 ? "opacity-100"
                 : "card-control-in opacity-0 focus:opacity-100 group-hover:opacity-100",
@@ -581,7 +586,7 @@ export const MediaCard = memo(function MediaCard({
             watchLater={watchLater}
             size={16}
             className={cn(
-              "absolute right-1 top-9 z-10 rounded bg-bg/70 p-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100",
+              "absolute right-1 top-9 z-10 rounded-item bg-bg/70 p-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100",
               !pinnedWatchLater && "card-control-in",
             )}
           />
@@ -610,7 +615,7 @@ export const MediaCard = memo(function MediaCard({
               over the whole region its overlay covers. */}
           <span title={file.relPath}>{fileNameOf(file.relPath)}</span>
         </HashLink>
-        <div className="truncate text-[10px] text-muted">{metaLine(file)}</div>
+        <div className="truncate text-2xs text-muted">{metaLine(file)}</div>
         {/* Editable rating once the card is hovered or focused (drawn only
             until then, under the link's overlay so a click opens the detail). */}
         {hot ? (

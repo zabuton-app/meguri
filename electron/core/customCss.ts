@@ -46,7 +46,8 @@ export const CUSTOM_CSS_TEMPLATE = `/*
  *   folder-row         a folder in the list
  *   modal-panel        the panel of a full-size window (settings, file
  *                      details, discovery, history, tags, ...)
- * The focused item in the grid and the list has aria-current="true".
+ * The focused item in the grid and the list has aria-current="true", and a
+ * selected one has data-selected.
  *
  * @import and url() pointing at other hosts are blocked by the app's Content
  * Security Policy, so this file never makes Meguri go online.
