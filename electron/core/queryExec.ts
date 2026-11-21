@@ -19,6 +19,7 @@ import type {
 } from "../../shared/ipc/activity.js";
 import type { Core } from "./index.js";
 import { countFiles, lastScanAt } from "./queries.js";
+import { listTags, type TagAggRow } from "./tagAdmin.js";
 import type {
   DuplicatesResult,
   FileRow,
@@ -124,6 +125,17 @@ interface DupRefsCacheEntry {
 }
 
 /**
+ * A value that changes whenever another connection commits to this workspace's
+ * database or to the library it attaches. PRAGMA data_version is per
+ * connection and only meaningful while that connection stays open.
+ */
+function dataVersion(db: DB): string {
+  const main = db.pragma("data_version", { simple: true }) as number;
+  const lib = db.pragma("lib.data_version", { simple: true }) as number;
+  return `${main}:${lib}`;
+}
+
+/**
  * Whether a query lists a collection in its hand-arranged order. That order is
  * the collection's refs, so it applies only when the refs ARE that order: the
  * duplicates filter also produces refs (duplicate-scan order, and intersected
@@ -145,6 +157,15 @@ export class QueryExecutor {
    * fetch while keeping staleness bounded by a short TTL.
    */
   private dupRefsCache = new Map<string, DupRefsCacheEntry>();
+  /**
+   * Each workspace's tag counts (listTags) with the dataVersion they were read
+   * at. Counting walks every meta_tags row, and the Tags view and the `tag:`
+   * suggestions ask again on every open although nothing has changed.
+   */
+  private tagRowsCache = new Map<
+    string,
+    { version: string; rows: readonly TagAggRow[] }
+  >();
 
   /** `warn` is injected because this class also runs inside the worker thread,
    *  where the electron-log based logger (which requires the electron module)
@@ -231,6 +252,18 @@ export class QueryExecutor {
     return resolved;
   }
 
+  private tagRows(target: cw.CoreTarget): readonly TagAggRow[] {
+    // Read the version before counting: a commit landing in between then
+    // leaves newer counts under the older version, which the next call
+    // recounts. The other order would keep stale counts under the new one.
+    const version = dataVersion(target.core.db);
+    const cached = this.tagRowsCache.get(target.id);
+    if (cached?.version === version) return cached.rows;
+    const rows = listTags(target.core.db);
+    this.tagRowsCache.set(target.id, { version, rows });
+    return rows;
+  }
+
   run(req: QueryRequest): QueryResponse {
     const cores = this.cores(req.targets);
     switch (req.kind) {
@@ -287,7 +320,7 @@ export class QueryExecutor {
       case "missing":
         return cw.listMissingWorkspaces(cores, req.limit);
       case "tagsList":
-        return cw.listTagsWorkspaces(cores, req.prefer);
+        return cw.listTagsWorkspaces(cores, req.prefer, (t) => this.tagRows(t));
       case "stats": {
         let fileCount = 0;
         let scanAt: number | null = null;
@@ -324,6 +357,9 @@ export class QueryExecutor {
   closeWorkspace(id: string): void {
     this.warned.delete(id);
     this.invalidateCaches();
+    // A reopened connection counts data_version afresh, so a kept entry could
+    // match the new handle's version by accident.
+    this.tagRowsCache.delete(id);
     const db = this.dbs.get(id);
     if (!db) return;
     this.dbs.delete(id);

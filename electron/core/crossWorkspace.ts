@@ -28,7 +28,7 @@ import {
   type HistorySeek,
   type SeekPosition,
 } from "./queries.js";
-import { listTags } from "./tagAdmin.js";
+import { listTags, type TagAggRow } from "./tagAdmin.js";
 import type {
   DuplicateGroup,
   DuplicatesResult,
@@ -705,15 +705,19 @@ function dupKey(hash: string, size: number): string {
  * Ordering puts user-owned tags first, then namespaces alphabetically, then
  * names case-insensitively. The known auto-meta namespaces get no special
  * treatment here: the set is open, and the renderer applies its own grouping
- * order on top. `prefer`: see capTagList.
+ * order on top. `prefer`: see capTagList. `rowsOf` lets the query worker
+ * serve one workspace's rows from its cache; they are read, never modified.
  */
 export function listTagsWorkspaces(
   cores: CoreTarget[],
   prefer?: readonly string[],
+  rowsOf: (target: CoreTarget) => readonly TagAggRow[] = (t) =>
+    listTags(t.core.db),
 ): TagList {
   const merged = new Map<string, TagSummary>();
-  for (const { id, core } of cores) {
-    for (const row of listTags(core.db)) {
+  for (const target of cores) {
+    const { id } = target;
+    for (const row of rowsOf(target)) {
       const qualified = qualifiedTagName(row.namespace, row.name);
       const entry = merged.get(qualified);
       if (!entry) {
