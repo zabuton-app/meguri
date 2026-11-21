@@ -33,7 +33,7 @@ import {
 } from "@/settings/PreferencesProvider";
 
 /** What a click on the bar reaches instead of moving the window; styles.css
- *  makes the same elements no-drag. */
+ *  makes the same elements no-drag (unless an immersive view covers them). */
 const CONTROLS =
   'a, button, input, select, textarea, [role="button"], [role="combobox"], [data-title-bar-control]';
 
@@ -113,6 +113,8 @@ export function TitleBar({
   return (
     <div
       data-title-bar=""
+      // Its controls stop cutting holes in the drag region (styles.css).
+      data-immersive={immersive ? "" : undefined}
       data-slot="title-bar"
       data-testid="title-bar"
       ref={barRef}

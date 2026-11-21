@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures/app";
-import { openSettings, searchFor } from "./fixtures/helpers";
+import { openDiscover, openSettings, searchFor } from "./fixtures/helpers";
 
 // The custom title bar (#578). E2E runs on Linux, which gets the app's own
 // window buttons; macOS keeps the OS's traffic lights instead.
@@ -53,6 +53,35 @@ test.describe("Title bar", () => {
       await expect(ready.getByRole("dialog").first()).toBeVisible();
     });
   }
+
+  // The drag region itself is the OS's to hit-test (see above), so this
+  // checks the styles Chromium builds it from: the bar stays a drag region,
+  // and nothing over it or in it cancels that but the view's panel.
+  test("still moves the window by the band around an immersive view", async ({
+    ready,
+  }) => {
+    const region = (el: Locator) =>
+      el.evaluate((node) =>
+        getComputedStyle(node).getPropertyValue("-webkit-app-region"),
+      );
+    const bar = ready.getByTestId("title-bar");
+    // One of the bar's controls, its own hole until then.
+    // Hidden from the accessibility tree once the view is up.
+    const control = bar.getByRole("button", {
+      name: "Maximize",
+      includeHidden: true,
+    });
+    await expect(control).toBeVisible();
+    expect(await region(control)).toBe("no-drag");
+    const dialog = await openDiscover(ready);
+    // The bar's drag, inherited, rather than a hole of its own.
+    await expect.poll(() => region(control)).toBe("drag");
+    expect(await region(bar)).toBe("drag");
+    expect(await region(dialog)).toBe("none");
+    expect(await region(dialog.locator("[data-slot='modal-panel']"))).toBe(
+      "no-drag",
+    );
+  });
 
   test("keeps the window buttons and the toolbar usable in a narrow window", async ({
     app,

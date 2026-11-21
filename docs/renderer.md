@@ -640,7 +640,8 @@ buttons take the bar's left end; then it is the rail's first item
 
 The bar is a drag region (`-webkit-app-region: drag`); its links, buttons and
 fields are `no-drag` (`src/styles.css`), and the rest of it, the header's text
-included, moves the window.
+included, moves the window. While an immersive view covers it
+(`data-immersive`), its controls are a drag region too.
 The slot takes one screen's header at a time: today only Home, the parent of
 every route, renders into it.
 
@@ -652,11 +653,16 @@ sit above it, so the window can still be moved, minimized and closed while a mod
 open. The immersive views (Discover, the player and the file details' modal, not
 its side peek) cover the bar instead. They take their backdrop from
 `useImmersiveBackdrop()` (`src/components/immersiveView.ts`): the class
-`modal-backdrop-full`, a no-drag layer over the whole window with their panel set
-into it, and a hold that moves the bar's window buttons aside while it is up.
+`modal-backdrop-full`, a layer over the whole window with their panel set into
+it, and a hold that moves the bar's window buttons aside while it is up.
 The app's own buttons are hidden with their room kept, and macOS's traffic
 lights are hidden. Esc or the view's own close button leaves it, and a click on
-the backdrop around the panel closes it. Another overlay that covers the window without dimming the bar (the
+the backdrop around the panel closes it. The bar still moves the window under the
+backdrop: the panel alone is `no-drag`, and the bar's own controls stop being
+`no-drag` meanwhile, so the whole band around the panel moves the window and a
+click there does not close the view. That is the margin above the panel, or the
+band's full width where the panel is centered below it (the compact Discover and
+player). Another overlay that covers the window without dimming the bar (the
 workspace rail's drop target) is `fixed inset-below-title-bar`. ESLint refuses
 `fixed inset-0` in the renderer. The player's full screen takes its panel to the
 screen's edges, over the bar, as any full-screen element does.
@@ -664,8 +670,9 @@ screen's edges, over the bar, as any full-screen element does.
 A drag region ignores what is painted over it, so a click on a toast, a menu or
 a dialog over the bar's band would move the window. `src/styles.css` makes
 those layers `no-drag` (`[data-sonner-toaster]`,
-`[data-radix-popper-content-wrapper]`, `[role="dialog"]` other than a
-`modal-backdrop`, the pet), and the
+`[data-radix-popper-content-wrapper]`, a `[role="dialog"]` that is not a
+backdrop (`modal-backdrop`, `modal-backdrop-full`), an immersive view's panel
+(`.modal-backdrop-full > *`), the pet), and the
 toasts start below the bar. A new floating layer that can reach the band goes
 in that list. The crash screen (`ErrorBoundary`) replaces the whole app, title
 bar included, so it draws a plain drag strip with a Close button of its own.

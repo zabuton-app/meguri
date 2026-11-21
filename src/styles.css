@@ -40,21 +40,27 @@
 /* Layers that can float over the title bar's band: a click there would move
    the window instead, since a drag region ignores what is painted over it.
    A no-drag area later in the document is cut out of the drag region. A new
-   floating layer that can reach the band belongs in this list. A modal's
-   backdrop (modal-backdrop) is left out: it covers the band on purpose, and
-   the bar under it still moves the window. An immersive view's
-   (modal-backdrop-full) is not: it takes the band as part of the view. */
+   floating layer that can reach the band belongs in this list. A backdrop
+   (a modal's modal-backdrop, an immersive view's modal-backdrop-full) is left
+   out: it covers the band on purpose, and the bar under it still moves the
+   window. An immersive view's panel, the backdrop's only child, is not: it
+   takes the band as part of the view, and its controls there take their
+   clicks. */
 [data-sonner-toaster],
 [data-radix-popper-content-wrapper],
-[role="dialog"]:not(.modal-backdrop),
+[role="dialog"]:not(.modal-backdrop, .modal-backdrop-full),
+.modal-backdrop-full > *,
 [data-pet] {
   -webkit-app-region: no-drag;
 }
 
 /* Controls in the title bar take their clicks; the rest of it moves the
    window. data-title-bar-control marks a whole area as one (Home's search
-   box, chips included). TitleBar.tsx's CONTROLS lists the same elements. */
-[data-title-bar]
+   box, chips included). TitleBar.tsx's CONTROLS lists the same elements.
+   Not while an immersive view covers the bar (data-immersive): its controls
+   are out of reach under the backdrop, and a hole there would take a grab on
+   the band as a click on the backdrop, which closes the view. */
+[data-title-bar]:not([data-immersive])
   :is(
     a,
     button,
@@ -88,12 +94,12 @@
 /* The backdrop of an immersive view (Discover, the player, the file details'
    modal), whose content takes the title bar's band too. Taken through
    useImmersiveBackdrop (immersiveView.ts), which also moves the bar's window
-   buttons aside while it is up. No-drag, so a click on the band reaches the
-   view instead of moving the window. */
+   buttons aside while it is up. Like modal-backdrop it leaves the bar's drag
+   region in force, so the band around the panel still moves the window; the
+   panel (its child) is no-drag, above. */
 @utility modal-backdrop-full {
   position: fixed;
   inset: 0;
-  -webkit-app-region: no-drag;
 }
 
 /* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */
