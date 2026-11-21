@@ -78,7 +78,7 @@ export function FilterBar({
         />
 
         <div
-          className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2"
+          className="flex h-8 items-center gap-1.5 rounded-control border border-border px-2"
           title={t("filter.ratingFilter")}
         >
           <RatingStars
@@ -95,9 +95,9 @@ export function FilterBar({
           title={t("favorite.filter")}
           aria-label={t("favorite.filter")}
           className={cn(
-            "flex size-8 items-center justify-center rounded-md border border-border transition-colors",
+            "flex size-8 items-center justify-center rounded-control border border-border transition-colors",
             value.favorite
-              ? "border-error/50 bg-error/10 text-error"
+              ? "bg-error/15 text-error"
               : "text-muted hover:text-error",
           )}
         >
@@ -112,9 +112,9 @@ export function FilterBar({
             title={t("view.heatmap")}
             aria-label={t("view.heatmap")}
             className={cn(
-              "flex size-8 items-center justify-center rounded-md border border-border transition-colors",
+              "flex size-8 items-center justify-center rounded-control border border-border transition-colors",
               heatmapOpen
-                ? "border-primary bg-primary/20 text-fg"
+                ? "bg-primary/15 text-fg"
                 : "text-muted hover:text-fg",
             )}
           >

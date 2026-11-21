@@ -135,16 +135,19 @@ html[data-appearance] {
 }
 
 /* Buttons in the header and search bar: little clouds, white with dark ink
-   in both variants. Active ones keep their blue (bg-primary), so the current
-   view and filter still stand out. The rail's buttons have no fill of their
-   own, so they stay bare on the sky.
+   in both variants. Active ones (a bg-primary fill, pressed, on or open)
+   keep their blue, so the current view and filter still stand out. The
+   rail's buttons have no fill of their own, so they stay bare on the sky.
 
    Not public API: buttons carry no data-slot, so this picks the framed ones
    (filled with --c-surface or outlined with --c-border) by their utility
    classes. It may need updating when the app's markup changes. */
 :is([data-slot="title-bar"], [data-slot="filter-bar"])
   :is(button, a, div):is([class~="bg-surface"], [class~="border-border"]):not(
-    [class~="bg-primary"]
+    [class~="bg-primary"],
+    [aria-pressed="true"],
+    [data-active],
+    [data-state="open"]
   ) {
   --c-fg: #10263a;
   --c-muted: #3f566b;
@@ -156,7 +159,10 @@ html[data-appearance] {
 }
 :is([data-slot="title-bar"], [data-slot="filter-bar"])
   :is(button, a):is([class~="bg-surface"], [class~="border-border"]):not(
-    [class~="bg-primary"]
+    [class~="bg-primary"],
+    [aria-pressed="true"],
+    [data-active],
+    [data-state="open"]
   ):hover {
   background-color: #dfe9f3;
 }
