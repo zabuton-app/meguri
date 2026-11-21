@@ -337,9 +337,13 @@ type FetchBatch<T> = (
 /**
  * k-way merge for the file search. With a keyed cursor every stream seeks
  * straight to its position (no offset re-scan, and no K× deep-OFFSET cost);
- * an offset-only cursor (first page / backward paging) falls back to skipping
- * merged rows. Batches are fetched without tags — the merge discards rows, so
- * tags are attached only to the final page.
+ * an offset-only cursor (first page / backward paging / a timeline anchor
+ * inside a section) falls back to skipping merged rows. To skip them, each
+ * stream reads offset + limit + 1 rows in one query, so memory is
+ * O(N × offset) here rather than O(N × batch) as in mergePages: one sort per
+ * workspace instead of one per hundred rows skipped (#362). Batches are
+ * fetched without tags — the merge discards rows, so tags are attached only
+ * to the final page.
  */
 function mergeSearchPages(
   targets: CoreTarget[],
@@ -358,17 +362,22 @@ function mergeSearchPages(
     exhausted: boolean;
   }
 
-  const fetchInto = (stream: SearchStream, seek?: SeekPosition): void => {
+  const fetchInto = (
+    stream: SearchStream,
+    seek?: SeekPosition,
+    size = batchSize,
+  ): void => {
     const res = searchFiles(
       stream.core.db,
       {
         ...query,
         cursor: seek ? undefined : 0,
-        limit: batchSize,
+        limit: size,
         fileIds: idsByWs?.get(stream.wsId),
       },
       seek,
-      { skipTags: true },
+      // Only the first fetch goes without a seek, sized by the merge itself.
+      { skipTags: true, uncapped: !seek },
     );
     stream.buffer = inject(res.items, stream.wsId);
     stream.bufIdx = 0;
@@ -407,8 +416,11 @@ function mergeSearchPages(
     bufIdx: 0,
     exhausted: false,
   }));
+  // No stream can give more than every row before the page plus the page.
+  // Fetched a batch at a time, a deep offset cost seconds of sorting (#362).
   for (const stream of streams) {
-    fetchInto(stream, key ? seekFor(key, stream.wsId) : undefined);
+    if (key) fetchInto(stream, seekFor(key, stream.wsId));
+    else fetchInto(stream, undefined, offset + batchSize);
   }
 
   const cmp = comparatorFor(query.sort, query.sortDir);
