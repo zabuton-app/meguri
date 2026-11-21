@@ -9,7 +9,7 @@ import { MANUAL_SORT, resolveSortDir } from "@shared/sortDir";
 import { parseQualifiedTagName } from "@shared/tags";
 import type { Lang, TFunc } from "@/i18n/I18nProvider";
 import { formatDate } from "@/lib/dates";
-import { kindLabelKey } from "@/lib/mediaKind";
+import { kindLabel, normalizeKinds } from "@/lib/mediaKind";
 import { SORT_KEYS } from "@/lib/sortLabel";
 import { tagHumanLabel } from "@/lib/tagLabel";
 
@@ -36,7 +36,8 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
   if (query.q?.trim()) next.q = query.q.trim();
   if (query.tags?.length) next.tags = query.tags.filter(Boolean);
   if (query.tagSource) next.tagSource = query.tagSource;
-  if (query.kind) next.kind = query.kind;
+  const kinds = normalizeKinds(query.kinds);
+  if (kinds) next.kinds = kinds;
   if (query.ratingMin != null && query.ratingMin > 0)
     next.ratingMin = query.ratingMin;
   if (query.favorite) next.favorite = true;
@@ -204,10 +205,8 @@ export function describeSearchQuery(
   const folder = scopedFolderPath(query);
   if (folder != null) parts.push(`${t("folder.chip")}: ${folder}`);
   if (query.q) parts.push(`"${query.q}"`);
-  if (query.kind) {
-    const key = kindLabelKey(query.kind);
-    parts.push(key ? t(key) : query.kind);
-  }
+  if (query.kinds?.length)
+    parts.push(query.kinds.map((k) => kindLabel(t, k)).join(", "));
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
   if (query.favorite) parts.push(t("favorite.chip"));
   if (query.duplicates) parts.push(t("duplicates.chip"));

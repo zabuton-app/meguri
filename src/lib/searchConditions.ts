@@ -146,15 +146,16 @@ export function describeConditions(
     });
   });
 
-  if (query.kind)
+  if (query.kinds?.length)
     out.push({
       key: "kind",
-      // `kind` is a plain string in the schema, so a saved search can carry a
+      // Kinds are plain strings in the schema, so a saved search can carry a
       // value the UI has no label for. Show it verbatim rather than mislabel it.
-      label: kindLabel(t, query.kind),
+      // One chip for the whole selection, cleared as a whole.
+      label: query.kinds.map((k) => kindLabel(t, k)).join(", "),
       group: "primary",
       chip: true,
-      clear: (q) => without(q, "kind"),
+      clear: (q) => without(q, "kinds"),
     });
 
   if (query.ratingMin)

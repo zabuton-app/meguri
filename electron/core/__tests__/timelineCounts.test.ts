@@ -142,7 +142,7 @@ describe("timelineCounts", () => {
       months: { "2026-05": 1 },
       undated: 0,
     });
-    expect(counts(db, "captured", { kind: "video" })).toEqual({
+    expect(counts(db, "captured", { kinds: ["video"] })).toEqual({
       months: { "2026-06": 1 },
       undated: 1,
     });

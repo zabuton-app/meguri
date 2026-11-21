@@ -70,12 +70,12 @@ describe("parseTimelineAxis", () => {
 describe("timelineQuery", () => {
   it("orders the filter by the axis, newest first, leaving the filter alone", () => {
     const filter = {
-      kind: "video" as const,
+      kinds: ["video"],
       sort: "name",
       sortDir: "asc" as const,
     };
     expect(timelineQuery(filter, "captured")).toEqual({
-      kind: "video",
+      kinds: ["video"],
       sort: "captured",
       sortDir: "desc",
     });

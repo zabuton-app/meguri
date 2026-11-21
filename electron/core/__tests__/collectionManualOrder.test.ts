@@ -157,7 +157,7 @@ describe("searchCollectionManual", () => {
     const cores = [coreTarget("ws1", db)];
     const order = [...ids].reverse();
     const res = searchCollectionManual(cores, refsOf("ws1", order), {
-      kind: "video",
+      kinds: ["video"],
     });
     expect(pathsOf(res)).toEqual(["005.mp4", "003.mp4", "001.mp4"]);
   });
@@ -168,13 +168,13 @@ describe("searchCollectionManual", () => {
     }));
     const cores = [coreTarget("ws1", db)];
     const res = searchCollectionManual(cores, refsOf("ws1", ids), {
-      kind: "video",
+      kinds: ["video"],
       limit: 2,
     });
     expect(pathsOf(res)).toEqual(["005.mp4", "010.mp4"]);
     // The remaining two matches are still reachable through the cursor.
     expect(
-      pageAll(cores, refsOf("ws1", ids), { kind: "video", limit: 2 }),
+      pageAll(cores, refsOf("ws1", ids), { kinds: ["video"], limit: 2 }),
     ).toEqual(["005.mp4", "010.mp4", "015.mp4", "020.mp4"]);
   });
 
@@ -198,7 +198,7 @@ describe("searchCollectionManual", () => {
     const cores = [coreTarget("ws1", db)];
     // Videos are 001, 003, 005, 007, 009 — skipping two rows lands on 005.
     const res = searchCollectionManual(cores, refsOf("ws1", ids), {
-      kind: "video",
+      kinds: ["video"],
       limit: 2,
       cursor: 2,
     });

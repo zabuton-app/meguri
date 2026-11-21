@@ -28,7 +28,7 @@ const make = (id: string, extra: Partial<SmartCollection> = {}) =>
   ({
     id,
     name: `Search ${id}`,
-    query: { kind: "video" },
+    query: { kinds: ["video"] },
     createdAt: 1,
     updatedAt: 2,
     ...extra,
@@ -54,7 +54,7 @@ describe("stored smart collections", () => {
   it("read back newest first, with the default", () => {
     store.importSmartCollections([], null);
     const folder = make("a", {
-      query: { kind: "video", folder: { path: "x/y", recursive: true } },
+      query: { kinds: ["video"], folder: { path: "x/y", recursive: true } },
       workspaceId: "ws1",
     });
     store.addSmartCollection(folder);
@@ -79,6 +79,19 @@ describe("stored smart collections", () => {
     });
     store.setDefaultSmartCollection("a");
     expect(store.setDefaultSmartCollection(null).defaultId).toBeNull();
+  });
+
+  it("read a query stored with the single kind of earlier versions as a selection", () => {
+    store.addSmartCollection(make("a"));
+    exec(
+      "UPDATE smart_collections SET query = ? WHERE id = ?",
+      JSON.stringify({ kind: "image", favorite: true }),
+      "a",
+    );
+    expect(store.listSmartCollections().collections[0].query).toEqual({
+      kinds: ["image"],
+      favorite: true,
+    });
   });
 
   it("leave out an entry that does not validate", () => {

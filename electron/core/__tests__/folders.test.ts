@@ -254,7 +254,7 @@ describe("searchFiles folder filter", () => {
   it("combines with other conditions and every sort", () => {
     for (const sort of [undefined, "name", "captured", "rating", "hash"]) {
       const res = searchFiles(db, {
-        kind: "video",
+        kinds: ["video"],
         sort,
         folder: { path: "Movie", recursive: true },
       });

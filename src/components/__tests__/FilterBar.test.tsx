@@ -97,7 +97,7 @@ describe("collapsed-condition badge", () => {
   });
 
   it("does not count conditions that are visible on the primary row", () => {
-    setup({ kind: "video", favorite: true, ratingMin: 3 });
+    setup({ kinds: ["video"], favorite: true, ratingMin: 3 });
     expect(badge()).toBeNull();
   });
 
@@ -117,54 +117,56 @@ describe("collapsed-condition badge", () => {
   });
 });
 
-describe("kind segments", () => {
-  it("exposes exactly one checked radio", () => {
-    setup({ kind: "video" });
-    const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(4);
-    expect(
-      radios.filter((r) => r.getAttribute("aria-checked") === "true"),
-    ).toHaveLength(1);
-  });
+describe("kind toggles", () => {
+  const group = () => screen.getByRole("group", { name: "Filter by kind" });
+  const toggle = (name: string) =>
+    within(group()).getByRole("button", { name });
+  const pressed = () =>
+    within(group())
+      .getAllByRole("button")
+      .filter((b) => b.getAttribute("aria-pressed") === "true")
+      .map((b) => b.textContent);
 
-  it("defaults to the neutral segment when no kind is set", () => {
+  it("presses All when no kind is set", () => {
     setup({});
-    expect(screen.getAllByRole("radio")[0].getAttribute("aria-checked")).toBe(
-      "true",
-    );
+    expect(pressed()).toEqual(["All"]);
   });
 
-  it("selects a kind on click", () => {
-    const { latest } = setup({});
-    fireEvent.click(screen.getAllByRole("radio")[1]);
-    expect(latest()?.kind).toBe("video");
+  it("presses every selected kind and not All", () => {
+    setup({ kinds: ["video", "image"] });
+    expect(pressed()).toEqual(["Video", "Image"]);
   });
 
-  it("moves selection with the arrow keys, and focus with it", () => {
-    const { latest } = setup({});
-    fireEvent.keyDown(screen.getAllByRole("radio")[0], { key: "ArrowRight" });
-    expect(latest()?.kind).toBe("video");
-    // Roving tabindex only works if focus follows selection; without this the
-    // focus move could break silently.
-    expect(document.activeElement).toBe(screen.getAllByRole("radio")[1]);
+  it("adds a kind to the selection on click", () => {
+    const { latest } = setup({ kinds: ["video"] });
+    fireEvent.click(toggle("Image"));
+    expect(latest()?.kinds).toEqual(["video", "image"]);
   });
 
-  it("jumps to the ends with Home and End", () => {
-    const { latest } = setup({ kind: "video" });
-    fireEvent.keyDown(screen.getAllByRole("radio")[1], { key: "End" });
-    expect(latest()?.kind).toBe("audio");
-    fireEvent.keyDown(screen.getAllByRole("radio")[3], { key: "Home" });
-    expect(latest()?.kind).toBeUndefined();
+  it("removes a selected kind on click, back to every kind when none is left", () => {
+    const { latest } = setup({ kinds: ["video"] });
+    fireEvent.click(toggle("Video"));
+    expect(latest()?.kinds).toBeUndefined();
   });
 
-  it("keeps the group reachable when the query carries an unknown kind", () => {
-    // A saved search can hold any string. With no segment matching, roving
-    // tabindex would put -1 on every button and strand the group off the Tab
-    // order, so the neutral segment takes the focusable slot.
-    setup({ kind: "document" });
-    const radios = screen.getAllByRole("radio");
-    expect(radios.filter((r) => r.tabIndex === 0)).toHaveLength(1);
-    expect(radios[0].getAttribute("aria-checked")).toBe("true");
+  it("treats turning on the last kind as every kind", () => {
+    const { latest } = setup({ kinds: ["video", "image"] });
+    fireEvent.click(toggle("Audio"));
+    expect(latest()?.kinds).toBeUndefined();
+  });
+
+  it("clears the selection in one click with All", () => {
+    const { latest } = setup({ kinds: ["video", "audio"] });
+    fireEvent.click(toggle("All"));
+    expect(latest()?.kinds).toBeUndefined();
+  });
+
+  it("keeps a kind it has no toggle for while toggling the others", () => {
+    // A saved search from a newer build can carry a kind this one does not list.
+    const { latest } = setup({ kinds: ["document"] });
+    expect(pressed()).toEqual([]);
+    fireEvent.click(toggle("Video"));
+    expect(latest()?.kinds).toEqual(["video", "document"]);
   });
 });
 
@@ -252,7 +254,7 @@ describe("saved searches", () => {
       {
         id: "sc-1",
         name: "Unplayed videos",
-        query: { kind: "video", played: false },
+        query: { kinds: ["video"], played: false },
         createdAt: 0,
         updatedAt: 0,
       },
@@ -265,7 +267,7 @@ describe("saved searches", () => {
     );
     fireEvent.click(await screen.findByText("Unplayed videos"));
 
-    await waitFor(() => expect(latest()?.kind).toBe("video"));
+    await waitFor(() => expect(latest()?.kinds).toEqual(["video"]));
     expect(latest()?.played).toBe(false);
     // Both read-back surfaces come from the same derivation, so neither can lag.
     expect(chips()).toHaveLength(2);
@@ -280,7 +282,7 @@ describe("the chip row", () => {
   });
 
   it("shows one chip per active condition, from both the row and the panel", () => {
-    setup({ kind: "video", favorite: true, played: false });
+    setup({ kinds: ["video"], favorite: true, played: false });
     expect(chips()).toHaveLength(3);
   });
 
@@ -294,21 +296,25 @@ describe("the chip row", () => {
   });
 
   it("restores the default sort when its chip is removed", () => {
-    const { latest } = setup({ sort: "name", sortDir: "asc", kind: "video" });
+    const { latest } = setup({
+      sort: "name",
+      sortDir: "asc",
+      kinds: ["video"],
+    });
     const sortChip = chips().find((c) => c.textContent?.includes("Sort order"));
     fireEvent.click(within(sortChip!).getByRole("button"));
 
     expect(latest()?.sort).toBeUndefined();
     expect(latest()?.sortDir).toBeUndefined();
-    expect(latest()?.kind).toBe("video");
+    expect(latest()?.kinds).toEqual(["video"]);
   });
 
   it("removes only its own condition", () => {
-    const { latest } = setup({ kind: "video", favorite: true });
+    const { latest } = setup({ kinds: ["video"], favorite: true });
     const kindChip = chips().find((c) => c.textContent?.includes("Video"));
     fireEvent.click(within(kindChip!).getByRole("button"));
 
-    expect(latest()?.kind).toBeUndefined();
+    expect(latest()?.kinds).toBeUndefined();
     expect(latest()?.favorite).toBe(true);
   });
 
@@ -333,7 +339,7 @@ describe("the chip row", () => {
   });
 
   it("keeps clear-all outside the scrolling chips", () => {
-    setup({ q: "sunset tag:beach", kind: "video", favorite: true });
+    setup({ q: "sunset tag:beach", kinds: ["video"], favorite: true });
     const track = document.querySelector('[data-slot="filter-chip-track"]');
     expect(track).not.toBeNull();
     // Every chip scrolls; the way out of the filter set does not.
@@ -342,7 +348,7 @@ describe("the chip row", () => {
   });
 
   it("clears everything at once, search text included", () => {
-    const { latest } = setup({ q: "sunset", kind: "video", played: false });
+    const { latest } = setup({ q: "sunset", kinds: ["video"], played: false });
     fireEvent.click(screen.getByText("Clear all"));
 
     expect(latest()).toEqual({});
@@ -357,7 +363,7 @@ describe("the default saved search", () => {
       {
         id: "sc-1",
         name: "Rated videos",
-        query: { kind: "video", sort: "rating" },
+        query: { kinds: ["video"], sort: "rating" },
         createdAt: 0,
         updatedAt: 0,
       },
@@ -427,7 +433,7 @@ describe("the default saved search", () => {
     main.collections = ["First", "Second"].map((name, i) => ({
       id: `sc-${i}`,
       name,
-      query: { kind: "video" },
+      query: { kinds: ["video"] },
       createdAt: 0,
       updatedAt: 0,
     }));
@@ -447,12 +453,12 @@ describe("the default saved search", () => {
     store("sc-1");
     const { latest } = setup({ q: "cat" });
     fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
-    expect(latest()).toEqual({ kind: "video", sort: "rating" });
+    expect(latest()).toEqual({ kinds: ["video"], sort: "rating" });
   });
 
   it("empties the filter on Clear all once it is shown", () => {
     store("sc-1");
-    const { latest } = setup({ kind: "video", sort: "rating" });
+    const { latest } = setup({ kinds: ["video"], sort: "rating" });
     fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
     expect(latest()).toEqual({});
   });

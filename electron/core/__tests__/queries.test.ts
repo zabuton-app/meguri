@@ -50,15 +50,30 @@ describe("searchFiles", () => {
     setFavorite(db, vid, true);
     setRating(db, img, 4);
 
-    expect(searchFiles(db, { kind: "image" }).items.map((f) => f.id)).toEqual([
-      img,
-    ]);
+    expect(
+      searchFiles(db, { kinds: ["image"] }).items.map((f) => f.id),
+    ).toEqual([img]);
     expect(searchFiles(db, { favorite: true }).items.map((f) => f.id)).toEqual([
       vid,
     ]);
     expect(searchFiles(db, { ratingMin: 3 }).items.map((f) => f.id)).toEqual([
       img,
     ]);
+  });
+
+  it("filters by any of several kinds, and by every kind when none is given", () => {
+    const vid = insertFile(db, rootId, { relPath: "a.mp4", kind: "video" });
+    const img = insertFile(db, rootId, { relPath: "b.jpg", kind: "image" });
+    const aud = insertFile(db, rootId, { relPath: "c.mp3", kind: "audio" });
+    const ids = (kinds?: string[]) =>
+      searchFiles(db, { kinds, limit: 100 })
+        .items.map((f) => f.id)
+        .sort((a, b) => a - b);
+
+    expect(ids(["video"])).toEqual([vid]);
+    expect(ids(["video", "audio"])).toEqual([vid, aud]);
+    expect(ids([])).toEqual([vid, img, aud]);
+    expect(ids(undefined)).toEqual([vid, img, aud]);
   });
 
   it("reports hasThumb from thumb_path, not from thumb_status", () => {
@@ -455,7 +470,7 @@ describe("randomFiles", () => {
     for (let i = 0; i < 5; i++)
       insertFile(db, rootId, { relPath: `v${i}.mp4`, kind: "video" });
     insertFile(db, rootId, { relPath: "p.jpg", kind: "image" });
-    const out = randomFiles(db, { kind: "video", limit: 3 });
+    const out = randomFiles(db, { kinds: ["video"], limit: 3 });
     expect(out.length).toBe(3);
     expect(out.every((f) => f.kind === "video")).toBe(true);
     db.close();
@@ -476,7 +491,7 @@ describe("randomFiles", () => {
     const { db, rootId } = newDb();
     insertFile(db, rootId, { relPath: "v.mp4", kind: "video" });
     insertFile(db, rootId, { relPath: "a.mp3", kind: "audio" });
-    const out = randomFiles(db, { kind: "audio", limit: 10 });
+    const out = randomFiles(db, { kinds: ["audio"], limit: 10 });
     expect(out.length).toBe(1);
     expect(out[0].kind).toBe("audio");
     db.close();

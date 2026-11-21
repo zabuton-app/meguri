@@ -48,7 +48,7 @@ function clearEverything(query: SearchQuery): SearchQuery {
 const EVERYTHING: SearchQuery = {
   q: "sunset tag:beach",
   tags: ["holiday", "4k"],
-  kind: "video",
+  kinds: ["video"],
   ratingMin: 3,
   favorite: true,
   played: false,
@@ -147,7 +147,7 @@ describe("describeConditions", () => {
   });
 
   it("labels conditions with translated text", () => {
-    expect(find({ kind: "video" }, "kind").label).toBe(en["kind.video"]);
+    expect(find({ kinds: ["video"] }, "kind").label).toBe(en["kind.video"]);
     expect(find({ ratingMin: 4 }, "rating").label).toBe("★4+");
     expect(find({ played: true }, "played").label).toBe(en["filter.played"]);
     expect(find({ played: false }, "played").label).toBe(en["filter.unplayed"]);
@@ -189,8 +189,8 @@ describe("clear reducers", () => {
   });
 
   it("drops the query entirely when only free text was in it", () => {
-    const before: SearchQuery = { q: "sunset", kind: "video" };
-    expect(find(before, "q").clear(before)).toEqual({ kind: "video" });
+    const before: SearchQuery = { q: "sunset", kinds: ["video"] };
+    expect(find(before, "q").clear(before)).toEqual({ kinds: ["video"] });
   });
 
   it("removes one tag by value, so clearing several in a row hits the right ones", () => {
@@ -225,8 +225,8 @@ describe("clear reducers", () => {
     expect(find(before, "btime").clear(before)).toEqual({});
     const captured: SearchQuery = { capturedFrom: 1, capturedTo: 2 };
     expect(find(captured, "capturedAt").clear(captured)).toEqual({});
-    const added: SearchQuery = { addedFrom: 1, addedTo: 2, kind: "video" };
-    expect(find(added, "addedAt").clear(added)).toEqual({ kind: "video" });
+    const added: SearchQuery = { addedFrom: 1, addedTo: 2, kinds: ["video"] };
+    expect(find(added, "addedAt").clear(added)).toEqual({ kinds: ["video"] });
     const played: SearchQuery = { playedFrom: 1, playedTo: 2, favorite: true };
     expect(find(played, "playedAt").clear(played)).toEqual({ favorite: true });
     expect(find({ playedTo: 1_700_000_000 }, "playedAt").label).toContain(
@@ -244,25 +244,32 @@ describe("clear reducers", () => {
     // filter back on — and a non-idempotent reducer breaks any fold over the
     // descriptor list.
     const clear = find({ duplicates: true }, "duplicates").clear;
-    expect(clear({ kind: "video" })).toEqual({ kind: "video" });
+    expect(clear({ kinds: ["video"] })).toEqual({ kinds: ["video"] });
     expect(clear(clear({ duplicates: true }))).toEqual({});
   });
 
   it("drops keys instead of leaving them as explicit undefined", () => {
     // toEqual ignores undefined-valued keys, so this needs the strict form to
     // mean anything: the cleared query must not carry `kind: undefined`.
-    const before: SearchQuery = { kind: "video", favorite: true };
+    const before: SearchQuery = { kinds: ["video"], favorite: true };
     expect(find(before, "kind").clear(before)).toStrictEqual({
       favorite: true,
     });
   });
 
+  it("lists several kinds on one chip, cleared as a whole", () => {
+    const before: SearchQuery = { kinds: ["video", "image"], favorite: true };
+    const chip = find(before, "kind");
+    expect(chip.label).toBe(`${t("kind.video")}, ${t("kind.image")}`);
+    expect(chip.clear(before)).toStrictEqual({ favorite: true });
+  });
+
   it("labels the audio kind", () => {
-    expect(find({ kind: "audio" }, "kind").label).toBe(t("kind.audio"));
+    expect(find({ kinds: ["audio"] }, "kind").label).toBe(t("kind.audio"));
   });
 
   it("shows an unrecognized kind verbatim rather than mislabelling it", () => {
-    expect(find({ kind: "document" }, "kind").label).toBe("document");
+    expect(find({ kinds: ["document"] }, "kind").label).toBe("document");
   });
 
   it("leaves an explicitly chosen sort alone when duplicates is cleared", () => {
@@ -295,7 +302,7 @@ describe("clear reducers", () => {
 describe("collapsedConditionCount", () => {
   it("is zero when nothing is hidden", () => {
     expect(
-      collapsedConditionCount(describe_({ kind: "video", favorite: true })),
+      collapsedConditionCount(describe_({ kinds: ["video"], favorite: true })),
     ).toBe(0);
   });
 
@@ -317,7 +324,7 @@ describe("folder", () => {
   const folder = { path: "Movie/2024", recursive: true };
 
   it("comes first, as a primary chip naming the path", () => {
-    const [first] = describe_({ kind: "video", folder });
+    const [first] = describe_({ kinds: ["video"], folder });
     expect(first).toMatchObject({
       key: "folder",
       label: "Folder: Movie/2024",
@@ -332,11 +339,11 @@ describe("folder", () => {
 
   it("clears only itself", () => {
     expect(
-      find({ kind: "video", folder }, "folder").clear({
-        kind: "video",
+      find({ kinds: ["video"], folder }, "folder").clear({
+        kinds: ["video"],
         folder,
       }),
-    ).toEqual({ kind: "video" });
+    ).toEqual({ kinds: ["video"] });
   });
 
   it("does not count toward the collapsed panel's badge", () => {
@@ -350,9 +357,11 @@ describe("folder", () => {
 
 describe("the default saved search", () => {
   it("is where Clear all returns, and from there Clear all empties", () => {
-    const def = { kind: "video" as const, sort: "btime" };
+    const def = { kinds: ["video"], sort: "btime" };
     expect(clearAllTarget({ q: "cat" }, def)).toEqual(def);
-    expect(clearAllTarget({ sort: "btime", kind: "video" }, def)).toEqual({});
+    expect(clearAllTarget({ sort: "btime", kinds: ["video"] }, def)).toEqual(
+      {},
+    );
     // A folder is where the view is, not a condition that differs.
     expect(
       clearAllTarget({ ...def, folder: { path: "A", recursive: true } }, def),
@@ -378,8 +387,8 @@ describe("the default saved search", () => {
       describeConditions(q, t, "en", def)
         .find((d) => d.key === "sort")!
         .clear(q);
-    expect(clear({ sort: "name", kind: "image" })).toEqual({
-      kind: "image",
+    expect(clear({ sort: "name", kinds: ["image"] })).toEqual({
+      kinds: ["image"],
       sort: "btime",
       sortDir: "asc",
     });
@@ -394,7 +403,7 @@ describe("the default saved search", () => {
     ).toEqual({});
     // A default without a sort: the sort is just dropped.
     expect(
-      describeConditions({ sort: "name" }, t, "en", { kind: "video" })
+      describeConditions({ sort: "name" }, t, "en", { kinds: ["video"] })
         .find((d) => d.key === "sort")!
         .clear({ sort: "name" }),
     ).toEqual({});
