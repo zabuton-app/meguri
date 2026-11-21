@@ -45,13 +45,12 @@ const tilesDir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-spectrum-"));
 try {
   await waitReady(page);
 
-  // The track without cover art, so the pattern is the whole stage. Its
-  // thumbnail link has no accessible name (a glyph, no <img alt>), so it is
-  // found through the card rather than by role.
+  // The track without cover art, so the pattern is the whole stage. The
+  // link inside the card's thumbnail ([data-thumb]) opens it.
   const track = page
     .getByTestId("media-card")
     .filter({ hasText: "Open Sky.mp3" })
-    .locator("a[data-thumb]");
+    .locator("[data-thumb] a");
   await track.scrollIntoViewIfNeeded();
   await sleep(500);
   await track.click();

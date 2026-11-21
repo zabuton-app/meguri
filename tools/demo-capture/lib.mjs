@@ -69,7 +69,13 @@ export async function launchApp({
   }
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${userDataDir}`, "--force-device-scale-factor=1"],
+      // --enable-unsafe-swiftshader: software WebGL where there is no GPU
+      // (Xvfb), so the graph view draws there too. A real GPU is used first.
+      args: [
+        `--user-data-dir=${userDataDir}`,
+        "--force-device-scale-factor=1",
+        "--enable-unsafe-swiftshader",
+      ],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: mediaRoot },
     }),
   );
