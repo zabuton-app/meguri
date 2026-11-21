@@ -13,7 +13,9 @@ choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `duplicates` (`src/routes/Duplicates/`), `missing` (`src/routes/Missing/`),
 `tags` (`src/routes/Tags/`),
 `auto-tag` (`src/routes/AutoTag/`), and `settings` (`src/routes/Settings/`)
-are its **children**. Home renders an
+are its **children**. `auto-tag` and `settings` are rarely opened, so they use
+the route's `lazy` and load on first visit; the router waits for the module
+before it navigates, so they need no `Suspense`. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
 stays mounted underneath. The file detail can alternatively dock as a **side
 peek** — a sheet docked beside the list as a flex sibling, so the list narrows
