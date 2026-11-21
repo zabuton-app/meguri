@@ -100,14 +100,14 @@ html[data-appearance] {
   --c-chrome: #ffe600;
 }
 /* The palette is redefined inside the bars, so their tiles, icons, fields,
-   hover states and the active workspace (a black tile with a yellow glyph)
-   follow without touching each element. */
+   hover states and the selected workspace's black tint and bar follow
+   without touching each element. */
 [data-slot="workspace-rail"],
 [data-slot="title-bar"],
 body:has([data-slot="workspace-rail"] [data-state="open"])
   [data-slot="context-menu-content"] {
   --c-bg: #ffe600;
-  --c-surface: #ebd400; /* workspace and collection tiles */
+  --c-surface: #ebd400;
   --c-overlay: #d9c300;
   --c-hover: #cbb700;
   --c-border: #8f8100;

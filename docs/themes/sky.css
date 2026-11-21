@@ -134,18 +134,15 @@ html[data-appearance] {
   background-color: var(--sk-search);
 }
 
-/* Buttons in the rail, header and search bar: little clouds, white with dark
-   ink in both variants. Active ones keep their blue (bg-primary), so the
-   current view and filter still stand out.
+/* Buttons in the header and search bar: little clouds, white with dark ink
+   in both variants. Active ones keep their blue (bg-primary), so the current
+   view and filter still stand out. The rail's buttons have no fill of their
+   own, so they stay bare on the sky.
 
    Not public API: buttons carry no data-slot, so this picks the framed ones
    (filled with --c-surface or outlined with --c-border) by their utility
    classes. It may need updating when the app's markup changes. */
-:is(
-    [data-slot="workspace-rail"],
-    [data-slot="title-bar"],
-    [data-slot="filter-bar"]
-  )
+:is([data-slot="title-bar"], [data-slot="filter-bar"])
   :is(button, a, div):is([class~="bg-surface"], [class~="border-border"]):not(
     [class~="bg-primary"]
   ) {
@@ -157,11 +154,7 @@ html[data-appearance] {
   /* Some buttons inherit the bar's text color instead of setting their own. */
   color: var(--c-fg);
 }
-:is(
-    [data-slot="workspace-rail"],
-    [data-slot="title-bar"],
-    [data-slot="filter-bar"]
-  )
+:is([data-slot="title-bar"], [data-slot="filter-bar"])
   :is(button, a):is([class~="bg-surface"], [class~="border-border"]):not(
     [class~="bg-primary"]
   ):hover {
