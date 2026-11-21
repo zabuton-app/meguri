@@ -240,7 +240,7 @@ function Cover({
 
   const showArt = src != null && failedSrc !== src;
   return (
-    <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-overlay text-muted">
+    <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-item bg-overlay text-muted">
       {showArt ? (
         <img
           src={src}
