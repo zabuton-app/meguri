@@ -280,7 +280,7 @@ function ChromeButton({
       title={title}
       aria-label={title}
       aria-pressed={active}
-      className={`flex size-10 items-center justify-center rounded-full border border-border/60 backdrop-blur-md transition hover:bg-bg/70 disabled:opacity-40 ${
+      className={`flex size-10 items-center justify-center rounded-control border border-border/60 backdrop-blur-md transition hover:bg-bg/70 disabled:opacity-40 ${
         active ? "bg-bg/80 text-[var(--c-primary)]" : "bg-bg/40 text-bright-fg"
       }`}
     >
