@@ -230,7 +230,8 @@ export default function Discover() {
   // cache sync patches every ["files_random"]-prefixed query including this
   // queue (no reshuffle) plus the list / detail caches.
 
-  // Modal size toggle; the persisted value is shared with MediaDetail's modal.
+  // Modal size toggle; the persisted value is shared with MediaDetail's modal
+  // and the playlist player.
   const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
     MODAL_SIZE_KEY,
     "large",
