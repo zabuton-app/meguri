@@ -229,6 +229,15 @@ export function describeConditions(
       },
     });
 
+  if (query.subtitles)
+    out.push({
+      key: "subtitles",
+      label: t("filter.subtitlesChip"),
+      group: "collapsed",
+      chip: true,
+      clear: (q) => without(q, "subtitles"),
+    });
+
   // Not a narrowing condition, but it is hidden state once the control moves
   // into the panel. The badge alone would only say that *something* is set; the
   // chip is what names it without making the user open the panel to find out.

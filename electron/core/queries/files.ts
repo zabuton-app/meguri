@@ -5,6 +5,7 @@ import { fileTags } from "../tags.js";
 import { listBookmarksByMetaKey } from "./bookmarks.js";
 import { thumbOffsetByKey } from "./meta.js";
 import { resolveSortDir } from "../../../shared/sortDir.js";
+import { TEXT_SUBTITLE_CODECS } from "../../../shared/embeddedSubtitles.js";
 import {
   FOLDER_FILE_FROM,
   folderCondition,
@@ -33,6 +34,7 @@ const DEFAULT_LIMIT = 100;
 
 /** Bound once: the excluded-source list never changes at runtime. */
 const HIDDEN_SOURCES_JSON = JSON.stringify([...LIST_HIDDEN_SOURCES]);
+const TEXT_SUBTITLE_CODECS_JSON = JSON.stringify(TEXT_SUBTITLE_CODECS);
 const MAX_LIMIT = 500;
 
 // Metadata (rating/favorite/last_accessed) lives in file_meta, keyed by meta_key, so it
@@ -405,6 +407,15 @@ export function appendSearchConditions(
     // latter is only checked after the join, so it scans every file row.
     sql +=
       " AND f.meta_key IN (SELECT meta_key FROM file_meta WHERE resume_position IS NOT NULL)";
+  }
+  if (query.subtitles) {
+    // Read from the ffprobe streams the scan stored in files.meta, so it needs
+    // no column or rescan. It parses JSON per row and has no index; the kind
+    // test lets idx_files_kind skip everything but videos first.
+    sql += ` AND f.kind = 'video' AND EXISTS (SELECT 1 FROM json_each(f.meta, '$.streams') s
+      WHERE json_extract(s.value, '$.codec_type') = 'subtitle'
+        AND json_extract(s.value, '$.codec_name') IN (SELECT value FROM json_each(?)))`;
+    args.push(TEXT_SUBTITLE_CODECS_JSON);
   }
   if (query.played != null) {
     const op = query.played ? "EXISTS" : "NOT EXISTS";

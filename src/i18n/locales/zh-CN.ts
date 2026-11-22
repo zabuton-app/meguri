@@ -323,6 +323,8 @@ export const zhCN: Catalog = {
   "filter.playState": "播放状态",
   "filter.sortSection": "排序方式",
   "filter.otherSection": "其他",
+  "filter.subtitles": "仅显示带字幕的视频",
+  "filter.subtitlesChip": "有字幕",
 
   // smart collections
   "smartCollection.title": "智能收藏",

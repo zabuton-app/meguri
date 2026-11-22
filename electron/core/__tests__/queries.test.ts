@@ -62,6 +62,47 @@ describe("searchFiles", () => {
     ]);
   });
 
+  it("filters to videos with an embedded text subtitle track (#378)", () => {
+    const withMeta = (
+      relPath: string,
+      kind: "video" | "audio",
+      streams: unknown[],
+    ) => {
+      const id = insertFile(db, rootId, { relPath, kind });
+      db.prepare("UPDATE files SET meta = ? WHERE id = ?").run(
+        JSON.stringify({ streams }),
+        id,
+      );
+      return id;
+    };
+    const video = { codec_type: "video", codec_name: "h264" };
+    const srt = withMeta("srt.mkv", "video", [
+      video,
+      { codec_type: "subtitle", codec_name: "subrip" },
+    ]);
+    const movText = withMeta("tx3g.mp4", "video", [
+      video,
+      { codec_type: "subtitle", codec_name: "mov_text" },
+    ]);
+    // Bitmap subtitles: the player cannot show them, so they do not count.
+    withMeta("pgs.mkv", "video", [
+      video,
+      { codec_type: "subtitle", codec_name: "hdmv_pgs_subtitle" },
+    ]);
+    withMeta("plain.mp4", "video", [video]);
+    // An audio file is not a video, whatever its streams say.
+    withMeta("lyrics.mka", "audio", [
+      { codec_type: "audio", codec_name: "flac" },
+      { codec_type: "subtitle", codec_name: "ass" },
+    ]);
+    insertFile(db, rootId, { relPath: "unprobed.mp4" });
+
+    const ids = searchFiles(db, { subtitles: true, limit: 100 })
+      .items.map((f) => f.id)
+      .sort((a, b) => a - b);
+    expect(ids).toEqual([srt, movText]);
+  });
+
   it("filters by any of several kinds, and by every kind when none is given", () => {
     const vid = insertFile(db, rootId, { relPath: "a.mp4", kind: "video" });
     const img = insertFile(db, rootId, { relPath: "b.jpg", kind: "image" });

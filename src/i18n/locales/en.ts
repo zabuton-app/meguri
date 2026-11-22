@@ -355,6 +355,8 @@ export const en: Catalog = {
   "filter.playState": "Play state",
   "filter.sortSection": "Sort order",
   "filter.otherSection": "Other",
+  "filter.subtitles": "Show only videos with subtitles",
+  "filter.subtitlesChip": "Subtitles",
 
   // smart collections
   "smartCollection.title": "Smart collections",
