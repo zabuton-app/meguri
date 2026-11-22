@@ -15,6 +15,17 @@ The layers, from bottom to top:
 At equal specificity a higher layer wins, so `custom.css` can adjust a CSS
 theme.
 
+**Random theme on startup** in the Theme section picks a different built-in
+theme with the current light or dark appearance on each start. Like picking a
+built-in theme by hand, it turns off the selected CSS theme; `custom.css` is
+unaffected. A manual pick lasts until the next start. While it is on, the
+window opens on a neutral gray and the picked theme fades in.
+
+Switching built-in themes, or light and dark, cross-fades the window over half
+a second with a View Transition, unless the system asks for reduced motion. A
+`custom.css` can turn this switch fade off with
+`::view-transition-old(root), ::view-transition-new(root) { animation: none; }`.
+
 ![The three layers: built-in theme, CSS theme, custom.css](assets/css-layers.png)
 
 `<userData>` below is, for example, `~/.config/meguri` on Linux.

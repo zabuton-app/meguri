@@ -1,9 +1,11 @@
-// Immersive views (Discover, the playlist player, the file details' modal)
-// cover the whole window, the title bar's band included, and the bar's window
-// buttons step aside while one is open: the app's own would sit on top of the
-// view's controls, and macOS draws its traffic lights over whatever is there.
-// Whether one is open lives outside React because the bar is mounted in App,
-// beside the router the views live in.
+// Immersive views (Discover, the playlist player, the file details' modal,
+// the image comparison) cover the whole window, the title bar's band
+// included, and the bar's window buttons step aside while one is open: the
+// app's own would sit on top of the view's controls, and macOS draws its
+// traffic lights over whatever is there. Whether one is open lives outside
+// React because the bar is mounted in App, beside the router the views live
+// in. Home reads it too: the comparison is not a route, so the path alone
+// does not tell Home its list is covered.
 import { useLayoutEffect } from "react";
 import { createHoldStore } from "@/hooks/createFlagStore";
 

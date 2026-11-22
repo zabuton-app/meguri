@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  profileArg,
   skipFirstLaunchTour,
   waitForIndexedMedia,
   waitForRenderer,
@@ -40,7 +41,7 @@ export const test = base.extend<MeguriFixtures>({
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-e2e-"));
     const app = await _electron.launch(
       electronLaunchOptions({
-        args: [`--user-data-dir=${userDataDir}`],
+        args: [profileArg(userDataDir)],
         env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: mediaRoot },
       }),
     );

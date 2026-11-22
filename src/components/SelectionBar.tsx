@@ -10,7 +10,7 @@
 // on click (see src/lib/bulkEdit.ts for those rules).
 import { useState } from "react";
 import { useLocation } from "react-router";
-import { Clock, Heart, StarOff, Tag, X } from "lucide-react";
+import { Clock, Columns2, Heart, StarOff, Tag, X } from "lucide-react";
 import { useSelection } from "@/components/SelectionContext";
 import { BurstEffect } from "@/components/effects/BurstEffect";
 import { RatingStars } from "@/components/RatingStars";
@@ -20,11 +20,15 @@ import { useWatchLater } from "@/hooks/useWatchLater";
 import { useI18n } from "@/i18n/I18nProvider";
 import { bulkFlagOf, bulkToggleTarget, uniformRating } from "@/lib/bulkEdit";
 import { MAX_BULK_FILES } from "@shared/tags";
+import { canCompare } from "@/compare/canCompare";
+import { ExperimentalCorner } from "@/components/ExperimentalBadge";
 import { cn } from "@/lib/utils";
 
 interface Props {
   /** Opens the bulk tag dialog. */
   onEditTags: () => void;
+  /** Opens the comparison of the two selected images. */
+  onCompare: () => void;
   /** Leaves selection mode. Owned by the caller, which also closes the dialog. */
   onExit: () => void;
 }
@@ -39,7 +43,7 @@ const ACTION_CLASS =
 const TOGGLE_CLASS =
   "relative flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control border border-border bg-bg px-2.5 text-xs text-fg transition hover:bg-overlay disabled:cursor-default disabled:hover:bg-bg";
 
-export function SelectionBar({ onEditTags, onExit }: Props) {
+export function SelectionBar({ onEditTags, onCompare, onExit }: Props) {
   const { t } = useI18n();
   const selection = useSelection();
   const watchLaterMembership = useWatchLater();
@@ -89,6 +93,7 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
   const unavailable = empty || tooMany || selection.pending;
   const busy = unavailable || bulk.pending;
   const limitTitle = t("select.bulkFileLimit", { max: MAX_BULK_FILES });
+  const comparable = canCompare(selection);
 
   return (
     <div
@@ -299,6 +304,23 @@ export function SelectionBar({ onEditTags, onExit }: Props) {
           </span>
         )}
       </button>
+
+      <span className="h-6 w-px bg-border-strong" />
+
+      {/* Always shown, disabled until the selection is two images: the button
+          is how the feature is found, and its title says what it needs. */}
+      <ExperimentalCorner>
+        <button
+          type="button"
+          onClick={onCompare}
+          disabled={!comparable}
+          title={comparable ? undefined : t("select.compareHint")}
+          className={ACTION_CLASS}
+        >
+          <Columns2 className="size-4" />
+          {t("select.compare")}
+        </button>
+      </ExperimentalCorner>
 
       <span className="h-6 w-px bg-border-strong" />
 

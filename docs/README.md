@@ -21,6 +21,8 @@ For what the app is, how to install it, and how to use it, see the top-level
   internationalization, theming, and content zoom.
 - [Build and CI](build-and-ci.md) — npm scripts, the electron-vite build, the
   two-project test setup, packaging, CI, and Docker-based development.
+- [Crash Reports](crash-reports.md) — locating dumps and symbolizing native
+  crashes from summaries or privately shared minidumps.
 
 For people writing stylesheets rather than code:
 

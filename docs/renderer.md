@@ -39,6 +39,36 @@ route, sitting alongside its companion components and hooks — for example
 `src/routes/Player/usePlayerKeys.ts` (the playlist's keyboard control). Keep
 mechanics in such hooks and components; `index.tsx` should stay a composition.
 
+One immersive view is not a route: the image comparison (`src/compare/`),
+opened from the selection bar for exactly two images. It keeps the pair it
+opened with and sits over the list as Discover does. Home reads
+`useImmersiveViewOpen()` so the list's keys stand down while it is up. The
+alignment runs in `align.worker.ts` with OpenCV.js (`@techstark/opencv-js`,
+about 15 MB in its own chunk, so it loads only when a comparison opens):
+`alignImages.ts` places B in A by a scale and an offset (no rotation),
+correlating the images' edges rather than their shades (`edges.ts`; a dark
+and a light theme of one screen invert most shades but keep every edge in
+place). Three searches each guess the placement: `searchContained.ts` finds
+one image inside the other at scale 1 (a crop of any size),
+`searchCoarse.ts` tries B as a whole at quarter-octave scales from a quarter
+to four times, in A padded with a margin of no edges, and
+`searchFeatures.ts` pairs up ORB features (RANSAC over scale and offset).
+`refine.ts` measures every guess the same way at full size, with a patch in
+each half of the overlap whose distance apart gives the scale to a fraction
+of a pixel, so the scores compare and the highest wins. A new search only
+has to return guesses. On the view's side, `geometry.ts` holds the
+placement's arithmetic (span, overlap, the inverse for a swap) and
+`modes.ts` the layer styles of each way to look.
+
+The renderer's CSP (`index.html`) does not reach this worker: OpenCV.js
+compiles its wasm there without `'wasm-unsafe-eval'` in the packaged app
+(`e2e/compare.spec.ts`). A worker takes the policy of its own script's
+response, not the page's `<meta>` one, and a `file:` script has none. So
+`connect-src` does not limit the worker's `fetch` either. The package is pinned to an exact version for that
+reason. When updating it, check that its `dist/opencv.js` is the official
+`https://docs.opencv.org/<version>/opencv.js` with the package's
+`dist/opencv.js.patch` applied, and update `THIRD_PARTY_NOTICES.txt`.
+
 ## Provider hierarchy
 
 The provider stack is set up in `renderApp()` (`src/renderApp.tsx`):
@@ -538,6 +568,13 @@ UI primitives are in `src/components/ui/` (Radix plus class-variance-authority,
 in the shadcn style). Confirmation dialogs use `ConfirmProvider` / `useConfirm`
 (`src/components/ConfirmDialog.tsx`).
 
+An experimental feature carries a beaker (`src/components/ExperimentalBadge.tsx`)
+wherever it is offered or opens: `ExperimentalCorner` around the control that
+starts it (the beaker overhangs its corner), `ExperimentalBadge` next to the
+title of what it opens. Its title says the feature may change or be removed.
+Take both off when the feature is no longer experimental. The image comparison
+is one.
+
 ## Design tokens
 
 The app's scales (#584). A new part takes its values from them; a value
@@ -694,7 +731,16 @@ such as gruvbox, solarized, and nord. It has four layers:
   is passed through untouched.
 - `ThemeProvider.tsx` — injects one `html[data-theme="<id>"]` block per scheme at
   import time (before the first paint, which is what `public/theme-boot.js`
-  assumes) and switches `<html data-theme>`.
+  assumes) and switches `<html data-theme>`. A switch cross-fades the window
+  with `document.startViewTransition`, applying the new theme synchronously
+  inside the callback (`flushSync` plus `applyTheme`) so the transition
+  snapshots it, and skips the fade under reduced motion.
+- `startupTheme.ts` — with "Random theme on startup" on, picks and applies the
+  theme before the first render. `public/theme-boot.js` reads the same
+  preference from `meguri.prefs` and paints a neutral gray instead of the
+  previous theme's color, with `data-boot-fade` on `<html>`; `styles.css` fades
+  the picked theme in over `--meguri-theme-fade`, and `ThemeProvider` removes
+  the attribute once that has played.
 
 Adding a theme means adding its palette to `schemes.ts`; nothing else needs to be
 touched. `src/themes/__tests__/derive.test.ts` runs every scheme through the

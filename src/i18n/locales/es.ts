@@ -7,6 +7,8 @@ export const es: Catalog = {
   "common.cancel": "Cancelar",
   "common.ok": "Aceptar",
   "common.actionFailed": "No se pudo completar la acción",
+  "common.experimental":
+    "Experimental: puede cambiar o desaparecer en una versión futura",
 
   // window
   "window.minimize": "Minimizar",
@@ -36,6 +38,9 @@ export const es: Catalog = {
   "settings.light": "Claro",
   "settings.dark": "Oscuro",
   "settings.theme": "Tema",
+  "settings.randomThemeOnStartup": "Tema aleatorio al iniciar",
+  "settings.randomThemeOnStartupDesc":
+    "Elige otro tema integrado con la apariencia actual en cada inicio. Desactiva el tema CSS seleccionado.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "Cambiar al modo claro",
@@ -632,6 +637,8 @@ export const es: Catalog = {
   "select.deselectAll": "Vaciar",
   "select.editTags": "Editar etiquetas",
   "select.exit": "Salir de la selección",
+  "select.compare": "Comparar",
+  "select.compareHint": "Selecciona exactamente dos imágenes para compararlas",
   "select.bulkFileLimit":
     "Hasta {max} archivos por edición. Reduce la selección.",
   "select.ratingClear": "Borrar la valoración",
@@ -1570,4 +1577,35 @@ export const es: Catalog = {
   "settings.tour": "Tutorial",
   "settings.tourDesc": "Vuelve a mostrar el recorrido del primer inicio",
   "settings.tourReplay": "Repetir",
+
+  // image comparison
+  "compare.title": "Comparar imágenes",
+  "compare.mode": "Comparación",
+  "compare.mode.slider": "Deslizador",
+  "compare.mode.difference": "Diferencia",
+  "compare.mode.onion": "Superposición",
+  "compare.mode.blink": "Parpadeo",
+  "compare.opacity": "Opacidad de B",
+  "compare.swap": "Intercambiar A y B",
+  "compare.align": "Alinear",
+  "compare.alignHint":
+    "Mueve B según el desplazamiento encontrado para que ambas coincidan",
+  "compare.zoomIn": "Acercar",
+  "compare.zoomOut": "Alejar",
+  "compare.fit": "Ajustar",
+  "compare.split": "Posición de la división",
+  "compare.aligning": "Alineando… {percent}%",
+  "compare.alignFailed": "No se pudieron alinear las imágenes",
+  "compare.alignResult":
+    "Desplazamiento {dx}, {dy} px · coincidencia de bordes {score} %",
+  "compare.alignScale": "escala ×{scale}",
+  "compare.lowScore":
+    "coincidencia de bordes baja, la alineación puede no ser correcta",
+  "shortcuts.sectionCompare": "Comparación de imágenes",
+  "shortcuts.compareModes":
+    "Deslizador / diferencia / superposición / parpadeo",
+  "shortcuts.compareSwap": "Intercambiar A y B",
+  "shortcuts.compareZoom": "Acercar / alejar las imágenes",
+  "shortcuts.compareFit": "Ajustar las imágenes",
+  "shortcuts.compareBlink": "Alternar A y B durante el parpadeo",
 };

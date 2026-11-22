@@ -25,6 +25,7 @@ import {
 } from "@/components/pet/petSize";
 import { platform } from "@/lib/platform";
 
+// public/theme-boot.js reads randomThemeOnStartup from this key before the bundle loads.
 const LS_KEY = "meguri.prefs";
 
 export const DEFAULT_SCENE_COUNT = 12;
@@ -95,6 +96,7 @@ export function isListThumbSize(v: unknown): v is ListThumbSize {
 }
 
 interface Prefs {
+  randomThemeOnStartup: boolean;
   sceneCount: number;
   keybindingPreset: KeybindingPreset;
   hideSupportLink: boolean;
@@ -141,6 +143,7 @@ interface Prefs {
 }
 
 const DEFAULTS: Prefs = {
+  randomThemeOnStartup: false,
   sceneCount: DEFAULT_SCENE_COUNT,
   keybindingPreset: DEFAULT_KEYBINDING_PRESET,
   hideSupportLink: false,
@@ -176,12 +179,16 @@ export function clampPlaylistImageSeconds(n: number): number {
 }
 
 /** Load saved prefs, falling back to defaults for missing/invalid fields. */
-function loadPrefs(): Prefs {
+export function loadPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Prefs>;
       return {
+        randomThemeOnStartup:
+          typeof parsed.randomThemeOnStartup === "boolean"
+            ? parsed.randomThemeOnStartup
+            : DEFAULTS.randomThemeOnStartup,
         sceneCount:
           typeof parsed.sceneCount === "number"
             ? clampSceneCount(parsed.sceneCount)
@@ -258,6 +265,7 @@ function loadPrefs(): Prefs {
 }
 
 interface PrefsCtx extends Prefs {
+  setRandomThemeOnStartup: (enabled: boolean) => void;
   setSceneCount: (n: number) => void;
   setKeybindingPreset: (p: KeybindingPreset) => void;
   setHideSupportLink: (hidden: boolean) => void;
@@ -303,6 +311,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PrefsCtx>(
     () => ({
       ...prefs,
+      setRandomThemeOnStartup: (enabled) =>
+        setPrefs((p) => ({ ...p, randomThemeOnStartup: enabled })),
       setSceneCount: (n) =>
         setPrefs((p) => ({ ...p, sceneCount: clampSceneCount(n) })),
       setKeybindingPreset: (kp) =>

@@ -219,6 +219,21 @@ export function ShortcutsOverlay({
       ],
     },
     {
+      id: "compare",
+      title: t("shortcuts.sectionCompare"),
+      rows: [
+        {
+          label: t("shortcuts.compareModes"),
+          keys: [[["1"], ["2"], ["3"], ["4"]]],
+        },
+        { label: t("shortcuts.compareSwap"), keys: [[["S"]]] },
+        { label: t("shortcuts.compareZoom"), keys: [[["+"], ["-"]]] },
+        { label: t("shortcuts.compareFit"), keys: [[["0"]]] },
+        { label: t("shortcuts.compareBlink"), keys: [[["Space"]]] },
+        { label: t("common.close"), keys: esc },
+      ],
+    },
+    {
       id: "graph",
       title: t("shortcuts.sectionGraph"),
       rows: [
