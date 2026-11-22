@@ -368,6 +368,7 @@ export const MediaGrid = memo(function MediaGrid({
         mediaBase={mediaBase}
         workspaceId={wsId}
         active={navActive}
+        onOpenFolder={onOpenFolder}
       >
         <ScrollArea
           className="page-scroll h-full"
