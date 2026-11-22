@@ -550,6 +550,7 @@ export const es: Catalog = {
   "player.subtitles": "Subtítulos",
   "player.subtitleAuto": "Coincidir con el idioma del audio",
   "player.subtitleOff": "Desactivados",
+  "player.subtitleResetPosition": "Restablecer posición",
   "player.subtitleLoading": "Cargando subtítulos…",
   "player.subtitleUnavailable": "No se pudo cargar esta pista de subtítulos.",
   "player.subtitleTrackNumber": "Pista {number}",

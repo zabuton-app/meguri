@@ -552,6 +552,7 @@ export const fr: Catalog = {
   "player.subtitles": "Sous-titres",
   "player.subtitleAuto": "Suivre la langue audio",
   "player.subtitleOff": "Désactivés",
+  "player.subtitleResetPosition": "Réinitialiser la position",
   "player.subtitleLoading": "Chargement des sous-titres…",
   "player.subtitleUnavailable":
     "Impossible de charger cette piste de sous-titres.",
