@@ -57,6 +57,6 @@ test.describe("Settings", () => {
   test("opens from command menu", async ({ ready }) => {
     await ready.keyboard.press("Control+KeyK");
     await ready.getByText("Settings", { exact: true }).click();
-    await expect(ready.getByText("Appearance")).toBeVisible();
+    await expect(ready.getByText("Appearance", { exact: true })).toBeVisible();
   });
 });
