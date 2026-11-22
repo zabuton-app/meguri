@@ -8,13 +8,13 @@ import {
 import { ThemeProvider, useTheme } from "@/themes/ThemeProvider";
 import { deriveTokens } from "@/themes/derive";
 import { SCHEMES } from "@/themes/schemes";
-import log from "@/lib/logger";
 
 const cssThemeSelect = vi.fn().mockResolvedValue({});
+const logError = vi.fn();
 vi.mock("@/ipc/client", () => ({
   api: { cssThemeSelect: (file: string | null) => cssThemeSelect(file) },
 }));
-vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
+vi.mock("@/lib/logger", () => ({ default: { error: logError } }));
 const { startTheme } = await import("@/themes/startupTheme");
 
 afterEach(() => {
@@ -33,7 +33,9 @@ describe("random theme on startup", () => {
     expect(prefs.result.current.randomThemeOnStartup).toBe(false);
     act(() => prefs.result.current.setRandomThemeOnStartup(true));
     expect(
-      JSON.parse(localStorage.getItem("meguri.prefs")!).randomThemeOnStartup,
+      (JSON.parse(localStorage.getItem("meguri.prefs")!) as {
+        randomThemeOnStartup: boolean;
+      }).randomThemeOnStartup,
     ).toBe(true);
     prefs.unmount();
     const restored = renderHook(() => usePreferences(), {
@@ -135,6 +137,6 @@ describe("random theme on startup", () => {
     const { theme, ready } = startTheme();
     await expect(ready).resolves.toBeUndefined();
     expect(localStorage.getItem("meguri.theme")).toBe(theme);
-    expect(log.error).toHaveBeenCalled();
+    expect(logError).toHaveBeenCalled();
   });
 });

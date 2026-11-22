@@ -68,7 +68,9 @@ describe("ThemeSection", () => {
     fireEvent.click(toggle);
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     expect(
-      JSON.parse(localStorage.getItem("meguri.prefs")!).randomThemeOnStartup,
+      (JSON.parse(localStorage.getItem("meguri.prefs")!) as {
+        randomThemeOnStartup: boolean;
+      }).randomThemeOnStartup,
     ).toBe(true);
     expect(localStorage.getItem("meguri.theme")).toBe("gruvbox-dark");
     expect(cssThemeSelect).not.toHaveBeenCalled();
