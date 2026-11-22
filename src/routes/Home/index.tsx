@@ -69,6 +69,7 @@ import { patchCollectionItemOrder } from "@/lib/queryCache";
 import { TimelineView } from "@/timeline/TimelineView";
 import { useTimelineView } from "./useTimelineView";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
+import { useImmersiveViewOpen } from "@/components/immersiveView";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { SelectionProvider } from "@/components/SelectionContext";
 import { walksPlaybackOrder } from "@/lib/playbackOrder";
@@ -470,7 +471,11 @@ export default function Home() {
   // while nothing else can want those keys: no detail/settings/discover route
   // open — a docked side peek included, its player takes the arrows — and no
   // help/command overlay on top.
-  const navActive = location.pathname === "/" && !helpOpen && !commandOpen;
+  // An immersive view that is not a route (the image comparison, opened from
+  // the selection bar) covers the list as a routed modal does.
+  const immersiveOpen = useImmersiveViewOpen();
+  const navActive =
+    location.pathname === "/" && !helpOpen && !commandOpen && !immersiveOpen;
 
   // Folder view moves (back / up), while the list is in front — a docked side
   // peek included it is not, as its player owns those keys.
@@ -746,7 +751,8 @@ export default function Home() {
   // list in use. (Card focus navigation stays off then: its arrow keys would
   // fight the player's.)
   const peekDocked = usePeekDocked();
-  const listShortcutsActive = location.pathname === "/" || peekDocked;
+  const listShortcutsActive =
+    (location.pathname === "/" || peekDocked) && !immersiveOpen;
 
   // Tours run on the bare list only: no routed modal, overlay or menu on top
   // (the same condition as the views' keyboard navigation, navActive).

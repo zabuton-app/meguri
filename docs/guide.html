@@ -89,6 +89,7 @@
     <li><a href="#tags">Tags, ratings, and favorites</a></li>
     <li><a href="#auto-tag">Auto tagging</a></li>
     <li><a href="#bulk-edit">Editing several files at once</a></li>
+    <li><a href="#compare">Comparing two images</a></li>
     <li><a href="#timeline">Timeline view</a></li>
     <li><a href="#graph">Graph view</a></li>
     <li><a href="#collections">Collections</a></li>
@@ -393,6 +394,46 @@
   </ul>
   <p>One edit covers up to 5,000 files. The × at the end of the bar leaves
   selection mode.</p>
+
+  <h2 id="compare">Comparing two images</h2>
+  <p>This feature is experimental, marked with a beaker: it may change or be
+  removed in a later version.</p>
+  <p>Select exactly two images and click <strong>Compare</strong> in the
+  selection bar to see what differs between them: an edited copy, a
+  re-export, two shots in a row. The first image you selected is
+  <strong>A</strong>, the second <strong>B</strong>;
+  <strong>Swap A and B</strong> (<kbd>S</kbd>) turns them around.</p>
+  <p>Meguri looks for where B sits in A, so a cropped or shifted copy lines up
+  instead of showing as changed everywhere. It goes by the outlines in the
+  pictures, so a copy that is brighter, darker or in another theme still
+  lines up, and by distinctive points it finds in both, so a large shift does
+  too. A copy at another size (a thumbnail, an enlarged crop, up to four
+  times either way) is drawn at the size that lines it up, and the bottom
+  right shows the scale; it cannot be rotated. The bottom right shows the offset
+  it found and how well the two match as a percentage. The match compares
+  the outlines only, not the colours: it says how well the shapes line up,
+  not whether the pixels are the same. A low match is flagged
+  and the view opens with <strong>Align</strong> off, both images laid at the
+  top-left corner: the images may not be the same picture, or one may be
+  rotated, which the search does not handle. <strong>Align</strong>
+  turns the offset on or off either way.</p>
+  <p>The views compare the two where they overlap. What lies outside the
+  overlap, in either image, is shown dimmed.</p>
+  <p>Four ways to look at the pair (<kbd>1</kbd>–<kbd>4</kbd>):</p>
+  <ul>
+    <li><strong>Slider</strong>: A on the left of the handle, B on the right.
+    Drag the handle to move the split.</li>
+    <li><strong>Difference</strong>: pixels that are the same turn black, so
+    only the changes show.</li>
+    <li><strong>Onion skin</strong>: B over A, at the opacity the slider in
+    the toolbar sets.</li>
+    <li><strong>Blink</strong>: A and B take turns. With reduced motion on,
+    press <kbd>Space</kbd> to switch.</li>
+  </ul>
+  <p>Scroll to zoom and drag to pan; both images move together. <kbd>0</kbd>
+  or a double-click fits the pair back in the window, and <kbd>Esc</kbd>
+  closes the view. The button beside the close button shrinks the view to a
+  centred panel and back, as in Discover. Videos cannot be compared.</p>
 
   <h2 id="timeline">Timeline view</h2>
   <p>The third layout in the header lays your library out <strong>by

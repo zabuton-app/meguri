@@ -58,6 +58,15 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
     licenseUrl: "https://github.com/facebook/react/blob/main/LICENSE",
     sourceUrl: "https://github.com/facebook/react",
   },
+  // The image comparison's matching. Its full notices, with the libraries
+  // built into it (Protocol Buffers, zlib, FlatBuffers), are in
+  // THIRD_PARTY_NOTICES.txt in the app's resources.
+  {
+    name: "OpenCV.js",
+    license: "Apache-2.0",
+    licenseUrl: "https://github.com/opencv/opencv/blob/5.0.0/LICENSE",
+    sourceUrl: "https://github.com/opencv/opencv",
+  },
   // Bundled emoji fonts for the selectable emoji styles
   // (details in src/assets/fonts/emoji/LICENSES.md).
   {

@@ -7,6 +7,8 @@ export const fr: Catalog = {
   "common.cancel": "Annuler",
   "common.ok": "OK",
   "common.actionFailed": "Impossible d'effectuer l'action",
+  "common.experimental":
+    "Expérimental : peut changer ou disparaître dans une version future",
 
   // window
   "window.minimize": "Réduire",
@@ -638,6 +640,8 @@ export const fr: Catalog = {
   "select.deselectAll": "Vider",
   "select.editTags": "Modifier les tags",
   "select.exit": "Quitter la sélection",
+  "select.compare": "Comparer",
+  "select.compareHint": "Sélectionnez exactement deux images pour les comparer",
   "select.bulkFileLimit":
     "Jusqu’à {max} fichiers par modification. Réduisez la sélection.",
   "select.ratingClear": "Effacer la note",
@@ -1579,4 +1583,35 @@ export const fr: Catalog = {
   "settings.tour": "Tutoriel",
   "settings.tourDesc": "Affiche à nouveau la visite du premier lancement",
   "settings.tourReplay": "Revoir",
+
+  // image comparison
+  "compare.title": "Comparer des images",
+  "compare.mode": "Comparaison",
+  "compare.mode.slider": "Curseur",
+  "compare.mode.difference": "Différence",
+  "compare.mode.onion": "Superposition",
+  "compare.mode.blink": "Clignotement",
+  "compare.opacity": "Opacité de B",
+  "compare.swap": "Inverser A et B",
+  "compare.align": "Aligner",
+  "compare.alignHint":
+    "Déplace B du décalage trouvé pour que les deux se superposent",
+  "compare.zoomIn": "Zoom avant",
+  "compare.zoomOut": "Zoom arrière",
+  "compare.fit": "Ajuster",
+  "compare.split": "Position de la séparation",
+  "compare.aligning": "Alignement… {percent} %",
+  "compare.alignFailed": "Impossible d’aligner les images",
+  "compare.alignResult":
+    "Décalage {dx}, {dy} px · correspondance des contours {score} %",
+  "compare.alignScale": "échelle ×{scale}",
+  "compare.lowScore":
+    "correspondance des contours faible, l’alignement peut être faux",
+  "shortcuts.sectionCompare": "Comparaison d’images",
+  "shortcuts.compareModes":
+    "Curseur / différence / superposition / clignotement",
+  "shortcuts.compareSwap": "Inverser A et B",
+  "shortcuts.compareZoom": "Zoom avant / arrière sur les images",
+  "shortcuts.compareFit": "Ajuster les images",
+  "shortcuts.compareBlink": "Basculer entre A et B pendant le clignotement",
 };

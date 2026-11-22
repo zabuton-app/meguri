@@ -7,6 +7,8 @@ export const ko: Catalog = {
   "common.cancel": "취소",
   "common.ok": "확인",
   "common.actionFailed": "작업에 실패했습니다",
+  "common.experimental":
+    "실험적인 기능입니다. 이후 버전에서 바뀌거나 없어질 수 있습니다",
 
   // window
   "window.minimize": "최소화",
@@ -593,6 +595,8 @@ export const ko: Catalog = {
   "select.deselectAll": "비우기",
   "select.editTags": "태그 편집",
   "select.exit": "선택 모드 종료",
+  "select.compare": "비교",
+  "select.compareHint": "이미지를 정확히 두 장 선택하면 비교할 수 있습니다",
   "select.bulkFileLimit":
     "한 번에 편집할 수 있는 파일은 {max}개까지입니다. 선택을 줄이세요.",
   "select.ratingClear": "별점 지우기",
@@ -1375,4 +1379,31 @@ export const ko: Catalog = {
   "settings.tour": "튜토리얼",
   "settings.tourDesc": "처음 실행할 때 나오는 사용법 안내를 다시 표시합니다",
   "settings.tourReplay": "다시 보기",
+
+  // image comparison
+  "compare.title": "이미지 비교",
+  "compare.mode": "비교 방식",
+  "compare.mode.slider": "슬라이더",
+  "compare.mode.difference": "차이",
+  "compare.mode.onion": "겹쳐 보기",
+  "compare.mode.blink": "깜빡임",
+  "compare.opacity": "B의 불투명도",
+  "compare.swap": "A와 B 바꾸기",
+  "compare.align": "위치 맞춤",
+  "compare.alignHint": "찾은 어긋남만큼 B를 옮겨 두 이미지를 맞춥니다",
+  "compare.zoomIn": "확대",
+  "compare.zoomOut": "축소",
+  "compare.fit": "전체 보기",
+  "compare.split": "경계 위치",
+  "compare.aligning": "위치 맞추는 중… {percent}%",
+  "compare.alignFailed": "위치를 맞추지 못했습니다",
+  "compare.alignResult": "어긋남 {dx}, {dy} px · 윤곽 일치도 {score}%",
+  "compare.alignScale": "배율 ×{scale}",
+  "compare.lowScore": "윤곽 일치도가 낮아 위치가 어긋났을 수 있습니다",
+  "shortcuts.sectionCompare": "이미지 비교",
+  "shortcuts.compareModes": "슬라이더 / 차이 / 겹쳐 보기 / 깜빡임",
+  "shortcuts.compareSwap": "A와 B 바꾸기",
+  "shortcuts.compareZoom": "이미지 확대 / 축소",
+  "shortcuts.compareFit": "이미지 전체 보기",
+  "shortcuts.compareBlink": "깜빡임 중 A와 B 전환",
 };
