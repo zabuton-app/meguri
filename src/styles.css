@@ -35,6 +35,9 @@
      (modal-backdrop-full). electron/ipc/window.ts places the traffic lights
      for this height at zoom 1 until the bar moves them. */
   --meguri-title-bar-height: 3rem;
+  /* Length of the theme fades below: at startup with a random theme, and on a
+     switch. Keep BOOT_FADE_MS in ThemeProvider.tsx longer than this. */
+  --meguri-theme-fade: 500ms;
 }
 
 /* Layers that can float over the title bar's band: a click there would move
@@ -469,6 +472,36 @@ textarea,
 }
 .card-control-in {
   animation: card-control-in 150ms ease-out;
+}
+
+/* Random theme on startup: public/theme-boot.js paints a neutral gray and sets
+   data-boot-fade; the picked theme's background and the first render fade in over it.
+   ThemeProvider removes the attribute once the fade has played. */
+@keyframes boot-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* body paints var(--c-bg), which switches at once; let html's fading color show through. */
+html[data-boot-fade] body {
+  background-color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-boot-fade] {
+    transition: background-color var(--meguri-theme-fade) ease-out;
+  }
+  html[data-boot-fade] #root > * {
+    animation: boot-fade-in var(--meguri-theme-fade) ease-out both;
+  }
+}
+
+/* Theme switch: ThemeProvider cross-fades the window with a View Transition. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--meguri-theme-fade);
+  animation-timing-function: ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

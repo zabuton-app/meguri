@@ -25,6 +25,7 @@ import {
 } from "@/components/pet/petSize";
 import { platform } from "@/lib/platform";
 
+// public/theme-boot.js reads randomThemeOnStartup from this key before the bundle loads.
 const LS_KEY = "meguri.prefs";
 
 export const DEFAULT_SCENE_COUNT = 12;

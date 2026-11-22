@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { flushSync } from "react-dom";
 import { deriveTokens, schemeToCssVars } from "./derive";
 import { DEFAULT_THEME, SCHEMES } from "./schemes";
 
@@ -56,6 +57,9 @@ interface ThemeCtx {
 }
 
 const Ctx = createContext<ThemeCtx | null>(null);
+
+// Longer than --meguri-theme-fade in styles.css, so the startup fade is not cut short.
+const BOOT_FADE_MS = 700;
 
 const defaultScheme = SCHEMES.find((s) => s.id === DEFAULT_THEME) ?? SCHEMES[0];
 
@@ -144,8 +148,39 @@ export function ThemeProvider({
     applyTheme(theme);
   }, [theme]);
 
+  // End the startup fade that public/theme-boot.js began, once it has played: later remounts
+  // of the top element would fade in again. Timed from the first commit, where the animation
+  // starts, not from the render call, which React may commit much later.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!root.hasAttribute("data-boot-fade")) return;
+    const timer = setTimeout(
+      () => root.removeAttribute("data-boot-fade"),
+      BOOT_FADE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Cross-fade the whole window into the new theme. The View Transition snapshots the old
+  // look, so the change must be applied synchronously inside the callback: flushSync for
+  // React, and applyTheme directly because the effect above is not guaranteed to run there.
+  const switchTheme = (id: string) => {
+    if (id === theme) return;
+    if (
+      typeof document.startViewTransition !== "function" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setThemeState(id);
+      return;
+    }
+    document.startViewTransition(() => {
+      flushSync(() => setThemeState(id));
+      applyTheme(id);
+    });
+  };
+
   const setTheme = (id: string) => {
-    if (SCHEMES.some((s) => s.id === id)) setThemeState(id);
+    if (SCHEMES.some((s) => s.id === id)) switchTheme(id);
   };
 
   const current = SCHEMES.find((s) => s.id === theme) ?? SCHEMES[0];
@@ -155,13 +190,13 @@ export function ThemeProvider({
   const setMode = (m: Appearance) => {
     const fam = FAMILIES.find((f) => f.id === familyId);
     const next = fam?.[m] ?? fam?.dark ?? fam?.light;
-    if (next) setThemeState(next.id);
+    if (next) switchTheme(next.id);
   };
 
   const setFamily = (fid: string) => {
     const fam = FAMILIES.find((f) => f.id === fid);
     const next = fam?.[mode] ?? fam?.dark ?? fam?.light;
-    if (next) setThemeState(next.id);
+    if (next) switchTheme(next.id);
   };
 
   const value = useMemo<ThemeCtx>(
