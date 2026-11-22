@@ -10,7 +10,7 @@
 // What it acts on follows the command menu: the selection when the clicked
 // card is part of it, otherwise that one file. The actions come from
 // useFileActions, which the command menu shares. A folder card's menu acts on
-// that folder alone (FolderMenuBody).
+// that folder alone (FolderMenuBody), selected or not.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Check,
@@ -18,6 +18,7 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Folder,
   FolderOpen,
   FolderPlus,
   FolderSearch,
@@ -51,6 +52,7 @@ import {
   type FileActions,
 } from "@/hooks/useFileActions";
 import { useExcludeFolder } from "@/hooks/useExcludeFolder";
+import { useFolderPathActions } from "@/hooks/useFolderPathActions";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
@@ -92,6 +94,7 @@ export function FileContextMenu({
   mediaBase,
   workspaceId,
   active,
+  onOpenFolder,
   children,
 }: {
   /** The files the view shows; a right-clicked card is looked up among them. */
@@ -102,6 +105,8 @@ export function FileContextMenu({
   mediaBase: string;
   /** The view is in the foreground: the menu key opens the menu on the focused file. */
   active: boolean;
+  /** Enters a folder, as a click on its card does. */
+  onOpenFolder?: (path: string) => void;
   children: ReactNode;
 }) {
   const [target, setTarget] = useState<MenuTarget | null>(null);
@@ -183,6 +188,7 @@ export function FileContextMenu({
                 workspaceId={workspaceId}
                 folder={target.folder}
                 count={target.count}
+                onOpen={onOpenFolder}
               />
             )
           )}
@@ -348,24 +354,46 @@ function FolderMenuBody({
   workspaceId,
   folder,
   count,
+  onOpen,
 }: {
   workspaceId: string;
   folder: string;
   count: number;
+  onOpen?: (path: string) => void;
 }) {
   const { t } = useI18n();
   const exclude = useExcludeFolder();
+  const paths = useFolderPathActions();
   return (
-    <ContextMenuItem
-      // After the menu has closed and handed focus back, so the confirmation
-      // keeps it (as the file menu's delete does).
-      onSelect={() =>
-        window.setTimeout(() => void exclude(workspaceId, folder, count), 0)
-      }
-    >
-      <FolderX />
-      {t("folder.excludeFromScans")}
-    </ContextMenuItem>
+    <>
+      {onOpen && (
+        <ContextMenuItem onSelect={() => onOpen(folder)}>
+          <Folder />
+          {t("fileMenu.open")}
+        </ContextMenuItem>
+      )}
+      <ContextMenuItem
+        onSelect={() => paths.openInFileManager(workspaceId, folder)}
+      >
+        <FolderOpen />
+        {t("folder.openInFileManager")}
+      </ContextMenuItem>
+      <ContextMenuItem onSelect={() => paths.copyPath(workspaceId, folder)}>
+        <Copy />
+        {t("folder.copyPath")}
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem
+        // After the menu has closed and handed focus back, so the confirmation
+        // keeps it (as the file menu's delete does).
+        onSelect={() =>
+          window.setTimeout(() => void exclude(workspaceId, folder, count), 0)
+        }
+      >
+        <FolderX />
+        {t("folder.excludeFromScans")}
+      </ContextMenuItem>
+    </>
   );
 }
 

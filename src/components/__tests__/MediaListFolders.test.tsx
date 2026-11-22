@@ -62,6 +62,14 @@ describe("MediaList by folder", () => {
     expect(onOpenFolder).toHaveBeenCalledWith("Movie");
   });
 
+  it("opens a folder row's menu on a right-click, and enters it from there", async () => {
+    const onOpenFolder = vi.fn();
+    renderList({ folders: [folder("Movie")], onOpenFolder });
+    fireEvent.contextMenu(await screen.findByTestId("folder-row"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Open" }));
+    expect(onOpenFolder).toHaveBeenCalledWith("Movie");
+  });
+
   it("opens the focused folder row with Enter", async () => {
     const onOpenFolder = vi.fn();
     renderList({ folders: [folder("Movie")], onOpenFolder, navActive: true });

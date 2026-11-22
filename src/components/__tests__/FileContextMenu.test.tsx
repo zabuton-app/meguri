@@ -26,6 +26,9 @@ const mocks = vi.hoisted(() => ({
   copyFilePath: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   openExternal: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   scanExclusionsAddFolder: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  folderOpenInFileManager: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  folderCopyPath: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  onOpenFolder: vi.fn<(path: string) => void>(),
 }));
 
 vi.mock("@/ipc/client", () => ({
@@ -62,6 +65,9 @@ vi.mock("@/ipc/client", () => ({
     scanExclusionsAddFolder: (...args: unknown[]) =>
       mocks.scanExclusionsAddFolder(...args),
     openFolder: vi.fn().mockResolvedValue(undefined),
+    folderOpenInFileManager: (...args: unknown[]) =>
+      mocks.folderOpenInFileManager(...args),
+    folderCopyPath: (...args: unknown[]) => mocks.folderCopyPath(...args),
   },
   ALL_ID: "__all__",
 }));
@@ -73,6 +79,8 @@ beforeEach(() => {
   mocks.copyFilePath.mockResolvedValue(undefined);
   mocks.openExternal.mockResolvedValue(undefined);
   mocks.scanExclusionsAddFolder.mockResolvedValue({ folders: [] });
+  mocks.folderOpenInFileManager.mockResolvedValue(undefined);
+  mocks.folderCopyPath.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -108,7 +116,12 @@ function renderView(
   {
     selected = [],
     active = true,
-  }: { selected?: FileRow[]; active?: boolean } = {},
+    canEnterFolders = true,
+  }: {
+    selected?: FileRow[];
+    active?: boolean;
+    canEnterFolders?: boolean;
+  } = {},
 ) {
   return renderWithProviders(
     <>
@@ -118,6 +131,7 @@ function renderView(
         mediaBase="http://media"
         workspaceId="ws-1"
         active={active}
+        onOpenFolder={canEnterFolders ? mocks.onOpenFolder : undefined}
       >
         <div data-testid="view">
           {items.map((f) => (
@@ -189,7 +203,12 @@ describe("FileContextMenu", () => {
       within(menu())
         .getAllByRole("menuitem")
         .map((el) => el.textContent),
-    ).toEqual(["Exclude from scans"]);
+    ).toEqual([
+      "Open",
+      "Open in file manager",
+      "Copy path",
+      "Exclude from scans",
+    ]);
 
     fireEvent.click(item("Exclude from scans"));
     const dialog = await screen.findByRole("alertdialog");
@@ -207,6 +226,42 @@ describe("FileContextMenu", () => {
         "videos/old",
       ),
     );
+  });
+
+  it("enters a right-clicked folder from its Open item", () => {
+    renderView([file(1)]);
+    fireEvent.contextMenu(screen.getByTestId("folder"));
+    fireEvent.click(item("Open"));
+    expect(mocks.onOpenFolder).toHaveBeenCalledWith("videos/old");
+  });
+
+  it("offers no Open on a folder when the view cannot enter folders", () => {
+    renderView([file(1)], { canEnterFolders: false });
+    fireEvent.contextMenu(screen.getByTestId("folder"));
+    expect(
+      within(menu())
+        .getAllByRole("menuitem")
+        .map((el) => el.textContent),
+    ).toEqual(["Open in file manager", "Copy path", "Exclude from scans"]);
+  });
+
+  it("opens a right-clicked folder in the file manager", () => {
+    renderView([file(1)]);
+    fireEvent.contextMenu(screen.getByTestId("folder"));
+    fireEvent.click(item("Open in file manager"));
+    expect(mocks.folderOpenInFileManager).toHaveBeenCalledWith(
+      "ws-1",
+      "videos/old",
+    );
+    expect(mocks.folderCopyPath).not.toHaveBeenCalled();
+  });
+
+  it("copies a right-clicked folder's path", () => {
+    renderView([file(1)]);
+    fireEvent.contextMenu(screen.getByTestId("folder"));
+    fireEvent.click(item("Copy path"));
+    expect(mocks.folderCopyPath).toHaveBeenCalledWith("ws-1", "videos/old");
+    expect(mocks.folderOpenInFileManager).not.toHaveBeenCalled();
   });
 
   it("excludes nothing when the folder's exclusion is not confirmed", async () => {

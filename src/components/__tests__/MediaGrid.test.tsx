@@ -586,6 +586,23 @@ describe("MediaGrid", () => {
       expect(window.location.hash).not.toContain("/file/");
     });
 
+    it("opens a folder card's menu on a right-click, and enters it from there", async () => {
+      const onOpenFolder = vi.fn();
+      renderWithProviders(
+        <MediaGrid
+          items={[sampleFileRow]}
+          mediaBase="http://127.0.0.1:17345"
+          workspaceId={WS_ID}
+          loading={false}
+          folders={[folder("Movie")]}
+          onOpenFolder={onOpenFolder}
+        />,
+      );
+      fireEvent.contextMenu(await screen.findByTestId("folder-card"));
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Open" }));
+      expect(onOpenFolder).toHaveBeenCalledWith("Movie");
+    });
+
     it("opens the focused folder with Enter", async () => {
       const onOpenFolder = vi.fn();
       renderWithProviders(

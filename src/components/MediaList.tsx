@@ -258,6 +258,7 @@ export const MediaList = memo(function MediaList({
         mediaBase={mediaBase}
         workspaceId={wsId}
         active={navActive}
+        onOpenFolder={onOpenFolder}
       >
         <ScrollArea
           className="page-scroll h-full"

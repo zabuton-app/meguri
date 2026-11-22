@@ -63,6 +63,7 @@ import { recordRecentSearch } from "@/hooks/useRecentSearches";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { setScanning, useScanning } from "@/hooks/useScanning";
 import { useFilesSearch } from "@/hooks/useFilesSearch";
+import { useFolderPathActions } from "@/hooks/useFolderPathActions";
 import { filesSearchListOffset } from "@/lib/filesSearch";
 import { useStartupTimings } from "@/hooks/useStartupTimings";
 import { patchCollectionItemOrder } from "@/lib/queryCache";
@@ -125,6 +126,7 @@ const RECENT_SEARCH_SETTLE_MS = 1500;
 
 export default function Home() {
   const { t } = useI18n();
+  const folderPathActions = useFolderPathActions();
   const qc = useQueryClient();
   const confirm = useConfirm();
   const location = useLocation();
@@ -968,31 +970,15 @@ export default function Home() {
           canGoBack={folderNav.canGoBack}
           onBack={folderNav.goBack}
           onUp={folderNav.goUp}
-          onOpenInFileManager={() => {
-            api
-              .folderOpenInFileManager(workspaceId ?? "", folderNav.path)
-              .catch((error: unknown) =>
-                toast.error(t("folder.openFailed"), {
-                  id: "folder-open-failed",
-                  description:
-                    error instanceof Error ? error.message : String(error),
-                }),
-              );
-          }}
-          onCopyPath={() => {
-            api.folderCopyPath(workspaceId ?? "", folderNav.path).then(
-              () =>
-                toast.success(t("folder.pathCopied"), {
-                  id: "folder-path-copied",
-                }),
-              (error: unknown) =>
-                toast.error(t("folder.copyFailed"), {
-                  id: "folder-copy-failed",
-                  description:
-                    error instanceof Error ? error.message : String(error),
-                }),
-            );
-          }}
+          onOpenInFileManager={() =>
+            folderPathActions.openInFileManager(
+              workspaceId ?? "",
+              folderNav.path,
+            )
+          }
+          onCopyPath={() =>
+            folderPathActions.copyPath(workspaceId ?? "", folderNav.path)
+          }
           summary={
             // What the folder itself holds; a search shows its own results.
             // (and only once the listing is the folder named: a vanished
