@@ -170,6 +170,12 @@ export const VideoPlayer = forwardRef<
      */
     recordPosition?: boolean;
     /**
+     * Whether starting playback here counts as a play (default true): a row in
+     * the play history, and the file leaves Watch Later. Off for Discovery's
+     * in-place preview (#398), which samples a file rather than watches it.
+     */
+    recordPlay?: boolean;
+    /**
      * Whether the player takes its window-level keyboard shortcuts (default
      * true). Off where the host owns those keys: Discovery pages its slides
      * with the arrows, and Space belongs to whichever of its buttons has focus.
@@ -262,6 +268,7 @@ export const VideoPlayer = forwardRef<
     autoplay = true,
     reopenOnNetworkError = false,
     recordPosition = true,
+    recordPlay = true,
     shortcuts = true,
     audioTracks,
     subtitleTracks,
@@ -1243,7 +1250,9 @@ export const VideoPlayer = forwardRef<
           onPlay={() => {
             setPlaying(true);
             onPlaybackStart?.();
-            void api.fileRecordPlay(id, wsId, "browser", position);
+            if (recordPlay) {
+              void api.fileRecordPlay(id, wsId, "browser", position);
+            }
             playbackPosition.markPlayed();
             if (!playedRef.current) {
               playedRef.current = true;
