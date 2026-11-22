@@ -688,3 +688,8 @@ See the [License](#license) section for the full legal terms.
 ## License
 
 MIT
+
+The app bundles OpenCV.js for the image comparison. Its license and those of
+the libraries built into it are in
+[THIRD_PARTY_NOTICES.txt](./THIRD_PARTY_NOTICES.txt), which also ships in the
+app's resources folder.

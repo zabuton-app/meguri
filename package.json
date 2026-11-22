@@ -66,6 +66,7 @@
     "@radix-ui/react-switch": "^1.4.1",
     "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-virtual": "^3.14.26",
+    "@techstark/opencv-js": "5.0.0-release.1",
     "@zabuton-app/ffmpeg-binaries": "https://github.com/zabuton-app/ffmpeg-binaries/releases/download/v1.0.6/zabuton-app-ffmpeg-binaries-1.0.6.tgz",
     "better-sqlite3": "^13.2.0",
     "class-variance-authority": "^0.7.1",
@@ -140,6 +141,9 @@
     "files": [
       "out/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      "THIRD_PARTY_NOTICES.txt"
     ],
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**",

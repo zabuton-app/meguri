@@ -6,6 +6,8 @@ export const ja = {
   "common.cancel": "キャンセル",
   "common.ok": "OK",
   "common.actionFailed": "操作に失敗しました",
+  "common.experimental":
+    "試験的な機能です。今後、動きや見た目が変わったり、なくなったりすることがあります",
 
   // ウィンドウ
   "window.minimize": "最小化",
@@ -589,6 +591,8 @@ export const ja = {
   "select.deselectAll": "解除",
   "select.editTags": "タグを編集",
   "select.exit": "選択モードを終了",
+  "select.compare": "比較",
+  "select.compareHint": "画像をちょうど2枚選ぶと比較できます",
   "select.bulkFileLimit":
     "一度に編集できるのは{max}件までです。選択を減らしてください。",
   "select.ratingClear": "スターを外す",
@@ -1372,6 +1376,33 @@ export const ja = {
   "settings.tour": "チュートリアル",
   "settings.tourDesc": "初回起動時の使い方案内をもう一度表示します",
   "settings.tourReplay": "もう一度見る",
+
+  // 画像の比較
+  "compare.title": "画像を比較",
+  "compare.mode": "比較のしかた",
+  "compare.mode.slider": "スライダー",
+  "compare.mode.difference": "差分",
+  "compare.mode.onion": "重ねる",
+  "compare.mode.blink": "点滅",
+  "compare.opacity": "Bの不透明度",
+  "compare.swap": "AとBを入れ替え",
+  "compare.align": "位置合わせ",
+  "compare.alignHint": "見つかったずれの分だけBを動かして重ねます",
+  "compare.zoomIn": "拡大",
+  "compare.zoomOut": "縮小",
+  "compare.fit": "全体を表示",
+  "compare.split": "境目の位置",
+  "compare.aligning": "位置合わせ中… {percent}%",
+  "compare.alignFailed": "位置合わせできませんでした",
+  "compare.alignResult": "ずれ {dx}, {dy} px · 輪郭の一致度 {score}%",
+  "compare.alignScale": "倍率 ×{scale}",
+  "compare.lowScore": "輪郭の一致度が低く、位置がずれているかもしれません",
+  "shortcuts.sectionCompare": "画像の比較",
+  "shortcuts.compareModes": "スライダー / 差分 / 重ねる / 点滅",
+  "shortcuts.compareSwap": "AとBを入れ替え",
+  "shortcuts.compareZoom": "画像を拡大 / 縮小",
+  "shortcuts.compareFit": "画像の全体を表示",
+  "shortcuts.compareBlink": "点滅中にAとBを切り替え",
 } as const;
 
 export type TranslationKey = keyof typeof ja;

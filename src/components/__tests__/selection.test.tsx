@@ -483,7 +483,11 @@ describe("selection", () => {
         renderWithProviders(
           <SelectionProvider items={many} scope="one">
             <Starter />
-            <SelectionBar onEditTags={() => {}} onExit={() => {}} />
+            <SelectionBar
+              onEditTags={() => {}}
+              onCompare={() => {}}
+              onExit={() => {}}
+            />
           </SelectionProvider>,
         );
         fireEvent.click(screen.getByRole("button", { name: "start" }));
