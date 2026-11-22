@@ -1223,3 +1223,223 @@ describe("VideoPlayer", () => {
     });
   });
 });
+
+// The detail view's video zooms and pans like its image (#637). The transform
+// sits on what holds the <video>, so a handed-over element leaves it behind.
+describe("zoom and pan", () => {
+  afterEach(() => {
+    resetVideoHandOff();
+  });
+
+  // A clip of the given size in the same 1000 × 500 stage.
+  function renderPlayerAt(
+    size: { w: number; h: number },
+    overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {},
+  ) {
+    const r = renderPlayer({ zoomable: true, ...overrides });
+    const stage = r.video.parentElement?.parentElement as HTMLDivElement;
+    stage.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 1000, height: 500 }) as DOMRect;
+    Object.defineProperty(r.video, "videoWidth", { value: size.w });
+    Object.defineProperty(r.video, "videoHeight", { value: size.h });
+    loadVideo(r.video);
+    return { ...r, stage };
+  }
+
+  // A 2000 × 1000 video fitted to the stage: 50% of actual pixels.
+  function setup(overrides: Partial<Parameters<typeof VideoPlayer>[0]> = {}) {
+    const r = renderPlayerAt({ w: 2000, h: 1000 }, overrides);
+    return { ...r, picture: r.video.parentElement as HTMLDivElement };
+  }
+
+  const level = () => screen.getByText(/^\d+%$/).textContent;
+  const button = (title: string) => screen.getByTitle<HTMLButtonElement>(title);
+
+  function ctrlWheel(target: Element, x: number, y: number) {
+    const ev = new WheelEvent("wheel", {
+      deltaY: -100,
+      bubbles: true,
+      cancelable: true,
+    });
+    for (const [k, v] of Object.entries({
+      ctrlKey: true,
+      clientX: x,
+      clientY: y,
+    }))
+      Object.defineProperty(ev, k, { value: v });
+    act(() => {
+      target.dispatchEvent(ev);
+    });
+  }
+
+  it("starts at fit, with the controls in the bar", () => {
+    const { picture } = setup();
+    expect(level()).toBe("50%");
+    expect(button("media.zoomOut").disabled).toBe(true);
+    expect(button("media.zoomFit").disabled).toBe(true);
+    expect(picture.style.transform).toBe("");
+  });
+
+  it("is not offered unless the host asks for it", () => {
+    const { video } = renderPlayer();
+    Object.defineProperty(video, "videoWidth", { value: 2000 });
+    Object.defineProperty(video, "videoHeight", { value: 1000 });
+    loadVideo(video);
+    expect(screen.queryByTitle("media.zoomIn")).toBeNull();
+  });
+
+  it("zooms with Ctrl+wheel toward the pointer, on the holder and not the element", () => {
+    const { picture, stage, video } = setup();
+    const onWindowWheel = vi.fn();
+    window.addEventListener("wheel", onWindowWheel);
+    try {
+      ctrlWheel(stage, 250, 125);
+    } finally {
+      window.removeEventListener("wheel", onWindowWheel);
+    }
+    expect(onWindowWheel).not.toHaveBeenCalled();
+    expect(level()).toBe("60%");
+    // ×1.2 with the point under the pointer staying put.
+    expect(picture.style.transform).toBe("translate(-50px, -25px) scale(1.2)");
+    expect(video.style.transform).toBe("");
+    fireEvent.click(button("media.zoomFit"));
+    expect(level()).toBe("50%");
+    expect(picture.style.transform).toBe("");
+  });
+
+  it("pans on a drag without playing or pausing, while a click still does", () => {
+    const { picture, video } = setup();
+    const play = vi.fn().mockResolvedValue(undefined);
+    video.play = play;
+    picture.setPointerCapture = () => {};
+    fireEvent.click(button("media.zoomIn"));
+    fireEvent.click(button("media.zoomIn"));
+    // 0.78125 of actual pixels, centred: 1562.5 × 781.25 over 1000 × 500.
+    expect(picture.style.transform).toBe(
+      "translate(-281.25px, -140.625px) scale(1.5625)",
+    );
+
+    const at = { pointerId: 1, button: 0, buttons: 1 };
+    fireEvent.pointerDown(picture, { ...at, clientX: 500, clientY: 250 });
+    fireEvent.pointerMove(picture, { ...at, clientX: 600, clientY: 300 });
+    fireEvent.pointerUp(picture, { ...at, clientX: 600, clientY: 300 });
+    fireEvent.click(video);
+    expect(picture.style.transform).toBe(
+      "translate(-181.25px, -90.625px) scale(1.5625)",
+    );
+    expect(play).not.toHaveBeenCalled();
+
+    // A press that hardly moves is a click.
+    fireEvent.pointerDown(picture, { ...at, clientX: 500, clientY: 250 });
+    fireEvent.pointerMove(picture, { ...at, clientX: 502, clientY: 251 });
+    fireEvent.pointerUp(picture, { ...at, clientX: 502, clientY: 251 });
+    fireEvent.click(video);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(picture.style.transform).toBe(
+      "translate(-181.25px, -90.625px) scale(1.5625)",
+    );
+  });
+
+  it("leaves only the round play button over a paused, zoomed picture", () => {
+    const { video } = setup();
+    Object.defineProperty(video, "paused", { configurable: true, value: true });
+    fireEvent.pause(video);
+    const overlay = button("player.play");
+    expect(overlay.className).not.toContain("pointer-events-none");
+    fireEvent.click(button("media.zoomIn"));
+    expect(overlay.className).toContain("pointer-events-none");
+  });
+
+  it("goes back to fit when entering or leaving fullscreen", () => {
+    const { picture } = setup();
+    fireEvent.click(button("media.zoomIn"));
+    expect(picture.style.transform).not.toBe("");
+    act(() => {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    expect(picture.style.transform).toBe("");
+    expect(level()).toBe("50%");
+  });
+
+  it("still zooms with Ctrl+wheel after the error screen's reload", () => {
+    const { video } = setup();
+    fireVideoError(video, 3);
+    fireEvent.click(screen.getByText("player.reload"));
+    const next = document.querySelector("video") as HTMLVideoElement;
+    const picture = next.parentElement as HTMLDivElement;
+    const stage = picture.parentElement as HTMLDivElement;
+    stage.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 1000, height: 500 }) as DOMRect;
+    Object.defineProperty(next, "videoWidth", { value: 2000 });
+    Object.defineProperty(next, "videoHeight", { value: 1000 });
+    loadVideo(next);
+    expect(level()).toBe("50%");
+    ctrlWheel(stage, 250, 125);
+    expect(level()).toBe("60%");
+  });
+
+  it("offers no zoom for the next file before its picture has a size", () => {
+    const { view, props, stage } = setup();
+    fireEvent.click(button("media.zoomIn"));
+    view.rerender(
+      <Providers>
+        <VideoPlayer
+          {...props}
+          zoomable
+          id={2}
+          src="http://127.0.0.1:17345/ws/ws1/media/2"
+        />
+      </Providers>,
+    );
+    expect(screen.queryByTitle("media.zoomIn")).toBeNull();
+    // Nothing to zoom: the window's own zoom takes the wheel.
+    const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, "ctrlKey", { value: true });
+    act(() => {
+      stage.dispatchEvent(ev);
+    });
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("leaves the wheel to the window for a clip already past the highest zoom at fit", () => {
+    const { stage } = renderPlayerAt({ w: 100, h: 50 });
+    expect(screen.queryByTitle("media.zoomIn")).toBeNull();
+    const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, "ctrlKey", { value: true });
+    act(() => {
+      stage.dispatchEvent(ev);
+    });
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("forgets a press let go over the play button before it panned", () => {
+    const { picture, video } = setup();
+    picture.setPointerCapture = () => {};
+    Object.defineProperty(video, "paused", { configurable: true, value: true });
+    fireEvent.pause(video);
+    fireEvent.click(button("media.zoomIn"));
+    const before = picture.style.transform;
+    const at = { pointerId: 1, button: 0, buttons: 1 };
+    fireEvent.pointerDown(picture, { ...at, clientX: 100, clientY: 100 });
+    fireEvent.pointerLeave(picture, { ...at, clientX: 102, clientY: 100 });
+    // Later, a held button moving over the picture without a press here.
+    fireEvent.pointerMove(picture, { ...at, clientX: 300, clientY: 200 });
+    expect(picture.style.transform).toBe(before);
+  });
+
+  it("goes back to fit on another file", () => {
+    const { picture, view, props } = setup();
+    fireEvent.click(button("media.zoomIn"));
+    view.rerender(
+      <Providers>
+        <VideoPlayer
+          {...props}
+          zoomable
+          id={2}
+          src="http://127.0.0.1:17345/ws/ws1/media/2"
+        />
+      </Providers>,
+    );
+    expect(picture.style.transform).toBe("");
+  });
+});

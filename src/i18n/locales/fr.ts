@@ -475,7 +475,7 @@ export const fr: Catalog = {
   "shortcuts.zoom": "Zoom avant / arrière",
   "shortcuts.zoomReset": "Réinitialiser le zoom",
   "shortcuts.imagePaging": "Fichier précédent / suivant (images)",
-  "shortcuts.imageZoom": "Zoomer l'image (vers le pointeur)",
+  "shortcuts.imageZoom": "Zoomer l'image ou la vidéo (vers le pointeur)",
   "shortcuts.imageZoomToggle": "Ajuster l'image / taille réelle",
   "shortcuts.wheel": "Molette",
   "shortcuts.doubleClick": "Double-clic",

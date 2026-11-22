@@ -439,7 +439,7 @@ export const ja = {
   "shortcuts.zoom": "拡大 / 縮小",
   "shortcuts.zoomReset": "拡大率をリセット",
   "shortcuts.imagePaging": "前 / 次のファイル（画像）",
-  "shortcuts.imageZoom": "画像を拡大 / 縮小（ポインタの位置）",
+  "shortcuts.imageZoom": "画像・動画を拡大 / 縮小（ポインタの位置）",
   "shortcuts.imageZoomToggle": "画像を画面に合わせる / 実寸で表示",
   "shortcuts.wheel": "ホイール",
   "shortcuts.doubleClick": "ダブルクリック",

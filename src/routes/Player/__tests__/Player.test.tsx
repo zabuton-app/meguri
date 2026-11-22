@@ -349,7 +349,8 @@ describe("Player video chrome", () => {
     renderPlayer([row(1, "video")]);
     await screen.findByText("clip-1.mp4");
     const video = document.querySelector("video");
-    const stage = video?.parentElement;
+    // The stage holds the picture's holder, which holds the video.
+    const stage = video?.parentElement?.parentElement;
     expect(stage?.style.aspectRatio).toBeFalsy();
     expect(stage?.className).not.toContain("max-h-[78vh]");
     expect(video?.className).not.toContain("max-h-[78vh]");
@@ -360,7 +361,7 @@ describe("Player video chrome", () => {
     // opaque video wrapper would hide it and leave flat black bars instead.
     renderPlayer([row(1, "video")]);
     await screen.findByText("clip-1.mp4");
-    const stage = document.querySelector("video")?.parentElement;
+    const stage = document.querySelector("video")?.parentElement?.parentElement;
     expect(stage?.className).not.toContain("bg-black");
   });
 

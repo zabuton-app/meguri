@@ -123,8 +123,10 @@ export function createGradeRenderer(canvas: HTMLCanvasElement) {
     const shoulder = gl.getUniformLocation(program, "shoulder");
     const maxSize = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE));
     return {
-      draw(video: HTMLVideoElement, grade: VideoGrade): void {
-        const dpr = window.devicePixelRatio || 1;
+      /** `magnify`: how much larger than its layout box the canvas is shown
+       *  (a CSS transform, which its client size does not see). */
+      draw(video: HTMLVideoElement, grade: VideoGrade, magnify = 1): void {
+        const dpr = (window.devicePixelRatio || 1) * magnify;
         const scale = Math.min(
           1,
           (canvas.clientWidth * dpr) / video.videoWidth,

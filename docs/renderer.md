@@ -767,3 +767,13 @@ the image instead of the window: its listener stops the event before it
 bubbles to the window listener of `useContentZoom`, so that listener must stay
 on the bubble phase. Zoomed in, the image is drawn at its zoomed size over
 its own stage, not scaled with CSS zoom, so it does not touch the rule above.
+
+The detail view's video zooms the same way
+(`src/routes/MediaDetail/useVideoZoom.ts`, with the math of `imageZoom.ts`).
+It cannot be redrawn in a pane of its own, so the zoom is a CSS transform on
+the element that holds the `<video>` (and on the adjusted picture's canvas,
+which is drawn at the zoomed resolution), never on the `<video>` itself: that
+element is handed to and from the playlist player, which must not inherit a
+zoomed view. A press that moves a few pixels pans; one that does not still
+plays or pauses, and a double-click is left alone. The zoom buttons sit in
+the control bar.
