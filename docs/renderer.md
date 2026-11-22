@@ -694,7 +694,16 @@ such as gruvbox, solarized, and nord. It has four layers:
   is passed through untouched.
 - `ThemeProvider.tsx` — injects one `html[data-theme="<id>"]` block per scheme at
   import time (before the first paint, which is what `public/theme-boot.js`
-  assumes) and switches `<html data-theme>`.
+  assumes) and switches `<html data-theme>`. A switch cross-fades the window
+  with `document.startViewTransition`, applying the new theme synchronously
+  inside the callback (`flushSync` plus `applyTheme`) so the transition
+  snapshots it, and skips the fade under reduced motion.
+- `startupTheme.ts` — with "Random theme on startup" on, picks and applies the
+  theme before the first render. `public/theme-boot.js` reads the same
+  preference from `meguri.prefs` and paints a neutral gray instead of the
+  previous theme's color, with `data-boot-fade` on `<html>`; `styles.css` fades
+  the picked theme in over `--meguri-theme-fade`, and `ThemeProvider` removes
+  the attribute once that has played.
 
 Adding a theme means adding its palette to `schemes.ts`; nothing else needs to be
 touched. `src/themes/__tests__/derive.test.ts` runs every scheme through the
