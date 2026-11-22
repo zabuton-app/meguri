@@ -33,9 +33,11 @@ describe("random theme on startup", () => {
     expect(prefs.result.current.randomThemeOnStartup).toBe(false);
     act(() => prefs.result.current.setRandomThemeOnStartup(true));
     expect(
-      (JSON.parse(localStorage.getItem("meguri.prefs")!) as {
-        randomThemeOnStartup: boolean;
-      }).randomThemeOnStartup,
+      (
+        JSON.parse(localStorage.getItem("meguri.prefs")!) as {
+          randomThemeOnStartup: boolean;
+        }
+      ).randomThemeOnStartup,
     ).toBe(true);
     prefs.unmount();
     const restored = renderHook(() => usePreferences(), {
