@@ -1,6 +1,26 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
 
 export const FIXTURE_FILE = "test.png";
+
+/**
+ * The `--user-data-dir` argument for a launch, with the background update
+ * check turned off in that profile. The built app reports version 0.0, so
+ * wherever GitHub is reachable (CI) every release is newer, and the toast that
+ * appears about 8 seconds after launch sits over the top right of the window
+ * and takes clicks meant for what is under it (#535). A test should not depend
+ * on the network either. The shape is UpdateConfig in
+ * electron/core/appConfig.ts; every other field defaults.
+ */
+export function profileArg(userDataDir: string): string {
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(userDataDir, "config.json"),
+    JSON.stringify({ update: { autoCheck: false } }),
+  );
+  return `--user-data-dir=${userDataDir}`;
+}
 
 export async function waitForRenderer(page: Page): Promise<void> {
   // Electron can expose the initial blank page before it loads the app.

@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   closeTopDialog,
   openSettingsTab,
+  profileArg,
   skipFirstLaunchTour,
   waitForIdle,
   waitForIndexedMedia,
@@ -34,7 +35,7 @@ test("hides what a scan exclusion covers and brings it back when it goes", async
   );
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${userDataDir}`],
+      args: [profileArg(userDataDir)],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: root },
     }),
   );
@@ -114,7 +115,7 @@ test("excludes a folder from its card and includes it again from the workspace",
   );
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${userDataDir}`],
+      args: [profileArg(userDataDir)],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: root },
     }),
   );

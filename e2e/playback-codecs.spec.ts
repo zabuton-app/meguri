@@ -7,6 +7,7 @@ import { ffmpegPath as ffmpeg } from "@zabuton-app/ffmpeg-binaries";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
 import {
   closeTopDialog,
+  profileArg,
   skipFirstLaunchTour,
   waitForIdle,
 } from "./fixtures/helpers";
@@ -63,7 +64,7 @@ test("plays ordinary videos and codecs Chromium cannot decode", async () => {
   const app = await _electron.launch(
     electronLaunchOptions({
       args: [
-        `--user-data-dir=${path.join(tmp, "profile")}`,
+        profileArg(path.join(tmp, "profile")),
         // A machine whose GPU decodes HEVC through VA-API would play it; the
         // check is about Chromium's own decoders.
         "--disable-accelerated-video-decode",

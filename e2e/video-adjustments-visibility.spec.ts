@@ -7,6 +7,7 @@ import { ffmpegPath } from "@zabuton-app/ffmpeg-binaries";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
 import {
   openFileDetail,
+  profileArg,
   skipFirstLaunchTour,
   waitForIdle,
   waitForIndexedMedia,
@@ -33,7 +34,7 @@ test("video adjustments stay clickable under a stationary pointer", async () => 
   ]);
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${path.join(temp, "profile")}`],
+      args: [profileArg(path.join(temp, "profile"))],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: root },
     }),
   );
