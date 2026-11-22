@@ -423,7 +423,7 @@ export const zhCN: Catalog = {
   "shortcuts.zoom": "放大 / 缩小",
   "shortcuts.zoomReset": "重置缩放",
   "shortcuts.imagePaging": "上一个 / 下一个文件（图片）",
-  "shortcuts.imageZoom": "缩放图片（以指针为中心）",
+  "shortcuts.imageZoom": "缩放图片或视频（以指针为中心）",
   "shortcuts.imageZoomToggle": "图片适应窗口 / 实际大小",
   "shortcuts.wheel": "滚轮",
   "shortcuts.doubleClick": "双击",

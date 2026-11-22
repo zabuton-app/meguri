@@ -434,6 +434,7 @@ export default function MediaDetail() {
                     reopenOnNetworkError={needsVideoPreview(d.codec)}
                     navKeys={navBinding}
                     fullscreenTargetRef={modalRef}
+                    zoomable
                     bookmarks={d.bookmarks}
                     bookmarkPending={actions.pending.bookmark}
                     onAddBookmark={actions.addBookmark}

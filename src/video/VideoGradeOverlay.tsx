@@ -33,6 +33,12 @@ interface Props {
   playing: boolean;
   loaded: boolean;
   panel: VideoAdjustmentsPanel;
+  /** The detail view's zoom (#637): the adjusted picture covers the video, so
+   *  it takes the same transform. */
+  pictureStyle?: React.CSSProperties;
+  /** How much larger than at fit that transform draws the picture, so the
+   *  canvas is drawn at the resolution it is shown at. */
+  pictureScale?: number;
   t: TFunc;
 }
 
@@ -41,6 +47,8 @@ export function VideoGradeOverlay({
   playing,
   loaded,
   panel,
+  pictureStyle,
+  pictureScale = 1,
   t,
 }: Props) {
   const { open, onOpenChange, container } = panel;
@@ -80,6 +88,8 @@ export function VideoGradeOverlay({
           videoRef={videoRef}
           grade={previewGrade}
           active={active}
+          style={pictureStyle}
+          magnify={pictureScale}
           onError={setFailed}
         />
       )}
@@ -346,15 +356,19 @@ function GradedFrame({
   videoRef,
   grade,
   active,
+  style,
+  magnify,
   onError,
 }: {
   videoRef: Props["videoRef"];
   grade: VideoGrade;
   active: boolean;
+  style: React.CSSProperties | undefined;
+  magnify: number;
   onError: (failed: boolean) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const settings = useRef({ grade, active });
+  const settings = useRef({ grade, active, magnify });
   const redraw = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -386,7 +400,7 @@ function GradedFrame({
       )
         return;
       try {
-        renderer.draw(video, settings.current.grade);
+        renderer.draw(video, settings.current.grade, settings.current.magnify);
         canvas.style.visibility = "visible";
       } catch (error) {
         log.warn("Video adjustments could not draw", error);
@@ -429,18 +443,18 @@ function GradedFrame({
   }, [videoRef, onError]);
 
   useLayoutEffect(() => {
-    settings.current = { grade, active };
+    settings.current = { grade, active, magnify };
     if (!active && canvasRef.current)
       canvasRef.current.style.visibility = "hidden";
     redraw.current?.();
-  }, [grade, active]);
+  }, [grade, active, magnify]);
 
   return (
     <canvas
       ref={canvasRef}
       data-slot="graded-video"
       aria-hidden="true"
-      style={{ visibility: "hidden" }}
+      style={{ visibility: "hidden", ...style }}
       className="pointer-events-none absolute inset-0 h-full w-full object-contain"
     />
   );

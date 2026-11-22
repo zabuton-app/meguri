@@ -29,10 +29,13 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Shrink,
   SkipBack,
   SkipForward,
   Volume2,
   VolumeX,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { SceneBookmark } from "@/ipc/types";
@@ -66,6 +69,7 @@ import {
   stepSpeed,
 } from "@/lib/playbackSpeed";
 import { CTRL_BUTTON_CLASS } from "./controlBar";
+import { useVideoZoom } from "./useVideoZoom";
 import {
   previewAudioTrackOf,
   streamOffsetOf,
@@ -223,6 +227,12 @@ export const VideoPlayer = forwardRef<
      */
     chromeless?: boolean;
     /**
+     * Whether the picture can be zoomed and panned (#637): Ctrl+wheel, the
+     * zoom buttons in the control bar, and a drag while zoomed in. The detail
+     * view only; ignored when `chromeless`.
+     */
+    zoomable?: boolean;
+    /**
      * Fired instead of rendering the built-in error panel when playback fails
      * for good. The playlist player uses this to skip to the next item; the
      * panel's "open externally" escape hatch would be a manual affordance the
@@ -274,6 +284,7 @@ export const VideoPlayer = forwardRef<
     onFatalError,
     onOpenExternal,
     chromeless = false,
+    zoomable = false,
     t,
   },
   handleRef,
@@ -296,6 +307,13 @@ export const VideoPlayer = forwardRef<
   } | null>(null);
 
   const [loaded, setLoaded] = useState(false);
+  const zoom = useVideoZoom({
+    // Off on the error screen, which unmounts the stage.
+    enabled: zoomable && !chromeless && error == null,
+    loaded,
+    stageRef: wrapRef,
+    videoRef: ref,
+  });
   // Whether this player is currently the fullscreen element (used to drop the max-height cap).
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [subtitle, setSubtitle] = useState(() =>
@@ -490,6 +508,7 @@ export const VideoPlayer = forwardRef<
     setPosition(0);
     setPlaying(false);
     setLoaded(false);
+    zoom.reset();
     setNativeDur(null);
     setHover(null);
     setScrub(null);
@@ -932,6 +951,11 @@ export const VideoPlayer = forwardRef<
     else void el.requestFullscreen().catch(() => {});
   };
 
+  const zoomFitRef = useRef(zoom.fit);
+  useEffect(() => {
+    zoomFitRef.current = zoom.fit;
+  });
+
   // Track fullscreen state so the video can fill the screen (the default max-h cap would otherwise leave black bars).
   // The fullscreen element may be an ancestor (fullscreenTargetRef), so containment is the check.
   useEffect(() => {
@@ -940,6 +964,8 @@ export const VideoPlayer = forwardRef<
       setIsFullscreen(
         fs != null && wrapRef.current != null && fs.contains(wrapRef.current),
       );
+      // The stage changes size by far, so the view starts again at fit.
+      zoomFitRef.current();
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
@@ -1187,127 +1213,144 @@ export const VideoPlayer = forwardRef<
           aria-hidden="true"
         />
       )}
-      <VideoElement
-        videoRef={ref}
-        onAttach={onAttach}
-        src={openedAtStart ?? src}
-        autoPlay={autoplay}
-        className={`h-full w-full object-contain transition-opacity ${
-          chromeless
-            ? "max-h-full"
-            : isFullscreen
-              ? "max-h-screen"
-              : "max-h-[78vh]"
-        } ${loaded ? "opacity-100" : "opacity-0"}`}
-        onClick={togglePlay}
-        onPlay={() => {
-          setPlaying(true);
-          onPlaybackStart?.();
-          void api.fileRecordPlay(id, wsId, "browser", position);
-          playbackPosition.markPlayed();
-          if (!playedRef.current) {
-            playedRef.current = true;
-            onPlayed();
-          }
-        }}
-        onPause={() => {
-          setPlaying(false);
-          // A pause, whoever asked for it, withdraws autoplay: a stream paused
-          // while still loading has not played either, and `seek` must not
-          // take it for one that is about to start.
-          if (ref.current) ref.current.autoplay = false;
-          const v = ref.current;
-          const sample = v && sampleOf(v);
-          if (sample) playbackPosition.flush(sample);
-        }}
-        onEnded={() => {
-          setPlaying(false);
-          const v = ref.current;
-          const sample = v && sampleOf(v);
-          if (sample) playbackPosition.flush(endedSample(sample));
-          onEnded?.();
-        }}
-        onVolumeChange={() => {
-          const v = ref.current;
-          if (v) syncFromElement(v.volume, v.muted);
-        }}
-        onLoadedMetadata={() => {
-          const v = ref.current;
-          if (!v) return;
-          // Before anything else: seeks made from here on can be decided on
-          // their merits rather than deferred.
-          haveMetadataRef.current = true;
-          pendingAudio.current = null;
-          // The stream works again, so a later interruption may retry too.
-          netRetriedRef.current = false;
+      {/* Holds the video so the zoom's transform stays here when the element
+          is handed to the playlist player. */}
+      <div
+        data-slot="video-picture"
+        className={`absolute inset-0 flex items-center justify-center ${
+          zoom.zoomed
+            ? `touch-none select-none ${zoom.dragging ? "cursor-grabbing" : "cursor-grab"}`
+            : ""
+        }`}
+        style={zoom.pictureStyle}
+        {...zoom.panHandlers}
+      >
+        <VideoElement
+          videoRef={ref}
+          onAttach={onAttach}
+          src={openedAtStart ?? src}
+          autoPlay={autoplay}
+          className={`h-full w-full object-contain transition-opacity ${
+            chromeless
+              ? "max-h-full"
+              : isFullscreen
+                ? "max-h-screen"
+                : "max-h-[78vh]"
+          } ${loaded ? "opacity-100" : "opacity-0"}`}
+          onClick={() => {
+            if (!zoom.panned()) togglePlay();
+          }}
+          onPlay={() => {
+            setPlaying(true);
+            onPlaybackStart?.();
+            void api.fileRecordPlay(id, wsId, "browser", position);
+            playbackPosition.markPlayed();
+            if (!playedRef.current) {
+              playedRef.current = true;
+              onPlayed();
+            }
+          }}
+          onPause={() => {
+            setPlaying(false);
+            // A pause, whoever asked for it, withdraws autoplay: a stream paused
+            // while still loading has not played either, and `seek` must not
+            // take it for one that is about to start.
+            if (ref.current) ref.current.autoplay = false;
+            const v = ref.current;
+            const sample = v && sampleOf(v);
+            if (sample) playbackPosition.flush(sample);
+          }}
+          onEnded={() => {
+            setPlaying(false);
+            const v = ref.current;
+            const sample = v && sampleOf(v);
+            if (sample) playbackPosition.flush(endedSample(sample));
+            onEnded?.();
+          }}
+          onVolumeChange={() => {
+            const v = ref.current;
+            if (v) syncFromElement(v.volume, v.muted);
+          }}
+          onLoadedMetadata={() => {
+            const v = ref.current;
+            if (!v) return;
+            // Before anything else: seeks made from here on can be decided on
+            // their merits rather than deferred.
+            haveMetadataRef.current = true;
+            pendingAudio.current = null;
+            // The stream works again, so a later interruption may retry too.
+            netRetriedRef.current = false;
 
-          setLoaded(true);
-          // Apply the shared volume/mute to this freshly-loaded element. The
-          // effect above only fires when the value changes, so this is what
-          // covers an element that is new rather than a value that is new.
-          v.volume = volume;
-          v.muted = muted;
-          v.playbackRate = speedRef.current;
-          if (isFinite(v.duration)) {
-            setNativeDur(v.duration);
-            onNativeDuration(v.duration);
-          }
-          // Read the offset off the element: it may have been loaded from a
-          // `?t=` before this host saw it (opened at `startAt`, or handed
-          // over before its metadata arrived).
-          const source = v.getAttribute("src");
-          const streamOffset = streamOffsetOf(source);
-          setOffset(streamOffset);
-          setPosition(streamOffset + v.currentTime);
-          // Apply the initial seek (a resume point, a scene, a bookmark) once,
-          // unless the file was loaded from there already (`openedAtStart`).
-          if (startAt > 0 && !appliedStartRef.current) {
-            appliedStartRef.current = true;
-            if (source !== openedAtStart) seekRef.current(startAt);
-          }
-          // A seek asked for while there was nothing loaded yet. It comes after
-          // the initial seek because it is the newer intent of the two.
-          const deferred = deferredSeekRef.current;
-          if (deferred != null) {
-            deferredSeekRef.current = null;
-            seekRef.current(deferred);
-          }
-        }}
-        onLoadedData={() => {
-          const v = ref.current;
-          // A codec this Chromium has no decoder for, such as HEVC on Linux,
-          // loads and plays its sound with a black picture and no error. The
-          // scan measured a picture (width), so report it as undecodable.
-          if (v && width != null && width > 0 && v.videoWidth === 0) {
-            log.error("video loaded without a picture", { src });
-            setError(t("player.errNoPicture"));
-          }
-        }}
-        onTimeUpdate={() => {
-          const v = ref.current;
-          if (!v) return;
-          setPosition(offset + v.currentTime);
-          const sample = v.paused ? null : sampleOf(v);
-          if (sample) playbackPosition.tick(sample);
-        }}
-        onSeeked={() => {
-          const v = ref.current;
-          // A seek is a new place to come back to, playing or paused (a
-          // paused seek has no `timeupdate` stream to carry it otherwise).
-          const sample = v && sampleOf(v);
-          if (sample) playbackPosition.tick(sample, POSITION_SEEK_INTERVAL_MS);
-          const target = seekTargetRef.current;
-          if (!v || target == null) return;
-          // The run moved on while this seek was in flight; go where it points
-          // now. Landing on the target ends the chain.
-          const reached = streamOffsetOf(v.getAttribute("src")) + v.currentTime;
-          if (Math.abs(reached - target) > SEEK_SETTLED_SEC) flushSeek();
-        }}
-        onError={() => {
-          const v = ref.current;
-          if (v) handleElementError(v);
-        }}
-      />
+            setLoaded(true);
+            // Apply the shared volume/mute to this freshly-loaded element. The
+            // effect above only fires when the value changes, so this is what
+            // covers an element that is new rather than a value that is new.
+            v.volume = volume;
+            v.muted = muted;
+            v.playbackRate = speedRef.current;
+            if (isFinite(v.duration)) {
+              setNativeDur(v.duration);
+              onNativeDuration(v.duration);
+            }
+            // Read the offset off the element: it may have been loaded from a
+            // `?t=` before this host saw it (opened at `startAt`, or handed
+            // over before its metadata arrived).
+            const source = v.getAttribute("src");
+            const streamOffset = streamOffsetOf(source);
+            setOffset(streamOffset);
+            setPosition(streamOffset + v.currentTime);
+            // Apply the initial seek (a resume point, a scene, a bookmark) once,
+            // unless the file was loaded from there already (`openedAtStart`).
+            if (startAt > 0 && !appliedStartRef.current) {
+              appliedStartRef.current = true;
+              if (source !== openedAtStart) seekRef.current(startAt);
+            }
+            // A seek asked for while there was nothing loaded yet. It comes after
+            // the initial seek because it is the newer intent of the two.
+            const deferred = deferredSeekRef.current;
+            if (deferred != null) {
+              deferredSeekRef.current = null;
+              seekRef.current(deferred);
+            }
+          }}
+          onLoadedData={() => {
+            const v = ref.current;
+            // A codec this Chromium has no decoder for, such as HEVC on Linux,
+            // loads and plays its sound with a black picture and no error. The
+            // scan measured a picture (width), so report it as undecodable.
+            if (v && width != null && width > 0 && v.videoWidth === 0) {
+              log.error("video loaded without a picture", { src });
+              setError(t("player.errNoPicture"));
+            }
+          }}
+          onTimeUpdate={() => {
+            const v = ref.current;
+            if (!v) return;
+            setPosition(offset + v.currentTime);
+            const sample = v.paused ? null : sampleOf(v);
+            if (sample) playbackPosition.tick(sample);
+          }}
+          onSeeked={() => {
+            const v = ref.current;
+            // A seek is a new place to come back to, playing or paused (a
+            // paused seek has no `timeupdate` stream to carry it otherwise).
+            const sample = v && sampleOf(v);
+            if (sample)
+              playbackPosition.tick(sample, POSITION_SEEK_INTERVAL_MS);
+            const target = seekTargetRef.current;
+            if (!v || target == null) return;
+            // The run moved on while this seek was in flight; go where it points
+            // now. Landing on the target ends the chain.
+            const reached =
+              streamOffsetOf(v.getAttribute("src")) + v.currentTime;
+            if (Math.abs(reached - target) > SEEK_SETTLED_SEC) flushSeek();
+          }}
+          onError={() => {
+            const v = ref.current;
+            if (v) handleElementError(v);
+          }}
+        />
+      </div>
 
       {videoAdjustments && (
         <VideoGradeOverlay
@@ -1316,6 +1359,8 @@ export const VideoPlayer = forwardRef<
           playing={playing}
           loaded={loaded}
           panel={videoAdjustments}
+          pictureStyle={zoom.pictureStyle}
+          pictureScale={zoom.pictureScale}
           t={t}
         />
       )}
@@ -1345,10 +1390,14 @@ export const VideoPlayer = forwardRef<
         <button
           type="button"
           onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center"
+          // Zoomed in, only the round button takes the press: the rest of the
+          // picture is there to be dragged.
+          className={`absolute inset-0 flex items-center justify-center ${
+            zoom.zoomed ? "pointer-events-none" : ""
+          }`}
           title={t("player.play")}
         >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
+          <span className="pointer-events-auto flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
             <Play size={30} className="translate-x-0.5" />
           </span>
         </button>
@@ -1537,6 +1586,34 @@ export const VideoPlayer = forwardRef<
                   title={t("player.volume")}
                 />
               </div>
+              {zoom.ready && (
+                <div className="flex items-center">
+                  <CtrlButton
+                    onClick={zoom.zoomOut}
+                    disabled={!zoom.zoomed}
+                    title={t("media.zoomOut")}
+                  >
+                    <ZoomOut size={18} />
+                  </CtrlButton>
+                  <span className="min-w-10 text-center tabular-nums">
+                    {zoom.percent}%
+                  </span>
+                  <CtrlButton
+                    onClick={zoom.zoomIn}
+                    disabled={!zoom.canZoomIn}
+                    title={t("media.zoomIn")}
+                  >
+                    <ZoomIn size={18} />
+                  </CtrlButton>
+                  <CtrlButton
+                    onClick={zoom.fit}
+                    disabled={!zoom.zoomed}
+                    title={t("media.zoomFit")}
+                  >
+                    <Shrink size={18} />
+                  </CtrlButton>
+                </div>
+              )}
               <CtrlButton
                 onClick={toggleFullscreen}
                 title={t("player.fullscreen")}

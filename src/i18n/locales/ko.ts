@@ -435,7 +435,7 @@ export const ko: Catalog = {
   "shortcuts.zoom": "확대 / 축소",
   "shortcuts.zoomReset": "배율 초기화",
   "shortcuts.imagePaging": "이전 / 다음 파일 (이미지)",
-  "shortcuts.imageZoom": "이미지 확대 / 축소 (포인터 위치)",
+  "shortcuts.imageZoom": "이미지·동영상 확대 / 축소 (포인터 위치)",
   "shortcuts.imageZoomToggle": "이미지를 화면에 맞추기 / 실제 크기",
   "shortcuts.wheel": "휠",
   "shortcuts.doubleClick": "더블클릭",

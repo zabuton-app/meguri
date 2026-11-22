@@ -474,7 +474,7 @@ export const es: Catalog = {
   "shortcuts.zoom": "Acercar / alejar",
   "shortcuts.zoomReset": "Restablecer zoom",
   "shortcuts.imagePaging": "Archivo anterior / siguiente (imágenes)",
-  "shortcuts.imageZoom": "Ampliar la imagen (hacia el puntero)",
+  "shortcuts.imageZoom": "Ampliar la imagen o el vídeo (hacia el puntero)",
   "shortcuts.imageZoomToggle": "Ajustar la imagen / tamaño real",
   "shortcuts.wheel": "Rueda",
   "shortcuts.doubleClick": "Doble clic",
