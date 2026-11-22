@@ -15,6 +15,11 @@ The layers, from bottom to top:
 At equal specificity a higher layer wins, so `custom.css` can adjust a CSS
 theme.
 
+**Random theme on startup** in the Theme section picks a different built-in
+theme with the current light or dark appearance on each start. Like picking a
+built-in theme by hand, it turns off the selected CSS theme; `custom.css` is
+unaffected. A manual pick lasts until the next start.
+
 ![The three layers: built-in theme, CSS theme, custom.css](assets/css-layers.png)
 
 `<userData>` below is, for example, `~/.config/meguri` on Linux.

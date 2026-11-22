@@ -35,6 +35,9 @@ export const ko: Catalog = {
   "settings.light": "라이트",
   "settings.dark": "다크",
   "settings.theme": "테마",
+  "settings.randomThemeOnStartup": "시작할 때 무작위 테마 선택",
+  "settings.randomThemeOnStartupDesc":
+    "시작할 때마다 현재 모양에 맞는 다른 기본 테마를 선택합니다. 선택한 CSS 테마는 해제됩니다.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "라이트 모드로 전환",

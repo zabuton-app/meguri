@@ -36,6 +36,9 @@ export const en: Catalog = {
   "settings.light": "Light",
   "settings.dark": "Dark",
   "settings.theme": "Theme",
+  "settings.randomThemeOnStartup": "Random theme on startup",
+  "settings.randomThemeOnStartupDesc":
+    "Pick a different built-in theme in the current appearance each time the app starts. This turns off any selected CSS theme.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "Switch to light mode",

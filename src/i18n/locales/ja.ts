@@ -35,6 +35,9 @@ export const ja = {
   "settings.light": "ライト",
   "settings.dark": "ダーク",
   "settings.theme": "テーマ",
+  "settings.randomThemeOnStartup": "起動時にランダムなテーマを選ぶ",
+  "settings.randomThemeOnStartupDesc":
+    "起動するたびに、現在の外観に合う別の組み込みテーマを選びます。選択中の CSS テーマは解除されます。",
 
   // 外観トグル（ヘッダー）
   "theme.switchToLight": "ライトモードに切り替え",

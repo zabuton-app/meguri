@@ -35,6 +35,9 @@ export const zhCN: Catalog = {
   "settings.light": "浅色",
   "settings.dark": "深色",
   "settings.theme": "主题",
+  "settings.randomThemeOnStartup": "启动时随机选择主题",
+  "settings.randomThemeOnStartupDesc":
+    "每次启动时选择与当前外观相同的其他内置主题，并关闭已选的 CSS 主题。",
 
   // Appearance toggle (header)
   "theme.switchToLight": "切换到浅色模式",

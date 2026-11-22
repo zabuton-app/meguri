@@ -36,6 +36,9 @@ export const fr: Catalog = {
   "settings.light": "Clair",
   "settings.dark": "Sombre",
   "settings.theme": "Thème",
+  "settings.randomThemeOnStartup": "Thème aléatoire au démarrage",
+  "settings.randomThemeOnStartupDesc":
+    "Choisit un autre thème intégré avec l'apparence actuelle à chaque démarrage. Désactive le thème CSS sélectionné.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "Passer au mode clair",
