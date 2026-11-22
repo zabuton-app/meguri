@@ -31,7 +31,7 @@
     "test:core": "node scripts/test-core.mjs",
     "test:renderer": "vitest run --project renderer",
     "test:e2e": "npm run build && playwright test",
-    "test:e2e:headless": "npm run build && MEGURI_FORCE_X11=1 xvfb-run -a -s \"-screen 0 1280x960x24\" -- playwright test",
+    "test:e2e:headless": "npm run build && MEGURI_FORCE_X11=1 MEGURI_E2E_XVFB=1 playwright test",
     "test:e2e:install": "playwright install --with-deps",
     "postinstall": "electron-builder install-app-deps",
     "dist": "electron-vite build && electron-builder",
