@@ -129,6 +129,11 @@ definitive function from a nearest public symbol. Inline frames and source
 lines may require further interpretation of the symbol file. A summary
 contains only the top instruction pointer, not the rest of the stack.
 
+The top frame is often a generic crash helper, such as
+`logging::LogMessage::HandleFatal` for a failed `CHECK` or `ImmediateCrash`.
+It shows how the process stopped, not why; the cause is in the callers, so
+ask for the raw dump if the log does not explain it.
+
 ## Walk a raw minidump
 
 Obtain [Breakpad's `minidump_stackwalk`](https://github.com/google/breakpad#getting-started-from-main)
