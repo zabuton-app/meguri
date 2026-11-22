@@ -158,7 +158,7 @@ jobs:
       # `playwright install` step: xvfb comes with the runner image.
       #
       # Ubuntu 24.04 restricts unprivileged user namespaces; Electron needs this sysctl.
-      # Builds, then runs under Xvfb pinned to X11 (same as local runs).
+      # Builds, then runs pinned to X11 with one Xvfb display per worker (same as local runs).
       - name: Run E2E tests
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0

@@ -350,8 +350,8 @@ npm test
 
 E2E tests (Playwright + Electron). Builds the app first, then launches the
 packaged main process against fixture media in `e2e/fixtures/media/`. Run them
-under a virtual framebuffer (Linux, needs `xvfb-run`) so no windows appear on
-your desktop; CI runs the same script:
+under virtual framebuffers (Linux, needs `Xvfb`; each Playwright worker gets its
+own display) so no windows appear on your desktop; CI runs the same script:
 
 ```bash
 npm run test:e2e:headless
