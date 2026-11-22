@@ -58,7 +58,12 @@ each half of the overlap whose distance apart gives the scale to a fraction
 of a pixel, so the scores compare and the highest wins. A new search only
 has to return guesses. On the view's side, `geometry.ts` holds the
 placement's arithmetic (span, overlap, the inverse for a swap) and
-`modes.ts` the layer styles of each way to look.
+`modes.ts` the layer styles of each way to look. Zoom and pan behave as
+the file details' image and video do (`src/hooks/usePanZoom.ts`, with the
+math in `src/lib/panZoom.ts`): Ctrl+wheel zooms toward the pointer, a
+double-click toggles fit and actual pixels, and a drag pans, clamped at the
+edges. The box that holds both images is what is fitted, 100% is actual
+pixels of A, and pixels past 2× are drawn unsmoothed.
 
 The renderer's CSP (`index.html`) does not reach this worker: OpenCV.js
 compiles its wasm there without `'wasm-unsafe-eval'` in the packaged app

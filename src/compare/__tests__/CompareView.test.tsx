@@ -1,5 +1,5 @@
-import { fireEvent, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { FileRow } from "@/ipc/types";
 import { CompareView } from "../CompareView";
@@ -184,5 +184,103 @@ describe("CompareView", () => {
     const { onClose } = setup();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+// Zoom and pan as in the file details (#647): Ctrl+wheel, a double-click
+// between fit and actual pixels, and a pan clamped at the edges.
+describe("CompareView zoom and pan", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // The box both images span is 412 × 303 (B 12 px right of and 3 px above
+  // A); in a 206 × 303 stage it fits at 50%.
+  function setupStage() {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        const size =
+          this.dataset.slot === "compare-stage"
+            ? { width: 206, height: 303 }
+            : { width: 0, height: 0 };
+        return { left: 0, top: 0, ...size } as DOMRect;
+      },
+    );
+    const r = setup();
+    const stage = document.querySelector<HTMLElement>(
+      '[data-slot="compare-stage"]',
+    )!;
+    const level = () => screen.getByText(/^\d+%$/).textContent;
+    const box = () => r.layer("a").firstElementChild as HTMLElement;
+    return { ...r, stage, level, box };
+  }
+
+  // happy-dom's WheelEvent carries no modifier keys or pointer position.
+  function wheel(target: Element, init: { deltaY: number; ctrlKey: boolean }) {
+    const ev = new WheelEvent("wheel", {
+      deltaY: init.deltaY,
+      bubbles: true,
+      cancelable: true,
+    });
+    for (const [k, v] of Object.entries({
+      ...init,
+      clientX: 103,
+      clientY: 151,
+    }))
+      Object.defineProperty(ev, k, { value: v });
+    act(() => {
+      target.dispatchEvent(ev);
+    });
+    return ev;
+  }
+
+  it("zooms with Ctrl+wheel and leaves a plain wheel alone", () => {
+    const { stage, level } = setupStage();
+    expect(level()).toBe("50%");
+    expect(
+      wheel(stage, { deltaY: -100, ctrlKey: false }).defaultPrevented,
+    ).toBe(false);
+    expect(level()).toBe("50%");
+    expect(wheel(stage, { deltaY: -100, ctrlKey: true }).defaultPrevented).toBe(
+      true,
+    );
+    expect(level()).toBe("60%");
+  });
+
+  it("toggles fit and actual pixels on a double-click", () => {
+    const { stage, level, box } = setupStage();
+    fireEvent.doubleClick(stage, { clientX: 103, clientY: 151 });
+    expect(level()).toBe("100%");
+    // 412 wide in a 206 stage, centred on the point double-clicked.
+    expect(box().style.transform).toBe("translate(-103px, 0px) scale(1)");
+    fireEvent.doubleClick(stage, { clientX: 103, clientY: 151 });
+    expect(level()).toBe("50%");
+  });
+
+  it("pans by dragging while zoomed in, and stops at the edges", () => {
+    const { stage, box } = setupStage();
+    fireEvent.doubleClick(stage, { clientX: 103, clientY: 151 });
+    stage.setPointerCapture = () => {};
+    fireEvent.pointerDown(stage, {
+      pointerId: 1,
+      button: 0,
+      buttons: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(stage, {
+      pointerId: 1,
+      buttons: 1,
+      clientX: 150,
+      clientY: 150,
+    });
+    expect(box().style.transform).toBe("translate(-53px, 0px) scale(1)");
+    fireEvent.pointerMove(stage, {
+      pointerId: 1,
+      buttons: 1,
+      clientX: 1000,
+      clientY: 150,
+    });
+    expect(box().style.transform).toBe("translate(0px, 0px) scale(1)");
   });
 });
