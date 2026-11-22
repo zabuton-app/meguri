@@ -1,10 +1,13 @@
 import {
   AUTO_META_SOURCE,
+  isFavoriteSearchToken,
   namespaceOfAutoMetaValue,
   parseQualifiedTagName,
   parseExtSearchToken,
   parseHashSearchToken,
+  parseRatingSearchToken,
   parseTagSearchToken,
+  ratingSearchText,
 } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
@@ -79,8 +82,8 @@ export function tagHumanLabel(
 }
 
 /**
- * Human-readable description of a `tag:`, `hash:` or `ext:` search token, or
- * null when the token is ordinary free text. Used for the tooltip on the chips
+ * Human-readable description of a `tag:`, `hash:`, `ext:`, `rating:` or
+ * `is:fav` search token, or null when the token is ordinary free text. Used for the tooltip on the chips
  * the search box renders, where the chip itself shows the raw token.
  *
  * A generated tag is usually written as its bare value ("long"), so the category
@@ -92,6 +95,10 @@ export function searchTokenLabel(t: TFunc, token: string): string | null {
   if (hash !== null) return `${t("filter.hashChip")}: ${hash}`;
   const ext = parseExtSearchToken(token);
   if (ext !== null) return `${t("filter.extChip")}: ${ext}`;
+  const rating = parseRatingSearchToken(token);
+  if (rating !== null)
+    return `${t("media.rating")}: ${ratingSearchText(rating)}`;
+  if (isFavoriteSearchToken(token)) return `♥ ${t("favorite.chip")}`;
   const raw = parseTagSearchToken(token);
   if (raw === null) return null;
   const parsed = parseQualifiedTagName(raw);

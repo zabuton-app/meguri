@@ -12,13 +12,16 @@ import {
 } from "./folderRange.js";
 import {
   LIST_HIDDEN_SOURCES,
+  isFavoriteSearchToken,
   parseExtSearchToken,
   parseHashSearchToken,
+  parseRatingSearchToken,
   parseTagSearchToken,
   searchTokenTerms,
   splitSearchTokens,
   BARE_SEARCH_NAMESPACES,
   tagIdentityKey,
+  type RatingSearch,
 } from "../../../shared/tags.js";
 import type {
   FileDetail,
@@ -78,12 +81,18 @@ function buildSearchTerms(q: string): {
   hashPrefixes: string[];
   /** `ext:` values, lower-case, without the dot. */
   extValues: string[];
+  /** `rating:` comparisons. */
+  ratings: RatingSearch[];
+  /** Whether an `is:fav` token asks for favorites. */
+  favorite: boolean;
 } {
   const matchTokens: string[] = [];
   const anyOf: { match: string | null; likes: string[] }[] = [];
   const tagTokens: string[] = [];
   const hashPrefixes: string[] = [];
   const extValues: string[] = [];
+  const ratings: RatingSearch[] = [];
+  let favorite = false;
   for (const raw of splitSearchTokens(q)) {
     const hash = parseHashSearchToken(raw);
     if (hash) {
@@ -93,6 +102,15 @@ function buildSearchTerms(q: string): {
     const ext = parseExtSearchToken(raw);
     if (ext) {
       extValues.push(ext);
+      continue;
+    }
+    const rating = parseRatingSearchToken(raw);
+    if (rating) {
+      ratings.push(rating);
+      continue;
+    }
+    if (isFavoriteSearchToken(raw)) {
+      favorite = true;
       continue;
     }
     const tag = parseTagSearchToken(raw);
@@ -115,6 +133,8 @@ function buildSearchTerms(q: string): {
     tagTokens,
     hashPrefixes,
     extValues,
+    ratings,
+    favorite,
   };
 }
 
@@ -262,6 +282,8 @@ export function appendSearchConditions(
         tagTokens: [],
         hashPrefixes: [],
         extValues: [],
+        ratings: [],
+        favorite: false,
       };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
@@ -314,6 +336,15 @@ export function appendSearchConditions(
   for (const ext of terms.extValues) {
     sql += " AND f.ext = ?";
     args.push(ext);
+  }
+  // A file without a rating counts as 0, as ratingMin reads it below. The
+  // operator comes from the parser's fixed set, never from the typed text.
+  for (const { op, value } of terms.ratings) {
+    sql += ` AND COALESCE(m.rating, 0) ${op} ?`;
+    args.push(value);
+  }
+  if (terms.favorite) {
+    sql += " AND m.favorite = 1";
   }
   for (const value of terms.tagTokens) {
     const ids = resolveSearchTagIds(db, value);

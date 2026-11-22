@@ -74,6 +74,15 @@ describe("searchTokenLabel", () => {
     expect(searchTokenLabel(t, "ext:.MP4")).toBe("Extension: mp4");
   });
 
+  it("names a rating: directive by its comparison (#525)", () => {
+    expect(searchTokenLabel(t, "rating:>=4")).toBe("Rating: >=4");
+    expect(searchTokenLabel(t, "rating:3")).toBe("Rating: 3");
+  });
+
+  it("names an is:fav directive as favorites (#525)", () => {
+    expect(searchTokenLabel(t, "is:fav")).toBe("♥ Favorites");
+  });
+
   it("returns null for free text", () => {
     expect(searchTokenLabel(t, "beach")).toBeNull();
   });

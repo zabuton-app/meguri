@@ -481,6 +481,21 @@ the files whose `ext` is exactly `mp4`, in any case and with or without the dot
 `.m4v` files do not match. It is a chip like `hash:`, and it is ANDed with the
 other directives, so `ext:mp4 ext:mkv` matches nothing.
 
+The **`rating:` directive** finds files by rating (#525): `rating:>=4`,
+`rating:>4`, `rating:<=2`, `rating:<2`, or `rating:3` for exactly 3. The value
+is a whole number from 0 to 5, and a file without a rating counts as 0, as the
+rating filter's `ratingMin` does. Any other value or comparison (`rating:6`,
+`rating:3.5`, `rating:=3`) leaves the token ordinary text, as `hash:` does.
+Two of them make a range (`rating:>=2 rating:<5`).
+
+The **`is:fav` directive** finds favorites (#525). `fav` is the only value `is:`
+takes; `is:` with any other value is ordinary text.
+
+Both are chips like `hash:`, the condition row names them, and both accept a
+space after the colon (`rating: >=4`). They are independent of the rating and
+favorite controls of the filter bar: a directive does not set the control nor
+the other way round, and when both are set both apply (AND).
+
 The search is typed in the command menu, whose field starts from the search on
 screen (`useSearchDraft` in `src/hooks/`, rendered by `CommandMenu`). It shows a
 directive as a **chip** rather than as raw text, so it is added and removed as

@@ -341,13 +341,61 @@ export function parseExtSearchToken(token: string): string | null {
   return value || null;
 }
 
-/** True for a token the search box shows as a chip: a `tag:`, `hash:` or
- *  `ext:` directive rather than free text. */
+/**
+ * The search-box directive for a rating (#525): `rating:>=4`, `rating:<2`, or
+ * `rating:3` for exactly 3. A file without a rating counts as 0, as the
+ * rating filter's `ratingMin` does. A value other than a whole number from 0
+ * to 5, or a comparison other than `>`, `>=`, `<` and `<=`, leaves the token
+ * ordinary text.
+ */
+export const RATING_SEARCH_PREFIX = "rating";
+
+export interface RatingSearch {
+  /** The SQL comparison; `=` when the token has none. */
+  op: ">" | ">=" | "<" | "<=" | "=";
+  value: number;
+}
+
+/** The comparison of a `rating:` token, or null when the token is ordinary
+ *  text. */
+export function parseRatingSearchToken(token: string): RatingSearch | null {
+  const head = `${RATING_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return null;
+  const m = /^(>=|<=|>|<)?([0-5])$/.exec(token.slice(head.length).trim());
+  if (!m) return null;
+  return { op: (m[1] ?? "=") as RatingSearch["op"], value: Number(m[2]) };
+}
+
+/** A `rating:` comparison as the token writes it: `>=4`, or `3` for equality. */
+export function ratingSearchText({ op, value }: RatingSearch): string {
+  return `${op === "=" ? "" : op}${value}`;
+}
+
+/**
+ * The search-box directive for favorites (#525): `is:fav`. `fav` is the only
+ * value `is:` takes; any other leaves the token ordinary text.
+ */
+export const IS_SEARCH_PREFIX = "is";
+export const FAVORITE_SEARCH_VALUE = "fav";
+
+/** True for an `is:fav` token, in any case. */
+export function isFavoriteSearchToken(token: string): boolean {
+  const head = `${IS_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return false;
+  return (
+    token.slice(head.length).trim().toLowerCase() === FAVORITE_SEARCH_VALUE
+  );
+}
+
+/** True for a token the search box shows as a chip: a `tag:`, `hash:`,
+ *  `ext:`, `rating:` or `is:fav` directive rather than free text. */
 export function isSearchDirective(token: string): boolean {
   return (
     isTagDirective(token) ||
     parseHashSearchToken(token) !== null ||
-    parseExtSearchToken(token) !== null
+    parseExtSearchToken(token) !== null ||
+    parseRatingSearchToken(token) !== null ||
+    isFavoriteSearchToken(token)
   );
 }
 
@@ -365,6 +413,11 @@ export function searchDirectiveKey(token: string): string | null {
   if (hash !== null) return `${HASH_SEARCH_PREFIX}:${hash}`;
   const ext = parseExtSearchToken(token);
   if (ext !== null) return `${EXT_SEARCH_PREFIX}:${ext}`;
+  const rating = parseRatingSearchToken(token);
+  if (rating !== null)
+    return `${RATING_SEARCH_PREFIX}:${ratingSearchText(rating)}`;
+  if (isFavoriteSearchToken(token))
+    return `${IS_SEARCH_PREFIX}:${FAVORITE_SEARCH_VALUE}`;
   const tag = tagSearchKey(token);
   return tag === null ? null : `${TAG_SEARCH_PREFIX}:${tag}`;
 }
@@ -410,6 +463,8 @@ function foldSpacedDirectives(tokens: string[]): string[] {
     `${TAG_SEARCH_PREFIX}:`,
     `${HASH_SEARCH_PREFIX}:`,
     `${EXT_SEARCH_PREFIX}:`,
+    `${RATING_SEARCH_PREFIX}:`,
+    `${IS_SEARCH_PREFIX}:`,
   ];
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {

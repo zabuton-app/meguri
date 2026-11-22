@@ -12,6 +12,11 @@ import type {
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
+import {
+  isFavoriteSearchToken,
+  parseRatingSearchToken,
+  splitSearchTokens,
+} from "@shared/tags";
 
 /**
  * The SearchQuery part of a ["files_search", wsId, filter] query key. The
@@ -332,10 +337,15 @@ export function syncFileRowAcrossCaches(
     queryKey: ["graph_build"],
     predicate: (q) => {
       const filter = searchFilterOf(q.queryKey);
+      // The box's `is:fav` and `rating:` filter as the controls do (#525).
+      const tokens = splitSearchTokens(filter?.q ?? "");
       return (
-        ("favorite" in patch && filter?.favorite != null) ||
+        ("favorite" in patch &&
+          (filter?.favorite != null || tokens.some(isFavoriteSearchToken))) ||
         ("rating" in patch &&
-          (filter?.ratingMin != null || filter?.sort === "rating"))
+          (filter?.ratingMin != null ||
+            filter?.sort === "rating" ||
+            tokens.some((token) => parseRatingSearchToken(token) !== null)))
       );
     },
   });

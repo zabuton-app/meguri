@@ -11,13 +11,16 @@ import { DATE_RANGES } from "@/lib/dateRanges";
 import { kindLabel } from "@/lib/mediaKind";
 import { resolveSortDir } from "@shared/sortDir";
 import {
+  isFavoriteSearchToken,
   isSearchDirective,
   isTagDirective,
   joinSearchTokens,
   parseExtSearchToken,
   parseQualifiedTagName,
   parseHashSearchToken,
+  parseRatingSearchToken,
   parseTagSearchToken,
+  ratingSearchText,
   splitSearchTokens,
 } from "@shared/tags";
 import type { SearchQuery } from "@/ipc/types";
@@ -109,10 +112,16 @@ export function describeConditions(
   splitSearchTokens(query.q ?? "").forEach((token, i) => {
     const hash = parseHashSearchToken(token);
     const ext = parseExtSearchToken(token);
+    const rating = parseRatingSearchToken(token);
     const tag = isTagDirective(token) ? parseTagSearchToken(token) : null;
     let label: string;
     if (hash != null) label = `${t("filter.hashChip")}: ${hash}`;
     else if (ext != null) label = `${t("filter.extChip")}: ${ext}`;
+    // Apart from the rating and favorite controls' chips below: a directive
+    // and its control apply independently (#525), and each clears its own.
+    else if (rating != null)
+      label = `${t("media.rating")}: ${ratingSearchText(rating)}`;
+    else if (isFavoriteSearchToken(token)) label = `♥ ${t("favorite.chip")}`;
     else if (tag != null) label = tagLabel(t, tag);
     else return;
     out.push({

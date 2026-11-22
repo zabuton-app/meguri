@@ -334,6 +334,74 @@ describe("searchFiles", () => {
     expect(ids("ext:mkv")).toEqual([]);
   });
 
+  it("finds files by rating with rating:, an unrated file counting as 0 (#525)", () => {
+    const none = insertFile(db, rootId, { relPath: "a.mp4" });
+    const two = insertFile(db, rootId, { relPath: "b.mp4" });
+    const four = insertFile(db, rootId, { relPath: "c.mp4" });
+    const five = insertFile(db, rootId, { relPath: "d.mp4" });
+    setRating(db, two, 2);
+    setRating(db, four, 4);
+    setRating(db, five, 5);
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids("rating:4")).toEqual([four]);
+    expect(ids("rating:0")).toEqual([none]);
+    expect(ids("rating:>4")).toEqual([five]);
+    expect(ids("rating:>=4")).toEqual([four, five]);
+    expect(ids("rating:<2")).toEqual([none]);
+    expect(ids("rating:<=2")).toEqual([none, two]);
+    expect(ids("RATING: >=4")).toEqual([four, five]);
+    // Ranges combine: each directive is one more condition.
+    expect(ids("rating:>=2 rating:<5")).toEqual([two, four]);
+  });
+
+  it("leaves a rating: outside 0 to 5 as ordinary text (#525)", () => {
+    const hit = insertFile(db, rootId, { relPath: "rating:6.mp4" });
+    syncFts(db, hit);
+    const rated = insertFile(db, rootId, { relPath: "b.mp4" });
+    setRating(db, rated, 5);
+    const ids = (q: string) => searchFiles(db, { q }).items.map((f) => f.id);
+    expect(ids("rating:6")).toEqual([hit]);
+    expect(ids("rating:>=-1")).toEqual([]);
+    expect(ids("rating:=>3")).toEqual([]);
+    expect(ids("rating:3.5")).toEqual([]);
+  });
+
+  it("finds favorites with is:fav (#525)", () => {
+    const fav = insertFile(db, rootId, { relPath: "a.mp4" });
+    insertFile(db, rootId, { relPath: "b.mp4" });
+    const other = insertFile(db, rootId, { relPath: "is:favorite.mp4" });
+    syncFts(db, other);
+    setFavorite(db, fav, true);
+    const ids = (q: string) => searchFiles(db, { q }).items.map((f) => f.id);
+    expect(ids("is:fav")).toEqual([fav]);
+    expect(ids("IS: Fav")).toEqual([fav]);
+    // Any other value is ordinary text.
+    expect(ids("is:favorite")).toEqual([other]);
+  });
+
+  it("ANDs rating: and is:fav with the rating and favorite controls (#525)", () => {
+    const favFour = insertFile(db, rootId, { relPath: "a.mp4" });
+    const favTwo = insertFile(db, rootId, { relPath: "b.mp4" });
+    const four = insertFile(db, rootId, { relPath: "c.mp4" });
+    setFavorite(db, favFour, true);
+    setFavorite(db, favTwo, true);
+    setRating(db, favFour, 4);
+    setRating(db, favTwo, 2);
+    setRating(db, four, 4);
+    const ids = (query: SearchQuery) =>
+      searchFiles(db, { ...query, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+    expect(ids({ q: "is:fav", ratingMin: 3 })).toEqual([favFour]);
+    expect(ids({ q: "rating:>=4", favorite: true })).toEqual([favFour]);
+    // Both apply: the box asks for at most 2, the control for at least 3.
+    expect(ids({ q: "rating:<=2", ratingMin: 3 })).toEqual([]);
+    expect(ids({ q: "rating:>=2", ratingMin: 4 })).toEqual([favFour, four]);
+  });
+
   it("matches a substring in the middle of a word (trigram)", () => {
     const hit = insertFile(db, rootId, { relPath: "summer_beachvideo.mp4" });
     insertFile(db, rootId, { relPath: "work/report.mp4" });

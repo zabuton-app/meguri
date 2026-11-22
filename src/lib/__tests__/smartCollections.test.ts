@@ -119,6 +119,14 @@ describe("smartCollections", () => {
     expect(saved.query.q).toBe("ext:mp4");
   });
 
+  it("keeps rating: and is:fav through saving and reopening (#525)", () => {
+    const collection = makeSmartCollection("Best", {
+      q: "rating:>=4 is:fav",
+    });
+    const [saved] = parseSmartCollections(JSON.stringify([collection]));
+    expect(saved.query.q).toBe("rating:>=4 is:fav");
+  });
+
   it("describeSearchQuery builds a human-readable summary", () => {
     expect(
       describeSearchQuery(t, "en", {

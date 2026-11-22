@@ -136,6 +136,30 @@ describe("describeConditions", () => {
     );
   });
 
+  it("names rating: and is:fav apart from the rating and favorite controls (#525)", () => {
+    const query = { q: "rating:>=4 is:fav", ratingMin: 2, favorite: true };
+    expect(keys(query)).toEqual(
+      expect.arrayContaining([
+        "directive-0",
+        "directive-1",
+        "rating",
+        "favorite",
+      ]),
+    );
+    expect(find(query, "directive-0").label).toBe(`${t("media.rating")}: >=4`);
+    expect(find(query, "directive-1").label).toBe(`♥ ${t("favorite.chip")}`);
+    // Each chip clears only its own: the directive leaves the control alone.
+    expect(find(query, "directive-0").clear(query)).toEqual({
+      q: "is:fav",
+      ratingMin: 2,
+      favorite: true,
+    });
+    expect(find(query, "rating").clear(query)).toEqual({
+      q: "rating:>=4 is:fav",
+      favorite: true,
+    });
+  });
+
   it("describes a directive-only query without a free-text chip", () => {
     expect(keys({ q: "tag:beach" })).toEqual(["directive-0"]);
   });
