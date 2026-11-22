@@ -113,7 +113,12 @@ export function DiscoverCard({
     setPreview(null);
     setVideoPlaying(false);
   }
+  // A seek asked for outright (a scene button, possibly from the keyboard with
+  // the pointer still resting on the media) must show its result, so the scrub
+  // frame gives way until the pointer moves over the media again.
+  const [scrubDismissed, setScrubDismissed] = useState(false);
   const seekVideo = (at: number) => {
+    setScrubDismissed(true);
     if (videoRef.current) videoRef.current.seek(at);
     else setPreview({ at, autoplay: false });
   };
@@ -176,16 +181,22 @@ export function DiscoverCard({
   // Hover scrub preview on the main media (same behavior/preference as the
   // list thumbnails): pointer X maps onto the video timeline.
   const { hoverPreview, frameQuality, keybindingPreset } = usePreferences();
-  const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
-    useHoverFramePreview({
-      // Off only while the preview plays: a paused one (a scene just picked)
-      // is still a frame to scrub away from.
-      enabled: Boolean(hoverPreview && src && isVideo && !videoPlaying),
-      frameUrl: (t) =>
-        `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
-      duration: file.duration,
-      fileId: file.id,
-    });
+  const {
+    previewSrc: scrubSrc,
+    scrubFraction,
+    onMouseEnter,
+    onMouseMove,
+    onMouseLeave,
+  } = useHoverFramePreview({
+    // Off only while the preview plays: a paused one (a scene just picked)
+    // is still a frame to scrub away from.
+    enabled: Boolean(hoverPreview && src && isVideo && !videoPlaying),
+    frameUrl: (t) =>
+      `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
+    duration: file.duration,
+    fileId: file.id,
+  });
+  const previewSrc = scrubDismissed ? null : scrubSrc;
 
   return (
     // Black is the right ground behind a frame or a photo; with nothing to
@@ -202,8 +213,14 @@ export function DiscoverCard({
         to={detailTo}
         data-slot="discover-media"
         className="absolute inset-0 block"
-        onMouseEnter={onMouseEnter}
-        onMouseMove={onMouseMove}
+        onMouseEnter={(e) => {
+          setScrubDismissed(false);
+          onMouseEnter(e);
+        }}
+        onMouseMove={(e) => {
+          setScrubDismissed(false);
+          onMouseMove(e);
+        }}
         onMouseLeave={onMouseLeave}
       >
         {src ? (

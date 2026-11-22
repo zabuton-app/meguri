@@ -301,6 +301,45 @@ describe("DiscoverCard video hover scrub", () => {
     hover();
     expect(MockImage.last).toBeNull();
   });
+
+  it("scrubs again once the preview pauses under the pointer", () => {
+    renderWithProviders(<ActiveVideoCard overrides={withThumb} />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    const video = document.querySelector("video") as HTMLVideoElement;
+    fireEvent.play(video);
+    hover();
+    expect(MockImage.last).toBeNull();
+
+    // The pointer never leaves the media.
+    fireEvent.pause(video);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(MockImage.last?.src).toContain("/frame/7?t=");
+  });
+
+  it("reveals the video for a seek made from the keyboard over a scrub frame", () => {
+    renderWithProviders(<ActiveVideoCard overrides={withThumb} />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    const video = document.querySelector("video") as HTMLVideoElement;
+    fireEvent.play(video);
+    fireEvent.pause(video);
+    const link = hover();
+    act(() => MockImage.last?.onload?.());
+    const layer = () =>
+      document.querySelector('[data-slot="discover-video"]') as HTMLElement;
+    expect(layer().classList.contains("invisible")).toBe(true);
+
+    // Activated from the keyboard: the pointer stays over the media.
+    const scene = screen.getAllByRole("button", { name: /^seek to/i })[0];
+    scene.focus();
+    fireEvent.click(scene);
+    expect(layer().classList.contains("invisible")).toBe(false);
+
+    // Moving the pointer over the media again brings the scrub back.
+    fireEvent.mouseMove(link, { clientX: 10 });
+    expect(layer().classList.contains("invisible")).toBe(true);
+  });
 });
 
 describe("DiscoverCard thumbnail fallback", () => {
