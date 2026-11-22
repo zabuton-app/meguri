@@ -152,7 +152,7 @@ export function appBuildConfig(options: AppBuildOptions): UserConfig {
         outDir: "out/preload",
         // Output as CommonJS (.js) because ESM (.mjs) preload can fail to load.
         lib: { entry: fromRepo("electron/preload.ts"), formats: ["cjs"] },
-        rollupOptions: { output: { entryFileNames: "preload.js" } },
+        rolldownOptions: { output: { entryFileNames: "preload.js" } },
       },
     },
     renderer: {
@@ -174,7 +174,7 @@ export function appBuildConfig(options: AppBuildOptions): UserConfig {
         outDir: resolve("out/renderer"),
         // Vite does not empty an outDir outside `root` unless told to.
         emptyOutDir: true,
-        rollupOptions: { input: fromRepo("index.html") },
+        rolldownOptions: { input: fromRepo("index.html") },
       },
     },
   };
