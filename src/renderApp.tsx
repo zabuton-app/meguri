@@ -7,6 +7,7 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { RouteObject } from "react-router";
 import { ThemeProvider } from "@/themes/ThemeProvider";
+import { startTheme } from "@/themes/startupTheme";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { PreferencesProvider } from "@/settings/PreferencesProvider";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
@@ -41,6 +42,7 @@ export interface RenderAppOptions {
 
 export function renderApp(options: RenderAppOptions = {}): void {
   markStartup("script");
+  const { theme: startupTheme, ready: cssThemeReset } = startTheme();
   // Catch errors that ErrorBoundary can't: synchronous errors outside the React
   // tree and unhandled promise rejections from event handlers / async callbacks.
   // Both get forwarded to the main log file via electron-log/renderer.
@@ -69,9 +71,12 @@ export function renderApp(options: RenderAppOptions = {}): void {
   // (initialFilter), so they are loaded before the first render. Asked once:
   // when that fails, the window opens anyway, and Home asks again and applies
   // the default when it arrives.
-  void queryClient
-    .prefetchQuery({ ...smartCollectionsQuery, retry: false })
-    .finally(() => render(root, queryClient, router, settingsSections));
+  void Promise.all([
+    queryClient.prefetchQuery({ ...smartCollectionsQuery, retry: false }),
+    cssThemeReset,
+  ]).finally(() =>
+    render(root, queryClient, router, settingsSections, startupTheme),
+  );
 }
 
 function render(
@@ -79,12 +84,13 @@ function render(
   queryClient: QueryClient,
   router: AppRouter,
   settingsSections: readonly SettingsSection[],
+  startupTheme?: string,
 ): void {
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
+          <ThemeProvider initialTheme={startupTheme}>
             <I18nProvider>
               <PreferencesProvider>
                 <TourProvider>

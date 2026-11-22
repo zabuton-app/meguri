@@ -59,6 +59,39 @@ const Ctx = createContext<ThemeCtx | null>(null);
 
 const defaultScheme = SCHEMES.find((s) => s.id === DEFAULT_THEME) ?? SCHEMES[0];
 
+function storedScheme() {
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(LS_KEY);
+  } catch {
+    // ignore
+  }
+  return SCHEMES.find((s) => s.id === stored) ?? defaultScheme;
+}
+
+export function randomStartupTheme(): string {
+  const current = storedScheme();
+  const sameAppearance = SCHEMES.filter(
+    (s) => s.appearance === current.appearance,
+  );
+  const alternatives = sameAppearance.filter((s) => s.id !== current.id);
+  const candidates = alternatives.length ? alternatives : sameAppearance;
+  return candidates[Math.floor(Math.random() * candidates.length)].id;
+}
+
+export function applyTheme(theme: string): void {
+  document.documentElement.setAttribute("data-theme", theme);
+  const scheme = SCHEMES.find((s) => s.id === theme);
+  const bg = scheme && deriveTokens(scheme).bg;
+  if (bg) document.documentElement.style.backgroundColor = bg;
+  try {
+    localStorage.setItem(LS_KEY, theme);
+    if (bg) localStorage.setItem(LS_BG_KEY, bg);
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Generate the CSS for all schemes once (only changes when a theme is added).
  *
@@ -95,32 +128,20 @@ function injectStyleSheet(): void {
 
 injectStyleSheet();
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<string>(() => {
-    let stored: string | null = null;
-    try {
-      stored = localStorage.getItem(LS_KEY);
-    } catch {
-      // ignore
-    }
-    // A stale id (renamed or removed scheme) would match no [data-theme] block at all.
-    return SCHEMES.find((s) => s.id === stored)?.id ?? DEFAULT_THEME;
-  });
+export function ThemeProvider({
+  children,
+  initialTheme,
+}: {
+  children: ReactNode;
+  initialTheme?: string;
+}) {
+  const [theme, setThemeState] = useState<string>(
+    () => SCHEMES.find((s) => s.id === initialTheme)?.id ?? storedScheme().id,
+  );
 
   // Apply data-theme + save the LS mirror.
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    const scheme = SCHEMES.find((s) => s.id === theme);
-    const bg = scheme && deriveTokens(scheme).bg;
-    if (bg) document.documentElement.style.backgroundColor = bg;
-    try {
-      localStorage.setItem(LS_KEY, theme);
-      // Read back by public/theme-boot.js, which runs before the bundle and therefore before
-      // any palette is available (see injectStyleSheet).
-      if (bg) localStorage.setItem(LS_BG_KEY, bg);
-    } catch {
-      // ignore
-    }
+    applyTheme(theme);
   }, [theme]);
 
   const setTheme = (id: string) => {

@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CssThemesState } from "@shared/ipc/channels";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { ThemeProvider } from "@/themes/ThemeProvider";
+import { PreferencesProvider } from "@/settings/PreferencesProvider";
 
 const cssThemesGet = vi.fn<() => Promise<CssThemesState>>();
 const cssThemeSelect =
@@ -37,7 +38,9 @@ function renderSection() {
     <QueryClientProvider client={qc}>
       <ThemeProvider>
         <I18nProvider>
-          <ThemeSection />
+          <PreferencesProvider>
+            <ThemeSection />
+          </PreferencesProvider>
         </I18nProvider>
       </ThemeProvider>
     </QueryClientProvider>,
@@ -55,6 +58,22 @@ beforeEach(() => {
 });
 
 describe("ThemeSection", () => {
+  it("toggles the startup preference without changing the current theme", () => {
+    cssThemesGet.mockResolvedValue(state(null));
+    renderSection();
+    const toggle = screen.getByRole("switch", {
+      name: "Random theme on startup",
+    });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(
+      JSON.parse(localStorage.getItem("meguri.prefs")!).randomThemeOnStartup,
+    ).toBe(true);
+    expect(localStorage.getItem("meguri.theme")).toBe("gruvbox-dark");
+    expect(cssThemeSelect).not.toHaveBeenCalled();
+  });
+
   it("lists theme files after the built-in themes", async () => {
     cssThemesGet.mockResolvedValue(state(null));
     renderSection();
