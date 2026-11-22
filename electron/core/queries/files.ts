@@ -14,7 +14,9 @@ import {
   LIST_HIDDEN_SOURCES,
   parseExtSearchToken,
   parseHashSearchToken,
+  parseNumericSearchToken,
   parseTagSearchToken,
+  type NumericSearch,
   searchTokenTerms,
   splitSearchTokens,
   BARE_SEARCH_NAMESPACES,
@@ -78,12 +80,15 @@ function buildSearchTerms(q: string): {
   hashPrefixes: string[];
   /** `ext:` values, lower-case, without the dot. */
   extValues: string[];
+  /** `size:`, `duration:`, `width:` and `height:` comparisons. */
+  numeric: NumericSearch[];
 } {
   const matchTokens: string[] = [];
   const anyOf: { match: string | null; likes: string[] }[] = [];
   const tagTokens: string[] = [];
   const hashPrefixes: string[] = [];
   const extValues: string[] = [];
+  const numeric: NumericSearch[] = [];
   for (const raw of splitSearchTokens(q)) {
     const hash = parseHashSearchToken(raw);
     if (hash) {
@@ -93,6 +98,11 @@ function buildSearchTerms(q: string): {
     const ext = parseExtSearchToken(raw);
     if (ext) {
       extValues.push(ext);
+      continue;
+    }
+    const num = parseNumericSearchToken(raw);
+    if (num) {
+      numeric.push(num);
       continue;
     }
     const tag = parseTagSearchToken(raw);
@@ -115,8 +125,20 @@ function buildSearchTerms(q: string): {
     tagTokens,
     hashPrefixes,
     extValues,
+    numeric,
   };
 }
+
+/**
+ * The column each numeric directive compares. Duration in whole seconds, as the
+ * list shows it (formatDuration floors), so `duration:1:30` finds a 90.4 s clip.
+ */
+const NUMERIC_SEARCH_COLUMNS: Record<NumericSearch["field"], string> = {
+  size: "f.size",
+  duration: "CAST(f.duration AS INTEGER)",
+  width: "f.width",
+  height: "f.height",
+};
 
 /** A term the trigram tokenizer can index: three code points or more. */
 function isTrigramSearchable(term: string): boolean {
@@ -262,6 +284,7 @@ export function appendSearchConditions(
         tagTokens: [],
         hashPrefixes: [],
         extValues: [],
+        numeric: [],
       };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
@@ -314,6 +337,12 @@ export function appendSearchConditions(
   for (const ext of terms.extValues) {
     sql += " AND f.ext = ?";
     args.push(ext);
+  }
+  // No index either, for the same reason as ext. A NULL value (an image's
+  // duration) fails every comparison, so an unknown value never matches.
+  for (const { field, op, value } of terms.numeric) {
+    sql += ` AND ${NUMERIC_SEARCH_COLUMNS[field]} ${op} ?`;
+    args.push(value);
   }
   for (const value of terms.tagTokens) {
     const ids = resolveSearchTagIds(db, value);

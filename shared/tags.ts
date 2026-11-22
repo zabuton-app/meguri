@@ -341,13 +341,84 @@ export function parseExtSearchToken(token: string): string | null {
   return value || null;
 }
 
-/** True for a token the search box shows as a chip: a `tag:`, `hash:` or
- *  `ext:` directive rather than free text. */
+/**
+ * The search-box directives that compare a number (#524): `size:>1gb`,
+ * `duration:<30s`, `width:>=3840`, `height:1080`. The full words, not `dur:` or
+ * `res:`, which are tag namespaces (`tag:dur:long`).
+ */
+export const NUMERIC_SEARCH_FIELDS = [
+  "size",
+  "duration",
+  "width",
+  "height",
+] as const;
+export type NumericSearchField = (typeof NUMERIC_SEARCH_FIELDS)[number];
+export type NumericSearchOp = ">" | ">=" | "<" | "<=" | "=";
+
+export interface NumericSearch {
+  field: NumericSearchField;
+  op: NumericSearchOp;
+  /** Bytes for `size`, seconds for `duration`, pixels for width and height. */
+  value: number;
+  /** The comparison and value as typed, lower-cased: `>1gb`. */
+  text: string;
+}
+
+/** Binary, as formatSize shows sizes: 1 kb = 1024 bytes. */
+const SIZE_UNITS: Record<string, number> = {
+  b: 1,
+  kb: 1024,
+  mb: 1024 ** 2,
+  gb: 1024 ** 3,
+};
+const DURATION_UNITS: Record<string, number> = { s: 1, m: 60, h: 3600 };
+
+function parseNumericValue(
+  field: NumericSearchField,
+  value: string,
+): number | null {
+  if (field === "width" || field === "height") {
+    return /^\d+$/.test(value) ? Number(value) : null;
+  }
+  if (field === "duration") {
+    const clock = /^(?:(\d+):)?(\d+):([0-5]\d)$/.exec(value);
+    if (clock) {
+      const [, h, m, s] = clock;
+      // `hh:mm:ss` caps the minutes; `mm:ss` lets them run past an hour.
+      if (h !== undefined && Number(m) > 59) return null;
+      return Number(h ?? 0) * 3600 + Number(m) * 60 + Number(s);
+    }
+  }
+  const units = field === "size" ? SIZE_UNITS : DURATION_UNITS;
+  const m = /^(\d+(?:\.\d+)?)([a-z]*)$/.exec(value);
+  if (!m) return null;
+  // No unit is the column's own: bytes, or seconds.
+  if (m[2] && !Object.hasOwn(units, m[2])) return null;
+  return Number(m[1]) * (m[2] ? units[m[2]] : 1);
+}
+
+/** The comparison of a `size:`, `duration:`, `width:` or `height:` token, or
+ *  null when the token is ordinary text (an unknown unit, no number). */
+export function parseNumericSearchToken(token: string): NumericSearch | null {
+  const lower = token.toLowerCase();
+  const field = NUMERIC_SEARCH_FIELDS.find((f) => lower.startsWith(`${f}:`));
+  if (!field) return null;
+  const text = lower.slice(field.length + 1).trim();
+  const m = /^(>=|<=|>|<)?(.+)$/.exec(text);
+  if (!m) return null;
+  const value = parseNumericValue(field, m[2]);
+  if (value === null) return null;
+  return { field, op: (m[1] ?? "=") as NumericSearchOp, value, text };
+}
+
+/** True for a token the search box shows as a chip: a `tag:`, `hash:`, `ext:`
+ *  or numeric directive rather than free text. */
 export function isSearchDirective(token: string): boolean {
   return (
     isTagDirective(token) ||
     parseHashSearchToken(token) !== null ||
-    parseExtSearchToken(token) !== null
+    parseExtSearchToken(token) !== null ||
+    parseNumericSearchToken(token) !== null
   );
 }
 
@@ -365,6 +436,9 @@ export function searchDirectiveKey(token: string): string | null {
   if (hash !== null) return `${HASH_SEARCH_PREFIX}:${hash}`;
   const ext = parseExtSearchToken(token);
   if (ext !== null) return `${EXT_SEARCH_PREFIX}:${ext}`;
+  // On the value the SQL compares, so `size:>1gb` repeats `size:>1024mb`.
+  const num = parseNumericSearchToken(token);
+  if (num !== null) return `${num.field}:${num.op}${num.value}`;
   const tag = tagSearchKey(token);
   return tag === null ? null : `${TAG_SEARCH_PREFIX}:${tag}`;
 }
@@ -410,6 +484,7 @@ function foldSpacedDirectives(tokens: string[]): string[] {
     `${TAG_SEARCH_PREFIX}:`,
     `${HASH_SEARCH_PREFIX}:`,
     `${EXT_SEARCH_PREFIX}:`,
+    ...NUMERIC_SEARCH_FIELDS.map((f) => `${f}:`),
   ];
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {

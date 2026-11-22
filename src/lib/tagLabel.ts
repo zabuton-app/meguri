@@ -4,7 +4,9 @@ import {
   parseQualifiedTagName,
   parseExtSearchToken,
   parseHashSearchToken,
+  parseNumericSearchToken,
   parseTagSearchToken,
+  type NumericSearch,
 } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
@@ -78,10 +80,23 @@ export function tagHumanLabel(
   return `${tagNamespaceLabel(t, namespace)}: ${tagValueLabel(t, namespace, name)}`;
 }
 
+const NUMERIC_CHIP_KEYS: Record<NumericSearch["field"], TranslationKey> = {
+  size: "filter.sizeChip",
+  duration: "filter.durationChip",
+  width: "filter.widthChip",
+  height: "filter.heightChip",
+};
+
+/** What a `size:`, `duration:`, `width:` or `height:` condition reads as:
+ *  `Size: >1gb`, the comparison as typed. */
+export function numericSearchLabel(t: TFunc, num: NumericSearch): string {
+  return `${t(NUMERIC_CHIP_KEYS[num.field])}: ${num.text}`;
+}
+
 /**
- * Human-readable description of a `tag:`, `hash:` or `ext:` search token, or
- * null when the token is ordinary free text. Used for the tooltip on the chips
- * the search box renders, where the chip itself shows the raw token.
+ * Human-readable description of a `tag:`, `hash:`, `ext:` or numeric search
+ * token, or null when the token is ordinary free text. Used for the tooltip on
+ * the chips the search box renders, where the chip itself shows the raw token.
  *
  * A generated tag is usually written as its bare value ("long"), so the category
  * is recovered from the vocabulary; the qualified form is accepted too. A value
@@ -92,6 +107,8 @@ export function searchTokenLabel(t: TFunc, token: string): string | null {
   if (hash !== null) return `${t("filter.hashChip")}: ${hash}`;
   const ext = parseExtSearchToken(token);
   if (ext !== null) return `${t("filter.extChip")}: ${ext}`;
+  const num = parseNumericSearchToken(token);
+  if (num !== null) return numericSearchLabel(t, num);
   const raw = parseTagSearchToken(token);
   if (raw === null) return null;
   const parsed = parseQualifiedTagName(raw);

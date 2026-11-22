@@ -5,6 +5,7 @@ import {
   isReservedTagName,
   isSearchDirective,
   parseHashSearchToken,
+  parseNumericSearchToken,
   searchDirectiveKey,
   hasOpenQuote,
   joinSearchTokens,
@@ -384,6 +385,68 @@ describe("parseHashSearchToken", () => {
   });
 });
 
+describe("parseNumericSearchToken (#524)", () => {
+  const read = (token: string) => {
+    const num = parseNumericSearchToken(token);
+    return num && [num.field, num.op, num.value];
+  };
+
+  it("reads each comparison, and none as equality", () => {
+    expect(read("width:>3840")).toEqual(["width", ">", 3840]);
+    expect(read("width:>=3840")).toEqual(["width", ">=", 3840]);
+    expect(read("height:<720")).toEqual(["height", "<", 720]);
+    expect(read("height:<=720")).toEqual(["height", "<=", 720]);
+    expect(read("HEIGHT:1080")).toEqual(["height", "=", 1080]);
+  });
+
+  it("reads size units as binary, in any case, and no unit as bytes", () => {
+    expect(read("size:>1gb")).toEqual(["size", ">", 1024 ** 3]);
+    expect(read("size:<1.5MB")).toEqual(["size", "<", 1.5 * 1024 ** 2]);
+    expect(read("size:>=2kb")).toEqual(["size", ">=", 2048]);
+    expect(read("size:500b")).toEqual(["size", "=", 500]);
+    expect(read("size:500")).toEqual(["size", "=", 500]);
+  });
+
+  it("reads duration units and clock times in seconds", () => {
+    expect(read("duration:<30s")).toEqual(["duration", "<", 30]);
+    expect(read("duration:>20m")).toEqual(["duration", ">", 1200]);
+    expect(read("duration:>=1.5h")).toEqual(["duration", ">=", 5400]);
+    expect(read("duration:90")).toEqual(["duration", "=", 90]);
+    expect(read("duration:1:30")).toEqual(["duration", "=", 90]);
+    expect(read("duration:<90:00")).toEqual(["duration", "<", 5400]);
+    expect(read("duration:>1:02:03")).toEqual(["duration", ">", 3723]);
+  });
+
+  it("leaves an unparsable value as free text", () => {
+    for (const token of [
+      "size:",
+      "size:>",
+      "size:big",
+      "size:1tb",
+      "size:1constructor",
+      "size:-1mb",
+      "size:=1mb",
+      "size:>>1mb",
+      "width:1.5",
+      "width:1920px",
+      "height:>1080p",
+      "duration:1:3",
+      "duration:1:60",
+      "duration:1:60:00",
+      "duration:30d",
+      "sizes:>1gb",
+      ">1gb",
+    ]) {
+      expect(parseNumericSearchToken(token)).toBeNull();
+    }
+  });
+
+  it("folds a value typed after a space, as tag: does", () => {
+    expect(splitSearchTokens("size: >1gb trip")).toEqual(["size:>1gb", "trip"]);
+    expect(parseNumericSearchToken("size:>1gb")?.text).toBe(">1gb");
+  });
+});
+
 describe("searchDirectiveKey / isSearchDirective", () => {
   it("keys tag and hash directives apart, and folds each as its kind does", () => {
     expect(searchDirectiveKey("hash:3FA9")).toBe(
@@ -397,6 +460,20 @@ describe("searchDirectiveKey / isSearchDirective", () => {
       searchDirectiveKey("hash:3fa9"),
     );
     expect(searchDirectiveKey("3fa9")).toBeNull();
+  });
+
+  it("keys a numeric directive on the value it compares (#524)", () => {
+    expect(searchDirectiveKey("size:>1gb")).toBe(
+      searchDirectiveKey("SIZE:>1024mb"),
+    );
+    expect(searchDirectiveKey("size:>1gb")).not.toBe(
+      searchDirectiveKey("size:>=1gb"),
+    );
+    expect(searchDirectiveKey("width:1920")).not.toBe(
+      searchDirectiveKey("height:1920"),
+    );
+    expect(isSearchDirective("duration:<30s")).toBe(true);
+    expect(isSearchDirective("size:big")).toBe(false);
   });
 
   it("calls both kinds directives, and nothing else", () => {

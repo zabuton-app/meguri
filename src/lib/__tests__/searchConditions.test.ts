@@ -136,6 +136,18 @@ describe("describeConditions", () => {
     );
   });
 
+  it("names each numeric directive of a range in its own chip (#524)", () => {
+    const q = "trip size:>100mb size:<1gb";
+    expect(keys({ q })).toEqual(["q", "directive-1", "directive-2"]);
+    expect(find({ q }, "q").label).toBe('"trip"');
+    expect(find({ q }, "directive-1").label).toBe(
+      `${t("filter.sizeChip")}: >100mb`,
+    );
+    expect(find({ q }, "directive-2").label).toBe(
+      `${t("filter.sizeChip")}: <1gb`,
+    );
+  });
+
   it("describes a directive-only query without a free-text chip", () => {
     expect(keys({ q: "tag:beach" })).toEqual(["directive-0"]);
   });

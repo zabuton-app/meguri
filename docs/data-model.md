@@ -481,6 +481,20 @@ the files whose `ext` is exactly `mp4`, in any case and with or without the dot
 `.m4v` files do not match. It is a chip like `hash:`, and it is ANDed with the
 other directives, so `ext:mp4 ext:mkv` matches nothing.
 
+The **numeric directives** compare a column (#524): `size:` (bytes), `duration:`
+(seconds), `width:` and `height:` (pixels), each followed by `>`, `>=`, `<`,
+`<=` or no operator for equality (`size:>1gb`, `duration:<30s`,
+`width:>=3840`). `size:` takes `b`, `kb`, `mb` or `gb`, binary as `formatSize`
+shows sizes (1 kb = 1024 bytes); `duration:` takes `s`, `m`, `h` or a clock time
+(`1:30`, `1:02:03`), and is compared in whole seconds, as the list shows it.
+No unit is the column's own. The names are the full words because `dur` and
+`res` are tag namespaces. `parseNumericSearchToken()` in `shared/tags.ts` reads
+them; an unknown unit or a missing number leaves the token free text. A file
+whose value is unknown (`NULL`, such as an image's duration) never matches. Two
+directives on one field are ANDed, so `size:>100mb size:<1gb` is a range. They
+are chips like `ext:`, and none of the four columns is indexed: the comparison
+runs on the rows the other conditions leave.
+
 The search is typed in the command menu, whose field starts from the search on
 screen (`useSearchDraft` in `src/hooks/`, rendered by `CommandMenu`). It shows a
 directive as a **chip** rather than as raw text, so it is added and removed as
