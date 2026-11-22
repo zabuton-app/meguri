@@ -7,6 +7,7 @@ import { ffmpegPath as ffmpeg } from "@zabuton-app/ffmpeg-binaries";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
 import {
   openDiscover,
+  profileArg,
   skipFirstLaunchTour,
   waitForIdle,
 } from "./fixtures/helpers";
@@ -32,7 +33,7 @@ test("seeks from scenes inside the compact Discovery view and keeps play or paus
   ]);
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${path.join(temp, "profile")}`],
+      args: [profileArg(path.join(temp, "profile"))],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: root },
     }),
   );

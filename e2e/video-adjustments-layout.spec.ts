@@ -5,7 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import { ffmpegPath as ffmpeg } from "@zabuton-app/ffmpeg-binaries";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
-import { openFileDetail, skipFirstLaunchTour } from "./fixtures/helpers";
+import {
+  openFileDetail,
+  profileArg,
+  skipFirstLaunchTour,
+} from "./fixtures/helpers";
 
 test("video adjustments sit above a full-width scene strip", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-adjustments-"));
@@ -28,7 +32,7 @@ test("video adjustments sit above a full-width scene strip", async () => {
   ]);
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${path.join(tmp, "profile")}`],
+      args: [profileArg(path.join(tmp, "profile"))],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: media },
     }),
   );

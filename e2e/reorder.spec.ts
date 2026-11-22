@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
-import { skipFirstLaunchTour } from "./fixtures/helpers";
+import { profileArg, skipFirstLaunchTour } from "./fixtures/helpers";
 
 // Reordering needs two files to drag between, so this spec launches its own
 // instance over a temporary media root instead of the shared fixture (whose
@@ -18,7 +18,7 @@ test("dragging in manual order reorders without opening the detail view", async 
 
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${userDataDir}`],
+      args: [profileArg(userDataDir)],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: mediaRoot },
     }),
   );

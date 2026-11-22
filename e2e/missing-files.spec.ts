@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  profileArg,
   skipFirstLaunchTour,
   waitForIdle,
   waitForIndexedMedia,
@@ -27,7 +28,7 @@ test("lists a file gone from disk and removes it on request", async () => {
   );
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${userDataDir}`],
+      args: [profileArg(userDataDir)],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: root },
     }),
   );

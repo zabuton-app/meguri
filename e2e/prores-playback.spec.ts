@@ -5,7 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import { ffmpegPath as ffmpeg } from "@zabuton-app/ffmpeg-binaries";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
-import { skipFirstLaunchTour, waitForIdle } from "./fixtures/helpers";
+import {
+  profileArg,
+  skipFirstLaunchTour,
+  waitForIdle,
+} from "./fixtures/helpers";
 
 test("plays and seeks an indexed ProRes 422 MOV in the full player", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-prores-e2e-"));
@@ -37,7 +41,7 @@ test("plays and seeks an indexed ProRes 422 MOV in the full player", async () =>
   const original = fs.readFileSync(clip);
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${path.join(tmp, "profile")}`],
+      args: [profileArg(path.join(tmp, "profile"))],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: media },
     }),
   );

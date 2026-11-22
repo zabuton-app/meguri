@@ -8,6 +8,7 @@ import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
 import {
   closeTopDialog,
   openFileDetail,
+  profileArg,
   skipFirstLaunchTour,
   waitForIdle,
   waitForIndexedMedia,
@@ -38,7 +39,7 @@ test("shows a newly chosen main thumbnail in the detail view right away", async 
   ]);
   const app = await _electron.launch(
     electronLaunchOptions({
-      args: [`--user-data-dir=${path.join(temp, "profile")}`],
+      args: [profileArg(path.join(temp, "profile"))],
       env: { MEGURI_DISABLE_TRAY: "1", MEGURI_ROOT: root },
     }),
   );
