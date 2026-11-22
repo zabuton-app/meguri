@@ -774,4 +774,66 @@ describe("MediaGrid", () => {
     rerender(grid(undefined));
     expect(peeked()).toHaveLength(0);
   });
+
+  it("waits for the narrowed width before scrolling to the peek's file", async () => {
+    const scrollToIndex = mockVirtualizerScrollToIndex();
+    scrollToIndex.mockClear();
+    // Keep the observers' callbacks, so the test decides when the new width
+    // is reported (a frame after the layout change, as in the browser).
+    const observers: ResizeObserverCallback[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(cb: ResizeObserverCallback) {
+          observers.push(cb);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const proto = Element.prototype;
+    const wide = Object.getOwnPropertyDescriptor(proto, "clientWidth")!;
+    try {
+      const items = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((id) => ({
+        ...sampleFileRow,
+        id,
+        relPath: `clip-${id}.mp4`,
+      }));
+      const grid = (peekFileKey: string | undefined) => (
+        <MediaGrid
+          items={items}
+          mediaBase="http://127.0.0.1:17345"
+          workspaceId={WS_ID}
+          loading={false}
+          peekFileKey={peekFileKey}
+        />
+      );
+      // 1200px → 6 columns.
+      const { rerender } = renderWithProviders(grid(undefined));
+      await screen.findByText("clip-9.mp4");
+
+      // The peek docks: the grid is narrower (380px → 1 column) in the same
+      // render that names the file, before the observer has reported it.
+      Object.defineProperty(proto, "clientWidth", {
+        configurable: true,
+        get: () => 380,
+      });
+      rerender(grid(`${WS_ID}:9`));
+      await screen.findByText("clip-9.mp4");
+      // With 6 columns the 9th file would be on row 1.
+      expect(scrollToIndex).not.toHaveBeenCalled();
+
+      act(() => {
+        for (const cb of observers) cb([], {} as ResizeObserver);
+      });
+      await waitFor(() =>
+        expect(scrollToIndex).toHaveBeenCalledWith(8, { align: "auto" }),
+      );
+      expect(scrollToIndex).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(proto, "clientWidth", wide);
+      vi.unstubAllGlobals();
+    }
+  });
 });

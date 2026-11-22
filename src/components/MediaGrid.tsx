@@ -202,8 +202,16 @@ export function useCardGridMetrics(scrollEl: HTMLDivElement | null) {
     [measureKey, ready],
   );
   const rowEstimate = ready && extraH > 0 ? thumbH + extraH : ROW_ESTIMATE;
-  // `ready`: the width, and so `cols`, is measured.
-  return { cols, rowEstimate, measureRow, ready };
+  // Whether `cols` is measured for the width the grid has right now. The
+  // ResizeObserver reports a new width only in the frame after the layout
+  // changes, so a render in between (the one in which the side peek docks
+  // and narrows the grid) still carries the old column count. Reads the
+  // layout: call it only right before acting on `cols`.
+  const colsCurrent = useCallback(
+    () => ready && !!scrollEl && scrollEl.clientWidth - SIDE_PAD * 2 === innerW,
+    [ready, scrollEl, innerW],
+  );
+  return { cols, rowEstimate, measureRow, colsCurrent };
 }
 
 // Memoized: Home's props are referentially stable, so the grid only re-renders
@@ -242,7 +250,8 @@ export const MediaGrid = memo(function MediaGrid({
     scrollRef.current = node;
     setScrollEl(node);
   }, []);
-  const { cols, rowEstimate, measureRow, ready } = useCardGridMetrics(scrollEl);
+  const { cols, rowEstimate, measureRow, colsCurrent } =
+    useCardGridMetrics(scrollEl);
 
   // Folder cards lead the list, packed into the same rows as the files so the
   // row height and the 2D keyboard movement need no special case.
@@ -323,7 +332,8 @@ export const MediaGrid = memo(function MediaGrid({
   }, [wsId, resetKey]);
 
   // The card the docked peek shows. Its row is scrolled to once per file, as
-  // soon as the grid is loaded and its columns are known, and not again on
+  // soon as the grid is loaded and its columns are measured for its current
+  // width (opening the peek narrows the grid in this very render), and not again on
   // later renders (paging, a resize): that would fight the user's own
   // scrolling, and a file paged in later is not worth a jump either.
   const peekIndex = peekFileKey
@@ -337,10 +347,20 @@ export const MediaGrid = memo(function MediaGrid({
       scrolledToPeek.current = undefined;
       return;
     }
-    if (loading || !ready || scrolledToPeek.current === peekFileKey) return;
+    if (loading || scrolledToPeek.current === peekFileKey || !colsCurrent()) {
+      return;
+    }
     scrolledToPeek.current = peekFileKey;
     if (peekIndex >= 0) scrollToRow(Math.floor((peekIndex + leadCells) / cols));
-  }, [peekFileKey, peekIndex, loading, ready, leadCells, cols, scrollToRow]);
+  }, [
+    peekFileKey,
+    peekIndex,
+    loading,
+    colsCurrent,
+    leadCells,
+    cols,
+    scrollToRow,
+  ]);
 
   // Fetch the next page when a row near the end becomes visible (replaces the old IntersectionObserver sentinel).
   useInfiniteScrollTrigger({

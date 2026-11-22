@@ -76,6 +76,7 @@ import { patchCollectionItemOrder } from "@/lib/queryCache";
 import { TimelineView } from "@/timeline/TimelineView";
 import { useTimelineView } from "./useTimelineView";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
+import { fileWorkspaceId } from "@/routes/MediaDetail/fileWorkspace";
 import { useImmersiveViewOpen } from "@/components/immersiveView";
 import { PEEK_INSET_DOCK_PROPS } from "@/routes/MediaDetail/usePeekResize";
 import { SelectionProvider } from "@/components/SelectionContext";
@@ -761,17 +762,17 @@ export default function Home() {
   const peekDocked = usePeekDocked();
   const listShortcutsActive =
     (location.pathname === "/" || peekDocked) && !immersiveOpen;
-  // The file the docked peek shows, which the list marks and scrolls to. The
-  // detail falls back to the active workspace when the URL names none.
+  // The file the docked peek shows, which the list marks and scrolls to,
+  // resolved to a workspace the same way the detail does.
   const peekFileId = peekDocked
     ? matchPath("/file/:id", location.pathname)?.params.id
     : undefined;
   const peekFileKey = peekFileId
     ? mediaSortId({
-        workspaceId:
-          new URLSearchParams(location.search).get("ws") ??
-          status.data?.workspaceId ??
-          "",
+        workspaceId: fileWorkspaceId(
+          new URLSearchParams(location.search).get("ws"),
+          status.data?.workspaceId,
+        ),
         id: Number(peekFileId),
       })
     : undefined;
