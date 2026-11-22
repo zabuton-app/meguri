@@ -76,7 +76,9 @@ function renderPlayer(
     onOpenExternal,
     t,
     ...overrides,
-  };
+    // The spread loses the tie between `shortcuts` and `navKeys`; an override
+    // that turns the shortcuts off clears `navKeys` itself.
+  } as Parameters<typeof VideoPlayer>[0];
 
   const ref = createRef<PlayerHandle>();
   const view = render(
@@ -810,7 +812,7 @@ describe("VideoPlayer", () => {
   });
 
   it("leaves the keyboard alone when its shortcuts are off", () => {
-    const { video } = renderPlayer({ shortcuts: false });
+    const { video } = renderPlayer({ shortcuts: false, navKeys: undefined });
     loadVideo(video);
     const play = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(video, "play", { configurable: true, value: play });

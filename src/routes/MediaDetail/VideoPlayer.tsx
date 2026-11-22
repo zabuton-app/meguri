@@ -139,6 +139,22 @@ export interface PlayerHandle {
   ended: () => boolean;
 }
 
+/**
+ * Whether the player takes its window-level keyboard shortcuts (default true).
+ * Off where the host owns those keys: Discovery pages its slides with the
+ * arrows, and Space belongs to whichever of its buttons has focus. The paging
+ * chords only matter while the shortcuts are on, so the two are tied: a host
+ * that keeps them must say which chords to yield, and one that turns them off
+ * has nothing to pass (#401).
+ */
+type PlayerKeyboard =
+  | {
+      shortcuts?: true;
+      /** Active paging chords; the player yields these keys so they don't also seek. */
+      navKeys: NavBinding;
+    }
+  | { shortcuts: false; navKeys?: undefined };
+
 export const VideoPlayer = forwardRef<
   PlayerHandle,
   {
@@ -169,12 +185,6 @@ export const VideoPlayer = forwardRef<
      * the place it was left at.
      */
     recordPosition?: boolean;
-    /**
-     * Whether the player takes its window-level keyboard shortcuts (default
-     * true). Off where the host owns those keys: Discovery pages its slides
-     * with the arrows, and Space belongs to whichever of its buttons has focus.
-     */
-    shortcuts?: boolean;
     audioTracks?: Pick<EmbeddedTrack, "title" | "language">[];
     subtitleTracks?: EmbeddedTrack[];
     subtitleAudioLanguage?: string;
@@ -182,11 +192,6 @@ export const VideoPlayer = forwardRef<
     /** The detail view's side panel for the SDR adjustment controls; absent
      *  where adjustments are not offered. */
     videoAdjustments?: VideoAdjustmentsPanel;
-    /**
-     * Active paging chords; the player yields these keys so they don't also
-     * seek. Unused while `shortcuts` is false.
-     */
-    navKeys: NavBinding;
     /**
      * Element to fullscreen instead of the player itself (e.g. the whole modal,
      * YouTube-style: the video fills the screen and the rest scrolls below it).
@@ -247,7 +252,7 @@ export const VideoPlayer = forwardRef<
      */
     onOpenExternal?: () => void;
     t: TFunc;
-  }
+  } & PlayerKeyboard
 >(function VideoPlayer(
   {
     id,
@@ -988,7 +993,7 @@ export const VideoPlayer = forwardRef<
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Yield keys claimed by file paging (e.g. Vim's "l") so they don't also seek.
       const nk = navKeysRef.current;
-      if (matchAny(e, nk.prev) || matchAny(e, nk.next)) return;
+      if (nk && (matchAny(e, nk.prev) || matchAny(e, nk.next))) return;
       switch (e.code) {
         case "Space":
         case "KeyK":
