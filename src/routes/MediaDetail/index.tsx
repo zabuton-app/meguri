@@ -36,6 +36,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useResumeStart } from "@/hooks/useResumeStart";
 import { ResumeNotice } from "@/components/ResumeNotice";
 import { MediaModal, TopBar } from "./MediaModal";
+import { ZoomableImage } from "./ZoomableImage";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
 import { hasHdrTransfer } from "@/video/colorGrade";
 import { needsVideoPreview, isRemuxedVideo } from "@shared/playbackTracks";
@@ -483,17 +484,14 @@ export default function MediaDetail() {
                 />
               )
             ) : (
-              <div
-                className={`flex justify-center overflow-hidden rounded-card ${
-                  imageBgInverted ? "bg-white" : "bg-black"
-                }`}
-              >
-                <img
-                  src={mediaSrc}
-                  alt={d.relPath}
-                  className="max-h-[78vh] max-w-full object-contain"
-                />
-              </div>
+              <ZoomableImage
+                // Another file starts at fit.
+                key={mediaSrc}
+                src={mediaSrc}
+                alt={d.relPath}
+                inverted={imageBgInverted}
+                t={t}
+              />
             )}
 
             {/* Resumed where it was left: say so, and offer the way back to
