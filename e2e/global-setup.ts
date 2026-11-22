@@ -2,6 +2,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import type { FullConfig } from "@playwright/test";
 import { electronLaunchOptions } from "../scripts/electron-launch.cjs";
 
+// Xvfb is ready in well under a second; this only stops a hung server from
+// holding up global setup until the CI job times out.
+const XVFB_START_TIMEOUT_MS = 10_000;
+
 // Starts an Xvfb server and resolves with its display (":N") once it accepts
 // connections; -displayfd picks a free display number and reports it on fd 3.
 function startXvfb(): Promise<{ display: string; server: ChildProcess }> {
@@ -9,18 +13,38 @@ function startXvfb(): Promise<{ display: string; server: ChildProcess }> {
     const server = spawn(
       "Xvfb",
       ["-displayfd", "3", "-screen", "0", "1280x960x24", "-nolisten", "tcp"],
-      { stdio: ["ignore", "ignore", "ignore", "pipe"] },
+      { stdio: ["ignore", "ignore", "pipe", "pipe"] },
     );
+    // Xvfb writes harmless warnings to stderr on every start, so keep them and
+    // show them only when the server fails to start.
+    let stderr = "";
+    server.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    const fail = (message: string) =>
+      reject(
+        new Error(stderr.trim() ? `${message}:\n${stderr.trim()}` : message),
+      );
+    const timer = setTimeout(() => {
+      fail(`Xvfb reported no display within ${XVFB_START_TIMEOUT_MS} ms`);
+      server.kill();
+    }, XVFB_START_TIMEOUT_MS);
     let output = "";
     server.stdio[3]?.on("data", (chunk: Buffer) => {
       output += chunk.toString();
-      if (output.includes("\n"))
+      if (output.includes("\n")) {
+        clearTimeout(timer);
         resolve({ display: `:${output.trim()}`, server });
+      }
     });
-    server.on("error", reject);
-    server.on("exit", (code) =>
-      reject(new Error(`Xvfb exited with code ${code}`)),
-    );
+    server.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    server.on("exit", (code) => {
+      clearTimeout(timer);
+      fail(`Xvfb exited with code ${code}`);
+    });
   });
 }
 
