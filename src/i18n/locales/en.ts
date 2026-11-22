@@ -351,6 +351,7 @@ export const en: Catalog = {
   "filter.moreActive": "More conditions ({count} active)",
   "filter.hashChip": "Content hash",
   "filter.extChip": "Extension",
+  "filter.excludeChip": "Exclude",
   "filter.kindFilter": "Filter by kind",
   "filter.playState": "Play state",
   "filter.sortSection": "Sort order",

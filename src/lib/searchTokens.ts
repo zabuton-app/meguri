@@ -5,6 +5,7 @@ import {
   hasOpenQuote,
   isSearchDirective,
   joinSearchTokens,
+  parseNegatedSearchToken,
   tagIdentityKey,
   splitSearchTokens,
 } from "@shared/tags";
@@ -109,6 +110,8 @@ export function plainWordAtCaret(draft: string): string | null {
   const tail = splitSearchTokens(draft).at(-1)?.normalize("NFC");
   if (tail === undefined || tail.includes(":") || tail.includes("|"))
     return null;
+  // An exclusion (`-draft`): a tag picked for it would include instead.
+  if (parseNegatedSearchToken(tail).negated) return null;
   const length = [...tail].length;
   return length >= 2 || (length === 1 && WORD_PER_CHARACTER.test(tail))
     ? tail

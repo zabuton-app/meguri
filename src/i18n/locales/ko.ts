@@ -330,6 +330,7 @@ export const ko: Catalog = {
   "filter.moreActive": "기타 조건 ({count}개 적용 중)",
   "filter.hashChip": "콘텐츠 해시",
   "filter.extChip": "확장자",
+  "filter.excludeChip": "제외",
   "filter.kindFilter": "종류로 필터링",
   "filter.playState": "시청 상태",
   "filter.sortSection": "정렬 순서",

@@ -14,6 +14,7 @@ import {
   LIST_HIDDEN_SOURCES,
   parseExtSearchToken,
   parseHashSearchToken,
+  parseNegatedSearchToken,
   parseTagSearchToken,
   searchTokenTerms,
   splitSearchTokens,
@@ -50,6 +51,30 @@ function escapeLike(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
+/** What one polarity of a search asks for: the files that match, or (`not`)
+ *  the files to leave out. */
+interface SearchTerms {
+  /** Plain tokens long enough for the index, as one ANDed MATCH expression. */
+  match: string | null;
+  /** Everything else: per token, a MATCH expression and/or LIKE terms, ORed. */
+  anyOf: { match: string | null; likes: string[] }[];
+  tagTokens: string[];
+  /** `hash:` prefixes, lower-case hex. */
+  hashPrefixes: string[];
+  /** `ext:` values, lower-case, without the dot. */
+  extValues: string[];
+}
+
+function emptyTerms(): SearchTerms {
+  return {
+    match: null,
+    anyOf: [],
+    tagTokens: [],
+    hashPrefixes: [],
+    extValues: [],
+  };
+}
+
 /** Split the free-text query for the trigram-tokenized files_fts.
  *
  *  A `tag:<value>` token is pulled out first: generated tags are not in the
@@ -67,55 +92,45 @@ function escapeLike(s: string): string {
  *
  *  A token may carry alternatives (`yoga|ヨガ`, see searchTokenTerms), any of
  *  which satisfies it. Each token becomes one `anyOf` group — a plain token is
- *  a group of one — split by whether each term can use the trigram index. */
-function buildSearchTerms(q: string): {
-  /** Plain tokens long enough for the index, as one ANDed MATCH expression. */
-  match: string | null;
-  /** Everything else: per token, a MATCH expression and/or LIKE terms, ORed. */
-  anyOf: { match: string | null; likes: string[] }[];
-  tagTokens: string[];
-  /** `hash:` prefixes, lower-case hex. */
-  hashPrefixes: string[];
-  /** `ext:` values, lower-case, without the dot. */
-  extValues: string[];
-} {
+ *  a group of one — split by whether each term can use the trigram index.
+ *
+ *  A token with a leading `-` (#523) goes to `not` instead, read the same way:
+ *  the conditions there are the files to leave out. Every negated free-text
+ *  token is a group of its own, since one long phrase in a MATCH of several
+ *  would exclude only the files carrying them all. */
+function buildSearchTerms(q: string): SearchTerms & { not: SearchTerms } {
+  const terms = emptyTerms();
+  const not = emptyTerms();
   const matchTokens: string[] = [];
-  const anyOf: { match: string | null; likes: string[] }[] = [];
-  const tagTokens: string[] = [];
-  const hashPrefixes: string[] = [];
-  const extValues: string[] = [];
   for (const raw of splitSearchTokens(q)) {
-    const hash = parseHashSearchToken(raw);
+    const { negated, body } = parseNegatedSearchToken(raw);
+    const into = negated ? not : terms;
+    const hash = parseHashSearchToken(body);
     if (hash) {
-      hashPrefixes.push(hash);
+      into.hashPrefixes.push(hash);
       continue;
     }
-    const ext = parseExtSearchToken(raw);
+    const ext = parseExtSearchToken(body);
     if (ext) {
-      extValues.push(ext);
+      into.extValues.push(ext);
       continue;
     }
-    const tag = parseTagSearchToken(raw);
+    const tag = parseTagSearchToken(body);
     if (tag) {
-      tagTokens.push(tag);
+      into.tagTokens.push(tag);
       continue;
     }
-    const terms = searchTokenTerms(raw);
-    const long = terms.filter(isTrigramSearchable).map(ftsPhrase);
-    const likes = terms.filter((term) => !isTrigramSearchable(term));
-    if (terms.length === 1 && long.length === 1) {
+    const words = searchTokenTerms(body);
+    const long = words.filter(isTrigramSearchable).map(ftsPhrase);
+    const likes = words.filter((term) => !isTrigramSearchable(term));
+    if (!negated && words.length === 1 && long.length === 1) {
       matchTokens.push(long[0]);
     } else {
-      anyOf.push({ match: long.length ? long.join(" OR ") : null, likes });
+      into.anyOf.push({ match: long.length ? long.join(" OR ") : null, likes });
     }
   }
-  return {
-    match: matchTokens.length ? matchTokens.join(" ") : null,
-    anyOf,
-    tagTokens,
-    hashPrefixes,
-    extValues,
-  };
+  terms.match = matchTokens.length ? matchTokens.join(" ") : null;
+  return { ...terms, not };
 }
 
 /** A term the trigram tokenizer can index: three code points or more. */
@@ -243,6 +258,46 @@ export function fromFor(query: SearchQuery): string {
 }
 
 /**
+ * The condition that a file's path or user tags match one free-text token:
+ * any of its terms, through the index or LIKE. Parenthesized, so a leading
+ * NOT negates all of it.
+ */
+function anyOfCondition(
+  group: { match: string | null; likes: string[] },
+  args: unknown[],
+): string {
+  const parts: string[] = [];
+  if (group.match) {
+    // The terms the index can serve stay on the index, whatever else is in
+    // the group. Besides the cost, MATCH folds case for every script while
+    // LIKE only does for ASCII — sending `école` to LIKE because `ヨガ` sat
+    // beside it would silently stop it matching `École`.
+    parts.push("f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)");
+    args.push(group.match);
+  }
+  if (group.likes.length > 0) {
+    // Too short for a trigram (two-character Japanese words are the common
+    // case): LIKE, as a correlated EXISTS (rowid = f.id) rather than an
+    // independent IN-subquery — the latter LIKE-scans the whole files_fts
+    // table per term, while this form only probes the rows already narrowed
+    // by MATCH and the other filters.
+    const likes = group.likes
+      .map(
+        () => "x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'",
+      )
+      .join(" OR ");
+    parts.push(
+      `EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (${likes}))`,
+    );
+    for (const term of group.likes) {
+      const pattern = `%${escapeLike(term)}%`;
+      args.push(pattern, pattern);
+    }
+  }
+  return `(${parts.join(" OR ")})`;
+}
+
+/**
  * Append the WHERE conditions a SearchQuery asks for. Exported so the graph
  * view (queries/graph.ts) narrows exactly the rows files_search would.
  */
@@ -256,50 +311,17 @@ export function appendSearchConditions(
 ): string {
   const terms = query.q
     ? buildSearchTerms(query.q)
-    : {
-        match: null,
-        anyOf: [],
-        tagTokens: [],
-        hashPrefixes: [],
-        extValues: [],
-      };
+    : { ...emptyTerms(), not: emptyTerms() };
   if (terms.match) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(terms.match);
   }
   for (const group of terms.anyOf) {
-    const parts: string[] = [];
-    if (group.match) {
-      // The terms the index can serve stay on the index, whatever else is in
-      // the group. Besides the cost, MATCH folds case for every script while
-      // LIKE only does for ASCII — sending `école` to LIKE because `ヨガ` sat
-      // beside it would silently stop it matching `École`.
-      parts.push(
-        "f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)",
-      );
-      args.push(group.match);
-    }
-    if (group.likes.length > 0) {
-      // Too short for a trigram (two-character Japanese words are the common
-      // case): LIKE, as a correlated EXISTS (rowid = f.id) rather than an
-      // independent IN-subquery — the latter LIKE-scans the whole files_fts
-      // table per term, while this form only probes the rows already narrowed
-      // by MATCH and the other filters.
-      const likes = group.likes
-        .map(
-          () =>
-            "x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'",
-        )
-        .join(" OR ");
-      parts.push(
-        `EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (${likes}))`,
-      );
-      for (const term of group.likes) {
-        const pattern = `%${escapeLike(term)}%`;
-        args.push(pattern, pattern);
-      }
-    }
-    sql += ` AND (${parts.join(" OR ")})`;
+    sql += ` AND ${anyOfCondition(group, args)}`;
+  }
+  // A token with a leading `-`: the same conditions, each turned into NOT.
+  for (const group of terms.not.anyOf) {
+    sql += ` AND NOT ${anyOfCondition(group, args)}`;
   }
   // A range on the hash rather than LIKE, so idx_files_content_hash serves it:
   // every hex digit sorts before "g", so the prefix followed by "g" is past
@@ -308,11 +330,21 @@ export function appendSearchConditions(
     sql += " AND f.content_hash >= ? AND f.content_hash < ?";
     args.push(prefix, `${prefix}g`);
   }
+  // ...and so a file without a hash is never excluded either.
+  for (const prefix of terms.not.hashPrefixes) {
+    sql +=
+      " AND (f.content_hash IS NULL OR f.content_hash < ? OR f.content_hash >= ?)";
+    args.push(prefix, `${prefix}g`);
+  }
   // Exact, on the lower-cased value the scan stores. No index: with nothing
   // else narrowing, a rare extension makes the list walk its sort order until
   // a page fills, up to every live row.
   for (const ext of terms.extValues) {
     sql += " AND f.ext = ?";
+    args.push(ext);
+  }
+  for (const ext of terms.not.extValues) {
+    sql += " AND f.ext IS NOT ?";
     args.push(ext);
   }
   for (const value of terms.tagTokens) {
@@ -324,6 +356,13 @@ export function appendSearchConditions(
     }
     sql += ` AND ${tagCondition(db, args, JSON.stringify(ids))}`;
   }
+  for (const value of terms.not.tagTokens) {
+    const ids = resolveSearchTagIds(db, value);
+    // No tag by that name: no file carries it, so none is left out.
+    if (ids.length === 0) continue;
+    sql += ` AND NOT ${tagCondition(db, args, JSON.stringify(ids))}`;
+  }
+
   if (query.folder) {
     const cond = folderCondition(
       folderRange(query.folder.path, sep),

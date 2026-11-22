@@ -341,13 +341,45 @@ export function parseExtSearchToken(token: string): string | null {
   return value || null;
 }
 
+/**
+ * A leading `-` excludes what the rest of the token matches (#523):
+ * `-tag:screenshot`, `-ext:gif`, `-draft`. A lone `-` is ordinary text.
+ */
+export const SEARCH_NOT = "-";
+
+/**
+ * How the tokenizer marks a token whose leading `-` was typed inside quotes
+ * (`"-intro"`): that dash is text, not a negation. The backslash is the same
+ * escape `\|` is for alternatives; {@link joinSearchTokens} writes it back as
+ * the quotes.
+ */
+const LITERAL_DASH = `\\${SEARCH_NOT}`;
+
+/**
+ * A token taken apart into whether it is negated and the token it negates —
+ * the directive or free text that is then read as usual. A quoted leading dash
+ * (see LITERAL_DASH) is text, so the body keeps it and the token is not
+ * negated.
+ */
+export function parseNegatedSearchToken(token: string): {
+  negated: boolean;
+  body: string;
+} {
+  if (token.startsWith(LITERAL_DASH))
+    return { negated: false, body: token.slice(1) };
+  if (token.startsWith(SEARCH_NOT) && token.length > SEARCH_NOT.length)
+    return { negated: true, body: token.slice(SEARCH_NOT.length) };
+  return { negated: false, body: token };
+}
+
 /** True for a token the search box shows as a chip: a `tag:`, `hash:` or
- *  `ext:` directive rather than free text. */
+ *  `ext:` directive, negated or not, rather than free text. */
 export function isSearchDirective(token: string): boolean {
+  const { body } = parseNegatedSearchToken(token);
   return (
-    isTagDirective(token) ||
-    parseHashSearchToken(token) !== null ||
-    parseExtSearchToken(token) !== null
+    isTagDirective(body) ||
+    parseHashSearchToken(body) !== null ||
+    parseExtSearchToken(body) !== null
   );
 }
 
@@ -361,6 +393,13 @@ export function isSearchDirective(token: string): boolean {
  * condition the user typed. The prefix keeps `tag:3fa9` and `hash:3fa9` apart.
  */
 export function searchDirectiveKey(token: string): string | null {
+  const { negated, body } = parseNegatedSearchToken(token);
+  const key = positiveDirectiveKey(body);
+  // `tag:x` and `-tag:x` are opposite conditions, never repeats of each other.
+  return key !== null && negated ? `${SEARCH_NOT}${key}` : key;
+}
+
+function positiveDirectiveKey(token: string): string | null {
   const hash = parseHashSearchToken(token);
   if (hash !== null) return `${HASH_SEARCH_PREFIX}:${hash}`;
   const ext = parseExtSearchToken(token);
@@ -413,7 +452,8 @@ function foldSpacedDirectives(tokens: string[]): string[] {
   ];
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    if (bare.includes(tokens[i].toLowerCase()) && i + 1 < tokens.length) {
+    const { body } = parseNegatedSearchToken(tokens[i]);
+    if (bare.includes(body.toLowerCase()) && i + 1 < tokens.length) {
       out.push(tokens[i] + tokens[i + 1]);
       i++;
       continue;
@@ -437,6 +477,15 @@ export function splitSearchTokens(q: string): string[] {
   const out: string[] = [];
   let buf = "";
   let quoted = false;
+  // Whether the token's first character is a `-` typed inside quotes, which
+  // is text rather than a negation (see LITERAL_DASH).
+  let literalDash = false;
+  const push = () => {
+    const token = buf.trim();
+    if (token) out.push(literalDash ? `\\${token}` : token);
+    buf = "";
+    literalDash = false;
+  };
   for (let i = 0; i < q.length; i++) {
     const c = q[i];
     if (c === '"') {
@@ -449,13 +498,13 @@ export function splitSearchTokens(q: string): string[] {
       continue;
     }
     if (!quoted && /\s/.test(c)) {
-      if (buf.trim()) out.push(buf.trim());
-      buf = "";
+      push();
       continue;
     }
+    if (c === SEARCH_NOT && quoted && !buf.trim()) literalDash = true;
     buf += c;
   }
-  if (buf.trim()) out.push(buf.trim());
+  push();
   return foldSpacedDirectives(out);
 }
 
@@ -480,12 +529,17 @@ export function hasOpenQuote(q: string): boolean {
 
 /** Inverse of {@link splitSearchTokens}: re-quote what needs it and join. */
 export function joinSearchTokens(tokens: string[]): string {
+  const quote = (text: string) => `"${text.replace(/"/g, '""')}"`;
   return tokens
     .map((token) => {
-      // A directive quotes only its value, so the prefix stays readable.
-      const value = parseTagSearchToken(token);
-      if (value !== null) return tagSearchToken(value);
-      return needsQuoting(token) ? `"${token.replace(/"/g, '""')}"` : token;
+      if (token.startsWith(LITERAL_DASH)) return quote(token.slice(1));
+      const { negated, body } = parseNegatedSearchToken(token);
+      const not = negated ? SEARCH_NOT : "";
+      // A directive quotes only its value, so the prefix stays readable, and
+      // a negation keeps its `-` outside the quotes, where it means "not".
+      const value = parseTagSearchToken(body);
+      if (value !== null) return not + tagSearchToken(value);
+      return not + (needsQuoting(body) ? quote(body) : body);
     })
     .join(" ");
 }

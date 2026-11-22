@@ -4,6 +4,7 @@ import {
   parseQualifiedTagName,
   parseExtSearchToken,
   parseHashSearchToken,
+  parseNegatedSearchToken,
   parseTagSearchToken,
 } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
@@ -86,8 +87,17 @@ export function tagHumanLabel(
  * A generated tag is usually written as its bare value ("long"), so the category
  * is recovered from the vocabulary; the qualified form is accepted too. A value
  * that belongs to no closed set — a manual tag, or a codec — reads as itself.
+ * A negated directive (`-tag:beach`) reads as an exclusion of the same.
  */
-export function searchTokenLabel(t: TFunc, token: string): string | null {
+export function searchTokenLabel(t: TFunc, raw: string): string | null {
+  const { negated, body } = parseNegatedSearchToken(raw);
+  const label = positiveTokenLabel(t, body);
+  return label !== null && negated
+    ? `${t("filter.excludeChip")}: ${label}`
+    : label;
+}
+
+function positiveTokenLabel(t: TFunc, token: string): string | null {
   const hash = parseHashSearchToken(token);
   if (hash !== null) return `${t("filter.hashChip")}: ${hash}`;
   const ext = parseExtSearchToken(token);

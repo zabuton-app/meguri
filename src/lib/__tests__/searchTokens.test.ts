@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_TAG_SUGGESTIONS,
   pendingDirective,
+  plainWordAtCaret,
   splitQueryChips,
   tagSuggestions,
   viewIsOneWorkspace,
@@ -113,5 +114,19 @@ describe("splitQueryChips", () => {
       chips: [],
       text: "sunset 2024",
     });
+  });
+
+  it("chips a negated directive and leaves negated text as text (#523)", () => {
+    expect(splitQueryChips('-tag:screenshot -draft "-intro"')).toEqual({
+      chips: ["-tag:screenshot"],
+      text: '-draft "-intro"',
+    });
+  });
+});
+
+describe("plainWordAtCaret", () => {
+  it("offers no tag for an excluded word (#523)", () => {
+    expect(plainWordAtCaret("beach")).toBe("beach");
+    expect(plainWordAtCaret("-beach")).toBeNull();
   });
 });

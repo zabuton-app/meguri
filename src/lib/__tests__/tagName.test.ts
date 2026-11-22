@@ -5,6 +5,7 @@ import {
   isReservedTagName,
   isSearchDirective,
   parseHashSearchToken,
+  parseNegatedSearchToken,
   searchDirectiveKey,
   hasOpenQuote,
   joinSearchTokens,
@@ -238,6 +239,52 @@ describe("splitSearchTokens / joinSearchTokens", () => {
       'beach tag:"sea side" tag:4k',
     );
   });
+
+  it("keeps a negation's - outside the quotes (#523)", () => {
+    expect(splitSearchTokens('-tag:"sea side" -"old trip"')).toEqual([
+      "-tag:sea side",
+      "-old trip",
+    ]);
+    expect(joinSearchTokens(["-tag:sea side", "-old trip", "-draft"])).toBe(
+      '-tag:"sea side" -"old trip" -draft',
+    );
+    expect(splitSearchTokens("-tag: beach")).toEqual(["-tag:beach"]);
+  });
+
+  it("round-trips a quoted leading - as text, not a negation (#523)", () => {
+    const tokens = splitSearchTokens('"-intro" " -outro"');
+    expect(tokens.map((t) => parseNegatedSearchToken(t))).toEqual([
+      { negated: false, body: "-intro" },
+      { negated: false, body: "-outro" },
+    ]);
+    expect(joinSearchTokens(tokens)).toBe('"-intro" "-outro"');
+    expect(splitSearchTokens(joinSearchTokens(tokens))).toEqual(tokens);
+  });
+});
+
+describe("parseNegatedSearchToken", () => {
+  it("takes a leading - as a negation of the rest (#523)", () => {
+    expect(parseNegatedSearchToken("-tag:beach")).toEqual({
+      negated: true,
+      body: "tag:beach",
+    });
+    expect(parseNegatedSearchToken("-draft")).toEqual({
+      negated: true,
+      body: "draft",
+    });
+    expect(parseNegatedSearchToken("draft")).toEqual({
+      negated: false,
+      body: "draft",
+    });
+  });
+
+  it("leaves a lone - as text", () => {
+    expect(splitSearchTokens("beach - ")).toEqual(["beach", "-"]);
+    expect(parseNegatedSearchToken("-")).toEqual({
+      negated: false,
+      body: "-",
+    });
+  });
 });
 
 describe("reservedTagPrefix", () => {
@@ -397,6 +444,26 @@ describe("searchDirectiveKey / isSearchDirective", () => {
       searchDirectiveKey("hash:3fa9"),
     );
     expect(searchDirectiveKey("3fa9")).toBeNull();
+  });
+
+  it("keys a negated directive apart from the same one included (#523)", () => {
+    expect(searchDirectiveKey("-tag:Beach")).toBe(
+      searchDirectiveKey("-tag:beach"),
+    );
+    expect(searchDirectiveKey("-tag:beach")).not.toBe(
+      searchDirectiveKey("tag:beach"),
+    );
+    expect(searchDirectiveKey("-ext:GIF")).toBe(searchDirectiveKey("-ext:gif"));
+    expect(searchDirectiveKey("-draft")).toBeNull();
+  });
+
+  it("calls a negated directive a directive, and negated text text (#523)", () => {
+    expect(isSearchDirective("-tag:beach")).toBe(true);
+    expect(isSearchDirective("-hash:3fa9")).toBe(true);
+    expect(isSearchDirective("-ext:gif")).toBe(true);
+    expect(isSearchDirective("-draft")).toBe(false);
+    // Quoted, the - is text, so the rest is no directive either.
+    expect(isSearchDirective(splitSearchTokens('"-tag:beach"')[0])).toBe(false);
   });
 
   it("calls both kinds directives, and nothing else", () => {
