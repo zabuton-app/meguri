@@ -155,6 +155,14 @@ export function ShortcutsOverlay({
         { label: t("media.prev"), keys: alts(b.prev), preset: true },
         { label: t("media.next"), keys: alts(b.next), preset: true },
         { label: t("shortcuts.imagePaging"), keys: arrowsLR },
+        {
+          label: t("shortcuts.imageZoom"),
+          keys: [[["Ctrl", t("shortcuts.wheel")]]],
+        },
+        {
+          label: t("shortcuts.imageZoomToggle"),
+          keys: [[[t("shortcuts.doubleClick")]]],
+        },
         { label: t("shortcuts.watchLater"), keys: W },
         { label: t("common.close"), keys: esc },
       ],

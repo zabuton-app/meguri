@@ -38,6 +38,9 @@ export const en: Catalog = {
   "settings.light": "Light",
   "settings.dark": "Dark",
   "settings.theme": "Theme",
+  "settings.randomThemeOnStartup": "Random theme on startup",
+  "settings.randomThemeOnStartupDesc":
+    "Pick a different built-in theme in the current appearance each time the app starts. This turns off any selected CSS theme.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "Switch to light mode",
@@ -407,6 +410,9 @@ export const en: Catalog = {
   "media.moreActions": "More actions",
   "media.prev": "Previous file",
   "media.next": "Next file",
+  "media.zoomIn": "Zoom in",
+  "media.zoomOut": "Zoom out",
+  "media.zoomFit": "Fit to view",
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.sectionList": "List",
   "shortcuts.sectionDetail": "Detail",
@@ -450,6 +456,10 @@ export const en: Catalog = {
   "shortcuts.zoom": "Zoom in / out",
   "shortcuts.zoomReset": "Reset zoom",
   "shortcuts.imagePaging": "Previous / next file (images)",
+  "shortcuts.imageZoom": "Zoom the image (toward the pointer)",
+  "shortcuts.imageZoomToggle": "Fit the image / show at actual size",
+  "shortcuts.wheel": "Wheel",
+  "shortcuts.doubleClick": "Double-click",
   "shortcuts.playerPrevNext": "Previous / next",
   "shortcuts.playerArrows": "Previous / next (images and audio)",
   "shortcuts.shuffle": "Toggle shuffle",

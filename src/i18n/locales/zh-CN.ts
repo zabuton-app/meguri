@@ -36,6 +36,9 @@ export const zhCN: Catalog = {
   "settings.light": "浅色",
   "settings.dark": "深色",
   "settings.theme": "主题",
+  "settings.randomThemeOnStartup": "启动时随机选择主题",
+  "settings.randomThemeOnStartupDesc":
+    "每次启动时选择与当前外观相同的其他内置主题，并关闭已选的 CSS 主题。",
 
   // Appearance toggle (header)
   "theme.switchToLight": "切换到浅色模式",
@@ -375,6 +378,9 @@ export const zhCN: Catalog = {
   "media.moreActions": "更多操作",
   "media.prev": "上一个文件",
   "media.next": "下一个文件",
+  "media.zoomIn": "放大",
+  "media.zoomOut": "缩小",
+  "media.zoomFit": "适应窗口",
   "shortcuts.title": "键盘快捷键",
   "shortcuts.sectionList": "列表",
   "shortcuts.sectionDetail": "详情",
@@ -417,6 +423,10 @@ export const zhCN: Catalog = {
   "shortcuts.zoom": "放大 / 缩小",
   "shortcuts.zoomReset": "重置缩放",
   "shortcuts.imagePaging": "上一个 / 下一个文件（图片）",
+  "shortcuts.imageZoom": "缩放图片（以指针为中心）",
+  "shortcuts.imageZoomToggle": "图片适应窗口 / 实际大小",
+  "shortcuts.wheel": "滚轮",
+  "shortcuts.doubleClick": "双击",
   "shortcuts.playerPrevNext": "上一个 / 下一个",
   "shortcuts.playerArrows": "上一个 / 下一个（图片和音频）",
   "shortcuts.shuffle": "切换随机播放",

@@ -37,6 +37,9 @@ export const ja = {
   "settings.light": "ライト",
   "settings.dark": "ダーク",
   "settings.theme": "テーマ",
+  "settings.randomThemeOnStartup": "起動時にランダムなテーマを選ぶ",
+  "settings.randomThemeOnStartupDesc":
+    "起動するたびに、現在の外観に合う別の組み込みテーマを選びます。選択中の CSS テーマは解除されます。",
 
   // 外観トグル（ヘッダー）
   "theme.switchToLight": "ライトモードに切り替え",
@@ -390,6 +393,9 @@ export const ja = {
   "media.moreActions": "その他の操作",
   "media.prev": "前のファイル",
   "media.next": "次のファイル",
+  "media.zoomIn": "拡大",
+  "media.zoomOut": "縮小",
+  "media.zoomFit": "画面に合わせる",
   "shortcuts.title": "キーボードショートカット",
   "shortcuts.sectionList": "一覧",
   "shortcuts.sectionDetail": "詳細",
@@ -433,6 +439,10 @@ export const ja = {
   "shortcuts.zoom": "拡大 / 縮小",
   "shortcuts.zoomReset": "拡大率をリセット",
   "shortcuts.imagePaging": "前 / 次のファイル（画像）",
+  "shortcuts.imageZoom": "画像を拡大 / 縮小（ポインタの位置）",
+  "shortcuts.imageZoomToggle": "画像を画面に合わせる / 実寸で表示",
+  "shortcuts.wheel": "ホイール",
+  "shortcuts.doubleClick": "ダブルクリック",
   "shortcuts.playerPrevNext": "前 / 次",
   "shortcuts.playerArrows": "前 / 次（画像とオーディオ）",
   "shortcuts.shuffle": "シャッフルを切り替え",

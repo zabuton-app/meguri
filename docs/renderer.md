@@ -751,3 +751,10 @@ series-shared `ThemeProvider.tsx` on purpose.
 Zoom uses `webFrame.setZoomFactor` rather than CSS zoom, so coordinate math is
 not affected. It is driven via `preload` through
 `src/hooks/useContentZoom.ts`.
+
+The detail view's image has a zoom of its own
+(`src/routes/MediaDetail/ZoomableImage.tsx`). Ctrl+wheel over the image zooms
+the image instead of the window: its listener stops the event before it
+bubbles to the window listener of `useContentZoom`, so that listener must stay
+on the bubble phase. Zoomed in, the image is drawn at its zoomed size over
+its own stage, not scaled with CSS zoom, so it does not touch the rule above.

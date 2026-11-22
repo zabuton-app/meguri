@@ -377,7 +377,7 @@ Electron needs, `npm run test:e2e:install` pulls them in.
 | Tag / Rate | Assign in the detail view (tags have autocomplete). Click a tag in the grid to search                                |
 | Search     | Filter and sort by full text, kind, and rating in the top bar (conditions shown as badges, individually removable)   |
 | Theme      | Switch from Theme at the top-right of the header                                                                     |
-| Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset                                                                            |
+| Zoom       | Ctrl + wheel, Ctrl +/-, Ctrl + 0 to reset. Over an image in the detail view, Ctrl + wheel zooms the image            |
 
 To drag a file to another app, hover over it in grid or list view and drag
 the arrow beside its selection checkbox. Drag from a selected file's arrow

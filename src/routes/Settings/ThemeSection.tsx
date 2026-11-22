@@ -8,6 +8,8 @@ import { useTheme } from "@/themes/ThemeProvider";
 import { deriveTokens, type Token } from "@/themes/derive";
 import { useCssThemes } from "@/hooks/useCssThemes";
 import { useI18n } from "@/i18n/I18nProvider";
+import { usePreferences } from "@/settings/PreferencesProvider";
+import { Switch } from "@/components/ui/switch";
 
 // Swatches for the theme picker. Derived tokens, not raw palette slots, so what the swatch
 // shows is what the UI will actually use — and the chrome colors that used to be invisible in
@@ -63,6 +65,7 @@ function ThemeCard({
 export function ThemeSection() {
   const { t } = useI18n();
   const { mode, familyId, families, setFamily } = useTheme();
+  const { randomThemeOnStartup, setRandomThemeOnStartup } = usePreferences();
   const cssThemes = useCssThemes();
   const cssSelected = cssThemes.state?.selected ?? null;
 
@@ -79,6 +82,21 @@ export function ThemeSection() {
       <h2 className="text-sm font-semibold text-bright-fg">
         {t("settings.theme")}
       </h2>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col">
+          <span className="text-sm text-fg">
+            {t("settings.randomThemeOnStartup")}
+          </span>
+          <span className="text-xs text-muted">
+            {t("settings.randomThemeOnStartupDesc")}
+          </span>
+        </div>
+        <Switch
+          checked={randomThemeOnStartup}
+          onCheckedChange={setRandomThemeOnStartup}
+          aria-label={t("settings.randomThemeOnStartup")}
+        />
+      </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {families.map((fam) => {
           // Preview the variant for the current appearance (or the paired variant if absent).

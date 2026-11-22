@@ -38,6 +38,9 @@ export const fr: Catalog = {
   "settings.light": "Clair",
   "settings.dark": "Sombre",
   "settings.theme": "Thème",
+  "settings.randomThemeOnStartup": "Thème aléatoire au démarrage",
+  "settings.randomThemeOnStartupDesc":
+    "Choisit un autre thème intégré avec l'apparence actuelle à chaque démarrage. Désactive le thème CSS sélectionné.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "Passer au mode clair",
@@ -425,6 +428,9 @@ export const fr: Catalog = {
   "media.moreActions": "Autres actions",
   "media.prev": "Fichier précédent",
   "media.next": "Fichier suivant",
+  "media.zoomIn": "Zoom avant",
+  "media.zoomOut": "Zoom arrière",
+  "media.zoomFit": "Ajuster à la vue",
   "shortcuts.title": "Raccourcis clavier",
   "shortcuts.sectionList": "Liste",
   "shortcuts.sectionDetail": "Détail",
@@ -469,6 +475,10 @@ export const fr: Catalog = {
   "shortcuts.zoom": "Zoom avant / arrière",
   "shortcuts.zoomReset": "Réinitialiser le zoom",
   "shortcuts.imagePaging": "Fichier précédent / suivant (images)",
+  "shortcuts.imageZoom": "Zoomer l'image (vers le pointeur)",
+  "shortcuts.imageZoomToggle": "Ajuster l'image / taille réelle",
+  "shortcuts.wheel": "Molette",
+  "shortcuts.doubleClick": "Double-clic",
   "shortcuts.playerPrevNext": "Précédent / suivant",
   "shortcuts.playerArrows": "Précédent / suivant (images et audio)",
   "shortcuts.shuffle": "Activer ou désactiver l’ordre aléatoire",

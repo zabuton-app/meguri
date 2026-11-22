@@ -47,6 +47,8 @@ export function useContentZoom() {
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       // Suppress the webview's default page zoom and unify on our own zoom.
+      // Bubble phase on purpose: the detail view's image stops Ctrl+wheel over
+      // it to zoom itself (ZoomableImage), and must reach it before this does.
       e.preventDefault();
       setZoom(e.deltaY < 0 ? zoom * STEP : zoom / STEP);
     };

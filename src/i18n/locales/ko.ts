@@ -37,6 +37,9 @@ export const ko: Catalog = {
   "settings.light": "라이트",
   "settings.dark": "다크",
   "settings.theme": "테마",
+  "settings.randomThemeOnStartup": "시작할 때 무작위 테마 선택",
+  "settings.randomThemeOnStartupDesc":
+    "시작할 때마다 현재 모양에 맞는 다른 기본 테마를 선택합니다. 선택한 CSS 테마는 해제됩니다.",
 
   // Appearance toggle (header)
   "theme.switchToLight": "라이트 모드로 전환",
@@ -386,6 +389,9 @@ export const ko: Catalog = {
   "media.moreActions": "기타 작업",
   "media.prev": "이전 파일",
   "media.next": "다음 파일",
+  "media.zoomIn": "확대",
+  "media.zoomOut": "축소",
+  "media.zoomFit": "화면에 맞추기",
   "shortcuts.title": "키보드 단축키",
   "shortcuts.sectionList": "목록",
   "shortcuts.sectionDetail": "상세",
@@ -429,6 +435,10 @@ export const ko: Catalog = {
   "shortcuts.zoom": "확대 / 축소",
   "shortcuts.zoomReset": "배율 초기화",
   "shortcuts.imagePaging": "이전 / 다음 파일 (이미지)",
+  "shortcuts.imageZoom": "이미지 확대 / 축소 (포인터 위치)",
+  "shortcuts.imageZoomToggle": "이미지를 화면에 맞추기 / 실제 크기",
+  "shortcuts.wheel": "휠",
+  "shortcuts.doubleClick": "더블클릭",
   "shortcuts.playerPrevNext": "이전 / 다음",
   "shortcuts.playerArrows": "이전 / 다음 (이미지와 오디오)",
   "shortcuts.shuffle": "셔플 전환",
