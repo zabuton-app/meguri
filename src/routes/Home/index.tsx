@@ -9,7 +9,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router";
+import {
+  Link,
+  Outlet,
+  matchPath,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import {
   useQuery,
   useQueryClient,
@@ -755,6 +761,20 @@ export default function Home() {
   const peekDocked = usePeekDocked();
   const listShortcutsActive =
     (location.pathname === "/" || peekDocked) && !immersiveOpen;
+  // The file the docked peek shows, which the list marks and scrolls to. The
+  // detail falls back to the active workspace when the URL names none.
+  const peekFileId = peekDocked
+    ? matchPath("/file/:id", location.pathname)?.params.id
+    : undefined;
+  const peekFileKey = peekFileId
+    ? mediaSortId({
+        workspaceId:
+          new URLSearchParams(location.search).get("ws") ??
+          status.data?.workspaceId ??
+          "",
+        id: Number(peekFileId),
+      })
+    : undefined;
 
   // Tours run on the bare list only: no routed modal, overlay or menu on top
   // (the same condition as the views' keyboard navigation, navActive).
@@ -1089,6 +1109,7 @@ export default function Home() {
                 onOpenFolder={folderNav.enter}
                 resetKey={viewResetKey}
                 inFolder={folderSearching}
+                peekFileKey={peekFileKey}
               />
             ) : (
               // By folder, either view gets the folders ahead of the files
@@ -1113,6 +1134,7 @@ export default function Home() {
                 onOpenFolder={folderNav.enter}
                 resetKey={viewResetKey}
                 inFolder={folderSearching}
+                peekFileKey={peekFileKey}
               />
             )}
           </main>

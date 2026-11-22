@@ -3,7 +3,7 @@
 // hides behind its own HTMLElement.prototype property.
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
-import "@/test/mockVirtualizer";
+import { mockVirtualizerScrollToIndex } from "@/test/mockVirtualizer";
 import { MediaGrid } from "@/components/MediaGrid";
 import { HOVER_RELEASE_MS } from "@/hooks/useHoverActivation";
 import {
@@ -710,5 +710,68 @@ describe("MediaGrid", () => {
       "media-card",
     ]);
     expect(rows[1].children).toHaveLength(1);
+  });
+
+  it("marks the file the docked peek shows and scrolls to it once per file", async () => {
+    const scrollToIndex = mockVirtualizerScrollToIndex();
+    scrollToIndex.mockClear();
+    // 1200px stub → 6 columns; a window starting at item 100 opens its first
+    // row with 4 empty cells, so the 4th item lands on row 1.
+    const items = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((id) => ({
+      ...sampleFileRow,
+      id,
+      relPath: `clip-${id}.mp4`,
+    }));
+    const grid = (peekFileKey: string | undefined, rows = items) => (
+      <MediaGrid
+        items={rows}
+        mediaBase="http://127.0.0.1:17345"
+        workspaceId={WS_ID}
+        loading={false}
+        listOffset={100}
+        peekFileKey={peekFileKey}
+      />
+    );
+    const { rerender } = renderWithProviders(grid(`${WS_ID}:4`));
+    await screen.findByText("clip-4.mp4");
+    const peeked = () =>
+      screen
+        .getAllByTestId("media-card")
+        .filter((c) => c.getAttribute("aria-current") === "page")
+        .map((c) => c.textContent);
+    expect(peeked()).toHaveLength(1);
+    expect(peeked()[0]).toContain("clip-4.mp4");
+    await waitFor(() =>
+      expect(scrollToIndex).toHaveBeenCalledWith(1, { align: "auto" }),
+    );
+    expect(scrollToIndex).toHaveBeenCalledTimes(1);
+
+    // A re-render for the same file (another page loaded) leaves the scroll
+    // to the user.
+    rerender(
+      grid(`${WS_ID}:4`, [
+        ...items,
+        { ...sampleFileRow, id: 10, relPath: "clip-10.mp4" },
+      ]),
+    );
+    await screen.findByText("clip-10.mp4");
+    expect(scrollToIndex).toHaveBeenCalledTimes(1);
+
+    // Another file (prev/next in the peek) is scrolled to.
+    rerender(grid(`${WS_ID}:9`));
+    await waitFor(() =>
+      expect(scrollToIndex).toHaveBeenLastCalledWith(2, { align: "auto" }),
+    );
+    expect(scrollToIndex).toHaveBeenCalledTimes(2);
+    expect(peeked()[0]).toContain("clip-9.mp4");
+
+    // The same file in another workspace is not this one.
+    rerender(grid("other-ws:9"));
+    await waitFor(() => expect(peeked()).toHaveLength(0));
+    expect(scrollToIndex).toHaveBeenCalledTimes(2);
+
+    // Closing the peek clears the mark.
+    rerender(grid(undefined));
+    expect(peeked()).toHaveLength(0);
   });
 });

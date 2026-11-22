@@ -106,6 +106,9 @@ interface Props {
   resetKey?: string;
   /** The list is a search inside a folder: its empty state says so. */
   inFolder?: boolean;
+  /** mediaSortId of the file a docked side peek shows: marked, and scrolled
+   *  into view each time it changes. */
+  peekFileKey?: string;
 }
 
 const noop = () => {};
@@ -199,7 +202,8 @@ export function useCardGridMetrics(scrollEl: HTMLDivElement | null) {
     [measureKey, ready],
   );
   const rowEstimate = ready && extraH > 0 ? thumbH + extraH : ROW_ESTIMATE;
-  return { cols, rowEstimate, measureRow };
+  // `ready`: the width, and so `cols`, is measured.
+  return { cols, rowEstimate, measureRow, ready };
 }
 
 // Memoized: Home's props are referentially stable, so the grid only re-renders
@@ -224,6 +228,7 @@ export const MediaGrid = memo(function MediaGrid({
   onOpenFolder,
   resetKey,
   inFolder = false,
+  peekFileKey,
 }: Props) {
   const watchLaterMembership = useWatchLater();
 
@@ -237,7 +242,7 @@ export const MediaGrid = memo(function MediaGrid({
     scrollRef.current = node;
     setScrollEl(node);
   }, []);
-  const { cols, rowEstimate, measureRow } = useCardGridMetrics(scrollEl);
+  const { cols, rowEstimate, measureRow, ready } = useCardGridMetrics(scrollEl);
 
   // Folder cards lead the list, packed into the same rows as the files so the
   // row height and the 2D keyboard movement need no special case.
@@ -316,6 +321,26 @@ export const MediaGrid = memo(function MediaGrid({
     // Reset only when wsId/resetKey change. The virtualizer reference is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId, resetKey]);
+
+  // The card the docked peek shows. Its row is scrolled to once per file, as
+  // soon as the grid is loaded and its columns are known, and not again on
+  // later renders (paging, a resize): that would fight the user's own
+  // scrolling, and a file paged in later is not worth a jump either.
+  const peekIndex = peekFileKey
+    ? entries.findIndex(
+        (e) => e.kind === "file" && mediaSortId(e.file) === peekFileKey,
+      )
+    : -1;
+  const scrolledToPeek = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!peekFileKey) {
+      scrolledToPeek.current = undefined;
+      return;
+    }
+    if (loading || !ready || scrolledToPeek.current === peekFileKey) return;
+    scrolledToPeek.current = peekFileKey;
+    if (peekIndex >= 0) scrollToRow(Math.floor((peekIndex + leadCells) / cols));
+  }, [peekFileKey, peekIndex, loading, ready, leadCells, cols, scrollToRow]);
 
   // Fetch the next page when a row near the end becomes visible (replaces the old IntersectionObserver sentinel).
   useInfiniteScrollTrigger({
@@ -420,6 +445,7 @@ export const MediaGrid = memo(function MediaGrid({
                         mediaBase={mediaBase}
                         onTagClick={onTagClick}
                         focused={focused}
+                        peeked={cell - leadCells === peekIndex}
                         watchLater={watchLaterMembership}
                         watchLaterRef={
                           focused ? focusedWatchLaterRef : undefined
@@ -454,6 +480,7 @@ export const MediaCard = memo(function MediaCard({
   mediaBase,
   onTagClick,
   focused,
+  peeked,
   watchLater,
   watchLaterRef,
   fileDraggable,
@@ -464,6 +491,8 @@ export const MediaCard = memo(function MediaCard({
   mediaBase: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  /** The file the docked side peek shows. */
+  peeked?: boolean;
   watchLater: WatchLaterMembership;
   /** Set only on the focused card, so the "W" shortcut can drive this toggle. */
   watchLaterRef?: Ref<HTMLButtonElement>;
@@ -508,13 +537,17 @@ export const MediaCard = memo(function MediaCard({
       data-testid="media-card"
       data-slot="media-card"
       data-file-key={mediaSortId(file)}
-      aria-current={focused ? "true" : undefined}
+      // "page" marks the file the peek shows; the keyboard focus, which can
+      // be elsewhere, keeps "true" and wins on the card that has both.
+      aria-current={focused ? "true" : peeked ? "page" : undefined}
       data-selected={selected || undefined}
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-card border border-border bg-surface transition-colors hover:border-border-strong",
         // A tint marks what is selected and a ring where the focus is, so
         // the two show together (#587). The tint is mixed into the card's
-        // own color, which a theme may redefine on the card.
+        // own color, which a theme may redefine on the card. The file in the
+        // peek takes the primary border alone.
+        peeked && "border-primary hover:border-primary",
         selected &&
           "border-primary hover:border-primary bg-[color-mix(in_oklab,var(--c-primary)_15%,var(--c-surface))]",
         focused && "border-primary hover:border-primary ring-2 ring-primary",
