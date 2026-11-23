@@ -114,13 +114,19 @@ export function DiscoverCard({
     setVideoPlaying(false);
   }
   // A seek asked for outright (a scene button, possibly from the keyboard with
-  // the pointer still resting on the media) must show its result, so the scrub
-  // frame gives way until the pointer moves over the media again.
+  // the pointer still resting on the media) must show its result, so the
+  // scrub is off until the pointer moves over the media again. While the
+  // preview plays the video shows anyway, and once it plays the seek has been
+  // seen: a pause then scrubs under the pointer as any pause does.
   const [scrubDismissed, setScrubDismissed] = useState(false);
   const seekVideo = (at: number) => {
-    setScrubDismissed(true);
+    if (!videoPlaying) setScrubDismissed(true);
     if (videoRef.current) videoRef.current.seek(at);
     else setPreview({ at, autoplay: false });
+  };
+  const onPlayingChange = (playing: boolean) => {
+    setVideoPlaying(playing);
+    if (playing) setScrubDismissed(false);
   };
   const toggleVideo = () => {
     if (videoRef.current) videoRef.current.togglePlay();
@@ -181,22 +187,24 @@ export function DiscoverCard({
   // Hover scrub preview on the main media (same behavior/preference as the
   // list thumbnails): pointer X maps onto the video timeline.
   const { hoverPreview, frameQuality, keybindingPreset } = usePreferences();
-  const {
-    previewSrc: scrubSrc,
-    scrubFraction,
-    onMouseEnter,
-    onMouseMove,
-    onMouseLeave,
-  } = useHoverFramePreview({
-    // Off only while the preview plays: a paused one (a scene just picked)
-    // is still a frame to scrub away from.
-    enabled: Boolean(hoverPreview && src && isVideo && !videoPlaying),
-    frameUrl: (t) =>
-      `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
-    duration: file.duration,
-    fileId: file.id,
-  });
-  const previewSrc = scrubDismissed ? null : scrubSrc;
+  const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
+    useHoverFramePreview({
+      // Off while the video is what to show: the preview plays, or a scene was
+      // just picked. A paused preview is otherwise still a frame to scrub away
+      // from. Off the stage too, so a card paged away from loads no frames.
+      enabled: Boolean(
+        hoverPreview &&
+        src &&
+        isVideo &&
+        isActive &&
+        !videoPlaying &&
+        !scrubDismissed,
+      ),
+      frameUrl: (t) =>
+        `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
+      duration: file.duration,
+      fileId: file.id,
+    });
 
   return (
     // Black is the right ground behind a frame or a photo; with nothing to
@@ -291,7 +299,7 @@ export function DiscoverCard({
               dropFromWatchLaterCache(qc, wsId, file.id);
             }}
             onPlaybackStart={claimVideo}
-            onPlayingChange={setVideoPlaying}
+            onPlayingChange={onPlayingChange}
             onFatalError={(message) => {
               setPreview(null);
               setVideoPlaying(false);

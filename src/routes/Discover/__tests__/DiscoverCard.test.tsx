@@ -338,7 +338,33 @@ describe("DiscoverCard video hover scrub", () => {
 
     // Moving the pointer over the media again brings the scrub back.
     fireEvent.mouseMove(link, { clientX: 10 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    act(() => MockImage.last?.onload?.());
     expect(layer().classList.contains("invisible")).toBe(true);
+  });
+
+  it("scrubs under the pointer on a pause after a scene picked while playing", () => {
+    renderWithProviders(<ActiveVideoCard overrides={withThumb} />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    const video = document.querySelector("video") as HTMLVideoElement;
+    fireEvent.play(video);
+    hover();
+    const scene = screen.getAllByRole("button", { name: /^seek to/i })[0];
+    scene.focus();
+    fireEvent.click(scene);
+
+    // The pointer never moves: the pause alone brings the scrub back.
+    fireEvent.pause(video);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    act(() => MockImage.last?.onload?.());
+    const layer = document.querySelector(
+      '[data-slot="discover-video"]',
+    ) as HTMLElement;
+    expect(layer.classList.contains("invisible")).toBe(true);
   });
 });
 

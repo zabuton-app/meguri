@@ -34,6 +34,8 @@ export function computeScrubTime(
 }
 
 interface Options {
+  /** Whether to scrub. The pointer is followed while off too, so turning it
+   *  back on with the pointer still over the media scrubs from there. */
   enabled: boolean;
   /** Builds the media-server frame URL for a given time in seconds. */
   frameUrl: (t: number) => string;
