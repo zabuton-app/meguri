@@ -55,7 +55,7 @@ function renderPlayer(
   const onOpenExternal = vi.fn();
   const t = (key: string) => key;
 
-  const props = {
+  const base = {
     id: 1,
     src: "http://127.0.0.1:17345/ws/ws1/media/1",
     duration: 120,
@@ -75,10 +75,11 @@ function renderPlayer(
     onPlayed,
     onOpenExternal,
     t,
-    ...overrides,
-    // The spread loses the tie between `shortcuts` and `navKeys`; an override
-    // that turns the shortcuts off clears `navKeys` itself.
-  } as Parameters<typeof VideoPlayer>[0];
+  } satisfies Parameters<typeof VideoPlayer>[0];
+  // The spread loses the tie between `shortcuts` and `navKeys`; an override
+  // that turns the shortcuts off clears `navKeys` itself. The base above is
+  // still checked whole, so a required prop it lacks does not compile.
+  const props = { ...base, ...overrides } as Parameters<typeof VideoPlayer>[0];
 
   const ref = createRef<PlayerHandle>();
   const view = render(
