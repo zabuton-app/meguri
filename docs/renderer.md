@@ -26,8 +26,8 @@ choice, the modal size and the peek width are all remembered in
 mark the file it shows (`aria-current="page"`, a primary border) and scroll
 it into view once each time the file changes (`useScrollToPeek`), so
 prev/next in the peek or a file opened from elsewhere does not leave the list
-behind. A file outside the pages loaded at that moment is neither marked nor
-scrolled to, even once its page loads later.
+behind. A file outside the pages loaded at that moment is not scrolled to,
+even once its page loads later; it is marked from then on.
 
 A modal's frame closes itself on Esc (unless a layer on top already took the
 key) and keeps keyboard focus inside with `useModalFocus`

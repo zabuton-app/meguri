@@ -8,7 +8,9 @@ import { useEffect, useRef } from "react";
  * jump either.
  *
  * `row` is the view's row of the peek's file, or -1 when the view does not
- * hold it. `ready` is read inside the effect, so it may read the layout.
+ * hold it. `ready` is read inside the effect, so it may read the layout; a
+ * new `ready` is what makes the effect check again, so it must change
+ * identity whenever its answer can change (a `useCallback` over what it reads).
  */
 export function useScrollToPeek({
   peekFileKey,

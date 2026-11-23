@@ -313,8 +313,9 @@ describe("TimelineView", () => {
       expect(scrollToIndex).toHaveBeenCalledTimes(2);
       expect(peeked()[0]).toContain("f10.mp4");
 
-      // A file outside the loaded window is neither marked nor scrolled to.
-      rerender(view(peekItems, { peekFileKey: "other-ws:10" }));
+      // A file the counts place but the loaded window does not hold (the
+      // window ends with October) is neither marked nor scrolled to.
+      rerender(view(peekItems.slice(0, 8), { peekFileKey: `${WS_ID}:9` }));
       await waitFor(() => expect(peeked()).toHaveLength(0));
       expect(scrollToIndex).toHaveBeenCalledTimes(2);
 
