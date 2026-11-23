@@ -3,8 +3,10 @@
 //
 //   node scripts/dev/make-subtitle-samples.mjs [output-dir]
 //
-// Writes to samples/subtitles/ by default (the Docker dev container's library,
-// where .gitignore keeps the videos out of Git):
+// Writes to samples/subtitles/ by default, where .gitignore keeps the videos
+// out of Git. Open it with `MEGURI_ROOT=samples/subtitles npm run dev`, or in
+// the Docker dev container add /media/library/subtitles as a workspace (the
+// seeded ones are /media/library/1 and /2 only):
 //
 //   01-mkv-4tracks-10min-audio-eng.mkv  10 min, audio eng; SRT eng and jpn,
 //     ASS fra, WebVTT kor. Cues cross the 2-minute loading windows (01:55-02:05,
@@ -267,8 +269,9 @@ function generate(
   args.push(
     "-c:v",
     "libx264",
+    // veryfast rather than ultrafast: a third of the size, a few seconds more.
     "-preset",
-    "ultrafast",
+    "veryfast",
     "-crf",
     "32",
     "-pix_fmt",
@@ -281,7 +284,13 @@ function generate(
   subtitles.forEach((s, i) => {
     args.push(`-c:s:${i}`, subtitleCodec ?? WRITERS[s.format].codec);
     args.push(`-metadata:s:s:${i}`, `language=${s.language}`);
-    if (s.title) args.push(`-metadata:s:s:${i}`, `title=${s.title}`);
+    // MP4 has no title tag for a track: its name goes in the handler name,
+    // which ffprobe reports in place of a title.
+    if (s.title)
+      args.push(
+        `-metadata:s:s:${i}`,
+        `${file.endsWith(".mp4") ? "handler_name" : "title"}=${s.title}`,
+      );
   });
   args.push(path.join(target, file));
 

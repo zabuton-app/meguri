@@ -335,6 +335,10 @@ videos):
 node scripts/dev/make-subtitle-samples.mjs [output-dir]
 ```
 
+The seeded workspaces do not include that folder: in the container, add
+`/media/library/subtitles` as a workspace, or open it with
+`MEGURI_ROOT=samples/subtitles npm run dev`.
+
 ### Build / distribution packages
 
 ```bash
