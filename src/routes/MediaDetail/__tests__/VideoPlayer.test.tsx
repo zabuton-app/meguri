@@ -245,6 +245,121 @@ describe("embedded subtitles", () => {
   });
 });
 
+// The captions can be dragged out of the way and put back (#377).
+describe("dragging subtitles", () => {
+  beforeEach(() => {
+    localStorage.removeItem("meguri.subtitlePosition");
+    fileSubtitles.mockReset();
+    fileSubtitles.mockResolvedValue([{ start: 0, end: 60, text: "Hello" }]);
+  });
+
+  // The captions in a 1000 × 400 area, their box 200 × 40 at its bottom middle.
+  async function setup() {
+    const r = renderPlayer({
+      subtitleTracks: [{ title: "English", language: "eng", codec: "subrip" }],
+      subtitleAudioLanguage: "eng",
+    });
+    loadVideo(r.video);
+    const box = await screen.findByText("Hello");
+    const area = box.parentElement as HTMLDivElement;
+    area.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 1000, height: 400 }) as DOMRect;
+    box.getBoundingClientRect = () =>
+      ({ left: 400, top: 360, width: 200, height: 40 }) as DOMRect;
+    box.setPointerCapture = () => {};
+    const play = vi.fn().mockResolvedValue(undefined);
+    r.video.play = play;
+    return { ...r, box, area, play };
+  }
+
+  const at = { pointerId: 1, button: 0, buttons: 1 };
+
+  it("moves them on a drag, kept inside the player, without playing", async () => {
+    const { box, play } = await setup();
+    expect(box.style.left).toBe("50%");
+    expect(box.style.top).toBe("100%");
+
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 100, clientY: 200 });
+    fireEvent.pointerUp(box, { ...at, clientX: 100, clientY: 200 });
+    fireEvent.click(box);
+    // The box's left edge at 0 of 800 px of room, its top at 180 of 360.
+    expect(box.style.left).toBe("0%");
+    expect(box.style.top).toBe("50%");
+    expect(box.style.transform).toBe("translate(0%, -50%)");
+    expect(play).not.toHaveBeenCalled();
+
+    // Past the edge, it stops there.
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 1500, clientY: -500 });
+    fireEvent.pointerUp(box, { ...at, clientX: 1500, clientY: -500 });
+    expect(box.style.left).toBe("100%");
+    expect(box.style.top).toBe("0%");
+    expect(
+      JSON.parse(localStorage.getItem("meguri.subtitlePosition") ?? "null"),
+    ).toEqual({ x: 1, y: 0 });
+  });
+
+  it("captures the pointer from the press on", async () => {
+    const { box } = await setup();
+    const capture = vi.fn();
+    box.setPointerCapture = capture;
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    expect(capture).toHaveBeenCalledWith(1);
+  });
+
+  it("keeps the captions while dragged across the end of the cue", async () => {
+    const { box, video } = await setup();
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 300, clientY: 380 });
+    // The cue ends mid-drag: the box holds the pointer capture, so it stays.
+    video.currentTime = 70;
+    fireEvent.timeUpdate(video);
+    await waitFor(() => expect(box.textContent).toBe(""));
+    expect(box.isConnected).toBe(true);
+
+    fireEvent.pointerUp(box, { ...at, clientX: 300, clientY: 380 });
+    expect(
+      JSON.parse(localStorage.getItem("meguri.subtitlePosition") ?? "null"),
+    ).toEqual({ x: 0.25, y: 1 });
+    await waitFor(() => expect(box.isConnected).toBe(false));
+  });
+
+  it("plays or pauses on a click that hardly moves", async () => {
+    const { box, play } = await setup();
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 502, clientY: 381 });
+    fireEvent.pointerUp(box, { ...at, clientX: 502, clientY: 381 });
+    fireEvent.click(box);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(box.style.left).toBe("50%");
+    expect(localStorage.getItem("meguri.subtitlePosition")).toBeNull();
+  });
+
+  it("keeps the position for the next clip, and resets it from the panel", async () => {
+    localStorage.setItem(
+      "meguri.subtitlePosition",
+      JSON.stringify({ x: 0.25, y: 0.5 }),
+    );
+    const { box, area } = await setup();
+    expect(box.style.left).toBe("25%");
+    expect(box.style.top).toBe("50%");
+    // Paused, the control bar shows: the captions stay above it.
+    expect(area.className.split(" ")).toContain("bottom-20");
+    expect(area.className.split(" ")).not.toContain("bottom-3");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.audioSubtitles" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.subtitleResetPosition" }),
+    );
+    expect(box.style.left).toBe("50%");
+    expect(box.style.top).toBe("100%");
+    expect(localStorage.getItem("meguri.subtitlePosition")).toBeNull();
+  });
+});
+
 describe("audio and subtitles panel", () => {
   const tracks = [{ title: "English", language: "eng", codec: "subrip" }];
 
@@ -1024,6 +1139,20 @@ describe("VideoPlayer", () => {
 
     expect(fileRecordPlay).toHaveBeenCalledWith(1, "ws1", "browser", 0);
     expect(onPlayed).toHaveBeenCalledTimes(1);
+  });
+
+  it("records no play, and fires no onPlayed, when told not to", () => {
+    const { video, onPlayed } = renderPlayer({
+      autoplay: false,
+      recordPlay: false,
+    });
+    loadVideo(video);
+
+    fireEvent.play(video);
+
+    expect(fileRecordPlay).not.toHaveBeenCalled();
+    // A caller's onPlayed updates what a recorded play changes.
+    expect(onPlayed).not.toHaveBeenCalled();
   });
 
   it("ignores MEDIA_ERR_ABORTED without surfacing the error screen", () => {

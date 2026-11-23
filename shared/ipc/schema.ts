@@ -202,6 +202,8 @@ export const SearchQuerySchema = z.preprocess(
     favorite: z.boolean().optional(),
     /** Restrict to files that have duplicates (same content_hash + size, cross-workspace in the All view). */
     duplicates: z.boolean().optional(),
+    /** Only videos with an embedded text subtitle track the player can show. */
+    subtitles: z.boolean().optional(),
     played: z.boolean().optional(),
     /** Only files left part-way through (a resume point is stored). */
     inProgress: z.boolean().optional(),

@@ -6,7 +6,9 @@ import {
 } from "@shared/embeddedSubtitles";
 import {
   AUTO_SUBTITLE,
+  readSubtitlePosition,
   readSubtitlePreference,
+  saveSubtitlePosition,
   saveSubtitlePreference,
   SUBTITLES_OFF,
   subtitlePreferenceKey,
@@ -65,5 +67,18 @@ describe("subtitle preferences", () => {
     expect(
       readSubtitlePreference(subtitlePreferenceKey("other", "first.mkv")),
     ).toBe(AUTO_SUBTITLE);
+  });
+});
+
+describe("subtitle position", () => {
+  it("is one position for all clips, and ignores a malformed one", () => {
+    saveSubtitlePosition({ x: 0.25, y: 0.75 });
+    expect(readSubtitlePosition()).toEqual({ x: 0.25, y: 0.75 });
+    saveSubtitlePosition(null);
+    expect(readSubtitlePosition()).toBeNull();
+    localStorage.setItem("meguri.subtitlePosition", '{"x":2,"y":0.5}');
+    expect(readSubtitlePosition()).toBeNull();
+    localStorage.setItem("meguri.subtitlePosition", "not JSON");
+    expect(readSubtitlePosition()).toBeNull();
   });
 });

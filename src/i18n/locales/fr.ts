@@ -369,10 +369,17 @@ export const fr: Catalog = {
   },
   "filter.hashChip": "Empreinte du contenu",
   "filter.extChip": "Extension",
+  "filter.sizeChip": "Taille",
+  "filter.durationChip": "Durée",
+  "filter.widthChip": "Largeur",
+  "filter.heightChip": "Hauteur",
+  "filter.excludeChip": "Exclure",
   "filter.kindFilter": "Filtrer par type",
   "filter.playState": "État de lecture",
   "filter.sortSection": "Tri",
   "filter.otherSection": "Autres",
+  "filter.subtitles": "Afficher uniquement les vidéos sous-titrées",
+  "filter.subtitlesChip": "Sous-titres",
 
   // smart collections
   "smartCollection.title": "Collections intelligentes",
@@ -552,6 +559,7 @@ export const fr: Catalog = {
   "player.subtitles": "Sous-titres",
   "player.subtitleAuto": "Suivre la langue audio",
   "player.subtitleOff": "Désactivés",
+  "player.subtitleResetPosition": "Réinitialiser la position",
   "player.subtitleLoading": "Chargement des sous-titres…",
   "player.subtitleUnavailable":
     "Impossible de charger cette piste de sous-titres.",
