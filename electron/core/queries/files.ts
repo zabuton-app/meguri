@@ -16,7 +16,9 @@ import {
   parseExtSearchToken,
   parseHashSearchToken,
   parseNegatedSearchToken,
+  parseNumericSearchToken,
   parseTagSearchToken,
+  type NumericSearch,
   searchTokenTerms,
   splitSearchTokens,
   BARE_SEARCH_NAMESPACES,
@@ -85,6 +87,17 @@ function freeTextGroup(token: string): FreeTextGroup {
     likes: words.filter((term) => !isTrigramSearchable(term)),
   };
 }
+
+/**
+ * The column each numeric directive compares. Duration in whole seconds, as the
+ * list shows it (formatDuration floors), so `duration:1:30` finds a 90.4 s clip.
+ */
+const NUMERIC_SEARCH_COLUMNS: Record<NumericSearch["field"], string> = {
+  size: "f.size",
+  duration: "CAST(f.duration AS INTEGER)",
+  width: "f.width",
+  height: "f.height",
+};
 
 /** A term the trigram tokenizer can index: three code points or more. */
 function isTrigramSearchable(term: string): boolean {
@@ -249,8 +262,9 @@ function anyOfCondition(group: FreeTextGroup, args: unknown[]): string {
 
 /**
  * The condition that a file matches one directive token (`tag:`, `hash:`,
- * `ext:`), or null for free text. A new directive is added here, and both
- * `tag:x` and `-tag:x` then work: the exclusion only ever wraps this.
+ * `ext:`, `size:`, `duration:`, `width:`, `height:`), or null for free text.
+ * A new directive is added here, and both `tag:x` and `-tag:x` then work: the
+ * exclusion only ever wraps this.
  */
 function directiveCondition(
   db: DB,
@@ -272,6 +286,15 @@ function directiveCondition(
     // until a page fills, up to every live row.
     args.push(ext);
     return "f.ext = ?";
+  }
+  const num = parseNumericSearchToken(token);
+  if (num) {
+    // No index either, for the same reason as ext. A NULL value (an image's
+    // duration) fails every comparison, so an unknown value never matches,
+    // and is kept by `-duration:<30s`. The operator is one of the parser's
+    // fixed set, never text from the query.
+    args.push(num.value);
+    return `${NUMERIC_SEARCH_COLUMNS[num.field]} ${num.op} ?`;
   }
   const tag = parseTagSearchToken(token);
   if (tag) {

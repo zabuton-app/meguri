@@ -484,12 +484,32 @@ the files whose `ext` is exactly `mp4`, in any case and with or without the dot
 `.m4v` files do not match. It is a chip like `hash:`, and it is ANDed with the
 other directives, so `ext:mp4 ext:mkv` matches nothing.
 
+The **numeric directives** compare a column (#524): `size:` (bytes), `duration:`
+(seconds), `width:` and `height:` (pixels), each followed by `>`, `>=`, `<`,
+`<=` or no operator for equality (`size:>1gb`, `duration:<30s`,
+`width:>=3840`). `size:` takes `b`, `kb`, `mb` or `gb`, binary as `formatSize`
+shows sizes (1 kb = 1024 bytes); `duration:` takes `s`, `m`, `h` or a clock time
+(`1:30`, `1:02:03`), and is compared in whole seconds, as the list shows it.
+No unit is the column's own. Equality is exact on the stored value:
+`size:1.5gb` is 1610612736 bytes, not every file the list shows as 1.5 GB, so a
+range (`size:>1.4gb size:<1.6gb`) finds those. The names are the full words
+because `dur` and `res` are tag namespaces. `parseNumericSearchToken()` in `shared/tags.ts` reads
+them; an unknown unit or a missing number leaves the token free text. A file
+whose value is unknown (`NULL`, such as an image's duration) never matches. Two
+directives on one field are ANDed, so `size:>100mb size:<1gb` is a range. They
+are chips like `ext:`, and none of the four columns is indexed: the comparison
+runs on the rows the other conditions leave. With a leading `-`
+(`-size:>1gb`), a file whose value is unknown is kept.
+
 A leading **`-` excludes** (#523): `-tag:screenshot`, `-ext:gif`, `-hash:3fa9`
 and `-draft` leave out the files the same token without the `-` would match.
 `parseNegatedSearchToken()` in `shared/tags.ts` reads it, and
-`buildSearchTerms()` sends the token's condition to SQL as `NOT …`. Negated free
-text follows the positive split (trigram `MATCH` for 3+ code points, `LIKE` for
-shorter ones), each negated word on its own, and with alternatives
+`appendSearchConditions()` sends the token's condition, built by
+`directiveCondition()` for a directive, to SQL as `NOT COALESCE((…), 0)`. A
+file the condition says nothing about (`NULL`) is kept, and a directive added
+there can be excluded as well. Negated free text follows the positive split
+(trigram `MATCH` for 3+ code points, `LIKE` for shorter ones), each negated word
+on its own, and with alternatives
 (`-draft|wip`) a file matching any of them is left out. A file without a hash is
 never excluded by `-hash:`, and `-tag:` with a name no tag has excludes nothing.
 A query of negations only returns every other file; on 100,000 synthetic files a

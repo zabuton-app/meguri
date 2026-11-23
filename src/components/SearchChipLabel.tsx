@@ -5,6 +5,7 @@ import {
   TAG_SEARCH_PREFIX,
   parseExtSearchToken,
   parseHashSearchToken,
+  parseNumericSearchToken,
   parseNegatedSearchToken,
   parseTagSearchToken,
 } from "@shared/tags";
@@ -23,15 +24,20 @@ export function SearchChipLabel({
   const { negated, body: token } = parseNegatedSearchToken(raw);
   const hash = parseHashSearchToken(token);
   const ext = parseExtSearchToken(token);
+  const num = parseNumericSearchToken(token);
   const prefix =
     hash !== null
       ? HASH_SEARCH_PREFIX
       : ext !== null
         ? EXT_SEARCH_PREFIX
-        : TAG_SEARCH_PREFIX;
-  const body = hash ?? ext ?? parseTagSearchToken(token) ?? "";
+        : num !== null
+          ? num.field
+          : TAG_SEARCH_PREFIX;
+  const body = hash ?? ext ?? num?.text ?? parseTagSearchToken(token) ?? "";
   const human =
-    hash === null && ext === null ? generatedTagChipLabel(t, token) : null;
+    hash === null && ext === null && num === null
+      ? generatedTagChipLabel(t, token)
+      : null;
   return (
     <span className="truncate">
       {negated && <span className="text-error">{SEARCH_NOT}</span>}

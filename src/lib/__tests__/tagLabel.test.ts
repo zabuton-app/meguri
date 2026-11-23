@@ -74,6 +74,14 @@ describe("searchTokenLabel", () => {
     expect(searchTokenLabel(t, "ext:.MP4")).toBe("Extension: mp4");
   });
 
+  it("names a numeric directive by its field and comparison (#524)", () => {
+    expect(searchTokenLabel(t, "SIZE:>1GB")).toBe("Size: >1gb");
+    expect(searchTokenLabel(t, "duration:<1:30")).toBe("Duration: <1:30");
+    expect(searchTokenLabel(t, "width:>=3840")).toBe("Width: >=3840");
+    expect(searchTokenLabel(t, "height:1080")).toBe("Height: 1080");
+    expect(searchTokenLabel(t, "size:big")).toBeNull();
+  });
+
   it("names a negated directive as an exclusion (#523)", () => {
     expect(searchTokenLabel(t, "-ext:GIF")).toBe("Exclude: Extension: gif");
     expect(searchTokenLabel(t, "-draft")).toBeNull();

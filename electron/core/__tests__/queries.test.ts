@@ -379,6 +379,99 @@ describe("searchFiles", () => {
     expect(ids("ext:mkv")).toEqual([]);
   });
 
+  describe("numeric directives (#524)", () => {
+    const ids = (q: string) =>
+      searchFiles(db, { q, sort: "name", sortDir: "asc" }).items.map(
+        (f) => f.id,
+      );
+
+    it("compares size with each operator, in binary units", () => {
+      const small = insertFile(db, rootId, { relPath: "a.mp4", size: 1024 });
+      const mid = insertFile(db, rootId, { relPath: "b.mp4", size: 1024 ** 2 });
+      const big = insertFile(db, rootId, { relPath: "c.mp4", size: 1024 ** 3 });
+      expect(ids("size:>1mb")).toEqual([big]);
+      expect(ids("size:>=1mb")).toEqual([mid, big]);
+      expect(ids("size:<1mb")).toEqual([small]);
+      expect(ids("size:<=1mb")).toEqual([small, mid]);
+      expect(ids("size:1mb")).toEqual([mid]);
+      expect(ids("size:1kb")).toEqual([small]);
+    });
+
+    it("ANDs two directives on one field into a range", () => {
+      insertFile(db, rootId, { relPath: "a.mp4", size: 50 * 1024 ** 2 });
+      const mid = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        size: 500 * 1024 ** 2,
+      });
+      insertFile(db, rootId, { relPath: "c.mp4", size: 2 * 1024 ** 3 });
+      expect(ids("size:>100mb size:<1gb")).toEqual([mid]);
+      expect(ids("size: >100mb size: <1gb")).toEqual([mid]);
+    });
+
+    it("compares duration in whole seconds, and never matches an unknown one", () => {
+      const short = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        duration: 29.9,
+      });
+      const clip = insertFile(db, rootId, { relPath: "b.mp4", duration: 90.4 });
+      const long = insertFile(db, rootId, {
+        relPath: "c.mp4",
+        duration: 3723,
+      });
+      insertFile(db, rootId, { relPath: "d.jpg", kind: "image" });
+      expect(ids("duration:<30s")).toEqual([short]);
+      expect(ids("duration:1:30")).toEqual([clip]);
+      expect(ids("duration:90")).toEqual([clip]);
+      expect(ids("duration:>20m")).toEqual([long]);
+      expect(ids("duration:>=1:02:03")).toEqual([long]);
+      expect(ids("duration:<=1h")).toEqual([short, clip]);
+      // 90.4 s is 90 in whole seconds, so it is not over 90.
+      expect(ids("duration:>90s")).toEqual([long]);
+    });
+
+    it("compares width and height in pixels", () => {
+      const uhd = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        width: 3840,
+        height: 2160,
+      });
+      const hd = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        width: 1920,
+        height: 1080,
+      });
+      insertFile(db, rootId, { relPath: "c.mp3", kind: "audio" });
+      expect(ids("width:>=3840")).toEqual([uhd]);
+      expect(ids("height:1080")).toEqual([hd]);
+      expect(ids("height:<2160")).toEqual([hd]);
+    });
+
+    it("excludes with a leading -, keeping a file whose value is unknown", () => {
+      const short = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        duration: 20,
+        size: 1024,
+      });
+      const long = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        duration: 600,
+        size: 1024 ** 3,
+      });
+      const image = insertFile(db, rootId, { relPath: "c.jpg", kind: "image" });
+      expect(ids("-duration:<30s")).toEqual([long, image]);
+      expect(ids("-size:>1mb")).toEqual([short, image]);
+      expect(ids("duration:>10s -duration:>5m")).toEqual([short]);
+    });
+
+    it("leaves an unparsable value as free text", () => {
+      // Searched as the text it is, so it finds a name that contains it.
+      const named = insertFile(db, rootId, { relPath: "size:big.mp4" });
+      insertFile(db, rootId, { relPath: "other.mp4", size: 2 * 1024 ** 3 });
+      syncFts(db, named);
+      expect(ids("size:big")).toEqual([named]);
+    });
+  });
+
   describe("a leading - excludes (#523)", () => {
     const ids = (q: string) =>
       searchFiles(db, { q })

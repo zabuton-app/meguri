@@ -738,6 +738,13 @@ describe("search field", () => {
     );
   });
 
+  it("chips numeric directives, folding a space after the colon (#524)", () => {
+    renderMenu();
+    type("size: >100mb DURATION:<1:30 size:big ");
+    expect(chips()).toEqual(["size:>100mb", "duration:<1:30"]);
+    expect(field().value).toBe("size:big ");
+  });
+
   it("keeps a half-typed directive as text", () => {
     renderMenu();
     type("tag:bea");

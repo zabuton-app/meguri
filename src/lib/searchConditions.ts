@@ -17,6 +17,7 @@ import {
   parseExtSearchToken,
   parseQualifiedTagName,
   parseHashSearchToken,
+  parseNumericSearchToken,
   parseNegatedSearchToken,
   parseTagSearchToken,
   splitSearchTokens,
@@ -30,7 +31,7 @@ import {
   scopedFolderPath,
 } from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
-import { tagHumanLabel } from "@/lib/tagLabel";
+import { numericSearchLabel, tagHumanLabel } from "@/lib/tagLabel";
 
 /** Which surface owns the control that sets a condition. */
 export type ConditionGroup = "primary" | "collapsed";
@@ -111,10 +112,12 @@ export function describeConditions(
     const { negated, body: token } = parseNegatedSearchToken(raw);
     const hash = parseHashSearchToken(token);
     const ext = parseExtSearchToken(token);
+    const num = parseNumericSearchToken(token);
     const tag = isTagDirective(token) ? parseTagSearchToken(token) : null;
     let label: string;
     if (hash != null) label = `${t("filter.hashChip")}: ${hash}`;
     else if (ext != null) label = `${t("filter.extChip")}: ${ext}`;
+    else if (num != null) label = numericSearchLabel(t, num);
     else if (tag != null) label = tagLabel(t, tag);
     else return;
     if (negated) label = `${t("filter.excludeChip")}: ${label}`;
