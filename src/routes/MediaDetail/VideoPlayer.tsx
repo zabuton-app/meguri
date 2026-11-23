@@ -1398,8 +1398,8 @@ export const VideoPlayer = forwardRef<
       {/* After the round play button, so the captions can still be dragged
           while paused. They stay above the control bar while it shows (the
           same conditions as the bar's own); a dragged position may go lower
-          when it hides. */}
-      {caption && (
+          when it hides. Kept while dragged, even when the cue ends. */}
+      {(caption || captionDrag.dragging) && (
         <div
           ref={captionAreaRef}
           data-slot="video-subtitles"
@@ -1413,7 +1413,7 @@ export const VideoPlayer = forwardRef<
             className={`pointer-events-auto absolute w-max max-w-full touch-none select-none whitespace-pre-line rounded-item bg-black/80 px-3 py-1 text-center text-white ${
               captionDrag.dragging ? "cursor-grabbing" : "cursor-move"
             } ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
-            style={captionStyle(captionDrag.position ?? DEFAULT_CAPTION_PLACE)}
+            style={captionDrag.style}
             onClick={() => {
               if (!captionDrag.dragged()) togglePlay();
             }}
@@ -1673,19 +1673,6 @@ function CtrlButton({
       {children}
     </button>
   );
-}
-
-// Centred along the bottom of the captions' area, where they start out.
-const DEFAULT_CAPTION_PLACE = { x: 0.5, y: 1 };
-
-// Moving the box by its own size as well as the area's keeps it inside the
-// area at every fraction, without measuring either.
-function captionStyle({ x, y }: { x: number; y: number }): React.CSSProperties {
-  return {
-    left: `${x * 100}%`,
-    top: `${y * 100}%`,
-    transform: `translate(${-x * 100}%, ${-y * 100}%)`,
-  };
 }
 
 // Round the ratio with about 80px (layout) of margin so the preview doesn't overflow the bar edges too much.

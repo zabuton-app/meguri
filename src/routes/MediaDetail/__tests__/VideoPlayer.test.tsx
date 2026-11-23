@@ -298,6 +298,31 @@ describe("dragging subtitles", () => {
     ).toEqual({ x: 1, y: 0 });
   });
 
+  it("captures the pointer from the press on", async () => {
+    const { box } = await setup();
+    const capture = vi.fn();
+    box.setPointerCapture = capture;
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    expect(capture).toHaveBeenCalledWith(1);
+  });
+
+  it("keeps the captions while dragged across the end of the cue", async () => {
+    const { box, video } = await setup();
+    fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
+    fireEvent.pointerMove(box, { ...at, clientX: 300, clientY: 380 });
+    // The cue ends mid-drag: the box holds the pointer capture, so it stays.
+    video.currentTime = 70;
+    fireEvent.timeUpdate(video);
+    await waitFor(() => expect(box.textContent).toBe(""));
+    expect(box.isConnected).toBe(true);
+
+    fireEvent.pointerUp(box, { ...at, clientX: 300, clientY: 380 });
+    expect(
+      JSON.parse(localStorage.getItem("meguri.subtitlePosition") ?? "null"),
+    ).toEqual({ x: 0.25, y: 1 });
+    await waitFor(() => expect(box.isConnected).toBe(false));
+  });
+
   it("plays or pauses on a click that hardly moves", async () => {
     const { box, play } = await setup();
     fireEvent.pointerDown(box, { ...at, clientX: 500, clientY: 380 });
@@ -318,7 +343,8 @@ describe("dragging subtitles", () => {
     expect(box.style.left).toBe("25%");
     expect(box.style.top).toBe("50%");
     // Paused, the control bar shows: the captions stay above it.
-    expect(area.className).toContain("bottom-20");
+    expect(area.className.split(" ")).toContain("bottom-20");
+    expect(area.className.split(" ")).not.toContain("bottom-3");
 
     fireEvent.click(
       screen.getByRole("button", { name: "player.audioSubtitles" }),

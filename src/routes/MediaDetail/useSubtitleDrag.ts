@@ -1,4 +1,4 @@
-import { useRef, useState, type RefObject } from "react";
+import { useRef, useState, type CSSProperties, type RefObject } from "react";
 import {
   readSubtitlePosition,
   saveSubtitlePosition,
@@ -43,6 +43,9 @@ export function useSubtitleDrag(areaRef: RefObject<HTMLElement | null>) {
       if (e.button !== 0) return;
       // No text selection while dragging. The click still arrives.
       e.preventDefault();
+      // Captured from the press on: the box is small, and a quick move can
+      // leave it before the threshold is crossed.
+      e.currentTarget.setPointerCapture(e.pointerId);
       const box = e.currentTarget.getBoundingClientRect();
       press.current = {
         id: e.pointerId,
@@ -68,7 +71,6 @@ export function useSubtitleDrag(areaRef: RefObject<HTMLElement | null>) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
         d.dragging = true;
         draggedRef.current = true;
-        e.currentTarget.setPointerCapture(e.pointerId);
         setDragging(true);
       }
       const area = areaRef.current?.getBoundingClientRect();
@@ -89,6 +91,10 @@ export function useSubtitleDrag(areaRef: RefObject<HTMLElement | null>) {
   return {
     /** Null at the default place above the control bar. */
     position,
+    /** Places the captions' box at `position` inside the area. */
+    style: captionStyle(position ?? DEFAULT_PLACE),
+    /** While true, the captions' box must stay mounted, even between cues:
+     *  it holds the pointer capture. */
     dragging,
     /** Whether the click that ends the current press was a drag. */
     dragged: () => draggedRef.current,
@@ -97,6 +103,19 @@ export function useSubtitleDrag(areaRef: RefObject<HTMLElement | null>) {
       saveSubtitlePosition(null);
     },
     handlers,
+  };
+}
+
+// Centred along the bottom of the area, where the captions start out.
+const DEFAULT_PLACE = { x: 0.5, y: 1 };
+
+// Moving the box by its own size as well as the area's keeps it inside the
+// area at every fraction, without measuring either. `along` is the inverse.
+function captionStyle({ x, y }: SubtitlePosition): CSSProperties {
+  return {
+    left: `${x * 100}%`,
+    top: `${y * 100}%`,
+    transform: `translate(${-x * 100}%, ${-y * 100}%)`,
   };
 }
 
