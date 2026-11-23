@@ -410,9 +410,13 @@ export function appendSearchConditions(
   }
   if (query.subtitles) {
     // Read from the ffprobe streams the scan stored in files.meta, so it needs
-    // no column or rescan. It parses JSON per row and has no index; the kind
-    // test lets idx_files_kind skip everything but videos first.
-    sql += ` AND f.kind = 'video' AND EXISTS (SELECT 1 FROM json_each(f.meta, '$.streams') s
+    // no column or rescan. There is no index for it: a list sorted by anything
+    // but its pinned order tests every video for every page. The LIKE, a plain
+    // text search over the stored JSON (written by JSON.stringify, so with no
+    // space after the colon), drops the videos with no subtitle stream at all
+    // before the JSON is parsed, about halving that walk. json_each then checks
+    // the codec.
+    sql += ` AND f.kind = 'video' AND f.meta LIKE '%"subtitle"%' AND EXISTS (SELECT 1 FROM json_each(f.meta, '$.streams') s
       WHERE json_extract(s.value, '$.codec_type') = 'subtitle'
         AND json_extract(s.value, '$.codec_name') IN (SELECT value FROM json_each(?)))`;
     args.push(TEXT_SUBTITLE_CODECS_JSON);

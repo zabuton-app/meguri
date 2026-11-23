@@ -90,6 +90,10 @@ describe("searchFiles", () => {
       { codec_type: "subtitle", codec_name: "hdmv_pgs_subtitle" },
     ]);
     withMeta("plain.mp4", "video", [video]);
+    // The word alone, outside a subtitle stream, is not a subtitle track.
+    withMeta("titled.mp4", "video", [
+      { ...video, tags: { title: "subtitle" } },
+    ]);
     // An audio file is not a video, whatever its streams say.
     withMeta("lyrics.mka", "audio", [
       { codec_type: "audio", codec_name: "flac" },
