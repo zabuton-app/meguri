@@ -12,14 +12,10 @@ import { kindLabel } from "@/lib/mediaKind";
 import { resolveSortDir } from "@shared/sortDir";
 import {
   isSearchDirective,
-  isTagDirective,
   joinSearchTokens,
-  parseExtSearchToken,
   parseQualifiedTagName,
-  parseHashSearchToken,
-  parseNumericSearchToken,
   parseNegatedSearchToken,
-  parseTagSearchToken,
+  parseSearchDirective,
   splitSearchTokens,
 } from "@shared/tags";
 import type { SearchQuery } from "@/ipc/types";
@@ -31,7 +27,7 @@ import {
   scopedFolderPath,
 } from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
-import { numericSearchLabel, tagHumanLabel } from "@/lib/tagLabel";
+import { directiveLabel, tagHumanLabel } from "@/lib/tagLabel";
 
 /** Which surface owns the control that sets a condition. */
 export type ConditionGroup = "primary" | "collapsed";
@@ -109,17 +105,10 @@ export function describeConditions(
     });
 
   splitSearchTokens(query.q ?? "").forEach((raw, i) => {
-    const { negated, body: token } = parseNegatedSearchToken(raw);
-    const hash = parseHashSearchToken(token);
-    const ext = parseExtSearchToken(token);
-    const num = parseNumericSearchToken(token);
-    const tag = isTagDirective(token) ? parseTagSearchToken(token) : null;
-    let label: string;
-    if (hash != null) label = `${t("filter.hashChip")}: ${hash}`;
-    else if (ext != null) label = `${t("filter.extChip")}: ${ext}`;
-    else if (num != null) label = numericSearchLabel(t, num);
-    else if (tag != null) label = tagLabel(t, tag);
-    else return;
+    const { negated, body } = parseNegatedSearchToken(raw);
+    const d = parseSearchDirective(body);
+    if (d === null) return;
+    let label = d.kind === "tag" ? tagLabel(t, d.value) : directiveLabel(t, d);
     if (negated) label = `${t("filter.excludeChip")}: ${label}`;
     out.push({
       key: `directive-${i}`,

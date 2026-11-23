@@ -520,6 +520,14 @@ directive is a chip of its own, drawn struck through behind its `-`, and
 `searchDirectiveKey()` keeps `tag:x` and `-tag:x` apart. A negated word stays
 free text.
 
+Every directive is told apart from free text by one parser,
+`parseSearchDirective()` in `shared/tags.ts` (#666): the chips, the duplicate
+check, the space folding and the labels read its result. A new directive is
+added there and to `DIRECTIVE_PREFIXES`, then to `directiveCondition()` in
+`electron/core/queries/files.ts` (its SQL) and `directiveLabel()` in
+`src/lib/tagLabel.ts` (its label); each is a `switch` or a `Record` on the
+directive's kind, so leaving one out does not compile.
+
 The search is typed in the command menu, whose field starts from the search on
 screen (`useSearchDraft` in `src/hooks/`, rendered by `CommandMenu`). It shows a
 directive as a **chip** rather than as raw text, so it is added and removed as

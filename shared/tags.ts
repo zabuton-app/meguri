@@ -278,15 +278,10 @@ export function parseTagSearchToken(token: string): string | null {
   return value || null;
 }
 
-/** True for a token the search box treats as an exact-tag directive. */
-export function isTagDirective(token: string): boolean {
-  return parseTagSearchToken(token) !== null;
-}
-
 /**
  * A `tag:` directive's value folded by tagIdentityKey, the fold the SQL that
- * finally resolves the tag uses (see {@link searchDirectiveKey}); null for
- * anything else.
+ * finally resolves the tag uses (the key {@link parseSearchDirective} gives a
+ * tag); null for anything else.
  */
 export function tagSearchKey(token: string): string | null {
   const value = parseTagSearchToken(token);
@@ -442,16 +437,81 @@ export function parseNegatedSearchToken(token: string): {
   return { negated: false, body: token };
 }
 
-/** True for a token the search box shows as a chip: a `tag:`, `hash:`,
- *  `ext:` or numeric directive, negated or not, rather than free text. */
+/**
+ * A search-box directive, read once (#666): which kind it is, what its chip
+ * shows (`prefix:value`), and the key two directives are compared on. Every
+ * place that tells directives apart reads this rather than chaining the
+ * parsers above. A new kind is added here and to DIRECTIVE_PREFIXES, then to
+ * directiveCondition (SQL, main) and directiveLabel (renderer), whose switches
+ * do not compile without it.
+ */
+export type SearchDirective =
+  | ({ kind: "tag" } & DirectiveText)
+  | ({ kind: "hash" } & DirectiveText)
+  | ({ kind: "ext" } & DirectiveText)
+  | ({ kind: "numeric"; num: NumericSearch } & DirectiveText);
+
+interface DirectiveText {
+  /** What the chip shows before the colon. */
+  prefix: string;
+  /** What the chip shows after it. */
+  value: string;
+  /** What two directives are compared on (see searchDirectiveKey). */
+  key: string;
+}
+
+/** The prefixes each kind is typed with. A Record, so a new kind without its
+ *  prefixes does not compile: left out of the space folding, `x: 3` would
+ *  quietly become a search for the text. */
+const DIRECTIVE_PREFIXES: Record<SearchDirective["kind"], readonly string[]> = {
+  tag: [TAG_SEARCH_PREFIX],
+  hash: [HASH_SEARCH_PREFIX],
+  ext: [EXT_SEARCH_PREFIX],
+  numeric: NUMERIC_SEARCH_FIELDS,
+};
+
+/** The prefixes, with their colon, a space after the colon is folded for. */
+export const SEARCH_DIRECTIVE_PREFIXES: readonly string[] = Object.values(
+  DIRECTIVE_PREFIXES,
+)
+  .flat()
+  .map((prefix) => `${prefix}:`);
+
+/**
+ * The directive a token (without a leading `-`) is, or null for free text.
+ * Each key is folded the way the SQL reads the value: a looser fold would
+ * silently drop a condition the user typed. The prefix keeps `tag:3fa9` and
+ * `hash:3fa9` apart.
+ */
+export function parseSearchDirective(token: string): SearchDirective | null {
+  const hash = parseHashSearchToken(token);
+  if (hash !== null) {
+    const key = `${HASH_SEARCH_PREFIX}:${hash}`;
+    return { kind: "hash", prefix: HASH_SEARCH_PREFIX, value: hash, key };
+  }
+  const ext = parseExtSearchToken(token);
+  if (ext !== null) {
+    const key = `${EXT_SEARCH_PREFIX}:${ext}`;
+    return { kind: "ext", prefix: EXT_SEARCH_PREFIX, value: ext, key };
+  }
+  const num = parseNumericSearchToken(token);
+  if (num !== null) {
+    // On the value the SQL compares, so `size:>1gb` repeats `size:>1024mb`.
+    const key = `${num.field}:${num.op}${num.value}`;
+    return { kind: "numeric", prefix: num.field, value: num.text, key, num };
+  }
+  const tag = parseTagSearchToken(token);
+  if (tag !== null) {
+    const key = `${TAG_SEARCH_PREFIX}:${tagSearchKey(token)}`;
+    return { kind: "tag", prefix: TAG_SEARCH_PREFIX, value: tag, key };
+  }
+  return null;
+}
+
+/** True for a token the search box shows as a chip: a directive, negated or
+ *  not, rather than free text. */
 export function isSearchDirective(token: string): boolean {
-  const { body } = parseNegatedSearchToken(token);
-  return (
-    isTagDirective(body) ||
-    parseHashSearchToken(body) !== null ||
-    parseExtSearchToken(body) !== null ||
-    parseNumericSearchToken(body) !== null
-  );
+  return parseSearchDirective(parseNegatedSearchToken(token).body) !== null;
 }
 
 /**
@@ -459,27 +519,14 @@ export function isSearchDirective(token: string): boolean {
  * same condition — null for ordinary free text.
  *
  * Both routes into the query (typing one, clicking a tag) go through here, so
- * neither can append a condition the other would have called a repeat. Each
- * kind is folded the way its SQL reads it: a looser fold would silently drop a
- * condition the user typed. The prefix keeps `tag:3fa9` and `hash:3fa9` apart.
+ * neither can append a condition the other would have called a repeat. See
+ * parseSearchDirective for how each kind is folded.
  */
 export function searchDirectiveKey(token: string): string | null {
   const { negated, body } = parseNegatedSearchToken(token);
-  const key = positiveDirectiveKey(body);
+  const key = parseSearchDirective(body)?.key ?? null;
   // `tag:x` and `-tag:x` are opposite conditions, never repeats of each other.
   return key !== null && negated ? `${SEARCH_NOT}${key}` : key;
-}
-
-function positiveDirectiveKey(token: string): string | null {
-  const hash = parseHashSearchToken(token);
-  if (hash !== null) return `${HASH_SEARCH_PREFIX}:${hash}`;
-  const ext = parseExtSearchToken(token);
-  if (ext !== null) return `${EXT_SEARCH_PREFIX}:${ext}`;
-  // On the value the SQL compares, so `size:>1gb` repeats `size:>1024mb`.
-  const num = parseNumericSearchToken(token);
-  if (num !== null) return `${num.field}:${num.op}${num.value}`;
-  const tag = tagSearchKey(token);
-  return tag === null ? null : `${TAG_SEARCH_PREFIX}:${tag}`;
 }
 
 function needsQuoting(value: string): boolean {
@@ -519,16 +566,13 @@ export function tagSearchToken(name: string, namespace = ""): string {
  * that the directive exists to avoid — the one failure the user cannot see.
  */
 function foldSpacedDirectives(tokens: string[]): string[] {
-  const bare = [
-    `${TAG_SEARCH_PREFIX}:`,
-    `${HASH_SEARCH_PREFIX}:`,
-    `${EXT_SEARCH_PREFIX}:`,
-    ...NUMERIC_SEARCH_FIELDS.map((f) => `${f}:`),
-  ];
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
     const { body } = parseNegatedSearchToken(tokens[i]);
-    if (bare.includes(body.toLowerCase()) && i + 1 < tokens.length) {
+    if (
+      SEARCH_DIRECTIVE_PREFIXES.includes(body.toLowerCase()) &&
+      i + 1 < tokens.length
+    ) {
       // A quoted leading dash is marked for a token of its own (LITERAL_DASH);
       // inside a directive's value it is plain text.
       const value = tokens[i + 1];

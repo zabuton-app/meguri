@@ -2,12 +2,11 @@ import {
   AUTO_META_SOURCE,
   namespaceOfAutoMetaValue,
   parseQualifiedTagName,
-  parseExtSearchToken,
-  parseHashSearchToken,
-  parseNumericSearchToken,
   parseNegatedSearchToken,
+  parseSearchDirective,
   parseTagSearchToken,
   type NumericSearch,
+  type SearchDirective,
 } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
@@ -88,10 +87,24 @@ const NUMERIC_CHIP_KEYS: Record<NumericSearch["field"], TranslationKey> = {
   height: "filter.heightChip",
 };
 
-/** What a `size:`, `duration:`, `width:` or `height:` condition reads as:
- *  `Size: >1gb`, the comparison as typed. */
-export function numericSearchLabel(t: TFunc, num: NumericSearch): string {
-  return `${t(NUMERIC_CHIP_KEYS[num.field])}: ${num.text}`;
+/**
+ * What a directive other than `tag:` reads as: its field and value, `Hash:
+ * 3fa9`, `Size: >1gb` (the comparison as typed). A `tag:` directive's label
+ * depends on where it is shown, so each caller builds its own. Shared by the
+ * chip's tooltip and the condition row, so the two read the same.
+ */
+export function directiveLabel(
+  t: TFunc,
+  d: Exclude<SearchDirective, { kind: "tag" }>,
+): string {
+  switch (d.kind) {
+    case "hash":
+      return `${t("filter.hashChip")}: ${d.value}`;
+    case "ext":
+      return `${t("filter.extChip")}: ${d.value}`;
+    case "numeric":
+      return `${t(NUMERIC_CHIP_KEYS[d.num.field])}: ${d.value}`;
+  }
 }
 
 /**
@@ -113,15 +126,10 @@ export function searchTokenLabel(t: TFunc, raw: string): string | null {
 }
 
 function positiveTokenLabel(t: TFunc, token: string): string | null {
-  const hash = parseHashSearchToken(token);
-  if (hash !== null) return `${t("filter.hashChip")}: ${hash}`;
-  const ext = parseExtSearchToken(token);
-  if (ext !== null) return `${t("filter.extChip")}: ${ext}`;
-  const num = parseNumericSearchToken(token);
-  if (num !== null) return numericSearchLabel(t, num);
-  const raw = parseTagSearchToken(token);
-  if (raw === null) return null;
-  const parsed = parseQualifiedTagName(raw);
+  const d = parseSearchDirective(token);
+  if (d === null) return null;
+  if (d.kind !== "tag") return directiveLabel(t, d);
+  const parsed = parseQualifiedTagName(d.value);
   const namespace =
     parsed.namespace || namespaceOfAutoMetaValue(parsed.name) || "";
   return namespace

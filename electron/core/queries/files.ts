@@ -13,11 +13,8 @@ import {
 } from "./folderRange.js";
 import {
   LIST_HIDDEN_SOURCES,
-  parseExtSearchToken,
-  parseHashSearchToken,
   parseNegatedSearchToken,
-  parseNumericSearchToken,
-  parseTagSearchToken,
+  parseSearchDirective,
   type NumericSearch,
   searchTokenTerms,
   splitSearchTokens,
@@ -261,48 +258,46 @@ function anyOfCondition(group: FreeTextGroup, args: unknown[]): string {
 }
 
 /**
- * The condition that a file matches one directive token (`tag:`, `hash:`,
- * `ext:`, `size:`, `duration:`, `width:`, `height:`), or null for free text.
- * A new directive is added here, and both `tag:x` and `-tag:x` then work: the
- * exclusion only ever wraps this.
+ * The condition that a file matches one directive token (see
+ * parseSearchDirective), or null for free text. A new kind of directive has to
+ * be handled here — the switch does not compile without it — and both `x` and
+ * `-x` then work: the exclusion only ever wraps this.
  */
 function directiveCondition(
   db: DB,
   token: string,
   args: unknown[],
 ): string | null {
-  const hash = parseHashSearchToken(token);
-  if (hash) {
-    // A range on the hash rather than LIKE, so idx_files_content_hash serves
-    // it: every hex digit sorts before "g", so the prefix followed by "g" is
-    // past every hash that starts with it. Files without a hash never match.
-    args.push(hash, `${hash}g`);
-    return "f.content_hash >= ? AND f.content_hash < ?";
+  const d = parseSearchDirective(token);
+  if (d === null) return null;
+  switch (d.kind) {
+    case "hash":
+      // A range on the hash rather than LIKE, so idx_files_content_hash serves
+      // it: every hex digit sorts before "g", so the prefix followed by "g" is
+      // past every hash that starts with it. Files without a hash never match.
+      args.push(d.value, `${d.value}g`);
+      return "f.content_hash >= ? AND f.content_hash < ?";
+    case "ext":
+      // Exact, on the lower-cased value the scan stores. No index: with
+      // nothing else narrowing, a rare extension makes the list walk its sort
+      // order until a page fills, up to every live row.
+      args.push(d.value);
+      return "f.ext = ?";
+    case "numeric":
+      // No index either, for the same reason as ext. A NULL value (an image's
+      // duration) fails every comparison, so an unknown value never matches,
+      // and is kept by `-duration:<30s`. The operator is one of the parser's
+      // fixed set, never text from the query.
+      args.push(d.num.value);
+      return `${NUMERIC_SEARCH_COLUMNS[d.num.field]} ${d.num.op} ?`;
+    case "tag": {
+      const ids = resolveSearchTagIds(db, d.value);
+      // No tag by that name: no file carries it.
+      return ids.length === 0
+        ? "0"
+        : tagCondition(db, args, JSON.stringify(ids));
+    }
   }
-  const ext = parseExtSearchToken(token);
-  if (ext) {
-    // Exact, on the lower-cased value the scan stores. No index: with nothing
-    // else narrowing, a rare extension makes the list walk its sort order
-    // until a page fills, up to every live row.
-    args.push(ext);
-    return "f.ext = ?";
-  }
-  const num = parseNumericSearchToken(token);
-  if (num) {
-    // No index either, for the same reason as ext. A NULL value (an image's
-    // duration) fails every comparison, so an unknown value never matches,
-    // and is kept by `-duration:<30s`. The operator is one of the parser's
-    // fixed set, never text from the query.
-    args.push(num.value);
-    return `${NUMERIC_SEARCH_COLUMNS[num.field]} ${num.op} ?`;
-  }
-  const tag = parseTagSearchToken(token);
-  if (tag) {
-    const ids = resolveSearchTagIds(db, tag);
-    // No tag by that name: no file carries it.
-    return ids.length === 0 ? "0" : tagCondition(db, args, JSON.stringify(ids));
-  }
-  return null;
 }
 
 /** The condition that a file matches one token, directive or free text. */
