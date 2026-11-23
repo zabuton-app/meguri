@@ -20,8 +20,7 @@ import {
   type ZoomView,
 } from "@/lib/panZoom";
 
-/** How far a press moves before it pans instead of clicking (also how far
- *  one on the video's captions moves before it drags them). */
+/** How far a press moves before it is a drag rather than a click. */
 export const DRAG_THRESHOLD_PX = 4;
 
 // Zoom and pan of a picture in a stage, one behavior for the detail view's

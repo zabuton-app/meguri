@@ -257,6 +257,14 @@ describe("CompareView zoom and pan", () => {
     expect(level()).toBe("50%");
   });
 
+  it("goes back to fit on a swap, whose A counts the zoom in other pixels", () => {
+    const { stage, level } = setupStage();
+    fireEvent.doubleClick(stage, { clientX: 103, clientY: 151 });
+    expect(level()).toBe("100%");
+    fireEvent.keyDown(window, { key: "s" });
+    expect(level()).toBe("50%");
+  });
+
   it("pans by dragging while zoomed in, and stops at the edges", () => {
     const { stage, box } = setupStage();
     fireEvent.doubleClick(stage, { clientX: 103, clientY: 151 });

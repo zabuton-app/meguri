@@ -232,6 +232,10 @@ export function ShortcutsOverlay({
           keys: [[["+"], ["-"]], [["Ctrl", t("shortcuts.wheel")]]],
         },
         { label: t("shortcuts.compareFit"), keys: [[["0"]]] },
+        {
+          label: t("shortcuts.imageZoomToggle"),
+          keys: [[[t("shortcuts.doubleClick")]]],
+        },
         { label: t("shortcuts.compareBlink"), keys: [[["Space"]]] },
         { label: t("common.close"), keys: esc },
       ],

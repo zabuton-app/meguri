@@ -771,15 +771,17 @@ Zoom uses `webFrame.setZoomFactor` rather than CSS zoom, so coordinate math is
 not affected. It is driven via `preload` through
 `src/hooks/useContentZoom.ts`.
 
-The detail view's image has a zoom of its own
-(`src/routes/MediaDetail/ZoomableImage.tsx`). Ctrl+wheel over the image zooms
-the image instead of the window: its listener stops the event before it
-bubbles to the window listener of `useContentZoom`, so that listener must stay
-on the bubble phase. Zoomed in, the image is drawn at its zoomed size over
-its own stage, not scaled with CSS zoom, so it does not touch the rule above.
+The detail view's image and video and the image comparison have a zoom of
+their own, with one behavior (`src/hooks/usePanZoom.ts`, with the math of
+`src/lib/panZoom.ts`; #647). Ctrl+wheel over the picture zooms it instead of
+the window: the hook's listener stops the event before it bubbles to the
+window listener of `useContentZoom`, so that listener must stay on the bubble
+phase. Zoomed in, the image is drawn at its zoomed size over its own stage
+(`src/routes/MediaDetail/ZoomableImage.tsx`), not scaled with CSS zoom, so it
+does not touch the rule above.
 
-The detail view's video zooms the same way
-(`src/routes/MediaDetail/useVideoZoom.ts`, with the math of `imageZoom.ts`).
+The detail view's video (`src/routes/MediaDetail/useVideoZoom.ts`) is on the
+same hook.
 It cannot be redrawn in a pane of its own, so the zoom is a CSS transform on
 the element that holds the `<video>` (and on the adjusted picture's canvas,
 which is drawn at the zoomed resolution), never on the `<video>` itself: that

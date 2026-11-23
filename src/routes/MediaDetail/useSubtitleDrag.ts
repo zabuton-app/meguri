@@ -4,6 +4,8 @@ import {
   saveSubtitlePosition,
   type SubtitlePosition,
 } from "@/lib/subtitlePreference";
+// The same threshold as panning a zoomed video: a press on the captions that
+// hardly moves still plays or pauses, as one on the picture does.
 import { DRAG_THRESHOLD_PX } from "@/hooks/usePanZoom";
 
 // Dragging the captions to another place in the player (#377). The position is

@@ -143,6 +143,13 @@ export function CompareView({
     content: { w: box.width, h: box.height },
   });
   const placed = zoom.placed;
+  // Swapping makes the other image A, whose pixels the zoom counts in: with a
+  // placement that scales B, the same zoom would show another magnification,
+  // so the swap goes back to fit.
+  const swap = () => {
+    setSwapped((v) => !v);
+    zoom.fit();
+  };
   // Where each image is drawn, in A's pixels.
   const rectA: Rect = { x: 0, y: 0, ...sizeA };
   const rectB: Rect = {
@@ -159,7 +166,7 @@ export function CompareView({
 
   useCompareKeys({
     setMode,
-    swap: () => setSwapped((v) => !v),
+    swap,
     fit: zoom.fit,
     zoomIn: zoom.zoomIn,
     zoomOut: zoom.zoomOut,
@@ -228,7 +235,7 @@ export function CompareView({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSwapped((v) => !v)}
+            onClick={swap}
             title={t("compare.swap")}
           >
             <ArrowLeftRight />
