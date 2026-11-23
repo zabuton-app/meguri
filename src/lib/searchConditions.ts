@@ -108,6 +108,9 @@ export function describeConditions(
     const { negated, body } = parseNegatedSearchToken(raw);
     const d = parseSearchDirective(body);
     if (d === null) return;
+    // A `rating:` or `is:fav` directive is a chip apart from the rating and
+    // favorite controls' below: the two apply independently (#525), and each
+    // clears its own.
     let label = d.kind === "tag" ? tagLabel(t, d.value) : directiveLabel(t, d);
     if (negated) label = `${t("filter.excludeChip")}: ${label}`;
     out.push({

@@ -104,6 +104,12 @@ export function directiveLabel(
       return `${t("filter.extChip")}: ${d.value}`;
     case "numeric":
       return `${t(NUMERIC_CHIP_KEYS[d.num.field])}: ${d.value}`;
+    case "rating":
+      return `${t("media.rating")}: ${d.value}`;
+    case "favorite":
+      // Unlike the favorite control's `♥ Favorites`: both can be on at once,
+      // and each chip clears only its own.
+      return `${t("favorite.chip")} (${d.prefix}:${d.value})`;
   }
 }
 

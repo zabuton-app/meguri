@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   hashSearchToken,
   isEditableTag,
+  isFavoriteSearchToken,
   isReservedTagName,
   isSearchDirective,
   parseHashSearchToken,
@@ -11,7 +12,9 @@ import {
   hasOpenQuote,
   joinSearchTokens,
   parseQualifiedTagName,
+  parseRatingSearchToken,
   parseTagSearchToken,
+  ratingSearchText,
   reservedTagPrefix,
   qualifiedTagName,
   splitSearchTokens,
@@ -439,6 +442,69 @@ describe("parseHashSearchToken", () => {
   });
 });
 
+describe("parseRatingSearchToken", () => {
+  it("reads each comparison, and none as equality (#525)", () => {
+    expect(parseRatingSearchToken("rating:>4")).toEqual({ op: ">", value: 4 });
+    expect(parseRatingSearchToken("rating:>=4")).toEqual({
+      op: ">=",
+      value: 4,
+    });
+    expect(parseRatingSearchToken("rating:<2")).toEqual({ op: "<", value: 2 });
+    expect(parseRatingSearchToken("rating:<=2")).toEqual({
+      op: "<=",
+      value: 2,
+    });
+    expect(parseRatingSearchToken("RATING:3")).toEqual({ op: "=", value: 3 });
+    expect(parseRatingSearchToken("rating:0")).toEqual({ op: "=", value: 0 });
+    expect(parseRatingSearchToken("rating:5")).toEqual({ op: "=", value: 5 });
+  });
+
+  it("leaves a value outside 0 to 5, or another comparison, as free text", () => {
+    for (const token of [
+      "rating:6",
+      "rating:>=6",
+      "rating:-1",
+      "rating:3.5",
+      "rating:05",
+      "rating:=3",
+      "rating:=>3",
+      "rating:!=3",
+      "rating:>",
+      "rating:",
+      "rating:high",
+      "4",
+    ])
+      expect(parseRatingSearchToken(token), token).toBeNull();
+  });
+
+  it("folds a value typed after a space", () => {
+    expect(splitSearchTokens("rating: >=4 trip")).toEqual([
+      "rating:>=4",
+      "trip",
+    ]);
+  });
+
+  it("writes the comparison back as the token does", () => {
+    expect(ratingSearchText({ op: ">=", value: 4 })).toBe(">=4");
+    expect(ratingSearchText({ op: "=", value: 3 })).toBe("3");
+  });
+});
+
+describe("isFavoriteSearchToken", () => {
+  it("reads is:fav in any case, and a value after a space (#525)", () => {
+    expect(isFavoriteSearchToken("is:fav")).toBe(true);
+    expect(isFavoriteSearchToken("IS:Fav")).toBe(true);
+    expect(splitSearchTokens("is: fav trip")).toEqual(["is:fav", "trip"]);
+  });
+
+  it("leaves any other value as free text", () => {
+    expect(isFavoriteSearchToken("is:favorite")).toBe(false);
+    expect(isFavoriteSearchToken("is:played")).toBe(false);
+    expect(isFavoriteSearchToken("is:")).toBe(false);
+    expect(isFavoriteSearchToken("fav")).toBe(false);
+  });
+});
+
 describe("parseNumericSearchToken (#524)", () => {
   const read = (token: string) => {
     const num = parseNumericSearchToken(token);
@@ -552,6 +618,16 @@ describe("searchDirectiveKey / isSearchDirective", () => {
     expect(searchDirectiveKey("3fa9")).toBeNull();
   });
 
+  it("keys rating: by its comparison and is:fav in any case (#525)", () => {
+    expect(searchDirectiveKey("RATING:>=4")).toBe(
+      searchDirectiveKey("rating:>=4"),
+    );
+    expect(searchDirectiveKey("rating:>=4")).not.toBe(
+      searchDirectiveKey("rating:>4"),
+    );
+    expect(searchDirectiveKey("IS:FAV")).toBe(searchDirectiveKey("is:fav"));
+  });
+
   it("keys a numeric directive on the value it compares (#524)", () => {
     expect(searchDirectiveKey("size:>1gb")).toBe(
       searchDirectiveKey("SIZE:>1024mb"),
@@ -590,6 +666,10 @@ describe("searchDirectiveKey / isSearchDirective", () => {
     expect(isSearchDirective("tag:beach")).toBe(true);
     expect(isSearchDirective("hash:3fa9")).toBe(true);
     expect(isSearchDirective("hash:3f")).toBe(false);
+    expect(isSearchDirective("rating:>=4")).toBe(true);
+    expect(isSearchDirective("rating:6")).toBe(false);
+    expect(isSearchDirective("is:fav")).toBe(true);
+    expect(isSearchDirective("is:played")).toBe(false);
     expect(isSearchDirective("beach")).toBe(false);
   });
 });

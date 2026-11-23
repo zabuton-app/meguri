@@ -501,6 +501,22 @@ are chips like `ext:`, and none of the four columns is indexed: the comparison
 runs on the rows the other conditions leave. With a leading `-`
 (`-size:>1gb`), a file whose value is unknown is kept.
 
+The **`rating:` directive** finds files by rating (#525): `rating:>=4`,
+`rating:>4`, `rating:<=2`, `rating:<2`, or `rating:3` for exactly 3. The value
+is a whole number from 0 to 5, and a file without a rating counts as 0, as the
+rating filter's `ratingMin` does. Any other value or comparison (`rating:6`,
+`rating:3.5`, `rating:=3`) leaves the token ordinary text, as `hash:` does.
+Two of them make a range (`rating:>=2 rating:<5`).
+
+The **`is:fav` directive** finds favorites (#525). `fav` is the only value `is:`
+takes; `is:` with any other value is ordinary text.
+
+Both are chips like `hash:`, the condition row names them, and both accept a
+space after the colon (`rating: >=4`). They are independent of the rating and
+favorite controls of the filter bar: a directive does not set the control nor
+the other way round, and when both are set both apply (AND). With a leading `-`,
+`-is:fav` keeps every file that is not a favorite.
+
 A leading **`-` excludes** (#523): `-tag:screenshot`, `-ext:gif`, `-hash:3fa9`
 and `-draft` leave out the files the same token without the `-` would match.
 `parseNegatedSearchToken()` in `shared/tags.ts` reads it, and

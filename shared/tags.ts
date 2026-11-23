@@ -337,6 +337,52 @@ export function parseExtSearchToken(token: string): string | null {
 }
 
 /**
+ * The search-box directive for a rating (#525): `rating:>=4`, `rating:<2`, or
+ * `rating:3` for exactly 3. A file without a rating counts as 0, as the
+ * rating filter's `ratingMin` does. A value other than a whole number from 0
+ * to 5, or a comparison other than `>`, `>=`, `<` and `<=`, leaves the token
+ * ordinary text.
+ */
+export const RATING_SEARCH_PREFIX = "rating";
+
+export interface RatingSearch {
+  /** The SQL comparison; `=` when the token has none. */
+  op: ">" | ">=" | "<" | "<=" | "=";
+  value: number;
+}
+
+/** The comparison of a `rating:` token, or null when the token is ordinary
+ *  text. */
+export function parseRatingSearchToken(token: string): RatingSearch | null {
+  const head = `${RATING_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return null;
+  const m = /^(>=|<=|>|<)?([0-5])$/.exec(token.slice(head.length).trim());
+  if (!m) return null;
+  return { op: (m[1] ?? "=") as RatingSearch["op"], value: Number(m[2]) };
+}
+
+/** A `rating:` comparison as the token writes it: `>=4`, or `3` for equality. */
+export function ratingSearchText({ op, value }: RatingSearch): string {
+  return `${op === "=" ? "" : op}${value}`;
+}
+
+/**
+ * The search-box directive for favorites (#525): `is:fav`. `fav` is the only
+ * value `is:` takes; any other leaves the token ordinary text.
+ */
+export const IS_SEARCH_PREFIX = "is";
+export const FAVORITE_SEARCH_VALUE = "fav";
+
+/** True for an `is:fav` token, in any case. */
+export function isFavoriteSearchToken(token: string): boolean {
+  const head = `${IS_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return false;
+  return (
+    token.slice(head.length).trim().toLowerCase() === FAVORITE_SEARCH_VALUE
+  );
+}
+
+/**
  * The search-box directives that compare a number (#524): `size:>1gb`,
  * `duration:<30s`, `width:>=3840`, `height:1080`. The full words, not `dur:` or
  * `res:`, which are tag namespaces (`tag:dur:long`).
@@ -449,7 +495,9 @@ export type SearchDirective =
   | ({ kind: "tag" } & DirectiveText)
   | ({ kind: "hash" } & DirectiveText)
   | ({ kind: "ext" } & DirectiveText)
-  | ({ kind: "numeric"; num: NumericSearch } & DirectiveText);
+  | ({ kind: "numeric"; num: NumericSearch } & DirectiveText)
+  | ({ kind: "rating"; rating: RatingSearch } & DirectiveText)
+  | ({ kind: "favorite" } & DirectiveText);
 
 interface DirectiveText {
   /** What the chip shows before the colon. */
@@ -468,6 +516,8 @@ const DIRECTIVE_PREFIXES: Record<SearchDirective["kind"], readonly string[]> = {
   hash: [HASH_SEARCH_PREFIX],
   ext: [EXT_SEARCH_PREFIX],
   numeric: NUMERIC_SEARCH_FIELDS,
+  rating: [RATING_SEARCH_PREFIX],
+  favorite: [IS_SEARCH_PREFIX],
 };
 
 /** The prefixes, with their colon, a space after the colon is folded for. */
@@ -499,6 +549,21 @@ export function parseSearchDirective(token: string): SearchDirective | null {
     // On the value the SQL compares, so `size:>1gb` repeats `size:>1024mb`.
     const key = `${num.field}:${num.op}${num.value}`;
     return { kind: "numeric", prefix: num.field, value: num.text, key, num };
+  }
+  const rating = parseRatingSearchToken(token);
+  if (rating !== null) {
+    const value = ratingSearchText(rating);
+    const key = `${RATING_SEARCH_PREFIX}:${value}`;
+    return { kind: "rating", prefix: RATING_SEARCH_PREFIX, value, key, rating };
+  }
+  if (isFavoriteSearchToken(token)) {
+    const key = `${IS_SEARCH_PREFIX}:${FAVORITE_SEARCH_VALUE}`;
+    return {
+      kind: "favorite",
+      prefix: IS_SEARCH_PREFIX,
+      value: FAVORITE_SEARCH_VALUE,
+      key,
+    };
   }
   const tag = parseTagSearchToken(token);
   if (tag !== null) {

@@ -290,6 +290,14 @@ function directiveCondition(
       // fixed set, never text from the query.
       args.push(d.num.value);
       return `${NUMERIC_SEARCH_COLUMNS[d.num.field]} ${d.num.op} ?`;
+    case "rating":
+      // A file without a rating counts as 0, as ratingMin reads it below.
+      // The operator comes from the parser's fixed set, never the typed text.
+      args.push(d.rating.value);
+      return `COALESCE(m.rating, 0) ${d.rating.op} ?`;
+    case "favorite":
+      // NULL without a file_meta row: kept by `-is:fav`, as a non-favorite.
+      return "m.favorite = 1";
     case "tag": {
       const ids = resolveSearchTagIds(db, d.value);
       // No tag by that name: no file carries it.
