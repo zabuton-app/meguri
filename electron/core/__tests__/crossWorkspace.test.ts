@@ -166,6 +166,48 @@ describe("searchWorkspaces", () => {
       ["ws-b", "b/clip.mp4"],
     ]);
   });
+  it("applies a numeric directive in the All view across workspaces (#524)", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    insertFile(a.db, a.rootId, { relPath: "a/big.mp4", size: 2 * 1024 ** 3 });
+    insertFile(a.db, a.rootId, { relPath: "a/small.mp4", size: 1024 });
+    insertFile(b.db, b.rootId, { relPath: "b/big.mp4", size: 3 * 1024 ** 3 });
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { q: "size:>1gb", limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.relPath])).toEqual([
+      ["ws-a", "a/big.mp4"],
+      ["ws-b", "b/big.mp4"],
+    ]);
+  });
+
+  it("applies rating: and is:fav in the All view across workspaces (#525)", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    const aHit = insertFile(a.db, a.rootId, { relPath: "a/one.mp4" });
+    const aLow = insertFile(a.db, a.rootId, { relPath: "a/two.mp4" });
+    const bHit = insertFile(b.db, b.rootId, { relPath: "b/one.mp4" });
+    insertFile(b.db, b.rootId, { relPath: "b/two.mp4" });
+    setRating(a.db, aHit, 5);
+    setFavorite(a.db, aHit, true);
+    setRating(a.db, aLow, 1);
+    setFavorite(a.db, aLow, true);
+    setRating(b.db, bHit, 4);
+    setFavorite(b.db, bHit, true);
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { q: "is:fav rating:>=4", limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.relPath])).toEqual([
+      ["ws-a", "a/one.mp4"],
+      ["ws-b", "b/one.mp4"],
+    ]);
+  });
 });
 
 describe("searchWorkspaces k-way merge", () => {

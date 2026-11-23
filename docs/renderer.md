@@ -22,7 +22,12 @@ peek** — a sheet docked beside the list as a flex sibling, so the list narrows
 and stays fully usable along with the toolbar and the bottom player bar
 (`MediaModal`'s `presentation` prop). Its left edge is a drag handle; the
 choice, the modal size and the peek width are all remembered in
-`localStorage`.
+`localStorage`. While the peek is docked, the grid and the list mark the file
+it shows (`aria-current="page"`, a primary border) and scroll it into view
+once each time the file changes, so prev/next in the peek or a file opened
+from elsewhere does not leave the list behind. A file outside the pages
+loaded at that moment is neither marked nor scrolled to, even once its page
+loads later.
 
 A modal's frame closes itself on Esc (unless a layer on top already took the
 key) and keeps keyboard focus inside with `useModalFocus`
@@ -58,7 +63,12 @@ each half of the overlap whose distance apart gives the scale to a fraction
 of a pixel, so the scores compare and the highest wins. A new search only
 has to return guesses. On the view's side, `geometry.ts` holds the
 placement's arithmetic (span, overlap, the inverse for a swap) and
-`modes.ts` the layer styles of each way to look.
+`modes.ts` the layer styles of each way to look. Zoom and pan behave as
+the file details' image and video do (`src/hooks/usePanZoom.ts`, with the
+math in `src/lib/panZoom.ts`): Ctrl+wheel zooms toward the pointer, a
+double-click toggles fit and actual pixels, and a drag pans, clamped at the
+edges. The box that holds both images is what is fitted, 100% is actual
+pixels of A, and pixels past 2× are drawn unsmoothed.
 
 The renderer's CSP (`index.html`) does not reach this worker: OpenCV.js
 compiles its wasm there without `'wasm-unsafe-eval'` in the packaged app
@@ -761,15 +771,17 @@ Zoom uses `webFrame.setZoomFactor` rather than CSS zoom, so coordinate math is
 not affected. It is driven via `preload` through
 `src/hooks/useContentZoom.ts`.
 
-The detail view's image has a zoom of its own
-(`src/routes/MediaDetail/ZoomableImage.tsx`). Ctrl+wheel over the image zooms
-the image instead of the window: its listener stops the event before it
-bubbles to the window listener of `useContentZoom`, so that listener must stay
-on the bubble phase. Zoomed in, the image is drawn at its zoomed size over
-its own stage, not scaled with CSS zoom, so it does not touch the rule above.
+The detail view's image and video and the image comparison have a zoom of
+their own, with one behavior (`src/hooks/usePanZoom.ts`, with the math of
+`src/lib/panZoom.ts`; #647). Ctrl+wheel over the picture zooms it instead of
+the window: the hook's listener stops the event before it bubbles to the
+window listener of `useContentZoom`, so that listener must stay on the bubble
+phase. Zoomed in, the image is drawn at its zoomed size over its own stage
+(`src/routes/MediaDetail/ZoomableImage.tsx`), not scaled with CSS zoom, so it
+does not touch the rule above.
 
-The detail view's video zooms the same way
-(`src/routes/MediaDetail/useVideoZoom.ts`, with the math of `imageZoom.ts`).
+The detail view's video (`src/routes/MediaDetail/useVideoZoom.ts`) is on the
+same hook.
 It cannot be redrawn in a pane of its own, so the zoom is a CSS transform on
 the element that holds the `<video>` (and on the adjusted picture's canvas,
 which is drawn at the zoomed resolution), never on the `<video>` itself: that

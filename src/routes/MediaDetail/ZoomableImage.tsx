@@ -1,21 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Shrink, ZoomIn, ZoomOut } from "lucide-react";
+import { usePanZoom } from "@/hooks/usePanZoom";
+import type { Size } from "@/lib/panZoom";
 import type { TFunc } from "@/i18n/I18nProvider";
-import {
-  BUTTON_STEP,
-  imagePointAt,
-  MAX_ZOOM,
-  panBy,
-  placeImage,
-  wheelFactor,
-  zoomTo,
-  type Size,
-  type ZoomView,
-} from "./imageZoom";
 
-// The detail view's image, which can be zoomed and panned. Zoom with Ctrl+wheel
-// (toward the pointer), the buttons at the lower right, or a double-click (fit
-// ↔ actual pixels); drag to pan while zoomed in.
+// The detail view's image, which can be zoomed and panned (usePanZoom.ts).
+// Zoom with Ctrl+wheel (toward the pointer), the buttons at the lower right, or
+// a double-click (fit ↔ actual pixels); drag to pan while zoomed in.
 //
 // The stage keeps the size it has at fit. Zoomed in, the image is drawn over
 // the whole stage, bars beside the fitted image included, rather than inside
@@ -35,106 +26,11 @@ export function ZoomableImage({
   t: TFunc;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  // Null at fit.
-  const [view, setView] = useState<ZoomView | null>(null);
   const [natural, setNatural] = useState<Size | null>(null);
-  // The fitted image's width over its natural width: the zoom at fit.
-  const [fitZoom, setFitZoom] = useState(0);
-  const [stageSize, setStageSize] = useState<Size | null>(null);
-  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
-
-  const stageRect = () => rectOf(stageRef.current);
-
-  const measure = () => {
-    const r = stageRect();
-    if (r) setStageSize({ w: r.width, h: r.height });
-    const img = imgRef.current;
-    const box = boxRef.current;
-    if (!box || !img || !img.naturalWidth || !img.naturalHeight) return;
-    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
-    setFitZoom(box.clientWidth / img.naturalWidth);
-  };
-  const measureRef = useRef(measure);
-  useEffect(() => {
-    measureRef.current = measure;
-  });
-
-  // The stage and the fitted image follow the window and the side peek's
-  // width; so do the level shown at fit and the point below which zooming out
-  // returns to fit.
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => measureRef.current());
-    ro.observe(stage);
-    return () => ro.disconnect();
-  }, []);
-
-  /** Zoom by `factor`, toward a client point or else the middle. */
-  const zoomBy = (factor: number, at?: { x: number; y: number }) => {
-    const r = stageRect();
-    if (!r || !natural || !fitZoom) return;
-    const vp = { w: r.width, h: r.height };
-    setStageSize(vp);
-    setView((prev) => {
-      const next = (prev?.zoom ?? fitZoom) * factor;
-      if (next <= fitZoom) return null;
-      const vx = at ? at.x - r.left : vp.w / 2;
-      const vy = at ? at.y - r.top : vp.h / 2;
-      if (prev) {
-        const p = imagePointAt(prev, vx, vy, vp, natural);
-        return zoomTo(next, p.x, p.y, vx, vy, vp, natural);
-      }
-      // From fit: the spot of the fitted image under the point stays put.
-      const b = boxRef.current?.getBoundingClientRect();
-      if (!b || !b.width || !b.height)
-        return zoomTo(next, 0.5, 0.5, vx, vy, vp, natural);
-      return zoomTo(
-        next,
-        (r.left + vx - b.left) / b.width,
-        (r.top + vy - b.top) / b.height,
-        vx,
-        vy,
-        vp,
-        natural,
-      );
-    });
-  };
-
-  // Native, not React's onWheel: React registers wheel listeners as passive,
-  // and the window-wide Ctrl+wheel zoom (useContentZoom, on window) must be
-  // kept from also seeing this event. A plain wheel is left to scroll the
-  // detail view. Read through a ref so the listener, registered once, sees the
-  // current state.
-  const onWheelRef = useRef<(e: WheelEvent) => void>(() => {});
-  useEffect(() => {
-    onWheelRef.current = (e) => {
-      // An image that never loaded has nothing to zoom: leave the window zoom.
-      if (!e.ctrlKey || !natural || !fitZoom) return;
-      e.preventDefault();
-      e.stopPropagation();
-      zoomBy(wheelFactor(e.deltaY), { x: e.clientX, y: e.clientY });
-    };
-  });
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const onWheel = (e: WheelEvent) => onWheelRef.current(e);
-    stage.addEventListener("wheel", onWheel, { passive: false });
-    return () => stage.removeEventListener("wheel", onWheel);
-  }, []);
-
-  const endDrag = () => {
-    drag.current = null;
-    setDragging(false);
-  };
-
-  const zoom = view?.zoom ?? fitZoom;
-  const placed =
-    view && natural && stageSize && placeImage(view, stageSize, natural);
+  // The stage is as tall as the fitted image and centers it across, so its fit
+  // is the fitted image's.
+  const zoom = usePanZoom({ stageRef, content: natural });
+  const placed = zoom.view && zoom.placed;
 
   return (
     <div
@@ -144,19 +40,18 @@ export function ZoomableImage({
       }`}
     >
       <div
-        ref={boxRef}
         data-slot="zoomable-image"
         className="relative max-w-full"
-        onDoubleClick={(e) => {
-          // Actual pixels, unless the image already fits at or below them.
-          if (fitZoom < 1) zoomBy(1 / fitZoom, { x: e.clientX, y: e.clientY });
-        }}
+        onDoubleClick={(e) => zoom.toggle({ x: e.clientX, y: e.clientY })}
       >
         <img
-          ref={imgRef}
           src={src}
           alt={alt}
-          onLoad={measure}
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            if (img.naturalWidth && img.naturalHeight)
+              setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+          }}
           // Hidden rather than removed while zoomed: it keeps the stage at the
           // size it has at fit.
           className={`block max-h-[78vh] max-w-full object-contain ${
@@ -168,42 +63,10 @@ export function ZoomableImage({
         <div
           data-slot="image-zoom-pane"
           className={`absolute inset-0 touch-none ${
-            dragging ? "cursor-grabbing" : "cursor-grab"
+            zoom.dragging ? "cursor-grabbing" : "cursor-grab"
           }`}
-          onDoubleClick={() => setView(null)}
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-            e.currentTarget.setPointerCapture(e.pointerId);
-            drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
-            setDragging(true);
-          }}
-          onPointerMove={(e) => {
-            const d = drag.current;
-            if (!d || d.id !== e.pointerId) return;
-            // The button is up although no pointerup arrived here: the pane
-            // was closed mid-drag (zoomed out to fit) and opened again.
-            if (!(e.buttons & 1)) {
-              endDrag();
-              return;
-            }
-            const r = stageRect();
-            if (!r || !natural) return;
-            drag.current = { id: d.id, x: e.clientX, y: e.clientY };
-            const vp = { w: r.width, h: r.height };
-            setView(
-              (v) =>
-                v && panBy(v, e.clientX - d.x, e.clientY - d.y, vp, natural),
-            );
-          }}
-          onPointerUp={(e) => {
-            if (drag.current?.id === e.pointerId) endDrag();
-          }}
-          // Also when the capture is lost without a pointerup reaching here
-          // (the window losing the mouse mid-drag), or hovering would keep
-          // panning.
-          onLostPointerCapture={endDrag}
-          onPointerCancel={endDrag}
+          onDoubleClick={() => zoom.toggle()}
+          {...zoom.panHandlers}
         >
           <img
             src={src}
@@ -218,26 +81,19 @@ export function ZoomableImage({
           />
         </div>
       )}
-      {fitZoom > 0 && (
+      {zoom.ready && (
         <ZoomControls
-          percent={Math.round(zoom * 100)}
-          zoomed={view != null}
-          canZoomIn={zoom < MAX_ZOOM}
-          onZoomOut={() => zoomBy(1 / BUTTON_STEP)}
-          onZoomIn={() => zoomBy(BUTTON_STEP)}
-          onFit={() => setView(null)}
+          percent={zoom.percent}
+          zoomed={zoom.zoomed}
+          canZoomIn={zoom.canZoomIn}
+          onZoomOut={zoom.zoomOut}
+          onZoomIn={zoom.zoomIn}
+          onFit={zoom.fit}
           t={t}
         />
       )}
     </div>
   );
-}
-
-// One source for the stage's size, read the same way by the drawing and by the
-// event handlers that work in its coordinates; null while it has no size.
-function rectOf(el: Element | null) {
-  const r = el?.getBoundingClientRect();
-  return r && r.width && r.height ? r : null;
 }
 
 function ZoomControls({

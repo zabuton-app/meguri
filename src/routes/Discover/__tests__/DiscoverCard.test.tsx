@@ -15,7 +15,22 @@ const mocks = vi.hoisted(() => ({
   fileSetFavorite: vi.fn(),
   fileRecordPlay: vi.fn(),
   fileSavePosition: vi.fn(),
+  exclusivePlayback: vi.fn(),
 }));
+
+// Records which cards take part in audio/video exclusivity, then defers to the
+// real hook so playback still behaves as in the app.
+vi.mock("@/audio/useAudioPlayer", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/audio/useAudioPlayer")>();
+  return {
+    ...actual,
+    useExclusivePlayback: (pause: () => void) => {
+      mocks.exclusivePlayback();
+      return actual.useExclusivePlayback(pause);
+    },
+  };
+});
 
 vi.mock("@/ipc/client", () => ({
   api: {
@@ -207,7 +222,27 @@ describe("DiscoverCard video", () => {
     expect(screen.getByRole("button", { name: /^pause$/i })).toBeTruthy();
   });
 
-  it("previews without moving the resume point or taking the keyboard", () => {
+  it("registers for exclusive playback only once a preview is mounted", () => {
+    mocks.exclusivePlayback.mockReset();
+    const { rerender } = renderWithProviders(
+      <ActiveVideoCard isActive={false} />,
+    );
+    rerender(<ActiveVideoCard />);
+    expect(mocks.exclusivePlayback).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    expect(mocks.exclusivePlayback).toHaveBeenCalled();
+  });
+
+  it("does not register an image card for exclusive playback", () => {
+    mocks.exclusivePlayback.mockReset();
+    renderWithProviders(
+      <ActiveVideoCard overrides={{ kind: "image", duration: null }} />,
+    );
+    expect(mocks.exclusivePlayback).not.toHaveBeenCalled();
+  });
+
+  it("previews without counting a play, moving the resume point or taking the keyboard", () => {
     const { unmount } = renderWithProviders(<ActiveVideoCard />);
     fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
     const video = document.querySelector("video") as HTMLVideoElement;
@@ -230,7 +265,8 @@ describe("DiscoverCard video", () => {
     expect(fireEvent.keyDown(window, { code: "ArrowRight" })).toBe(true);
 
     unmount();
-    expect(mocks.fileRecordPlay).toHaveBeenCalled();
+    // Not a play (#398): no history row, and the file stays in Watch Later.
+    expect(mocks.fileRecordPlay).not.toHaveBeenCalled();
     expect(mocks.fileSavePosition).not.toHaveBeenCalled();
   });
 });
@@ -300,6 +336,71 @@ describe("DiscoverCard video hover scrub", () => {
 
     hover();
     expect(MockImage.last).toBeNull();
+  });
+
+  it("scrubs again once the preview pauses under the pointer", () => {
+    renderWithProviders(<ActiveVideoCard overrides={withThumb} />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    const video = document.querySelector("video") as HTMLVideoElement;
+    fireEvent.play(video);
+    hover();
+    expect(MockImage.last).toBeNull();
+
+    // The pointer never leaves the media.
+    fireEvent.pause(video);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(MockImage.last?.src).toContain("/frame/7?t=");
+  });
+
+  it("reveals the video for a seek made from the keyboard over a scrub frame", () => {
+    renderWithProviders(<ActiveVideoCard overrides={withThumb} />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    const video = document.querySelector("video") as HTMLVideoElement;
+    fireEvent.play(video);
+    fireEvent.pause(video);
+    const link = hover();
+    act(() => MockImage.last?.onload?.());
+    const layer = () =>
+      document.querySelector('[data-slot="discover-video"]') as HTMLElement;
+    expect(layer().classList.contains("invisible")).toBe(true);
+
+    // Activated from the keyboard: the pointer stays over the media.
+    const scene = screen.getAllByRole("button", { name: /^seek to/i })[0];
+    scene.focus();
+    fireEvent.click(scene);
+    expect(layer().classList.contains("invisible")).toBe(false);
+
+    // Moving the pointer over the media again brings the scrub back.
+    fireEvent.mouseMove(link, { clientX: 10 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    act(() => MockImage.last?.onload?.());
+    expect(layer().classList.contains("invisible")).toBe(true);
+  });
+
+  it("scrubs under the pointer on a pause after a scene picked while playing", () => {
+    renderWithProviders(<ActiveVideoCard overrides={withThumb} />);
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    const video = document.querySelector("video") as HTMLVideoElement;
+    fireEvent.play(video);
+    hover();
+    const scene = screen.getAllByRole("button", { name: /^seek to/i })[0];
+    scene.focus();
+    fireEvent.click(scene);
+
+    // The pointer never moves: the pause alone brings the scrub back.
+    fireEvent.pause(video);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    act(() => MockImage.last?.onload?.());
+    const layer = document.querySelector(
+      '[data-slot="discover-video"]',
+    ) as HTMLElement;
+    expect(layer.classList.contains("invisible")).toBe(true);
   });
 });
 

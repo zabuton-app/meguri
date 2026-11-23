@@ -4,6 +4,7 @@ import {
   useState,
   type ReactNode,
   type Ref,
+  type RefObject,
 } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -47,7 +48,6 @@ import { tagColorClass } from "@/lib/tagColorClass";
 import { tagHumanLabel } from "@/lib/tagLabel";
 import { TagChipLabel } from "@/components/TagChipLabel";
 import type { TFunc } from "@/i18n/I18nProvider";
-import { NAV_BINDINGS } from "@/settings/keybindings";
 import {
   VideoPlayer,
   type PlayerHandle,
@@ -95,9 +95,6 @@ export function DiscoverCard({
   const qc = useQueryClient();
   const { pause: pauseAudio } = useAudioActions();
   const videoRef = useRef<PlayerHandle>(null);
-  const { claim: claimVideo } = useExclusivePlayback(() =>
-    videoRef.current?.pause(),
-  );
   const [preview, setPreview] = useState<{
     at: number;
     autoplay: boolean;
@@ -113,9 +110,20 @@ export function DiscoverCard({
     setPreview(null);
     setVideoPlaying(false);
   }
+  // A seek asked for outright (a scene button, possibly from the keyboard with
+  // the pointer still resting on the media) must show its result, so the
+  // scrub is off until the pointer moves over the media again. While the
+  // preview plays the video shows anyway, and once it plays the seek has been
+  // seen: a pause then scrubs under the pointer as any pause does.
+  const [scrubDismissed, setScrubDismissed] = useState(false);
   const seekVideo = (at: number) => {
+    if (!videoPlaying) setScrubDismissed(true);
     if (videoRef.current) videoRef.current.seek(at);
     else setPreview({ at, autoplay: false });
+  };
+  const onPlayingChange = (playing: boolean) => {
+    setVideoPlaying(playing);
+    if (playing) setScrubDismissed(false);
   };
   const toggleVideo = () => {
     if (videoRef.current) videoRef.current.togglePlay();
@@ -175,12 +183,20 @@ export function DiscoverCard({
 
   // Hover scrub preview on the main media (same behavior/preference as the
   // list thumbnails): pointer X maps onto the video timeline.
-  const { hoverPreview, frameQuality, keybindingPreset } = usePreferences();
+  const { hoverPreview, frameQuality } = usePreferences();
   const { previewSrc, scrubFraction, onMouseEnter, onMouseMove, onMouseLeave } =
     useHoverFramePreview({
-      // Off only while the preview plays: a paused one (a scene just picked)
-      // is still a frame to scrub away from.
-      enabled: Boolean(hoverPreview && src && isVideo && !videoPlaying),
+      // Off while the video is what to show: the preview plays, or a scene was
+      // just picked. A paused preview is otherwise still a frame to scrub away
+      // from. Off the stage too, so a card paged away from loads no frames.
+      enabled: Boolean(
+        hoverPreview &&
+        src &&
+        isVideo &&
+        isActive &&
+        !videoPlaying &&
+        !scrubDismissed,
+      ),
       frameUrl: (t) =>
         `${mediaBase}/ws/${wsId}/frame/${file.id}?t=${t}&q=${frameQuality}`,
       duration: file.duration,
@@ -202,8 +218,14 @@ export function DiscoverCard({
         to={detailTo}
         data-slot="discover-media"
         className="absolute inset-0 block"
-        onMouseEnter={onMouseEnter}
-        onMouseMove={onMouseMove}
+        onMouseEnter={(e) => {
+          setScrubDismissed(false);
+          onMouseEnter(e);
+        }}
+        onMouseMove={(e) => {
+          setScrubDismissed(false);
+          onMouseMove(e);
+        }}
         onMouseLeave={onMouseLeave}
       >
         {src ? (
@@ -245,50 +267,21 @@ export function DiscoverCard({
       </Link>
 
       {activePreview && mediaBase && (
-        <div
-          data-slot="discover-video"
-          className={cn(
-            "pointer-events-none absolute inset-0",
-            // The scrub frame is drawn in the layer below; step aside for it.
-            previewSrc && "invisible",
-          )}
-        >
-          <VideoPlayer
-            ref={videoRef}
-            id={file.id}
-            src={mediaSrcOf(mediaBase, wsId, file.id)}
-            duration={file.duration}
-            width={file.width}
-            height={file.height}
-            mediaBase={mediaBase}
-            wsId={wsId}
-            startAt={activePreview.at}
-            // A list row carries no codec, so only the container can tell;
-            // a codec the server converts takes the slower path.
-            remuxed={isRemuxedVideo(null, file.ext)}
-            autoplay={activePreview.autoplay}
-            navKeys={NAV_BINDINGS[keybindingPreset]}
-            onNativeDuration={() => undefined}
-            onPlayed={() => {
-              invalidatePlayedSearches(qc);
-              dropFromWatchLaterCache(qc, wsId, file.id);
-            }}
-            onPlaybackStart={claimVideo}
-            onPlayingChange={setVideoPlaying}
-            onFatalError={(message) => {
-              setPreview(null);
-              setVideoPlaying(false);
-              toast.error(message);
-            }}
-            chromeless
-            // A preview: it samples the file, so the place it was left at
-            // stays, and the keyboard stays with Discovery (arrows page the
-            // slides, Space activates the focused button).
-            recordPosition={false}
-            shortcuts={false}
-            t={t}
-          />
-        </div>
+        <DiscoverPreview
+          playerRef={videoRef}
+          file={file}
+          mediaBase={mediaBase}
+          at={activePreview.at}
+          autoplay={activePreview.autoplay}
+          hidden={Boolean(previewSrc)}
+          onPlayingChange={onPlayingChange}
+          onFatalError={(message) => {
+            setPreview(null);
+            setVideoPlaying(false);
+            toast.error(message);
+          }}
+          t={t}
+        />
       )}
 
       {isAudio && spectrumLayout && (
@@ -495,6 +488,76 @@ export function DiscoverCard({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The active video slide's in-place preview. It registers for exclusive
+ * playback itself, so only a card with a mounted preview is a peer that the
+ * bar's audio has to pause: image, audio and off-stage cards have no player.
+ */
+function DiscoverPreview({
+  playerRef,
+  file,
+  mediaBase,
+  at,
+  autoplay,
+  hidden,
+  onPlayingChange,
+  onFatalError,
+  t,
+}: {
+  playerRef: RefObject<PlayerHandle | null>;
+  file: FileRow;
+  mediaBase: string;
+  at: number;
+  autoplay: boolean;
+  /** The scrub frame is drawn in the layer below; step aside for it. */
+  hidden: boolean;
+  onPlayingChange: (playing: boolean) => void;
+  onFatalError: (message: string) => void;
+  t: TFunc;
+}) {
+  const { claim } = useExclusivePlayback(() => playerRef.current?.pause());
+  const wsId = file.workspaceId;
+  return (
+    <div
+      data-slot="discover-video"
+      className={cn(
+        "pointer-events-none absolute inset-0",
+        hidden && "invisible",
+      )}
+    >
+      <VideoPlayer
+        ref={playerRef}
+        id={file.id}
+        src={mediaSrcOf(mediaBase, wsId, file.id)}
+        duration={file.duration}
+        width={file.width}
+        height={file.height}
+        mediaBase={mediaBase}
+        wsId={wsId}
+        startAt={at}
+        // A list row carries no codec, so only the container can tell;
+        // a codec the server converts takes the slower path.
+        remuxed={isRemuxedVideo(null, file.ext)}
+        autoplay={autoplay}
+        onNativeDuration={() => undefined}
+        onPlayed={() => undefined}
+        onPlaybackStart={claim}
+        onPlayingChange={onPlayingChange}
+        onFatalError={onFatalError}
+        chromeless
+        // A preview: it samples the file, so it is not a play (no history
+        // row, and the file stays in Watch Later, #398), the place it was left
+        // at stays, and the keyboard stays with Discovery (arrows page the
+        // slides, Space activates the focused button).
+        recordPlay={false}
+        recordPosition={false}
+        shortcuts={false}
+        t={t}
+      />
     </div>
   );
 }

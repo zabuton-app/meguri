@@ -738,6 +738,21 @@ describe("search field", () => {
     );
   });
 
+  it("chips rating: and is:fav once closed, as typed in any case (#525)", () => {
+    renderMenu();
+    type("RATING: >=4 Is:Fav rating:6 ");
+    expect(chips()).toEqual(["rating:>=4", "is:fav"]);
+    // Out of range: ordinary text.
+    expect(field().value).toBe("rating:6 ");
+  });
+
+  it("chips numeric directives, folding a space after the colon (#524)", () => {
+    renderMenu();
+    type("size: >100mb DURATION:<1:30 size:big ");
+    expect(chips()).toEqual(["size:>100mb", "duration:<1:30"]);
+    expect(field().value).toBe("size:big ");
+  });
+
   it("keeps a half-typed directive as text", () => {
     renderMenu();
     type("tag:bea");

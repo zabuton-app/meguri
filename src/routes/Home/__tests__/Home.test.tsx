@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { Route, Routes } from "react-router";
 import "@/test/mockVirtualizer";
 import Home from "@/routes/Home";
 import MediaDetail from "@/routes/MediaDetail";
 import { parkPass, peekPass } from "@/routes/Player/detour";
+import { holdPeekDocked } from "@/routes/MediaDetail/peekDocked";
 import {
   defaultAppStatus,
   defaultWorkspacesList,
@@ -607,6 +614,30 @@ describe("Home + MediaDetail integration", () => {
       expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
     });
     expect(mocks.fileRecordPlay).not.toHaveBeenCalled();
+  });
+
+  it("marks the file a docked side peek shows in the list, and only then", async () => {
+    const peekedCard = () =>
+      document.querySelector('[data-testid="media-card"][aria-current="page"]');
+    renderWithProviders(<AppRoutes />, { route: `/file/1?ws=${WS_ID}` });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "sample.mp4" })).toBeTruthy();
+    });
+    // As a modal the detail covers the list: nothing to mark.
+    expect(peekedCard()).toBeNull();
+
+    let release = () => {};
+    act(() => {
+      release = holdPeekDocked();
+    });
+    try {
+      await waitFor(() =>
+        expect(peekedCard()?.textContent).toContain("sample.mp4"),
+      );
+    } finally {
+      act(() => release());
+    }
+    expect(peekedCard()).toBeNull();
   });
 
   it("records a play when opening an image detail", async () => {

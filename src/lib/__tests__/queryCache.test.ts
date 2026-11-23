@@ -267,6 +267,8 @@ describe("targeted files_search invalidation", () => {
       ["favorite", { favorite: true }],
       ["rated", { ratingMin: 3 }],
       ["byRating", { sort: "rating" }],
+      ["favDirective", { q: "is:fav" }],
+      ["ratingDirective", { q: "beach rating:>=4" }],
     ] as const)
       await qc.fetchQuery({
         queryKey: ["graph_build", "ws", filter],
@@ -277,10 +279,14 @@ describe("targeted files_search invalidation", () => {
         invalidated.push(String(e.query.state.data));
     });
     syncFileRowAcrossCaches(qc, "ws", 1, { favorite: 1 });
-    expect(invalidated).toEqual(["favorite"]);
+    expect(invalidated.sort()).toEqual(["favDirective", "favorite"]);
     invalidated.length = 0;
     syncFileRowAcrossCaches(qc, "ws", 1, { rating: 4 });
-    expect(invalidated.sort()).toEqual(["byRating", "rated"]);
+    expect(invalidated.sort()).toEqual([
+      "byRating",
+      "rated",
+      "ratingDirective",
+    ]);
   });
 
   it("invalidateTagSearches hits tag filters and text queries only", () => {

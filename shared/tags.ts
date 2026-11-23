@@ -278,15 +278,10 @@ export function parseTagSearchToken(token: string): string | null {
   return value || null;
 }
 
-/** True for a token the search box treats as an exact-tag directive. */
-export function isTagDirective(token: string): boolean {
-  return parseTagSearchToken(token) !== null;
-}
-
 /**
  * A `tag:` directive's value folded by tagIdentityKey, the fold the SQL that
- * finally resolves the tag uses (see {@link searchDirectiveKey}); null for
- * anything else.
+ * finally resolves the tag uses (the key {@link parseSearchDirective} gives a
+ * tag); null for anything else.
  */
 export function tagSearchKey(token: string): string | null {
   const value = parseTagSearchToken(token);
@@ -341,14 +336,247 @@ export function parseExtSearchToken(token: string): string | null {
   return value || null;
 }
 
-/** True for a token the search box shows as a chip: a `tag:`, `hash:` or
- *  `ext:` directive rather than free text. */
-export function isSearchDirective(token: string): boolean {
+/**
+ * The search-box directive for a rating (#525): `rating:>=4`, `rating:<2`, or
+ * `rating:3` for exactly 3. A file without a rating counts as 0, as the
+ * rating filter's `ratingMin` does. A value other than a whole number from 0
+ * to 5, or a comparison other than `>`, `>=`, `<` and `<=`, leaves the token
+ * ordinary text.
+ */
+export const RATING_SEARCH_PREFIX = "rating";
+
+export interface RatingSearch {
+  /** The SQL comparison; `=` when the token has none. */
+  op: ">" | ">=" | "<" | "<=" | "=";
+  value: number;
+}
+
+/** The comparison of a `rating:` token, or null when the token is ordinary
+ *  text. */
+export function parseRatingSearchToken(token: string): RatingSearch | null {
+  const head = `${RATING_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return null;
+  const m = /^(>=|<=|>|<)?([0-5])$/.exec(token.slice(head.length).trim());
+  if (!m) return null;
+  return { op: (m[1] ?? "=") as RatingSearch["op"], value: Number(m[2]) };
+}
+
+/** A `rating:` comparison as the token writes it: `>=4`, or `3` for equality. */
+export function ratingSearchText({ op, value }: RatingSearch): string {
+  return `${op === "=" ? "" : op}${value}`;
+}
+
+/**
+ * The search-box directive for favorites (#525): `is:fav`. `fav` is the only
+ * value `is:` takes; any other leaves the token ordinary text.
+ */
+export const IS_SEARCH_PREFIX = "is";
+export const FAVORITE_SEARCH_VALUE = "fav";
+
+/** True for an `is:fav` token, in any case. */
+export function isFavoriteSearchToken(token: string): boolean {
+  const head = `${IS_SEARCH_PREFIX}:`;
+  if (!token.toLowerCase().startsWith(head)) return false;
   return (
-    isTagDirective(token) ||
-    parseHashSearchToken(token) !== null ||
-    parseExtSearchToken(token) !== null
+    token.slice(head.length).trim().toLowerCase() === FAVORITE_SEARCH_VALUE
   );
+}
+
+/**
+ * The search-box directives that compare a number (#524): `size:>1gb`,
+ * `duration:<30s`, `width:>=3840`, `height:1080`. The full words, not `dur:` or
+ * `res:`, which are tag namespaces (`tag:dur:long`).
+ */
+export const NUMERIC_SEARCH_FIELDS = [
+  "size",
+  "duration",
+  "width",
+  "height",
+] as const;
+export type NumericSearchField = (typeof NUMERIC_SEARCH_FIELDS)[number];
+export type NumericSearchOp = ">" | ">=" | "<" | "<=" | "=";
+
+export interface NumericSearch {
+  field: NumericSearchField;
+  op: NumericSearchOp;
+  /** Bytes for `size`, seconds for `duration`, pixels for width and height. */
+  value: number;
+  /** The comparison and value as typed, lower-cased: `>1gb`. */
+  text: string;
+}
+
+/** Binary, as formatSize shows sizes: 1 kb = 1024 bytes. */
+const SIZE_UNITS: Record<string, number> = {
+  b: 1,
+  kb: 1024,
+  mb: 1024 ** 2,
+  gb: 1024 ** 3,
+};
+const DURATION_UNITS: Record<string, number> = { s: 1, m: 60, h: 3600 };
+
+function parseNumericValue(
+  field: NumericSearchField,
+  value: string,
+): number | null {
+  if (field === "width" || field === "height") {
+    return /^\d+$/.test(value) ? Number(value) : null;
+  }
+  if (field === "duration") {
+    const clock = /^(?:(\d+):)?(\d+):([0-5]\d)$/.exec(value);
+    if (clock) {
+      const [, h, m, s] = clock;
+      // `hh:mm:ss` caps the minutes; `mm:ss` lets them run past an hour.
+      if (h !== undefined && Number(m) > 59) return null;
+      return Number(h ?? 0) * 3600 + Number(m) * 60 + Number(s);
+    }
+  }
+  const units = field === "size" ? SIZE_UNITS : DURATION_UNITS;
+  const m = /^(\d+(?:\.\d+)?)([a-z]*)$/.exec(value);
+  if (!m) return null;
+  // No unit is the column's own: bytes, or seconds.
+  if (m[2] && !Object.hasOwn(units, m[2])) return null;
+  return Number(m[1]) * (m[2] ? units[m[2]] : 1);
+}
+
+/** The comparison of a `size:`, `duration:`, `width:` or `height:` token, or
+ *  null when the token is ordinary text (an unknown unit, no number). */
+export function parseNumericSearchToken(token: string): NumericSearch | null {
+  const lower = token.toLowerCase();
+  const field = NUMERIC_SEARCH_FIELDS.find((f) => lower.startsWith(`${f}:`));
+  if (!field) return null;
+  const text = lower.slice(field.length + 1).trim();
+  const m = /^(>=|<=|>|<)?(.+)$/.exec(text);
+  if (!m) return null;
+  const value = parseNumericValue(field, m[2]);
+  if (value === null) return null;
+  return { field, op: (m[1] ?? "=") as NumericSearchOp, value, text };
+}
+
+/**
+ * A leading `-` excludes what the rest of the token matches (#523):
+ * `-tag:screenshot`, `-ext:gif`, `-draft`. A lone `-` is ordinary text.
+ */
+export const SEARCH_NOT = "-";
+
+/**
+ * How the tokenizer marks a token whose leading `-` was typed inside quotes
+ * (`"-intro"`): that dash is text, not a negation. The backslash is the same
+ * escape `\|` is for alternatives; {@link joinSearchTokens} writes it back as
+ * the quotes.
+ */
+const LITERAL_DASH = `\\${SEARCH_NOT}`;
+
+/**
+ * A token taken apart into whether it is negated and the token it negates —
+ * the directive or free text that is then read as usual. A quoted leading dash
+ * (see LITERAL_DASH) is text, so the body keeps it and the token is not
+ * negated.
+ */
+export function parseNegatedSearchToken(token: string): {
+  negated: boolean;
+  body: string;
+} {
+  if (token.startsWith(LITERAL_DASH))
+    return { negated: false, body: token.slice(1) };
+  if (token.startsWith(SEARCH_NOT) && token.length > SEARCH_NOT.length)
+    return { negated: true, body: token.slice(SEARCH_NOT.length) };
+  return { negated: false, body: token };
+}
+
+/**
+ * A search-box directive, read once (#666): which kind it is, what its chip
+ * shows (`prefix:value`), and the key two directives are compared on. Every
+ * place that tells directives apart reads this rather than chaining the
+ * parsers above. A new kind is added here and to DIRECTIVE_PREFIXES, then to
+ * directiveCondition (SQL, main) and directiveLabel (renderer), whose switches
+ * do not compile without it.
+ */
+export type SearchDirective =
+  | ({ kind: "tag" } & DirectiveText)
+  | ({ kind: "hash" } & DirectiveText)
+  | ({ kind: "ext" } & DirectiveText)
+  | ({ kind: "numeric"; num: NumericSearch } & DirectiveText)
+  | ({ kind: "rating"; rating: RatingSearch } & DirectiveText)
+  | ({ kind: "favorite" } & DirectiveText);
+
+interface DirectiveText {
+  /** What the chip shows before the colon. */
+  prefix: string;
+  /** What the chip shows after it. */
+  value: string;
+  /** What two directives are compared on (see searchDirectiveKey). */
+  key: string;
+}
+
+/** The prefixes each kind is typed with. A Record, so a new kind without its
+ *  prefixes does not compile: left out of the space folding, `x: 3` would
+ *  quietly become a search for the text. */
+const DIRECTIVE_PREFIXES: Record<SearchDirective["kind"], readonly string[]> = {
+  tag: [TAG_SEARCH_PREFIX],
+  hash: [HASH_SEARCH_PREFIX],
+  ext: [EXT_SEARCH_PREFIX],
+  numeric: NUMERIC_SEARCH_FIELDS,
+  rating: [RATING_SEARCH_PREFIX],
+  favorite: [IS_SEARCH_PREFIX],
+};
+
+/** The prefixes, with their colon, a space after the colon is folded for. */
+export const SEARCH_DIRECTIVE_PREFIXES: readonly string[] = Object.values(
+  DIRECTIVE_PREFIXES,
+)
+  .flat()
+  .map((prefix) => `${prefix}:`);
+
+/**
+ * The directive a token (without a leading `-`) is, or null for free text.
+ * Each key is folded the way the SQL reads the value: a looser fold would
+ * silently drop a condition the user typed. The prefix keeps `tag:3fa9` and
+ * `hash:3fa9` apart.
+ */
+export function parseSearchDirective(token: string): SearchDirective | null {
+  const hash = parseHashSearchToken(token);
+  if (hash !== null) {
+    const key = `${HASH_SEARCH_PREFIX}:${hash}`;
+    return { kind: "hash", prefix: HASH_SEARCH_PREFIX, value: hash, key };
+  }
+  const ext = parseExtSearchToken(token);
+  if (ext !== null) {
+    const key = `${EXT_SEARCH_PREFIX}:${ext}`;
+    return { kind: "ext", prefix: EXT_SEARCH_PREFIX, value: ext, key };
+  }
+  const num = parseNumericSearchToken(token);
+  if (num !== null) {
+    // On the value the SQL compares, so `size:>1gb` repeats `size:>1024mb`.
+    const key = `${num.field}:${num.op}${num.value}`;
+    return { kind: "numeric", prefix: num.field, value: num.text, key, num };
+  }
+  const rating = parseRatingSearchToken(token);
+  if (rating !== null) {
+    const value = ratingSearchText(rating);
+    const key = `${RATING_SEARCH_PREFIX}:${value}`;
+    return { kind: "rating", prefix: RATING_SEARCH_PREFIX, value, key, rating };
+  }
+  if (isFavoriteSearchToken(token)) {
+    const key = `${IS_SEARCH_PREFIX}:${FAVORITE_SEARCH_VALUE}`;
+    return {
+      kind: "favorite",
+      prefix: IS_SEARCH_PREFIX,
+      value: FAVORITE_SEARCH_VALUE,
+      key,
+    };
+  }
+  const tag = parseTagSearchToken(token);
+  if (tag !== null) {
+    const key = `${TAG_SEARCH_PREFIX}:${tagSearchKey(token)}`;
+    return { kind: "tag", prefix: TAG_SEARCH_PREFIX, value: tag, key };
+  }
+  return null;
+}
+
+/** True for a token the search box shows as a chip: a directive, negated or
+ *  not, rather than free text. */
+export function isSearchDirective(token: string): boolean {
+  return parseSearchDirective(parseNegatedSearchToken(token).body) !== null;
 }
 
 /**
@@ -356,17 +584,14 @@ export function isSearchDirective(token: string): boolean {
  * same condition — null for ordinary free text.
  *
  * Both routes into the query (typing one, clicking a tag) go through here, so
- * neither can append a condition the other would have called a repeat. Each
- * kind is folded the way its SQL reads it: a looser fold would silently drop a
- * condition the user typed. The prefix keeps `tag:3fa9` and `hash:3fa9` apart.
+ * neither can append a condition the other would have called a repeat. See
+ * parseSearchDirective for how each kind is folded.
  */
 export function searchDirectiveKey(token: string): string | null {
-  const hash = parseHashSearchToken(token);
-  if (hash !== null) return `${HASH_SEARCH_PREFIX}:${hash}`;
-  const ext = parseExtSearchToken(token);
-  if (ext !== null) return `${EXT_SEARCH_PREFIX}:${ext}`;
-  const tag = tagSearchKey(token);
-  return tag === null ? null : `${TAG_SEARCH_PREFIX}:${tag}`;
+  const { negated, body } = parseNegatedSearchToken(token);
+  const key = parseSearchDirective(body)?.key ?? null;
+  // `tag:x` and `-tag:x` are opposite conditions, never repeats of each other.
+  return key !== null && negated ? `${SEARCH_NOT}${key}` : key;
 }
 
 function needsQuoting(value: string): boolean {
@@ -406,15 +631,19 @@ export function tagSearchToken(name: string, namespace = ""): string {
  * that the directive exists to avoid — the one failure the user cannot see.
  */
 function foldSpacedDirectives(tokens: string[]): string[] {
-  const bare = [
-    `${TAG_SEARCH_PREFIX}:`,
-    `${HASH_SEARCH_PREFIX}:`,
-    `${EXT_SEARCH_PREFIX}:`,
-  ];
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    if (bare.includes(tokens[i].toLowerCase()) && i + 1 < tokens.length) {
-      out.push(tokens[i] + tokens[i + 1]);
+    const { body } = parseNegatedSearchToken(tokens[i]);
+    if (
+      SEARCH_DIRECTIVE_PREFIXES.includes(body.toLowerCase()) &&
+      i + 1 < tokens.length
+    ) {
+      // A quoted leading dash is marked for a token of its own (LITERAL_DASH);
+      // inside a directive's value it is plain text.
+      const value = tokens[i + 1];
+      out.push(
+        tokens[i] + (value.startsWith(LITERAL_DASH) ? value.slice(1) : value),
+      );
       i++;
       continue;
     }
@@ -437,6 +666,15 @@ export function splitSearchTokens(q: string): string[] {
   const out: string[] = [];
   let buf = "";
   let quoted = false;
+  // Whether the token's first character is a `-` typed inside quotes, which
+  // is text rather than a negation (see LITERAL_DASH).
+  let literalDash = false;
+  const push = () => {
+    const token = buf.trim();
+    if (token) out.push(literalDash ? `\\${token}` : token);
+    buf = "";
+    literalDash = false;
+  };
   for (let i = 0; i < q.length; i++) {
     const c = q[i];
     if (c === '"') {
@@ -449,13 +687,13 @@ export function splitSearchTokens(q: string): string[] {
       continue;
     }
     if (!quoted && /\s/.test(c)) {
-      if (buf.trim()) out.push(buf.trim());
-      buf = "";
+      push();
       continue;
     }
+    if (c === SEARCH_NOT && quoted && !buf.trim()) literalDash = true;
     buf += c;
   }
-  if (buf.trim()) out.push(buf.trim());
+  push();
   return foldSpacedDirectives(out);
 }
 
@@ -480,12 +718,17 @@ export function hasOpenQuote(q: string): boolean {
 
 /** Inverse of {@link splitSearchTokens}: re-quote what needs it and join. */
 export function joinSearchTokens(tokens: string[]): string {
+  const quote = (text: string) => `"${text.replace(/"/g, '""')}"`;
   return tokens
     .map((token) => {
-      // A directive quotes only its value, so the prefix stays readable.
-      const value = parseTagSearchToken(token);
-      if (value !== null) return tagSearchToken(value);
-      return needsQuoting(token) ? `"${token.replace(/"/g, '""')}"` : token;
+      if (token.startsWith(LITERAL_DASH)) return quote(token.slice(1));
+      const { negated, body } = parseNegatedSearchToken(token);
+      const not = negated ? SEARCH_NOT : "";
+      // A directive quotes only its value, so the prefix stays readable, and
+      // a negation keeps its `-` outside the quotes, where it means "not".
+      const value = parseTagSearchToken(body);
+      if (value !== null) return not + tagSearchToken(value);
+      return not + (needsQuoting(body) ? quote(body) : body);
     })
     .join(" ");
 }
@@ -543,8 +786,11 @@ export function anyOfSearchToken(terms: readonly string[]): string {
     // A separator inside a term is part of the term, not another alternative.
     parts.push(term.split(SEARCH_OR).join(ESCAPED_OR));
   }
+  const token = parts.slice(0, MAX_SEARCH_ALTERNATIVES).join(SEARCH_OR);
+  // A first term starting with `-` is text: marked so it is written quoted
+  // rather than read back as an exclusion.
   return joinSearchTokens([
-    parts.slice(0, MAX_SEARCH_ALTERNATIVES).join(SEARCH_OR),
+    token.startsWith(SEARCH_NOT) ? `\\${token}` : token,
   ]);
 }
 

@@ -1,10 +1,11 @@
 // The collapsed half of the filter bar: play state, sort order, creation-date
-// range, and duplicates. They live behind one trigger so the primary row stays
-// short, and the trigger carries a count of how many of them are active — a
-// condition folded out of sight still has to announce itself.
+// range, duplicates and subtitles. They live behind one trigger so the primary
+// row stays short, and the trigger carries a count of how many of them are
+// active — a condition folded out of sight still has to announce itself.
 import { useState, type ReactNode } from "react";
 import {
   ChevronDown,
+  Captions,
   CopyCheck,
   SlidersHorizontal,
   SortAsc,
@@ -299,7 +300,7 @@ export function MoreFiltersPopover({
         </Section>
 
         <Section label={t("filter.otherSection")}>
-          <div>
+          <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
               onClick={() => patch(toggleDuplicatesPatch(value))}
@@ -314,6 +315,23 @@ export function MoreFiltersPopover({
             >
               <CopyCheck className="size-4" />
               {t("duplicates.chip")}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                patch({ subtitles: value.subtitles ? undefined : true })
+              }
+              aria-pressed={!!value.subtitles}
+              title={t("filter.subtitles")}
+              className={cn(
+                "flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors",
+                value.subtitles
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-border text-muted hover:text-fg",
+              )}
+            >
+              <Captions className="size-4" />
+              {t("filter.subtitlesChip")}
             </button>
           </div>
         </Section>

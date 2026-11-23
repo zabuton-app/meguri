@@ -34,6 +34,8 @@ export function computeScrubTime(
 }
 
 interface Options {
+  /** Whether to scrub. The pointer is followed while off too, so turning it
+   *  back on with the pointer still over the media scrubs from there. */
   enabled: boolean;
   /** Builds the media-server frame URL for a given time in seconds. */
   frameUrl: (t: number) => string;
@@ -71,6 +73,10 @@ export function useHoverFramePreview({
   // Whether the start delay has elapsed for the current hover.
   const activeRef = useRef(false);
   const failuresRef = useRef(0);
+  // Whether the pointer is over the media, and where (0..1) when known. Kept
+  // while the scrub is disabled, so it can start again in place when re-enabled.
+  const hoveringRef = useRef(false);
+  const pointerRef = useRef<number | null>(null);
   // Latest values readable from timer/onload callbacks without re-subscribing.
   const optsRef = useRef({ enabled, frameUrl, duration });
   // Updated after commit, so a discarded render cannot leave values that never
@@ -137,41 +143,67 @@ export function useHoverFramePreview({
     img.src = optsRef.current.frameUrl(t);
   };
 
-  /** Track the pointer: remember the wanted timestamp and the indicator fraction. */
-  const updateScrub = (e: React.MouseEvent) => {
-    const dur = optsRef.current.duration;
-    if (dur == null || dur < MIN_SCRUB_DURATION_SEC) return;
+  /** Remember where the pointer sits over the media. */
+  const trackPointer = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
     if (rect.width <= 0) return;
-    const fraction = Math.min(
+    pointerRef.current = Math.min(
       1,
       Math.max(0, (e.clientX - rect.left) / rect.width),
     );
+  };
+
+  /** Aim at the pointer: remember the wanted timestamp and the indicator fraction. */
+  const updateScrub = () => {
+    const dur = optsRef.current.duration;
+    const fraction = pointerRef.current;
+    if (fraction == null || dur == null || dur < MIN_SCRUB_DURATION_SEC) return;
     const t = computeScrubTime(dur, fraction);
     if (t == null) return;
     desiredRef.current = t;
     setScrubFraction(fraction);
   };
 
-  const onMouseEnter = (e?: React.MouseEvent) => {
+  /** Begin a hover: aim at the pointer, and ask for frames after the start delay. */
+  const start = () => {
     const { enabled: on, duration: dur } = optsRef.current;
     if (!on || dur == null || dur < MIN_SCRUB_DURATION_SEC) return;
     stop();
-    if (e) updateScrub(e);
+    updateScrub();
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       activeRef.current = true;
       pump();
     }, startDelayMs);
   };
+  const startRef = useRef(start);
+  useLayoutEffect(() => {
+    startRef.current = start;
+  });
+
+  // Re-enabled while the pointer is still over the media (a preview paused or
+  // ended under it): start again without waiting for the pointer to re-enter.
+  useEffect(() => {
+    if (enabled && hoveringRef.current) startRef.current();
+  }, [enabled]);
+
+  const onMouseEnter = (e?: React.MouseEvent) => {
+    hoveringRef.current = true;
+    pointerRef.current = null;
+    if (e) trackPointer(e);
+    start();
+  };
 
   const onMouseMove = (e: React.MouseEvent) => {
+    trackPointer(e);
     if (!optsRef.current.enabled) return;
-    updateScrub(e);
+    updateScrub();
     if (activeRef.current) pump();
   };
 
   const onMouseLeave = () => {
+    hoveringRef.current = false;
+    pointerRef.current = null;
     stop();
     setPreviewSrc(null);
     setScrubFraction(null);

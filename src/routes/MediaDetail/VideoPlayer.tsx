@@ -70,6 +70,7 @@ import {
 } from "@/lib/playbackSpeed";
 import { CTRL_BUTTON_CLASS } from "./controlBar";
 import { useVideoZoom } from "./useVideoZoom";
+import { useSubtitleDrag } from "./useSubtitleDrag";
 import {
   previewAudioTrackOf,
   streamOffsetOf,
@@ -139,6 +140,22 @@ export interface PlayerHandle {
   ended: () => boolean;
 }
 
+/**
+ * Whether the player takes its window-level keyboard shortcuts (default true).
+ * Off where the host owns those keys: Discovery pages its slides with the
+ * arrows, and Space belongs to whichever of its buttons has focus. The paging
+ * chords only matter while the shortcuts are on, so the two are tied: a host
+ * that keeps them must say which chords to yield, and one that turns them off
+ * has nothing to pass (#401).
+ */
+type PlayerKeyboard =
+  | {
+      shortcuts?: true;
+      /** Active paging chords; the player yields these keys so they don't also seek. */
+      navKeys: NavBinding;
+    }
+  | { shortcuts: false; navKeys?: undefined };
+
 export const VideoPlayer = forwardRef<
   PlayerHandle,
   {
@@ -170,11 +187,13 @@ export const VideoPlayer = forwardRef<
      */
     recordPosition?: boolean;
     /**
-     * Whether the player takes its window-level keyboard shortcuts (default
-     * true). Off where the host owns those keys: Discovery pages its slides
-     * with the arrows, and Space belongs to whichever of its buttons has focus.
+     * Whether starting playback here counts as a play (default true): a row in
+     * the play history, and the file leaves Watch Later; onPlayed fires only
+     * then. Off for Discovery's in-place preview (#398), which samples a file
+     * rather than watches it. A host adopting a handed-over element takes the
+     * previous host's play as recorded, so no host with this off hands off.
      */
-    shortcuts?: boolean;
+    recordPlay?: boolean;
     audioTracks?: Pick<EmbeddedTrack, "title" | "language">[];
     subtitleTracks?: EmbeddedTrack[];
     subtitleAudioLanguage?: string;
@@ -182,11 +201,6 @@ export const VideoPlayer = forwardRef<
     /** The detail view's side panel for the SDR adjustment controls; absent
      *  where adjustments are not offered. */
     videoAdjustments?: VideoAdjustmentsPanel;
-    /**
-     * Active paging chords; the player yields these keys so they don't also
-     * seek. Unused while `shortcuts` is false.
-     */
-    navKeys: NavBinding;
     /**
      * Element to fullscreen instead of the player itself (e.g. the whole modal,
      * YouTube-style: the video fills the screen and the rest scrolls below it).
@@ -210,7 +224,9 @@ export const VideoPlayer = forwardRef<
      */
     onExportFrame?: (sec: number) => void;
     onNativeDuration: (d: number | null) => void;
-    /** Fired once per loaded file when playback first starts (used to refresh the list order). */
+    /** Fired once per loaded file, when playback first starts and the play is
+     *  recorded: never with `recordPlay` off. Callers update what a recorded
+     *  play changes (the play-sorted lists, Watch Later). */
     onPlayed: () => void;
     /** Fires on every play (not just the first), so the caller can enforce
      *  audio/video exclusivity. Distinct from onPlayed, which fires once per file. */
@@ -247,7 +263,7 @@ export const VideoPlayer = forwardRef<
      */
     onOpenExternal?: () => void;
     t: TFunc;
-  }
+  } & PlayerKeyboard
 >(function VideoPlayer(
   {
     id,
@@ -262,6 +278,7 @@ export const VideoPlayer = forwardRef<
     autoplay = true,
     reopenOnNetworkError = false,
     recordPosition = true,
+    recordPlay = true,
     shortcuts = true,
     audioTracks,
     subtitleTracks,
@@ -292,6 +309,9 @@ export const VideoPlayer = forwardRef<
   const ref = useRef<HTMLVideoElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  // The room the captions can be dragged around in.
+  const captionAreaRef = useRef<HTMLDivElement>(null);
+  const captionDrag = useSubtitleDrag(captionAreaRef);
   const [error, setError] = useState<string | null>(null);
   // For stream playback, the start second begun on the server side via ?t.
   const [offset, setOffset] = useState(0);
@@ -725,7 +745,7 @@ export const VideoPlayer = forwardRef<
       // the play; this host still owes its own callers the start.
       onPlaybackStart?.();
       playedRef.current = true;
-      onPlayed();
+      if (recordPlay) onPlayed();
     }
   };
 
@@ -988,7 +1008,7 @@ export const VideoPlayer = forwardRef<
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Yield keys claimed by file paging (e.g. Vim's "l") so they don't also seek.
       const nk = navKeysRef.current;
-      if (matchAny(e, nk.prev) || matchAny(e, nk.next)) return;
+      if (nk && (matchAny(e, nk.prev) || matchAny(e, nk.next))) return;
       switch (e.code) {
         case "Space":
         case "KeyK":
@@ -1243,9 +1263,11 @@ export const VideoPlayer = forwardRef<
           onPlay={() => {
             setPlaying(true);
             onPlaybackStart?.();
-            void api.fileRecordPlay(id, wsId, "browser", position);
+            if (recordPlay) {
+              void api.fileRecordPlay(id, wsId, "browser", position);
+            }
             playbackPosition.markPlayed();
-            if (!playedRef.current) {
+            if (recordPlay && !playedRef.current) {
               playedRef.current = true;
               onPlayed();
             }
@@ -1373,18 +1395,6 @@ export const VideoPlayer = forwardRef<
           {t("player.audioTrackUnavailable")}
         </div>
       )}
-      {caption && (
-        <div
-          data-slot="video-subtitles"
-          className="pointer-events-none absolute inset-x-5 bottom-20 text-center"
-        >
-          <span
-            className={`inline-block whitespace-pre-line rounded-item bg-black/80 px-3 py-1 text-white ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
-          >
-            {caption}
-          </span>
-        </div>
-      )}
       {/* Center play/pause indicator (shown large while paused). */}
       {!chromeless && loaded && !playing && (
         <button
@@ -1401,6 +1411,35 @@ export const VideoPlayer = forwardRef<
             <Play size={30} className="translate-x-0.5" />
           </span>
         </button>
+      )}
+
+      {/* After the round play button, so the captions can still be dragged
+          while paused. They stay above the control bar while it shows (the
+          same conditions as the bar's own); a dragged position may go lower
+          when it hides. Kept while dragged, even when the cue ends. */}
+      {(caption || captionDrag.dragging) && (
+        <div
+          ref={captionAreaRef}
+          data-slot="video-subtitles"
+          className={`pointer-events-none absolute inset-x-5 top-3 ${
+            !captionDrag.position || controlsVisible || captionDrag.dragging
+              ? "bottom-20"
+              : "bottom-3 group-hover:bottom-20 group-has-[[aria-expanded=true]]:bottom-20"
+          }`}
+        >
+          <div
+            className={`pointer-events-auto absolute w-max max-w-full touch-none select-none whitespace-pre-line rounded-item bg-black/80 px-3 py-1 text-center text-white ${
+              captionDrag.dragging ? "cursor-grabbing" : "cursor-move"
+            } ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
+            style={captionDrag.style}
+            onClick={() => {
+              if (!captionDrag.dragged()) togglePlay();
+            }}
+            {...captionDrag.handlers}
+          >
+            {caption}
+          </div>
+        </div>
       )}
 
       {/*
@@ -1546,6 +1585,8 @@ export const VideoPlayer = forwardRef<
                           autoTrack: autoSubtitle,
                           shown: subtitlesOn,
                           status: subtitleStatus,
+                          moved: captionDrag.position != null,
+                          onResetPosition: captionDrag.reset,
                         }
                       : undefined
                   }

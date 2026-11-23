@@ -176,6 +176,38 @@ describe("useHoverFramePreview", () => {
     expect(result.current.previewSrc).toBeNull();
   });
 
+  it("resumes at the pointer when re-enabled while the pointer stays over", () => {
+    const { result, rerender } = renderPreview();
+    rerender({ fileId: 1, enabled: false });
+    act(() => result.current.onMouseEnter(mouseEvt(10)));
+    act(() => result.current.onMouseMove(mouseEvt(50)));
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(MockImage.instances).toHaveLength(0);
+
+    rerender({ fileId: 1, enabled: true });
+    expect(result.current.scrubFraction).toBe(0.5);
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(MockImage.instances).toHaveLength(1);
+    expect(MockImage.instances[0].src).toBe(frameUrl(1800));
+  });
+
+  it("does not resume when re-enabled after the pointer left", () => {
+    const { result, rerender } = renderPreview();
+    rerender({ fileId: 1, enabled: false });
+    act(() => result.current.onMouseEnter(mouseEvt(50)));
+    act(() => result.current.onMouseLeave());
+
+    rerender({ fileId: 1, enabled: true });
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(MockImage.instances).toHaveLength(0);
+  });
+
   it("does nothing for unusable durations", () => {
     const { result } = renderPreview({ duration: 0 });
     act(() => result.current.onMouseEnter(mouseEvt(50)));
