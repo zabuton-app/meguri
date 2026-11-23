@@ -19,6 +19,7 @@ import {
   type MediaReorder,
 } from "@/components/MediaReorder";
 import { mediaSortId } from "@/lib/mediaSortId";
+import { useScrollToPeek } from "@/hooks/useScrollToPeek";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import {
   useWatchLater,
@@ -331,36 +332,24 @@ export const MediaGrid = memo(function MediaGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId, resetKey]);
 
-  // The card the docked peek shows. Its row is scrolled to once per file, as
-  // soon as the grid is loaded and its columns are measured for its current
-  // width (opening the peek narrows the grid in this very render), and not again on
-  // later renders (paging, a resize): that would fight the user's own
-  // scrolling, and a file paged in later is not worth a jump either.
+  // The card the docked peek shows. Its row is scrolled to once the grid is
+  // loaded and its columns are measured for its current width (opening the
+  // peek narrows the grid in this very render).
   const peekIndex = peekFileKey
     ? entries.findIndex(
         (e) => e.kind === "file" && mediaSortId(e.file) === peekFileKey,
       )
     : -1;
-  const scrolledToPeek = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (!peekFileKey) {
-      scrolledToPeek.current = undefined;
-      return;
-    }
-    if (loading || scrolledToPeek.current === peekFileKey || !colsCurrent()) {
-      return;
-    }
-    scrolledToPeek.current = peekFileKey;
-    if (peekIndex >= 0) scrollToRow(Math.floor((peekIndex + leadCells) / cols));
-  }, [
+  const peekReady = useCallback(
+    () => !loading && colsCurrent(),
+    [loading, colsCurrent],
+  );
+  useScrollToPeek({
     peekFileKey,
-    peekIndex,
-    loading,
-    colsCurrent,
-    leadCells,
-    cols,
+    row: peekIndex >= 0 ? Math.floor((peekIndex + leadCells) / cols) : -1,
+    ready: peekReady,
     scrollToRow,
-  ]);
+  });
 
   // Fetch the next page when a row near the end becomes visible (replaces the old IntersectionObserver sentinel).
   useInfiniteScrollTrigger({
