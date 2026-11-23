@@ -129,4 +129,8 @@ describe("plainWordAtCaret", () => {
     expect(plainWordAtCaret("beach")).toBe("beach");
     expect(plainWordAtCaret("-beach")).toBeNull();
   });
+
+  it("offers the word itself for a quoted leading - (#523)", () => {
+    expect(plainWordAtCaret('"-beach"')).toBe("-beach");
+  });
 });

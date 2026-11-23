@@ -260,6 +260,11 @@ describe("splitSearchTokens / joinSearchTokens", () => {
     expect(joinSearchTokens(tokens)).toBe('"-intro" "-outro"');
     expect(splitSearchTokens(joinSearchTokens(tokens))).toEqual(tokens);
   });
+
+  it("keeps a quoted leading - in a directive typed with a space (#523)", () => {
+    expect(splitSearchTokens('tag: "-intro"')).toEqual(["tag:-intro"]);
+    expect(splitSearchTokens('-tag: "-intro"')).toEqual(["-tag:-intro"]);
+  });
 });
 
 describe("parseNegatedSearchToken", () => {

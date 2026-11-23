@@ -454,7 +454,12 @@ function foldSpacedDirectives(tokens: string[]): string[] {
   for (let i = 0; i < tokens.length; i++) {
     const { body } = parseNegatedSearchToken(tokens[i]);
     if (bare.includes(body.toLowerCase()) && i + 1 < tokens.length) {
-      out.push(tokens[i] + tokens[i + 1]);
+      // A quoted leading dash is marked for a token of its own (LITERAL_DASH);
+      // inside a directive's value it is plain text.
+      const value = tokens[i + 1];
+      out.push(
+        tokens[i] + (value.startsWith(LITERAL_DASH) ? value.slice(1) : value),
+      );
       i++;
       continue;
     }
@@ -597,8 +602,11 @@ export function anyOfSearchToken(terms: readonly string[]): string {
     // A separator inside a term is part of the term, not another alternative.
     parts.push(term.split(SEARCH_OR).join(ESCAPED_OR));
   }
+  const token = parts.slice(0, MAX_SEARCH_ALTERNATIVES).join(SEARCH_OR);
+  // A first term starting with `-` is text: marked so it is written quoted
+  // rather than read back as an exclusion.
   return joinSearchTokens([
-    parts.slice(0, MAX_SEARCH_ALTERNATIVES).join(SEARCH_OR),
+    token.startsWith(SEARCH_NOT) ? `\\${token}` : token,
   ]);
 }
 

@@ -110,11 +110,13 @@ export function plainWordAtCaret(draft: string): string | null {
   const tail = splitSearchTokens(draft).at(-1)?.normalize("NFC");
   if (tail === undefined || tail.includes(":") || tail.includes("|"))
     return null;
-  // An exclusion (`-draft`): a tag picked for it would include instead.
-  if (parseNegatedSearchToken(tail).negated) return null;
-  const length = [...tail].length;
-  return length >= 2 || (length === 1 && WORD_PER_CHARACTER.test(tail))
-    ? tail
+  // An exclusion (`-draft`): a tag picked for it would include instead. The
+  // body, not the token: a quoted leading dash is marked in the token.
+  const { negated, body: word } = parseNegatedSearchToken(tail);
+  if (negated) return null;
+  const length = [...word].length;
+  return length >= 2 || (length === 1 && WORD_PER_CHARACTER.test(word))
+    ? word
     : null;
 }
 

@@ -51,35 +51,17 @@ function escapeLike(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
-/** What one polarity of a search asks for: the files that match, or (`not`)
- *  the files to leave out. */
-interface SearchTerms {
-  /** Plain tokens long enough for the index, as one ANDed MATCH expression. */
+/** One free-text token: any of its terms, through the index or LIKE. */
+interface FreeTextGroup {
   match: string | null;
-  /** Everything else: per token, a MATCH expression and/or LIKE terms, ORed. */
-  anyOf: { match: string | null; likes: string[] }[];
-  tagTokens: string[];
-  /** `hash:` prefixes, lower-case hex. */
-  hashPrefixes: string[];
-  /** `ext:` values, lower-case, without the dot. */
-  extValues: string[];
+  likes: string[];
 }
 
-function emptyTerms(): SearchTerms {
-  return {
-    match: null,
-    anyOf: [],
-    tagTokens: [],
-    hashPrefixes: [],
-    extValues: [],
-  };
-}
-
-/** Split the free-text query for the trigram-tokenized files_fts.
+/** How the search box's text is read (see appendSearchConditions).
  *
- *  A `tag:<value>` token is pulled out first: generated tags are not in the
+ *  A `tag:<value>` token is a directive: generated tags are not in the
  *  full-text index (see FTS_ROW_SELECT in db.ts), so this prefix is the explicit
- *  way to reach them from the search box.
+ *  way to reach them from the search box. So are `hash:` and `ext:`.
  *
  *  Of what remains, tokens of 3+ codepoints go into an FTS MATCH expression
  *  (trigram matches substrings, so no prefix `*` is needed). Shorter tokens
@@ -91,46 +73,15 @@ function emptyTerms(): SearchTerms {
  *  the quote characters would return zero rows.
  *
  *  A token may carry alternatives (`yoga|ヨガ`, see searchTokenTerms), any of
- *  which satisfies it. Each token becomes one `anyOf` group — a plain token is
- *  a group of one — split by whether each term can use the trigram index.
- *
- *  A token with a leading `-` (#523) goes to `not` instead, read the same way:
- *  the conditions there are the files to leave out. Every negated free-text
- *  token is a group of its own, since one long phrase in a MATCH of several
- *  would exclude only the files carrying them all. */
-function buildSearchTerms(q: string): SearchTerms & { not: SearchTerms } {
-  const terms = emptyTerms();
-  const not = emptyTerms();
-  const matchTokens: string[] = [];
-  for (const raw of splitSearchTokens(q)) {
-    const { negated, body } = parseNegatedSearchToken(raw);
-    const into = negated ? not : terms;
-    const hash = parseHashSearchToken(body);
-    if (hash) {
-      into.hashPrefixes.push(hash);
-      continue;
-    }
-    const ext = parseExtSearchToken(body);
-    if (ext) {
-      into.extValues.push(ext);
-      continue;
-    }
-    const tag = parseTagSearchToken(body);
-    if (tag) {
-      into.tagTokens.push(tag);
-      continue;
-    }
-    const words = searchTokenTerms(body);
-    const long = words.filter(isTrigramSearchable).map(ftsPhrase);
-    const likes = words.filter((term) => !isTrigramSearchable(term));
-    if (!negated && words.length === 1 && long.length === 1) {
-      matchTokens.push(long[0]);
-    } else {
-      into.anyOf.push({ match: long.length ? long.join(" OR ") : null, likes });
-    }
-  }
-  terms.match = matchTokens.length ? matchTokens.join(" ") : null;
-  return { ...terms, not };
+ *  which satisfies it. Each token becomes one group — a plain token is a group
+ *  of one — split by whether each term can use the trigram index. */
+function freeTextGroup(token: string): FreeTextGroup {
+  const words = searchTokenTerms(token);
+  const long = words.filter(isTrigramSearchable).map(ftsPhrase);
+  return {
+    match: long.length ? long.join(" OR ") : null,
+    likes: words.filter((term) => !isTrigramSearchable(term)),
+  };
 }
 
 /** A term the trigram tokenizer can index: three code points or more. */
@@ -262,10 +213,7 @@ export function fromFor(query: SearchQuery): string {
  * any of its terms, through the index or LIKE. Parenthesized, so a leading
  * NOT negates all of it.
  */
-function anyOfCondition(
-  group: { match: string | null; likes: string[] },
-  args: unknown[],
-): string {
+function anyOfCondition(group: FreeTextGroup, args: unknown[]): string {
   const parts: string[] = [];
   if (group.match) {
     // The terms the index can serve stay on the index, whatever else is in
@@ -298,6 +246,49 @@ function anyOfCondition(
 }
 
 /**
+ * The condition that a file matches one directive token (`tag:`, `hash:`,
+ * `ext:`), or null for free text. A new directive is added here, and both
+ * `tag:x` and `-tag:x` then work: the exclusion only ever wraps this.
+ */
+function directiveCondition(
+  db: DB,
+  token: string,
+  args: unknown[],
+): string | null {
+  const hash = parseHashSearchToken(token);
+  if (hash) {
+    // A range on the hash rather than LIKE, so idx_files_content_hash serves
+    // it: every hex digit sorts before "g", so the prefix followed by "g" is
+    // past every hash that starts with it. Files without a hash never match.
+    args.push(hash, `${hash}g`);
+    return "f.content_hash >= ? AND f.content_hash < ?";
+  }
+  const ext = parseExtSearchToken(token);
+  if (ext) {
+    // Exact, on the lower-cased value the scan stores. No index: with nothing
+    // else narrowing, a rare extension makes the list walk its sort order
+    // until a page fills, up to every live row.
+    args.push(ext);
+    return "f.ext = ?";
+  }
+  const tag = parseTagSearchToken(token);
+  if (tag) {
+    const ids = resolveSearchTagIds(db, tag);
+    // No tag by that name: no file carries it.
+    return ids.length === 0 ? "0" : tagCondition(db, args, JSON.stringify(ids));
+  }
+  return null;
+}
+
+/** The condition that a file matches one token, directive or free text. */
+function searchTokenCondition(db: DB, token: string, args: unknown[]): string {
+  return (
+    directiveCondition(db, token, args) ??
+    anyOfCondition(freeTextGroup(token), args)
+  );
+}
+
+/**
  * Append the WHERE conditions a SearchQuery asks for. Exported so the graph
  * view (queries/graph.ts) narrows exactly the rows files_search would.
  */
@@ -309,58 +300,34 @@ export function appendSearchConditions(
   /** rel_path's separator; see folderRange(). Injected only by tests. */
   sep?: string,
 ): string {
-  const terms = query.q
-    ? buildSearchTerms(query.q)
-    : { ...emptyTerms(), not: emptyTerms() };
-  if (terms.match) {
-    sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
-    args.push(terms.match);
-  }
-  for (const group of terms.anyOf) {
-    sql += ` AND ${anyOfCondition(group, args)}`;
-  }
-  // A token with a leading `-`: the same conditions, each turned into NOT.
-  for (const group of terms.not.anyOf) {
-    sql += ` AND NOT ${anyOfCondition(group, args)}`;
-  }
-  // A range on the hash rather than LIKE, so idx_files_content_hash serves it:
-  // every hex digit sorts before "g", so the prefix followed by "g" is past
-  // every hash that starts with it. Files without a hash never match.
-  for (const prefix of terms.hashPrefixes) {
-    sql += " AND f.content_hash >= ? AND f.content_hash < ?";
-    args.push(prefix, `${prefix}g`);
-  }
-  // ...and so a file without a hash is never excluded either.
-  for (const prefix of terms.not.hashPrefixes) {
-    sql +=
-      " AND (f.content_hash IS NULL OR f.content_hash < ? OR f.content_hash >= ?)";
-    args.push(prefix, `${prefix}g`);
-  }
-  // Exact, on the lower-cased value the scan stores. No index: with nothing
-  // else narrowing, a rare extension makes the list walk its sort order until
-  // a page fills, up to every live row.
-  for (const ext of terms.extValues) {
-    sql += " AND f.ext = ?";
-    args.push(ext);
-  }
-  for (const ext of terms.not.extValues) {
-    sql += " AND f.ext IS NOT ?";
-    args.push(ext);
-  }
-  for (const value of terms.tagTokens) {
-    const ids = resolveSearchTagIds(db, value);
-    if (ids.length === 0) {
-      // No tag by that name: nothing can match.
-      sql += " AND 0";
-      break;
+  // Plain tokens long enough for the index, sent as one ANDed MATCH.
+  const matchTokens: string[] = [];
+  for (const raw of query.q ? splitSearchTokens(query.q) : []) {
+    const { negated, body } = parseNegatedSearchToken(raw);
+    if (negated) {
+      // A leading `-` (#523): NOT of what the token matches, whatever it is.
+      // A file the condition says nothing about (NULL: no hash, no extension)
+      // is kept, so an exclusion never drops a file for lacking the value it
+      // names. Each negated word is its own condition: one MATCH of several
+      // would exclude only the files carrying them all.
+      sql += ` AND NOT COALESCE((${searchTokenCondition(db, body, args)}), 0)`;
+      continue;
     }
-    sql += ` AND ${tagCondition(db, args, JSON.stringify(ids))}`;
+    const directive = directiveCondition(db, body, args);
+    if (directive !== null) {
+      sql += ` AND ${directive}`;
+      continue;
+    }
+    const words = searchTokenTerms(body);
+    if (words.length === 1 && isTrigramSearchable(words[0])) {
+      matchTokens.push(ftsPhrase(words[0]));
+    } else {
+      sql += ` AND ${anyOfCondition(freeTextGroup(body), args)}`;
+    }
   }
-  for (const value of terms.not.tagTokens) {
-    const ids = resolveSearchTagIds(db, value);
-    // No tag by that name: no file carries it, so none is left out.
-    if (ids.length === 0) continue;
-    sql += ` AND NOT ${tagCondition(db, args, JSON.stringify(ids))}`;
+  if (matchTokens.length > 0) {
+    sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
+    args.push(matchTokens.join(" "));
   }
 
   if (query.folder) {
