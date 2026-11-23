@@ -37,6 +37,8 @@ function subtitles(
     autoTrack: 0,
     shown: true,
     status: "idle" as const,
+    moved: false,
+    onResetPosition: vi.fn(),
     ...overrides,
   };
 }
@@ -97,6 +99,23 @@ describe("TrackPanel", () => {
         "player.subtitleUnavailable",
       ),
     ).toBeTruthy();
+  });
+
+  it("offers to reset the captions' position only once they were moved", () => {
+    open({ subtitles: subtitles() });
+    const reset = () =>
+      within(column("player.subtitles")).getByRole<HTMLButtonElement>(
+        "button",
+        { name: "player.subtitleResetPosition" },
+      );
+    expect(reset().disabled).toBe(true);
+    cleanup();
+
+    const onResetPosition = vi.fn();
+    open({ subtitles: subtitles({ moved: true, onResetPosition }) });
+    expect(reset().disabled).toBe(false);
+    fireEvent.click(reset());
+    expect(onResetPosition).toHaveBeenCalledTimes(1);
   });
 
   it("puts audio beside subtitles, or alone when the clip has no text subtitles", () => {

@@ -70,6 +70,7 @@ import {
 } from "@/lib/playbackSpeed";
 import { CTRL_BUTTON_CLASS } from "./controlBar";
 import { useVideoZoom } from "./useVideoZoom";
+import { useSubtitleDrag } from "./useSubtitleDrag";
 import {
   previewAudioTrackOf,
   streamOffsetOf,
@@ -292,6 +293,9 @@ export const VideoPlayer = forwardRef<
   const ref = useRef<HTMLVideoElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  // The room the captions can be dragged around in.
+  const captionAreaRef = useRef<HTMLDivElement>(null);
+  const captionDrag = useSubtitleDrag(captionAreaRef);
   const [error, setError] = useState<string | null>(null);
   // For stream playback, the start second begun on the server side via ?t.
   const [offset, setOffset] = useState(0);
@@ -1373,18 +1377,6 @@ export const VideoPlayer = forwardRef<
           {t("player.audioTrackUnavailable")}
         </div>
       )}
-      {caption && (
-        <div
-          data-slot="video-subtitles"
-          className="pointer-events-none absolute inset-x-5 bottom-20 text-center"
-        >
-          <span
-            className={`inline-block whitespace-pre-line rounded-item bg-black/80 px-3 py-1 text-white ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
-          >
-            {caption}
-          </span>
-        </div>
-      )}
       {/* Center play/pause indicator (shown large while paused). */}
       {!chromeless && loaded && !playing && (
         <button
@@ -1401,6 +1393,35 @@ export const VideoPlayer = forwardRef<
             <Play size={30} className="translate-x-0.5" />
           </span>
         </button>
+      )}
+
+      {/* After the round play button, so the captions can still be dragged
+          while paused. They stay above the control bar while it shows (the
+          same conditions as the bar's own); a dragged position may go lower
+          when it hides. Kept while dragged, even when the cue ends. */}
+      {(caption || captionDrag.dragging) && (
+        <div
+          ref={captionAreaRef}
+          data-slot="video-subtitles"
+          className={`pointer-events-none absolute inset-x-5 top-3 ${
+            !captionDrag.position || controlsVisible || captionDrag.dragging
+              ? "bottom-20"
+              : "bottom-3 group-hover:bottom-20 group-has-[[aria-expanded=true]]:bottom-20"
+          }`}
+        >
+          <div
+            className={`pointer-events-auto absolute w-max max-w-full touch-none select-none whitespace-pre-line rounded-item bg-black/80 px-3 py-1 text-center text-white ${
+              captionDrag.dragging ? "cursor-grabbing" : "cursor-move"
+            } ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
+            style={captionDrag.style}
+            onClick={() => {
+              if (!captionDrag.dragged()) togglePlay();
+            }}
+            {...captionDrag.handlers}
+          >
+            {caption}
+          </div>
+        </div>
       )}
 
       {/*
@@ -1546,6 +1567,8 @@ export const VideoPlayer = forwardRef<
                           autoTrack: autoSubtitle,
                           shown: subtitlesOn,
                           status: subtitleStatus,
+                          moved: captionDrag.position != null,
+                          onResetPosition: captionDrag.reset,
                         }
                       : undefined
                   }

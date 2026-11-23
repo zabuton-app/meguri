@@ -1,7 +1,13 @@
 // The control bar's audio and subtitles button and the panel it opens: one
 // column per kind of track the clip offers to choose between.
 import { useId, useState, type ReactNode } from "react";
-import { AudioLines, Captions, Check, type LucideIcon } from "lucide-react";
+import {
+  AudioLines,
+  Captions,
+  Check,
+  RotateCcw,
+  type LucideIcon,
+} from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -37,6 +43,9 @@ interface Props {
     /** Subtitles are on screen (the button is underlined). */
     shown: boolean;
     status: SubtitleStatus;
+    /** The captions were dragged away from their default place. */
+    moved: boolean;
+    onResetPosition: () => void;
   };
   /** The element to render the panel in: the one that goes fullscreen. */
   portalTarget: () => HTMLElement | null;
@@ -172,6 +181,16 @@ export function TrackPanel({ audio, subtitles, portalTarget, t }: Props) {
                   />
                 ),
             )}
+            <hr className="mx-1.5 my-1 border-white/10" />
+            <button
+              type="button"
+              disabled={!subtitles.moved}
+              onClick={subtitles.onResetPosition}
+              className="flex min-h-10 items-center gap-2.5 rounded-item px-2.5 py-1 text-left text-sm hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+            >
+              <RotateCcw size={16} aria-hidden="true" className="shrink-0" />
+              {t("player.subtitleResetPosition")}
+            </button>
             {status === "error" && (
               <p className="px-2.5 py-1.5 text-xs text-warn">
                 {t("player.subtitleUnavailable")}

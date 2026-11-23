@@ -508,6 +508,7 @@ export const ko: Catalog = {
   "player.subtitles": "자막",
   "player.subtitleAuto": "오디오 언어와 일치",
   "player.subtitleOff": "끄기",
+  "player.subtitleResetPosition": "위치 초기화",
   "player.subtitleLoading": "자막 불러오는 중…",
   "player.subtitleUnavailable": "이 자막 트랙을 불러올 수 없습니다.",
   "player.subtitleTrackNumber": "트랙 {number}",

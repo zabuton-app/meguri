@@ -496,6 +496,7 @@ export const zhCN: Catalog = {
   "player.subtitles": "字幕",
   "player.subtitleAuto": "匹配音轨语言",
   "player.subtitleOff": "关闭",
+  "player.subtitleResetPosition": "重置位置",
   "player.subtitleLoading": "正在加载字幕…",
   "player.subtitleUnavailable": "无法加载此字幕轨。",
   "player.subtitleTrackNumber": "字幕轨 {number}",

@@ -514,6 +514,7 @@ export const ja = {
   "player.subtitles": "字幕",
   "player.subtitleAuto": "音声の言語に合わせる",
   "player.subtitleOff": "オフ",
+  "player.subtitleResetPosition": "位置をリセット",
   "player.subtitleLoading": "字幕を読み込み中…",
   "player.subtitleUnavailable": "字幕トラックを読み込めませんでした。",
   "player.subtitleTrackNumber": "トラック {number}",

@@ -529,6 +529,7 @@ export const en: Catalog = {
   "player.subtitles": "Subtitle track",
   "player.subtitleAuto": "Match audio language",
   "player.subtitleOff": "Off",
+  "player.subtitleResetPosition": "Reset position",
   "player.subtitleLoading": "Loading subtitles…",
   "player.subtitleUnavailable": "This subtitle track could not be loaded.",
   "player.subtitleTrackNumber": "Track {number}",
