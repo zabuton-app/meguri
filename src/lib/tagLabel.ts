@@ -89,11 +89,14 @@ const NUMERIC_CHIP_KEYS: Record<NumericSearch["field"], TranslationKey> = {
 
 /**
  * What a directive other than `tag:` reads as: its field and value, `Hash:
- * 3fa9`, `Size: >1gb` (the comparison as typed). Null for a `tag:` directive,
- * whose label depends on where it is shown. Shared by the chip's tooltip and
- * the condition row, so the two read the same.
+ * 3fa9`, `Size: >1gb` (the comparison as typed). A `tag:` directive's label
+ * depends on where it is shown, so each caller builds its own. Shared by the
+ * chip's tooltip and the condition row, so the two read the same.
  */
-export function directiveLabel(t: TFunc, d: SearchDirective): string | null {
+export function directiveLabel(
+  t: TFunc,
+  d: Exclude<SearchDirective, { kind: "tag" }>,
+): string {
   switch (d.kind) {
     case "hash":
       return `${t("filter.hashChip")}: ${d.value}`;
@@ -101,8 +104,6 @@ export function directiveLabel(t: TFunc, d: SearchDirective): string | null {
       return `${t("filter.extChip")}: ${d.value}`;
     case "numeric":
       return `${t(NUMERIC_CHIP_KEYS[d.num.field])}: ${d.value}`;
-    case "tag":
-      return null;
   }
 }
 

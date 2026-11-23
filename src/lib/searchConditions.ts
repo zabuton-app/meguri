@@ -108,7 +108,7 @@ export function describeConditions(
     const { negated, body } = parseNegatedSearchToken(raw);
     const d = parseSearchDirective(body);
     if (d === null) return;
-    let label = directiveLabel(t, d) ?? tagLabel(t, d.value);
+    let label = d.kind === "tag" ? tagLabel(t, d.value) : directiveLabel(t, d);
     if (negated) label = `${t("filter.excludeChip")}: ${label}`;
     out.push({
       key: `directive-${i}`,

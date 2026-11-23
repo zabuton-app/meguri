@@ -278,15 +278,10 @@ export function parseTagSearchToken(token: string): string | null {
   return value || null;
 }
 
-/** True for a token the search box treats as an exact-tag directive. */
-export function isTagDirective(token: string): boolean {
-  return parseTagSearchToken(token) !== null;
-}
-
 /**
  * A `tag:` directive's value folded by tagIdentityKey, the fold the SQL that
- * finally resolves the tag uses (see {@link searchDirectiveKey}); null for
- * anything else.
+ * finally resolves the tag uses (the key {@link parseSearchDirective} gives a
+ * tag); null for anything else.
  */
 export function tagSearchKey(token: string): string | null {
   const value = parseTagSearchToken(token);
@@ -446,26 +441,41 @@ export function parseNegatedSearchToken(token: string): {
  * A search-box directive, read once (#666): which kind it is, what its chip
  * shows (`prefix:value`), and the key two directives are compared on. Every
  * place that tells directives apart reads this rather than chaining the
- * parsers above, so a new kind is added here, and a `switch` on `kind` that
- * leaves it out does not compile.
+ * parsers above. A new kind is added here and to DIRECTIVE_PREFIXES, then to
+ * directiveCondition (SQL, main) and directiveLabel (renderer), whose switches
+ * do not compile without it.
  */
 export type SearchDirective =
-  | { kind: "tag" | "hash" | "ext"; prefix: string; value: string; key: string }
-  | {
-      kind: "numeric";
-      prefix: string;
-      value: string;
-      key: string;
-      num: NumericSearch;
-    };
+  | ({ kind: "tag" } & DirectiveText)
+  | ({ kind: "hash" } & DirectiveText)
+  | ({ kind: "ext" } & DirectiveText)
+  | ({ kind: "numeric"; num: NumericSearch } & DirectiveText);
+
+interface DirectiveText {
+  /** What the chip shows before the colon. */
+  prefix: string;
+  /** What the chip shows after it. */
+  value: string;
+  /** What two directives are compared on (see searchDirectiveKey). */
+  key: string;
+}
+
+/** The prefixes each kind is typed with. A Record, so a new kind without its
+ *  prefixes does not compile: left out of the space folding, `x: 3` would
+ *  quietly become a search for the text. */
+const DIRECTIVE_PREFIXES: Record<SearchDirective["kind"], readonly string[]> = {
+  tag: [TAG_SEARCH_PREFIX],
+  hash: [HASH_SEARCH_PREFIX],
+  ext: [EXT_SEARCH_PREFIX],
+  numeric: NUMERIC_SEARCH_FIELDS,
+};
 
 /** The prefixes, with their colon, a space after the colon is folded for. */
-export const SEARCH_DIRECTIVE_PREFIXES: readonly string[] = [
-  `${TAG_SEARCH_PREFIX}:`,
-  `${HASH_SEARCH_PREFIX}:`,
-  `${EXT_SEARCH_PREFIX}:`,
-  ...NUMERIC_SEARCH_FIELDS.map((f) => `${f}:`),
-];
+export const SEARCH_DIRECTIVE_PREFIXES: readonly string[] = Object.values(
+  DIRECTIVE_PREFIXES,
+)
+  .flat()
+  .map((prefix) => `${prefix}:`);
 
 /**
  * The directive a token (without a leading `-`) is, or null for free text.
@@ -492,7 +502,7 @@ export function parseSearchDirective(token: string): SearchDirective | null {
   }
   const tag = parseTagSearchToken(token);
   if (tag !== null) {
-    const key = `${TAG_SEARCH_PREFIX}:${tagIdentityKey(tag)}`;
+    const key = `${TAG_SEARCH_PREFIX}:${tagSearchKey(token)}`;
     return { kind: "tag", prefix: TAG_SEARCH_PREFIX, value: tag, key };
   }
   return null;
