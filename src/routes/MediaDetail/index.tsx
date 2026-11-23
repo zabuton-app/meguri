@@ -22,7 +22,8 @@ import { fileNameOf, folderPathOf } from "@/lib/relPath";
 import { subtitlePreferenceKey } from "@/lib/subtitlePreference";
 import { readEmbeddedTracks } from "@shared/embeddedSubtitles";
 import { isNormalizedFolderPath } from "@shared/folderPath";
-import { api, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
+import { api } from "@/ipc/client";
+import { fileWorkspaceId } from "./fileWorkspace";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,18 +118,11 @@ export default function MediaDetail() {
   // Handle for calling the player's seek from a scene click.
   const playerRef = useRef<PlayerHandle>(null);
   const status = useAppStatus();
-  // The file's owning workspace: from "?ws=" (set by every list/grid link, required in "All"
-  // and collection views), falling back to the active workspace ID for single-workspace
-  // navigation. The active ID is only a usable fallback when it's a real workspace — the
-  // "All"/collection sentinels aren't resolvable Cores, so ignore them here.
-  const activeId = status.data?.workspaceId ?? "";
-  const activeFallback =
-    activeId &&
-    activeId !== ALL_ID &&
-    !activeId.startsWith(COLLECTION_ID_PREFIX)
-      ? activeId
-      : "";
-  const wsId = searchParams.get("ws") ?? activeFallback;
+  // The file's owning workspace (see fileWorkspaceId).
+  const wsId = fileWorkspaceId(
+    searchParams.get("ws"),
+    status.data?.workspaceId,
+  );
   // Like a tag filter, showing the file's folder closes the detail to the list.
   const onShowFolder = useCallback(
     (path: string) => {

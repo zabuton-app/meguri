@@ -42,6 +42,7 @@ export function cleanSearchQuery(query: SearchQuery): SearchQuery {
     next.ratingMin = query.ratingMin;
   if (query.favorite) next.favorite = true;
   if (query.duplicates) next.duplicates = true;
+  if (query.subtitles) next.subtitles = true;
   if (query.played != null) next.played = query.played;
   if (query.inProgress) next.inProgress = true;
   if (query.playedVia) next.playedVia = query.playedVia;
@@ -210,6 +211,7 @@ export function describeSearchQuery(
   if (query.ratingMin) parts.push(`★${query.ratingMin}+`);
   if (query.favorite) parts.push(t("favorite.chip"));
   if (query.duplicates) parts.push(t("duplicates.chip"));
+  if (query.subtitles) parts.push(t("filter.subtitlesChip"));
   if (query.played != null) {
     const label = query.played ? t("filter.played") : t("filter.unplayed");
     parts.push(query.playedVia ? `${label} (${query.playedVia})` : label);
