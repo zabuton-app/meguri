@@ -425,6 +425,8 @@ describe("searchFiles", () => {
       expect(ids("duration:>20m")).toEqual([long]);
       expect(ids("duration:>=1:02:03")).toEqual([long]);
       expect(ids("duration:<=1h")).toEqual([short, clip]);
+      // 90.4 s is 90 in whole seconds, so it is not over 90.
+      expect(ids("duration:>90s")).toEqual([long]);
     });
 
     it("compares width and height in pixels", () => {
@@ -442,6 +444,23 @@ describe("searchFiles", () => {
       expect(ids("width:>=3840")).toEqual([uhd]);
       expect(ids("height:1080")).toEqual([hd]);
       expect(ids("height:<2160")).toEqual([hd]);
+    });
+
+    it("excludes with a leading -, keeping a file whose value is unknown", () => {
+      const short = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        duration: 20,
+        size: 1024,
+      });
+      const long = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        duration: 600,
+        size: 1024 ** 3,
+      });
+      const image = insertFile(db, rootId, { relPath: "c.jpg", kind: "image" });
+      expect(ids("-duration:<30s")).toEqual([long, image]);
+      expect(ids("-size:>1mb")).toEqual([short, image]);
+      expect(ids("duration:>10s -duration:>5m")).toEqual([short]);
     });
 
     it("leaves an unparsable value as free text", () => {

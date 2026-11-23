@@ -490,8 +490,10 @@ The **numeric directives** compare a column (#524): `size:` (bytes), `duration:`
 `width:>=3840`). `size:` takes `b`, `kb`, `mb` or `gb`, binary as `formatSize`
 shows sizes (1 kb = 1024 bytes); `duration:` takes `s`, `m`, `h` or a clock time
 (`1:30`, `1:02:03`), and is compared in whole seconds, as the list shows it.
-No unit is the column's own. The names are the full words because `dur` and
-`res` are tag namespaces. `parseNumericSearchToken()` in `shared/tags.ts` reads
+No unit is the column's own. Equality is exact on the stored value:
+`size:1.5gb` is 1610612736 bytes, not every file the list shows as 1.5 GB, so a
+range (`size:>1.4gb size:<1.6gb`) finds those. The names are the full words
+because `dur` and `res` are tag namespaces. `parseNumericSearchToken()` in `shared/tags.ts` reads
 them; an unknown unit or a missing number leaves the token free text. A file
 whose value is unknown (`NULL`, such as an image's duration) never matches. Two
 directives on one field are ANDed, so `size:>100mb size:<1gb` is a range. They
@@ -505,9 +507,9 @@ and `-draft` leave out the files the same token without the `-` would match.
 `appendSearchConditions()` sends the token's condition, built by
 `directiveCondition()` for a directive, to SQL as `NOT COALESCE((…), 0)`. A
 file the condition says nothing about (`NULL`) is kept, and a directive added
-there can be excluded as well. Negated free
-text follows the positive split (trigram `MATCH` for 3+ code points, `LIKE` for
-shorter ones), each negated word on its own, and with alternatives
+there can be excluded as well. Negated free text follows the positive split
+(trigram `MATCH` for 3+ code points, `LIKE` for shorter ones), each negated word
+on its own, and with alternatives
 (`-draft|wip`) a file matching any of them is left out. A file without a hash is
 never excluded by `-hash:`, and `-tag:` with a name no tag has excludes nothing.
 A query of negations only returns every other file; on 100,000 synthetic files a

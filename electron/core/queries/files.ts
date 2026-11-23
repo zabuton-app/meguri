@@ -262,8 +262,9 @@ function anyOfCondition(group: FreeTextGroup, args: unknown[]): string {
 
 /**
  * The condition that a file matches one directive token (`tag:`, `hash:`,
- * `ext:`, `size:`, `duration:`, `width:`, `height:`), or null for free text. A new directive is added here, and both
- * `tag:x` and `-tag:x` then work: the exclusion only ever wraps this.
+ * `ext:`, `size:`, `duration:`, `width:`, `height:`), or null for free text.
+ * A new directive is added here, and both `tag:x` and `-tag:x` then work: the
+ * exclusion only ever wraps this.
  */
 function directiveCondition(
   db: DB,
