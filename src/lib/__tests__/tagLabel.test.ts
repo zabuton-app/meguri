@@ -82,6 +82,11 @@ describe("searchTokenLabel", () => {
     expect(searchTokenLabel(t, "size:big")).toBeNull();
   });
 
+  it("names a negated directive as an exclusion (#523)", () => {
+    expect(searchTokenLabel(t, "-ext:GIF")).toBe("Exclude: Extension: gif");
+    expect(searchTokenLabel(t, "-draft")).toBeNull();
+  });
+
   it("returns null for free text", () => {
     expect(searchTokenLabel(t, "beach")).toBeNull();
   });

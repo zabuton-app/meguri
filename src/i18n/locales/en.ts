@@ -355,10 +355,13 @@ export const en: Catalog = {
   "filter.durationChip": "Duration",
   "filter.widthChip": "Width",
   "filter.heightChip": "Height",
+  "filter.excludeChip": "Exclude",
   "filter.kindFilter": "Filter by kind",
   "filter.playState": "Play state",
   "filter.sortSection": "Sort order",
   "filter.otherSection": "Other",
+  "filter.subtitles": "Show only videos with subtitles",
+  "filter.subtitlesChip": "Subtitles",
 
   // smart collections
   "smartCollection.title": "Smart collections",
@@ -533,6 +536,7 @@ export const en: Catalog = {
   "player.subtitles": "Subtitle track",
   "player.subtitleAuto": "Match audio language",
   "player.subtitleOff": "Off",
+  "player.subtitleResetPosition": "Reset position",
   "player.subtitleLoading": "Loading subtitles…",
   "player.subtitleUnavailable": "This subtitle track could not be loaded.",
   "player.subtitleTrackNumber": "Track {number}",

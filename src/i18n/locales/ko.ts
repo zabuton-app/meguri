@@ -334,10 +334,13 @@ export const ko: Catalog = {
   "filter.durationChip": "길이",
   "filter.widthChip": "너비",
   "filter.heightChip": "높이",
+  "filter.excludeChip": "제외",
   "filter.kindFilter": "종류로 필터링",
   "filter.playState": "시청 상태",
   "filter.sortSection": "정렬 순서",
   "filter.otherSection": "기타",
+  "filter.subtitles": "자막이 있는 동영상만 표시",
+  "filter.subtitlesChip": "자막 있음",
 
   // smart collections
   "smartCollection.title": "스마트 컬렉션",
@@ -512,6 +515,7 @@ export const ko: Catalog = {
   "player.subtitles": "자막",
   "player.subtitleAuto": "오디오 언어와 일치",
   "player.subtitleOff": "끄기",
+  "player.subtitleResetPosition": "위치 초기화",
   "player.subtitleLoading": "자막 불러오는 중…",
   "player.subtitleUnavailable": "이 자막 트랙을 불러올 수 없습니다.",
   "player.subtitleTrackNumber": "트랙 {number}",

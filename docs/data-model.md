@@ -63,6 +63,9 @@ In the workspace database (`CORE_DDL`):
   HEIF/AVIF (as phone cameras write) keeps `width` / `height` NULL: depending
   on the version, ffprobe reports one tile's size, 0x0, or no stream at all,
   never the full image. Its stored `meta` keeps only the first tile's stream.
+  `meta` holds the ffprobe output; the subtitle filter reads its streams
+  directly, matching only the text codecs the player shows
+  (`shared/embeddedSubtitles.ts`), so it has no column of its own.
 - `tags` (library) — the tag master, unique on `(namespace, name)`. An empty namespace
   means the tag is the user's own; a non-empty one means it is owned by a
   pipeline (see [Derived tags](#derived-tags)). The constraint tells
@@ -493,7 +496,27 @@ them; an unknown unit or a missing number leaves the token free text. A file
 whose value is unknown (`NULL`, such as an image's duration) never matches. Two
 directives on one field are ANDed, so `size:>100mb size:<1gb` is a range. They
 are chips like `ext:`, and none of the four columns is indexed: the comparison
-runs on the rows the other conditions leave.
+runs on the rows the other conditions leave. With a leading `-`
+(`-size:>1gb`), a file whose value is unknown is kept.
+
+A leading **`-` excludes** (#523): `-tag:screenshot`, `-ext:gif`, `-hash:3fa9`
+and `-draft` leave out the files the same token without the `-` would match.
+`parseNegatedSearchToken()` in `shared/tags.ts` reads it, and
+`appendSearchConditions()` sends the token's condition, built by
+`directiveCondition()` for a directive, to SQL as `NOT COALESCE((…), 0)`. A
+file the condition says nothing about (`NULL`) is kept, and a directive added
+there can be excluded as well. Negated free
+text follows the positive split (trigram `MATCH` for 3+ code points, `LIKE` for
+shorter ones), each negated word on its own, and with alternatives
+(`-draft|wip`) a file matching any of them is left out. A file without a hash is
+never excluded by `-hash:`, and `-tag:` with a name no tag has excludes nothing.
+A query of negations only returns every other file; on 100,000 synthetic files a
+page of one costs about what the positive form does. A lone `-` is ordinary
+text, and a dash typed inside quotes (`"-intro"`) is text too: the tokenizer
+marks it as `\-intro`, and `joinSearchTokens()` writes it back quoted. A negated
+directive is a chip of its own, drawn struck through behind its `-`, and
+`searchDirectiveKey()` keeps `tag:x` and `-tag:x` apart. A negated word stays
+free text.
 
 The search is typed in the command menu, whose field starts from the search on
 screen (`useSearchDraft` in `src/hooks/`, rendered by `CommandMenu`). It shows a

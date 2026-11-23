@@ -338,10 +338,13 @@ export const ja = {
   "filter.durationChip": "長さ",
   "filter.widthChip": "幅",
   "filter.heightChip": "高さ",
+  "filter.excludeChip": "除外",
   "filter.kindFilter": "種別で絞り込み",
   "filter.playState": "視聴状態",
   "filter.sortSection": "並び順",
   "filter.otherSection": "その他",
+  "filter.subtitles": "字幕付きの動画のみ表示",
+  "filter.subtitlesChip": "字幕あり",
 
   // スマートコレクション
   "smartCollection.title": "スマートコレクション",
@@ -518,6 +521,7 @@ export const ja = {
   "player.subtitles": "字幕",
   "player.subtitleAuto": "音声の言語に合わせる",
   "player.subtitleOff": "オフ",
+  "player.subtitleResetPosition": "位置をリセット",
   "player.subtitleLoading": "字幕を読み込み中…",
   "player.subtitleUnavailable": "字幕トラックを読み込めませんでした。",
   "player.subtitleTrackNumber": "トラック {number}",

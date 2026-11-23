@@ -18,6 +18,7 @@ import {
   parseQualifiedTagName,
   parseHashSearchToken,
   parseNumericSearchToken,
+  parseNegatedSearchToken,
   parseTagSearchToken,
   splitSearchTokens,
 } from "@shared/tags";
@@ -107,7 +108,8 @@ export function describeConditions(
       },
     });
 
-  splitSearchTokens(query.q ?? "").forEach((token, i) => {
+  splitSearchTokens(query.q ?? "").forEach((raw, i) => {
+    const { negated, body: token } = parseNegatedSearchToken(raw);
     const hash = parseHashSearchToken(token);
     const ext = parseExtSearchToken(token);
     const num = parseNumericSearchToken(token);
@@ -118,6 +120,7 @@ export function describeConditions(
     else if (num != null) label = numericSearchLabel(t, num);
     else if (tag != null) label = tagLabel(t, tag);
     else return;
+    if (negated) label = `${t("filter.excludeChip")}: ${label}`;
     out.push({
       key: `directive-${i}`,
       label,
@@ -230,6 +233,15 @@ export function describeConditions(
           ),
         );
       },
+    });
+
+  if (query.subtitles)
+    out.push({
+      key: "subtitles",
+      label: t("filter.subtitlesChip"),
+      group: "collapsed",
+      chip: true,
+      clear: (q) => without(q, "subtitles"),
     });
 
   // Not a narrowing condition, but it is hidden state once the control moves

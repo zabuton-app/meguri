@@ -106,6 +106,9 @@ interface Props {
   resetKey?: string;
   /** The list is a search inside a folder: its empty state says so. */
   inFolder?: boolean;
+  /** mediaSortId of the file a docked side peek shows: marked, and scrolled
+   *  into view each time it changes. */
+  peekFileKey?: string;
 }
 
 const noop = () => {};
@@ -132,6 +135,7 @@ export const MediaList = memo(function MediaList({
   onOpenFolder,
   resetKey,
   inFolder = false,
+  peekFileKey,
 }: Props) {
   const watchLaterMembership = useWatchLater();
   const { listThumbSize } = usePreferences();
@@ -214,6 +218,26 @@ export const MediaList = memo(function MediaList({
     setFocusedIndex(-1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId, resetKey]);
+
+  // The row the docked peek shows. It is scrolled to once per file, as soon
+  // as the list is loaded, and not again on later renders (paging, a resize):
+  // that would fight the user's own scrolling, and a file paged in later is
+  // not worth a jump either.
+  const peekIndex = peekFileKey
+    ? entries.findIndex(
+        (e) => e.kind === "file" && mediaSortId(e.file) === peekFileKey,
+      )
+    : -1;
+  const scrolledToPeek = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!peekFileKey) {
+      scrolledToPeek.current = undefined;
+      return;
+    }
+    if (loading || scrolledToPeek.current === peekFileKey) return;
+    scrolledToPeek.current = peekFileKey;
+    if (peekIndex >= 0) scrollToRow(peekIndex);
+  }, [peekFileKey, peekIndex, loading, scrollToRow]);
 
   // Fetch the next page when a row near the end becomes visible.
   useInfiniteScrollTrigger({
@@ -302,6 +326,7 @@ export const MediaList = memo(function MediaList({
                       thumbWidth={thumbWidth}
                       onTagClick={onTagClick}
                       focused={focused}
+                      peeked={vr.index === peekIndex}
                       watchLater={watchLaterMembership}
                       watchLaterRef={focused ? focusedWatchLaterRef : undefined}
                       fileDraggable={!reorder}
@@ -330,6 +355,7 @@ const MediaRow = memo(function MediaRow({
   thumbWidth,
   onTagClick,
   focused,
+  peeked,
   watchLater,
   watchLaterRef,
   fileDraggable,
@@ -342,6 +368,8 @@ const MediaRow = memo(function MediaRow({
   thumbWidth: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  /** The file the docked side peek shows. */
+  peeked?: boolean;
   watchLater: WatchLaterMembership;
   /** Set only on the focused row, so the "W" shortcut can drive this toggle. */
   watchLaterRef?: Ref<HTMLButtonElement>;
@@ -387,12 +415,16 @@ const MediaRow = memo(function MediaRow({
       {...dragProps}
       data-slot="media-row"
       data-file-key={mediaSortId(file)}
-      aria-current={focused ? "true" : undefined}
+      // "page" marks the file the peek shows; the keyboard focus, which can
+      // be elsewhere, keeps "true" and wins on the row that has both.
+      aria-current={focused ? "true" : peeked ? "page" : undefined}
       data-selected={selected || undefined}
       className={cn(
         "group @container relative flex items-center gap-4 rounded-card p-2 pr-4 transition-colors hover:bg-fg/10",
-        // The grid's vocabulary: a tint for selected, a ring for focus (#587).
+        // The grid's vocabulary: a tint for selected, a ring for focus (#587),
+        // and a 1px outline for the file in the peek.
         selected && "bg-primary/15 hover:bg-primary/25",
+        peeked && "ring-1 ring-inset ring-primary",
         focused && "ring-2 ring-inset ring-primary",
       )}
     >
