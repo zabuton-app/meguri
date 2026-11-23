@@ -327,6 +327,18 @@ The Docker dev container seeds its initial workspace list from
 local Docker workspace back to the sample state, remove the Docker volume or run
 the seed step with `MEGURI_SEED_SAMPLE_CONFIG=force`.
 
+To try the subtitle features, generate sample videos with embedded subtitle
+tracks into `samples/subtitles/` (with the bundled ffmpeg; Git ignores the
+videos):
+
+```bash
+node scripts/dev/make-subtitle-samples.mjs [output-dir]
+```
+
+The seeded workspaces do not include that folder: in the container, add
+`/media/library/subtitles` as a workspace, or open it with
+`MEGURI_ROOT=samples/subtitles npm run dev`.
+
 ### Build / distribution packages
 
 ```bash
