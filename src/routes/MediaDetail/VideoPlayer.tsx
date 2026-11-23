@@ -171,6 +171,14 @@ export const VideoPlayer = forwardRef<
      */
     recordPosition?: boolean;
     /**
+     * Whether starting playback here counts as a play (default true): a row in
+     * the play history, and the file leaves Watch Later; onPlayed fires only
+     * then. Off for Discovery's in-place preview (#398), which samples a file
+     * rather than watches it. A host adopting a handed-over element takes the
+     * previous host's play as recorded, so no host with this off hands off.
+     */
+    recordPlay?: boolean;
+    /**
      * Whether the player takes its window-level keyboard shortcuts (default
      * true). Off where the host owns those keys: Discovery pages its slides
      * with the arrows, and Space belongs to whichever of its buttons has focus.
@@ -211,7 +219,9 @@ export const VideoPlayer = forwardRef<
      */
     onExportFrame?: (sec: number) => void;
     onNativeDuration: (d: number | null) => void;
-    /** Fired once per loaded file when playback first starts (used to refresh the list order). */
+    /** Fired once per loaded file, when playback first starts and the play is
+     *  recorded: never with `recordPlay` off. Callers update what a recorded
+     *  play changes (the play-sorted lists, Watch Later). */
     onPlayed: () => void;
     /** Fires on every play (not just the first), so the caller can enforce
      *  audio/video exclusivity. Distinct from onPlayed, which fires once per file. */
@@ -263,6 +273,7 @@ export const VideoPlayer = forwardRef<
     autoplay = true,
     reopenOnNetworkError = false,
     recordPosition = true,
+    recordPlay = true,
     shortcuts = true,
     audioTracks,
     subtitleTracks,
@@ -729,7 +740,7 @@ export const VideoPlayer = forwardRef<
       // the play; this host still owes its own callers the start.
       onPlaybackStart?.();
       playedRef.current = true;
-      onPlayed();
+      if (recordPlay) onPlayed();
     }
   };
 
@@ -1247,9 +1258,11 @@ export const VideoPlayer = forwardRef<
           onPlay={() => {
             setPlaying(true);
             onPlaybackStart?.();
-            void api.fileRecordPlay(id, wsId, "browser", position);
+            if (recordPlay) {
+              void api.fileRecordPlay(id, wsId, "browser", position);
+            }
             playbackPosition.markPlayed();
-            if (!playedRef.current) {
+            if (recordPlay && !playedRef.current) {
               playedRef.current = true;
               onPlayed();
             }

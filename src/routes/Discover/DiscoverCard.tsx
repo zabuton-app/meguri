@@ -269,10 +269,7 @@ export function DiscoverCard({
             autoplay={activePreview.autoplay}
             navKeys={NAV_BINDINGS[keybindingPreset]}
             onNativeDuration={() => undefined}
-            onPlayed={() => {
-              invalidatePlayedSearches(qc);
-              dropFromWatchLaterCache(qc, wsId, file.id);
-            }}
+            onPlayed={() => undefined}
             onPlaybackStart={claimVideo}
             onPlayingChange={setVideoPlaying}
             onFatalError={(message) => {
@@ -281,9 +278,11 @@ export function DiscoverCard({
               toast.error(message);
             }}
             chromeless
-            // A preview: it samples the file, so the place it was left at
-            // stays, and the keyboard stays with Discovery (arrows page the
+            // A preview: it samples the file, so it is not a play (no history
+            // row, and the file stays in Watch Later), the place it was left
+            // at stays, and the keyboard stays with Discovery (arrows page the
             // slides, Space activates the focused button).
+            recordPlay={false}
             recordPosition={false}
             shortcuts={false}
             t={t}
