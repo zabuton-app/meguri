@@ -19,6 +19,8 @@ import {
   tagSearchKey,
   tagSearchToken,
   tidyTagName,
+  parseSearchDirective,
+  SEARCH_DIRECTIVE_PREFIXES,
 } from "@shared/tags";
 
 describe("tidyTagName", () => {
@@ -496,6 +498,42 @@ describe("parseNumericSearchToken (#524)", () => {
   it("folds a value typed after a space, as tag: does", () => {
     expect(splitSearchTokens("size: >1gb trip")).toEqual(["size:>1gb", "trip"]);
     expect(parseNumericSearchToken("size:>1gb")?.text).toBe(">1gb");
+  });
+});
+
+describe("parseSearchDirective", () => {
+  it("reads each kind once, with what its chip shows (#666)", () => {
+    expect(parseSearchDirective("HASH:3FA9")).toMatchObject({
+      kind: "hash",
+      prefix: "hash",
+      value: "3fa9",
+    });
+    expect(parseSearchDirective("ext:.GIF")).toMatchObject({
+      kind: "ext",
+      prefix: "ext",
+      value: "gif",
+    });
+    expect(parseSearchDirective("size:>1GB")).toMatchObject({
+      kind: "numeric",
+      prefix: "size",
+      value: ">1gb",
+    });
+    // A token as the tokenizer gives it, quotes taken off.
+    expect(
+      parseSearchDirective(splitSearchTokens('tag:"sea side"')[0]),
+    ).toMatchObject({
+      kind: "tag",
+      prefix: "tag",
+      value: "sea side",
+    });
+    expect(parseSearchDirective("beach")).toBeNull();
+    expect(parseSearchDirective("size:big")).toBeNull();
+  });
+
+  it("folds a space after the colon for every prefix it reads (#666)", () => {
+    for (const prefix of SEARCH_DIRECTIVE_PREFIXES) {
+      expect(splitSearchTokens(`${prefix} x`)).toEqual([`${prefix}x`]);
+    }
   });
 });
 
