@@ -100,7 +100,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.187.0",
-    "@vitejs/plugin-react": "^5.2.0",
+    "@vitejs/plugin-react": "^6.3.0",
     "assemblyscript": "0.28.20",
     "electron": "^45.3.2",
     "electron-builder": "^26.18.0",
@@ -118,7 +118,7 @@
     "tailwindcss": "^4.3.5",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.72.2",
-    "vite": "^6.4.5",
+    "vite": "^8.3.8",
     "vitest": "^5.1.0"
   },
   "build": {
@@ -201,7 +201,6 @@
   },
   "allowScripts": {
     "electron-winstaller@5.4.0": true,
-    "esbuild@0.25.12": true,
     "https://github.com/zabuton-app/ffmpeg-binaries/releases/download/v1.0.6/zabuton-app-ffmpeg-binaries-1.0.6.tgz": true,
     "better-sqlite3": false
   }
