@@ -1024,7 +1024,7 @@ describe("VideoPlayer", () => {
     expect(onPlayed).toHaveBeenCalledTimes(1);
   });
 
-  it("records no play when told not to, but still fires onPlayed", () => {
+  it("records no play, and fires no onPlayed, when told not to", () => {
     const { video, onPlayed } = renderPlayer({
       autoplay: false,
       recordPlay: false,
@@ -1034,7 +1034,8 @@ describe("VideoPlayer", () => {
     fireEvent.play(video);
 
     expect(fileRecordPlay).not.toHaveBeenCalled();
-    expect(onPlayed).toHaveBeenCalledTimes(1);
+    // A caller's onPlayed updates what a recorded play changes.
+    expect(onPlayed).not.toHaveBeenCalled();
   });
 
   it("ignores MEDIA_ERR_ABORTED without surfacing the error screen", () => {
