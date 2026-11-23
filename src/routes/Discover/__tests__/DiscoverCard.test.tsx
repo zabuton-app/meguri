@@ -207,7 +207,7 @@ describe("DiscoverCard video", () => {
     expect(screen.getByRole("button", { name: /^pause$/i })).toBeTruthy();
   });
 
-  it("previews without moving the resume point or taking the keyboard", () => {
+  it("previews without counting a play, moving the resume point or taking the keyboard", () => {
     const { unmount } = renderWithProviders(<ActiveVideoCard />);
     fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
     const video = document.querySelector("video") as HTMLVideoElement;
@@ -230,7 +230,8 @@ describe("DiscoverCard video", () => {
     expect(fireEvent.keyDown(window, { code: "ArrowRight" })).toBe(true);
 
     unmount();
-    expect(mocks.fileRecordPlay).toHaveBeenCalled();
+    // Not a play (#398): no history row, and the file stays in Watch Later.
+    expect(mocks.fileRecordPlay).not.toHaveBeenCalled();
     expect(mocks.fileSavePosition).not.toHaveBeenCalled();
   });
 });

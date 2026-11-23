@@ -11,16 +11,11 @@ import { DATE_RANGES } from "@/lib/dateRanges";
 import { kindLabel } from "@/lib/mediaKind";
 import { resolveSortDir } from "@shared/sortDir";
 import {
-  isFavoriteSearchToken,
   isSearchDirective,
-  isTagDirective,
   joinSearchTokens,
-  parseExtSearchToken,
   parseQualifiedTagName,
-  parseHashSearchToken,
-  parseRatingSearchToken,
-  parseTagSearchToken,
-  ratingSearchText,
+  parseNegatedSearchToken,
+  parseSearchDirective,
   splitSearchTokens,
 } from "@shared/tags";
 import type { SearchQuery } from "@/ipc/types";
@@ -32,7 +27,7 @@ import {
   scopedFolderPath,
 } from "@/lib/smartCollections";
 import { sortLabel } from "@/lib/sortLabel";
-import { tagHumanLabel } from "@/lib/tagLabel";
+import { directiveLabel, tagHumanLabel } from "@/lib/tagLabel";
 
 /** Which surface owns the control that sets a condition. */
 export type ConditionGroup = "primary" | "collapsed";
@@ -109,21 +104,15 @@ export function describeConditions(
       },
     });
 
-  splitSearchTokens(query.q ?? "").forEach((token, i) => {
-    const hash = parseHashSearchToken(token);
-    const ext = parseExtSearchToken(token);
-    const rating = parseRatingSearchToken(token);
-    const tag = isTagDirective(token) ? parseTagSearchToken(token) : null;
-    let label: string;
-    if (hash != null) label = `${t("filter.hashChip")}: ${hash}`;
-    else if (ext != null) label = `${t("filter.extChip")}: ${ext}`;
-    // Apart from the rating and favorite controls' chips below: a directive
-    // and its control apply independently (#525), and each clears its own.
-    else if (rating != null)
-      label = `${t("media.rating")}: ${ratingSearchText(rating)}`;
-    else if (isFavoriteSearchToken(token)) label = `♥ ${t("favorite.chip")}`;
-    else if (tag != null) label = tagLabel(t, tag);
-    else return;
+  splitSearchTokens(query.q ?? "").forEach((raw, i) => {
+    const { negated, body } = parseNegatedSearchToken(raw);
+    const d = parseSearchDirective(body);
+    if (d === null) return;
+    // A `rating:` or `is:fav` directive is a chip apart from the rating and
+    // favorite controls' below: the two apply independently (#525), and each
+    // clears its own.
+    let label = d.kind === "tag" ? tagLabel(t, d.value) : directiveLabel(t, d);
+    if (negated) label = `${t("filter.excludeChip")}: ${label}`;
     out.push({
       key: `directive-${i}`,
       label,
@@ -236,6 +225,15 @@ export function describeConditions(
           ),
         );
       },
+    });
+
+  if (query.subtitles)
+    out.push({
+      key: "subtitles",
+      label: t("filter.subtitlesChip"),
+      group: "collapsed",
+      chip: true,
+      clear: (q) => without(q, "subtitles"),
     });
 
   // Not a narrowing condition, but it is hidden state once the control moves

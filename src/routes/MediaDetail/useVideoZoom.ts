@@ -11,8 +11,9 @@ import {
   type ZoomView,
 } from "./imageZoom";
 
-/** How far a press moves before it pans instead of playing or pausing. */
-const DRAG_THRESHOLD_PX = 4;
+/** How far a press moves before it pans instead of playing or pausing (also
+ *  how far one on the captions moves before it drags them). */
+export const DRAG_THRESHOLD_PX = 4;
 
 // Zoom and pan of the detail view's video (#637), with the math of the image's
 // (imageZoom.ts) and its handling of the wheel (ZoomableImage.tsx): keep the

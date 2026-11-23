@@ -1,46 +1,38 @@
 import {
-  EXT_SEARCH_PREFIX,
-  FAVORITE_SEARCH_VALUE,
-  HASH_SEARCH_PREFIX,
-  IS_SEARCH_PREFIX,
-  RATING_SEARCH_PREFIX,
+  SEARCH_NOT,
   TAG_SEARCH_PREFIX,
-  isFavoriteSearchToken,
-  parseExtSearchToken,
-  parseHashSearchToken,
-  parseRatingSearchToken,
-  parseTagSearchToken,
-  ratingSearchText,
+  parseNegatedSearchToken,
+  parseSearchDirective,
 } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { generatedTagChipLabel } from "@/lib/tagLabel";
 
-/** What a search chip reads: `tag:beach`, or a generated tag's `Tempo: Fast`. */
-export function SearchChipLabel({ t, token }: { t: TFunc; token: string }) {
-  const [prefix, body] = directiveParts(token);
-  const human =
-    prefix === TAG_SEARCH_PREFIX ? generatedTagChipLabel(t, token) : null;
+/** What a search chip reads: `tag:beach`, or a generated tag's `Tempo: Fast`;
+ *  an exclusion (`-tag:beach`) struck through behind its `-`. */
+export function SearchChipLabel({
+  t,
+  token: raw,
+}: {
+  t: TFunc;
+  token: string;
+}) {
+  const { negated, body: token } = parseNegatedSearchToken(raw);
+  const d = parseSearchDirective(token);
+  const prefix = d?.prefix ?? TAG_SEARCH_PREFIX;
+  const body = d?.value ?? "";
+  // A generated tag reads as its category and value (`Tempo: Fast`).
+  const human = d?.kind === "tag" ? generatedTagChipLabel(t, token) : null;
   return (
     <span className="truncate">
-      {human ?? (
-        <>
-          <span className="text-muted">{prefix}:</span>
-          {body}
-        </>
-      )}
+      {negated && <span className="text-error">{SEARCH_NOT}</span>}
+      <span className={negated ? "line-through" : undefined}>
+        {human ?? (
+          <>
+            <span className="text-muted">{prefix}:</span>
+            {body}
+          </>
+        )}
+      </span>
     </span>
   );
-}
-
-/** A directive's prefix and its value as the chip shows it, normalized. */
-function directiveParts(token: string): [string, string] {
-  const hash = parseHashSearchToken(token);
-  if (hash !== null) return [HASH_SEARCH_PREFIX, hash];
-  const ext = parseExtSearchToken(token);
-  if (ext !== null) return [EXT_SEARCH_PREFIX, ext];
-  const rating = parseRatingSearchToken(token);
-  if (rating !== null) return [RATING_SEARCH_PREFIX, ratingSearchText(rating)];
-  if (isFavoriteSearchToken(token))
-    return [IS_SEARCH_PREFIX, FAVORITE_SEARCH_VALUE];
-  return [TAG_SEARCH_PREFIX, parseTagSearchToken(token) ?? ""];
 }

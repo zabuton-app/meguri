@@ -1,13 +1,12 @@
 import {
   AUTO_META_SOURCE,
-  isFavoriteSearchToken,
   namespaceOfAutoMetaValue,
   parseQualifiedTagName,
-  parseExtSearchToken,
-  parseHashSearchToken,
-  parseRatingSearchToken,
+  parseNegatedSearchToken,
+  parseSearchDirective,
   parseTagSearchToken,
-  ratingSearchText,
+  type NumericSearch,
+  type SearchDirective,
 } from "@shared/tags";
 import type { TFunc } from "@/i18n/I18nProvider";
 import type { TranslationKey } from "@/i18n/locales/ja";
@@ -81,27 +80,60 @@ export function tagHumanLabel(
   return `${tagNamespaceLabel(t, namespace)}: ${tagValueLabel(t, namespace, name)}`;
 }
 
+const NUMERIC_CHIP_KEYS: Record<NumericSearch["field"], TranslationKey> = {
+  size: "filter.sizeChip",
+  duration: "filter.durationChip",
+  width: "filter.widthChip",
+  height: "filter.heightChip",
+};
+
 /**
- * Human-readable description of a `tag:`, `hash:`, `ext:`, `rating:` or
- * `is:fav` search token, or null when the token is ordinary free text. Used for the tooltip on the chips
- * the search box renders, where the chip itself shows the raw token.
+ * What a directive other than `tag:` reads as: its field and value, `Hash:
+ * 3fa9`, `Size: >1gb` (the comparison as typed). A `tag:` directive's label
+ * depends on where it is shown, so each caller builds its own. Shared by the
+ * chip's tooltip and the condition row, so the two read the same.
+ */
+export function directiveLabel(
+  t: TFunc,
+  d: Exclude<SearchDirective, { kind: "tag" }>,
+): string {
+  switch (d.kind) {
+    case "hash":
+      return `${t("filter.hashChip")}: ${d.value}`;
+    case "ext":
+      return `${t("filter.extChip")}: ${d.value}`;
+    case "numeric":
+      return `${t(NUMERIC_CHIP_KEYS[d.num.field])}: ${d.value}`;
+    case "rating":
+      return `${t("media.rating")}: ${d.value}`;
+    case "favorite":
+      return `♥ ${t("favorite.chip")}`;
+  }
+}
+
+/**
+ * Human-readable description of a `tag:`, `hash:`, `ext:` or numeric search
+ * token, or null when the token is ordinary free text. Used for the tooltip on
+ * the chips the search box renders, where the chip itself shows the raw token.
  *
  * A generated tag is usually written as its bare value ("long"), so the category
  * is recovered from the vocabulary; the qualified form is accepted too. A value
  * that belongs to no closed set — a manual tag, or a codec — reads as itself.
+ * A negated directive (`-tag:beach`) reads as an exclusion of the same.
  */
-export function searchTokenLabel(t: TFunc, token: string): string | null {
-  const hash = parseHashSearchToken(token);
-  if (hash !== null) return `${t("filter.hashChip")}: ${hash}`;
-  const ext = parseExtSearchToken(token);
-  if (ext !== null) return `${t("filter.extChip")}: ${ext}`;
-  const rating = parseRatingSearchToken(token);
-  if (rating !== null)
-    return `${t("media.rating")}: ${ratingSearchText(rating)}`;
-  if (isFavoriteSearchToken(token)) return `♥ ${t("favorite.chip")}`;
-  const raw = parseTagSearchToken(token);
-  if (raw === null) return null;
-  const parsed = parseQualifiedTagName(raw);
+export function searchTokenLabel(t: TFunc, raw: string): string | null {
+  const { negated, body } = parseNegatedSearchToken(raw);
+  const label = positiveTokenLabel(t, body);
+  return label !== null && negated
+    ? `${t("filter.excludeChip")}: ${label}`
+    : label;
+}
+
+function positiveTokenLabel(t: TFunc, token: string): string | null {
+  const d = parseSearchDirective(token);
+  if (d === null) return null;
+  if (d.kind !== "tag") return directiveLabel(t, d);
+  const parsed = parseQualifiedTagName(d.value);
   const namespace =
     parsed.namespace || namespaceOfAutoMetaValue(parsed.name) || "";
   return namespace

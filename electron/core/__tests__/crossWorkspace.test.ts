@@ -166,6 +166,23 @@ describe("searchWorkspaces", () => {
       ["ws-b", "b/clip.mp4"],
     ]);
   });
+  it("applies a numeric directive in the All view across workspaces (#524)", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    insertFile(a.db, a.rootId, { relPath: "a/big.mp4", size: 2 * 1024 ** 3 });
+    insertFile(a.db, a.rootId, { relPath: "a/small.mp4", size: 1024 });
+    insertFile(b.db, b.rootId, { relPath: "b/big.mp4", size: 3 * 1024 ** 3 });
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { q: "size:>1gb", limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.relPath])).toEqual([
+      ["ws-a", "a/big.mp4"],
+      ["ws-b", "b/big.mp4"],
+    ]);
+  });
 
   it("applies rating: and is:fav in the All view across workspaces (#525)", () => {
     const a = newDb();

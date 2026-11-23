@@ -68,6 +68,11 @@ describe("smartCollections", () => {
     expect(cleanSearchQuery({ duplicates: false })).toEqual({});
   });
 
+  it("cleanSearchQuery keeps the subtitles flag only when set (#378)", () => {
+    expect(cleanSearchQuery({ subtitles: true })).toEqual({ subtitles: true });
+    expect(cleanSearchQuery({ subtitles: false })).toEqual({});
+  });
+
   it("parseSmartCollections ignores invalid JSON and schema", () => {
     expect(parseSmartCollections(null)).toEqual([]);
     expect(parseSmartCollections("{not json")).toEqual([]);
@@ -127,6 +132,13 @@ describe("smartCollections", () => {
     expect(saved.query.q).toBe("rating:>=4 is:fav");
   });
 
+  it("keeps numeric directives through saving and reopening (#524)", () => {
+    const q = "size:>100mb duration:<30s";
+    const collection = makeSmartCollection("Short", { q });
+    const [saved] = parseSmartCollections(JSON.stringify([collection]));
+    expect(saved.query.q).toBe(q);
+  });
+
   it("describeSearchQuery builds a human-readable summary", () => {
     expect(
       describeSearchQuery(t, "en", {
@@ -164,6 +176,7 @@ describe("hasFilterConditions", () => {
     { capturedFrom: 1 },
     { btimeTo: 1 },
     { duplicates: true },
+    { subtitles: true },
     { played: false },
   ])("is true for %j", (query) => {
     expect(hasFilterConditions(query)).toBe(true);
