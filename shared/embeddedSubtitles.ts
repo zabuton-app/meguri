@@ -86,6 +86,26 @@ export interface EmbeddedTrack {
   codec: string;
 }
 
+/**
+ * MP4 has no title tag, so ffmpeg writes a track's title to `handler_name`; but muxers also fill it
+ * with a fixed default when there is no title. Compared lowercased.
+ */
+const DEFAULT_HANDLER_NAMES = new Set([
+  "soundhandler",
+  "videohandler",
+  "subtitlehandler",
+  "core media audio",
+  "core media video",
+  "core media text",
+]);
+
+function trackTitle(tags: Stream["tags"]): string {
+  const title = tags?.title ?? tags?.handler_name;
+  if (typeof title !== "string") return "";
+  const trimmed = title.trim();
+  return DEFAULT_HANDLER_NAMES.has(trimmed.toLowerCase()) ? "" : trimmed;
+}
+
 export function readEmbeddedTracks(
   raw: unknown,
   kind: "audio" | "subtitle",
@@ -93,13 +113,9 @@ export function readEmbeddedTracks(
   return streams(raw)
     .filter((stream) => stream.codec_type === kind)
     .map((stream) => {
-      const title = stream.tags?.title ?? stream.tags?.handler_name;
       const language = stream.tags?.language;
       return {
-        title:
-          typeof title === "string" && title !== "SoundHandler"
-            ? title.trim()
-            : "",
+        title: trackTitle(stream.tags),
         language:
           typeof language === "string" && language !== "und"
             ? language.trim()

@@ -49,6 +49,41 @@ describe("embedded subtitle metadata", () => {
     expect(readEmbeddedTracks("invalid JSON", "subtitle")).toEqual([]);
   });
 
+  it("treats a muxer's default handler name as no title", () => {
+    const defaults = [
+      "SoundHandler",
+      "VideoHandler",
+      "SubtitleHandler",
+      "Core Media Audio",
+      "Core Media Video",
+      " core media text ",
+    ];
+    const metadata = {
+      streams: [...defaults, "English"].map((handler_name) => ({
+        codec_type: "subtitle",
+        codec_name: "mov_text",
+        tags: { handler_name, language: "eng" },
+      })),
+    };
+    expect(
+      readEmbeddedTracks(metadata, "subtitle").map((track) => track.title),
+    ).toEqual([...defaults.map(() => ""), "English"]);
+    expect(
+      readEmbeddedTracks(
+        {
+          streams: [
+            {
+              codec_type: "audio",
+              codec_name: "aac",
+              tags: { handler_name: "SOUNDHANDLER" },
+            },
+          ],
+        },
+        "audio",
+      ),
+    ).toEqual([{ title: "", language: "", codec: "aac" }]);
+  });
+
   it("matches regional tags by language and excludes unknown languages", () => {
     expect(sameSubtitleLanguage("en-GB", "en-US")).toBe(true);
     expect(sameSubtitleLanguage("eng", "fra")).toBe(false);
