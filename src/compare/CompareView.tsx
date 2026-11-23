@@ -3,7 +3,8 @@
 // B is placed where the alignment found it in A (align.worker.ts), so a crop
 // or a resized copy lines up instead of turning the whole picture into
 // "changed". The ways to look are in modes.ts. Zoom and pan are shared, so the
-// same pixel of both stays under the cursor.
+// same pixel of both stays under the cursor; they behave as the detail view's
+// (usePanZoom.ts).
 //
 // The stage draws three layers at one transform: both whole images dimmed,
 // then A and B each cut to where they overlap — the part the modes compare —
@@ -32,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { usePanZoom } from "@/hooks/usePanZoom";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import { formatSize } from "@/lib/format";
@@ -59,8 +61,6 @@ import { layerStyles, MODES, type CompareMode } from "./modes";
 import { SplitHandle } from "./SplitHandle";
 import { useAlignment, type AlignState } from "./useAlignment";
 import { useCompareKeys } from "./useCompareKeys";
-import { useStagePanZoom } from "./useStagePanZoom";
-import { fitScale } from "./viewport";
 
 /** How bright the parts of the images outside their overlap are drawn. */
 const CONTEXT_OPACITY = 0.35;
@@ -68,7 +68,6 @@ const CONTEXT_OPACITY = 0.35;
 const LOW_SCORE = 0.7;
 /** How long each image shows in the blink mode. */
 const BLINK_MS = 500;
-const ZOOM_STEP = 1.25;
 
 const sizeOfRow = (row: FileRow): Size => ({
   width: row.width ?? 0,
@@ -86,7 +85,6 @@ export function CompareView({
   const { t } = useI18n();
   const titleId = useId();
   const stageRef = useRef<HTMLDivElement>(null);
-  const { view, stage, zoomBy, fit, panHandlers } = useStagePanZoom(stageRef);
   const reducedMotion = usePrefersReducedMotion();
 
   const mediaBase = useAppStatus().data?.mediaBase ?? "";
@@ -138,7 +136,20 @@ export function CompareView({
   const sizeB = sizeOf(bi);
   const box = spanOf(sizeA, sizeB, placement);
   const overlap = overlapOf(sizeA, sizeB, placement);
-  const scale = fitScale(box, stage) * view.zoom;
+  // The box, zoomed and panned like the detail view's image: 100% is actual
+  // pixels of A, and fit is the whole box.
+  const zoom = usePanZoom({
+    stageRef,
+    content: { w: box.width, h: box.height },
+  });
+  const placed = zoom.placed;
+  // Swapping makes the other image A, whose pixels the zoom counts in: with a
+  // placement that scales B, the same zoom would show another magnification,
+  // so the swap goes back to fit.
+  const swap = () => {
+    setSwapped((v) => !v);
+    zoom.fit();
+  };
   // Where each image is drawn, in A's pixels.
   const rectA: Rect = { x: 0, y: 0, ...sizeA };
   const rectB: Rect = {
@@ -155,22 +166,26 @@ export function CompareView({
 
   useCompareKeys({
     setMode,
-    swap: () => setSwapped((v) => !v),
-    fit,
-    zoomIn: () => zoomBy(ZOOM_STEP),
-    zoomOut: () => zoomBy(1 / ZOOM_STEP),
+    swap,
+    fit: zoom.fit,
+    zoomIn: zoom.zoomIn,
+    zoomOut: zoom.zoomOut,
     flip: mode === "blink" ? () => setBlinkB((v) => !v) : null,
   });
 
-  // The box, centred on the stage and moved by the pan, at the shared scale.
+  // The box where the view places it, at the shared zoom. Hidden until the
+  // stage and the box have sizes, though its images still load.
   const boxStyle: CSSProperties = {
     width: box.width,
     height: box.height,
     transformOrigin: "0 0",
-    transform: `translate(${view.panX}px, ${view.panY}px) scale(${scale}) translate(-50%, -50%)`,
+    transform: placed
+      ? `translate(${placed.left}px, ${placed.top}px) scale(${zoom.zoom})`
+      : undefined,
+    visibility: placed ? undefined : "hidden",
     // Past 2x, show the pixels rather than smoothing them: a one-pixel
     // difference is what this view is for.
-    imageRendering: scale >= 2 ? "pixelated" : undefined,
+    imageRendering: zoom.zoom >= 2 ? "pixelated" : undefined,
   };
   const layers = layerStyles(mode, { split, opacity, blinkB });
   const image = (i: number, rect: Rect, toOverlap: boolean) => (
@@ -220,7 +235,7 @@ export function CompareView({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSwapped((v) => !v)}
+            onClick={swap}
             title={t("compare.swap")}
           >
             <ArrowLeftRight />
@@ -238,22 +253,16 @@ export function CompareView({
             {t("compare.align")}
           </Button>
           <div className="ml-auto flex items-center gap-1">
-            <IconButton
-              label={t("compare.zoomOut")}
-              onClick={() => zoomBy(1 / ZOOM_STEP)}
-            >
+            <IconButton label={t("compare.zoomOut")} onClick={zoom.zoomOut}>
               <Minus />
             </IconButton>
             <span className="w-12 text-center text-xs tabular-nums text-muted">
-              {Math.round(scale * 100)}%
+              {zoom.percent}%
             </span>
-            <IconButton
-              label={t("compare.zoomIn")}
-              onClick={() => zoomBy(ZOOM_STEP)}
-            >
+            <IconButton label={t("compare.zoomIn")} onClick={zoom.zoomIn}>
               <Plus />
             </IconButton>
-            <IconButton label={t("compare.fit")} onClick={fit}>
+            <IconButton label={t("compare.fit")} onClick={zoom.fit}>
               <Maximize />
             </IconButton>
             <IconButton
@@ -273,9 +282,12 @@ export function CompareView({
         <div
           ref={stageRef}
           data-slot="compare-stage"
-          className="relative min-h-0 flex-1 cursor-grab touch-none overflow-hidden bg-black [isolation:isolate] active:cursor-grabbing"
-          {...panHandlers}
-          onDoubleClick={fit}
+          className={cn(
+            "relative min-h-0 flex-1 touch-none overflow-hidden bg-black [isolation:isolate]",
+            zoom.zoomed && (zoom.dragging ? "cursor-grabbing" : "cursor-grab"),
+          )}
+          {...zoom.panHandlers}
+          onDoubleClick={(e) => zoom.toggle({ x: e.clientX, y: e.clientY })}
         >
           <StageLayer
             slot="compare-context"
@@ -435,7 +447,7 @@ function StageLayer({
 }) {
   return (
     <div className="absolute inset-0" data-slot={slot} style={style}>
-      <div className="absolute left-1/2 top-1/2" style={boxStyle}>
+      <div className="absolute left-0 top-0" style={boxStyle}>
         {children}
       </div>
     </div>

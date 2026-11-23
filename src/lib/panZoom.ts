@@ -1,9 +1,11 @@
-// Zoom and pan of the detail view's image, as plain math.
+// Zoom and pan of a picture in a viewport, as plain math: the detail view's
+// image and video, and the image comparison's box that holds both images
+// (usePanZoom.ts handles the input).
 //
-// A zoomed image is shown in a viewport that covers the detail view, not in the
-// image's fitted box, so the view is kept in terms that do not depend on either
-// box: the zoom in actual pixels (1 is 100%), and the point of the image (as
-// fractions of its width and height) at the viewport's center.
+// "Image" here is whatever is zoomed, of any size. The view is kept in terms
+// that do not depend on the viewport's size: the zoom in the image's pixels (1
+// is 100%), and the point of the image (as fractions of its width and height)
+// at the viewport's center.
 
 export interface Size {
   w: number;
@@ -36,6 +38,18 @@ const WHEEL_NOTCH = 1.2;
 
 export function wheelFactor(deltaY: number): number {
   return Math.pow(WHEEL_NOTCH, -deltaY / 100);
+}
+
+/** The zoom that fits the image in the viewport; 0 while either has no size. */
+export function fitZoomOf(viewport: Size, image: Size): number {
+  if (!(viewport.w > 0 && viewport.h > 0 && image.w > 0 && image.h > 0))
+    return 0;
+  return Math.min(viewport.w / image.w, viewport.h / image.h);
+}
+
+/** The view at fit: the whole image, centered. */
+export function fitView(zoom: number): ZoomView {
+  return { zoom, cx: 0.5, cy: 0.5 };
 }
 
 // One axis: an image narrower than the viewport sits in the middle; a wider one

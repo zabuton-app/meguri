@@ -40,7 +40,7 @@ export function SplitHandle({
       onPointerMove={(e) => {
         if (e.currentTarget.hasPointerCapture(e.pointerId)) splitAt(e.clientX);
       }}
-      // Not the stage's double-click, which fits the view.
+      // Not the stage's double-click, which zooms the view.
       onDoubleClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         const step =

@@ -1,19 +1,21 @@
-// The zoom and pan math of the detail view's image (#633).
+// The zoom and pan math shared by the detail view and the comparison (#633,
+// #647).
 import { describe, expect, it } from "vitest";
 import {
+  fitZoomOf,
   imagePointAt,
   MAX_ZOOM,
   panBy,
   placeImage,
   wheelFactor,
   zoomTo,
-} from "@/routes/MediaDetail/imageZoom";
+} from "@/lib/panZoom";
 
 // A 4000 × 2000 photo in a 1000 × 800 viewport.
 const image = { w: 4000, h: 2000 };
 const viewport = { w: 1000, h: 800 };
 
-describe("imageZoom", () => {
+describe("panZoom", () => {
   it("keeps the spot under the pointer in place", () => {
     const v = zoomTo(1, 0.3, 0.6, 200, 500, viewport, image);
     const p = placeImage(v, viewport, image);
@@ -71,5 +73,15 @@ describe("imageZoom", () => {
   it("zooms in for a wheel turned forward and out for one turned back", () => {
     expect(wheelFactor(-100)).toBeCloseTo(1.2);
     expect(wheelFactor(100)).toBeCloseTo(1 / 1.2);
+  });
+
+  it("fits the image by its tighter side", () => {
+    expect(fitZoomOf(viewport, image)).toBe(0.25);
+    expect(fitZoomOf({ w: 1000, h: 800 }, { w: 100, h: 400 })).toBe(2);
+  });
+
+  it("has no fit while the image or the viewport has no size", () => {
+    expect(fitZoomOf(viewport, { w: 0, h: 0 })).toBe(0);
+    expect(fitZoomOf({ w: 0, h: 0 }, image)).toBe(0);
   });
 });
