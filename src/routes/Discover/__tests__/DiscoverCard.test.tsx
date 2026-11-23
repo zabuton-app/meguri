@@ -15,7 +15,22 @@ const mocks = vi.hoisted(() => ({
   fileSetFavorite: vi.fn(),
   fileRecordPlay: vi.fn(),
   fileSavePosition: vi.fn(),
+  exclusivePlayback: vi.fn(),
 }));
+
+// Records which cards take part in audio/video exclusivity, then defers to the
+// real hook so playback still behaves as in the app.
+vi.mock("@/audio/useAudioPlayer", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/audio/useAudioPlayer")>();
+  return {
+    ...actual,
+    useExclusivePlayback: (pause: () => void) => {
+      mocks.exclusivePlayback();
+      return actual.useExclusivePlayback(pause);
+    },
+  };
+});
 
 vi.mock("@/ipc/client", () => ({
   api: {
@@ -205,6 +220,26 @@ describe("DiscoverCard video", () => {
     fireEvent.play(document.querySelector("video") as HTMLVideoElement);
     // No "(Space)" hint: the player's shortcuts are off in Discovery.
     expect(screen.getByRole("button", { name: /^pause$/i })).toBeTruthy();
+  });
+
+  it("registers for exclusive playback only once a preview is mounted", () => {
+    mocks.exclusivePlayback.mockReset();
+    const { rerender } = renderWithProviders(
+      <ActiveVideoCard isActive={false} />,
+    );
+    rerender(<ActiveVideoCard />);
+    expect(mocks.exclusivePlayback).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+    expect(mocks.exclusivePlayback).toHaveBeenCalled();
+  });
+
+  it("does not register an image card for exclusive playback", () => {
+    mocks.exclusivePlayback.mockReset();
+    renderWithProviders(
+      <ActiveVideoCard overrides={{ kind: "image", duration: null }} />,
+    );
+    expect(mocks.exclusivePlayback).not.toHaveBeenCalled();
   });
 
   it("previews without counting a play, moving the resume point or taking the keyboard", () => {
