@@ -379,6 +379,77 @@ describe("searchFiles", () => {
     expect(ids("ext:mkv")).toEqual([]);
   });
 
+  describe("a leading - excludes (#523)", () => {
+    const ids = (q: string) =>
+      searchFiles(db, { q })
+        .items.map((f) => f.id)
+        .sort((a, b) => a - b);
+
+    it("excludes by hash prefix, keeping files without a hash", () => {
+      const a = insertFile(db, rootId, {
+        relPath: "a.mp4",
+        contentHash: "3fa9c1d2" + "0".repeat(56),
+      });
+      const b = insertFile(db, rootId, {
+        relPath: "b.mp4",
+        contentHash: "3fa9ffff" + "0".repeat(56),
+      });
+      const c = insertFile(db, rootId, { relPath: "c.mp4", contentHash: null });
+      expect(ids("-hash:3FA9C1")).toEqual([b, c]);
+      expect(ids("-hash:3fa9")).toEqual([c]);
+      expect(ids("hash:3fa9 -hash:3fa9c1")).toEqual([b]);
+      expect(ids("-hash:ffff")).toEqual([a, b, c]);
+    });
+
+    it("excludes by extension", () => {
+      const mp4 = insertFile(db, rootId, { relPath: "a.mp4" });
+      const gif = insertFile(db, rootId, { relPath: "b.gif", ext: "gif" });
+      const mov = insertFile(db, rootId, { relPath: "c.mov", ext: "mov" });
+      expect(ids("-ext:GIF")).toEqual([mp4, mov]);
+      expect(ids("-ext:.gif -ext:mov")).toEqual([mp4]);
+      expect(ids("-ext:mkv")).toEqual([mp4, gif, mov]);
+      expect(ids("ext:gif -ext:gif")).toEqual([]);
+    });
+
+    it("excludes free text through the index and through LIKE", () => {
+      const draft = insertFile(db, rootId, { relPath: "trip/draft_cut.mp4" });
+      const final = insertFile(db, rootId, { relPath: "trip/final.mp4" });
+      const ab = insertFile(db, rootId, { relPath: "ab/clip.mp4" });
+      for (const id of [draft, final, ab]) syncFts(db, id);
+      // 3+ code points: the trigram index.
+      expect(ids("-draft")).toEqual([final, ab]);
+      expect(ids("trip -draft")).toEqual([final]);
+      expect(ids("-DRAFT")).toEqual([final, ab]);
+      // Shorter: LIKE.
+      expect(ids("-ab")).toEqual([draft, final]);
+      // Alternatives: a file matching any of them is left out.
+      expect(ids("-draft|ab")).toEqual([final]);
+      // Each negated word excludes on its own, not only together.
+      expect(ids("-draft -final")).toEqual([ab]);
+    });
+
+    it("excludes by a user's tag, in the path or the tags", () => {
+      const tagged = insertFile(db, rootId, { relPath: "a.mp4" });
+      const plain = insertFile(db, rootId, { relPath: "b.mp4" });
+      addManualTag(db, tagged, "screenshot");
+      for (const id of [tagged, plain]) syncFts(db, id);
+      expect(ids("-screenshot")).toEqual([plain]);
+      expect(ids("-tag:screenshot")).toEqual([plain]);
+      // No such tag: nothing to leave out.
+      expect(ids("-tag:nope")).toEqual([tagged, plain]);
+    });
+
+    it("searches a quoted leading - as text, and a lone - as text", () => {
+      const intro = insertFile(db, rootId, { relPath: "-intro.mp4" });
+      const other = insertFile(db, rootId, { relPath: "intro.mp4" });
+      const dash = insertFile(db, rootId, { relPath: "a - b.mp4" });
+      for (const id of [intro, other, dash]) syncFts(db, id);
+      expect(ids('"-intro"')).toEqual([intro]);
+      expect(ids("-intro")).toEqual([dash]);
+      expect(ids("-")).toEqual([intro, dash]);
+    });
+  });
+
   it("matches a substring in the middle of a word (trigram)", () => {
     const hit = insertFile(db, rootId, { relPath: "summer_beachvideo.mp4" });
     insertFile(db, rootId, { relPath: "work/report.mp4" });

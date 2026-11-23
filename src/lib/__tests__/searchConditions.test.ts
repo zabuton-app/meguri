@@ -139,6 +139,19 @@ describe("describeConditions", () => {
     );
   });
 
+  it("names a negated directive as an exclusion, and keeps negated text as text (#523)", () => {
+    const query = { q: "-draft -tag:screenshot -ext:gif" };
+    expect(keys(query)).toEqual(["q", "directive-1", "directive-2"]);
+    expect(find(query, "q").label).toBe('"-draft"');
+    expect(find(query, "directive-1").label).toBe(
+      `${t("filter.excludeChip")}: ${t("media.tags")}: screenshot`,
+    );
+    expect(find(query, "directive-2").label).toBe(
+      `${t("filter.excludeChip")}: ${t("filter.extChip")}: gif`,
+    );
+    expect(find(query, "directive-1").clear(query).q).toBe("-draft -ext:gif");
+  });
+
   it("describes a directive-only query without a free-text chip", () => {
     expect(keys({ q: "tag:beach" })).toEqual(["directive-0"]);
   });

@@ -4,6 +4,7 @@ import {
   MAX_SEARCH_ALTERNATIVES,
   anyOfSearchToken,
   joinSearchTokens,
+  parseNegatedSearchToken,
   searchTokenTerms,
   splitSearchTokens,
 } from "../../../shared/tags.js";
@@ -59,5 +60,15 @@ describe("anyOfSearchToken", () => {
 
   it("does not let a trailing backslash escape the next separator", () => {
     expect(roundTrip(["a\\", "b"])).toEqual(["a", "b"]);
+  });
+
+  it("keeps a first term starting with - as text, not an exclusion (#523)", () => {
+    const token = anyOfSearchToken(["-intro", "outro"]);
+    const tokens = splitSearchTokens(token);
+    expect(tokens).toHaveLength(1);
+    const { negated, body } = parseNegatedSearchToken(tokens[0]);
+    expect(negated).toBe(false);
+    expect(searchTokenTerms(body)).toEqual(["-intro", "outro"]);
+    expect(joinSearchTokens(tokens)).toBe(token);
   });
 });

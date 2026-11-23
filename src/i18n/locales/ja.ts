@@ -334,6 +334,7 @@ export const ja = {
   "filter.moreActive": "他の条件（{count}件適用中）",
   "filter.hashChip": "内容ハッシュ",
   "filter.extChip": "拡張子",
+  "filter.excludeChip": "除外",
   "filter.kindFilter": "種別で絞り込み",
   "filter.playState": "視聴状態",
   "filter.sortSection": "並び順",

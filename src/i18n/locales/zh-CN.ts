@@ -319,6 +319,7 @@ export const zhCN: Catalog = {
   "filter.moreActive": "其他条件（已应用 {count} 项）",
   "filter.hashChip": "内容哈希",
   "filter.extChip": "扩展名",
+  "filter.excludeChip": "排除",
   "filter.kindFilter": "按类型筛选",
   "filter.playState": "播放状态",
   "filter.sortSection": "排序方式",

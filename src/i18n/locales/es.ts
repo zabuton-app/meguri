@@ -368,6 +368,7 @@ export const es: Catalog = {
   },
   "filter.hashChip": "Hash del contenido",
   "filter.extChip": "Extensión",
+  "filter.excludeChip": "Excluir",
   "filter.kindFilter": "Filtrar por tipo",
   "filter.playState": "Estado de reproducción",
   "filter.sortSection": "Orden",

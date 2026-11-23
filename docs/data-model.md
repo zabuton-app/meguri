@@ -484,6 +484,22 @@ the files whose `ext` is exactly `mp4`, in any case and with or without the dot
 `.m4v` files do not match. It is a chip like `hash:`, and it is ANDed with the
 other directives, so `ext:mp4 ext:mkv` matches nothing.
 
+A leading **`-` excludes** (#523): `-tag:screenshot`, `-ext:gif`, `-hash:3fa9`
+and `-draft` leave out the files the same token without the `-` would match.
+`parseNegatedSearchToken()` in `shared/tags.ts` reads it, and
+`buildSearchTerms()` sends the token's condition to SQL as `NOT …`. Negated free
+text follows the positive split (trigram `MATCH` for 3+ code points, `LIKE` for
+shorter ones), each negated word on its own, and with alternatives
+(`-draft|wip`) a file matching any of them is left out. A file without a hash is
+never excluded by `-hash:`, and `-tag:` with a name no tag has excludes nothing.
+A query of negations only returns every other file; on 100,000 synthetic files a
+page of one costs about what the positive form does. A lone `-` is ordinary
+text, and a dash typed inside quotes (`"-intro"`) is text too: the tokenizer
+marks it as `\-intro`, and `joinSearchTokens()` writes it back quoted. A negated
+directive is a chip of its own, drawn struck through behind its `-`, and
+`searchDirectiveKey()` keeps `tag:x` and `-tag:x` apart. A negated word stays
+free text.
+
 The search is typed in the command menu, whose field starts from the search on
 screen (`useSearchDraft` in `src/hooks/`, rendered by `CommandMenu`). It shows a
 directive as a **chip** rather than as raw text, so it is added and removed as

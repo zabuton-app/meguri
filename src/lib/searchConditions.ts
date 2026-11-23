@@ -17,6 +17,7 @@ import {
   parseExtSearchToken,
   parseQualifiedTagName,
   parseHashSearchToken,
+  parseNegatedSearchToken,
   parseTagSearchToken,
   splitSearchTokens,
 } from "@shared/tags";
@@ -106,7 +107,8 @@ export function describeConditions(
       },
     });
 
-  splitSearchTokens(query.q ?? "").forEach((token, i) => {
+  splitSearchTokens(query.q ?? "").forEach((raw, i) => {
+    const { negated, body: token } = parseNegatedSearchToken(raw);
     const hash = parseHashSearchToken(token);
     const ext = parseExtSearchToken(token);
     const tag = isTagDirective(token) ? parseTagSearchToken(token) : null;
@@ -115,6 +117,7 @@ export function describeConditions(
     else if (ext != null) label = `${t("filter.extChip")}: ${ext}`;
     else if (tag != null) label = tagLabel(t, tag);
     else return;
+    if (negated) label = `${t("filter.excludeChip")}: ${label}`;
     out.push({
       key: `directive-${i}`,
       label,
