@@ -20,6 +20,7 @@ import {
   type MediaReorder,
 } from "@/components/MediaReorder";
 import { mediaSortId } from "@/lib/mediaSortId";
+import { useScrollToPeek } from "@/hooks/useScrollToPeek";
 import { SelectionCheck } from "@/components/SelectionCheck";
 import { useSelectableClick } from "@/hooks/useSelectableClick";
 import { useFileDrag } from "@/hooks/useFileDrag";
@@ -219,25 +220,19 @@ export const MediaList = memo(function MediaList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId, resetKey]);
 
-  // The row the docked peek shows. It is scrolled to once per file, as soon
-  // as the list is loaded, and not again on later renders (paging, a resize):
-  // that would fight the user's own scrolling, and a file paged in later is
-  // not worth a jump either.
+  // The row the docked peek shows, scrolled to once the list is loaded.
   const peekIndex = peekFileKey
     ? entries.findIndex(
         (e) => e.kind === "file" && mediaSortId(e.file) === peekFileKey,
       )
     : -1;
-  const scrolledToPeek = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (!peekFileKey) {
-      scrolledToPeek.current = undefined;
-      return;
-    }
-    if (loading || scrolledToPeek.current === peekFileKey) return;
-    scrolledToPeek.current = peekFileKey;
-    if (peekIndex >= 0) scrollToRow(peekIndex);
-  }, [peekFileKey, peekIndex, loading, scrollToRow]);
+  const peekReady = useCallback(() => !loading, [loading]);
+  useScrollToPeek({
+    peekFileKey,
+    row: peekIndex,
+    ready: peekReady,
+    scrollToRow,
+  });
 
   // Fetch the next page when a row near the end becomes visible.
   useInfiniteScrollTrigger({

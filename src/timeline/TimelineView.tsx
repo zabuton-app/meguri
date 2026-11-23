@@ -21,11 +21,13 @@ import {
   type GridNavDirection,
 } from "@/hooks/useGridKeyboardNav";
 import { usePublishFocusedFile } from "@/hooks/useFocusedFile";
+import { useScrollToPeek } from "@/hooks/useScrollToPeek";
 import type { FolderViewEntry } from "@/hooks/useFolderEntries";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useWatchLaterHotkey } from "@/hooks/useWatchLaterHotkey";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow, SearchQuery } from "@/ipc/types";
+import { mediaSortId } from "@/lib/mediaSortId";
 import {
   FILES_SEARCH_PAGE_SIZE,
   type FilesSearchPageParam,
@@ -82,6 +84,8 @@ interface Props {
   onAnchor: (anchor: FilesSearchPageParam) => void;
   navActive?: boolean;
   watchLater?: boolean;
+  /** The file the docked side peek shows (`mediaSortId`), if one is docked. */
+  peekFileKey?: string;
 }
 
 export const TimelineView = memo(function TimelineView({
@@ -104,6 +108,7 @@ export const TimelineView = memo(function TimelineView({
   onAnchor,
   navActive = false,
   watchLater = false,
+  peekFileKey,
 }: Props) {
   const { t, lang } = useI18n();
   const watchLaterMembership = useWatchLater();
@@ -117,7 +122,8 @@ export const TimelineView = memo(function TimelineView({
     scrollRef.current = node;
     setScrollEl(node);
   }, []);
-  const { cols, rowEstimate, measureRow } = useCardGridMetrics(scrollEl);
+  const { cols, rowEstimate, measureRow, colsCurrent } =
+    useCardGridMetrics(scrollEl);
 
   // Where the view is, read off the scroll element itself: the section at the
   // top and the window under the view both follow it.
@@ -213,6 +219,25 @@ export const TimelineView = memo(function TimelineView({
     // Reset only when the list changes. The virtualizer reference is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listKey]);
+
+  // The card the docked peek shows, as an index into the whole list. Only a
+  // file in the loaded window has one. Its row is scrolled to once the window
+  // is loaded and the columns are measured for the current width (opening the
+  // peek narrows the view in this very render).
+  const peekInItems = peekFileKey
+    ? items.findIndex((f) => mediaSortId(f) === peekFileKey)
+    : -1;
+  const peekIndex = peekInItems >= 0 ? listOffset + peekInItems : -1;
+  const peekReady = useCallback(
+    () => !loading && colsCurrent(),
+    [loading, colsCurrent],
+  );
+  useScrollToPeek({
+    peekFileKey,
+    row: peekIndex >= 0 ? rowOfIndex(layout, peekIndex) : -1,
+    ready: peekReady,
+    scrollToRow,
+  });
 
   // The row under the top edge. A row ending on the edge is above it: the
   // ends are sums of estimates, which can come out a hair past the integer
@@ -503,6 +528,7 @@ export const TimelineView = memo(function TimelineView({
                             mediaBase={mediaBase}
                             onTagClick={onTagClick}
                             focused={focused}
+                            peeked={index === peekIndex}
                             watchLater={watchLaterMembership}
                             watchLaterRef={
                               focused ? focusedWatchLaterRef : undefined

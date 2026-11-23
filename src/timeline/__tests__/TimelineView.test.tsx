@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { mockVirtualizerScrollToOffset } from "@/test/mockVirtualizer";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  mockVirtualizerScrollToIndex,
+  mockVirtualizerScrollToOffset,
+} from "@/test/mockVirtualizer";
 import { TimelineView } from "@/timeline/TimelineView";
 import { defaultWorkspacesList, sampleFileRow, WS_ID } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -260,5 +263,142 @@ describe("TimelineView", () => {
     // Still disagreeing with fresh counts: the list is read again from the
     // top of the view instead.
     expect(onAnchor).toHaveBeenCalled();
+  });
+
+  describe("beside a docked peek", () => {
+    // October holds 8 files and August 2. At 1200px (6 columns) the rows are:
+    // October's header, files 0-5, files 6-7, August's header, files 8-9.
+    const peekCounts = {
+      days: [
+        { day: "2026-10-15", count: 8 },
+        { day: "2026-08-15", count: 2 },
+      ],
+      undated: 0,
+    };
+    const peekItems = Array.from({ length: 10 }, (_, i) =>
+      dated(i + 1, i < 8 ? at(2026, 10, 20 - i) : at(2026, 8, 10 - i)),
+    );
+    const peeked = () =>
+      screen
+        .getAllByTestId("media-card")
+        .filter((c) => c.getAttribute("aria-current") === "page")
+        .map((c) => c.textContent);
+    const scrollToIndex = mockVirtualizerScrollToIndex();
+
+    beforeEach(() => {
+      mocks.timelineCounts.mockResolvedValue(peekCounts);
+      scrollToIndex.mockClear();
+    });
+
+    it("marks the peek's file and scrolls to it once per file", async () => {
+      const { rerender } = renderWithProviders(
+        view(peekItems, { peekFileKey: `${WS_ID}:8` }),
+      );
+      await screen.findByText("f8.mp4");
+      expect(peeked()).toHaveLength(1);
+      expect(peeked()[0]).toContain("f8.mp4");
+      await waitFor(() =>
+        expect(scrollToIndex).toHaveBeenCalledWith(2, { align: "auto" }),
+      );
+
+      // Re-rendering for the same file does not scroll again.
+      rerender(view(peekItems, { peekFileKey: `${WS_ID}:8` }));
+      expect(scrollToIndex).toHaveBeenCalledTimes(1);
+
+      // Another file (prev/next in the peek) is scrolled to.
+      rerender(view(peekItems, { peekFileKey: `${WS_ID}:10` }));
+      await waitFor(() =>
+        expect(scrollToIndex).toHaveBeenLastCalledWith(4, { align: "auto" }),
+      );
+      expect(scrollToIndex).toHaveBeenCalledTimes(2);
+      expect(peeked()[0]).toContain("f10.mp4");
+
+      // A file outside the loaded window is neither marked nor scrolled to.
+      rerender(view(peekItems, { peekFileKey: "other-ws:10" }));
+      await waitFor(() => expect(peeked()).toHaveLength(0));
+      expect(scrollToIndex).toHaveBeenCalledTimes(2);
+
+      // Closing the peek clears the mark.
+      rerender(view(peekItems, { peekFileKey: undefined }));
+      expect(peeked()).toHaveLength(0);
+    });
+
+    it("places a file of a window that starts further down the list", async () => {
+      // The window holds files 8-9 of the list (August's).
+      renderWithProviders(
+        view(peekItems.slice(8), {
+          listOffset: 8,
+          peekFileKey: `${WS_ID}:9`,
+        }),
+      );
+      await screen.findByText("f9.mp4");
+      expect(peeked()[0]).toContain("f9.mp4");
+      await waitFor(() =>
+        expect(scrollToIndex).toHaveBeenCalledWith(4, { align: "auto" }),
+      );
+    });
+
+    it("waits for the window to load before scrolling", async () => {
+      const { rerender } = renderWithProviders(
+        view(peekItems, { peekFileKey: `${WS_ID}:10`, loading: true }),
+      );
+      await screen.findByText("f10.mp4");
+      expect(scrollToIndex).not.toHaveBeenCalled();
+      rerender(view(peekItems, { peekFileKey: `${WS_ID}:10` }));
+      await waitFor(() =>
+        expect(scrollToIndex).toHaveBeenCalledWith(4, { align: "auto" }),
+      );
+      expect(scrollToIndex).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits for the narrowed width before scrolling to the peek's file", async () => {
+      // Keep the observers' callbacks, so the test decides when the new width
+      // is reported (a frame after the layout change, as in the browser).
+      const observers: ResizeObserverCallback[] = [];
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(cb: ResizeObserverCallback) {
+            observers.push(cb);
+          }
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        },
+      );
+      // The prototype the test setup stubs the width on (see vitest.setup.ts).
+      const proto = Object.hasOwn(HTMLElement.prototype, "clientWidth")
+        ? HTMLElement.prototype
+        : Element.prototype;
+      const wide = Object.getOwnPropertyDescriptor(proto, "clientWidth")!;
+      try {
+        const { rerender } = renderWithProviders(view(peekItems));
+        await screen.findByText("f10.mp4");
+
+        // The peek docks: the view is narrower (380px → 1 column) in the
+        // same render that names the file, before the observer reports it.
+        Object.defineProperty(proto, "clientWidth", {
+          configurable: true,
+          get: () => 380,
+        });
+        rerender(view(peekItems, { peekFileKey: `${WS_ID}:10` }));
+        await screen.findByText("f10.mp4");
+        // With 6 columns the 10th file would be on row 4.
+        expect(scrollToIndex).not.toHaveBeenCalled();
+
+        act(() => {
+          for (const cb of observers) cb([], {} as ResizeObserver);
+        });
+        // One column: October's header and 8 rows, August's header, then
+        // the 10th file on row 11.
+        await waitFor(() =>
+          expect(scrollToIndex).toHaveBeenCalledWith(11, { align: "auto" }),
+        );
+        expect(scrollToIndex).toHaveBeenCalledTimes(1);
+      } finally {
+        Object.defineProperty(proto, "clientWidth", wide);
+        vi.unstubAllGlobals();
+      }
+    });
   });
 });

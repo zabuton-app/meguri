@@ -1088,6 +1088,7 @@ export default function Home() {
                 onAnchor={timeline.onAnchor}
                 navActive={navActive}
                 watchLater={activeCollection?.id === WATCH_LATER_ID}
+                peekFileKey={peekFileKey}
               />
             ) : view === "list" ? (
               <MediaList

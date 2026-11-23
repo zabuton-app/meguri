@@ -22,12 +22,12 @@ peek** — a sheet docked beside the list as a flex sibling, so the list narrows
 and stays fully usable along with the toolbar and the bottom player bar
 (`MediaModal`'s `presentation` prop). Its left edge is a drag handle; the
 choice, the modal size and the peek width are all remembered in
-`localStorage`. While the peek is docked, the grid and the list mark the file
-it shows (`aria-current="page"`, a primary border) and scroll it into view
-once each time the file changes, so prev/next in the peek or a file opened
-from elsewhere does not leave the list behind. A file outside the pages
-loaded at that moment is neither marked nor scrolled to, even once its page
-loads later.
+`localStorage`. While the peek is docked, the grid, the list and the timeline
+mark the file it shows (`aria-current="page"`, a primary border) and scroll
+it into view once each time the file changes (`useScrollToPeek`), so
+prev/next in the peek or a file opened from elsewhere does not leave the list
+behind. A file outside the pages loaded at that moment is neither marked nor
+scrolled to, even once its page loads later.
 
 A modal's frame closes itself on Esc (unless a layer on top already took the
 key) and keeps keyboard focus inside with `useModalFocus`
