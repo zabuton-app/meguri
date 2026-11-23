@@ -338,6 +338,8 @@ export const ja = {
   "filter.playState": "視聴状態",
   "filter.sortSection": "並び順",
   "filter.otherSection": "その他",
+  "filter.subtitles": "字幕付きの動画のみ表示",
+  "filter.subtitlesChip": "字幕あり",
 
   // スマートコレクション
   "smartCollection.title": "スマートコレクション",

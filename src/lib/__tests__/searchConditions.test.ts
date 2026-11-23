@@ -59,6 +59,7 @@ const EVERYTHING: SearchQuery = {
   playedFrom: 1_700_000_000,
   playedTo: 1_800_000_000,
   duplicates: true,
+  subtitles: true,
   sort: "name",
   sortDir: "desc",
 };
@@ -87,6 +88,7 @@ describe("describeConditions", () => {
       "addedAt",
       "playedAt",
       "duplicates",
+      "subtitles",
       "sort",
     ]);
   });
@@ -107,6 +109,7 @@ describe("describeConditions", () => {
       addedAt: "collapsed",
       playedAt: "collapsed",
       duplicates: "collapsed",
+      subtitles: "collapsed",
       sort: "collapsed",
     });
   });

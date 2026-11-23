@@ -373,6 +373,8 @@ export const fr: Catalog = {
   "filter.playState": "État de lecture",
   "filter.sortSection": "Tri",
   "filter.otherSection": "Autres",
+  "filter.subtitles": "Afficher uniquement les vidéos sous-titrées",
+  "filter.subtitlesChip": "Sous-titres",
 
   // smart collections
   "smartCollection.title": "Collections intelligentes",

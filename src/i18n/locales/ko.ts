@@ -334,6 +334,8 @@ export const ko: Catalog = {
   "filter.playState": "시청 상태",
   "filter.sortSection": "정렬 순서",
   "filter.otherSection": "기타",
+  "filter.subtitles": "자막이 있는 동영상만 표시",
+  "filter.subtitlesChip": "자막 있음",
 
   // smart collections
   "smartCollection.title": "스마트 컬렉션",

@@ -1,13 +1,16 @@
 export const SUBTITLE_WINDOW_SECONDS = 120;
 
-const TEXT_CODECS = new Set([
+/** The subtitle codecs the player can show; the library's subtitle filter matches the same ones. */
+export const TEXT_SUBTITLE_CODECS = [
   "subrip",
   "ass",
   "ssa",
   "webvtt",
   "mov_text",
   "text",
-]);
+] as const;
+
+const TEXT_CODECS = new Set<string>(TEXT_SUBTITLE_CODECS);
 
 export function isTextSubtitle(codec: string): boolean {
   return TEXT_CODECS.has(codec);

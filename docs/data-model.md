@@ -63,6 +63,9 @@ In the workspace database (`CORE_DDL`):
   HEIF/AVIF (as phone cameras write) keeps `width` / `height` NULL: depending
   on the version, ffprobe reports one tile's size, 0x0, or no stream at all,
   never the full image. Its stored `meta` keeps only the first tile's stream.
+  `meta` holds the ffprobe output; the subtitle filter reads its streams
+  directly, matching only the text codecs the player shows
+  (`shared/embeddedSubtitles.ts`), so it has no column of its own.
 - `tags` (library) — the tag master, unique on `(namespace, name)`. An empty namespace
   means the tag is the user's own; a non-empty one means it is owned by a
   pipeline (see [Derived tags](#derived-tags)). The constraint tells
