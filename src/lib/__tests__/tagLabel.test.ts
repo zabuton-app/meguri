@@ -80,7 +80,7 @@ describe("searchTokenLabel", () => {
   });
 
   it("names an is:fav directive as favorites (#525)", () => {
-    expect(searchTokenLabel(t, "is:fav")).toBe("♥ Favorites");
+    expect(searchTokenLabel(t, "is:fav")).toBe("Favorites (is:fav)");
   });
 
   it("names a numeric directive by its field and comparison (#524)", () => {

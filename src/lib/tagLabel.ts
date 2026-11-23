@@ -107,7 +107,9 @@ export function directiveLabel(
     case "rating":
       return `${t("media.rating")}: ${d.value}`;
     case "favorite":
-      return `♥ ${t("favorite.chip")}`;
+      // Unlike the favorite control's `♥ Favorites`: both can be on at once,
+      // and each chip clears only its own.
+      return `${t("favorite.chip")} (${d.prefix}:${d.value})`;
   }
 }
 

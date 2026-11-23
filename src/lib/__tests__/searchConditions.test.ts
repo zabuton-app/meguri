@@ -150,7 +150,11 @@ describe("describeConditions", () => {
       ]),
     );
     expect(find(query, "directive-0").label).toBe(`${t("media.rating")}: >=4`);
-    expect(find(query, "directive-1").label).toBe(`♥ ${t("favorite.chip")}`);
+    // Told apart from the favorite control's chip, which reads the same word.
+    expect(find(query, "directive-1").label).toBe(
+      `${t("favorite.chip")} (is:fav)`,
+    );
+    expect(find(query, "favorite").label).toBe(`♥ ${t("favorite.chip")}`);
     // Each chip clears only its own: the directive leaves the control alone.
     expect(find(query, "directive-0").clear(query)).toEqual({
       q: "is:fav",
