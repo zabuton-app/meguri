@@ -328,9 +328,20 @@ export function appendSearchConditions(
   /** rel_path's separator; see folderRange(). Injected only by tests. */
   sep?: string,
 ): string {
+  sql = appendTextConditions(db, sql, args, query.q);
+  return appendFilterConditions(db, sql, args, query, sep);
+}
+
+/** The conditions of the search box's text (`q`). */
+function appendTextConditions(
+  db: DB,
+  sql: string,
+  args: unknown[],
+  q: string | undefined,
+): string {
   // Plain tokens long enough for the index, sent as one ANDed MATCH.
   const matchTokens: string[] = [];
-  for (const raw of query.q ? splitSearchTokens(query.q) : []) {
+  for (const raw of q ? splitSearchTokens(q) : []) {
     const { negated, body } = parseNegatedSearchToken(raw);
     if (negated) {
       // A leading `-` (#523): NOT of what the token matches, whatever it is.
@@ -357,7 +368,17 @@ export function appendSearchConditions(
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
     args.push(matchTokens.join(" "));
   }
+  return sql;
+}
 
+/** The conditions of everything but the search box's text. */
+function appendFilterConditions(
+  db: DB,
+  sql: string,
+  args: unknown[],
+  query: SearchQuery,
+  sep?: string,
+): string {
   if (query.folder) {
     const cond = folderCondition(
       folderRange(query.folder.path, sep),
@@ -625,6 +646,33 @@ function pinnedSortIndex(sort?: string, dir?: string): string | null {
 }
 
 /**
+ * Whether every token of the search box's text is an exclusion (`-ext:gif`,
+ * `-draft`). An exclusion usually leaves most files, so walking the sort index
+ * fills a page at once (#670).
+ */
+function isExclusionOnly(q: string | undefined): boolean {
+  const tokens = q ? splitSearchTokens(q) : [];
+  return (
+    tokens.length > 0 &&
+    tokens.every((token) => parseNegatedSearchToken(token).negated)
+  );
+}
+
+/**
+ * The index searchFiles pins for a list filtered only by exclusions, or null.
+ * Only name and addedAt: when an exclusion leaves almost nothing, the walk
+ * reads every live row, and in their index order the table rows come in about
+ * the order they are stored. The captured, btime and hash orders are unrelated
+ * to it, so the same walk reads the rows at random, measured at up to 5.7× the
+ * unpinned time for captured on a database on disk (#670).
+ */
+function exclusionSortIndex(sort?: string, dir?: string): string | null {
+  return sort === "name" || sort === "addedAt"
+    ? pinnedSortIndex(sort, dir)
+    : null;
+}
+
+/**
  * Search one workspace DB. With `seek`, the page starts right after that sort
  * position (keyset pagination — no OFFSET scan) and `nextCursor` is null: the
  * caller (crossWorkspace) tracks continuation itself. Without it, the legacy
@@ -644,17 +692,24 @@ export function searchFiles(
   const cap = opts?.uncapped ? Infinity : seek ? MAX_LIMIT + 1 : MAX_LIMIT;
   const limit = Math.max(1, Math.min(cap, query.limit ?? DEFAULT_LIMIT));
   const args: unknown[] = [];
-  const filters = appendSearchConditions(db, "", args, query, opts?.sep);
+  const text = appendTextConditions(db, "", args, query.q);
+  const rest = appendFilterConditions(db, "", args, query, opts?.sep);
+  const filters = text + rest;
   // Only an unfiltered list is pinned: without statistics nothing tells how
   // few rows a filter leaves, and for a rare one, walking the sort order to
-  // fill a page reads every live row in index order (#363). Nor is a page in
-  // the NULL tail of captured, btime or hash (a seek key without a value): the
-  // index cannot reach that tail by the key, so it would walk every row with a
-  // value first.
+  // fill a page reads every live row in index order (#363). A list filtered
+  // only by exclusions is pinned in some orders (see exclusionSortIndex). Nor
+  // is a page in the NULL tail of captured, btime or hash (a seek key without
+  // a value): the index cannot reach that tail by the key, so it would walk
+  // every row with a value first.
   const sortIndex =
-    filters === "" && seek?.v !== null
-      ? pinnedSortIndex(query.sort, query.sortDir)
-      : null;
+    seek?.v === null || rest !== ""
+      ? null
+      : text === ""
+        ? pinnedSortIndex(query.sort, query.sortDir)
+        : isExclusionOnly(query.q)
+          ? exclusionSortIndex(query.sort, query.sortDir)
+          : null;
   const from = sortIndex
     ? `FROM files f INDEXED BY ${sortIndex} LEFT JOIN file_meta m ON m.meta_key = f.meta_key`
     : fromFor(query);
@@ -664,7 +719,8 @@ export function searchFiles(
     const cond = appendSeekCondition(seekArgs, seek, query.sort, query.sortDir);
     // Nothing follows the key. Not sent as "AND (0)": SQLite rejects a WHERE
     // it can prove false under INDEXED BY ("no query solution"). The filters
-    // can write "AND 0" too, but a filtered list is never pinned.
+    // can write "AND 0" too, but only a list they leave unpinned: an
+    // exclusion writes "NOT COALESCE(...)", never a bare 0.
     if (cond === "0") return { items: [], nextCursor: null };
     sql += ` AND (${cond})`;
     args.push(...seekArgs);

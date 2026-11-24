@@ -813,6 +813,12 @@ of the date and hash orders is left to the planner, as each of those indexes
 yields only one. So is any
 filtered list: without statistics nothing tells how few rows a filter leaves,
 and for a rare one, walking the sort order to fill a page reads every live row.
+A list filtered only by exclusions (every search token starts with `-`, and
+nothing else filters) is pinned in the name and added orders (#670): an
+exclusion usually leaves most files, so a page fills at once. The captured,
+btime and hash orders are not, as their index order is unrelated to the
+table's; when an exclusion leaves almost nothing, the walk reads every row at
+random.
 Tag filters (`tags[]` and `tag:`) are the exception: they count the tag's
 `meta_tags` rows first, across the whole library and capped at
 `RARE_TAG_ROWS`. Under the cap, the condition is an `IN` on `files.id` that

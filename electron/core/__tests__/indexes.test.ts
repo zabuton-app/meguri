@@ -4,7 +4,7 @@
 // these run synchronously on the main process (better-sqlite3), so plan
 // regressions translate directly into UI/IPC stalls.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DB } from "../db.js";
+import { rebuildFtsAll, type DB } from "../db.js";
 import type { SearchQuery } from "../types.js";
 import {
   FILE_COLS,
@@ -333,6 +333,92 @@ describe("searchFiles plans without statistics (#363)", () => {
           "sqlite_autoindex_meta_tags_1 (meta_key=? AND tag_id=?)",
         );
         expect(p, JSON.stringify(query)).not.toContain("idx_meta_tags_tag");
+      }
+    });
+  });
+
+  describe("a list filtered only by exclusions (#670)", () => {
+    const exclusions = [
+      "-ext:gif",
+      "-ab",
+      "-abc",
+      "-tag:t",
+      "-hash:ab",
+      "-is:fav",
+      "-ab -ext:gif -v00",
+    ];
+
+    it.each<[string, "asc" | "desc", string]>([
+      ["name", "asc", "idx_files_alive_name_key"],
+      ["name", "desc", "idx_files_alive_name_key"],
+      ["addedAt", "desc", "idx_files_alive_added"],
+    ])("sort=%s %s walks %s", (sort, sortDir, index) => {
+      for (const q of exclusions) {
+        for (const seek of [undefined, seekFor(sort)]) {
+          const p = searchPlan({ q, sort, sortDir }, seek);
+          expect(p, q).toContain(index);
+          expect(p, q).not.toContain("TEMP B-TREE");
+        }
+      }
+    });
+
+    it("leaves the captured, btime and hash orders to the planner", () => {
+      // Their index order is unrelated to the table's, so an exclusion that
+      // leaves almost nothing would read every row at random.
+      for (const [sort, sortDir] of [
+        ["captured", "desc"],
+        ["btime", "desc"],
+        ["hash", "asc"],
+      ] as const) {
+        for (const q of exclusions) {
+          const p = searchPlan({ q, sort, sortDir });
+          expect(p, `${sort} ${q}`).not.toContain(`idx_files_alive_${sort}`);
+        }
+      }
+    });
+
+    it("leaves an exclusion beside any other condition to the planner", () => {
+      for (const query of [
+        { q: "-ab abc" },
+        { q: "-ab ext:gif" },
+        { q: "-ab", kinds: ["image"] },
+        { q: "-ab", tags: ["t"] },
+        { q: "-ab", favorite: true },
+        { q: "-ab", capturedFrom: 0, capturedTo: 1 },
+        // A quoted dash is text, not an exclusion.
+        { q: '"-ab"' },
+      ]) {
+        const p = searchPlan({ ...query, sort: "name", sortDir: "asc" });
+        expect(p, JSON.stringify(query)).not.toContain(
+          "idx_files_alive_name_key",
+        );
+      }
+    });
+
+    it("returns the rows the planner's own order does", () => {
+      rebuildFtsAll(db);
+      const cases: [string, (relPath: string) => boolean][] = [
+        ["-v00", (relPath) => !relPath.includes("v00")],
+        ["-tag:t", () => true],
+        ["-ext:mp4", () => false],
+      ];
+      for (const [sort, sortDir] of [
+        ["name", "asc"],
+        ["name", "desc"],
+        ["addedAt", "desc"],
+      ] as const) {
+        const all = db
+          .prepare(
+            `SELECT f.id, f.rel_path FROM files f NOT INDEXED WHERE f.deleted_at IS NULL ORDER BY ${orderByFor(sort, sortDir)}`,
+          )
+          .all() as { id: number; rel_path: string }[];
+        for (const [q, keep] of cases) {
+          const { items } = searchFiles(db, { q, sort, sortDir, limit: 200 });
+          expect(
+            items.map((f) => f.id),
+            `${sort} ${sortDir} ${q}`,
+          ).toEqual(all.filter((r) => keep(r.rel_path)).map((r) => r.id));
+        }
       }
     });
   });
