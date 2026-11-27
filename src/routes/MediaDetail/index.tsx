@@ -625,7 +625,9 @@ export default function MediaDetail() {
 
             {d.kind === "image" && (
               <PhotoDetailsCard
-                key={`${wsId}:${fileId}`}
+                // Its own prefix: a key shared with DownloadOriginCard, its
+                // sibling, makes React draw one of them twice.
+                key={`photo-details:${wsId}:${fileId}`}
                 id={fileId}
                 workspaceId={wsId}
                 open={photoDetailsOpen}
