@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import log from "@/lib/logger";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useForgetSelected } from "@/components/SelectionContext";
 import {
@@ -12,10 +11,9 @@ import {
 import { api } from "@/ipc/client";
 import type { FileDetail } from "@/ipc/types";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
 import {
-  dropFromWatchLaterCache,
   forgetDeletedFile,
-  invalidatePlayedSearches,
   invalidateCollectionSearches,
   invalidateTagSearches,
   patchFileDetailInCache,
@@ -109,6 +107,7 @@ export function useDetailMutations({
   const confirm = useConfirm();
   const qc = useQueryClient();
   const forgetSelected = useForgetSelected();
+  const shell = useFileShellActions();
   // Every mutation takes the file it acts on as a variable, set when the
   // action starts. The route keeps this hook mounted across prev/next, and
   // react-query runs a mutation with the options of the latest render: a file
@@ -220,21 +219,10 @@ export function useDetailMutations({
   };
 
   const openExternal = () => {
-    const target = here;
     // The external player is about to play this very file: stop it here.
     pauseVideo?.();
     pauseAudio?.();
-    // The main process records the play and consumes the Watch Later entry,
-    // so mirror that once it confirms — it can also refuse (a file gone
-    // missing under the root), and patching regardless would show the file
-    // as consumed when it is not.
-    void api
-      .openExternal(target.fileId, target.wsId)
-      .then(() => {
-        dropFromWatchLaterCache(qc, target.wsId, target.fileId);
-        invalidatePlayedSearches(qc);
-      })
-      .catch((e: unknown) => log.error("open external", e));
+    shell.openExternal(fileId, wsId);
   };
 
   const invalidateCollections = () => {

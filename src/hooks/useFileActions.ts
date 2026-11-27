@@ -20,6 +20,7 @@ import type { FileRow } from "@/ipc/types";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useSelection } from "@/components/SelectionContext";
 import { useBulkEdit } from "@/hooks/useBulkEdit";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
 import type { WatchLaterMembership } from "@/hooks/useWatchLater";
 import { useI18n } from "@/i18n/I18nProvider";
 import { playFavoriteFx, playRatingFx } from "@/lib/fileFxStore";
@@ -32,10 +33,8 @@ import {
   type BulkFlag,
 } from "@/lib/bulkEdit";
 import {
-  dropFromWatchLaterCache,
   forgetDeletedFile,
   invalidateCollectionSearches,
-  invalidatePlayedSearches,
 } from "@/lib/queryCache";
 import { WATCH_LATER_ID } from "@shared/workspaceIds";
 
@@ -122,6 +121,7 @@ export function useFileActions(
   const qc = useQueryClient();
   const confirm = useConfirm();
   const bulk = useBulkEdit(rows, watchLater.id, deferListRefresh);
+  const shell = useFileShellActions();
   const { forget } = useSelection();
   const {
     isCurrent: isCurrentAudio,
@@ -185,33 +185,10 @@ export function useFileActions(
         // The external player is about to play this very file: stop the
         // audio bar if it has it, or both would sound.
         pauseAudioIfCurrent(id, workspaceId);
-        // The main process records the play and consumes the Watch Later
-        // entry; mirror that once it confirms (see useDetailMutations).
-        api.openExternal(id, workspaceId).then(
-          () => {
-            dropFromWatchLaterCache(qc, workspaceId, id);
-            invalidatePlayedSearches(qc);
-          },
-          (e: unknown) =>
-            toast.error(t("media.openExternalFailed"), {
-              description: errorText(e),
-            }),
-        );
+        shell.openExternal(id, workspaceId);
       },
-      openFolder: () => {
-        api
-          .openFolder(id, workspaceId)
-          .catch((e: unknown) =>
-            toast.error(t("folder.openFailed"), { description: errorText(e) }),
-          );
-      },
-      copyPath: () => {
-        api.copyFilePath(id, workspaceId).then(
-          () => toast.success(t("media.filePathCopied"), { id: "path-copied" }),
-          (e: unknown) =>
-            toast.error(t("folder.copyFailed"), { description: errorText(e) }),
-        );
-      },
+      openFolder: () => shell.openFolder(id, workspaceId),
+      copyPath: () => shell.copyPath(id, workspaceId),
       // The detail view's delete (useDetailMutations) without a view to
       // close afterwards.
       deleteFromIndex: async () => {
@@ -244,6 +221,7 @@ export function useFileActions(
     t,
     confirm,
     qc,
+    shell,
     forget,
     isCurrentAudio,
     closeAudio,

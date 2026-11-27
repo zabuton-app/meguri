@@ -83,6 +83,7 @@ import {
   MEDIA_ERR_NETWORK,
 } from "@/lib/mediaError";
 import { usePlaybackPosition } from "@/hooks/usePlaybackPosition";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
 import {
   endedSample,
   POSITION_SEEK_INTERVAL_MS,
@@ -255,13 +256,6 @@ export const VideoPlayer = forwardRef<
      * full-screen player must not show.
      */
     onFatalError?: (message: string) => void;
-    /**
-     * Fired when the error screen hands the file to an external player. That
-     * counts as a play main-side (and consumes the Watch Later entry), so the
-     * parent gets to keep its caches in step. Optional because a caller that
-     * handles failures itself (onFatalError) never renders that screen.
-     */
-    onOpenExternal?: () => void;
     t: TFunc;
   } & PlayerKeyboard
 >(function VideoPlayer(
@@ -299,7 +293,6 @@ export const VideoPlayer = forwardRef<
     onEnded,
     onPlayingChange,
     onFatalError,
-    onOpenExternal,
     chromeless = false,
     zoomable = false,
     t,
@@ -312,6 +305,7 @@ export const VideoPlayer = forwardRef<
   // The room the captions can be dragged around in.
   const captionAreaRef = useRef<HTMLDivElement>(null);
   const captionDrag = useSubtitleDrag(captionAreaRef);
+  const shell = useFileShellActions();
   const [error, setError] = useState<string | null>(null);
   // For stream playback, the start second begun on the server side via ?t.
   const [offset, setOffset] = useState(0);
@@ -1155,15 +1149,7 @@ export const VideoPlayer = forwardRef<
           <Button
             variant="outline"
             size="sm"
-            // Only report the launch once the main process confirms it: it
-            // records the play (and consumes the Watch Later entry) there, and
-            // can refuse for a file that has gone missing under the root.
-            onClick={() =>
-              void api
-                .openExternal(id, wsId)
-                .then(() => onOpenExternal?.())
-                .catch((e: unknown) => log.error("open external", e))
-            }
+            onClick={() => shell.openExternal(id, wsId)}
           >
             <ExternalLink />
             {t("player.openExternal")}
