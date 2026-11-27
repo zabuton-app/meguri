@@ -235,6 +235,7 @@ export default function MediaDetail() {
     mediaBase,
     autoplay,
     startAt,
+    explicitStartAt,
     pauseVideo: () => playerRef.current?.pause(),
     // The peek ends above the bar, so the bar stays — and for audio it is the
     // transport, the compact tile in the sheet having none.

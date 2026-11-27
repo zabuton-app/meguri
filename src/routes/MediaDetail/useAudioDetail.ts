@@ -11,7 +11,11 @@ import {
   useState,
 } from "react";
 import type { FileDetail } from "@/ipc/types";
-import { useAudioPlayer, useExclusivePlayback } from "@/audio/useAudioPlayer";
+import {
+  useAudioActions,
+  useAudioPlayer,
+  useExclusivePlayback,
+} from "@/audio/useAudioPlayer";
 import { holdBarSuppressed } from "@/audio/barVisibility";
 
 interface Options {
@@ -26,6 +30,10 @@ interface Options {
   /** `?t=`: where to begin, in seconds (the playlist handing over the track it
    *  was playing). 0 when absent. */
   startAt: number;
+  /** `?t=` itself, null when the URL names no time: a time asked for (a
+   *  scene, a bookmark, a point on the filmstrip's waveform) moves a track
+   *  that is already playing, where a plain reopen leaves it alone. */
+  explicitStartAt?: number | null;
   /** Pause the video player, if one is mounted (a no-op otherwise). */
   pauseVideo: () => void;
   /** False when the view is docked as a side peek: the bar sits below the
@@ -40,10 +48,12 @@ export function useAudioDetail({
   mediaBase,
   autoplay,
   startAt,
+  explicitStartAt = null,
   pauseVideo,
   suppressBar = true,
 }: Options) {
   const { current, isPlaying, play, close } = useAudioPlayer();
+  const { seek } = useAudioActions();
   const isAudio = file?.kind === "audio";
   const isCurrentAudio =
     isAudio && current?.file.id === file.id && current.workspaceId === wsId;
@@ -100,7 +110,10 @@ export function useAudioDetail({
     // media base: on a direct URL the detail query can resolve before
     // app_status, and playing then would build a src against an empty origin.
     if (!wsId || !mediaBase) return;
-    const visitKey = `${wsId}:${file.id}`;
+    const trackKey = `${wsId}:${file.id}`;
+    // A time asked for is a visit of its own, so a second click on another
+    // point of the same track (the side peek stays open) moves it again.
+    const visitKey = `${trackKey}:${explicitStartAt ?? ""}`;
     if (autoStartedFor.current === visitKey) return;
     autoStartedFor.current = visitKey;
     const loaded = current?.file.id === file.id && current.workspaceId === wsId;
@@ -108,14 +121,27 @@ export function useAudioDetail({
     // alone rather than restarting from zero. Loaded but paused — in practice
     // prev/next back to the track after a video interrupted it — starts over,
     // like arriving at any other item, rather than resuming mid-track.
+    // Unless a time was asked for: then it moves there and keeps playing.
     if (loaded && isPlaying) {
+      if (explicitStartAt != null) seek(explicitStartAt);
       setStartedFor(null);
       return;
     }
     play({ ...file, workspaceId: wsId }, wsId, { startAt });
     // Recorded alongside the play() it describes, in the same effect.
-    setStartedFor(visitKey);
-  }, [file, wsId, mediaBase, autoplay, startAt, current, isPlaying, play]);
+    setStartedFor(trackKey);
+  }, [
+    file,
+    wsId,
+    mediaBase,
+    autoplay,
+    startAt,
+    explicitStartAt,
+    current,
+    isPlaying,
+    play,
+    seek,
+  ]);
 
   // The bar's track as of now, for a call made after an await: the render the
   // caller closed over may be older (#258).
