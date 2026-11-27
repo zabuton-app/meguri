@@ -191,12 +191,23 @@ export function applyDerivedTagsByKey(
   return true;
 }
 
+/**
+ * A photo whose EXIF is not read yet (`files.exif` NULL; backfillExif reads it
+ * later). Its tags are left as they are rather than derived without EXIF:
+ * they are shared by every copy of the photo (one meta_key), and another copy
+ * may have read its camera and lens already.
+ */
+function isUnreadPhoto(input: AutoMetaInput): boolean {
+  return input.kind === "image" && input.exif === null;
+}
+
 /** File-id convenience wrapper used by the scan pipeline. */
 export function applyAutoMetaTags(
   db: DB,
   fileId: number,
   input: AutoMetaInput,
 ): boolean {
+  if (isUnreadPhoto(input)) return false;
   const metaKey = metaKeyOf(db, fileId);
   if (!metaKey) return false;
   return applyDerivedTagsByKey(
@@ -278,7 +289,8 @@ export async function backfillDerivedTags(
     source: string;
     versionKey: string;
     version: string;
-    derive: (row: DerivedTagRow) => DerivedTag[];
+    /** Null leaves the row's tags as they are. */
+    derive: (row: DerivedTagRow) => DerivedTag[] | null;
     signal?: AbortSignal;
     onProgress?: (done: number, total: number) => void;
   },
@@ -297,7 +309,11 @@ export async function backfillDerivedTags(
     const tagIdOf = derivedTagIdResolver(db);
     let n = 0;
     for (const row of chunk) {
-      if (applyDerivedTagsByKey(db, row.meta_key, source, derive(row), tagIdOf))
+      const desired = derive(row);
+      if (
+        desired !== null &&
+        applyDerivedTagsByKey(db, row.meta_key, source, desired, tagIdOf)
+      )
         n++;
     }
     return n;
@@ -348,12 +364,14 @@ export function backfillAutoMetaTags(
     source: AUTO_META_SOURCE,
     versionKey: AUTO_META_VERSION_KEY,
     version: String(AUTO_META_RULESET_VERSION),
-    derive: (row) =>
-      autoMetaTagsFor({
+    derive: (row) => {
+      const input = {
         ...row,
         raw: parseProbe(row.meta),
         exif: parsePhotoExif(row.exif),
-      }),
+      };
+      return isUnreadPhoto(input) ? null : autoMetaTagsFor(input);
+    },
     ...opts,
   });
 }

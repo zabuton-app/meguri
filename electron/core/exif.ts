@@ -2,6 +2,7 @@
 // (#701): the capture time that fills `captured_at`, and the camera details
 // kept in `files.exif`. ffprobe reads neither from a still image.
 import { DOMParser, onErrorStopParsing } from "@xmldom/xmldom";
+import path from "node:path";
 import ExifReader from "exifreader";
 import type { PhotoExif } from "../../shared/photoInfo.js";
 
@@ -27,15 +28,19 @@ export async function readExif(file: string): Promise<ExifResult> {
   try {
     // Read through the loose Tag shape: the declared per-tag types differ
     // between EXIF and XMP, and only the value or description is wanted.
-    tags = (await ExifReader.load(file, {
-      // Reads only the bytes that hold the metadata, not the whole picture.
-      length: "auto",
-      expanded: true,
-      includeOffsets: true,
+    const common = {
+      expanded: true as const,
       // Passed in rather than left to ExifReader's own lookup, which finds
       // the package only when ExifReader is loaded as CommonJS.
       domParser: new DOMParser({ onError: onErrorStopParsing }),
-    })) as { exif?: Group; xmp?: Group };
+    };
+    tags = (await (hasFixedWindow(file)
+      ? ExifReader.load(file, { ...common, length: FIXED_WINDOW })
+      : ExifReader.load(file, {
+          ...common,
+          length: "auto",
+          includeOffsets: true,
+        }))) as { exif?: Group; xmp?: Group };
   } catch (err) {
     // An fs error (ENOENT, EACCES, EIO) means the file was not read; anything
     // else (MetadataMissingError, UnsupportedFormatError, a broken file) means
@@ -48,6 +53,21 @@ export async function readExif(file: string): Promise<ExifResult> {
   return { exif: photoExif(tags.exif), capturedAt: capturedAt(tags) };
 }
 
+/**
+ * How much of the file to read: only the bytes that hold the metadata, never
+ * the picture. ExifReader finds them itself (`length: "auto"`) in JPEG, HEIC,
+ * AVIF, WebP and GIF. In a PNG it does not converge and in a TIFF it is not
+ * supported; both would read the whole file (tens of MB, over a network share
+ * too), so they get a fixed window. Their writers put the metadata before the
+ * image data, which a window this size covers.
+ */
+const FIXED_WINDOW = 1 << 20;
+const FIXED_WINDOW_EXTS = new Set([".png", ".tif", ".tiff"]);
+
+function hasFixedWindow(file: string): boolean {
+  return FIXED_WINDOW_EXTS.has(path.extname(file).toLowerCase());
+}
+
 function text(tag: Tag | undefined): string | undefined {
   if (!tag) return undefined;
   const v: unknown = Array.isArray(tag.value) ? tag.value[0] : tag.value;
@@ -55,6 +75,10 @@ function text(tag: Tag | undefined): string | undefined {
   return typeof tag.description === "string" && tag.description.trim()
     ? tag.description
     : undefined;
+}
+
+function firstOf(v: unknown): unknown {
+  return Array.isArray(v) ? (v as unknown[])[0] : v;
 }
 
 /** A number, an EXIF rational `[numerator, denominator]`, or a one-item list. */
@@ -83,7 +107,8 @@ function photoExif(exif: Group): PhotoExif {
   set("lens", text(exif.LensModel));
   set("fNumber", num(exif.FNumber));
   set("exposureTime", num(exif.ExposureTime));
-  set("iso", num(exif.ISOSpeedRatings));
+  // A list, not a ratio: some cameras write it twice (`[100, 100]`).
+  set("iso", num({ value: firstOf(exif.ISOSpeedRatings?.value) }));
   set("focalLength", num(exif.FocalLength));
   set("focalLength35mm", num(exif.FocalLengthIn35mmFilm));
   return out;

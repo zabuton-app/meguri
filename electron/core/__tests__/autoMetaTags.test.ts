@@ -363,6 +363,29 @@ describe("applyDerivedTagsByKey", () => {
     );
   });
 
+  it("leaves a photo's tags alone while its EXIF is unread (#701)", () => {
+    const photo = insertFile(db, rootId, {
+      relPath: "p.jpg",
+      kind: "image",
+      width: 800,
+      height: 600,
+    });
+    const input = {
+      kind: "image",
+      width: 800,
+      height: 600,
+      duration: null,
+      codec: null,
+    };
+    applyAutoMetaTags(db, photo, { ...input, exif: { model: "X-T4" } });
+    expect(applyAutoMetaTags(db, photo, { ...input, exif: null })).toBe(false);
+    expect(
+      fileTags(db, photo).some(
+        (t) => t.namespace === "camera" && t.name === "X-T4",
+      ),
+    ).toBe(true);
+  });
+
   it("refuses an unnamespaced derived tag", () => {
     const metaKey = db
       .prepare("SELECT meta_key FROM files WHERE id = ?")
@@ -412,6 +435,8 @@ describe("backfillAutoMetaTags", () => {
       width: 800,
       height: 600,
     });
+    // Its EXIF read, and none found: an unread photo is left to backfillExif.
+    db.prepare("UPDATE files SET exif = '{}' WHERE rel_path = 'b.jpg'").run();
   });
   afterEach(() => db.close());
 
@@ -443,6 +468,29 @@ describe("backfillAutoMetaTags", () => {
         .filter((t) => t.namespace === "camera")
         .map((t) => t.name),
     ).toEqual(["Apple iPhone 15 Pro"]);
+  });
+
+  it("keeps the camera tag a copy gave when another copy is still unread (#701)", async () => {
+    // Two copies of one photo share a meta_key, and with it their tags.
+    const photo = (relPath: string, exif: string | null) => {
+      const id = insertFile(db, rootId, {
+        relPath,
+        kind: "image",
+        width: 800,
+        height: 600,
+        contentHash: "same-photo",
+      });
+      db.prepare("UPDATE files SET exif = ? WHERE id = ?").run(exif, id);
+      return id;
+    };
+    const read = photo("c.jpg", JSON.stringify({ model: "X-T4" }));
+    photo("d.jpg", null);
+    await backfillAutoMetaTags(db);
+    expect(
+      fileTags(db, read)
+        .filter((t) => t.namespace === "camera")
+        .map((t) => t.name),
+    ).toEqual(["X-T4"]);
   });
 
   it("skips soft-deleted rows", async () => {
@@ -539,6 +587,8 @@ describe("backfillAutoMetaTags", () => {
         codec: image ? null : codecs[i % 4],
       });
     }
+    // Read, without EXIF: an unread photo is left to backfillExif (#701).
+    db.prepare("UPDATE files SET exif = '{}' WHERE kind = 'image'").run();
     const tagsByPath = (target: DB) =>
       target
         .prepare(
@@ -590,6 +640,7 @@ describe("backfillAutoMetaTags", () => {
         height: 600,
       });
     }
+    db.prepare("UPDATE files SET exif = '{}'").run(); // read (#701)
     await backfillAutoMetaTags(db, {
       onProgress: (done) => {
         // As pruneUnusedTags may do from another workspace's scan during the

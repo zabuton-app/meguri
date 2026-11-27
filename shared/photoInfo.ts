@@ -106,8 +106,16 @@ export function lensName(exif: PhotoExif): string | null {
 /** A number without a trailing `.0`: 2.5, 30. */
 const plain = (n: number) => String(Math.round(n * 10) / 10);
 
-/** `1/120s` below a second, `2.5s` from one up. */
+/**
+ * `1/120s` for a fraction of a second as cameras name them, `0.7s` or `2.5s`
+ * otherwise: 0.7 s is not 1/1 s, and 0.4 s not 1/2 s.
+ */
 export function shutterLabel(seconds: number): string {
-  if (seconds < 1) return `1/${Math.round(1 / seconds)}s`;
+  if (seconds < 1) {
+    const n = 1 / seconds;
+    const r = Math.round(n);
+    // 5%: EXIF stores 1/120 s as 0.0083 and the like.
+    if (r >= 2 && Math.abs(n - r) <= n * 0.05) return `1/${r}s`;
+  }
   return `${plain(seconds)}s`;
 }

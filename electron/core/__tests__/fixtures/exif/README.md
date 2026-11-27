@@ -35,3 +35,22 @@ exiftool -overwrite_original -DateTimeOriginal="2022:03:04 05:06:07" \
 
 rm base.*
 ```
+
+The TIFF, and a PNG with an `eXIf` chunk:
+
+```sh
+ffmpeg -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 dated.tiff
+exiftool -overwrite_original -DateTimeOriginal="2023:08:09 10:11:12" \
+  -Make=Nikon -Model="NIKON Z 8" dated.tiff
+
+ffmpeg -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 dated.png
+exiftool -overwrite_original -DateTimeOriginal="2024:01:02 03:04:05" \
+  -Make=Apple -Model="iPhone 15 Pro" dated.png
+```
+
+A camera that writes ISOSpeedRatings twice:
+
+```sh
+ffmpeg -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 iso-pair.jpg
+exiftool -overwrite_original '-ISO=100 100' -Model="X-T4" iso-pair.jpg
+```

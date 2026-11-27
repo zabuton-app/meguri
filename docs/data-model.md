@@ -693,7 +693,9 @@ phase `exif`): every photo whose `exif` is still NULL, by id in chunks, the
 files read in a pool and each chunk written in one transaction with its
 derived tags. Its progress is the rows themselves, not a version: a pass cut
 short resumes where it stopped, and a photo it could not read (a share that
-dropped out) stays NULL and is tried again by the next scan. Once every photo
+dropped out) stays NULL and is tried again by the next scan. While a photo is
+unread its derived tags are left as they are, not derived without its EXIF:
+they belong to its `meta_key`, which another copy may share and have read. Once every photo
 is read, the pass finds nothing through `idx_files_exif_pending` and reads no
 file.
 

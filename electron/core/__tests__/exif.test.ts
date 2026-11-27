@@ -2,7 +2,8 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import zlib from "node:zlib";
 import { exifDateToUnix, readExif } from "../exif.js";
 
 const fx = (name: string) =>
@@ -66,6 +67,43 @@ describe("readExif", () => {
     expect(r.exif?.model).toBe(model);
   });
 
+  it.each([
+    ["dated.tiff", "NIKON Z 8", new Date(2023, 7, 9, 10, 11, 12)],
+    ["dated.png", "iPhone 15 Pro", new Date(2024, 0, 2, 3, 4, 5)],
+  ])("reads %s", async (name, model, date) => {
+    const r = await readExif(fx(name));
+    expect(r.capturedAt).toBe(date.getTime() / 1000);
+    expect(r.exif?.model).toBe(model);
+  });
+
+  it("reads the metadata of a large PNG without reading it whole", async () => {
+    // 8 MB of picture-like data after the metadata, as a camera PNG has.
+    const png = await fs.readFile(fx("dated.png"));
+    const iend = png.length - 12;
+    const big = path.join(tmp, "big.png");
+    await fs.writeFile(
+      big,
+      Buffer.concat([
+        png.subarray(0, iend),
+        chunk("prVt", Buffer.alloc(8 << 20)),
+        png.subarray(iend),
+      ]),
+    );
+    // ExifReader warns when length "auto" gives up and reads the whole file.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const r = await readExif(big);
+      expect(r.exif?.model).toBe("iPhone 15 Pro");
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("reads an ISO written twice as one value, not a ratio", async () => {
+    expect((await readExif(fx("iso-pair.jpg"))).exif?.iso).toBe(100);
+  });
+
   it("returns exif: null when the file cannot be read", async () => {
     expect(await readExif(path.join(tmp, "missing.jpg"))).toEqual({
       exif: null,
@@ -79,6 +117,16 @@ describe("readExif", () => {
     expect(await readExif(garbage)).toEqual({ exif: {}, capturedAt: null });
   });
 });
+
+/** A PNG chunk: length, type, data, CRC over type and data. */
+function chunk(type: string, data: Buffer): Buffer {
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(data.length, 0);
+  head.write(type, 4, "ascii");
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(zlib.crc32(Buffer.concat([head.subarray(4), data])), 0);
+  return Buffer.concat([head, data, crc]);
+}
 
 describe("exifDateToUnix", () => {
   it.each([

@@ -182,8 +182,11 @@ ffprobe reads no EXIF from a still image, so for a photo `extractMeta()` also
 reads its EXIF with ExifReader (`electron/core/exif.ts`), alongside ffprobe and
 independent of it: a picture ffprobe cannot read can still say when it was
 taken. ExifReader reads only the bytes that hold the metadata
-(`length: "auto"`), and the XMP parser is passed in (`@xmldom/xmldom`) rather
-than left to ExifReader's own lookup. The capture time is `DateTimeOriginal`,
+(`length: "auto"`), except in a PNG, where that does not converge, and a TIFF,
+where it is not supported: both would read the whole file, so they get a fixed
+1 MB window, which covers the metadata their writers put before the image data.
+The XMP parser is passed in (`@xmldom/xmldom`) rather than left to ExifReader's
+own lookup. The capture time is `DateTimeOriginal`,
 then `DateTimeDigitized`, then the same dates in XMP; EXIF wins because cameras
 write it. The matching offset tag (`OffsetTimeOriginal`, …) places the time;
 without one it is read as the computer's local time, which is what the camera's
