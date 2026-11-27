@@ -78,11 +78,16 @@ describe("resetIndex", () => {
     const b = idOf("b.mp4");
     // As if probed and thumbnailed.
     db.prepare(
-      "UPDATE files SET width = 1920, thumb_path = 'x.webp', thumb_status = 'done'",
+      "UPDATE files SET width = 1920, thumb_path = 'x.webp', thumb_status = 'done', exif = '{}'",
     ).run();
     fs.writeFileSync(path.join(thumbs, `${a}.webp`), "thumb");
 
     await resetIndex(core, () => false);
+
+    // The EXIF is read again with the rest of the probe (#701).
+    expect(
+      db.prepare("SELECT exif FROM files WHERE id = ?").pluck().get(a),
+    ).toBeNull();
 
     // Soft-deleted, reset for the rescan, out of the search index.
     expect(row(a)).toMatchObject({

@@ -19,6 +19,7 @@ const PHASE_KEY: Record<string, TranslationKey> = {
   index: "scan.phaseIndex",
   thumbnail: "scan.phaseThumbnail",
   tags: "scan.phaseTags",
+  exif: "scan.phaseExif",
 };
 
 export function ScanProgress({

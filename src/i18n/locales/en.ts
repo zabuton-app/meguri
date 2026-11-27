@@ -534,6 +534,11 @@ export const en: Catalog = {
   "media.metaBpm": "BPM",
   "media.metaKey": "Key",
   "media.metaGenre": "Genre",
+  "media.metaCamera": "Camera",
+  "media.metaLens": "Lens",
+  "media.metaExposure": "Exposure",
+  "media.metaFocalLength": "Focal length",
+  "media.metaFocalEquiv": "{mm} mm equiv.",
   "media.playHistory": "Play history",
   "media.scenes": "Scenes",
   "media.bookmarks": "Scene bookmarks",
@@ -638,6 +643,7 @@ export const en: Catalog = {
   "scan.phaseIndex": "Building index",
   "scan.phaseThumbnail": "Generating thumbnails",
   "scan.phaseTags": "Tagging",
+  "scan.phaseExif": "Reading photo details",
   "scan.cancel": "Cancel scan",
 
   // tag editor
@@ -1275,6 +1281,8 @@ export const en: Catalog = {
   "tags.ns.key": "Key",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "Genre",
+  "tags.ns.camera": "Camera",
+  "tags.ns.lens": "Lens",
   "tags.value.durShort": "Short",
   "tags.value.durMedium": "Medium",
   "tags.value.durLong": "Long",

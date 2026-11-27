@@ -195,6 +195,15 @@ describe("migrateFilesTable", () => {
     db.close();
   });
 
+  it("adds the exif column and its pending index to an older DB (#701)", () => {
+    const file = path.join(dir, "exif.sqlite");
+    makeLegacyDb(file);
+    const db = openDb(file, ":memory:");
+    expect(tableColumns(db, "files")).toContain("exif");
+    expect(indexNames(db)).toContain("idx_files_exif_pending");
+    db.close();
+  });
+
   it("keeps meta_key-keyed user data attached across the rebuild", () => {
     const file = path.join(dir, "userdata.sqlite");
     makeLegacyDb(file);

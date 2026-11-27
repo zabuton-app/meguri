@@ -82,6 +82,7 @@ export const sampleFileDetail: FileDetail = {
   fps: 30,
   mtime: 1_700_000_000,
   meta: null,
+  exif: null,
   tags: [],
   playHistory: [],
   bookmarks: [],

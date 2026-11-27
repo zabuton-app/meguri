@@ -514,6 +514,11 @@ export const ko: Catalog = {
   "media.metaBpm": "BPM",
   "media.metaKey": "키",
   "media.metaGenre": "장르",
+  "media.metaCamera": "카메라",
+  "media.metaLens": "렌즈",
+  "media.metaExposure": "노출",
+  "media.metaFocalLength": "초점 거리",
+  "media.metaFocalEquiv": "35mm 환산 {mm} mm",
   "media.playHistory": "재생 기록",
   "media.scenes": "장면",
   "media.bookmarks": "장면 북마크",
@@ -618,6 +623,7 @@ export const ko: Catalog = {
   "scan.phaseIndex": "인덱스 생성",
   "scan.phaseThumbnail": "썸네일 생성",
   "scan.phaseTags": "태그 부여",
+  "scan.phaseExif": "사진 정보 읽기",
   "scan.cancel": "스캔 취소",
 
   // tag editor
@@ -1172,6 +1178,8 @@ export const ko: Catalog = {
   "tags.ns.key": "키",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "장르",
+  "tags.ns.camera": "카메라",
+  "tags.ns.lens": "렌즈",
   "tags.value.durShort": "짧음",
   "tags.value.durMedium": "보통",
   "tags.value.durLong": "긺",

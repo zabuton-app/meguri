@@ -229,7 +229,7 @@ export function updateExtractedMeta(
   m: ExtractedMeta,
 ): void {
   db.prepare(
-    "UPDATE files SET width = ?, height = ?, duration = ?, codec = ?, fps = ?, captured_at = COALESCE(?, captured_at), meta = COALESCE(?, meta) WHERE id = ?",
+    "UPDATE files SET width = ?, height = ?, duration = ?, codec = ?, fps = ?, captured_at = COALESCE(?, captured_at), meta = COALESCE(?, meta), exif = COALESCE(?, exif) WHERE id = ?",
   ).run(
     m.width,
     m.height,
@@ -238,6 +238,7 @@ export function updateExtractedMeta(
     m.fps,
     m.capturedAt,
     m.raw == null ? null : JSON.stringify(m.raw),
+    m.exif == null ? null : JSON.stringify(m.exif),
     fileId,
   );
 }
