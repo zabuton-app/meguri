@@ -319,6 +319,13 @@ test.
 
 A previewed video always gets AAC audio.
 
+The codec and tracks come from the metadata the scan stored. For a video the
+scan has not reached yet, or one ffprobe cannot read, the server probes it
+itself (`probePlaybackMetadata` in `electron/core/playbackMetadata.ts`) and
+remembers the result, a failure included, by path, size and modification time.
+The range requests and seeks of one playback then reuse it instead of running
+ffprobe each time. A probe that hits its five-second limit is not remembered.
+
 ### Frame previews
 
 A `frame` request returns a single JPEG frame at `?t=<seconds>`, used for seek
