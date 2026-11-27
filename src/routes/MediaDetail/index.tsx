@@ -80,6 +80,9 @@ const NoteCard = lazy(() => import("./NoteCard"));
 
 export default function MediaDetail() {
   const { t, lang } = useI18n();
+  // Kept across photos, so the photo details stay open while stepping through
+  // a series (#725).
+  const [photoDetailsOpen, setPhotoDetailsOpen] = useState(false);
   const titleId = useId();
   const { id } = useParams();
   const fileId = Number(id);
@@ -625,6 +628,8 @@ export default function MediaDetail() {
                 key={`${wsId}:${fileId}`}
                 id={fileId}
                 workspaceId={wsId}
+                open={photoDetailsOpen}
+                onOpenChange={setPhotoDetailsOpen}
               />
             )}
 

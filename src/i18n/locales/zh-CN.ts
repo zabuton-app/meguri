@@ -511,7 +511,7 @@ export const zhCN: Catalog = {
   "media.metaCaptured": "拍摄时间",
   "photoDetails.title": "拍摄信息",
   "photoDetails.unreadable": "无法读取文件。",
-  "photoDetails.field.taken": "拍摄时间",
+  "photoDetails.field.taken": "拍摄地时间",
   "photoDetails.field.camera": "相机",
   "photoDetails.field.lens": "镜头",
   "photoDetails.field.aperture": "光圈",

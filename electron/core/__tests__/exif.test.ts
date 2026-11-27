@@ -168,6 +168,25 @@ describe("readPhotoDetails (#725)", () => {
     });
   });
 
+  it("names a UTC date's offset +00:00", async () => {
+    const r = await readPhotoDetails(fx("xmp-utc.png"));
+    expect(r).toEqual({
+      status: "ok",
+      details: {
+        takenAt: new Date(2020, 0, 2, 3, 4, 5).getTime() / 1000,
+        takenOffset: "+00:00",
+      },
+    });
+  });
+
+  it("leaves out an offset tag that is not an offset", async () => {
+    const r = await readPhotoDetails(fx("bad-offset.jpg"));
+    expect(r).toEqual({
+      status: "ok",
+      details: { takenAt: new Date(2019, 6, 21, 14, 35, 0).getTime() / 1000 },
+    });
+  });
+
   it("reads an image without EXIF as ok with no details", async () => {
     expect(await readPhotoDetails(fx("no-exif.png"))).toEqual({
       status: "ok",

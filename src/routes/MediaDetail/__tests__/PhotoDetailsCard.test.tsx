@@ -20,12 +20,22 @@ vi.mock("@/ipc/client", () => ({
 const { PhotoDetailsCard } =
   await import("@/routes/MediaDetail/PhotoDetailsCard");
 
-function renderCard(id = 7) {
+function renderCard(
+  id = 7,
+  open = false,
+  onOpenChange: (open: boolean) => void = () => {},
+) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ui = (fileId: number) => (
     <QueryClientProvider client={qc}>
       <I18nProvider>
-        <PhotoDetailsCard id={fileId} workspaceId="ws" />
+        <PhotoDetailsCard
+          key={fileId}
+          id={fileId}
+          workspaceId="ws"
+          open={open}
+          onOpenChange={onOpenChange}
+        />
       </I18nProvider>
     </QueryClientProvider>
   );
@@ -64,6 +74,20 @@ describe("PhotoDetailsCard", () => {
     expect(screen.queryByText("Lens")).toBeNull();
   });
 
+  it("names its time the local time where the photo was taken", async () => {
+    // Not "Captured": the chip above shows the same moment in this
+    // computer's time zone, which can differ.
+    filePhotoDetails.mockResolvedValue({
+      status: "ok",
+      details: { takenAt: 1_563_687_300, takenOffset: "+09:00" },
+    });
+    renderCard();
+    expect(await screen.findByText("Local time where taken")).toBeTruthy();
+    expect(field("Local time where taken")).toBe(
+      `${new Date(1_563_687_300 * 1000).toLocaleString("en")} (+09:00)`,
+    );
+  });
+
   it("shows nothing for a photo without details", async () => {
     filePhotoDetails.mockResolvedValue({ status: "ok", details: {} });
     const { container, qc } = renderCard();
@@ -96,5 +120,33 @@ describe("PhotoDetailsCard", () => {
     show(8);
     expect(await screen.findByText("NIKON D850")).toBeTruthy();
     expect(screen.queryByText("Canon EOS R5")).toBeNull();
+  });
+
+  it("stays open on the next photo when it was open (#725)", async () => {
+    filePhotoDetails.mockImplementation((id) =>
+      Promise.resolve({
+        status: "ok",
+        details: { model: id === 7 ? "Canon EOS R5" : "NIKON D850" },
+      }),
+    );
+    const { show, container } = renderCard(7, true);
+    await screen.findByText("Canon EOS R5");
+    show(8);
+    await screen.findByText("NIKON D850");
+    expect(container.querySelector("details")?.open).toBe(true);
+  });
+
+  it("reports opening and closing to its owner", async () => {
+    filePhotoDetails.mockResolvedValue({
+      status: "ok",
+      details: { model: "Canon EOS R5" },
+    });
+    const onOpenChange = vi.fn();
+    const { container } = renderCard(7, false, onOpenChange);
+    await screen.findByText("Canon EOS R5");
+    const details = container.querySelector("details")!;
+    details.open = true;
+    details.dispatchEvent(new Event("toggle"));
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
   });
 });

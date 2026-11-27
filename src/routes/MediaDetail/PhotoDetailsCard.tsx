@@ -8,14 +8,20 @@ import { photoDetailRows } from "@shared/photoInfo";
 /**
  * A photo's details as its EXIF gives them (#725), like a file's details in a
  * file manager: only the fields the photo has, read when the view opens.
- * Folded by default; nothing at all when the photo gives none.
+ * Folded by default; nothing at all when the photo gives none. Whether it is
+ * open belongs to the detail view, so that it stays open from one photo to
+ * the next while the user compares their settings.
  */
 export function PhotoDetailsCard({
   id,
   workspaceId,
+  open,
+  onOpenChange,
 }: {
   id: number;
   workspaceId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const { t, lang } = useI18n();
   const { data } = useQuery({
@@ -39,7 +45,7 @@ export function PhotoDetailsCard({
       aria-label={t("photoDetails.title")}
       className="space-y-2 border-t border-border py-3 text-sm"
     >
-      <details>
+      <details open={open} onToggle={(e) => onOpenChange(e.currentTarget.open)}>
         <summary className="cursor-pointer font-semibold text-bright-fg">
           {t("photoDetails.title")}
         </summary>

@@ -566,7 +566,7 @@ export const fr: Catalog = {
   "media.metaCaptured": "Prise de vue",
   "photoDetails.title": "Infos de la photo",
   "photoDetails.unreadable": "Impossible de lire le fichier.",
-  "photoDetails.field.taken": "Prise de vue",
+  "photoDetails.field.taken": "Heure locale de la prise",
   "photoDetails.field.camera": "Appareil",
   "photoDetails.field.lens": "Objectif",
   "photoDetails.field.aperture": "Ouverture",

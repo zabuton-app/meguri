@@ -69,3 +69,15 @@ exiftool -overwrite_original -DateTimeOriginal="2019:07:21 14:35:00" \
   -Software="Adobe Lightroom 7.0" -Artist="Jane Doe" -Copyright="(c) Jane Doe" \
   -GPSLatitude=35.0 -GPSLatitudeRef=N full.jpg
 ```
+
+An XMP date in UTC (`Z`), and an offset tag that is not an offset:
+
+```sh
+ffmpeg -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 xmp-utc.png
+exiftool -overwrite_original \
+  '-XMP-exif:DateTimeOriginal=2020:01:02 03:04:05Z' xmp-utc.png
+
+ffmpeg -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 bad-offset.jpg
+exiftool -overwrite_original -DateTimeOriginal="2019:07:21 14:35:00" \
+  '-OffsetTimeOriginal#=xx' bad-offset.jpg
+```

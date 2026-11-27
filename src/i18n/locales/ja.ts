@@ -529,7 +529,7 @@ export const ja = {
   "media.metaCaptured": "撮影日時",
   "photoDetails.title": "撮影情報",
   "photoDetails.unreadable": "ファイルを読めませんでした。",
-  "photoDetails.field.taken": "撮影日時",
+  "photoDetails.field.taken": "撮影地の時刻",
   "photoDetails.field.camera": "カメラ",
   "photoDetails.field.lens": "レンズ",
   "photoDetails.field.aperture": "F値",

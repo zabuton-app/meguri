@@ -11,7 +11,7 @@ import {
   readWebVtt,
 } from "../../shared/embeddedSubtitles.js";
 import { readDownloadOrigin } from "../core/downloadOrigin.js";
-import { readPhotoDetails } from "../core/exif.js";
+import { photoDetailsOf } from "../core/photoDetails.js";
 import { absPathOf } from "../core/tags.js";
 import { handle } from "../core/ipcHandler.js";
 import { isRemuxedVideo } from "../../shared/playbackTracks.js";
@@ -102,15 +102,9 @@ export function registerFileHandlers(ctx: IpcContext): void {
     return core && abs ? readDownloadOrigin(abs, core.root) : [];
   });
   // What the detail view lists about a photo (#725), read when it opens.
-  handle("file_photo_details", ({ id, workspaceId }) => {
-    const core = coreById(ws, workspaceId);
-    const kind = core.db
-      .prepare("SELECT kind FROM files WHERE id = ?")
-      .pluck()
-      .get(id);
-    if (kind !== "image") return null;
-    return readPhotoDetails(ensureFileInsideRoot(core, id));
-  });
+  handle("file_photo_details", ({ id, workspaceId }) =>
+    photoDetailsOf(coreById(ws, workspaceId), id),
+  );
   handle("file_subtitles", async ({ id, workspaceId, track, windowStart }) => {
     const core = coreById(ws, workspaceId);
     const file = q.fileDetail(core.db, id);

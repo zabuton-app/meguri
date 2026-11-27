@@ -524,7 +524,7 @@ export const ko: Catalog = {
   "media.metaCaptured": "촬영 일시",
   "photoDetails.title": "촬영 정보",
   "photoDetails.unreadable": "파일을 읽을 수 없습니다.",
-  "photoDetails.field.taken": "촬영 일시",
+  "photoDetails.field.taken": "촬영지 시각",
   "photoDetails.field.camera": "카메라",
   "photoDetails.field.lens": "렌즈",
   "photoDetails.field.aperture": "조리개",

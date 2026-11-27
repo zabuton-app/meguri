@@ -565,7 +565,7 @@ export const es: Catalog = {
   "media.metaCaptured": "Capturado",
   "photoDetails.title": "Datos de la foto",
   "photoDetails.unreadable": "No se pudo leer el archivo.",
-  "photoDetails.field.taken": "Fecha de captura",
+  "photoDetails.field.taken": "Hora local de la toma",
   "photoDetails.field.camera": "Cámara",
   "photoDetails.field.lens": "Objetivo",
   "photoDetails.field.aperture": "Apertura",

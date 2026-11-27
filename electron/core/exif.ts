@@ -136,7 +136,7 @@ function takenTime(tags: Tags): { at: number; offset?: string } | null {
     const wall = m ? m[1] : date;
     const at = exifDateToUnix(wall);
     if (at !== null) {
-      const offset = given?.trim() || m?.[2];
+      const offset = offsetLabel(given?.trim() || m?.[2]);
       return offset ? { at, offset } : { at };
     }
   }
@@ -248,6 +248,14 @@ function capturedAt(tags: { exif?: Group; xmp?: Group }): number | null {
     if (t !== null) return t;
   }
   return null;
+}
+
+/** `+09:00` for an offset as EXIF or XMP writes it (`Z` is `+00:00`), or
+ *  undefined for anything else: a broken tag is not shown. */
+function offsetLabel(raw: string | undefined): string | undefined {
+  const m = raw ? OFFSET.exec(raw) : null;
+  if (!m) return undefined;
+  return m[1] ? `${m[1]}${m[2]}:${m[3]}` : "+00:00";
 }
 
 const DATE =
