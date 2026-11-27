@@ -6,6 +6,7 @@
 import { z } from "zod";
 import type { DownloadOriginEntry } from "../downloadOrigin.js";
 import type { SubtitleCue } from "../embeddedSubtitles.js";
+import type { PhotoDetailsResult } from "../photoInfo.js";
 import type {
   AppStatus,
   CrashReport,
@@ -413,6 +414,7 @@ export const ChannelInputs = {
   }),
   file_get: FileTarget,
   file_download_origin: FileTarget,
+  file_photo_details: FileTarget,
   file_subtitles: FileTarget.extend({
     track: z.number().int().nonnegative(),
     windowStart: z.number().int().nonnegative().max(31_536_000),
@@ -734,6 +736,8 @@ export interface ChannelOutputs {
   timeline_counts: TimelineCounts;
   file_get: FileDetail | null;
   file_download_origin: DownloadOriginEntry[];
+  /** Null for a file that is not an image. */
+  file_photo_details: PhotoDetailsResult | null;
   file_subtitles: SubtitleCue[];
   file_set_rating: void;
   file_set_favorite: void;

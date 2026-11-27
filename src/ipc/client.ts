@@ -157,6 +157,8 @@ export const api = {
     invoke("file_get", { id, workspaceId }),
   fileDownloadOrigin: (id: number, workspaceId: string) =>
     invoke("file_download_origin", { id, workspaceId }),
+  filePhotoDetails: (id: number, workspaceId: string) =>
+    invoke("file_photo_details", { id, workspaceId }),
   fileSubtitles: (
     id: number,
     workspaceId: string,
