@@ -105,6 +105,11 @@ export const FileRowSchema = z.object({
   progress: z.number().nullable(),
   /** Tags attached to search results (for grid display). For detail fetches, use FileDetail.tags. */
   tags: z.array(TagInfoSchema).optional(),
+  codec: z.string().nullable().optional(),
+  fps: z.number().nullable().optional(),
+  /** Scene bookmark positions in seconds, ascending (for the filmstrip). Named
+   *  apart from FileDetail.bookmarks, which carries the full rows. */
+  bookmarkSecs: z.array(z.number()).optional(),
 });
 export type FileRow = z.infer<typeof FileRowSchema>;
 

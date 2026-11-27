@@ -5,6 +5,7 @@ import type { SearchQuery } from "../types.js";
 import { addFileTag, addManualTag, syncFts, upsertTag } from "../tags.js";
 import {
   addBookmark,
+  attachBookmarkSecs,
   deleteFromIndex,
   fileDetail,
   filesByIds,
@@ -808,6 +809,41 @@ describe("attachTags", () => {
         ?.tags.map((t) => `${t.namespace}:${t.name}`)
         .sort(),
     ).toEqual([":beach", "res:4k"]);
+    db.close();
+  });
+});
+
+describe("filmstrip row details", () => {
+  it("search rows carry codec and fps", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "a.mp4", codec: "h264" });
+    db.prepare("UPDATE files SET fps = 29.97 WHERE id = ?").run(id);
+    const row = searchFiles(db, {}).items[0];
+    expect(row.codec).toBe("h264");
+    expect(row.fps).toBe(29.97);
+    db.close();
+  });
+
+  it("attachBookmarkSecs attaches each file's bookmark seconds in order", () => {
+    const { db, rootId } = newDb();
+    const a = insertFile(db, rootId, { relPath: "a.mp4", contentHash: "ha" });
+    const b = insertFile(db, rootId, { relPath: "b.mp4", contentHash: "hb" });
+    addBookmark(db, a, 30);
+    addBookmark(db, a, 5);
+    const rows = filesByIds(db, [a, b]);
+    attachBookmarkSecs(db, rows);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(a)?.bookmarkSecs).toEqual([5, 30]);
+    expect(byId.get(b)?.bookmarkSecs).toEqual([]);
+    db.close();
+  });
+
+  it("search rows carry bookmarkSecs", () => {
+    const { db, rootId } = newDb();
+    const a = insertFile(db, rootId, { relPath: "a.mp4", contentHash: "ha" });
+    addBookmark(db, a, 30);
+    addBookmark(db, a, 5);
+    expect(searchFiles(db, {}).items[0].bookmarkSecs).toEqual([5, 30]);
     db.close();
   });
 });

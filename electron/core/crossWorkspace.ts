@@ -8,6 +8,7 @@ import { resolveSortDir } from "../../shared/sortDir.js";
 import { usesOwnMetadata } from "./db.js";
 import type { Core } from "./index.js";
 import {
+  attachBookmarkSecs,
   attachTags,
   duplicateFileIds,
   duplicateFiles,
@@ -174,6 +175,7 @@ export function filesByIdsWorkspaces(
     const rows = filesByIds(target.core.db, [...new Set(fileIds)]);
     // List rows carry their tags.
     attachTags(target.core.db, rows);
+    attachBookmarkSecs(target.core.db, rows);
     out.push(...inject(rows, workspaceId));
   }
   return out;
@@ -444,7 +446,10 @@ function mergeSearchPages(
   }
   for (const { id, core } of targets) {
     const rows = byWs.get(id);
-    if (rows?.length) attachTags(core.db, rows);
+    if (rows?.length) {
+      attachTags(core.db, rows);
+      attachBookmarkSecs(core.db, rows);
+    }
   }
 
   return {
@@ -944,7 +949,10 @@ export function listDuplicatesWorkspaces(
   }
   for (const { id, core } of cores) {
     const list = byWs.get(id);
-    if (list?.length) attachTags(core.db, list);
+    if (list?.length) {
+      attachTags(core.db, list);
+      attachBookmarkSecs(core.db, list);
+    }
   }
 
   return { groups, fileCount, truncated };
