@@ -26,6 +26,24 @@ export const FRAME_MIN_W = 64;
 
 export type StripLayout = { frameW: number; frameH: number; scrolls: boolean };
 
+/** Below this much strip beside the details, the details go above the strip. */
+export const STACK_BELOW_STRIP_W = 320;
+
+export type RowLayout = StripLayout & {
+  /** Details above the strip, each the row's full width (a narrow view, such
+   *  as the list beside a docked side peek). */
+  stacked: boolean;
+};
+
+/** How every row is laid out in a view `viewWidth` wide. */
+export function rowLayout(viewWidth: number, count: number): RowLayout {
+  const stacked = viewWidth - STRIP_CHROME < STACK_BELOW_STRIP_W;
+  const stripWidth = stacked
+    ? viewWidth - 2 * VIEW_PAD_X - 2 * ROW_PAD
+    : viewWidth - STRIP_CHROME;
+  return { ...stripLayout(stripWidth, count), stacked };
+}
+
 /**
  * Frame boxes for a strip `stripWidth` wide: `count` 16:9 boxes sharing it,
  * so the strip spans the row, the height following the width. A video of

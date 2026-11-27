@@ -22,7 +22,7 @@ import {
   LEFT_COL_W,
   ROW_GAP,
   ROW_PAD,
-  type StripLayout,
+  type RowLayout,
 } from "@/filmstrip/frames";
 import { Waveform } from "@/filmstrip/Waveform";
 
@@ -55,8 +55,8 @@ export const FilmstripRow = memo(function FilmstripRow({
   file: FileRow;
   /** Position in the loaded list — what a Shift-click ranges from. */
   index: number;
-  /** Frame size, worked out once for the view's width. */
-  layout: StripLayout;
+  /** Frame size and arrangement, worked out once for the view's width. */
+  layout: RowLayout;
   mediaBase: string;
   limiter: ImageLimiter;
   onScreen: boolean;
@@ -80,17 +80,28 @@ export const FilmstripRow = memo(function FilmstripRow({
       data-file-key={mediaSortId(file)}
       aria-current={focused ? "true" : peeked ? "page" : undefined}
       data-selected={selected || undefined}
+      data-layout={layout.stacked ? "stacked" : "side"}
+      // Selection gestures (selection mode, Ctrl/Shift/Cmd) on anything that
+      // would open the file — the name, a frame, a bookmark mark, the
+      // waveform, the thumbnail — are taken here, before they reach it, so
+      // every such target selects without wiring of its own. Controls (the
+      // toggles, the tags, the check) are buttons and stay controls.
+      onClickCapture={(e) => {
+        if ((e.target as Element).closest("a[href], [data-opens-file]"))
+          onSelectableClick(e);
+      }}
       style={{ padding: ROW_PAD, gap: ROW_GAP }}
       className={cn(
-        "group relative flex items-start rounded-card transition-colors hover:bg-fg/10",
+        "group relative flex rounded-card transition-colors hover:bg-fg/10",
+        layout.stacked ? "flex-col" : "items-start",
         selected && "bg-primary/15 hover:bg-primary/25",
         peeked && "ring-1 ring-inset ring-primary",
         focused && "ring-2 ring-inset ring-primary",
       )}
     >
       <div
-        className="flex shrink-0 flex-col gap-1.5"
-        style={{ width: LEFT_COL_W }}
+        className="flex min-w-0 shrink-0 flex-col gap-1.5"
+        style={{ width: layout.stacked ? undefined : LEFT_COL_W }}
       >
         <div className="flex min-w-0 items-center gap-2">
           <SelectionCheck
@@ -100,7 +111,6 @@ export const FilmstripRow = memo(function FilmstripRow({
           />
           <HashLink
             to={fileHref(file.id, file.workspaceId, { autoplay: false })}
-            onClick={onSelectableClick}
             className="h-6 min-w-0 truncate text-sm font-medium leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-card after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
           >
             <span title={file.relPath}>{fileNameOf(file.relPath)}</span>
@@ -147,7 +157,6 @@ export const FilmstripRow = memo(function FilmstripRow({
           mediaBase={mediaBase}
           limiter={limiter}
           onScreen={onScreen}
-          onFrameClick={onSelectableClick}
         />
       ) : timeline && file.kind === "audio" ? (
         <Waveform
@@ -157,17 +166,13 @@ export const FilmstripRow = memo(function FilmstripRow({
           mediaBase={mediaBase}
           limiter={limiter}
           onScreen={onScreen}
-          onSelectableClick={onSelectableClick}
         />
       ) : (
         // An image, or a file not probed yet: its thumbnail, once.
         <HashLink
           data-slot="filmstrip-thumb"
           to={fileHref(file.id, file.workspaceId)}
-          onClick={(e) => {
-            if (onSelectableClick(e)) return;
-            onThumbnailClick(file)(e);
-          }}
+          onClick={onThumbnailClick(file)}
           aria-label={fileNameOf(file.relPath)}
           className="relative z-10 block shrink-0 overflow-hidden rounded-item bg-overlay text-muted"
           style={{ width: layout.frameW, height: layout.frameH }}

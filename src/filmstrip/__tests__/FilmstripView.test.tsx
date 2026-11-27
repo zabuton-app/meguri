@@ -407,4 +407,69 @@ describe("FilmstripView", () => {
         ?.getAttribute("data-selected"),
     ).toBe("true");
   });
+
+  it("a Ctrl-click on a bookmark mark or a frame selects the row instead of opening it", async () => {
+    view([row({ id: 7, duration: 100, bookmarkSecs: [25] })]);
+    await screen.findByText("sample.mp4");
+    const selected = () =>
+      document
+        .querySelector('[data-slot="filmstrip-row"]')
+        ?.getAttribute("data-selected");
+    window.location.hash = "#/";
+    fireEvent.click(
+      document.querySelector('[data-slot="filmstrip-bookmark"]')!,
+      { ctrlKey: true },
+    );
+    await act(async () => {});
+    expect(window.location.hash).toBe("#/");
+    expect(selected()).toBe("true");
+    // A second one, on a frame, takes it out of the selection again.
+    fireEvent.click(document.querySelector('[data-slot="filmstrip-frame"]')!, {
+      ctrlKey: true,
+    });
+    await act(async () => {});
+    expect(window.location.hash).toBe("#/");
+    expect(selected()).toBeNull();
+  });
+
+  it("a Ctrl-click on the favorite toggle is still the toggle, not a selection", async () => {
+    view([row({ id: 7, duration: 100 })]);
+    await screen.findByText("sample.mp4");
+    const fav = screen.getByRole("button", { name: "Add to favorites" });
+    fireEvent.click(fav, { ctrlKey: true });
+    await act(async () => {});
+    expect(
+      document
+        .querySelector('[data-slot="filmstrip-row"]')
+        ?.getAttribute("data-selected"),
+    ).toBeNull();
+  });
+
+  it("stacks the details over the strip when the view is too narrow for both side by side", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(500);
+    // The default 10 frames, not the 4 the other tests set.
+    localStorage.clear();
+    view([row({ id: 7, duration: 100 })]);
+    await screen.findByText("sample.mp4");
+    const r = document.querySelector<HTMLElement>(
+      '[data-slot="filmstrip-row"]',
+    )!;
+    expect(r.dataset.layout).toBe("stacked");
+    // The strip gets the row's whole width (500 less 2 × 12 and 2 × 8 of
+    // padding = 460): too narrow for 10 boxes of 64, so they keep 64 and scroll.
+    const box = document.querySelector<HTMLElement>(
+      '[data-slot="filmstrip-frame-box"]',
+    )!;
+    expect(box.style.width).toBe("64px");
+  });
+
+  it("puts the details beside the strip when the view is wide enough", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1600);
+    view([row({ id: 7, duration: 100 })]);
+    await screen.findByText("sample.mp4");
+    expect(
+      document.querySelector<HTMLElement>('[data-slot="filmstrip-row"]')!
+        .dataset.layout,
+    ).toBe("side");
+  });
 });

@@ -1,4 +1,3 @@
-import type { MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -20,7 +19,6 @@ export function Waveform({
   mediaBase,
   limiter,
   onScreen,
-  onSelectableClick,
 }: {
   file: FileRow;
   duration: number;
@@ -29,8 +27,6 @@ export function Waveform({
   mediaBase: string;
   limiter: ImageLimiter;
   onScreen: boolean;
-  /** Returns true when the click was a selection gesture (no navigation). */
-  onSelectableClick: (e: MouseEvent) => boolean;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -45,9 +41,10 @@ export function Waveform({
       <button
         type="button"
         data-slot="filmstrip-waveform"
+        // Opens the file, so the row takes selection clicks on it first.
+        data-opens-file
         aria-label={t("filmstrip.waveform")}
         onClick={(e) => {
-          if (onSelectableClick(e)) return;
           const rect = e.currentTarget.getBoundingClientRect();
           const x = Math.min(Math.max(e.clientX - rect.left, 0), rect.width);
           const sec =

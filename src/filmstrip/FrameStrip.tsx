@@ -1,4 +1,3 @@
-import type { MouseEvent } from "react";
 import { HashLink } from "@/components/HashLink";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fileHref } from "@/lib/fileHref";
@@ -19,7 +18,6 @@ export function FrameStrip({
   mediaBase,
   limiter,
   onScreen,
-  onFrameClick,
 }: {
   file: FileRow;
   duration: number;
@@ -28,8 +26,6 @@ export function FrameStrip({
   limiter: ImageLimiter;
   /** Frames load only while their row is on screen. */
   onScreen: boolean;
-  /** Returns true when the click was a selection gesture (no navigation). */
-  onFrameClick: (e: MouseEvent) => boolean;
 }) {
   const { filmstripFrames, frameQuality } = usePreferences();
   // The times follow the count alone, never the width: a resize (a side peek
@@ -54,7 +50,6 @@ export function FrameStrip({
               layout={layout}
               url={onScreen ? `${base}?t=${sec}&q=${frameQuality}` : null}
               limiter={limiter}
-              onClick={onFrameClick}
             />
           ))}
         </div>
@@ -70,14 +65,12 @@ function Frame({
   layout,
   url,
   limiter,
-  onClick,
 }: {
   file: FileRow;
   sec: number;
   layout: StripLayout;
   url: string | null;
   limiter: ImageLimiter;
-  onClick: (e: MouseEvent) => boolean;
 }) {
   const { t } = useI18n();
   const { src, failed } = useLimitedImage(limiter, url);
@@ -87,7 +80,6 @@ function Frame({
       data-slot="filmstrip-frame"
       data-failed={failed || undefined}
       to={fileHref(file.id, file.workspaceId, { t: sec })}
-      onClick={onClick}
       aria-label={t("filmstrip.playFrom", { time })}
       className="group/frame flex shrink-0 flex-col items-center gap-0.5"
     >

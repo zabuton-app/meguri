@@ -34,10 +34,10 @@ import { FilmstripRow } from "@/filmstrip/FilmstripRow";
 import { usePreferences } from "@/settings/PreferencesProvider";
 import {
   ROW_PAD,
-  STRIP_CHROME,
+  ROW_GAP,
   VIEW_PAD_X,
-  stripLayout,
-  type StripLayout,
+  rowLayout,
+  type RowLayout,
 } from "@/filmstrip/frames";
 
 /** The left column's height (name, details, tags, toggles): a row is never lower. */
@@ -48,10 +48,13 @@ const LEFT_COL_H = 100;
  * bookmark bar (and the sideways scrollbar when the strip scrolls), padded.
  * Every row gets the same, so the virtualizer needs no measuring.
  */
-function rowHeight({ frameH, scrolls }: StripLayout): number {
+function rowHeight({ frameH, scrolls, stacked }: RowLayout): number {
   const strip = frameH + 2 + 16 + 4 + 16 + (scrolls ? 14 : 0);
+  const content = stacked
+    ? LEFT_COL_H + ROW_GAP + strip
+    : Math.max(LEFT_COL_H, strip);
   // pb-0.5 under each row.
-  return 2 * ROW_PAD + Math.max(LEFT_COL_H, strip) + 2;
+  return 2 * ROW_PAD + content + 2;
 }
 
 interface Props {
@@ -125,7 +128,7 @@ export const FilmstripView = memo(function FilmstripView({
     return () => ro.disconnect();
   }, [scrollEl]);
   const layout = useMemo(
-    () => stripLayout(viewW - STRIP_CHROME, filmstripFrames),
+    () => rowLayout(viewW, filmstripFrames),
     [viewW, filmstripFrames],
   );
   const rowH = rowHeight(layout);
