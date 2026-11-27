@@ -225,14 +225,13 @@ export default function NoteCard({
   const showAdd = !editing && view.isEmpty;
 
   return (
+    // Separated from the sections around it by a rule, like them (#589). While
+    // editing, only the area being typed in gets a field's frame.
     <section
       aria-label={t("media.note")}
-      className={cn(
-        "flex flex-col gap-3 rounded-xl border bg-surface p-4",
-        editing ? "border-primary" : "border-border",
-      )}
+      className="flex flex-col gap-3 border-t border-border py-4"
     >
-      <div className="flex min-h-8 items-center gap-2">
+      <div className="flex min-h-7 items-center gap-2">
         <span className="text-xs font-semibold uppercase text-muted">
           {t("media.note")}
         </span>
@@ -240,7 +239,7 @@ export default function NoteCard({
         {!editing && !view.isEmpty && (
           <Button
             variant="outline"
-            size="sm"
+            size="compact"
             className="ml-auto"
             onClick={startEditing}
           >
@@ -254,7 +253,7 @@ export default function NoteCard({
         <button
           type="button"
           onClick={startEditing}
-          className="flex h-14 items-center justify-center gap-2 rounded-lg border border-dashed border-border-strong text-sm text-muted hover:bg-accent hover:text-accent-foreground"
+          className="flex h-14 items-center justify-center gap-2 rounded-card border border-dashed border-border-strong text-sm text-muted hover:bg-fg/10 hover:text-bright-fg"
         >
           <Plus className="size-4" />
           {t("media.note.add")}
@@ -269,7 +268,7 @@ export default function NoteCard({
         className={cn(
           "relative",
           editing &&
-            "min-h-40 rounded-lg border border-border-strong bg-background px-3.5 py-3",
+            "min-h-40 rounded-control border border-border-strong bg-bg px-3 py-3 focus-within:border-ring",
           collapsed && "overflow-hidden",
         )}
         style={
@@ -287,7 +286,7 @@ export default function NoteCard({
       {!editing && overflowing && !view.isEmpty && (
         <Button
           variant="outline"
-          size="sm"
+          size="compact"
           className="self-start"
           onClick={() => setExpanded((v) => !v)}
         >
@@ -314,7 +313,7 @@ export default function NoteCard({
           </span>
           <Button
             variant="outline"
-            size="sm"
+            size="compact"
             className="ml-auto"
             onClick={finishEditing}
           >
@@ -344,12 +343,7 @@ function SaveStatus({
       >
         <CircleAlert className="size-3.5" aria-hidden />
         {t("media.note.saveFailed")}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-6 px-2"
-          onClick={onRetry}
-        >
+        <Button variant="outline" size="compact" onClick={onRetry}>
           {t("media.note.retry")}
         </Button>
       </span>
@@ -472,7 +466,7 @@ function Toolbar({
     <div
       role="toolbar"
       aria-label={t("media.note.toolbar")}
-      className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-background p-1"
+      className="flex flex-wrap items-center gap-0.5 rounded-card border border-border bg-bg p-1"
     >
       {items.map((group, i) => (
         <div key={i} className="flex items-center gap-0.5">
@@ -483,7 +477,7 @@ function Toolbar({
               type="button"
               variant="ghost"
               size="icon"
-              className={cn("size-8", active[key] && "bg-accent")}
+              className={cn("size-7", active[key] && "bg-primary/15")}
               aria-label={t(label)}
               aria-pressed={active[key]}
               title={t(label)}
@@ -552,7 +546,7 @@ function LinkButton({
           type="button"
           variant="ghost"
           size="icon"
-          className={cn("size-8", active && "bg-accent")}
+          className={cn("size-7", active && "bg-primary/15")}
           aria-label={t("media.note.link")}
           aria-pressed={active}
           title={t("media.note.link")}

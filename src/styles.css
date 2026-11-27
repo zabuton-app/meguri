@@ -546,7 +546,7 @@ html[data-boot-fade] body {
   font-size: 1.25rem;
 }
 .note-content h2 {
-  font-size: 1.1rem;
+  font-size: 1.125rem;
 }
 .note-content h3 {
   font-size: 1rem;
@@ -580,20 +580,20 @@ html[data-boot-fade] body {
   accent-color: var(--c-primary);
 }
 .note-content blockquote {
-  border-left: 3px solid var(--c-border-strong);
+  border-left: 2px solid var(--c-border-strong);
   padding-left: 0.75rem;
   color: var(--c-secondary-fg);
 }
 .note-content code {
   border: 1px solid var(--c-border);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-item);
   background: var(--c-bg);
   padding: 0.05em 0.3em;
   font-size: 0.85em;
 }
 .note-content pre {
   border: 1px solid var(--c-border);
-  border-radius: 0.375rem;
+  border-radius: var(--radius-control);
   background: var(--c-bg);
   padding: 0.6rem 0.75rem;
   overflow-x: auto;
