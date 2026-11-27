@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 // happy-dom does not reflect aria-* attributes to element properties (ariaSelected and so on).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { onSearchLibrary } from "@/lib/ui-events";
@@ -151,6 +157,23 @@ async function lastSaved(): Promise<AutoTagConfig> {
     timeout: 2000,
   });
   return mocks.autoTagSet.mock.calls.at(-1)![0];
+}
+
+/**
+ * Waits until the file list has been read `times` times and drawn again.
+ * Until the rules have run over the names it brings, the suggestions are
+ * empty, so a test that looks for a row as soon as the call is made finds
+ * either the old list or none, depending on timing.
+ */
+async function reloaded(times: number) {
+  await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(times));
+  await act(() => mocks.autoTagFiles.mock.results[times - 1].value);
+  // The rules run again over the new names; the fake worker answers at once,
+  // the real one would not, so wait for them rather than count on it.
+  await waitFor(() => {
+    expect(screen.queryAllByText("testing…")).toHaveLength(0);
+    expect(screen.queryAllByText("Analyzing file names…")).toHaveLength(0);
+  });
 }
 
 describe("AutoTag", () => {
@@ -341,7 +364,7 @@ describe("AutoTag", () => {
       }),
     );
     // What was written before the failure is read back rather than lost.
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+    await reloaded(2);
     expect(screen.queryByText(/^Added /)).toBeNull();
   });
 
@@ -475,7 +498,7 @@ describe("AutoTag", () => {
       expect(within(dialog).getByText("Move files to “Port”?")).toBeTruthy();
       expect(mocks.autoTagEdit).not.toHaveBeenCalled();
       fireEvent.click(
-        within(dialog).getByRole("button", { name: "Replace on 1 files" }),
+        within(dialog).getByRole("button", { name: "Replace on 1 file" }),
       );
       // One edit: the new tag on, the old one — as the file spells it — off,
       // so no file is left with neither.
@@ -495,7 +518,7 @@ describe("AutoTag", () => {
       const again = await screen.findByRole("alertdialog");
       expect(within(again).getByText("Move files to “Quay”?")).toBeTruthy();
       expect(
-        within(again).getByRole("button", { name: "Replace on 1 files" }),
+        within(again).getByRole("button", { name: "Replace on 1 file" }),
       ).toBeTruthy();
     });
 
@@ -505,10 +528,10 @@ describe("AutoTag", () => {
       await renderScreen("Keywords");
       rename("Harbor", "Port");
       fireEvent.click(
-        await screen.findByRole("button", { name: "Replace on 1 files" }),
+        await screen.findByRole("button", { name: "Replace on 1 file" }),
       );
       // Read again rather than guessed at; the setting stays renamed.
-      await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+      await reloaded(2);
       expect((await lastSaved()).keywords).toMatchObject([{ tags: ["Port"] }]);
     });
 
@@ -581,7 +604,7 @@ describe("AutoTag", () => {
       await renderScreen("Folders");
       rename("harbor", "Port");
       fireEvent.click(
-        await screen.findByRole("button", { name: "Replace on 1 files" }),
+        await screen.findByRole("button", { name: "Replace on 1 file" }),
       );
       await waitFor(() =>
         expect(mocks.autoTagEdit).toHaveBeenCalledWith(
@@ -743,7 +766,7 @@ describe("AutoTag", () => {
         "day1",
       ),
     );
-    expect(within(pane).getByText("1 files")).toBeTruthy();
+    expect(within(pane).getByText("1 file")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Find a folder"), {
       target: { value: "" },
     });
@@ -863,7 +886,7 @@ describe("AutoTag", () => {
     expect(within(row).getByText(/adds to existing tag/)).toBeTruthy();
     // One of its two files carries the tag already, from before.
     expect(
-      within(row).getByRole("button", { name: "Remove from 1 files" }),
+      within(row).getByRole("button", { name: "Remove from 1 file" }),
     ).toBeTruthy();
     fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
 
@@ -921,7 +944,7 @@ describe("AutoTag", () => {
       .getByRole("checkbox", { name: "Harbor" })
       .closest("div")!;
     fireEvent.click(
-      within(row).getByRole("button", { name: "Remove from 1 files" }),
+      within(row).getByRole("button", { name: "Remove from 1 file" }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     // Only the file the candidate names is sent; main detaches by content.
@@ -954,12 +977,12 @@ describe("AutoTag", () => {
     const row = () =>
       screen.getByRole("checkbox", { name: "Harbor" }).closest("div")!;
     fireEvent.click(
-      within(row()).getByRole("button", { name: "Remove from 1 files" }),
+      within(row()).getByRole("button", { name: "Remove from 1 file" }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     // The list is read again rather than guessed at, and nothing is claimed.
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
-    await within(row()).findByRole("button", { name: "Remove from 1 files" });
+    await reloaded(2);
+    await within(row()).findByRole("button", { name: "Remove from 1 file" });
     expect(screen.queryByText(/^Removed/)).toBeNull();
   });
 
@@ -986,7 +1009,7 @@ describe("AutoTag", () => {
       .getByRole("checkbox", { name: "Harbor" })
       .closest("div")!;
     fireEvent.click(
-      within(row).getByRole("button", { name: "Remove from 1 files" }),
+      within(row).getByRole("button", { name: "Remove from 1 file" }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
     await waitFor(() =>
@@ -1005,10 +1028,10 @@ describe("AutoTag", () => {
     fireEvent.click(within(row).getByRole("button", { name: "Apply" }));
     await waitFor(() => expect(mocks.autoTagApply).toHaveBeenCalled());
     // The list is loaded again to show what the files really carry.
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+    await reloaded(2);
     // Still the one file that carried the tag before, not two.
     expect(
-      screen.getByRole("button", { name: "Remove from 1 files" }),
+      await screen.findByRole("button", { name: "Remove from 1 file" }),
     ).toBeTruthy();
     expect(screen.queryByRole("status")).toBeNull();
   });
@@ -1033,14 +1056,14 @@ describe("AutoTag", () => {
     const row = () =>
       screen.getByRole("checkbox", { name: "Harbor" }).closest("div")!;
     fireEvent.click(within(row()).getByRole("button", { name: "Apply" }));
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(2));
+    await reloaded(2);
 
     fireEvent.click(
       await within(row()).findByRole("button", { name: /Remove from/ }),
     );
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     await waitFor(() => expect(mocks.autoTagEdit).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(mocks.autoTagFiles).toHaveBeenCalledTimes(3));
+    await reloaded(3);
   });
 
   it("splits a write by how long its places run together", async () => {

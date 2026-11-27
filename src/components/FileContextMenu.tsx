@@ -1,4 +1,5 @@
-// The right-click menu on the files of a list view (grid, list, timeline).
+// The right-click menu on the files of a list view (grid, list, timeline),
+// and on the folder cards of the folder view.
 //
 // One menu per view, not one per card: the view's cards are virtualized and
 // memoized, and a menu root on each would add to every card's mount for a menu
@@ -8,7 +9,8 @@
 //
 // What it acts on follows the command menu: the selection when the clicked
 // card is part of it, otherwise that one file. The actions come from
-// useFileActions, which the command menu shares.
+// useFileActions, which the command menu shares. A folder card's menu acts on
+// that folder alone (FolderMenuBody), selected or not.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Check,
@@ -16,9 +18,11 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Folder,
   FolderOpen,
   FolderPlus,
   FolderSearch,
+  FolderX,
   Heart,
   ImageDown,
   Info,
@@ -47,10 +51,13 @@ import {
   useFileActions,
   type FileActions,
 } from "@/hooks/useFileActions";
+import { useExcludeFolder } from "@/hooks/useExcludeFolder";
+import { useFolderPathActions } from "@/hooks/useFolderPathActions";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useI18n, type TFunc } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
 import { mediaSortId } from "@/lib/mediaSortId";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import { folderPathOf } from "@/lib/relPath";
 import { showFolderInLibrary } from "@/lib/ui-events";
 import { copyImageToClipboard } from "@/routes/MediaDetail/utils";
@@ -62,44 +69,53 @@ import {
 } from "@/settings/keybindings";
 import { isNormalizedFolderPath } from "@shared/folderPath";
 import { MAX_BULK_FILES } from "@shared/tags";
+import { isTyping } from "@/lib/keyTarget";
 
 /** The attribute a file's card or row carries, so the menu can tell which was clicked. */
 const FILE_KEY_ATTR = "data-file-key";
+/** The attribute a folder card or row carries (FolderCard, FolderRow). */
+const FOLDER_PATH_ATTR = "data-folder-path";
+/** The files under that folder, which excluding it hides. */
+const FOLDER_COUNT_ATTR = "data-folder-count";
 
 const NO_FILES: FileRow[] = [];
 const RATINGS = [0, 1, 2, 3, 4, 5];
 
-const isTyping = (el: Element | null) =>
-  el instanceof HTMLElement &&
-  (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
-
 function cardOf(target: EventTarget | null): Element | null {
   return target instanceof Element
-    ? target.closest(`[${FILE_KEY_ATTR}]`)
+    ? target.closest(`[${FILE_KEY_ATTR}], [${FOLDER_PATH_ATTR}]`)
     : null;
 }
+
+type MenuTarget = { file: FileRow } | { folder: string; count: number };
 
 export function FileContextMenu({
   items,
   mediaBase,
+  workspaceId,
   active,
+  onOpenFolder,
   children,
 }: {
   /** The files the view shows; a right-clicked card is looked up among them. */
   items: FileRow[];
+  /** The workspace the folder cards are in (the active one). */
+  workspaceId?: string;
   /** Base URL of the local media server, for copying an image. */
   mediaBase: string;
   /** The view is in the foreground: the menu key opens the menu on the focused file. */
   active: boolean;
+  /** Enters a folder, as a click on its card does. */
+  onOpenFolder?: (path: string) => void;
   children: ReactNode;
 }) {
-  const [file, setFile] = useState<FileRow | null>(null);
+  const [target, setTarget] = useState<MenuTarget | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!isContextMenuKey(e) || isTyping(document.activeElement)) return;
+      if (!isContextMenuKey(e) || isTyping()) return;
       const focused = getFocusedFile();
       if (!focused) return;
       const key = mediaSortId(focused);
@@ -128,7 +144,7 @@ export function FileContextMenu({
   return (
     <ContextMenu
       onOpenChange={(open) => {
-        if (!open) setFile(null);
+        if (!open) setTarget(null);
       }}
     >
       <ContextMenuTrigger asChild>
@@ -136,20 +152,27 @@ export function FileContextMenu({
           ref={rootRef}
           className="contents"
           onContextMenu={(e) => {
-            const key = cardOf(e.target)?.getAttribute(FILE_KEY_ATTR);
+            const card = cardOf(e.target);
+            const folder = card?.getAttribute(FOLDER_PATH_ATTR);
+            if (folder && workspaceId) {
+              const count = Number(card?.getAttribute(FOLDER_COUNT_ATTR));
+              setTarget({ folder, count: Number.isFinite(count) ? count : 0 });
+              return;
+            }
+            const key = card?.getAttribute(FILE_KEY_ATTR);
             const hit = key ? items.find((f) => mediaSortId(f) === key) : null;
-            // Not on a file (a folder card, the gaps between cards): no menu.
+            // Not on a card (the gaps between cards): no menu.
             if (!hit) {
               e.preventDefault();
               return;
             }
-            setFile(hit);
+            setTarget({ file: hit });
           }}
         >
           {children}
         </div>
       </ContextMenuTrigger>
-      {file && (
+      {target && (
         <ContextMenuContent
           className="min-w-56"
           // The menu's keys are its own: the views' window listeners (focus
@@ -157,7 +180,18 @@ export function FileContextMenu({
           onKeyDown={(e) => e.stopPropagation()}
           onEscapeKeyDown={stopEscape}
         >
-          <FileMenuBody file={file} mediaBase={mediaBase} />
+          {"file" in target ? (
+            <FileMenuBody file={target.file} mediaBase={mediaBase} />
+          ) : (
+            workspaceId && (
+              <FolderMenuBody
+                workspaceId={workspaceId}
+                folder={target.folder}
+                count={target.count}
+                onOpen={onOpenFolder}
+              />
+            )
+          )}
         </ContextMenuContent>
       )}
     </ContextMenu>
@@ -194,7 +228,7 @@ function FileMenuBody({
   const folderPath = folderPathOf(file.relPath);
   const imageSrc =
     file.kind === "image" && mediaBase
-      ? `${mediaBase}/ws/${file.workspaceId}/media/${file.id}`
+      ? mediaSrcOf(mediaBase, file.workspaceId, file.id)
       : "";
 
   return (
@@ -316,6 +350,53 @@ function FileMenuBody({
   );
 }
 
+function FolderMenuBody({
+  workspaceId,
+  folder,
+  count,
+  onOpen,
+}: {
+  workspaceId: string;
+  folder: string;
+  count: number;
+  onOpen?: (path: string) => void;
+}) {
+  const { t } = useI18n();
+  const exclude = useExcludeFolder();
+  const paths = useFolderPathActions();
+  return (
+    <>
+      {onOpen && (
+        <ContextMenuItem onSelect={() => onOpen(folder)}>
+          <Folder />
+          {t("fileMenu.open")}
+        </ContextMenuItem>
+      )}
+      <ContextMenuItem
+        onSelect={() => paths.openInFileManager(workspaceId, folder)}
+      >
+        <FolderOpen />
+        {t("folder.openInFileManager")}
+      </ContextMenuItem>
+      <ContextMenuItem onSelect={() => paths.copyPath(workspaceId, folder)}>
+        <Copy />
+        {t("folder.copyPath")}
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem
+        // After the menu has closed and handed focus back, so the confirmation
+        // keeps it (as the file menu's delete does).
+        onSelect={() =>
+          window.setTimeout(() => void exclude(workspaceId, folder, count), 0)
+        }
+      >
+        <FolderX />
+        {t("folder.excludeFromScans")}
+      </ContextMenuItem>
+    </>
+  );
+}
+
 /**
  * Esc is the menu's too, but it is handled on the document before it reaches
  * the menu, and the menu is gone by the time it would bubble through it: stop
@@ -337,7 +418,7 @@ function copyImage(src: string, t: TFunc) {
 
 function Shortcut({ children }: { children: ReactNode }) {
   return (
-    <span className="ml-auto pl-4 font-mono text-[11px] text-muted">
+    <span className="ml-auto pl-4 font-mono text-2xs text-muted">
       {children}
     </span>
   );

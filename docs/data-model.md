@@ -29,7 +29,7 @@ be merged into the library yet keeps its directory instead, metadata and all.
 
 `electron/core/paths.ts` resolves these paths. The top-level
 [README](../README.md#where-data-is-stored) is the canonical description of the
-full storage tree, including `config.json`.
+full storage tree.
 
 ## Schema
 
@@ -46,11 +46,16 @@ with `lib.`: an unqualified `CREATE INDEX` or `CREATE TRIGGER` would land in
 
 In the workspace database (`CORE_DDL`):
 
-- `scan_roots` — the registered root for this database.
+- `scan_roots` — the registered root for this database, with `last_scan_at`
+  and `mountpoint` (whether the root was a mountpoint at the last scan).
 - `files` — the file index: `rel_path`, `abs_path`, `kind` (`video` | `image` |
   `audio`), size/mtime/inode, `content_hash`, media metadata (`width`, `height`,
-  `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`, and
-  `deleted_at` / `excluded_at` markers. For audio, `width` / `height` / `fps`
+  `duration`, `codec`, `fps`, `captured_at`), `thumb_path` / `thumb_status`,
+  `deleted_at` / `excluded_at` / `scan_excluded_at` markers (the last set
+  with `deleted_at` on a file a scan exclusion hides; see
+  [Scan exclusions](media-pipeline.md#scan-exclusions)), and `name_key`, the
+  name sort's key
+  (see [Name sort](#name-sort)). For audio, `width` / `height` / `fps`
   stay NULL even when the file embeds cover art — the artwork's dimensions
   describe the jacket, not the track. Images keep `fps` NULL too, except
   animated ones (a GIF with more than one frame, or an APNG): ffprobe reports a
@@ -58,6 +63,9 @@ In the workspace database (`CORE_DDL`):
   HEIF/AVIF (as phone cameras write) keeps `width` / `height` NULL: depending
   on the version, ffprobe reports one tile's size, 0x0, or no stream at all,
   never the full image. Its stored `meta` keeps only the first tile's stream.
+  `meta` holds the ffprobe output; the subtitle filter reads its streams
+  directly, matching only the text codecs the player shows
+  (`shared/embeddedSubtitles.ts`), so it has no column of its own.
 - `tags` (library) — the tag master, unique on `(namespace, name)`. An empty namespace
   means the tag is the user's own; a non-empty one means it is owned by a
   pipeline (see [Derived tags](#derived-tags)). The constraint tells
@@ -94,6 +102,14 @@ In the library (`LIB_DDL`):
 - `migrated_workspaces` — the workspaces found on the library: merged into it,
   or created after it, and whether their own tables are gone yet (`complete`;
   see [The shared library](#the-shared-library)).
+- `app_settings` — the app's settings (see [App settings](#app-settings)).
+- `collections`, `collection_items` — user collections and their files, in
+  order (`position`; see [App settings](#app-settings)).
+- `smart_collections` — saved searches, newest first (`position`), and which
+  one is the default (see [App settings](#app-settings)).
+
+The last four are created by `openSettingsDb()`, not `LIB_DDL`: they are read
+before any workspace attaches the library.
 
 ## Versionless migrations
 
@@ -148,9 +164,42 @@ resets the rows, and the rescan revives them in place.) It is also what makes
 the library shared: two workspaces holding the same content (the same
 `content_hash`) read and write the same rows.
 
+The renderer's caches follow the same rule: a change to a file's metadata
+(favorite, rating, tags, the resume position, bookmarks) is patched onto every
+cached row and detail with the same content hash, in any workspace
+(`patchFileRowInCaches` and `patchFileDetailInCache` in
+`src/lib/queryCache.ts`), so the file's copies on screen show it at once. A
+file without a hash shares its metadata with none.
+
 When a file gains its first hash, `migrateMetaKey()` moves its metadata from
 the path key to the hash. Another workspace's copy may already hold metadata
 under that hash; the two are merged by the rules below.
+
+When the content of a file changes at the same path (its tags or cover art
+edited, a recording that grew), it gets a new hash but stays the same file to
+the user: the path, not only the hash, tells it apart. `copyMetaKey()` copies
+its metadata to the new hash, plays and bookmarks included, merged by the rules
+below into what the library already holds there. It is copied rather than
+moved, since another file, in this workspace or another one, may still have the
+old content. Only the user's tags are copied; the tags derived from the content
+(resolution, codec and so on) are derived again for the new content.
+
+Where the path and the hash disagree, the path decides, and the outcome is
+accepted as it is:
+
+- another file's content copied over this one: this file's metadata is merged
+  into that content, so the other file shows it too
+- two files that swap their content: both end up with both files' metadata
+- an edit undone: the content gets back its old metadata merged with what was
+  set in between, so a favorite or a tag removed in between comes back
+- a copy of the old content still listed: the same plays show under both
+
+Nothing is copied to or from empty content: every empty file (truncated by a
+failed sync, or not written yet) has the same hash, which would gather all
+their metadata and hand it to each one that gets content. A changed file moved
+or renamed in the same step is not recognized, and starts without metadata.
+The copies left under old hashes are not cleaned up, so a tag kept only there
+still counts as in use for tag completion.
 
 `file_meta` holds `favorite`, `rating` (0–5), `last_accessed_at`, and
 `thumb_offset_sec` (the user-chosen thumbnail frame offset, `NULL` meaning the
@@ -245,20 +294,20 @@ of the clock counts as the stalest, never as the newest.
 
 Rows for the same `meta_key` are merged so that nothing the user set is lost:
 
-| What | Rule |
-| --- | --- |
-| `favorite` | either one set |
-| `rating`, `last_accessed_at` | the higher |
-| `thumb_offset_sec`, `resume_position` | the newer row's, unless it has none |
-| `note` | both, held one first, joined by a `---` line; one that is already a whole part of the other is not added |
-| `tags` | matched on the exact `(namespace, name)` |
-| `meta_tags` | one row per `(meta_key, tag, source)` |
-| `scene_bookmarks` | one within `BOOKMARK_NEAR_EPS` of another is not added |
-| `play_history` | identical events are kept once |
+| What                                  | Rule                                                                                                     |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `favorite`                            | either one set                                                                                           |
+| `rating`, `last_accessed_at`          | the higher                                                                                               |
+| `thumb_offset_sec`, `resume_position` | the newer row's, unless it has none                                                                      |
+| `note`                                | both, held one first, joined by a `---` line; one that is already a whole part of the other is not added |
+| `tags`                                | matched on the exact `(namespace, name)`                                                                 |
+| `meta_tags`                           | one row per `(meta_key, tag, source)`                                                                    |
+| `scene_bookmarks`                     | one within `BOOKMARK_NEAR_EPS` of another is not added                                                   |
+| `play_history`                        | identical events are kept once                                                                           |
 
 Merging the same rows again changes nothing. `FILE_META_MERGE_SET` in
-`queries/meta.ts` holds the `file_meta` rules for both this merge and
-`migrateMetaKey()`.
+`queries/meta.ts` holds the `file_meta` rules for this merge,
+`migrateMetaKey()` and `copyMetaKey()`.
 
 Since every workspace reads the same rows, an edit made in one shows in every
 workspace holding the same content. Tag rename, merge and delete, and clearing
@@ -275,14 +324,87 @@ an event two workspaces share once.
 Metadata is never collected: the library keeps rows for files no workspace
 holds any more, so a removed workspace added again gets its metadata back.
 
+### App settings
+
+The app's settings (`AppConfig` in `electron/core/appConfig.ts`: workspaces
+and preferences) are rows of `app_settings (key, value)`, one per field, the
+value as JSON. Every read parses each field on its own, so a value
+that does not validate falls back to its default without taking the others
+with it. `updateConfig()` writes only the fields a change touched, in one
+transaction.
+
+They used to live in `<userData>/config.json`. A launch that finds no import
+record (`_config_json_imported_at`) imports it, over whatever `app_settings`
+holds, and records the import in the same transaction; the file is then left
+alone. A library put back from
+a copy taken before the import imports it again.
+
+User collections have tables of their own (`electron/core/collectionStore.ts`),
+so a change writes only its rows: adding a file is one insert, however many
+files the collections hold, and rearranging a collection updates the
+`position` of the files moved. An item still refers to a file by
+`workspace_id + file_id`. `Workspaces` keeps the collections in memory and
+writes each change through. Collections kept as one JSON row of
+`app_settings` (`collections`, which is also where config.json's are imported)
+are moved into the tables, and the row dropped, in one transaction on the next
+load; a row that is not a list is dropped and the tables kept. An import always
+writes the row, so a `config.json` without collections replaces them with none,
+as it replaces every setting. Collections that cannot be read at startup are
+served empty and not written for the session.
+
+Smart collections (saved searches) have a table of their own too
+(`electron/core/smartCollectionStore.ts`): one row each, the `SearchQuery` as
+JSON in `query`, and `is_default` on the one the list opens with (a partial
+unique index keeps it to one). Each row is validated with
+`SmartCollectionSchema` when it is read, so one that does not leaves the rest.
+An earlier version kept them in the renderer's `localStorage`; the first launch
+with no record of the move (`_smart_collections_imported_at` in
+`app_settings`) moves them in and records it in the same transaction, unless
+the table already holds some, which are kept. `localStorage` is not read again
+after that, nor cleared, for an older version to start from. Unlike a setting,
+a write that fails throws, and the renderer reports it.
+
+Being in the library, the settings share its backups and are rolled back with
+it when a damaged library is put back from a copy. The settings create the
+library before any workspace attaches it; until one has, it holds no metadata
+and is not copied, since a copy without `tag_changes` could not be put back.
+Each read or write opens its own connection and closes it, so nothing holds
+the library open between them, and commits sync (`synchronous = FULL`).
+
+## Name sort
+
+Sorting by name follows a file manager's order (#292): case folded, and digit
+runs compared as numbers, so `Ep2` comes before `Ep10`. SQLite's collations
+cannot compare digits numerically, and the list pages with a keyset on the sort
+value, so the order comes from a stored key: `files.name_key`, which
+`naturalNameKey()` (`electron/core/nameKey.ts`) builds from the whole `rel_path`.
+Files stay grouped by folder, as before. Each digit run, leading zeros dropped,
+becomes its length (itself prefixed by how many digits it has) followed by the
+digits (`Ep10` → `ep1210`), so the key compares as a plain string at any length;
+the id breaks ties (`Ep02` and `Ep2`).
+
+The scan writes the key with `rel_path` (insert and move). `backfillNameKeys()`
+in `db.ts` adds the column to an older DB and, on every open, computes again
+every key when `NAME_KEY_VERSION` changes (recorded in `settings`), or else the
+keys that no longer match their path: an older app version inserts rows
+without one and moves rows without updating it. Nothing in the schema calls the
+key function, so an older version can still open and write the database.
+`idx_files_alive_name_key` serves the sort in both directions (see
+[Query layer](#query-layer)); inside a folder the folder's own files are found
+on `idx_files_alive_rel_path` and sorted. The `All` merge compares the same
+key.
+
 ## Full-text search
 
 `files_fts(rel_path, tags_text)` is an FTS5 virtual table whose `rowid` matches
 `files.id`. It is kept in sync by `syncFts()` in `electron/core/tags.ts`; call it
-after any tag change so the searchable `tags_text` stays current. For a batch of
+after a change to the user's own tags so the searchable `tags_text` stays
+current. Derived (namespaced) tags never reach `tags_text`, so writing them needs
+no re-sync. For a batch of
 files — a tag rename, a merge, the derived-tag backfill — use
 `resyncFtsForKeys()` in `db.ts` instead, which re-indexes a whole set of
-`meta_key`s in one pair of statements.
+`meta_key`s in one pair of statements. The scan's index phase does the same by
+file id with `resyncFtsForIds()`, one transaction per chunk of 256 files.
 
 A soft-deleted file has no `files_fts` row once it is removed from the index, or
 once the index is re-synced or rebuilt while it is gone (both skip deleted
@@ -293,9 +415,10 @@ and `runScan()` re-syncs its row along with the new, moved and changed files;
 those files are not auto-tagged again.
 
 `tags_text` holds the **user's own** tag names, joined by spaces and
-deduplicated across sources. Three places produce it — `syncFts()`,
-`resyncFtsForKeys()` and the trigram rebuild — and they must never drift, so the
-projection lives in a single `FTS_ROW_SELECT` constant in `db.ts`.
+deduplicated across sources. Four places produce it — `syncFts()`,
+`resyncFtsForKeys()`, `resyncFtsForIds()` and the trigram rebuild — and they
+must never drift, so the projection lives in a single `FTS_ROW_SELECT` constant
+in `db.ts`.
 
 Each workspace keeps its own `files_fts`, while the tags live in the library,
 so a tag changed through one workspace has to reach the others' indexes.
@@ -325,14 +448,14 @@ and folds case for ASCII only.
 
 The auto-tagging screen uses this to search the library for a dictionary
 entry's terms (`searchLibrary()` in `src/lib/ui-events.ts`, which
-replaces the text query rather than adding to it) — by the search box's rules,
+replaces the text query rather than adding to it) — by the search's rules,
 a substring of the path or of the tags, not by the entry's own word matching.
 
 Generated tags are deliberately **not** indexed. The tokenizer is trigram, so
 indexing `dur:long` would make a plain search for "long" return every long
 video — and likewise for "short", "square", "h264".
 
-Exact tag conditions instead live in the search box as the **`tag:` directive**,
+Exact tag conditions instead live in the search as the **`tag:` directive**,
 which `buildSearchTerms()` in `queries/files.ts` pulls out before the FTS split
 and resolves against the `tags` table:
 
@@ -358,35 +481,137 @@ chip the box draws and the SQL the query produces can never disagree about it.
 tag the user creates. The structured `SearchQuery.tags[]` field still works and
 is what saved searches and Discover URLs carry.
 
-The box itself (`SearchTokenInput`) renders a directive as a **chip** rather than
-as raw text, so it is added and removed as one unit: a directive only means
-anything whole, and backspacing through the middle of one silently turns an exact
-tag match into a substring search. A token becomes a chip once the user closes it
-with a space or Enter — never mid-word — and `hasOpenQuote()` keeps a space typed
-inside an unclosed `tag:"…` phrase from counting as that boundary. Free text stays
-ordinary editable text, so the box remains one plain string end to end.
+The **`hash:` directive** finds files by content hash (#302): `hash:3fa9c1d2`
+matches every file whose `content_hash` starts with those hex digits, at least
+four of them (`MIN_HASH_SEARCH_LENGTH`), in any case. It becomes a range on the
+indexed column (`>= prefix AND < prefix || 'g'`, every hex digit sorting before
+`g`), so a file without a hash never matches. Shorter or non-hex values stay
+free text. The Duplicates view copies a group's full hash and opens the list on
+`hash:<hash>`, which is how a group's copies are found from the list. It is a
+chip like `tag:`, and the condition row names it.
 
-Focus never leaves the input — the chips are a rendering of the query string, not
+The **`ext:` directive** finds files by extension (#522): `ext:mp4` matches
+the files whose `ext` is exactly `mp4`, in any case and with or without the dot
+(`ext:.MP4`). It is an exact match on the column, so `mp4_backup/clip.mov` and
+`.m4v` files do not match. It is a chip like `hash:`, and it is ANDed with the
+other directives, so `ext:mp4 ext:mkv` matches nothing.
+
+The **numeric directives** compare a column (#524): `size:` (bytes), `duration:`
+(seconds), `width:` and `height:` (pixels), each followed by `>`, `>=`, `<`,
+`<=` or no operator for equality (`size:>1gb`, `duration:<30s`,
+`width:>=3840`). `size:` takes `b`, `kb`, `mb` or `gb`, binary as `formatSize`
+shows sizes (1 kb = 1024 bytes); `duration:` takes `s`, `m`, `h` or a clock time
+(`1:30`, `1:02:03`), and is compared in whole seconds, as the list shows it.
+No unit is the column's own. Equality is exact on the stored value:
+`size:1.5gb` is 1610612736 bytes, not every file the list shows as 1.5 GB, so a
+range (`size:>1.4gb size:<1.6gb`) finds those. The names are the full words
+because `dur` and `res` are tag namespaces. `parseNumericSearchToken()` in `shared/tags.ts` reads
+them; an unknown unit or a missing number leaves the token free text. A file
+whose value is unknown (`NULL`, such as an image's duration) never matches. Two
+directives on one field are ANDed, so `size:>100mb size:<1gb` is a range. They
+are chips like `ext:`, and none of the four columns is indexed: the comparison
+runs on the rows the other conditions leave. With a leading `-`
+(`-size:>1gb`), a file whose value is unknown is kept.
+
+The **`rating:` directive** finds files by rating (#525): `rating:>=4`,
+`rating:>4`, `rating:<=2`, `rating:<2`, or `rating:3` for exactly 3. The value
+is a whole number from 0 to 5, and a file without a rating counts as 0, as the
+rating filter's `ratingMin` does. Any other value or comparison (`rating:6`,
+`rating:3.5`, `rating:=3`) leaves the token ordinary text, as `hash:` does.
+Two of them make a range (`rating:>=2 rating:<5`).
+
+The **`is:fav` directive** finds favorites (#525). `fav` is the only value `is:`
+takes; `is:` with any other value is ordinary text.
+
+Both are chips like `hash:`, the condition row names them, and both accept a
+space after the colon (`rating: >=4`). They are independent of the rating and
+favorite controls of the filter bar: a directive does not set the control nor
+the other way round, and when both are set both apply (AND). With a leading `-`,
+`-is:fav` keeps every file that is not a favorite.
+
+A leading **`-` excludes** (#523): `-tag:screenshot`, `-ext:gif`, `-hash:3fa9`
+and `-draft` leave out the files the same token without the `-` would match.
+`parseNegatedSearchToken()` in `shared/tags.ts` reads it, and
+`appendSearchConditions()` sends the token's condition, built by
+`directiveCondition()` for a directive, to SQL as `NOT COALESCE((…), 0)`. A
+file the condition says nothing about (`NULL`) is kept, and a directive added
+there can be excluded as well. Negated free text follows the positive split
+(trigram `MATCH` for 3+ code points, `LIKE` for shorter ones), each negated word
+on its own, and with alternatives
+(`-draft|wip`) a file matching any of them is left out. A file without a hash is
+never excluded by `-hash:`, and `-tag:` with a name no tag has excludes nothing.
+A query of negations only returns every other file; on 100,000 synthetic files a
+page of one costs about what the positive form does. A lone `-` is ordinary
+text, and a dash typed inside quotes (`"-intro"`) is text too: the tokenizer
+marks it as `\-intro`, and `joinSearchTokens()` writes it back quoted. A negated
+directive is a chip of its own, drawn struck through behind its `-`, and
+`searchDirectiveKey()` keeps `tag:x` and `-tag:x` apart. A negated word stays
+free text.
+
+Every directive is told apart from free text by one parser,
+`parseSearchDirective()` in `shared/tags.ts` (#666): the chips, the duplicate
+check, the space folding and the labels read its result. A new directive is
+added there and to `DIRECTIVE_PREFIXES`, then to `directiveCondition()` in
+`electron/core/queries/files.ts` (its SQL) and `directiveLabel()` in
+`src/lib/tagLabel.ts` (its label); each is a `switch` or a `Record` on the
+directive's kind, so leaving one out does not compile.
+
+The search is typed in the command menu, whose field starts from the search on
+screen (`useSearchDraft` in `src/hooks/`, rendered by `CommandMenu`). It shows a
+directive as a **chip** rather than as raw text, so it is added and removed as
+one unit: a directive only means anything whole, and backspacing through the
+middle of one silently turns an exact tag match into a substring search. A token
+becomes a chip once the user closes it with a space — never mid-word — and
+`hasOpenQuote()` keeps a space typed inside an unclosed `tag:"…` phrase from
+counting as that boundary. A condition the field already carries is not chipped
+twice (compared by `searchDirectiveKey()`, as `addSearchTokens()` compares a tag
+click); the chip that carries it is highlighted instead. "Search for" runs the
+whole field, chips and text, as the new search.
+
+Focus never leaves the input — the chips are a rendering of the query, not
 widgets of their own. Once the caret runs out of text to its left, Left and
 Backspace start walking back over the chips instead, highlighting one at a time;
 Left/Right move the highlight, Backspace/Delete removes the highlighted chip, and
 Escape, Right past the last chip, or simply typing returns to the text. Backspace
-highlights before it deletes because a chip goes with no undo. Clicking a chip
-highlights it too, and so does clicking a tag that is _already_ a condition:
-`onTagClick` in Home compares the result of `addSearchTokens()` by reference and,
-when nothing changed, sends `highlightSearchToken()` over the event bus rather
-than leaving what looks like a dead click.
+highlights before it deletes because a chip goes with no undo, and a highlight
+the field placed itself (a repeat) takes one press to arm. Clicking a chip
+highlights it too. In the title bar, clicking a tag that is _already_ a condition
+lights its chip there: `onTagClick` in Home compares the result of
+`addSearchTokens()` by reference and, when nothing changed, sends
+`highlightSearchToken()` over the event bus rather than leaving what looks like a
+dead click.
 
-While a directive is being typed the box completes it from the tag catalog — the
-user's own tags and the generated ones in one list, since one directive matches
-both. The match is a case-insensitive substring — a tag is as often remembered by
-a word in the middle of it — ranked prefix-first then by file count, and capped
-at `MAX_TAG_SUGGESTIONS`. Tab or Enter accepts the highlighted candidate and
-chips it; Tab preventDefaults so the caret stays put for the next condition,
-while Shift+Tab still leaves the field. The candidates come from a
-`tags_list_all` catalog fetched once (under the tag screen's query-key prefix,
-so every tag mutation invalidates it too) and filtered in the renderer: one
-query instead of one per keystroke, and correct in the `All` view and in
+The completions are rows of the menu, so cmdk owns the highlight, the arrow keys,
+Enter, the pointer and input methods: one list, one highlighted row, and that row
+is what Enter takes. They run only with the caret at the end of the text, since a
+pick replaces the last token, not while an input method composes, and not until
+the field is edited (opened, it lists every command, as an empty field would).
+Picking one keeps the menu open, so the search can go on being typed.
+
+While a directive is being typed the field completes it from the tag catalog —
+the user's own tags and the generated ones in one list, since one directive
+matches both. The match is a case-insensitive substring — a tag is as often
+remembered by a word in the middle of it — ranked prefix-first then by file
+count, and capped at `MAX_TAG_SUGGESTIONS`. The tags come first, so Enter takes
+the highlighted one and chips it.
+
+An ordinary word at the end of the text (two characters, or one in Han, kana
+or Hangul; not one with `|` alternatives) is offered the tags whose **names**
+contain it too (#542), compared as tag names are (`tagIdentityKey`), below a
+first row that searches for the whole field, so Enter does what it does with no
+list. Picking a tag replaces the word with that tag's chip.
+
+A word that begins a generated namespace's name (without `audio_`, or in full
+once a `_` is typed) or its label in the app's language is also offered that
+namespace's directive (`tempo` → `tag:audio_tempo:`), between the first row and
+the tags. Picking it leaves the directive open, so its values are offered next:
+the whole set for a closed one. Only a beginning counts, so `au` does not list
+every `audio_` namespace.
+
+The candidates come from a `tags_list_all` catalog (under the tag screen's
+query-key prefix, so every tag mutation and the end of a scan invalidate it
+too), kept for a minute, and filtered in the renderer: one query instead of
+one per keystroke, and correct in the `All` view and in
 collections, where a workspace-scoped `tags_list` cannot resolve a database at
 all. The box asks for the catalog of **every** workspace
 (`tags_list_all` with `allWorkspaces`), so a tag kept in another workspace is
@@ -407,14 +632,43 @@ Tags whose `source` is not `manual` are owned by a pipeline and are read-only to
 the user: rename, merge and delete reject them, and the tag management screen
 offers no affordance for them. Today the only such source is `auto-meta`, which
 `electron/core/autoMetaTags.ts` derives during the scan from the ffprobe columns
-already stored on `files`:
+already stored on `files`, and for audio files (`electron/core/audioMetaTags.ts`)
+from the probe output stored in `files.meta`:
 
-| Namespace | Applies to    | Values                                               |
-| --------- | ------------- | ---------------------------------------------------- |
-| `res`     | video + image | `4k` / `1080p` / `720p` / `sd`, from the longer edge |
-| `dur`     | video         | `short` (<1 min) / `medium` / `long` (>30 min)       |
-| `codec`   | video         | normalized `codec_name` (`h264`, `hevc`, `av1`, …)   |
-| `orient`  | video + image | `vertical` / `horizontal` / `square`                 |
+| Namespace       | Applies to    | Values                                               |
+| --------------- | ------------- | ---------------------------------------------------- |
+| `res`           | video + image | `4k` / `1080p` / `720p` / `sd`, from the longer edge |
+| `dur`           | video + audio | `short` (<1 min) / `medium` / `long` (>30 min)       |
+| `codec`         | video + audio | normalized `codec_name` (`h264`, `flac`, `mp3`, …)   |
+| `orient`        | video + image | `vertical` / `horizontal` / `square`                 |
+| `audio_quality` | audio         | `lossless` / `lossy`, plus `hires`                   |
+| `audio_ch`      | audio         | `mono` / `stereo` / `surround`                       |
+| `audio_tempo`   | audio         | `slow` (<90 BPM) / `moderate` / `fast` (≥120 BPM)    |
+| `audio_bpm`     | audio         | a band of ten (`120-129`), from an embedded BPM      |
+| `audio_key`     | audio         | a key name (`A minor`), from an embedded key         |
+| `audio_camelot` | audio         | the same key in Camelot notation (`8A`)              |
+| `audio_genre`   | audio         | each embedded genre, lowercased                      |
+
+`audio_quality:hires` is lossless audio above 48 kHz or above 16 bit (not
+counting floating-point PCM's bit depth); telephone PCM (`pcm_mulaw`,
+`pcm_alaw`) gets no quality. The namespaces only audio files get start with
+`audio_`, so they read apart from the video ones. `dur` and `codec` are
+shared, with the same thresholds for both. A bare `tag:` value searches manual
+tags and `res`, `dur`, `codec` and `orient` only (`BARE_SEARCH_NAMESPACES` in
+`shared/tags.ts`); the `audio_` ones are searched with their namespace
+(`tag:audio_tempo:fast`), since their values are everyday words or whatever a
+file's tags say, which a manual tag can be named too. The search shows a
+generated tag's chip as its category and value (`Tempo: Fast`). Completion
+offers every value of a closed set (`CLOSED_TAG_VALUES`) once its namespace is
+typed, `tag:audio_quality:` for one, even when no file carries it yet.
+
+An audio file's embedded tags (`TBPM` / `TKEY` in ID3, `BPM` / `INITIALKEY` in
+Vorbis comments, `tmpo` in MP4, and `genre`) are read from the container's and
+the audio stream's tags, whatever their case; the first value that can be read
+wins, and one that cannot gives no tag. A key is understood as a name (`Am`,
+`F#m`, `Bb`), in Camelot (`8A`) or in Open Key (`1m`), or as several of these
+that agree (`8A - Am`). The backfill reads `files.meta` for audio rows only,
+and a changed file's stored output is dropped until it is probed again.
 
 Application is a diff against the current `(meta_key, source)` rows, so
 re-scanning an unchanged library writes nothing. Files that the scan classifies
@@ -427,6 +681,11 @@ file on the next scan.
 The set of namespaces is **not closed**. No code that decides tag _identity_ may
 enumerate it: search tokens resolve against the `tags` table itself, and the tag
 screen sorts unknown namespaces after the known ones rather than dropping them.
+One exception is deliberate: a _bare_ `tag:` value reaches only the
+namespaces in `BARE_SEARCH_NAMESPACES` (besides manual tags). A namespace
+missing from it is not lost, since its qualified form (`tag:ns:value`) always
+resolves; it only cannot be reached without its namespace, which is the safe
+side for a namespace whose values can be the names of manual tags.
 
 ## Auto tagging
 
@@ -487,7 +746,7 @@ the screen reads the files again. Each call is split to fit the file count, the
 (file, tag) pairs and the places' total length (`MAX_AUTO_TAG_PLACE_CHARS`).
 
 The configuration (`rules`, `keywords`, `folders`, `applyOnScan`, dismissed
-suggestions and excluded terms) is app-wide, in `config.json` under `autoTag`.
+suggestions and excluded terms) is app-wide, in the `autoTag` setting (`app_settings`).
 With `applyOnScan` on, `runScan()` runs the engine over the files the scan
 inserted, updated or moved, ahead of the FTS sync and the thumbnail pool. The
 ids still owed are kept in `settings` under `auto_tag_pending` until the pass
@@ -554,3 +813,30 @@ across `electron/core/queries/`:
 - `bookmarks.ts` — scene bookmark operations.
 - `thumbs.ts` — thumbnail-related queries.
 - `scanRoots.ts` — scan-root bookkeeping.
+
+Workspace databases are never `ANALYZE`d. Without statistics, SQLite reads
+`deleted_at IS NULL` off `idx_files_alive` and sorts every live row for each
+page. For an unfiltered list, `searchFiles` therefore names the sort index with
+`INDEXED BY` (`pinnedSortIndex()`): `idx_files_alive_name_key` for the name
+sort, `idx_files_alive_captured`, `idx_files_alive_btime` and
+`idx_files_alive_added` for those orders newest first, and
+`idx_files_alive_hash` for the hash order ascending. The opposite direction
+of the date and hash orders is left to the planner, as each of those indexes
+yields only one. So is any
+filtered list: without statistics nothing tells how few rows a filter leaves,
+and for a rare one, walking the sort order to fill a page reads every live row.
+A list filtered only by exclusions (every search token starts with `-`, and
+nothing else filters) is pinned in the name and added orders (#670): an
+exclusion usually leaves most files, so a page fills at once. The captured,
+btime and hash orders are not, as their index order is unrelated to the
+table's; when an exclusion leaves almost nothing, the walk reads every row at
+random.
+Tag filters (`tags[]` and `tag:`) are the exception: they count the tag's
+`meta_tags` rows first, across the whole library and capped at
+`RARE_TAG_ROWS`. Under the cap, the condition is an `IN` on `files.id` that
+starts from `idx_meta_tags_tag` and looks the files up by `meta_key`; written
+as `f.meta_key IN (...)`, the planner would still walk `idx_files_alive`.
+Above it, the tag stays a per-file `EXISTS`, since collecting every match
+costs more than checking each file.
+The plan tests in `electron/core/__tests__/indexes.test.ts` that check these
+run without statistics.

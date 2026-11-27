@@ -1,12 +1,12 @@
 // Right pane of the duplicates view: one group's copies side by side, with the
 // parts of each path that set it apart highlighted, so the user can tell which
-// copy to keep. Read-only: the actions open, reveal or copy a copy's path.
+// copy to keep. Read-only: the actions open, reveal or copy a copy's path, and
+// copy the group's hash or show its copies in the list.
 import { memo, useMemo } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Copy, FolderOpen, Play, Star } from "lucide-react";
-import { api } from "@/ipc/client";
-import type { DuplicateGroup, FileRow } from "@/ipc/types";
+import { Copy, FolderOpen, Play, Search, Star } from "lucide-react";
+import type { DuplicateGroup } from "@/ipc/types";
 import { fileHref } from "@/lib/fileHref";
 import { formatDate } from "@/lib/dates";
 import { formatDuration, formatSize } from "@/lib/format";
@@ -15,6 +15,9 @@ import { Button } from "@/components/ui/button";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
+import { showMatchingFiles } from "@/lib/ui-events";
+import { hashSearchToken } from "@shared/tags";
 import { groupName, oldestCopy, reclaimableBytes } from "./groupView";
 import { diffPaths, type PathPart } from "./pathDiff";
 
@@ -22,7 +25,7 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const PART_CLASS: Record<PathPart["kind"], string> = {
   same: "text-muted",
-  diff: "rounded-sm bg-warn/15 px-0.5 text-warn",
+  diff: "rounded-item bg-warn/15 px-0.5 text-warn",
   name: "text-fg",
 };
 
@@ -43,6 +46,7 @@ export const GroupDetail = memo(function GroupDetail({
   className,
 }: Props) {
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const parts = useMemo(
     () => diffPaths(group.files.map((f) => f.relPath)),
     [group.files],
@@ -56,22 +60,21 @@ export const GroupDetail = memo(function GroupDetail({
     formatDuration(first.duration, { hours: true }),
   ].filter(Boolean);
 
-  // The same actions, toasts and toast id as useFileActions' single-file
-  // openFolder / copyPath (that hook pulls in selection and Watch Later, which
-  // this view does not need). Keep the two in step.
-  const openFolder = (file: FileRow) => {
-    api
-      .openFolder(file.id, file.workspaceId)
-      .catch((e: unknown) =>
-        toast.error(t("folder.openFailed"), { description: errorText(e) }),
-      );
-  };
-  const copyPath = (file: FileRow) => {
-    api.copyFilePath(file.id, file.workspaceId).then(
-      () => toast.success(t("media.filePathCopied"), { id: "path-copied" }),
+  const shell = useFileShellActions();
+
+  const copyHash = () => {
+    void navigator.clipboard.writeText(group.contentHash).then(
+      () => toast.success(t("duplicates.hashCopied"), { id: "hash-copied" }),
       (e: unknown) =>
-        toast.error(t("folder.copyFailed"), { description: errorText(e) }),
+        toast.error(t("duplicates.hashCopyFailed"), {
+          description: errorText(e),
+        }),
     );
+  };
+  // Every copy of the group, whatever the list was narrowed to.
+  const showInList = () => {
+    showMatchingFiles([hashSearchToken(group.contentHash)]);
+    void navigate("/");
   };
 
   return (
@@ -90,16 +93,27 @@ export const GroupDetail = memo(function GroupDetail({
             ))}
             <span className="font-mono">{group.contentHash.slice(0, 8)}</span>
           </p>
+          {/* The hash is what a `hash:` search finds the copies by (#302). */}
+          <div className="mt-1 flex flex-wrap gap-2">
+            <Button variant="outline" size="compact" onClick={copyHash}>
+              <Copy />
+              {t("duplicates.copyHash")}
+            </Button>
+            <Button variant="outline" size="compact" onClick={showInList}>
+              <Search />
+              {t("duplicates.showInList")}
+            </Button>
+          </div>
         </div>
         <dl className="flex gap-4 text-right">
           <div>
-            <dt className="text-[11px] text-muted">{t("duplicates.copies")}</dt>
+            <dt className="text-2xs text-muted">{t("duplicates.copies")}</dt>
             <dd className="text-lg font-semibold text-fg tabular-nums">
               {group.files.length}
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] text-muted">
+            <dt className="text-2xs text-muted">
               {t("duplicates.reclaimable")}
             </dt>
             <dd className="text-lg font-semibold text-warn tabular-nums">
@@ -113,7 +127,7 @@ export const GroupDetail = memo(function GroupDetail({
         <p className="flex items-center gap-2 bg-surface px-4 py-1.5 text-xs text-muted">
           <span
             aria-hidden
-            className="size-2.5 rounded-sm border border-warn bg-warn/15"
+            className="size-2.5 rounded-item border border-warn bg-warn/15"
           />
           {t("duplicates.diffLegend")}
         </p>
@@ -132,13 +146,13 @@ export const GroupDetail = memo(function GroupDetail({
               // cards out of view skip style, layout and paint. The intrinsic
               // size stands in until a card is laid out once: the w-36
               // aspect-video thumbnail plus the card's p-2.5 and border.
-              className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface/60 p-2.5 [content-visibility:auto] [contain-intrinsic-size:auto_6.5rem]"
+              className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface/60 p-2.5 [content-visibility:auto] [contain-intrinsic-size:auto_6.5rem]"
             >
               <Link
                 to={href}
                 tabIndex={-1}
                 aria-hidden
-                className="group/thumb relative aspect-video w-36 shrink-0 overflow-hidden rounded-md bg-surface"
+                className="group/thumb relative aspect-video w-36 shrink-0 overflow-hidden rounded-item bg-surface"
               >
                 <MediaThumbnail
                   file={file}
@@ -150,7 +164,7 @@ export const GroupDetail = memo(function GroupDetail({
                 />
                 {oldest === file && (
                   <span
-                    className="absolute top-1 left-1 rounded bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground"
+                    className="absolute top-1 left-1 rounded-item bg-primary px-1.5 text-2xs font-semibold text-primary-foreground"
                     title={t("duplicates.oldestHint")}
                   >
                     {t("duplicates.oldest")}
@@ -159,7 +173,7 @@ export const GroupDetail = memo(function GroupDetail({
               </Link>
               <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
                 <p
-                  className="font-mono text-[13px] leading-snug break-all select-text"
+                  className="font-mono text-xs leading-snug break-all select-text"
                   title={file.relPath}
                 >
                   {parts[i].map((part, j) => (
@@ -204,7 +218,7 @@ export const GroupDetail = memo(function GroupDetail({
                 </div>
               </div>
               <div className="flex shrink-0 flex-col gap-1">
-                <Button asChild variant="outline" size="sm" className="h-7">
+                <Button asChild variant="outline" size="compact">
                   <Link to={href}>
                     <Play />
                     {t("duplicates.open")}
@@ -212,18 +226,18 @@ export const GroupDetail = memo(function GroupDetail({
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-7 justify-start"
-                  onClick={() => openFolder(file)}
+                  size="compact"
+                  className="justify-start"
+                  onClick={() => shell.openFolder(file.id, file.workspaceId)}
                 >
                   <FolderOpen />
                   {t("media.openFolder")}
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-7 justify-start"
-                  onClick={() => copyPath(file)}
+                  size="compact"
+                  className="justify-start"
+                  onClick={() => shell.copyPath(file.id, file.workspaceId)}
                 >
                   <Copy />
                   {t("media.copyFilePath")}

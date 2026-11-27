@@ -1,6 +1,6 @@
-// What the IPC handler groups need from the main process. main.ts owns the
+// What the IPC handler groups need from the main process. app.ts owns the
 // live state (window, tray, media server) plus the ScanManager, and hands the
-// groups this narrow view of it, so a handler never reaches into main.ts and
+// groups this narrow view of it, so a handler never reaches into app.ts and
 // the groups can be registered — and read — one domain at a time. Helpers
 // shared by the groups live in helpers.ts.
 import type { BrowserWindow } from "electron";
@@ -11,17 +11,25 @@ import type { WorkspacePasses } from "../core/workspacePasses.js";
 import type { Workspaces } from "../core/workspaces.js";
 import type { ScanManager } from "../scanManager.js";
 import type { LogoId } from "../../shared/ipc/schema.js";
+import type { LogoImages } from "../app.js";
+import type { CrashIssueForm } from "../core/crashReports.js";
 
 export interface IpcContext {
   ws: Workspaces;
   queryClient: QueryWorkerClient;
-  /** Coalesces playback-position writes; flushed on quit by main.ts. */
+  /** Coalesces playback-position writes; flushed on quit by app.ts. */
   positions: PositionWriter;
   // Function-typed properties rather than methods: the groups destructure
   // these freely, and none of them relies on `this`.
   /** Live values, read on each call: they change after registration. */
   mainWindow: () => BrowserWindow | null;
   mediaBase: () => string | null;
+  /**
+   * The media server's X-Api-Token, for main-process code that fetches from
+   * mediaBase(). Unlike mediaBase(), it is fixed for the app's lifetime.
+   * Never hand it to the renderer: the session injects it there.
+   */
+  mediaToken: () => string;
   isDevMode: () => boolean;
   /** Send an event to the renderer (no-op when the window is gone). */
   emit: (channel: string, payload: unknown) => void;
@@ -29,6 +37,8 @@ export interface IpcContext {
   scans: ScanManager;
   /** Re-apply the logo variant to the live tray and window/dock icons. */
   applyLogo: (logo: LogoId) => void;
+  /** The app's logo bitmaps, from startApp()'s options. */
+  logos: LogoImages;
   /** Evaluates the auto-tagging engine off the main thread. */
   deriveAutoTags: DeriveAutoTags;
   /**
@@ -43,4 +53,13 @@ export interface IpcContext {
   /** When the library copy put back at startup was taken (Unix seconds), or
    *  null when the library was sound. */
   libraryRestoredFrom: () => number | null;
+  /** Where crash reports and dumps are kept (crashReports.ts), the issue
+   *  form they are filed with (null: the app has none), and the report found
+   *  at this launch, if any. */
+  crashReports: {
+    reportsDir: string;
+    dumpsDir: string;
+    issueForm: CrashIssueForm | null;
+    newReportId: string | null;
+  };
 }

@@ -1,13 +1,19 @@
 // 日本語カタログ（原典）。キーはドット区切りのフラット構造。
 // 補間は {name} 形式。en.ts はこのキー集合と同型でなければならない（型で強制）。
 export const ja = {
-  // アプリ名（表示名の漢字1文字。ガイドライン00）
-  "app.name": "巡",
-
   // 共通
   "common.close": "閉じる",
+  "common.retry": "もう一度読み込む",
   "common.cancel": "キャンセル",
   "common.ok": "OK",
+  "common.actionFailed": "操作に失敗しました",
+  "common.experimental":
+    "試験的な機能です。今後、動きや見た目が変わったり、なくなったりすることがあります",
+
+  // ウィンドウ
+  "window.minimize": "最小化",
+  "window.maximize": "最大化",
+  "window.restore": "元に戻す",
 
   // 種別
   "kind.video": "動画",
@@ -32,6 +38,9 @@ export const ja = {
   "settings.light": "ライト",
   "settings.dark": "ダーク",
   "settings.theme": "テーマ",
+  "settings.randomThemeOnStartup": "起動時にランダムなテーマを選ぶ",
+  "settings.randomThemeOnStartupDesc":
+    "起動するたびに、現在の外観に合う別の組み込みテーマを選びます。選択中の CSS テーマは解除されます。",
 
   // 外観トグル（ヘッダー）
   "theme.switchToLight": "ライトモードに切り替え",
@@ -46,6 +55,9 @@ export const ja = {
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",
   "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
+  "settings.filmstripFrames": "フィルムストリップのコマ数",
+  "settings.filmstripFramesDesc":
+    "フィルムストリップ表示で1行に並べるコマの数。",
   "settings.hoverPreview": "ホバープレビュー",
   "settings.hoverPreviewDesc":
     "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
@@ -61,6 +73,12 @@ export const ja = {
   "settings.listThumbSizeSmall": "小",
   "settings.listThumbSizeMedium": "中",
   "settings.listThumbSizeLarge": "大",
+  "settings.windowButtons": "ウィンドウボタン",
+  "settings.windowButtonsDesc":
+    "最小化・最大化・閉じるのボタンを置く場所。タイル型などウィンドウマネージャで窓を操作するなら、表示しないこともできる",
+  "settings.windowButtonsLeft": "左",
+  "settings.windowButtonsRight": "右",
+  "settings.windowButtonsNone": "なし",
   "settings.emojiStyle": "絵文字スタイル",
   "settings.emojiStyleDesc":
     "絵文字アイコンや文中の絵文字の見た目を切り替えます。",
@@ -78,6 +96,59 @@ export const ja = {
     "custom.cssをテーマの上に重ねて適用します。保存するとすぐに反映されます。",
   "settings.customCssOpen": "ファイルを開く",
   "settings.customCssOpenError": "custom.cssを開けませんでした。",
+  "settings.tabScan": "スキャン",
+  "settings.scanExclusions": "パターンで除外",
+  "settings.scanExclusionsDesc":
+    "すべてのワークスペースで、スキャンから外すファイルやフォルダ。大文字・小文字は区別しません。",
+  "settings.scanExclusionsNextScan":
+    "保存すると、パターンに一致する取り込み済みのファイルが非表示になります。外したパターンのファイルは次のスキャンで戻ります。",
+  "settings.scanExclusionsSave": "保存",
+  "settings.scanExclusionsSaved": "スキャンの除外を保存しました。",
+  "settings.scanExclusionsSaveError": "スキャンの除外を保存できませんでした。",
+  "settings.scanExclusionsPattern": "パターン{n}",
+  "settings.scanExclusionsRemove": "パターン{n}を削除",
+  "settings.scanExclusionsAdd": "追加するパターン",
+  "settings.scanExclusionsNone": "パターンはありません。",
+  "settings.scanExclusionsPresets": "よく使うもの:",
+  "settings.scanExclusionsPresetAdd": "{pattern}を入れる",
+  "settings.scanExclusionsKind": "方式",
+  "settings.scanExclusionsKindName": "名前",
+  "settings.scanExclusionsKindContains": "含む",
+  "settings.scanExclusionsKindRegex": "正規表現",
+  "settings.scanExclusionsKindNameHint":
+    "名前が一致するファイルやフォルダを、どの階層でも除外します。フォルダなら中身もまとめて除外されます。*は任意の文字列（*.tmpなど）。/を含めると（work/private、/private）ワークスペースのフォルダからのパスに、末尾に/を付けると（private/）フォルダだけになります。",
+  "settings.scanExclusionsKindContainsHint":
+    "パスのどこかにこの文字列を含むものを除外します。名前の一部にも当たります（tempならattempt.mp4も）。",
+  "settings.scanExclusionsKindRegexHint":
+    "正規表現。ワークスペースのフォルダからのパスに当てます。フォルダのパスは末尾が/になります。",
+  "settings.scanExclusionsAddAction": "追加",
+  "settings.scanExclusionsDuplicate": "一覧にあるパターンです。",
+  "settings.scanExclusionsPreviewHint":
+    "パターンを入れると、取り込み済みのファイルのうち一致するものを表示します。",
+  "settings.scanExclusionsPreviewLoading": "一致するファイルを探しています…",
+  "settings.scanExclusionsPreviewError":
+    "一致するファイルを調べられませんでした。",
+  "settings.scanExclusionsPreviewNone":
+    "取り込み済みのファイルには一致しません。",
+  "settings.scanExclusionsPreviewCount":
+    "{count}件のファイルが一致します。追加して保存すると非表示になります。",
+  "settings.scanExclusionsPreviewList": "一致するファイル",
+  "settings.scanExclusionsPreviewMore": "ほか{count}件",
+  "settings.scanExclusionsTestTimedOut":
+    "このパターンは時間内に終わりませんでした。スキャンを止めてしまうので追加できません。",
+  "settings.folderExclusions": "フォルダで除外",
+  "settings.folderExclusionsDesc":
+    "ワークスペースごとに、特定のフォルダだけを除外します。フォルダ表示でフォルダを右クリックして追加できます。",
+  "settings.folderExclusionsCount": "{count}フォルダ",
+  "settings.folderExclusionsNone": "なし",
+  "settings.folderExclusionsNotFound": "{count}件見つかりません",
+  "settings.folderExclusionsManage": "管理",
+  "settings.folderExclusionsManageLabel": "{name}の除外フォルダを管理",
+  "settings.folderExclusionsLoadError": "除外フォルダを読み込めませんでした。",
+  "settings.folderExclusionsNoWorkspaces": "ワークスペースがありません。",
+  "settings.scanExclusionsGlobal": "グローバル",
+  "settings.folderExclusionsPerWorkspace": "ワークスペースごと",
+  "settings.scanExclusionsLoadError": "スキャン除外を読み込めませんでした。",
   "settings.logo": "アプリのロゴ",
   "settings.logoDesc": "ウィンドウ・トレイ・画面内のアイコンに反映されます。",
   "logo.dark": "濃色",
@@ -94,7 +165,7 @@ export const ja = {
   "settings.update": "アップデート",
   "settings.updateDesc": "新しいバージョンが公開されていないか確認します。",
   "settings.updateCheckNow": "今すぐ確認",
-  "settings.updateAuto": "起動時に自動で確認する",
+  "settings.updateAuto": "自動で確認する",
   "update.available": "新しいバージョン {version} が利用可能です",
   "update.availableDesc": "現在のバージョン: {current}",
   "update.view": "リリースを開く",
@@ -121,15 +192,14 @@ export const ja = {
   "library.restored":
     "ライブラリが壊れていたため、{date}時点の写しから戻しました",
   "library.restoredDesc":
-    "それより後に付けたお気に入り・評価・タグなどは失われています。壊れたファイルは、ライブラリと同じフォルダに残してあります。",
+    "それより後に変えたお気に入り・評価・タグ・ワークスペース・コレクション・設定などは失われています。壊れたファイルは、ライブラリと同じフォルダに残してあります。",
   "config.movedAside":
     "設定ファイル（config.json）が壊れていたため、初期設定で起動しました",
   "config.movedAsideDesc":
     "登録していたワークスペースやコレクションは、壊れたファイルと一緒に config.json.corrupt-<日時> として同じフォルダに残してあります。",
-  "config.unreadable":
-    "設定ファイル（config.json）を読み込めなかったため、初期設定で起動しています",
+  "config.unreadable": "設定を読み込めなかったため、初期設定で起動しています",
   "config.unreadableDesc":
-    "ファイルは変更していません。ほかのアプリが使っていないか確認して、Meguriを再起動してください。",
+    "設定は変更していません。ほかのアプリが使っていないか確認して、{app}を再起動してください。",
   "settings.about": "このアプリについて",
   "about.version": "{name} バージョン {version}",
   "about.appLicense": "{name}は MIT License の下で公開されています。",
@@ -140,6 +210,30 @@ export const ja = {
   "about.license": "ライセンス",
   "about.source": "ソース",
   "about.fullDependencies": "すべての依存パッケージを見る (package.json)",
+  "crash.crashed": "{app}は前回、異常終了しました",
+  "crash.uncleanExit": "{app}は前回、正常に終了しませんでした",
+  "crash.noticeDesc":
+    "レポートを確認して、よければGitHubで報告してください。自動で送信されることはありません。",
+  "crash.viewReport": "レポートを見る",
+  "crash.dismiss": "閉じる",
+  "crash.reportTitle": "クラッシュレポート",
+  "crash.reportDesc":
+    "共有する前に内容を確認してください。「GitHubで報告」はレポートをコピーしてから、Issueの作成画面を開きます。コピーしたレポートを貼り付けてください。",
+  "crash.copy": "コピー",
+  "crash.copied": "レポートをコピーしました",
+  "crash.copyFailed": "レポートをコピーできませんでした",
+  "crash.reportOnGitHub": "GitHubで報告",
+  "crash.title": "クラッシュレポート",
+  "crash.desc":
+    "異常終了したときのレポートを、新しいものからいくつか残します。このPCに保存されるだけで、自動で送信されることはありません。",
+  "crash.none": "クラッシュレポートはありません。",
+  "crash.openFolder": "フォルダを開く",
+  "crash.openFolderFailed": "フォルダを開けませんでした",
+  "crash.view": "表示",
+  "crash.delete": "削除",
+  "crash.deleteFailed": "レポートを削除できませんでした",
+  "crash.kindCrashed": "異常終了",
+  "crash.kindUncleanExit": "正常に終了せず",
   "keybinding.normal": "標準",
   "keybinding.vim": "Vim",
   "keybinding.emacs": "Emacs",
@@ -147,6 +241,7 @@ export const ja = {
   // 一覧画面（Home）
   "home.noDirectory": "（ディレクトリ未選択）",
   "home.scan": "スキャン",
+  "home.moreTools": "その他",
   "home.initError": "初期化エラー: {msg}",
   "home.initErrorSchemaMismatchHelp":
     "データベースの形式が現在のアプリと一致しない可能性があります。左のサイドバーからこのワークスペースを削除して、再登録してください。",
@@ -167,6 +262,10 @@ export const ja = {
   "home.scanCanceled": "スキャンをキャンセルしました",
   "home.escCloseHint": "もう一度 Esc を押すとウィンドウを閉じます",
   "home.scanError": "スキャン中にエラーが発生しました",
+  "home.scanExclusionStuck":
+    "スキャン除外のパターンの実行に時間がかかりすぎました",
+  "home.scanExclusionStuckDesc":
+    "スキャンは行われていません。設定 → スキャンでパターンを修正するか削除してください。",
   "home.scanRootUnreadable": "ワークスペースのフォルダにアクセスできません",
   "home.scanRootUnreadableNamed": "「{name}」のフォルダにアクセスできません",
   "home.scanRootUnreadableDesc":
@@ -182,12 +281,11 @@ export const ja = {
 
   // コマンドメニュー
   "command.title": "コマンドメニュー",
-  "command.placeholder": "コマンドを検索...",
+  "command.placeholder": "ファイルを検索、またはコマンドを入力...",
   "command.empty": "該当するコマンドがありません。",
   "command.groupNavigation": "移動",
   "command.groupWorkspace": "ワークスペース",
   "command.groupView": "表示",
-  "command.focusSearch": "検索にフォーカス",
   "command.openDevTools": "開発者コンソールを開く",
   "command.shortcutHint": "{shortcut} で開けます",
   "command.groupFile": "ファイル操作",
@@ -204,6 +302,13 @@ export const ja = {
   "command.pageCollections": "コレクション",
   "command.ratingPlaceholder": "0〜5 を入力して選ぶ...",
   "command.collectionPlaceholder": "コレクションを検索...",
+  "command.workspacePlaceholder": "切り替えるワークスペースを検索...",
+  "command.collectionOpenPlaceholder": "開くコレクションを検索...",
+  "command.searchInPlaceholder":
+    "「{name}」で検索する語を入力（Enterだけで開く）",
+  "command.openItem": "「{name}」を開く",
+  "command.searchIn": "「{name}」で「{q}」を検索",
+  "command.clearFilters": "フィルターをすべてクリア",
   "command.groupRecent": "最近の検索",
   "command.clearRecent": "最近の検索を消去",
   "command.more": "他 {count} 件 · 入力して絞り込む",
@@ -212,6 +317,8 @@ export const ja = {
   // フィルタ（FilterBar / 条件バッジ）
   "filter.searchHint":
     'ファイル名とタグを検索します。tag:旅行 や tag:4k で、手動タグも自動タグも完全一致で絞り込めます。空白を含むタグは tag:"夏 旅行" のように引用符で囲みます。',
+  "filter.openSearch": "検索、またはコマンドを実行",
+  "filter.clearSearch": "検索をクリア",
   "filter.searchPlaceholder": "ファイル名・タグを検索",
   "filter.tagSuggestions": "タグの候補",
   "filter.tagElsewhere": "他のワークスペースのみ",
@@ -229,10 +336,19 @@ export const ja = {
   "filter.dateTo": "終了日",
   "filter.more": "他の条件",
   "filter.moreActive": "他の条件（{count}件適用中）",
+  "filter.hashChip": "内容ハッシュ",
+  "filter.extChip": "拡張子",
+  "filter.sizeChip": "サイズ",
+  "filter.durationChip": "長さ",
+  "filter.widthChip": "幅",
+  "filter.heightChip": "高さ",
+  "filter.excludeChip": "除外",
   "filter.kindFilter": "種別で絞り込み",
   "filter.playState": "視聴状態",
   "filter.sortSection": "並び順",
   "filter.otherSection": "その他",
+  "filter.subtitles": "字幕付きの動画のみ表示",
+  "filter.subtitlesChip": "字幕あり",
 
   // スマートコレクション
   "smartCollection.title": "スマートコレクション",
@@ -249,6 +365,18 @@ export const ja = {
 
   // メディア詳細（MediaDetail）
   "media.notFound": "ファイルが見つかりません。",
+  "downloadOrigin.title": "ダウンロード元",
+  "downloadOrigin.website": "ウェブサイト",
+  "downloadOrigin.recorded": "記録された URL",
+  "downloadOrigin.download": "ダウンロード URL",
+  "downloadOrigin.referrer": "参照元 URL",
+  "downloadOrigin.other": "その他の記録された URL",
+  "downloadOrigin.copy": "コピー",
+  "downloadOrigin.copyLabel": "{label}をコピー",
+  "downloadOrigin.openLabel": "{label}を開く",
+  "downloadOrigin.copied": "URL をクリップボードにコピーしました",
+  "downloadOrigin.copyFailed": "URL をコピーできませんでした。",
+  "downloadOrigin.openFailed": "URL を開けませんでした。",
   "media.openExternal": "外部で開く",
   "media.openExternalFailed": "外部で開けませんでした",
   "fileMenu.open": "開く",
@@ -276,12 +404,15 @@ export const ja = {
   "media.moreActions": "その他の操作",
   "media.prev": "前のファイル",
   "media.next": "次のファイル",
+  "media.zoomIn": "拡大",
+  "media.zoomOut": "縮小",
+  "media.zoomFit": "画面に合わせる",
   "shortcuts.title": "キーボードショートカット",
   "shortcuts.sectionList": "一覧",
-  "shortcuts.sectionDetail": "詳細・プレイヤー",
+  "shortcuts.sectionDetail": "詳細",
   "shortcuts.commandMenu":
     "コマンドメニューを開く（ファイル操作・最近の検索・スマートコレクション）",
-  "shortcuts.search": "検索にフォーカス",
+  "shortcuts.search": "検索",
   "shortcuts.scrollDown": "下へスクロール",
   "shortcuts.scrollUp": "上へスクロール",
   "shortcuts.moveFocus": "フォーカス移動（上下左右）",
@@ -301,10 +432,47 @@ export const ja = {
   "shortcuts.skip10": "10秒 戻る / 進む",
   "shortcuts.volume": "音量 上げ / 下げ",
   "shortcuts.mute": "ミュート切替",
+  "shortcuts.speed": "再生速度を下げる / 上げる",
   "shortcuts.fullscreen": "全画面切替",
   "shortcuts.seekStart": "先頭へ移動",
   "shortcuts.spectrumPattern":
     "スペクトラムのパターンを 次 / 前 へ（プレイリスト再生のオーディオ）",
+  "shortcuts.sectionGeneral": "全般",
+  "shortcuts.sectionPlayback": "再生",
+  "shortcuts.sectionPlayer": "プレイヤー",
+  "shortcuts.sectionDiscover": "ディスカバー",
+  "shortcuts.hintGeneral": "どの画面でも",
+  "shortcuts.hintList": "ライブラリ",
+  "shortcuts.hintDetail": "ファイルを開いているとき",
+  "shortcuts.hintPlayback": "動画とオーディオ",
+  "shortcuts.hintPlayer": "プレイリスト",
+  "shortcuts.hintDiscover": "カードのシャッフル",
+  "shortcuts.zoom": "拡大 / 縮小",
+  "shortcuts.zoomReset": "拡大率をリセット",
+  "shortcuts.imagePaging": "前 / 次のファイル（画像）",
+  "shortcuts.imageZoom": "画像・動画を拡大 / 縮小（ポインタの位置）",
+  "shortcuts.imageZoomToggle": "画像を画面に合わせる / 実寸で表示",
+  "shortcuts.wheel": "ホイール",
+  "shortcuts.doubleClick": "ダブルクリック",
+  "shortcuts.playerPrevNext": "前 / 次",
+  "shortcuts.playerArrows": "前 / 次（画像とオーディオ）",
+  "shortcuts.shuffle": "シャッフルを切り替え",
+  "shortcuts.playerDetail": "再生中のファイルの詳細を開く",
+  "shortcuts.playerExit": "プレイヤーを閉じる",
+  "shortcuts.discoverPaging": "前 / 次のカード",
+  "shortcuts.discoverReshuffle": "シャッフルし直す",
+  "shortcuts.preset": "プリセット",
+  "shortcuts.presetNote": "点の付いたキーはプリセットに従う。",
+  "shortcuts.presetChange": "設定で変更",
+  "shortcuts.filterLabel": "ショートカットを絞り込む",
+  "shortcuts.filterPlaceholder": "操作名やキーで絞り込み",
+  "shortcuts.noMatch": "「{query}」に一致するショートカットはありません",
+  "shortcuts.noMatchHint":
+    "操作名（「音量」）やキー（「ctrl」）で探してください。",
+  "shortcuts.sectionsLabel": "セクション",
+  "shortcuts.or": "または",
+  "shortcuts.toClose": "で閉じる",
+  "shortcuts.macNote": "macOSではCtrlは⌘です。",
   "media.rating": "評価",
   "media.tags": "タグ",
   "media.note": "メモ",
@@ -345,6 +513,12 @@ export const ja = {
   "media.metaDuration": "長さ",
   "media.metaCodec": "コーデック",
   "media.metaFps": "FPS",
+  "media.metaSampleRate": "サンプリング周波数",
+  "media.metaBitDepth": "ビット深度",
+  "media.metaChannels": "チャンネル",
+  "media.metaBpm": "BPM",
+  "media.metaKey": "キー",
+  "media.metaGenre": "ジャンル",
   "media.playHistory": "再生履歴",
   "media.scenes": "シーン",
   "media.bookmarks": "シーンブックマーク",
@@ -355,6 +529,38 @@ export const ja = {
   "media.currentMainThumb": "現在のメインサムネ:",
 
   // プレイヤー操作
+  "grade.cool": "寒色",
+  "grade.warm": "暖色",
+  "grade.green": "緑",
+  "grade.magenta": "マゼンタ",
+  "grade.title": "映像調整",
+  "grade.color": "カラー",
+  "grade.exposure": "露出",
+  "grade.contrast": "コントラスト",
+  "grade.pivot": "ピボット",
+  "grade.saturation": "減算彩度",
+  "grade.temperature": "色温度",
+  "grade.tint": "色かぶり補正",
+  "grade.toggle": "映像調整を有効にする",
+  "grade.on": "オン",
+  "grade.off": "オフ",
+  "grade.resetAll": "すべてリセット",
+  "grade.holdHint":
+    "調整名を押し続けると、その項目の初期値でプレビューできます。",
+  "grade.preview": "リニア sRGB プレビュー",
+  "grade.unavailable": "このデバイスでは映像調整を使用できません。",
+
+  "player.subtitles": "字幕",
+  "player.subtitleAuto": "音声の言語に合わせる",
+  "player.subtitleOff": "オフ",
+  "player.subtitleResetPosition": "位置をリセット",
+  "player.subtitleLoading": "字幕を読み込み中…",
+  "player.subtitleUnavailable": "字幕トラックを読み込めませんでした。",
+  "player.subtitleTrackNumber": "トラック {number}",
+  "player.audioSubtitles": "音声と字幕",
+  "player.subtitleAutoMatch": "{audio}の音声なら{track}を選択",
+  "player.subtitleAutoNone": "一致する字幕なし（オフ）",
+  "player.subtitleAutoUnknown": "音声の言語が不明（オフ）",
   "player.play": "再生",
   "player.playKey": "再生 (Space)",
   "player.pauseKey": "一時停止 (Space)",
@@ -364,6 +570,13 @@ export const ja = {
   "player.unmute": "ミュート解除 (M)",
   "player.fullscreen": "全画面 (F)",
   "player.volume": "音量",
+  "player.speed": "再生速度",
+  "player.speedValue": "{speed}×",
+  "player.audioTrack": "音声トラック",
+  "player.audioTrackNumber": "トラック {number}",
+  "player.audioTrackDefault": "既定",
+  "player.audioTrackUnavailable":
+    "音声トラックを再生できなかったため、前のトラックに戻しました。",
   "player.seek": "シーク",
   "player.playFailed": "内蔵プレイヤーで再生できませんでした。",
   "player.openExternal": "外部プレイヤーで開く",
@@ -377,6 +590,8 @@ export const ja = {
   // 再生エラー
   "player.errAborted": "読み込みが中断されました (MEDIA_ERR_ABORTED)",
   "player.errNetwork": "ネットワークエラー (MEDIA_ERR_NETWORK)",
+  "player.errNoPicture":
+    "映像をデコードできませんでした — この環境ではコーデック未対応の可能性",
   "player.errDecode":
     "デコードに失敗しました — コーデック未対応の可能性 (MEDIA_ERR_DECODE)",
   "player.errSrcNotSupported":
@@ -426,6 +641,8 @@ export const ja = {
   "select.deselectAll": "解除",
   "select.editTags": "タグを編集",
   "select.exit": "選択モードを終了",
+  "select.compare": "比較",
+  "select.compareHint": "画像をちょうど2枚選ぶと比較できます",
   "select.bulkFileLimit":
     "一度に編集できるのは{max}件までです。選択を減らしてください。",
   "select.ratingClear": "スターを外す",
@@ -464,7 +681,7 @@ export const ja = {
   // メディアグリッド
   "grid.empty": "表示できるメディアがありません。",
   "grid.emptyHint":
-    "「スキャン」を実行すると、配下の動画・画像がここに並びます。",
+    "「スキャン」を実行すると、配下の動画・画像・音声がここに並びます。",
   "grid.searchByTag": "「{name}」で絞り込み",
   "view.grid": "グリッド表示",
   "view.list": "リスト表示",
@@ -491,6 +708,13 @@ export const ja = {
   "heatmap.clearDay": "選んだ日付を解除",
   "heatmap.error": "集計を読み込めませんでした",
 
+  // Filmstrip view
+  "view.filmstrip": "フィルムストリップ表示",
+  "view.folderUnavailableFilmstrip":
+    "フィルムストリップ表示ではフォルダごとの表示は使えません",
+  "filmstrip.bookmarks": "ブックマーク: {count}",
+  "filmstrip.playFrom": "{time}から再生",
+  "filmstrip.waveform": "波形: クリックした位置から再生",
   // タイムライン表示
   "view.timeline": "タイムライン表示",
   "view.folderUnavailableTimeline":
@@ -580,6 +804,20 @@ export const ja = {
   "folder.moved": "表示中のフォルダが見つからないため、上の階層へ移動しました",
   "folder.chip": "フォルダ",
   "folder.showInLibrary": "ライブラリでフォルダを表示",
+  "folder.excludeFromScans": "スキャンから除外",
+  "folder.excludeConfirm":
+    "このフォルダを、このワークスペースのスキャンから外します。",
+  "folder.excludeAction": "除外",
+  "folder.excluded": "「{name}」をスキャンから除外しました",
+  "folder.excludeTitle": "「{name}」をスキャンから除外",
+  "folder.excludeTarget": "対象のフォルダ",
+  "folder.excludeHides":
+    "中のファイル{count}件がすぐに非表示になります。ディスク上のファイルは消えません。",
+  "folder.excludeOnlyThis":
+    "このフォルダだけが対象です。別の場所にある「{name}」はスキャンされます。",
+  "folder.excludeUndoHint":
+    "戻すときは、ワークスペースの編集 →「スキャンから除外」から。",
+  "folder.excludeFailed": "フォルダを除外できませんでした",
   "folder.showFailed": "フォルダを表示できませんでした",
   "folder.subfolderMenu": "「{name}」のサブフォルダ",
   "folder.loading": "読み込み中…",
@@ -601,15 +839,20 @@ export const ja = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "「{path}」の中から選んでいます",
   "discover.empty": "おすすめできるメディアがありません。",
+  "discover.loadFailed":
+    "おすすめのメディアを読み込めませんでした。もう一度お試しください。",
   "discover.emptyHint":
-    "「スキャン」で動画や画像を取り込むと、ここでランダムにおすすめされます。",
-  "discover.sceneHint": "ホバーで拡大 · クリックでその時点から再生",
+    "「スキャン」で動画や画像、音声を取り込むと、ここでランダムにおすすめされます。",
+  "discover.sceneHint": "シーンをクリックするとその位置に移動します",
   "discover.moreScenes": "+{count}",
 
   // 再生履歴
   "history.title": "再生履歴",
   "history.empty": "再生履歴はまだありません。",
-  "history.emptyHint": "動画や画像を再生すると、ここに履歴が表示されます。",
+  "history.loadFailed":
+    "再生履歴を読み込めませんでした。もう一度お試しください。",
+  "history.emptyHint":
+    "動画や画像、音声を再生すると、ここに履歴が表示されます。",
   "history.clear": "履歴をクリア",
   "history.clearAction": "クリア",
   "history.clearConfirm":
@@ -620,6 +863,27 @@ export const ja = {
   "history.today": "今日",
   "history.yesterday": "昨日",
 
+  // Missing files
+  "missing.title": "見つからないファイル",
+  "missing.empty": "見つからないファイルはありません。",
+  "missing.loadFailed":
+    "見つからないファイルを確認できませんでした。もう一度お試しください。",
+  "missing.hint":
+    "スキャンでディスクに見つからなかったファイルです。ファイルが戻ってくれば、コレクションなどはそのまま復活します。もう戻らないファイルだけを選んで削除してください。",
+  "missing.scanning":
+    "スキャン中のワークスペースは、スキャンが終わるまでここに表示されません。",
+  "missing.truncated":
+    "{total}件のうち、最近見つからなくなった{shown}件を表示しています。削除すると残りが表示されます。",
+  "missing.selectAll": "すべて選択",
+  "missing.goneAt": "{date}から見つかりません",
+  "missing.remove": "見つからないファイルを削除",
+  "missing.removeSelected": "選択した{count}件を削除",
+  "missing.removeConfirm":
+    "選択した{count}件をファイル一覧とコレクションから削除し、サムネイルも消去します。タグや評価などはそのまま残ります。この操作は取り消せません。",
+  "missing.removeAction": "削除",
+  "missing.removedToast": "{count}件を削除しました",
+  "missing.removeFailed": "削除できませんでした",
+
   "duplicates.title": "重複ファイル",
   "duplicates.empty": "重複ファイルは見つかりませんでした。",
   "duplicates.emptyHint":
@@ -627,6 +891,10 @@ export const ja = {
   "duplicates.loadFailed":
     "重複ファイルを読み込めませんでした。もう一度お試しください。",
   "duplicates.retry": "もう一度読み込む",
+  "duplicates.copyHash": "ハッシュをコピー",
+  "duplicates.hashCopied": "ハッシュをコピーしました",
+  "duplicates.hashCopyFailed": "ハッシュをコピーできませんでした",
+  "duplicates.showInList": "一覧で表示",
   "duplicates.fileCount": "{count} 件",
   "duplicates.truncated":
     "グループ数が多いため上位 {max} 件のみ表示しています。",
@@ -856,6 +1124,7 @@ export const ja = {
   "tags.cloudOnlyAuto":
     "表示できるのは自動タグのみです。自動タグをオンにすると表示されます。",
   "tags.empty": "タグはまだありません。",
+  "tags.loadFailed": "タグを読み込めませんでした。もう一度お試しください。",
   "tags.emptyHint": "詳細画面でタグを追加すると、ここに一覧が表示されます。",
   "tags.searchPlaceholder": "タグを絞り込み",
   "tags.noMatch": "一致するタグがありません。",
@@ -903,12 +1172,28 @@ export const ja = {
   "tags.ns.dur": "長さ",
   "tags.ns.codec": "コーデック",
   "tags.ns.orient": "向き",
+  "tags.ns.quality": "音質",
+  "tags.ns.ch": "チャンネル",
+  "tags.ns.tempo": "テンポ",
+  "tags.ns.bpm": "BPM",
+  "tags.ns.key": "キー",
+  "tags.ns.camelot": "Camelot",
+  "tags.ns.genre": "ジャンル",
   "tags.value.durShort": "短尺",
   "tags.value.durMedium": "中尺",
   "tags.value.durLong": "長尺",
   "tags.value.orientVertical": "縦長",
   "tags.value.orientHorizontal": "横長",
   "tags.value.orientSquare": "正方形",
+  "tags.value.qualityLossless": "ロスレス",
+  "tags.value.qualityLossy": "非可逆圧縮",
+  "tags.value.qualityHires": "ハイレゾ",
+  "tags.value.chMono": "モノラル",
+  "tags.value.chStereo": "ステレオ",
+  "tags.value.chSurround": "サラウンド",
+  "tags.value.tempoSlow": "ゆっくり",
+  "tags.value.tempoModerate": "ふつう",
+  "tags.value.tempoFast": "速い",
 
   // ワークスペースレール
   "workspace.all": "すべて",
@@ -916,6 +1201,31 @@ export const ja = {
   "workspace.edit": "ワークスペースを編集",
   "workspace.editAction": "保存",
   "workspace.pathReadonly": "パスは変更できません",
+  "workspace.excludedFolders": "スキャンから除外",
+  "workspace.excludedFoldersEmpty":
+    "除外しているフォルダはありません。フォルダ表示でフォルダを右クリックするか、「フォルダを追加」から選べます。",
+  "workspace.excludedFolderNotFound": "見つかりません",
+  "workspace.excludedFolderInclude": "{path}をスキャンの対象に戻す",
+  "workspace.excludedFoldersNextScan":
+    "一覧から外したフォルダは、次のスキャンから再び読み込まれます。",
+  "workspace.excludedFoldersDesc":
+    "このフォルダとその中身だけが対象です。別の場所にある同じ名前のフォルダはスキャンされます。",
+  "workspace.excludedFolderIncludeAction": "スキャンに戻す",
+  "workspace.excludedFolderRemoveAction": "一覧から外す",
+  "workspace.excludedFolderRemove": "{path}を一覧から外す",
+  "workspace.excludedFolderUndo": "取り消す",
+  "workspace.excludedFolderUndoLabel": "{path}の変更を取り消す",
+  "workspace.excludedFolderIncluding": "保存するとスキャンに戻ります",
+  "workspace.excludedFolderAdding": "保存すると除外されます",
+  "workspace.excludedFoldersAdd": "フォルダを追加",
+  "workspace.excludedFolderOutside":
+    "ワークスペースの中にあるフォルダを選んでください",
+  "workspace.excludedFolderPickFailed": "フォルダを選べませんでした",
+  "workspace.excludedFoldersRetry": "再読み込み",
+  "workspace.excludedFoldersLoadError":
+    "除外したフォルダを読み込めませんでした。",
+  "workspace.excludedFoldersSaveError":
+    "除外したフォルダを更新できませんでした",
   "workspace.addDirectory": "動画ディレクトリを追加",
   "workspace.removeFromSidebar": "ワークスペースを削除",
   "workspace.removeTitle": "ワークスペースを削除",
@@ -1026,7 +1336,7 @@ export const ja = {
   "playlist.loading": "読み込み中…",
   "playlist.empty": "再生できるメディアがありません。",
   "playlist.emptyHint":
-    "動画や画像を含む一覧を開いてから再生を始めてください。",
+    "動画や画像、音声を含む一覧を開いてから再生を始めてください。",
   "playlist.unplayable": "再生できるメディアがありませんでした。",
   "playlist.reorderNeedsManual": "並び替えるには手動順に切り替えます。",
   "settings.resumePlayback": "続きから再生",
@@ -1094,17 +1404,17 @@ export const ja = {
   "tour.languageTitle": "言語を選んでね",
   "tour.languageBody":
     "使う言語を選んでね。この案内もこの言語で進むよ。あとから設定でも変えられるよ",
-  "tour.welcomeTitle": "Meguriへようこそ",
+  "tour.welcomeTitle": "{app}へようこそ",
   "tour.welcomeBody": "使い方をざっと案内するね。Escでいつでも飛ばせるよ",
   "tour.addWorkspaceTitle": "フォルダを追加",
   "tour.addWorkspaceBody":
-    "まずは動画や画像が入ったフォルダを追加してね。中身を読み込んでサムネイルを作るよ。いくつでも追加できるよ",
+    "まずは動画や画像、音声が入ったフォルダを追加してね。中身を読み込んでサムネイルを作るよ。いくつでも追加できるよ",
   "tour.collectionsTitle": "コレクション",
   "tour.collectionsBody":
     "フォルダをまたいで好きなファイルをまとめられるよ。ファイルをここにドラッグすると追加できるよ",
   "tour.searchTitle": "検索と絞り込み",
   "tour.searchBody":
-    "ファイル名やタグで検索できるよ。一覧で / を押すとここに飛べるよ",
+    "ファイル名やタグで検索できるよ。ここをクリックするか一覧で / を押して、開いたメニューに入力してね",
   "tour.viewTitle": "表示の切り替え",
   "tour.viewBody":
     "グリッド・リスト・タイムライン・グラフで表示を切り替えられるよ",
@@ -1130,6 +1440,33 @@ export const ja = {
   "settings.tour": "チュートリアル",
   "settings.tourDesc": "初回起動時の使い方案内をもう一度表示します",
   "settings.tourReplay": "もう一度見る",
+
+  // 画像の比較
+  "compare.title": "画像を比較",
+  "compare.mode": "比較のしかた",
+  "compare.mode.slider": "スライダー",
+  "compare.mode.difference": "差分",
+  "compare.mode.onion": "重ねる",
+  "compare.mode.blink": "点滅",
+  "compare.opacity": "Bの不透明度",
+  "compare.swap": "AとBを入れ替え",
+  "compare.align": "位置合わせ",
+  "compare.alignHint": "見つかったずれの分だけBを動かして重ねます",
+  "compare.zoomIn": "拡大",
+  "compare.zoomOut": "縮小",
+  "compare.fit": "全体を表示",
+  "compare.split": "境目の位置",
+  "compare.aligning": "位置合わせ中… {percent}%",
+  "compare.alignFailed": "位置合わせできませんでした",
+  "compare.alignResult": "ずれ {dx}, {dy} px · 輪郭の一致度 {score}%",
+  "compare.alignScale": "倍率 ×{scale}",
+  "compare.lowScore": "輪郭の一致度が低く、位置がずれているかもしれません",
+  "shortcuts.sectionCompare": "画像の比較",
+  "shortcuts.compareModes": "スライダー / 差分 / 重ねる / 点滅",
+  "shortcuts.compareSwap": "AとBを入れ替え",
+  "shortcuts.compareZoom": "画像を拡大 / 縮小",
+  "shortcuts.compareFit": "画像の全体を表示",
+  "shortcuts.compareBlink": "点滅中にAとBを切り替え",
 } as const;
 
 export type TranslationKey = keyof typeof ja;

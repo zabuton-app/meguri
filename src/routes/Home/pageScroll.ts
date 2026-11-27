@@ -88,8 +88,7 @@ function pageScrollFrame(run: PageScroll) {
  */
 function runOn(vp: HTMLElement): PageScroll | null {
   return pageScroll?.viewport === vp &&
-    (pageScroll.last === null ||
-      Math.abs(vp.scrollTop - pageScroll.last) <= 2)
+    (pageScroll.last === null || Math.abs(vp.scrollTop - pageScroll.last) <= 2)
     ? pageScroll
     : null;
 }

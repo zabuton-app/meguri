@@ -2,44 +2,64 @@
 //
 // Policy: Chromium's <video> can play MP4(H.264)/WebM etc. with Range seeking
 // (even with non-faststart where moov is at the end, it can read it via a Range request to the tail).
-// So these are served as raw files via Range to enable full seeking. Only containers Chromium
+// Directly playable files use Range for full seeking. Containers Chromium
 // cannot demux (mkv/avi/wmv/flv/ts) are remuxed on the fly to fragmented MP4 with ffmpeg
-// and served. ProRes uses a compatible H.264 preview instead of stream copy.
+// and served. Audio the built-in player cannot decode, such as Dolby Digital or
+// DTS, is converted to AAC. Video it cannot decode, such as ProRes or MPEG-4
+// Part 2, uses an H.264 preview instead of stream copy.
 // Both streams support time seeking via ?t=<seconds>.
 //
-// URLs have the form /ws/<workspaceId>/<kind>/<fileId> (kind = thumb|media|frame).
+// URLs have the form /ws/<workspaceId>/<kind>/<fileId> (kind = thumb|media|frame|waveform).
 // Requests must include X-Api-Token; the Electron session injects it for in-app media loads.
 // Resolving the DB by workspace ID lets it serve correctly without depending on the active switch,
 // and the browser cache key is naturally separated by ID as well.
 // frame returns a single JPEG frame at ?t=<seconds> (for seek preview).
+// waveform returns a PNG of an audio file's whole waveform (for the filmstrip).
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
+import {
+  defaultAudioTrack,
+  directAacTracks,
+  needsAacAudio,
+} from "./playbackAudio.js";
 import type { Core } from "./index.js";
 import { mediaFileOf, thumbPathIfDone } from "./tags.js";
-import { isInsideRoot } from "./paths.js";
+import { isInsideRealRoot, realpathForRootCheck } from "./paths.js";
 import { FFMPEG } from "./ffmpeg-paths.js";
 import { QueueFullError, Semaphore } from "./concurrency.js";
 import { DECODE_FFMPEG_THREADS, videoDecodeSlots } from "./mediaConcurrency.js";
+import {
+  isTaggedHdr,
+  previewEncoder,
+  previewEncoderArgs,
+  videoPreviewFilter,
+  supportsToneMapping,
+  type PreviewEncoder,
+} from "./videoPreview.js";
 import { scopedLog } from "./logger.js";
+import {
+  PREVIEW_AUDIO_TRACK_PARAM,
+  REMUX_CONTAINERS,
+  hasRemuxVideo,
+  needsVideoPreview,
+} from "../../shared/playbackTracks.js";
+import { readEmbeddedTracks } from "../../shared/embeddedSubtitles.js";
+import { probePlaybackMetadata } from "./playbackMetadata.js";
+import { videoCodecOf } from "./media.js";
 
 const log = scopedLog("server");
 
-// Only containers Chromium cannot demux are remuxed with ffmpeg and served.
-// Browser-compatible files are served via Range to enable full seeking.
-const REMUX_CONTAINERS = new Set(["mkv", "avi", "wmv", "flv", "ts"]);
-
-// Hard cap on ffmpeg streaming/transcoding requests. Without this a corrupt
-// media file can hang ffmpeg and pin a request slot indefinitely. 60s matches
-// the extractor side in media.ts and gives long-range seeks enough headroom.
+// Cap one-shot FFmpeg requests and periods without output in remux streams.
+// This prevents corrupt media from pinning a slot indefinitely.
 // SIGKILL ensures the child actually dies if it ignores SIGTERM.
 const FFMPEG_REQUEST_TIMEOUT_MS = 60_000;
 const FFMPEG_KILL_SIGNAL = "SIGKILL" as const;
 // Decoding requests (frame grabs, image transcodes) take a slot from the
 // process-wide `videoDecodeSlots` pool shared with the scan pipeline
-// (mediaConcurrency.ts). Remux sessions are `-c copy` — no decode, little memory,
-// but they live as long as playback — so they get their own cap: one long
+// (mediaConcurrency.ts). Remux sessions copy the picture and may encode audio.
+// They live as long as playback, so they get their own cap: one long
 // movie must not pin a decode slot for hours. The number is a count of
 // concurrent playback sessions (a single user rarely has more than a couple
 // open at once) rather than anything CPU-derived.
@@ -47,7 +67,9 @@ const REMUX_MAX_CONCURRENT = 8;
 const remuxSlots = new Semaphore(REMUX_MAX_CONCURRENT);
 // Playback can stay open for a long time. Keep its decoders separate from the
 // thumbnail and scrub pool, and cap concurrent previews and FFmpeg threads.
-const proResPreviewSlots = new Semaphore(2);
+const videoPreviewSlots = new Semaphore(2);
+// Reclaim a preview only under contention, after sustained socket backpressure.
+const PREVIEW_READER_TIMEOUT_MS = 120_000;
 // Requests queued for a slot are bounded too, so a burst of frame grabs (or
 // a renderer gone haywire) cannot pile up sockets and waiters without limit;
 // beyond this the request is shed with 503. A client that disconnects while
@@ -87,9 +109,19 @@ async function acquireForResponse(
 // Image formats Chromium cannot decode natively are transcoded to JPEG with ffmpeg on the fly.
 // (jpg/png/gif/webp/avif/bmp render directly, so they are served as raw files.)
 const TRANSCODE_IMAGES = new Set(["heic", "heif", "tiff"]);
+// Video containers served as they are unless their codecs need converting.
+// WebM is served as it is without a probe: it holds VP8, VP9 or AV1 with Opus
+// or Vorbis, all of which the player decodes.
+const DIRECT_CONTAINERS = new Set(["mp4", "m4v", "mov"]);
 
 function ext(p: string): string {
   return path.extname(p).slice(1).toLowerCase();
+}
+
+function storedMeta(core: Core, id: number): string | null | undefined {
+  const row = core.db.prepare("SELECT meta FROM files WHERE id = ?").get(id) as
+    { meta: string | null } | undefined;
+  return row?.meta;
 }
 
 function contentType(p: string): string {
@@ -177,7 +209,49 @@ export function startServer(
 const AUTH_HEADER = "x-api-token";
 
 // URLs have the form /ws/<workspaceId>/<kind>/<fileId>.
-const ROUTE = /^\/ws\/([0-9a-f]+)\/(thumb|media|frame)\/(\d+)$/;
+const ROUTE = /^\/ws\/([0-9a-f]+)\/(thumb|media|frame|waveform)\/(\d+)$/;
+
+// Each workspace's roots as resolved for the path check, kept for the
+// workspace's lifetime: resolving the root again on every request would walk
+// a network share twice per request. Core.init has already resolved the root,
+// so a root re-pointed while the workspace is open is picked up when it is
+// opened again; until then its files are refused, not served from the old
+// place. A failed resolution is dropped, so a root that comes back (a
+// remounted drive) is resolved again.
+const realRoots = new WeakMap<Core, Map<string, Promise<string>>>();
+
+function realRootOf(core: Core, root: string): Promise<string> {
+  let roots = realRoots.get(core);
+  if (!roots) {
+    roots = new Map();
+    realRoots.set(core, roots);
+  }
+  const known = roots.get(root);
+  if (known) return known;
+  const real = realpathForRootCheck(root);
+  roots.set(root, real);
+  real.catch(() => {
+    if (roots.get(root) === real) roots.delete(root);
+  });
+  return real;
+}
+
+/** isInsideRoot without blocking the main process on a slow share. */
+async function insideRoot(
+  core: Core,
+  abs: string,
+  root: string,
+): Promise<boolean> {
+  try {
+    const [realAbs, realRoot] = await Promise.all([
+      realpathForRootCheck(abs),
+      realRootOf(core, root),
+    ]);
+    return isInsideRealRoot(realAbs, realRoot);
+  } catch {
+    return false;
+  }
+}
 
 async function handle(
   req: http.IncomingMessage,
@@ -227,13 +301,14 @@ async function handle(
 
     if (kind === "thumb") {
       const tp = thumbPathIfDone(core.db, id);
-      if (!tp || !isInsideRoot(tp, core.dataDir)) {
+      const inside = tp != null && (await insideRoot(core, tp, core.dataDir));
+      if (res.destroyed || res.writableEnded) return;
+      if (!inside) {
         res.writeHead(404).end();
         return;
       }
-      // Thumbnails get max-age + ETag (not `immutable` — see the note on
-      // THUMB_CACHE_CONTROL) so repeat grid renders hit the browser cache and
-      // revalidations come back as cheap 304s.
+      // Thumbnails are revalidated on every load (see THUMB_CACHE_CONTROL);
+      // the ETag makes an unchanged one a cheap 304.
       await serveFile(req, res, tp, THUMB_CACHE_CONTROL);
       return;
     }
@@ -244,7 +319,9 @@ async function handle(
       return;
     }
     const abs = file.absPath;
-    if (!isInsideRoot(abs, core.root)) {
+    const inside = await insideRoot(core, abs, core.root);
+    if (res.destroyed || res.writableEnded) return;
+    if (!inside) {
       res.writeHead(403).end();
       return;
     }
@@ -257,29 +334,123 @@ async function handle(
       return;
     }
 
+    if (kind === "waveform") {
+      if (file.kind !== "audio") {
+        res.writeHead(404).end();
+        return;
+      }
+      serveWaveform(res, abs);
+      return;
+    }
+
     // kind === "media"
     const startT = url.searchParams.get("t");
-    // Repack unsupported containers. ProRes needs a codec conversion even
-    // when it lives in a container Chromium can demux, such as MOV.
-    const proResPreview = file.kind === "video" && file.codec === "prores";
-    if (proResPreview || REMUX_CONTAINERS.has(ext(abs))) {
+    const parsed = startT != null ? Number(startT) : NaN;
+    const start = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+    const extension = ext(abs);
+    const remuxContainer = REMUX_CONTAINERS.has(extension);
+    let metadata: unknown;
+    let codec = file.codec;
+    // A scan can publish the file before writing its codec. Read the codec
+    // the scan would store, so an early open of a previewed codec gets its preview.
+    // Only where these requests probe anyway: a HEAD for a remux container
+    // gets video/mp4 whatever the codec, and other containers play directly.
+    if (
+      file.kind === "video" &&
+      codec == null &&
+      (remuxContainer
+        ? req.method !== "HEAD"
+        : DIRECT_CONTAINERS.has(extension))
+    ) {
+      metadata = await probePlaybackMetadata(abs, storedMeta(core, id));
+      if (res.destroyed || res.writableEnded) return;
+      codec = videoCodecOf(metadata);
+    }
+    // Repack unsupported containers. A codec the player cannot decode needs a
+    // conversion even when it lives in a container Chromium can demux, such
+    // as MOV.
+    const videoPreview = file.kind === "video" && needsVideoPreview(codec);
+    const remux = videoPreview || remuxContainer;
+    const directAac =
+      !videoPreview &&
+      file.kind === "video" &&
+      DIRECT_CONTAINERS.has(extension);
+    const requested = url.searchParams.get(PREVIEW_AUDIO_TRACK_PARAM);
+    const needsStreams =
+      directAac || (remux && (requested !== null || req.method !== "HEAD"));
+    if (needsStreams && metadata === undefined) {
+      metadata = await probePlaybackMetadata(abs, storedMeta(core, id));
+      if (res.destroyed || res.writableEnded) return;
+    }
+
+    // Chromium can show the picture while silently dropping default audio it
+    // cannot decode, such as Dolby Digital or DTS. Preserve the primary video
+    // and convert just the default audio.
+    const directTrack = directAac ? directAacTracks(metadata) : undefined;
+    if (directTrack) {
       if (req.method === "HEAD") {
         res.writeHead(200, { "Content-Type": "video/mp4" }).end();
         return;
       }
-      const parsed = startT != null ? Number(startT) : NaN;
-      const start = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      serveRemux(res, abs, start, proResPreview);
+      serveRemux(res, abs, start, "aac", directTrack.audio, directTrack.video);
+      return;
+    }
+    if (remux) {
+      const tracks = readEmbeddedTracks(metadata, "audio");
+      let audioTrack: number | undefined;
+      if (requested !== null) {
+        const audio = /^\d+$/.test(requested) ? Number(requested) : -1;
+        if (
+          !Number.isSafeInteger(audio) ||
+          audio < 0 ||
+          audio >= tracks.length ||
+          (!videoPreview && !hasRemuxVideo(metadata))
+        ) {
+          res.writeHead(400).end();
+          return;
+        }
+        audioTrack = audio;
+      }
+      if (req.method === "HEAD") {
+        res.writeHead(200, { "Content-Type": "video/mp4" }).end();
+        return;
+      }
+      // Convert to AAC whatever track FFmpeg's automatic selection may pick
+      // when one of them cannot be copied into a stream the player decodes.
+      const aac =
+        audioTrack !== undefined
+          ? needsAacAudio(tracks[audioTrack].codec)
+          : tracks.some(({ codec }) => needsAacAudio(codec));
+      let mode: RemuxMode = videoPreview ? "preview" : aac ? "aac" : "copy";
+      if (videoPreview && isTaggedHdr(metadata)) {
+        const toneMap = await supportsToneMapping();
+        if (res.destroyed || res.writableEnded) return;
+        if (toneMap) mode = "preview-hdr";
+      }
+      serveRemux(
+        res,
+        abs,
+        start,
+        mode,
+        audioTrack,
+        undefined,
+        defaultAudioTrack(metadata),
+      );
       return;
     }
     // Chromium-unsupported image formats (heic/heif/tiff) are transcoded to JPEG.
-    if (TRANSCODE_IMAGES.has(ext(abs))) {
+    if (TRANSCODE_IMAGES.has(extension)) {
       serveTranscodedImage(res, abs);
       return;
     }
     // Everything else (mp4/mov/webm/images) is served via Range = full seeking.
     await serveFile(req, res, abs);
   } catch (e) {
+    if (e instanceof QueueFullError) {
+      if (!res.headersSent && !res.destroyed)
+        res.writeHead(503, { "Retry-After": "1" }).end();
+      return;
+    }
     log.error("request failed:", req.method, req.url ?? "", e);
     if (!res.headersSent) res.writeHead(500).end();
   }
@@ -303,12 +474,12 @@ function etagMatches(
   });
 }
 
-// Let the browser cache thumbnails instead of re-requesting on every grid
-// render. Not `immutable`: the renderer's `?v=` cache buster is a per-component
-// counter (not a persistent version), so a regenerated thumbnail can be
-// requested under an old `?v=`. The ETag below lets those revalidations come
-// back as a cheap 304 instead of a full body once max-age expires.
-const THUMB_CACHE_CONTROL = "public, max-age=3600";
+// Revalidate a cached thumbnail on every load instead of trusting it for a
+// while. The renderer's `?v=` cache buster is a per-view counter, not a
+// persistent version, so a view can ask for a regenerated thumbnail under a
+// `?v=` another view already cached with the old picture (#295). The ETag
+// below answers an unchanged thumbnail with a 304.
+const THUMB_CACHE_CONTROL = "no-cache";
 
 async function serveFile(
   req: http.IncomingMessage,
@@ -356,21 +527,39 @@ async function serveFile(
       "Content-Range": `bytes ${start}-${end}/${size}`,
       "Content-Length": end - start + 1,
     });
-    const stream = fs.createReadStream(file, { start, end });
-    res.on("close", () => stream.destroy());
-    stream.on("error", () => res.end());
-    stream.pipe(res);
+    pipeBody(fs.createReadStream(file, { start, end }), res, end - start + 1);
   } else {
     res.writeHead(200, {
       "Content-Type": ctype,
       "Accept-Ranges": "bytes",
       "Content-Length": size,
     });
-    const stream = fs.createReadStream(file);
-    res.on("close", () => stream.destroy());
-    stream.on("error", () => res.end());
-    stream.pipe(res);
+    pipeBody(fs.createReadStream(file), res, size);
   }
+}
+
+// Headers (and Content-Length) are already sent when the body starts, so a
+// failed or short read must abort the response: end() would close a body that
+// is shorter than announced and leave the client waiting for the missing bytes.
+function pipeBody(
+  stream: fs.ReadStream,
+  res: http.ServerResponse,
+  expected: number,
+) {
+  let sent = 0;
+  res.on("close", () => stream.destroy());
+  stream.on("error", (err) => res.destroy(err));
+  stream.on("data", (chunk) => {
+    sent += chunk.length;
+  });
+  stream.on("end", () => {
+    if (sent === expected) res.end();
+    else
+      res.destroy(
+        new Error(`file read ended after ${sent} of ${expected} bytes`),
+      );
+  });
+  stream.pipe(res, { end: false });
 }
 
 // Quickly extract a single frame at the given seconds using input seek (-ss before -i) and return it as JPEG.
@@ -393,17 +582,21 @@ type RemuxSession = {
   historyBytes: number;
   joinable: boolean;
   // Clients whose socket buffer is full; ffmpeg stdout stays paused until all drain.
-  blocked: Set<http.ServerResponse>;
+  blocked: Map<http.ServerResponse, { since: number; pending: number }>;
 };
 
 const remuxInflight = new Map<string, RemuxSession>();
 
+type RemuxMode = "copy" | "aac" | "preview" | "preview-hdr";
+
 function remuxKey(
   file: string,
   start: number | null,
-  proResPreview: boolean,
+  mode: RemuxMode,
+  audioTrack?: number,
+  videoTrack?: number,
 ): string {
-  return `${file}\0${start ?? ""}\0${proResPreview}`;
+  return `${file}\0${start ?? ""}\0${mode}\0${audioTrack ?? ""}\0${videoTrack ?? ""}`;
 }
 
 function spawnFfmpegChild(
@@ -443,7 +636,7 @@ function detachRemuxClient(
   session: RemuxSession,
   res: http.ServerResponse,
 ) {
-  session.clients.delete(res);
+  if (!session.clients.delete(res)) return;
   session.blocked.delete(res);
   if (session.clients.size === 0) {
     session.child.kill("SIGKILL");
@@ -485,7 +678,10 @@ function writeRemuxChunk(
   }
   if (!client.write(chunk)) {
     if (!session.blocked.has(client)) {
-      session.blocked.add(client);
+      session.blocked.set(client, {
+        since: performance.now(),
+        pending: client.writableLength,
+      });
       client.once("drain", () => {
         session.blocked.delete(client);
         resumeIfDrained(session);
@@ -528,58 +724,77 @@ function startRemuxSession(
   start: number | null,
   res: http.ServerResponse,
   releaseSlot: () => void,
-  proResPreview: boolean,
+  mode: RemuxMode,
+  audioTrack?: number,
+  videoTrack?: number,
+  // The track a preview plays when none was chosen. A copy leaves the choice
+  // to FFmpeg; a preview maps its streams itself.
+  defaultAudio = 0,
+  // Set for a preview, which serveRemux resolves; unused for a copy.
+  encoder?: PreviewEncoder,
 ) {
+  const videoPreview = mode === "preview" || mode === "preview-hdr";
   const args = ["-v", "error"];
-  if (proResPreview)
+  if (videoPreview)
     args.push(
       "-threads",
       String(DECODE_FFMPEG_THREADS),
+      // Tone mapping works in 32-bit float and is several times the cost of
+      // the scale alone; on one thread a 4K PQ clip barely kept up with
+      // playback on a fast desktop core.
       "-filter_threads",
-      "1",
+      mode === "preview-hdr" ? String(DECODE_FFMPEG_THREADS) : "1",
     );
   if (start != null && start > 0) args.push("-ss", start.toFixed(3));
+  // Keep FFmpeg's automatic picture selection for remux-only containers.
+  // The last matching input discard option keeps just the chosen audio track.
+  if (!videoPreview && videoTrack === undefined && audioTrack !== undefined)
+    args.push("-discard:a", "all", `-discard:a:${audioTrack}`, "none");
   args.push("-i", file);
-  if (proResPreview) {
+  if (videoPreview) {
+    // Thrown before the spawn, so serveRemux answers 500 and frees the slot.
+    if (!encoder) throw new Error("preview without an encoder");
     args.push(
       "-map",
-      "0:v:0",
+      // The picture a direct file's remux picked, else the first that is not
+      // an embedded cover (attached_pic), which can come first; that is the
+      // stream the stored codec describes.
+      videoTrack !== undefined ? `0:${videoTrack}` : "0:V:0",
       "-map",
-      "0:a:0?",
+      `0:a:${audioTrack ?? defaultAudio}?`,
       "-write_tmcd",
       "0",
       "-vf",
-      "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
-      "-c:v",
-      "libx264",
-      "-preset",
-      "ultrafast",
+      videoPreviewFilter(mode === "preview-hdr"),
+      ...previewEncoderArgs(encoder),
       "-pix_fmt",
       "yuv420p",
-      "-threads:v",
-      "2",
       "-force_key_frames",
       "expr:gte(t,n_forced*1)",
       "-c:a",
       "aac",
     );
   } else {
+    if (videoTrack !== undefined)
+      args.push("-map", `0:${videoTrack}`, "-map", `0:a:${audioTrack}`);
+    else if (audioTrack !== undefined) args.push("-sn", "-dn");
     args.push("-c", "copy");
+    if (mode === "aac") args.push("-c:a", "aac", "-b:a", "384k");
   }
   args.push(
     "-movflags",
-    "frag_keyframe+empty_moov+default_base_moof",
+    // Delay the header until FFmpeg knows the copied video's keyframe
+    // preroll and can put it on the same timeline as re-encoded audio.
+    mode === "aac"
+      ? "frag_keyframe+delay_moov+default_base_moof"
+      : "frag_keyframe+empty_moov+default_base_moof",
     "-f",
     "mp4",
     "pipe:1",
   );
 
-  // A long preview can legitimately outlive the one-shot FFmpeg deadline.
-  // Bound periods without output, excluding pauses caused by the client.
-  const child = spawnFfmpegChild(
-    args,
-    proResPreview ? 0 : FFMPEG_REQUEST_TIMEOUT_MS,
-  );
+  // A remux can legitimately outlive the one-shot FFmpeg deadline.
+  const child = spawnFfmpegChild(args, 0);
   const session: RemuxSession = {
     child,
     clients: new Set([res]),
@@ -588,23 +803,45 @@ function startRemuxSession(
     history: [],
     historyBytes: 0,
     joinable: true,
-    blocked: new Set(),
+    blocked: new Map(),
   };
   remuxInflight.set(key, session);
   res.on("close", () => detachRemuxClient(key, session, res));
 
   let sawOutput = false;
-  let lastOutputAt = Date.now();
-  const watchdog = proResPreview
-    ? setInterval(() => {
-        if (session.blocked.size > 0) lastOutputAt = Date.now();
-        else if (Date.now() - lastOutputAt >= FFMPEG_REQUEST_TIMEOUT_MS)
-          child.kill(FFMPEG_KILL_SIGNAL);
-      }, 5_000).unref()
-    : undefined;
+  let lastOutputAt = performance.now();
+  // Bound periods without output, excluding pauses caused by the client.
+  const watchdog = setInterval(() => {
+    const now = performance.now();
+    if (session.blocked.size === 0) {
+      if (now - lastOutputAt >= FFMPEG_REQUEST_TIMEOUT_MS)
+        child.kill(FFMPEG_KILL_SIGNAL);
+      return;
+    }
+    lastOutputAt = now;
+    if (!videoPreview) return;
+    for (const [client, blocked] of session.blocked) {
+      const pending = client.writableLength;
+      if (pending < blocked.pending) blocked.since = now;
+      blocked.pending = pending;
+      // Pauses and slow readers can hold a preview slot while capacity is free;
+      // only a reader that has drained nothing for a while yields it, and only
+      // when another preview is waiting for the slot.
+      // Ending one of several readers would not free the slot.
+      if (
+        videoPreviewSlots.waiting > 0 &&
+        session.blocked.size === session.clients.size &&
+        now - blocked.since >= PREVIEW_READER_TIMEOUT_MS
+      ) {
+        client.destroy();
+        detachRemuxClient(key, session, client);
+        break;
+      }
+    }
+  }, 5_000).unref();
   child.stdout!.on("data", (chunk: Buffer) => {
     sawOutput = true;
-    lastOutputAt = Date.now();
+    lastOutputAt = performance.now();
     broadcastRemuxChunk(key, session, chunk);
   });
   child.on("error", () => {
@@ -613,6 +850,30 @@ function startRemuxSession(
   });
   child.on("close", (code) => {
     clearInterval(watchdog);
+    // A copy FFmpeg gave up on before writing anything is tried once more as
+    // a preview, which encodes both streams. This catches whatever the codec
+    // allowlists let through but the MP4 muxer refuses, such as VP8 in MKV,
+    // without listing each container and codec pair up front. Not after a
+    // kill: the watchdog or the last client leaving would end the preview the
+    // same way.
+    if (!videoPreview && !sawOutput && code !== null && code !== 0) {
+      const clients = [...session.clients];
+      session.clients.clear();
+      endRemuxSession(key, session);
+      log.warn("remux produced no output, retrying as a preview");
+      for (const client of clients)
+        if (!client.destroyed && !client.headersSent)
+          serveRemux(
+            client,
+            file,
+            start,
+            "preview",
+            audioTrack,
+            videoTrack,
+            defaultAudio,
+          );
+      return;
+    }
     finishRemuxClients(session, code === 0 && sawOutput);
     endRemuxSession(key, session);
   });
@@ -700,13 +961,43 @@ function serveFrame(
   serveBufferedFfmpeg(res, args, "image/jpeg");
 }
 
-// Decode a Chromium-unsupported still image (heic/heif/tiff) to JPEG and return it.
-function serveTranscodedImage(res: http.ServerResponse, file: string) {
+// Size of the waveform image: wide enough for a full-width filmstrip row.
+const WAVEFORM_SIZE = "2000x120";
+
+// Draw the whole file's waveform as one PNG: one opaque color on transparent,
+// so the renderer can use it as a mask and color it from the theme. Decodes
+// the whole file (measured: about a second for an hour of AAC). Square-root
+// scale and peak samples keep quiet speech readable at row height.
+function serveWaveform(res: http.ServerResponse, file: string) {
   const args = [
     "-v",
     "error",
     "-threads",
     String(DECODE_FFMPEG_THREADS),
+    "-i",
+    file,
+    "-filter_complex",
+    `aformat=channel_layouts=mono,showwavespic=s=${WAVEFORM_SIZE}:colors=white:scale=sqrt:filter=peak`,
+    "-frames:v",
+    "1",
+    "-f",
+    "image2",
+    "-c:v",
+    "png",
+    "pipe:1",
+  ];
+  serveBufferedFfmpeg(res, args, "image/png");
+}
+
+// Decode a Chromium-unsupported still image (heic/heif/tiff) to JPEG and return it.
+function serveTranscodedImage(res: http.ServerResponse, file: string) {
+  const args = [
+    "-v",
+    "error",
+    // One thread: a tiled HEIF gets one decoder per tile, each with this many
+    // threads (see runFfmpegThumb in media.ts).
+    "-threads",
+    "1",
     "-i",
     file,
     "-frames:v",
@@ -724,9 +1015,12 @@ function serveRemux(
   res: http.ServerResponse,
   file: string,
   start: number | null,
-  proResPreview: boolean,
+  mode: RemuxMode,
+  audioTrack?: number,
+  videoTrack?: number,
+  defaultAudio?: number,
 ) {
-  const key = remuxKey(file, start, proResPreview);
+  const key = remuxKey(file, start, mode, audioTrack, videoTrack);
   const existing = remuxInflight.get(key);
   if (existing) {
     attachRemuxClient(key, existing, res);
@@ -734,8 +1028,13 @@ function serveRemux(
   }
 
   void (async () => {
+    const videoPreview = mode === "preview" || mode === "preview-hdr";
+    // Every preview starts here, a copy retried as one included, so the
+    // encoder is picked here and not by each caller.
+    const encoder = videoPreview ? await previewEncoder() : undefined;
+    if (res.destroyed || res.writableEnded) return;
     const releaseSlot = await acquireForResponse(
-      proResPreview ? proResPreviewSlots : remuxSlots,
+      videoPreview ? videoPreviewSlots : remuxSlots,
       res,
     );
     if (!releaseSlot) return;
@@ -748,7 +1047,18 @@ function serveRemux(
     }
 
     try {
-      startRemuxSession(key, file, start, res, releaseSlot, proResPreview);
+      startRemuxSession(
+        key,
+        file,
+        start,
+        res,
+        releaseSlot,
+        mode,
+        audioTrack,
+        videoTrack,
+        defaultAudio,
+        encoder,
+      );
     } catch (e) {
       // spawn() can throw synchronously; the slot would otherwise never be
       // released (it only reaches the session on success).

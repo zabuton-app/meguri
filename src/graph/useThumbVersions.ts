@@ -32,8 +32,8 @@ export interface ThumbVersions {
 }
 
 /**
- * The WebP is rewritten in place when a thumbnail is regenerated, and served
- * with a max-age, so the URL has to change for the new picture to show.
+ * The WebP is rewritten in place when a thumbnail is regenerated, and a loaded
+ * picture is fetched again only under a new URL.
  * Every mount starts from a version of its own: the view cannot know what
  * was regenerated while it was away (a 2D / 3D switch remounts it, and so
  * does a visit to the list). A file regenerated since then, by `thumb:done`,
@@ -55,37 +55,27 @@ export function useThumbVersions(): ThumbVersions {
   useEffect(() => {
     let pending = new Set<string>();
     let timer: ReturnType<typeof setTimeout> | null = null;
-    // The unlisten arrives a microtask after the subscription is live; a
-    // cleanup that runs first must still take the subscription down.
-    let cancelled = false;
-    let unlisten: (() => void) | undefined;
-    void events
-      .onThumbDone((event) => {
-        pending.add(
-          event.workspaceId
-            ? `${event.workspaceId}:${event.id}`
-            : String(event.id),
-        );
-        // Dozens arrive per second during a scan: one update per window.
-        timer ??= setTimeout(() => {
-          timer = null;
-          const batch = pending;
-          pending = new Set();
-          const version = nextVersion();
-          setRegenerated((prev) => {
-            const next = new Map(prev);
-            for (const key of batch) next.set(key, version);
-            return next;
-          });
-        }, VERSION_FLUSH_MS);
-      })
-      .then((u) => {
-        if (cancelled) u();
-        else unlisten = u;
-      });
+    const unlisten = events.onThumbDone((event) => {
+      pending.add(
+        event.workspaceId
+          ? `${event.workspaceId}:${event.id}`
+          : String(event.id),
+      );
+      // Dozens arrive per second during a scan: one update per window.
+      timer ??= setTimeout(() => {
+        timer = null;
+        const batch = pending;
+        pending = new Set();
+        const version = nextVersion();
+        setRegenerated((prev) => {
+          const next = new Map(prev);
+          for (const key of batch) next.set(key, version);
+          return next;
+        });
+      }, VERSION_FLUSH_MS);
+    });
     return () => {
-      cancelled = true;
-      unlisten?.();
+      unlisten();
       if (timer) clearTimeout(timer);
     };
   }, []);

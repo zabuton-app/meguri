@@ -48,12 +48,15 @@ export const FolderRow = memo(function FolderRow({
     <div
       data-testid="folder-row"
       data-slot="folder-row"
+      data-folder-path={entry.path}
+      data-folder-count={entry.count}
       aria-current={focused ? "true" : undefined}
+      data-selected={selected || undefined}
       className={cn(
-        "folder-art group relative flex items-center gap-4 rounded-lg p-2 pr-4 transition-colors hover:bg-overlay/50",
+        "folder-art group relative flex items-center gap-4 rounded-card p-2 pr-4 transition-colors hover:bg-fg/10",
         // The media row's state vocabulary, so the two read as one list.
-        selected && "bg-primary/10 ring-1 ring-inset ring-primary/50",
-        focused && "bg-primary/15 ring-2 ring-inset ring-primary",
+        selected && "bg-primary/15 hover:bg-primary/25",
+        focused && "ring-2 ring-inset ring-primary",
       )}
     >
       {/* Above the name's stretched hit area, like a media row's thumbnail;
@@ -85,7 +88,7 @@ export const FolderRow = memo(function FolderRow({
             onClick={open}
             aria-label={t("folder.open", { name: entry.name })}
             title={entry.name}
-            className="min-w-0 truncate text-left text-[15px] font-bold leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
+            className="min-w-0 truncate text-left text-sm font-bold leading-6 text-bright-fg outline-none after:absolute after:inset-0 after:rounded-card after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary"
           >
             {entry.name}
           </button>

@@ -2,9 +2,14 @@ import { vi } from "vitest";
 
 /** One spy for every instance, so a test can see what was scrolled to. */
 const scrollToOffset = vi.hoisted(() => vi.fn());
+const scrollToIndex = vi.hoisted(() => vi.fn());
 
 export function mockVirtualizerScrollToOffset() {
   return scrollToOffset;
+}
+
+export function mockVirtualizerScrollToIndex() {
+  return scrollToIndex;
 }
 
 /** Render all virtual rows in jsdom (no layout engine / scroll viewport). */
@@ -19,13 +24,15 @@ vi.mock("@tanstack/react-virtual", () => ({
           start: index * rowHeight,
         })),
       getTotalSize: () => opts.count * rowHeight,
+      // Every row counts as on screen.
+      range: { startIndex: 0, endIndex: opts.count - 1 },
       measureElement: () => {},
       measure: () => {},
       isScrolling: false,
       scrollToOffset,
       getOffsetForIndex: (index: number) => [index * rowHeight, "start"],
       // Keyboard focus navigation scrolls the focused row into view.
-      scrollToIndex: vi.fn(),
+      scrollToIndex,
     };
   },
 }));

@@ -2,6 +2,7 @@
 // folderFiles) and the folder filter on searchFiles. Runs the real SQL on an
 // in-memory DB; the Windows cases inject "\" as the separator.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import path from "node:path";
 import type { DB } from "../db.js";
 import {
   FOLDER_FILE_FROM,
@@ -34,6 +35,13 @@ function exclude(db: DB, id: number): void {
     "UPDATE files SET deleted_at = 1, excluded_at = 1 WHERE id = ?",
   ).run(id);
 }
+
+/**
+ * A rel_path written the way the running OS's scan writes it. The describes
+ * below that exercise the default separator (rather than injecting one) have to
+ * seed natively, or nothing matches on Windows (#297).
+ */
+const rel = (p: string) => p.split("/").join(path.sep);
 
 /** Seed the layout from quickstart.md, written with `sep`. */
 function seed(db: DB, rootId: number, sep: string): Record<string, number> {
@@ -203,7 +211,7 @@ describe("searchFiles folder filter", () => {
   let ids: Record<string, number>;
   beforeEach(() => {
     ({ db, rootId } = newDb());
-    ids = seed(db, rootId, "/");
+    ids = seed(db, rootId, path.sep);
   });
   afterEach(() => db.close());
 
@@ -246,7 +254,7 @@ describe("searchFiles folder filter", () => {
   it("combines with other conditions and every sort", () => {
     for (const sort of [undefined, "name", "captured", "rating", "hash"]) {
       const res = searchFiles(db, {
-        kind: "video",
+        kinds: ["video"],
         sort,
         folder: { path: "Movie", recursive: true },
       });
@@ -258,7 +266,7 @@ describe("searchFiles folder filter", () => {
 
   it("pages through a folder without leaking rows from outside it", () => {
     for (let i = 0; i < 5; i++) {
-      insertFile(db, rootId, { relPath: `Movie/p${i}.mp4` });
+      insertFile(db, rootId, { relPath: rel(`Movie/p${i}.mp4`) });
     }
     const seen: number[] = [];
     let cursor: number | undefined = 0;
@@ -298,7 +306,7 @@ describe("folderFiles", () => {
   let ids: Record<string, number>;
   beforeEach(() => {
     ({ db, rootId } = newDb());
-    ids = seed(db, rootId, "/");
+    ids = seed(db, rootId, path.sep);
   });
   afterEach(() => db.close());
 
@@ -307,8 +315,8 @@ describe("folderFiles", () => {
     const res = folderFiles(db, ["Movie", "A_B"], { limit: 100 });
     expect(res[0]).toMatchObject({ path: "Movie", total: 2 });
     expect(res[0].rows.map((r) => r.relPath)).toEqual([
-      "Movie/2024/deep/d1.mp4",
-      "Movie/m1.mp4",
+      rel("Movie/2024/deep/d1.mp4"),
+      rel("Movie/m1.mp4"),
     ]);
     expect(res[1]).toEqual({ path: "A_B", total: 0, rows: [] });
   });
@@ -331,7 +339,7 @@ describe("folderFiles", () => {
 
   it("spends one row budget across the whole call but always reports totals", () => {
     for (let i = 0; i < 5; i++)
-      insertFile(db, rootId, { relPath: `Big/b${i}.jpg` });
+      insertFile(db, rootId, { relPath: rel(`Big/b${i}.jpg`) });
     const res = folderFiles(db, ["Big", "Movie"], { limit: 3 });
     expect(res[0]).toMatchObject({ path: "Big", total: 5 });
     expect(res[0].rows).toHaveLength(3);
@@ -342,7 +350,7 @@ describe("folderFiles", () => {
 describe("folder queries at the workspace level", () => {
   it("stamps preview and expanded rows with the workspace", () => {
     const { db, rootId } = newDb();
-    insertFile(db, rootId, { relPath: "Movie/m1.mp4" });
+    insertFile(db, rootId, { relPath: rel("Movie/m1.mp4") });
     const listing = listFoldersWorkspace(target(db), "");
     expect(listing.folders[0].previews[0].workspaceId).toBe(WS);
     const [expanded] = folderFilesWorkspace(target(db), ["Movie"], 10);
@@ -353,7 +361,7 @@ describe("folder queries at the workspace level", () => {
   it("expands the root to every live file", () => {
     const { db, rootId } = newDb();
     ["a.mp4", "Movie/m1.mp4", "😀/x.jpg"].forEach((relPath) =>
-      insertFile(db, rootId, { relPath }),
+      insertFile(db, rootId, { relPath: rel(relPath) }),
     );
     const [root] = folderFiles(db, [""], { limit: 10 });
     expect(root.total).toBe(3);
@@ -378,7 +386,9 @@ describe("folder plans without statistics", () => {
   it("keeps ranged queries on idx_files_alive_rel_path", () => {
     const { db, rootId } = newDb();
     for (let i = 0; i < 50; i++) {
-      const id = insertFile(db, rootId, { relPath: `F${i % 5}/v${i}.mp4` });
+      const id = insertFile(db, rootId, {
+        relPath: rel(`F${i % 5}/v${i}.mp4`),
+      });
       markThumb(db, id);
     }
     const detail = (
@@ -435,7 +445,7 @@ describe("folder plans without statistics", () => {
       limit: 50,
     });
     expect(picked.length).toBe(10);
-    expect(picked.every((r) => r.relPath.startsWith("F1/"))).toBe(true);
+    expect(picked.every((r) => r.relPath.startsWith(rel("F1/")))).toBe(true);
     // The real queries prepare with the pin too (INDEXED BY fails loudly if
     // the index cannot serve them).
     expect(() => listFolders(db, "F1")).not.toThrow();

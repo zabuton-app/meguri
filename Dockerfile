@@ -23,7 +23,7 @@ WORKDIR /app
 # postinstall runs `electron-builder install-app-deps`, which prepares
 # better-sqlite3 for Electron. Electron exposes its downloader as a bin script
 # rather than an npm lifecycle hook, so fetch the runtime explicitly.
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci \
   && ./node_modules/.bin/install-electron
 

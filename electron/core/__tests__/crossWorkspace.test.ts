@@ -1,8 +1,10 @@
 // Regression tests for cross-workspace merge pagination (k-way merge).
-import { afterEach, describe, expect, it } from "vitest";
+import { naturalNameKey } from "../nameKey.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "../index.js";
 import type { DB } from "../db.js";
 import {
+  addBookmark,
   recordAccess,
   searchFiles,
   setFavorite,
@@ -21,6 +23,7 @@ import { addFileTag, addManualTag, upsertTag } from "../tags.js";
 import { MAX_TAG_LIST } from "../../../shared/tags.js";
 import type {
   FileRow,
+  HistoryQuery,
   SearchCursor,
   SearchQuery,
   SearchResult,
@@ -48,7 +51,12 @@ function searchWorkspacesNaive(
   const perWs = offset + limit + 1;
   const all: FileRow[] = [];
   for (const { id, core } of cores) {
-    const res = searchFiles(core.db, { ...query, cursor: 0, limit: perWs });
+    const res = searchFiles(
+      core.db,
+      { ...query, cursor: 0, limit: perWs },
+      undefined,
+      { uncapped: true },
+    );
     for (const it of res.items) it.workspaceId = id;
     all.push(...res.items);
   }
@@ -68,7 +76,11 @@ function comparatorFor(
       return (a, b) => cmpNum(a.rating, b.rating, direction) || tiebreak(a, b);
     case "name":
       return (a, b) =>
-        cmpStr(a.relPath, b.relPath, direction) || tiebreak(a, b);
+        cmpStr(
+          naturalNameKey(a.relPath),
+          naturalNameKey(b.relPath),
+          direction,
+        ) || tiebreak(a, b);
     default:
       return (a, b) =>
         cmpStr(a.workspaceId, b.workspaceId) || cmpNum(a.id, b.id, direction);
@@ -137,6 +149,88 @@ describe("searchWorkspaces", () => {
       direct.items.map((f) => ["solo", f.relPath]),
     );
   });
+
+  it("cross-workspace rows carry bookmarkSecs", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    const fa = insertFile(a.db, a.rootId, { relPath: "a/clip.mp4" });
+    const fb = insertFile(b.db, b.rootId, { relPath: "b/clip.mp4" });
+    addBookmark(a.db, fa, 40);
+    addBookmark(a.db, fa, 4);
+    addBookmark(b.db, fb, 9);
+    // Two workspaces take the merge path, which defers tags (skipTags) and
+    // attaches them per workspace after the merge.
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.bookmarkSecs])).toEqual([
+      ["ws-a", [4, 40]],
+      ["ws-b", [9]],
+    ]);
+  });
+
+  it("applies an ext: directive in the All view across workspaces (#522)", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    insertFile(a.db, a.rootId, { relPath: "a/clip.mp4" });
+    insertFile(a.db, a.rootId, { relPath: "a/clip.mov" });
+    insertFile(b.db, b.rootId, { relPath: "b/clip.mp4" });
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { q: "ext:mp4", limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.relPath])).toEqual([
+      ["ws-a", "a/clip.mp4"],
+      ["ws-b", "b/clip.mp4"],
+    ]);
+  });
+  it("applies a numeric directive in the All view across workspaces (#524)", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    insertFile(a.db, a.rootId, { relPath: "a/big.mp4", size: 2 * 1024 ** 3 });
+    insertFile(a.db, a.rootId, { relPath: "a/small.mp4", size: 1024 });
+    insertFile(b.db, b.rootId, { relPath: "b/big.mp4", size: 3 * 1024 ** 3 });
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { q: "size:>1gb", limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.relPath])).toEqual([
+      ["ws-a", "a/big.mp4"],
+      ["ws-b", "b/big.mp4"],
+    ]);
+  });
+
+  it("applies rating: and is:fav in the All view across workspaces (#525)", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    const aHit = insertFile(a.db, a.rootId, { relPath: "a/one.mp4" });
+    const aLow = insertFile(a.db, a.rootId, { relPath: "a/two.mp4" });
+    const bHit = insertFile(b.db, b.rootId, { relPath: "b/one.mp4" });
+    insertFile(b.db, b.rootId, { relPath: "b/two.mp4" });
+    setRating(a.db, aHit, 5);
+    setFavorite(a.db, aHit, true);
+    setRating(a.db, aLow, 1);
+    setFavorite(a.db, aLow, true);
+    setRating(b.db, bHit, 4);
+    setFavorite(b.db, bHit, true);
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { q: "is:fav rating:>=4", limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.relPath])).toEqual([
+      ["ws-a", "a/one.mp4"],
+      ["ws-b", "b/one.mp4"],
+    ]);
+  });
 });
 
 describe("searchWorkspaces k-way merge", () => {
@@ -181,6 +275,49 @@ describe("searchWorkspaces k-way merge", () => {
     expect(got.items.map((f) => [f.workspaceId, f.id])).toEqual(
       want.items.map((f) => [f.workspaceId, f.id]),
     );
+  });
+
+  it("reads a deep offset with one sorting query per workspace (#362)", () => {
+    const a = seedWorkspace("ws-a", 600, "x/");
+    const z = seedWorkspace("ws-z", 600, "y/");
+    track(a.db);
+    track(z.db);
+    const cores = [a.target, z.target];
+    const spies = [vi.spyOn(a.db, "prepare"), vi.spyOn(z.db, "prepare")];
+    try {
+      // Past MAX_LIMIT (500) per workspace, and far past one batch.
+      const query: SearchQuery = { limit: 15, cursor: 1100, sort: "rating" };
+      const got = searchWorkspaces(cores, query);
+      // The page queries; attachTags reads files too, without a LIMIT.
+      const sorts = spies
+        .flatMap((spy) => spy.mock.calls)
+        .filter(([sql]) => /FROM files\b[\s\S]*\bLIMIT \?/.test(sql));
+      expect(sorts).toHaveLength(2);
+      const want = searchWorkspacesNaive(cores, query);
+      expect(cursorOffset(got.nextCursor)).toBe(want.nextCursor);
+      expect(got.items.map((f) => [f.workspaceId, f.id])).toEqual(
+        want.items.map((f) => [f.workspaceId, f.id]),
+      );
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
+
+  it("reads a deep offset that leaves rows in every workspace (#362)", () => {
+    const a = seedWorkspace("ws-a", 600, "x/");
+    const z = seedWorkspace("ws-z", 600, "y/");
+    track(a.db);
+    track(z.db);
+    const cores = [a.target, z.target];
+    for (const sort of ["rating", "name"] as const) {
+      const query: SearchQuery = { limit: 15, cursor: 300, sort };
+      const got = searchWorkspaces(cores, query);
+      const want = searchWorkspacesNaive(cores, query);
+      expect(cursorOffset(got.nextCursor)).toBe(want.nextCursor);
+      expect(got.items.map((f) => [f.workspaceId, f.id])).toEqual(
+        want.items.map((f) => [f.workspaceId, f.id]),
+      );
+    }
   });
 });
 
@@ -255,6 +392,42 @@ describe("keyset pagination equivalence", () => {
       }
       expect(walked.map(keyFn), `sort=${sort ?? "id"} ${sortDir}`).toEqual(
         all.map(keyFn),
+      );
+    }
+  });
+
+  // SQLite compares TEXT as UTF-8 bytes; a JS `<` compares UTF-16 code units.
+  // The two disagree between U+E000–U+FFFF (full-width `（`) and astral
+  // characters (emoji), so a merge on `<` could step past a row the next
+  // page's seek then leaves behind (#485).
+  it("walking a name sort keeps full-width and astral names in SQLite's order", () => {
+    const seed = (wsId: string, relPaths: string[]) => {
+      const { db, rootId } = newDb();
+      for (const relPath of relPaths) insertFile(db, rootId, { relPath });
+      dbs.push(db);
+      return coreTarget(wsId, db);
+    };
+    const cores = [
+      seed("ws-a", ["（1）.mp4", "～2.mp4"]),
+      seed("ws-b", ["😀.mp4", "a.mp4"]),
+    ];
+    for (const sortDir of ["asc", "desc"] as const) {
+      const walked: string[] = [];
+      let cursor: SearchQuery["cursor"] = undefined;
+      for (;;) {
+        const page = searchWorkspaces(cores, {
+          sort: "name",
+          sortDir,
+          limit: 1,
+          cursor,
+        });
+        walked.push(...page.items.map((f) => f.relPath));
+        if (page.nextCursor == null) break;
+        cursor = page.nextCursor;
+      }
+      const want = ["a.mp4", "（1）.mp4", "～2.mp4", "😀.mp4"];
+      expect(walked, sortDir).toEqual(
+        sortDir === "asc" ? want : [...want].reverse(),
       );
     }
   });
@@ -398,7 +571,11 @@ describe("searchCollection k-way merge", () => {
       [...merged]
         .sort(
           (x, y) =>
-            x.relPath.localeCompare(y.relPath) ||
+            cmpStr(
+              naturalNameKey(x.relPath),
+              naturalNameKey(y.relPath),
+              "asc",
+            ) ||
             x.workspaceId.localeCompare(y.workspaceId) ||
             x.id - y.id,
         )
@@ -740,7 +917,7 @@ describe("listHistoryWorkspaces over a shared library", () => {
       expect(all.items[0].workspaceId).toBe("a");
 
       const paged: number[] = [];
-      let cursor: number | undefined = 0;
+      let cursor: HistoryQuery["cursor"] = 0;
       while (cursor !== undefined) {
         const page = listHistoryWorkspaces(targets, { limit: 2, cursor });
         paged.push(...page.items.map((e) => e.historyId));

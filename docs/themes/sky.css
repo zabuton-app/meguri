@@ -44,9 +44,8 @@ html[data-appearance="dark"] {
      contrast the palette above has against --c-bg. */
   --sk-sky: linear-gradient(180deg, #061d44 0%, #0a2a5e 45%, #0e377a 100%);
   --sk-chrome: #051736;
-  /* Header and search bar: veils of light over the sky, so the gradient
-     still shows through. The header is the brighter of the two. */
-  --sk-header: rgb(255 255 255 / 0.09);
+  /* Search bar: a veil of light over the sky, so the gradient still shows
+     through. */
   --sk-search: rgb(255 255 255 / 0.045);
 
   /* The media: clouds. The sky blue is deepened inside them so the white
@@ -92,7 +91,6 @@ html[data-appearance="light"] {
   /* The page: daytime sky, deepening toward the bottom. */
   --sk-sky: linear-gradient(180deg, #bfe0f8 0%, #a9d1f2 45%, #93c4ec 100%);
   --sk-chrome: var(--c-surface);
-  --sk-header: rgb(255 255 255 / 0.5);
   --sk-search: rgb(255 255 255 / 0.25);
 
   --sk-cloud-primary: #1f5fae;
@@ -124,48 +122,32 @@ html[data-appearance] body {
     var(--sk-sky) fixed;
 }
 
-/* Side rail: the upper sky */
-[data-slot="workspace-rail"] {
-  background-color: var(--sk-chrome);
-  border-right: 1px solid var(--c-border);
+/* The frame (the title bar and the rail) and the corners around the
+   content panel: the upper sky. */
+html[data-appearance] {
+  --c-chrome: var(--sk-chrome);
 }
 
-/* Header and search bar: see-through veils of different strength, so each
-   band reads apart from the rail and from the other while the sky still
-   runs up to the top. */
-[data-slot="home-header"] {
-  background-color: var(--sk-header);
-}
+/* Search bar: a see-through veil, so it reads apart from the frame while the
+   sky still shows through. */
 [data-slot="filter-bar"] {
   background-color: var(--sk-search);
 }
 
-/* Header: horizon line, from sky to sea */
-[data-slot="home-header"] {
-  border-bottom: 2px solid transparent;
-  border-image: linear-gradient(
-      90deg,
-      var(--c-primary),
-      var(--c-accent2),
-      var(--c-info)
-    )
-    1;
-}
-
-/* Buttons in the rail, header and search bar: little clouds, white with dark
-   ink in both variants. Active ones keep their blue (bg-primary), so the
-   current view and filter still stand out.
+/* Buttons in the header and search bar: little clouds, white with dark ink
+   in both variants. Active ones (a bg-primary fill, pressed, on or open)
+   keep their blue, so the current view and filter still stand out. The
+   rail's buttons have no fill of their own, so they stay bare on the sky.
 
    Not public API: buttons carry no data-slot, so this picks the framed ones
    (filled with --c-surface or outlined with --c-border) by their utility
    classes. It may need updating when the app's markup changes. */
-:is(
-    [data-slot="workspace-rail"],
-    [data-slot="home-header"],
-    [data-slot="filter-bar"]
-  )
+:is([data-slot="title-bar"], [data-slot="filter-bar"])
   :is(button, a, div):is([class~="bg-surface"], [class~="border-border"]):not(
-    [class~="bg-primary"]
+    [class~="bg-primary"],
+    [aria-pressed="true"],
+    [data-active],
+    [data-state="open"]
   ) {
   --c-fg: #10263a;
   --c-muted: #3f566b;
@@ -175,13 +157,12 @@ html[data-appearance] body {
   /* Some buttons inherit the bar's text color instead of setting their own. */
   color: var(--c-fg);
 }
-:is(
-    [data-slot="workspace-rail"],
-    [data-slot="home-header"],
-    [data-slot="filter-bar"]
-  )
+:is([data-slot="title-bar"], [data-slot="filter-bar"])
   :is(button, a):is([class~="bg-surface"], [class~="border-border"]):not(
-    [class~="bg-primary"]
+    [class~="bg-primary"],
+    [aria-pressed="true"],
+    [data-active],
+    [data-state="open"]
   ):hover {
   background-color: #dfe9f3;
 }

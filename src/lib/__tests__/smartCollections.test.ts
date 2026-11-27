@@ -1,22 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/locales/en";
+import { pickMessage } from "@/i18n/message";
 import {
   cleanSearchQuery,
   DEFAULT_SMART_COLLECTION_KEY,
   defaultQueryOf,
-  loadInitialFilter,
   type SmartCollection,
   describeSearchQuery,
   hasFilterConditions,
   hasSearchConditions,
   makeSmartCollection,
   parseSmartCollections,
-  saveSmartCollections,
+  readLegacySmartCollections,
   SMART_COLLECTIONS_KEY,
 } from "@/lib/smartCollections";
 
 const t = (key: keyof typeof en, params?: Record<string, string | number>) => {
-  let s: string = en[key];
+  let s = pickMessage(en[key], new Intl.PluralRules("en"), params?.count);
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       s = s.replace(`{${k}}`, String(v));
@@ -33,9 +33,27 @@ describe("smartCollections", () => {
         tags: ["a", ""],
         ratingMin: 0,
         favorite: false,
-        kind: undefined,
+        kinds: [],
       }),
     ).toEqual({ q: "hello", tags: ["a"] });
+  });
+
+  it("cleanSearchQuery puts kinds in one order, so the same selection is one search", () => {
+    expect(cleanSearchQuery({ kinds: ["audio", "video", "audio"] })).toEqual({
+      kinds: ["video", "audio"],
+    });
+  });
+
+  it("cleanSearchQuery treats every kind selected as no kind filter", () => {
+    expect(cleanSearchQuery({ kinds: ["image", "audio", "video"] })).toEqual(
+      {},
+    );
+  });
+
+  it("cleanSearchQuery keeps a kind this build does not know, after the known ones", () => {
+    expect(
+      cleanSearchQuery({ kinds: ["document", "image", "audio", "video"] }),
+    ).toEqual({ kinds: ["video", "image", "audio", "document"] });
   });
 
   it("hasSearchConditions reflects cleaned query", () => {
@@ -50,30 +68,87 @@ describe("smartCollections", () => {
     expect(cleanSearchQuery({ duplicates: false })).toEqual({});
   });
 
+  it("cleanSearchQuery keeps the subtitles flag only when set (#378)", () => {
+    expect(cleanSearchQuery({ subtitles: true })).toEqual({ subtitles: true });
+    expect(cleanSearchQuery({ subtitles: false })).toEqual({});
+  });
+
   it("parseSmartCollections ignores invalid JSON and schema", () => {
     expect(parseSmartCollections(null)).toEqual([]);
     expect(parseSmartCollections("{not json")).toEqual([]);
     expect(parseSmartCollections(JSON.stringify([{ id: 1 }]))).toEqual([]);
   });
 
-  it("saveSmartCollections round-trips through localStorage", () => {
+  it("parseSmartCollections keeps the entries that validate", () => {
     const collection = makeSmartCollection("Favorites", { favorite: true });
-    saveSmartCollections([collection]);
-    const raw = localStorage.getItem(SMART_COLLECTIONS_KEY);
-    expect(raw).toBeTruthy();
-    expect(parseSmartCollections(raw)).toEqual([collection]);
+    expect(
+      parseSmartCollections(JSON.stringify([{ id: 1 }, collection])),
+    ).toEqual([collection]);
+  });
+
+  it("reads what an earlier version left in localStorage", () => {
+    const collection = makeSmartCollection("Favorites", { favorite: true });
+    try {
+      localStorage.setItem(SMART_COLLECTIONS_KEY, JSON.stringify([collection]));
+      localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, collection.id);
+      expect(readLegacySmartCollections()).toEqual({
+        collections: [collection],
+        defaultId: collection.id,
+      });
+    } finally {
+      localStorage.removeItem(SMART_COLLECTIONS_KEY);
+      localStorage.removeItem(DEFAULT_SMART_COLLECTION_KEY);
+    }
+    expect(readLegacySmartCollections()).toEqual({
+      collections: [],
+      defaultId: null,
+    });
+  });
+
+  it("reads nothing from localStorage that cannot be read", () => {
+    const getItem = vi.spyOn(localStorage, "getItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    try {
+      expect(readLegacySmartCollections()).toBeNull();
+    } finally {
+      getItem.mockRestore();
+    }
+  });
+
+  it("keeps an ext: directive through saving and reopening (#538)", () => {
+    // The directive lives in `q`, so a saved search must hand it back intact
+    // for the main process to apply.
+    const collection = makeSmartCollection("MP4", { q: "ext:mp4" });
+    const [saved] = parseSmartCollections(JSON.stringify([collection]));
+    expect(saved.query.q).toBe("ext:mp4");
+  });
+
+  it("keeps rating: and is:fav through saving and reopening (#525)", () => {
+    const collection = makeSmartCollection("Best", {
+      q: "rating:>=4 is:fav",
+    });
+    const [saved] = parseSmartCollections(JSON.stringify([collection]));
+    expect(saved.query.q).toBe("rating:>=4 is:fav");
+  });
+
+  it("keeps numeric directives through saving and reopening (#524)", () => {
+    const q = "size:>100mb duration:<30s";
+    const collection = makeSmartCollection("Short", { q });
+    const [saved] = parseSmartCollections(JSON.stringify([collection]));
+    expect(saved.query.q).toBe(q);
   });
 
   it("describeSearchQuery builds a human-readable summary", () => {
     expect(
       describeSearchQuery(t, "en", {
         q: "cat",
-        kind: "video",
+        kinds: ["video"],
         ratingMin: 3,
         favorite: true,
       }),
     ).toContain("cat");
-    expect(describeSearchQuery(t, "en", { kind: "video" })).toContain(
+    expect(describeSearchQuery(t, "en", { kinds: ["video"] })).toContain(
       en["kind.video"],
     );
   });
@@ -95,12 +170,13 @@ describe("hasFilterConditions", () => {
   it.each([
     { q: "beach" },
     { tags: ["a"] },
-    { kind: "video" },
+    { kinds: ["video"] },
     { ratingMin: 3 },
     { favorite: true },
     { capturedFrom: 1 },
     { btimeTo: 1 },
     { duplicates: true },
+    { subtitles: true },
     { played: false },
   ])("is true for %j", (query) => {
     expect(hasFilterConditions(query)).toBe(true);
@@ -141,11 +217,11 @@ describe("folder condition", () => {
   it("saves the workspace with a folder, so the folder can be found again", () => {
     const c = makeSmartCollection(
       "Clips",
-      { kind: "video", folder: { path: "a/b", recursive: true } },
+      { kinds: ["video"], folder: { path: "a/b", recursive: true } },
       "ws1",
     );
     expect(c.query).toEqual({
-      kind: "video",
+      kinds: ["video"],
       folder: { path: "a/b", recursive: true },
     });
     expect(c.workspaceId).toBe("ws1");
@@ -155,15 +231,15 @@ describe("folder condition", () => {
 
   it("drops a folder that has no workspace to place it in", () => {
     const c = makeSmartCollection("Clips", {
-      kind: "video",
+      kinds: ["video"],
       folder: { path: "a/b", recursive: true },
     });
-    expect(c.query).toEqual({ kind: "video" });
+    expect(c.query).toEqual({ kinds: ["video"] });
     expect(c.workspaceId).toBeUndefined();
   });
 
   it("keeps no workspace for a search without a folder", () => {
-    const c = makeSmartCollection("Videos", { kind: "video" }, "ws1");
+    const c = makeSmartCollection("Videos", { kinds: ["video"] }, "ws1");
     expect(c.workspaceId).toBeUndefined();
   });
 
@@ -175,14 +251,23 @@ describe("folder condition", () => {
       createdAt: 1,
       updatedAt: 1,
     };
-    expect(parseSmartCollections(JSON.stringify([old]))).toEqual([old]);
+    // The single `kind` of that time reads as a one-kind selection.
+    expect(parseSmartCollections(JSON.stringify([old]))).toEqual([
+      { ...old, query: { kinds: ["video"] } },
+    ]);
+  });
+
+  it("lists every selected kind in the description", () => {
+    expect(describeSearchQuery(t, "en", { kinds: ["video", "audio"] })).toBe(
+      `${t("kind.video")}, ${t("kind.audio")}`,
+    );
   });
 
   it("names the folder in the description", () => {
     expect(
       describeSearchQuery(t, "en", {
         folder: { path: "a/b", recursive: true },
-        kind: "video",
+        kinds: ["video"],
       }),
     ).toBe("Folder: a/b / Video");
   });
@@ -193,7 +278,7 @@ describe("the default saved search", () => {
     id: "d1",
     name: "Recent videos",
     query: {
-      kind: "video",
+      kinds: ["video"],
       sort: "btime",
       folder: { path: "Movies", recursive: true },
     },
@@ -204,7 +289,7 @@ describe("the default saved search", () => {
 
   it("applies its conditions without the workspace-bound folder", () => {
     expect(defaultQueryOf([saved], "d1")).toEqual({
-      kind: "video",
+      kinds: ["video"],
       sort: "btime",
     });
   });
@@ -214,22 +299,15 @@ describe("the default saved search", () => {
     expect(defaultQueryOf([saved], "gone")).toBeNull();
   });
 
-  it("is what the list starts with", () => {
-    expect(loadInitialFilter()).toEqual({});
-    saveSmartCollections([saved]);
-    localStorage.setItem(DEFAULT_SMART_COLLECTION_KEY, "d1");
-    expect(loadInitialFilter()).toEqual({ kind: "video", sort: "btime" });
-  });
-
   it("drops a manual sort, which exists only inside a collection", () => {
     const manual = {
       ...saved,
       query: {
-        kind: "video" as const,
+        kinds: ["video"],
         sort: "manual",
         sortDir: "asc" as const,
       },
     };
-    expect(defaultQueryOf([manual], "d1")).toEqual({ kind: "video" });
+    expect(defaultQueryOf([manual], "d1")).toEqual({ kinds: ["video"] });
   });
 });

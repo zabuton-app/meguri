@@ -11,7 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/ipc/client";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
 import type { FileDetail } from "@/ipc/types";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,7 @@ export function DetailActions({
   onShowFolder?: () => void;
   t: TFunc;
 }) {
+  const shell = useFileShellActions();
   return (
     <div className="flex items-start gap-3">
       <div className="min-w-0 flex-1">
@@ -163,7 +164,7 @@ export function DetailActions({
               )}
               <DropdownMenuItem
                 className="rounded-none px-3 py-2 text-xs"
-                onSelect={() => void api.openFolder(fileId, wsId)}
+                onSelect={() => shell.openFolder(fileId, wsId)}
               >
                 <FolderOpen />
                 {t("media.openFolder")}
@@ -171,7 +172,7 @@ export function DetailActions({
               <DropdownMenuSeparator className="mx-0 my-0 bg-muted/35" />
               <DropdownMenuItem
                 className="rounded-none px-3 py-2 text-xs"
-                onSelect={() => void api.copyFilePath(fileId, wsId)}
+                onSelect={() => shell.copyPath(fileId, wsId)}
               >
                 <Copy />
                 {t("media.copyFilePath")}

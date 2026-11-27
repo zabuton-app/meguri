@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_TAG_SUGGESTIONS,
   pendingDirective,
+  plainWordAtCaret,
+  splitQueryChips,
   tagSuggestions,
   viewIsOneWorkspace,
 } from "@/lib/searchTokens";
@@ -96,5 +98,39 @@ describe("tagSuggestions", () => {
   it("honours an explicit limit", () => {
     const out = tagSuggestions([tag("a"), tag("b")], { value: "" }, 1);
     expect(out).toHaveLength(1);
+  });
+});
+
+describe("splitQueryChips", () => {
+  it("separates directives from free text", () => {
+    expect(splitQueryChips('sunset tag:"beach house" tag:4k')).toEqual({
+      chips: ["tag:beach house", "tag:4k"],
+      text: "sunset",
+    });
+  });
+
+  it("leaves a plain query alone", () => {
+    expect(splitQueryChips("sunset 2024")).toEqual({
+      chips: [],
+      text: "sunset 2024",
+    });
+  });
+
+  it("chips a negated directive and leaves negated text as text (#523)", () => {
+    expect(splitQueryChips('-tag:screenshot -draft "-intro"')).toEqual({
+      chips: ["-tag:screenshot"],
+      text: '-draft "-intro"',
+    });
+  });
+});
+
+describe("plainWordAtCaret", () => {
+  it("offers no tag for an excluded word (#523)", () => {
+    expect(plainWordAtCaret("beach")).toBe("beach");
+    expect(plainWordAtCaret("-beach")).toBeNull();
+  });
+
+  it("offers the word itself for a quoted leading - (#523)", () => {
+    expect(plainWordAtCaret('"-beach"')).toBe("-beach");
   });
 });

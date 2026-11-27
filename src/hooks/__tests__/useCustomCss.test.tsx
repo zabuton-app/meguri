@@ -19,9 +19,9 @@ vi.mock("@/ipc/client", () => ({
   events: {
     onCustomCssChanged: (cb: (e: CustomCssChanged) => void) => {
       emitChanged = cb;
-      return Promise.resolve(() => {
+      return () => {
         emitChanged = null;
-      });
+      };
     },
   },
 }));

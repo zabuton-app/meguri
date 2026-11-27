@@ -18,6 +18,7 @@ import {
   keepStillAt,
 } from "../autoTag.js";
 import {
+  AutoTagRuleDroppedError,
   AutoTagTimeoutError,
   AutoTagUnavailableError,
   AutoTagWorkerClient,
@@ -68,6 +69,14 @@ import {
 } from "../../../shared/autoTagAnalysis.js";
 import { AutoTagConfigSchema } from "../../../shared/ipc/schema.js";
 import { insertFile, newDb } from "./helpers.js";
+
+/**
+ * A rel_path as the running OS's scan writes it. Folder rules read stored paths
+ * with path.sep (folderOf), so a fixture spelled with "/" names no folder at
+ * all on Windows (#297). Rule folders stay "/"-separated: that is the form
+ * folderOf returns whatever the path was written with.
+ */
+const rel = (p: string) => p.split("/").join(path.sep);
 
 /**
  * The built-in rules switched on (they ship switched off), parentheses aside:
@@ -569,7 +578,7 @@ describe("files still where they were read", () => {
   });
 
   it("keeps a file at the place the screen named, and no other", () => {
-    const kept = insertFile(db, rootId, { relPath: "Trips/a.mp4" });
+    const kept = insertFile(db, rootId, { relPath: rel("Trips/a.mp4") });
     const moved = insertFile(db, rootId, { relPath: "b.mp4" });
     const gone = insertFile(db, rootId, { relPath: "c.mp4" });
     db.prepare("UPDATE files SET rel_path = ? WHERE id = ?").run(
@@ -680,7 +689,7 @@ describe("attaching tags", () => {
 
   it("runs the engine over every file, or only the ones named", async () => {
     const ids = NAMES.map((relPath) =>
-      insertFile(db, rootId, { relPath: `dir/${relPath}` }),
+      insertFile(db, rootId, { relPath: rel(`dir/${relPath}`) }),
     );
     const engine = { rules: activeRules(), keywords: [keyword()] };
 
@@ -713,10 +722,10 @@ describe("attaching tags", () => {
   });
 
   it("adds the folder rules' tags even when the names could not be read", async () => {
-    const file = insertFile(db, rootId, { relPath: "Trips/ABCD-123.mp4" });
+    const file = insertFile(db, rootId, { relPath: rel("Trips/ABCD-123.mp4") });
     // More than one chunk of them: every one gets the folder's tags.
     const more = Array.from({ length: 600 }, (_, i) =>
-      insertFile(db, rootId, { relPath: `Trips/clip${i}.mp4` }),
+      insertFile(db, rootId, { relPath: rel(`Trips/clip${i}.mp4`) }),
     );
     const folders: FolderRule[] = [
       {
@@ -779,10 +788,11 @@ describe("attaching tags", () => {
   });
 
   it("tags the files under a folder of this workspace, subfolders included", async () => {
-    const at = (relPath: string) => insertFile(db, rootId, { relPath });
+    const at = (relPath: string) =>
+      insertFile(db, rootId, { relPath: rel(relPath) });
     const inFolder = at("Trips/2024/harbor.mp4");
-    // "/"-separated, as the rest of these paths: Windows's "\\" is covered
-    // where folderOf is given it.
+    // Written here with "/" and stored with the OS's separator (rel); the rule
+    // folders below stay "/"-separated, as folderOf returns them.
     const deeper = at("Trips/2024/day1/walk.mp4");
     const sibling = at("Trips/2024b/pier.mp4");
     const elsewhere = at("Work/plan.mp4");
@@ -879,7 +889,9 @@ describe("attaching tags", () => {
     // macOS hands names over decomposed (NFD); the rule was written from the
     // screen, which shows them composed (NFC).
     const nfd = "Cafe\u0301";
-    const inFolder = insertFile(db, rootId, { relPath: `${nfd}/menu.mp4` });
+    const inFolder = insertFile(db, rootId, {
+      relPath: rel(`${nfd}/menu.mp4`),
+    });
     const atRoot = insertFile(db, rootId, { relPath: "top.mp4" });
     const folders: FolderRule[] = [
       {
@@ -994,7 +1006,7 @@ describe("attaching tags", () => {
   });
 
   it("loads names, own tags and the tag catalog for the screen", () => {
-    const a = insertFile(db, rootId, { relPath: `dir/${NAMES[0]}` });
+    const a = insertFile(db, rootId, { relPath: rel(`dir/${NAMES[0]}`) });
     addManualTag(db, a, "Yoga");
     const gone = insertFile(db, rootId, { relPath: "gone.mp4" });
     db.prepare("UPDATE files SET deleted_at = 1 WHERE id = ?").run(gone);
@@ -1006,7 +1018,7 @@ describe("attaching tags", () => {
           id: a,
           name: NAMES[0],
           folder: "dir",
-          metaKey: `p:/fake/root/dir/${NAMES[0]}`,
+          metaKey: `p:/fake/root/${rel(`dir/${NAMES[0]}`)}`,
           tags: ["Yoga"],
         },
       ],
@@ -1204,6 +1216,39 @@ ${body}`,
       await client.derive({ rules: [edited], keywords: [] }, ["d.mp4"]),
     ).toEqual([[]]);
     expect(client.droppedRules()).toEqual(["Slow", "Slow"]);
+    client.dispose();
+  });
+
+  it("fails a whole engine's requests once one of its rules is left out", async () => {
+    const client = new AutoTagWorkerClient(workerFile(naming), 500);
+    const whole = {
+      rules: [slow, ...activeRules()],
+      keywords: [],
+      whole: true,
+    };
+    // The one waiting behind it fails too, instead of going on without it.
+    const results = await Promise.allSettled([
+      client.derive(whole, ["a.mp4"]),
+      client.derive(whole, ["b.mp4"]),
+    ]);
+    for (const r of results) {
+      expect(r).toMatchObject({ status: "rejected" });
+      if (r.status === "rejected")
+        expect(r.reason).toBeInstanceOf(AutoTagRuleDroppedError);
+    }
+    // And every one after it, without waiting on the rule again.
+    const started = Date.now();
+    await expect(client.derive(whole, ["c.mp4"])).rejects.toBeInstanceOf(
+      AutoTagRuleDroppedError,
+    );
+    expect(Date.now() - started).toBeLessThan(500);
+    // An engine without it is run as before.
+    const ids = activeRules().map((r) => r.id);
+    expect(
+      await client.derive({ rules: activeRules(), keywords: [], whole: true }, [
+        "d.mp4",
+      ]),
+    ).toEqual([ids]);
     client.dispose();
   });
 

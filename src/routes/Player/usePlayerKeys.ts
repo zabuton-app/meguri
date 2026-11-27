@@ -1,7 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { useCycleSpectrumPattern } from "@/audio/useSpectrumPatternHotkey";
 import { bumpVolume, toggleMuted, VOLUME_STEP } from "@/hooks/useVolume";
 import { matchAny, type NavBinding } from "@/settings/keybindings";
+import { isLayerOnTop, isTyping } from "@/lib/keyTarget";
+import { useAudioActions } from "@/audio/useAudioPlayer";
+import { speedKeyStep, stepSpeed } from "@/lib/playbackSpeed";
 
 interface PlayerKeyActions {
   isImage: boolean;
@@ -15,6 +18,8 @@ interface PlayerKeyActions {
   exit: () => void;
   navBinding: NavBinding;
   wake: () => void;
+  /** The player's own element: keys are left alone while a layer is over it. */
+  viewRef: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -29,20 +34,15 @@ interface PlayerKeyActions {
 export function usePlayerKeys(actions: PlayerKeyActions): void {
   // V / Shift+V step through the spectrum patterns (see the hook).
   const cycleSpectrum = useCycleSpectrumPattern();
-  const keyState = useRef({ ...actions, cycleSpectrum });
+  const { setPlaybackRate } = useAudioActions();
+  const keyState = useRef({ ...actions, cycleSpectrum, setPlaybackRate });
   useEffect(() => {
-    keyState.current = { ...actions, cycleSpectrum };
+    keyState.current = { ...actions, cycleSpectrum, setPlaybackRate };
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isTyping() || isLayerOnTop(keyState.current.viewRef.current)) return;
       const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
       // Space and Enter belong to whatever control has focus. Swallowing them
       // here would stop the control bar's own buttons from ever activating,
       // which is the whole of "usable from the keyboard alone".
@@ -79,6 +79,10 @@ export function usePlayerKeys(actions: PlayerKeyActions): void {
           // In full screen the browser's own Esc leaves it; closing the player
           // as well would collapse two steps into one keypress.
           if (document.fullscreenElement) return;
+          // An Esc a layer on top already used to close itself (the shortcuts
+          // overlay, the command menu) is not ours: by now that layer may be
+          // gone from the DOM, so isLayerOnTop above cannot tell.
+          if (e.defaultPrevented) return;
           e.preventDefault();
           s.exit();
           return;
@@ -143,7 +147,13 @@ export function usePlayerKeys(actions: PlayerKeyActions): void {
           e.preventDefault();
           s.cycleSpectrum(e.shiftKey ? -1 : 1);
           return;
-        default:
+        default: {
+          // Slower / faster, as the video player does with the same keys.
+          const speedStep = speedKeyStep(e);
+          if (!speedStep || !s.isAudio) return;
+          e.preventDefault();
+          s.setPlaybackRate((rate) => stepSpeed(rate, speedStep));
+        }
       }
     };
     window.addEventListener("keydown", onKey);

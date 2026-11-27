@@ -68,13 +68,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function Probe({ file }: { file: FileDetail }) {
+function Probe({
+  file,
+  explicitStartAt = null,
+  navKey,
+}: {
+  file: FileDetail;
+  explicitStartAt?: number | null;
+  navKey?: string;
+}) {
   const { startedHere } = useAudioDetail({
     file,
     wsId: WS_ID,
     mediaBase: defaultAppStatus.mediaBase ?? "",
     autoplay: true,
-    startAt: 0,
+    startAt: explicitStartAt ?? 0,
+    explicitStartAt,
+    navKey,
     pauseVideo: () => {},
   });
   return <span data-testid="started-here">{String(startedHere)}</span>;
@@ -105,6 +115,44 @@ describe("useAudioDetail auto-start", () => {
     // A fresh start from the top, not a resume from 42 s.
     expect(playSpy).toHaveBeenCalledTimes(2);
     expect(el.currentTime).toBe(0);
+  });
+
+  it("moves a playing track to a time the caller names (?t=), again for each new time", () => {
+    const { rerender } = renderWithProviders(<Probe file={audio} />);
+    act(() => {
+      Object.defineProperty(el, "duration", {
+        value: 600,
+        configurable: true,
+      });
+      el.dispatchEvent(new Event("loadedmetadata"));
+      el.dispatchEvent(new Event("play"));
+    });
+    // A click on the filmstrip's waveform while it plays: same track, a time.
+    rerender(<Probe file={audio} explicitStartAt={90} />);
+    expect(el.currentTime).toBe(90);
+    rerender(<Probe file={audio} explicitStartAt={300} />);
+    expect(el.currentTime).toBe(300);
+    // Still the one playback: moved, not restarted.
+    expect(playSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves it back to the same time when that time is asked for again", () => {
+    const { rerender } = renderWithProviders(<Probe file={audio} />);
+    act(() => {
+      Object.defineProperty(el, "duration", {
+        value: 600,
+        configurable: true,
+      });
+      el.dispatchEvent(new Event("loadedmetadata"));
+      el.dispatchEvent(new Event("play"));
+    });
+    rerender(<Probe file={audio} explicitStartAt={90} navKey="a" />);
+    expect(el.currentTime).toBe(90);
+    // Listened on to 180 s, then the same point clicked again (a new
+    // navigation to the same URL).
+    el.currentTime = 180;
+    rerender(<Probe file={audio} explicitStartAt={90} navKey="b" />);
+    expect(el.currentTime).toBe(90);
   });
 
   it("leaves a track that is still playing alone", () => {

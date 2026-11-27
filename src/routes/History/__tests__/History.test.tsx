@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { Route, Routes } from "react-router";
+import "@/test/mockVirtualizer";
 import History from "@/routes/History";
 import {
   defaultAppStatus,
@@ -75,10 +76,74 @@ describe("History", () => {
     expect(link?.getAttribute("href")).toContain(`ws=${WS_ID}`);
   });
 
+  it("loads the next page as the end of the list comes into view", async () => {
+    const day = 24 * 60 * 60;
+    const today = entry.playedAt;
+    mocks.historyList.mockImplementation((query) =>
+      Promise.resolve(
+        (query as { cursor: unknown }).cursor === 0
+          ? {
+              items: [
+                { ...entry, historyId: 1, relPath: "a.mp4", playedAt: today },
+                {
+                  ...entry,
+                  historyId: 2,
+                  relPath: "b.mp4",
+                  playedAt: today - 1,
+                },
+              ],
+              nextCursor: { at: today - 1, id: 2, ws: WS_ID },
+            }
+          : {
+              items: [
+                {
+                  ...entry,
+                  historyId: 3,
+                  relPath: "c.mp4",
+                  playedAt: today - 2,
+                },
+                {
+                  ...entry,
+                  historyId: 4,
+                  relPath: "d.mp4",
+                  playedAt: today - 3 * day,
+                },
+              ],
+              nextCursor: null,
+            },
+      ),
+    );
+    renderWithProviders(<HistoryRoute />, { route: "/history" });
+    expect(await screen.findByText("d.mp4")).toBeTruthy();
+    expect(mocks.historyList).toHaveBeenCalledWith({
+      cursor: { at: today - 1, id: 2, ws: WS_ID },
+      limit: 50,
+    });
+    expect(mocks.historyList).toHaveBeenCalledTimes(2);
+    // A day spread over two pages keeps one header.
+    expect(screen.getAllByText("Today")).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(2);
+  });
+
   it("shows the empty state when there is no history", async () => {
     mocks.historyList.mockResolvedValue({ items: [], nextCursor: null });
     renderWithProviders(<HistoryRoute />, { route: "/history" });
     expect(await screen.findByText("No play history yet.")).toBeTruthy();
+  });
+
+  it("shows a load error with a retry instead of the empty state", async () => {
+    mocks.historyList.mockRejectedValueOnce(new Error("db locked"));
+    renderWithProviders(<HistoryRoute />, { route: "/history" });
+    expect(
+      await screen.findByText(
+        "Could not load the play history. Please try again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("No play history yet.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("sample.mp4")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("toggles the modal size and persists it", async () => {

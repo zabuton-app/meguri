@@ -38,7 +38,7 @@ export function NameTags({
   if (!parts.some((part) => part.tag !== null)) return null;
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] text-muted">{t("media.nameTags.hint")}</span>
+      <span className="text-2xs text-muted">{t("media.nameTags.hint")}</span>
       <div className="flex flex-wrap items-center gap-y-1 font-mono text-sm leading-7 text-bright-fg">
         {parts.map((part, i) => {
           const { tag } = part;
@@ -63,7 +63,7 @@ export function NameTags({
               title={label}
               onClick={() => onAdd(tag)}
               className={cn(
-                "inline-flex items-center gap-1 rounded border px-1.5 leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "inline-flex items-center gap-1 rounded-item border px-1.5 leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 tagged
                   ? "border-transparent bg-accent2/20"
                   : "border-dashed border-border-strong hover:border-solid hover:bg-overlay",

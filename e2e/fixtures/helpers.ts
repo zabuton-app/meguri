@@ -1,6 +1,26 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
 
 export const FIXTURE_FILE = "test.png";
+
+/**
+ * The `--user-data-dir` argument for a launch, with the background update
+ * check turned off in that profile. The built app reports version 0.0, so
+ * wherever GitHub is reachable (CI) every release is newer, and the toast that
+ * appears about 8 seconds after launch sits over the top right of the window
+ * and takes clicks meant for what is under it (#535). A test should not depend
+ * on the network either. The shape is UpdateConfig in
+ * electron/core/appConfig.ts; every other field defaults.
+ */
+export function profileArg(userDataDir: string): string {
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(userDataDir, "config.json"),
+    JSON.stringify({ update: { autoCheck: false } }),
+  );
+  return `--user-data-dir=${userDataDir}`;
+}
 
 export async function waitForRenderer(page: Page): Promise<void> {
   // Electron can expose the initial blank page before it loads the app.
@@ -13,8 +33,19 @@ export function statusBar(page: Page): Locator {
   return page.getByRole("contentinfo", { name: "Status bar" });
 }
 
-export function searchInput(page: Page): Locator {
-  return page.locator("#list-search-input");
+/** The search in the title bar: it shows the search and opens the command menu. */
+export function searchTrigger(page: Page): Locator {
+  return page.locator('[data-slot="search-trigger"]');
+}
+
+/** Search the library for `text`, typed in the command menu as a user does. */
+export async function searchFor(page: Page, text: string): Promise<void> {
+  await searchTrigger(page)
+    .getByRole("button", { name: "Search or run a command" })
+    .click();
+  await page.keyboard.type(text);
+  await page.keyboard.press("Enter");
+  await expect(searchTrigger(page)).toContainText(text);
 }
 
 /** The exact-tag directives the search box renders as chips beside the text. */
@@ -62,7 +93,7 @@ export async function closeTopDialog(page: Page): Promise<void> {
 }
 
 export async function openSettings(page: Page): Promise<Locator> {
-  await page.getByTitle("Settings").click();
+  await page.getByTitle("Settings", { exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Settings", { exact: true })).toBeVisible();
   return dialog;
@@ -92,7 +123,9 @@ export async function openDiscover(page: Page): Promise<Locator> {
 
 export async function openCommandMenu(page: Page): Promise<void> {
   await page.keyboard.press("Control+KeyK");
-  await expect(page.getByPlaceholder("Search commands...")).toBeVisible();
+  await expect(
+    page.getByPlaceholder("Search files, or type a command..."),
+  ).toBeVisible();
 }
 
 /** Assert that a RatingStars control shows the given value (1–5). */

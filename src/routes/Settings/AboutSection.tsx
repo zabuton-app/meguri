@@ -7,6 +7,8 @@ import { ExternalLink, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, type AboutInfo } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
+import { appGlyph } from "@/lib/appName";
+import { CrashReportsSection } from "./CrashReportsSection";
 
 const GITHUB_URL = "https://github.com/zabuton-app/meguri";
 
@@ -23,7 +25,7 @@ interface ThirdPartyEntry {
 const THIRD_PARTY: ThirdPartyEntry[] = [
   // The ffmpeg/ffprobe executables themselves are GPL builds of FFmpeg; the
   // GPL corresponding-source obligation is satisfied by pointing at the
-  // FFmpeg source download page (not just the npm wrappers below).
+  // FFmpeg source download page (not just the download scripts below).
   {
     name: "FFmpeg / FFprobe (bundled binaries)",
     license: "GPL-3.0",
@@ -31,19 +33,11 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
     sourceUrl: "https://ffmpeg.org/download.html",
   },
   {
-    name: "ffmpeg-static (npm)",
-    license: "GPL-3.0-or-later",
+    name: "ffmpeg-binaries (download scripts)",
+    license: "MIT",
     licenseUrl:
-      "https://github.com/eugeneware/ffmpeg-static/blob/master/LICENSE",
-    sourceUrl: "https://github.com/eugeneware/ffmpeg-static",
-  },
-  {
-    name: "@derhuerst/ffprobe-static (npm)",
-    license: "GPL-3.0-or-later",
-    licenseUrl:
-      "https://github.com/eugeneware/ffmpeg-static/blob/master/LICENSE",
-    sourceUrl:
-      "https://github.com/eugeneware/ffmpeg-static/tree/master/packages/ffprobe-static",
+      "https://github.com/zabuton-app/ffmpeg-binaries/blob/main/LICENSE",
+    sourceUrl: "https://github.com/zabuton-app/ffmpeg-binaries",
   },
   {
     name: "Electron (Chromium / Node.js)",
@@ -63,6 +57,15 @@ const THIRD_PARTY: ThirdPartyEntry[] = [
     license: "MIT",
     licenseUrl: "https://github.com/facebook/react/blob/main/LICENSE",
     sourceUrl: "https://github.com/facebook/react",
+  },
+  // The image comparison's matching. Its full notices, with the libraries
+  // built into it (Protocol Buffers, zlib, FlatBuffers), are in
+  // THIRD_PARTY_NOTICES.txt in the app's resources.
+  {
+    name: "OpenCV.js",
+    license: "Apache-2.0",
+    licenseUrl: "https://github.com/opencv/opencv/blob/5.0.0/LICENSE",
+    sourceUrl: "https://github.com/opencv/opencv",
   },
   // Bundled emoji fonts for the selectable emoji styles
   // (details in src/assets/fonts/emoji/LICENSES.md).
@@ -105,7 +108,7 @@ export function AboutSection() {
   // bug reports, and the attributions below are notices we are obliged to
   // surface. The app has no Edit menu or context menu to copy them any other way.
   return (
-    <section className="flex select-text flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
+    <section className="flex select-text flex-col gap-3 border-b border-border py-3">
       {/* App identity + version */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col">
@@ -115,10 +118,10 @@ export function AboutSection() {
           <span className="text-xs text-muted">
             {info
               ? t("about.version", {
-                  name: t("app.name"),
+                  name: appGlyph(),
                   version: info.version,
                 })
-              : t("app.name")}
+              : appGlyph()}
           </span>
           {info && (
             <span className="text-xs text-muted">
@@ -140,7 +143,7 @@ export function AboutSection() {
 
       {/* App license */}
       <p className="text-xs text-muted">
-        {t("about.appLicense", { name: t("app.name") })}{" "}
+        {t("about.appLicense", { name: appGlyph() })}{" "}
         <button
           type="button"
           className="cursor-pointer underline hover:text-fg"
@@ -149,6 +152,8 @@ export function AboutSection() {
           MIT License
         </button>
       </p>
+
+      <CrashReportsSection />
 
       {/* Third-party licenses */}
       <div className="flex flex-col gap-2 border-t border-border pt-3">
@@ -161,11 +166,11 @@ export function AboutSection() {
           {THIRD_PARTY.map((entry) => (
             <li
               key={entry.name}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border border-border bg-bg px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-card border border-border bg-bg px-3 py-2"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-xs text-fg">{entry.name}</span>
-                <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted">
+                <span className="shrink-0 rounded-item border border-border px-1.5 py-0.5 text-2xs text-muted">
                   {entry.license}
                 </span>
               </span>

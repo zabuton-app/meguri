@@ -8,25 +8,41 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-// Which thumbnails fail, by file name: none unless a test says so.
+// Which thumbnails and probes fail, by file name: none unless a test says so.
 const media = vi.hoisted(() => {
-  const state: { failThumb: (src: string) => boolean } = {
+  const state: {
+    failThumb: (src: string) => boolean;
+    failProbe: (src: string) => boolean;
+  } = {
     failThumb: () => false,
+    failProbe: () => false,
   };
   return state;
 });
 vi.mock("../media.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../media.js")>()),
-  extractMeta: () =>
-    Promise.resolve({
-      width: 640,
-      height: 360,
-      duration: 1,
-      codec: "h264",
-      fps: 30,
-      capturedAt: null,
-      raw: { streams: [] },
-    }),
+  extractMeta: (src: string) =>
+    Promise.resolve(
+      media.failProbe(src)
+        ? {
+            width: null,
+            height: null,
+            duration: null,
+            codec: null,
+            fps: null,
+            capturedAt: null,
+            raw: null,
+          }
+        : {
+            width: 640,
+            height: 360,
+            duration: 1,
+            codec: "h264",
+            fps: 30,
+            capturedAt: null,
+            raw: { streams: [] },
+          },
+    ),
   generateThumb: async (src: string, _kind: string, dest: string) => {
     if (media.failThumb(src)) return false;
     await fsp.writeFile(dest, "webp");
@@ -34,19 +50,47 @@ vi.mock("../media.js", async (importOriginal) => ({
   },
 }));
 
+// Whether the root is a mountpoint now: a real one cannot be made here.
+// `next` answers the following calls first (runScan asks before and after the
+// walk).
+const mount = vi.hoisted(() => {
+  const state: { now: boolean | null; next: (boolean | null)[] } = {
+    now: false,
+    next: [],
+  };
+  return state;
+});
+vi.mock("../scan.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../scan.js")>()),
+  isMountpoint: () =>
+    Promise.resolve(mount.next.length > 0 ? mount.next.shift()! : mount.now),
+}));
+
 import { openDb, type DB } from "../db.js";
 import type { Core } from "../index.js";
 import {
   clearExcludedFiles,
+  countMissingFiles,
   deleteFromIndex,
+  scanRootWasMountpoint,
   upsertScanRoot,
 } from "../queries.js";
 import { fileTags } from "../tags.js";
 import { runScan, type JobEvent } from "../jobs.js";
 import { ScanRootUnreadableError } from "../scan.js";
-import { deriveAutoTagsInProcess } from "../autoTagDeriver.js";
+import {
+  AutoTagRuleDroppedError,
+  AutoTagUnavailableError,
+  deriveAutoTagsInProcess,
+  type DeriveAutoTags,
+} from "../autoTagDeriver.js";
+import {
+  applyScanExclusions,
+  scanExclusionFilter,
+} from "../scanExclusionFilter.js";
 import { autoTagSettingsVersion } from "../autoTag.js";
 import { defaultAutoTagConfig, defaultRules } from "../../../shared/autoTag.js";
+import type { ExclusionPattern } from "../../../shared/scanExclusions.js";
 
 describe("runScan", () => {
   let db: DB;
@@ -58,6 +102,8 @@ describe("runScan", () => {
 
   beforeEach(async () => {
     media.failThumb = () => false;
+    mount.now = false;
+    mount.next = [];
     db = openDb(":memory:", ":memory:");
     root = await fsp.mkdtemp(path.join(os.tmpdir(), "meguri-runscan-"));
     thumbs = await fsp.mkdtemp(path.join(os.tmpdir(), "meguri-runscan-th-"));
@@ -119,6 +165,32 @@ describe("runScan", () => {
     expect(events.at(-1)).toMatchObject({ type: "done", stats });
   });
 
+  it("indexes files in chunks, each keeping its search entry through the thumbnail pass", async () => {
+    // One past a chunk of 256 (#276).
+    for (let i = 0; i < 257; i++) write(`f${i}.mp4`, `content ${i}`);
+
+    await scan();
+
+    const all = rows();
+    expect(all).toHaveLength(257);
+    expect(db.prepare("SELECT count(*) FROM files_fts").pluck().get()).toBe(
+      257,
+    );
+    const index = events.filter(
+      (e) => e.type === "progress" && e.phase === "index",
+    );
+    expect(index.at(-1)).toMatchObject({ done: 257, total: 257 });
+    // The thumbnail pass adds derived tags but leaves the entry as it was:
+    // namespaced tags are not in tags_text.
+    const { id } = all[0];
+    expect(fileTags(db, id).some((t) => t.namespace === "res")).toBe(true);
+    expect(
+      db
+        .prepare("SELECT rel_path, tags_text FROM files_fts WHERE rowid = ?")
+        .get(id),
+    ).toEqual({ rel_path: all[0].rel_path, tags_text: "" });
+  });
+
   it("follows a rename: same id, search entry under the new name", async () => {
     write("a.mp4", "AAAAAAAAAA");
     await scan();
@@ -129,6 +201,10 @@ describe("runScan", () => {
 
     expect(stats).toMatchObject({ moved: 1, inserted: 0, deleted: 0 });
     expect(rows()).toMatchObject([{ id, rel_path: "renamed.mp4" }]);
+    // The name sort's key goes with the name (#292).
+    expect(
+      db.prepare("SELECT name_key FROM files WHERE id = ?").pluck().get(id),
+    ).toBe("renamed.mp114");
     expect(
       db
         .prepare("SELECT rel_path FROM files_fts WHERE rowid = ?")
@@ -239,6 +315,148 @@ describe("runScan", () => {
     expect(rows()).toEqual(before);
   });
 
+  describe("a root that was a mountpoint (#312)", () => {
+    const scanMounted = async () => {
+      mount.now = true;
+      write("a.mp4", "AAAAAAAAAA");
+      await scan();
+      expect(scanRootWasMountpoint(db, rootId)).toBe(true);
+    };
+    // Unmounted: the bare mountpoint, an empty folder on its parent's device.
+    const unmount = () => {
+      fs.rmSync(path.join(root, "a.mp4"));
+      mount.now = false;
+    };
+
+    it("fails without touching the index when nothing is mounted there", async () => {
+      await scanMounted();
+      const before = rows();
+      unmount();
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+      await expect(scan({ rebuild: true })).rejects.toBeInstanceOf(
+        ScanRootUnreadableError,
+      );
+      expect(rows()).toEqual(before);
+      // Still known as a mountpoint, for the scan after.
+      expect(scanRootWasMountpoint(db, rootId)).toBe(true);
+    });
+
+    it("scans files put in the folder once it is no longer mounted on", async () => {
+      await scanMounted();
+      unmount();
+      write("b.mp4", "BBBBBBBBBB");
+
+      expect(await scan()).toMatchObject({ inserted: 1, deleted: 1 });
+      expect(scanRootWasMountpoint(db, rootId)).toBe(false);
+    });
+
+    it("fails also when the bare mountpoint holds other files", async () => {
+      await scanMounted();
+      const before = rows();
+      unmount();
+      // A desktop's hidden file, or a marker some put in a mountpoint.
+      write(".directory", "[Desktop Entry]");
+      write("NOT_MOUNTED", "");
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+      expect(rows()).toEqual(before);
+    });
+
+    it("fails when the drive is unmounted during the walk", async () => {
+      await scanMounted();
+      write("b.mp4", "BBBBBBBBBB");
+      const before = rows();
+      // Mounted when the walk starts, the bare mountpoint when it ends.
+      mount.next = [true, false];
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+      expect(rows()).toEqual(before);
+      expect(scanRootWasMountpoint(db, rootId)).toBe(true);
+    });
+
+    it("fails when the root cannot be told apart after the walk", async () => {
+      await scanMounted();
+      const before = rows();
+      mount.next = [true, null];
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+      expect(rows()).toEqual(before);
+    });
+
+    it("blames the drive, not ffmpeg, when it is unmounted during the thumbnails", async () => {
+      await scanMounted();
+      write("b.mp4", "BBBBBBBBBB");
+      // Mounted through the walk; the bare mountpoint by the thumbnails.
+      mount.next = [true, true];
+      mount.now = false;
+      media.failThumb = () => true;
+
+      await expect(scan()).rejects.toBeInstanceOf(ScanRootUnreadableError);
+    });
+
+    it("empties the list of a mounted drive that was emptied", async () => {
+      await scanMounted();
+      fs.rmSync(path.join(root, "a.mp4"));
+
+      expect(await scan()).toMatchObject({ deleted: 1 });
+    });
+
+    it("empties the list of a plain folder that was emptied", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      await scan();
+      fs.rmSync(path.join(root, "a.mp4"));
+
+      expect(await scan()).toMatchObject({ deleted: 1 });
+      expect(scanRootWasMountpoint(db, rootId)).toBe(false);
+    });
+  });
+
+  it("drops a changed file's stored probe output, even when probing it again fails (#468)", async () => {
+    write("a.mp3", "AAAAAAAAAA");
+    write("b.mp4", "BBBBBBBBBB");
+    await scan();
+    // What the old content said, which derived tags read.
+    db.prepare("UPDATE files SET meta = ?").run(
+      JSON.stringify({ format: { tags: { genre: "Old" } } }),
+    );
+    media.failProbe = (src) => src.endsWith("a.mp3");
+    try {
+      // b.mp4 changes too and probes fine, so the scan is not taken for one
+      // where ffprobe cannot run at all.
+      write("a.mp3", "CCCCCCCCCCCCCCCC");
+      write("b.mp4", "DDDDDDDDDDDDDDDD");
+      await scan();
+    } finally {
+      media.failProbe = () => false;
+    }
+
+    expect(
+      db.prepare("SELECT meta FROM files WHERE rel_path = 'a.mp3'").get(),
+    ).toEqual({ meta: null });
+  });
+
+  it("keeps a changed video's stored probe output when probing it again fails", async () => {
+    write("a.mp4", "AAAAAAAAAA");
+    write("b.mp4", "BBBBBBBBBB");
+    await scan();
+    // Its embedded tracks are read from it.
+    const kept = JSON.stringify({ streams: [{ codec_type: "subtitle" }] });
+    db.prepare("UPDATE files SET meta = ? WHERE rel_path = 'a.mp4'").run(kept);
+    media.failProbe = (src) => src.endsWith("a.mp4");
+    try {
+      write("a.mp4", "CCCCCCCCCCCCCCCC");
+      write("b.mp4", "DDDDDDDDDDDDDDDD");
+      await scan();
+    } finally {
+      media.failProbe = () => false;
+    }
+
+    expect(
+      db.prepare("SELECT meta FROM files WHERE rel_path = 'a.mp4'").get(),
+    ).toEqual({ meta: kept });
+  });
+
   it("keeps file ids and rebuilds search entries and thumbnails on a rebuild", async () => {
     write("a.mp4", "AAAAAAAAAA");
     write("b.mp4", "BBBBBBBBBB");
@@ -332,4 +550,312 @@ describe("runScan", () => {
       }
     },
   );
+
+  describe("scan exclusions (#282)", () => {
+    const WS = "ws-1";
+    const regex = (value: string): ExclusionPattern => ({
+      kind: "regex",
+      value,
+    });
+    const withExclusions = (
+      patterns: string[],
+      folders: Record<string, string[]> = {},
+      derive: DeriveAutoTags = deriveAutoTagsInProcess,
+    ) => ({
+      autoTag: () => ({
+        config: { ...defaultAutoTagConfig(), applyOnScan: false },
+        version: autoTagSettingsVersion(),
+      }),
+      deriveAutoTags: derive,
+      workspaceId: WS,
+      exclusions: () => ({ patterns: patterns.map(regex), folders }),
+    });
+    const rel = (p: string) => p.split("/").join(path.sep);
+    const row = (p: string) =>
+      db
+        .prepare(
+          "SELECT id, deleted_at, scan_excluded_at FROM files WHERE rel_path = ?",
+        )
+        .get(rel(p)) as
+        | {
+            id: number;
+            deleted_at: number | null;
+            scan_excluded_at: number | null;
+          }
+        | undefined;
+    /** Whether the file is listed, and whether a rule hides it. */
+    const state = (p: string) => {
+      const r = row(p)!;
+      return {
+        id: r.id,
+        listed: r.deleted_at === null,
+        hidden: r.scan_excluded_at !== null,
+      };
+    };
+
+    it("leaves out what a pattern or an excluded folder covers", async () => {
+      write("keep/a.mp4", "AAAAAAAAAA");
+      write("@eaDir/b.jpg", "BBBBBBBBBB");
+      // Case-insensitive, and anywhere in the path.
+      write("deep/@EADIR/c.jpg", "CCCCCCCCCC");
+      write("d.tmp.mp4", "DDDDDDDDDD");
+      write("renders/old/e.mp4", "EEEEEEEEEE");
+      write("renders/older/f.mp4", "FFFFFFFFFF");
+
+      await scan(
+        withExclusions(["(^|/)@eaDir/", "\\.tmp\\.mp4$"], {
+          [WS]: ["renders/old"],
+        }),
+      );
+
+      expect(rows().map((r) => r.rel_path)).toEqual(
+        ["keep/a.mp4", "renders/older/f.mp4"].map(rel),
+      );
+    });
+
+    it("does not report what an excluded folder holds as unreadable", async () => {
+      write("cache/a.mp4", "AAAAAAAAAA");
+      await fsp.chmod(path.join(root, "cache"), 0o000);
+      try {
+        expect(await scan(withExclusions(["^cache/$"]))).toMatchObject({
+          skipped: 0,
+        });
+      } finally {
+        await fsp.chmod(path.join(root, "cache"), 0o755);
+      }
+    });
+
+    it("hides files indexed before, out of Missing, and brings them back with their ids", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      write("b.mp4", "BBBBBBBBBB");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+
+      await scan(withExclusions(["^old/$"]));
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+      expect(hasFts(id)).toBe(false);
+      expect(countMissingFiles(db)).toBe(0);
+      expect(row("b.mp4")).toMatchObject({ deleted_at: null });
+
+      await scan(withExclusions([]));
+      expect(state("old/a.mp4")).toEqual({ id, listed: true, hidden: false });
+      expect(hasFts(id)).toBe(true);
+    });
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "keeps a hidden file hidden while its folder cannot be read",
+      async () => {
+        write("old/a.mp4", "AAAAAAAAAA");
+        await scan(withExclusions([]));
+        await scan(withExclusions(["^old/$"]));
+        await fsp.chmod(path.join(root, "old"), 0o000);
+        try {
+          await scan(withExclusions([]));
+          expect(state("old/a.mp4").hidden).toBe(true);
+          expect(countMissingFiles(db)).toBe(0);
+        } finally {
+          await fsp.chmod(path.join(root, "old"), 0o755);
+        }
+        await scan(withExclusions([]));
+        expect(state("old/a.mp4")).toMatchObject({
+          listed: true,
+          hidden: false,
+        });
+      },
+    );
+
+    it("lists a hidden file that is gone by the time the rule is taken out as missing", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      await scan(withExclusions(["^old/$"]));
+      fs.rmSync(path.join(root, "old"), { recursive: true });
+
+      await scan(withExclusions([]));
+
+      expect(state("old/a.mp4")).toMatchObject({
+        listed: false,
+        hidden: false,
+      });
+      expect(countMissingFiles(db)).toBe(1);
+    });
+
+    it("does not take a hidden file for the source of a move", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+      write("copy.mp4", "AAAAAAAAAA");
+
+      await scan(withExclusions(["^old/$"]));
+
+      expect(row("copy.mp4")!.id).not.toBe(id);
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+    });
+
+    it("keeps hidden files and their thumbnails through a rebuild", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+
+      await scan({ ...withExclusions(["^old/$"]), rebuild: true });
+
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+      expect(fs.existsSync(path.join(thumbs, `${id}.webp`))).toBe(true);
+      expect(countMissingFiles(db)).toBe(0);
+    });
+
+    it("leaves out a folder by its name, at any depth (#529)", async () => {
+      write("work/Private/a.mp4", "AAAAAAAAAA");
+      write("work/private-old/b.mp4", "BBBBBBBBBB");
+      await scan({
+        ...withExclusions([]),
+        exclusions: () => ({
+          patterns: [{ kind: "name", value: "private" }],
+          folders: {},
+        }),
+      });
+      expect(rows().map((r) => r.rel_path)).toEqual(
+        ["work/private-old/b.mp4"].map(rel),
+      );
+    });
+
+    it("hides what a rule covers without a scan, and lets nothing back", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      write("b.mp4", "BBBBBBBBBB");
+      await scan(withExclusions([]));
+      const filter = scanExclusionFilter(
+        { patterns: [regex("^old/$")], folders: {} },
+        WS,
+        deriveAutoTagsInProcess,
+      );
+
+      expect(await applyScanExclusions(db, rootId, filter)).toBe(1);
+      expect(state("old/a.mp4").hidden).toBe(true);
+      // Taken out again, but not released: only a scan finds the file.
+      expect(await applyScanExclusions(db, rootId, null)).toBe(0);
+      expect(state("old/a.mp4").hidden).toBe(true);
+    });
+
+    it("keeps a file hidden when the scan that would bring it back is cut short", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+      // New, so the scan hashes it; it is stopped there.
+      write("new.mp4", "NNNNNNNNNN");
+      const ac = new AbortController();
+
+      await runScan(
+        core,
+        "job",
+        (e) => {
+          if (e.type === "progress" && e.phase === "hash") ac.abort();
+        },
+        { ...withExclusions([]), signal: ac.signal },
+      );
+
+      // Not missing (where it could be purged), though it is there.
+      expect(state("old/a.mp4")).toEqual({ id, listed: false, hidden: true });
+      expect(countMissingFiles(db)).toBe(0);
+      await scan(withExclusions([]));
+      expect(state("old/a.mp4")).toEqual({ id, listed: true, hidden: false });
+    });
+
+    it("brings back a hidden file moved out of the excluded folder with its id", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const { id } = row("old/a.mp4")!;
+      await scan(withExclusions(["^old/$"]));
+      fs.renameSync(path.join(root, "old", "a.mp4"), path.join(root, "a.mp4"));
+
+      await scan(withExclusions([]));
+
+      expect(state("a.mp4")).toEqual({ id, listed: true, hidden: false });
+      expect(countMissingFiles(db)).toBe(0);
+    });
+
+    it("excludes what a pattern of lookaheads alone covers", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      write("b.jpg", "BBBBBBBBBB");
+
+      await scan(withExclusions(["(?=.*\\.jpg$)"]));
+
+      expect(rows().map((r) => r.rel_path)).toEqual(["a.mp4"]);
+    });
+
+    it("fails without touching the index when a pattern was given up on", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const before = rows();
+      write("b.mp4", "BBBBBBBBBB");
+
+      await expect(
+        scan(
+          withExclusions(["^old/$"], {}, () =>
+            Promise.reject(new AutoTagRuleDroppedError()),
+          ),
+        ),
+      ).rejects.toThrow(AutoTagRuleDroppedError);
+      expect(rows()).toEqual(before);
+    });
+
+    it("finishes the scan when a rule saved during it cannot be applied", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      let reads = 0;
+      // The second read, once the files are synced, has a pattern the worker
+      // cannot run.
+      const opts = {
+        ...withExclusions([], {}, (engine, names) =>
+          engine.rules.some((r) => r.name === "^late$")
+            ? Promise.reject(new AutoTagRuleDroppedError())
+            : deriveAutoTagsInProcess(engine, names),
+        ),
+        exclusions: () => ({
+          patterns: reads++ === 0 ? [] : [regex("^late$")],
+          folders: {},
+        }),
+      };
+
+      await expect(scan(opts)).resolves.toMatchObject({ inserted: 1 });
+      expect(rows()[0]).toMatchObject({
+        deleted_at: null,
+        thumb_status: "done",
+      });
+    });
+
+    it("leaves files removed from the index by hand as they are", async () => {
+      write("old/a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      deleteFromIndex(db, row("old/a.mp4")!.id);
+
+      await scan(withExclusions(["^old/$"]));
+
+      expect(row("old/a.mp4")).toMatchObject({ scan_excluded_at: null });
+    });
+
+    it("skips a pattern that does not compile and applies the others", async () => {
+      write("a/x.mp4", "AAAAAAAAAA");
+      write("b/y.mp4", "BBBBBBBBBB");
+
+      await scan(withExclusions(["(", "^a/$"]));
+
+      expect(rows().map((r) => r.rel_path)).toEqual([rel("b/y.mp4")]);
+    });
+
+    it("fails without touching the index when the patterns cannot be run", async () => {
+      write("a.mp4", "AAAAAAAAAA");
+      await scan(withExclusions([]));
+      const before = rows();
+
+      await expect(
+        scan(
+          withExclusions(["^old/$"], {}, () =>
+            Promise.reject(new AutoTagUnavailableError("down")),
+          ),
+        ),
+      ).rejects.toThrow(AutoTagUnavailableError);
+      expect(rows()).toEqual(before);
+    });
+  });
 });

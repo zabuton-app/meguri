@@ -23,7 +23,9 @@ import {
   isPetSize,
   type PetSize,
 } from "@/components/pet/petSize";
+import { platform } from "@/lib/platform";
 
+// public/theme-boot.js reads randomThemeOnStartup from this key before the bundle loads.
 const LS_KEY = "meguri.prefs";
 
 export const DEFAULT_SCENE_COUNT = 12;
@@ -31,6 +33,16 @@ export const SCENE_COUNT_MIN = 1;
 export const SCENE_COUNT_MAX = 48;
 // Choices offered in the settings UI.
 export const SCENE_COUNT_OPTIONS = [4, 6, 8, 12, 16, 20, 24, 32] as const;
+
+// Frames per filmstrip row. A fixed count, not one fitted to the width: the
+// frame times follow the count, so a width-fitted count would fetch every
+// frame again on each resize (a side peek docking, say). The frames grow
+// or shrink to fill the row instead.
+export const DEFAULT_FILMSTRIP_FRAMES = 10;
+export const FILMSTRIP_FRAMES_MIN = 4;
+export const FILMSTRIP_FRAMES_MAX = 24;
+// Choices offered in the settings UI.
+export const FILMSTRIP_FRAMES_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 24] as const;
 
 // Frame-preview (hover scrub / scene rail) quality presets, mirrored by the
 // media server's ?q= allowlist in electron/core/server.ts.
@@ -75,12 +87,28 @@ export const LIST_THUMB_SIZE_OPTIONS = ["small", "medium", "large"] as const;
 export type ListThumbSize = (typeof LIST_THUMB_SIZE_OPTIONS)[number];
 export const DEFAULT_LIST_THUMB_SIZE: ListThumbSize = "medium";
 
+// Which end of the title bar holds the window buttons (#578), or none, for a
+// window manager that handles windows itself (a tiling one). The default
+// follows the OS: macOS keeps its traffic lights on the left, Windows and
+// Linux put theirs on the right.
+export const WINDOW_BUTTONS_OPTIONS = ["left", "right", "none"] as const;
+export type WindowButtons = (typeof WINDOW_BUTTONS_OPTIONS)[number];
+export function defaultWindowButtons(): WindowButtons {
+  return platform() === "darwin" ? "left" : "right";
+}
+
+export function isWindowButtons(v: unknown): v is WindowButtons {
+  return WINDOW_BUTTONS_OPTIONS.includes(v as WindowButtons);
+}
+
 export function isListThumbSize(v: unknown): v is ListThumbSize {
   return LIST_THUMB_SIZE_OPTIONS.includes(v as ListThumbSize);
 }
 
 interface Prefs {
+  randomThemeOnStartup: boolean;
   sceneCount: number;
+  filmstripFrames: number;
   keybindingPreset: KeybindingPreset;
   hideSupportLink: boolean;
   hoverPreview: boolean;
@@ -121,10 +149,14 @@ interface Prefs {
   petVisible: boolean;
   /** How large the pet is drawn (see src/components/pet/petSize.ts). */
   petSize: PetSize;
+  /** Which end of the title bar holds the window buttons. */
+  windowButtons: WindowButtons;
 }
 
 const DEFAULTS: Prefs = {
+  randomThemeOnStartup: false,
   sceneCount: DEFAULT_SCENE_COUNT,
+  filmstripFrames: DEFAULT_FILMSTRIP_FRAMES,
   keybindingPreset: DEFAULT_KEYBINDING_PRESET,
   hideSupportLink: false,
   hoverPreview: true,
@@ -142,11 +174,23 @@ const DEFAULTS: Prefs = {
   resumePlayback: true,
   petVisible: true,
   petSize: DEFAULT_PET_SIZE,
+  windowButtons: defaultWindowButtons(),
 };
 
 function clampSceneCount(n: number): number {
   if (!Number.isFinite(n)) return DEFAULT_SCENE_COUNT;
   return Math.min(SCENE_COUNT_MAX, Math.max(SCENE_COUNT_MIN, Math.round(n)));
+}
+
+// Anything but a number (an "auto" stored by an earlier build, too) reads as
+// the default.
+function parseFilmstripFrames(v: unknown): number {
+  if (typeof v !== "number" || !Number.isFinite(v))
+    return DEFAULT_FILMSTRIP_FRAMES;
+  return Math.min(
+    FILMSTRIP_FRAMES_MAX,
+    Math.max(FILMSTRIP_FRAMES_MIN, Math.round(v)),
+  );
 }
 
 export function clampPlaylistImageSeconds(n: number): number {
@@ -158,16 +202,21 @@ export function clampPlaylistImageSeconds(n: number): number {
 }
 
 /** Load saved prefs, falling back to defaults for missing/invalid fields. */
-function loadPrefs(): Prefs {
+export function loadPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Prefs>;
       return {
+        randomThemeOnStartup:
+          typeof parsed.randomThemeOnStartup === "boolean"
+            ? parsed.randomThemeOnStartup
+            : DEFAULTS.randomThemeOnStartup,
         sceneCount:
           typeof parsed.sceneCount === "number"
             ? clampSceneCount(parsed.sceneCount)
             : DEFAULT_SCENE_COUNT,
+        filmstripFrames: parseFilmstripFrames(parsed.filmstripFrames),
         keybindingPreset: isKeybindingPreset(parsed.keybindingPreset)
           ? parsed.keybindingPreset
           : DEFAULT_KEYBINDING_PRESET,
@@ -228,6 +277,9 @@ function loadPrefs(): Prefs {
             ? parsed.petVisible
             : DEFAULTS.petVisible,
         petSize: isPetSize(parsed.petSize) ? parsed.petSize : DEFAULT_PET_SIZE,
+        windowButtons: isWindowButtons(parsed.windowButtons)
+          ? parsed.windowButtons
+          : DEFAULTS.windowButtons,
       };
     }
   } catch {
@@ -237,7 +289,9 @@ function loadPrefs(): Prefs {
 }
 
 interface PrefsCtx extends Prefs {
+  setRandomThemeOnStartup: (enabled: boolean) => void;
   setSceneCount: (n: number) => void;
+  setFilmstripFrames: (n: number) => void;
   setKeybindingPreset: (p: KeybindingPreset) => void;
   setHideSupportLink: (hidden: boolean) => void;
   setHoverPreview: (enabled: boolean) => void;
@@ -255,6 +309,7 @@ interface PrefsCtx extends Prefs {
   setResumePlayback: (enabled: boolean) => void;
   setPetVisible: (visible: boolean) => void;
   setPetSize: (size: PetSize) => void;
+  setWindowButtons: (side: WindowButtons) => void;
 }
 
 const Ctx = createContext<PrefsCtx | null>(null);
@@ -281,8 +336,12 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PrefsCtx>(
     () => ({
       ...prefs,
+      setRandomThemeOnStartup: (enabled) =>
+        setPrefs((p) => ({ ...p, randomThemeOnStartup: enabled })),
       setSceneCount: (n) =>
         setPrefs((p) => ({ ...p, sceneCount: clampSceneCount(n) })),
+      setFilmstripFrames: (v) =>
+        setPrefs((p) => ({ ...p, filmstripFrames: parseFilmstripFrames(v) })),
       setKeybindingPreset: (kp) =>
         setPrefs((p) => ({ ...p, keybindingPreset: kp })),
       setHideSupportLink: (hidden) =>
@@ -317,6 +376,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setPetVisible: (visible) =>
         setPrefs((p) => ({ ...p, petVisible: visible })),
       setPetSize: (size) => setPrefs((p) => ({ ...p, petSize: size })),
+      setWindowButtons: (side) =>
+        setPrefs((p) => ({ ...p, windowButtons: side })),
     }),
     [prefs],
   );

@@ -1,6 +1,12 @@
 // SQLite (better-sqlite3). Schema definition and connection.
 import Database from "better-sqlite3";
 import { tagIdentityKey } from "../../shared/tags.js";
+import {
+  NAME_KEY_VERSION,
+  NAME_KEY_VERSION_SETTING,
+  naturalNameKey,
+} from "./nameKey.js";
+import { getSetting, setSetting } from "./queries/settings.js";
 
 export type DB = Database.Database;
 
@@ -14,6 +20,12 @@ export type DB = Database.Database;
 function registerFunctions(db: DB): void {
   db.function("tag_key", { deterministic: true }, (name: unknown) =>
     typeof name === "string" ? tagIdentityKey(name) : name,
+  );
+  // Only for filling files.name_key in bulk (backfillColumns): the scan binds
+  // the key it computes, so nothing in the schema depends on this function and
+  // an older app version can still open and write the database.
+  db.function("natural_name_key", { deterministic: true }, (path: unknown) =>
+    typeof path === "string" ? naturalNameKey(path) : null,
   );
 }
 
@@ -81,6 +93,12 @@ CREATE TABLE IF NOT EXISTS files (
   thumb_path TEXT, thumb_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (thumb_status IN ('pending','done','error')),
   deleted_at INTEGER, excluded_at INTEGER, created_at INTEGER NOT NULL, meta TEXT,
+  -- Set with deleted_at when a scan exclusion (#282) covers the file: hidden,
+  -- not missing, and back with the same id once no rule covers it.
+  scan_excluded_at INTEGER,
+  -- The name sort's key, naturalNameKey(rel_path) (nameKey.ts),
+  -- written with rel_path by the scan.
+  name_key TEXT,
   -- Stable identity for metadata, independent of the autoincrement id: content_hash
   -- when available (survives move/rename), else the absolute path. The fallback
   -- has to be unique across workspaces, not just within this database, and a
@@ -94,7 +112,9 @@ CREATE TABLE IF NOT EXISTS files (
 const CORE_DDL = `
 CREATE TABLE IF NOT EXISTS scan_roots (
   id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, path_hash TEXT NOT NULL,
-  last_scan_at INTEGER, created_at INTEGER NOT NULL
+  last_scan_at INTEGER, created_at INTEGER NOT NULL,
+  -- 1 when the root was a mountpoint at the last scan (see isMountpoint).
+  mountpoint INTEGER
 );
 
 ${FILES_DDL};
@@ -116,6 +136,9 @@ CREATE INDEX IF NOT EXISTS idx_files_alive_rel_path ON files(rel_path, id) WHERE
 -- matches the "captured_at IS NULL ASC" NULLs-last term exactly. The ASC
 -- direction still filesorts (a reversed scan would put NULLs first).
 CREATE INDEX IF NOT EXISTS idx_files_alive_captured ON files((captured_at IS NULL), captured_at DESC, id) WHERE deleted_at IS NULL;
+-- Drives sort=hash in its default ASC direction, NULLs (files not hashed yet)
+-- last as in the ORDER BY. The DESC direction still filesorts.
+CREATE INDEX IF NOT EXISTS idx_files_alive_hash ON files((content_hash IS NULL), content_hash, id) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
@@ -371,7 +394,8 @@ function hasColumn(db: DB, table: string, column: string): boolean {
 
 /** Idempotent column additions for tables that pre-date the new column. CREATE TABLE
  *  IF NOT EXISTS leaves existing tables alone, so columns added after first release must
- *  be added explicitly with ALTER. Each step must be safe to run repeatedly. */
+ *  be added explicitly with ALTER. Each step must be safe to run repeatedly.
+ *  backfillNameKeys also keeps the derived name keys in step with their paths. */
 function backfillColumns(db: DB): void {
   // A workspace's own file_meta exists only until its metadata is merged into
   // the library (whose LIB_DDL already has these columns and the index). Until
@@ -391,6 +415,23 @@ function backfillColumns(db: DB): void {
       "CREATE INDEX IF NOT EXISTS main.idx_file_meta_resume ON file_meta(meta_key) WHERE resume_position IS NOT NULL",
     );
   }
+  // Whether the root was a mountpoint at the last scan: an unmounted one must
+  // not read as an empty folder (#312).
+  if (!hasColumn(db, "scan_roots", "mountpoint")) {
+    db.exec("ALTER TABLE scan_roots ADD COLUMN mountpoint INTEGER");
+  }
+  // Set while a scan exclusion hides the file (#282).
+  if (!hasColumn(db, "files", "scan_excluded_at")) {
+    db.exec("ALTER TABLE files ADD COLUMN scan_excluded_at INTEGER");
+  }
+  // The missing-files list (queries/missing.ts): its WHERE and ORDER BY
+  // exactly, so the planner takes it without statistics and does not sort.
+  // Here rather than in CORE_DDL because it reads scan_excluded_at; it
+  // replaces idx_files_missing, from before files hidden by a scan exclusion.
+  db.exec("DROP INDEX IF EXISTS idx_files_missing");
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_missing_list ON files(deleted_at DESC, id DESC) WHERE deleted_at IS NOT NULL AND excluded_at IS NULL AND scan_excluded_at IS NULL",
+  );
   // Filesystem creation time (birthtime), NULL where the filesystem doesn't
   // provide it. The index lives here (not in CORE_DDL) because on pre-existing
   // DBs the column only exists after this ALTER runs.
@@ -407,6 +448,39 @@ function backfillColumns(db: DB): void {
   // direction; created_at is never NULL, so no NULLs-last term.
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_files_alive_added ON files(created_at DESC, id) WHERE deleted_at IS NULL",
+  );
+  backfillNameKeys(db);
+}
+
+/**
+ * The name sort's key (#292): added to DBs from before it and kept equal to
+ * naturalNameKey(rel_path). Every key is computed again when the function
+ * changes (NAME_KEY_VERSION); otherwise the keys that no longer match their
+ * path are, which an older app version leaves behind (it inserts rows without
+ * one and moves rows without updating it). Checking every row costs about 55ms
+ * per 100,000 files, once per open. Drives sort=name in both directions, like
+ * idx_files_alive_rel_path did.
+ */
+function backfillNameKeys(db: DB): void {
+  if (!hasColumn(db, "files", "name_key")) {
+    db.exec("ALTER TABLE files ADD COLUMN name_key TEXT");
+  }
+  const current =
+    getSetting(db, NAME_KEY_VERSION_SETTING) === String(NAME_KEY_VERSION);
+  db.transaction(() => {
+    db.exec(
+      current
+        ? "UPDATE files SET name_key = natural_name_key(rel_path) WHERE name_key IS NOT natural_name_key(rel_path)"
+        : "UPDATE files SET name_key = natural_name_key(rel_path)",
+    );
+    if (!current) {
+      setSetting(db, NAME_KEY_VERSION_SETTING, String(NAME_KEY_VERSION));
+    }
+  })();
+  // After the fill: building the index over filled keys is cheaper than
+  // moving every entry of one built over empty ones.
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_alive_name_key ON files(name_key, id) WHERE deleted_at IS NULL",
   );
 }
 
@@ -480,7 +554,7 @@ function migrateFilesTable(db: DB): void {
 }
 
 /** The tables that hold user-curated metadata under a meta_key. migrateMetaKey
- *  (queries/meta.ts) lists the same tables; keep the two in step. */
+ *  and copyMetaKey (queries/meta.ts) list the same tables; keep them in step. */
 export const META_KEYED_TABLES = [
   "file_meta",
   "meta_tags",
@@ -560,6 +634,27 @@ export function resyncFtsForKeys(db: DB, metaKeys: string[]): void {
   }
 }
 
+/**
+ * Re-index the given file ids, for the scan's index phase. Same single-JSON-
+ * array binding as resyncFtsForKeys. A file removed from the index
+ * (excluded_at) keeps having no FTS row (#266), and a soft-deleted one loses
+ * its row as in resyncFtsForKeys. Caller supplies the transaction and the
+ * chunking (the scan yields between chunks).
+ */
+export function resyncFtsForIds(db: DB, ids: readonly number[]): void {
+  if (ids.length === 0) return;
+  const chunk = JSON.stringify(ids);
+  db.prepare(
+    "DELETE FROM files_fts WHERE rowid IN (SELECT value FROM json_each(?))",
+  ).run(chunk);
+  db.prepare(
+    `INSERT INTO files_fts (rowid, rel_path, tags_text)
+     ${FTS_ROW_SELECT}
+       AND f.excluded_at IS NULL
+       AND f.id IN (SELECT value FROM json_each(?))`,
+  ).run(chunk);
+}
+
 /** Versionless idempotent migration: DBs created before the trigram switch still carry
  *  a unicode61 files_fts (CREATE VIRTUAL TABLE IF NOT EXISTS leaves it alone), so the
  *  tokenizer is detected from the stored DDL and the table rebuilt once. files_fts is
@@ -629,6 +724,79 @@ export function openLibraryReadonly(libraryFile: string): DB | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * The app's settings, in the library so they share its backups, check and
+ * restore (libraryBackup.ts): one row per AppConfig field, the value as JSON
+ * (appConfig.ts). Not `settings`: workspace databases have a `main.settings`,
+ * which an unqualified name on their connections would resolve to first.
+ */
+const APP_SETTINGS_DDL = `
+CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+-- User collections (collectionStore.ts). position orders the collections, and
+-- the items within one: gaps are fine, only the order counts. An item refers
+-- to a file by its workspace and its id there (files.id).
+CREATE TABLE IF NOT EXISTS collections (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  emoji TEXT,
+  locked INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0, 1)),
+  position INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collection_items (
+  collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL,
+  file_id INTEGER NOT NULL,
+  position INTEGER NOT NULL,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (collection_id, workspace_id, file_id)
+);
+CREATE INDEX IF NOT EXISTS idx_collection_items_order ON collection_items(collection_id, position);
+-- Removing a workspace, or files from one, drops their items everywhere.
+CREATE INDEX IF NOT EXISTS idx_collection_items_file ON collection_items(workspace_id, file_id);
+
+-- Smart collections, the saved searches (smartCollectionStore.ts). query is the
+-- SearchQuery as JSON. position orders them, newest first: a new one takes one
+-- below the lowest. At most one is the default, the one the list opens with.
+CREATE TABLE IF NOT EXISTS smart_collections (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  query TEXT NOT NULL,
+  workspace_id TEXT,
+  is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+  position INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_smart_collections_default ON smart_collections(is_default) WHERE is_default = 1;
+`;
+
+/**
+ * The shared library on its own, writable, for the app's settings: opened
+ * before any workspace, so it creates the library on a first launch. Throws
+ * when it cannot be opened.
+ */
+export function openSettingsDb(libraryFile: string): DB {
+  const db = new Database(libraryFile);
+  try {
+    db.pragma("busy_timeout = 5000");
+    db.pragma("journal_mode = WAL");
+    // FULL, not the NORMAL the workspaces use: a setting saved is meant to
+    // stay saved through a power loss, as the fsync of config.json made it, and
+    // settings are written rarely enough for the sync on each commit.
+    db.pragma("synchronous = FULL");
+    // Removing a collection takes its items with it (ON DELETE CASCADE).
+    db.pragma("foreign_keys = ON");
+    db.exec(APP_SETTINGS_DDL);
+  } catch (e) {
+    db.close();
+    throw e;
+  }
+  return db;
 }
 
 /**

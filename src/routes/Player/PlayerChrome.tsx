@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import {
   Info,
   Maximize,
+  Maximize2,
   Minimize,
+  Minimize2,
   Pause,
   Play,
   AudioLines,
@@ -26,12 +28,15 @@ import { FolderScopeChip } from "@/components/FolderScopeChip";
 export function PlayerChrome({
   title,
   folderLabel,
+  notice,
   position,
   total,
   playing,
   shuffle,
   repeat,
   fullscreen,
+  small,
+  onToggleSize,
   canPrev,
   visible,
   volume,
@@ -55,6 +60,10 @@ export function PlayerChrome({
   title: string;
   /** The folder being played, when the playlist is a folder's subtree. */
   folderLabel?: string | null;
+  /** A notice under the folder (where playback resumed), shown, and clicked,
+   *  as part of the chrome: this layer covers the stage, so anything beside
+   *  it would sit under it. */
+  notice?: ReactNode;
   position: number;
   total: number;
   playing: boolean;
@@ -62,6 +71,9 @@ export function PlayerChrome({
   repeat: boolean;
   /** Whether the player currently owns the screen (it does not by default). */
   fullscreen: boolean;
+  /** The panel's size over the window ("small" is the compact one). */
+  small: boolean;
+  onToggleSize: () => void;
   canPrev: boolean;
   /** False once the user has been idle; the chrome fades out of the way. */
   visible: boolean;
@@ -105,15 +117,27 @@ export function PlayerChrome({
     >
       {/* Centred at the top: the top-left corner belongs to the audio glyph
           (AudioArt's "corner" spectrum layout) and the top-right to the exit. */}
-      {folderLabel && (
-        <div className="absolute left-1/2 top-3 flex max-w-[50%] -translate-x-1/2 justify-center">
-          <FolderScopeChip
-            label={folderLabel}
-            description={t("playlist.inFolder", { path: folderLabel })}
-          />
+      {(folderLabel || notice) && (
+        <div className="absolute left-1/2 top-3 flex max-w-[50%] -translate-x-1/2 flex-col items-center gap-2">
+          {folderLabel && (
+            <FolderScopeChip
+              label={folderLabel}
+              description={t("playlist.inFolder", { path: folderLabel })}
+            />
+          )}
+          {notice}
         </div>
       )}
-      <div className="absolute right-3 top-3">
+      <div className="absolute right-3 top-3 flex items-center gap-2">
+        {/* Full screen takes the screen whatever the size. */}
+        {!fullscreen && (
+          <ChromeButton
+            onClick={onToggleSize}
+            title={small ? t("media.modalMaximize") : t("media.modalMinimize")}
+          >
+            {small ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
+          </ChromeButton>
+        )}
         <ChromeButton onClick={onExit} title={t("playlist.exit")}>
           <X size={20} />
         </ChromeButton>
@@ -256,7 +280,7 @@ function ChromeButton({
       title={title}
       aria-label={title}
       aria-pressed={active}
-      className={`flex size-10 items-center justify-center rounded-full border border-border/60 backdrop-blur-md transition hover:bg-bg/70 disabled:opacity-40 ${
+      className={`flex size-10 items-center justify-center rounded-control border border-border/60 backdrop-blur-md transition hover:bg-bg/70 disabled:opacity-40 ${
         active ? "bg-bg/80 text-[var(--c-primary)]" : "bg-bg/40 text-bright-fg"
       }`}
     >

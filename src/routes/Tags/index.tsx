@@ -2,7 +2,7 @@
 // and origin, and lets the user rename, merge and delete the ones they created.
 // A second view draws the same catalog as a cloud, sized by use.
 // Overlays the library as a modal, like /duplicates and /history.
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { LoadError } from "@/components/LoadError";
 import { invalidateTagCatalog } from "@/lib/queryCache";
 import { applyTagFilter } from "@/lib/ui-events";
 import { tagHumanLabel, tagNamespaceLabel } from "@/lib/tagLabel";
@@ -59,6 +60,7 @@ const refOf = (tag: TagSummary): TagRef => ({
 
 export default function Tags() {
   const { t } = useI18n();
+  const titleId = useId();
   const qc = useQueryClient();
   const confirm = useConfirm();
   const navigate = useNavigate();
@@ -172,6 +174,7 @@ export default function Tags() {
           : t("tags.renamed", { from: vars.from.name, to: vars.to }),
       );
     },
+    meta: { reportsOwnError: true },
     onError: (error) =>
       toast.error(t("tags.renameFailed"), {
         description: error instanceof Error ? error.message : String(error),
@@ -184,6 +187,7 @@ export default function Tags() {
       afterMutation();
       toast.success(t("tags.merged", { count: vars.from.length }));
     },
+    meta: { reportsOwnError: true },
     onError: (error) =>
       toast.error(t("tags.mergeFailed"), {
         description: error instanceof Error ? error.message : String(error),
@@ -195,6 +199,7 @@ export default function Tags() {
       afterMutation();
       toast.success(t("tags.deleted"));
     },
+    meta: { reportsOwnError: true },
     onError: (error) =>
       toast.error(t("tags.deleteFailed"), {
         description: error instanceof Error ? error.message : String(error),
@@ -221,7 +226,7 @@ export default function Tags() {
 
   const onFilterByTag = useCallback(
     (tag: TagSummary) => {
-      applyTagFilter([tagSearchToken(tag.name)]);
+      applyTagFilter([tagSearchToken(tag.name, tag.namespace)]);
       void navigate("/");
     },
     [navigate],
@@ -301,10 +306,12 @@ export default function Tags() {
     : t("media.modalMinimize");
 
   return (
-    <HistoryModal onClose={onClose} size={modalSize}>
+    <HistoryModal onClose={onClose} size={modalSize} titleId={titleId}>
       <header className="flex flex-wrap items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
         <TagsIcon className="size-4 text-primary" />
-        <span className="text-sm font-medium text-fg">{t("tags.title")}</span>
+        <span id={titleId} className="text-sm font-medium text-fg">
+          {t("tags.title")}
+        </span>
         {all.length > 0 && (
           <span className="text-xs text-muted">
             {t("tags.summary", {
@@ -335,8 +342,8 @@ export default function Tags() {
           {isCloud ? (
             <Button
               variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+              size="compact"
+              className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
               onClick={() => setCloudIncludeAuto((prev) => !prev)}
               aria-pressed={cloudIncludeAuto}
             >
@@ -346,8 +353,7 @@ export default function Tags() {
             <ButtonGroup>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
+                size="compact"
                 onClick={() => setSort("name")}
                 aria-pressed={sort === "name"}
               >
@@ -355,8 +361,7 @@ export default function Tags() {
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
+                size="compact"
                 onClick={() => setSort("count")}
                 aria-pressed={sort === "count"}
               >
@@ -366,8 +371,7 @@ export default function Tags() {
           )}
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={toggleModalSize}
             aria-label={toggleLabel}
             aria-pressed={isSmall}
@@ -377,8 +381,7 @@ export default function Tags() {
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onClose}
             aria-label={t("common.close")}
             title={`${t("common.close")} (Esc)`}
@@ -395,8 +398,7 @@ export default function Tags() {
           </span>
           <Button
             variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
+            size="compact"
             disabled={selectedTags.length < 2 || mutating}
             onClick={() => setMergeOpen(true)}
           >
@@ -404,8 +406,7 @@ export default function Tags() {
           </Button>
           <Button
             variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
+            size="compact"
             disabled={mutating}
             onClick={() => void onDeleteSelected()}
           >
@@ -421,15 +422,21 @@ export default function Tags() {
         </div>
       )}
 
-      {/* Loading and "no tags at all" belong to the catalog, not to a view. */}
+      {/* Loading, a failed load and "no tags at all" belong to the catalog, not to a view. */}
       {loading ? (
         <ScrollArea className="page-scroll min-h-0 flex-1">
           <div className="flex flex-col gap-2 p-4">
             {Array.from({ length: 8 }, (_, i) => (
-              <Skeleton key={i} className="h-7 w-full rounded-lg" />
+              <Skeleton key={i} className="h-7 w-full rounded-card" />
             ))}
           </div>
         </ScrollArea>
+      ) : catalog.isError && !catalog.data ? (
+        <LoadError
+          message={t("tags.loadFailed")}
+          onRetry={() => void catalog.refetch()}
+          retrying={catalog.isFetching}
+        />
       ) : all.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted">
           <TagsIcon className="size-10 opacity-50" />

@@ -10,17 +10,7 @@ import {
   useEffect,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-
-const OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"]';
-
-function isTyping(el: HTMLElement | null): boolean {
-  return (
-    !!el &&
-    (el.tagName === "INPUT" ||
-      el.tagName === "TEXTAREA" ||
-      el.isContentEditable)
-  );
-}
+import { LAYER_SELECTOR, isTyping } from "@/lib/keyTarget";
 
 export function useFolderNavKeys({
   active,
@@ -36,7 +26,7 @@ export function useFolderNavKeys({
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       const el = document.activeElement as HTMLElement | null;
-      if (isTyping(el) || el?.closest(OVERLAY)) return;
+      if (isTyping() || el?.closest(LAYER_SELECTOR)) return;
       const plain = !e.ctrlKey && !e.metaKey && !e.shiftKey;
       if (
         (plain && e.altKey && e.code === "ArrowLeft") ||

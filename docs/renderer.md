@@ -2,24 +2,39 @@
 
 The renderer is a React + TypeScript app under `src/`, talking to the main
 process over `window.api`. This document covers its routing, provider stack, data
-fetching, internationalization, theming, and content zoom.
+fetching, internationalization, the title bar, theming, and content zoom.
 
 ## Routing
 
-Routing uses `createHashRouter` (`src/App.tsx`); a hash router is the stable
+Routing uses `createHashRouter` (`src/appRouter.tsx`); a hash router is the stable
 choice inside a webview. `/` (`src/routes/Home/`) is the parent route, and
 `file/:id` (`src/routes/MediaDetail/`), `discover` (`src/routes/Discover/`),
 `play` (`src/routes/Player/`), `history` (`src/routes/History/`),
-`duplicates` (`src/routes/Duplicates/`), `tags` (`src/routes/Tags/`),
+`duplicates` (`src/routes/Duplicates/`), `missing` (`src/routes/Missing/`),
+`tags` (`src/routes/Tags/`),
 `auto-tag` (`src/routes/AutoTag/`), and `settings` (`src/routes/Settings/`)
-are its **children**. Home renders an
+are its **children**. `auto-tag` and `settings` are rarely opened, so they use
+the route's `lazy` and load on first visit; the router waits for the module
+before it navigates, so they need no `Suspense`. Home renders an
 `<Outlet />`, so these children mount as modals **on top of** the list, which
 stays mounted underneath. The file detail can alternatively dock as a **side
 peek** — a sheet docked beside the list as a flex sibling, so the list narrows
 and stays fully usable along with the toolbar and the bottom player bar
 (`MediaModal`'s `presentation` prop). Its left edge is a drag handle; the
 choice, the modal size and the peek width are all remembered in
-`localStorage`.
+`localStorage`. While the peek is docked, the grid, the list, the timeline and
+the filmstrip mark the file it shows (`aria-current="page"`, a primary border) and scroll
+it into view once each time the file changes (`useScrollToPeek`), so
+prev/next in the peek or a file opened from elsewhere does not leave the list
+behind. A file outside the pages loaded at that moment is not scrolled to,
+even once its page loads later; it is marked from then on.
+
+A modal's frame closes itself on Esc (unless a layer on top already took the
+key) and keeps keyboard focus inside with `useModalFocus`
+(`src/hooks/useModalFocus.ts`): focus moves into the panel (`tabIndex={-1}`) on
+open, Tab cycles inside it, and focus returns to the opener on close. The
+dialog element is named with `aria-labelledby` pointing at the title the route
+renders. The peek is not a modal, so it does neither.
 
 Each route is a directory: `index.tsx` is the entry point and composes the
 route, sitting alongside its companion components and hooks — for example
@@ -30,12 +45,86 @@ the note, which `useNoteWriter.ts` saves as the user types), and
 `src/routes/Player/usePlayerKeys.ts` (the playlist's keyboard control). Keep
 mechanics in such hooks and components; `index.tsx` should stay a composition.
 
+One immersive view is not a route: the image comparison (`src/compare/`),
+opened from the selection bar for exactly two images. It keeps the pair it
+opened with and sits over the list as Discover does. Home reads
+`useImmersiveViewOpen()` so the list's keys stand down while it is up. The
+alignment runs in `align.worker.ts` with OpenCV.js (`@techstark/opencv-js`,
+about 15 MB in its own chunk, so it loads only when a comparison opens):
+`alignImages.ts` places B in A by a scale and an offset (no rotation),
+correlating the images' edges rather than their shades (`edges.ts`; a dark
+and a light theme of one screen invert most shades but keep every edge in
+place). Three searches each guess the placement: `searchContained.ts` finds
+one image inside the other at scale 1 (a crop of any size),
+`searchCoarse.ts` tries B as a whole at quarter-octave scales from a quarter
+to four times, in A padded with a margin of no edges, and
+`searchFeatures.ts` pairs up ORB features (RANSAC over scale and offset).
+`refine.ts` measures every guess the same way at full size, with a patch in
+each half of the overlap whose distance apart gives the scale to a fraction
+of a pixel, so the scores compare and the highest wins. A new search only
+has to return guesses. On the view's side, `geometry.ts` holds the
+placement's arithmetic (span, overlap, the inverse for a swap) and
+`modes.ts` the layer styles of each way to look. Zoom and pan behave as
+the file details' image and video do (`src/hooks/usePanZoom.ts`, with the
+math in `src/lib/panZoom.ts`): Ctrl+wheel zooms toward the pointer, a
+double-click toggles fit and actual pixels, and a drag pans, clamped at the
+edges. The box that holds both images is what is fitted, 100% is actual
+pixels of A, and pixels past 2× are drawn unsmoothed.
+
+The renderer's CSP (`index.html`) does not reach this worker: OpenCV.js
+compiles its wasm there without `'wasm-unsafe-eval'` in the packaged app
+(`e2e/compare.spec.ts`). A worker takes the policy of its own script's
+response, not the page's `<meta>` one, and a `file:` script has none. So
+`connect-src` does not limit the worker's `fetch` either. The package is pinned to an exact version for that
+reason. When updating it, check that its `dist/opencv.js` is the official
+`https://docs.opencv.org/<version>/opencv.js` with the package's
+`dist/opencv.js.patch` applied, and update `THIRD_PARTY_NOTICES.txt`.
+
 ## Provider hierarchy
 
-The provider stack is set up in `src/main.tsx`:
+The provider stack is set up in `renderApp()` (`src/renderApp.tsx`):
 
 ```text
 QueryClientProvider → ThemeProvider → I18nProvider → PreferencesProvider → TourProvider → ConfirmProvider
+```
+
+## Starting the renderer
+
+`renderApp()` (`src/renderApp.tsx`) starts the renderer: the window error
+logging, the query client, the router and the provider stack. Nothing in it
+runs on import. `src/main.tsx` is only Meguri's entry point, which calls it
+with no options; it is the renderer-side counterpart of `startApp()` (see
+[architecture.md](architecture.md)).
+
+An app built on Meguri calls `renderApp()` from its own entry point (built with
+`appBuildConfig()`'s `rendererEntry`, see
+[Building from another project](build-and-ci.md#building-from-another-project))
+and passes what it adds:
+
+- `settingsSections`: settings tabs shown after Meguri's own, in order. Each
+  has an `id`, a `label(lang)` (the app's strings are not in Meguri's
+  catalogs, so it is called with the current language) and a `Component`
+  rendered as the tab's panel. Their DOM ids are prefixed with `extra-`, so
+  they cannot collide with Meguri's tabs.
+- `routes`: React Router routes added after Meguri's as children of `/`. Like
+  `/settings`, they mount over the list, so a page renders itself as a modal.
+
+```tsx
+// The app's renderer entry
+import { renderApp } from "../vendor/meguri/src/renderApp";
+import { SyncSettings } from "./SyncSettings";
+import { SyncLog } from "./SyncLog";
+
+renderApp({
+  settingsSections: [
+    {
+      id: "sync",
+      label: (lang) => (lang === "ja" ? "同期" : "Sync"),
+      Component: SyncSettings,
+    },
+  ],
+  routes: [{ path: "sync-log", element: <SyncLog /> }],
+});
 ```
 
 ## Audio playback
@@ -140,8 +229,26 @@ targets and add its strings to every locale.
 
 Data fetching uses `@tanstack/react-query`. The file list is an
 `useInfiniteQuery` combined with `@tanstack/react-virtual` for infinite scroll
-plus virtualization (`src/components/MediaGrid.tsx`). Four view modes — grid,
-list, timeline and graph — are switchable.
+plus virtualization (`src/components/MediaGrid.tsx`). Five view modes — grid,
+list, timeline, filmstrip and graph — are switchable.
+
+A list that can grow without bound — loaded page by page, or not capped — is
+virtualized: only the rows in view are mounted. Use `useVirtualizer` from
+`@tanstack/react-virtual` directly, with `useInfiniteScrollTrigger` to load the
+next page and `useScrollToRow` / `useGridKeyboardNav` where it has keyboard
+navigation. Each list lays out its own rows; there is no shared list component.
+Rows placed by transform cannot use `position: sticky`, so a pinned section
+header is drawn over the list (the timeline, History). A list with a fixed cap
+need not be virtualized: Duplicates (`MAX_DUPLICATE_GROUPS`, 500) and Tags
+(`MAX_TAG_LIST`, 2,000) open in under 0.3 s at the cap and scroll at 60 fps,
+while History, before it was virtualized, took 3.5 s to add its 100th page of
+50 rows (#519).
+
+A mutation that fails is reported by a generic toast
+(`src/hooks/useMutationErrorNotifier.ts`), so an action never fails silently.
+A mutation that shows its own error message sets
+`meta: { reportsOwnError: true }` to keep the failure from being reported
+twice.
 
 The grid and the list have a "show by folder" option (`BY_FOLDER_KEY`, remembered apart
 from the view mode) that browses one workspace like a file manager: the current
@@ -237,6 +344,29 @@ window follows. The day counts and the list are two reads; a file found under
 another day's header has the counts read again. The timeline has no
 folder form (`hasFolderForm`), shows a collection in date order rather than
 its manual order, and keeps the heatmap panel over it like any view.
+
+The filmstrip (`src/filmstrip/`) draws the list one row per file, laid out along
+its length: a video's frames at even intervals with their timecodes and a bar
+marking its scene bookmarks, an audio file's waveform (the server's `waveform`
+kind, used as a CSS mask over a theme color), an image's thumbnail. A frame, a
+bookmark mark or a point on the waveform opens the file at that time and plays;
+the rest of the row opens it paused, as in the list. The frame count is the
+`filmstripFrames` preference (10 by default), never fitted to the width: the
+frame times follow the count, so a width-fitted count would fetch every frame
+again on each resize, such as a side peek docking. Frames are 16:9 boxes sharing
+the row's width, so the strip always spans the row and their height (and every
+row's) follows the view's width (`stripLayout`, worked out once per view); a
+video of another aspect sits inside its box whole. Only when a box would drop
+below 64px wide does the row scroll sideways. The quality follows
+`frameQuality`. Each frame is an ffmpeg run on a decode slot shared with seek
+previews, thumbnails and the scan, so images load only for the rows in the
+viewport (the virtualizer's `range`, not its overscan), through one queue per
+view that keeps every decode slot but one busy, never fewer than two
+(`filmstripInFlight`, from `app_status`'s `decodeSlots`; `imageLimiter.ts`,
+`fetch` with an `AbortController`, so a row scrolled away gives up its
+requests). The search rows carry `codec`, `fps` and `bookmarkSecs` for it.
+Keyboard, selection, the peek and paging are the list's; it has no folder form
+and no drag-to-reorder.
 
 The heatmap (`src/heatmap/`, "Contribution graph" in the UI) is not a view but
 a panel under the filter bar, over whichever view is shown, toggled from the
@@ -427,7 +557,9 @@ stay in sync without a refetch. Discover pulls videos with `randomFiles`
 (`ORDER BY RANDOM()`) and presents them one at a time as a full-bleed immersive
 modal driven by embla-carousel, with a horizontal `SceneRail` of seekable scene
 previews. The History route lists `history_list` pages (day-grouped, infinite
-scroll) across the active or all workspaces.
+scroll, virtualized) across the active or all workspaces. The Missing route (opened from
+the scan menu) lists `missing_files_list` (on the query worker, virtualized)
+and removes the files the user selects with `missing_files_purge`.
 
 Hovering a video thumbnail scrubs through frames fetched from the `frame`
 endpoint (`src/hooks/useHoverFramePreview.ts`, shared by `MediaThumbnail` and
@@ -444,11 +576,177 @@ to `localStorage`). The supported languages are `ja`, `en`, `es`, `fr`, `ko`, an
 `TranslationKey` is defined primarily in `src/i18n/locales/ja.ts`. When adding a
 key, sync **all** locales.
 
+Strings do not spell out the app's name: write `{app}`, which `t()` always
+fills in with `appName()` (`src/lib/appName.ts`), the name the main process
+was started with. Because it needs no param, a locale may use `{app}` where
+`ja` does not. The About section names the app by its one-character mark
+instead, `appGlyph()` from the same file (Meguri's is 巡).
+
+A string with a `{count}` can have plural forms: instead of a string, the locale
+gives an object keyed by `Intl.PluralRules` category, with at least `other`
+(`{ one: "{count} file", other: "{count} files" }`; `src/i18n/message.ts`).
+`t()` picks the form for the `count` param, so pass the number itself; a count
+that is not a number, such as `"1,000+"`, takes `other`. `ja.ts` has no forms,
+and only the categories of the locale's language are allowed (a test checks).
+Forms are given where the words around the number change with it and the
+count can be one (in French, also zero), not where it never can (an action on
+several selected tags, a list past its limit). Only `count` picks a form: a
+string whose other number params (`{files}`, `{tags}`) decide the noun keeps
+one wording, or is split into keys such as `…One` / `…Many` by its caller.
+Number params are written with `Intl.NumberFormat` for the app's language, not
+the OS's, so do not format them before passing them in.
+
 ## UI primitives and dialogs
 
 UI primitives are in `src/components/ui/` (Radix plus class-variance-authority,
 in the shadcn style). Confirmation dialogs use `ConfirmProvider` / `useConfirm`
 (`src/components/ConfirmDialog.tsx`).
+
+An experimental feature carries a beaker (`src/components/ExperimentalBadge.tsx`)
+wherever it is offered or opens: `ExperimentalCorner` around the control that
+starts it (the beaker overhangs its corner), `ExperimentalBadge` next to the
+title of what it opens. Its title says the feature may change or be removed.
+Take both off when the feature is no longer experimental. The image comparison
+is one.
+
+## Design tokens
+
+The app's scales (#584). A new part takes its values from them; a value
+outside them needs a reason.
+
+Corner radii are named by what they round (`src/styles.css`), and a part
+inside another gets a smaller one than its container:
+
+| Class             | Size | For                                      |
+| ----------------- | ---- | ---------------------------------------- |
+| `rounded-panel`   | 16px | the content panel set in the frame       |
+| `rounded-window`  | 12px | modals, dialogs, the selection bar       |
+| `rounded-card`    | 8px  | cards, panels, list rows, bubbles        |
+| `rounded-control` | 6px  | buttons, fields, menus, popovers, badges |
+| `rounded-item`    | 4px  | menu items, small chips inside a control |
+| `rounded-full`    | pill | pills, switches, round buttons           |
+
+`cn()` (`src/lib/utils.ts`) knows these names, so a radius passed in
+`className` replaces a component's own.
+
+The other scales use Tailwind's classes, limited to these steps:
+
+- **Spacing**: 0.5, 1, 1.5, 2, 3, 4, 6 and 8 (2 to 32px). Layout offsets built
+  on layout variables (`--meguri-title-bar-height` and the like) are positions,
+  not spacing.
+- **Control heights**: 24px (`h-6`, icon buttons on cards and rows), 28px
+  (`h-7`, `Button size="compact"`, controls in a window's dense rows and
+  toolbars) and 32px (`h-8`, `Button size="sm"`, `Input`, `Select`: the bars,
+  dialogs and forms).
+- **Font sizes**: `text-2xs` (11px, badges, counts and secondary lines),
+  `text-xs` (12px, most text), `text-sm` (14px, body text, menu items and
+  fields), `text-base` (16px, window titles), `text-lg` and `text-xl`
+  (headings in empty states and the tour). Unlike the others, `text-2xs` sets
+  no line height. `font-medium` for emphasis,
+  `font-semibold` for titles, `font-bold` for numbers that are the point.
+- **Borders**: 1px; 2px only for focus and selection rings. `border-border`
+  for dividers and containers, `border-border-strong` for the edge of a
+  control; translucent white over video and images.
+- **Tints**: `bg-fg/10` for hover on a bare button or row, `bg-primary/15` for
+  a selected item, `bg-primary/25` for a selected item hovered or active,
+  `bg-black/70` for a modal's backdrop.
+- **Shadows**: `shadow-lg` for menus and popovers, `shadow-2xl` for windows.
+
+So far the shared primitives (`src/components/ui/`), the content panel and
+the modals use the radius names. Elsewhere a raw `rounded-md`, `text-[13px]`
+or 26px control is either a part already at its scale's value that only needs
+the name, or one that has to move; each sub-issue of #579 sorts out its own
+area.
+
+## Title bar
+
+The app draws the window's title bar (`src/components/TitleBar.tsx`) across the
+top of the shell, above the workspace rail. `titleBarOptions()` in
+`electron/ipc/window.ts` hides the native one (`titleBarStyle: "hidden"`).
+The bar and the rail share the `chrome` color (`--color-chrome` in
+`src/styles.css`: a CSS theme's `--c-chrome`, or else the `surface` with 12%
+of the text color, so it stands apart from the content in every theme) and read as one frame;
+the content is a bordered panel set into it (`data-slot="content-panel"` in
+`App.tsx`). The bar holds the logo, then the current screen's header, with the
+window buttons at the end the user picks under "Window buttons" in the
+Appearance settings (the `windowButtons` preference): left by default on macOS
+and right elsewhere. "None" draws no buttons, for a window manager that handles
+windows itself (a tiling one); it is offered on every OS.
+
+The logo heads the rail's column: in the bar, above the rail, unless the
+buttons take the bar's left end; then it is the rail's first item
+(`AppLogo` in both places).
+
+- The screen's header renders into the bar's slot through `<TitleBarPortal>`
+  (`src/components/titleBarSlot.tsx`, with the slot in `titleBarSlotContext.ts`). Home's header (`HomeHeader`) is the one
+  there now: the path on the left, the list's search (`SearchTrigger`, taken
+  out of the filter bar) in the middle, the toolbar on the right. As in VS
+  Code, the search is not typed in the bar: it shows the search on screen
+  (conditions as removable chips) and opens the command menu over it, the
+  menu's field laid where the search was (`searchAnchor`), so one field is on
+  screen with the commands under it. The field starts from the search on
+  screen, its conditions as chips (see "Full-text search" in data-model.md), and
+  completes tags as rows of the menu. "Search for" is the first row whenever
+  the field holds a search, so Enter runs the field as the search, and a
+  recent or saved search, or a command, that matches is a pick below it. Until
+  the field is edited its rows are not filtered, so the menu still lists every
+  command.
+  The focus-search keys (`/`, Ctrl+F) open the menu too. Without the
+  provider, as in a screen's own tests, the header renders in place.
+- On Windows and Linux there are no window buttons from the OS, so the bar
+  draws minimize, maximize/restore and close: close last on the right, close
+  first on the left. They call `window_minimize`, `window_toggle_maximize` and
+  `window_close`; close goes through the window's `close` handler, so it hides
+  the window to the tray as before. The `window:state` event tells the bar
+  when the window is maximized, for the maximize button's icon. A double click
+  on the bar is the OS's: the drag region is the window's caption there.
+- On macOS the OS keeps its traffic lights. They do not zoom with the page, so
+  the bar leaves them room sized in screen px (divided by `--meguri-zoom`,
+  which `useContentZoom` publishes) and moves them into it with
+  `window_set_button_position` on every resize (a zoom change fires one) and
+  change of side. Full screen hides them, and their room with them; "None"
+  hides them through `window_set_button_visibility`. The page
+  gets a double click on the bar, and `window_title_bar_double_click` applies
+  the system setting (zoom, minimize or nothing).
+
+The bar is a drag region (`-webkit-app-region: drag`); its links, buttons and
+fields are `no-drag` (`src/styles.css`), and the rest of it, the header's text
+included, moves the window. While an immersive view covers it
+(`data-immersive`), its controls are a drag region too.
+The slot takes one screen's header at a time: today only Home, the parent of
+every route, renders into it.
+
+A modal's backdrop is `modal-backdrop` (`src/styles.css`): one layer that dims
+and blurs the whole window, title bar included, with its content kept below the
+bar. The bar still moves the window under it (a click on one of its controls
+reaches the backdrop instead, which closes the modal), and the window buttons
+sit above it, so the window can still be moved, minimized and closed while a modal is
+open. The immersive views (Discover, the player and the file details' modal, not
+its side peek) cover the bar instead. They take their backdrop from
+`useImmersiveBackdrop()` (`src/components/immersiveView.ts`): the class
+`modal-backdrop-full`, a layer over the whole window with their panel set into
+it, and a hold that moves the bar's window buttons aside while it is up.
+The app's own buttons are hidden with their room kept, and macOS's traffic
+lights are hidden. Esc or the view's own close button leaves it, and a click on
+the backdrop around the panel closes it. The bar still moves the window under the
+backdrop: the panel alone is `no-drag`, and the bar's own controls stop being
+`no-drag` meanwhile, so the whole band around the panel moves the window and a
+click there does not close the view. That is the margin above the panel, or the
+band's full width where the panel is centered below it (the compact Discover and
+player). Another overlay that covers the window without dimming the bar (the
+workspace rail's drop target) is `fixed inset-below-title-bar`. ESLint refuses
+`fixed inset-0` in the renderer. The player's full screen takes its panel to the
+screen's edges, over the bar, as any full-screen element does.
+
+A drag region ignores what is painted over it, so a click on a toast, a menu or
+a dialog over the bar's band would move the window. `src/styles.css` makes
+those layers `no-drag` (`[data-sonner-toaster]`,
+`[data-radix-popper-content-wrapper]`, a `[role="dialog"]` that is not a
+backdrop (`modal-backdrop`, `modal-backdrop-full`), an immersive view's panel
+(`.modal-backdrop-full > *`), the pet), and the
+toasts start below the bar. A new floating layer that can reach the band goes
+in that list. The crash screen (`ErrorBoundary`) replaces the whole app, title
+bar included, so it draws a plain drag strip with a Close button of its own.
 
 ## Theming
 
@@ -467,7 +765,16 @@ such as gruvbox, solarized, and nord. It has four layers:
   is passed through untouched.
 - `ThemeProvider.tsx` — injects one `html[data-theme="<id>"]` block per scheme at
   import time (before the first paint, which is what `public/theme-boot.js`
-  assumes) and switches `<html data-theme>`.
+  assumes) and switches `<html data-theme>`. A switch cross-fades the window
+  with `document.startViewTransition`, applying the new theme synchronously
+  inside the callback (`flushSync` plus `applyTheme`) so the transition
+  snapshots it, and skips the fade under reduced motion.
+- `startupTheme.ts` — with "Random theme on startup" on, picks and applies the
+  theme before the first render. `public/theme-boot.js` reads the same
+  preference from `meguri.prefs` and paints a neutral gray instead of the
+  previous theme's color, with `data-boot-fade` on `<html>`; `styles.css` fades
+  the picked theme in over `--meguri-theme-fade`, and `ThemeProvider` removes
+  the attribute once that has played.
 
 Adding a theme means adding its palette to `schemes.ts`; nothing else needs to be
 touched. `src/themes/__tests__/derive.test.ts` runs every scheme through the
@@ -487,3 +794,22 @@ series-shared `ThemeProvider.tsx` on purpose.
 Zoom uses `webFrame.setZoomFactor` rather than CSS zoom, so coordinate math is
 not affected. It is driven via `preload` through
 `src/hooks/useContentZoom.ts`.
+
+The detail view's image and video and the image comparison have a zoom of
+their own, with one behavior (`src/hooks/usePanZoom.ts`, with the math of
+`src/lib/panZoom.ts`; #647). Ctrl+wheel over the picture zooms it instead of
+the window: the hook's listener stops the event before it bubbles to the
+window listener of `useContentZoom`, so that listener must stay on the bubble
+phase. Zoomed in, the image is drawn at its zoomed size over its own stage
+(`src/routes/MediaDetail/ZoomableImage.tsx`), not scaled with CSS zoom, so it
+does not touch the rule above.
+
+The detail view's video (`src/routes/MediaDetail/useVideoZoom.ts`) is on the
+same hook.
+It cannot be redrawn in a pane of its own, so the zoom is a CSS transform on
+the element that holds the `<video>` (and on the adjusted picture's canvas,
+which is drawn at the zoomed resolution), never on the `<video>` itself: that
+element is handed to and from the playlist player, which must not inherit a
+zoomed view. A press that moves a few pixels pans; one that does not still
+plays or pauses, and a double-click is left alone. The zoom buttons sit in
+the control bar.

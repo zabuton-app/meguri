@@ -24,6 +24,11 @@ const toasts = vi.hoisted(() => ({
   info: vi.fn(),
 }));
 
+vi.mock("@/hooks/useLogo", () => ({
+  useLogo: () => ({ logo: "default" }),
+  useLogoImages: () => ({ default: "logo.png" }),
+}));
+
 vi.mock("sonner", () => ({
   toast: Object.assign(vi.fn(), toasts),
   Toaster: () => null,
@@ -45,8 +50,8 @@ vi.mock("@/ipc/client", () => ({
       mocks.collectionSetMembership(...args),
   },
   events: {
-    onWorkspaceChanged: vi.fn().mockResolvedValue(() => {}),
-    onScanDone: vi.fn().mockResolvedValue(() => {}),
+    onWorkspaceChanged: vi.fn().mockReturnValue(() => {}),
+    onScanDone: vi.fn().mockReturnValue(() => {}),
   },
   ALL_ID: "__all__",
   COLLECTION_ID_PREFIX: "collection:",
@@ -78,6 +83,25 @@ describe("WorkspaceRail", () => {
     expect(
       container.querySelector('nav[data-slot="workspace-rail"]'),
     ).toBeTruthy();
+  });
+
+  // The logo heads the rail's column: in the title bar above, unless the
+  // window buttons take the bar's left end (#578).
+  it("shows the logo only while the window buttons are on the left", () => {
+    localStorage.setItem(
+      "meguri.prefs",
+      JSON.stringify({ windowButtons: "left" }),
+    );
+    const { container, unmount } = renderWithProviders(<WorkspaceRail />);
+    expect(container.querySelector('img[src="logo.png"]')).toBeTruthy();
+    unmount();
+    localStorage.setItem(
+      "meguri.prefs",
+      JSON.stringify({ windowButtons: "right" }),
+    );
+    const right = renderWithProviders(<WorkspaceRail />);
+    expect(right.container.querySelector('img[src="logo.png"]')).toBeNull();
+    localStorage.removeItem("meguri.prefs");
   });
 
   it("switches workspace when an inactive entry is clicked", async () => {

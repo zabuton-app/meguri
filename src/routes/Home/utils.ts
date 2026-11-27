@@ -1,7 +1,7 @@
 import {
   joinSearchTokens,
   splitSearchTokens,
-  tagSearchKey,
+  searchDirectiveKey,
 } from "@shared/tags";
 import { isActivityMetric, type ActivityMetric } from "@shared/ipc/activity";
 import {
@@ -14,15 +14,21 @@ import type { SearchQuery } from "@/ipc/types";
 export const DISCOVER_FILTER_PARAM = "filter";
 export const VIEW_KEY = "meguri.view";
 
-export type ViewMode = "grid" | "list" | "graph" | "timeline";
+export type ViewMode = "grid" | "list" | "graph" | "timeline" | "filmstrip";
 
 export function isViewMode(v: string | null): v is ViewMode {
-  return v === "grid" || v === "list" || v === "graph" || v === "timeline";
+  return (
+    v === "grid" ||
+    v === "list" ||
+    v === "graph" ||
+    v === "timeline" ||
+    v === "filmstrip"
+  );
 }
 
 /**
- * Whether a view can be drawn by folder. The graph and the timeline have no
- * folder form; the stored option waits for the grid and the list.
+ * Whether a view can be drawn by folder. The graph, the timeline and the
+ * filmstrip have no folder form; the stored option waits for the grid and the list.
  */
 export function hasFolderForm(view: ViewMode): boolean {
   return view === "grid" || view === "list";
@@ -128,14 +134,14 @@ export function addSearchTokens(
   // while `current` holds them unquoted — normalize both sides before comparing,
   // or a second click on a multi-word tag would append a duplicate.
   const incoming = tokens.flatMap((token) => splitSearchTokens(token));
-  // A directive is compared on tagSearchKey rather than on the token, so a tag
-  // clicked while `tag:4K` is already in the box is recognised as the condition
-  // it resolves to — the same key the search box applies to a typed one. Free
-  // text has no such resolution and stays an exact comparison.
-  const keys = new Set(current.map(tagSearchKey));
+  // A directive is compared on searchDirectiveKey rather than on the token, so
+  // a tag clicked while `tag:4K` is already in the box is recognised as the
+  // condition it resolves to — the same key the search box applies to a typed
+  // one. Free text has no such resolution and stays an exact comparison.
+  const keys = new Set(current.map(searchDirectiveKey));
   const added = incoming.filter((token) => {
     if (!token) return false;
-    const key = tagSearchKey(token);
+    const key = searchDirectiveKey(token);
     if (key === null) return !current.includes(token);
     if (keys.has(key)) return false;
     keys.add(key);

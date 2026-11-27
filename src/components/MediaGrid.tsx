@@ -19,6 +19,7 @@ import {
   type MediaReorder,
 } from "@/components/MediaReorder";
 import { mediaSortId } from "@/lib/mediaSortId";
+import { useScrollToPeek } from "@/hooks/useScrollToPeek";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
 import {
   useWatchLater,
@@ -106,6 +107,9 @@ interface Props {
   resetKey?: string;
   /** The list is a search inside a folder: its empty state says so. */
   inFolder?: boolean;
+  /** mediaSortId of the file a docked side peek shows: marked, and scrolled
+   *  into view each time it changes. */
+  peekFileKey?: string;
 }
 
 const noop = () => {};
@@ -199,7 +203,16 @@ export function useCardGridMetrics(scrollEl: HTMLDivElement | null) {
     [measureKey, ready],
   );
   const rowEstimate = ready && extraH > 0 ? thumbH + extraH : ROW_ESTIMATE;
-  return { cols, rowEstimate, measureRow };
+  // Whether `cols` is measured for the width the grid has right now. The
+  // ResizeObserver reports a new width only in the frame after the layout
+  // changes, so a render in between (the one in which the side peek docks
+  // and narrows the grid) still carries the old column count. Reads the
+  // layout: call it only right before acting on `cols`.
+  const colsCurrent = useCallback(
+    () => ready && !!scrollEl && scrollEl.clientWidth - SIDE_PAD * 2 === innerW,
+    [ready, scrollEl, innerW],
+  );
+  return { cols, rowEstimate, measureRow, colsCurrent };
 }
 
 // Memoized: Home's props are referentially stable, so the grid only re-renders
@@ -224,6 +237,7 @@ export const MediaGrid = memo(function MediaGrid({
   onOpenFolder,
   resetKey,
   inFolder = false,
+  peekFileKey,
 }: Props) {
   const watchLaterMembership = useWatchLater();
 
@@ -237,7 +251,8 @@ export const MediaGrid = memo(function MediaGrid({
     scrollRef.current = node;
     setScrollEl(node);
   }, []);
-  const { cols, rowEstimate, measureRow } = useCardGridMetrics(scrollEl);
+  const { cols, rowEstimate, measureRow, colsCurrent } =
+    useCardGridMetrics(scrollEl);
 
   // Folder cards lead the list, packed into the same rows as the files so the
   // row height and the 2D keyboard movement need no special case.
@@ -317,6 +332,25 @@ export const MediaGrid = memo(function MediaGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId, resetKey]);
 
+  // The card the docked peek shows. Its row is scrolled to once the grid is
+  // loaded and its columns are measured for its current width (opening the
+  // peek narrows the grid in this very render).
+  const peekIndex = peekFileKey
+    ? entries.findIndex(
+        (e) => e.kind === "file" && mediaSortId(e.file) === peekFileKey,
+      )
+    : -1;
+  const peekReady = useCallback(
+    () => !loading && colsCurrent(),
+    [loading, colsCurrent],
+  );
+  useScrollToPeek({
+    peekFileKey,
+    row: peekIndex >= 0 ? Math.floor((peekIndex + leadCells) / cols) : -1,
+    ready: peekReady,
+    scrollToRow,
+  });
+
   // Fetch the next page when a row near the end becomes visible (replaces the old IntersectionObserver sentinel).
   useInfiniteScrollTrigger({
     virtualRows,
@@ -340,7 +374,7 @@ export const MediaGrid = memo(function MediaGrid({
         {Array.from({ length: 18 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-col overflow-hidden rounded-md border border-border bg-surface"
+            className="flex flex-col overflow-hidden rounded-card border border-border bg-surface"
           >
             <Skeleton className="aspect-video rounded-none" />
             <div className="flex flex-col gap-1.5 px-2 py-1.5">
@@ -363,7 +397,13 @@ export const MediaGrid = memo(function MediaGrid({
   // display:table to block so absolutely positioned rows track the width correctly.
   return (
     <MediaReorderProvider items={items} reorder={reorder}>
-      <FileContextMenu items={items} mediaBase={mediaBase} active={navActive}>
+      <FileContextMenu
+        items={items}
+        mediaBase={mediaBase}
+        workspaceId={wsId}
+        active={navActive}
+        onOpenFolder={onOpenFolder}
+      >
         <ScrollArea
           className="page-scroll h-full"
           viewportClassName="pt-4"
@@ -414,6 +454,7 @@ export const MediaGrid = memo(function MediaGrid({
                         mediaBase={mediaBase}
                         onTagClick={onTagClick}
                         focused={focused}
+                        peeked={cell - leadCells === peekIndex}
                         watchLater={watchLaterMembership}
                         watchLaterRef={
                           focused ? focusedWatchLaterRef : undefined
@@ -448,6 +489,7 @@ export const MediaCard = memo(function MediaCard({
   mediaBase,
   onTagClick,
   focused,
+  peeked,
   watchLater,
   watchLaterRef,
   fileDraggable,
@@ -458,6 +500,8 @@ export const MediaCard = memo(function MediaCard({
   mediaBase: string;
   onTagClick?: (name: string) => void;
   focused?: boolean;
+  /** The file the docked side peek shows. */
+  peeked?: boolean;
   watchLater: WatchLaterMembership;
   /** Set only on the focused card, so the "W" shortcut can drive this toggle. */
   watchLaterRef?: Ref<HTMLButtonElement>;
@@ -502,11 +546,20 @@ export const MediaCard = memo(function MediaCard({
       data-testid="media-card"
       data-slot="media-card"
       data-file-key={mediaSortId(file)}
-      aria-current={focused ? "true" : undefined}
+      // "page" marks the file the peek shows; the keyboard focus, which can
+      // be elsewhere, keeps "true" and wins on the card that has both.
+      aria-current={focused ? "true" : peeked ? "page" : undefined}
+      data-selected={selected || undefined}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-primary",
-        focused && "border-primary ring-2 ring-primary",
-        selected && "border-primary ring-1 ring-primary",
+        "group relative flex flex-col overflow-hidden rounded-card border border-border bg-surface transition-colors hover:border-border-strong",
+        // A tint marks what is selected and a ring where the focus is, so
+        // the two show together (#587). The tint is mixed into the card's
+        // own color, which a theme may redefine on the card. The file in the
+        // peek takes the primary border alone.
+        peeked && "border-primary hover:border-primary",
+        selected &&
+          "border-primary hover:border-primary bg-[color-mix(in_oklab,var(--c-primary)_15%,var(--c-surface))]",
+        focused && "border-primary hover:border-primary ring-2 ring-primary",
       )}
     >
       {/* The link covers the thumbnail and the toggles sit beside it, not
@@ -532,7 +585,7 @@ export const MediaCard = memo(function MediaCard({
         >
           <MediaThumbnail file={file} mediaBase={mediaBase} />
           {hasTimeline(file.kind) && !!file.duration && (
-            <span className="absolute bottom-1 right-1 rounded bg-bg/70 px-1 text-[10px] text-fg">
+            <span className="absolute bottom-1 right-1 rounded-item bg-bg/70 px-1 text-2xs text-fg">
               {formatDuration(file.duration)}
             </span>
           )}
@@ -560,7 +613,7 @@ export const MediaCard = memo(function MediaCard({
             favorite={file.favorite}
             size={16}
             className={cn(
-              "absolute right-1 top-1 z-10 rounded bg-bg/70 p-1 transition-opacity",
+              "absolute right-1 top-1 z-10 rounded-item bg-bg/70 p-1 transition-opacity",
               pinnedFavorite
                 ? "opacity-100"
                 : "card-control-in opacity-0 focus:opacity-100 group-hover:opacity-100",
@@ -576,7 +629,7 @@ export const MediaCard = memo(function MediaCard({
             watchLater={watchLater}
             size={16}
             className={cn(
-              "absolute right-1 top-9 z-10 rounded bg-bg/70 p-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100",
+              "absolute right-1 top-9 z-10 rounded-item bg-bg/70 p-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 aria-pressed:opacity-100",
               !pinnedWatchLater && "card-control-in",
             )}
           />
@@ -605,7 +658,7 @@ export const MediaCard = memo(function MediaCard({
               over the whole region its overlay covers. */}
           <span title={file.relPath}>{fileNameOf(file.relPath)}</span>
         </HashLink>
-        <div className="truncate text-[10px] text-muted">{metaLine(file)}</div>
+        <div className="truncate text-2xs text-muted">{metaLine(file)}</div>
         {/* Editable rating once the card is hovered or focused (drawn only
             until then, under the link's overlay so a click opens the detail). */}
         {hot ? (

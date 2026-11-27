@@ -14,6 +14,7 @@ describe("parseViewMode", () => {
     expect(parseViewMode("list")).toBe("list");
     expect(parseViewMode("graph")).toBe("graph");
     expect(parseViewMode("timeline")).toBe("timeline");
+    expect(parseViewMode("filmstrip")).toBe("filmstrip");
   });
 
   it("moves a stored table view to the list", () => {
@@ -34,6 +35,7 @@ describe("hasFolderForm", () => {
     expect(hasFolderForm("list")).toBe(true);
     expect(hasFolderForm("graph")).toBe(false);
     expect(hasFolderForm("timeline")).toBe(false);
+    expect(hasFolderForm("filmstrip")).toBe(false);
   });
 
   it("keeps the folder view off under the graph, option or not", () => {
@@ -70,12 +72,12 @@ describe("parseTimelineAxis", () => {
 describe("timelineQuery", () => {
   it("orders the filter by the axis, newest first, leaving the filter alone", () => {
     const filter = {
-      kind: "video" as const,
+      kinds: ["video"],
       sort: "name",
       sortDir: "asc" as const,
     };
     expect(timelineQuery(filter, "captured")).toEqual({
-      kind: "video",
+      kinds: ["video"],
       sort: "captured",
       sortDir: "desc",
     });

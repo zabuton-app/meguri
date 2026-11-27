@@ -15,6 +15,9 @@ export interface PlayOpts {
   startAt?: number;
 }
 
+/** A speed, or how to get one from the current speed (a key stepping it). */
+export type SpeedUpdate = number | ((current: number) => number);
+
 export interface AudioPlayerState {
   /** The loaded track, or null when nothing is loaded (bar hidden). */
   current: AudioTrack | null;
@@ -27,6 +30,8 @@ export interface AudioPlayerState {
   duration: number | null;
   volume: number;
   muted: boolean;
+  /** Playback speed of the loaded track; normal again for the next one. */
+  playbackRate: number;
   /** i18n key of the playback failure message; null when healthy. */
   error: TranslationKey | null;
 
@@ -38,6 +43,7 @@ export interface AudioPlayerState {
   pause: () => void;
   seek: (sec: number) => void;
   setVolume: (v: number) => void;
+  setPlaybackRate: (next: SpeedUpdate) => void;
   toggleMuted: () => void;
   /** Stop playback, unload the track, hide the bar. */
   close: () => void;
@@ -71,6 +77,7 @@ export interface AudioActions {
   pause: () => void;
   seek: (sec: number) => void;
   setVolume: (v: number) => void;
+  setPlaybackRate: (next: SpeedUpdate) => void;
   toggleMuted: () => void;
   close: () => void;
   dismissError: () => void;

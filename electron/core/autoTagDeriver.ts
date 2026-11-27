@@ -28,6 +28,13 @@ export interface AutoTagEngine {
    * the caller adds its tags itself (see applyAutoTags).
    */
   folders?: readonly FolderRule[];
+  /**
+   * Every rule or none: once one of its rules is left out (it did not finish),
+   * a request fails with AutoTagRuleDroppedError instead of going on without
+   * it. For rules whose silence would be taken for an answer, such as the
+   * scan exclusions, where no match lets a file in.
+   */
+  whole?: boolean;
 }
 
 /** Tags for each file name, in the same order. */
@@ -45,6 +52,14 @@ export class AutoTagTimeoutError extends Error {
   constructor() {
     super("auto-tagging worker got stuck outside any rule");
     this.name = "AutoTagTimeoutError";
+  }
+}
+
+/** A rule of a `whole` engine was left out, so the request was not run. */
+export class AutoTagRuleDroppedError extends Error {
+  constructor() {
+    super("a rule did not finish and was left out");
+    this.name = "AutoTagRuleDroppedError";
   }
 }
 
@@ -143,7 +158,11 @@ export class AutoTagWorkerClient {
     try {
       return await this.request(engine, names);
     } catch (err) {
-      if (err instanceof AutoTagTimeoutError) throw err;
+      if (
+        err instanceof AutoTagTimeoutError ||
+        err instanceof AutoTagRuleDroppedError
+      )
+        throw err;
       log.warn("auto-tag worker failed:", err);
       throw new AutoTagUnavailableError(err);
     }
@@ -176,6 +195,12 @@ export class AutoTagWorkerClient {
   private send(id: number): void {
     const p = this.pending.get(id);
     if (!p) return;
+    const { version, rules } = this.versionOf(p.engine);
+    if (p.engine.whole && rules.length < p.engine.rules.length) {
+      this.pending.delete(id);
+      p.reject(new AutoTagRuleDroppedError());
+      return;
+    }
     let worker: Worker;
     try {
       worker = this.ensureWorker();
@@ -184,7 +209,6 @@ export class AutoTagWorkerClient {
       p.reject(err instanceof Error ? err : new Error(String(err)));
       return;
     }
-    const { version, rules } = this.versionOf(p.engine);
     p.sent = rules;
     if (!this.watchdog) this.arm();
     // Posts arrive in order, so the engine is held by the time its chunk is

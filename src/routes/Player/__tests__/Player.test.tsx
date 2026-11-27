@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // happy-dom's Animation.cancel() leaves its finished promise rejected and unhandled.
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MediaNavProvider, type MediaNav } from "@/components/MediaNavContext";
 import Player from "@/routes/Player";
@@ -13,6 +13,7 @@ import {
   WS_ID,
 } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
+import { isImmersiveViewOpen } from "@/components/immersiveView";
 
 const mocks = vi.hoisted(() => ({
   appStatus: vi.fn(),
@@ -219,6 +220,60 @@ describe("Player keyboard control", () => {
     expect(await screen.findByText("1 / 3")).toBeTruthy();
   });
 
+  it("leaves the keys to a dialog open over it", async () => {
+    renderPlayer([row(1, "video"), row(3, "video"), row(5, "video")]);
+    await screen.findByText("1 / 3");
+    // The shortcuts overlay, or a confirm dialog, on top of the player (#268).
+    const layer = document.createElement("div");
+    layer.setAttribute("role", "dialog");
+    document.body.append(layer);
+    fireEvent.keyDown(window, { code: "KeyN" });
+    expect(screen.getByText("1 / 3")).toBeTruthy();
+    layer.remove();
+    fireEvent.keyDown(window, { code: "KeyN" });
+    expect(await screen.findByText("2 / 3")).toBeTruthy();
+  });
+
+  it("closes on a click on the backdrop, not on the panel", async () => {
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const panel = screen.getByTestId("player-panel");
+    fireEvent.click(panel);
+    expect(window.location.hash).toBe("#/play");
+    fireEvent.click(panel.parentElement!);
+    await waitFor(() => expect(window.location.hash).toBe("#/"));
+  });
+
+  it("covers the whole window, title bar included, while it is open", async () => {
+    const { unmount } = renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const backdrop = screen.getByTestId("player-panel").parentElement!;
+    expect(backdrop.classList).toContain("modal-backdrop-full");
+    // The title bar's window buttons step aside meanwhile.
+    expect(isImmersiveViewOpen()).toBe(true);
+    unmount();
+    expect(isImmersiveViewOpen()).toBe(false);
+  });
+
+  it("stays open when a layer on top claimed the Escape", async () => {
+    renderPlayer([row(1, "video"), row(3, "video")]);
+    await screen.findByText("1 / 2");
+    // What the shortcuts overlay and Radix's command menu do: take the key in
+    // the capture phase, mark it as theirs and close themselves.
+    const claim = (e: KeyboardEvent) => e.preventDefault();
+    window.addEventListener("keydown", claim, true);
+    try {
+      fireEvent.keyDown(window, { code: "Escape", key: "Escape" });
+    } finally {
+      window.removeEventListener("keydown", claim, true);
+    }
+    // Leaving the player navigates to "/"; it is still on /play.
+    expect(window.location.hash).toBe("#/play");
+    // An Esc nobody claimed still leaves.
+    fireEvent.keyDown(window, { code: "Escape", key: "Escape" });
+    await waitFor(() => expect(window.location.hash).toBe("#/"));
+  });
+
   it("steps with the arrow keys while an image is on screen", async () => {
     renderPlayer([row(2, "image"), row(4, "image")]);
     await screen.findByText("1 / 2");
@@ -294,7 +349,8 @@ describe("Player video chrome", () => {
     renderPlayer([row(1, "video")]);
     await screen.findByText("clip-1.mp4");
     const video = document.querySelector("video");
-    const stage = video?.parentElement;
+    // The stage holds the picture's holder, which holds the video.
+    const stage = video?.parentElement?.parentElement;
     expect(stage?.style.aspectRatio).toBeFalsy();
     expect(stage?.className).not.toContain("max-h-[78vh]");
     expect(video?.className).not.toContain("max-h-[78vh]");
@@ -305,7 +361,7 @@ describe("Player video chrome", () => {
     // opaque video wrapper would hide it and leave flat black bars instead.
     renderPlayer([row(1, "video")]);
     await screen.findByText("clip-1.mp4");
-    const stage = document.querySelector("video")?.parentElement;
+    const stage = document.querySelector("video")?.parentElement?.parentElement;
     expect(stage?.className).not.toContain("bg-black");
   });
 
@@ -339,6 +395,21 @@ describe("Player video chrome", () => {
   });
 });
 
+describe("Player resume notice", () => {
+  it("shows where it resumed as part of the chrome, so it takes clicks", async () => {
+    // The chrome is a layer over the whole stage: a notice beside it, not in
+    // it, sat under it and took no clicks.
+    mocks.fileGet.mockResolvedValue({
+      ...detailFor(1, "video"),
+      duration: 120,
+      resumePosition: 42,
+    });
+    renderPlayer([row(1, "video")]);
+    const startOver = await screen.findByRole("button", { name: /Start over/ });
+    expect(startOver.closest("[data-slot='player-chrome']")).not.toBeNull();
+  });
+});
+
 describe("Player fullscreen", () => {
   it("does not take over the screen on its own", async () => {
     const request = vi.fn();
@@ -354,6 +425,14 @@ describe("Player fullscreen", () => {
     renderPlayer([row(1, "video")]);
     fireEvent.click(await screen.findByLabelText("Fullscreen (F)"));
     expect(request).toHaveBeenCalled();
+  });
+
+  it("takes the panel full screen, not the backdrop around it", async () => {
+    const request = vi.fn().mockResolvedValue(undefined);
+    Element.prototype.requestFullscreen = request;
+    renderPlayer([row(1, "video")]);
+    fireEvent.click(await screen.findByLabelText("Fullscreen (F)"));
+    expect(request.mock.contexts[0]).toBe(screen.getByTestId("player-panel"));
   });
 
   it("toggles full screen on F", async () => {
@@ -372,6 +451,55 @@ describe("Player fullscreen", () => {
     fireEvent(document, new Event("fullscreenchange"));
     expect(screen.getByText("1 / 2")).toBeTruthy();
     expect(screen.getByLabelText("Next (N)")).toBeTruthy();
+  });
+});
+
+describe("Player size", () => {
+  it("toggles between the large and the compact panel, and remembers it", async () => {
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const panel = screen.getByTestId("player-panel");
+    expect(panel.classList).toContain("flex-1");
+    fireEvent.click(screen.getByLabelText("Shrink modal"));
+    expect(panel.classList).toContain("max-w-4xl");
+    expect(panel.classList).not.toContain("flex-1");
+    // The size Discover and the file details share.
+    expect(localStorage.getItem("meguri.media.modalSize")).toBe("small");
+    fireEvent.click(screen.getByLabelText("Enlarge modal"));
+    expect(panel.classList).toContain("flex-1");
+    expect(localStorage.getItem("meguri.media.modalSize")).toBe("large");
+  });
+
+  it("opens at the size Discover and the file details last used", async () => {
+    localStorage.setItem("meguri.media.modalSize", "small");
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    expect(screen.getByTestId("player-panel").classList).toContain("max-w-4xl");
+    expect(screen.getByLabelText("Enlarge modal")).toBeTruthy();
+  });
+
+  it("hides the size toggle in full screen, which takes the screen anyway", async () => {
+    renderPlayer([row(1, "video")]);
+    await screen.findByText("clip-1.mp4");
+    const panel = screen.getByTestId("player-panel");
+    expect(screen.getByLabelText("Shrink modal")).toBeTruthy();
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => panel,
+    });
+    try {
+      fireEvent(document, new Event("fullscreenchange"));
+      await waitFor(() =>
+        expect(screen.queryByLabelText("Shrink modal")).toBeNull(),
+      );
+    } finally {
+      // Out of full screen again (and nothing for unmount to exit).
+      delete (document as { fullscreenElement?: unknown }).fullscreenElement;
+    }
+    fireEvent(document, new Event("fullscreenchange"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("Shrink modal")).toBeTruthy(),
+    );
   });
 });
 
@@ -453,6 +581,8 @@ describe("Player switching latency", () => {
 });
 
 describe("Player transitions", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   function live(): HTMLElement | null {
     return document.querySelector('[data-slot="player-fade"]');
   }
@@ -487,28 +617,65 @@ describe("Player transitions", () => {
     expect(await screen.findByText("3 / 3")).toBeTruthy();
   });
 
-  it("swaps instantly when the OS asks for reduced motion", async () => {
-    const original = window.matchMedia;
-    window.matchMedia = (query: string): MediaQueryList =>
-      ({
-        matches: query.includes("prefers-reduced-motion"),
-        media: query,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as MediaQueryList;
-    try {
-      renderPlayer([row(1, "video"), row(3, "video")]);
+  describe("with a still to animate against", () => {
+    // jsdom loads no images, so an <img> never reports a currentSrc and there
+    // is nothing to freeze. Report its src as loaded, so a switch has a still
+    // and the outgoing layer appears whenever the switch is animated.
+    beforeEach(() => {
+      vi.spyOn(
+        HTMLImageElement.prototype,
+        "currentSrc",
+        "get",
+      ).mockImplementation(function (this: HTMLImageElement) {
+        return this.src;
+      });
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    function stubReducedMotion(reduce: boolean) {
+      // jsdom has no matchMedia to spy on.
+      vi.stubGlobal(
+        "matchMedia",
+        (query: string): MediaQueryList =>
+          ({
+            matches: reduce && query.includes("prefers-reduced-motion"),
+            media: query,
+            onchange: null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+            dispatchEvent: () => false,
+          }) as MediaQueryList,
+      );
+    }
+
+    async function renderAndPressNext() {
+      renderPlayer([row(2, "image"), row(4, "image")]);
       await screen.findByText("1 / 2");
+      // The image gets its URL once the media server's address arrives.
+      await waitFor(() =>
+        expect(
+          document.querySelector<HTMLImageElement>('[data-slot="player-media"]')
+            ?.src,
+        ).toBeTruthy(),
+      );
       fireEvent.click(screen.getByLabelText("Next (N)"));
       expect(screen.getByText("2 / 2")).toBeTruthy();
-      expect(outgoing()).toBeNull();
-    } finally {
-      window.matchMedia = original;
     }
+
+    it("holds the outgoing item while it animates out", async () => {
+      // The control for the case below: same setup, reduced motion off.
+      stubReducedMotion(false);
+      await renderAndPressNext();
+      expect(outgoing()).not.toBeNull();
+    });
+
+    it("swaps instantly when the OS asks for reduced motion", async () => {
+      stubReducedMotion(true);
+      await renderAndPressNext();
+      expect(outgoing()).toBeNull();
+    });
   });
 });
 

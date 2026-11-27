@@ -1,0 +1,41 @@
+name: Crash report
+description: Meguri crashed, or did not exit normally. Paste the report it offered at the next launch.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a crash. "Report on GitHub" in Meguri copied the report to your clipboard: paste it below.
+        Never attach a crash dump (`.dmp`) here: it holds part of the app's memory, such as file names and paths. A maintainer may ask for one through a private channel.
+  - type: textarea
+    id: report
+    attributes:
+      label: Crash report
+      description: The report from Meguri (Settings → About → Crash reports). Read it before you paste it.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What were you doing?
+      description: Optional. What you were doing when it happened, if you remember.
+  - type: input
+    id: version
+    attributes:
+      label: Meguri version
+      placeholder: e.g. 0.12.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows, macOS or Linux
+    validations:
+      required: true
+  - type: input
+    id: channel
+    attributes:
+      label: How you installed Meguri
+      placeholder: e.g. GitHub Release (AppImage), AUR (meguri-bin), Microsoft Store

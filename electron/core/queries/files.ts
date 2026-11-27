@@ -1,9 +1,11 @@
 // File search, listing and detail queries. Dynamic SQL is built safely with placeholders.
+import { naturalNameKey } from "../nameKey.js";
 import type { DB } from "../db.js";
 import { fileTags } from "../tags.js";
-import { listBookmarksByMetaKey } from "./bookmarks.js";
+import { attachBookmarkSecs, listBookmarksByMetaKey } from "./bookmarks.js";
 import { thumbOffsetByKey } from "./meta.js";
 import { resolveSortDir } from "../../../shared/sortDir.js";
+import { TEXT_SUBTITLE_CODECS } from "../../../shared/embeddedSubtitles.js";
 import {
   FOLDER_FILE_FROM,
   folderCondition,
@@ -11,9 +13,12 @@ import {
 } from "./folderRange.js";
 import {
   LIST_HIDDEN_SOURCES,
-  parseTagSearchToken,
+  parseNegatedSearchToken,
+  parseSearchDirective,
+  type NumericSearch,
   searchTokenTerms,
   splitSearchTokens,
+  BARE_SEARCH_NAMESPACES,
   tagIdentityKey,
 } from "../../../shared/tags.js";
 import type {
@@ -29,13 +34,14 @@ const DEFAULT_LIMIT = 100;
 
 /** Bound once: the excluded-source list never changes at runtime. */
 const HIDDEN_SOURCES_JSON = JSON.stringify([...LIST_HIDDEN_SOURCES]);
+const TEXT_SUBTITLE_CODECS_JSON = JSON.stringify(TEXT_SUBTITLE_CODECS);
 const MAX_LIMIT = 500;
 
 // Metadata (rating/favorite/last_accessed) lives in file_meta, keyed by meta_key, so it
 // is reached through a LEFT JOIN. COALESCE supplies defaults for files with no meta row.
 // Exported for queries that join files under the same `f`/`m` aliases (see history.ts).
 export const FILE_COLS =
-  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, (f.thumb_path IS NOT NULL) AS hasThumb, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, f.created_at AS addedAt, m.last_accessed_at AS lastAccessedAt, m.resume_position AS resumePosition, CASE WHEN m.resume_position IS NOT NULL AND f.duration > 0 THEN MIN(1.0, m.resume_position / f.duration) END AS progress";
+  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, f.codec, f.fps, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, (f.thumb_path IS NOT NULL) AS hasThumb, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, f.created_at AS addedAt, m.last_accessed_at AS lastAccessedAt, m.resume_position AS resumePosition, CASE WHEN m.resume_position IS NOT NULL AND f.duration > 0 THEN MIN(1.0, m.resume_position / f.duration) END AS progress";
 
 export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
@@ -46,11 +52,17 @@ function escapeLike(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
-/** Split the free-text query for the trigram-tokenized files_fts.
+/** One free-text token: any of its terms, through the index or LIKE. */
+interface FreeTextGroup {
+  match: string | null;
+  likes: string[];
+}
+
+/** How the search box's text is read (see appendSearchConditions).
  *
- *  A `tag:<value>` token is pulled out first: generated tags are not in the
+ *  A `tag:<value>` token is a directive: generated tags are not in the
  *  full-text index (see FTS_ROW_SELECT in db.ts), so this prefix is the explicit
- *  way to reach them from the search box.
+ *  way to reach them from the search box. So are `hash:` and `ext:`.
  *
  *  Of what remains, tokens of 3+ codepoints go into an FTS MATCH expression
  *  (trigram matches substrings, so no prefix `*` is needed). Shorter tokens
@@ -62,39 +74,27 @@ function escapeLike(s: string): string {
  *  the quote characters would return zero rows.
  *
  *  A token may carry alternatives (`yoga|ヨガ`, see searchTokenTerms), any of
- *  which satisfies it. Each token becomes one `anyOf` group — a plain token is
- *  a group of one — split by whether each term can use the trigram index. */
-function buildSearchTerms(q: string): {
-  /** Plain tokens long enough for the index, as one ANDed MATCH expression. */
-  match: string | null;
-  /** Everything else: per token, a MATCH expression and/or LIKE terms, ORed. */
-  anyOf: { match: string | null; likes: string[] }[];
-  tagTokens: string[];
-} {
-  const matchTokens: string[] = [];
-  const anyOf: { match: string | null; likes: string[] }[] = [];
-  const tagTokens: string[] = [];
-  for (const raw of splitSearchTokens(q)) {
-    const tag = parseTagSearchToken(raw);
-    if (tag) {
-      tagTokens.push(tag);
-      continue;
-    }
-    const terms = searchTokenTerms(raw);
-    const long = terms.filter(isTrigramSearchable).map(ftsPhrase);
-    const likes = terms.filter((term) => !isTrigramSearchable(term));
-    if (terms.length === 1 && long.length === 1) {
-      matchTokens.push(long[0]);
-    } else {
-      anyOf.push({ match: long.length ? long.join(" OR ") : null, likes });
-    }
-  }
+ *  which satisfies it. Each token becomes one group — a plain token is a group
+ *  of one — split by whether each term can use the trigram index. */
+function freeTextGroup(token: string): FreeTextGroup {
+  const words = searchTokenTerms(token);
+  const long = words.filter(isTrigramSearchable).map(ftsPhrase);
   return {
-    match: matchTokens.length ? matchTokens.join(" ") : null,
-    anyOf,
-    tagTokens,
+    match: long.length ? long.join(" OR ") : null,
+    likes: words.filter((term) => !isTrigramSearchable(term)),
   };
 }
+
+/**
+ * The column each numeric directive compares. Duration in whole seconds, as the
+ * list shows it (formatDuration floors), so `duration:1:30` finds a 90.4 s clip.
+ */
+const NUMERIC_SEARCH_COLUMNS: Record<NumericSearch["field"], string> = {
+  size: "f.size",
+  duration: "CAST(f.duration AS INTEGER)",
+  width: "f.width",
+  height: "f.height",
+};
 
 /** A term the trigram tokenizer can index: three code points or more. */
 function isTrigramSearchable(term: string): boolean {
@@ -155,14 +155,60 @@ function resolveTagIds(db: DB, token: string): number[] {
  */
 function resolveSearchTagIds(db: DB, value: string): number[] {
   const key = tagIdentityKey(value);
+  // A bare value names a manual tag or one of the bare-searched generated
+  // namespaces' (#468): `tag:jazz` is not every file whose genre is jazz.
+  // The one place a namespace list decides identity (docs/data-model.md):
+  // a namespace left out still resolves in its qualified form.
   return db
     .prepare(
       `SELECT id FROM tags
-        WHERE tag_key(name) = ?
+        WHERE (tag_key(name) = ?
+               AND (namespace = '' OR namespace IN (SELECT value FROM json_each(?))))
            OR (namespace <> '' AND tag_key(namespace || ':' || name) = ?)`,
     )
     .pluck()
-    .all(key, key) as number[];
+    .all(key, JSON.stringify(BARE_SEARCH_NAMESPACES), key) as number[];
+}
+
+/**
+ * How many meta_tags rows a tag filter may match and still start from them
+ * (#365). The count is library-wide: every one of them is a probe of the
+ * files' meta_key index, whichever workspace it belongs to, so the cap also
+ * bounds what that form costs (about a millisecond on 50,000 files).
+ * Exported for the tests, which put a tag on either side of it.
+ */
+export const RARE_TAG_ROWS = 2000;
+
+/**
+ * The condition that a file carries one of the tags in `ids` (a JSON array),
+ * optionally from one source. For a rare tag, the list starts from the tag's
+ * rows in idx_meta_tags_tag and looks the files up by meta_key. For a common
+ * one, it stays a probe of meta_tags per file: collecting every match then
+ * costs more than checking each file, and a list sorted along an index stops
+ * checking once a page fills.
+ *
+ * Through files.id rather than `f.meta_key IN (...)`: without statistics, the
+ * planner pairs the latter with idx_files_alive and still walks every live
+ * file, while an IN on the rowid is the lookup it prefers.
+ */
+function tagCondition(
+  db: DB,
+  args: unknown[],
+  ids: string,
+  source?: string,
+): string {
+  const rows = db
+    .prepare(
+      "SELECT count(*) FROM (SELECT 1 FROM meta_tags WHERE tag_id IN (SELECT value FROM json_each(?)) LIMIT ?)",
+    )
+    .pluck()
+    .get(ids, RARE_TAG_ROWS + 1) as number;
+  args.push(ids);
+  if (source) args.push(source);
+  const bySource = source ? " AND mt.source = ?" : "";
+  return rows <= RARE_TAG_ROWS
+    ? `f.id IN (SELECT id FROM files WHERE meta_key IN (SELECT mt.meta_key FROM meta_tags mt WHERE mt.tag_id IN (SELECT value FROM json_each(?))${bySource}))`
+    : `EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?))${bySource})`;
 }
 
 /**
@@ -172,6 +218,102 @@ function resolveSearchTagIds(db: DB, value: string): number[] {
  */
 export function fromFor(query: SearchQuery): string {
   return query.folder?.path ? FOLDER_FILE_FROM : FILE_FROM;
+}
+
+/**
+ * The condition that a file's path or user tags match one free-text token:
+ * any of its terms, through the index or LIKE. Parenthesized, so a leading
+ * NOT negates all of it.
+ */
+function anyOfCondition(group: FreeTextGroup, args: unknown[]): string {
+  const parts: string[] = [];
+  if (group.match) {
+    // The terms the index can serve stay on the index, whatever else is in
+    // the group. Besides the cost, MATCH folds case for every script while
+    // LIKE only does for ASCII — sending `école` to LIKE because `ヨガ` sat
+    // beside it would silently stop it matching `École`.
+    parts.push("f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)");
+    args.push(group.match);
+  }
+  if (group.likes.length > 0) {
+    // Too short for a trigram (two-character Japanese words are the common
+    // case): LIKE, as a correlated EXISTS (rowid = f.id) rather than an
+    // independent IN-subquery — the latter LIKE-scans the whole files_fts
+    // table per term, while this form only probes the rows already narrowed
+    // by MATCH and the other filters.
+    const likes = group.likes
+      .map(
+        () => "x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'",
+      )
+      .join(" OR ");
+    parts.push(
+      `EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (${likes}))`,
+    );
+    for (const term of group.likes) {
+      const pattern = `%${escapeLike(term)}%`;
+      args.push(pattern, pattern);
+    }
+  }
+  return `(${parts.join(" OR ")})`;
+}
+
+/**
+ * The condition that a file matches one directive token (see
+ * parseSearchDirective), or null for free text. A new kind of directive has to
+ * be handled here — the switch does not compile without it — and both `x` and
+ * `-x` then work: the exclusion only ever wraps this.
+ */
+function directiveCondition(
+  db: DB,
+  token: string,
+  args: unknown[],
+): string | null {
+  const d = parseSearchDirective(token);
+  if (d === null) return null;
+  switch (d.kind) {
+    case "hash":
+      // A range on the hash rather than LIKE, so idx_files_content_hash serves
+      // it: every hex digit sorts before "g", so the prefix followed by "g" is
+      // past every hash that starts with it. Files without a hash never match.
+      args.push(d.value, `${d.value}g`);
+      return "f.content_hash >= ? AND f.content_hash < ?";
+    case "ext":
+      // Exact, on the lower-cased value the scan stores. No index: with
+      // nothing else narrowing, a rare extension makes the list walk its sort
+      // order until a page fills, up to every live row.
+      args.push(d.value);
+      return "f.ext = ?";
+    case "numeric":
+      // No index either, for the same reason as ext. A NULL value (an image's
+      // duration) fails every comparison, so an unknown value never matches,
+      // and is kept by `-duration:<30s`. The operator is one of the parser's
+      // fixed set, never text from the query.
+      args.push(d.num.value);
+      return `${NUMERIC_SEARCH_COLUMNS[d.num.field]} ${d.num.op} ?`;
+    case "rating":
+      // A file without a rating counts as 0, as ratingMin reads it below.
+      // The operator comes from the parser's fixed set, never the typed text.
+      args.push(d.rating.value);
+      return `COALESCE(m.rating, 0) ${d.rating.op} ?`;
+    case "favorite":
+      // NULL without a file_meta row: kept by `-is:fav`, as a non-favorite.
+      return "m.favorite = 1";
+    case "tag": {
+      const ids = resolveSearchTagIds(db, d.value);
+      // No tag by that name: no file carries it.
+      return ids.length === 0
+        ? "0"
+        : tagCondition(db, args, JSON.stringify(ids));
+    }
+  }
+}
+
+/** The condition that a file matches one token, directive or free text. */
+function searchTokenCondition(db: DB, token: string, args: unknown[]): string {
+  return (
+    directiveCondition(db, token, args) ??
+    anyOfCondition(freeTextGroup(token), args)
+  );
 }
 
 /**
@@ -186,58 +328,57 @@ export function appendSearchConditions(
   /** rel_path's separator; see folderRange(). Injected only by tests. */
   sep?: string,
 ): string {
-  const terms = query.q
-    ? buildSearchTerms(query.q)
-    : { match: null, anyOf: [], tagTokens: [] };
-  if (terms.match) {
+  sql = appendTextConditions(db, sql, args, query.q);
+  return appendFilterConditions(db, sql, args, query, sep);
+}
+
+/** The conditions of the search box's text (`q`). */
+function appendTextConditions(
+  db: DB,
+  sql: string,
+  args: unknown[],
+  q: string | undefined,
+): string {
+  // Plain tokens long enough for the index, sent as one ANDed MATCH.
+  const matchTokens: string[] = [];
+  for (const raw of q ? splitSearchTokens(q) : []) {
+    const { negated, body } = parseNegatedSearchToken(raw);
+    if (negated) {
+      // A leading `-` (#523): NOT of what the token matches, whatever it is.
+      // A file the condition says nothing about (NULL: no hash, no extension)
+      // is kept, so an exclusion never drops a file for lacking the value it
+      // names. Each negated word is its own condition: one MATCH of several
+      // would exclude only the files carrying them all.
+      sql += ` AND NOT COALESCE((${searchTokenCondition(db, body, args)}), 0)`;
+      continue;
+    }
+    const directive = directiveCondition(db, body, args);
+    if (directive !== null) {
+      sql += ` AND ${directive}`;
+      continue;
+    }
+    const words = searchTokenTerms(body);
+    if (words.length === 1 && isTrigramSearchable(words[0])) {
+      matchTokens.push(ftsPhrase(words[0]));
+    } else {
+      sql += ` AND ${anyOfCondition(freeTextGroup(body), args)}`;
+    }
+  }
+  if (matchTokens.length > 0) {
     sql += " AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)";
-    args.push(terms.match);
+    args.push(matchTokens.join(" "));
   }
-  for (const group of terms.anyOf) {
-    const parts: string[] = [];
-    if (group.match) {
-      // The terms the index can serve stay on the index, whatever else is in
-      // the group. Besides the cost, MATCH folds case for every script while
-      // LIKE only does for ASCII — sending `école` to LIKE because `ヨガ` sat
-      // beside it would silently stop it matching `École`.
-      parts.push(
-        "f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)",
-      );
-      args.push(group.match);
-    }
-    if (group.likes.length > 0) {
-      // Too short for a trigram (two-character Japanese words are the common
-      // case): LIKE, as a correlated EXISTS (rowid = f.id) rather than an
-      // independent IN-subquery — the latter LIKE-scans the whole files_fts
-      // table per term, while this form only probes the rows already narrowed
-      // by MATCH and the other filters.
-      const likes = group.likes
-        .map(
-          () =>
-            "x.rel_path LIKE ? ESCAPE '\\' OR x.tags_text LIKE ? ESCAPE '\\'",
-        )
-        .join(" OR ");
-      parts.push(
-        `EXISTS (SELECT 1 FROM files_fts x WHERE x.rowid = f.id AND (${likes}))`,
-      );
-      for (const term of group.likes) {
-        const pattern = `%${escapeLike(term)}%`;
-        args.push(pattern, pattern);
-      }
-    }
-    sql += ` AND (${parts.join(" OR ")})`;
-  }
-  for (const value of terms.tagTokens) {
-    const ids = resolveSearchTagIds(db, value);
-    if (ids.length === 0) {
-      // No tag by that name: nothing can match.
-      sql += " AND 0";
-      break;
-    }
-    sql +=
-      " AND EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?)))";
-    args.push(JSON.stringify(ids));
-  }
+  return sql;
+}
+
+/** The conditions of everything but the search box's text. */
+function appendFilterConditions(
+  db: DB,
+  sql: string,
+  args: unknown[],
+  query: SearchQuery,
+  sep?: string,
+): string {
   if (query.folder) {
     const cond = folderCondition(
       folderRange(query.folder.path, sep),
@@ -248,9 +389,12 @@ export function appendSearchConditions(
       args.push(...cond.args);
     }
   }
-  if (query.kind) {
-    sql += " AND f.kind = ?";
-    args.push(query.kind);
+  if (query.kinds?.length) {
+    // A placeholder per kind, not json_each as for fileIds: the list is short
+    // (the schema caps it), and without statistics the planner cannot size
+    // json_each, so a single kind would lose idx_files_kind and scan every row.
+    sql += ` AND f.kind IN (${query.kinds.map(() => "?").join(", ")})`;
+    args.push(...query.kinds);
   }
   if (query.fileIds?.length) {
     // Pass the IDs as a single JSON array bound to one placeholder rather than
@@ -308,22 +452,27 @@ export function appendSearchConditions(
       sql += " AND 0";
       break;
     }
-    // Pre-resolving to ids drops the `tags` join, leaving a primary-key probe on
-    // meta_tags(meta_key, tag_id).
-    sql +=
-      " AND EXISTS (SELECT 1 FROM meta_tags mt WHERE mt.meta_key = f.meta_key AND mt.tag_id IN (SELECT value FROM json_each(?))";
-    args.push(JSON.stringify(ids));
-    if (query.tagSource) {
-      sql += " AND mt.source = ?";
-      args.push(query.tagSource);
-    }
-    sql += ")";
+    // Pre-resolving to ids drops the `tags` join.
+    sql += ` AND ${tagCondition(db, args, JSON.stringify(ids), query.tagSource)}`;
   }
   if (query.inProgress) {
     // An IN over the partial index rather than a test on the joined `m`: the
     // latter is only checked after the join, so it scans every file row.
     sql +=
       " AND f.meta_key IN (SELECT meta_key FROM file_meta WHERE resume_position IS NOT NULL)";
+  }
+  if (query.subtitles) {
+    // Read from the ffprobe streams the scan stored in files.meta, so it needs
+    // no column or rescan. There is no index for it: a list sorted by anything
+    // but its pinned order tests every video for every page. The LIKE, a plain
+    // text search over the stored JSON (written by JSON.stringify, so with no
+    // space after the colon), drops the videos with no subtitle stream at all
+    // before the JSON is parsed, about halving that walk. json_each then checks
+    // the codec.
+    sql += ` AND f.kind = 'video' AND f.meta LIKE '%"subtitle"%' AND EXISTS (SELECT 1 FROM json_each(f.meta, '$.streams') s
+      WHERE json_extract(s.value, '$.codec_type') = 'subtitle'
+        AND json_extract(s.value, '$.codec_name') IN (SELECT value FROM json_each(?)))`;
+    args.push(TEXT_SUBTITLE_CODECS_JSON);
   }
   if (query.played != null) {
     const op = query.played ? "EXISTS" : "NOT EXISTS";
@@ -386,7 +535,7 @@ function sortSpecFor(sort?: string, dir?: string): SortSpec {
       // picker ("added" there is the id order): the timeline's "added" axis.
       return { expr: "f.created_at", nullable: false, cmp, idCmp: ">" };
     case "name":
-      return { expr: "f.rel_path", nullable: false, cmp, idCmp: cmp };
+      return { expr: "f.name_key", nullable: false, cmp, idCmp: cmp };
     case "accessed":
       return { expr: "m.last_accessed_at", nullable: true, cmp, idCmp: ">" };
     case "hash":
@@ -412,7 +561,8 @@ export function sortValueOf(
     case "addedAt":
       return row.addedAt;
     case "name":
-      return row.relPath;
+      // The stored key is this function of the path (see backfillNameKeys).
+      return naturalNameKey(row.relPath);
     case "accessed":
       return row.lastAccessedAt;
     case "hash":
@@ -463,28 +613,116 @@ function appendSeekCondition(
 }
 
 /**
+ * The index searchFiles pins with INDEXED BY for an unfiltered list in this
+ * order, or null to leave the plan to SQLite (#363). Workspace DBs are never
+ * ANALYZEd, and without statistics the planner takes idx_files_alive for
+ * "deleted_at IS NULL" and sorts every live row in a temp b-tree for each
+ * page. Walking the sort index instead reads only as far as a page needs.
+ *
+ * Only where the index yields the ORDER BY as it is. captured, btime and
+ * created_at are indexed newest first, so their ascending orders would still
+ * be sorted (for created_at, within each second, and a scan adds many files in
+ * the same second). content_hash is indexed in its default ascending order,
+ * so its descending order would be.
+ *
+ * Keep in step with orderByFor().
+ */
+function pinnedSortIndex(sort?: string, dir?: string): string | null {
+  if (sort === "name") return "idx_files_alive_name_key";
+  if (sort === "hash") {
+    return resolveSortDir(sort, dir) === "asc" ? "idx_files_alive_hash" : null;
+  }
+  if (resolveSortDir(sort, dir) !== "desc") return null;
+  switch (sort) {
+    case "addedAt":
+      return "idx_files_alive_added";
+    case "captured":
+      return "idx_files_alive_captured";
+    case "btime":
+      return "idx_files_alive_btime";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Whether every token of the search box's text is an exclusion (`-ext:gif`,
+ * `-draft`). An exclusion usually leaves most files, so walking the sort index
+ * fills a page at once (#670).
+ */
+function isExclusionOnly(q: string | undefined): boolean {
+  const tokens = q ? splitSearchTokens(q) : [];
+  return (
+    tokens.length > 0 &&
+    tokens.every((token) => parseNegatedSearchToken(token).negated)
+  );
+}
+
+/**
+ * The index searchFiles pins for a list filtered only by exclusions, or null.
+ * Only name and addedAt: when an exclusion leaves almost nothing, the walk
+ * reads every live row, and in their index order the table rows come in about
+ * the order they are stored. The captured, btime and hash orders are unrelated
+ * to it, so the same walk reads the rows at random, measured at up to 5.7× the
+ * unpinned time for captured on a database on disk (#670).
+ */
+function exclusionSortIndex(sort?: string, dir?: string): string | null {
+  return sort === "name" || sort === "addedAt"
+    ? pinnedSortIndex(sort, dir)
+    : null;
+}
+
+/**
  * Search one workspace DB. With `seek`, the page starts right after that sort
  * position (keyset pagination — no OFFSET scan) and `nextCursor` is null: the
  * caller (crossWorkspace) tracks continuation itself. Without it, the legacy
  * numeric-offset contract applies. `skipTags` defers tag attachment to the
  * caller (the k-way merge discards rows, so batch-level attachment is wasted).
+ * `uncapped` lifts the MAX_LIMIT cap for an internal caller that sizes its own
+ * fetch (the k-way merge reading past a deep offset in one query).
  */
 export function searchFiles(
   db: DB,
   query: SearchQuery,
   seek?: SeekPosition,
-  opts?: { skipTags?: boolean; sep?: string },
+  opts?: { skipTags?: boolean; sep?: string; uncapped?: boolean },
 ): SearchResult {
   // The seek path allows one extra row (internal callers fetch limit+1 for
   // has-more detection); the IPC boundary still caps requests at MAX_LIMIT.
-  const cap = seek ? MAX_LIMIT + 1 : MAX_LIMIT;
+  const cap = opts?.uncapped ? Infinity : seek ? MAX_LIMIT + 1 : MAX_LIMIT;
   const limit = Math.max(1, Math.min(cap, query.limit ?? DEFAULT_LIMIT));
   const args: unknown[] = [];
-  let sql = `SELECT ${FILE_COLS} ${fromFor(query)} WHERE f.deleted_at IS NULL`;
-  sql = appendSearchConditions(db, sql, args, query, opts?.sep);
+  const text = appendTextConditions(db, "", args, query.q);
+  const rest = appendFilterConditions(db, "", args, query, opts?.sep);
+  const filters = text + rest;
+  // Only an unfiltered list is pinned: without statistics nothing tells how
+  // few rows a filter leaves, and for a rare one, walking the sort order to
+  // fill a page reads every live row in index order (#363). A list filtered
+  // only by exclusions is pinned in some orders (see exclusionSortIndex). Nor
+  // is a page in the NULL tail of captured, btime or hash (a seek key without
+  // a value): the index cannot reach that tail by the key, so it would walk
+  // every row with a value first.
+  const sortIndex =
+    seek?.v === null || rest !== ""
+      ? null
+      : text === ""
+        ? pinnedSortIndex(query.sort, query.sortDir)
+        : isExclusionOnly(query.q)
+          ? exclusionSortIndex(query.sort, query.sortDir)
+          : null;
+  const from = sortIndex
+    ? `FROM files f INDEXED BY ${sortIndex} LEFT JOIN file_meta m ON m.meta_key = f.meta_key`
+    : fromFor(query);
+  let sql = `SELECT ${FILE_COLS} ${from} WHERE f.deleted_at IS NULL${filters}`;
   if (seek) {
     const seekArgs: unknown[] = [];
-    sql += ` AND (${appendSeekCondition(seekArgs, seek, query.sort, query.sortDir)})`;
+    const cond = appendSeekCondition(seekArgs, seek, query.sort, query.sortDir);
+    // Nothing follows the key. Not sent as "AND (0)": SQLite rejects a WHERE
+    // it can prove false under INDEXED BY ("no query solution"). The filters
+    // can write "AND 0" too, but only a list they leave unpinned: an
+    // exclusion writes "NOT COALESCE(...)", never a bare 0.
+    if (cond === "0") return { items: [], nextCursor: null };
+    sql += ` AND (${cond})`;
     args.push(...seekArgs);
   }
 
@@ -507,7 +745,10 @@ export function searchFiles(
       nextCursor = offset + limit;
     }
   }
-  if (!opts?.skipTags) attachTags(db, items);
+  if (!opts?.skipTags) {
+    attachTags(db, items);
+    attachBookmarkSecs(db, items);
+  }
   return { items, nextCursor };
 }
 
@@ -521,6 +762,8 @@ export function numericCursor(cursor: SearchQuery["cursor"]): number {
  * ORDER BY clause for a sort key/direction. Exported for the index-plan tests.
  * Kept in lockstep with comparatorFor() in crossWorkspace.ts — the All view's
  * k-way merge re-implements this ordering in JS and breaks if they diverge.
+ * pinnedSortIndex() pins an index only for an order that index yields as it
+ * is; changing an order here can leave its pinned index sorting again.
  */
 export function orderByFor(sort?: string, dir?: string): string {
   const direction = resolveSortDir(sort, dir).toUpperCase();
@@ -534,10 +777,11 @@ export function orderByFor(sort?: string, dir?: string): string {
     case "addedAt":
       return `f.created_at ${direction}, f.id ASC`;
     case "name":
-      // The id tiebreak follows the main direction so both directions map onto
-      // a single scan of idx_files_alive_rel_path (forward/backward); a fixed
-      // "id ASC" would force a temp b-tree for the DESC case.
-      return `f.rel_path ${direction}, f.id ${direction}`;
+      // Natural order (#292). The id tiebreak follows the main direction so
+      // both directions map onto a single scan of idx_files_alive_name_key
+      // (forward/backward); a fixed "id ASC" would force a temp b-tree for the
+      // DESC case.
+      return `f.name_key ${direction}, f.id ${direction}`;
     case "accessed":
       return `m.last_accessed_at IS NULL ASC, m.last_accessed_at ${direction}, f.id ASC`;
     case "hash":
@@ -587,6 +831,7 @@ export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
   }
   const items = filesByIds(db, reservoir);
   attachTags(db, items);
+  attachBookmarkSecs(db, items);
   return items;
 }
 
@@ -661,7 +906,7 @@ interface FileDetailRow extends FileRow {
 export function fileDetail(db: DB, fileId: number): FileDetail | null {
   const r = db
     .prepare(
-      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.codec, f.fps, f.mtime, f.meta, f.meta_key AS metaKey, m.note
+      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.mtime, f.meta, f.meta_key AS metaKey, m.note
        ${FILE_FROM} WHERE f.id = ? AND f.deleted_at IS NULL`,
     )
     .get(fileId) as FileDetailRow | undefined;

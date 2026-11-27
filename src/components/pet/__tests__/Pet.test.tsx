@@ -1,5 +1,6 @@
 // The pet in the window: poking it, feeding it, its menu, and how it follows
 // what the app is doing. The sprite's `data-pet-state` is what it shows.
+import type { QueryClient } from "@tanstack/react-query";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
@@ -11,7 +12,10 @@ import {
   defaultWorkspacesList,
   sampleFileRow,
 } from "@/test/fixtures";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from "@/test/renderWithProviders";
 
 type Listener = (payload?: unknown) => void;
 
@@ -42,7 +46,7 @@ vi.mock("sonner", () => ({
 vi.mock("@/ipc/client", () => {
   const listen = (name: string) => (cb: Listener) => {
     mocks.listeners[name] = cb;
-    return Promise.resolve(() => {});
+    return () => {};
   };
   return {
     api: {
@@ -90,10 +94,23 @@ const fileDrag = (files: { workspaceId: string; fileId: number }[]) => ({
   dropEffect: "none",
 });
 
-function setup(props: Partial<Parameters<typeof Pet>[0]> = {}) {
+/** A query client that holds `list` before the first render, for a test that
+ *  needs the pet to know Watch Later's items from the start. Waiting for the
+ *  fetch instead raced React Query's notification on a slow runner. */
+function cachedList(list: ReturnType<typeof watchLater>) {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(["workspaces_list"], list);
+  return queryClient;
+}
+
+function setup(
+  props: Partial<Parameters<typeof Pet>[0]> = {},
+  queryClient?: QueryClient,
+) {
   const onDiscover = vi.fn();
   renderWithProviders(
     <Pet active hasPool onDiscover={onDiscover} {...props} />,
+    { queryClient },
   );
   return { onDiscover };
 }
@@ -276,9 +293,7 @@ describe("Pet", () => {
     const files = [{ workspaceId: "ws-a", fileId: 1 }];
     mocks.workspacesList.mockResolvedValue(watchLater(files));
     mocks.collectionSetMembership.mockResolvedValue({ changed: 0 });
-    setup();
-    await waitFor(() => expect(mocks.workspacesList).toHaveBeenCalled());
-    await act(async () => {});
+    setup({}, cachedList(watchLater(files)));
     fireEvent.drop(pet(), { dataTransfer: fileDrag(files) });
     expect(shown()).toBe("headShake");
   });
@@ -390,12 +405,9 @@ describe("Pet", () => {
     });
 
     it("shows Watch Later before playing it", async () => {
-      mocks.workspacesList.mockResolvedValue(
-        watchLater([{ workspaceId: "ws-a", fileId: 1 }]),
-      );
-      setup();
-      await waitFor(() => expect(mocks.workspacesList).toHaveBeenCalled());
-      await act(async () => {});
+      const list = watchLater([{ workspaceId: "ws-a", fileId: 1 }]);
+      mocks.workspacesList.mockResolvedValue(list);
+      setup({}, cachedList(list));
       // The switch is held open: the player must not open on the old list.
       let finishSwitch = () => {};
       mocks.workspaceSwitch.mockReturnValue(
@@ -465,8 +477,13 @@ describe("Pet", () => {
           action: expect.objectContaining({ label: "Settings" }) as unknown,
         }),
       );
-      expect(localStorage.getItem("meguri.prefs")).toContain(
-        '"petVisible":false',
+      // The pet hides when the change commits, but the preference is written by
+      // a passive effect that can run a tick later (the change comes from the
+      // sprite's timer, outside act).
+      await waitFor(() =>
+        expect(localStorage.getItem("meguri.prefs")).toContain(
+          '"petVisible":false',
+        ),
       );
     });
   });

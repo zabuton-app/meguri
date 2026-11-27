@@ -13,16 +13,25 @@ import {
   lazy,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyTagFilter, showFolderInLibrary } from "@/lib/ui-events";
 import { fileNameOf, folderPathOf } from "@/lib/relPath";
+import { subtitlePreferenceKey } from "@/lib/subtitlePreference";
+import { readEmbeddedTracks } from "@shared/embeddedSubtitles";
 import { isNormalizedFolderPath } from "@shared/folderPath";
-import { api, ALL_ID, COLLECTION_ID_PREFIX } from "@/ipc/client";
+import { api } from "@/ipc/client";
+import { fileWorkspaceId } from "./fileWorkspace";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,9 +45,13 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useResumeStart } from "@/hooks/useResumeStart";
 import { ResumeNotice } from "@/components/ResumeNotice";
 import { MediaModal, TopBar } from "./MediaModal";
+import { ZoomableImage } from "./ZoomableImage";
 import { VideoPlayer, type PlayerHandle } from "./VideoPlayer";
+import { hasHdrTransfer } from "@/video/colorGrade";
+import { needsVideoPreview, isRemuxedVideo } from "@shared/playbackTracks";
 import { useAudioActions } from "@/audio/useAudioPlayer";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import { AudioCompact, AudioStage } from "./AudioStage";
 import { DetailActions } from "./DetailActions";
 import { PlayHistory } from "./PlayHistory";
@@ -50,6 +63,7 @@ import { useDetailPresentation } from "./useDetailPresentation";
 import { useThumbVersion } from "./useThumbVersion";
 import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
+import { DownloadOriginCard } from "./DownloadOriginCard";
 import { MetaChips } from "./MetaChips";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
 import {
@@ -65,10 +79,13 @@ const NoteCard = lazy(() => import("./NoteCard"));
 
 export default function MediaDetail() {
   const { t, lang } = useI18n();
+  const titleId = useId();
   const { id } = useParams();
   const fileId = Number(id);
-  // Optional initial seek position (seconds), e.g. when arriving from a Discovery scene click.
+  // Optional initial seek position (seconds), e.g. when the playlist hands over.
   const [searchParams] = useSearchParams();
+  // Each navigation's key: the same `?t=` asked for again is a new request.
+  const location = useLocation();
   // Null when absent: `?t=0` is a start asked for, not a missing one.
   const tParam = searchParams.get("t");
   const explicitStartAt =
@@ -101,6 +118,11 @@ export default function MediaDetail() {
 
   // Total duration for scenes/history. Falls back to the natively obtained value when the DB duration is empty.
   const [nativeDur, setNativeDur] = useState<number | null>(null);
+  // The video adjustments side panel. Kept open across files; its element is
+  // where the player's adjustment controls render.
+  const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
+  const [adjustmentsContainer, setAdjustmentsContainer] =
+    useState<HTMLDivElement | null>(null);
   const [imageBgInverted, setImageBgInverted] = useLocalStorage<boolean>(
     IMAGE_BG_INVERTED_KEY,
     false,
@@ -109,18 +131,11 @@ export default function MediaDetail() {
   // Handle for calling the player's seek from a scene click.
   const playerRef = useRef<PlayerHandle>(null);
   const status = useAppStatus();
-  // The file's owning workspace: from "?ws=" (set by every list/grid link, required in "All"
-  // and collection views), falling back to the active workspace ID for single-workspace
-  // navigation. The active ID is only a usable fallback when it's a real workspace — the
-  // "All"/collection sentinels aren't resolvable Cores, so ignore them here.
-  const activeId = status.data?.workspaceId ?? "";
-  const activeFallback =
-    activeId &&
-    activeId !== ALL_ID &&
-    !activeId.startsWith(COLLECTION_ID_PREFIX)
-      ? activeId
-      : "";
-  const wsId = searchParams.get("ws") ?? activeFallback;
+  // The file's owning workspace (see fileWorkspaceId).
+  const wsId = fileWorkspaceId(
+    searchParams.get("ws"),
+    status.data?.workspaceId,
+  );
   // Like a tag filter, showing the file's folder closes the detail to the list.
   const onShowFolder = useCallback(
     (path: string) => {
@@ -212,8 +227,7 @@ export default function MediaDetail() {
   // Serve via the local HTTP server (Chromium's <video> can handle http+Range).
   const mediaBase = status.data?.mediaBase ?? "";
   // Include the workspace ID in the URL path (/ws/<id>/...) to avoid collisions with another DB after switching.
-  const mediaSrc =
-    mediaBase && wsId ? `${mediaBase}/ws/${wsId}/media/${fileId}` : "";
+  const mediaSrc = mediaBase && wsId ? mediaSrcOf(mediaBase, wsId, fileId) : "";
   const { onClose, openPlaylist } = useCloseTarget({
     fileId,
     wsId,
@@ -234,6 +248,8 @@ export default function MediaDetail() {
     mediaBase,
     autoplay,
     startAt,
+    explicitStartAt,
+    navKey: location.key,
     pauseVideo: () => playerRef.current?.pause(),
     // The peek ends above the bar, so the bar stays — and for audio it is the
     // transport, the compact tile in the sheet having none.
@@ -275,6 +291,7 @@ export default function MediaDetail() {
       fileId,
       wsId,
       kind,
+      viewRef: modalRef,
     });
   // The way into the playlist from here (see useCloseTarget). Offered only
   // while a list is mounted underneath, and only for a file that list has
@@ -298,6 +315,8 @@ export default function MediaDetail() {
         onClose={onClose}
         size={modalSize}
         presentation={presentation}
+        // The prev/next keys look for layers over this frame, here too.
+        containerRef={modalRef}
         t={t}
       >
         <TopBar
@@ -309,10 +328,10 @@ export default function MediaDetail() {
           t={t}
         />
         <div className="flex w-full flex-col gap-4 px-4 py-4">
-          <Skeleton className="aspect-video w-full rounded-xl" />
+          <Skeleton className="aspect-video w-full rounded-card" />
           <Skeleton className="h-6 w-2/3" />
           <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-card" />
         </div>
       </MediaModal>
     );
@@ -323,6 +342,8 @@ export default function MediaDetail() {
         onClose={onClose}
         size={modalSize}
         presentation={presentation}
+        // The prev/next keys look for layers over this frame, here too.
+        containerRef={modalRef}
         t={t}
       >
         <TopBar
@@ -338,12 +359,14 @@ export default function MediaDetail() {
     );
   }
 
+  const audioTracks = readEmbeddedTracks(d.meta, "audio");
   const total = d.duration && d.duration > 0 ? d.duration : (nativeDur ?? null);
   const slash = d.relPath.lastIndexOf("/");
   const basename = slash >= 0 ? d.relPath.slice(slash + 1) : d.relPath;
   const dir = slash >= 0 ? d.relPath.slice(0, slash) : "";
   // A file of a collection is still in a real workspace: the one named by wsId.
   const folderPath = folderPathOf(d.relPath);
+  const showsAdjustments = d.kind === "video" && !hasHdrTransfer(d.meta);
 
   return (
     <MediaModal
@@ -352,12 +375,14 @@ export default function MediaDetail() {
       presentation={presentation}
       fullscreen={isFullscreen}
       containerRef={modalRef}
+      titleId={titleId}
       t={t}
     >
       {!isFullscreen && (
         <TopBar
           onClose={onClose}
           title={basename}
+          titleId={titleId}
           onPrev={goPrev}
           onNext={goNext}
           canPrev={canPrev}
@@ -374,200 +399,235 @@ export default function MediaDetail() {
         />
       )}
 
-      <ScrollArea className="page-scroll min-h-0 flex-1">
-        <div className="flex w-full flex-col gap-4 px-4 py-4">
-          {/* Player / viewer */}
-          {d.kind === "video" ? (
-            // In fullscreen, cancel the surrounding padding so the video is
-            // edge-to-edge for the first screenful (the rest scrolls below).
-            <div className={isFullscreen ? "-mx-4 -mt-4" : "contents"}>
-              <VideoPlayer
-                ref={playerRef}
-                id={fileId}
-                src={mediaSrc}
-                duration={d.duration}
-                width={d.width}
-                height={d.height}
-                mediaBase={mediaBase}
-                wsId={wsId}
-                startAt={startAt}
-                autoplay={autoplay}
-                navKeys={navBinding}
-                fullscreenTargetRef={modalRef}
-                bookmarks={d.bookmarks}
-                bookmarkPending={actions.pending.bookmark}
-                onAddBookmark={actions.addBookmark}
-                onRemoveBookmark={actions.removeBookmark}
-                exportPending={actions.pending.export}
-                onExportFrame={actions.exportFrame}
-                onNativeDuration={setNativeDur}
-                onPlayed={() => {
-                  invalidatePlayedSearches(qc);
-                  dropFromWatchLaterCache(qc, wsId, fileId);
-                }}
-                onOpenExternal={() => {
-                  dropFromWatchLaterCache(qc, wsId, fileId);
-                  invalidatePlayedSearches(qc);
-                }}
-                // Video demands attention, background audio yields. Pause rather
-                // than close, so the bar stays visible and the user can resume.
-                onPlaybackStart={claimPlayback}
-                t={t}
-              />
-            </div>
-          ) : d.kind === "audio" ? (
-            // In the peek the bottom bar stays on screen as the transport, so
-            // the sheet shows the track as a tile rather than a second stage.
-            isPeek ? (
-              <AudioCompact
-                file={d}
-                wsId={wsId}
-                mediaBase={mediaBase}
-                coverSrc={coverSrc}
-              />
+      <div className="flex min-h-0 flex-1">
+        <ScrollArea className="page-scroll min-h-0 min-w-0 flex-1">
+          <div className="flex w-full flex-col gap-4 px-4 py-4">
+            {/* Player / viewer */}
+            {d.kind === "video" ? (
+              // In fullscreen, cancel the surrounding padding so the video is
+              // edge-to-edge for the first screenful (the rest scrolls below).
+              <div className={`flex ${isFullscreen ? "-mx-4 -mt-4" : "gap-4"}`}>
+                <div className="min-w-0 flex-1">
+                  <VideoPlayer
+                    ref={playerRef}
+                    id={fileId}
+                    src={mediaSrc}
+                    remuxed={isRemuxedVideo(d.codec, d.ext)}
+                    audioTracks={
+                      isRemuxedVideo(d.codec, d.ext) ? audioTracks : undefined
+                    }
+                    subtitleTracks={readEmbeddedTracks(d.meta, "subtitle")}
+                    subtitleAudioLanguage={
+                      needsVideoPreview(d.codec) || audioTracks.length === 1
+                        ? audioTracks[0]?.language
+                        : undefined
+                    }
+                    subtitleKey={subtitlePreferenceKey(wsId, d.relPath)}
+                    videoAdjustments={
+                      showsAdjustments
+                        ? {
+                            open: adjustmentsOpen,
+                            onOpenChange: setAdjustmentsOpen,
+                            container: adjustmentsContainer,
+                          }
+                        : undefined
+                    }
+                    duration={d.duration}
+                    width={d.width}
+                    height={d.height}
+                    mediaBase={mediaBase}
+                    wsId={wsId}
+                    startAt={startAt}
+                    autoplay={autoplay}
+                    // The server can end a video preview that stops reading.
+                    reopenOnNetworkError={needsVideoPreview(d.codec)}
+                    navKeys={navBinding}
+                    fullscreenTargetRef={modalRef}
+                    zoomable
+                    bookmarks={d.bookmarks}
+                    bookmarkPending={actions.pending.bookmark}
+                    onAddBookmark={actions.addBookmark}
+                    onRemoveBookmark={actions.removeBookmark}
+                    exportPending={actions.pending.export}
+                    onExportFrame={actions.exportFrame}
+                    onNativeDuration={setNativeDur}
+                    onPlayed={() => {
+                      invalidatePlayedSearches(qc);
+                      dropFromWatchLaterCache(qc, wsId, fileId);
+                    }}
+                    // Video demands attention, background audio yields. Pause rather
+                    // than close, so the bar stays visible and the user can resume.
+                    onPlaybackStart={claimPlayback}
+                    t={t}
+                  />
+                </div>
+                {showsAdjustments && adjustmentsOpen && (
+                  <div
+                    ref={setAdjustmentsContainer}
+                    data-slot="video-adjustments-panel"
+                    // A sidebar as tall as the video beside it, so the scene
+                    // strip and the rest of the detail view span the full width.
+                    className="contents"
+                  />
+                )}
+              </div>
+            ) : d.kind === "audio" ? (
+              // In the peek the bottom bar stays on screen as the transport, so
+              // the sheet shows the track as a tile rather than a second stage.
+              isPeek ? (
+                <AudioCompact
+                  file={d}
+                  wsId={wsId}
+                  mediaBase={mediaBase}
+                  coverSrc={coverSrc}
+                />
+              ) : (
+                <AudioStage
+                  file={d}
+                  wsId={wsId}
+                  mediaBase={mediaBase}
+                  coverSrc={coverSrc}
+                />
+              )
             ) : (
-              <AudioStage
-                file={d}
-                wsId={wsId}
-                mediaBase={mediaBase}
-                coverSrc={coverSrc}
-              />
-            )
-          ) : (
-            <div
-              className={`flex justify-center overflow-hidden rounded-xl ${
-                imageBgInverted ? "bg-white" : "bg-black"
-              }`}
-            >
-              <img
+              <ZoomableImage
+                // Another file starts at fit.
+                key={mediaSrc}
                 src={mediaSrc}
                 alt={d.relPath}
-                className="max-h-[78vh] max-w-full object-contain"
-              />
-            </div>
-          )}
-
-          {/* Resumed where it was left: say so, and offer the way back to
-              zero. Audio only when this view started the track itself —
-              opened without autoplay nothing has started, and a track found
-              already playing in the bar was left where it was. */}
-          {resumeStart.resumed &&
-            (d.kind === "video" ||
-              (d.kind === "audio" && audioStartedHere)) && (
-              <ResumeNotice
-                sec={resumeStart.startAt}
-                onStartOver={() => {
-                  if (d.kind === "video") playerRef.current?.seek(0);
-                  else if (isCurrentAudio(fileId, wsId)) seekAudio(0);
-                  resumeStart.dismiss();
-                }}
+                inverted={imageBgInverted}
                 t={t}
               />
             )}
 
-          {/* Title + controls */}
-          <DetailActions
-            detail={d}
-            basename={basename}
-            dir={dir}
-            fileId={fileId}
-            wsId={wsId}
-            mediaSrc={mediaSrc}
-            collections={collections}
-            imageBgInverted={imageBgInverted}
-            onToggleImageBg={toggleImageBgInverted}
-            onOpenExternal={actions.openExternal}
-            onDeleteFromIndex={() => void actions.deleteFromIndex()}
-            onAddToCollection={actions.addToCollection}
-            onRemoveFromCollection={actions.removeFromCollection}
-            onShowFolder={
-              wsId && isNormalizedFolderPath(folderPath)
-                ? () => onShowFolder(folderPath)
-                : undefined
-            }
-            t={t}
-          />
+            {/* Resumed where it was left: say so, and offer the way back to
+              zero. Audio only when this view started the track itself —
+              opened without autoplay nothing has started, and a track found
+              already playing in the bar was left where it was. */}
+            {resumeStart.resumed &&
+              (d.kind === "video" ||
+                (d.kind === "audio" && audioStartedHere)) && (
+                <ResumeNotice
+                  sec={resumeStart.startAt}
+                  onStartOver={() => {
+                    if (d.kind === "video") playerRef.current?.seek(0);
+                    else if (isCurrentAudio(fileId, wsId)) seekAudio(0);
+                    resumeStart.dismiss();
+                  }}
+                  t={t}
+                />
+              )}
 
-          {/* Scenes: evenly spaced thumbnails. Click to seek to that position. */}
-          {d.kind === "video" && total && (
-            <Scenes
-              id={fileId}
-              total={total}
-              mediaBase={mediaBase}
-              wsId={wsId}
-              thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={actions.pendingThumbSec}
-              // Status alone, not hasThumbFile: a video marked done always has
-              // a frame behind it, and the scene picker shows the slot itself.
-              mainThumbUrl={
-                d.thumbStatus === "done"
-                  ? thumbUrl(mediaBase, wsId, fileId, thumbVersion)
-                  : null
-              }
-              mainThumbPending={actions.pending.mainThumb}
-              onSeek={(sec) => playerRef.current?.seek(sec)}
-              onSetMainThumb={actions.setMainThumb}
-              t={t}
-            />
-          )}
-
-          {/* User-curated scene bookmarks. Hidden when empty (the player has a button to add one). */}
-          {d.kind === "video" && d.bookmarks.length > 0 && (
-            <SceneBookmarks
-              id={fileId}
-              bookmarks={d.bookmarks}
-              mediaBase={mediaBase}
-              wsId={wsId}
-              thumbOffsetSec={d.thumbOffsetSec}
-              pendingThumbSec={actions.pendingThumbSec}
-              onSeek={(sec) => playerRef.current?.seek(sec)}
-              onRemove={actions.removeBookmark}
-              onSetMainThumb={actions.setMainThumb}
-              t={t}
-            />
-          )}
-
-          {/* Rating + tags */}
-          <RatingTagsCard
-            detail={d}
-            // Whichever separator the path was stored with: a folder must
-            // never be offered as part of the name.
-            basename={fileNameOf(d.relPath)}
-            fileId={fileId}
-            wsId={wsId}
-            watchLater={watchLater}
-            watchLaterRef={watchLaterRef}
-            onRate={actions.setRating}
-            onAddTag={actions.addTag}
-            onRemoveTag={actions.removeTag}
-            onTagClick={onTagFilter}
-            t={t}
-          />
-
-          {/* Note. One card per file, so leaving a file writes what was
-              typed in it (see NoteCard). */}
-          <Suspense fallback={null}>
-            <NoteCard
-              key={`${wsId}:${fileId}`}
+            {/* Title + controls */}
+            <DetailActions
+              detail={d}
+              basename={basename}
+              dir={dir}
               fileId={fileId}
               wsId={wsId}
-              note={d.note}
+              mediaSrc={mediaSrc}
+              collections={collections}
+              imageBgInverted={imageBgInverted}
+              onToggleImageBg={toggleImageBgInverted}
+              onOpenExternal={actions.openExternal}
+              onDeleteFromIndex={() => void actions.deleteFromIndex()}
+              onAddToCollection={actions.addToCollection}
+              onRemoveFromCollection={actions.removeFromCollection}
+              onShowFolder={
+                wsId && isNormalizedFolderPath(folderPath)
+                  ? () => onShowFolder(folderPath)
+                  : undefined
+              }
+              t={t}
             />
-          </Suspense>
 
-          {/* Metadata chips */}
-          <MetaChips
-            detail={d}
-            wsId={wsId}
-            workspaceLabel={owningWorkspace?.label ?? null}
-            workspacePath={owningWorkspace?.path ?? null}
-            total={total}
-            t={t}
-          />
+            {/* Scenes: evenly spaced thumbnails. Click to seek to that position. */}
+            {d.kind === "video" && total && (
+              <Scenes
+                id={fileId}
+                total={total}
+                mediaBase={mediaBase}
+                wsId={wsId}
+                thumbOffsetSec={d.thumbOffsetSec}
+                pendingThumbSec={actions.pendingThumbSec}
+                // Status alone, not hasThumbFile: a video marked done always has
+                // a frame behind it, and the scene picker shows the slot itself.
+                mainThumbUrl={
+                  d.thumbStatus === "done"
+                    ? thumbUrl(mediaBase, wsId, fileId, thumbVersion)
+                    : null
+                }
+                mainThumbPending={actions.pending.mainThumb}
+                onSeek={(sec) => playerRef.current?.seek(sec)}
+                onSetMainThumb={actions.setMainThumb}
+                t={t}
+              />
+            )}
 
-          <PlayHistory history={d.playHistory} t={t} lang={lang} />
-        </div>
-      </ScrollArea>
+            {/* User-curated scene bookmarks. Hidden when empty (the player has a button to add one). */}
+            {d.kind === "video" && d.bookmarks.length > 0 && (
+              <SceneBookmarks
+                id={fileId}
+                bookmarks={d.bookmarks}
+                mediaBase={mediaBase}
+                wsId={wsId}
+                thumbOffsetSec={d.thumbOffsetSec}
+                pendingThumbSec={actions.pendingThumbSec}
+                onSeek={(sec) => playerRef.current?.seek(sec)}
+                onRemove={actions.removeBookmark}
+                onSetMainThumb={actions.setMainThumb}
+                t={t}
+              />
+            )}
+
+            {/* Rating + tags */}
+            <RatingTagsCard
+              detail={d}
+              // Whichever separator the path was stored with: a folder must
+              // never be offered as part of the name.
+              basename={fileNameOf(d.relPath)}
+              fileId={fileId}
+              wsId={wsId}
+              watchLater={watchLater}
+              watchLaterRef={watchLaterRef}
+              onRate={actions.setRating}
+              onAddTag={actions.addTag}
+              onRemoveTag={actions.removeTag}
+              onTagClick={onTagFilter}
+              t={t}
+            />
+
+            {/* Note. One card per file, so leaving a file writes what was
+              typed in it (see NoteCard). */}
+            <Suspense fallback={null}>
+              <NoteCard
+                key={`${wsId}:${fileId}`}
+                fileId={fileId}
+                wsId={wsId}
+                note={d.note}
+              />
+            </Suspense>
+
+            {/* Metadata chips */}
+            <MetaChips
+              detail={d}
+              wsId={wsId}
+              workspaceLabel={owningWorkspace?.label ?? null}
+              workspacePath={owningWorkspace?.path ?? null}
+              total={total}
+              t={t}
+            />
+
+            <DownloadOriginCard
+              key={`${wsId}:${fileId}`}
+              id={fileId}
+              workspaceId={wsId}
+            />
+
+            <PlayHistory history={d.playHistory} t={t} lang={lang} />
+          </div>
+        </ScrollArea>
+      </div>
     </MediaModal>
   );
 }

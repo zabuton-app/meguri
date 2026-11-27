@@ -3,10 +3,12 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { Core } from "./index.js";
-import { nowUnix } from "./db.js";
+import { nowUnix, resyncFtsForIds } from "./db.js";
 import {
   assertScanRootReadable,
   emptyScanStats,
+  isMountpoint,
+  ScanRootUnreadableError,
   syncFiles,
   unreadableMatcher,
   walk,
@@ -14,7 +16,6 @@ import {
 } from "./scan.js";
 import { coverArtStreamIndex, extractMeta, generateThumb } from "./media.js";
 import * as q from "./queries.js";
-import { syncFts } from "./tags.js";
 import {
   applyAutoMetaTags,
   backfillAutoMetaTags,
@@ -35,8 +36,23 @@ import {
 import { scopedLog } from "./logger.js";
 import type { Kind } from "./types.js";
 import type { AutoTagConfig } from "../../shared/autoTag.js";
+import type { ScanExclusions } from "../../shared/scanExclusions.js";
+import {
+  applyScanExclusions,
+  hideFiles,
+  releaseFiles,
+  scanExclusionChanges,
+  scanExclusionFilter,
+} from "./scanExclusionFilter.js";
 
 const log = scopedLog("scan");
+
+function logExclusions(hidden: number, released = 0): void {
+  if (hidden > 0 || released > 0)
+    log.info(
+      `scan exclusions: hid ${hidden} file(s), let ${released} come back`,
+    );
+}
 
 export type JobEvent =
   | {
@@ -64,20 +80,35 @@ export type JobEvent =
  * is spelled out in the rebuild confirmation dialog.
  *
  * Rows for which `keep` is true (paths the walk could not read) are left as they are, with
- * their thumbnails: they could not be scanned again now.
+ * their thumbnails: they could not be scanned again now. So are rows hidden by a scan
+ * exclusion (#282), which the scan does not read: they stay hidden, ready to come back
+ * when no rule covers them. Not those in `releasing`, which no rule covers any more:
+ * this scan reads them again.
  */
 export async function resetIndex(
   core: Pick<Core, "db" | "rootId" | "thumbsDir">,
   keep: (relPath: string) => boolean,
+  releasing: ReadonlySet<number> = new Set(),
 ): Promise<void> {
   const { db } = core;
   const now = nowUnix();
   const kept = new Set<number>();
   db.transaction(() => {
     const rows = db
-      .prepare("SELECT id, rel_path FROM files WHERE root_id = ?")
-      .all(core.rootId) as { id: number; rel_path: string }[];
-    for (const r of rows) if (keep(r.rel_path)) kept.add(r.id);
+      .prepare(
+        "SELECT id, rel_path, scan_excluded_at FROM files WHERE root_id = ?",
+      )
+      .all(core.rootId) as {
+      id: number;
+      rel_path: string;
+      scan_excluded_at: number | null;
+    }[];
+    for (const r of rows)
+      if (
+        keep(r.rel_path) ||
+        (r.scan_excluded_at !== null && !releasing.has(r.id))
+      )
+        kept.add(r.id);
     // Set-based, with the kept ids as a JSON array: one statement each instead
     // of one per row.
     const notKept = "id NOT IN (SELECT value FROM json_each(?))";
@@ -131,6 +162,12 @@ export async function runScan(
     signal?: AbortSignal;
     /** The workspace being scanned, for the configuration's folder rules. */
     workspaceId?: string;
+    /**
+     * Reads the scan exclusions (#282) from the app config; nothing is
+     * excluded when omitted. Read when the scan starts, and again once the
+     * files are synced, to hide what a rule saved meanwhile covers.
+     */
+    exclusions?: () => ScanExclusions;
   } & (
     | { autoTag?: undefined; deriveAutoTags?: undefined }
     | {
@@ -154,6 +191,18 @@ export async function runScan(
   // walk() throws when the root cannot be read, before anything below touches
   // the index.
   const unreadablePaths: string[] = [];
+  // The patterns run in the auto-tag worker; without one (tests), nothing is
+  // excluded.
+  const filterNow = () =>
+    opts.exclusions && opts.deriveAutoTags
+      ? scanExclusionFilter(
+          opts.exclusions(),
+          opts.workspaceId ?? null,
+          opts.deriveAutoTags,
+        )
+      : null;
+  const exclude = filterNow();
+  const mountpointBefore = await isMountpoint(core.root);
   const discovered = await walk(
     core.root,
     (count) =>
@@ -166,6 +215,7 @@ export async function runScan(
       }),
     signal,
     (relPath) => unreadablePaths.push(relPath),
+    exclude,
   );
 
   if (signal?.aborted) {
@@ -174,14 +224,50 @@ export async function runScan(
     return empty;
   }
 
+  // A root that was a mountpoint and now is a folder on its parent's device
+  // with no media is a drive that is not mounted (readdir succeeds on the bare
+  // mountpoint): fail as an unreachable root before anything is deleted
+  // (#312). Media found means the user put files there instead. Whatever else
+  // the bare folder holds (a desktop's hidden file, a "not mounted" marker)
+  // does not count. Taken before and after the walk, so a drive unmounted (or
+  // mounted, or gone) during it fails the scan too rather than recording what
+  // it saw.
+  const mountpoint = await isMountpoint(core.root);
+  if (mountpointBefore !== null && mountpointBefore !== mountpoint) {
+    throw new ScanRootUnreadableError(
+      "the scan root was mounted or unmounted during the scan",
+    );
+  }
+  if (
+    mountpoint === false &&
+    discovered.length === 0 &&
+    q.scanRootWasMountpoint(db, core.rootId)
+  ) {
+    throw new ScanRootUnreadableError(
+      "the scan root looks like a mountpoint with nothing mounted",
+    );
+  }
+
   // Rows walk() could not reach (a folder or file that exists but cannot be
   // read) are kept as they are by the rebuild, the sync and the thumbnails.
   const isUnreadable = unreadableMatcher(unreadablePaths);
 
+  // What the rules cover now is hidden, so that the sync below does not take
+  // it for gone. What no rule covers any more is synced like any other row:
+  // what the walk found comes back, and the rest is let go once the sync is
+  // through. Not before: a scan cut short would leave it missing (and open to
+  // a purge) though it is there. Not what the walk could not read either: it
+  // would be missing, though only out of reach.
+  const changes = await scanExclusionChanges(db, core.rootId, exclude, {
+    release: true,
+    keep: isUnreadable,
+  });
+  const hidden = await hideFiles(db, changes.hide, signal);
+  const releasing = new Set(changes.release.map((r) => r.id));
   // A rebuild resets the derived file index (keeping file ids and durable
   // metadata) before syncing. Only after the walk, so an unreachable root keeps
   // its index.
-  if (opts.rebuild) await resetIndex(core, isUnreadable);
+  if (opts.rebuild) await resetIndex(core, isUnreadable, releasing);
 
   const { stats, ftsTargets, ftsMissing, unreadable } = await syncFiles(
     db,
@@ -194,8 +280,24 @@ export async function runScan(
       unreadablePaths,
       // A rebuild starts over, hashes included.
       rehash: opts.rebuild,
+      releasing,
     },
   );
+  // Not found by a scan that went through: gone, so missing like any file
+  // that is gone. Not one whose content could not be read: it is there.
+  if (!signal?.aborted) {
+    const unhashed = new Set(unreadable.map((u) => u.relPath));
+    logExclusions(
+      hidden,
+      await releaseFiles(
+        db,
+        changes.release
+          .filter((r) => !unhashed.has(r.relPath))
+          .map((r) => r.id),
+        signal,
+      ),
+    );
+  }
   // Told to the user (counts only) so a folder or file that never shows up
   // does not go unnoticed (#314).
   stats.skipped = unreadablePaths.length + unreadable.length;
@@ -216,7 +318,24 @@ export async function runScan(
       byCode,
     );
   }
+  // A rule saved during the walk and the sync hid what was indexed then, but
+  // not what this scan has added or brought back since. The scan's own work
+  // is done by now, so a failure here is only logged: the next scan, or the
+  // next save, hides what this one could not.
+  if (!signal?.aborted && opts.exclusions) {
+    try {
+      logExclusions(
+        await applyScanExclusions(db, core.rootId, filterNow(), signal),
+      );
+    } catch (err) {
+      log.warn(
+        "could not apply the scan exclusions saved during the scan",
+        err,
+      );
+    }
+  }
   q.touchScanRoot(db, core.rootId);
+  if (mountpoint !== null) q.setScanRootMountpoint(db, core.rootId, mountpoint);
 
   // Tag what this scan added or changed (ftsTargets is exactly that set). Ahead
   // of the FTS sync and the thumbnail pool: the engine reads nothing but file
@@ -268,23 +387,22 @@ export async function runScan(
   // Sync FTS for new/moved/updated entries and for unchanged rows that have no
   // FTS row (see syncFiles), less those auto tagging re-synced as it tagged them.
   const ftsIds = [...ftsTargets, ...ftsMissing].filter((id) => !tagged.has(id));
+  // One transaction per chunk rather than an autocommitted delete and insert
+  // per file (#276); the loop yields to the event loop between chunks.
   const ftsTotal = ftsIds.length;
-  let done = 0;
-  for (const id of ftsIds) {
-    if (signal?.aborted) break;
-    syncFts(db, id);
-    done++;
-    if (done % 64 === 0 || done === ftsTotal) {
-      onEvent({
-        type: "progress",
-        jobId,
-        phase: "index",
-        done,
-        total: ftsTotal,
-      });
-      // Yield to the event loop every 256 entries.
-      if (done % 256 === 0) await new Promise((r) => setImmediate(r));
-    }
+  const FTS_CHUNK = 256;
+  for (let done = 0; done < ftsTotal && !signal?.aborted;) {
+    const chunk = ftsIds.slice(done, done + FTS_CHUNK);
+    db.transaction(() => resyncFtsForIds(db, chunk))();
+    done += chunk.length;
+    onEvent({
+      type: "progress",
+      jobId,
+      phase: "index",
+      done,
+      total: ftsTotal,
+    });
+    await new Promise((r) => setImmediate(r));
   }
 
   if (signal?.aborted) {
@@ -335,15 +453,13 @@ export async function runScan(
     } else {
       q.setThumb(db, r.id, r.ok ? r.dest : null, r.ok ? "done" : "error");
     }
-    // Derive from what was just written, and before syncFts — which rebuilds
-    // tags_text by re-reading meta_tags.
+    // No FTS re-sync: derived tags are namespaced, and tags_text carries only
+    // the user's own (as in backfillDerivedTags).
     applyAutoMetaTags(db, r.id, { kind: r.kind, ...r.meta });
-    syncFts(db, r.id);
   };
-  // Per-file transaction for the retry path: persistOne spans several writes
-  // (incl. the FTS delete+insert), so a mid-way failure must roll back the
-  // whole file rather than leave partial state (e.g. an FTS row deleted but
-  // never re-inserted).
+  // Per-file transaction for the retry path: persistOne spans several writes,
+  // so a mid-way failure must roll back the whole file rather than leave
+  // partial state (e.g. metadata written but its derived tags not).
   const persistOneTx = db.transaction(persistOne);
 
   const flush = (): void => {
@@ -539,8 +655,14 @@ export async function runScan(
   const attempted = pending.length - noCoverArt;
   if (failed > 0 && failed === attempted && !signal?.aborted) {
     // A drive or share that went away during the thumbnails fails them all
-    // too: say so, rather than blame ffmpeg (#313).
+    // too: say so, rather than blame ffmpeg (#313). An unmounted mountpoint
+    // can still be read, as a bare folder (#312).
     await assertScanRootReadable(core.root);
+    if (mountpoint === true && (await isMountpoint(core.root)) === false) {
+      throw new ScanRootUnreadableError(
+        "the scan root was unmounted during the scan",
+      );
+    }
     throw new Error(
       `thumbnail extraction failed for all ${failed} attempted file(s) (is ffmpeg/ffprobe working?)`,
     );

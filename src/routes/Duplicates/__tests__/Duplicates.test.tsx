@@ -154,6 +154,26 @@ describe("Duplicates", () => {
     });
   });
 
+  it("copies a group's hash and searches the list for its copies (#302)", async () => {
+    const searched = vi.fn();
+    window.addEventListener("meguri:show-matching-files", (e) =>
+      searched((e as CustomEvent<string[]>).detail),
+    );
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    renderWithProviders(<DuplicatesRoute />, { route: "/duplicates" });
+    await screen.findByText("2 groups");
+    fireEvent.click(detail().getByRole("button", { name: "Copy hash" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("aaaaaaaa1111"));
+
+    fireEvent.click(detail().getByRole("button", { name: "Show in the list" }));
+    expect(searched).toHaveBeenCalledWith(["hash:aaaaaaaa1111"]);
+    expect(await screen.findByTestId("home")).toBeTruthy();
+  });
+
   it("shows the empty state when there are no duplicates", async () => {
     mocks.duplicatesList.mockResolvedValue({
       groups: [],

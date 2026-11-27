@@ -15,17 +15,22 @@ function PopoverContent({
   align = "end",
   sideOffset = 6,
   collisionPadding = 8,
+  container,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> & {
+  /** Where to portal to (default: body). Content outside a fullscreen
+   *  element is not shown while it is fullscreen. */
+  container?: HTMLElement | null;
+}) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "z-50 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg outline-none",
+          "z-50 rounded-control border border-border bg-popover p-3 text-popover-foreground shadow-lg outline-none",
           className,
         )}
         {...props}

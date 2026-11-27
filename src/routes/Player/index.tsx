@@ -17,6 +17,7 @@ import { api } from "@/ipc/client";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useAudioActions, useExclusivePlayback } from "@/audio/useAudioPlayer";
 import { ResumeNotice } from "@/components/ResumeNotice";
+import { useImmersiveBackdrop } from "@/components/immersiveView";
 import { useResumeStart } from "@/hooks/useResumeStart";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { usePlaybackQueue } from "@/hooks/usePlaybackQueue";
@@ -34,6 +35,7 @@ import {
 import { fileHref } from "@/lib/fileHref";
 import { announceVideoHandOff } from "@/video/videoHandOff";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { mediaSrcOf } from "@/lib/mediaSrc";
 import { queueKey } from "@/lib/playbackQueue";
 import { fileNameOf } from "@/lib/relPath";
 import {
@@ -53,7 +55,13 @@ import { usePlayerKeys } from "./usePlayerKeys";
 import { usePlaylistAudio } from "./usePlaylistAudio";
 import { useStageTransition } from "./useStageTransition";
 import { useFolderScopeLabel } from "@/hooks/useFolderScopeLabel";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import {
+  MODAL_SIZE_KEY,
+  type ModalSize,
+} from "@/routes/MediaDetail/MediaModal";
 import { usePlaybackNav } from "@/components/MediaNavContext";
+import { isRemuxedVideo, needsVideoPreview } from "@shared/playbackTracks";
 
 /**
  * Half of one item-to-item transition: the outgoing item fades out over this
@@ -145,6 +153,20 @@ export default function Player() {
   );
 
   const rootRef = useRef<HTMLDivElement>(null);
+  // Over the whole window, title bar included: its buttons step aside.
+  const backdrop = useImmersiveBackdrop();
+  // Large or compact, as Discover: the same stored size, so the immersive
+  // views open alike.
+  const [modalSize, setModalSize] = useLocalStorage<ModalSize>(
+    MODAL_SIZE_KEY,
+    "large",
+    (raw) => (raw === "small" ? "small" : "large"),
+  );
+  const isSmall = modalSize === "small";
+  const toggleModalSize = useCallback(
+    () => setModalSize((prev) => (prev === "small" ? "large" : "small")),
+    [setModalSize],
+  );
   const { isFullscreen, toggleFullscreen, exitFullscreen } =
     useFullscreen(rootRef);
 
@@ -192,7 +214,7 @@ export default function Player() {
     // the fallback for when the hand-off does not happen.
     if (current.kind === "video" && mediaBase)
       announceVideoHandOff(
-        `${mediaBase}/ws/${current.workspaceId}/media/${current.fileId}`,
+        mediaSrcOf(mediaBase, current.workspaceId, current.fileId),
       );
     void navigate(
       fileHref(current.fileId, current.workspaceId, {
@@ -263,9 +285,11 @@ export default function Player() {
     // Audio may have no thumbnail at all (no embedded cover art), and the queue
     // item cannot tell; a guaranteed 404 is not worth warming.
     if (upcoming.kind === "audio") return;
-    const kind = upcoming.kind === "image" ? "media" : "thumb";
     const img = new Image();
-    img.src = `${mediaBase}/ws/${upcoming.workspaceId}/${kind}/${upcoming.fileId}`;
+    img.src =
+      upcoming.kind === "image"
+        ? mediaSrcOf(mediaBase, upcoming.workspaceId, upcoming.fileId)
+        : (thumbUrl(mediaBase, upcoming.workspaceId, upcoming.fileId) ?? "");
   }, [upcoming, mediaBase]);
 
   const wsId = current?.workspaceId ?? "";
@@ -277,9 +301,7 @@ export default function Player() {
     ? (thumbUrl(mediaBase, wsId, current.fileId) ?? undefined)
     : undefined;
   const mediaSrc =
-    mediaBase && current
-      ? `${mediaBase}/ws/${wsId}/media/${current.fileId}`
-      : "";
+    mediaBase && current ? mediaSrcOf(mediaBase, wsId, current.fileId) : "";
 
   const { leaving, transitionTo } = useStageTransition({
     rootRef,
@@ -355,6 +377,7 @@ export default function Player() {
     exit,
     navBinding,
     wake,
+    viewRef: rootRef,
   });
 
   // Nothing playable: say so rather than sitting on a black screen (FR-016).
@@ -382,12 +405,22 @@ export default function Player() {
     : t("playlist.empty");
 
   return (
+    // An immersive view's backdrop, as Discover's: the player is a panel over
+    // the whole window, the title bar's band included, and the bar's window
+    // buttons step aside meanwhile (useImmersiveBackdrop above).
     <div
-      ref={rootRef}
       role="dialog"
       aria-modal="true"
       aria-label={t("playlist.start")}
-      className={cn("fixed inset-0 z-50 overflow-hidden", ground)}
+      className={cn(
+        backdrop,
+        "z-50 flex bg-black/70 p-3 backdrop-blur-sm",
+        isSmall && "items-center justify-center",
+      )}
+      // The backdrop itself, not a click that bubbled up from the panel.
+      onClick={(e) => {
+        if (e.target === e.currentTarget) exit();
+      }}
       onMouseMove={wake}
       // Pressing a control counts as activity in its own right. Without this the
       // bar keeps counting down from the last mouse *movement*, so clicking Next
@@ -398,149 +431,171 @@ export default function Player() {
       onPointerDown={wake}
       onKeyDown={wake}
     >
-      {queue.waiting && !current ? (
-        <div className="flex h-full w-full items-center justify-center text-muted">
-          <p>{t("playlist.loading")}</p>
-        </div>
-      ) : empty || queue.unplayable ? (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center text-muted">
-          <p>{emptyMessage}</p>
-          <p className="text-sm">{t("playlist.emptyHint")}</p>
-        </div>
-      ) : (
-        <>
-          {leaving && (
+      <div
+        ref={rootRef}
+        data-testid="player-panel"
+        // Full screen takes the panel to the screen's edges, whatever its
+        // size: no frame there (the UA stylesheet lifts the size limits).
+        className={cn(
+          "relative min-w-0 overflow-hidden rounded-window border border-border shadow-2xl [&:fullscreen]:rounded-none [&:fullscreen]:border-0",
+          // The compact size is Discover's.
+          isSmall ? "h-[85vh] max-h-[880px] w-full max-w-4xl" : "flex-1",
+          ground,
+        )}
+      >
+        {queue.waiting && !current ? (
+          <div className="flex h-full w-full items-center justify-center text-muted">
+            <p>{t("playlist.loading")}</p>
+          </div>
+        ) : empty || queue.unplayable ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center text-muted">
+            <p>{emptyMessage}</p>
+            <p className="text-sm">{t("playlist.emptyHint")}</p>
+          </div>
+        ) : (
+          <>
+            {leaving && (
+              <div
+                key={leaving.snapshot.key}
+                data-slot="player-leaving"
+                className="absolute inset-0"
+                style={leavingStyle(
+                  leaving.leg,
+                  leaving.dir,
+                  transitionMs,
+                  playlistFade,
+                  playlistTransition,
+                )}
+              >
+                <SnapshotStage snapshot={leaving.snapshot} ground={ground} />
+              </div>
+            )}
             <div
-              key={leaving.snapshot.key}
-              data-slot="player-leaving"
+              data-slot="player-fade"
               className="absolute inset-0"
-              style={leavingStyle(
-                leaving.leg,
-                leaving.dir,
+              style={enteringStyle(
+                leaving?.leg ?? null,
+                leaving?.dir ?? 1,
                 transitionMs,
                 playlistFade,
                 playlistTransition,
               )}
             >
-              <SnapshotStage snapshot={leaving.snapshot} ground={ground} />
+              <PlayerStage backdropSrc={thumbSrc} ground={ground}>
+                {current && isImage && (
+                  <ImageStage
+                    src={mediaSrc}
+                    alt={file?.relPath ?? ""}
+                    durationMs={playlistImageSeconds * 1000}
+                    paused={paused}
+                    motion={imageMotion}
+                    onDone={goNext}
+                    onError={skipCurrent}
+                  />
+                )}
+                {current && !isImage && !isAudio && (
+                  <VideoPlayer
+                    ref={videoRef}
+                    key={`${wsId}:${current.fileId}`}
+                    id={current.fileId}
+                    src={mediaSrc}
+                    // Chromeless hides the seek bar and drops the aspect-ratio box,
+                    // so these only enrich; the video need not wait for them.
+                    duration={file?.duration ?? null}
+                    width={file?.width ?? null}
+                    height={file?.height ?? null}
+                    mediaBase={mediaBase}
+                    wsId={wsId}
+                    startAt={resumeStart.startAt}
+                    remuxed={isRemuxedVideo(
+                      detailFor?.codec ?? null,
+                      detailFor?.ext ?? null,
+                    )}
+                    autoplay
+                    // The server can end a video preview that stops reading.
+                    reopenOnNetworkError={needsVideoPreview(detailFor?.codec)}
+                    navKeys={navBinding}
+                    fullscreenTargetRef={rootRef}
+                    onNativeDuration={() => undefined}
+                    onPlayed={() => invalidatePlayedSearches(qc)}
+                    // Reclaims the sound on every start (first play, resume,
+                    // item switch), not only when the player mounted.
+                    onPlaybackStart={claimPlayback}
+                    chromeless
+                    onEnded={goNext}
+                    onPlayingChange={(playing) => {
+                      setVideoPlaying(playing);
+                      // The video draws no chrome of its own here, so a play/pause
+                      // from the keyboard would otherwise change nothing on screen.
+                      wake();
+                    }}
+                    onFatalError={skipCurrent}
+                    t={t}
+                  />
+                )}
+                {current && isAudio && (
+                  <AudioArt
+                    thumbSrc={thumbSrc}
+                    hasArt={hasArt}
+                    playing={audioPlaying}
+                  />
+                )}
+              </PlayerStage>
             </div>
-          )}
-          <div
-            data-slot="player-fade"
-            className="absolute inset-0"
-            style={enteringStyle(
-              leaving?.leg ?? null,
-              leaving?.dir ?? 1,
-              transitionMs,
-              playlistFade,
-              playlistTransition,
-            )}
-          >
-            <PlayerStage backdropSrc={thumbSrc} ground={ground}>
-              {current && isImage && (
-                <ImageStage
-                  src={mediaSrc}
-                  alt={file?.relPath ?? ""}
-                  durationMs={playlistImageSeconds * 1000}
-                  paused={paused}
-                  motion={imageMotion}
-                  onDone={goNext}
-                  onError={skipCurrent}
-                />
-              )}
-              {current && !isImage && !isAudio && (
-                <VideoPlayer
-                  ref={videoRef}
-                  key={`${wsId}:${current.fileId}`}
-                  id={current.fileId}
-                  src={mediaSrc}
-                  // Chromeless hides the seek bar and drops the aspect-ratio box,
-                  // so these only enrich; the video need not wait for them.
-                  duration={file?.duration ?? null}
-                  width={file?.width ?? null}
-                  height={file?.height ?? null}
-                  mediaBase={mediaBase}
-                  wsId={wsId}
-                  startAt={resumeStart.startAt}
-                  autoplay
-                  navKeys={navBinding}
-                  fullscreenTargetRef={rootRef}
-                  onNativeDuration={() => undefined}
-                  onPlayed={() => invalidatePlayedSearches(qc)}
-                  // Reclaims the sound on every start (first play, resume,
-                  // item switch), not only when the player mounted.
-                  onPlaybackStart={claimPlayback}
-                  chromeless
-                  onEnded={goNext}
-                  onPlayingChange={(playing) => {
-                    setVideoPlaying(playing);
-                    // The video draws no chrome of its own here, so a play/pause
-                    // from the keyboard would otherwise change nothing on screen.
-                    wake();
+          </>
+        )}
+
+        {!empty && !queue.unplayable && (
+          <PlayerChrome
+            title={title}
+            folderLabel={folderLabel}
+            // Resumed where it was left: shown with the rest of the chrome.
+            notice={
+              resumeStart.resumed && !isImage ? (
+                <ResumeNotice
+                  sec={resumeStart.startAt}
+                  onStartOver={() => {
+                    if (isAudio) seekAudio(0);
+                    else videoRef.current?.seek(0);
+                    resumeStart.dismiss();
                   }}
-                  onFatalError={skipCurrent}
+                  className="bg-black/60 text-white/80 backdrop-blur-sm [&_button]:text-white"
                   t={t}
                 />
-              )}
-              {current && isAudio && (
-                <AudioArt
-                  thumbSrc={thumbSrc}
-                  hasArt={hasArt}
-                  playing={audioPlaying}
-                />
-              )}
-            </PlayerStage>
-          </div>
-        </>
-      )}
-
-      {/* Resumed where it was left: shown with the rest of the chrome. */}
-      {resumeStart.resumed && !isImage && chromeVisible && (
-        <ResumeNotice
-          sec={resumeStart.startAt}
-          onStartOver={() => {
-            if (isAudio) seekAudio(0);
-            else videoRef.current?.seek(0);
-            resumeStart.dismiss();
-          }}
-          className="absolute top-4 left-1/2 z-20 -translate-x-1/2 bg-black/60 text-white/80 backdrop-blur-sm [&_button]:text-white"
-          t={t}
-        />
-      )}
-
-      {!empty && !queue.unplayable && (
-        <PlayerChrome
-          title={title}
-          folderLabel={folderLabel}
-          position={queue.position}
-          total={queue.total}
-          playing={playing}
-          shuffle={playlistShuffle}
-          repeat={playlistRepeat}
-          fullscreen={isFullscreen}
-          canPrev={queue.canPrev}
-          visible={chromeVisible}
-          volume={volume}
-          muted={muted}
-          audible={!isImage}
-          canOpenDetail={!!current}
-          onOpenDetail={openDetail}
-          onVolumeChange={setVolume}
-          onToggleMute={toggleMuted}
-          onTogglePlay={togglePlay}
-          onPrev={goPrev}
-          onNext={goNext}
-          onToggleShuffle={toggleShuffle}
-          onToggleRepeat={toggleRepeat}
-          spectrum={
-            isAudio ? (reducedMotion ? null : audioSpectrum) : undefined
-          }
-          onToggleSpectrum={() => setAudioSpectrum(!audioSpectrum)}
-          onToggleFullscreen={toggleFullscreen}
-          onExit={exit}
-          t={t}
-        />
-      )}
+              ) : null
+            }
+            position={queue.position}
+            total={queue.total}
+            playing={playing}
+            shuffle={playlistShuffle}
+            repeat={playlistRepeat}
+            fullscreen={isFullscreen}
+            small={isSmall}
+            onToggleSize={toggleModalSize}
+            canPrev={queue.canPrev}
+            visible={chromeVisible}
+            volume={volume}
+            muted={muted}
+            audible={!isImage}
+            canOpenDetail={!!current}
+            onOpenDetail={openDetail}
+            onVolumeChange={setVolume}
+            onToggleMute={toggleMuted}
+            onTogglePlay={togglePlay}
+            onPrev={goPrev}
+            onNext={goNext}
+            onToggleShuffle={toggleShuffle}
+            onToggleRepeat={toggleRepeat}
+            spectrum={
+              isAudio ? (reducedMotion ? null : audioSpectrum) : undefined
+            }
+            onToggleSpectrum={() => setAudioSpectrum(!audioSpectrum)}
+            onToggleFullscreen={toggleFullscreen}
+            onExit={exit}
+            t={t}
+          />
+        )}
+      </div>
     </div>
   );
 }

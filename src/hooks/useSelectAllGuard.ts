@@ -4,6 +4,7 @@
 // avoid. Inside an input/textarea/contenteditable the shortcut keeps its normal
 // meaning, so "select all" stays a field affordance like in a native app.
 import { useEffect } from "react";
+import { isTyping } from "@/lib/keyTarget";
 
 // Chromium triggers select-all off the produced character, not the physical key:
 // on AZERTY the key labelled "A" is KeyQ, so a `code`-only test never fires there.
@@ -30,14 +31,9 @@ export function useSelectAllGuard() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!isSelectAllKey(e)) return;
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      // A focused <select> has no text to select: the default would select
+      // the whole page, which is what this guard is for.
+      if (isTyping() && document.activeElement?.tagName !== "SELECT") return;
       e.preventDefault();
     };
     // Capture phase: a stopPropagation() anywhere in the tree (Radix and cmdk both

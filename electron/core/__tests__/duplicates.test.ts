@@ -106,10 +106,22 @@ describe("listDuplicatesWorkspaces", () => {
   it("finds duplicates that only exist across workspaces", () => {
     const a = newDb();
     const b = newDb();
-    insertFile(a.db, a.rootId, { relPath: "x.mp4", contentHash: "h1", size: 10 });
-    insertFile(b.db, b.rootId, { relPath: "y.mp4", contentHash: "h1", size: 10 });
+    insertFile(a.db, a.rootId, {
+      relPath: "x.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
+    insertFile(b.db, b.rootId, {
+      relPath: "y.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
     // Unique within and across → never reported.
-    insertFile(b.db, b.rootId, { relPath: "z.mp4", contentHash: "h9", size: 10 });
+    insertFile(b.db, b.rootId, {
+      relPath: "z.mp4",
+      contentHash: "h9",
+      size: 10,
+    });
 
     const res = listDuplicatesWorkspaces([
       coreTarget("wsA", a.db),
@@ -125,9 +137,21 @@ describe("listDuplicatesWorkspaces", () => {
   it("merges intra-DB and cross-DB duplicates into one group", () => {
     const a = newDb();
     const b = newDb();
-    insertFile(a.db, a.rootId, { relPath: "a1.mp4", contentHash: "h1", size: 10 });
-    insertFile(a.db, a.rootId, { relPath: "a2.mp4", contentHash: "h1", size: 10 });
-    insertFile(b.db, b.rootId, { relPath: "b1.mp4", contentHash: "h1", size: 10 });
+    insertFile(a.db, a.rootId, {
+      relPath: "a1.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
+    insertFile(a.db, a.rootId, {
+      relPath: "a2.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
+    insertFile(b.db, b.rootId, {
+      relPath: "b1.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
 
     const res = listDuplicatesWorkspaces([
       coreTarget("wsA", a.db),
@@ -141,8 +165,16 @@ describe("listDuplicatesWorkspaces", () => {
   it("keeps same hash with different sizes apart across workspaces", () => {
     const a = newDb();
     const b = newDb();
-    insertFile(a.db, a.rootId, { relPath: "x.mp4", contentHash: "h1", size: 10 });
-    insertFile(b.db, b.rootId, { relPath: "y.mp4", contentHash: "h1", size: 11 });
+    insertFile(a.db, a.rootId, {
+      relPath: "x.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
+    insertFile(b.db, b.rootId, {
+      relPath: "y.mp4",
+      contentHash: "h1",
+      size: 11,
+    });
 
     const res = listDuplicatesWorkspaces([
       coreTarget("wsA", a.db),
@@ -154,8 +186,16 @@ describe("listDuplicatesWorkspaces", () => {
 
   it("returns the same result shape for single and multi target sets", () => {
     const a = newDb();
-    insertFile(a.db, a.rootId, { relPath: "a1.mp4", contentHash: "h1", size: 10 });
-    insertFile(a.db, a.rootId, { relPath: "a2.mp4", contentHash: "h1", size: 10 });
+    insertFile(a.db, a.rootId, {
+      relPath: "a1.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
+    insertFile(a.db, a.rootId, {
+      relPath: "a2.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
     const single = listDuplicatesWorkspaces([coreTarget("wsA", a.db)]);
 
     const empty = newDb();
@@ -209,7 +249,11 @@ describe("duplicateFileRefs", () => {
       size: 10,
     });
     // Same hash, different size: not a duplicate of the pair above.
-    insertFile(b.db, b.rootId, { relPath: "z.mp4", contentHash: "h1", size: 99 });
+    insertFile(b.db, b.rootId, {
+      relPath: "z.mp4",
+      contentHash: "h1",
+      size: 99,
+    });
 
     const refs = duplicateFileRefs([
       coreTarget("wsA", a.db),
@@ -244,10 +288,26 @@ describe("duplicateFileRefs", () => {
     const a = newDb();
     const b = newDb();
     // Default (id) sort would list all of wsA before wsB, splitting the pairs.
-    insertFile(a.db, a.rootId, { relPath: "a1.mp4", contentHash: "h1", size: 10 });
-    insertFile(a.db, a.rootId, { relPath: "a2.mp4", contentHash: "h2", size: 10 });
-    insertFile(b.db, b.rootId, { relPath: "b1.mp4", contentHash: "h1", size: 10 });
-    insertFile(b.db, b.rootId, { relPath: "b2.mp4", contentHash: "h2", size: 10 });
+    insertFile(a.db, a.rootId, {
+      relPath: "a1.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
+    insertFile(a.db, a.rootId, {
+      relPath: "a2.mp4",
+      contentHash: "h2",
+      size: 10,
+    });
+    insertFile(b.db, b.rootId, {
+      relPath: "b1.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
+    insertFile(b.db, b.rootId, {
+      relPath: "b2.mp4",
+      contentHash: "h2",
+      size: 10,
+    });
 
     const cores = [coreTarget("wsA", a.db), coreTarget("wsB", b.db)];
     const res = searchCollection(cores, duplicateFileRefs(cores), {
@@ -305,9 +365,21 @@ describe("duplicateFileRefs", () => {
   it("feeds searchCollection as a duplicates-only search filter", () => {
     const a = newDb();
     const b = newDb();
-    insertFile(a.db, a.rootId, { relPath: "dup-a.mp4", contentHash: "h1", size: 10 });
-    insertFile(a.db, a.rootId, { relPath: "solo.mp4", contentHash: "h2", size: 10 });
-    insertFile(b.db, b.rootId, { relPath: "dup-b.mp4", contentHash: "h1", size: 10 });
+    insertFile(a.db, a.rootId, {
+      relPath: "dup-a.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
+    insertFile(a.db, a.rootId, {
+      relPath: "solo.mp4",
+      contentHash: "h2",
+      size: 10,
+    });
+    insertFile(b.db, b.rootId, {
+      relPath: "dup-b.mp4",
+      contentHash: "h1",
+      size: 10,
+    });
 
     const cores = [coreTarget("wsA", a.db), coreTarget("wsB", b.db)];
     const res = searchCollection(cores, duplicateFileRefs(cores), {});

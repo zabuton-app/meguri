@@ -19,7 +19,7 @@ import {
 } from "./lib.mjs";
 
 const require = createRequire(path.join(repoRoot, "package.json"));
-const ffmpegPath = require("ffmpeg-static");
+const { ffmpegPath } = require("@zabuton-app/ffmpeg-binaries");
 
 // Settings order (src/audio/spectrumPatterns.ts) with the Settings labels.
 const PATTERNS = [
@@ -45,13 +45,12 @@ const tilesDir = fs.mkdtempSync(path.join(os.tmpdir(), "meguri-spectrum-"));
 try {
   await waitReady(page);
 
-  // The track without cover art, so the pattern is the whole stage. Its
-  // thumbnail link has no accessible name (a glyph, no <img alt>), so it is
-  // found through the card rather than by role.
+  // The track without cover art, so the pattern is the whole stage. The
+  // link inside the card's thumbnail ([data-thumb]) opens it.
   const track = page
     .getByTestId("media-card")
     .filter({ hasText: "Open Sky.mp3" })
-    .locator("a[data-thumb]");
+    .locator("[data-thumb] a");
   await track.scrollIntoViewIfNeeded();
   await sleep(500);
   await track.click();
@@ -88,6 +87,7 @@ try {
     await sleep(2500);
     await stage.evaluate((el, text) => {
       el.querySelector(".capture-label")?.remove();
+      // eslint-disable-next-line no-undef -- runs in the page, where document is defined
       const tag = document.createElement("div");
       tag.className = "capture-label";
       tag.textContent = text;

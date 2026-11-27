@@ -121,14 +121,15 @@ describe("WatchLaterButton", () => {
   });
 
   it("suppresses all decorative effects under prefers-reduced-motion while still mutating", async () => {
-    const orig = window.matchMedia;
-    window.matchMedia = (query: string) =>
-      ({
-        matches: query.includes("prefers-reduced-motion"),
-        media: query,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      }) as unknown as MediaQueryList;
+    const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes("prefers-reduced-motion"),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
     try {
       setup(false);
 
@@ -146,7 +147,7 @@ describe("WatchLaterButton", () => {
         ),
       );
     } finally {
-      window.matchMedia = orig;
+      matchMedia.mockRestore();
     }
   });
 });

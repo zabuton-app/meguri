@@ -79,7 +79,7 @@ describe("useFilesSearch keepWhileTyping", () => {
     const hook = setup({ scope: "w", filter: { q: "a" } });
     await settleFirst(hook);
 
-    hook.rerender({ scope: "w", filter: { q: "a", kind: "video" } });
+    hook.rerender({ scope: "w", filter: { q: "a", kinds: ["video"] } });
     expect(hook.result.current.isPlaceholderData).toBe(false);
     expect(hook.result.current.data).toBeUndefined();
   });

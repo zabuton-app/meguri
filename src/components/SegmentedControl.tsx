@@ -81,10 +81,11 @@ export function SegmentedControl<T>({
           onClick={() => onChange(option.value)}
           onKeyDown={onKeyDown}
           className={cn(
-            "h-8 truncate border px-3 text-sm transition-colors",
+            "h-8 truncate border border-border px-3 text-sm transition-colors",
+            // The selected segment is tinted, as every "on" control (#590).
             i === selected
-              ? "border-primary bg-primary font-medium text-primary-foreground"
-              : "border-border text-muted hover:text-fg",
+              ? "bg-primary/15 font-medium text-fg"
+              : "text-muted hover:text-fg",
           )}
         >
           {option.label}

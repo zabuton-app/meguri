@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,6 +6,9 @@ import { usePreferences } from "@/settings/PreferencesProvider";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { MainThumbStar } from "./MainThumbStar";
 import { fmtTime, isSameThumbSource, isThumbPendingFor } from "./utils";
+
+/** How long a file must stay on screen before its scene frames are requested. */
+const SCENE_FRAME_DELAY_MS = 400;
 
 export function Scenes({
   id,
@@ -41,19 +44,32 @@ export function Scenes({
   const scenes = Array.from({ length: sceneCount }, (_, i) =>
     Math.floor((total * (i + 0.5)) / sceneCount),
   );
+  // Frames are extracted by ffmpeg on the media server and an unmounted <img> does not
+  // cancel its request, so skimming past a file would queue frames for every file passed.
+  // Only request them once the user has stayed on the file for a moment.
+  const [framesDueId, setFramesDueId] = useState<number | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => setFramesDueId(id), SCENE_FRAME_DELAY_MS);
+    // Drop the grant when the file changes, so returning to an earlier file waits again.
+    return () => {
+      clearTimeout(timer);
+      setFramesDueId(null);
+    };
+  }, [id]);
+  const framesDue = framesDueId === id;
   return (
-    <section className="rounded-xl border border-border bg-surface p-3">
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+    <section className="border-t border-border py-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase text-muted">
           {t("media.scenes")}
         </h3>
         {/* Live preview of the file's main thumbnail so the user sees the change land,
             instead of having to navigate back to the list to confirm. */}
         {mainThumbUrl && (
-          <div className="flex items-center gap-2 text-[11px] text-muted">
+          <div className="flex items-center gap-2 text-2xs text-muted">
             <span>{t("media.currentMainThumb")}</span>
             <div
-              className="relative h-10 overflow-hidden rounded border border-border bg-black"
+              className="relative h-10 overflow-hidden rounded-item border border-border bg-black"
               aria-busy={mainThumbPending}
             >
               <img src={mainThumbUrl} alt="" className="h-full w-auto" />
@@ -68,24 +84,37 @@ export function Scenes({
       </div>
       <ScrollArea className="w-full" viewportClassName="pb-3">
         <div className="flex gap-2">
-          {scenes.map((sec, i) => {
-            const isMain = isSameThumbSource(thumbOffsetSec, sec);
-            const pending = isThumbPendingFor(pendingThumbSec, sec, isMain);
-            return (
-              <SceneThumb
+          {!framesDue &&
+            // Hold each thumb's box while waiting, so the rail and the sections
+            // below it do not jump on every prev/next.
+            scenes.map((_, i) => (
+              <div
                 key={i}
-                id={id}
-                sec={sec}
-                mediaBase={mediaBase}
-                wsId={wsId}
-                isMainThumb={isMain}
-                thumbPending={pending}
-                onSeek={onSeek}
-                onSetMainThumb={onSetMainThumb}
-                t={t}
-              />
-            );
-          })}
+                data-testid="scene-placeholder"
+                className="shrink-0 overflow-hidden rounded-item border border-border"
+              >
+                <Skeleton className="h-24 w-40 rounded-none" />
+              </div>
+            ))}
+          {framesDue &&
+            scenes.map((sec, i) => {
+              const isMain = isSameThumbSource(thumbOffsetSec, sec);
+              const pending = isThumbPendingFor(pendingThumbSec, sec, isMain);
+              return (
+                <SceneThumb
+                  key={i}
+                  id={id}
+                  sec={sec}
+                  mediaBase={mediaBase}
+                  wsId={wsId}
+                  isMainThumb={isMain}
+                  thumbPending={pending}
+                  onSeek={onSeek}
+                  onSetMainThumb={onSetMainThumb}
+                  t={t}
+                />
+              );
+            })}
         </div>
       </ScrollArea>
     </section>
@@ -121,7 +150,7 @@ function SceneThumb({
       <button
         type="button"
         onClick={() => onSeek(sec)}
-        className={`relative block overflow-hidden rounded-lg border transition hover:border-[var(--c-primary)] ${
+        className={`relative block overflow-hidden rounded-item border transition hover:border-[var(--c-primary)] ${
           isMainThumb ? "border-[var(--c-primary)]" : "border-border"
         }`}
         title={t("scene.seekTo", { time: fmtTime(sec) })}
@@ -137,7 +166,7 @@ function SceneThumb({
             loaded ? "w-auto opacity-100" : "w-40 opacity-0"
           }`}
         />
-        <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1 text-[10px] tabular-nums text-white">
+        <span className="absolute bottom-1 right-1 rounded-item bg-black/75 px-1 text-2xs tabular-nums text-white">
           {fmtTime(sec)}
         </span>
       </button>

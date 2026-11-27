@@ -1,3 +1,16 @@
+import { useQuery } from "@tanstack/react-query";
+import {
+  SUBTITLE_WINDOW_SECONDS,
+  isTextSubtitle,
+  sameSubtitleLanguage,
+  type EmbeddedTrack,
+} from "@shared/embeddedSubtitles";
+import {
+  AUTO_SUBTITLE,
+  SUBTITLES_OFF,
+  readSubtitlePreference,
+  saveSubtitlePreference,
+} from "@/lib/subtitlePreference";
 import {
   forwardRef,
   useCallback,
@@ -16,10 +29,13 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Shrink,
   SkipBack,
   SkipForward,
   Volume2,
   VolumeX,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { api } from "@/ipc/client";
 import type { SceneBookmark } from "@/ipc/types";
@@ -39,20 +55,43 @@ import {
 import { matchAny, type NavBinding } from "@/settings/keybindings";
 import type { TFunc } from "@/i18n/I18nProvider";
 import { VideoElement } from "@/video/VideoElement";
+import {
+  VideoGradeOverlay,
+  type VideoAdjustmentsPanel,
+} from "@/video/VideoGradeOverlay";
 import { isSameSource } from "@/video/videoHandOff";
-import { streamOffsetOf, withStreamSeek } from "@/lib/mediaSrc";
+import { TrackPanel, type SubtitleStatus } from "./TrackPanel";
+import { SpeedMenu } from "@/components/SpeedMenu";
+import {
+  NORMAL_SPEED,
+  PLAYBACK_SPEEDS,
+  speedKeyStep,
+  stepSpeed,
+} from "@/lib/playbackSpeed";
+import { CTRL_BUTTON_CLASS } from "./controlBar";
+import { useVideoZoom } from "./useVideoZoom";
+import { useSubtitleDrag } from "./useSubtitleDrag";
+import {
+  previewAudioTrackOf,
+  streamOffsetOf,
+  withPreviewAudioTrack,
+  withStreamSeek,
+} from "@/lib/mediaSrc";
 import {
   isFatalMediaError,
   MEDIA_ERR_ABORTED,
   MEDIA_ERR_NETWORK,
 } from "@/lib/mediaError";
 import { usePlaybackPosition } from "@/hooks/usePlaybackPosition";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
 import {
   endedSample,
   POSITION_SEEK_INTERVAL_MS,
   type PositionSample,
 } from "@/lib/positionReporter";
 import { fmtTime } from "./utils";
+import { DEFAULT_AUDIO_TRACK } from "@shared/playbackTracks";
+import { isLayerOnTop, isTyping } from "@/lib/keyTarget";
 
 // readyState at which metadata is in (HTMLMediaElement.HAVE_METADATA), as a
 // plain number: the constant lives on a global jsdom does not provide.
@@ -102,6 +141,22 @@ export interface PlayerHandle {
   ended: () => boolean;
 }
 
+/**
+ * Whether the player takes its window-level keyboard shortcuts (default true).
+ * Off where the host owns those keys: Discovery pages its slides with the
+ * arrows, and Space belongs to whichever of its buttons has focus. The paging
+ * chords only matter while the shortcuts are on, so the two are tied: a host
+ * that keeps them must say which chords to yield, and one that turns them off
+ * has nothing to pass (#401).
+ */
+type PlayerKeyboard =
+  | {
+      shortcuts?: true;
+      /** Active paging chords; the player yields these keys so they don't also seek. */
+      navKeys: NavBinding;
+    }
+  | { shortcuts: false; navKeys?: undefined };
+
 export const VideoPlayer = forwardRef<
   PlayerHandle,
   {
@@ -114,10 +169,39 @@ export const VideoPlayer = forwardRef<
     wsId: string;
     /** Initial seek position in seconds (0 = start). Applied once on load. */
     startAt: number;
+    /**
+     * Whether the media server remuxes this file (see `isRemuxedVideo`). Such a
+     * file is loaded from `startAt` straight away rather than from the top and
+     * seeked once its metadata is in: that seek re-serves it from `?t=`, a
+     * second ffmpeg run on top of the one already started (#400). Leave it off
+     * when unsure — the file then takes the slower path that works for all.
+     */
+    remuxed?: boolean;
     /** Whether the video should start playing automatically (default true). */
     autoplay?: boolean;
-    /** Active paging chords; the player yields these keys so they don't also seek. */
-    navKeys: NavBinding;
+    /** Reopen the stream once at its position after a network error mid-playback. */
+    reopenOnNetworkError?: boolean;
+    /**
+     * Whether playing here moves the file's resume point (default true). Off
+     * for Discovery's in-place preview: sampling a file there must not replace
+     * the place it was left at.
+     */
+    recordPosition?: boolean;
+    /**
+     * Whether starting playback here counts as a play (default true): a row in
+     * the play history, and the file leaves Watch Later; onPlayed fires only
+     * then. Off for Discovery's in-place preview (#398), which samples a file
+     * rather than watches it. A host adopting a handed-over element takes the
+     * previous host's play as recorded, so no host with this off hands off.
+     */
+    recordPlay?: boolean;
+    audioTracks?: Pick<EmbeddedTrack, "title" | "language">[];
+    subtitleTracks?: EmbeddedTrack[];
+    subtitleAudioLanguage?: string;
+    subtitleKey?: string;
+    /** The detail view's side panel for the SDR adjustment controls; absent
+     *  where adjustments are not offered. */
+    videoAdjustments?: VideoAdjustmentsPanel;
     /**
      * Element to fullscreen instead of the player itself (e.g. the whole modal,
      * YouTube-style: the video fills the screen and the rest scrolls below it).
@@ -141,7 +225,9 @@ export const VideoPlayer = forwardRef<
      */
     onExportFrame?: (sec: number) => void;
     onNativeDuration: (d: number | null) => void;
-    /** Fired once per loaded file when playback first starts (used to refresh the list order). */
+    /** Fired once per loaded file, when playback first starts and the play is
+     *  recorded: never with `recordPlay` off. Callers update what a recorded
+     *  play changes (the play-sorted lists, Watch Later). */
     onPlayed: () => void;
     /** Fires on every play (not just the first), so the caller can enforce
      *  audio/video exclusivity. Distinct from onPlayed, which fires once per file. */
@@ -158,21 +244,20 @@ export const VideoPlayer = forwardRef<
      */
     chromeless?: boolean;
     /**
+     * Whether the picture can be zoomed and panned (#637): Ctrl+wheel, the
+     * zoom buttons in the control bar, and a drag while zoomed in. The detail
+     * view only; ignored when `chromeless`.
+     */
+    zoomable?: boolean;
+    /**
      * Fired instead of rendering the built-in error panel when playback fails
      * for good. The playlist player uses this to skip to the next item; the
      * panel's "open externally" escape hatch would be a manual affordance the
      * full-screen player must not show.
      */
     onFatalError?: (message: string) => void;
-    /**
-     * Fired when the error screen hands the file to an external player. That
-     * counts as a play main-side (and consumes the Watch Later entry), so the
-     * parent gets to keep its caches in step. Optional because a caller that
-     * handles failures itself (onFatalError) never renders that screen.
-     */
-    onOpenExternal?: () => void;
     t: TFunc;
-  }
+  } & PlayerKeyboard
 >(function VideoPlayer(
   {
     id,
@@ -183,7 +268,17 @@ export const VideoPlayer = forwardRef<
     mediaBase,
     wsId,
     startAt,
+    remuxed = false,
     autoplay = true,
+    reopenOnNetworkError = false,
+    recordPosition = true,
+    recordPlay = true,
+    shortcuts = true,
+    audioTracks,
+    subtitleTracks,
+    subtitleAudioLanguage = "",
+    subtitleKey,
+    videoAdjustments,
     navKeys,
     fullscreenTargetRef,
     bookmarks,
@@ -198,8 +293,8 @@ export const VideoPlayer = forwardRef<
     onEnded,
     onPlayingChange,
     onFatalError,
-    onOpenExternal,
     chromeless = false,
+    zoomable = false,
     t,
   },
   handleRef,
@@ -207,15 +302,88 @@ export const VideoPlayer = forwardRef<
   const ref = useRef<HTMLVideoElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  // The room the captions can be dragged around in.
+  const captionAreaRef = useRef<HTMLDivElement>(null);
+  const captionDrag = useSubtitleDrag(captionAreaRef);
+  const shell = useFileShellActions();
   const [error, setError] = useState<string | null>(null);
   // For stream playback, the start second begun on the server side via ?t.
   const [offset, setOffset] = useState(0);
   // Current playback position for display (seconds).
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [audioTrack, setAudioTrack] = useState(DEFAULT_AUDIO_TRACK);
+  const [trackUnavailable, setTrackUnavailable] = useState(false);
+  const pendingAudio = useRef<{
+    track: number;
+    at: number;
+    resume: boolean;
+  } | null>(null);
+
   const [loaded, setLoaded] = useState(false);
+  const zoom = useVideoZoom({
+    // Off on the error screen, which unmounts the stage.
+    enabled: zoomable && !chromeless && error == null,
+    loaded,
+    stageRef: wrapRef,
+    videoRef: ref,
+  });
   // Whether this player is currently the fullscreen element (used to drop the max-height cap).
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [subtitle, setSubtitle] = useState(() =>
+    readSubtitlePreference(subtitleKey),
+  );
+  // A track chosen in the player is the audio that plays, whatever the caller
+  // could infer from the metadata alone.
+  const audioLanguage =
+    audioTrack === DEFAULT_AUDIO_TRACK
+      ? subtitleAudioLanguage
+      : (audioTracks?.[audioTrack]?.language ?? "");
+  const autoSubtitle =
+    subtitleTracks?.findIndex(
+      (track) =>
+        isTextSubtitle(track.codec) &&
+        sameSubtitleLanguage(audioLanguage, track.language),
+    ) ?? SUBTITLES_OFF;
+  const chosenSubtitle = subtitle === AUTO_SUBTITLE ? autoSubtitle : subtitle;
+  const showSubtitles = !chromeless;
+  // Only a text track can be shown; a saved bitmap track counts as off.
+  const subtitlesOn =
+    showSubtitles &&
+    chosenSubtitle >= 0 &&
+    isTextSubtitle(subtitleTracks?.[chosenSubtitle]?.codec ?? "");
+  const subtitleWindow =
+    Math.floor(Math.max(0, position) / SUBTITLE_WINDOW_SECONDS) *
+    SUBTITLE_WINDOW_SECONDS;
+  const subtitleQuery = useQuery({
+    queryKey: ["file_subtitles", wsId, id, chosenSubtitle, subtitleWindow],
+    queryFn: () => api.fileSubtitles(id, wsId, chosenSubtitle, subtitleWindow),
+    enabled: subtitlesOn,
+    staleTime: Infinity,
+    retry: false,
+    placeholderData: (previous, query) =>
+      query?.queryKey[1] === wsId &&
+      query.queryKey[2] === id &&
+      query.queryKey[3] === chosenSubtitle
+        ? previous
+        : undefined,
+  });
+  const caption =
+    showSubtitles && chosenSubtitle >= 0
+      ? subtitleQuery.data
+          ?.filter((cue) => cue.start <= position && position < cue.end)
+          .map((cue) => cue.text)
+          .join("\n")
+      : undefined;
+  // Shown on the audio and subtitles button. Loading only while there is
+  // nothing to show yet: not between cue windows, where the last cues stay.
+  const subtitleStatus: SubtitleStatus = !showSubtitles
+    ? "idle"
+    : subtitleQuery.isError
+      ? "error"
+      : subtitleQuery.isFetching && !subtitleQuery.isPlaceholderData && !caption
+        ? "loading"
+        : "idle";
   // Volume lives outside this component so the playlist chrome and the detail
   // view stay in step (see hooks/useVolume.ts).
   const { volume, muted } = useVolume();
@@ -257,6 +425,17 @@ export const VideoPlayer = forwardRef<
     totalRef.current = total;
   });
 
+  // Playback speed, for this file only (#280): it goes back to normal when the
+  // file changes. Assigned on every load too, as a new source (a stream
+  // reopened at another second) starts the element at normal speed again.
+  const [speed, setSpeed] = useState(NORMAL_SPEED);
+  const speedRef = useRef(speed);
+  useEffect(() => {
+    speedRef.current = speed;
+    const v = ref.current;
+    if (v && v.playbackRate !== speed) v.playbackRate = speed;
+  }, [speed]);
+
   // Push the shared volume onto the element. Assigning only when the value
   // actually differs is what stops this from ping-ponging with the
   // `volumechange` handler below, which feeds the element's value back in.
@@ -284,7 +463,7 @@ export const VideoPlayer = forwardRef<
   // Fire onPlayed only on the first play of each loaded file (not on every pause/resume).
   const playedRef = useRef(false);
   // Where playback stands, for the resume point (see usePlaybackPosition).
-  const playbackPosition = usePlaybackPosition(wsId, id);
+  const playbackPosition = usePlaybackPosition(wsId, id, recordPosition);
   /**
    * The element's position in the file, or null while it has none to give
    * (nothing loaded, or a stream being re-served from a new second). Read off
@@ -334,11 +513,16 @@ export const VideoPlayer = forwardRef<
   // and the reload button on the error screen. Deliberately leaves `playedRef`
   // alone: reloading the same file must not re-fire onPlayed.
   const resetPlaybackState = () => {
+    setAudioTrack(DEFAULT_AUDIO_TRACK);
+    setTrackUnavailable(false);
+    pendingAudio.current = null;
+    setSubtitle(readSubtitlePreference(subtitleKey));
     setError(null);
     setOffset(0);
     setPosition(0);
     setPlaying(false);
     setLoaded(false);
+    zoom.reset();
     setNativeDur(null);
     setHover(null);
     setScrub(null);
@@ -363,6 +547,41 @@ export const VideoPlayer = forwardRef<
     attachedRef.current = { el, adopted };
   }, []);
 
+  const restartPreview = (
+    v: HTMLVideoElement,
+    nextSrc: string,
+    at: number,
+    resume: boolean,
+  ) => {
+    const next = withStreamSeek(nextSrc, at, true);
+    haveMetadataRef.current = false;
+    appliedStartRef.current = true;
+    setLoaded(false);
+    setOffset(streamOffsetOf(next));
+    setPosition(streamOffsetOf(next));
+    v.autoplay = resume;
+    v.src = next;
+    v.load();
+    if (resume) void v.play().catch(() => {});
+  };
+
+  const chooseAudioTrack = (index: number) => {
+    const v = ref.current;
+    if (!v || !haveMetadataRef.current || index === audioTrack) return;
+    const source = v.getAttribute("src") ?? src;
+    const at = streamOffsetOf(source) + v.currentTime;
+    cancelQueuedSeek();
+    if (retryTimerRef.current != null) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    netRetriedRef.current = false;
+    pendingAudio.current = { track: audioTrack, at, resume: !v.paused };
+    setTrackUnavailable(false);
+    setAudioTrack(index);
+    restartPreview(v, withPreviewAudioTrack(source, index), at, !v.paused);
+  };
+
   /** Map a MediaError to the message shown, or handle the transient cases.
    *  Shared by the element's `error` event and adoption (an element that
    *  failed while parked has no event left to deliver). */
@@ -375,12 +594,44 @@ export const VideoPlayer = forwardRef<
       log.debug("video load aborted", { src });
       return;
     }
+    const fallback = pendingAudio.current;
+    if (fallback) {
+      pendingAudio.current = null;
+      setAudioTrack(fallback.track);
+      setTrackUnavailable(true);
+      restartPreview(
+        v,
+        withPreviewAudioTrack(v.getAttribute("src") ?? src, fallback.track),
+        fallback.at,
+        fallback.resume,
+      );
+      return;
+    }
     log.error("video error", {
       src,
       currentSrc: v.currentSrc,
       networkState: v.networkState,
       code,
     });
+    // The server can end a video preview that stopped reading while another
+    // preview waits for its slot. Reopen it once where it stopped; a reopen
+    // that loads restores the retry (see onLoadedMetadata).
+    if (
+      code === MEDIA_ERR_NETWORK &&
+      reopenOnNetworkError &&
+      haveMetadataRef.current &&
+      !netRetriedRef.current
+    ) {
+      netRetriedRef.current = true;
+      const source = v.getAttribute("src") ?? src;
+      const at = streamOffsetOf(source) + v.currentTime;
+      const resume = !v.paused;
+      retryTimerRef.current = window.setTimeout(() => {
+        retryTimerRef.current = null;
+        if (ref.current === v && v.error) restartPreview(v, source, at, resume);
+      }, NETWORK_RETRY_DELAY_MS);
+      return;
+    }
     // A network error right after opening is often transient (the media
     // request can be starved while frame previews hold the origin's
     // connection slots) — reload once before surfacing the error. Only
@@ -443,6 +694,10 @@ export const VideoPlayer = forwardRef<
     const attached = attachedRef.current;
     if (!v || attached?.el !== v || !attached.adopted) return;
     if (!isSameSource(v, src)) return;
+    // The same file playing on: at the speed it was playing at.
+    setSpeed(
+      PLAYBACK_SPEEDS.includes(v.playbackRate) ? v.playbackRate : NORMAL_SPEED,
+    );
     const firstTime =
       adoptedOnceRef.current?.el !== v || adoptedOnceRef.current.src !== src;
     adoptedOnceRef.current = { el: v, src };
@@ -459,6 +714,8 @@ export const VideoPlayer = forwardRef<
     // A stream the other route re-served from `?t=` reports positions
     // relative to that second (see `offset`).
     const streamOffset = streamOffsetOf(v.getAttribute("src"));
+    setAudioTrack(previewAudioTrackOf(v.getAttribute("src")));
+    pendingAudio.current = null;
     setOffset(streamOffset);
     setPosition(streamOffset + v.currentTime);
     setLoaded(true);
@@ -482,7 +739,7 @@ export const VideoPlayer = forwardRef<
       // the play; this host still owes its own callers the start.
       onPlaybackStart?.();
       playedRef.current = true;
-      onPlayed();
+      if (recordPlay) onPlayed();
     }
   };
 
@@ -494,9 +751,10 @@ export const VideoPlayer = forwardRef<
     // eslint-disable-next-line react-hooks/set-state-in-effect
     resetPlaybackState();
     playedRef.current = false;
+    setSpeed(NORMAL_SPEED);
     adoptLoadedElement();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, src]);
+  }, [id, src, subtitleKey]);
 
   useEffect(
     () => () => {
@@ -540,23 +798,31 @@ export const VideoPlayer = forwardRef<
     // Playback has been placed; a start position arriving late (see the
     // effect below `seekRef`) must not move it again.
     appliedStartRef.current = true;
+    const source = v.getAttribute("src") ?? src;
+    const relative = t - streamOffsetOf(source);
     let inSeekable = false;
     for (let i = 0; i < v.seekable.length; i++) {
-      if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) {
+      if (relative >= v.seekable.start(i) && relative <= v.seekable.end(i)) {
         inSeekable = true;
         break;
       }
     }
     if (isFinite(v.duration) && inSeekable) {
-      v.currentTime = t;
+      v.currentTime = relative;
     } else {
-      // Stream: re-serve from the specified second.
+      // Loading a remuxed stream must carry over play/pause. A seek asked for
+      // before the metadata loaded reaches here with the element still paused:
+      // it has not played yet (`played` is empty) and autoplay is about to
+      // start it. That is not the same as one that was paused, which
+      // `onPause` tells apart by withdrawing autoplay.
+      const resume = !v.paused || (v.autoplay && v.played.length === 0);
+      v.autoplay = resume;
       lastStreamSeekRef.current = Date.now();
       setOffset(t);
       setPosition(t);
-      v.src = withStreamSeek(src, t);
+      v.src = withStreamSeek(source, t);
       v.load();
-      void v.play().catch(() => {});
+      if (resume) void v.play().catch(() => {});
     }
   };
 
@@ -618,8 +884,10 @@ export const VideoPlayer = forwardRef<
   /** Whether the element can reach `t` on its own, without re-serving. */
   const canSeekNatively = (v: HTMLVideoElement, t: number) => {
     if (!haveMetadataRef.current || !isFinite(v.duration)) return false;
+    const relative = t - streamOffsetOf(v.getAttribute("src"));
     for (let i = 0; i < v.seekable.length; i++) {
-      if (t >= v.seekable.start(i) && t <= v.seekable.end(i)) return true;
+      if (relative >= v.seekable.start(i) && relative <= v.seekable.end(i))
+        return true;
     }
     return false;
   };
@@ -697,6 +965,11 @@ export const VideoPlayer = forwardRef<
     else void el.requestFullscreen().catch(() => {});
   };
 
+  const zoomFitRef = useRef(zoom.fit);
+  useEffect(() => {
+    zoomFitRef.current = zoom.fit;
+  });
+
   // Track fullscreen state so the video can fill the screen (the default max-h cap would otherwise leave black bars).
   // The fullscreen element may be an ancestor (fullscreenTargetRef), so containment is the check.
   useEffect(() => {
@@ -705,6 +978,8 @@ export const VideoPlayer = forwardRef<
       setIsFullscreen(
         fs != null && wrapRef.current != null && fs.contains(wrapRef.current),
       );
+      // The stage changes size by far, so the view starts again at fit.
+      zoomFitRef.current();
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
@@ -717,22 +992,17 @@ export const VideoPlayer = forwardRef<
     navKeysRef.current = navKeys;
   });
 
-  // Keyboard shortcuts. Disabled while a tag input or similar is focused.
+  // Keyboard shortcuts. Disabled while a tag input or similar is focused, or
+  // when the host owns the keys (`shortcuts`).
   useEffect(() => {
+    if (!shortcuts) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (
-        el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.isContentEditable)
-      )
-        return;
+      if (isTyping() || isLayerOnTop(wrapRef.current)) return;
       // Ignore modified combos (browser / Emacs-style shortcuts).
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Yield keys claimed by file paging (e.g. Vim's "l") so they don't also seek.
       const nk = navKeysRef.current;
-      if (matchAny(e, nk.prev) || matchAny(e, nk.next)) return;
+      if (nk && (matchAny(e, nk.prev) || matchAny(e, nk.next))) return;
       switch (e.code) {
         case "Space":
         case "KeyK":
@@ -777,13 +1047,19 @@ export const VideoPlayer = forwardRef<
           seekRef.current(0);
           break;
       }
+      const speedStep = speedKeyStep(e);
+      if (speedStep) {
+        e.preventDefault();
+        setSpeed((s) => stepSpeed(s, speedStep));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // All handlers go through refs / stable references, so registering once is
-    // enough; `chromeless` is a prop the handler reads directly, so it re-binds
-    // on the rare occasion that changes.
-  }, [togglePlay, chromeless]);
+    // enough; `chromeless` (read by the handler) and `shortcuts` (whether to
+    // listen at all) are props, so it re-binds on the rare occasion either
+    // changes.
+  }, [togglePlay, chromeless, shortcuts]);
 
   // Event coordinates on the seek bar → {ratio, t}.
   // ratio is computed from getBoundingClientRect+clientX (consistent even under CSS zoom). Positioning
@@ -841,11 +1117,19 @@ export const VideoPlayer = forwardRef<
     if (error && onFatalError) onFatalError(error);
   }, [error, onFatalError]);
 
+  // A remuxed file is a stream, so the server can start it at `startAt` for
+  // the same one ffmpeg run that starting at the top would cost. The element
+  // keeps whatever `?t=` it was loaded with when `startAt` changes later:
+  // VideoElement sees the same file and leaves it alone. An empty `src` (the
+  // media origin not known yet) has no URL to add it to.
+  const openedAtStart =
+    remuxed && startAt > 0 && src ? withStreamSeek(src, startAt) : null;
+
   if (error && onFatalError) return null;
 
   if (error) {
     return (
-      <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl bg-surface p-8 text-center text-muted">
+      <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-card bg-surface p-8 text-center text-muted">
         <p>{t("player.playFailed")}</p>
         {/* Selectable: the raw codec / MediaError string belongs in bug reports. */}
         <p className="select-text text-xs">{error}</p>
@@ -865,15 +1149,7 @@ export const VideoPlayer = forwardRef<
           <Button
             variant="outline"
             size="sm"
-            // Only report the launch once the main process confirms it: it
-            // records the play (and consumes the Watch Later entry) there, and
-            // can refuse for a file that has gone missing under the root.
-            onClick={() =>
-              void api
-                .openExternal(id, wsId)
-                .then(() => onOpenExternal?.())
-                .catch((e: unknown) => log.error("open external", e))
-            }
+            onClick={() => shell.openExternal(id, wsId)}
           >
             <ExternalLink />
             {t("player.openExternal")}
@@ -885,6 +1161,12 @@ export const VideoPlayer = forwardRef<
 
   const pct = total ? `${Math.min(100, (displayPos / total) * 100)}%` : "0%";
   const controlsVisible = !chromeless && loaded && (!playing || hover != null);
+  // The audio and subtitles panel has a column per kind of track with
+  // something to choose between.
+  const hasAudioChoice = (audioTracks?.length ?? 0) > 1;
+  const hasSubtitleChoice =
+    showSubtitles &&
+    !!subtitleTracks?.some((track) => isTextSubtitle(track.codec));
   const aspectRatio =
     width && height && width > 0 && height > 0
       ? `${width} / ${height}`
@@ -924,7 +1206,7 @@ export const VideoPlayer = forwardRef<
       } ${
         fillsParent
           ? `${chromeless ? "h-full" : "h-screen"} rounded-none`
-          : "max-h-[78vh] rounded-xl"
+          : "max-h-[78vh] rounded-card"
       }`}
       style={fillsParent ? undefined : { aspectRatio }}
     >
@@ -937,122 +1219,225 @@ export const VideoPlayer = forwardRef<
           aria-hidden="true"
         />
       )}
-      <VideoElement
-        videoRef={ref}
-        onAttach={onAttach}
-        src={src}
-        autoPlay={autoplay}
-        className={`h-full w-full object-contain transition-opacity ${
-          chromeless
-            ? "max-h-full"
-            : isFullscreen
-              ? "max-h-screen"
-              : "max-h-[78vh]"
-        } ${loaded ? "opacity-100" : "opacity-0"}`}
-        onClick={togglePlay}
-        onPlay={() => {
-          setPlaying(true);
-          onPlaybackStart?.();
-          void api.fileRecordPlay(id, wsId, "browser", position);
-          playbackPosition.markPlayed();
-          if (!playedRef.current) {
-            playedRef.current = true;
-            onPlayed();
-          }
-        }}
-        onPause={() => {
-          setPlaying(false);
-          const v = ref.current;
-          const sample = v && sampleOf(v);
-          if (sample) playbackPosition.flush(sample);
-        }}
-        onEnded={() => {
-          setPlaying(false);
-          const v = ref.current;
-          const sample = v && sampleOf(v);
-          if (sample) playbackPosition.flush(endedSample(sample));
-          onEnded?.();
-        }}
-        onVolumeChange={() => {
-          const v = ref.current;
-          if (v) syncFromElement(v.volume, v.muted);
-        }}
-        onLoadedMetadata={() => {
-          const v = ref.current;
-          if (!v) return;
-          // Before anything else: seeks made from here on can be decided on
-          // their merits rather than deferred.
-          haveMetadataRef.current = true;
-          setLoaded(true);
-          // Apply the shared volume/mute to this freshly-loaded element. The
-          // effect above only fires when the value changes, so this is what
-          // covers an element that is new rather than a value that is new.
-          v.volume = volume;
-          v.muted = muted;
-          if (isFinite(v.duration)) {
-            setNativeDur(v.duration);
-            onNativeDuration(v.duration);
-          }
-          // Apply the initial seek (e.g. from a Discovery scene click) once.
-          if (startAt > 0 && !appliedStartRef.current) {
-            appliedStartRef.current = true;
-            seekRef.current(startAt);
-          }
-          // A seek asked for while there was nothing loaded yet. It comes after
-          // the initial seek because it is the newer intent of the two.
-          const deferred = deferredSeekRef.current;
-          if (deferred != null) {
-            deferredSeekRef.current = null;
-            seekRef.current(deferred);
-          }
-        }}
-        onTimeUpdate={() => {
-          const v = ref.current;
-          if (!v) return;
-          setPosition(offset + v.currentTime);
-          const sample = v.paused ? null : sampleOf(v);
-          if (sample) playbackPosition.tick(sample);
-        }}
-        onSeeked={() => {
-          const v = ref.current;
-          // A seek is a new place to come back to, playing or paused (a
-          // paused seek has no `timeupdate` stream to carry it otherwise).
-          const sample = v && sampleOf(v);
-          if (sample) playbackPosition.tick(sample, POSITION_SEEK_INTERVAL_MS);
-          const target = seekTargetRef.current;
-          if (!v || target == null) return;
-          // The run moved on while this seek was in flight; go where it points
-          // now. Landing on the target ends the chain.
-          if (Math.abs(v.currentTime - target) > SEEK_SETTLED_SEC) flushSeek();
-        }}
-        onError={() => {
-          const v = ref.current;
-          if (v) handleElementError(v);
-        }}
-      />
+      {/* Holds the video so the zoom's transform stays here when the element
+          is handed to the playlist player. */}
+      <div
+        data-slot="video-picture"
+        className={`absolute inset-0 flex items-center justify-center ${
+          zoom.zoomed
+            ? `touch-none select-none ${zoom.dragging ? "cursor-grabbing" : "cursor-grab"}`
+            : ""
+        }`}
+        style={zoom.pictureStyle}
+        {...zoom.panHandlers}
+      >
+        <VideoElement
+          videoRef={ref}
+          onAttach={onAttach}
+          src={openedAtStart ?? src}
+          autoPlay={autoplay}
+          className={`h-full w-full object-contain transition-opacity ${
+            chromeless
+              ? "max-h-full"
+              : isFullscreen
+                ? "max-h-screen"
+                : "max-h-[78vh]"
+          } ${loaded ? "opacity-100" : "opacity-0"}`}
+          onClick={() => {
+            if (!zoom.panned()) togglePlay();
+          }}
+          onPlay={() => {
+            setPlaying(true);
+            onPlaybackStart?.();
+            if (recordPlay) {
+              void api.fileRecordPlay(id, wsId, "browser", position);
+            }
+            playbackPosition.markPlayed();
+            if (recordPlay && !playedRef.current) {
+              playedRef.current = true;
+              onPlayed();
+            }
+          }}
+          onPause={() => {
+            setPlaying(false);
+            // A pause, whoever asked for it, withdraws autoplay: a stream paused
+            // while still loading has not played either, and `seek` must not
+            // take it for one that is about to start.
+            if (ref.current) ref.current.autoplay = false;
+            const v = ref.current;
+            const sample = v && sampleOf(v);
+            if (sample) playbackPosition.flush(sample);
+          }}
+          onEnded={() => {
+            setPlaying(false);
+            const v = ref.current;
+            const sample = v && sampleOf(v);
+            if (sample) playbackPosition.flush(endedSample(sample));
+            onEnded?.();
+          }}
+          onVolumeChange={() => {
+            const v = ref.current;
+            if (v) syncFromElement(v.volume, v.muted);
+          }}
+          onLoadedMetadata={() => {
+            const v = ref.current;
+            if (!v) return;
+            // Before anything else: seeks made from here on can be decided on
+            // their merits rather than deferred.
+            haveMetadataRef.current = true;
+            pendingAudio.current = null;
+            // The stream works again, so a later interruption may retry too.
+            netRetriedRef.current = false;
 
+            setLoaded(true);
+            // Apply the shared volume/mute to this freshly-loaded element. The
+            // effect above only fires when the value changes, so this is what
+            // covers an element that is new rather than a value that is new.
+            v.volume = volume;
+            v.muted = muted;
+            v.playbackRate = speedRef.current;
+            if (isFinite(v.duration)) {
+              setNativeDur(v.duration);
+              onNativeDuration(v.duration);
+            }
+            // Read the offset off the element: it may have been loaded from a
+            // `?t=` before this host saw it (opened at `startAt`, or handed
+            // over before its metadata arrived).
+            const source = v.getAttribute("src");
+            const streamOffset = streamOffsetOf(source);
+            setOffset(streamOffset);
+            setPosition(streamOffset + v.currentTime);
+            // Apply the initial seek (a resume point, a scene, a bookmark) once,
+            // unless the file was loaded from there already (`openedAtStart`).
+            if (startAt > 0 && !appliedStartRef.current) {
+              appliedStartRef.current = true;
+              if (source !== openedAtStart) seekRef.current(startAt);
+            }
+            // A seek asked for while there was nothing loaded yet. It comes after
+            // the initial seek because it is the newer intent of the two.
+            const deferred = deferredSeekRef.current;
+            if (deferred != null) {
+              deferredSeekRef.current = null;
+              seekRef.current(deferred);
+            }
+          }}
+          onLoadedData={() => {
+            const v = ref.current;
+            // A codec this Chromium has no decoder for, such as HEVC on Linux,
+            // loads and plays its sound with a black picture and no error. The
+            // scan measured a picture (width), so report it as undecodable.
+            if (v && width != null && width > 0 && v.videoWidth === 0) {
+              log.error("video loaded without a picture", { src });
+              setError(t("player.errNoPicture"));
+            }
+          }}
+          onTimeUpdate={() => {
+            const v = ref.current;
+            if (!v) return;
+            setPosition(offset + v.currentTime);
+            const sample = v.paused ? null : sampleOf(v);
+            if (sample) playbackPosition.tick(sample);
+          }}
+          onSeeked={() => {
+            const v = ref.current;
+            // A seek is a new place to come back to, playing or paused (a
+            // paused seek has no `timeupdate` stream to carry it otherwise).
+            const sample = v && sampleOf(v);
+            if (sample)
+              playbackPosition.tick(sample, POSITION_SEEK_INTERVAL_MS);
+            const target = seekTargetRef.current;
+            if (!v || target == null) return;
+            // The run moved on while this seek was in flight; go where it points
+            // now. Landing on the target ends the chain.
+            const reached =
+              streamOffsetOf(v.getAttribute("src")) + v.currentTime;
+            if (Math.abs(reached - target) > SEEK_SETTLED_SEC) flushSeek();
+          }}
+          onError={() => {
+            const v = ref.current;
+            if (v) handleElementError(v);
+          }}
+        />
+      </div>
+
+      {videoAdjustments && (
+        <VideoGradeOverlay
+          key={`${wsId}:${id}`}
+          videoRef={ref}
+          playing={playing}
+          loaded={loaded}
+          panel={videoAdjustments}
+          pictureStyle={zoom.pictureStyle}
+          pictureScale={zoom.pictureScale}
+          t={t}
+        />
+      )}
+
+      {trackUnavailable && (
+        <div
+          role="status"
+          className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-item bg-black/80 px-2 py-1 text-xs text-white"
+        >
+          {t("player.audioTrackUnavailable")}
+        </div>
+      )}
       {/* Center play/pause indicator (shown large while paused). */}
       {!chromeless && loaded && !playing && (
         <button
           type="button"
           onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center"
+          // Zoomed in, only the round button takes the press: the rest of the
+          // picture is there to be dragged.
+          className={`absolute inset-0 flex items-center justify-center ${
+            zoom.zoomed ? "pointer-events-none" : ""
+          }`}
           title={t("player.play")}
         >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
+          <span className="pointer-events-auto flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition group-hover:bg-black/70">
             <Play size={30} className="translate-x-0.5" />
           </span>
         </button>
+      )}
+
+      {/* After the round play button, so the captions can still be dragged
+          while paused. They stay above the control bar while it shows (the
+          same conditions as the bar's own); a dragged position may go lower
+          when it hides. Kept while dragged, even when the cue ends. */}
+      {(caption || captionDrag.dragging) && (
+        <div
+          ref={captionAreaRef}
+          data-slot="video-subtitles"
+          className={`pointer-events-none absolute inset-x-5 top-3 ${
+            !captionDrag.position || controlsVisible || captionDrag.dragging
+              ? "bottom-20"
+              : "bottom-3 group-hover:bottom-20 group-has-[[aria-expanded=true]]:bottom-20"
+          }`}
+        >
+          <div
+            className={`pointer-events-auto absolute w-max max-w-full touch-none select-none whitespace-pre-line rounded-item bg-black/80 px-3 py-1 text-center text-white ${
+              captionDrag.dragging ? "cursor-grabbing" : "cursor-move"
+            } ${isFullscreen ? "text-lg md:text-2xl" : "text-sm md:text-lg"}`}
+            style={captionDrag.style}
+            onClick={() => {
+              if (!captionDrag.dragged()) togglePlay();
+            }}
+            {...captionDrag.handlers}
+          >
+            {caption}
+          </div>
+        </div>
       )}
 
       {/*
         Custom controls (with a frame preview at the hover position).
         Not rendered at all when chromeless: leaving it in the tree at
         opacity 0 would keep its buttons clickable and tab-reachable.
+        It stays shown while a popover from it is open (`aria-expanded`):
+        the panel renders elsewhere, so hovering it leaves the bar.
       */}
       {!chromeless && (
         <div
-          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity ${
+          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-black/85 via-black/40 to-transparent px-3 pb-2 pt-8 text-white transition-opacity has-[[aria-expanded=true]]:opacity-100 ${
             controlsVisible ? "opacity-100" : "opacity-0"
           } group-hover:opacity-100`}
         >
@@ -1101,9 +1486,9 @@ export const VideoPlayer = forwardRef<
                   alt=""
                   // max-w-none: cancels Tailwind preflight's img{max-width:100%}.
                   // Prevents the image from being squashed horizontally when the containing block's available width shrinks at later positions.
-                  className="h-28 w-auto max-w-none rounded-md border border-white/30 bg-black shadow-lg"
+                  className="h-28 w-auto max-w-none rounded-control border border-white/30 bg-black shadow-lg"
                 />
-                <span className="mt-1 rounded bg-black/75 px-1.5 py-0.5 text-[11px] tabular-nums">
+                <span className="mt-1 rounded-item bg-black/75 px-1.5 py-0.5 text-2xs tabular-nums">
                   {fmtTime(hover.t)}
                 </span>
               </div>
@@ -1161,6 +1546,51 @@ export const VideoPlayer = forwardRef<
               {total ? fmtTime(total) : "--:--"}
             </span>
             <div className="ml-auto flex items-center gap-1">
+              {(hasAudioChoice || hasSubtitleChoice) && (
+                <TrackPanel
+                  audio={
+                    hasAudioChoice && audioTracks
+                      ? {
+                          tracks: audioTracks,
+                          value: audioTrack,
+                          disabled: !loaded,
+                          onChange: chooseAudioTrack,
+                        }
+                      : undefined
+                  }
+                  subtitles={
+                    hasSubtitleChoice && subtitleTracks
+                      ? {
+                          tracks: subtitleTracks,
+                          value: subtitle,
+                          onChange: (choice) => {
+                            setSubtitle(choice);
+                            saveSubtitlePreference(subtitleKey, choice);
+                          },
+                          audioLanguage,
+                          autoTrack: autoSubtitle,
+                          shown: subtitlesOn,
+                          status: subtitleStatus,
+                          moved: captionDrag.position != null,
+                          onResetPosition: captionDrag.reset,
+                        }
+                      : undefined
+                  }
+                  portalTarget={() =>
+                    fullscreenTargetRef?.current ?? wrapRef.current
+                  }
+                  t={t}
+                />
+              )}
+              <SpeedMenu
+                speed={speed}
+                onChange={setSpeed}
+                className={CTRL_BUTTON_CLASS}
+                look="dark"
+                portalTarget={() =>
+                  fullscreenTargetRef?.current ?? wrapRef.current
+                }
+              />
               <div className="group/vol flex items-center">
                 <CtrlButton
                   onClick={toggleMuted}
@@ -1183,6 +1613,34 @@ export const VideoPlayer = forwardRef<
                   title={t("player.volume")}
                 />
               </div>
+              {zoom.ready && (
+                <div className="flex items-center">
+                  <CtrlButton
+                    onClick={zoom.zoomOut}
+                    disabled={!zoom.zoomed}
+                    title={t("media.zoomOut")}
+                  >
+                    <ZoomOut size={18} />
+                  </CtrlButton>
+                  <span className="min-w-10 text-center tabular-nums">
+                    {zoom.percent}%
+                  </span>
+                  <CtrlButton
+                    onClick={zoom.zoomIn}
+                    disabled={!zoom.canZoomIn}
+                    title={t("media.zoomIn")}
+                  >
+                    <ZoomIn size={18} />
+                  </CtrlButton>
+                  <CtrlButton
+                    onClick={zoom.fit}
+                    disabled={!zoom.zoomed}
+                    title={t("media.zoomFit")}
+                  >
+                    <Shrink size={18} />
+                  </CtrlButton>
+                </div>
+              )}
               <CtrlButton
                 onClick={toggleFullscreen}
                 title={t("player.fullscreen")}
@@ -1214,7 +1672,7 @@ function CtrlButton({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="flex items-center justify-center rounded-full p-1.5 text-white/90 transition hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-white/90"
+      className={CTRL_BUTTON_CLASS}
     >
       {children}
     </button>

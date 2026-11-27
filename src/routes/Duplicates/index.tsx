@@ -4,7 +4,7 @@
 // the left, the selected group's copies compared on the right. Read-only —
 // resolving duplicates (deleting copies) is out of scope. Overlays the list
 // as a modal.
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useId, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CopyCheck, Maximize2, Minimize2, X } from "lucide-react";
@@ -41,6 +41,7 @@ function SummaryChip({ children }: { children: ReactNode }) {
 
 export default function Duplicates() {
   const { t } = useI18n();
+  const titleId = useId();
   const navigate = useNavigate();
   const onClose = useCallback(() => {
     void navigate("/");
@@ -116,10 +117,12 @@ export default function Duplicates() {
     ? t("media.modalMaximize")
     : t("media.modalMinimize");
   return (
-    <HistoryModal onClose={onClose} size={modalSize}>
+    <HistoryModal onClose={onClose} size={modalSize} titleId={titleId}>
       <header className="flex flex-wrap items-center gap-2 border-b border-border bg-bg px-3 py-2.5">
         <CopyCheck className="size-4 text-primary" />
-        <h1 className="text-sm font-medium text-fg">{t("duplicates.title")}</h1>
+        <h1 id={titleId} className="text-sm font-medium text-fg">
+          {t("duplicates.title")}
+        </h1>
         {groups.length > 0 && (
           <div className="flex flex-wrap gap-1.5 sm:ml-2">
             <SummaryChip>
@@ -141,8 +144,7 @@ export default function Duplicates() {
         <div className="ml-auto flex items-center gap-2">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={toggleModalSize}
             aria-label={toggleLabel}
             aria-pressed={isSmall}
@@ -152,8 +154,7 @@ export default function Duplicates() {
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 px-2"
+            size="compact"
             onClick={onClose}
             aria-label={t("common.close")}
             title={`${t("common.close")} (Esc)`}
@@ -166,7 +167,7 @@ export default function Duplicates() {
       {loading ? (
         <div className="flex flex-col gap-2 p-4">
           {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            <Skeleton key={i} className="h-14 w-full rounded-card" />
           ))}
         </div>
       ) : duplicates.isError && !duplicates.data ? (

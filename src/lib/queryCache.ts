@@ -7,10 +7,16 @@ import type {
   FileRow,
   SearchQuery,
   SearchResult,
+  UserCollectionItem,
   WorkspacesList,
 } from "@/ipc/types";
 import { COLLECTION_ID_PREFIX } from "@/ipc/client";
 import { WATCH_LATER_ID, collectionTarget } from "@shared/workspaceIds";
+import {
+  parseNegatedSearchToken,
+  parseSearchDirective,
+  splitSearchTokens,
+} from "@shared/tags";
 
 /**
  * The SearchQuery part of a ["files_search", wsId, filter] query key. The
@@ -35,13 +41,55 @@ function matchesFile(
   return row.id === fileId && row.workspaceId === workspaceId;
 }
 
-/** Patch a file row across list/search caches (infinite search + discovery queue). */
+/**
+ * The file's content hash, from whichever cache holds it (its detail, a list,
+ * the Discover queue); null when none does or the file has none yet.
+ */
+function contentHashOf(
+  qc: QueryClient,
+  workspaceId: string,
+  fileId: number,
+): string | null {
+  const detail = qc.getQueryData<FileDetail | null>([
+    "file_get",
+    workspaceId,
+    fileId,
+  ]);
+  if (detail) return detail.contentHash ?? null;
+  for (const [, data] of qc.getQueriesData<InfiniteData<SearchResult>>({
+    queryKey: ["files_search"],
+  })) {
+    for (const page of data?.pages ?? []) {
+      const row = page.items.find((r) => matchesFile(r, workspaceId, fileId));
+      if (row) return row.contentHash ?? null;
+    }
+  }
+  for (const [, rows] of qc.getQueriesData<FileRow[]>({
+    queryKey: ["files_random"],
+  })) {
+    const row = rows?.find((r) => matchesFile(r, workspaceId, fileId));
+    if (row) return row.contentHash ?? null;
+  }
+  return null;
+}
+
+/**
+ * Patch a file row across list/search caches (infinite search + discovery
+ * queue). What these patches carry — favorite, rating, tags, the resume
+ * position, bookmarks — is kept per content (meta_key), so the rows of the
+ * file's other copies (same content hash, in any workspace) are patched too.
+ * A file without a hash keys its metadata by path and shares it with none.
+ */
 export function patchFileRowInCaches(
   qc: QueryClient,
   workspaceId: string,
   fileId: number,
   patch: Partial<FileRow>,
 ): void {
+  const contentHash = contentHashOf(qc, workspaceId, fileId);
+  const matches = (row: FileRow) =>
+    matchesFile(row, workspaceId, fileId) ||
+    (contentHash != null && row.contentHash === contentHash);
   qc.setQueriesData<InfiniteData<SearchResult>>(
     { queryKey: ["files_search"] },
     (old) =>
@@ -51,18 +99,14 @@ export function patchFileRowInCaches(
             pages: old.pages.map((page) => ({
               ...page,
               items: page.items.map((item) =>
-                matchesFile(item, workspaceId, fileId)
-                  ? { ...item, ...patch }
-                  : item,
+                matches(item) ? { ...item, ...patch } : item,
               ),
             })),
           }
         : old,
   );
   qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, (old) =>
-    old?.map((row) =>
-      matchesFile(row, workspaceId, fileId) ? { ...row, ...patch } : row,
-    ),
+    old?.map((row) => (matches(row) ? { ...row, ...patch } : row)),
   );
 }
 
@@ -117,17 +161,23 @@ export function forgetDeletedFile(
   void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
 }
 
-/** Patch the detail cache when the modal is open for the same file. */
+/** Patch the detail cache of the file, and of its copies, wherever one is held. */
 export function patchFileDetailInCache(
   qc: QueryClient,
   workspaceId: string,
   fileId: number,
   patch: Partial<FileDetail>,
 ): void {
-  qc.setQueryData<FileDetail | null>(
-    ["file_get", workspaceId, fileId],
-    (old) => (old ? { ...old, ...patch } : old),
-  );
+  // Per content, as patchFileRowInCaches: the copies' details as well.
+  const contentHash = contentHashOf(qc, workspaceId, fileId);
+  for (const [key, old] of qc.getQueriesData<FileDetail | null>({
+    queryKey: ["file_get"],
+  })) {
+    if (!old) continue;
+    const self = key[1] === workspaceId && key[2] === fileId;
+    if (self || (contentHash != null && old.contentHash === contentHash))
+      qc.setQueryData<FileDetail | null>(key, { ...old, ...patch });
+  }
 }
 
 /** Marks a graph query whose nodes are sized by plays (see useGraphData). */
@@ -274,6 +324,18 @@ export function invalidateFileCaches(qc: QueryClient): void {
 }
 
 /**
+ * After a scan exclusion hid files (#282): they leave the lists as a file
+ * removed from the index does, from the folder cards (their counts and
+ * mosaics), the history and Missing too.
+ */
+export function invalidateHiddenFiles(qc: QueryClient): void {
+  invalidateFileCaches(qc);
+  void qc.invalidateQueries({ queryKey: ["folders_list"] });
+  void qc.invalidateQueries({ queryKey: ["history_list"] });
+  void qc.invalidateQueries({ queryKey: ["missing_files"] });
+}
+
+/**
  * Invalidate only the searches scoped to a user collection (membership changes
  * on add/remove-from-collection); regular workspace lists are unaffected.
  */
@@ -319,10 +381,21 @@ export function syncFileRowAcrossCaches(
     queryKey: ["graph_build"],
     predicate: (q) => {
       const filter = searchFilterOf(q.queryKey);
+      // The box's `is:fav` and `rating:` filter as the controls do (#525),
+      // excluded (`-is:fav`) or not.
+      const kinds = new Set(
+        splitSearchTokens(filter?.q ?? "").map(
+          (token) =>
+            parseSearchDirective(parseNegatedSearchToken(token).body)?.kind,
+        ),
+      );
       return (
-        ("favorite" in patch && filter?.favorite != null) ||
+        ("favorite" in patch &&
+          (filter?.favorite != null || kinds.has("favorite"))) ||
         ("rating" in patch &&
-          (filter?.ratingMin != null || filter?.sort === "rating"))
+          (filter?.ratingMin != null ||
+            filter?.sort === "rating" ||
+            kinds.has("rating")))
       );
     },
   });
@@ -343,27 +416,31 @@ export function syncFileRowAcrossCaches(
  * for the rest of the visit.
  *
  * So patch the cache in place rather than invalidating it: `setQueryData` keeps
- * the refetch (and with it the navigation order) from happening at all.
+ * the refetch (and with it the navigation order) from happening at all. If a
+ * refetch had already invalidated the key, preserve that invalidation so its
+ * newer data can be picked up on the next mount.
  */
 export function dropFromWatchLaterCache(
   qc: QueryClient,
   workspaceId: string,
   fileId: number,
 ): void {
+  const queryKey = ["workspaces_list"] as const;
+  const wasInvalidated = qc.getQueryState(queryKey)?.isInvalidated ?? false;
   // Cancel first: a workspaces_list fetch already in flight would land after
-  // this patch and restore the entry the main process has just consumed. The
-  // detail view mounts its own observer for that key, so such a fetch is
-  // routinely in the air when the play is recorded.
+  // this patch and restore the entry the main process has just consumed. A
+  // refetch started by some other invalidation (the detail view's flush on
+  // close, a collection edit) can be in the air when the play is recorded.
   //
   // Only when there is data to protect, though. Cancelling reverts the query to
   // its previous value, so cancelling a first-ever load strands this app-wide
   // key at undefined with nothing to re-run it (refetchOnWindowFocus is off) —
   // which would empty the workspace rail and freeze every Watch Later toggle in
   // its disabled state. With no data the patch below is a no-op anyway.
-  if (qc.getQueryData(["workspaces_list"]) !== undefined) {
-    void qc.cancelQueries({ queryKey: ["workspaces_list"] });
+  if (qc.getQueryData(queryKey) !== undefined) {
+    void qc.cancelQueries({ queryKey });
   }
-  qc.setQueryData<WorkspacesList>(["workspaces_list"], (prev) => {
+  qc.setQueryData<WorkspacesList>(queryKey, (prev) => {
     if (!prev) return prev;
     const watchLater = prev.collections.find((c) => c.id === WATCH_LATER_ID);
     if (!watchLater) return prev;
@@ -379,4 +456,59 @@ export function dropFromWatchLaterCache(
       ),
     };
   });
+  if (wasInvalidated) {
+    void qc.invalidateQueries({ queryKey, refetchType: "none" });
+  }
+}
+
+/** Optimistically mirror a manual reorder into the cached collection order. */
+export function patchCollectionItemOrder(
+  qc: QueryClient,
+  collectionId: string,
+  order: { workspaceId: string; fileId: number }[],
+): void {
+  const queryKey = ["workspaces_list"] as const;
+  const wasInvalidated = qc.getQueryState(queryKey)?.isInvalidated ?? false;
+  const key = (item: { workspaceId: string; fileId: number }) =>
+    `${item.workspaceId}:${item.fileId}`;
+
+  // Cancel first, as in dropFromWatchLaterCache: a fetch already in flight
+  // carries the old order, and a reorder is not broadcast to correct it.
+  if (qc.getQueryData(queryKey) !== undefined) {
+    void qc.cancelQueries({ queryKey });
+  }
+  qc.setQueryData<WorkspacesList>(queryKey, (prev) => {
+    if (!prev) return prev;
+    const collection = prev.collections.find(
+      (item) => item.id === collectionId,
+    );
+    if (!collection || order.length === 0) return prev;
+
+    const byKey = new Map(collection.items.map((item) => [key(item), item]));
+    const moving: UserCollectionItem[] = [];
+    const movedKeys = new Set<string>();
+    for (const ref of order) {
+      const itemKey = key(ref);
+      if (movedKeys.has(itemKey)) continue;
+      const item = byKey.get(itemKey);
+      if (!item) continue;
+      movedKeys.add(itemKey);
+      moving.push(item);
+    }
+    if (moving.length === 0) return prev;
+
+    let at = 0;
+    const items = collection.items.map((item) =>
+      movedKeys.has(key(item)) ? moving[at++] : item,
+    );
+    return {
+      ...prev,
+      collections: prev.collections.map((item) =>
+        item.id === collectionId ? { ...item, items } : item,
+      ),
+    };
+  });
+  if (wasInvalidated) {
+    void qc.invalidateQueries({ queryKey, refetchType: "none" });
+  }
 }

@@ -29,9 +29,9 @@ vi.mock("@/ipc/client", () => ({
   events: {
     onLibraryMerge: (cb: (e: LibraryMergeEvent) => void) => {
       mocks.listener = cb;
-      return Promise.resolve(() => {
+      return () => {
         mocks.listener = null;
-      });
+      };
     },
   },
 }));

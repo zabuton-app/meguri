@@ -14,7 +14,7 @@ import path from "node:path";
 import { defaultMediaDir, repoRoot } from "./lib.mjs";
 
 const require = createRequire(path.join(repoRoot, "package.json"));
-const ffmpegPath = require("ffmpeg-static");
+const { ffmpegPath } = require("@zabuton-app/ffmpeg-binaries");
 
 const args = process.argv.slice(2);
 const audioOnly = args.includes("--audio-only");

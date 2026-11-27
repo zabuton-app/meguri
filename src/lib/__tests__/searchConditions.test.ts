@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/locales/en";
+import { pickMessage } from "@/i18n/message";
 import type { SearchQuery } from "@/ipc/types";
 import { formatDate } from "@/lib/dates";
 import {
@@ -10,7 +11,7 @@ import {
 } from "@/lib/searchConditions";
 
 const t = (key: keyof typeof en, params?: Record<string, string | number>) => {
-  let s: string = en[key];
+  let s = pickMessage(en[key], new Intl.PluralRules("en"), params?.count);
   if (params) {
     for (const [k, v] of Object.entries(params))
       s = s.replace(`{${k}}`, String(v));
@@ -47,7 +48,7 @@ function clearEverything(query: SearchQuery): SearchQuery {
 const EVERYTHING: SearchQuery = {
   q: "sunset tag:beach",
   tags: ["holiday", "4k"],
-  kind: "video",
+  kinds: ["video"],
   ratingMin: 3,
   favorite: true,
   played: false,
@@ -58,6 +59,7 @@ const EVERYTHING: SearchQuery = {
   playedFrom: 1_700_000_000,
   playedTo: 1_800_000_000,
   duplicates: true,
+  subtitles: true,
   sort: "name",
   sortDir: "desc",
 };
@@ -86,6 +88,7 @@ describe("describeConditions", () => {
       "addedAt",
       "playedAt",
       "duplicates",
+      "subtitles",
       "sort",
     ]);
   });
@@ -106,6 +109,7 @@ describe("describeConditions", () => {
       addedAt: "collapsed",
       playedAt: "collapsed",
       duplicates: "collapsed",
+      subtitles: "collapsed",
       sort: "collapsed",
     });
   });
@@ -116,8 +120,76 @@ describe("describeConditions", () => {
     expect(keys({ q: "sunset tag:beach" })).toEqual(["q", "directive-1"]);
     expect(find({ q: "sunset tag:beach" }, "q").label).toBe('"sunset"');
     expect(find({ q: "sunset tag:beach" }, "directive-1").label).toBe(
-      `${en["media.tags"]}: beach`,
+      `${t("media.tags")}: beach`,
     );
+  });
+
+  it("names a hash: directive, apart from the free text (#302)", () => {
+    expect(keys({ q: "trip hash:3fa9c1d2" })).toEqual(["q", "directive-1"]);
+    expect(find({ q: "trip hash:3fa9c1d2" }, "directive-1").label).toBe(
+      `${t("filter.hashChip")}: 3fa9c1d2`,
+    );
+  });
+
+  it("names an ext: directive, apart from the free text (#538)", () => {
+    expect(keys({ q: "trip ext:MP4" })).toEqual(["q", "directive-1"]);
+    expect(find({ q: "trip ext:MP4" }, "q").label).toBe('"trip"');
+    expect(find({ q: "trip ext:MP4" }, "directive-1").label).toBe(
+      `${t("filter.extChip")}: mp4`,
+    );
+  });
+
+  it("names rating: and is:fav apart from the rating and favorite controls (#525)", () => {
+    const query = { q: "rating:>=4 is:fav", ratingMin: 2, favorite: true };
+    expect(keys(query)).toEqual(
+      expect.arrayContaining([
+        "directive-0",
+        "directive-1",
+        "rating",
+        "favorite",
+      ]),
+    );
+    expect(find(query, "directive-0").label).toBe(`${t("media.rating")}: >=4`);
+    // Told apart from the favorite control's chip, which reads the same word.
+    expect(find(query, "directive-1").label).toBe(
+      `${t("favorite.chip")} (is:fav)`,
+    );
+    expect(find(query, "favorite").label).toBe(`♥ ${t("favorite.chip")}`);
+    // Each chip clears only its own: the directive leaves the control alone.
+    expect(find(query, "directive-0").clear(query)).toEqual({
+      q: "is:fav",
+      ratingMin: 2,
+      favorite: true,
+    });
+    expect(find(query, "rating").clear(query)).toEqual({
+      q: "rating:>=4 is:fav",
+      favorite: true,
+    });
+  });
+
+  it("names each numeric directive of a range in its own chip (#524)", () => {
+    const q = "trip size:>100mb size:<1gb";
+    expect(keys({ q })).toEqual(["q", "directive-1", "directive-2"]);
+    expect(find({ q }, "q").label).toBe('"trip"');
+    expect(find({ q }, "directive-1").label).toBe(
+      `${t("filter.sizeChip")}: >100mb`,
+    );
+    expect(find({ q }, "directive-2").label).toBe(
+      `${t("filter.sizeChip")}: <1gb`,
+    );
+  });
+
+  it("names a negated directive as an exclusion, and keeps negated text as text (#523)", () => {
+    const query = { q: "-draft -tag:screenshot -ext:gif" };
+    expect(keys(query)).toEqual(["q", "directive-1", "directive-2"]);
+    expect(find(query, "q").label).toBe('"-draft"');
+    expect(find(query, "directive-1").label).toBe(
+      `${t("filter.excludeChip")}: ${t("media.tags")}: screenshot`,
+    );
+    expect(find(query, "directive-2").label).toBe(
+      `${t("filter.excludeChip")}: ${t("filter.extChip")}: gif`,
+    );
+    expect(find(query, "directive-1").clear(query).q).toBe("-draft -ext:gif");
   });
 
   it("describes a directive-only query without a free-text chip", () => {
@@ -126,12 +198,12 @@ describe("describeConditions", () => {
 
   it("keeps a quoted multi-word directive in one chip", () => {
     expect(find({ q: 'tag:"beach house"' }, "directive-0").label).toBe(
-      `${en["media.tags"]}: beach house`,
+      `${t("media.tags")}: beach house`,
     );
   });
 
   it("labels conditions with translated text", () => {
-    expect(find({ kind: "video" }, "kind").label).toBe(en["kind.video"]);
+    expect(find({ kinds: ["video"] }, "kind").label).toBe(en["kind.video"]);
     expect(find({ ratingMin: 4 }, "rating").label).toBe("★4+");
     expect(find({ played: true }, "played").label).toBe(en["filter.played"]);
     expect(find({ played: false }, "played").label).toBe(en["filter.unplayed"]);
@@ -161,7 +233,7 @@ describe("sort", () => {
 
   it("names itself in the chip so it does not read as a narrowing filter", () => {
     expect(find({ sort: "name", sortDir: "asc" }, "sort").label).toBe(
-      `${en["filter.sortSection"]}: ${en["sort.name"]} / ${en["sort.asc"]}`,
+      `${t("filter.sortSection")}: ${t("sort.name")} / ${t("sort.asc")}`,
     );
   });
 });
@@ -173,8 +245,8 @@ describe("clear reducers", () => {
   });
 
   it("drops the query entirely when only free text was in it", () => {
-    const before: SearchQuery = { q: "sunset", kind: "video" };
-    expect(find(before, "q").clear(before)).toEqual({ kind: "video" });
+    const before: SearchQuery = { q: "sunset", kinds: ["video"] };
+    expect(find(before, "q").clear(before)).toEqual({ kinds: ["video"] });
   });
 
   it("removes one tag by value, so clearing several in a row hits the right ones", () => {
@@ -209,8 +281,8 @@ describe("clear reducers", () => {
     expect(find(before, "btime").clear(before)).toEqual({});
     const captured: SearchQuery = { capturedFrom: 1, capturedTo: 2 };
     expect(find(captured, "capturedAt").clear(captured)).toEqual({});
-    const added: SearchQuery = { addedFrom: 1, addedTo: 2, kind: "video" };
-    expect(find(added, "addedAt").clear(added)).toEqual({ kind: "video" });
+    const added: SearchQuery = { addedFrom: 1, addedTo: 2, kinds: ["video"] };
+    expect(find(added, "addedAt").clear(added)).toEqual({ kinds: ["video"] });
     const played: SearchQuery = { playedFrom: 1, playedTo: 2, favorite: true };
     expect(find(played, "playedAt").clear(played)).toEqual({ favorite: true });
     expect(find({ playedTo: 1_700_000_000 }, "playedAt").label).toContain(
@@ -228,25 +300,32 @@ describe("clear reducers", () => {
     // filter back on — and a non-idempotent reducer breaks any fold over the
     // descriptor list.
     const clear = find({ duplicates: true }, "duplicates").clear;
-    expect(clear({ kind: "video" })).toEqual({ kind: "video" });
+    expect(clear({ kinds: ["video"] })).toEqual({ kinds: ["video"] });
     expect(clear(clear({ duplicates: true }))).toEqual({});
   });
 
   it("drops keys instead of leaving them as explicit undefined", () => {
     // toEqual ignores undefined-valued keys, so this needs the strict form to
     // mean anything: the cleared query must not carry `kind: undefined`.
-    const before: SearchQuery = { kind: "video", favorite: true };
+    const before: SearchQuery = { kinds: ["video"], favorite: true };
     expect(find(before, "kind").clear(before)).toStrictEqual({
       favorite: true,
     });
   });
 
+  it("lists several kinds on one chip, cleared as a whole", () => {
+    const before: SearchQuery = { kinds: ["video", "image"], favorite: true };
+    const chip = find(before, "kind");
+    expect(chip.label).toBe(`${t("kind.video")}, ${t("kind.image")}`);
+    expect(chip.clear(before)).toStrictEqual({ favorite: true });
+  });
+
   it("labels the audio kind", () => {
-    expect(find({ kind: "audio" }, "kind").label).toBe(t("kind.audio"));
+    expect(find({ kinds: ["audio"] }, "kind").label).toBe(t("kind.audio"));
   });
 
   it("shows an unrecognized kind verbatim rather than mislabelling it", () => {
-    expect(find({ kind: "document" }, "kind").label).toBe("document");
+    expect(find({ kinds: ["document"] }, "kind").label).toBe("document");
   });
 
   it("leaves an explicitly chosen sort alone when duplicates is cleared", () => {
@@ -279,7 +358,7 @@ describe("clear reducers", () => {
 describe("collapsedConditionCount", () => {
   it("is zero when nothing is hidden", () => {
     expect(
-      collapsedConditionCount(describe_({ kind: "video", favorite: true })),
+      collapsedConditionCount(describe_({ kinds: ["video"], favorite: true })),
     ).toBe(0);
   });
 
@@ -301,7 +380,7 @@ describe("folder", () => {
   const folder = { path: "Movie/2024", recursive: true };
 
   it("comes first, as a primary chip naming the path", () => {
-    const [first] = describe_({ kind: "video", folder });
+    const [first] = describe_({ kinds: ["video"], folder });
     expect(first).toMatchObject({
       key: "folder",
       label: "Folder: Movie/2024",
@@ -316,11 +395,11 @@ describe("folder", () => {
 
   it("clears only itself", () => {
     expect(
-      find({ kind: "video", folder }, "folder").clear({
-        kind: "video",
+      find({ kinds: ["video"], folder }, "folder").clear({
+        kinds: ["video"],
         folder,
       }),
-    ).toEqual({ kind: "video" });
+    ).toEqual({ kinds: ["video"] });
   });
 
   it("does not count toward the collapsed panel's badge", () => {
@@ -334,9 +413,11 @@ describe("folder", () => {
 
 describe("the default saved search", () => {
   it("is where Clear all returns, and from there Clear all empties", () => {
-    const def = { kind: "video" as const, sort: "btime" };
+    const def = { kinds: ["video"], sort: "btime" };
     expect(clearAllTarget({ q: "cat" }, def)).toEqual(def);
-    expect(clearAllTarget({ sort: "btime", kind: "video" }, def)).toEqual({});
+    expect(clearAllTarget({ sort: "btime", kinds: ["video"] }, def)).toEqual(
+      {},
+    );
     // A folder is where the view is, not a condition that differs.
     expect(
       clearAllTarget({ ...def, folder: { path: "A", recursive: true } }, def),
@@ -362,8 +443,8 @@ describe("the default saved search", () => {
       describeConditions(q, t, "en", def)
         .find((d) => d.key === "sort")!
         .clear(q);
-    expect(clear({ sort: "name", kind: "image" })).toEqual({
-      kind: "image",
+    expect(clear({ sort: "name", kinds: ["image"] })).toEqual({
+      kinds: ["image"],
       sort: "btime",
       sortDir: "asc",
     });
@@ -378,7 +459,7 @@ describe("the default saved search", () => {
     ).toEqual({});
     // A default without a sort: the sort is just dropped.
     expect(
-      describeConditions({ sort: "name" }, t, "en", { kind: "video" })
+      describeConditions({ sort: "name" }, t, "en", { kinds: ["video"] })
         .find((d) => d.key === "sort")!
         .clear({ sort: "name" }),
     ).toEqual({});

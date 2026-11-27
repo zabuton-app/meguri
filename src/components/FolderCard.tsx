@@ -59,21 +59,21 @@ export const FolderCard = memo(function FolderCard({
     <div
       data-testid="folder-card"
       data-slot="folder-card"
+      data-folder-path={entry.path}
+      data-folder-count={entry.count}
       aria-current={focused ? "true" : undefined}
+      data-selected={selected || undefined}
+      onClick={open}
       className={cn(
-        "folder-art group relative flex flex-col rounded-lg border border-transparent",
+        "folder-art group relative flex cursor-pointer flex-col rounded-card border border-transparent",
         // The media card's state vocabulary, so a mixed row reads as one list.
+        selected && "border-primary",
         focused && "ring-2 ring-primary",
-        selected && "ring-1 ring-primary",
       )}
     >
       {/* The folder body opens the folder too; the name button below is the
           keyboard/screen-reader target, so this region stays out of the tab order. */}
-      <div
-        data-thumb
-        onClick={open}
-        className="group/thumb relative block aspect-video cursor-pointer"
-      >
+      <div data-thumb className="group/thumb relative block aspect-video">
         <FolderArt previews={entry.previews} mediaBase={mediaBase} joined />
       </div>
       <FolderSelectionCheck
@@ -84,7 +84,7 @@ export const FolderCard = memo(function FolderCard({
           a second line, then empty slots the height of its rating and tag rows. */}
       <div
         className={cn(
-          "flex flex-col gap-1 rounded-b-lg border-t border-(--folder-tint) bg-(--folder-tint) px-2 py-1.5 transition-colors group-hover:border-(--folder-tint-hover) group-hover:bg-(--folder-tint-hover)",
+          "flex flex-col gap-1 rounded-b-card border-t border-(--folder-tint) bg-(--folder-tint) px-2 py-1.5 transition-colors group-hover:border-(--folder-tint-hover) group-hover:bg-(--folder-tint-hover)",
           META_EDGE,
         )}
       >
@@ -97,23 +97,22 @@ export const FolderCard = memo(function FolderCard({
           />
           <button
             type="button"
-            onClick={open}
             aria-label={t("folder.open", { name: entry.name })}
             title={entry.name}
-            className="min-w-0 flex-1 truncate text-left text-[13px] font-bold leading-4 text-bright-fg"
+            className="min-w-0 flex-1 truncate text-left text-xs font-bold leading-4 text-bright-fg"
           >
             {entry.name}
           </button>
-          <span className="shrink-0 rounded-full bg-bg/55 px-1.5 text-[10px] font-semibold leading-4 text-bright-fg">
+          <span className="shrink-0 rounded-full bg-bg/55 px-1.5 text-2xs font-semibold leading-4 text-bright-fg">
             {count}
           </span>
         </div>
-        <div className="truncate text-[10px] text-fg">
+        <div className="truncate text-2xs text-fg">
           {entry.subfolders > 0
             ? t("folder.subfolders", { count: entry.subfolders })
             : NBSP}
         </div>
-        <div aria-hidden className="h-[14px]" />
+        <div aria-hidden className="h-3.5" />
         <div aria-hidden className="h-6" />
       </div>
     </div>

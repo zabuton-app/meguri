@@ -3,16 +3,21 @@
 // silently reintroduces a full scan / temp b-tree sort fails loudly. All of
 // these run synchronously on the main process (better-sqlite3), so plan
 // regressions translate directly into UI/IPC stalls.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { DB } from "../db.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { rebuildFtsAll, type DB } from "../db.js";
+import type { SearchQuery } from "../types.js";
 import {
   FILE_COLS,
   FILE_FROM,
   folderCondition,
   folderRange,
   orderByFor,
+  RARE_TAG_ROWS,
   searchFiles,
+  sortValueOf,
+  type SeekPosition,
 } from "../queries.js";
+import { upsertTag } from "../tags.js";
 import { insertFile, newDb } from "./helpers.js";
 
 function plan(db: DB, sql: string): string {
@@ -22,7 +27,11 @@ function plan(db: DB, sql: string): string {
   return rows.map((r) => r.detail).join("\n");
 }
 
-/** The exact SQL shape searchFiles() emits for a bare (unfiltered) sort. */
+/**
+ * An unfiltered sort without searchFiles' INDEXED BY: what these tests check
+ * is that the index can serve the order once the planner has statistics. The
+ * pinned plans the app runs are covered by the describe at the end (#363).
+ */
 function searchSql(sort: string | undefined, dir: string | undefined): string {
   return `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL ORDER BY ${orderByFor(sort, dir)} LIMIT 101 OFFSET 0`;
 }
@@ -59,10 +68,10 @@ describe("index query plans", () => {
     expect(p).toContain("idx_file_meta_resume");
   });
 
-  it("sort=name uses idx_files_alive_rel_path in both directions", () => {
+  it("sort=name uses idx_files_alive_name_key in both directions", () => {
     for (const dir of ["asc", "desc"]) {
       const p = plan(db, searchSql("name", dir));
-      expect(p).toContain("idx_files_alive_rel_path");
+      expect(p).toContain("idx_files_alive_name_key");
       expect(p).not.toContain("TEMP B-TREE");
     }
   });
@@ -85,7 +94,10 @@ describe("index query plans", () => {
         .replace("f.rel_path < ?", "f.rel_path < 'dir0'")
         .replace("substr(f.rel_path, ?), ?", "substr(f.rel_path, 5), '/'");
 
-    it("a folder-scoped sort=name walks idx_files_alive_rel_path without sorting", () => {
+    // The folder is found on rel_path, the order is name_key's (#292), so the
+    // folder's own files are sorted: the folder bounds the work, the index on
+    // rel_path keeps the rest of the library out of it.
+    it("a folder-scoped sort=name ranges over idx_files_alive_rel_path and sorts that folder", () => {
       const direct = folderCondition(folderRange("dir", "/"), false);
       const p = plan(
         db,
@@ -93,8 +105,9 @@ describe("index query plans", () => {
           `SELECT ${FILE_COLS} ${FILE_FROM} WHERE f.deleted_at IS NULL AND ${direct.sql} ORDER BY ${orderByFor("name", "asc")} LIMIT 101 OFFSET 0`,
         ),
       );
-      expect(p).toContain("idx_files_alive_rel_path");
-      expect(p).not.toContain("TEMP B-TREE");
+      expect(p).toContain(
+        "idx_files_alive_rel_path (rel_path>? AND rel_path<?)",
+      );
     });
 
     it("counting a folder's children is a range search on idx_files_alive_rel_path", () => {
@@ -144,6 +157,12 @@ describe("index query plans", () => {
     expect(p).not.toContain("TEMP B-TREE");
   });
 
+  it("sort=hash (default asc) uses idx_files_alive_hash", () => {
+    const p = plan(db, searchSql("hash", "asc"));
+    expect(p).toContain("idx_files_alive_hash");
+    expect(p).not.toContain("TEMP B-TREE");
+  });
+
   it("tag-name prefix autocomplete is a range search on idx_tags_manual_name", () => {
     // Mirrors listTagNames' SQL: the namespace = '' predicate restricts completion
     // to user-owned tags, and the partial index over the same predicate keeps the
@@ -167,5 +186,310 @@ describe("index query plans", () => {
     expect(desc.items.map((f) => f.id)).toEqual(
       asc.items.map((f) => f.id).reverse(),
     );
+  });
+});
+
+// Workspace DBs are never ANALYZEd, so these are the plans the app runs. The
+// tests above run ANALYZE first, which hides a plan that only holds with
+// statistics; dropping sqlite_stat1 afterwards is not enough, as the loaded
+// statistics stay in effect on the connection.
+describe("searchFiles plans without statistics (#363)", () => {
+  let db: DB;
+  beforeEach(() => {
+    let rootId: number;
+    ({ db, rootId } = newDb());
+    for (let i = 0; i < 100; i++) {
+      insertFile(db, rootId, {
+        relPath: `dir/v${String(i).padStart(3, "0")}.mp4`,
+        capturedAt: i % 3 ? 1_700_000_000 + i : null,
+        btime: i % 4 ? 1_690_000_000 + i : null,
+      });
+    }
+  });
+  afterEach(() => db.close());
+
+  /** The plan of the statement searchFiles runs, with its bound values. */
+  function searchPlan(query: SearchQuery, seek?: SeekPosition): string {
+    let captured: { sql: string; args: unknown[] } | undefined;
+    const prepare = db.prepare.bind(db);
+    const spy = vi.spyOn(db, "prepare").mockImplementation((sql: string) => {
+      const stmt = prepare(sql);
+      if (captured || !sql.includes("FROM files f")) return stmt;
+      const all = stmt.all.bind(stmt);
+      return Object.assign(stmt, {
+        all: (...args: unknown[]) => {
+          captured = { sql, args };
+          return all(...args);
+        },
+      });
+    });
+    try {
+      searchFiles(db, query, seek, { skipTags: true });
+    } finally {
+      spy.mockRestore();
+    }
+    if (!captured) throw new Error("searchFiles ran no query");
+    const rows = db
+      .prepare(`EXPLAIN QUERY PLAN ${captured.sql}`)
+      .all(...captured.args) as { detail: string }[];
+    return rows.map((r) => r.detail).join("\n");
+  }
+
+  // A seek key of the sort's own type: a string for name and hash, a number
+  // otherwise.
+  const seekFor = (sort: string): SeekPosition => ({
+    v:
+      sort === "name"
+        ? "dir/v050.mp4"
+        : sort === "hash"
+          ? "3fa9c1d2"
+          : 1_700_000_050,
+    id: 50,
+    tie: "after-id",
+  });
+
+  it.each<[string, "asc" | "desc" | undefined, string]>([
+    ["name", "asc", "idx_files_alive_name_key"],
+    ["name", "desc", "idx_files_alive_name_key"],
+    ["captured", "desc", "idx_files_alive_captured"],
+    ["captured", undefined, "idx_files_alive_captured"],
+    ["btime", "desc", "idx_files_alive_btime"],
+    ["addedAt", "desc", "idx_files_alive_added"],
+    ["hash", "asc", "idx_files_alive_hash"],
+    ["hash", undefined, "idx_files_alive_hash"],
+  ])(
+    "sort=%s %s walks %s, first page and after a seek",
+    (sort, sortDir, index) => {
+      for (const seek of [undefined, seekFor(sort)]) {
+        const p = searchPlan({ sort, sortDir }, seek);
+        expect(p).toContain(index);
+        expect(p).not.toContain("TEMP B-TREE");
+      }
+    },
+  );
+
+  it("narrows a single kind through its index", () => {
+    // json_each(?) would hide the list's size from a planner with no
+    // statistics, and it would walk every live row instead.
+    expect(searchPlan({ kinds: ["audio"] })).toContain("idx_files_kind");
+  });
+
+  it("leaves every filtered list to the planner", () => {
+    // Without statistics, nothing tells how few rows a filter leaves; for a
+    // rare one, walking the sort order reads every live row.
+    for (const query of [
+      { kinds: ["image"] },
+      { q: "ab" },
+      { q: "abc" },
+      { q: "hash:ab" },
+      { q: "ext:gif" },
+      { q: "tag:t" },
+      { tags: ["t"] },
+      { favorite: true },
+      { played: true },
+      { fileIds: [1, 2, 3] },
+      { capturedFrom: 0, capturedTo: 1 },
+      { playedFrom: 0, playedTo: 1 },
+    ]) {
+      const p = searchPlan({ ...query, sort: "name", sortDir: "asc" });
+      expect(p, JSON.stringify(query)).not.toContain(
+        "idx_files_alive_name_key",
+      );
+    }
+  });
+
+  describe("tag filters (#365)", () => {
+    beforeEach(() => {
+      const ids = db.prepare("SELECT id, meta_key FROM files").all() as {
+        id: number;
+        meta_key: string;
+      }[];
+      const add = db.prepare(
+        "INSERT INTO meta_tags (meta_key, tag_id, source) VALUES (?, ?, 'manual')",
+      );
+      const rare = upsertTag(db, "", "rare");
+      const common = upsertTag(db, "", "common");
+      add.run(ids[0].meta_key, rare);
+      for (const { meta_key } of ids) add.run(meta_key, common);
+      // Another workspace's rows count too: past the cap, the tag is common.
+      for (let i = 0; i < RARE_TAG_ROWS; i++) add.run(`elsewhere${i}`, common);
+    });
+
+    it("starts a rare tag from its rows and looks the files up by meta_key", () => {
+      for (const query of [{ tags: ["rare"] }, { q: "tag:rare" }]) {
+        const p = searchPlan({ ...query, sort: "name", sortDir: "asc" });
+        expect(p, JSON.stringify(query)).toContain("idx_meta_tags_tag");
+        expect(p, JSON.stringify(query)).toContain("idx_files_meta_key");
+        expect(p, JSON.stringify(query)).not.toContain(
+          "idx_files_alive (deleted_at=?)",
+        );
+      }
+    });
+
+    it("checks a common tag per file instead of collecting its rows", () => {
+      for (const query of [{ tags: ["common"] }, { q: "tag:common" }]) {
+        const p = searchPlan({ ...query, sort: "name", sortDir: "asc" });
+        expect(p, JSON.stringify(query)).toContain(
+          "sqlite_autoindex_meta_tags_1 (meta_key=? AND tag_id=?)",
+        );
+        expect(p, JSON.stringify(query)).not.toContain("idx_meta_tags_tag");
+      }
+    });
+  });
+
+  describe("a list filtered only by exclusions (#670)", () => {
+    const exclusions = [
+      "-ext:gif",
+      "-ab",
+      "-abc",
+      "-tag:t",
+      "-hash:ab",
+      "-is:fav",
+      "-ab -ext:gif -v00",
+    ];
+
+    it.each<[string, "asc" | "desc", string]>([
+      ["name", "asc", "idx_files_alive_name_key"],
+      ["name", "desc", "idx_files_alive_name_key"],
+      ["addedAt", "desc", "idx_files_alive_added"],
+    ])("sort=%s %s walks %s", (sort, sortDir, index) => {
+      for (const q of exclusions) {
+        for (const seek of [undefined, seekFor(sort)]) {
+          const p = searchPlan({ q, sort, sortDir }, seek);
+          expect(p, q).toContain(index);
+          expect(p, q).not.toContain("TEMP B-TREE");
+        }
+      }
+    });
+
+    it("leaves the captured, btime and hash orders to the planner", () => {
+      // Their index order is unrelated to the table's, so an exclusion that
+      // leaves almost nothing would read every row at random.
+      for (const [sort, sortDir] of [
+        ["captured", "desc"],
+        ["btime", "desc"],
+        ["hash", "asc"],
+      ] as const) {
+        for (const q of exclusions) {
+          const p = searchPlan({ q, sort, sortDir });
+          expect(p, `${sort} ${q}`).not.toContain(`idx_files_alive_${sort}`);
+        }
+      }
+    });
+
+    it("leaves an exclusion beside any other condition to the planner", () => {
+      for (const query of [
+        { q: "-ab abc" },
+        { q: "-ab ext:gif" },
+        { q: "-ab", kinds: ["image"] },
+        { q: "-ab", tags: ["t"] },
+        { q: "-ab", favorite: true },
+        { q: "-ab", capturedFrom: 0, capturedTo: 1 },
+        // A quoted dash is text, not an exclusion.
+        { q: '"-ab"' },
+      ]) {
+        const p = searchPlan({ ...query, sort: "name", sortDir: "asc" });
+        expect(p, JSON.stringify(query)).not.toContain(
+          "idx_files_alive_name_key",
+        );
+      }
+    });
+
+    it("returns the rows the planner's own order does", () => {
+      rebuildFtsAll(db);
+      const cases: [string, (relPath: string) => boolean][] = [
+        ["-v00", (relPath) => !relPath.includes("v00")],
+        ["-tag:t", () => true],
+        ["-ext:mp4", () => false],
+      ];
+      for (const [sort, sortDir] of [
+        ["name", "asc"],
+        ["name", "desc"],
+        ["addedAt", "desc"],
+      ] as const) {
+        const all = db
+          .prepare(
+            `SELECT f.id, f.rel_path FROM files f NOT INDEXED WHERE f.deleted_at IS NULL ORDER BY ${orderByFor(sort, sortDir)}`,
+          )
+          .all() as { id: number; rel_path: string }[];
+        for (const [q, keep] of cases) {
+          const { items } = searchFiles(db, { q, sort, sortDir, limit: 200 });
+          expect(
+            items.map((f) => f.id),
+            `${sort} ${sortDir} ${q}`,
+          ).toEqual(all.filter((r) => keep(r.rel_path)).map((r) => r.id));
+        }
+      }
+    });
+  });
+
+  it("leaves the ascending date orders to the planner (their indexes are newest first)", () => {
+    const indexes = {
+      captured: "idx_files_alive_captured",
+      btime: "idx_files_alive_btime",
+      addedAt: "idx_files_alive_added",
+    };
+    for (const [sort, index] of Object.entries(indexes)) {
+      const p = searchPlan({ sort, sortDir: "asc" });
+      expect(p, sort).not.toContain(index);
+    }
+  });
+
+  it("leaves the descending hash order to the planner (its index is ascending)", () => {
+    expect(searchPlan({ sort: "hash", sortDir: "desc" })).not.toContain(
+      "idx_files_alive_hash",
+    );
+  });
+
+  it("leaves a page in the NULL tail to the planner", () => {
+    for (const [sort, sortDir] of [
+      ["captured", "desc"],
+      ["btime", "desc"],
+      ["hash", "asc"],
+    ] as const) {
+      const p = searchPlan(
+        { sort, sortDir },
+        { v: null, id: 50, tie: "after-id" },
+      );
+      expect(p, sort).not.toContain(`idx_files_alive_${sort}`);
+    }
+  });
+
+  it("pages through the hash order under the pinned index, NULLs last", () => {
+    // The plan tests above see only NULL hashes; give the walk both kinds and
+    // check its rows against the planner's own order.
+    db.exec(
+      "UPDATE files SET content_hash = printf('%08x', (id * 2654435761) % 4294967296) WHERE id % 3 != 0",
+    );
+    const expected = (
+      db
+        .prepare(
+          `SELECT f.id FROM files f NOT INDEXED WHERE f.deleted_at IS NULL ORDER BY ${orderByFor("hash", "asc")}`,
+        )
+        .all() as { id: number }[]
+    ).map((r) => r.id);
+    const seen: number[] = [];
+    let seek: SeekPosition | undefined;
+    for (;;) {
+      const { items } = searchFiles(db, { sort: "hash", limit: 7 }, seek, {
+        skipTags: true,
+      });
+      if (items.length === 0) break;
+      seen.push(...items.map((f) => f.id));
+      const last = items[items.length - 1];
+      seek = { v: sortValueOf("hash", last), id: last.id, tie: "after-id" };
+    }
+    expect(seen).toEqual(expected);
+  });
+
+  it("returns an empty page for a seek with nothing after it, under the pinned index", () => {
+    // The key sits in the NULL tail of an earlier workspace, so every row
+    // after it was already returned. "AND (0)" under INDEXED BY would throw.
+    const res = searchFiles(
+      db,
+      { sort: "captured", sortDir: "desc" },
+      { v: null, id: 1, tie: "none" },
+    );
+    expect(res).toEqual({ items: [], nextCursor: null });
   });
 });

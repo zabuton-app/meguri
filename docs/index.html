@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meguri — a local-first media library</title>
-<meta name="description" content="Browse, search, and play your local videos and photos. No cloud, no account. Available on the Microsoft Store and for Linux, Windows, and macOS.">
+<meta name="description" content="Browse, search, and play your local videos, photos, and audio. No cloud, no account. Available on the Microsoft Store and for Linux, Windows, and macOS.">
 <link rel="icon" href="./assets/icon.png">
 <style>
   /* Solarized light, regardless of the OS color scheme */
@@ -48,19 +48,7 @@
     border-radius: 10px; overflow: hidden;
     box-shadow: 0 18px 44px rgba(20, 14, 8, .45), 0 4px 12px rgba(20, 14, 8, .3);
   }
-  .titlebar {
-    display: flex; align-items: center; gap: .45rem;
-    padding: .6rem .9rem;
-    background: var(--card); border-bottom: 1px solid var(--border);
-  }
-  .titlebar .dot { width: 12px; height: 12px; border-radius: 50%; }
-  .dot.red { background: #ff5f57; }
-  .dot.yellow { background: #febc2e; }
-  .dot.green { background: #28c840; }
-  .titlebar .title {
-    flex: 1; text-align: center; margin-right: 3.3rem; /* balance the dots */
-    color: var(--muted); font-size: .85rem;
-  }
+  /* The screenshot holds the app's own title bar and window buttons. */
   .appwin img { display: block; width: 100%; }
   h2 { font-size: 1.3rem; margin: 2.5rem 0 1rem; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
@@ -103,7 +91,7 @@
   <header>
     <img class="logo" src="./assets/icon.png" alt="Meguri logo">
     <h1>Meguri</h1>
-    <p class="tagline">A local-first media library for your videos and photos —
+    <p class="tagline">A local-first media library for your videos, photos, and audio —
     scan, browse, search, and play, all offline. No cloud, no account.</p>
     <p id="version"></p>
     <nav class="top"><a href="./guide.html">📖 User Guide — how to use Meguri</a></nav>
@@ -112,10 +100,6 @@
   <div class="monitor">
     <div class="desktop">
       <div class="appwin">
-        <div class="titlebar">
-          <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
-          <span class="title">Meguri</span>
-        </div>
         <img src="./assets/theme-solarized-light.png" alt="Meguri browsing a media library in grid view">
       </div>
     </div>
@@ -132,6 +116,7 @@
       <h3>🪟 Windows</h3>
       <a class="btn" href="https://apps.microsoft.com/detail/9NRSM11RRH8Z">Microsoft Store</a>
       <a class="btn secondary" data-asset="exe" href="https://github.com/zabuton-app/meguri/releases/latest">Installer (x64)</a>
+      <a class="btn secondary" data-asset="portable" href="https://github.com/zabuton-app/meguri/releases/latest">Portable (x64)</a>
     </div>
     <div class="card" data-os="mac">
       <h3>🍎 macOS</h3>
@@ -231,7 +216,11 @@
       const match = {
         AppImage: (a) => a.name.endsWith(".AppImage"),
         deb: (a) => a.name.endsWith(".deb"),
-        exe: (a) => a.name.endsWith(".exe"),
+        // The installer is "-setup.exe". Releases up to v0.10.2 have a single
+        // ".exe", so match any .exe that is not the portable build.
+        exe: (a) =>
+          a.name.endsWith(".exe") && !a.name.endsWith("-portable.exe"),
+        portable: (a) => a.name.endsWith("-portable.exe"),
         dmg: (a) => a.name.endsWith(".dmg"),
         zip: (a) => a.name.endsWith(".zip"),
       };

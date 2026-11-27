@@ -103,7 +103,7 @@ export function RuleEditor({
           <input
             className={cn(
               MONO,
-              "h-[34px] rounded-md border bg-black/25 px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "h-8 rounded-control border bg-black/25 px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
               patternError
                 ? "border-error text-error"
                 : "border-border-strong text-accent2",
@@ -161,7 +161,7 @@ export function RuleEditor({
           ))}
           <SmallButton
             variant="ghost"
-            className="ml-auto h-[26px] hover:text-error"
+            className="ml-auto h-7 hover:text-error"
             onClick={onDelete}
           >
             {t("autoTag.deleteRule")}
@@ -169,7 +169,7 @@ export function RuleEditor({
         </div>
       </div>
 
-      <div className="flex flex-col overflow-hidden rounded-lg border border-border">
+      <div className="flex flex-col overflow-hidden rounded-card border border-border">
         <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2">
           <span className="text-xs font-semibold text-fg">
             {t("autoTag.liveTest")}
@@ -218,7 +218,7 @@ export function RuleEditor({
               <span
                 className={cn(
                   MONO,
-                  "min-w-0 flex-[1_1_280px] break-all text-[13px] text-fg",
+                  "min-w-0 flex-[1_1_280px] break-all text-xs text-fg",
                 )}
               >
                 <Highlighted
@@ -239,7 +239,7 @@ export function RuleEditor({
                   <Chip key={tag}>{tag}</Chip>
                 ))}
                 {row.hits.length > 0 && row.tags.length === 0 && (
-                  <span className="text-[11px] text-muted">
+                  <span className="text-2xs text-muted">
                     {t("autoTag.excluded")}
                   </span>
                 )}

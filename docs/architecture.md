@@ -17,6 +17,96 @@ server that lives inside the main process (see [Media Pipeline](media-pipeline.m
 
 This separation is strict: the renderer never touches the filesystem, the
 database, or ffmpeg directly. Everything goes over IPC or the media server.
+ESLint enforces the folder boundaries with `no-restricted-imports` in
+`eslint.config.mjs`: `src/` imports nothing from `electron/`, Electron, Node
+built-ins or main-only packages (renderer tests may use Node built-ins),
+`shared/` follows the same rule and also imports nothing from `src/`, and
+`electron/` imports nothing from `src/`. Only static imports are checked, not
+`import()`.
+
+Web permissions are denied unless listed in `ALLOWED` in
+`electron/core/permissions.ts` (clipboard write and fullscreen today), and so
+are device requests (HID, serial, USB). A feature that needs another permission
+adds it there with the reason; a denial is logged under the `permissions`
+scope.
+
+The main process starts in `startApp()` (`electron/app.ts`); nothing in it runs
+on import. `electron/main.ts` is only the entry point that calls it with
+Meguri's identity: the app name, its one-character mark, the URL scheme, the
+GitHub repository the update check looks at, the Microsoft Store product ID
+(optional: an app that is not on the Store leaves it out), the prefix of the
+environment variables it reads (`MEGURI`, for `MEGURI_ROOT`,
+`MEGURI_DISABLE_TRAY` and `MEGURI_UPDATE_REPO`) and the logo bitmaps. Another
+app built on this code can call `startApp()` from its own entry point with its own values.
+Its renderer is started the same way, by `renderApp()` (see
+[Starting the renderer](renderer.md#starting-the-renderer)).
+It can also pass `setup`, which runs once right after `registerIpc()` and
+before the tray and window appear, with the same `IpcContext` the handler
+groups get (both `IpcContext` and `handle()` are exported from
+`electron/app.ts`). That is where such an app registers its own IPC handlers
+and reaches the workspaces, the query worker and the media server: `mediaBase()`
+gives its base URL and `mediaToken()` the `X-Api-Token` its requests need.
+`handle()` only knows the channels in `shared/ipc/`, which follow steps 1 to 3 of
+[Adding a new IPC channel](#adding-a-new-ipc-channel). The preload whitelist
+knows those too, plus the app's `extraChannels` (`invoke` and `events` lists),
+which main passes to the preload as process arguments
+(`EXTRA_INVOKE_CHANNELS_ARG` and `EXTRA_EVENT_CHANNELS_ARG` in
+`shared/ipc/channelNames.ts`), so the renderer still cannot add a channel. A
+name that is empty, holds a comma or is a preload-only channel fails startup.
+`setup` registers the handlers for its `extraChannels.invoke` with
+`ctx.handleExtra(channel, fn)` (`SetupContext` in `electron/app.ts`), which
+checks the caller is the app's own page just as `handle()` does and then calls
+`fn(raw, event)` with the payload as is: those channels have no schema in
+`shared/ipc/`, so the app validates its own input. A channel that is not in
+`extraChannels.invoke` throws.
+Nothing is on
+screen until `setup` settles, so long work belongs in the background. There is
+no quit hook: work that writes to the workspaces runs through `ctx.passes` (or
+`ctx.scans`), which every quit path stops before the databases close, while a
+`before-quit` listener runs after Meguri's teardown on macOS and on an OS
+shutdown, and not at all on a Windows log-off.
+The `userData` directory is not part of these options: it is `<appData>/` plus the top-level `productName`, or
+else `name`, of the package.json Electron loads. Meguri has no top-level
+`productName` (`build.productName` does not count), so its data is in
+`<appData>/meguri`; an app with its own package.json gets its own directory.
+
+The renderer gets the app name synchronously, not over an IPC channel, so it is
+there before the first render: the window passes it to the preload as a process argument
+(`webPreferences.additionalArguments`, `APP_NAME_ARG` in
+`shared/ipc/channelNames.ts`), and the preload exposes it as
+`window.api.appName`. The app's one-character mark (`glyph`, Meguri's 巡)
+travels the same way, as `window.api.appGlyph`. The renderer's text uses it through `{app}` in the
+locale strings (see [Renderer](renderer.md#internationalization)). The media
+server's origin travels the same way too, as `window.api.mediaOrigin`, for the
+Content Security Policy below.
+
+Each launch writes how long its startup steps took to `main.log`, as two
+`[startup]` lines. Main's (the main script, `ready`, opening the workspaces,
+the media server, IPC, the app's `setup`, the window, the library merge when
+one runs) is written however startup ends, and says whether it was `ok`,
+`failed` or ended by a `quit`. The renderer's (its script, the first render,
+the first list) is written when the first list settles, and says how: `list
+shown`, `list failed`, `no workspace` or `workspace error`. Each line lists
+only the steps reached. Both count milliseconds from main's process start:
+main passes its `performance.timeOrigin` the same way, as
+`window.api.startupOrigin` (`STARTUP_ORIGIN_ARG`), to the window startup makes
+only, and the renderer keeps a flag in session storage so a reload of that
+page writes nothing. The steps are marked with `performance.mark()` and
+formatted by `shared/startupTiming.ts`.
+
+The renderer's Content Security Policy is in three places:
+
+- `index.html` holds the packaged app's policy.
+- `devServerCsp()` in `electron.vite.shared.ts` adds the dev server's own
+  sources (`localhost`, its HMR socket) while serving.
+- `public/media-csp.js` appends a second policy in the packaged app that allows
+  only the media server's port on `127.0.0.1`, which is picked at startup. A
+  request must pass both policies, so the second can only narrow the first.
+
+A new source goes into `index.html`, and also into `media-csp.js` when it is
+for `img-src`, `media-src` or `connect-src`. A change to `connect-src` also
+needs the string `devServerCsp()` looks for, or `npm run dev` stops with an
+error saying so.
 
 ## IPC type system
 
@@ -35,10 +125,12 @@ both processes so there is nothing to hand-sync.
     Outputs are plain types, not Zod schemas, because the renderer trusts data
     coming from main and needs no runtime check.
 
-There are roughly three dozen invoke channels, covering app status, workspace and
-collection management, scanning, file search and mutation, tags, scene
-bookmarks, thumbnail offsets, and shell operations (open externally, open
-folder, copy path, open URL, toggle DevTools).
+There are over eighty invoke channels, covering app status, workspace and
+collection management, scanning, file search and mutation, folders, the graph,
+heatmap and timeline views, play history, duplicates, tags and auto tagging,
+scene bookmarks, thumbnail offsets, the update check, logos, custom CSS and CSS
+themes, and shell operations (open externally, open folder, copy path, open
+URL, toggle DevTools).
 
 `electron/core/types.ts` and `src/ipc/types.ts` are thin re-export shims over the
 shared schemas, kept for import-path compatibility; they hold no definitions of
@@ -46,11 +138,14 @@ their own.
 
 ### Validation
 
-`electron/core/ipcHandler.ts` exposes a `handle(channel, fn)` helper. It looks up
-`ChannelInputs[channel]`, runs `safeParse()` on the incoming payload, and only
-then calls `fn` with the parsed data. Malformed payloads are rejected here, which
-makes this a real defense layer even though calls already pass through the
-preload whitelist.
+`electron/core/ipcHandler.ts` exposes a `handle(channel, fn)` helper. It first
+rejects a call whose sending frame is not the app's own page (`isAppUrl()` in
+`electron/core/appUrl.ts`: the bundled `index.html`, or the dev server's origin
+when unpackaged; the same check keeps the window from navigating away). It then
+looks up `ChannelInputs[channel]`, runs `safeParse()` on the incoming payload,
+and only then calls `fn` with the parsed data. Malformed payloads are rejected
+here, which makes this a real defense layer even though calls already pass
+through the preload whitelist.
 
 ### Events
 
@@ -66,10 +161,21 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
   `errorReason: "root-unreadable"`. Since the startup scan can finish before a
   view listens, `scan_unreadable_workspaces` returns the workspaces whose last
   scan failed that way.
-- `workspace:changed` — the active workspace changed.
+- `workspace:changed` — the workspaces or collections changed: the active one,
+  the list (added, removed, reordered, renamed, or given an emoji), or which
+  files a collection holds. Not sent when a collection's files are reordered
+  (a refetch would undo the order the renderer already shows) or a played file
+  leaves Watch Later (it would drop the open file from prev/next); the renderer
+  updates its own view for those.
 - `update:available` — the update check found a newer release.
+- `library:merge` — progress of merging workspaces' metadata into the shared
+  library, at startup or when retried (`library_merge_retry`), then its end
+  with the workspaces that failed (see
+  [The shared library](data-model.md#the-shared-library)).
 - `custom-css:changed` — `custom.css` was saved or deleted (see
   [Custom CSS](#custom-css)).
+- `css-themes:changed` — a `.css` file in the CSS themes folder was added,
+  changed or removed (see [CSS theme files](#css-theme-files)).
 
 ### Adding a new IPC channel
 
@@ -82,12 +188,14 @@ The event channels are listed in `EVENT_CHANNELS` in `shared/ipc/channelNames.ts
 4. Add `handle("<channel>", (input) => ...)` inside the relevant
    `register*Handlers()` under `electron/ipc/`. Handlers are grouped by domain,
    one module each (`status.ts`, `workspaces.ts`, `scan.ts`, `files.ts`,
-   `tags.ts`, `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`,
-   `logo.ts`, `updates.ts`); `electron/ipc/index.ts` wires them up in `registerIpc()`.
-   Each group receives an `IpcContext` (`electron/ipc/context.ts`) with what it
-   needs from the main process — the `Workspaces`, the query worker client,
-   `emit()`, the `ScanManager`, and live getters for the window and media
-   server.
+   `folders.ts`, `graph.ts`, `activity.ts`, `timeline.ts`, `tags.ts`,
+   `autoTag.ts`, `bookmarks.ts`, `thumbs.ts`, `shell.ts`, `window.ts`, `updates.ts`,
+   `logo.ts`, `customCss.ts`, `cssThemes.ts`); `electron/ipc/index.ts` wires
+   them up in `registerIpc()`. Each group but `updates.ts` receives an
+   `IpcContext` (`electron/ipc/context.ts`) with what it needs from the main
+   process — the `Workspaces`, the query worker client, `emit()`, the
+   `ScanManager`, and live getters for the window and media server (its base
+   URL and token).
    Shared helpers (`coreById`, `queryTargets`, `scopedCores`,
    `ensureFileInsideRoot`) are in `electron/ipc/helpers.ts`; a handler that
    hands a file path to the OS must resolve it through `ensureFileInsideRoot`
@@ -112,7 +220,7 @@ registering it.
 ## Tray-resident lifecycle
 
 The app lives in the system tray and **does not quit when its window is closed**.
-This is an invariant in `electron/main.ts`; preserve it when changing window or
+This is an invariant in `electron/app.ts`; preserve it when changing window or
 lifecycle behavior:
 
 - The window's `close` event calls `preventDefault()` and hides the window to the
@@ -139,15 +247,40 @@ lifecycle behavior:
   delay, bounded per minute; past that (or on a launch / integrity failure) the
   user is asked to reload or quit instead of being left with a blank window.
 - A single-instance lock prevents a second copy from launching.
-- The tray and window icons are base64-embedded images
-  (`electron/core/logoAssets.ts`), to avoid bundle path-resolution issues.
+- Crash reports (`electron/core/crashReports.ts`, packaged builds only, or
+  `<PREFIX>_CRASH_REPORTS=1` in development): `crashReporter` writes minidumps
+  of every process under `app.getPath("crashDumps")` and uploads nothing. Each
+  run writes `<userData>/session.json`, records child process crashes in it,
+  and removes it on a clean exit (`will-quit` and `teardownSync()`). The next
+  launch turns a marker left behind into a report in
+  `<userData>/crash-reports/`: crashed (a dump after the last recorded crash
+  is the main process's), or did not exit normally. The window announces it
+  once, and Settings → About lists the kept reports. The newest five reports
+  and dumps are kept. "Report on GitHub" opens the app's crash report issue
+  form (`crashReportForm` in `startApp()`'s options; without one, a report
+  can only be copied). The report summarizes each of the run's dumps as text
+  (`electron/core/minidump.ts`): the process type, the exception and its
+  thread, the module and offset it crashed at, and the `globalExtra`
+  annotations (the newest 20 dumps); the newest
+  readable dump's module list (file names, versions, build or debug IDs; on macOS
+  without the system libraries) closes the report. No memory contents or
+  directories go in, and a dump it cannot read gets a one-line note. A dump
+  whose process type is `browser` is the main process's crash; one that
+  cannot be read is taken for it only if it is more than 10 s after the last
+  recorded child crash. The test fixtures are made with
+  `scripts/dev/crash-fixture.mjs`.
+- The tray and window icons are base64 images the entry point passes to
+  `startApp()` (`logos`; Meguri's are in `electron/core/logoAssets.ts`),
+  embedded to avoid bundle path-resolution issues.
   Three logo variants exist (`dark` = vermilion kanji, `light` = inverted,
   `enso` = pictorial brush circle with a media card, raster-sourced — no SVG
   master); the choice is persisted as `logo` in
-  main's `config.json` and switched from Settings via the `logo_get` /
+  main's settings (`appConfig.ts`) and switched from Settings via the `logo_get` /
   `logo_set` IPC channels. The renderer mirrors the same choice through
   `useLogo()` (react-query cache), which drives the Settings picker and the
-  in-app logo in the workspace rail.
+  in-app logo (in the title bar, or atop the workspace rail). The renderer does not bundle the
+  bitmaps: it gets them from main as data URLs (`logo_images`,
+  `useLogoImages()`).
 
 ## Workspace model
 
@@ -161,19 +294,28 @@ ratings, tags, bookmarks, play history — lives in one library,
 `Workspaces.idFor()` / `pathHash()`; that ID is also the name of the directory
 holding the workspace's generated files.
 
-- `electron/core/appConfig.ts` is the lone layer that persists
-  `<userData>/config.json`: `roots`, `activePath`, `collections` and
-  `workspaceEmojis` (owned by `Workspaces`), plus `update`, `logo`, `autoTag`,
-  `customCss` and `cssTheme`. Each owner writes only its own fields through
-  `updateConfig()`, which merges over what is on disk; writing a snapshot back
-  wholesale would revert the fields another owner changed since. A
-  `config.json` that cannot be parsed is renamed to
-  `config.json.corrupt-<time>` before anything saves, and one that cannot be
-  read at startup (locked, no permission) is not written over for the rest of
-  the session; either way the app runs on defaults and tells the user
-  (`app_status.configProblem`). A read or parse that fails later, once the
-  file was read, only skips the save that met it, and readers get the last
-  config read or saved meanwhile.
+- `electron/core/appConfig.ts` is the lone layer that persists the app's
+  settings: `roots`, `activePath` and `workspaceEmojis` (owned by
+  `Workspaces`), plus `update`, `logo`, `autoTag`, `customCss`,
+  `cssTheme` and `scanExclusions`. They live in the library's `app_settings`
+  table (see
+  [Data Model](data-model.md#app-settings)), one row per field, so they share
+  its daily backup, check and restore. Each owner writes only its own fields
+  through `updateConfig()`, which reads the stored settings, applies the change
+  and writes the fields that changed in one transaction; writing a snapshot
+  back wholesale would revert the fields another owner changed since.
+  - Startup runs `maintainLibrary()` before `Workspaces` reads the settings, and
+    after the single-instance lock, so a second instance never touches the
+    library.
+  - On a launch that finds no import record in `app_settings`,
+    `<userData>/config.json` (where the settings used to live) is imported once and recorded as
+    imported; it is then left in place and never read again, for an older
+    version of the app to start from. A `config.json` that cannot be parsed is
+    renamed to `config.json.corrupt-<time>` and the app starts from defaults;
+    one that cannot be read (locked, no permission), or a library that cannot
+    be opened, leaves the app on defaults without writing any setting until
+    the next launch. Either way the user is told (`app_status.configProblem`).
+    A read that fails later serves the last settings read or saved.
 - `electron/core/workspaces.ts` reads the config and caches a `Core` per ID. It
   distinguishes `active()` (the active workspace) from `byId()` (any workspace by
   ID). Code that opens files should be deliberate about which it needs — the
@@ -183,7 +325,7 @@ holding the workspace's generated files.
   (with the library attached), `root`, and `dataDir`. `Core.init` moves a
   workspace's own metadata into the library on the first open after the
   upgrade, and catches its keyword index up with tag changes made elsewhere.
-  On the first launch after the upgrade, `main.ts` opens every workspace that
+  On the first launch after the upgrade, `app.ts` opens every workspace that
   still has to move before scans start, while a modal shows the progress.
 - `electron/core/paths.ts` resolves the storage layout; see
   [Data Model](data-model.md#storage-layout).
@@ -198,6 +340,14 @@ path that skips merging). Scanning never targets `All`. Each workspace's results
 come from its own file index, joined with the shared library. The play history
 is the one list where two workspaces return the same row (an event for content
 both hold); the merge keeps it once.
+
+Both the file search and the play history are paged with a keyset cursor:
+the next page's cursor is the last row's sort key and workspace, and every
+workspace seeks straight past it instead of skipping the rows before it, so a
+deep page reads about as much as the first one. For the play history the key is `(playedAt, historyId,
+workspaceId)`; a page seeks from the event before the key in each workspace,
+so a run of plays collapsed into the previous page's last row stays
+collapsed.
 
 ### Folders
 
@@ -357,8 +507,9 @@ owns them, so keep them distinct.
 ### User collections
 
 Manually curated virtual folders that span workspaces. They are stored in the
-`collections` array of `<userData>/config.json` (see `UserCollectionConfig` in
-`electron/core/appConfig.ts`), and each item references a file by
+library's `collections` and `collection_items` tables (see
+`electron/core/collectionStore.ts` and
+[Data Model](data-model.md#app-settings)), and each item references a file by
 `workspaceId + fileId`. A file keeps its id across moves, renames and index
 rebuilds (a rebuild soft-deletes the rows and the rescan revives them in place),
 so these references stay valid. The exception is identical copies moved at
@@ -375,21 +526,27 @@ what the `manual` sort reads. The UI lives in
 
 ### Smart collections
 
-Saved searches: a named `SearchQuery`. These never touch the main process —
-they persist in the renderer's `localStorage` (`SMART_COLLECTIONS_KEY`). The
-schema and normalization live in `src/lib/smartCollections.ts`, the hook in
-`src/hooks/useSmartCollections.ts`, and the UI in
-`src/components/SmartCollectionsMenu.tsx`. A query is passed through
+Saved searches: a named `SearchQuery`. They are stored in the library's
+`smart_collections` table (`electron/core/smartCollectionStore.ts`; see
+[Data Model](data-model.md#app-settings)) and changed through the
+`smart_collections_list` / `smart_collections_import` / `smart_collection_add` /
+`smart_collection_remove` / `smart_collection_set_default` IPC channels, each
+of which answers with what is stored. The schema is `SmartCollectionSchema` in
+`shared/ipc/schema.ts`, the normalization in `src/lib/smartCollections.ts`, the
+hook in `src/hooks/useSmartCollections.ts` (one React Query cache entry, so
+every user of the hook reads the same state), and the UI in
+`src/components/SmartCollectionsMenu.tsx`. `renderApp()` loads them before the
+first render, so the list opens on the default one and the menu never shows
+empty while they load. A query is passed through
 `cleanSearchQuery()` to drop empty fields before it is stored. A folder below
 the root is kept as `folder: { path, recursive: true }` and saved together with
 the collection's `workspaceId`, since a folder path means nothing outside its
 own workspace; a folder with no workspace to place it in is dropped. Opening
 such a search switches to that workspace and browses the folder by folder.
 
-One saved search can be marked as the default (the star in the menu; its id is
-stored under `DEFAULT_SMART_COLLECTION_KEY`, apart from the collections). Its
-conditions and sort become Home's initial filter at launch
-(`loadInitialFilter()`), and "Clear all" returns to them — or empties the
+One saved search can be marked as the default (the star in the menu; stored as
+`is_default` on its row). Its conditions and sort become Home's initial filter
+at launch (`initialFilter()`), and "Clear all" returns to them — or empties the
 filter once it already shows exactly them (`clearAllTarget()` in
 `src/lib/searchConditions.ts`); removing the sort chip restores its sort. The
 default applies in every workspace, so its folder and a manual sort, both
@@ -407,8 +564,12 @@ injects what it is given.
   an existing file), and watches it. The watcher is on the directory, not the
   file, because editors that save by renaming a new file over the old one would
   end a watch on the file after the first save. Events are debounced so one save
-  is read once.
-- The switch is persisted as `customCss.enabled` in `config.json` (off by
+  is read once. Because macOS can drop events made just after a watch starts,
+  the directory is also compared once with a snapshot taken at registration.
+  A watch that is already running is not checked again, though macOS rebuilds
+  its event stream whenever any watch starts or stops (such as when custom CSS
+  is switched): a save at that moment shows only after the next save.
+- The switch is persisted as the `customCss.enabled` setting (off by
   default) and works whether or not the file exists. The watcher runs only while
   it is on.
 - `electron/ipc/customCss.ts` handles `custom_css_get`,
@@ -437,7 +598,7 @@ theme file picked from `<userData>/themes/*.css`.
   `electron/core/watchDirectory.ts` with `custom.css`; it runs for the whole
   session, since a file added while nothing is picked must still reach the
   list.
-- The pick is `cssTheme` in `config.json` (null for none). A picked file that
+- The pick is the `cssTheme` setting (null for none). A picked file that
   disappears reads as none without clearing the stored pick, so it comes back
   with the file.
 - `electron/ipc/cssThemes.ts` handles `css_themes_get`, `css_theme_select`

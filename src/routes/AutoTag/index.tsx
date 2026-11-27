@@ -125,7 +125,7 @@ export default function AutoTag() {
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex justify-center bg-black/70 backdrop-blur-sm",
+        "modal-backdrop z-50 flex justify-center bg-black/70 backdrop-blur-sm",
         isSmall ? "items-center p-2 sm:p-6" : "p-2 sm:p-4 md:p-6",
       )}
       onClick={onClose}
@@ -136,14 +136,14 @@ export default function AutoTag() {
       <div
         data-slot="modal-panel"
         className={cn(
-          "relative flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl",
+          "relative flex min-h-0 w-full flex-col overflow-hidden rounded-window border border-border bg-bg shadow-2xl",
           isSmall &&
-            "h-[min(880px,calc(100vh-48px))] min-h-[min(620px,100%)] max-w-[1160px]",
+            "h-[min(880px,calc(100vh-48px-var(--meguri-title-bar-height)))] min-h-[min(620px,100%)] max-w-[1160px]",
         )}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2.5">
-          <span className="size-2 rounded-sm bg-primary" />
+          <span className="size-2 rounded-item bg-primary" />
           <span id="auto-tag-title" className="text-sm font-medium text-fg">
             {t("autoTag.title")}
           </span>
@@ -165,7 +165,7 @@ export default function AutoTag() {
             title={toggleLabel}
             aria-label={toggleLabel}
             aria-pressed={isSmall}
-            className="ml-auto flex h-7 items-center rounded-md px-2 text-fg transition hover:bg-fg/10 hover:text-bright-fg"
+            className="ml-auto flex h-7 items-center rounded-control px-2 text-fg transition hover:bg-fg/10 hover:text-bright-fg"
           >
             {isSmall ? (
               <Maximize2 className="size-4" />
@@ -178,7 +178,7 @@ export default function AutoTag() {
             onClick={onClose}
             title={`${t("common.close")} (Esc)`}
             aria-label={t("common.close")}
-            className="flex h-7 items-center rounded-md px-2 text-fg transition hover:bg-fg/10 hover:text-bright-fg"
+            className="flex h-7 items-center rounded-control px-2 text-fg transition hover:bg-fg/10 hover:text-bright-fg"
           >
             <X className="size-4" />
           </button>
@@ -222,7 +222,7 @@ export default function AutoTag() {
           className="flex min-h-0 flex-1 flex-col"
         >
           {!state ? (
-            <p className="p-8 text-center text-[13px] text-muted">
+            <p className="p-8 text-center text-xs text-muted">
               {t("autoTag.loading")}
             </p>
           ) : !ConditionTab ? (

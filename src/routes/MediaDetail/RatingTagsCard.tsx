@@ -40,7 +40,7 @@ export function RatingTagsCard({
   t: TFunc;
 }) {
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4">
+    <div className="flex flex-col gap-4 border-t border-border py-4">
       <div className="flex items-center gap-3">
         <span className="w-16 shrink-0 text-xs font-semibold uppercase text-muted">
           {t("media.rating")}

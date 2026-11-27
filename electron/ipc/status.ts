@@ -4,6 +4,7 @@ import log from "../core/logger.js";
 import type { WorkspaceStats } from "../core/types.js";
 import { ALL_ID } from "../core/workspaces.js";
 import { configLoadProblem } from "../core/appConfig.js";
+import { VIDEO_DECODE_MAX_PARALLEL } from "../core/mediaConcurrency.js";
 import type { IpcContext } from "./context.js";
 import { queryTargets } from "./helpers.js";
 
@@ -33,6 +34,7 @@ export function registerStatusHandlers(ctx: IpcContext): void {
         mediaBase: ctx.mediaBase(),
         workspaceId: null,
         devMode: ctx.isDevMode(),
+        decodeSlots: VIDEO_DECODE_MAX_PARALLEL,
         libraryMerge,
         libraryRestoredFrom: ctx.libraryRestoredFrom() ?? undefined,
         configProblem: configLoadProblem() ?? undefined,
@@ -51,6 +53,7 @@ export function registerStatusHandlers(ctx: IpcContext): void {
         mediaBase: ctx.mediaBase(),
         workspaceId: ALL_ID,
         devMode: ctx.isDevMode(),
+        decodeSlots: VIDEO_DECODE_MAX_PARALLEL,
         libraryMergeFailed,
         libraryRestoredFrom,
         configProblem,
@@ -66,6 +69,7 @@ export function registerStatusHandlers(ctx: IpcContext): void {
         mediaBase: ctx.mediaBase(),
         workspaceId: ws.activeId,
         devMode: ctx.isDevMode(),
+        decodeSlots: VIDEO_DECODE_MAX_PARALLEL,
         libraryMergeFailed,
         libraryRestoredFrom,
         configProblem,
@@ -80,6 +84,7 @@ export function registerStatusHandlers(ctx: IpcContext): void {
       mediaBase: ctx.mediaBase(),
       workspaceId: ws.activeId,
       devMode: ctx.isDevMode(),
+      decodeSlots: VIDEO_DECODE_MAX_PARALLEL,
       libraryMergeFailed,
       libraryRestoredFrom,
       configProblem,

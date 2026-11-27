@@ -11,10 +11,10 @@ describe("addSearchTokens", () => {
   });
 
   it("AND-appends to existing text without dropping other conditions", () => {
-    const before = { q: "sunset", kind: "video" as const };
+    const before = { q: "sunset", kinds: ["video"] };
     expect(addSearchTokens(before, ["tag:4k"])).toEqual({
       q: "sunset tag:4k",
-      kind: "video",
+      kinds: ["video"],
     });
   });
 
@@ -93,8 +93,10 @@ describe("isFolderView in the graph", () => {
 describe("replaceSearchTokens", () => {
   it("makes the tokens the whole text query and keeps the other filters", () => {
     expect(
-      replaceSearchTokens({ q: "beach tag:4k", kind: "video" }, ["yoga|ヨガ"]),
-    ).toEqual({ q: "yoga|ヨガ", kind: "video" });
+      replaceSearchTokens({ q: "beach tag:4k", kinds: ["video"] }, [
+        "yoga|ヨガ",
+      ]),
+    ).toEqual({ q: "yoga|ヨガ", kinds: ["video"] });
   });
 
   it("does not AND a second search onto the first", () => {

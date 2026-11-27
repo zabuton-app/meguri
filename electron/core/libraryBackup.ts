@@ -4,7 +4,7 @@
 // else holds it, so a damaged library would leave every workspace unable to
 // open with nothing to go back to.
 //
-// Runs at startup before any workspace is opened (main.ts): the library is
+// Runs at startup before any workspace is opened (app.ts): the library is
 // checked (`PRAGMA quick_check`); a sound one gets a copy when the newest is
 // older than BACKUP_EVERY_MS, keeping the BACKUPS_KEPT newest; a damaged one is
 // set aside next to itself and the newest copy put in its place. With no copy
@@ -83,6 +83,17 @@ function listBackups(
     });
 }
 
+/** Whether a workspace has attached the library and made its tables (LIB_DDL). */
+function holdsMetadata(db: DB): boolean {
+  return (
+    db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tag_changes'",
+      )
+      .get() !== undefined
+  );
+}
+
 /** `library-20261108T123456789.sqlite`, in UTC, to the millisecond. */
 function backupName(now: number): string {
   const stamp = new Date(now)
@@ -103,6 +114,10 @@ function takeBackup(file: string, dir: string, now: number): number | null {
   let db: DB | undefined;
   try {
     db = openLibraryReadonlyOrThrow(file);
+    // The settings (app_settings) create the library before any workspace
+    // attaches it. Until one has, it holds no metadata, and a copy of it could
+    // not be put back (forgetTagChanges needs tag_changes): none is taken.
+    if (!holdsMetadata(db)) return null;
     db.prepare("VACUUM INTO ?").run(target);
   } catch (e) {
     fs.rmSync(target, { force: true });

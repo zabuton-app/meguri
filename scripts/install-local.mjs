@@ -92,7 +92,7 @@ function buildDesktopEntry() {
     "[Desktop Entry]",
     "Type=Application",
     `Name=${APP_NAME}`,
-    "Comment=Local video and image browser",
+    "Comment=Local video, image, and audio browser",
     // %U: accepts both file paths and URLs (required for x-scheme-handler).
     `Exec=${binPath} %U`,
     `Icon=${ICON_NAME}`,

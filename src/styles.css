@@ -25,6 +25,84 @@
      it to their offset so they stay clear of the sheet; this is the value
      they fall back to while it is not docked. */
   --meguri-peek-inset: 0px;
+  /* The content zoom (useContentZoom), published for the room the title bar
+     leaves macOS's traffic lights: they do not zoom with the page. */
+  --meguri-zoom: 1;
+  /* Height of the title bar (TitleBar.tsx). A modal's backdrop leaves the
+     bar's band clear (modal-backdrop) and other window-covering overlays start
+     below it (inset-below-title-bar), so the window can still be moved,
+     minimized and closed while one is open; only an immersive view covers it
+     (modal-backdrop-full). electron/ipc/window.ts places the traffic lights
+     for this height at zoom 1 until the bar moves them. */
+  --meguri-title-bar-height: 3rem;
+  /* Length of the theme fades below: at startup with a random theme, and on a
+     switch. Keep BOOT_FADE_MS in ThemeProvider.tsx longer than this. */
+  --meguri-theme-fade: 500ms;
+}
+
+/* Layers that can float over the title bar's band: a click there would move
+   the window instead, since a drag region ignores what is painted over it.
+   A no-drag area later in the document is cut out of the drag region. A new
+   floating layer that can reach the band belongs in this list. A backdrop
+   (a modal's modal-backdrop, an immersive view's modal-backdrop-full) is left
+   out: it covers the band on purpose, and the bar under it still moves the
+   window. An immersive view's panel, the backdrop's only child, is not: it
+   takes the band as part of the view, and its controls there take their
+   clicks. */
+[data-sonner-toaster],
+[data-radix-popper-content-wrapper],
+[role="dialog"]:not(.modal-backdrop, .modal-backdrop-full),
+.modal-backdrop-full > *,
+[data-pet] {
+  -webkit-app-region: no-drag;
+}
+
+/* Controls in the title bar take their clicks; the rest of it moves the
+   window. data-title-bar-control marks a whole area as one (Home's search
+   box, chips included). TitleBar.tsx's CONTROLS lists the same elements.
+   Not while an immersive view covers the bar (data-immersive): its controls
+   are out of reach under the backdrop, and a hole there would take a grab on
+   the band as a click on the backdrop, which closes the view. */
+[data-title-bar]:not([data-immersive])
+  :is(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    [role="button"],
+    [role="combobox"],
+    [data-title-bar-control]
+  ) {
+  -webkit-app-region: no-drag;
+}
+
+/* A fixed overlay covering the window below the title bar. */
+@utility inset-below-title-bar {
+  inset: var(--meguri-title-bar-height) 0 0 0;
+}
+
+/* A modal's backdrop: it dims and blurs the whole window, title bar
+   included, as one layer (two would show a seam where they meet). Its
+   content still starts below the bar: the bar's band is a transparent
+   border, which the backdrop's own background and blur paint under. The bar
+   stays a drag region under it, since a drag region ignores what is painted
+   over it, and the window buttons sit above it (TitleBar.tsx). */
+@utility modal-backdrop {
+  position: fixed;
+  inset: 0;
+  border-top: var(--meguri-title-bar-height) solid transparent;
+}
+
+/* The backdrop of an immersive view (Discover, the player, the file details'
+   modal), whose content takes the title bar's band too. Taken through
+   useImmersiveBackdrop (immersiveView.ts), which also moves the bar's window
+   buttons aside while it is up. Like modal-backdrop it leaves the bar's drag
+   region in force, so the band around the panel still moves the window; the
+   panel (its child) is no-drag, above. */
+@utility modal-backdrop-full {
+  position: fixed;
+  inset: 0;
 }
 
 /* Turn semantic tokens into Tailwind utilities and also alias them to shadcn variables. */
@@ -32,6 +110,18 @@
   --color-bg: var(--c-bg);
   --color-surface: var(--c-surface);
   --color-overlay: var(--c-overlay);
+  /* The window's frame around the content: the title bar, the workspace
+     rail and the strips and corners around the content panel (App.tsx). A
+     CSS theme sets it with --c-chrome (docs/theming.md), so all of them
+     change together. Otherwise it is the surface with a touch of the text
+     color, so the frame stands apart from the content in every theme
+     (darker in a light one, lighter in a dark one) and keeps the theme's
+     hue. Much more than this and the muted text on it (the path, some
+     icons) starts to fade. */
+  --color-chrome: var(
+    --c-chrome,
+    color-mix(in oklab, var(--c-surface), var(--c-fg) 12%)
+  );
   --color-border: var(--c-border);
   /* Meaningful UI boundaries (form controls, switch tracks) rather than decorative rules. */
   --color-border-strong: var(--c-border-strong);
@@ -73,10 +163,22 @@
   --color-destructive-foreground: var(--c-bg);
   --color-ring: var(--c-primary);
   --color-input: var(--c-border-strong);
+}
 
-  --radius-lg: 0.5rem;
-  --radius-md: 0.375rem;
-  --radius-sm: 0.25rem;
+/* The app's scales (#584; docs/renderer.md#design-tokens). A part takes its
+   corner radius by what it is, not by size, and a part inside another gets
+   a smaller one than its container. A radius added here goes in cn()'s list
+   too (src/lib/utils.ts). */
+@theme {
+  --radius-panel: 1rem; /* the content panel set in the frame */
+  --radius-window: 0.75rem; /* modals and dialogs */
+  --radius-card: 0.5rem; /* cards and panels inside a window or the list */
+  --radius-control: 0.375rem; /* buttons, fields, menus, popovers, badges */
+  --radius-item: 0.25rem; /* menu items, small chips inside a control */
+
+  /* Badges, counts and secondary lines. No line height of its own, as the
+     text-[11px] it replaces had none. */
+  --text-2xs: 0.6875rem;
 }
 
 html,
@@ -218,6 +320,8 @@ textarea,
 
 /* Sonner uses its own light/dark palette by default. Bridge it to Meguri themes. */
 [data-sonner-toaster][data-sonner-theme] {
+  /* Rounded as a popover is (rounded-control), not sonner's own 8px. */
+  --border-radius: var(--radius-control) !important;
   --normal-bg: var(--c-surface) !important;
   --normal-bg-hover: var(--c-overlay) !important;
   --normal-border: color-mix(
@@ -368,6 +472,36 @@ textarea,
 }
 .card-control-in {
   animation: card-control-in 150ms ease-out;
+}
+
+/* Random theme on startup: public/theme-boot.js paints a neutral gray and sets
+   data-boot-fade; the picked theme's background and the first render fade in over it.
+   ThemeProvider removes the attribute once the fade has played. */
+@keyframes boot-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* body paints var(--c-bg), which switches at once; let html's fading color show through. */
+html[data-boot-fade] body {
+  background-color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-boot-fade] {
+    transition: background-color var(--meguri-theme-fade) ease-out;
+  }
+  html[data-boot-fade] #root > * {
+    animation: boot-fade-in var(--meguri-theme-fade) ease-out both;
+  }
+}
+
+/* Theme switch: ThemeProvider cross-fades the window with a View Transition. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--meguri-theme-fade);
+  animation-timing-function: ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

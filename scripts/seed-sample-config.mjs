@@ -16,3 +16,26 @@ if (!force && fs.existsSync(target)) {
 
 fs.mkdirSync(path.dirname(target), { recursive: true });
 fs.copyFileSync(source, target);
+
+// The app imports config.json into the library once and records it there
+// (appConfig.ts). Forgetting that record makes the next launch import the
+// sample just copied, over the settings it holds; the metadata stays.
+const library = path.join(path.dirname(target), "library.sqlite");
+if (fs.existsSync(library)) {
+  const { DatabaseSync } = await import("node:sqlite");
+  const db = new DatabaseSync(library);
+  try {
+    const table = db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'app_settings'",
+      )
+      .get();
+    if (table) {
+      db.prepare("DELETE FROM app_settings WHERE key = ?").run(
+        "_config_json_imported_at",
+      );
+    }
+  } finally {
+    db.close();
+  }
+}

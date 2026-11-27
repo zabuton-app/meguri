@@ -15,7 +15,7 @@ export function PlayHistory({
 }) {
   if (history.length === 0) return null;
   return (
-    <section className="rounded-xl border border-border bg-surface p-4">
+    <section className="border-t border-border py-4">
       <h3 className="mb-2 text-xs font-semibold uppercase text-muted">
         {t("media.playHistory")}
       </h3>

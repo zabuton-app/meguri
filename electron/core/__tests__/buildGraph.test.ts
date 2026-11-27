@@ -67,7 +67,7 @@ describe("buildGraph", () => {
       {},
       { q: "beach" },
       { tags: ["sea"] },
-      { kind: "image" },
+      { kinds: ["image"] },
       { ratingMin: 3 },
       { favorite: true },
       { sort: "name", sortDir: "desc" },
