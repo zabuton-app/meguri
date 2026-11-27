@@ -5,7 +5,6 @@ import { formatDuration } from "@/lib/format";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
 import { useLimitedImage, type ImageLimiter } from "@/filmstrip/imageLimiter";
-import { FRAME_H } from "@/filmstrip/FrameStrip";
 
 /**
  * An audio file's whole waveform. The server draws it white on transparent;
@@ -15,6 +14,7 @@ import { FRAME_H } from "@/filmstrip/FrameStrip";
 export function Waveform({
   file,
   duration,
+  height,
   mediaBase,
   limiter,
   onScreen,
@@ -22,6 +22,8 @@ export function Waveform({
 }: {
   file: FileRow;
   duration: number;
+  /** The frames' height, so an audio row lines up with the video rows. */
+  height: number;
   mediaBase: string;
   limiter: ImageLimiter;
   onScreen: boolean;
@@ -51,7 +53,7 @@ export function Waveform({
           void navigate(fileHref(file.id, file.workspaceId, { t: sec }));
         }}
         className="relative z-10 w-full overflow-hidden rounded-item bg-overlay"
-        style={{ height: FRAME_H }}
+        style={{ height }}
       >
         {src && (
           <span

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { createImageLimiter, useLimitedImage } from "@/filmstrip/imageLimiter";
+import {
+  createImageLimiter,
+  filmstripInFlight,
+  useLimitedImage,
+} from "@/filmstrip/imageLimiter";
 
 type Pending = {
   url: string;
@@ -27,6 +31,18 @@ function deferredFetch() {
 
 const ok = () => new Response(new Blob(["x"]), { status: 200 });
 const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe("filmstripInFlight", () => {
+  it("leaves one of the server's decode slots free, using at least two", () => {
+    expect(filmstripInFlight(6)).toBe(5);
+    expect(filmstripInFlight(3)).toBe(2);
+    expect(filmstripInFlight(2)).toBe(2);
+  });
+
+  it("uses two when the slot count is not known", () => {
+    expect(filmstripInFlight(undefined)).toBe(2);
+  });
+});
 
 describe("createImageLimiter", () => {
   it("keeps at most `max` loads in flight and starts the rest in order", async () => {

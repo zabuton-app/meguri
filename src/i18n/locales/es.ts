@@ -57,9 +57,7 @@ export const es: Catalog = {
   "settings.scenesDesc":
     "Cuántas miniaturas de escena generar en la pantalla de detalles.",
   "settings.filmstripFrames": "Fotogramas de la tira",
-  "settings.filmstripFramesDesc":
-    "Fotogramas por fila en la vista de tira. Automático los ajusta al ancho de la fila.",
-  "settings.filmstripFramesAuto": "Automático",
+  "settings.filmstripFramesDesc": "Fotogramas por fila en la vista de tira.",
   "settings.hoverPreview": "Vista previa al pasar el cursor",
   "settings.hoverPreviewDesc":
     "Muestra la escena bajo el cursor al pasar sobre la miniatura de un vídeo.",

@@ -2,11 +2,16 @@ import { useEffect, useState } from "react";
 
 /**
  * Frame and waveform requests the filmstrip keeps in flight at once. Each is
- * an ffmpeg run on a decode slot shared with seek previews, thumbnails and the
- * scan (2 to 6 slots), and the server sheds requests beyond its waiting queue,
- * so the view queues its own instead of firing a screenful at once.
+ * an ffmpeg run on one of the server's decode slots (2 to 6, by the CPU
+ * count), shared with seek previews, thumbnails and the scan, and the server
+ * sheds requests beyond its waiting queue, so the view queues its own instead
+ * of firing a screenful at once. It takes every slot but one, so a seek
+ * preview still gets one; never fewer than two. More would only queue at the
+ * server.
  */
-export const FILMSTRIP_MAX_IN_FLIGHT = 2;
+export function filmstripInFlight(decodeSlots: number | undefined): number {
+  return Math.max(2, (decodeSlots ?? 0) - 1);
+}
 
 export type ImageLimiter = {
   /** Fetch `url` once a slot is free. Rejects on abort or a non-OK response. */

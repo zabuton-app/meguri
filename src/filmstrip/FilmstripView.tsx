@@ -3,7 +3,15 @@
 // so what a clip holds, and where, shows without opening it. Built like the
 // list (MediaList): the same keyboard, selection, peek and paging, no folders
 // and no drag-to-reorder.
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import { FileContextMenu } from "@/components/FileContextMenu";
@@ -20,12 +28,31 @@ import { mediaSortId } from "@/lib/mediaSortId";
 import type { FileRow } from "@/ipc/types";
 import {
   createImageLimiter,
-  FILMSTRIP_MAX_IN_FLIGHT,
+  filmstripInFlight,
 } from "@/filmstrip/imageLimiter";
 import { FilmstripRow } from "@/filmstrip/FilmstripRow";
+import { usePreferences } from "@/settings/PreferencesProvider";
+import {
+  ROW_PAD,
+  STRIP_CHROME,
+  VIEW_PAD_X,
+  stripLayout,
+  type StripLayout,
+} from "@/filmstrip/frames";
 
-/** Every row has this height: frames, timecodes and the bookmark bar, padded. */
-const FILMSTRIP_ROW_H = 120;
+/** The left column's height (name, details, tags, toggles): a row is never lower. */
+const LEFT_COL_H = 100;
+
+/**
+ * A row's height for a frame size: the frames, their timecodes and the
+ * bookmark bar (and the sideways scrollbar when the strip scrolls), padded.
+ * Every row gets the same, so the virtualizer needs no measuring.
+ */
+function rowHeight({ frameH, scrolls }: StripLayout): number {
+  const strip = frameH + 2 + 16 + 4 + 16 + (scrolls ? 14 : 0);
+  // pb-0.5 under each row.
+  return 2 * ROW_PAD + Math.max(LEFT_COL_H, strip) + 2;
+}
 
 interface Props {
   items: FileRow[];
@@ -49,6 +76,8 @@ interface Props {
   peekFileKey?: string;
   /** Changing it scrolls back to the top, as a workspace switch does (a new search). */
   resetKey?: string;
+  /** The media server's decode slots (app_status), which set how many frames load at once. */
+  decodeSlots?: number;
 }
 
 export const FilmstripView = memo(function FilmstripView({
@@ -68,18 +97,38 @@ export const FilmstripView = memo(function FilmstripView({
   watchLater = false,
   peekFileKey,
   resetKey,
+  decodeSlots,
 }: Props) {
   const watchLaterMembership = useWatchLater();
   // One queue for the whole view, so a screenful of rows shares the cap.
-  const limiter = useMemo(
-    () => createImageLimiter(FILMSTRIP_MAX_IN_FLIGHT),
-    [],
-  );
+  const maxInFlight = filmstripInFlight(decodeSlots);
+  const limiter = useMemo(() => createImageLimiter(maxInFlight), [maxInFlight]);
 
+  const { filmstripFrames } = usePreferences();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
   const setScrollRef = useCallback((node: HTMLDivElement | null) => {
     scrollRef.current = node;
+    setScrollEl(node);
   }, []);
+
+  // Frames fill the strip at 16:9, so their size, and every row's height,
+  // follows the view's width. Measured before paint, so rows are laid out
+  // once at the right height.
+  const [viewW, setViewW] = useState(0);
+  useLayoutEffect(() => {
+    if (!scrollEl) return;
+    const compute = () => setViewW(scrollEl.clientWidth);
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(scrollEl);
+    return () => ro.disconnect();
+  }, [scrollEl]);
+  const layout = useMemo(
+    () => stripLayout(viewW - STRIP_CHROME, filmstripFrames),
+    [viewW, filmstripFrames],
+  );
+  const rowH = rowHeight(layout);
 
   const { entries, onOpen, onInspect } = useFolderEntries({
     items,
@@ -91,9 +140,16 @@ export const FilmstripView = memo(function FilmstripView({
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => FILMSTRIP_ROW_H,
+    estimateSize: () => rowH,
     overscan: 4,
   });
+  // estimateSize results are cached per index; drop them when the row height
+  // changes so every row offset follows.
+  useEffect(() => {
+    virtualizer.measure();
+    // The virtualizer reference is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowH]);
   const virtualRows = virtualizer.getVirtualItems();
   // Rows in the viewport, without the overscan: only these load frames.
   const range = virtualizer.range;
@@ -190,15 +246,18 @@ export const FilmstripView = memo(function FilmstripView({
             return (
               <div
                 key={vr.key}
-                className="absolute left-0 top-0 w-full px-3 pb-0.5"
+                className="absolute left-0 top-0 w-full pb-0.5"
                 style={{
                   transform: `translateY(${vr.start}px)`,
-                  height: FILMSTRIP_ROW_H,
+                  height: rowH,
+                  paddingLeft: VIEW_PAD_X,
+                  paddingRight: VIEW_PAD_X,
                 }}
               >
                 <FilmstripRow
                   file={entry.file}
                   index={entry.fileIndex}
+                  layout={layout}
                   mediaBase={mediaBase}
                   limiter={limiter}
                   onScreen={onScreen}

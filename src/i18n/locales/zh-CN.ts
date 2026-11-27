@@ -54,9 +54,7 @@ export const zhCN: Catalog = {
   "settings.scenes": "场景缩略图数量",
   "settings.scenesDesc": "在详情页生成多少张场景缩略图。",
   "settings.filmstripFrames": "胶片帧数",
-  "settings.filmstripFramesDesc":
-    "胶片视图中每行显示的帧数。自动时按行宽排列。",
-  "settings.filmstripFramesAuto": "自动",
+  "settings.filmstripFramesDesc": "胶片视图中每行显示的帧数。",
   "settings.hoverPreview": "悬停预览",
   "settings.hoverPreviewDesc": "预览视频缩略图上光标位置对应的场景。",
   "settings.frameQuality": "预览画质",

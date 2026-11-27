@@ -17,7 +17,13 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
 import type { ImageLimiter } from "@/filmstrip/imageLimiter";
-import { FRAME_H, FrameStrip } from "@/filmstrip/FrameStrip";
+import { FrameStrip } from "@/filmstrip/FrameStrip";
+import {
+  LEFT_COL_W,
+  ROW_GAP,
+  ROW_PAD,
+  type StripLayout,
+} from "@/filmstrip/frames";
 import { Waveform } from "@/filmstrip/Waveform";
 
 /** Details for the left column: duration, size, codec and frame rate. */
@@ -36,6 +42,7 @@ function detailsOf(file: FileRow): string {
 export const FilmstripRow = memo(function FilmstripRow({
   file,
   index,
+  layout,
   mediaBase,
   limiter,
   onScreen,
@@ -48,6 +55,8 @@ export const FilmstripRow = memo(function FilmstripRow({
   file: FileRow;
   /** Position in the loaded list — what a Shift-click ranges from. */
   index: number;
+  /** Frame size, worked out once for the view's width. */
+  layout: StripLayout;
   mediaBase: string;
   limiter: ImageLimiter;
   onScreen: boolean;
@@ -71,14 +80,18 @@ export const FilmstripRow = memo(function FilmstripRow({
       data-file-key={mediaSortId(file)}
       aria-current={focused ? "true" : peeked ? "page" : undefined}
       data-selected={selected || undefined}
+      style={{ padding: ROW_PAD, gap: ROW_GAP }}
       className={cn(
-        "group relative flex items-start gap-4 rounded-card p-2 transition-colors hover:bg-fg/10",
+        "group relative flex items-start rounded-card transition-colors hover:bg-fg/10",
         selected && "bg-primary/15 hover:bg-primary/25",
         peeked && "ring-1 ring-inset ring-primary",
         focused && "ring-2 ring-inset ring-primary",
       )}
     >
-      <div className="flex w-64 shrink-0 flex-col gap-1.5">
+      <div
+        className="flex shrink-0 flex-col gap-1.5"
+        style={{ width: LEFT_COL_W }}
+      >
         <div className="flex min-w-0 items-center gap-2">
           <SelectionCheck
             file={file}
@@ -130,6 +143,7 @@ export const FilmstripRow = memo(function FilmstripRow({
         <FrameStrip
           file={file}
           duration={duration}
+          layout={layout}
           mediaBase={mediaBase}
           limiter={limiter}
           onScreen={onScreen}
@@ -139,6 +153,7 @@ export const FilmstripRow = memo(function FilmstripRow({
         <Waveform
           file={file}
           duration={duration}
+          height={layout.frameH}
           mediaBase={mediaBase}
           limiter={limiter}
           onScreen={onScreen}
@@ -154,8 +169,8 @@ export const FilmstripRow = memo(function FilmstripRow({
             onThumbnailClick(file)(e);
           }}
           aria-label={fileNameOf(file.relPath)}
-          className="relative z-10 block aspect-video shrink-0 overflow-hidden rounded-item bg-overlay text-muted"
-          style={{ height: FRAME_H }}
+          className="relative z-10 block shrink-0 overflow-hidden rounded-item bg-overlay text-muted"
+          style={{ width: layout.frameW, height: layout.frameH }}
         >
           <MediaThumbnail
             file={file}

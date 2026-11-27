@@ -528,6 +528,9 @@ export const AppStatusSchema = z.object({
   workspaceId: z.string().nullable(),
   /** True while running unpackaged for local development. */
   devMode: z.boolean(),
+  /** How many ffmpeg decodes the media server runs at once (frame grabs,
+   *  waveforms), so the filmstrip can size its own queue to it. */
+  decodeSlots: z.number().optional(),
   /** Present while workspaces are being merged into the shared library (the
    *  first launch after the upgrade): how many of them are done. */
   libraryMerge: LibraryMergeProgressSchema.optional(),

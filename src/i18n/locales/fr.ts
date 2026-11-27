@@ -57,9 +57,7 @@ export const fr: Catalog = {
   "settings.scenesDesc":
     "Nombre de miniatures de scène à générer sur l'écran de détail.",
   "settings.filmstripFrames": "Images de la pellicule",
-  "settings.filmstripFramesDesc":
-    "Images par ligne dans la vue pellicule. Auto les ajuste à la largeur de la ligne.",
-  "settings.filmstripFramesAuto": "Auto",
+  "settings.filmstripFramesDesc": "Images par ligne dans la vue pellicule.",
   "settings.hoverPreview": "Aperçu au survol",
   "settings.hoverPreviewDesc":
     "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",

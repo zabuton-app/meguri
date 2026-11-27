@@ -34,8 +34,11 @@ export const SCENE_COUNT_MAX = 48;
 // Choices offered in the settings UI.
 export const SCENE_COUNT_OPTIONS = [4, 6, 8, 12, 16, 20, 24, 32] as const;
 
-// Frames per filmstrip row: "auto" fits the row's width, a number fixes it.
-export type FilmstripFrames = "auto" | number;
+// Frames per filmstrip row. A fixed count, not one fitted to the width: the
+// frame times follow the count, so a width-fitted count would fetch every
+// frame again on each resize (a side peek docking, say). The frames grow
+// or shrink to fill the row instead.
+export const DEFAULT_FILMSTRIP_FRAMES = 10;
 export const FILMSTRIP_FRAMES_MIN = 4;
 export const FILMSTRIP_FRAMES_MAX = 24;
 // Choices offered in the settings UI.
@@ -105,7 +108,7 @@ export function isListThumbSize(v: unknown): v is ListThumbSize {
 interface Prefs {
   randomThemeOnStartup: boolean;
   sceneCount: number;
-  filmstripFrames: FilmstripFrames;
+  filmstripFrames: number;
   keybindingPreset: KeybindingPreset;
   hideSupportLink: boolean;
   hoverPreview: boolean;
@@ -153,7 +156,7 @@ interface Prefs {
 const DEFAULTS: Prefs = {
   randomThemeOnStartup: false,
   sceneCount: DEFAULT_SCENE_COUNT,
-  filmstripFrames: "auto",
+  filmstripFrames: DEFAULT_FILMSTRIP_FRAMES,
   keybindingPreset: DEFAULT_KEYBINDING_PRESET,
   hideSupportLink: false,
   hoverPreview: true,
@@ -179,8 +182,11 @@ function clampSceneCount(n: number): number {
   return Math.min(SCENE_COUNT_MAX, Math.max(SCENE_COUNT_MIN, Math.round(n)));
 }
 
-function parseFilmstripFrames(v: unknown): FilmstripFrames {
-  if (typeof v !== "number" || !Number.isFinite(v)) return "auto";
+// Anything but a number (an "auto" stored by an earlier build, too) reads as
+// the default.
+function parseFilmstripFrames(v: unknown): number {
+  if (typeof v !== "number" || !Number.isFinite(v))
+    return DEFAULT_FILMSTRIP_FRAMES;
   return Math.min(
     FILMSTRIP_FRAMES_MAX,
     Math.max(FILMSTRIP_FRAMES_MIN, Math.round(v)),
@@ -285,7 +291,7 @@ export function loadPrefs(): Prefs {
 interface PrefsCtx extends Prefs {
   setRandomThemeOnStartup: (enabled: boolean) => void;
   setSceneCount: (n: number) => void;
-  setFilmstripFrames: (v: FilmstripFrames) => void;
+  setFilmstripFrames: (n: number) => void;
   setKeybindingPreset: (p: KeybindingPreset) => void;
   setHideSupportLink: (hidden: boolean) => void;
   setHoverPreview: (enabled: boolean) => void;

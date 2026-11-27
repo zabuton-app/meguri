@@ -23,9 +23,15 @@ function row(over: Partial<FileRow>): FileRow {
   return { ...sampleFileRow, ...over };
 }
 
-function strip(items: FileRow[], navActive = false, resetKey?: string) {
+function strip(
+  items: FileRow[],
+  navActive = false,
+  resetKey?: string,
+  decodeSlots?: number,
+) {
   return (
     <FilmstripView
+      decodeSlots={decodeSlots}
       items={items}
       mediaBase={BASE}
       workspaceId={WS_ID}
@@ -232,22 +238,82 @@ describe("FilmstripView", () => {
     ).toHaveLength(0);
   });
 
-  it("in auto mode requests no frames until the strip is measured", async () => {
-    localStorage.setItem(
-      "meguri.prefs",
-      JSON.stringify({ filmstripFrames: "auto" }),
-    );
-    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1100);
-    // 72px high at 16:9 is 128px wide; 1100px holds 8 with 4px gaps.
+  it("asks for the same frames whatever the width, so a resize fetches nothing new", async () => {
+    // The default count, not the fixed 4 the other tests set.
+    localStorage.clear();
+    const frameUrls = () =>
+      fetchedUrls()
+        .filter((u) => u.includes("/frame/"))
+        .sort();
+    const width = vi
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(1400);
+    const wide = view([row({ id: 7, duration: 100 })]);
+    await waitFor(() => expect(frameUrls()).toHaveLength(10));
+    const atWide = frameUrls();
+    wide.unmount();
+    fetchMock.mockClear();
+    // Narrower, as when a side peek docks beside the view.
+    width.mockReturnValue(600);
     view([row({ id: 7, duration: 100 })]);
+    await waitFor(() => expect(frameUrls()).toHaveLength(10));
+    expect(frameUrls()).toEqual(atWide);
+  });
+
+  it("sizes 16:9 frame boxes from the view's width and keeps each frame's aspect", async () => {
+    // 1600 wide, less the view's padding, the row's padding, the left column
+    // and the gap beside it (312), leaves 1288: 10 frames of 125 × 70.
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1600);
+    localStorage.clear();
+    view([
+      row({ id: 7, duration: 100, width: 1080, height: 1920 }),
+      row({
+        id: 8,
+        kind: "image",
+        ext: "jpg",
+        relPath: "p.jpg",
+        duration: null,
+      }),
+      row({
+        id: 9,
+        kind: "audio",
+        ext: "m4a",
+        relPath: "ep.m4a",
+        duration: 60,
+      }),
+    ]);
+    await screen.findByText("sample.mp4");
+    const box = document.querySelector<HTMLElement>(
+      '[data-slot="filmstrip-frame"] [data-slot="filmstrip-frame-box"]',
+    )!;
+    expect(box.style.width).toBe("125px");
+    expect(box.style.height).toBe("70px");
+    // A tall video sits inside the box whole: contained, not cropped.
     await waitFor(() =>
       expect(
-        document.querySelectorAll('[data-slot="filmstrip-frame"] img'),
-      ).toHaveLength(8),
+        document.querySelector('[data-slot="filmstrip-frame"] img')?.className,
+      ).toContain("object-contain"),
     );
-    // No frame from a not-yet-measured layout (one frame, at 50 s).
-    expect(fetchedUrls().filter((u) => u.includes("/frame/"))).toHaveLength(8);
-    expect(fetchedUrls().some((u) => u.includes("t=50&"))).toBe(false);
+    const thumb = document.querySelector<HTMLElement>(
+      '[data-slot="filmstrip-thumb"]',
+    )!;
+    expect(thumb.style.height).toBe("70px");
+    const wave = document.querySelector<HTMLElement>(
+      '[data-slot="filmstrip-waveform"]',
+    )!;
+    expect(wave.style.height).toBe("70px");
+  });
+
+  it("keeps as many frame requests in flight as the server's decode slots allow, less one", async () => {
+    // Requests that never settle, so the count in flight can be read.
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+    localStorage.clear();
+    renderWithProviders(
+      strip([row({ id: 7, duration: 100 })], false, undefined, 6),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    await act(async () => {});
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
   it("goes back to the top and drops the focus when resetKey changes", async () => {

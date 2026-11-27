@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitFrameCount, frameTimes, frameWidthFor } from "@/filmstrip/frames";
+import { frameTimes, stripLayout } from "@/filmstrip/frames";
 
 describe("frameTimes", () => {
   it("spaces frames evenly at the middle of each slice, in whole seconds", () => {
@@ -11,24 +11,23 @@ describe("frameTimes", () => {
   });
 });
 
-describe("fitFrameCount", () => {
-  it("fits as many frames as the strip holds, gaps between them", () => {
-    expect(fitFrameCount(1000, 120, 4)).toBe(8);
+describe("stripLayout", () => {
+  it("shares the strip's width among 16:9 frames, gaps between them", () => {
+    // (1288 - 9 gaps of 4) / 10 = 125.2 → 125 wide, 70 high.
+    expect(stripLayout(1288, 10)).toEqual({
+      frameW: 125,
+      frameH: 70,
+      scrolls: false,
+    });
   });
 
-  it("keeps at least one frame on a narrow strip", () => {
-    expect(fitFrameCount(50, 120, 4)).toBe(1);
-    expect(fitFrameCount(0, 120, 4)).toBe(1);
-  });
-});
-
-describe("frameWidthFor", () => {
-  it("uses 16:9 when the size is unknown", () => {
-    expect(frameWidthFor(90, null, null)).toBe(160);
-    expect(frameWidthFor(90, 0, 1080)).toBe(160);
-  });
-
-  it("follows the video's aspect ratio", () => {
-    expect(frameWidthFor(90, 1080, 1920)).toBe(50.625);
+  it("keeps a frame at its minimum width and scrolls a strip too narrow for it", () => {
+    expect(stripLayout(500, 10)).toEqual({
+      frameW: 64,
+      frameH: 36,
+      scrolls: true,
+    });
+    // An unmeasured strip (width 0) too.
+    expect(stripLayout(0, 10).frameW).toBe(64);
   });
 });

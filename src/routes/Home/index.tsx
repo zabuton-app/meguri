@@ -1113,6 +1113,7 @@ export default function Home() {
                 watchLater={activeCollection?.id === WATCH_LATER_ID}
                 peekFileKey={peekFileKey}
                 resetKey={viewResetKey}
+                decodeSlots={status.data?.decodeSlots}
               />
             ) : view === "list" ? (
               <MediaList

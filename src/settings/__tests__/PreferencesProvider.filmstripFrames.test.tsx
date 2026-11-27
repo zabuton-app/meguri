@@ -26,8 +26,8 @@ function stored(value: unknown) {
 afterEach(() => localStorage.clear());
 
 describe("filmstripFrames preference", () => {
-  it("defaults to auto", () => {
-    expect(renderPrefs().result.current.filmstripFrames).toBe("auto");
+  it("defaults to 10", () => {
+    expect(renderPrefs().result.current.filmstripFrames).toBe(10);
   });
 
   it("loads a stored count", () => {
@@ -43,9 +43,12 @@ describe("filmstripFrames preference", () => {
     expect(renderPrefs().result.current.filmstripFrames).toBe(24);
   });
 
-  it("reads anything else as auto", () => {
+  it("reads anything else, including an earlier auto, as 10", () => {
     stored("x");
-    expect(renderPrefs().result.current.filmstripFrames).toBe("auto");
+    expect(renderPrefs().result.current.filmstripFrames).toBe(10);
+    localStorage.clear();
+    stored("auto");
+    expect(renderPrefs().result.current.filmstripFrames).toBe(10);
   });
 
   it("persists what the setter is given", () => {
@@ -56,7 +59,5 @@ describe("filmstripFrames preference", () => {
       filmstripFrames?: unknown;
     };
     expect(saved.filmstripFrames).toBe(12);
-    act(() => result.current.setFilmstripFrames("auto"));
-    expect(result.current.filmstripFrames).toBe("auto");
   });
 });

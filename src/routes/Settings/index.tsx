@@ -557,17 +557,12 @@ export default function Settings() {
                 </div>
                 <Select
                   value={String(filmstripFrames)}
-                  onValueChange={(v) =>
-                    setFilmstripFrames(v === "auto" ? "auto" : Number(v))
-                  }
+                  onValueChange={(v) => setFilmstripFrames(Number(v))}
                 >
                   <SelectTrigger className="min-w-24">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">
-                      {t("settings.filmstripFramesAuto")}
-                    </SelectItem>
                     {FILMSTRIP_FRAMES_OPTIONS.map((n) => (
                       <SelectItem key={n} value={String(n)}>
                         {n}

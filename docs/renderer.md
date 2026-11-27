@@ -344,21 +344,28 @@ another day's header has the counts read again. The timeline has no
 folder form (`hasFolderForm`), shows a collection in date order rather than
 its manual order, and keeps the heatmap panel over it like any view.
 
-The filmstrip (`src/filmstrip/`) draws the list one row per file, laid out
-along its length: a video's frames at even intervals with their timecodes and
-a bar marking its scene bookmarks, an audio file's waveform (the server's
-`waveform` kind, used as a CSS mask over a theme color), an image's thumbnail.
-A frame, a bookmark mark or a point on the waveform opens the file at that
-time and plays; the rest of the row opens it paused, as in the list. The frame
-count fits the row's width, or is fixed by the `filmstripFrames` preference;
-the quality follows `frameQuality`. Each frame is an ffmpeg run on a decode
-slot shared with seek previews, thumbnails and the scan, so images load only
-for the rows in the viewport (the virtualizer's `range`, not its overscan),
-through one queue per view that keeps two requests in flight
-(`imageLimiter.ts`, `fetch` with an `AbortController`, so a row scrolled away
-gives up its requests). The search rows carry `codec`, `fps` and
-`bookmarkSecs` for it. Keyboard, selection, the peek and paging are the
-list's; it has no folder form and no drag-to-reorder.
+The filmstrip (`src/filmstrip/`) draws the list one row per file, laid out along
+its length: a video's frames at even intervals with their timecodes and a bar
+marking its scene bookmarks, an audio file's waveform (the server's `waveform`
+kind, used as a CSS mask over a theme color), an image's thumbnail. A frame, a
+bookmark mark or a point on the waveform opens the file at that time and plays;
+the rest of the row opens it paused, as in the list. The frame count is the
+`filmstripFrames` preference (10 by default), never fitted to the width: the
+frame times follow the count, so a width-fitted count would fetch every frame
+again on each resize, such as a side peek docking. Frames are 16:9 boxes sharing
+the row's width, so the strip always spans the row and their height (and every
+row's) follows the view's width (`stripLayout`, worked out once per view); a
+video of another aspect sits inside its box whole. Only when a box would drop
+below 64px wide does the row scroll sideways. The quality follows
+`frameQuality`. Each frame is an ffmpeg run on a decode slot shared with seek
+previews, thumbnails and the scan, so images load only for the rows in the
+viewport (the virtualizer's `range`, not its overscan), through one queue per
+view that keeps every decode slot but one busy, never fewer than two
+(`filmstripInFlight`, from `app_status`'s `decodeSlots`; `imageLimiter.ts`,
+`fetch` with an `AbortController`, so a row scrolled away gives up its
+requests). The search rows carry `codec`, `fps` and `bookmarkSecs` for it.
+Keyboard, selection, the peek and paging are the list's; it has no folder form
+and no drag-to-reorder.
 
 The heatmap (`src/heatmap/`, "Contribution graph" in the UI) is not a view but
 a panel under the filter bar, over whichever view is shown, toggled from the
