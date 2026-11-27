@@ -1,7 +1,7 @@
 // The filmstrip view: one row per file, laid out along its length.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
-import "@/test/mockVirtualizer";
+import { mockVirtualizerScrollToOffset } from "@/test/mockVirtualizer";
 import { FilmstripView } from "@/filmstrip/FilmstripView";
 import { defaultWorkspacesList, sampleFileRow, WS_ID } from "@/test/fixtures";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -23,16 +23,21 @@ function row(over: Partial<FileRow>): FileRow {
   return { ...sampleFileRow, ...over };
 }
 
-function view(items: FileRow[], navActive = false) {
-  return renderWithProviders(
+function strip(items: FileRow[], navActive = false, resetKey?: string) {
+  return (
     <FilmstripView
       items={items}
       mediaBase={BASE}
       workspaceId={WS_ID}
       loading={false}
       navActive={navActive}
-    />,
+      resetKey={resetKey}
+    />
   );
+}
+
+function view(items: FileRow[], navActive = false) {
+  return renderWithProviders(strip(items, navActive));
 }
 
 const fetchedUrls = () => fetchMock.mock.calls.map((c) => c[0] as string);
@@ -225,5 +230,70 @@ describe("FilmstripView", () => {
     expect(
       document.querySelectorAll('[data-slot="filmstrip-frame"] img'),
     ).toHaveLength(0);
+  });
+
+  it("in auto mode requests no frames until the strip is measured", async () => {
+    localStorage.setItem(
+      "meguri.prefs",
+      JSON.stringify({ filmstripFrames: "auto" }),
+    );
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1100);
+    // 72px high at 16:9 is 128px wide; 1100px holds 8 with 4px gaps.
+    view([row({ id: 7, duration: 100 })]);
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll('[data-slot="filmstrip-frame"] img'),
+      ).toHaveLength(8),
+    );
+    // No frame from a not-yet-measured layout (one frame, at 50 s).
+    expect(fetchedUrls().filter((u) => u.includes("/frame/"))).toHaveLength(8);
+    expect(fetchedUrls().some((u) => u.includes("t=50&"))).toBe(false);
+  });
+
+  it("goes back to the top and drops the focus when resetKey changes", async () => {
+    const items = [
+      row({ id: 1, relPath: "one.mp4" }),
+      row({ id: 2, relPath: "two.mp4" }),
+    ];
+    const { rerender } = renderWithProviders(strip(items, true, "a"));
+    await screen.findByText("two.mp4");
+    act(() => {
+      fireEvent.keyDown(window, { key: "ArrowDown", code: "ArrowDown" });
+    });
+    const rows = () => document.querySelectorAll('[data-slot="filmstrip-row"]');
+    expect(rows()[0].getAttribute("aria-current")).toBe("true");
+    const scrollToOffset = mockVirtualizerScrollToOffset();
+    scrollToOffset.mockClear();
+    rerender(strip(items, true, "b"));
+    expect(scrollToOffset).toHaveBeenCalledWith(0);
+    expect(rows()[0].getAttribute("aria-current")).toBeNull();
+  });
+
+  it("a Ctrl-click on the waveform selects the row instead of opening it", async () => {
+    view([
+      row({
+        id: 5,
+        kind: "audio",
+        ext: "m4a",
+        relPath: "ep.m4a",
+        duration: 3600,
+      }),
+    ]);
+    const wave = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>(
+        '[data-slot="filmstrip-waveform"]',
+      );
+      expect(el).toBeTruthy();
+      return el!;
+    });
+    window.location.hash = "#/";
+    fireEvent.click(wave, { clientX: 10, ctrlKey: true });
+    await act(async () => {});
+    expect(window.location.hash).toBe("#/");
+    expect(
+      document
+        .querySelector('[data-slot="filmstrip-row"]')
+        ?.getAttribute("data-selected"),
+    ).toBe("true");
   });
 });

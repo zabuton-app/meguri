@@ -142,6 +142,7 @@ export const FilmstripRow = memo(function FilmstripRow({
           mediaBase={mediaBase}
           limiter={limiter}
           onScreen={onScreen}
+          onSelectableClick={onSelectableClick}
         />
       ) : (
         // An image, or a file not probed yet: its thumbnail, once.

@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useLayoutEffect, useState, type MouseEvent } from "react";
 import { HashLink } from "@/components/HashLink";
 import { fileHref } from "@/lib/fileHref";
 import { formatDuration } from "@/lib/format";
@@ -34,7 +34,8 @@ export function FrameStrip({
   const [stripEl, setStripEl] = useState<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
 
-  useEffect(() => {
+  // Measured before paint, so a row does not first show one wide frame.
+  useLayoutEffect(() => {
     if (!stripEl) return;
     const compute = () => setWidth(stripEl.clientWidth);
     compute();
@@ -43,14 +44,18 @@ export function FrameStrip({
     return () => ro.disconnect();
   }, [stripEl]);
 
+  // Under auto, nothing until the strip is measured: a count from width 0
+  // would request a frame that is dropped as soon as the width is known.
   const count =
-    filmstripFrames === "auto"
-      ? fitFrameCount(
-          width,
-          frameWidthFor(FRAME_H, file.width, file.height),
-          FRAME_GAP,
-        )
-      : filmstripFrames;
+    filmstripFrames !== "auto"
+      ? filmstripFrames
+      : width === 0
+        ? 0
+        : fitFrameCount(
+            width,
+            frameWidthFor(FRAME_H, file.width, file.height),
+            FRAME_GAP,
+          );
   const times = frameTimes(duration, count);
   const base = `${mediaBase}/ws/${file.workspaceId}/frame/${file.id}`;
 

@@ -3,7 +3,7 @@
 // settles (#258).
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, waitFor } from "@testing-library/react";
-import type { FileDetail } from "@/ipc/types";
+import type { FileDetail, FileRow } from "@/ipc/types";
 import {
   createTestQueryClient,
   renderWithProviders,
@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   fileDeleteFromIndex: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
   thumbSetOffset: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
   fileSetRating: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
+  bookmarkAdd: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
+  bookmarkRemove: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
 }));
 
 vi.mock("@/components/ConfirmDialog", async (importOriginal) => ({
@@ -28,6 +30,8 @@ vi.mock("@/ipc/client", () => ({
     fileDeleteFromIndex: (...a: unknown[]) => mocks.fileDeleteFromIndex(...a),
     thumbSetOffset: (...a: unknown[]) => mocks.thumbSetOffset(...a),
     fileSetRating: (...a: unknown[]) => mocks.fileSetRating(...a),
+    bookmarkAdd: (...a: unknown[]) => mocks.bookmarkAdd(...a),
+    bookmarkRemove: (...a: unknown[]) => mocks.bookmarkRemove(...a),
   },
 }));
 
@@ -154,5 +158,37 @@ describe("detail actions across prev/next", () => {
 
     expect(t.actions().pendingThumbSec).toBeUndefined();
     expect(t.actions().pending.mainThumb).toBe(false);
+  });
+});
+
+describe("bookmark edits reach the list rows", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const listRow = () =>
+    ({ id: 1, workspaceId: WS, bookmarkSecs: [30] }) as unknown as FileRow;
+
+  it("adds and removes the bookmark's seconds on the cached search rows", async () => {
+    const t = setup();
+    t.qc.setQueryData(["file_get", WS, 1], {
+      id: 1,
+      bookmarks: [{ id: 9, sec: 30, createdAt: 0 }],
+    });
+    t.qc.setQueryData(["files_search", "k"], {
+      pages: [{ items: [listRow()], nextCursor: null }],
+      pageParams: [0],
+    });
+    const rowSecs = () =>
+      t.qc.getQueryData<{ pages: { items: FileRow[] }[] }>([
+        "files_search",
+        "k",
+      ])?.pages[0].items[0].bookmarkSecs;
+
+    mocks.bookmarkAdd.mockResolvedValue({ id: 10, sec: 5, createdAt: 0 });
+    act(() => t.actions().addBookmark(5));
+    await waitFor(() => expect(rowSecs()).toEqual([5, 30]));
+
+    mocks.bookmarkRemove.mockResolvedValue(undefined);
+    act(() => t.actions().removeBookmark(9));
+    await waitFor(() => expect(rowSecs()).toEqual([5]));
   });
 });

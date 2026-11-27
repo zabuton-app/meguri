@@ -3,7 +3,7 @@
 // so what a clip holds, and where, shows without opening it. Built like the
 // list (MediaList): the same keyboard, selection, peek and paging, no folders
 // and no drag-to-reorder.
-import { memo, useCallback, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MediaEmptyState } from "@/components/MediaEmptyState";
 import { FileContextMenu } from "@/components/FileContextMenu";
@@ -47,6 +47,8 @@ interface Props {
   watchLater?: boolean;
   /** mediaSortId of the file a docked side peek shows. */
   peekFileKey?: string;
+  /** Changing it scrolls back to the top, as a workspace switch does (a new search). */
+  resetKey?: string;
 }
 
 export const FilmstripView = memo(function FilmstripView({
@@ -65,6 +67,7 @@ export const FilmstripView = memo(function FilmstripView({
   navActive = false,
   watchLater = false,
   peekFileKey,
+  resetKey,
 }: Props) {
   const watchLaterMembership = useWatchLater();
   // One queue for the whole view, so a screenful of rows shares the cap.
@@ -96,7 +99,7 @@ export const FilmstripView = memo(function FilmstripView({
   const range = virtualizer.range;
 
   const scrollToRow = useScrollToRow(virtualizer);
-  const { focusedIndex } = useGridKeyboardNav({
+  const { focusedIndex, setFocusedIndex } = useGridKeyboardNav({
     itemCount: entries.length,
     columns: 1,
     active: navActive,
@@ -107,6 +110,16 @@ export const FilmstripView = memo(function FilmstripView({
   const focusedWatchLaterRef = useRef<HTMLButtonElement>(null);
   useWatchLaterHotkey({ active: navActive, buttonRef: focusedWatchLaterRef });
   usePublishFocusedFile(entries, focusedIndex);
+
+  // Back to the top on a workspace switch and on a resetKey change, as the
+  // list does: Home keeps the previous results on screen while a new search
+  // loads, so the view would otherwise land mid-way into the new one.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+    virtualizer.scrollToOffset(0);
+    setFocusedIndex(-1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsId, resetKey]);
 
   const peekIndex = peekFileKey
     ? entries.findIndex(

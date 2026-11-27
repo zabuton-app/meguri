@@ -1112,6 +1112,7 @@ export default function Home() {
                 navActive={navActive}
                 watchLater={activeCollection?.id === WATCH_LATER_ID}
                 peekFileKey={peekFileKey}
+                resetKey={viewResetKey}
               />
             ) : view === "list" ? (
               <MediaList

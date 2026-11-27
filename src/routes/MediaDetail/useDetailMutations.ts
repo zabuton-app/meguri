@@ -262,6 +262,16 @@ export function useDetailMutations({
     onError: onCollectionError,
   });
 
+  // The list rows carry the bookmark seconds (the filmstrip draws them); keep
+  // them in step with the detail, as tag edits are.
+  const patchRowBookmarks = (target: Target) => {
+    const detail = qc.getQueryData<FileDetail | null>(detailKeyOf(target));
+    if (!detail) return;
+    patchFileRowInCaches(qc, target.wsId, target.fileId, {
+      bookmarkSecs: detail.bookmarks.map((b) => b.sec),
+    });
+  };
+
   const addBookmark = useMutation({
     mutationFn: ({ target, sec }: { target: Target; sec: number }) =>
       api.bookmarkAdd(target.fileId, target.wsId, sec),
@@ -278,6 +288,7 @@ export function useDetailMutations({
             }
           : old,
       );
+      patchRowBookmarks(target);
     },
   });
   const removeBookmark = useMutation({
@@ -297,6 +308,7 @@ export function useDetailMutations({
             }
           : old,
       );
+      patchRowBookmarks(target);
     },
   });
 
