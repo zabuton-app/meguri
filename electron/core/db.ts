@@ -1,6 +1,7 @@
 // SQLite (better-sqlite3). Schema definition and connection.
 import Database from "better-sqlite3";
 import { tagIdentityKey } from "../../shared/tags.js";
+import { noteMatches } from "../../shared/noteSearch.js";
 import {
   NAME_KEY_VERSION,
   NAME_KEY_VERSION_SETTING,
@@ -12,14 +13,26 @@ export type DB = Database.Database;
 
 /**
  * Make tagIdentityKey callable from SQL as `tag_key(name)`, so a query matches
- * tag names by the same rule as the code around it. SQLite's own `lower()` and
- * NOCASE stop at ASCII. Connection-local: every handle that runs those queries
- * registers it, and nothing in the schema depends on it, so the file still
- * opens anywhere else.
+ * tag names by the same rule as the code around it, and noteMatches as
+ * `note_match(note, termsJson)` for the `note:` search. SQLite's own
+ * `lower()` and NOCASE stop at ASCII. Connection-local: every handle that runs
+ * those queries registers it, and nothing in the schema depends on it, so the
+ * file still opens anywhere else.
  */
 function registerFunctions(db: DB): void {
   db.function("tag_key", { deterministic: true }, (name: unknown) =>
     typeof name === "string" ? tagIdentityKey(name) : name,
+  );
+  // One call per note and `note:` token, however many alternatives the token
+  // has, returning only a flag: folding a long note is the cost, so no folded
+  // copy is handed back to SQLite.
+  db.function(
+    "note_match",
+    { deterministic: true },
+    (note: unknown, terms: unknown) =>
+      typeof note === "string" && typeof terms === "string"
+        ? Number(noteMatches(note, JSON.parse(terms) as string[]))
+        : 0,
   );
   // Only for filling files.name_key in bulk (backfillColumns): the scan binds
   // the key it computes, so nothing in the schema depends on this function and
@@ -353,6 +366,12 @@ function backfillLibraryColumns(db: DB): void {
   if (!metaCols.includes("note")) {
     db.exec("ALTER TABLE lib.file_meta ADD COLUMN note TEXT");
   }
+  // Drives the `note:` and `has:note` searches (see appendSearchConditions).
+  // Here rather than in LIB_DDL, which runs before the column exists on a
+  // library from before notes.
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS lib.idx_file_meta_note ON file_meta(meta_key) WHERE note IS NOT NULL",
+  );
 }
 
 function attachLibrary(db: DB, libraryFile: string): void {
@@ -415,6 +434,10 @@ function backfillColumns(db: DB): void {
     // Drives the "In progress" filter (see appendSearchConditions).
     db.exec(
       "CREATE INDEX IF NOT EXISTS main.idx_file_meta_resume ON file_meta(meta_key) WHERE resume_position IS NOT NULL",
+    );
+    // And the `note:` / `has:note` searches.
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS main.idx_file_meta_note ON file_meta(meta_key) WHERE note IS NOT NULL",
     );
   }
   // Whether the root was a mountpoint at the last scan: an unmounted one must

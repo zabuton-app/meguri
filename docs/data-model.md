@@ -537,6 +537,29 @@ favorite controls of the filter bar: a directive does not set the control nor
 the other way round, and when both are set both apply (AND). With a leading `-`,
 `-is:fav` keeps every file that is not a favorite.
 
+The **`note:` and `has:note` directives** look at a file's note
+(`file_meta.note`) instead of its name (#350, `shared/noteSearch.ts`):
+
+- `note:<text>` — the note contains the text, compared after
+  `noteSearchKey()` (NFKC and lowercase for every script, so `note:école`
+  finds `École`). Any length works, since no trigram is involved.
+  Alternatives work as in free text (`note:pexels|pixabay`), a value with
+  spaces is quoted (`note:"cc0 licence"`), and separate `note:` tokens are
+  ANDed.
+- `has:note` — the file has a note. `note` is the only value `has:` takes;
+  any other is ordinary text, as with `is:`.
+
+The note lives in the library, not in a workspace's `files_fts`, so neither
+goes through the index. Each becomes
+`f.id IN (SELECT id FROM files WHERE meta_key IN (SELECT meta_key FROM file_meta WHERE note IS NOT NULL …))`,
+which starts from the partial index `idx_file_meta_note` and reaches the files
+by their meta_key index, the form a rare tag uses (#365). A `note:` token adds
+`note_match(note, terms)`, a JS function registered in `db.ts`, so every note
+in the library is read on each such search; storing a folded copy of the note
+is the next step if that ever shows up on large libraries. They are chips like
+`hash:`, a space after the colon is folded as for the others, and with a
+leading `-`, `-has:note` keeps the files without a note.
+
 A leading **`-` excludes** (#523): `-tag:screenshot`, `-ext:gif`, `-hash:3fa9`
 and `-draft` leave out the files the same token without the `-` would match.
 `parseNegatedSearchToken()` in `shared/tags.ts` reads it, and

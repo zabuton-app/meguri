@@ -288,6 +288,30 @@ export function invalidateTagSearches(qc: QueryClient): void {
 }
 
 /**
+ * Invalidate only the views filtered by a note (`note:` or `has:note` in the
+ * query), after a note is saved: a list of files that have a note must lose
+ * the one whose note was just removed. Other views do not show the note.
+ */
+export function invalidateNoteSearches(qc: QueryClient): void {
+  // Negated ones too: `-has:note` must gain the file whose note was removed.
+  const byNote = (q: { queryKey: readonly unknown[] }) =>
+    splitSearchTokens(searchFilterOf(q.queryKey)?.q ?? "").some((token) => {
+      const kind = parseSearchDirective(
+        parseNegatedSearchToken(token).body,
+      )?.kind;
+      return kind === "note" || kind === "hasNote";
+    });
+  for (const key of [
+    "files_search",
+    "graph_build",
+    "activity_days",
+    "timeline_counts",
+  ]) {
+    void qc.invalidateQueries({ queryKey: [key], predicate: byNote });
+  }
+}
+
+/**
  * Invalidate everything that embeds tag names, after a catalog-level edit
  * (rename / merge / delete) or a bulk edit over a selection.
  *

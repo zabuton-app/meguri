@@ -28,6 +28,7 @@ import {
   Settings,
   Sparkles,
   Star,
+  StickyNote,
   Sun,
   Tag,
   Tags as TagsIcon,
@@ -77,6 +78,7 @@ import { commandMenuShortcut } from "@/lib/platform";
 import { fileNameOf } from "@/lib/relPath";
 import { recentSearchKey } from "@/lib/recentSearches";
 import {
+  fixedDirectiveSuggestions,
   namespaceSuggestions,
   pendingDirective,
   plainWordAtCaret,
@@ -486,6 +488,8 @@ function CommandMenuBody({
     : null;
   const word =
     completing && directiveValue === null ? plainWordAtCaret(draft.text) : null;
+  // `has:` offers `has:note`: a directive with one value, not a tag.
+  const fixed = completing ? fixedDirectiveSuggestions(draft.text) : [];
   // The search row: first once the field is edited, and while a search is
   // only shown again too, so Enter on the field as opened (`/` then Enter,
   // as in a search box) runs that search rather than whichever command
@@ -514,11 +518,13 @@ function CommandMenuBody({
   // but not one that turns up later (the catalog arriving, a chip removed):
   // the first row is put back on whenever it changes.
   const firstRow =
-    directiveValue !== null && completions.suggestions.length > 0
-      ? `complete-tag ${completions.suggestions[0].qualified}`
-      : searchRow
-        ? `search-for ${draft.query}`
-        : null;
+    fixed.length > 0
+      ? `complete-directive ${fixed[0]}`
+      : directiveValue !== null && completions.suggestions.length > 0
+        ? `complete-tag ${completions.suggestions[0].qualified}`
+        : searchRow
+          ? `search-for ${draft.query}`
+          : null;
   const [highlighted, setHighlighted] = useState("");
   const [seenFirstRow, setSeenFirstRow] = useState<string | null>(null);
   if (firstRow !== seenFirstRow) {
@@ -671,6 +677,13 @@ function CommandMenuBody({
           />
         ) : (
           <>
+            {/* After `has:`, as after `tag:`, Enter takes the completion. */}
+            <DirectiveCompletions
+              t={t}
+              tokens={fixed}
+              draft={draft}
+              onPicked={refocus}
+            />
             {/* After `tag:`, Enter takes the highlighted tag, so the tags come
                 first; over a word, the search does (#542). */}
             {directiveValue !== null && (
@@ -1084,6 +1097,54 @@ function TagCompletions({
           <TagSuggestionLabel t={t} tag={tag} held={held(tag)} />
         </CommandItem>
       ))}
+    </CommandGroup>
+  );
+}
+
+/**
+ * The directives with one fixed value the end of the field begins (`has:`
+ * offers `has:note`), apart from the tags: they are no tags. Picking one
+ * chips it, as a tag pick does.
+ */
+function DirectiveCompletions({
+  t,
+  tokens,
+  draft,
+  onPicked,
+}: {
+  t: TFunc;
+  tokens: string[];
+  draft: SearchDraft;
+  onPicked: () => void;
+}) {
+  if (tokens.length === 0) return null;
+  return (
+    // Force-mounted, as the tag completions are: they match the end of the
+    // field, not the whole of it.
+    <CommandGroup heading={t("filter.directiveSuggestions")} forceMount>
+      {tokens.map((token) => {
+        const colon = token.indexOf(":") + 1;
+        return (
+          <CommandItem
+            key={token}
+            forceMount
+            value={`complete-directive ${token}`}
+            onSelect={() => {
+              draft.acceptToken(token);
+              onPicked();
+            }}
+          >
+            <StickyNote />
+            <span className="truncate">
+              <span className="text-muted">{token.slice(0, colon)}</span>
+              {token.slice(colon)}
+            </span>
+            <span className="truncate text-xs text-muted">
+              {searchTokenLabel(t, token)}
+            </span>
+          </CommandItem>
+        );
+      })}
     </CommandGroup>
   );
 }

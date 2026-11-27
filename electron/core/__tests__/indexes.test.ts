@@ -14,6 +14,7 @@ import {
   orderByFor,
   RARE_TAG_ROWS,
   searchFiles,
+  setNote,
   sortValueOf,
   type SeekPosition,
 } from "../queries.js";
@@ -337,6 +338,22 @@ describe("searchFiles plans without statistics (#363)", () => {
     });
   });
 
+  describe("note searches (#350)", () => {
+    beforeEach(() => {
+      const ids = db.prepare("SELECT id FROM files").pluck().all() as number[];
+      setNote(db, ids[0], "Source: pexels");
+    });
+
+    it("start from the files that have a note and look them up by meta_key", () => {
+      for (const q of ["has:note", "note:pexels", "note:pexels|pixabay"]) {
+        const p = searchPlan({ q, sort: "name", sortDir: "asc" });
+        expect(p, q).toContain("idx_file_meta_note");
+        expect(p, q).toContain("idx_files_meta_key");
+        expect(p, q).not.toContain("idx_files_alive (deleted_at=?)");
+      }
+    });
+  });
+
   describe("a list filtered only by exclusions (#670)", () => {
     const exclusions = [
       "-ext:gif",
@@ -345,6 +362,8 @@ describe("searchFiles plans without statistics (#363)", () => {
       "-tag:t",
       "-hash:ab",
       "-is:fav",
+      "-has:note",
+      "-note:ab",
       "-ab -ext:gif -v00",
     ];
 
@@ -397,10 +416,18 @@ describe("searchFiles plans without statistics (#363)", () => {
 
     it("returns the rows the planner's own order does", () => {
       rebuildFtsAll(db);
+      const noted = "dir/v007.mp4";
+      const notedId = db
+        .prepare("SELECT id FROM files WHERE rel_path = ?")
+        .pluck()
+        .get(noted) as number;
+      setNote(db, notedId, "Source: pexels");
       const cases: [string, (relPath: string) => boolean][] = [
         ["-v00", (relPath) => !relPath.includes("v00")],
         ["-tag:t", () => true],
         ["-ext:mp4", () => false],
+        ["-has:note", (relPath) => relPath !== noted],
+        ["-note:pexels", (relPath) => relPath !== noted],
       ];
       for (const [sort, sortDir] of [
         ["name", "asc"],

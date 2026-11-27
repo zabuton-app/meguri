@@ -346,11 +346,13 @@ export const es: Catalog = {
 
   // filter
   "filter.searchHint":
-    'Busca en los nombres de archivo y en las etiquetas. Usa tag:playa o tag:4k para coincidir de forma exacta, tanto con las tuyas como con las automáticas. Entrecomilla los valores con espacios: tag:"casa de playa".',
+    'Busca en los nombres de archivo y en las etiquetas. Usa tag:playa o tag:4k para coincidir de forma exacta, tanto con las tuyas como con las automáticas. Entrecomilla los valores con espacios: tag:"casa de playa". note:pexels busca archivos cuya nota contiene el texto, y has:note los que tienen una nota.',
+  "filter.hasNote": "Con nota",
   "filter.openSearch": "Buscar o ejecutar un comando",
   "filter.clearSearch": "Borrar la búsqueda",
   "filter.searchPlaceholder": "Buscar nombre de archivo o etiquetas",
   "filter.tagSuggestions": "Sugerencias de etiquetas",
+  "filter.directiveSuggestions": "Condiciones de búsqueda",
   "filter.tagElsewhere": "solo en otros espacios de trabajo",
   "filter.all": "Todo",
   "filter.played": "Reproducido",

@@ -300,11 +300,13 @@ export const zhCN: Catalog = {
 
   // filter
   "filter.searchHint":
-    '搜索文件名和标签。用 tag:旅行 或 tag:4k 精确匹配标签，手动标签与自动标签通用。含空格的值请加引号：tag:"夏日 旅行"。',
+    '搜索文件名和标签。用 tag:旅行 或 tag:4k 精确匹配标签，手动标签与自动标签通用。含空格的值请加引号：tag:"夏日 旅行"。用 note:pexels 查找备注中包含该文字的文件，用 has:note 查找有备注的文件。',
+  "filter.hasNote": "有备注",
   "filter.openSearch": "搜索或运行命令",
   "filter.clearSearch": "清除搜索",
   "filter.searchPlaceholder": "搜索文件名或标签",
   "filter.tagSuggestions": "标签建议",
+  "filter.directiveSuggestions": "搜索条件建议",
   "filter.tagElsewhere": "仅在其他工作区",
   "filter.all": "全部",
   "filter.played": "已播放",

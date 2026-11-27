@@ -22,6 +22,7 @@ import {
   BARE_SEARCH_NAMESPACES,
   tagIdentityKey,
 } from "../../../shared/tags.js";
+import { noteSearchKey } from "../../../shared/noteSearch.js";
 import type {
   FileDetail,
   FileRow,
@@ -258,6 +259,9 @@ function anyOfCondition(group: FreeTextGroup, args: unknown[]): string {
   return `(${parts.join(" OR ")})`;
 }
 
+/** The meta_keys whose file_meta row holds a note (idx_file_meta_note). */
+const NOTED_KEYS = "SELECT meta_key FROM file_meta WHERE note IS NOT NULL";
+
 /**
  * The condition that a file matches one directive token (see
  * parseSearchDirective), or null for free text. A new kind of directive has to
@@ -299,6 +303,15 @@ function directiveCondition(
     case "favorite":
       // NULL without a file_meta row: kept by `-is:fav`, as a non-favorite.
       return "m.favorite = 1";
+    case "note":
+      // The token's alternatives for note_match (db.ts), folded as it folds
+      // the note. Starts from the few files that have a note
+      // (idx_file_meta_note) and reaches them through files.id, as a rare tag
+      // does (see tagCondition).
+      args.push(JSON.stringify(searchTokenTerms(d.value).map(noteSearchKey)));
+      return `f.id IN (SELECT id FROM files WHERE meta_key IN (${NOTED_KEYS} AND note_match(note, ?)))`;
+    case "hasNote":
+      return `f.id IN (SELECT id FROM files WHERE meta_key IN (${NOTED_KEYS}))`;
     case "tag": {
       const ids = resolveSearchTagIds(db, d.value);
       // No tag by that name: no file carries it.

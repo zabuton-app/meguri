@@ -112,6 +112,10 @@ export function directiveLabel(
       // Unlike the favorite control's `♥ Favorites`: both can be on at once,
       // and each chip clears only its own.
       return `${t("favorite.chip")} (${d.prefix}:${d.value})`;
+    case "note":
+      return `${t("media.note")}: "${d.value}"`;
+    case "hasNote":
+      return t("filter.hasNote");
   }
 }
 

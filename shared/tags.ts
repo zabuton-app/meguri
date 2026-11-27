@@ -11,6 +11,14 @@
  * The two forms are joined by a colon for display and for filter values:
  * `beach` for a manual tag, `res:4k` for a namespaced one.
  */
+import {
+  HAS_NOTE_VALUE,
+  HAS_SEARCH_PREFIX,
+  NOTE_SEARCH_PREFIX,
+  isHasNoteToken,
+  noteSearchKey,
+  parseNoteSearchToken,
+} from "./noteSearch.js";
 
 /** `meta_tags.source` written by the metadata classifier. */
 export const AUTO_META_SOURCE = "auto-meta";
@@ -501,7 +509,9 @@ export type SearchDirective =
   | ({ kind: "ext" } & DirectiveText)
   | ({ kind: "numeric"; num: NumericSearch } & DirectiveText)
   | ({ kind: "rating"; rating: RatingSearch } & DirectiveText)
-  | ({ kind: "favorite" } & DirectiveText);
+  | ({ kind: "favorite" } & DirectiveText)
+  | ({ kind: "note" } & DirectiveText)
+  | ({ kind: "hasNote" } & DirectiveText);
 
 interface DirectiveText {
   /** What the chip shows before the colon. */
@@ -522,6 +532,8 @@ const DIRECTIVE_PREFIXES: Record<SearchDirective["kind"], readonly string[]> = {
   numeric: NUMERIC_SEARCH_FIELDS,
   rating: [RATING_SEARCH_PREFIX],
   favorite: [IS_SEARCH_PREFIX],
+  note: [NOTE_SEARCH_PREFIX],
+  hasNote: [HAS_SEARCH_PREFIX],
 };
 
 /** The prefixes, with their colon, a space after the colon is folded for. */
@@ -568,6 +580,21 @@ export function parseSearchDirective(token: string): SearchDirective | null {
       value: FAVORITE_SEARCH_VALUE,
       key,
     };
+  }
+  if (isHasNoteToken(token)) {
+    const key = `${HAS_SEARCH_PREFIX}:${HAS_NOTE_VALUE}`;
+    return {
+      kind: "hasNote",
+      prefix: HAS_SEARCH_PREFIX,
+      value: HAS_NOTE_VALUE,
+      key,
+    };
+  }
+  const note = parseNoteSearchToken(token);
+  if (note !== null) {
+    // Folded as note_match compares, so `note:École` repeats `note:école`.
+    const key = `${NOTE_SEARCH_PREFIX}:${noteSearchKey(note)}`;
+    return { kind: "note", prefix: NOTE_SEARCH_PREFIX, value: note, key };
   }
   const tag = parseTagSearchToken(token);
   if (tag !== null) {
@@ -635,12 +662,15 @@ export function tagSearchToken(name: string, namespace = ""): string {
  * that the directive exists to avoid — the one failure the user cannot see.
  */
 function foldSpacedDirectives(tokens: string[]): string[] {
+  // A directive typed after an abandoned `note: ` is a condition of its own,
+  // not the value: `note: tag:beach` must not search notes for "tag:beach".
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
     const { body } = parseNegatedSearchToken(tokens[i]);
     if (
       SEARCH_DIRECTIVE_PREFIXES.includes(body.toLowerCase()) &&
-      i + 1 < tokens.length
+      i + 1 < tokens.length &&
+      !isSearchDirective(tokens[i + 1])
     ) {
       // A quoted leading dash is marked for a token of its own (LITERAL_DASH);
       // inside a directive's value it is plain text.
@@ -732,6 +762,10 @@ export function joinSearchTokens(tokens: string[]): string {
       // a negation keeps its `-` outside the quotes, where it means "not".
       const value = parseTagSearchToken(body);
       if (value !== null) return not + tagSearchToken(value);
+      const note = parseNoteSearchToken(body);
+      if (note !== null && needsQuoting(note)) {
+        return `${not}${NOTE_SEARCH_PREFIX}:${quote(note)}`;
+      }
       return not + (needsQuoting(body) ? quote(body) : body);
     })
     .join(" ");

@@ -332,11 +332,13 @@ export const en: Catalog = {
 
   // filter
   "filter.searchHint":
-    'Searches file names and tags. Use tag:beach or tag:4k to match a tag exactly, whether you added it or the scan did. Quote values with spaces: tag:"beach house".',
+    'Searches file names and tags. Use tag:beach or tag:4k to match a tag exactly, whether you added it or the scan did. Quote values with spaces: tag:"beach house". note:pexels finds files whose note contains the text, and has:note files that have a note.',
+  "filter.hasNote": "Has a note",
   "filter.openSearch": "Search or run a command",
   "filter.clearSearch": "Clear search",
   "filter.searchPlaceholder": "Search file name or tags",
   "filter.tagSuggestions": "Tag suggestions",
+  "filter.directiveSuggestions": "Search conditions",
   "filter.tagElsewhere": "other workspaces only",
   "filter.all": "All",
   "filter.played": "Played",
