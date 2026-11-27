@@ -90,6 +90,34 @@ describe("createImageLimiter", () => {
     expect(calls.map((c) => c.url)).toEqual(["a", "b"]);
   });
 
+  it("does not ask again for a url the server failed, for the limiter's lifetime", async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response(null, { status: 500 }),
+    ) as unknown as typeof fetch;
+    const limiter = createImageLimiter(2, fetchImpl);
+    await expect(
+      limiter.load("a", new AbortController().signal),
+    ).rejects.toBeDefined();
+    await expect(
+      limiter.load("a", new AbortController().signal),
+    ).rejects.toBeDefined();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again after a 503, which only says the server was busy", async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response(null, { status: 503 }),
+    ) as unknown as typeof fetch;
+    const limiter = createImageLimiter(2, fetchImpl);
+    await expect(
+      limiter.load("a", new AbortController().signal),
+    ).rejects.toBeDefined();
+    await expect(
+      limiter.load("a", new AbortController().signal),
+    ).rejects.toBeDefined();
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects a response that is not OK", async () => {
     const { calls, fetchImpl } = deferredFetch();
     const limiter = createImageLimiter(1, fetchImpl);
@@ -136,5 +164,32 @@ describe("useLimitedImage", () => {
     await flush();
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(result.current).toEqual({ src: undefined, failed: false });
+  });
+
+  it("does not hand back a revoked object URL when the same url comes back", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:one");
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockReturnValue();
+    let settle: (r: Response) => void = () => {};
+    const fetchImpl = vi
+      .fn()
+      .mockImplementationOnce(async () => ok())
+      .mockImplementation(
+        () => new Promise<Response>((res) => (settle = res)),
+      ) as unknown as typeof fetch;
+    const limiter = createImageLimiter(2, fetchImpl);
+    const initialProps: { url: string | null } = { url: "http://x/frame" };
+    const { result, rerender } = renderHook(
+      ({ url }: { url: string | null }) => useLimitedImage(limiter, url),
+      { initialProps },
+    );
+    await waitFor(() => expect(result.current.src).toBe("blob:one"));
+    // Scrolled off, then back on: the first object URL is gone.
+    rerender({ url: null });
+    expect(revoke).toHaveBeenCalledWith("blob:one");
+    rerender({ url: "http://x/frame" });
+    // Loading again: nothing yet, not the revoked one.
+    expect(result.current).toEqual({ src: undefined, failed: false });
+    settle(ok());
+    await waitFor(() => expect(result.current.src).toBe("blob:one"));
   });
 });

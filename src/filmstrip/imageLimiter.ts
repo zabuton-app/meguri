@@ -28,6 +28,11 @@ export function createImageLimiter(
 ): ImageLimiter {
   let active = 0;
   const queue: Waiter[] = [];
+  // Urls the server failed: asked again they would fail again (a waveform
+  // past the request timeout holds a decode slot for a minute each time), so
+  // they are not, for the limiter's lifetime (the view's). A 503 only says
+  // the server was busy and is asked again.
+  const failed = new Set<string>();
 
   const next = () => {
     while (active < max && queue.length > 0) {
@@ -44,6 +49,10 @@ export function createImageLimiter(
           reject(abortError());
           return;
         }
+        if (failed.has(url)) {
+          reject(new Error("failed before"));
+          return;
+        }
         const waiter: Waiter = {
           signal,
           start: () => {
@@ -51,7 +60,10 @@ export function createImageLimiter(
             active++;
             fetchImpl(url, { signal })
               .then((res) => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) {
+                  if (res.status !== 503) failed.add(url);
+                  throw new Error(`HTTP ${res.status}`);
+                }
                 return res.blob();
               })
               .then(resolve, reject)
@@ -106,6 +118,9 @@ export function useLimitedImage(
     return () => {
       ac.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
+      // Forget the result with its object URL: the same url coming back (a
+      // row scrolled off and on) must load again, not reuse a revoked one.
+      setState({ url: null, src: undefined, failed: false });
     };
   }, [limiter, url]);
 
