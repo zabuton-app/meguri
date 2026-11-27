@@ -386,9 +386,9 @@ async function runFfmpegThumb(
   complexFilter = false,
 ): Promise<boolean> {
   const useOffset = typeof offsetSec === "number";
-  const output = useOffset
-    ? path.join(path.dirname(dest), `${randomUUID()}.webp`)
-    : dest;
+  // Write next to dest and rename on success, so a failed or empty run never
+  // touches the thumbnail being shown, and a finished one replaces it whole.
+  const output = path.join(path.dirname(dest), `${randomUUID()}.webp`);
   // scale BEFORE thumbnail: the thumbnail filter keeps its whole scoring
   // window (default 100 frames) in memory, so at full 4K that is ~1.2 GB per
   // process versus ~140 MB once the frames are already 480px. Its histogram
@@ -440,17 +440,14 @@ async function runFfmpegThumb(
   );
   try {
     await execFileAsync(FFMPEG, args, { timeout: 60000, signal });
-    // FFmpeg can exit successfully without writing a frame at a requested
-    // time. Check the new output so an older thumbnail cannot mask a miss.
-    if (kind === "audio" || useOffset) {
-      const st = await fsPromises.stat(output).catch(() => null);
-      if (!st || st.size === 0) {
-        if (st && !useOffset) await fsPromises.unlink(output).catch(() => {});
-        log.warn("ffmpeg thumbnail extraction produced no output");
-        return false;
-      }
+    // FFmpeg can exit successfully without writing a frame (a seek past the
+    // end, a stream with no decodable picture).
+    const st = await fsPromises.stat(output).catch(() => null);
+    if (!st || st.size === 0) {
+      log.warn("ffmpeg thumbnail extraction produced no output");
+      return false;
     }
-    if (useOffset) await fsPromises.rename(output, dest);
+    await fsPromises.rename(output, dest);
     return true;
   } catch (err) {
     // Surface ffmpeg's reason so the next failure isn't silent. Aborted runs are expected
@@ -487,6 +484,6 @@ async function runFfmpegThumb(
     }
     return false;
   } finally {
-    if (useOffset) await fsPromises.unlink(output).catch(() => {});
+    await fsPromises.unlink(output).catch(() => {});
   }
 }
