@@ -7,15 +7,20 @@ import path from "node:path";
 
 // Probes of files named "slow*" hang until the test resolves them or their
 // signal aborts, which, like the real extractMeta, yields no metadata.
+// Files named "bad*" yield no metadata, like a file ffprobe cannot read.
 const media = vi.hoisted(() => ({
   held: new Map<string, (raw: unknown) => void>(),
+  probed: [] as string[],
 }));
 vi.mock("../media.js", () => ({
   extractMeta: (file: string, _kind: string, signal?: AbortSignal) =>
     new Promise((resolve) => {
+      media.probed.push(file);
       const done = (raw: unknown) => resolve({ raw });
       signal?.addEventListener("abort", () => done(null));
-      if (path.basename(file).startsWith("slow")) media.held.set(file, done);
+      const name = path.basename(file);
+      if (name.startsWith("slow")) media.held.set(file, done);
+      else if (name.startsWith("bad")) done(null);
       else done({ streams: [{ codec_type: "audio", codec_name: "ac3" }] });
     }),
 }));
@@ -31,6 +36,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   media.held.clear();
+  media.probed.length = 0;
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -87,5 +93,51 @@ describe("probePlaybackMetadata", () => {
     for (const c of timeouts) c.abort(new DOMException("", "TimeoutError"));
 
     await expect(probe).resolves.toBeNull();
+  });
+
+  it("reuses a finished probe for later requests for the same file", async () => {
+    const file = touch("clip.mkv");
+    const first = await probePlaybackMetadata(file);
+    const again = await probePlaybackMetadata(file);
+
+    expect(again).toEqual(first);
+    expect(media.probed).toEqual([file]);
+  });
+
+  it("reuses a failed probe too", async () => {
+    const file = touch("bad.mkv");
+    await expect(probePlaybackMetadata(file)).resolves.toBeNull();
+    await expect(probePlaybackMetadata(file)).resolves.toBeNull();
+
+    expect(media.probed).toEqual([file]);
+  });
+
+  it("probes again once the file changes", async () => {
+    const file = touch("changed.mkv");
+    await probePlaybackMetadata(file);
+    fs.writeFileSync(file, "more bytes");
+    await probePlaybackMetadata(file);
+
+    expect(media.probed).toEqual([file, file]);
+  });
+
+  it("does not keep a probe that ran past the timeout", async () => {
+    const timeouts: AbortController[] = [];
+    vi.spyOn(AbortSignal, "timeout").mockImplementation(() => {
+      const c = new AbortController();
+      timeouts.push(c);
+      return c.signal;
+    });
+
+    const file = touch("slow-busy.mkv");
+    const probe = probePlaybackMetadata(file);
+    await vi.waitFor(() => expect(media.held.size).toBe(1));
+    for (const c of timeouts) c.abort(new DOMException("", "TimeoutError"));
+    await expect(probe).resolves.toBeNull();
+
+    const retry = probePlaybackMetadata(file);
+    await vi.waitFor(() => expect(media.probed).toEqual([file, file]));
+    media.held.get(file)!({ streams: [] });
+    await expect(retry).resolves.toEqual({ streams: [] });
   });
 });
