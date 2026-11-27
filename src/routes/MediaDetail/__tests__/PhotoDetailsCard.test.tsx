@@ -20,22 +20,12 @@ vi.mock("@/ipc/client", () => ({
 const { PhotoDetailsCard } =
   await import("@/routes/MediaDetail/PhotoDetailsCard");
 
-function renderCard(
-  id = 7,
-  open = false,
-  onOpenChange: (open: boolean) => void = () => {},
-) {
+function renderCard(id = 7) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ui = (fileId: number) => (
     <QueryClientProvider client={qc}>
       <I18nProvider>
-        <PhotoDetailsCard
-          key={fileId}
-          id={fileId}
-          workspaceId="ws"
-          open={open}
-          onOpenChange={onOpenChange}
-        />
+        <PhotoDetailsCard key={fileId} id={fileId} workspaceId="ws" />
       </I18nProvider>
     </QueryClientProvider>
   );
@@ -65,7 +55,8 @@ describe("PhotoDetailsCard", () => {
       },
     });
     renderCard();
-    expect(await screen.findByText("Photo details")).toBeTruthy();
+    expect(await screen.findByText("Canon EOS R5")).toBeTruthy();
+    expect(screen.getByText("Photo details")).toBeTruthy();
     expect(filePhotoDetails).toHaveBeenCalledWith(7, "ws");
     expect(field("Camera")).toBe("Canon EOS R5");
     expect(field("Metering mode")).toBe("Pattern");
@@ -122,31 +113,24 @@ describe("PhotoDetailsCard", () => {
     expect(screen.queryByText("Canon EOS R5")).toBeNull();
   });
 
-  it("stays open on the next photo when it was open (#725)", async () => {
-    filePhotoDetails.mockImplementation((id) =>
-      Promise.resolve({
-        status: "ok",
-        details: { model: id === 7 ? "Canon EOS R5" : "NIKON D850" },
-      }),
-    );
-    const { show, container } = renderCard(7, true);
-    await screen.findByText("Canon EOS R5");
-    show(8);
-    await screen.findByText("NIKON D850");
-    expect(container.querySelector("details")?.open).toBe(true);
-  });
-
-  it("reports opening and closing to its owner", async () => {
+  it("shows its rows as soon as they are read, without a toggle", async () => {
     filePhotoDetails.mockResolvedValue({
       status: "ok",
       details: { model: "Canon EOS R5" },
     });
-    const onOpenChange = vi.fn();
-    const { container } = renderCard(7, false, onOpenChange);
-    await screen.findByText("Canon EOS R5");
-    const details = container.querySelector("details")!;
-    details.open = true;
-    details.dispatchEvent(new Event("toggle"));
-    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    const { container } = renderCard();
+    expect(await screen.findByText("Canon EOS R5")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Photo details" })).toBeTruthy();
+    expect(field("Camera")).toBe("Canon EOS R5");
+    expect(container.querySelector("details")).toBeNull();
+  });
+
+  it("shows a placeholder while the photo is being read", async () => {
+    filePhotoDetails.mockReturnValue(new Promise(() => {}));
+    const { container } = renderCard();
+    expect(
+      await screen.findByRole("heading", { name: "Photo details" }),
+    ).toBeTruthy();
+    expect(container.querySelector('[data-slot="skeleton"]')).not.toBeNull();
   });
 });
