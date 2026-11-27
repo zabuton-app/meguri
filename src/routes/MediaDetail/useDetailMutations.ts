@@ -18,6 +18,7 @@ import {
   invalidatePlayedSearches,
   invalidateCollectionSearches,
   invalidateTagSearches,
+  patchFileDetailInCache,
   patchFileRowInCaches,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
@@ -147,6 +148,11 @@ export function useDetailMutations({
             (tag) => !LIST_HIDDEN_SOURCES.includes(tag.source),
           ),
         });
+        // Tags belong to the content, the generated ones too, so the
+        // copies' details take the fresh set as it is.
+        patchFileDetailInCache(qc, target.wsId, target.fileId, {
+          tags: fresh.tags,
+        });
       }
     } catch {
       // The tag edit itself succeeded; if the refetch fails (transient IPC
@@ -268,13 +274,13 @@ export function useDetailMutations({
   const patchRowBookmarks = (target: Target) => {
     const detail = qc.getQueryData<FileDetail | null>(detailKeyOf(target));
     if (!detail) return;
-    patchFileRowInCaches(
-      qc,
-      target.wsId,
-      target.fileId,
-      { bookmarkSecs: detail.bookmarks.map((b) => b.sec) },
-      detail.contentHash,
-    );
+    patchFileRowInCaches(qc, target.wsId, target.fileId, {
+      bookmarkSecs: detail.bookmarks.map((b) => b.sec),
+    });
+    // The copies' details: the target's own already holds the change.
+    patchFileDetailInCache(qc, target.wsId, target.fileId, {
+      bookmarks: detail.bookmarks,
+    });
   };
 
   const addBookmark = useMutation({
