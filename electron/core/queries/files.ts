@@ -849,7 +849,7 @@ interface FileDetailRow extends FileRow {
 export function fileDetail(db: DB, fileId: number): FileDetail | null {
   const r = db
     .prepare(
-      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.codec, f.fps, f.mtime, f.meta, f.meta_key AS metaKey
+      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.mtime, f.meta, f.meta_key AS metaKey
        ${FILE_FROM} WHERE f.id = ? AND f.deleted_at IS NULL`,
     )
     .get(fileId) as FileDetailRow | undefined;

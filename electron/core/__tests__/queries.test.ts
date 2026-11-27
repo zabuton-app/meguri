@@ -824,6 +824,16 @@ describe("filmstrip row details", () => {
     db.close();
   });
 
+  it("fileDetail carries codec and fps, selected once with the row's columns", () => {
+    const { db, rootId } = newDb();
+    const id = insertFile(db, rootId, { relPath: "a.mp4", codec: "hevc" });
+    db.prepare("UPDATE files SET fps = 23.976 WHERE id = ?").run(id);
+    const d = fileDetail(db, id);
+    expect(d?.codec).toBe("hevc");
+    expect(d?.fps).toBe(23.976);
+    db.close();
+  });
+
   it("attachBookmarkSecs attaches each file's bookmark seconds in order", () => {
     const { db, rootId } = newDb();
     const a = insertFile(db, rootId, { relPath: "a.mp4", contentHash: "ha" });
