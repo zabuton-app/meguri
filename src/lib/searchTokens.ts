@@ -1,6 +1,7 @@
 import {
   AUTO_META_NAMESPACES,
   CLOSED_TAG_VALUES,
+  SEARCH_NOT,
   TAG_SEARCH_PREFIX,
   hasOpenQuote,
   isSearchDirective,
@@ -9,6 +10,7 @@ import {
   tagIdentityKey,
   splitSearchTokens,
 } from "@shared/tags";
+import { HAS_NOTE_VALUE, HAS_SEARCH_PREFIX } from "@shared/noteSearch";
 import { ALL_ID, COLLECTION_ID_PREFIX } from "@shared/workspaceIds";
 import type { TagSummary } from "@/ipc/types";
 
@@ -61,6 +63,27 @@ export function pendingDirective(draft: string): PendingDirective | null {
   const head = `${TAG_SEARCH_PREFIX}:`;
   if (!tail.toLowerCase().startsWith(head)) return null;
   return { value: tail.slice(head.length) };
+}
+
+/** Directives with one fixed value, offered whole once their prefix is typed. */
+const FIXED_DIRECTIVES = [`${HAS_SEARCH_PREFIX}:${HAS_NOTE_VALUE}`];
+
+/**
+ * The fixed-value directives the end of the draft begins, from its colon on
+ * (`has:` and `has:n` offer `has:note`), negated when it is. Nothing while a
+ * quoted phrase is open or once a space has closed the token.
+ */
+export function fixedDirectiveSuggestions(draft: string): string[] {
+  if (/\s$/.test(draft) || hasOpenQuote(draft)) return [];
+  const tail = splitSearchTokens(draft).at(-1);
+  if (tail === undefined) return [];
+  const { negated, body } = parseNegatedSearchToken(tail);
+  const typed = body.toLowerCase();
+  if (!typed.includes(":")) return [];
+  const not = negated ? SEARCH_NOT : "";
+  return FIXED_DIRECTIVES.filter((d) => d.startsWith(typed)).map(
+    (d) => not + d,
+  );
 }
 
 /**

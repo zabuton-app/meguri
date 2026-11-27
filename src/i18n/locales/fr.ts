@@ -353,6 +353,7 @@ export const fr: Catalog = {
   "filter.clearSearch": "Effacer la recherche",
   "filter.searchPlaceholder": "Rechercher un nom de fichier ou des tags",
   "filter.tagSuggestions": "Suggestions de tags",
+  "filter.directiveSuggestions": "Conditions de recherche",
   "filter.tagElsewhere": "autres espaces de travail seulement",
   "filter.all": "Tout",
   "filter.played": "Lu",

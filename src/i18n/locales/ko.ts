@@ -318,6 +318,7 @@ export const ko: Catalog = {
   "filter.clearSearch": "검색 지우기",
   "filter.searchPlaceholder": "파일 이름·태그 검색",
   "filter.tagSuggestions": "태그 제안",
+  "filter.directiveSuggestions": "검색 조건 제안",
   "filter.tagElsewhere": "다른 워크스페이스에만 있음",
   "filter.all": "전체",
   "filter.played": "시청함",

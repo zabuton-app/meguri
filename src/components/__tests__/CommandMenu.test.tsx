@@ -873,6 +873,19 @@ describe("search field", () => {
     expect(props.onSearch).not.toHaveBeenCalled();
   });
 
+  it("completes has:note after has:, first, and chips the pick in the field", async () => {
+    const { props } = renderMenu();
+    type("sunset has:");
+    expect(texts()[0]).toBe("has:noteHas a note");
+    expect(selected()[0].textContent).toBe("has:noteHas a note");
+    fireEvent.keyDown(field(), { key: "Enter" });
+    expect(chips()).toEqual(["has:note"]);
+    expect(field().value).toBe("sunset ");
+    // The menu stays open, to go on typing.
+    expect(props.onOpenChange).not.toHaveBeenCalled();
+    expect(props.onSearch).not.toHaveBeenCalled();
+  });
+
   it("offers an ordinary word's search first, then the tags it names", async () => {
     renderMenu({ filter: { q: "tag:sea" } });
     type("park bea");

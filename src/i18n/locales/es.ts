@@ -352,6 +352,7 @@ export const es: Catalog = {
   "filter.clearSearch": "Borrar la búsqueda",
   "filter.searchPlaceholder": "Buscar nombre de archivo o etiquetas",
   "filter.tagSuggestions": "Sugerencias de etiquetas",
+  "filter.directiveSuggestions": "Condiciones de búsqueda",
   "filter.tagElsewhere": "solo en otros espacios de trabajo",
   "filter.all": "Todo",
   "filter.played": "Reproducido",

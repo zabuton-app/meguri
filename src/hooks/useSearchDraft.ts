@@ -98,12 +98,16 @@ export function useSearchDraft(initial: string) {
     if (keepHighlight && next.length) aim(Math.min(index, next.length - 1));
   };
 
-  /** Swap the word or directive at the end of the text for a tag's chip. */
-  const accept = (tag: TagSummary) => {
+  /** Swap the word or directive at the end of the text for `token`'s chip. */
+  const acceptToken = (token: string) => {
     const tokens = splitSearchTokens(text);
-    tokens[tokens.length - 1] = tagSearchToken(tag.name, tag.namespace);
+    tokens[tokens.length - 1] = token;
     apply(`${joinSearchTokens(tokens)} `);
   };
+
+  /** Swap the word or directive at the end of the text for a tag's chip. */
+  const accept = (tag: TagSummary) =>
+    acceptToken(tagSearchToken(tag.name, tag.namespace));
 
   /** Swap the word for a directive on `ns`, left open for its values. */
   const startNamespace = (ns: string) => {
@@ -169,6 +173,7 @@ export function useSearchDraft(initial: string) {
     aim,
     removeChip,
     accept,
+    acceptToken,
     startNamespace,
     onKey,
   };

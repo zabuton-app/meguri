@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  fixedDirectiveSuggestions,
   MAX_TAG_SUGGESTIONS,
   pendingDirective,
   plainWordAtCaret,
@@ -46,6 +47,23 @@ describe("pendingDirective", () => {
     expect(pendingDirective("beach")).toBeNull();
     expect(pendingDirective("")).toBeNull();
     expect(pendingDirective("todo:later")).toBeNull();
+  });
+});
+
+describe("fixedDirectiveSuggestions", () => {
+  it("offers has:note once has: is typed, in any case and negated", () => {
+    expect(fixedDirectiveSuggestions("has:")).toEqual(["has:note"]);
+    expect(fixedDirectiveSuggestions("sunset HAS:N")).toEqual(["has:note"]);
+    expect(fixedDirectiveSuggestions("has:note")).toEqual(["has:note"]);
+    expect(fixedDirectiveSuggestions("-has:")).toEqual(["-has:note"]);
+  });
+
+  it("offers nothing before the colon, for another value, or once closed", () => {
+    expect(fixedDirectiveSuggestions("has")).toEqual([]);
+    expect(fixedDirectiveSuggestions("has:tags")).toEqual([]);
+    expect(fixedDirectiveSuggestions("tag:")).toEqual([]);
+    expect(fixedDirectiveSuggestions("has: ")).toEqual([]);
+    expect(fixedDirectiveSuggestions("")).toEqual([]);
   });
 });
 

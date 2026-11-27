@@ -322,6 +322,7 @@ export const ja = {
   "filter.clearSearch": "検索をクリア",
   "filter.searchPlaceholder": "ファイル名・タグを検索",
   "filter.tagSuggestions": "タグの候補",
+  "filter.directiveSuggestions": "検索条件の候補",
   "filter.tagElsewhere": "他のワークスペースのみ",
   "filter.all": "すべて",
   "filter.played": "視聴済み",
