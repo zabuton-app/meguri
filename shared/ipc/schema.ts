@@ -119,6 +119,8 @@ export const FileDetailSchema = FileRowSchema.extend({
   fps: z.number().nullable(),
   mtime: z.number().nullable(),
   meta: z.unknown(),
+  /** A photo's EXIF (shared/photoInfo.ts), null until read and for video and audio. */
+  exif: z.unknown(),
   tags: z.array(TagInfoSchema),
   playHistory: z.array(PlayEntrySchema),
   bookmarks: z.array(SceneBookmarkSchema),

@@ -10,6 +10,13 @@ import {
   type AudioInfo,
 } from "@shared/audioInfo";
 import { tagValueLabel } from "@/lib/tagLabel";
+import {
+  cameraName,
+  lensName,
+  parsePhotoExif,
+  shutterLabel,
+  type PhotoExif,
+} from "@shared/photoInfo";
 
 interface Props {
   detail: FileDetail;
@@ -23,8 +30,9 @@ interface Props {
 
 /**
  * Metadata badges shown under the player (workspace, kind, resolution, size,
- * duration, codec, fps), and for audio what its stored probe output says
- * (#468): format, channels, and the BPM, key and genre written in the file.
+ * duration, codec, fps), for audio what its stored probe output says (#468):
+ * format, channels, and the BPM, key and genre written in the file, and for a
+ * photo what its EXIF says (#701): camera, lens, exposure and focal length.
  */
 export function MetaChips({
   detail,
@@ -67,6 +75,7 @@ export function MetaChips({
         />
       )}
       {detail.kind === "audio" && <AudioChips meta={detail.meta} t={t} />}
+      {detail.kind === "image" && <PhotoChips exif={detail.exif} t={t} />}
     </div>
   );
 }
@@ -116,6 +125,44 @@ function AudioChips({ meta, t }: { meta: unknown; t: TFunc }) {
       {info.genres.length > 0 && (
         <Chip label={t("media.metaGenre")} value={info.genres.join(", ")} />
       )}
+    </>
+  );
+}
+
+/** `f/4 · 1/125s · ISO 200`, with only what the photo gives. */
+function exposureLabel(exif: PhotoExif): string | null {
+  const parts = [
+    exif.fNumber !== undefined ? `f/${plain(exif.fNumber)}` : null,
+    exif.exposureTime !== undefined ? shutterLabel(exif.exposureTime) : null,
+    exif.iso !== undefined ? `ISO ${exif.iso}` : null,
+  ].filter((p) => p !== null);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/** `50 mm`, or `6.8 mm (24 mm equiv.)` when the 35 mm figure differs. */
+function focalLabel(exif: PhotoExif, t: TFunc): string | null {
+  const { focalLength: mm, focalLength35mm: equiv } = exif;
+  if (mm === undefined) return null;
+  const own = `${plain(mm)} mm`;
+  return equiv !== undefined && Math.round(equiv) !== Math.round(mm)
+    ? `${own} (${t("media.metaFocalEquiv", { mm: plain(equiv) })})`
+    : own;
+}
+
+/** What a photo's EXIF says; a value it does not give is left out. */
+function PhotoChips({ exif: stored, t }: { exif: unknown; t: TFunc }) {
+  const exif = parsePhotoExif(stored);
+  if (!exif) return null;
+  const camera = cameraName(exif);
+  const lens = lensName(exif);
+  const exposure = exposureLabel(exif);
+  const focal = focalLabel(exif, t);
+  return (
+    <>
+      {camera && <Chip label={t("media.metaCamera")} value={camera} />}
+      {lens && <Chip label={t("media.metaLens")} value={lens} />}
+      {exposure && <Chip label={t("media.metaExposure")} value={exposure} />}
+      {focal && <Chip label={t("media.metaFocalLength")} value={focal} />}
     </>
   );
 }

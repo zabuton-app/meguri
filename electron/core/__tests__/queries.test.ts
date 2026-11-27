@@ -813,6 +813,21 @@ describe("attachTags", () => {
   });
 });
 
+describe("fileDetail exif (#701)", () => {
+  it("returns a photo's stored EXIF parsed, and null when unread", () => {
+    const { db, rootId } = newDb();
+    const read = insertFile(db, rootId, { relPath: "a.jpg", kind: "image" });
+    const unread = insertFile(db, rootId, { relPath: "b.jpg", kind: "image" });
+    db.prepare("UPDATE files SET exif = ? WHERE id = ?").run(
+      JSON.stringify({ model: "X-T4", iso: 400 }),
+      read,
+    );
+    expect(fileDetail(db, read)?.exif).toEqual({ model: "X-T4", iso: 400 });
+    expect(fileDetail(db, unread)?.exif).toBeNull();
+    db.close();
+  });
+});
+
 describe("filmstrip row details", () => {
   it("search rows carry codec and fps", () => {
     const { db, rootId } = newDb();

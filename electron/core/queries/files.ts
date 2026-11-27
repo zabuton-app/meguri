@@ -6,6 +6,7 @@ import { attachBookmarkSecs, listBookmarksByMetaKey } from "./bookmarks.js";
 import { thumbOffsetByKey } from "./meta.js";
 import { resolveSortDir } from "../../../shared/sortDir.js";
 import { TEXT_SUBTITLE_CODECS } from "../../../shared/embeddedSubtitles.js";
+import { parsePhotoExif } from "../../../shared/photoInfo.js";
 import {
   FOLDER_FILE_FROM,
   folderCondition,
@@ -899,13 +900,14 @@ interface FileDetailRow extends FileRow {
   fps: number | null;
   mtime: number;
   meta: string | null;
+  exif: string | null;
   metaKey: string;
 }
 
 export function fileDetail(db: DB, fileId: number): FileDetail | null {
   const r = db
     .prepare(
-      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.mtime, f.meta, f.meta_key AS metaKey
+      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.mtime, f.meta, f.exif, f.meta_key AS metaKey
        ${FILE_FROM} WHERE f.id = ? AND f.deleted_at IS NULL`,
     )
     .get(fileId) as FileDetailRow | undefined;
@@ -929,6 +931,7 @@ export function fileDetail(db: DB, fileId: number): FileDetail | null {
     fps: r.fps,
     mtime: r.mtime,
     meta,
+    exif: parsePhotoExif(r.exif),
     tags: fileTags(db, fileId),
     playHistory,
     bookmarks,
