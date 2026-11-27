@@ -65,6 +65,7 @@ import { Scenes } from "./Scenes";
 import { SceneBookmarks } from "./SceneBookmarks";
 import { DownloadOriginCard } from "./DownloadOriginCard";
 import { MetaChips } from "./MetaChips";
+import { PhotoDetailsCard } from "./PhotoDetailsCard";
 import { usePrevNextNavigation } from "./usePrevNextNavigation";
 import {
   dropFromWatchLaterCache,
@@ -616,7 +617,18 @@ export default function MediaDetail() {
               workspacePath={owningWorkspace?.path ?? null}
               total={total}
               t={t}
+              lang={lang}
             />
+
+            {d.kind === "image" && (
+              <PhotoDetailsCard
+                // Its own prefix: a key shared with DownloadOriginCard, its
+                // sibling, makes React draw one of them twice.
+                key={`photo-details:${wsId}:${fileId}`}
+                id={fileId}
+                workspaceId={wsId}
+              />
+            )}
 
             <DownloadOriginCard
               key={`${wsId}:${fileId}`}

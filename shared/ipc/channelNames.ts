@@ -65,6 +65,7 @@ export const INVOKE_CHANNELS = [
   "timeline_counts",
   "file_get",
   "file_download_origin",
+  "file_photo_details",
   "file_subtitles",
   "file_set_rating",
   "file_set_favorite",

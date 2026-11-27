@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { formatDuration, formatSize } from "@/lib/format";
 import type { FileDetail } from "@/ipc/types";
-import type { TFunc } from "@/i18n/I18nProvider";
+import type { Lang, TFunc } from "@/i18n/I18nProvider";
+import { formatDateTime } from "@/lib/dates";
 import { hasTimeline, kindLabel } from "@/lib/mediaKind";
 import {
   audioInfo,
@@ -26,6 +27,7 @@ interface Props {
   /** Total duration in seconds (falls back to the native value when DB duration is empty). */
   total: number | null;
   t: TFunc;
+  lang: Lang;
 }
 
 /**
@@ -33,6 +35,7 @@ interface Props {
  * duration, codec, fps), for audio what its stored probe output says (#468):
  * format, channels, and the BPM, key and genre written in the file, and for a
  * photo what its EXIF says (#701): camera, lens, exposure and focal length.
+ * The capture date shows for any kind that has one (#725).
  */
 export function MetaChips({
   detail,
@@ -41,6 +44,7 @@ export function MetaChips({
   workspacePath,
   total,
   t,
+  lang,
 }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -50,6 +54,12 @@ export function MetaChips({
         title={workspacePath || workspaceLabel || wsId}
       />
       <Chip label={t("media.metaKind")} value={kindLabel(t, detail.kind)} />
+      {detail.capturedAt !== null && (
+        <Chip
+          label={t("media.metaCaptured")}
+          value={formatDateTime(new Date(detail.capturedAt * 1000), lang)}
+        />
+      )}
       <Chip
         label={t("media.metaResolution")}
         value={

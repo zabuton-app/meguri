@@ -3,6 +3,7 @@ import {
   cameraName,
   lensName,
   parsePhotoExif,
+  photoDetailRows,
   shutterLabel,
 } from "../../../shared/photoInfo.js";
 
@@ -66,5 +67,88 @@ describe("parsePhotoExif", () => {
     expect(parsePhotoExif(null)).toBeNull();
     expect(parsePhotoExif("{")).toBeNull();
     expect(parsePhotoExif("[1]")).toBeNull();
+  });
+});
+
+describe("photoDetailRows (#725)", () => {
+  const taken = (u: number) => `T${u}`;
+
+  it("lists the rows a photo gives, in order", () => {
+    expect(
+      photoDetailRows(
+        {
+          takenAt: 100,
+          takenOffset: "+09:00",
+          make: "Canon",
+          model: "Canon EOS R5",
+          fNumber: 4,
+          exposureTime: 0.008,
+          iso: 200,
+          exposureBias: -0.7,
+          focalLength: 6.765,
+          focalLength35mm: 24,
+          meteringMode: 5,
+          flashFired: false,
+          whiteBalance: 1,
+          exposureProgram: 3,
+          width: 8192,
+          height: 5464,
+          software: "LR",
+        },
+        taken,
+      ),
+    ).toEqual([
+      { key: "taken", value: "T100 (+09:00)" },
+      { key: "camera", value: "Canon EOS R5" },
+      { key: "aperture", value: "f/4" },
+      { key: "exposureTime", value: "1/125s" },
+      { key: "iso", value: "200" },
+      { key: "exposureBias", value: "-0.7 EV" },
+      { key: "focalLength", value: "6.8 mm", equiv35: "24" },
+      { key: "meteringMode", valueKey: "metering.pattern" },
+      { key: "flash", valueKey: "flash.notFired" },
+      { key: "whiteBalance", valueKey: "whiteBalance.manual" },
+      { key: "exposureProgram", valueKey: "program.aperture" },
+      { key: "size", value: "8192×5464" },
+      { key: "software", value: "LR" },
+    ]);
+  });
+
+  it("gives the lens, artist and copyright as written", () => {
+    expect(
+      photoDetailRows(
+        { lens: "RF50mm F1.8 STM", artist: "Jane", copyright: "(c) Jane" },
+        taken,
+      ),
+    ).toEqual([
+      { key: "lens", value: "RF50mm F1.8 STM" },
+      { key: "artist", value: "Jane" },
+      { key: "copyright", value: "(c) Jane" },
+    ]);
+  });
+
+  it("shows an exposure bias of zero, and a positive one with its sign", () => {
+    expect(photoDetailRows({ exposureBias: 0 }, taken)).toEqual([
+      { key: "exposureBias", value: "0 EV" },
+    ]);
+    expect(photoDetailRows({ exposureBias: 1 / 3 }, taken)).toEqual([
+      { key: "exposureBias", value: "+0.3 EV" },
+    ]);
+  });
+
+  it("leaves out unknown or out-of-range enum values", () => {
+    expect(
+      photoDetailRows({ meteringMode: 0, exposureProgram: 0 }, taken),
+    ).toEqual([]);
+    expect(
+      photoDetailRows(
+        { meteringMode: 255, exposureProgram: 42, whiteBalance: 7 },
+        taken,
+      ),
+    ).toEqual([]);
+  });
+
+  it("is empty for no details", () => {
+    expect(photoDetailRows({}, taken)).toEqual([]);
   });
 });

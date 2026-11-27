@@ -4,7 +4,11 @@
 import { DOMParser, onErrorStopParsing } from "@xmldom/xmldom";
 import path from "node:path";
 import ExifReader from "exifreader";
-import type { PhotoExif } from "../../shared/photoInfo.js";
+import type {
+  PhotoDetails,
+  PhotoDetailsResult,
+  PhotoExif,
+} from "../../shared/photoInfo.js";
 
 export interface ExifResult {
   /**
@@ -22,35 +26,121 @@ interface Tag {
 }
 type Group = Record<string, Tag | undefined> | undefined;
 
-/** Never throws. */
-export async function readExif(file: string): Promise<ExifResult> {
-  let tags: { exif?: Group; xmp?: Group };
+type Tags = { exif?: Group; xmp?: Group };
+
+/**
+ * The file's EXIF and XMP; "unreadable" when the file could not be read at
+ * all (an fs error: ENOENT, EACCES, EIO), "empty" when it was read and had
+ * nothing to give (MetadataMissingError, UnsupportedFormatError, a broken
+ * file). Never throws.
+ */
+async function loadTags(file: string): Promise<Tags | "unreadable" | "empty"> {
   try {
-    // Read through the loose Tag shape: the declared per-tag types differ
-    // between EXIF and XMP, and only the value or description is wanted.
     const common = {
       expanded: true as const,
       // Passed in rather than left to ExifReader's own lookup, which finds
       // the package only when ExifReader is loaded as CommonJS.
       domParser: new DOMParser({ onError: onErrorStopParsing }),
     };
-    tags = (await (hasFixedWindow(file)
+    // Read through the loose Tag shape: the declared per-tag types differ
+    // between EXIF and XMP, and only the value or description is wanted.
+    return (await (hasFixedWindow(file)
       ? ExifReader.load(file, { ...common, length: FIXED_WINDOW })
       : ExifReader.load(file, {
           ...common,
           length: "auto",
           includeOffsets: true,
-        }))) as { exif?: Group; xmp?: Group };
+        }))) as Tags;
   } catch (err) {
-    // An fs error (ENOENT, EACCES, EIO) means the file was not read; anything
-    // else (MetadataMissingError, UnsupportedFormatError, a broken file) means
-    // it was, and has nothing to give.
     const code = (err as NodeJS.ErrnoException | null)?.code;
-    return typeof code === "string"
-      ? { exif: null, capturedAt: null }
-      : { exif: {}, capturedAt: null };
+    return typeof code === "string" ? "unreadable" : "empty";
   }
+}
+
+/** Never throws. */
+export async function readExif(file: string): Promise<ExifResult> {
+  const tags = await loadTags(file);
+  if (tags === "unreadable") return { exif: null, capturedAt: null };
+  if (tags === "empty") return { exif: {}, capturedAt: null };
   return { exif: photoExif(tags.exif), capturedAt: capturedAt(tags) };
+}
+
+/**
+ * What the detail view lists about a photo (#725), as raw values: the
+ * renderer words and translates them. GPS is left out until #704 settles how
+ * a photo's position is shown. Never throws.
+ */
+export async function readPhotoDetails(
+  file: string,
+): Promise<PhotoDetailsResult> {
+  const tags = await loadTags(file);
+  if (tags === "unreadable") return { status: "unreadable" };
+  if (tags === "empty") return { status: "ok", details: {} };
+  const { exif } = tags;
+  const out: PhotoDetails = {};
+  const set = <K extends keyof PhotoDetails>(key: K, v: PhotoDetails[K]) => {
+    if (v !== undefined) out[key] = v;
+  };
+  const taken = takenTime(tags);
+  if (taken) {
+    set("takenAt", taken.at);
+    set("takenOffset", taken.offset);
+  }
+  const camera = photoExif(exif);
+  set("make", camera.make);
+  set("model", camera.model);
+  set("lens", camera.lens);
+  set("fNumber", camera.fNumber);
+  set("exposureTime", camera.exposureTime);
+  set("iso", camera.iso);
+  set("exposureBias", signedNum(exif?.ExposureBiasValue));
+  set("focalLength", camera.focalLength);
+  set("focalLength35mm", camera.focalLength35mm);
+  set("meteringMode", int(exif?.MeteringMode));
+  const flash = int(exif?.Flash);
+  // Bit 0 of the Flash tag says whether it fired; the rest is its mode.
+  if (flash !== undefined) set("flashFired", (flash & 1) === 1);
+  set("whiteBalance", int(exif?.WhiteBalance));
+  set("exposureProgram", int(exif?.ExposureProgram));
+  set("width", num(exif?.PixelXDimension));
+  set("height", num(exif?.PixelYDimension));
+  set("software", text(exif?.Software));
+  set("artist", text(exif?.Artist));
+  set("copyright", text(exif?.Copyright));
+  return { status: "ok", details: out };
+}
+
+/**
+ * The capture time as the camera's clock showed it (read as local time, so
+ * that formatting it gives that wall time back) and the offset recorded with
+ * it, from the same sources as capturedAt.
+ */
+function takenTime(tags: Tags): { at: number; offset?: string } | null {
+  const { exif, xmp } = tags;
+  const candidates: [string | undefined, string | undefined][] = [
+    [
+      text(exif?.DateTimeOriginal),
+      text(exif?.OffsetTimeOriginal) ?? text(exif?.OffsetTime),
+    ],
+    [
+      text(exif?.DateTimeDigitized),
+      text(exif?.OffsetTimeDigitized) ?? text(exif?.OffsetTime),
+    ],
+    [text(xmp?.DateTimeOriginal), undefined],
+    [text(xmp?.CreateDate), undefined],
+  ];
+  for (const [date, given] of candidates) {
+    if (!date) continue;
+    // An XMP date carries its offset; take it off to keep the wall time.
+    const m = /^(.*?)(Z|[+-]\d{2}:?\d{2})$/.exec(date.trim());
+    const wall = m ? m[1] : date;
+    const at = exifDateToUnix(wall);
+    if (at !== null) {
+      const offset = offsetLabel(given?.trim() || m?.[2]);
+      return offset ? { at, offset } : { at };
+    }
+  }
+  return null;
 }
 
 /**
@@ -96,6 +186,25 @@ function num(tag: Tag | undefined): number | undefined {
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+/** Like num(), but zero and negative values count (an exposure bias). */
+function signedNum(tag: Tag | undefined): number | undefined {
+  const v = tag?.value;
+  const n: unknown = Array.isArray(v)
+    ? v.length === 2 && typeof v[0] === "number" && typeof v[1] === "number"
+      ? v[1] === 0
+        ? NaN
+        : v[0] / v[1]
+      : v[0]
+    : v;
+  return typeof n === "number" && Number.isFinite(n) ? n : undefined;
+}
+
+/** An enum's number, as written (0 included: it can mean "auto"). */
+function int(tag: Tag | undefined): number | undefined {
+  const n = firstOf(tag?.value);
+  return typeof n === "number" && Number.isInteger(n) ? n : undefined;
+}
+
 function photoExif(exif: Group): PhotoExif {
   const out: PhotoExif = {};
   if (!exif) return out;
@@ -139,6 +248,14 @@ function capturedAt(tags: { exif?: Group; xmp?: Group }): number | null {
     if (t !== null) return t;
   }
   return null;
+}
+
+/** `+09:00` for an offset as EXIF or XMP writes it (`Z` is `+00:00`), or
+ *  undefined for anything else: a broken tag is not shown. */
+function offsetLabel(raw: string | undefined): string | undefined {
+  const m = raw ? OFFSET.exec(raw) : null;
+  if (!m) return undefined;
+  return m[1] ? `${m[1]}${m[2]}:${m[3]}` : "+00:00";
 }
 
 const DATE =

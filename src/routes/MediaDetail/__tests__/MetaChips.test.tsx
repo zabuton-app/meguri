@@ -32,6 +32,7 @@ function renderChips(d: FileDetail) {
       workspacePath="/music"
       total={120}
       t={t as never}
+      lang="en"
     />,
   );
 }
@@ -147,5 +148,22 @@ describe("MetaChips for photos (#701)", () => {
     expect(chip("media.metaExposure")).toBeNull();
     renderChips(detail("video", null, exif));
     expect(chip("media.metaCamera")).toBeNull();
+  });
+});
+
+describe("MetaChips capture date (#725)", () => {
+  it("shows when the file was captured, in the app's language", () => {
+    renderChips({
+      ...detail("video", null),
+      capturedAt: 1_563_687_300,
+    });
+    expect(chip("media.metaCaptured")).toBe(
+      new Date(1_563_687_300 * 1000).toLocaleString("en"),
+    );
+  });
+
+  it("shows no capture date when the file has none", () => {
+    renderChips({ ...detail("image", null), capturedAt: null });
+    expect(chip("media.metaCaptured")).toBeNull();
   });
 });

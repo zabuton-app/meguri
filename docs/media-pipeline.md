@@ -194,6 +194,14 @@ clock showed and the day the timeline buckets by. A file that cannot be opened
 leaves `exif` NULL for a later scan; one that opens but has no EXIF stores
 `'{}'` (see [Data Model](data-model.md#schema)).
 
+The detail view's photo details (#725: exposure bias, metering, flash, white
+balance, exposure program, size, software, author and copyright, besides what
+`files.exif` keeps) are not stored. `file_photo_details` reads them with the
+same loader when the view opens (`readPhotoDetails()`) and returns raw values,
+which the renderer words and translates (`photoDetailRows()` in
+`shared/photoInfo.ts`), so ExifReader's English descriptions never reach the
+screen. GPS is not read until #704 settles how a position is shown.
+
 For audio the thumbnail is the file's embedded cover art (ID3v2 `APIC`, MP4
 `covr`, FLAC `METADATA_BLOCK_PICTURE`). `coverArtStreamIndex()` finds it in the
 already-probed ffprobe JSON via each stream's `disposition.attached_pic` flag,

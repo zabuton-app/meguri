@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import zlib from "node:zlib";
-import { exifDateToUnix, readExif } from "../exif.js";
+import { exifDateToUnix, readExif, readPhotoDetails } from "../exif.js";
 
 const fx = (name: string) =>
   fileURLToPath(new URL(`./fixtures/exif/${name}`, import.meta.url));
@@ -127,6 +127,79 @@ function chunk(type: string, data: Buffer): Buffer {
   crc.writeUInt32BE(zlib.crc32(Buffer.concat([head.subarray(4), data])), 0);
   return Buffer.concat([head, data, crc]);
 }
+
+describe("readPhotoDetails (#725)", () => {
+  it("reads a photo's details without its GPS", async () => {
+    expect(await readPhotoDetails(fx("full.jpg"))).toEqual({
+      status: "ok",
+      details: {
+        takenAt: new Date(2019, 6, 21, 14, 35, 0).getTime() / 1000,
+        takenOffset: "+09:00",
+        make: "Canon",
+        model: "Canon EOS R5",
+        lens: "RF24-105mm F4 L IS USM",
+        fNumber: 4,
+        exposureTime: 0.008,
+        iso: 200,
+        exposureBias: -0.7,
+        focalLength: 50,
+        focalLength35mm: 50,
+        meteringMode: 5,
+        flashFired: false,
+        whiteBalance: 0,
+        exposureProgram: 3,
+        width: 8192,
+        height: 5464,
+        software: "Adobe Lightroom 7.0",
+        artist: "Jane Doe",
+        copyright: "(c) Jane Doe",
+      },
+    });
+  });
+
+  it("takes the date from XMP when EXIF has none", async () => {
+    const r = await readPhotoDetails(fx("xmp-only.png"));
+    expect(r).toEqual({
+      status: "ok",
+      details: {
+        takenAt: new Date(2020, 0, 2, 3, 4, 5).getTime() / 1000,
+        takenOffset: "+01:00",
+      },
+    });
+  });
+
+  it("names a UTC date's offset +00:00", async () => {
+    const r = await readPhotoDetails(fx("xmp-utc.png"));
+    expect(r).toEqual({
+      status: "ok",
+      details: {
+        takenAt: new Date(2020, 0, 2, 3, 4, 5).getTime() / 1000,
+        takenOffset: "+00:00",
+      },
+    });
+  });
+
+  it("leaves out an offset tag that is not an offset", async () => {
+    const r = await readPhotoDetails(fx("bad-offset.jpg"));
+    expect(r).toEqual({
+      status: "ok",
+      details: { takenAt: new Date(2019, 6, 21, 14, 35, 0).getTime() / 1000 },
+    });
+  });
+
+  it("reads an image without EXIF as ok with no details", async () => {
+    expect(await readPhotoDetails(fx("no-exif.png"))).toEqual({
+      status: "ok",
+      details: {},
+    });
+  });
+
+  it("reports a file it cannot read", async () => {
+    expect(await readPhotoDetails(path.join(tmp, "missing.jpg"))).toEqual({
+      status: "unreadable",
+    });
+  });
+});
 
 describe("exifDateToUnix", () => {
   it.each([
