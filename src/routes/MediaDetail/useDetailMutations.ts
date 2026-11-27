@@ -263,13 +263,18 @@ export function useDetailMutations({
   });
 
   // The list rows carry the bookmark seconds (the filmstrip draws them); keep
-  // them in step with the detail, as tag edits are.
+  // them in step with the detail, as tag edits are. Bookmarks belong to the
+  // content, so the file's copies (same content hash) change with it.
   const patchRowBookmarks = (target: Target) => {
     const detail = qc.getQueryData<FileDetail | null>(detailKeyOf(target));
     if (!detail) return;
-    patchFileRowInCaches(qc, target.wsId, target.fileId, {
-      bookmarkSecs: detail.bookmarks.map((b) => b.sec),
-    });
+    patchFileRowInCaches(
+      qc,
+      target.wsId,
+      target.fileId,
+      { bookmarkSecs: detail.bookmarks.map((b) => b.sec) },
+      detail.contentHash,
+    );
   };
 
   const addBookmark = useMutation({

@@ -191,4 +191,31 @@ describe("bookmark edits reach the list rows", () => {
     act(() => t.actions().removeBookmark(9));
     await waitFor(() => expect(rowSecs()).toEqual([5]));
   });
+
+  it("reaches the other copies of the same content too", async () => {
+    const t = setup();
+    t.qc.setQueryData(["file_get", WS, 1], {
+      id: 1,
+      contentHash: "same",
+      bookmarks: [],
+    });
+    const rows = [
+      { id: 1, workspaceId: WS, contentHash: "same", bookmarkSecs: [] },
+      // A copy in another workspace: bookmarks follow the content.
+      { id: 7, workspaceId: "ws-other", contentHash: "same", bookmarkSecs: [] },
+      { id: 8, workspaceId: WS, contentHash: "different", bookmarkSecs: [] },
+    ] as unknown as FileRow[];
+    t.qc.setQueryData(["files_search", "k"], {
+      pages: [{ items: rows, nextCursor: null }],
+      pageParams: [0],
+    });
+    const secs = () =>
+      t.qc
+        .getQueryData<{ pages: { items: FileRow[] }[] }>(["files_search", "k"])
+        ?.pages[0].items.map((r) => r.bookmarkSecs);
+
+    mocks.bookmarkAdd.mockResolvedValue({ id: 10, sec: 5, createdAt: 0 });
+    act(() => t.actions().addBookmark(5));
+    await waitFor(() => expect(secs()).toEqual([[5], [5], []]));
+  });
 });

@@ -47,7 +47,13 @@ export function patchFileRowInCaches(
   workspaceId: string,
   fileId: number,
   patch: Partial<FileRow>,
+  /** Also patch every row with this content hash: for data kept per content
+   *  (bookmarks), which the file's other copies share. */
+  contentHash?: string | null,
 ): void {
+  const matches = (row: FileRow) =>
+    matchesFile(row, workspaceId, fileId) ||
+    (contentHash != null && row.contentHash === contentHash);
   qc.setQueriesData<InfiniteData<SearchResult>>(
     { queryKey: ["files_search"] },
     (old) =>
@@ -57,18 +63,14 @@ export function patchFileRowInCaches(
             pages: old.pages.map((page) => ({
               ...page,
               items: page.items.map((item) =>
-                matchesFile(item, workspaceId, fileId)
-                  ? { ...item, ...patch }
-                  : item,
+                matches(item) ? { ...item, ...patch } : item,
               ),
             })),
           }
         : old,
   );
   qc.setQueriesData<FileRow[]>({ queryKey: ["files_random"] }, (old) =>
-    old?.map((row) =>
-      matchesFile(row, workspaceId, fileId) ? { ...row, ...patch } : row,
-    ),
+    old?.map((row) => (matches(row) ? { ...row, ...patch } : row)),
   );
 }
 
