@@ -2,7 +2,7 @@
 import { naturalNameKey } from "../nameKey.js";
 import type { DB } from "../db.js";
 import { fileTags } from "../tags.js";
-import { listBookmarksByMetaKey } from "./bookmarks.js";
+import { attachBookmarkSecs, listBookmarksByMetaKey } from "./bookmarks.js";
 import { thumbOffsetByKey } from "./meta.js";
 import { resolveSortDir } from "../../../shared/sortDir.js";
 import { TEXT_SUBTITLE_CODECS } from "../../../shared/embeddedSubtitles.js";
@@ -41,7 +41,7 @@ const MAX_LIMIT = 500;
 // is reached through a LEFT JOIN. COALESCE supplies defaults for files with no meta row.
 // Exported for queries that join files under the same `f`/`m` aliases (see history.ts).
 export const FILE_COLS =
-  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, (f.thumb_path IS NOT NULL) AS hasThumb, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, f.created_at AS addedAt, m.last_accessed_at AS lastAccessedAt, m.resume_position AS resumePosition, CASE WHEN m.resume_position IS NOT NULL AND f.duration > 0 THEN MIN(1.0, m.resume_position / f.duration) END AS progress";
+  "f.id, f.rel_path AS relPath, f.kind, f.ext, f.size, f.width, f.height, f.duration, f.codec, f.fps, COALESCE(m.rating, 0) AS rating, COALESCE(m.favorite, 0) AS favorite, f.thumb_status AS thumbStatus, (f.thumb_path IS NOT NULL) AS hasThumb, f.content_hash AS contentHash, f.captured_at AS capturedAt, f.btime, f.created_at AS addedAt, m.last_accessed_at AS lastAccessedAt, m.resume_position AS resumePosition, CASE WHEN m.resume_position IS NOT NULL AND f.duration > 0 THEN MIN(1.0, m.resume_position / f.duration) END AS progress";
 
 export const FILE_FROM =
   "FROM files f LEFT JOIN file_meta m ON m.meta_key = f.meta_key";
@@ -689,7 +689,10 @@ export function searchFiles(
       nextCursor = offset + limit;
     }
   }
-  if (!opts?.skipTags) attachTags(db, items);
+  if (!opts?.skipTags) {
+    attachTags(db, items);
+    attachBookmarkSecs(db, items);
+  }
   return { items, nextCursor };
 }
 
@@ -772,6 +775,7 @@ export function randomFiles(db: DB, query: SearchQuery): FileRow[] {
   }
   const items = filesByIds(db, reservoir);
   attachTags(db, items);
+  attachBookmarkSecs(db, items);
   return items;
 }
 
@@ -845,7 +849,7 @@ interface FileDetailRow extends FileRow {
 export function fileDetail(db: DB, fileId: number): FileDetail | null {
   const r = db
     .prepare(
-      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.codec, f.fps, f.mtime, f.meta, f.meta_key AS metaKey
+      `SELECT ${FILE_COLS}, f.abs_path AS absPath, f.mtime, f.meta, f.meta_key AS metaKey
        ${FILE_FROM} WHERE f.id = ? AND f.deleted_at IS NULL`,
     )
     .get(fileId) as FileDetailRow | undefined;

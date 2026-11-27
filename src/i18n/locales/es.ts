@@ -56,6 +56,8 @@ export const es: Catalog = {
   "settings.scenes": "Miniaturas de escena",
   "settings.scenesDesc":
     "Cuántas miniaturas de escena generar en la pantalla de detalles.",
+  "settings.filmstripFrames": "Fotogramas de la tira",
+  "settings.filmstripFramesDesc": "Fotogramas por fila en la vista de tira.",
   "settings.hoverPreview": "Vista previa al pasar el cursor",
   "settings.hoverPreviewDesc":
     "Muestra la escena bajo el cursor al pasar sobre la miniatura de un vídeo.",
@@ -748,6 +750,14 @@ export const es: Catalog = {
   "heatmap.clearDay": "Quitar los días seleccionados",
   "heatmap.error": "No se pudieron cargar los recuentos",
 
+  // Filmstrip view
+  "view.filmstrip": "Vista de tira",
+  "view.folderUnavailableFilmstrip":
+    "La vista por carpetas no está disponible en la vista de tira",
+  "filmstrip.bookmarks": "Marcadores: {count}",
+  "filmstrip.playFrom": "Reproducir desde {time}",
+  "filmstrip.waveform":
+    "Forma de onda: haz clic para reproducir desde ese punto",
   // Vista de cronología
   "view.timeline": "Vista de cronología",
   "view.folderUnavailableTimeline":

@@ -24,6 +24,8 @@ vi.mock("@tanstack/react-virtual", () => ({
           start: index * rowHeight,
         })),
       getTotalSize: () => opts.count * rowHeight,
+      // Every row counts as on screen.
+      range: { startIndex: 0, endIndex: opts.count - 1 },
       measureElement: () => {},
       measure: () => {},
       isScrolling: false,

@@ -53,6 +53,8 @@ export const zhCN: Catalog = {
   "settings.languageDesc": "切换界面的显示语言。",
   "settings.scenes": "场景缩略图数量",
   "settings.scenesDesc": "在详情页生成多少张场景缩略图。",
+  "settings.filmstripFrames": "胶片帧数",
+  "settings.filmstripFramesDesc": "胶片视图中每行显示的帧数。",
   "settings.hoverPreview": "悬停预览",
   "settings.hoverPreviewDesc": "预览视频缩略图上光标位置对应的场景。",
   "settings.frameQuality": "预览画质",
@@ -651,6 +653,12 @@ export const zhCN: Catalog = {
   "heatmap.clearDay": "清除所选日期",
   "heatmap.error": "无法加载统计",
 
+  // Filmstrip view
+  "view.filmstrip": "胶片视图",
+  "view.folderUnavailableFilmstrip": "胶片视图中无法按文件夹显示",
+  "filmstrip.bookmarks": "书签：{count}",
+  "filmstrip.playFrom": "从 {time} 开始播放",
+  "filmstrip.waveform": "波形：点击从该处开始播放",
   // 时间线视图
   "view.timeline": "时间线视图",
   "view.folderUnavailableTimeline": "时间线视图中无法按文件夹显示",

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   CalendarRange,
+  Film,
   ChevronDown,
   CopyCheck,
   DatabaseBackup,
@@ -138,6 +139,7 @@ export function HomeHeader({
     { mode: "grid", label: t("view.grid"), Icon: LayoutGrid },
     { mode: "list", label: t("view.list"), Icon: List },
     { mode: "timeline", label: t("view.timeline"), Icon: CalendarRange },
+    { mode: "filmstrip", label: t("view.filmstrip"), Icon: Film },
     { mode: "graph", label: t("view.graph"), Icon: Waypoints },
   ] as const;
   const folderDisabled = !folderAvailable || !hasFolderForm(view);
@@ -146,9 +148,11 @@ export function HomeHeader({
       ? t("view.folderUnavailableGraph")
       : view === "timeline"
         ? t("view.folderUnavailableTimeline")
-        : folderAvailable
-          ? t("view.folder")
-          : t("view.folderUnavailable");
+        : view === "filmstrip"
+          ? t("view.folderUnavailableFilmstrip")
+          : folderAvailable
+            ? t("view.folder")
+            : t("view.folderUnavailable");
   return (
     <TitleBarPortal>
       <header

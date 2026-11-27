@@ -105,6 +105,11 @@ export const FileRowSchema = z.object({
   progress: z.number().nullable(),
   /** Tags attached to search results (for grid display). For detail fetches, use FileDetail.tags. */
   tags: z.array(TagInfoSchema).optional(),
+  codec: z.string().nullable().optional(),
+  fps: z.number().nullable().optional(),
+  /** Scene bookmark positions in seconds, ascending (for the filmstrip). Named
+   *  apart from FileDetail.bookmarks, which carries the full rows. */
+  bookmarkSecs: z.array(z.number()).optional(),
 });
 export type FileRow = z.infer<typeof FileRowSchema>;
 
@@ -523,6 +528,9 @@ export const AppStatusSchema = z.object({
   workspaceId: z.string().nullable(),
   /** True while running unpackaged for local development. */
   devMode: z.boolean(),
+  /** How many ffmpeg decodes the media server runs at once (frame grabs,
+   *  waveforms), so the filmstrip can size its own queue to it. */
+  decodeSlots: z.number().optional(),
   /** Present while workspaces are being merged into the shared library (the
    *  first launch after the upgrade): how many of them are done. */
   libraryMerge: LibraryMergeProgressSchema.optional(),

@@ -56,6 +56,8 @@ export const en: Catalog = {
   "settings.scenes": "Scene thumbnails",
   "settings.scenesDesc":
     "How many scene thumbnails to generate on the detail screen.",
+  "settings.filmstripFrames": "Filmstrip frames",
+  "settings.filmstripFramesDesc": "Frames per row in the filmstrip view.",
   "settings.hoverPreview": "Hover preview",
   "settings.hoverPreviewDesc":
     "Preview the scene under the cursor while hovering over a video thumbnail.",
@@ -712,6 +714,13 @@ export const en: Catalog = {
   "heatmap.clearDay": "Clear the days picked",
   "heatmap.error": "Could not load the counts",
 
+  // Filmstrip view
+  "view.filmstrip": "Filmstrip view",
+  "view.folderUnavailableFilmstrip":
+    "The folder view is not available in the filmstrip view",
+  "filmstrip.bookmarks": "Bookmarks: {count}",
+  "filmstrip.playFrom": "Play from {time}",
+  "filmstrip.waveform": "Waveform: click to play from that point",
   // Timeline view
   "view.timeline": "Timeline view",
   "view.folderUnavailableTimeline":

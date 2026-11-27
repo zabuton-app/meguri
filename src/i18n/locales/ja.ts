@@ -54,6 +54,9 @@ export const ja = {
   "settings.languageDesc": "UI の表示言語を切り替えます。",
   "settings.scenes": "シーンサムネ枚数",
   "settings.scenesDesc": "動画詳細でシーンサムネを何枚生成するか。",
+  "settings.filmstripFrames": "フィルムストリップのコマ数",
+  "settings.filmstripFramesDesc":
+    "フィルムストリップ表示で1行に並べるコマの数。",
   "settings.hoverPreview": "ホバープレビュー",
   "settings.hoverPreviewDesc":
     "動画サムネ上のカーソル位置に応じたシーンをプレビュー表示します。",
@@ -676,6 +679,13 @@ export const ja = {
   "heatmap.clearDay": "選んだ日付を解除",
   "heatmap.error": "集計を読み込めませんでした",
 
+  // Filmstrip view
+  "view.filmstrip": "フィルムストリップ表示",
+  "view.folderUnavailableFilmstrip":
+    "フィルムストリップ表示ではフォルダごとの表示は使えません",
+  "filmstrip.bookmarks": "ブックマーク: {count}",
+  "filmstrip.playFrom": "{time}から再生",
+  "filmstrip.waveform": "波形: クリックした位置から再生",
   // タイムライン表示
   "view.timeline": "タイムライン表示",
   "view.folderUnavailableTimeline":

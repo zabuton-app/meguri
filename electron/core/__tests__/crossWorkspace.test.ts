@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "../index.js";
 import type { DB } from "../db.js";
 import {
+  addBookmark,
   recordAccess,
   searchFiles,
   setFavorite,
@@ -147,6 +148,28 @@ describe("searchWorkspaces", () => {
     expect(got.items.map((f) => [f.workspaceId, f.relPath])).toEqual(
       direct.items.map((f) => ["solo", f.relPath]),
     );
+  });
+
+  it("cross-workspace rows carry bookmarkSecs", () => {
+    const a = newDb();
+    const b = newDb();
+    track(a.db);
+    track(b.db);
+    const fa = insertFile(a.db, a.rootId, { relPath: "a/clip.mp4" });
+    const fb = insertFile(b.db, b.rootId, { relPath: "b/clip.mp4" });
+    addBookmark(a.db, fa, 40);
+    addBookmark(a.db, fa, 4);
+    addBookmark(b.db, fb, 9);
+    // Two workspaces take the merge path, which defers tags (skipTags) and
+    // attaches them per workspace after the merge.
+    const got = searchWorkspaces(
+      [coreTarget("ws-a", a.db), coreTarget("ws-b", b.db)],
+      { limit: 10, sort: "name" },
+    );
+    expect(got.items.map((f) => [f.workspaceId, f.bookmarkSecs])).toEqual([
+      ["ws-a", [4, 40]],
+      ["ws-b", [9]],
+    ]);
   });
 
   it("applies an ext: directive in the All view across workspaces (#522)", () => {

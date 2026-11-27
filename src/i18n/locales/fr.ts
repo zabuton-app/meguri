@@ -56,6 +56,8 @@ export const fr: Catalog = {
   "settings.scenes": "Miniatures de scène",
   "settings.scenesDesc":
     "Nombre de miniatures de scène à générer sur l'écran de détail.",
+  "settings.filmstripFrames": "Images de la pellicule",
+  "settings.filmstripFramesDesc": "Images par ligne dans la vue pellicule.",
   "settings.hoverPreview": "Aperçu au survol",
   "settings.hoverPreviewDesc":
     "Affiche la scène sous le curseur au survol de la miniature d'une vidéo.",
@@ -752,6 +754,13 @@ export const fr: Catalog = {
   "heatmap.clearDay": "Effacer les jours sélectionnés",
   "heatmap.error": "Impossible de charger les décomptes",
 
+  // Filmstrip view
+  "view.filmstrip": "Vue pellicule",
+  "view.folderUnavailableFilmstrip":
+    "L’affichage par dossier n’est pas disponible dans la vue pellicule",
+  "filmstrip.bookmarks": "Signets : {count}",
+  "filmstrip.playFrom": "Lire à partir de {time}",
+  "filmstrip.waveform": "Forme d'onde : cliquez pour lire à partir de ce point",
   // Vue chronologique
   "view.timeline": "Vue chronologique",
   "view.folderUnavailableTimeline":

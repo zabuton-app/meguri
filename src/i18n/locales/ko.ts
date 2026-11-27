@@ -54,6 +54,9 @@ export const ko: Catalog = {
   "settings.languageDesc": "UI 표시 언어를 전환합니다.",
   "settings.scenes": "장면 썸네일 수",
   "settings.scenesDesc": "상세 화면에서 생성할 장면 썸네일 수입니다.",
+  "settings.filmstripFrames": "필름스트립 프레임 수",
+  "settings.filmstripFramesDesc":
+    "필름스트립 보기에서 한 줄에 놓을 프레임 수입니다.",
   "settings.hoverPreview": "호버 미리보기",
   "settings.hoverPreviewDesc":
     "동영상 썸네일 위 커서 위치에 해당하는 장면을 미리보기로 표시합니다.",
@@ -669,6 +672,13 @@ export const ko: Catalog = {
   "heatmap.clearDay": "선택한 날짜 해제",
   "heatmap.error": "집계를 불러오지 못했습니다",
 
+  // Filmstrip view
+  "view.filmstrip": "필름스트립 보기",
+  "view.folderUnavailableFilmstrip":
+    "필름스트립 보기에서는 폴더별 보기를 사용할 수 없습니다",
+  "filmstrip.bookmarks": "북마크: {count}",
+  "filmstrip.playFrom": "{time}부터 재생",
+  "filmstrip.waveform": "파형: 클릭한 위치부터 재생",
   // 타임라인 보기
   "view.timeline": "타임라인 보기",
   "view.folderUnavailableTimeline":

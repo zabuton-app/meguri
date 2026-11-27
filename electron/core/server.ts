@@ -9,11 +9,12 @@
 // Part 2, uses an H.264 preview instead of stream copy.
 // Both streams support time seeking via ?t=<seconds>.
 //
-// URLs have the form /ws/<workspaceId>/<kind>/<fileId> (kind = thumb|media|frame).
+// URLs have the form /ws/<workspaceId>/<kind>/<fileId> (kind = thumb|media|frame|waveform).
 // Requests must include X-Api-Token; the Electron session injects it for in-app media loads.
 // Resolving the DB by workspace ID lets it serve correctly without depending on the active switch,
 // and the browser cache key is naturally separated by ID as well.
 // frame returns a single JPEG frame at ?t=<seconds> (for seek preview).
+// waveform returns a PNG of an audio file's whole waveform (for the filmstrip).
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -208,7 +209,7 @@ export function startServer(
 const AUTH_HEADER = "x-api-token";
 
 // URLs have the form /ws/<workspaceId>/<kind>/<fileId>.
-const ROUTE = /^\/ws\/([0-9a-f]+)\/(thumb|media|frame)\/(\d+)$/;
+const ROUTE = /^\/ws\/([0-9a-f]+)\/(thumb|media|frame|waveform)\/(\d+)$/;
 
 // Each workspace's roots as resolved for the path check, kept for the
 // workspace's lifetime: resolving the root again on every request would walk
@@ -330,6 +331,15 @@ async function handle(
       const t = Number(url.searchParams.get("t") ?? "0");
       const q = parseFrameQuality(url.searchParams.get("q"));
       serveFrame(res, abs, isFinite(t) && t > 0 ? t : 0, q);
+      return;
+    }
+
+    if (kind === "waveform") {
+      if (file.kind !== "audio") {
+        res.writeHead(404).end();
+        return;
+      }
+      serveWaveform(res, abs);
       return;
     }
 
@@ -949,6 +959,34 @@ function serveFrame(
   if (qv !== null) args.push("-q:v", String(qv));
   args.push("-f", "mjpeg", "pipe:1");
   serveBufferedFfmpeg(res, args, "image/jpeg");
+}
+
+// Size of the waveform image: wide enough for a full-width filmstrip row.
+const WAVEFORM_SIZE = "2000x120";
+
+// Draw the whole file's waveform as one PNG: one opaque color on transparent,
+// so the renderer can use it as a mask and color it from the theme. Decodes
+// the whole file (measured: about a second for an hour of AAC). Square-root
+// scale and peak samples keep quiet speech readable at row height.
+function serveWaveform(res: http.ServerResponse, file: string) {
+  const args = [
+    "-v",
+    "error",
+    "-threads",
+    String(DECODE_FFMPEG_THREADS),
+    "-i",
+    file,
+    "-filter_complex",
+    `aformat=channel_layouts=mono,showwavespic=s=${WAVEFORM_SIZE}:colors=white:scale=sqrt:filter=peak`,
+    "-frames:v",
+    "1",
+    "-f",
+    "image2",
+    "-c:v",
+    "png",
+    "pipe:1",
+  ];
+  serveBufferedFfmpeg(res, args, "image/png");
 }
 
 // Decode a Chromium-unsupported still image (heic/heif/tiff) to JPEG and return it.

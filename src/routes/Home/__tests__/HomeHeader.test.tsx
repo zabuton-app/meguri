@@ -24,7 +24,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const onSetView = vi.fn();
 
-function renderHeader(view: "grid" | "graph" = "grid") {
+function renderHeader(view: "grid" | "graph" | "filmstrip" = "grid") {
   renderWithProviders(
     <HomeHeader
       root="/media"
@@ -90,6 +90,24 @@ describe("HomeHeader's toolbar", () => {
     screen.getByRole("menuitem", { name: "history.title" });
     fireEvent.click(screen.getByRole("menuitemradio", { name: "view.list" }));
     expect(onSetView).toHaveBeenCalledWith("list");
+  });
+
+  it("offers the filmstrip view", () => {
+    headerWidth(1000);
+    renderHeader();
+    fireEvent.click(screen.getByRole("button", { name: "view.filmstrip" }));
+    expect(onSetView).toHaveBeenCalledWith("filmstrip");
+  });
+
+  it("tells why the folder toggle is off in the filmstrip", async () => {
+    headerWidth(500);
+    renderHeader("filmstrip");
+    await openMore();
+    const folder = screen.getByRole("menuitemcheckbox", {
+      name: /view\.folder/,
+    });
+    expect(folder.getAttribute("aria-disabled")).toBe("true");
+    expect(folder.textContent).toContain("view.folderUnavailableFilmstrip");
   });
 
   it("tells why the folded folder toggle is off", async () => {

@@ -32,6 +32,9 @@ interface Props {
   scrubPreview?: boolean;
   /** Set to false to omit the watched-so-far bar (e.g. a folder card's mosaic tile). */
   showProgress?: boolean;
+  /** How the image fills its box: "cover" (default) crops to fill it,
+   *  "contain" shows it whole (the filmstrip, beside letterboxed frames). */
+  fit?: "cover" | "contain";
 }
 
 /**
@@ -80,6 +83,7 @@ export function MediaThumbnail({
   showPlayOverlay = true,
   scrubPreview = true,
   showProgress = true,
+  fit = "cover",
 }: Props) {
   const storedVersion = useThumbVersionOf(file.workspaceId, file.id);
   const version = versionProp ?? storedVersion;
@@ -142,7 +146,8 @@ export function MediaThumbnail({
         onLoad={() => setImgLoaded(true)}
         onError={() => setFailedSrc(src)}
         className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity",
+          "absolute inset-0 h-full w-full transition-opacity",
+          fit === "contain" ? "object-contain" : "object-cover",
           imgLoaded ? "opacity-100" : "opacity-0",
         )}
       />

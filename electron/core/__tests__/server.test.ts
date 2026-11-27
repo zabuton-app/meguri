@@ -555,6 +555,47 @@ describe("frame serving (ffmpeg path)", () => {
   });
 });
 
+describe("waveform serving (ffmpeg path)", () => {
+  let toneId: number;
+  beforeAll(() => {
+    const tone = path.join(root, "tone.wav");
+    execFileSync(FFMPEG, [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=1",
+      tone,
+    ]);
+    toneId = insert("tone.wav", tone, null, "done", "audio", "wav");
+  });
+
+  it("serves a PNG waveform for an audio file", async () => {
+    const res = await fetch(
+      `${base}/ws/${WS}/waveform/${toneId}`,
+      authHeaders(),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect([...buf.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  });
+
+  it("refuses a waveform for a video", async () => {
+    const res = await fetch(
+      `${base}/ws/${WS}/waveform/${remuxId}`,
+      authHeaders(),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses a waveform without the token", async () => {
+    const res = await fetch(`${base}/ws/${WS}/waveform/${toneId}`);
+    expect(res.status).toBe(401);
+  });
+});
+
 describe("still image transcoding (ffmpeg path)", () => {
   it("serves the whole grid of a tiled HEIF as a JPEG", async () => {
     const heic = path.join(root, "grid.heic");
