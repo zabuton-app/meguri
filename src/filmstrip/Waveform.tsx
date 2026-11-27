@@ -1,5 +1,7 @@
 import type { MouseEvent } from "react";
 import { useNavigate } from "react-router";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { fileHref } from "@/lib/fileHref";
 import { formatDuration } from "@/lib/format";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -35,7 +37,7 @@ export function Waveform({
   const url = onScreen
     ? `${mediaBase}/ws/${file.workspaceId}/waveform/${file.id}`
     : null;
-  const { src } = useLimitedImage(limiter, url);
+  const { src, failed } = useLimitedImage(limiter, url);
   const fmt = (sec: number) =>
     formatDuration(sec, { hours: true, fallback: "0:00" });
   return (
@@ -52,10 +54,14 @@ export function Waveform({
             rect.width > 0 ? Math.floor((duration * x) / rect.width) : 0;
           void navigate(fileHref(file.id, file.workspaceId, { t: sec }));
         }}
-        className="relative z-10 w-full overflow-hidden rounded-item bg-overlay"
+        className={cn(
+          "relative z-10 w-full overflow-hidden rounded-item",
+          // While loading the skeleton is the box (see FrameStrip).
+          (src || failed) && "bg-overlay",
+        )}
         style={{ height }}
       >
-        {src && (
+        {src ? (
           <span
             aria-hidden
             className="absolute inset-0 bg-primary/80"
@@ -66,6 +72,8 @@ export function Waveform({
               WebkitMaskSize: "100% 100%",
             }}
           />
+        ) : (
+          !failed && <Skeleton className="absolute inset-0 rounded-none" />
         )}
       </button>
       <div className="flex justify-between text-2xs leading-4 tabular-nums text-muted">

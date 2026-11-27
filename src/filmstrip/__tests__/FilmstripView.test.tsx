@@ -236,6 +236,51 @@ describe("FilmstripView", () => {
     expect(
       document.querySelectorAll('[data-slot="filmstrip-frame"] img'),
     ).toHaveLength(0);
+    // Not left pulsing as if still on its way.
+    expect(
+      document.querySelectorAll(
+        '[data-slot="filmstrip-frame"] [data-slot="skeleton"]',
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("shows a loading skeleton in each frame and the waveform until the image arrives", async () => {
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+    view([
+      row({ id: 7, duration: 100 }),
+      row({
+        id: 5,
+        kind: "audio",
+        ext: "m4a",
+        relPath: "ep.m4a",
+        duration: 60,
+      }),
+    ]);
+    await screen.findByText("ep.m4a");
+    expect(
+      document.querySelectorAll(
+        '[data-slot="filmstrip-frame"] [data-slot="skeleton"]',
+      ),
+    ).toHaveLength(4);
+    expect(
+      document.querySelector(
+        '[data-slot="filmstrip-waveform"] [data-slot="skeleton"]',
+      ),
+    ).toBeTruthy();
+  });
+
+  it("drops the skeleton once a frame's image has loaded", async () => {
+    view([row({ id: 7, duration: 100 })]);
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll('[data-slot="filmstrip-frame"] img'),
+      ).toHaveLength(4),
+    );
+    expect(
+      document.querySelectorAll(
+        '[data-slot="filmstrip-frame"] [data-slot="skeleton"]',
+      ),
+    ).toHaveLength(0);
   });
 
   it("asks for the same frames whatever the width, so a resize fetches nothing new", async () => {
