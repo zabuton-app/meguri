@@ -14,15 +14,21 @@ import type { SearchQuery } from "@/ipc/types";
 export const DISCOVER_FILTER_PARAM = "filter";
 export const VIEW_KEY = "meguri.view";
 
-export type ViewMode = "grid" | "list" | "graph" | "timeline";
+export type ViewMode = "grid" | "list" | "graph" | "timeline" | "filmstrip";
 
 export function isViewMode(v: string | null): v is ViewMode {
-  return v === "grid" || v === "list" || v === "graph" || v === "timeline";
+  return (
+    v === "grid" ||
+    v === "list" ||
+    v === "graph" ||
+    v === "timeline" ||
+    v === "filmstrip"
+  );
 }
 
 /**
- * Whether a view can be drawn by folder. The graph and the timeline have no
- * folder form; the stored option waits for the grid and the list.
+ * Whether a view can be drawn by folder. The graph, the timeline and the
+ * filmstrip have no folder form; the stored option waits for the grid and the list.
  */
 export function hasFolderForm(view: ViewMode): boolean {
   return view === "grid" || view === "list";

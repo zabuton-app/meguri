@@ -717,6 +717,9 @@ export const en: Catalog = {
   "heatmap.error": "Could not load the counts",
 
   // Filmstrip view
+  "view.filmstrip": "Filmstrip view",
+  "view.folderUnavailableFilmstrip":
+    "The folder view is not available in the filmstrip view",
   "filmstrip.bookmarks": "Bookmarks: {count}",
   "filmstrip.playFrom": "Play from {time}",
   "filmstrip.waveform": "Waveform: click to play from that point",

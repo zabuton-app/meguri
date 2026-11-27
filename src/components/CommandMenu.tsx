@@ -3,6 +3,7 @@ import {
   Bookmark,
   CalendarDays,
   CalendarRange,
+  Film,
   ChevronRight,
   Clock,
   Copy,
@@ -1535,6 +1536,11 @@ function FixedGroups({
       id: "view-timeline",
       icon: CalendarRange,
       run: () => closeThen(() => onSetView("timeline")),
+    }),
+    action(t, "view.filmstrip", {
+      id: "view-filmstrip",
+      icon: Film,
+      run: () => closeThen(() => onSetView("filmstrip")),
     }),
     action(t, "view.graph", {
       id: "view-graph",

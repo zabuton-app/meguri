@@ -674,6 +674,9 @@ export const ko: Catalog = {
   "heatmap.error": "집계를 불러오지 못했습니다",
 
   // Filmstrip view
+  "view.filmstrip": "필름스트립 보기",
+  "view.folderUnavailableFilmstrip":
+    "필름스트립 보기에서는 폴더별 보기를 사용할 수 없습니다",
   "filmstrip.bookmarks": "북마크: {count}",
   "filmstrip.playFrom": "{time}부터 재생",
   "filmstrip.waveform": "파형: 클릭한 위치부터 재생",

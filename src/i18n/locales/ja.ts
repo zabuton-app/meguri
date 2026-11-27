@@ -681,6 +681,9 @@ export const ja = {
   "heatmap.error": "集計を読み込めませんでした",
 
   // Filmstrip view
+  "view.filmstrip": "フィルムストリップ表示",
+  "view.folderUnavailableFilmstrip":
+    "フィルムストリップ表示ではフォルダごとの表示は使えません",
   "filmstrip.bookmarks": "ブックマーク: {count}",
   "filmstrip.playFrom": "{time}から再生",
   "filmstrip.waveform": "波形: クリックした位置から再生",

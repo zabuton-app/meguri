@@ -757,6 +757,9 @@ export const fr: Catalog = {
   "heatmap.error": "Impossible de charger les décomptes",
 
   // Filmstrip view
+  "view.filmstrip": "Vue pellicule",
+  "view.folderUnavailableFilmstrip":
+    "L’affichage par dossier n’est pas disponible dans la vue pellicule",
   "filmstrip.bookmarks": "Signets : {count}",
   "filmstrip.playFrom": "Lire à partir de {time}",
   "filmstrip.waveform": "Forme d'onde : cliquez pour lire à partir de ce point",

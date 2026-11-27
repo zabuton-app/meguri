@@ -753,6 +753,9 @@ export const es: Catalog = {
   "heatmap.error": "No se pudieron cargar los recuentos",
 
   // Filmstrip view
+  "view.filmstrip": "Vista de tira",
+  "view.folderUnavailableFilmstrip":
+    "La vista por carpetas no está disponible en la vista de tira",
   "filmstrip.bookmarks": "Marcadores: {count}",
   "filmstrip.playFrom": "Reproducir desde {time}",
   "filmstrip.waveform":

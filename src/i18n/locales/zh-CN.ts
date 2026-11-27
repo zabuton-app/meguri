@@ -656,6 +656,8 @@ export const zhCN: Catalog = {
   "heatmap.error": "无法加载统计",
 
   // Filmstrip view
+  "view.filmstrip": "胶片视图",
+  "view.folderUnavailableFilmstrip": "胶片视图中无法按文件夹显示",
   "filmstrip.bookmarks": "书签：{count}",
   "filmstrip.playFrom": "从 {time} 开始播放",
   "filmstrip.waveform": "波形：点击从该处开始播放",

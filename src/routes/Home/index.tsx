@@ -74,6 +74,7 @@ import { filesSearchListOffset } from "@/lib/filesSearch";
 import { useStartupTimings } from "@/hooks/useStartupTimings";
 import { patchCollectionItemOrder } from "@/lib/queryCache";
 import { TimelineView } from "@/timeline/TimelineView";
+import { FilmstripView } from "@/filmstrip/FilmstripView";
 import { useTimelineView } from "./useTimelineView";
 import { usePeekDocked } from "@/routes/MediaDetail/peekDocked";
 import { fileWorkspaceId } from "@/routes/MediaDetail/fileWorkspace";
@@ -415,9 +416,13 @@ export default function Home() {
   // Drag-to-reorder edits the collection's own item order, so it is offered only
   // where that order is both stored (a collection) and visible (manual sort).
   const manualSort = filter.sort === MANUAL_SORT;
-  // (The timeline shows its own order whatever the sort says.)
+  // (The timeline shows its own order whatever the sort says; the filmstrip
+  // shows the order but its rows are not dragged.)
   const reorderCollectionId =
-    activeCollection && manualSort && view !== "timeline"
+    activeCollection &&
+    manualSort &&
+    view !== "timeline" &&
+    view !== "filmstrip"
       ? activeCollection.id
       : null;
 
@@ -1086,6 +1091,24 @@ export default function Home() {
                 fetchPreviousPage={fetchPreviousPage}
                 isFetchingPreviousPage={search.isFetchingPreviousPage}
                 onAnchor={timeline.onAnchor}
+                navActive={navActive}
+                watchLater={activeCollection?.id === WATCH_LATER_ID}
+                peekFileKey={peekFileKey}
+              />
+            ) : view === "filmstrip" ? (
+              <FilmstripView
+                items={items}
+                mediaBase={status.data?.mediaBase ?? ""}
+                workspaceId={status.data?.workspaceId ?? ""}
+                listOffset={listOffset}
+                loading={listLoading}
+                onTagClick={onTagClick}
+                hasNextPage={search.hasNextPage}
+                fetchNextPage={fetchNextPage}
+                isFetchingNextPage={search.isFetchingNextPage}
+                hasPreviousPage={search.hasPreviousPage}
+                fetchPreviousPage={fetchPreviousPage}
+                isFetchingPreviousPage={search.isFetchingPreviousPage}
                 navActive={navActive}
                 watchLater={activeCollection?.id === WATCH_LATER_ID}
                 peekFileKey={peekFileKey}
