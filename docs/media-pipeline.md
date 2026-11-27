@@ -178,6 +178,19 @@ filter for one workspace.
 `electron/core/media.ts` extracts metadata with ffprobe and generates thumbnails
 with ffmpeg, written as WebP.
 
+ffprobe reads no EXIF from a still image, so for a photo `extractMeta()` also
+reads its EXIF with ExifReader (`electron/core/exif.ts`), alongside ffprobe and
+independent of it: a picture ffprobe cannot read can still say when it was
+taken. ExifReader reads only the bytes that hold the metadata
+(`length: "auto"`), and the XMP parser is passed in (`@xmldom/xmldom`) rather
+than left to ExifReader's own lookup. The capture time is `DateTimeOriginal`,
+then `DateTimeDigitized`, then the same dates in XMP; EXIF wins because cameras
+write it. The matching offset tag (`OffsetTimeOriginal`, …) places the time;
+without one it is read as the computer's local time, which is what the camera's
+clock showed and the day the timeline buckets by. A file that cannot be opened
+leaves `exif` NULL for a later scan; one that opens but has no EXIF stores
+`'{}'` (see [Data Model](data-model.md#schema)).
+
 For audio the thumbnail is the file's embedded cover art (ID3v2 `APIC`, MP4
 `covr`, FLAC `METADATA_BLOCK_PICTURE`). `coverArtStreamIndex()` finds it in the
 already-probed ffprobe JSON via each stream's `disposition.attached_pic` flag,

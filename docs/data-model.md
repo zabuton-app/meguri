@@ -66,6 +66,14 @@ In the workspace database (`CORE_DDL`):
   `meta` holds the ffprobe output; the subtitle filter reads its streams
   directly, matching only the text codecs the player shows
   (`shared/embeddedSubtitles.ts`), so it has no column of its own.
+  `exif` holds what a photo's EXIF says (`PhotoExif` in `shared/photoInfo.ts`:
+  camera, lens and exposure) as JSON: `'{}'` when the photo was read and had
+  none, NULL until it is read, and always NULL for video and audio. A photo's
+  `captured_at` comes from its EXIF date (see
+  [Metadata and thumbnails](media-pipeline.md#metadata-and-thumbnails)). A
+  changed file's `exif` is dropped until it is read again, and
+  `idx_files_exif_pending` finds the photos still to read (see
+  [Derived tags](#derived-tags)).
 - `tags` (library) — the tag master, unique on `(namespace, name)`. An empty namespace
   means the tag is the user's own; a non-empty one means it is owned by a
   pipeline (see [Derived tags](#derived-tags)). The constraint tells
@@ -627,8 +635,9 @@ Tags whose `source` is not `manual` are owned by a pipeline and are read-only to
 the user: rename, merge and delete reject them, and the tag management screen
 offers no affordance for them. Today the only such source is `auto-meta`, which
 `electron/core/autoMetaTags.ts` derives during the scan from the ffprobe columns
-already stored on `files`, and for audio files (`electron/core/audioMetaTags.ts`)
-from the probe output stored in `files.meta`:
+already stored on `files`, for audio files (`electron/core/audioMetaTags.ts`)
+from the probe output stored in `files.meta`, and for photos from the EXIF
+stored in `files.exif`:
 
 | Namespace       | Applies to    | Values                                               |
 | --------------- | ------------- | ---------------------------------------------------- |
@@ -643,6 +652,8 @@ from the probe output stored in `files.meta`:
 | `audio_key`     | audio         | a key name (`A minor`), from an embedded key         |
 | `audio_camelot` | audio         | the same key in Camelot notation (`8A`)              |
 | `audio_genre`   | audio         | each embedded genre, lowercased                      |
+| `camera`        | image         | the camera (`Canon EOS R5`, `Apple iPhone 15 Pro`)   |
+| `lens`          | image         | the lens model as the photo names it                 |
 
 `audio_quality:hires` is lossless audio above 48 kHz or above 16 bit (not
 counting floating-point PCM's bit depth); telephone PCM (`pcm_mulaw`,
@@ -652,7 +663,10 @@ shared, with the same thresholds for both. A bare `tag:` value searches manual
 tags and `res`, `dur`, `codec` and `orient` only (`BARE_SEARCH_NAMESPACES` in
 `shared/tags.ts`); the `audio_` ones are searched with their namespace
 (`tag:audio_tempo:fast`), since their values are everyday words or whatever a
-file's tags say, which a manual tag can be named too. The search shows a
+file's tags say, which a manual tag can be named too; so are `camera` and
+`lens` (`tag:camera:Canon EOS R5`). A camera's name is its `Model`, with the
+maker in front when the model does not start with it, and the maker's company
+suffix dropped (`NIKON CORPORATION` reads as `NIKON`). The search shows a
 generated tag's chip as its category and value (`Tempo: Fast`). Completion
 offers every value of a closed set (`CLOSED_TAG_VALUES`) once its namespace is
 typed, `tag:audio_quality:` for one, even when no file carries it yet.
@@ -672,6 +686,16 @@ is filled in by a separate chunked pass in `runScan()` (progress phase `tags`),
 gated on a ruleset version recorded in the `settings` table under
 `auto_meta_ruleset_version`. Bumping `AUTO_META_RULESET_VERSION` re-derives every
 file on the next scan.
+
+A photo's EXIF is not stored on an unchanged file either, so the scan reads it
+in a pass of its own before that one (`electron/core/exifBackfill.ts`, progress
+phase `exif`): every photo whose `exif` is still NULL, by id in chunks, the
+files read in a pool and each chunk written in one transaction with its
+derived tags. Its progress is the rows themselves, not a version: a pass cut
+short resumes where it stopped, and a photo it could not read (a share that
+dropped out) stays NULL and is tried again by the next scan. Once every photo
+is read, the pass finds nothing through `idx_files_exif_pending` and reads no
+file.
 
 The set of namespaces is **not closed**. No code that decides tag _identity_ may
 enumerate it: search tokens resolve against the `tags` table itself, and the tag
