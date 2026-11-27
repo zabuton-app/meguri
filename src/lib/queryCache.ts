@@ -41,16 +41,52 @@ function matchesFile(
   return row.id === fileId && row.workspaceId === workspaceId;
 }
 
-/** Patch a file row across list/search caches (infinite search + discovery queue). */
+/**
+ * The file's content hash, from whichever cache holds it (its detail, a list,
+ * the Discover queue); null when none does or the file has none yet.
+ */
+function contentHashOf(
+  qc: QueryClient,
+  workspaceId: string,
+  fileId: number,
+): string | null {
+  const detail = qc.getQueryData<FileDetail | null>([
+    "file_get",
+    workspaceId,
+    fileId,
+  ]);
+  if (detail) return detail.contentHash ?? null;
+  for (const [, data] of qc.getQueriesData<InfiniteData<SearchResult>>({
+    queryKey: ["files_search"],
+  })) {
+    for (const page of data?.pages ?? []) {
+      const row = page.items.find((r) => matchesFile(r, workspaceId, fileId));
+      if (row) return row.contentHash ?? null;
+    }
+  }
+  for (const [, rows] of qc.getQueriesData<FileRow[]>({
+    queryKey: ["files_random"],
+  })) {
+    const row = rows?.find((r) => matchesFile(r, workspaceId, fileId));
+    if (row) return row.contentHash ?? null;
+  }
+  return null;
+}
+
+/**
+ * Patch a file row across list/search caches (infinite search + discovery
+ * queue). What these patches carry — favorite, rating, tags, the resume
+ * position, bookmarks — is kept per content (meta_key), so the rows of the
+ * file's other copies (same content hash, in any workspace) are patched too.
+ * A file without a hash keys its metadata by path and shares it with none.
+ */
 export function patchFileRowInCaches(
   qc: QueryClient,
   workspaceId: string,
   fileId: number,
   patch: Partial<FileRow>,
-  /** Also patch every row with this content hash: for data kept per content
-   *  (bookmarks), which the file's other copies share. */
-  contentHash?: string | null,
 ): void {
+  const contentHash = contentHashOf(qc, workspaceId, fileId);
   const matches = (row: FileRow) =>
     matchesFile(row, workspaceId, fileId) ||
     (contentHash != null && row.contentHash === contentHash);
@@ -125,17 +161,23 @@ export function forgetDeletedFile(
   void qc.invalidateQueries({ queryKey: ["timeline_counts"] });
 }
 
-/** Patch the detail cache when the modal is open for the same file. */
+/** Patch the detail cache of the file, and of its copies, wherever one is held. */
 export function patchFileDetailInCache(
   qc: QueryClient,
   workspaceId: string,
   fileId: number,
   patch: Partial<FileDetail>,
 ): void {
-  qc.setQueryData<FileDetail | null>(
-    ["file_get", workspaceId, fileId],
-    (old) => (old ? { ...old, ...patch } : old),
-  );
+  // Per content, as patchFileRowInCaches: the copies' details as well.
+  const contentHash = contentHashOf(qc, workspaceId, fileId);
+  for (const [key, old] of qc.getQueriesData<FileDetail | null>({
+    queryKey: ["file_get"],
+  })) {
+    if (!old) continue;
+    const self = key[1] === workspaceId && key[2] === fileId;
+    if (self || (contentHash != null && old.contentHash === contentHash))
+      qc.setQueryData<FileDetail | null>(key, { ...old, ...patch });
+  }
 }
 
 /** Marks a graph query whose nodes are sized by plays (see useGraphData). */

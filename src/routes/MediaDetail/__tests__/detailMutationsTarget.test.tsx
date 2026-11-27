@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   fileSetRating: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
   bookmarkAdd: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
   bookmarkRemove: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
+  fileAddTag: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
+  fileGet: vi.fn<(...a: unknown[]) => Promise<unknown>>(),
 }));
 
 vi.mock("@/components/ConfirmDialog", async (importOriginal) => ({
@@ -32,6 +34,8 @@ vi.mock("@/ipc/client", () => ({
     fileSetRating: (...a: unknown[]) => mocks.fileSetRating(...a),
     bookmarkAdd: (...a: unknown[]) => mocks.bookmarkAdd(...a),
     bookmarkRemove: (...a: unknown[]) => mocks.bookmarkRemove(...a),
+    fileAddTag: (...a: unknown[]) => mocks.fileAddTag(...a),
+    fileGet: (...a: unknown[]) => mocks.fileGet(...a),
   },
 }));
 
@@ -217,5 +221,58 @@ describe("bookmark edits reach the list rows", () => {
     mocks.bookmarkAdd.mockResolvedValue({ id: 10, sec: 5, createdAt: 0 });
     act(() => t.actions().addBookmark(5));
     await waitFor(() => expect(secs()).toEqual([[5], [5], []]));
+  });
+
+  it("a tag added on one copy shows in the other copy's detail and row (#716)", async () => {
+    const t = setup();
+    const tag = {
+      id: 3,
+      name: "beach",
+      namespace: "",
+      source: "manual",
+      score: null,
+    };
+    t.qc.setQueryData(["file_get", WS, 1], {
+      id: 1,
+      contentHash: "same",
+      tags: [],
+      bookmarks: [],
+    });
+    t.qc.setQueryData(["file_get", "ws-other", 7], {
+      id: 7,
+      contentHash: "same",
+      tags: [],
+      bookmarks: [],
+    });
+    t.qc.setQueryData(["files_search", "k"], {
+      pages: [
+        {
+          items: [
+            { id: 1, workspaceId: WS, contentHash: "same", tags: [] },
+            { id: 7, workspaceId: "ws-other", contentHash: "same", tags: [] },
+          ],
+          nextCursor: null,
+        },
+      ],
+      pageParams: [0],
+    });
+    mocks.fileAddTag.mockResolvedValue(undefined);
+    mocks.fileGet.mockResolvedValue({
+      id: 1,
+      contentHash: "same",
+      tags: [tag],
+      bookmarks: [],
+    });
+    act(() => t.actions().addTag("beach"));
+    await waitFor(() =>
+      expect(
+        t.qc.getQueryData<FileDetail>(["file_get", "ws-other", 7])?.tags,
+      ).toEqual([tag]),
+    );
+    expect(
+      t.qc
+        .getQueryData<{ pages: { items: FileRow[] }[] }>(["files_search", "k"])
+        ?.pages[0].items.map((r) => r.tags?.length),
+    ).toEqual([1, 1]);
   });
 });

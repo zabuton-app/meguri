@@ -164,6 +164,13 @@ resets the rows, and the rescan revives them in place.) It is also what makes
 the library shared: two workspaces holding the same content (the same
 `content_hash`) read and write the same rows.
 
+The renderer's caches follow the same rule: a change to a file's metadata
+(favorite, rating, tags, the resume position, bookmarks) is patched onto every
+cached row and detail with the same content hash, in any workspace
+(`patchFileRowInCaches` and `patchFileDetailInCache` in
+`src/lib/queryCache.ts`), so the file's copies on screen show it at once. A
+file without a hash shares its metadata with none.
+
 When a file gains its first hash, `migrateMetaKey()` moves its metadata from
 the path key to the hash. Another workspace's copy may already hold metadata
 under that hash; the two are merged by the rules below.

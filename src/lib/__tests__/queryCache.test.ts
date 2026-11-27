@@ -17,6 +17,8 @@ import {
   invalidatePlayedSearches,
   invalidateTagSearches,
   patchCollectionItemOrder,
+  patchFileDetailInCache,
+  patchFileRowInCaches,
   syncFileRowAcrossCaches,
 } from "@/lib/queryCache";
 
@@ -79,6 +81,117 @@ describe("syncFileRowAcrossCaches", () => {
     const detail = qc.getQueryData<FileDetail>(["file_get", "ws", 1]);
     expect(detail?.favorite).toBe(1);
     expect(detail?.rating).toBe(4);
+  });
+});
+
+describe("per-content metadata reaches every copy (#716)", () => {
+  const base = {
+    relPath: "a.mp4",
+    kind: "video",
+    ext: "mp4",
+    size: 100,
+    width: 1920,
+    height: 1080,
+    duration: 60,
+    favorite: 0,
+    rating: 0,
+    thumbStatus: "done",
+    hasThumb: 1,
+    capturedAt: null,
+    btime: null,
+    addedAt: 1_700_000_000,
+    lastAccessedAt: null,
+    resumePosition: null,
+    progress: null,
+  } satisfies Partial<FileRow>;
+  const row = (
+    workspaceId: string,
+    id: number,
+    contentHash: string | null,
+  ): FileRow => ({ ...base, workspaceId, id, contentHash });
+  const detailOf = (r: FileRow): FileDetail => ({
+    ...r,
+    absPath: `/${r.workspaceId}/${r.id}`,
+    codec: null,
+    fps: null,
+    mtime: null,
+    meta: null,
+    tags: [],
+    playHistory: [],
+    bookmarks: [],
+    thumbOffsetSec: null,
+  });
+
+  /** A list, a Discover queue and details holding three files: A, its copy
+   *  B in another workspace, and C with other content. */
+  function seed(hashA: string | null, hashB: string | null) {
+    const qc = new QueryClient();
+    const a = row("ws", 1, hashA);
+    const b = row("ws-2", 7, hashB);
+    const c = row("ws", 8, "other");
+    qc.setQueryData<InfiniteData<SearchResult>>(["files_search", "ws", {}], {
+      pages: [{ items: [a, b, c], nextCursor: null }],
+      pageParams: [undefined],
+    });
+    qc.setQueryData<FileRow[]>(["files_random", "ws", {}], [a, b, c]);
+    for (const r of [a, b, c])
+      qc.setQueryData<FileDetail>(
+        ["file_get", r.workspaceId, r.id],
+        detailOf(r),
+      );
+    const listed = () =>
+      qc
+        .getQueryData<InfiniteData<SearchResult>>(["files_search", "ws", {}])!
+        .pages[0].items.map((r) => r.favorite);
+    const random = () =>
+      qc
+        .getQueryData<FileRow[]>(["files_random", "ws", {}])!
+        .map((r) => r.favorite);
+    const details = () =>
+      [a, b, c].map(
+        (r) =>
+          qc.getQueryData<FileDetail>(["file_get", r.workspaceId, r.id])!
+            .favorite,
+      );
+    return { qc, listed, random, details };
+  }
+
+  it("a favorite set on one copy shows on the others, and on nothing else", () => {
+    const t = seed("same", "same");
+    syncFileRowAcrossCaches(t.qc, "ws", 1, { favorite: 1 });
+    expect(t.listed()).toEqual([1, 1, 0]);
+    expect(t.random()).toEqual([1, 1, 0]);
+    expect(t.details()).toEqual([1, 1, 0]);
+  });
+
+  it("a file without a content hash keeps the change to itself", () => {
+    // Keyed by path: no other file shares its metadata, not even another
+    // file that has no hash either.
+    const t = seed(null, null);
+    syncFileRowAcrossCaches(t.qc, "ws", 1, { favorite: 1 });
+    expect(t.listed()).toEqual([1, 0, 0]);
+    expect(t.details()).toEqual([1, 0, 0]);
+  });
+
+  it("finds the content from the detail when no list holds the file", () => {
+    const t = seed("same", "same");
+    // Only the detail knows file 1; the list and queue hold its copy.
+    t.qc.setQueryData<InfiniteData<SearchResult>>(["files_search", "ws", {}], {
+      pages: [{ items: [row("ws-2", 7, "same")], nextCursor: null }],
+      pageParams: [undefined],
+    });
+    patchFileRowInCaches(t.qc, "ws", 1, { favorite: 1 });
+    expect(
+      t.qc
+        .getQueryData<InfiniteData<SearchResult>>(["files_search", "ws", {}])!
+        .pages[0].items.map((r) => r.favorite),
+    ).toEqual([1]);
+  });
+
+  it("patches the copies' details too", () => {
+    const t = seed("same", "same");
+    patchFileDetailInCache(t.qc, "ws", 1, { favorite: 1 });
+    expect(t.details()).toEqual([1, 1, 0]);
   });
 });
 
