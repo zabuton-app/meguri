@@ -11,6 +11,13 @@ import { metaKeyOf, upsertTag } from "./tags.js";
 import { AUTO_META_SOURCE } from "../../shared/tags.js";
 import { audioMetaTagsFor } from "./audioMetaTags.js";
 import { codecTagName, durationClass } from "./derivedTagClasses.js";
+import { cleanTagName, isUsableTagName } from "../../shared/autoTag.js";
+import {
+  cameraName,
+  lensName,
+  parsePhotoExif,
+  type PhotoExif,
+} from "../../shared/photoInfo.js";
 
 export { AUTO_META_SOURCE };
 
@@ -19,7 +26,7 @@ export { AUTO_META_SOURCE };
  * The next scan of each workspace re-derives every file; classifications that
  * did not move diff out and cost one indexed read each.
  */
-export const AUTO_META_RULESET_VERSION = 3;
+export const AUTO_META_RULESET_VERSION = 4;
 export const AUTO_META_VERSION_KEY = "auto_meta_ruleset_version";
 
 export interface DerivedTag {
@@ -35,6 +42,8 @@ export interface AutoMetaInput {
   codec: string | null;
   /** The stored ffprobe output; read for audio files only. */
   raw?: unknown;
+  /** A photo's EXIF (files.exif); read for images only. */
+  exif?: PhotoExif | null;
 }
 
 /** ffprobe reports several spellings per codec; fold them onto one tag name. */
@@ -117,6 +126,15 @@ export function autoMetaTagsFor(input: AutoMetaInput): DerivedTag[] {
   if (size) {
     out.push({ namespace: "orient", name: orientationClass(size.w, size.h) });
   }
+  if (input.kind === "image" && input.exif) {
+    for (const [namespace, raw] of [
+      ["camera", cameraName(input.exif)],
+      ["lens", lensName(input.exif)],
+    ] as const) {
+      const name = raw === null ? "" : cleanTagName(raw);
+      if (isUsableTagName(name)) out.push({ namespace, name });
+    }
+  }
   return out;
 }
 
@@ -173,12 +191,23 @@ export function applyDerivedTagsByKey(
   return true;
 }
 
+/**
+ * A photo whose EXIF is not read yet (`files.exif` NULL; backfillExif reads it
+ * later). Its tags are left as they are rather than derived without EXIF:
+ * they are shared by every copy of the photo (one meta_key), and another copy
+ * may have read its camera and lens already.
+ */
+function isUnreadPhoto(input: AutoMetaInput): boolean {
+  return input.kind === "image" && input.exif === null;
+}
+
 /** File-id convenience wrapper used by the scan pipeline. */
 export function applyAutoMetaTags(
   db: DB,
   fileId: number,
   input: AutoMetaInput,
 ): boolean {
+  if (isUnreadPhoto(input)) return false;
   const metaKey = metaKeyOf(db, fileId);
   if (!metaKey) return false;
   return applyDerivedTagsByKey(
@@ -201,6 +230,8 @@ export interface DerivedTagRow {
   codec: string | null;
   /** The stored ffprobe output (JSON), for audio rows only; null otherwise. */
   meta: string | null;
+  /** The stored EXIF (JSON), for image rows only; null otherwise. */
+  exif: string | null;
 }
 
 const BACKFILL_CHUNK = 512;
@@ -215,7 +246,7 @@ const BACKFILL_CHUNK = 512;
  * workspace's scan may drop one (pruneUnusedTags), and a cached id would then
  * name no tag.
  */
-function derivedTagIdResolver(db: DB): (tag: DerivedTag) => number {
+export function derivedTagIdResolver(db: DB): (tag: DerivedTag) => number {
   const ids = new Map<string, number>();
   return ({ namespace, name }) => {
     const key = JSON.stringify([namespace, name]);
@@ -258,7 +289,8 @@ export async function backfillDerivedTags(
     source: string;
     versionKey: string;
     version: string;
-    derive: (row: DerivedTagRow) => DerivedTag[];
+    /** Null leaves the row's tags as they are. */
+    derive: (row: DerivedTagRow) => DerivedTag[] | null;
     signal?: AbortSignal;
     onProgress?: (done: number, total: number) => void;
   },
@@ -277,7 +309,11 @@ export async function backfillDerivedTags(
     const tagIdOf = derivedTagIdResolver(db);
     let n = 0;
     for (const row of chunk) {
-      if (applyDerivedTagsByKey(db, row.meta_key, source, derive(row), tagIdOf))
+      const desired = derive(row);
+      if (
+        desired !== null &&
+        applyDerivedTagsByKey(db, row.meta_key, source, desired, tagIdOf)
+      )
         n++;
     }
     return n;
@@ -290,7 +326,8 @@ export async function backfillDerivedTags(
   // also lets a concurrent tag mutation through during the yield.
   const page = db.prepare(
     `SELECT id, meta_key, kind, rel_path, width, height, duration, codec,
-            CASE WHEN kind = 'audio' THEN meta END AS meta
+            CASE WHEN kind = 'audio' THEN meta END AS meta,
+            CASE WHEN kind = 'image' THEN exif END AS exif
        FROM files WHERE deleted_at IS NULL AND id > ? ORDER BY id LIMIT ?`,
   );
 
@@ -327,7 +364,14 @@ export function backfillAutoMetaTags(
     source: AUTO_META_SOURCE,
     versionKey: AUTO_META_VERSION_KEY,
     version: String(AUTO_META_RULESET_VERSION),
-    derive: (row) => autoMetaTagsFor({ ...row, raw: parseProbe(row.meta) }),
+    derive: (row) => {
+      const input = {
+        ...row,
+        raw: parseProbe(row.meta),
+        exif: parsePhotoExif(row.exif),
+      };
+      return isUnreadPhoto(input) ? null : autoMetaTagsFor(input);
+    },
     ...opts,
   });
 }

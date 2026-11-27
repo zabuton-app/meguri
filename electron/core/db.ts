@@ -106,6 +106,8 @@ CREATE TABLE IF NOT EXISTS files (
   thumb_path TEXT, thumb_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (thumb_status IN ('pending','done','error')),
   deleted_at INTEGER, excluded_at INTEGER, created_at INTEGER NOT NULL, meta TEXT,
+  -- A photo's EXIF (#701): see backfillColumns, which adds it to older DBs.
+  exif TEXT,
   -- Set with deleted_at when a scan exclusion (#282) covers the file: hidden,
   -- not missing, and back with the same id once no rule covers it.
   scan_excluded_at INTEGER,
@@ -471,6 +473,15 @@ function backfillColumns(db: DB): void {
   // direction; created_at is never NULL, so no NULLs-last term.
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_files_alive_added ON files(created_at DESC, id) WHERE deleted_at IS NULL",
+  );
+  // A photo's EXIF (#701): JSON, '{}' when the file has none, NULL until it
+  // is read (and always for video and audio). The index finds the photos
+  // still to read, which every scan looks for (exifBackfill.ts).
+  if (!hasColumn(db, "files", "exif")) {
+    db.exec("ALTER TABLE files ADD COLUMN exif TEXT");
+  }
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_files_exif_pending ON files(id) WHERE exif IS NULL AND kind = 'image' AND deleted_at IS NULL",
   );
   backfillNameKeys(db);
 }

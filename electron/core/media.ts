@@ -7,6 +7,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { FFMPEG, FFPROBE } from "./ffmpeg-paths.js";
 import { DECODE_FFMPEG_THREADS } from "./mediaConcurrency.js";
+import { readExif, type ExifResult } from "./exif.js";
+import type { PhotoExif } from "../../shared/photoInfo.js";
 import log from "./logger.js";
 import type { Kind } from "./types.js";
 
@@ -22,6 +24,8 @@ export interface ExtractedMeta {
   fps: number | null;
   capturedAt: number | null;
   raw: unknown;
+  /** A photo's EXIF (see ExifResult); always null for video and audio. */
+  exif: PhotoExif | null;
 }
 
 interface FfprobeStream {
@@ -85,7 +89,29 @@ export async function extractMeta(
   kind: Kind,
   signal?: AbortSignal,
 ): Promise<ExtractedMeta> {
-  const empty: ExtractedMeta = {
+  // A photo's EXIF is read alongside ffprobe and kept whichever of the two
+  // fails: a picture ffprobe cannot read can still say when it was taken.
+  const [probed, exif] = await Promise.all([
+    probe(file, kind, signal),
+    kind === "image"
+      ? readExif(file)
+      : Promise.resolve<ExifResult>({ exif: null, capturedAt: null }),
+  ]);
+  return {
+    ...probed,
+    // EXIF first: a still's ffprobe tags rarely carry a date, and when they
+    // do it is a container's, not the camera's.
+    capturedAt: exif.capturedAt ?? probed.capturedAt,
+    exif: exif.exif,
+  };
+}
+
+async function probe(
+  file: string,
+  kind: Kind,
+  signal?: AbortSignal,
+): Promise<Omit<ExtractedMeta, "exif">> {
+  const empty: Omit<ExtractedMeta, "exif"> = {
     width: null,
     height: null,
     duration: null,

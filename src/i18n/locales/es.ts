@@ -556,6 +556,11 @@ export const es: Catalog = {
   "media.metaBpm": "BPM",
   "media.metaKey": "Tonalidad",
   "media.metaGenre": "Género",
+  "media.metaCamera": "Cámara",
+  "media.metaLens": "Objetivo",
+  "media.metaExposure": "Exposición",
+  "media.metaFocalLength": "Distancia focal",
+  "media.metaFocalEquiv": "equiv. {mm} mm",
   "media.playHistory": "Historial de reproducción",
   "media.scenes": "Escenas",
   "media.bookmarks": "Marcadores de escena",
@@ -661,6 +666,7 @@ export const es: Catalog = {
   "scan.phaseIndex": "Creando índice",
   "scan.phaseThumbnail": "Generando miniaturas",
   "scan.phaseTags": "Etiquetando",
+  "scan.phaseExif": "Leyendo datos de fotos",
   "scan.cancel": "Cancelar escaneo",
 
   // tag editor
@@ -1344,6 +1350,8 @@ export const es: Catalog = {
   "tags.ns.key": "Tonalidad",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "Género",
+  "tags.ns.camera": "Cámara",
+  "tags.ns.lens": "Objetivo",
   "tags.value.durShort": "Corta",
   "tags.value.durMedium": "Media",
   "tags.value.durLong": "Larga",

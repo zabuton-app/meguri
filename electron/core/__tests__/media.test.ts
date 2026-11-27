@@ -337,7 +337,29 @@ describe("extractMeta", () => {
       fps: null,
       capturedAt: null,
       raw: null,
+      exif: null,
     });
+  });
+
+  // #701: ffprobe reads no EXIF from a still image.
+  const exifFixture = (name: string) =>
+    fileURLToPath(new URL(`./fixtures/exif/${name}`, import.meta.url));
+
+  it("takes a photo's capture time and camera from its EXIF", async () => {
+    const meta = await extractMeta(exifFixture("dated-offset.jpg"), "image");
+    expect(meta.capturedAt).toBe(Date.UTC(2019, 6, 21, 5, 35, 0) / 1000);
+    expect(meta.exif?.model).toBe("Canon EOS R5");
+    expect(meta.width).toBe(16);
+  });
+
+  it("records an image without EXIF as read, with nothing in it", async () => {
+    const meta = await extractMeta(exifFixture("no-exif.png"), "image");
+    expect(meta.exif).toEqual({});
+  });
+
+  it("reads no EXIF from a video or an audio file", async () => {
+    expect((await extractMeta(video, "video")).exif).toBeNull();
+    expect((await extractMeta(audio, "audio")).exif).toBeNull();
   });
 });
 

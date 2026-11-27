@@ -172,6 +172,59 @@ describe("autoMetaTagsFor — whole rows", () => {
   });
 });
 
+describe("autoMetaTagsFor — camera and lens (#701)", () => {
+  const photo = {
+    kind: "image",
+    width: 4000,
+    height: 3000,
+    duration: null,
+    codec: "mjpeg",
+  };
+  const names = (tags: { namespace: string; name: string }[]) =>
+    tags
+      .filter((t) => t.namespace === "camera" || t.namespace === "lens")
+      .map((t) => `${t.namespace}:${t.name}`)
+      .sort();
+
+  it("tags a photo with its camera and lens", () => {
+    expect(
+      names(
+        autoMetaTagsFor({
+          ...photo,
+          exif: {
+            make: "Canon",
+            model: "Canon EOS R5",
+            lens: "RF24-105mm F4 L IS USM",
+          },
+        }),
+      ),
+    ).toEqual(["camera:Canon EOS R5", "lens:RF24-105mm F4 L IS USM"]);
+  });
+
+  it("adds no camera tag to a video, even with EXIF", () => {
+    expect(
+      names(
+        autoMetaTagsFor({
+          ...photo,
+          kind: "video",
+          exif: { make: "Canon", model: "Canon EOS R5" },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("adds no camera tag without a model", () => {
+    expect(
+      names(autoMetaTagsFor({ ...photo, exif: { make: "Canon" } })),
+    ).toEqual([]);
+  });
+
+  it("adds nothing for a photo read without EXIF", () => {
+    expect(names(autoMetaTagsFor({ ...photo, exif: {} }))).toEqual([]);
+    expect(names(autoMetaTagsFor({ ...photo, exif: null }))).toEqual([]);
+  });
+});
+
 describe("the declared vocabulary", () => {
   it("has no value shared between categories", () => {
     // This is what lets the search box accept `tag:long` instead of
@@ -310,6 +363,29 @@ describe("applyDerivedTagsByKey", () => {
     );
   });
 
+  it("leaves a photo's tags alone while its EXIF is unread (#701)", () => {
+    const photo = insertFile(db, rootId, {
+      relPath: "p.jpg",
+      kind: "image",
+      width: 800,
+      height: 600,
+    });
+    const input = {
+      kind: "image",
+      width: 800,
+      height: 600,
+      duration: null,
+      codec: null,
+    };
+    applyAutoMetaTags(db, photo, { ...input, exif: { model: "X-T4" } });
+    expect(applyAutoMetaTags(db, photo, { ...input, exif: null })).toBe(false);
+    expect(
+      fileTags(db, photo).some(
+        (t) => t.namespace === "camera" && t.name === "X-T4",
+      ),
+    ).toBe(true);
+  });
+
   it("refuses an unnamespaced derived tag", () => {
     const metaKey = db
       .prepare("SELECT meta_key FROM files WHERE id = ?")
@@ -359,6 +435,8 @@ describe("backfillAutoMetaTags", () => {
       width: 800,
       height: 600,
     });
+    // Its EXIF read, and none found: an unread photo is left to backfillExif.
+    db.prepare("UPDATE files SET exif = '{}' WHERE rel_path = 'b.jpg'").run();
   });
   afterEach(() => db.close());
 
@@ -374,6 +452,45 @@ describe("backfillAutoMetaTags", () => {
   it("is a no-op on a second run", async () => {
     await backfillAutoMetaTags(db);
     expect(await backfillAutoMetaTags(db)).toBe(0);
+  });
+
+  it("derives camera tags from the stored exif column (#701)", async () => {
+    db.prepare("UPDATE files SET exif = ? WHERE rel_path = 'b.jpg'").run(
+      JSON.stringify({ make: "Apple", model: "iPhone 15 Pro" }),
+    );
+    await backfillAutoMetaTags(db);
+    const id = db
+      .prepare("SELECT id FROM files WHERE rel_path = 'b.jpg'")
+      .pluck()
+      .get() as number;
+    expect(
+      fileTags(db, id)
+        .filter((t) => t.namespace === "camera")
+        .map((t) => t.name),
+    ).toEqual(["Apple iPhone 15 Pro"]);
+  });
+
+  it("keeps the camera tag a copy gave when another copy is still unread (#701)", async () => {
+    // Two copies of one photo share a meta_key, and with it their tags.
+    const photo = (relPath: string, exif: string | null) => {
+      const id = insertFile(db, rootId, {
+        relPath,
+        kind: "image",
+        width: 800,
+        height: 600,
+        contentHash: "same-photo",
+      });
+      db.prepare("UPDATE files SET exif = ? WHERE id = ?").run(exif, id);
+      return id;
+    };
+    const read = photo("c.jpg", JSON.stringify({ model: "X-T4" }));
+    photo("d.jpg", null);
+    await backfillAutoMetaTags(db);
+    expect(
+      fileTags(db, read)
+        .filter((t) => t.namespace === "camera")
+        .map((t) => t.name),
+    ).toEqual(["X-T4"]);
   });
 
   it("skips soft-deleted rows", async () => {
@@ -470,6 +587,8 @@ describe("backfillAutoMetaTags", () => {
         codec: image ? null : codecs[i % 4],
       });
     }
+    // Read, without EXIF: an unread photo is left to backfillExif (#701).
+    db.prepare("UPDATE files SET exif = '{}' WHERE kind = 'image'").run();
     const tagsByPath = (target: DB) =>
       target
         .prepare(
@@ -521,6 +640,7 @@ describe("backfillAutoMetaTags", () => {
         height: 600,
       });
     }
+    db.prepare("UPDATE files SET exif = '{}'").run(); // read (#701)
     await backfillAutoMetaTags(db, {
       onProgress: (done) => {
         // As pruneUnusedTags may do from another workspace's scan during the

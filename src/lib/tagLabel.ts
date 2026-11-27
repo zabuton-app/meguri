@@ -34,6 +34,8 @@ const NAMESPACE_KEYS: Record<string, TranslationKey> = {
   audio_key: "tags.ns.key",
   audio_camelot: "tags.ns.camelot",
   audio_genre: "tags.ns.genre",
+  camera: "tags.ns.camera",
+  lens: "tags.ns.lens",
 };
 
 const VALUE_KEYS: Record<string, TranslationKey> = {

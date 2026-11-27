@@ -42,6 +42,10 @@ export const AUTO_META_NAMESPACES = [
   "audio_key",
   "audio_camelot",
   "audio_genre",
+  // A photo's EXIF (#701). Open sets, like audio_genre: searched with their
+  // namespace (`tag:camera:…`), never bare.
+  "camera",
+  "lens",
 ] as const;
 export type AutoMetaNamespace = (typeof AUTO_META_NAMESPACES)[number];
 
