@@ -9,9 +9,10 @@
 // notifies the thumbnails of the files it names and nothing else.
 //
 // Home is the one writer: it listens for thumb:done and flushes batches here.
-// A MediaThumbnail given no `version` reads this store; views outside Home
-// that track regenerations their own way (Discover, the detail view) pass
-// their version explicitly.
+// A MediaThumbnail given no `version` and each Discover card read this store
+// (Discover is a child route of Home, so the listener is mounted with it);
+// the detail view tracks regenerations its own way and passes its version
+// explicitly.
 import { useCallback, useSyncExternalStore } from "react";
 import { mediaSortId } from "@/lib/mediaSortId";
 

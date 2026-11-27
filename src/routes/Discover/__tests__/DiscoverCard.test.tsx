@@ -8,6 +8,10 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
 import type { WatchLaterMembership } from "@/hooks/useWatchLater";
+import {
+  bumpThumbVersions,
+  resetThumbVersionsForTest,
+} from "@/lib/thumbVersionStore";
 
 const mocks = vi.hoisted(() => ({
   collectionAddFile: vi.fn(),
@@ -79,7 +83,6 @@ function Harness({ included }: { included: boolean }) {
     <DiscoverCard
       file={file}
       mediaBase=""
-      thumbVersion={0}
       onRate={() => {}}
       watchLater={membership(included)}
       isActive={false}
@@ -173,7 +176,6 @@ describe("DiscoverCard non-audio", () => {
         <DiscoverCard
           file={{ ...file, kind: "video" }}
           mediaBase=""
-          thumbVersion={0}
           onRate={() => {}}
           watchLater={membership(false)}
           isActive={false}
@@ -201,7 +203,6 @@ function ActiveVideoCard({
     <DiscoverCard
       file={{ ...file, ...overrides }}
       mediaBase="http://127.0.0.1:17345"
-      thumbVersion={0}
       onRate={() => {}}
       watchLater={membership(false)}
       isActive={isActive}
@@ -424,6 +425,10 @@ describe("DiscoverCard video hover scrub", () => {
 });
 
 describe("DiscoverCard thumbnail fallback", () => {
+  afterEach(() => {
+    resetThumbVersionsForTest();
+  });
+
   function renderCard(overrides: Partial<FileRow>) {
     function Harness() {
       const { t, lang } = useI18n();
@@ -431,7 +436,6 @@ describe("DiscoverCard thumbnail fallback", () => {
         <DiscoverCard
           file={{ ...file, ...overrides }}
           mediaBase="http://127.0.0.1:1"
-          thumbVersion={0}
           onRate={() => {}}
           watchLater={membership(false)}
           isActive={false}
@@ -461,29 +465,55 @@ describe("DiscoverCard thumbnail fallback", () => {
   it("retries a thumbnail whose URL changed after a failure", () => {
     // Keyed on the failed URL, not a sticky flag: a thumb:done bump produces a
     // new ?v= and deserves a fresh attempt.
-    const { container, rerender } = renderCard({
+    const { container } = renderCard({
       thumbStatus: "done",
       hasThumb: 1,
     });
     fireEvent.error(container.querySelector(`img[alt="${file.relPath}"]`)!);
     expect(container.querySelector("img")).toBeNull();
-    function Bumped() {
+    act(() => {
+      bumpThumbVersions(new Map([[`${file.workspaceId}:${file.id}`, 1]]));
+    });
+    expect(container.querySelector("img")).not.toBeNull();
+  });
+});
+
+describe("DiscoverCard thumbnail version", () => {
+  afterEach(() => {
+    resetThumbVersionsForTest();
+  });
+
+  it("busts the cache of the card whose thumbnail was redone, and only that one", () => {
+    const other = { ...file, id: file.id + 1, relPath: "videos/other.mp4" };
+    function Harness() {
       const { t, lang } = useI18n();
       return (
-        <DiscoverCard
-          file={{ ...file, thumbStatus: "done", hasThumb: 1 }}
-          mediaBase="http://127.0.0.1:1"
-          thumbVersion={1}
-          onRate={() => {}}
-          watchLater={membership(false)}
-          isActive={false}
-          t={t}
-          lang={lang}
-        />
+        <>
+          {[file, other].map((f) => (
+            <DiscoverCard
+              key={f.id}
+              file={{ ...f, thumbStatus: "done", hasThumb: 1 }}
+              mediaBase="http://127.0.0.1:1"
+              onRate={() => {}}
+              watchLater={membership(false)}
+              isActive={false}
+              t={t}
+              lang={lang}
+            />
+          ))}
+        </>
       );
     }
-    rerender(<Bumped />);
-    expect(container.querySelector("img")).not.toBeNull();
+    const { container } = renderWithProviders(<Harness />);
+    const srcOf = (f: FileRow) =>
+      container.querySelector(`img[alt="${f.relPath}"]`)?.getAttribute("src");
+    const before = { mine: srcOf(file), other: srcOf(other) };
+
+    act(() => {
+      bumpThumbVersions(new Map([[`${file.workspaceId}:${file.id}`, 1]]));
+    });
+    expect(srcOf(file)).not.toBe(before.mine);
+    expect(srcOf(other)).toBe(before.other);
   });
 });
 
@@ -495,7 +525,6 @@ describe("DiscoverCard audio", () => {
         <DiscoverCard
           file={{ ...file, kind: "audio", relPath: "music/track.mp3" }}
           mediaBase=""
-          thumbVersion={0}
           onRate={() => {}}
           watchLater={membership(false)}
           isActive={false}
