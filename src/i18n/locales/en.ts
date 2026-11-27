@@ -716,6 +716,10 @@ export const en: Catalog = {
   "heatmap.clearDay": "Clear the days picked",
   "heatmap.error": "Could not load the counts",
 
+  // Filmstrip view
+  "filmstrip.bookmarks": "Bookmarks: {count}",
+  "filmstrip.playFrom": "Play from {time}",
+  "filmstrip.waveform": "Waveform: click to play from that point",
   // Timeline view
   "view.timeline": "Timeline view",
   "view.folderUnavailableTimeline":

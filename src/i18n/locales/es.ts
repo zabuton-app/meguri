@@ -752,6 +752,11 @@ export const es: Catalog = {
   "heatmap.clearDay": "Quitar los días seleccionados",
   "heatmap.error": "No se pudieron cargar los recuentos",
 
+  // Filmstrip view
+  "filmstrip.bookmarks": "Marcadores: {count}",
+  "filmstrip.playFrom": "Reproducir desde {time}",
+  "filmstrip.waveform":
+    "Forma de onda: haz clic para reproducir desde ese punto",
   // Vista de cronología
   "view.timeline": "Vista de cronología",
   "view.folderUnavailableTimeline":

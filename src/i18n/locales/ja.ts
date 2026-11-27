@@ -680,6 +680,10 @@ export const ja = {
   "heatmap.clearDay": "選んだ日付を解除",
   "heatmap.error": "集計を読み込めませんでした",
 
+  // Filmstrip view
+  "filmstrip.bookmarks": "ブックマーク: {count}",
+  "filmstrip.playFrom": "{time}から再生",
+  "filmstrip.waveform": "波形: クリックした位置から再生",
   // タイムライン表示
   "view.timeline": "タイムライン表示",
   "view.folderUnavailableTimeline":

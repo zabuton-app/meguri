@@ -655,6 +655,10 @@ export const zhCN: Catalog = {
   "heatmap.clearDay": "清除所选日期",
   "heatmap.error": "无法加载统计",
 
+  // Filmstrip view
+  "filmstrip.bookmarks": "书签：{count}",
+  "filmstrip.playFrom": "从 {time} 开始播放",
+  "filmstrip.waveform": "波形：点击从该处开始播放",
   // 时间线视图
   "view.timeline": "时间线视图",
   "view.folderUnavailableTimeline": "时间线视图中无法按文件夹显示",
