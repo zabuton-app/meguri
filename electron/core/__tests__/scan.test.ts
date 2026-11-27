@@ -630,6 +630,42 @@ describe("syncFiles lifecycle", () => {
     expect(btimeOf()).toBe(expected);
   });
 
+  it("does not rewrite rows that are already up to date on a re-scan", async () => {
+    await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
+    await fsp.writeFile(path.join(root, "b.mp4"), "BBBBBBBBBB");
+    await rescan();
+
+    db.exec(`CREATE TEMP TABLE file_writes (id INTEGER);
+      CREATE TEMP TRIGGER log_file_writes AFTER UPDATE ON files
+      BEGIN INSERT INTO file_writes VALUES (NEW.id); END`);
+    const writes = () =>
+      (db.prepare("SELECT id FROM file_writes").all() as { id: number }[]).map(
+        (r) => r.id,
+      );
+
+    const second = await rescan();
+    expect(second.stats.unchanged).toBe(2);
+    expect(writes()).toEqual([]);
+
+    // A row that differs is still brought up to date, and only that one.
+    const b = db
+      .prepare("SELECT id FROM files WHERE rel_path = 'b.mp4'")
+      .get() as { id: number };
+    db.prepare("UPDATE files SET inode = -1 WHERE id = ?").run(b.id);
+    db.exec("DELETE FROM file_writes");
+    const third = await rescan();
+    expect(third.stats.unchanged).toBe(2);
+    expect(writes()).toEqual([b.id]);
+    const st = await fsp.stat(path.join(root, "b.mp4"));
+    expect(
+      (
+        db.prepare("SELECT inode FROM files WHERE id = ?").get(b.id) as {
+          inode: number;
+        }
+      ).inode,
+    ).toBe(Number(st.ino));
+  });
+
   it("inserts, then reports unchanged, then tracks a move/update/delete", async () => {
     await fsp.writeFile(path.join(root, "a.mp4"), "AAAAAAAAAA");
     await fsp.mkdir(path.join(root, "sub"));

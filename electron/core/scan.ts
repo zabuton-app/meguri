@@ -568,9 +568,13 @@ export async function syncFiles(
   const now = nowUnix();
 
   // btime is refreshed here too so rows scanned before the column existed get
-  // backfilled on the next scan without a content change.
+  // backfilled on the next scan without a content change. A row already up to
+  // date is not rewritten: writing deleted_at maintains every partial index on
+  // it, and on an unchanged library that is every row (#678).
   const touchUnchanged = db.prepare(
-    "UPDATE files SET deleted_at = NULL, scan_excluded_at = NULL, abs_path = ?, inode = ?, btime = ? WHERE id = ?",
+    `UPDATE files SET deleted_at = NULL, scan_excluded_at = NULL, abs_path = @absPath, inode = @inode, btime = @btime
+     WHERE id = @id AND (deleted_at IS NOT NULL OR scan_excluded_at IS NOT NULL
+       OR abs_path IS NOT @absPath OR inode IS NOT @inode OR btime IS NOT @btime)`,
   );
   // Recompute content_hash for changed files so meta_key stays anchored to the hash
   // (rather than dropping to the path fallback) and metadata keeps linking.
@@ -770,7 +774,12 @@ export async function syncFiles(
           } else {
             carryMeta(pathMetaKey(d.absPath));
           }
-          touchUnchanged.run(d.absPath, d.inode, d.btime, existing.id);
+          touchUnchanged.run({
+            absPath: d.absPath,
+            inode: d.inode,
+            btime: d.btime,
+            id: existing.id,
+          });
           // The extension-to-kind mapping can change between versions; follow
           // it, as an inserted row would.
           if (existing.kind !== d.kind || existing.ext !== d.ext) {
