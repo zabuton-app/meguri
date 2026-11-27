@@ -4,6 +4,7 @@ import type { Catalog } from "../message";
 export const en: Catalog = {
   // common
   "common.close": "Close",
+  "common.retry": "Try again",
   "common.cancel": "Cancel",
   "common.ok": "OK",
   "common.actionFailed": "Could not complete the action",
@@ -864,6 +865,7 @@ export const en: Catalog = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "Picking from “{path}”",
   "discover.empty": "No media to recommend.",
+  "discover.loadFailed": "Could not load media to recommend. Please try again.",
   "discover.emptyHint":
     'Run "Scan" to import videos, images, and audio, and they\'ll be recommended here at random.',
   "discover.sceneHint": "Click a scene to jump to it",
@@ -872,6 +874,7 @@ export const en: Catalog = {
   // Play history
   "history.title": "Play history",
   "history.empty": "No play history yet.",
+  "history.loadFailed": "Could not load the play history. Please try again.",
   "history.emptyHint":
     "Play videos, images, or audio and they will show up here.",
   "history.clear": "Clear history",
@@ -890,6 +893,7 @@ export const en: Catalog = {
   // Missing files
   "missing.title": "Missing files",
   "missing.empty": "No missing files.",
+  "missing.loadFailed": "Could not check for missing files. Please try again.",
   "missing.hint":
     "Files a scan did not find on disk. If a file comes back, it returns to its collections as before. Select only the files that are gone for good and remove them.",
   "missing.scanning":
@@ -1178,6 +1182,7 @@ export const en: Catalog = {
   "tags.cloudOnlyAuto":
     "Only automatic tags to show. Turn on automatic tags to see them.",
   "tags.empty": "No tags yet.",
+  "tags.loadFailed": "Could not load tags. Please try again.",
   "tags.emptyHint":
     "Add tags from the detail view and they will be listed here.",
   "tags.searchPlaceholder": "Filter tags",

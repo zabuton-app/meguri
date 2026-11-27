@@ -131,6 +131,21 @@ describe("History", () => {
     expect(await screen.findByText("No play history yet.")).toBeTruthy();
   });
 
+  it("shows a load error with a retry instead of the empty state", async () => {
+    mocks.historyList.mockRejectedValueOnce(new Error("db locked"));
+    renderWithProviders(<HistoryRoute />, { route: "/history" });
+    expect(
+      await screen.findByText(
+        "Could not load the play history. Please try again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("No play history yet.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("sample.mp4")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("toggles the modal size and persists it", async () => {
     renderWithProviders(<HistoryRoute />, { route: "/history" });
     // Default is the compact panel; the header offers the enlarge toggle.

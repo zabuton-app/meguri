@@ -4,6 +4,7 @@ import type { Catalog } from "../message";
 export const ko: Catalog = {
   // common
   "common.close": "닫기",
+  "common.retry": "다시 시도",
   "common.cancel": "취소",
   "common.ok": "확인",
   "common.actionFailed": "작업에 실패했습니다",
@@ -803,6 +804,8 @@ export const ko: Catalog = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "“{path}” 안에서 고르는 중",
   "discover.empty": "추천할 미디어가 없습니다.",
+  "discover.loadFailed":
+    "추천할 미디어를 불러오지 못했습니다. 다시 시도해 주세요.",
   "discover.emptyHint":
     "「스캔」으로 동영상, 이미지, 오디오를 가져오면 여기에서 무작위로 추천됩니다.",
   "discover.sceneHint": "장면을 클릭하면 해당 위치로 이동합니다",
@@ -811,6 +814,7 @@ export const ko: Catalog = {
   // 재생 기록
   "history.title": "재생 기록",
   "history.empty": "재생 기록이 아직 없습니다.",
+  "history.loadFailed": "재생 기록을 불러오지 못했습니다. 다시 시도해 주세요.",
   "history.emptyHint":
     "동영상이나 이미지, 오디오를 재생하면 여기에 기록이 표시됩니다.",
   "history.clear": "기록 지우기",
@@ -826,6 +830,8 @@ export const ko: Catalog = {
   // Missing files
   "missing.title": "찾을 수 없는 파일",
   "missing.empty": "찾을 수 없는 파일이 없습니다.",
+  "missing.loadFailed":
+    "찾을 수 없는 파일을 확인하지 못했습니다. 다시 시도해 주세요.",
   "missing.hint":
     "스캔에서 디스크에 없던 파일입니다. 파일이 돌아오면 컬렉션 등은 그대로 복원됩니다. 다시 돌아오지 않을 파일만 선택해서 삭제하세요.",
   "missing.scanning":
@@ -1083,6 +1089,7 @@ export const ko: Catalog = {
   "tags.cloudOnlyAuto":
     "표시할 수 있는 것은 자동 태그뿐입니다. 자동 태그를 켜면 표시됩니다.",
   "tags.empty": "아직 태그가 없습니다.",
+  "tags.loadFailed": "태그를 불러오지 못했습니다. 다시 시도해 주세요.",
   "tags.emptyHint": "상세 화면에서 태그를 추가하면 여기에 표시됩니다.",
   "tags.searchPlaceholder": "태그 검색",
   "tags.noMatch": "일치하는 태그가 없습니다.",

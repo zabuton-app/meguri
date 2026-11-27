@@ -4,6 +4,7 @@ import type { Catalog } from "../message";
 export const zhCN: Catalog = {
   // common
   "common.close": "关闭",
+  "common.retry": "重试",
   "common.cancel": "取消",
   "common.ok": "确定",
   "common.actionFailed": "操作失败",
@@ -778,6 +779,7 @@ export const zhCN: Catalog = {
   "discover.progress": "{current} / {total}",
   "discover.inFolder": "正在从“{path}”中挑选",
   "discover.empty": "没有可推荐的媒体。",
+  "discover.loadFailed": "无法加载推荐的媒体。请重试。",
   "discover.emptyHint": "执行“扫描”导入视频、图片和音频后，这里会随机推荐。",
   "discover.sceneHint": "点击场景即可跳转",
   "discover.moreScenes": "+{count}",
@@ -785,6 +787,7 @@ export const zhCN: Catalog = {
   // 播放历史
   "history.title": "播放历史",
   "history.empty": "暂无播放历史。",
+  "history.loadFailed": "无法加载播放历史。请重试。",
   "history.emptyHint": "播放视频、图片或音频后，历史记录会显示在这里。",
   "history.clear": "清除历史",
   "history.clearAction": "清除",
@@ -799,6 +802,7 @@ export const zhCN: Catalog = {
   // Missing files
   "missing.title": "找不到的文件",
   "missing.empty": "没有找不到的文件。",
+  "missing.loadFailed": "无法检查找不到的文件。请重试。",
   "missing.hint":
     "扫描时在磁盘上找不到的文件。文件回来后，会照常回到所在的合集。请只选择不会再回来的文件并删除。",
   "missing.scanning": "正在扫描的工作区在扫描完成前不会显示在这里。",
@@ -1040,6 +1044,7 @@ export const zhCN: Catalog = {
   "tags.cloudIncludeAuto": "自动标签",
   "tags.cloudOnlyAuto": "只有自动标签可显示。开启自动标签即可查看。",
   "tags.empty": "还没有标签。",
+  "tags.loadFailed": "无法加载标签。请重试。",
   "tags.emptyHint": "在详情页添加标签后，会显示在这里。",
   "tags.searchPlaceholder": "筛选标签",
   "tags.noMatch": "没有匹配的标签。",
