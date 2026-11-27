@@ -15,7 +15,7 @@ import {
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Maximize2, Minimize2, RefreshCw, Sparkles, X } from "lucide-react";
-import { api, events } from "@/ipc/client";
+import { api } from "@/ipc/client";
 import { useAppStatus } from "@/hooks/useAppStatus";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { syncFileRowAcrossCaches } from "@/lib/queryCache";
@@ -112,19 +112,6 @@ export default function Discover() {
     refetchOnWindowFocus: false,
   });
   const items = queue.data ?? [];
-
-  // Cache-bust thumbnail URLs after a regeneration (e.g. the user picked a new main
-  // thumbnail from MediaDetail). Without this, the browser keeps showing the previous
-  // <thumbsDir>/<id>.webp since the path itself didn't change.
-  const [thumbVersion, setThumbVersion] = useState<Record<string, number>>({});
-  useEffect(() => {
-    return events.onThumbDone((event) => {
-      const key = event.workspaceId
-        ? `${event.workspaceId}:${event.id}`
-        : String(event.id);
-      setThumbVersion((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
-    });
-  }, []);
 
   const [embla, setEmbla] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
@@ -345,7 +332,6 @@ export default function Discover() {
                   <DiscoverCard
                     file={f}
                     mediaBase={mediaBase}
-                    thumbVersion={thumbVersion[`${f.workspaceId}:${f.id}`] ?? 0}
                     onRate={(rating) =>
                       setRating.mutate({
                         id: f.id,

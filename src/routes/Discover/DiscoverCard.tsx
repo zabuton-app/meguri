@@ -12,6 +12,7 @@ import { AudioLines, ExternalLink, Pause, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import { fileHref } from "@/lib/fileHref";
 import { hasThumbFile, thumbUrl } from "@/lib/thumbUrl";
+import { useThumbVersionOf } from "@/lib/thumbVersionStore";
 import { mediaSrcOf } from "@/lib/mediaSrc";
 import { toast } from "sonner";
 import {
@@ -65,7 +66,6 @@ const CENTER_PLAY_CLASS =
 export function DiscoverCard({
   file,
   mediaBase,
-  thumbVersion,
   onRate,
   watchLater,
   watchLaterRef,
@@ -77,8 +77,6 @@ export function DiscoverCard({
 }: {
   file: FileRow;
   mediaBase: string;
-  /** Bumped on thumb:done so a regenerated thumbnail busts the browser cache. */
-  thumbVersion: number;
   onRate: (rating: number) => void;
   /** Shared membership lookup, resolved once by the route. */
   watchLater: WatchLaterMembership;
@@ -136,6 +134,10 @@ export function DiscoverCard({
   // Discover stays a browsing surface; seeking and volume wait for the bar.
   const audio = useAudioPlayer();
   const wsId = file.workspaceId;
+  // Bumped per file by Home's thumb:done listener (thumbVersionStore), so a
+  // regenerated thumbnail, such as a new main thumbnail picked in the detail
+  // view, busts the browser cache and re-renders only this card.
+  const thumbVersion = useThumbVersionOf(wsId, file.id);
   const coverUrl = hasThumbFile(file)
     ? (thumbUrl(mediaBase, wsId, file.id, thumbVersion) ?? undefined)
     : undefined;
