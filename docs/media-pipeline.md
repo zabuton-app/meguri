@@ -232,7 +232,7 @@ have the form:
 /ws/<workspaceId>/<kind>/<fileId>
 ```
 
-where `kind` is `thumb`, `media`, or `frame`. The server resolves the workspace
+where `kind` is `thumb`, `media`, `frame` or `waveform`. The server resolves the workspace
 by ID (not the active selection), so playback is independent of which workspace
 is currently focused.
 
@@ -323,6 +323,14 @@ A previewed video always gets AAC audio.
 
 A `frame` request returns a single JPEG frame at `?t=<seconds>`, used for seek
 previews.
+
+### Waveforms
+
+A `waveform` request returns a PNG of an audio file's whole waveform (2000×120,
+white on transparent, square-root scale, peak samples), used by the filmstrip
+view, which draws it as a mask in a theme color. Other kinds get 404. It
+decodes the whole file in one decode slot (about a second for an hour of AAC);
+a file that takes longer than the request timeout gets no image.
 
 ### Authorization
 
