@@ -119,3 +119,159 @@ export function shutterLabel(seconds: number): string {
   }
   return `${plain(seconds)}s`;
 }
+
+/**
+ * What the detail view lists about a photo (#725), read when the view opens
+ * (`file_photo_details`), as raw values. GPS is not among them until #704
+ * settles how a photo's position is shown.
+ */
+export interface PhotoDetails {
+  /** The capture time as the camera's clock showed it, as local Unix seconds. */
+  takenAt?: number;
+  /** `+09:00`, when the photo records one. */
+  takenOffset?: string;
+  make?: string;
+  model?: string;
+  lens?: string;
+  fNumber?: number;
+  exposureTime?: number;
+  iso?: number;
+  /** EV; 0 included. */
+  exposureBias?: number;
+  focalLength?: number;
+  focalLength35mm?: number;
+  /** EXIF MeteringMode. */
+  meteringMode?: number;
+  flashFired?: boolean;
+  /** EXIF WhiteBalance: 0 auto, 1 manual. */
+  whiteBalance?: number;
+  /** EXIF ExposureProgram. */
+  exposureProgram?: number;
+  width?: number;
+  height?: number;
+  software?: string;
+  artist?: string;
+  copyright?: string;
+}
+
+/** "unreadable" when the file could not be opened (a share that dropped out). */
+export type PhotoDetailsResult =
+  { status: "ok"; details: PhotoDetails } | { status: "unreadable" };
+
+export type PhotoDetailKey =
+  | "taken"
+  | "camera"
+  | "lens"
+  | "aperture"
+  | "exposureTime"
+  | "iso"
+  | "exposureBias"
+  | "focalLength"
+  | "meteringMode"
+  | "flash"
+  | "whiteBalance"
+  | "exposureProgram"
+  | "size"
+  | "software"
+  | "artist"
+  | "copyright";
+
+/**
+ * One row of the detail view's list. `value` is ready to show; an enum's row
+ * has `valueKey` instead (`metering.pattern`), a message key under
+ * `photoDetails.` for the renderer to translate.
+ */
+export interface PhotoDetailRow {
+  key: PhotoDetailKey;
+  value?: string;
+  valueKey?: string;
+  /** The 35 mm equivalent (`24`), on the focal length row when it differs. */
+  equiv35?: string;
+}
+
+/** EXIF 2.32's values; 0 (unknown), 255 (other) and the rest are left out. */
+const METERING: Record<number, string> = {
+  1: "average",
+  2: "centerWeighted",
+  3: "spot",
+  4: "multiSpot",
+  5: "pattern",
+  6: "partial",
+};
+const PROGRAM: Record<number, string> = {
+  1: "manual",
+  2: "normal",
+  3: "aperture",
+  4: "shutter",
+  5: "creative",
+  6: "action",
+  7: "portrait",
+  8: "landscape",
+};
+const WHITE_BALANCE: Record<number, string> = { 0: "auto", 1: "manual" };
+
+/** `-0.7 EV`, `+0.3 EV`, `0 EV`. */
+function evLabel(ev: number): string {
+  const v = Math.round(ev * 10) / 10;
+  return `${v > 0 ? "+" : ""}${v === 0 ? 0 : v} EV`;
+}
+
+/**
+ * The rows a photo gives, in display order; a field it does not give, or an
+ * enum value outside EXIF's list, has no row. `formatTaken` words the capture
+ * time in the app's language.
+ */
+export function photoDetailRows(
+  d: PhotoDetails,
+  formatTaken: (unix: number) => string,
+): PhotoDetailRow[] {
+  const rows: PhotoDetailRow[] = [];
+  const add = (key: PhotoDetailKey, value: string | null | undefined) => {
+    if (value) rows.push({ key, value });
+  };
+  const addEnum = (
+    key: PhotoDetailKey,
+    group: string,
+    names: Record<number, string>,
+    n: number | undefined,
+  ) => {
+    const name = n === undefined ? undefined : names[n];
+    if (name) rows.push({ key, valueKey: `${group}.${name}` });
+  };
+
+  if (d.takenAt !== undefined) {
+    const when = formatTaken(d.takenAt);
+    add("taken", d.takenOffset ? `${when} (${d.takenOffset})` : when);
+  }
+  add("camera", cameraName(d));
+  add("lens", lensName(d));
+  if (d.fNumber !== undefined) add("aperture", `f/${plain(d.fNumber)}`);
+  if (d.exposureTime !== undefined)
+    add("exposureTime", shutterLabel(d.exposureTime));
+  if (d.iso !== undefined) add("iso", String(d.iso));
+  if (d.exposureBias !== undefined)
+    add("exposureBias", evLabel(d.exposureBias));
+  if (d.focalLength !== undefined) {
+    const row: PhotoDetailRow = {
+      key: "focalLength",
+      value: `${plain(d.focalLength)} mm`,
+    };
+    const equiv = d.focalLength35mm;
+    if (equiv !== undefined && Math.round(equiv) !== Math.round(d.focalLength))
+      row.equiv35 = plain(equiv);
+    rows.push(row);
+  }
+  addEnum("meteringMode", "metering", METERING, d.meteringMode);
+  if (d.flashFired !== undefined)
+    rows.push({
+      key: "flash",
+      valueKey: d.flashFired ? "flash.fired" : "flash.notFired",
+    });
+  addEnum("whiteBalance", "whiteBalance", WHITE_BALANCE, d.whiteBalance);
+  addEnum("exposureProgram", "program", PROGRAM, d.exposureProgram);
+  if (d.width && d.height) add("size", `${d.width}×${d.height}`);
+  add("software", tidy(d.software));
+  add("artist", tidy(d.artist));
+  add("copyright", tidy(d.copyright));
+  return rows;
+}

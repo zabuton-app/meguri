@@ -54,3 +54,18 @@ A camera that writes ISOSpeedRatings twice:
 ffmpeg -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 iso-pair.jpg
 exiftool -overwrite_original '-ISO=100 100' -Model="X-T4" iso-pair.jpg
 ```
+
+A photo with every field the detail view lists, and a GPS position that must
+not be read (#725):
+
+```sh
+ffmpeg -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 full.jpg
+exiftool -overwrite_original -DateTimeOriginal="2019:07:21 14:35:00" \
+  -OffsetTimeOriginal="+09:00" -Make=Canon -Model="Canon EOS R5" \
+  -LensModel="RF24-105mm F4 L IS USM" -FNumber=4 -ExposureTime=1/125 \
+  -ISO=200 -ExposureCompensation=-0.7 -FocalLength=50 \
+  -FocalLengthIn35mmFormat=50 -MeteringMode#=5 -EXIF:Flash#=16 -WhiteBalance#=0 \
+  -ExposureProgram#=3 -ExifImageWidth=8192 -ExifImageHeight=5464 \
+  -Software="Adobe Lightroom 7.0" -Artist="Jane Doe" -Copyright="(c) Jane Doe" \
+  -GPSLatitude=35.0 -GPSLatitudeRef=N full.jpg
+```
