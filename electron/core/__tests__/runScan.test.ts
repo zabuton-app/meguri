@@ -32,6 +32,7 @@ vi.mock("../media.js", async (importOriginal) => ({
             fps: null,
             capturedAt: null,
             raw: null,
+            exif: null,
           }
         : {
             width: 640,
@@ -39,8 +40,14 @@ vi.mock("../media.js", async (importOriginal) => ({
             duration: 1,
             codec: "h264",
             fps: 30,
-            capturedAt: null,
+            // A .jpg stands for a photo with EXIF, a .png for one without.
+            capturedAt: src.endsWith(".jpg") ? 1_563_687_300 : null,
             raw: { streams: [] },
+            exif: src.endsWith(".jpg")
+              ? { make: "Canon", model: "Canon EOS R5" }
+              : src.endsWith(".png")
+                ? {}
+                : null,
           },
     ),
   generateThumb: async (src: string, _kind: string, dest: string) => {
@@ -189,6 +196,25 @@ describe("runScan", () => {
         .prepare("SELECT rel_path, tags_text FROM files_fts WHERE rowid = ?")
         .get(id),
     ).toEqual({ rel_path: all[0].rel_path, tags_text: "" });
+  });
+
+  it("stores a photo's EXIF and capture time (#701)", async () => {
+    write("photo.jpg", "JJJJJJJJJJ");
+    write("plain.png", "PPPPPPPPPP");
+    write("clip.mp4", "MMMMMMMMMM");
+
+    await scan();
+
+    const exifOf = (rel: string) =>
+      db
+        .prepare("SELECT exif, captured_at FROM files WHERE rel_path = ?")
+        .get(rel) as { exif: string | null; captured_at: number | null };
+    expect(exifOf("photo.jpg")).toEqual({
+      exif: JSON.stringify({ make: "Canon", model: "Canon EOS R5" }),
+      captured_at: 1_563_687_300,
+    });
+    expect(exifOf("plain.png").exif).toBe("{}");
+    expect(exifOf("clip.mp4").exif).toBeNull();
   });
 
   it("follows a rename: same id, search entry under the new name", async () => {
@@ -410,6 +436,33 @@ describe("runScan", () => {
       expect(await scan()).toMatchObject({ deleted: 1 });
       expect(scanRootWasMountpoint(db, rootId)).toBe(false);
     });
+  });
+
+  it("drops a changed photo's EXIF, even when reading it again fails (#701)", async () => {
+    write("a.jpg", "AAAAAAAAAA");
+    write("b.mp4", "BBBBBBBBBB");
+    await scan();
+    expect(
+      db
+        .prepare("SELECT exif FROM files WHERE rel_path = 'a.jpg'")
+        .pluck()
+        .get(),
+    ).not.toBeNull();
+    media.failProbe = (src) => src.endsWith("a.jpg");
+    try {
+      write("a.jpg", "CCCCCCCCCCCCCCCC");
+      write("b.mp4", "DDDDDDDDDDDDDDDD");
+      await scan();
+    } finally {
+      media.failProbe = () => false;
+    }
+    // Left to be read again rather than describing the old picture.
+    expect(
+      db
+        .prepare("SELECT exif FROM files WHERE rel_path = 'a.jpg'")
+        .pluck()
+        .get(),
+    ).toBeNull();
   });
 
   it("drops a changed file's stored probe output, even when probing it again fails (#468)", async () => {

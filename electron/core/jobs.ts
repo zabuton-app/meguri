@@ -129,7 +129,8 @@ export async function resetIndex(
     db.prepare(
       `UPDATE files SET deleted_at = COALESCE(deleted_at, ?), excluded_at = NULL,
          width = NULL, height = NULL, duration = NULL, codec = NULL, fps = NULL,
-         captured_at = NULL, meta = NULL, thumb_path = NULL, thumb_status = 'pending'
+         captured_at = NULL, meta = NULL, exif = NULL, thumb_path = NULL,
+         thumb_status = 'pending'
        WHERE root_id = ? AND ${notKept}`,
     ).run(now, core.rootId, keptJson);
   })();
