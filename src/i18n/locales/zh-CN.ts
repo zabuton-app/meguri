@@ -1096,6 +1096,8 @@ export const zhCN: Catalog = {
   "tags.ns.key": "调性",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "流派",
+  "tags.ns.camera": "相机",
+  "tags.ns.lens": "镜头",
   "tags.value.durShort": "短",
   "tags.value.durMedium": "中",
   "tags.value.durLong": "长",

@@ -1318,6 +1318,8 @@ export const fr: Catalog = {
   "tags.ns.key": "Tonalité",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "Genre",
+  "tags.ns.camera": "Appareil",
+  "tags.ns.lens": "Objectif",
   "tags.value.durShort": "Courte",
   "tags.value.durMedium": "Moyenne",
   "tags.value.durLong": "Longue",

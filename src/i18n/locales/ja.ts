@@ -1151,6 +1151,8 @@ export const ja = {
   "tags.ns.key": "キー",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "ジャンル",
+  "tags.ns.camera": "カメラ",
+  "tags.ns.lens": "レンズ",
   "tags.value.durShort": "短尺",
   "tags.value.durMedium": "中尺",
   "tags.value.durLong": "長尺",

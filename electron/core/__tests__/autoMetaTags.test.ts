@@ -172,6 +172,59 @@ describe("autoMetaTagsFor — whole rows", () => {
   });
 });
 
+describe("autoMetaTagsFor — camera and lens (#701)", () => {
+  const photo = {
+    kind: "image",
+    width: 4000,
+    height: 3000,
+    duration: null,
+    codec: "mjpeg",
+  };
+  const names = (tags: { namespace: string; name: string }[]) =>
+    tags
+      .filter((t) => t.namespace === "camera" || t.namespace === "lens")
+      .map((t) => `${t.namespace}:${t.name}`)
+      .sort();
+
+  it("tags a photo with its camera and lens", () => {
+    expect(
+      names(
+        autoMetaTagsFor({
+          ...photo,
+          exif: {
+            make: "Canon",
+            model: "Canon EOS R5",
+            lens: "RF24-105mm F4 L IS USM",
+          },
+        }),
+      ),
+    ).toEqual(["camera:Canon EOS R5", "lens:RF24-105mm F4 L IS USM"]);
+  });
+
+  it("adds no camera tag to a video, even with EXIF", () => {
+    expect(
+      names(
+        autoMetaTagsFor({
+          ...photo,
+          kind: "video",
+          exif: { make: "Canon", model: "Canon EOS R5" },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("adds no camera tag without a model", () => {
+    expect(
+      names(autoMetaTagsFor({ ...photo, exif: { make: "Canon" } })),
+    ).toEqual([]);
+  });
+
+  it("adds nothing for a photo read without EXIF", () => {
+    expect(names(autoMetaTagsFor({ ...photo, exif: {} }))).toEqual([]);
+    expect(names(autoMetaTagsFor({ ...photo, exif: null }))).toEqual([]);
+  });
+});
+
 describe("the declared vocabulary", () => {
   it("has no value shared between categories", () => {
     // This is what lets the search box accept `tag:long` instead of
@@ -374,6 +427,22 @@ describe("backfillAutoMetaTags", () => {
   it("is a no-op on a second run", async () => {
     await backfillAutoMetaTags(db);
     expect(await backfillAutoMetaTags(db)).toBe(0);
+  });
+
+  it("derives camera tags from the stored exif column (#701)", async () => {
+    db.prepare("UPDATE files SET exif = ? WHERE rel_path = 'b.jpg'").run(
+      JSON.stringify({ make: "Apple", model: "iPhone 15 Pro" }),
+    );
+    await backfillAutoMetaTags(db);
+    const id = db
+      .prepare("SELECT id FROM files WHERE rel_path = 'b.jpg'")
+      .pluck()
+      .get() as number;
+    expect(
+      fileTags(db, id)
+        .filter((t) => t.namespace === "camera")
+        .map((t) => t.name),
+    ).toEqual(["Apple iPhone 15 Pro"]);
   });
 
   it("skips soft-deleted rows", async () => {

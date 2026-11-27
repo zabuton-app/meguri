@@ -1247,6 +1247,8 @@ export const en: Catalog = {
   "tags.ns.key": "Key",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "Genre",
+  "tags.ns.camera": "Camera",
+  "tags.ns.lens": "Lens",
   "tags.value.durShort": "Short",
   "tags.value.durMedium": "Medium",
   "tags.value.durLong": "Long",

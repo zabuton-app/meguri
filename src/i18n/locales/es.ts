@@ -1314,6 +1314,8 @@ export const es: Catalog = {
   "tags.ns.key": "Tonalidad",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "Género",
+  "tags.ns.camera": "Cámara",
+  "tags.ns.lens": "Objetivo",
   "tags.value.durShort": "Corta",
   "tags.value.durMedium": "Media",
   "tags.value.durLong": "Larga",

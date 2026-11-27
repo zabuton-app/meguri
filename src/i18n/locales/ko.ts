@@ -1144,6 +1144,8 @@ export const ko: Catalog = {
   "tags.ns.key": "키",
   "tags.ns.camelot": "Camelot",
   "tags.ns.genre": "장르",
+  "tags.ns.camera": "카메라",
+  "tags.ns.lens": "렌즈",
   "tags.value.durShort": "짧음",
   "tags.value.durMedium": "보통",
   "tags.value.durLong": "긺",
