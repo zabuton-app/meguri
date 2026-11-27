@@ -610,6 +610,7 @@ export const en: Catalog = {
   "scan.phaseIndex": "Building index",
   "scan.phaseThumbnail": "Generating thumbnails",
   "scan.phaseTags": "Tagging",
+  "scan.phaseExif": "Reading photo details",
   "scan.cancel": "Cancel scan",
 
   // tag editor

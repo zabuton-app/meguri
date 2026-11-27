@@ -235,7 +235,7 @@ const BACKFILL_CHUNK = 512;
  * workspace's scan may drop one (pruneUnusedTags), and a cached id would then
  * name no tag.
  */
-function derivedTagIdResolver(db: DB): (tag: DerivedTag) => number {
+export function derivedTagIdResolver(db: DB): (tag: DerivedTag) => number {
   const ids = new Map<string, number>();
   return ({ namespace, name }) => {
     const key = JSON.stringify([namespace, name]);

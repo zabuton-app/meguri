@@ -634,6 +634,7 @@ export const fr: Catalog = {
   "scan.phaseIndex": "Création de l'index",
   "scan.phaseThumbnail": "Génération des miniatures",
   "scan.phaseTags": "Étiquetage",
+  "scan.phaseExif": "Lecture des infos photo",
   "scan.cancel": "Annuler le scan",
 
   // tag editor

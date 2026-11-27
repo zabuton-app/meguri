@@ -573,6 +573,7 @@ export const zhCN: Catalog = {
   "scan.phaseIndex": "正在建立索引",
   "scan.phaseThumbnail": "正在生成缩略图",
   "scan.phaseTags": "正在添加标签",
+  "scan.phaseExif": "正在读取照片信息",
   "scan.cancel": "取消扫描",
 
   // tag editor

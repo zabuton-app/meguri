@@ -7,6 +7,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Which thumbnails and probes fail, by file name: none unless a test says so.
 const media = vi.hoisted(() => {
@@ -215,6 +216,32 @@ describe("runScan", () => {
     });
     expect(exifOf("plain.png").exif).toBe("{}");
     expect(exifOf("clip.mp4").exif).toBeNull();
+  });
+
+  it("reads the EXIF of photos scanned before it was supported (#701)", async () => {
+    // A real file: the pass after the thumbnails reads it with ExifReader,
+    // not through the mocked extractMeta.
+    fs.copyFileSync(
+      fileURLToPath(
+        new URL("./fixtures/exif/dated-offset.jpg", import.meta.url),
+      ),
+      path.join(root, "old.jpg"),
+    );
+    await scan();
+    // As a library from before #701 holds it.
+    db.prepare("UPDATE files SET exif = NULL, captured_at = NULL").run();
+    events = [];
+
+    await scan();
+
+    expect(
+      db
+        .prepare("SELECT exif IS NOT NULL AS read, captured_at FROM files")
+        .get(),
+    ).toEqual({ read: 1, captured_at: Date.UTC(2019, 6, 21, 5, 35, 0) / 1000 });
+    expect(
+      events.some((e) => e.type === "progress" && e.phase === "exif"),
+    ).toBe(true);
   });
 
   it("follows a rename: same id, search entry under the new name", async () => {
@@ -456,13 +483,14 @@ describe("runScan", () => {
     } finally {
       media.failProbe = () => false;
     }
-    // Left to be read again rather than describing the old picture.
+    // Not the old picture's: read again by the pass after the thumbnails,
+    // which finds no EXIF in the new content.
     expect(
       db
         .prepare("SELECT exif FROM files WHERE rel_path = 'a.jpg'")
         .pluck()
         .get(),
-    ).toBeNull();
+    ).toBe("{}");
   });
 
   it("drops a changed file's stored probe output, even when probing it again fails (#468)", async () => {

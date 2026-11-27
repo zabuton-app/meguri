@@ -28,6 +28,7 @@ import {
   type DeriveAutoTags,
 } from "./autoTagDeriver.js";
 import { pool } from "./concurrency.js";
+import { backfillExif } from "./exifBackfill.js";
 import {
   LARGE_IMAGE_PIXELS,
   SCAN_POOL_WIDTH,
@@ -630,6 +631,18 @@ export async function runScan(
     // Persist the tail batch. On abort the buffered results are from ffmpeg
     // runs that completed before the signal fired, so they are safe to keep.
     flush();
+  }
+
+  // Photos whose EXIF is still unread: scanned before it was supported, or
+  // the read failed. Unchanged files never enter the pool above (#701). Before
+  // the derived-tag backfill, which would otherwise tag them without it.
+  if (!signal?.aborted) {
+    await backfillExif(db, {
+      skip: unreadablePaths.length > 0 ? isUnreadable : undefined,
+      signal,
+      onProgress: (d, t) =>
+        onEvent({ type: "progress", jobId, phase: "exif", done: d, total: t }),
+    });
   }
 
   // Files classified as unchanged/moved never enter the pool above (syncFiles

@@ -590,6 +590,7 @@ export const ko: Catalog = {
   "scan.phaseIndex": "인덱스 생성",
   "scan.phaseThumbnail": "썸네일 생성",
   "scan.phaseTags": "태그 부여",
+  "scan.phaseExif": "사진 정보 읽기",
   "scan.cancel": "스캔 취소",
 
   // tag editor

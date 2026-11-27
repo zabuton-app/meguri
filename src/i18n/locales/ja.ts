@@ -596,6 +596,7 @@ export const ja = {
   "scan.phaseIndex": "インデックス作成",
   "scan.phaseThumbnail": "サムネイル生成",
   "scan.phaseTags": "タグ付与",
+  "scan.phaseExif": "写真情報の読み取り",
   "scan.cancel": "スキャンをキャンセル",
 
   // タグ編集
