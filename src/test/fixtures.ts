@@ -87,6 +87,7 @@ export const sampleFileDetail: FileDetail = {
   playHistory: [],
   bookmarks: [],
   thumbOffsetSec: null,
+  note: null,
 };
 
 export const defaultAppStatus: AppStatus = {

@@ -63,6 +63,7 @@ describe("syncFileRowAcrossCaches", () => {
       playHistory: [],
       bookmarks: [],
       thumbOffsetSec: null,
+      note: null,
     });
 
     syncFileRowAcrossCaches(qc, "ws", 1, { favorite: 1, rating: 4 });
@@ -122,6 +123,7 @@ describe("per-content metadata reaches every copy (#716)", () => {
     playHistory: [],
     bookmarks: [],
     thumbOffsetSec: null,
+    note: null,
   });
 
   /** A list, a Discover queue and details holding three files: A, its copy

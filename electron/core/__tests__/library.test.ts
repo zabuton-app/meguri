@@ -99,6 +99,23 @@ const SEED_B = `
 `;
 
 describe("migrateWorkspaceMetadata", () => {
+  it("carries notes a workspace kept in its own file_meta, joining two different ones", () => {
+    // A workspace whose merge has not run yet still gains the note column
+    // (backfillColumns), so notes can be written into its own table.
+    const withNote = (note: string, updatedAt: number) => `
+      ALTER TABLE main.file_meta ADD COLUMN note TEXT;
+      INSERT INTO file_meta (meta_key, note, updated_at) VALUES ('h1', '${note}', ${updatedAt});
+    `;
+    makeLegacyWorkspace("a", ["h1"], withNote("from a", 10));
+    makeLegacyWorkspace("b", ["h1"], withNote("from b", 20));
+    openAndMigrate("a").close();
+    const db = openAndMigrate("b");
+    expect(libRows(db, "SELECT meta_key, note FROM lib.file_meta")).toEqual([
+      { meta_key: "h1", note: "from a\n\n---\n\nfrom b" },
+    ]);
+    db.close();
+  });
+
   it("merges two workspaces' metadata for the same content by the merge rules", () => {
     makeLegacyWorkspace("a", ["h1", "h2"], SEED_A);
     makeLegacyWorkspace("b", ["h1", "h3"], SEED_B);

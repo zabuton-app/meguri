@@ -64,6 +64,7 @@ import {
   MAX_TAG_NAME,
 } from "../tags.js";
 import { MAX_WORKSPACE_ID } from "../workspaceIds.js";
+import { NOTE_MAX_MARKDOWN } from "../note.js";
 import {
   GRAPH_LAYOUT_MAX_NODES,
   GRAPH_MAX_FILES_HARD,
@@ -418,6 +419,10 @@ export const ChannelInputs = {
   }),
   file_set_rating: FileTarget.extend({ rating: z.number() }),
   file_set_favorite: FileTarget.extend({ favorite: z.boolean() }),
+  // The whole note as Markdown; null (or text that is only whitespace) removes it.
+  file_set_note: FileTarget.extend({
+    note: z.string().max(NOTE_MAX_MARKDOWN).nullable(),
+  }),
   file_delete_from_index: FileTarget,
   file_record_play: FileTarget.extend({
     via: z.enum(["browser", "external"]),
@@ -732,6 +737,7 @@ export interface ChannelOutputs {
   file_subtitles: SubtitleCue[];
   file_set_rating: void;
   file_set_favorite: void;
+  file_set_note: void;
   file_delete_from_index: { id: number; relPath: string };
   file_record_play: void;
   file_save_position: void;
