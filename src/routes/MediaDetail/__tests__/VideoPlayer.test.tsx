@@ -11,6 +11,8 @@ import {
 } from "@testing-library/react";
 import { StrictMode, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { api } from "@/ipc/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { NAV_BINDINGS } from "@/settings/keybindings";
 import {
@@ -52,7 +54,6 @@ function renderPlayer(
   const onExportFrame = vi.fn();
   const onNativeDuration = vi.fn();
   const onPlayed = vi.fn();
-  const onOpenExternal = vi.fn();
   const t = (key: string) => key;
 
   const base = {
@@ -73,7 +74,6 @@ function renderPlayer(
     onExportFrame,
     onNativeDuration,
     onPlayed,
-    onOpenExternal,
     t,
   } satisfies Parameters<typeof VideoPlayer>[0];
   // The spread loses the tie between `shortcuts` and `navKeys`; an override
@@ -1214,6 +1214,25 @@ describe("VideoPlayer", () => {
     fireVideoError(video, 2);
 
     expect(screen.queryByText("player.playFailed")).not.toBeNull();
+  });
+
+  it("toasts when the error screen cannot open the file externally (#682)", async () => {
+    vi.mocked(api.openExternal).mockRejectedValueOnce(new Error("gone"));
+    const toastError = vi.spyOn(toast, "error");
+    const { video } = renderPlayer();
+
+    fireVideoError(video, 4);
+    fireEvent.click(
+      screen.getByRole("button", { name: "player.openExternal" }),
+    );
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Could not open externally", {
+        description: "gone",
+      }),
+    );
+    expect(api.openExternal).toHaveBeenCalledWith(1, "ws1");
+    toastError.mockRestore();
   });
 
   it("remounts the video with the reload button after a fatal error", () => {

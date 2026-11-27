@@ -6,8 +6,7 @@ import { memo, useMemo } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Copy, FolderOpen, Play, Search, Star } from "lucide-react";
-import { api } from "@/ipc/client";
-import type { DuplicateGroup, FileRow } from "@/ipc/types";
+import type { DuplicateGroup } from "@/ipc/types";
 import { fileHref } from "@/lib/fileHref";
 import { formatDate } from "@/lib/dates";
 import { formatDuration, formatSize } from "@/lib/format";
@@ -16,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { MediaThumbnail } from "@/components/MediaThumbnail";
 import { TagChips } from "@/components/TagChips";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
 import { showMatchingFiles } from "@/lib/ui-events";
 import { hashSearchToken } from "@shared/tags";
 import { groupName, oldestCopy, reclaimableBytes } from "./groupView";
@@ -60,23 +60,7 @@ export const GroupDetail = memo(function GroupDetail({
     formatDuration(first.duration, { hours: true }),
   ].filter(Boolean);
 
-  // The same actions, toasts and toast id as useFileActions' single-file
-  // openFolder / copyPath (that hook pulls in selection and Watch Later, which
-  // this view does not need). Keep the two in step.
-  const openFolder = (file: FileRow) => {
-    api
-      .openFolder(file.id, file.workspaceId)
-      .catch((e: unknown) =>
-        toast.error(t("folder.openFailed"), { description: errorText(e) }),
-      );
-  };
-  const copyPath = (file: FileRow) => {
-    api.copyFilePath(file.id, file.workspaceId).then(
-      () => toast.success(t("media.filePathCopied"), { id: "path-copied" }),
-      (e: unknown) =>
-        toast.error(t("folder.copyFailed"), { description: errorText(e) }),
-    );
-  };
+  const shell = useFileShellActions();
 
   const copyHash = () => {
     void navigator.clipboard.writeText(group.contentHash).then(
@@ -244,7 +228,7 @@ export const GroupDetail = memo(function GroupDetail({
                   variant="ghost"
                   size="compact"
                   className="justify-start"
-                  onClick={() => openFolder(file)}
+                  onClick={() => shell.openFolder(file.id, file.workspaceId)}
                 >
                   <FolderOpen />
                   {t("media.openFolder")}
@@ -253,7 +237,7 @@ export const GroupDetail = memo(function GroupDetail({
                   variant="ghost"
                   size="compact"
                   className="justify-start"
-                  onClick={() => copyPath(file)}
+                  onClick={() => shell.copyPath(file.id, file.workspaceId)}
                 >
                   <Copy />
                   {t("media.copyFilePath")}

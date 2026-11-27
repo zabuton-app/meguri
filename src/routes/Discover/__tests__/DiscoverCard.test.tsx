@@ -3,6 +3,7 @@
 // list views use. The mutation itself is covered by WatchLaterButton's own tests.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { FileRow } from "@/ipc/types";
@@ -143,6 +144,24 @@ describe("DiscoverCard watch later", () => {
       ),
     );
     expect(mocks.collectionAddFile).not.toHaveBeenCalled();
+  });
+});
+
+describe("DiscoverCard open externally", () => {
+  it("toasts when the file cannot be opened (#682)", async () => {
+    mocks.openExternal.mockReset().mockRejectedValue(new Error("gone"));
+    const toastError = vi.spyOn(toast, "error");
+    renderWithProviders(<Harness included={false} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open externally" }));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Could not open externally", {
+        description: "gone",
+      }),
+    );
+    expect(mocks.openExternal).toHaveBeenCalledWith(7, "ws");
+    toastError.mockRestore();
   });
 });
 

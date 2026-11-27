@@ -7,7 +7,6 @@ import {
   type RefObject,
 } from "react";
 import { Link } from "react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { AudioLines, ExternalLink, Pause, Play } from "lucide-react";
 import { kindIcon } from "@/lib/mediaKind";
 import { fileHref } from "@/lib/fileHref";
@@ -23,15 +22,10 @@ import { AudioSpectrum } from "@/audio/AudioSpectrum";
 import { useSpectrumPattern } from "@/audio/useSpectrumPattern";
 import { PATTERN_LAYOUT } from "@/audio/spectrumPatterns";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { useFileShellActions } from "@/hooks/useFileShellActions";
 import { useActivateFile } from "@/audio/useActivateFile";
-import { api } from "@/ipc/client";
 import type { FileRow } from "@/ipc/types";
 import { cn } from "@/lib/utils";
-import log from "@/lib/logger";
-import {
-  dropFromWatchLaterCache,
-  invalidatePlayedSearches,
-} from "@/lib/queryCache";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { WatchLaterButton } from "@/components/WatchLaterButton";
@@ -92,7 +86,7 @@ export function DiscoverCard({
   t: TFunc;
   lang: Lang;
 }) {
-  const qc = useQueryClient();
+  const shell = useFileShellActions();
   const { pause: pauseAudio } = useAudioActions();
   const videoRef = useRef<PlayerHandle>(null);
   const [preview, setPreview] = useState<{
@@ -456,20 +450,11 @@ export function DiscoverCard({
             variant="outline"
             size="icon"
             className="size-11 shrink-0 border-border/60 bg-bg/50 backdrop-blur-md"
-            // Main-side this counts as a play and consumes the Watch Later
-            // entry, so mirror that once it confirms (it can refuse for a file
-            // that has gone missing under the root).
             onClick={() => {
               // Same courtesy the detail view extends: an external player about
               // to play audio must not sound over whatever the bar is playing.
               if (isAudio) pauseAudio();
-              void api
-                .openExternal(file.id, wsId)
-                .then(() => {
-                  dropFromWatchLaterCache(qc, wsId, file.id);
-                  invalidatePlayedSearches(qc);
-                })
-                .catch((e: unknown) => log.error("open external", e));
+              shell.openExternal(file.id, wsId);
             }}
             title={t("media.openExternal")}
             aria-label={t("media.openExternal")}
